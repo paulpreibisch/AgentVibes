@@ -51,7 +51,7 @@
     "ora": "^6.0.0",
     "boxen": "^7.0.0",
     "figlet": "^1.6.0",
-    "commander": "^10.0.0",
+    "commander": "^14.0.0",
     "simple-git": "^3.0.0",
     "@octokit/rest": "^20.0.0",
     "fs-extra": "^11.0.0",
