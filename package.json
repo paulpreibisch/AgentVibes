@@ -59,7 +59,7 @@
     "joi": "^17.0.0",
     "axios": "^1.0.0",
     "node-ssh": "^13.0.0",
-    "which": "^3.0.0"
+    "which": "^5.0.0"
   },
   "peerDependencies": {
     "gh": ">=2.0.0"
