@@ -53,7 +53,7 @@
     "figlet": "^1.6.0",
     "commander": "^10.0.0",
     "simple-git": "^3.0.0",
-    "@octokit/rest": "^20.0.0",
+    "@octokit/rest": "^22.0.0",
     "fs-extra": "^11.0.0",
     "handlebars": "^4.7.0",
     "joi": "^17.0.0",
