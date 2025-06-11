@@ -71,7 +71,7 @@ jobs:
       continue-on-error: true
       
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage/lcov.info
       continue-on-error: true

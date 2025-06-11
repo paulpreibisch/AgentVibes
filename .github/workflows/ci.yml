@@ -73,7 +73,7 @@ jobs:
         c8 --reporter=text --reporter=lcov npm test
       
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage/lcov.info
