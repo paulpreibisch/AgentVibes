@@ -33,7 +33,7 @@ export async function runCLI(args) {
   program
     .name('create-teams')
     .description('Create unlimited themed agent teams for collaborative coding projects')
-    .version('1.1.0')
+    .version('1.2.0')
     .option('-t, --themes <themes>', 'Comma-separated theme names')
     .option('--theme <theme>', 'Single theme name (alias for --themes)')
     .option('-r, --repo <url>', 'GitHub repository URL to clone')
@@ -49,7 +49,7 @@ export async function runCLI(args) {
     .option('-c, --config <file>', 'Load configuration from file')
     .option('--dry-run', 'Show what would be created without doing it')
     .option('-v, --verbose', 'Detailed output')
-    .option('--enhanced', 'Use enhanced team-first workflow')
+    .option('--classic', 'Use classic workflow (default is enhanced team-first)')
     .parse(process.argv)
 
   const options = program.opts()
@@ -60,10 +60,11 @@ export async function runCLI(args) {
   const hasConfig = options.config !== undefined
   
   if (!hasThemes && !hasTheme && !hasConfig) {
-    if (options.enhanced) {
-      await runEnhancedWorkflow(options)
-    } else {
+    // Use enhanced workflow by default, fallback to classic with --classic flag
+    if (options.classic) {
       await runInteractiveMode(options)
+    } else {
+      await runEnhancedWorkflow(options)
     }
   } else {
     await runCommandMode(options)

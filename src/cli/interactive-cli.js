@@ -52,7 +52,7 @@ export class InteractiveCLI {
     const welcomeBox = boxen(
       chalk.cyan(title) + '\n' +
       chalk.yellow('Create themed AI coding teams') + '\n' +
-      chalk.green.bold('v1.1') + chalk.gray(' (commit 6d70109)') + '\n\n' +
+      chalk.green.bold('v1.2') + chalk.gray(' (enhanced by default)') + '\n\n' +
       chalk.gray('Use ↑↓ arrows to navigate • Enter to select • Type to search') + '\n' +
       chalk.blue('github.com/paulpreibisch/AgentVibes'),
       {

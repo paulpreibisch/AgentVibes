@@ -76,7 +76,6 @@ export async function customizeTeams(selectedThemes, loadThemes) {
       }
     }
     
-<<<<<<< HEAD
     // Add processed agents to allTeams with proper team structure
     // Create teams with dev and testing roles
     const maxTeams = Math.ceil(finalAgents.length / 2) // Each team gets 2 agents (dev + testing)
@@ -106,16 +105,6 @@ export async function customizeTeams(selectedThemes, loadThemes) {
         dockerNetwork: `${theme.name.toLowerCase().replace(/\s+/g, '-')}-network`
       })
     }
-=======
-    // Add processed agents to allTeams
-    finalAgents.forEach(agent => {
-      allTeams.push({
-        ...agent,
-        theme: theme.name,
-        themeEmoji: theme.emoji
-      })
-    })
->>>>>>> 0f40ac90e4e10625f5b5424971ab43d0b8e3601a
     
     console.log() // Add spacing
     
