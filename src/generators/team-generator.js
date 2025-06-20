@@ -18,7 +18,7 @@ import { logger } from '../utils/logger.js'
 import { generateGitHubProjectsSetup } from '../utils/github-projects.js'
 
 export async function generateTeams(config, progressCallback = () => {}) {
-  const { teams, outputDir, repoUrl, authMethod, projectBoard, projectId, dryRun } = config
+  const { teams, outputDir, repoUrl, repoBranch, authMethod, projectBoard, projectId, dryRun } = config
   
   if (!teams || teams.length === 0) {
     throw new Error('No teams specified for generation')
@@ -61,41 +61,44 @@ export async function generateTeams(config, progressCallback = () => {}) {
       
       for (const team of themeTeams) {
         const teamNumber = teams.indexOf(team) + 1
+        // Add teamNumber to team object for use in templates
+        team.teamNumber = teamNumber
         const characterConfig = generateCharacterConfig(team, 
           { name: themeName, emoji: team.themeEmoji, docker: { network: team.dockerNetwork || `${themeName.toLowerCase()}-network` } }, 
           teamNumber
         )
         
-        // Step 1: Create folder structure
-        progressCallback({
-          type: 'task',
-          theme: { name: themeName },
-          task: 'folders',
-          progress: 20,
-          message: `Creating directories for ${team.name}`
-        })
-        
-        await generateFolderStructure(outputDir, characterConfig)
-        completedSteps++
-        
-        // Step 2: Clone repository
+        // Step 1: Clone repository first (if specified)
         if (repoUrl) {
           progressCallback({
             type: 'task',
             theme: { name: themeName },
             task: 'clone',
-            progress: 40,
+            progress: 20,
             message: `Cloning repository for ${team.name}`
           })
           
           await cloneRepository(repoUrl, path.join(outputDir, characterConfig.paths.root), {
             authMethod,
+            branch: repoBranch,
             agentName: team.name
           })
           completedSteps++
         } else {
           completedSteps++
         }
+        
+        // Step 2: Create additional folder structure
+        progressCallback({
+          type: 'task',
+          theme: { name: themeName },
+          task: 'folders',
+          progress: 40,
+          message: `Creating additional directories for ${team.name}`
+        })
+        
+        await generateFolderStructure(outputDir, characterConfig, { skipIfExists: true })
+        completedSteps++
         
         // Step 3: Generate configurations
         progressCallback({
@@ -251,7 +254,7 @@ async function generateDockerComposeFiles(outputDir, teamsByTheme) {
       const serviceName = team.id
       services[serviceName] = {
         build: {
-          context: `../agents/${team.id}`,
+          context: `../teams/team-${team.teamNumber}/${team.role || 'dev'}`,
           dockerfile: 'Dockerfile'
         },
         container_name: `${themeName.toLowerCase()}-${team.id}`,
@@ -339,15 +342,15 @@ LAUNCH_PIDS=()
 
 ${teams.map((team, index) => `
 echo "├─ ${index === teams.length - 1 ? '└─' : '├─'} Starting ${team.emoji} ${team.name}..."
-cd agents/${team.id}
+cd teams/team-${team.teamNumber}/${team.role || 'dev'}
 if [ -f "./launch" ]; then
-    ./launch > ../launch-${team.id}.log 2>&1 &
+    ./launch > ../../launch-team-${team.teamNumber}-${team.id}.log 2>&1 &
     LAUNCH_PIDS+=($!)
-    echo "   📋 PID: $! | 📊 Log: agents/launch-${team.id}.log"
+    echo "   📋 PID: $! | 📊 Log: teams/launch-team-${team.teamNumber || '1'}-${team.id}.log"
 else
     echo "   ❌ Launch script not found for ${team.name}"
 fi
-cd ../..
+cd ../../..
 sleep 2
 `).join('')}
 
@@ -382,7 +385,7 @@ echo ""
 
 echo "USEFUL COMMANDS:"
 echo "├─ 🔍 Status check: ./scripts/status-check.sh"
-echo "├─ 📊 View logs:    tail -f agents/launch-*.log"
+echo "├─ 📊 View logs:    tail -f teams/launch-team-*.log"
 echo "└─ 🛑 Stop all:     ./scripts/down-all-teams.sh"
 echo ""
 
@@ -428,7 +431,7 @@ STOPPED_COUNT=0
 
 ${teams.map((team, index) => `
 echo "├─ ${index === teams.length - 1 ? '└─' : '├─'} Stopping ${team.emoji} ${team.name}..."
-cd agents/${team.id}
+cd teams/team-${team.teamNumber}/${team.role || 'dev'}
 if [ -f "./down" ]; then
     if ./down > /dev/null 2>&1; then
         echo "   ✅ ${team.name} stopped successfully"
@@ -440,7 +443,7 @@ if [ -f "./down" ]; then
 else
     echo "   ❌ Down script not found for ${team.name}"
 fi
-cd ../..
+cd ../../..
 `).join('')}
 
 echo ""
@@ -571,7 +574,7 @@ async function simulateGeneration(teams, config, progressCallback) {
   
   teams.forEach((team, index) => {
     logger.info(`\n${team.emoji} ${team.name}:`)
-    logger.info(`  - Directory: agents/${team.id}/`)
+    logger.info(`  - Directory: teams/team-${team.teamNumber}/${team.role || 'dev'}/`)
     logger.info(`  - CLAUDE.md with personality traits`)
     logger.info(`  - .mcp.json configuration`)
     logger.info(`  - Git hooks for emoji commits`)

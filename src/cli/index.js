@@ -21,6 +21,9 @@ import { displayProgress } from './progress-display.js'
 import { generateTeams } from '../generators/team-generator.js'
 import { loadThemes, loadThemeByName } from '../themes/theme-loader.js'
 import { logger } from '../utils/logger.js'
+import { ProjectDetector } from '../detectors/project-detector.js'
+import { TeamsAdapter } from '../adapters/teams-adapter.js'
+import { NewProjectAdapter } from '../adapters/new-project-adapter.js'
 import path from 'path'
 
 export async function runCLI(args) {
@@ -33,6 +36,9 @@ export async function runCLI(args) {
     .option('-t, --themes <themes>', 'Comma-separated theme names')
     .option('--theme <theme>', 'Single theme name (alias for --themes)')
     .option('-r, --repo <url>', 'GitHub repository URL to clone')
+    .option('-b, --branch <branch>', 'Git branch to clone (default: main/master)')
+    .option('--auth <method>', 'Authentication method: ssh, gh, token, public', 'public')
+    .option('--team-count <number>', 'Number of teams to create per theme', '2')
     .option('-o, --output <path>', 'Output directory', process.cwd())
     .option('-p, --port-start <number>', 'Starting port number', '3011')
     .option('--docker-network <name>', 'Docker network name')
@@ -66,9 +72,11 @@ async function runInteractiveMode(options) {
     // Get absolute path for display
     const absolutePath = path.resolve(options.output)
     
-    const existingSetup = await checkExistingSetup(options.output)
+    // Use new universal detection system
+    const detector = new ProjectDetector()
+    const detection = await detector.detectProject(options.output)
     
-    if (existingSetup.exists) {
+    if (detection.exists) {
       // Show welcome screen
       await showWelcomeScreen()
       
@@ -77,8 +85,8 @@ async function runInteractiveMode(options) {
       console.log(chalk.cyan(`   ${absolutePath}`))
       console.log(chalk.gray('   (Current location)\n'))
       
-      console.log(chalk.bold('⚠️  Existing Setup Detected'))
-      console.log(chalk.yellow(`💡 Found ${existingSetup.teamCount} teams in ${existingSetup.themes.join(', ')}\n`))
+      console.log(chalk.bold('⚠️  Existing Teams Project Detected'))
+      console.log(chalk.yellow(`💡 Found ${detection.config.totalTeams} teams with ${detection.config.totalAgents} agents\n`))
       
       const { modifyChoice } = await inquirer.prompt([
         {
@@ -86,8 +94,8 @@ async function runInteractiveMode(options) {
           name: 'modifyChoice',
           message: 'What would you like to do?',
           choices: [
+            { name: '🎯 Manage existing teams', value: 'manage' },
             { name: '➕ Add more themes/characters', value: 'add' },
-            { name: '✏️  Modify existing teams', value: 'modify' },
             { name: '🔄 Start over (delete all)', value: 'restart' },
             { name: '❌ Cancel', value: 'cancel' }
           ]
@@ -131,17 +139,28 @@ async function runInteractiveMode(options) {
         } else {
           process.exit(0)
         }
+      } else if (modifyChoice === 'manage') {
+        // Use teams adapter for management
+        await manageExistingTeams(detection, options)
+        return
       } else if (modifyChoice === 'add') {
         // Add more themes to existing setup
-        await addToExistingSetup(existingSetup, options)
-        return
-      } else if (modifyChoice === 'modify') {
-        // Modify existing teams
-        await modifyExistingSetup(existingSetup, options)
+        await addToExistingSetup(detection, options)
         return
       }
-    } else {
+    } else if (detection.type === 'new-project') {
       // Show welcome screen for new setup
+      await showWelcomeScreen()
+      
+      // Show project analysis
+      if (detection.metadata && !detection.metadata.isEmpty) {
+        console.log('\n' + chalk.bold('📊 Directory Analysis'))
+        console.log(chalk.cyan(`   Suitability: ${detection.metadata.reason}`))
+        console.log(chalk.gray(`   Confidence: ${Math.round(detection.confidence * 100)}%\n`))
+      }
+    } else {
+      console.log(chalk.yellow('\n⚠️  Unknown project structure detected'))
+      console.log(chalk.gray('Proceeding with new project setup...\n'))
       await showWelcomeScreen()
     }
 
@@ -258,11 +277,30 @@ async function runCommandMode(options) {
       }
       const theme = await loadThemeByName(trimmedName)
       
-      // Add all agents from this theme as teams
-      theme.agents.forEach((agent, index) => {
-        const teamNumber = teams.length + 1
-        const team = {
+      // Add agents from theme - create teams with dev and testing roles
+      const maxTeams = parseInt(options.teamCount) || 2
+      const agentsToUse = theme.agents.slice(0, maxTeams) // Get agents for teams
+      
+      // Create both dev and testing roles for each team
+      for (let teamIndex = 0; teamIndex < maxTeams; teamIndex++) {
+        const agent = agentsToUse[teamIndex] || agentsToUse[teamIndex % agentsToUse.length]
+        const teamNumber = teamIndex + 1
+        
+        // Create dev role
+        const devTeam = {
           ...agent,
+          role: 'dev',
+          theme: theme.name,
+          themeEmoji: theme.emoji,
+          teamNumber,
+          dockerNetwork: options.dockerNetwork || `${theme.name.toLowerCase().replace(/\s+/g, '-')}-network`
+        }
+        
+        // Create testing role (use next agent or cycle back)
+        const testingAgent = agentsToUse[(teamIndex + 1) % agentsToUse.length] || agent
+        const testingTeam = {
+          ...testingAgent,
+          role: 'testing',
           theme: theme.name,
           themeEmoji: theme.emoji,
           teamNumber,
@@ -272,22 +310,29 @@ async function runCommandMode(options) {
         // Override ports if port-start is specified
         if (options.portStart) {
           const basePort = parseInt(options.portStart)
-          team.ports = {
+          devTeam.ports = {
             backend: basePort + portOffset * 10,
             frontend: 5175 + portOffset,
             nginx: 3080 + portOffset
           }
+          testingTeam.ports = {
+            backend: basePort + (portOffset + 1) * 10,
+            frontend: 5175 + (portOffset + 1),
+            nginx: 3080 + (portOffset + 1)
+          }
         }
         
-        teams.push(team)
-        portOffset++
-      })
+        teams.push(devTeam)
+        teams.push(testingTeam)
+        portOffset += 2 // Increment by 2 for both roles
+      }
     }
     
     const config = {
       teams,
       repoUrl: options.repo,
-      authMethod: 'public',
+      repoBranch: options.branch,
+      authMethod: options.auth,
       outputDir: options.output,
       projectBoard: options.projectBoard,
       projectId: options.projectId,
@@ -354,15 +399,16 @@ async function getRepositoryConfig() {
   ])
 
   let repoUrl = ''
+  let repoBranch = undefined
 
   if (repoSource === 'skip') {
-    return { repoUrl: '', authMethod: 'none', repoSource }
+    return { repoUrl: '', repoBranch: undefined, authMethod: 'none', repoSource }
   }
 
   console.log() // Add spacing
 
   if (repoSource === 'url' || repoSource === 'existing') {
-    const { url } = await inquirer.prompt([
+    const { url, branch } = await inquirer.prompt([
       {
         type: 'input',
         name: 'url',
@@ -375,9 +421,16 @@ async function getRepositoryConfig() {
           }
           return true
         }
+      },
+      {
+        type: 'input',
+        name: 'branch',
+        message: 'Git branch to clone (leave empty for default):',
+        default: ''
       }
     ])
     repoUrl = url
+    repoBranch = branch || undefined
   } else if (repoSource === 'org') {
     const { org, repo } = await inquirer.prompt([
       {
@@ -421,6 +474,7 @@ async function getRepositoryConfig() {
 
   return {
     repoUrl,
+    repoBranch,
     authMethod,
     repoSource
   }
@@ -523,11 +577,11 @@ async function loadConfigFromFile(configPath) {
 async function checkExistingSetup(outputDir) {
   const fs = (await import('fs-extra')).default
   
-  const agentsDir = path.join(outputDir, 'agents')
+  const teamsDir = path.join(outputDir, 'teams')
   const dockerDir = path.join(outputDir, 'docker')
   const scriptsDir = path.join(outputDir, 'scripts')
   
-  if (!await fs.exists(agentsDir)) {
+  if (!await fs.exists(teamsDir)) {
     return { exists: false }
   }
   
@@ -536,10 +590,17 @@ async function checkExistingSetup(outputDir) {
   const themes = new Set()
   
   try {
-    const agentDirs = await fs.readdir(agentsDir)
+    const teamDirs = await fs.readdir(teamsDir)
     
-    for (const agentDir of agentDirs) {
-      const claudePath = path.join(agentsDir, agentDir, 'CLAUDE.md')
+    // Look for team-N directories
+    for (const teamDir of teamDirs) {
+      if (!teamDir.startsWith('team-')) continue
+      
+      const teamPath = path.join(teamsDir, teamDir)
+      const agentDirs = await fs.readdir(teamPath)
+    
+      for (const agentDir of agentDirs) {
+        const claudePath = path.join(teamPath, agentDir, 'CLAUDE.md')
       if (await fs.exists(claudePath)) {
         const content = await fs.readFile(claudePath, 'utf-8')
         // Extract theme from CLAUDE.md
@@ -547,8 +608,9 @@ async function checkExistingSetup(outputDir) {
         if (themeMatch) {
           themes.add(themeMatch[1])
         }
-        teams.push(agentDir)
+        teams.push(`${teamDir}/${agentDir}`)
       }
+    }
     }
     
     return {
@@ -557,7 +619,7 @@ async function checkExistingSetup(outputDir) {
       teams,
       themes: Array.from(themes),
       paths: {
-        agents: agentsDir,
+        teams: teamsDir,
         docker: dockerDir,
         scripts: scriptsDir
       }
@@ -571,7 +633,7 @@ async function cleanupExistingSetup(outputDir) {
   const fs = (await import('fs-extra')).default
   
   // Remove directories
-  await fs.remove(path.join(outputDir, 'agents'))
+  await fs.remove(path.join(outputDir, 'teams'))
   await fs.remove(path.join(outputDir, 'docker'))
   await fs.remove(path.join(outputDir, 'scripts'))
   await fs.remove(path.join(outputDir, 'teams'))
@@ -585,9 +647,72 @@ async function cleanupExistingSetup(outputDir) {
   }
 }
 
-async function addToExistingSetup(existingSetup, options) {
-  console.log('\n' + chalk.bold('Add to Existing Setup'))
-  console.log(chalk.yellow(`💡 You currently have ${existingSetup.teamCount} teams\n`))
+
+async function manageExistingTeams(detection, options) {
+  console.log('\n' + chalk.bold('🎯 Teams Management Dashboard'))
+  
+  // Create teams adapter
+  const adapter = new TeamsAdapter({
+    projectPath: options.output,
+    teams: detection.config.teams,
+    agents: detection.config.agents
+  })
+  
+  // Get available actions
+  const actions = adapter.getAvailableActions()
+  
+  // Group actions by category
+  const actionsByCategory = actions.reduce((groups, action) => {
+    const category = action.category || 'other'
+    if (!groups[category]) groups[category] = []
+    groups[category].push(action)
+    return groups
+  }, {})
+  
+  // Show action menu
+  const choices = []
+  Object.entries(actionsByCategory).forEach(([category, categoryActions]) => {
+    choices.push(new inquirer.Separator(`--- ${category.toUpperCase()} ---`))
+    categoryActions.forEach(action => {
+      choices.push({
+        name: `${action.name} - ${action.description}`,
+        value: action.id
+      })
+    })
+  })
+  
+  const { selectedAction } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedAction',
+      message: 'What would you like to do?',
+      choices
+    }
+  ])
+  
+  try {
+    const result = await adapter.executeAction(selectedAction)
+    
+    if (result.success) {
+      console.log(chalk.green(`\n✅ ${result.message}`))
+      
+      if (result.data) {
+        // Display result data nicely
+        console.log('\n' + chalk.bold('📊 Results:'))
+        console.log(JSON.stringify(result.data, null, 2))
+      }
+    } else {
+      console.log(chalk.red(`\n❌ ${result.message}`))
+    }
+  } catch (error) {
+    console.log(chalk.red(`\n❌ Error: ${error.message}`))
+    logger.error('Management action failed:', error)
+  }
+}
+
+async function addToExistingSetup(detection, options) {
+  console.log('\n' + chalk.bold('➕ Add to Existing Teams'))
+  console.log(chalk.yellow(`💡 You currently have ${detection.config.totalTeams} teams with ${detection.config.totalAgents} agents\n`))
   
   // Load themes and let user select new ones
   const themes = await loadThemes()
@@ -598,7 +723,7 @@ async function addToExistingSetup(existingSetup, options) {
     teams: await customizeTeams(selectedThemes, loadThemes),
     outputDir: options.output,
     appendMode: true,
-    existingTeams: existingSetup.teams
+    existingTeams: detection.config.teams
   }
   
   // Get repository configuration
@@ -612,20 +737,4 @@ async function addToExistingSetup(existingSetup, options) {
   })
   
   logger.success('✨ Additional teams added successfully!')
-}
-
-async function modifyExistingSetup(existingSetup, options) {
-  console.log('\n' + chalk.bold('Modify Existing Teams'))
-  console.log(chalk.yellow('💡 This feature is coming soon!\n'))
-  
-  // TODO: Implement team modification
-  // - List existing teams
-  // - Allow adding/removing characters
-  // - Allow port modifications
-  // - Regenerate configurations
-  
-  console.log(chalk.yellow('For now, you can:'))
-  console.log(chalk.yellow('1. Add new themes/characters'))
-  console.log(chalk.yellow('2. Start over with a fresh setup'))
-  console.log(chalk.yellow('3. Manually edit files in the agents/ directory\n'))
 }

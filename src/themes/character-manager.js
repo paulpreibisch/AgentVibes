@@ -35,11 +35,11 @@ export function generateCharacterConfig(agent, theme, teamNumber) {
       }
     },
     paths: {
-      root: `agents/${agent.id}`,
-      claude: `agents/${agent.id}/CLAUDE.md`,
-      mcp: `agents/${agent.id}/.mcp.json`,
-      commands: `agents/${agent.id}/.claude/commands`,
-      gitHooks: `agents/${agent.id}/.git/hooks`
+      root: `teams/team-${teamNumber}/${agent.role || 'dev'}`,
+      claude: `teams/team-${teamNumber}/${agent.role || 'dev'}/CLAUDE.md`,
+      mcp: `teams/team-${teamNumber}/${agent.role || 'dev'}/.mcp.json`,
+      commands: `teams/team-${teamNumber}/${agent.role || 'dev'}/.claude/commands`,
+      gitHooks: `teams/team-${teamNumber}/${agent.role || 'dev'}/.git/hooks`
     }
   }
 }
