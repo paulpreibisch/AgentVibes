@@ -60,9 +60,8 @@ export async function generateTeams(config, progressCallback = () => {}) {
       })
       
       for (const team of themeTeams) {
-        const teamNumber = teams.indexOf(team) + 1
-        // Add teamNumber to team object for use in templates
-        team.teamNumber = teamNumber
+        // Use the teamNumber that was already assigned to the team
+        const teamNumber = team.teamNumber
         const characterConfig = generateCharacterConfig(team, 
           { name: themeName, emoji: team.themeEmoji, docker: { network: team.dockerNetwork || `${themeName.toLowerCase()}-network` } }, 
           teamNumber
