@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "discord": {
+      "command": "node",
+      "args": [
+        "/home/fire/claude/discordmcp/build/index.js"
+      ]
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": ["firecrawl-mcp"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-puppeteer"]
+    },
+    "browsertools": {
+      "command": "npx",
+      "args": ["@agentdeskai/browser-tools-mcp@1.2.0"]
+    }
+  }
+}

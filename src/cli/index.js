@@ -100,7 +100,6 @@ async function runEnhancedWorkflow(options) {
     process.exit(1)
   }
 }
-
 async function runInteractiveMode(options) {
   try {
     // Check if setup already exists

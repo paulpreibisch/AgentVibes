@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+tests/test-output/
+tests/e2e-output/
+test-output/
+e2e-output/
+
+# Generated files
+agents/
+teams/
+docker/
+scripts/launch-all-teams.sh
+scripts/down-all-teams.sh
+scripts/status-check.sh
+*.pid
+built.flag
+
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.cache/
+
+# Build files
+dist/
+build/
