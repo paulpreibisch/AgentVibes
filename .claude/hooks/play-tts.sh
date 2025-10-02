@@ -13,6 +13,17 @@ TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice name or direct voice ID
 API_KEY="${ELEVENLABS_API_KEY}"
 
+# Check for project-local pretext configuration
+CONFIG_DIR="${CLAUDE_PROJECT_DIR:-.}/.claude/config"
+CONFIG_FILE="$CONFIG_DIR/agentvibes.json"
+
+if [[ -f "$CONFIG_FILE" ]] && command -v jq &> /dev/null; then
+  PRETEXT=$(jq -r '.pretext // empty' "$CONFIG_FILE" 2>/dev/null)
+  if [[ -n "$PRETEXT" ]]; then
+    TEXT="$PRETEXT: $TEXT"
+  fi
+fi
+
 # Limit text length to prevent API issues (max 500 chars for safety)
 if [ ${#TEXT} -gt 500 ]; then
   TEXT="${TEXT:0:497}..."
@@ -21,21 +32,21 @@ fi
 
 # Voice mapping (keep in sync with voice-manager.sh)
 declare -A VOICES=(
-  ["Cowboy"]="KTPVrSVAEUSJRClDzBw7"
-  ["Joanne"]="TC0Zp7WVFzhA8zpTlRqV"
-  ["Alex"]="zYcjlYFOd3taleS0gkk3"
-  ["Sarah"]="ruirxsoakN0GWmGNIo04"
-  ["Marcus"]="DGzg6RaUqxGRTHSBjfgF"
-  ["Deep Male"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["Sophia"]="flHkNRp1BlvT73UL6gyz"
-  ["David"]="9yzdeviXkFddZ4Oz8Mok"
-  ["Isabella"]="yjJ45q8TVCrtMhEKurxY"
+  ["Amy"]="bhJUNIXWQQ94l8eI2VUf"
+  ["Cowboy Bob"]="KTPVrSVAEUSJRClDzBw7"
+  ["Demon Monster"]="vfaqCOvlrKi4Zp7C2IAm"
+  ["Dr. Von Fusion"]="2cOq9bH3Wv1Io7H0QjuK"
+  ["Drill Sergeant"]="vfaqCOvlrKi4Zp7C2IAm"
+  ["El Nero"]="vfaqCOvlrKi4Zp7C2IAm"
+  ["Grandpa Spuds Oxley"]="NOpBlnGInO9m6vDvFkFC"
+  ["Jessica Anne Bogart"]="yjJ45q8TVCrtMhEKurxY"
+  ["Lutz Laugh"]="flHkNRp1BlvT73UL6gyz"
+  ["Matthew Schmitz"]="0SpgpJ4D3MpHCiWdyTg3"
   ["Michael"]="0SpgpJ4D3MpHCiWdyTg3"
-  ["Southern Mama"]="DLsHlh26Ugcm6ELvS0qi"
-  ["Amy (Chinese)"]="bhJUNIXWQQ94l8eI2VUf"
-  ["Grandpa Oxley"]="NOpBlnGInO9m6vDvFkFC"
+  ["Ms. Walker"]="DLsHlh26Ugcm6ELvS0qi"
   ["Northern Terry"]="wo6udizrrtpIxWGp2qJk"
-  ["Charollot"]="XB0fDUnXU5powFXDhCwa"
+  ["Ralf Eisend"]="9yzdeviXkFddZ4Oz8Mok"
+  ["Aria"]="pFZP5JQG7iQjIQuC4Bku"
 )
 
 # Determine which voice to use

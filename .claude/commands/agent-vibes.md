@@ -41,6 +41,14 @@ Replay recently played TTS audio
 
 Keeps last 10 audio files in history.
 
+### `/agent-vibes:set-pretext <word>`
+Set a prefix word/phrase for all TTS messages
+- `/agent-vibes:set-pretext AgentVibes` - All TTS starts with "AgentVibes:"
+- `/agent-vibes:set-pretext "Project Alpha"` - Custom phrase
+- `/agent-vibes:set-pretext ""` - Clear pretext
+
+Saved locally in `.claude/config/agentvibes.json`
+
 ## Getting Voice IDs
 
 To add your own custom voices:
