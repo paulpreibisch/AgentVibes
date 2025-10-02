@@ -31,6 +31,22 @@ AgentVibes brings your Claude Code sessions to life with beautiful text-to-speec
 
 ### Installation
 
+**🔧 Local Development (not yet published to npm):**
+
+```bash
+# Clone the repo
+cd ~/claude/AgentVibes
+
+# Install dependencies
+npm install
+
+# Run installer from your project directory
+cd ~/my-project
+node ~/claude/AgentVibes/bin/agent-vibes install
+```
+
+**📦 After Publishing to npm (coming soon):**
+
 ```bash
 # Install with npx (no global install needed!)
 npx agentvibes install
@@ -191,14 +207,29 @@ your-project/
 
 ## 🛠️ CLI Commands
 
+**Local Development:**
+
 Check installation status:
 ```bash
-npx agentvibes status
+node ~/claude/AgentVibes/bin/agent-vibes status
 ```
 
 Install in specific directory:
 ```bash
+node ~/claude/AgentVibes/bin/agent-vibes install --directory /path/to/project
+```
+
+Skip confirmation prompt:
+```bash
+node ~/claude/AgentVibes/bin/agent-vibes install --yes
+```
+
+**After npm publish:**
+
+```bash
+npx agentvibes status
 npx agentvibes install --directory /path/to/project
+npx agentvibes install --yes
 ```
 
 ---
