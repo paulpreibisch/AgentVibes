@@ -54,7 +54,7 @@ async function install(options = {}) {
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 10 slash commands → ${targetDir}/.claude/commands/`));
   console.log(chalk.gray(`   • 2 TTS scripts → ${targetDir}/.claude/hooks/`));
-  console.log(chalk.gray(`   • 2 output styles → ${targetDir}/.claude/output-styles/`));
+  console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
   console.log(chalk.gray(`   • Voice configuration files`));
   console.log(chalk.gray(`   • 15+ character voices ready to use\n`));
 
@@ -203,7 +203,7 @@ async function install(options = {}) {
     );
 
     console.log(chalk.gray('\n💡 Next steps:'));
-    console.log(chalk.gray('   1. Set output style: /output-style voice-summaries'));
+    console.log(chalk.gray('   1. Set output style: /output-style agent-vibes'));
     console.log(chalk.gray('   2. Try /agent-vibes:list to see all voices'));
     console.log(chalk.gray('   3. Use /agent-vibes:switch to change your voice\n'));
 
