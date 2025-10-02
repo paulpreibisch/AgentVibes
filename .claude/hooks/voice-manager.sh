@@ -105,6 +105,13 @@ case "$1" in
     echo "$FOUND" > "$VOICE_FILE"
     echo "✅ Voice switched to: $FOUND"
     echo "🎤 Voice ID: ${VOICES[$FOUND]}"
+
+    # Have the new voice introduce itself
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
+    if [ -x "$PLAY_TTS" ]; then
+      "$PLAY_TTS" "Hi, I'm $FOUND. I'll be your voice assistant moving forward." "$FOUND" > /dev/null 2>&1 &
+    fi
     ;;
 
   get)
