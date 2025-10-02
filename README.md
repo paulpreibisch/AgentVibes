@@ -142,7 +142,7 @@ Set personality style for TTS messages
 /agent-vibes:personality add cowboy "Howdy!" "Partner!"  # Custom
 ```
 
-Available personalities: normal, flirty, angry, sassy, moody, funny, sarcastic, poetic, annoying, professional, pirate, robot, valley-girl, zen, dramatic, random (picks randomly each time)
+Available personalities: normal, flirty, angry, sassy, moody, funny, sarcastic, poetic, annoying, professional, pirate, robot, surfer-dude, millennial, zen, dramatic, crass, random (picks randomly each time)
 
 ---
 

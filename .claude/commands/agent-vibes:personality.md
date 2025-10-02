@@ -38,9 +38,11 @@ This command allows you to add character and emotion to your TTS announcements b
 - **professional** - Formal and precise
 - **pirate** - Seafaring swagger
 - **robot** - Mechanical and precise
-- **valley-girl** - California casual
+- **surfer-dude** - Chill beach vibes
+- **millennial** - Internet generation speak
 - **zen** - Peaceful and mindful
 - **dramatic** - Theatrical flair
+- **crass** - Edgy and blunt
 - **random** - Picks a different personality each time!
 
 ## Custom Personalities

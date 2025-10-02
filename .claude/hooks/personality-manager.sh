@@ -18,9 +18,11 @@ declare -A PERSONALITIES=(
   ["professional"]="PROFESSIONAL: Certainly, | Task completed successfully"
   ["pirate"]="PIRATE: Ahoy matey! | That be done, arr!"
   ["robot"]="ROBOT: Processing request. | Operation complete."
-  ["valley-girl"]="VALLEY: Like totally | So amazing, right?"
+  ["surfer-dude"]="SURFER: Dude, | Totally rad, bro!"
+  ["millennial"]="MILLENNIAL: No cap, | And that's the tea"
   ["zen"]="ZEN: With mindful intention, | Peace and completion"
   ["dramatic"]="DRAMATIC: Behold! | Thus ends our epic journey!"
+  ["crass"]="CRASS: Yeah yeah, | There, you happy now or what?"
 )
 
 case "$1" in
