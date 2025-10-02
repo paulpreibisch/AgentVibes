@@ -11,4 +11,4 @@ Usage examples:
 - `/agent-vibes:preview first 10` - Preview first 10 voices
 - `/agent-vibes:preview last 5` - Preview last 5 voices
 
-!bash /home/fire/claude/SoraSage/teams/team-9/SageDev/.claude/hooks/voice-manager.sh preview $ARGUMENTS
+!bash .claude/hooks/voice-manager.sh preview $ARGUMENTS

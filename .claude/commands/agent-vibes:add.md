@@ -18,4 +18,4 @@ To find your voice IDs:
 
 After adding, you can switch to it with `/agent-vibes:switch "Voice Name"`
 
-!bash /home/fire/claude/SoraSage/teams/team-9/SageDev/.claude/hooks/voice-manager.sh add $ARGUMENTS
+!bash .claude/hooks/voice-manager.sh add $ARGUMENTS

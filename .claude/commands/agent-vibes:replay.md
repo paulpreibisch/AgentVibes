@@ -16,4 +16,4 @@ The system keeps the last 10 audio files in history. This is useful for:
 - Checking what was just said
 - Comparing different voice samples
 
-!bash /home/fire/claude/SoraSage/teams/team-9/SageDev/.claude/hooks/voice-manager.sh replay $ARGUMENTS
+!bash .claude/hooks/voice-manager.sh replay $ARGUMENTS

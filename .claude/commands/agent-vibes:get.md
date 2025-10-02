@@ -6,4 +6,4 @@ Display the currently selected ElevenLabs TTS voice.
 
 This shows which voice is currently set as the default for TTS audio generation.
 
-!bash /home/fire/claude/SoraSage/teams/team-9/SageDev/.claude/hooks/voice-manager.sh get
+!bash .claude/hooks/voice-manager.sh get
