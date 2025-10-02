@@ -1,73 +1,44 @@
 {
+  "$schema": "https://json.schemastore.org/package.json",
   "name": "agentvibes",
-  "version": "1.2.0",
-  "description": "Beautiful console application to create unlimited themed agent teams for any coding project",
-  "main": "src/cli/index.js",
-  "type": "module",
-  "bin": {
-    "create-teams": "./bin/create-teams",
-    "team-generator": "./bin/team-generator",
-    "agentic": "./bin/create-teams",
-    "agentvibes": "./bin/create-teams"
-  },
-  "scripts": {
-    "test": "node --test-timeout=60000 --test tests/*.test.js",
-    "test:simple": "node --test tests/themes.test.js",
-    "test:unit": "node --test tests/themes.test.js tests/generators.test.js",
-    "test:integration": "node --test tests/integration.test.js",
-    "test:e2e": "node --test tests/e2e.test.js tests/cli.test.js",
-    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
-    "test:watch": "node --test --watch tests/*.test.js",
-    "start": "node bin/create-teams",
-    "create-teams": "node bin/create-teams",
-    "clean": "./cleanup.sh",
-    "cleanup": "./cleanup.sh",
-    "credits": "node scripts/credits.js"
-  },
+  "version": "2.0.0",
+  "description": "Beautiful ElevenLabs TTS voice commands for Claude Code - Add professional narration to your AI coding sessions",
   "keywords": [
-    "agentvibes",
-    "agentic",
-    "team",
-    "generator",
-    "claude",
+    "elevenlabs",
+    "tts",
+    "text-to-speech",
+    "claude-code",
+    "voice",
     "ai",
-    "docker",
-    "github",
-    "themed",
-    "personalities"
+    "narration",
+    "agent-vibes"
   ],
-  "author": "Paul Preibisch <paul@paulpreibisch.com>",
-  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/paulpreibisch/AgentVibes.git"
   },
-  "bugs": {
-    "url": "https://github.com/paulpreibisch/AgentVibes/issues"
+  "license": "Apache-2.0",
+  "author": "Paul Preibisch <paul@paulpreibisch.com>",
+  "main": "src/installer.js",
+  "bin": {
+    "agentvibes": "./bin/agent-vibes",
+    "agent-vibes": "./bin/agent-vibes"
   },
-  "homepage": "https://github.com/paulpreibisch/AgentVibes#readme",
+  "scripts": {
+    "install-local": "node src/installer.js install"
+  },
   "dependencies": {
-    "@inquirer/prompts": "^3.0.0",
-    "@inquirer/search": "^3.0.15",
-    "@octokit/rest": "^20.0.0",
-    "axios": "^1.0.0",
     "boxen": "^7.0.0",
     "chalk": "^5.0.0",
     "commander": "^10.0.0",
     "figlet": "^1.6.0",
-    "fs-extra": "^11.0.0",
-    "handlebars": "^4.7.0",
-    "inquirer": "^12.6.3",
-    "joi": "^17.0.0",
-    "node-ssh": "^13.0.0",
-    "ora": "^6.0.0",
-    "simple-git": "^3.0.0",
-    "which": "^3.0.0"
-  },
-  "peerDependencies": {
-    "gh": ">=2.0.0"
+    "inquirer": "^12.0.0",
+    "ora": "^6.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
