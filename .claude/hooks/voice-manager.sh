@@ -198,6 +198,13 @@ case "$1" in
     fi
     ;;
 
+  list-simple)
+    # Simple list for AI to parse and display
+    for voice in "${!VOICES[@]}"; do
+      echo "$voice"
+    done | sort
+    ;;
+
   *)
     echo "Usage: voice-manager.sh [list|switch|get] [voice_name]"
     echo ""
