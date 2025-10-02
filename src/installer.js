@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 
-const { program } = require('commander');
-const path = require('node:path');
-const fs = require('node:fs/promises');
-const chalk = require('chalk');
-const inquirer = require('inquirer');
-const figlet = require('figlet');
-const boxen = require('boxen');
-const ora = require('ora');
+import { program } from 'commander';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import chalk from 'chalk';
+import inquirer from 'inquirer';
+import figlet from 'figlet';
+import boxen from 'boxen';
+import ora from 'ora';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const VERSION = '2.0.0';
 
