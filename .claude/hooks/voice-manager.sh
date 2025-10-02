@@ -98,14 +98,32 @@ case "$1" in
       IFS=$'\n' SORTED_VOICES=($(sort <<<"${VOICE_ARRAY[*]}"))
       unset IFS
 
-      # Display numbered list
-      for i in "${!SORTED_VOICES[@]}"; do
-        NUM=$((i + 1))
-        VOICE="${SORTED_VOICES[$i]}"
-        if [[ "$VOICE" == "$CURRENT" ]]; then
-          echo "  $NUM. $VOICE ✓ (current)"
+      # Display numbered list in two columns for compactness
+      HALF=$(( (${#SORTED_VOICES[@]} + 1) / 2 ))
+
+      for i in $(seq 0 $((HALF - 1))); do
+        NUM1=$((i + 1))
+        VOICE1="${SORTED_VOICES[$i]}"
+
+        # Format first column
+        if [[ "$VOICE1" == "$CURRENT" ]]; then
+          COL1=$(printf "%2d. %-20s ✓" "$NUM1" "$VOICE1")
         else
-          echo "  $NUM. $VOICE"
+          COL1=$(printf "%2d. %-20s  " "$NUM1" "$VOICE1")
+        fi
+
+        # Format second column if it exists
+        NUM2=$((i + HALF + 1))
+        if [[ $((i + HALF)) -lt ${#SORTED_VOICES[@]} ]]; then
+          VOICE2="${SORTED_VOICES[$((i + HALF))]}"
+          if [[ "$VOICE2" == "$CURRENT" ]]; then
+            COL2=$(printf "%2d. %-20s ✓" "$NUM2" "$VOICE2")
+          else
+            COL2=$(printf "%2d. %-20s  " "$NUM2" "$VOICE2")
+          fi
+          echo "  $COL1 $COL2"
+        else
+          echo "  $COL1"
         fi
       done
 
