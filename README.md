@@ -89,7 +89,7 @@ Preview voices by playing audio samples
 ```
 
 ### `/agent-vibes:switch <voice_name>`
-Switch to a different default voice
+Switch to a different default voice. Your voice selection is saved locally in `.claude/tts-voice.txt` and persists across Claude Code sessions.
 ```
 /agent-vibes:switch Aria
 /agent-vibes:switch "Cowboy Bob"
