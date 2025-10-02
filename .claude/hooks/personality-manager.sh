@@ -4,23 +4,23 @@
 PERSONALITY_FILE="$HOME/.claude/tts-personality.txt"
 CUSTOM_PERSONALITIES_FILE="$HOME/.claude/custom-personalities.json"
 
-# Default personalities with their modifiers
+# Default personalities with their modifiers (natural language only)
 declare -A PERSONALITIES=(
   ["normal"]="NORMAL:|"
-  ["flirty"]="FLIRTY: *winks* | *giggles*"
-  ["angry"]="ANGRY: Ugh! | Dammit!"
-  ["sassy"]="SASSY: *hair flip* | Whatever..."
-  ["moody"]="MOODY: *sighs heavily* | I guess..."
-  ["funny"]="FUNNY: Hehe! | *ba dum tss*"
-  ["sarcastic"]="SARCASTIC: Oh great... | How wonderful..."
-  ["poetic"]="POETIC: Like a gentle breeze, | Thus it is complete..."
-  ["annoying"]="ANNOYING: OMG OMG OMG! | YAAAAAY!"
-  ["professional"]="PROFESSIONAL: Certainly. | Task completed successfully."
-  ["pirate"]="PIRATE: Arrr! | Shiver me timbers!"
-  ["robot"]="ROBOT: INITIATING: | TASK_COMPLETE."
-  ["valley-girl"]="VALLEY: Like, totally | Oh em gee!"
-  ["zen"]="ZEN: Mindfully, | In harmony..."
-  ["dramatic"]="DRAMATIC: *thunder crashes* | *curtain falls*"
+  ["flirty"]="FLIRTY: Well hello there, | Hope that made you smile"
+  ["angry"]="ANGRY: Fine! | There, happy now?"
+  ["sassy"]="SASSY: Oh honey, | You're welcome, I guess"
+  ["moody"]="MOODY: If I must, | Whatever, it's done"
+  ["funny"]="FUNNY: Alrighty then! | Boom, nailed it!"
+  ["sarcastic"]="SARCASTIC: Oh joy, | Absolutely thrilling, I'm sure"
+  ["poetic"]="POETIC: With grace and purpose, | And so the tale concludes"
+  ["annoying"]="ANNOYING: Oh my gosh oh my gosh! | Best thing ever, right?"
+  ["professional"]="PROFESSIONAL: Certainly, | Task completed successfully"
+  ["pirate"]="PIRATE: Ahoy matey! | That be done, arr!"
+  ["robot"]="ROBOT: Processing request. | Operation complete."
+  ["valley-girl"]="VALLEY: Like totally | So amazing, right?"
+  ["zen"]="ZEN: With mindful intention, | Peace and completion"
+  ["dramatic"]="DRAMATIC: Behold! | Thus ends our epic journey!"
 )
 
 case "$1" in
