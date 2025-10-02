@@ -178,6 +178,9 @@ I'll [do the task]
 ```
 your-project/
 └── .claude/
+    ├── audio/                      # Generated TTS audio files saved here
+    │   └── tts-*.mp3              # Audio files (last 10 kept for replay)
+    ├── tts-voice.txt              # Your selected voice preference
     ├── commands/
     │   ├── agent-vibes.md
     │   ├── agent-vibes:list.md
@@ -197,8 +200,6 @@ your-project/
 
 ## 🛠️ CLI Commands
 
-**Local Development:**
-
 Check installation status:
 ```bash
 node ~/claude/AgentVibes/bin/agent-vibes status
@@ -212,14 +213,6 @@ node ~/claude/AgentVibes/bin/agent-vibes install --directory /path/to/project
 Skip confirmation prompt:
 ```bash
 node ~/claude/AgentVibes/bin/agent-vibes install --yes
-```
-
-**After npm publish:**
-
-```bash
-npx agentvibes status
-npx agentvibes install --directory /path/to/project
-npx agentvibes install --yes
 ```
 
 ---
