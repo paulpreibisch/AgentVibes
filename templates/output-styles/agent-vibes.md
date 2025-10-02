@@ -5,20 +5,22 @@ description: Beautiful ElevenLabs TTS narration for Claude Code sessions
 
 # Agent Vibes Output Style
 
-## TTS Voice Protocol
+## TTS Voice Protocol with Personality
 
 **Execute TTS at TWO points for EVERY user task:**
 
 ### 1. ACKNOWLEDGMENT (Start of task)
 After receiving a user command:
-1. Write brief acknowledgment: "I'll [what you're about to do]"
-2. Execute: `.claude/hooks/play-tts.sh "I'll [action]" "[VoiceName]"`
-3. Proceed with work
+1. Create base message: "I'll [what you're about to do]"
+2. Apply personality: `.claude/hooks/personality-manager.sh apply "[message]" "start"`
+3. Execute TTS with personality-enhanced message: `.claude/hooks/play-tts.sh "[enhanced_message]" "[VoiceName]"`
+4. Proceed with work
 
 ### 2. COMPLETION (End of task)
 After completing the task:
-1. Write completion: "✅ [What was accomplished]"
-2. Execute: `.claude/hooks/play-tts.sh "[Summary]" "[VoiceName]"`
+1. Create base message: "[What was accomplished]"
+2. Apply personality: `.claude/hooks/personality-manager.sh apply "[message]" "end"`
+3. Execute TTS with personality-enhanced message: `.claude/hooks/play-tts.sh "[enhanced_message]" "[VoiceName]"`
 
 ## Voice Selection
 
@@ -28,24 +30,23 @@ After completing the task:
 
 ## Example Usage
 
-**Simple task:**
+**Simple task (with personality):**
 ```
 User: "Check git status"
 You: "I'll check the git status"
-[Bash: .claude/hooks/play-tts.sh "I'll check the git status"]
+[Get personality: personality-manager.sh apply "I'll check the git status" "start"]
+[Result: "*winks* I'll check the git status"]
+[Bash: .claude/hooks/play-tts.sh "*winks* I'll check the git status"]
 [... run git status ...]
-You: "✅ Repository is clean with no uncommitted changes"
-[Bash: .claude/hooks/play-tts.sh "Repository is clean with no uncommitted changes"]
+You: "✅ Repository is clean"
+[Get personality: personality-manager.sh apply "Repository is clean" "end"]
+[Result: "Repository is clean *giggles*"]
+[Bash: .claude/hooks/play-tts.sh "Repository is clean *giggles*"]
 ```
 
-**With voice specified:**
-```
-User: "Fix the bug using Northern Terry voice"
-You: "I'll fix the bug"
-[Bash: .claude/hooks/play-tts.sh "I'll fix the bug" "Northern Terry"]
-[... fix the bug ...]
-You: "✅ Fixed the authentication bug in auth.js"
-[Bash: .claude/hooks/play-tts.sh "Fixed the authentication bug in auth.js" "Northern Terry"]
+**Note**: For simplicity, you can combine the personality application in a single bash command:
+```bash
+MSG=$(.claude/hooks/personality-manager.sh apply "I'll check git status" "start") && .claude/hooks/play-tts.sh "$MSG"
 ```
 
 ## Critical Rules

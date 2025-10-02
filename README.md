@@ -19,11 +19,12 @@ AgentVibes brings your Claude Code sessions to life with beautiful text-to-speec
 
 - 🎤 **15+ Professional Voices** - Character voices from ElevenLabs
 - 🎵 **Instant Audio Feedback** - Hear task completions and updates
+- 🎭 **Personality Styles** - Add emotion and character to messages
 - 🔄 **Voice Switching** - Change voices on the fly
 - 📋 **Voice Preview** - Listen to samples before choosing
 - 🔁 **Audio Replay** - Replay last 10 messages
 - ➕ **Custom Voices** - Add your own ElevenLabs voices
-- ⚡ **One Command Install** - `npx agentvibes install`
+- ⚡ **One Command Install** - Local installation
 
 ---
 
@@ -132,6 +133,17 @@ Replay recently played TTS audio
 /agent-vibes:replay 2          # Replay second-to-last
 ```
 
+### `/agent-vibes:personality <style>`
+Set personality style for TTS messages
+```
+/agent-vibes:personality flirty       # Playful and charming
+/agent-vibes:personality sarcastic    # Dry wit and irony
+/agent-vibes:personality list         # Show all personalities
+/agent-vibes:personality add cowboy "Howdy!" "Partner!"  # Custom
+```
+
+Available personalities: normal, flirty, angry, sassy, moody, funny, sarcastic, poetic, annoying, professional, pirate, robot, valley-girl, zen, dramatic
+
 ---
 
 ## 🎨 Default Voices
@@ -199,11 +211,13 @@ your-project/
     │   ├── agent-vibes:whoami.md
     │   ├── agent-vibes:sample.md
     │   ├── agent-vibes:add.md
-    │   └── agent-vibes:replay.md
+    │   ├── agent-vibes:replay.md
+    │   └── agent-vibes:personality.md
     ├── output-styles/
     │   └── agent-vibes.md          # TTS output style for voice narration
     └── hooks/
         ├── voice-manager.sh
+        ├── personality-manager.sh
         └── play-tts.sh
 ```
 

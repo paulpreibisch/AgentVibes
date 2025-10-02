@@ -52,11 +52,11 @@ async function install(options = {}) {
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
-  console.log(chalk.gray(`   • 10 slash commands → ${targetDir}/.claude/commands/`));
-  console.log(chalk.gray(`   • 2 TTS scripts → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • 11 slash commands → ${targetDir}/.claude/commands/`));
+  console.log(chalk.gray(`   • 3 TTS scripts → ${targetDir}/.claude/hooks/`));
   console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
   console.log(chalk.gray(`   • Voice configuration files`));
-  console.log(chalk.gray(`   • 15+ character voices ready to use\n`));
+  console.log(chalk.gray(`   • 15+ character voices with personality styles\n`));
 
   // Confirmation prompt (unless --yes flag is used)
   if (!options.yes) {
