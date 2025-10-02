@@ -49,8 +49,34 @@ async function install(options = {}) {
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
   console.log(chalk.gray(`   Target directory: ${targetDir}`));
-  console.log(chalk.gray(`   Package version: ${VERSION}\n`));
+  console.log(chalk.gray(`   Package version: ${VERSION}`));
 
+  console.log(chalk.cyan('\n📦 What will be installed:'));
+  console.log(chalk.gray(`   • 10 slash commands → ${targetDir}/.claude/commands/`));
+  console.log(chalk.gray(`   • 2 TTS scripts → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • Voice configuration files`));
+  console.log(chalk.gray(`   • 15+ character voices ready to use\n`));
+
+  // Confirmation prompt (unless --yes flag is used)
+  if (!options.yes) {
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: chalk.yellow('Install AgentVibes in this directory?'),
+        default: true,
+      },
+    ]);
+
+    if (!confirm) {
+      console.log(chalk.red('\n❌ Installation cancelled.\n'));
+      process.exit(0);
+    }
+  } else {
+    console.log(chalk.green('✓ Auto-confirmed (--yes flag)\n'));
+  }
+
+  console.log(''); // Add spacing
   const spinner = ora('Checking installation directory...').start();
 
   try {
@@ -173,6 +199,7 @@ program
   .command('install')
   .description('Install AgentVibes voice commands')
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
+  .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
     await install(options);
   });
