@@ -27,10 +27,10 @@ This command allows you to add character and emotion to your TTS announcements b
 ## Available Personalities
 
 - **normal** - Standard professional tone
-- **flirty** - Playful and charming (*winks*)
+- **flirty** - Playful and charming
 - **angry** - Frustrated and irritated
-- **sassy** - Bold with attitude (*hair flip*)
-- **moody** - Melancholic and brooding (*sighs*)
+- **sassy** - Bold with attitude
+- **moody** - Melancholic and brooding
 - **funny** - Lighthearted and comedic
 - **sarcastic** - Dry wit and irony
 - **poetic** - Elegant and lyrical
@@ -41,6 +41,7 @@ This command allows you to add character and emotion to your TTS announcements b
 - **valley-girl** - California casual
 - **zen** - Peaceful and mindful
 - **dramatic** - Theatrical flair
+- **random** - Picks a different personality each time!
 
 ## Custom Personalities
 

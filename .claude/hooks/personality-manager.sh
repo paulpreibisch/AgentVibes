@@ -44,6 +44,13 @@ case "$1" in
       fi
     done | sort
 
+    # Add random option
+    if [[ "$CURRENT" == "random" ]]; then
+      echo "  ✓ random (current) - picks randomly each time"
+    else
+      echo "  - random - picks randomly each time"
+    fi
+
     # List custom personalities if they exist
     if [ -f "$CUSTOM_PERSONALITIES_FILE" ] && [ -s "$CUSTOM_PERSONALITIES_FILE" ]; then
       echo ""
@@ -65,6 +72,21 @@ case "$1" in
       echo "❌ Error: Please specify a personality"
       echo "Usage: /agent-vibes:personality <name>"
       exit 1
+    fi
+
+    # Handle special "random" personality
+    if [[ "$PERSONALITY_NAME" == "random" ]]; then
+      echo "$PERSONALITY_NAME" > "$PERSONALITY_FILE"
+      echo "🎲 Personality set to: random (will pick randomly each time)"
+
+      # Demo with a random personality
+      SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+      PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
+
+      if [ -x "$PLAY_TTS" ]; then
+        "$PLAY_TTS" "I'll surprise you with a different personality each time" > /dev/null 2>&1 &
+      fi
+      exit 0
     fi
 
     # Check if it's a built-in personality
@@ -174,6 +196,21 @@ EOF
     PERSONALITY="normal"
     if [ -f "$PERSONALITY_FILE" ]; then
       PERSONALITY=$(cat "$PERSONALITY_FILE")
+    fi
+
+    # Handle random personality
+    if [[ "$PERSONALITY" == "random" ]]; then
+      # Get all personality names (excluding normal and random)
+      PERSONALITY_ARRAY=()
+      for p in "${!PERSONALITIES[@]}"; do
+        if [[ "$p" != "normal" && "$p" != "random" ]]; then
+          PERSONALITY_ARRAY+=("$p")
+        fi
+      done
+
+      # Pick a random one
+      RANDOM_INDEX=$((RANDOM % ${#PERSONALITY_ARRAY[@]}))
+      PERSONALITY="${PERSONALITY_ARRAY[$RANDOM_INDEX]}"
     fi
 
     # Get modifiers for this personality
