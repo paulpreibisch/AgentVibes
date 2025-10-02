@@ -54,6 +54,7 @@ async function install(options = {}) {
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 10 slash commands → ${targetDir}/.claude/commands/`));
   console.log(chalk.gray(`   • 2 TTS scripts → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • 2 output styles → ${targetDir}/.claude/output-styles/`));
   console.log(chalk.gray(`   • Voice configuration files`));
   console.log(chalk.gray(`   • 15+ character voices ready to use\n`));
 
@@ -84,6 +85,7 @@ async function install(options = {}) {
     const claudeDir = path.join(targetDir, '.claude');
     const commandsDir = path.join(claudeDir, 'commands');
     const hooksDir = path.join(claudeDir, 'hooks');
+    const outputStylesDir = path.join(claudeDir, 'output-styles');
 
     let exists = false;
     try {
@@ -95,8 +97,10 @@ async function install(options = {}) {
       spinner.info(chalk.yellow('Creating .claude directory structure...'));
       console.log(chalk.gray(`   → ${commandsDir}`));
       console.log(chalk.gray(`   → ${hooksDir}`));
+      console.log(chalk.gray(`   → ${outputStylesDir}`));
       await fs.mkdir(commandsDir, { recursive: true });
       await fs.mkdir(hooksDir, { recursive: true });
+      await fs.mkdir(outputStylesDir, { recursive: true });
       console.log(chalk.green('   ✓ Directories created!\n'));
     } else {
       spinner.succeed(chalk.green('.claude directory found!'));
@@ -132,6 +136,25 @@ async function install(options = {}) {
     }
     spinner.succeed(chalk.green('Installed TTS scripts!\n'));
 
+    // Copy output styles
+    spinner.start('Installing output styles...');
+    const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
+
+    // Create output-styles directory if it doesn't exist
+    try {
+      await fs.mkdir(outputStylesDir, { recursive: true });
+    } catch {}
+
+    const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
+    console.log(chalk.cyan(`📝 Installing ${outputStyleFiles.length} output styles:`));
+    for (const file of outputStyleFiles) {
+      const srcPath = path.join(srcOutputStylesDir, file);
+      const destPath = path.join(outputStylesDir, file);
+      await fs.copyFile(srcPath, destPath);
+      console.log(chalk.gray(`   ✓ ${file}`));
+    }
+    spinner.succeed(chalk.green('Installed output styles!\n'));
+
     // Check for API key
     spinner.start('Checking ElevenLabs API key...');
     const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -154,6 +177,7 @@ async function install(options = {}) {
     console.log(chalk.cyan('📦 Installation Summary:'));
     console.log(chalk.white(`   • ${commandFiles.length} slash commands installed`));
     console.log(chalk.white(`   • ${hookFiles.length} TTS scripts installed`));
+    console.log(chalk.white(`   • ${outputStyleFiles.length} output styles installed`));
     console.log(chalk.white(`   • Voice manager ready`));
     console.log(chalk.white(`   • 15+ character voices available\n`));
 
@@ -179,9 +203,9 @@ async function install(options = {}) {
     );
 
     console.log(chalk.gray('\n💡 Next steps:'));
-    console.log(chalk.gray('   1. Try /agent-vibes:list to see all voices'));
-    console.log(chalk.gray('   2. Use /agent-vibes:switch to change your voice'));
-    console.log(chalk.gray('   3. Configure your output style to use TTS\n'));
+    console.log(chalk.gray('   1. Set output style: /output-style voice-summaries'));
+    console.log(chalk.gray('   2. Try /agent-vibes:list to see all voices'));
+    console.log(chalk.gray('   3. Use /agent-vibes:switch to change your voice\n'));
 
   } catch (error) {
     spinner.fail('Installation failed!');

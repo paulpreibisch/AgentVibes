@@ -45,6 +45,17 @@ cd ~/my-project
 node ~/claude/AgentVibes/bin/agent-vibes install
 ```
 
+### Enable Voice Narration
+
+After installation, activate TTS voice narration in Claude Code:
+
+```bash
+/output-style voice-summaries
+```
+
+This enables automatic TTS for task acknowledgments and completions. AgentVibes includes two output styles:
+- **voice-summaries** - Manual TTS with direct control
+- **voice-summaries-enhanced** - Marker-based TTS with automatic detection
 
 ### Setup ElevenLabs API Key
 
@@ -191,6 +202,9 @@ your-project/
     │   ├── agent-vibes:sample.md
     │   ├── agent-vibes:add.md
     │   └── agent-vibes:replay.md
+    ├── output-styles/
+    │   ├── voice-summaries.md     # Manual TTS output style
+    │   └── voice-summaries-enhanced.md # Enhanced marker-based style
     └── hooks/
         ├── voice-manager.sh
         └── play-tts.sh
