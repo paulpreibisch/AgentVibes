@@ -45,16 +45,6 @@ cd ~/my-project
 node ~/claude/AgentVibes/bin/agent-vibes install
 ```
 
-**📦 After Publishing to npm (coming soon):**
-
-```bash
-# Install with npx (no global install needed!)
-npx agentvibes install
-
-# Or install globally
-npm install -g agentvibes
-agentvibes install
-```
 
 ### Setup ElevenLabs API Key
 
