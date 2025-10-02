@@ -76,21 +76,79 @@ case "$1" in
 
   switch)
     VOICE_NAME="$2"
+
     if [[ -z "$VOICE_NAME" ]]; then
-      echo "❌ Error: Please specify a voice name"
-      echo "Usage: Voice Switch <name>"
-      echo "Example: Voice Switch GentleGirl"
-      exit 1
+      # Show numbered list for selection
+      echo "🎤 Select a voice by number:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # Get current voice
+      CURRENT="Cowboy Bob"
+      if [ -f "$VOICE_FILE" ]; then
+        CURRENT=$(cat "$VOICE_FILE")
+      fi
+
+      # Create array of voice names
+      VOICE_ARRAY=()
+      for voice in "${!VOICES[@]}"; do
+        VOICE_ARRAY+=("$voice")
+      done
+
+      # Sort the array
+      IFS=$'\n' SORTED_VOICES=($(sort <<<"${VOICE_ARRAY[*]}"))
+      unset IFS
+
+      # Display numbered list
+      for i in "${!SORTED_VOICES[@]}"; do
+        NUM=$((i + 1))
+        VOICE="${SORTED_VOICES[$i]}"
+        if [[ "$VOICE" == "$CURRENT" ]]; then
+          echo "  $NUM. $VOICE ✓ (current)"
+        else
+          echo "  $NUM. $VOICE"
+        fi
+      done
+
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo ""
+      echo "Enter number (1-${#SORTED_VOICES[@]}) or voice name:"
+      echo "Usage: /agent-vibes:switch 5"
+      echo "       /agent-vibes:switch \"Northern Terry\""
+      exit 0
     fi
 
-    # Check if voice exists (case-insensitive)
-    FOUND=""
-    for voice in "${!VOICES[@]}"; do
-      if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
-        FOUND="$voice"
-        break
+    # Check if input is a number
+    if [[ "$VOICE_NAME" =~ ^[0-9]+$ ]]; then
+      # Get voice array
+      VOICE_ARRAY=()
+      for voice in "${!VOICES[@]}"; do
+        VOICE_ARRAY+=("$voice")
+      done
+
+      # Sort the array
+      IFS=$'\n' SORTED_VOICES=($(sort <<<"${VOICE_ARRAY[*]}"))
+      unset IFS
+
+      # Get voice by number (adjust for 0-based index)
+      INDEX=$((VOICE_NAME - 1))
+
+      if [[ $INDEX -ge 0 && $INDEX -lt ${#SORTED_VOICES[@]} ]]; then
+        VOICE_NAME="${SORTED_VOICES[$INDEX]}"
+        FOUND="${SORTED_VOICES[$INDEX]}"
+      else
+        echo "❌ Invalid number. Please choose between 1 and ${#SORTED_VOICES[@]}"
+        exit 1
       fi
-    done
+    else
+      # Check if voice exists (case-insensitive)
+      FOUND=""
+      for voice in "${!VOICES[@]}"; do
+        if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
+          FOUND="$voice"
+          break
+        fi
+      done
+    fi
 
     if [[ -z "$FOUND" ]]; then
       echo "❌ Unknown voice: $VOICE_NAME"
