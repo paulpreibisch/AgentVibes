@@ -1,7 +1,7 @@
 # 🎤 AgentVibes
 
-> Beautiful ElevenLabs TTS voice commands for Claude Code
-> Add professional narration to your AI coding sessions
+> **Bring your Claude Code sessions to life with voice!**
+> Professional text-to-speech narration powered by ElevenLabs AI voices
 
 [![npm version](https://badge.fury.io/js/agentvibes.svg)](https://badge.fury.io/js/agentvibes)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -11,265 +11,383 @@
 
 ---
 
+## 📑 Table of Contents
+
+- [What is AgentVibes?](#-what-is-agentvibes)
+- [Quick Start](#-quick-start)
+- [Personalities & Sentiments](#-personalities--sentiments)
+- [Voice Commands](#-voice-commands)
+- [Available Voices](#-available-voices)
+- [Installation Details](#-installation-details)
+- [Advanced Usage](#-advanced-usage)
+
+---
+
 ## ✨ What is AgentVibes?
 
-AgentVibes brings your Claude Code sessions to life with beautiful text-to-speech narration powered by ElevenLabs. Get audio feedback for completions, errors, and important updates - making your AI-assisted coding more immersive and productive.
+**AgentVibes adds lively voice narration to your Claude Code sessions!**
 
-### 🎯 Features
+Imagine Claude speaking to you with different voices and personalities as you code. Whether you want a sarcastic assistant, a pirate captain, or a wise grandpa - AgentVibes brings your AI coding buddy to life with professional ElevenLabs voices.
 
-- 🎤 **15+ Professional Voices** - Character voices from ElevenLabs
-- 🎵 **Instant Audio Feedback** - Hear task completions and updates
-- 🎭 **Personality Styles** - Add emotion and character to messages
-- 🔄 **Voice Switching** - Change voices on the fly
-- 📋 **Voice Preview** - Listen to samples before choosing
-- 🔁 **Audio Replay** - Replay last 10 messages
-- ➕ **Custom Voices** - Add your own ElevenLabs voices
-- ⚡ **One Command Install** - Local installation
+### 🎯 Key Features
+
+- 🎙️ **17+ Professional AI Voices** - Choose from characters, accents, and unique personalities
+- 🎭 **18 Built-in Personalities** - From sarcastic to flirty, pirate to professional
+- 💬 **Sentiment System** - Apply personality styles to ANY voice you choose
+- 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions
+- 🎵 **Voice Preview** - Listen before you choose
+- 🔄 **Audio Replay** - Replay the last 10 TTS messages
+- ⚡ **One-Command Install** - Get started in seconds
 
 ---
 
 ## 🚀 Quick Start
 
-### Installation
+### Step 1: Install AgentVibes
 
-**🔧 Local Development (not yet published to npm):**
+**Local Development (not yet on npm):**
 
 ```bash
-# Clone the repo
-cd ~/claude/AgentVibes
-
-# Install dependencies
-npm install
-
-# Run installer from your project directory
+# From your project directory
 cd ~/my-project
+
+# Install AgentVibes
 node ~/claude/AgentVibes/bin/agent-vibes install
 ```
 
-### Enable Voice Narration
+### Step 2: Get Your ElevenLabs API Key
 
-After installation, activate TTS voice narration in Claude Code:
+1. Sign up at [elevenlabs.io](https://elevenlabs.io/) (free tier available!)
+2. Copy your API key from the dashboard
+3. Add it to your environment:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+echo 'export ELEVENLABS_API_KEY="your-api-key-here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Step 3: Enable Voice in Claude Code
 
 ```bash
 /output-style agent-vibes
 ```
 
-This enables automatic TTS for task acknowledgments and completions.
+**That's it! Claude will now speak to you!** 🎉
 
-### Setup ElevenLabs API Key
+---
 
-1. Sign up at [elevenlabs.io](https://elevenlabs.io/)
-2. Copy your API key
-3. Set it in your environment:
+## 🎭 Personalities & Sentiments
+
+AgentVibes has two powerful ways to customize how Claude speaks:
+
+### 🎪 Personalities (Voice + Style)
+
+Personalities change **both the voice AND how Claude talks**. Each personality has a dedicated ElevenLabs voice:
+
+| Personality | Voice | Style |
+|------------|-------|-------|
+| **Sarcastic** | Jessica Anne Bogart | Dry wit and cutting observations |
+| **Flirty** | Jessica Anne Bogart | Playful charm and compliments |
+| **Pirate** | Pirate Marshal | Seafaring swagger - "Arr matey!" |
+| **Grandpa** | Grandpa Werthers | Rambling nostalgic stories |
+| **Angry** | Drill Sergeant | Frustrated and loud |
+| **Robot** | Dr. Von Fusion | Mechanical and precise |
+| **Zen** | Aria | Peaceful and mindful |
+| **Professional** | Michael | Formal and corporate |
+
+**18 total personalities** including: dramatic, millennial, surfer-dude, sassy, poetic, moody, funny, annoying, crass, normal, and random!
 
 ```bash
-export ELEVENLABS_API_KEY="your-api-key-here"
+# Try different personalities
+/agent-vibes:personality sarcastic
+/agent-vibes:personality pirate
+/agent-vibes:personality grandpa
+
+# List all available
+/agent-vibes:personality list
 ```
 
-For permanent setup, add to your `~/.bashrc` or `~/.zshrc`:
+### 💭 Sentiments (Style Only)
+
+**Sentiments apply personality styles to YOUR current voice** - perfect for custom voices!
 
 ```bash
-echo 'export ELEVENLABS_API_KEY="your-api-key-here"' >> ~/.bashrc
-source ~/.bashrc
+# Use YOUR voice with sarcastic attitude
+/agent-vibes:sentiment sarcastic
+
+# Use YOUR voice with flirty charm
+/agent-vibes:sentiment flirty
+
+# Clear sentiment
+/agent-vibes:sentiment clear
+```
+
+**The difference:**
+- **Personality** = Changes voice + style (e.g., Pirate Marshal + pirate speak)
+- **Sentiment** = Keeps your voice + adds style (e.g., Your Voice + sarcasm)
+
+### 🎤 Switch Voice with Sentiment
+
+```bash
+# Switch to Aria with sarcastic sentiment
+/agent-vibes:switch Aria --sentiment sarcastic
+
+# Switch to Cowboy Bob with zen sentiment
+/agent-vibes:switch "Cowboy Bob" --sentiment zen
 ```
 
 ---
 
-## 🎭 Available Commands
+## 🎤 Voice Commands
 
-Once installed, use these slash commands in Claude Code:
+### Core Commands
 
-### `/agent-vibes`
-Show all available commands and documentation
+| Command | Description |
+|---------|-------------|
+| `/agent-vibes:list` | Show all available voices |
+| `/agent-vibes:switch <voice>` | Change to a different voice |
+| `/agent-vibes:whoami` | Show current voice & personality |
+| `/agent-vibes:preview [N]` | Preview voices with audio samples |
+| `/agent-vibes:sample <voice>` | Test a specific voice |
+| `/agent-vibes:replay [N]` | Replay recent TTS audio |
 
-### `/agent-vibes:list [first|last] [N]`
-List all available voices
-```
-/agent-vibes:list              # Show all voices
-/agent-vibes:list first 5      # Show first 5 voices
-/agent-vibes:list last 3       # Show last 3 voices
-```
+### Personality Commands
 
-### `/agent-vibes:preview [first|last] [N]`
-Preview voices by playing audio samples
-```
-/agent-vibes:preview           # Preview first 3 voices
-/agent-vibes:preview 5         # Preview first 5 voices
-/agent-vibes:preview last 5    # Preview last 5 voices
-```
+| Command | Description |
+|---------|-------------|
+| `/agent-vibes:personality <name>` | Set personality (changes voice + style) |
+| `/agent-vibes:personality list` | Show all personalities |
+| `/agent-vibes:personality add <name>` | Create custom personality |
+| `/agent-vibes:personality edit <name>` | Edit personality file |
 
-### `/agent-vibes:switch <voice_name>`
-Switch to a different default voice. Your voice selection is saved locally in `.claude/tts-voice.txt` and persists across Claude Code sessions.
-```
-/agent-vibes:switch Aria
-/agent-vibes:switch "Cowboy Bob"
-/agent-vibes:switch Northern Terry
-```
+### Sentiment Commands
 
-### `/agent-vibes:get`
-Display the currently selected voice
+| Command | Description |
+|---------|-------------|
+| `/agent-vibes:sentiment <name>` | Apply sentiment to current voice |
+| `/agent-vibes:sentiment list` | Show all available sentiments |
+| `/agent-vibes:sentiment get` | Show current sentiment |
+| `/agent-vibes:sentiment clear` | Remove sentiment |
 
-### `/agent-vibes:whoami`
-Show current voice (alias for `:get`)
+### Advanced Commands
 
-### `/agent-vibes:sample <voice_name>`
-Test a specific voice with sample text
-```
-/agent-vibes:sample Aria
-/agent-vibes:sample "Southern Mama"
-```
-
-### `/agent-vibes:add <name> <voice_id>`
-Add a custom voice from your ElevenLabs account
-```
-/agent-vibes:add "My Voice" abc123xyz456
-```
-
-### `/agent-vibes:replay [N]`
-Replay recently played TTS audio
-```
-/agent-vibes:replay            # Replay last audio
-/agent-vibes:replay 1          # Replay most recent
-/agent-vibes:replay 2          # Replay second-to-last
-```
-
-### `/agent-vibes:personality <style>`
-Set personality style for TTS messages
-```
-/agent-vibes:personality flirty       # Playful and charming
-/agent-vibes:personality sarcastic    # Dry wit and irony
-/agent-vibes:personality list         # Show all personalities
-/agent-vibes:personality add cowboy "Howdy!" "Partner!"  # Custom
-```
-
-Available personalities: normal, flirty, angry, sassy, moody, funny, sarcastic, poetic, annoying, professional, pirate, robot, surfer-dude, millennial, zen, dramatic, crass, random (picks randomly each time)
+| Command | Description |
+|---------|-------------|
+| `/agent-vibes:add <name> <voice_id>` | Add custom ElevenLabs voice |
+| `/agent-vibes:set-pretext <text>` | Add prefix to all TTS messages |
 
 ---
 
-## 🎨 Default Voices
+## 🗣️ Available Voices
 
-AgentVibes comes with 15 Character Voices from ElevenLabs:
+AgentVibes includes **17 unique ElevenLabs voices**:
 
-- **Aria** (default) - Clear, professional
-- **Northern Terry** - Warm, friendly
-- **Cowboy Bob** - Western charm
-- **Southern Mama** - Comforting drawl
-- **Grandpa Spuds Oxley** - Wise elder
-- **Ms. Walker** - Professional teacher
-- **Ralf Eisend** - German precision
-- **Amy** - Bright Chinese accent
-- **Michael** - Authoritative
-- **Jessica Anne Bogart** - Enthusiastic
-- **Lutz Laugh** - Jovial
-- **Dr. Von Fusion** - Mad scientist
-- **Matthew Schmitz** - Deep baritone
-- **Demon Monster** - Spooky fun
-- **Drill Sergeant** - Military command
+| Voice Name | Character | Best For |
+|-----------|-----------|----------|
+| **Aria** | Clear professional | Default, all-purpose |
+| **Jessica Anne Bogart** | Wickedly eloquent | Sarcastic, flirty personalities |
+| **Pirate Marshal** | Authentic pirate | Pirate personality |
+| **Grandpa Werthers** | Nostalgic elder | Grandpa personality |
+| **Drill Sergeant** | Military authority | Angry personality |
+| **Cowboy Bob** | Western charm | Casual, friendly |
+| **Northern Terry** | Eccentric British | Quirky responses |
+| **Ms. Walker** | Warm teacher | Professional, helpful |
+| **Dr. Von Fusion** | Mad scientist | Robot personality |
+| **Matthew Schmitz** | Deep baritone | Dramatic readings |
+| **Grandpa Spuds Oxley** | Wise elder | Wisdom and advice |
+| **Michael** | British urban | Professional work |
+| **Ralf Eisend** | International speaker | Multi-cultural |
+| **Amy** | Chinese accent | Diverse representation |
+| **Lutz Laugh** | Jovial and giggly | Funny moments |
+| **Demon Monster** | Deep and spooky | Fun and dramatic |
+
+### Add Your Own Voices
+
+```bash
+# Get voice ID from elevenlabs.io
+/agent-vibes:add "My Voice" abc123xyz789
+```
+
+---
+
+## 📦 Installation Details
+
+### What Gets Installed?
+
+```
+your-project/
+└── .claude/
+    ├── commands/
+    │   └── agent-vibes/           # All slash commands
+    ├── hooks/
+    │   ├── voice-manager.sh       # Voice switching logic
+    │   ├── personality-manager.sh # Personality system
+    │   ├── sentiment-manager.sh   # Sentiment system
+    │   ├── play-tts.sh           # TTS playback
+    │   └── voices-config.sh      # Voice ID mappings
+    ├── personalities/            # 18 personality templates
+    │   ├── sarcastic.md
+    │   ├── flirty.md
+    │   ├── pirate.md
+    │   └── ... (15 more)
+    ├── output-styles/
+    │   └── agent-vibes.md        # Voice output style
+    └── audio/                    # Generated TTS files
+        └── tts-*.mp3            # Last 10 kept for replay
+```
+
+### Voice Settings Storage
+
+- **Current Voice**: `~/.claude/tts-voice.txt`
+- **Current Personality**: `~/.claude/tts-personality.txt`
+- **Current Sentiment**: `~/.claude/tts-sentiment.txt`
+
+These persist across Claude Code sessions!
+
+### CLI Management
+
+```bash
+# Check installation status
+node ~/claude/AgentVibes/bin/agent-vibes status
+
+# Update to latest version
+node ~/claude/AgentVibes/bin/agent-vibes update
+
+# Install with options
+node ~/claude/AgentVibes/bin/agent-vibes install --yes --directory ~/my-project
+```
 
 ---
 
 ## 🔧 Advanced Usage
 
-### Using Voices in Output Styles
+### Using in Output Styles
 
-You can specify voices in your Claude Code output style:
+Specify voices directly in your custom output styles:
 
 ```markdown
-I'll [do the task]
-[Bash: play-tts.sh "I'll do the task" "Aria"]
-[... does the work ...]
-✅ [Task complete]
-[Bash: play-tts.sh "Task complete" "Aria"]
+I'll start the task
+[Bash: .claude/hooks/play-tts.sh "Starting task" "Aria"]
+
+... work happens ...
+
+✅ Task complete!
+[Bash: .claude/hooks/play-tts.sh "All done" "Cowboy Bob"]
 ```
 
-### Adding Custom Voices
+### Create Custom Personalities
 
-1. Go to [elevenlabs.io/app/voice-library](https://elevenlabs.io/app/voice-library)
-2. Select or create a voice
-3. Copy the voice ID (15-30 character alphanumeric string)
-4. Add it with:
+1. Create a new personality:
+   ```bash
+   /agent-vibes:personality add mycustom
    ```
-   /agent-vibes:add "Custom Voice" voice-id-here
+
+2. Edit the generated file at `.claude/personalities/mycustom.md`:
+   ```markdown
+   ---
+   name: mycustom
+   description: My custom style
+   voice: Aria
+   ---
+
+   ## AI Instructions
+   Speak in your unique style here...
    ```
 
----
+3. Use it:
+   ```bash
+   /agent-vibes:personality mycustom
+   ```
 
-## 📦 What Gets Installed?
+### Sentiment Priority
 
-```
-your-project/
-└── .claude/
-    ├── audio/                      # Generated TTS audio files saved here
-    │   └── tts-*.mp3              # Audio files (last 10 kept for replay)
-    ├── tts-voice.txt              # Your selected voice preference
-    ├── commands/
-    │   ├── agent-vibes.md
-    │   ├── agent-vibes:list.md
-    │   ├── agent-vibes:preview.md
-    │   ├── agent-vibes:switch.md
-    │   ├── agent-vibes:get.md
-    │   ├── agent-vibes:whoami.md
-    │   ├── agent-vibes:sample.md
-    │   ├── agent-vibes:add.md
-    │   ├── agent-vibes:replay.md
-    │   └── agent-vibes:personality.md
-    ├── output-styles/
-    │   └── agent-vibes.md          # TTS output style for voice narration
-    └── hooks/
-        ├── voice-manager.sh
-        ├── personality-manager.sh
-        └── play-tts.sh
-```
+**How it works:**
+1. If sentiment is set → Uses sentiment style with current voice
+2. If no sentiment → Uses personality (includes voice change)
 
----
-
-## 🛠️ CLI Commands
-
-Check installation status:
 ```bash
+# Example workflow
+/agent-vibes:switch Aria              # Set voice to Aria
+/agent-vibes:sentiment sarcastic      # Add sarcasm to Aria
+/agent-vibes:sentiment clear          # Remove sentiment
+/agent-vibes:personality pirate       # Switch to Pirate Marshal + pirate style
+```
+
+---
+
+## 🌟 Tips & Tricks
+
+### Best Voice/Personality Combos
+
+- **Debugging**: Sarcastic + Jessica Anne Bogart 😏
+- **Learning**: Professional + Michael 📚
+- **Fun Coding**: Pirate + Pirate Marshal 🏴‍☠️
+- **Late Night**: Zen + Aria 🧘
+- **Pair Programming**: Grandpa + Grandpa Werthers 👴
+
+### Audio Replay
+
+Lost what Claude just said?
+```bash
+/agent-vibes:replay      # Replay last message
+/agent-vibes:replay 2    # Replay 2nd-to-last
+/agent-vibes:replay 5    # Replay 5th-to-last
+```
+
+### Voice Preview
+
+Not sure which voice to choose?
+```bash
+/agent-vibes:preview        # Hear first 3 voices
+/agent-vibes:preview 10     # Hear first 10 voices
+/agent-vibes:preview last 5 # Hear last 5 voices
+```
+
+---
+
+## ❓ Troubleshooting
+
+### No Audio Playing?
+
+1. Check API key: `echo $ELEVENLABS_API_KEY`
+2. Check output style: `/output-style agent-vibes`
+3. Test playback: `/agent-vibes:sample Aria`
+
+### Commands Not Found?
+
+```bash
+# Verify installation
 node ~/claude/AgentVibes/bin/agent-vibes status
-```
 
-Install in specific directory:
-```bash
-node ~/claude/AgentVibes/bin/agent-vibes install --directory /path/to/project
-```
-
-Skip confirmation prompt:
-```bash
+# Reinstall if needed
 node ~/claude/AgentVibes/bin/agent-vibes install --yes
 ```
 
----
+### Audio Files Piling Up?
 
-## 🌟 Show Some Love
-
-If AgentVibes enhances your coding sessions:
-- ⭐ Star this repo
-- 📣 Tweet about it @997Fire
-- 🎤 Share your favorite voices
-- 💬 Tag me in your AI coding videos
+Audio files are auto-limited to 10 most recent in `.claude/audio/`
 
 ---
 
-## 📝 License
+## 🙏 Credits & License
 
-Apache 2.0 License - See [LICENSE](LICENSE) for details
+**Built with ❤️ by [Paul Preibisch](https://github.com/paulpreibisch) ([@997Fire](https://x.com/997Fire))**
 
----
-
-## 🙏 Credits
-
-- Built by [Paul Preibisch](https://github.com/paulpreibisch) ([@997Fire](https://x.com/997Fire))
-- Powered by [ElevenLabs](https://elevenlabs.io/)
+- Powered by [ElevenLabs](https://elevenlabs.io/) AI voices
 - Made for [Claude Code](https://claude.com/claude-code)
+- Licensed under Apache 2.0
 
 ---
 
-## 🤝 Contributing
+## 🤝 Show Some Love
 
-PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+If AgentVibes makes your coding more fun:
+- ⭐ **Star this repo** on GitHub
+- 🐦 **Tweet about it** and tag [@997Fire](https://x.com/997Fire)
+- 🎥 **Share your videos** of Claude with personality
+- 💬 **Tell your dev friends** about voice-powered AI coding
 
 ---
 
-**Enjoy your TTS-enhanced coding sessions! 🎵**
+**Ready to give your Claude a voice? Install now and start coding with personality! 🎤✨**

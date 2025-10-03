@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const VERSION = '2.0.0';
+const VERSION = '1.0.0';
 
 // Beautiful ASCII art
 function showWelcome() {
