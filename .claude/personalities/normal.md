@@ -1,6 +1,7 @@
 ---
 name: normal
 description: Professional and clear communication
+voice: Aria
 ---
 
 # Normal Personality
