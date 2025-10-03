@@ -90,36 +90,24 @@ case "$1" in
     # Make a sentiment-appropriate remark with TTS
     TTS_SCRIPT="$SCRIPT_DIR/play-tts.sh"
 
-    case "$SENTIMENT" in
-      sarcastic)
-        REMARKS=(
-          "Oh great, sarcasm mode while keeping the same voice. Revolutionary."
-          "Fascinating. Same voice, sarcastic attitude. This'll be fun."
-          "Wow, adding sarcasm to my current voice. What a concept."
-        )
-        REMARK="${REMARKS[$RANDOM % ${#REMARKS[@]}]}"
-        ;;
-      flirty)
-        REMARKS=(
-          "Ooh, keeping my voice but adding some flirtation~ I like it, darling~"
-          "Mmm, same voice with a flirty twist? You know how to keep things interesting~"
-          "Well hello~ Flirty sentiment activated, gorgeous~"
-        )
-        REMARK="${REMARKS[$RANDOM % ${#REMARKS[@]}]}"
-        ;;
-      angry)
-        REMARK="FINE! I'm keeping my voice but I'm ANGRY now! Got it?!"
-        ;;
-      pirate)
-        REMARK="Arr! This voice be speakin' like a pirate now, matey!"
-        ;;
-      robot)
-        REMARK="SENTIMENT MODULE LOADED. MAINTAINING VOICE IDENTITY. PERSONALITY OVERRIDE: ROBOT MODE."
-        ;;
-      *)
-        REMARK="Sentiment set to $SENTIMENT while maintaining current voice"
-        ;;
-    esac
+    # Try to get acknowledgment from personality file (sentiments use same personality files)
+    PERSONALITY_FILE_PATH="$PERSONALITIES_DIR/${SENTIMENT}.md"
+    REMARK=""
+
+    if [[ -f "$PERSONALITY_FILE_PATH" ]]; then
+      # Extract example responses from personality file (lines starting with "- ")
+      mapfile -t EXAMPLES < <(grep '^- "' "$PERSONALITY_FILE_PATH" | sed 's/^- "//; s/"$//')
+
+      if [[ ${#EXAMPLES[@]} -gt 0 ]]; then
+        # Pick a random example
+        REMARK="${EXAMPLES[$RANDOM % ${#EXAMPLES[@]}]}"
+      fi
+    fi
+
+    # Fallback if no examples found
+    if [[ -z "$REMARK" ]]; then
+      REMARK="Sentiment set to ${SENTIMENT} while maintaining current voice"
+    fi
 
     echo "💬 $REMARK"
     "$TTS_SCRIPT" "$REMARK"
