@@ -269,7 +269,14 @@ program
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     const targetDir = options.directory || homeDir;
 
+    // Read version from package.json
+    const packageJson = JSON.parse(
+      await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8')
+    );
+    const version = packageJson.version;
+
     console.log(chalk.cyan('\n🔄 AgentVibes Update\n'));
+    console.log(chalk.bold(`   Version: ${version}`));
     console.log(chalk.gray(`   Target directory: ${targetDir}`));
     console.log(chalk.gray(`   Source: ${__dirname}/../\n`));
 
@@ -388,6 +395,28 @@ program
       console.log(chalk.white(`   • ${hookFiles.length} TTS scripts updated`));
       console.log(chalk.white(`   • ${srcPersonalityFiles.length} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
       console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
+
+      // Show recent changes from git log
+      try {
+        const { execSync } = await import('node:child_process');
+        const gitLog = execSync(
+          'git log --oneline --no-decorate -5',
+          { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+        ).trim();
+
+        if (gitLog) {
+          console.log(chalk.cyan('📝 Recent Changes:\n'));
+          const commits = gitLog.split('\n');
+          commits.forEach(commit => {
+            const [hash, ...messageParts] = commit.split(' ');
+            const message = messageParts.join(' ');
+            console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+          });
+          console.log();
+        }
+      } catch (error) {
+        // Git not available or not a git repo - skip changelog
+      }
 
       console.log(chalk.gray('💡 Changes will take effect immediately!'));
       console.log(chalk.gray('   Try the new personalities with: /agent-vibes:personality list\n'));
