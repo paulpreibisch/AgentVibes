@@ -420,10 +420,15 @@ The update command will:
 
 ## 🙏 Credits
 
-**Built with ❤️ by [Paul Preibisch](https://github.com/paulpreibisch) ([@997Fire](https://x.com/997Fire))**
+**Built with ❤️ by [Paul Preibisch](https://github.com/paulpreibisch)**
 
-- Powered by [ElevenLabs](https://elevenlabs.io/) AI voices
-- Made for [Claude Code](https://claude.com/claude-code)
+- 🐦 Twitter: [@997Fire](https://x.com/997Fire)
+- 💼 LinkedIn: [paul-preibisch](https://www.linkedin.com/in/paul-preibisch/)
+- 🌐 GitHub: [paulpreibisch](https://github.com/paulpreibisch)
+
+**Powered by:**
+- [ElevenLabs](https://elevenlabs.io/) AI voices
+- [Claude Code](https://claude.com/claude-code)
 - Licensed under Apache 2.0
 
 ---
