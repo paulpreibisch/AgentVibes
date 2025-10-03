@@ -298,7 +298,9 @@ case "$1" in
       exit 1
     fi
 
-    echo "🔊 Replaying audio #$N: $(basename "$AUDIO_FILE")"
+    echo "🔊 Replaying audio #$N:"
+    echo "   File: $(basename "$AUDIO_FILE")"
+    echo "   Path: $AUDIO_FILE"
 
     # Play the audio file in background
     (paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE" 2>/dev/null || mpg123 "$AUDIO_FILE" 2>/dev/null) &
