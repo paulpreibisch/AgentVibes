@@ -248,13 +248,61 @@ case "$1" in
     done | sort
     ;;
 
+  replay)
+    # Replay recent TTS audio from history
+    AUDIO_DIR="$HOME/.claude/audio"
+
+    # Default to replay last audio (N=1)
+    N="${2:-1}"
+
+    # Validate N is a number
+    if ! [[ "$N" =~ ^[0-9]+$ ]]; then
+      echo "❌ Invalid argument. Please use a number (1-10)"
+      echo "Usage: /agent-vibes:replay [N]"
+      echo "  N=1 - Last audio (default)"
+      echo "  N=2 - Second-to-last"
+      echo "  N=3 - Third-to-last"
+      exit 1
+    fi
+
+    # Check bounds
+    if [[ $N -lt 1 || $N -gt 10 ]]; then
+      echo "❌ Number out of range. Please choose 1-10"
+      exit 1
+    fi
+
+    # Get list of audio files sorted by time (newest first)
+    if [[ ! -d "$AUDIO_DIR" ]]; then
+      echo "❌ No audio history found"
+      echo "Audio files are stored in: $AUDIO_DIR"
+      exit 1
+    fi
+
+    # Get the Nth most recent file
+    AUDIO_FILE=$(ls -t "$AUDIO_DIR"/tts-*.mp3 2>/dev/null | sed -n "${N}p")
+
+    if [[ -z "$AUDIO_FILE" ]]; then
+      TOTAL=$(ls -t "$AUDIO_DIR"/tts-*.mp3 2>/dev/null | wc -l)
+      echo "❌ Audio #$N not found in history"
+      echo "Total audio files available: $TOTAL"
+      exit 1
+    fi
+
+    echo "🔊 Replaying audio #$N: $(basename "$AUDIO_FILE")"
+
+    # Play the audio file in background
+    (paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE" 2>/dev/null || mpg123 "$AUDIO_FILE" 2>/dev/null) &
+    ;;
+
   *)
-    echo "Usage: voice-manager.sh [list|switch|get] [voice_name]"
+    echo "Usage: voice-manager.sh [list|switch|get|replay|whoami] [voice_name]"
     echo ""
     echo "Commands:"
     echo "  list                    - List all available voices"
     echo "  switch <voice_name>     - Switch to a different voice"
     echo "  get                     - Get current voice name"
+    echo "  replay [N]              - Replay Nth most recent audio (default: 1)"
+    echo "  whoami                  - Show current voice and personality"
     exit 1
     ;;
 esac
