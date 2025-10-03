@@ -113,11 +113,11 @@ case "$1" in
     # Check if personality has an assigned voice
     ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "voice")
     if [[ -n "$ASSIGNED_VOICE" ]]; then
-      # Switch to the assigned voice
+      # Switch to the assigned voice (silently - personality will do the talking)
       VOICE_MANAGER="$SCRIPT_DIR/voice-manager.sh"
       if [[ -x "$VOICE_MANAGER" ]]; then
         echo "🎤 Switching to assigned voice: $ASSIGNED_VOICE"
-        "$VOICE_MANAGER" switch "$ASSIGNED_VOICE" >/dev/null 2>&1
+        "$VOICE_MANAGER" switch "$ASSIGNED_VOICE" --silent >/dev/null 2>&1
       fi
     fi
 

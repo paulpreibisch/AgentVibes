@@ -1,0 +1,39 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ master, v1 ]
+  pull_request:
+    branches: [ master, v1 ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Run tests
+        env:
+          ELEVENLABS_API_KEY: test_mock_key
+        run: npm test
+
+      - name: Report test results
+        if: always()
+        run: |
+          echo "✅ Test suite completed"
+          echo "See test results above"

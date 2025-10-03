@@ -84,6 +84,14 @@ case "$1" in
 
   switch)
     VOICE_NAME="$2"
+    SILENT_MODE=false
+
+    # Check for --silent flag
+    if [[ "$2" == "--silent" ]] || [[ "$3" == "--silent" ]]; then
+      SILENT_MODE=true
+      # If --silent is first arg, voice name is in $3
+      [[ "$2" == "--silent" ]] && VOICE_NAME="$3"
+    fi
 
     if [[ -z "$VOICE_NAME" ]]; then
       # Show numbered list for selection
@@ -190,11 +198,13 @@ case "$1" in
     echo "✅ Voice switched to: $FOUND"
     echo "🎤 Voice ID: ${VOICES[$FOUND]}"
 
-    # Have the new voice introduce itself
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
-    if [ -x "$PLAY_TTS" ]; then
-      "$PLAY_TTS" "Hi, I'm $FOUND. I'll be your voice assistant moving forward." "$FOUND" > /dev/null 2>&1 &
+    # Have the new voice introduce itself (unless silent mode)
+    if [[ "$SILENT_MODE" != "true" ]]; then
+      SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+      PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
+      if [ -x "$PLAY_TTS" ]; then
+        "$PLAY_TTS" "Hi, I'm $FOUND. I'll be your voice assistant moving forward." "$FOUND" > /dev/null 2>&1 &
+      fi
     fi
     ;;
 
