@@ -1,9 +1,16 @@
 #!/bin/bash
 # Sentiment manager for AgentVibes - applies personality to current voice
 
-SENTIMENT_FILE="$HOME/.claude/tts-sentiment.txt"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PERSONALITIES_DIR="$SCRIPT_DIR/../personalities"
+
+# Project-local file first, global fallback
+PROJECT_ROOT="$SCRIPT_DIR/../.."
+if [[ -d "$PROJECT_ROOT/.claude" ]]; then
+  SENTIMENT_FILE="$PROJECT_ROOT/.claude/tts-sentiment.txt"
+else
+  SENTIMENT_FILE="$HOME/.claude/tts-sentiment.txt"
+fi
 
 # Function to get personality data from markdown file
 get_personality_data() {

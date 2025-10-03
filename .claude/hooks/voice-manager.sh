@@ -2,11 +2,17 @@
 # Voice Manager - Handle voice switching and listing
 # Usage: voice-manager.sh [list|switch|get] [voice_name]
 
-VOICE_FILE="/tmp/claude-tts-voice-${USER}.txt"
-
 # Source the single voice configuration file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/voices-config.sh"
+
+# Project-local file first, global fallback
+PROJECT_ROOT="$SCRIPT_DIR/../.."
+if [[ -d "$PROJECT_ROOT/.claude" ]]; then
+  VOICE_FILE="$PROJECT_ROOT/.claude/tts-voice.txt"
+else
+  VOICE_FILE="$HOME/.claude/tts-voice.txt"
+fi
 
 case "$1" in
   list)

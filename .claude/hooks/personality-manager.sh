@@ -1,9 +1,16 @@
 #!/bin/bash
 # Personality manager for AgentVibes - adds character to TTS messages
 
-PERSONALITY_FILE="$HOME/.claude/tts-personality.txt"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PERSONALITIES_DIR="$SCRIPT_DIR/../personalities"
+
+# Project-local file first, global fallback
+PROJECT_ROOT="$SCRIPT_DIR/../.."
+if [[ -d "$PROJECT_ROOT/.claude" ]]; then
+  PERSONALITY_FILE="$PROJECT_ROOT/.claude/tts-personality.txt"
+else
+  PERSONALITY_FILE="$HOME/.claude/tts-personality.txt"
+fi
 
 # Function to get personality data from markdown file
 get_personality_data() {
