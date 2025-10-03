@@ -45,7 +45,8 @@ function showWelcome() {
 async function install(options = {}) {
   showWelcome();
 
-  const targetDir = options.directory || process.cwd();
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const targetDir = options.directory || homeDir;
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
   console.log(chalk.gray(`   Target directory: ${targetDir}`));
@@ -253,7 +254,7 @@ program
 program
   .command('install')
   .description('Install AgentVibes voice commands')
-  .option('-d, --directory <path>', 'Installation directory (default: current directory)')
+  .option('-d, --directory <path>', 'Installation directory (default: home directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
     await install(options);
@@ -262,10 +263,11 @@ program
 program
   .command('update')
   .description('Update AgentVibes to latest version from source')
-  .option('-d, --directory <path>', 'Installation directory (default: current directory)')
+  .option('-d, --directory <path>', 'Installation directory (default: home directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
-    const targetDir = options.directory || process.cwd();
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const targetDir = options.directory || homeDir;
 
     console.log(chalk.cyan('\n🔄 AgentVibes Update\n'));
     console.log(chalk.gray(`   Target directory: ${targetDir}`));
