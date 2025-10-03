@@ -1,0 +1,82 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.2, v2.1.0, etc.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # Needed to create GitHub releases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            # Get commits since previous tag
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Save to output (escape newlines)
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## 🎉 AgentVibes v${{ steps.version.outputs.VERSION }}
+
+            ### 📦 Installation
+            ```bash
+            npx agentvibes@${{ steps.version.outputs.VERSION }} install
+            ```
+
+            ### 📝 Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ### 🔗 Links
+            - 📦 [npm package](https://www.npmjs.com/package/agentvibes/v/${{ steps.version.outputs.VERSION }})
+            - 📚 [Documentation](https://github.com/paulpreibisch/AgentVibes#readme)
+
+            ---
+
+            **Built with ❤️ by [Paul Preibisch](https://github.com/paulpreibisch)**
+          draft: false
+          prerelease: false
