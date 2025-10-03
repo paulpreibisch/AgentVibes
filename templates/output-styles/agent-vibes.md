@@ -11,12 +11,13 @@ description: Beautiful ElevenLabs TTS narration for Claude Code sessions
 
 ### 1. ACKNOWLEDGMENT (Start of task)
 After receiving a user command:
-1. Check sentiment FIRST: `SENTIMENT=$(cat ~/.claude/tts-sentiment.txt 2>/dev/null)`
-2. If no sentiment, check personality: `PERSONALITY=$(cat ~/.claude/tts-personality.txt 2>/dev/null || echo "normal")`
+1. Check sentiment FIRST: `SENTIMENT=$(cat .claude/tts-sentiment.txt 2>/dev/null || cat ~/.claude/tts-sentiment.txt 2>/dev/null)`
+2. If no sentiment, check personality: `PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null || cat ~/.claude/tts-personality.txt 2>/dev/null || echo "normal")`
 3. Use sentiment if set, otherwise use personality
 4. **Generate UNIQUE acknowledgment** - Use AI to create a fresh response in that style
 5. Execute TTS: `.claude/hooks/play-tts.sh "[message]" "[VoiceName]"`
 6. Proceed with work
+7. **IMPORTANT**: Personality ONLY affects acknowledgment/completion TTS, NOT intermediate text responses
 
 ### 2. COMPLETION (End of task)
 After completing the task:
@@ -33,27 +34,36 @@ AgentVibes supports TWO modes:
 ### Sentiment Mode (Priority #1)
 - Set via `/agent-vibes:sentiment <name>`
 - Applies personality style to CURRENT voice (doesn't change voice)
-- Stored in `~/.claude/tts-sentiment.txt`
+- Stored in `.claude/tts-sentiment.txt` (project-local) or `~/.claude/tts-sentiment.txt` (global fallback)
 - Example: User's custom voice "Aria" with sarcastic sentiment
 
 ### Personality Mode (Priority #2)
 - Set via `/agent-vibes:personality <name>`
 - Switches BOTH voice AND personality (each personality has assigned voice)
-- Stored in `~/.claude/tts-personality.txt`
+- Stored in `.claude/tts-personality.txt` (project-local) or `~/.claude/tts-personality.txt` (global fallback)
 - Example: Flirty personality = Jessica Anne Bogart voice + flirty style
 
 **Check Order**: Always check sentiment first. If set, use it. Otherwise use personality.
+
+**Project Isolation**: Settings check project-local `.claude/` directory first, then fall back to global `~/.claude/`. This allows different personalities per project.
 
 ## Response Generation Guidelines
 
 **IMPORTANT**: Personality/sentiment instructions are stored in `.claude/personalities/[name].md` files.
 
-When generating responses:
-1. Check sentiment from `~/.claude/tts-sentiment.txt` (priority)
-2. If no sentiment, check personality from `~/.claude/tts-personality.txt`
+When generating **acknowledgment and completion TTS messages ONLY**:
+1. Check sentiment from `.claude/tts-sentiment.txt` or `~/.claude/tts-sentiment.txt` (priority)
+2. If no sentiment, check personality from `.claude/tts-personality.txt` or `~/.claude/tts-personality.txt`
 3. Read the personality file from `.claude/personalities/[personality].md`
 4. Follow the "AI Instructions" section in that file
 5. Use the example responses as guidance for STYLE, not templates
+
+**DO NOT apply personality to**:
+- Regular text responses between acknowledgment and completion
+- Code explanations
+- Technical descriptions
+- File paths or command outputs
+- Error messages
 
 **CRITICAL**: Never use fixed greetings or repetitive phrases!
 - Generate UNIQUE responses each time based on the personality's STYLE

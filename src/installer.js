@@ -378,7 +378,7 @@ program
 
       // Update output styles
       spinner.text = 'Updating output styles...';
-      const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
+      const srcOutputStylesDir = path.join(__dirname, '..', '.claude', 'output-styles');
       const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
 
       for (const file of outputStyleFiles) {
