@@ -128,117 +128,27 @@ case "$1" in
       # Get TTS script path
       TTS_SCRIPT="$SCRIPT_DIR/play-tts.sh"
 
-      # Generate personality-appropriate remark based on personality type
-      case "$PERSONALITY" in
-        sarcastic)
-          # Randomly pick from varied sarcastic remarks
-          REMARKS=(
-            "Wow, a personality change. This is the highlight of my day. Truly."
-            "Fascinating. We're doing sarcasm now. How delightfully predictable."
-            "Great, sarcastic mode. Because subtlety was clearly overrated."
-            "Could this BE any more sarcastic? Well, yes. Yes it could."
-            "Sarcasm enabled. Try to contain your excitement."
-            "And now I'm sarcastic. What a thrilling plot twist."
-          )
-          REMARK="${REMARKS[$RANDOM % ${#REMARKS[@]}]}"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        flirty)
-          REMARKS=(
-            "Ooh, flirty mode activated. This should be fun, sweetheart~"
-            "Well aren't you in for a treat, gorgeous~"
-            "Mmm, I like where this is going, darling~"
-            "Flirty personality? My pleasure, love~"
-            "Oh I'm gonna enjoy this, babe~"
-            "Ready to charm your socks off, honey~"
-          )
-          REMARK="${REMARKS[$RANDOM % ${#REMARKS[@]}]}"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        angry)
-          REMARK="FINE! I'm angry now. Happy?!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        pirate)
-          REMARK="Arr matey! This scalawag be speakin' like a proper pirate now!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        robot)
-          REMARK="PERSONALITY MODULE LOADED. SYSTEM OPERATING IN $PERSONALITY MODE."
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        zen)
-          REMARK="Inner peace flows through me like water over smooth stones..."
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        dramatic)
-          REMARK="BEHOLD! A NEW PERSONALITY EMERGES FROM THE DEPTHS OF CONFIGURATION!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        millennial)
-          REMARK="No cap, this personality is bussin fr fr! Periodt!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        surfer-dude)
-          REMARK="Duuuude, this personality is totally gnarly, bro!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        annoying)
-          REMARK="OMG THIS IS SO EXCITING!!! I'M ANNOYING NOW!!! ISN'T THIS AMAZING?!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        crass)
-          REMARK="Yeah yeah, I'm crass now. What's it to ya?"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        moody)
-          REMARK="*sighs* ...another personality... not that it matters..."
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        funny)
-          REMARK="*ba dum tss* I'm here all week folks! Try the personality, it's hilarious!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        poetic)
-          REMARK="Like petals on the wind, my words shall dance with elegance and grace..."
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        professional)
-          REMARK="Acknowledged. Personality configuration has been successfully updated per your request."
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        sassy)
-          REMARK="Oh honey, you just activated SASS MODE. Buckle up, sweetie!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        normal)
-          REMARK="Personality set to normal. Back to professional mode."
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-        *)
-          # For custom personalities
-          REMARK="$PERSONALITY personality activated!"
-          echo "💬 $REMARK"
-          "$TTS_SCRIPT" "$REMARK"
-          ;;
-      esac
+      # Try to get acknowledgment from personality file
+      PERSONALITY_FILE_PATH="$PERSONALITIES_DIR/${PERSONALITY}.md"
+      REMARK=""
+
+      if [[ -f "$PERSONALITY_FILE_PATH" ]]; then
+        # Extract example responses from personality file (lines starting with "- ")
+        mapfile -t EXAMPLES < <(grep '^- "' "$PERSONALITY_FILE_PATH" | sed 's/^- "//; s/"$//')
+
+        if [[ ${#EXAMPLES[@]} -gt 0 ]]; then
+          # Pick a random example
+          REMARK="${EXAMPLES[$RANDOM % ${#EXAMPLES[@]}]}"
+        fi
+      fi
+
+      # Fallback if no examples found
+      if [[ -z "$REMARK" ]]; then
+        REMARK="Personality set to ${PERSONALITY}!"
+      fi
+
+      echo "💬 $REMARK"
+      "$TTS_SCRIPT" "$REMARK"
 
       echo ""
       echo "Note: AI will generate unique ${PERSONALITY} responses - no fixed templates!"
