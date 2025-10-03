@@ -34,53 +34,60 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Generate changelog with categories
+      - name: Generate changelog with AI summary
         id: changelog
         run: |
-          # Get the previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          if [ -z "$PREV_TAG" ]; then
-            # First release - get all commits
-            COMMITS=$(git log --pretty=format:"%s (%h)" --no-merges)
+          # Check if AI-generated release notes exist
+          if [ -f "RELEASE_NOTES.md" ]; then
+            echo "📝 Using AI-generated release notes from RELEASE_NOTES.md"
+            CHANGELOG=$(cat RELEASE_NOTES.md)
           else
-            # Get commits since previous tag
-            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s (%h)" --no-merges)
-          fi
+            echo "📝 Generating automatic changelog from commits"
+            # Get the previous tag
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
-          # Categorize commits by conventional commit type
-          FEATURES=$(echo "$COMMITS" | grep "^feat:" | sed 's/^feat: /- /' || echo "")
-          FIXES=$(echo "$COMMITS" | grep "^fix:" | sed 's/^fix: /- /' || echo "")
-          DOCS=$(echo "$COMMITS" | grep "^docs:" | sed 's/^docs: /- /' || echo "")
-          TESTS=$(echo "$COMMITS" | grep "^test:" | sed 's/^test: /- /' || echo "")
-          CHORES=$(echo "$COMMITS" | grep "^chore:" | sed 's/^chore: /- /' || echo "")
-          OTHER=$(echo "$COMMITS" | grep -v "^feat:\|^fix:\|^docs:\|^test:\|^chore:" | sed 's/^/- /' || echo "")
+            if [ -z "$PREV_TAG" ]; then
+              # First release - get all commits
+              COMMITS=$(git log --pretty=format:"%s (%h)" --no-merges)
+            else
+              # Get commits since previous tag
+              COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s (%h)" --no-merges)
+            fi
 
-          # Build formatted changelog
-          CHANGELOG=""
+            # Categorize commits by conventional commit type
+            FEATURES=$(echo "$COMMITS" | grep "^feat:" | sed 's/^feat: /- /' || echo "")
+            FIXES=$(echo "$COMMITS" | grep "^fix:" | sed 's/^fix: /- /' || echo "")
+            DOCS=$(echo "$COMMITS" | grep "^docs:" | sed 's/^docs: /- /' || echo "")
+            TESTS=$(echo "$COMMITS" | grep "^test:" | sed 's/^test: /- /' || echo "")
+            CHORES=$(echo "$COMMITS" | grep "^chore:" | sed 's/^chore: /- /' || echo "")
+            OTHER=$(echo "$COMMITS" | grep -v "^feat:\|^fix:\|^docs:\|^test:\|^chore:" | sed 's/^/- /' || echo "")
 
-          if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n\n"
-          fi
+            # Build formatted changelog
+            CHANGELOG=""
 
-          if [ -n "$FIXES" ]; then
-            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n\n"
-          fi
+            if [ -n "$FEATURES" ]; then
+              CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n\n"
+            fi
 
-          if [ -n "$DOCS" ]; then
-            CHANGELOG="${CHANGELOG}### 📚 Documentation\n${DOCS}\n\n"
-          fi
+            if [ -n "$FIXES" ]; then
+              CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n\n"
+            fi
 
-          if [ -n "$TESTS" ]; then
-            CHANGELOG="${CHANGELOG}### 🧪 Testing\n${TESTS}\n\n"
-          fi
+            if [ -n "$DOCS" ]; then
+              CHANGELOG="${CHANGELOG}### 📚 Documentation\n${DOCS}\n\n"
+            fi
 
-          if [ -n "$CHORES" ]; then
-            CHANGELOG="${CHANGELOG}### 🔧 Maintenance\n${CHORES}\n\n"
-          fi
+            if [ -n "$TESTS" ]; then
+              CHANGELOG="${CHANGELOG}### 🧪 Testing\n${TESTS}\n\n"
+            fi
 
-          if [ -n "$OTHER" ]; then
-            CHANGELOG="${CHANGELOG}### 📦 Other Changes\n${OTHER}\n\n"
+            if [ -n "$CHORES" ]; then
+              CHANGELOG="${CHANGELOG}### 🔧 Maintenance\n${CHORES}\n\n"
+            fi
+
+            if [ -n "$OTHER" ]; then
+              CHANGELOG="${CHANGELOG}### 📦 Other Changes\n${OTHER}\n\n"
+            fi
           fi
 
           # Save to output
