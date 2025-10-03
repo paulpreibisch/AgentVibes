@@ -52,11 +52,12 @@ async function install(options = {}) {
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
-  console.log(chalk.gray(`   • 11 slash commands → ${targetDir}/.claude/commands/`));
-  console.log(chalk.gray(`   • 3 TTS scripts → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • 11 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
+  console.log(chalk.gray(`   • 4 TTS scripts → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • 10+ personality templates → ${targetDir}/.claude/personalities/`));
   console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
   console.log(chalk.gray(`   • Voice configuration files`));
-  console.log(chalk.gray(`   • 15+ character voices with personality styles\n`));
+  console.log(chalk.gray(`   • 15+ ElevenLabs character voices\n`));
 
   // Confirmation prompt (unless --yes flag is used)
   if (!options.yes) {
@@ -109,17 +110,21 @@ async function install(options = {}) {
 
     // Copy command files
     spinner.start('Installing /agent-vibes slash commands...');
-    const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands');
+    const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
     const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
 
-    // Copy all command files
+    // Create agent-vibes commands directory
+    const agentVibesCommandsDir = path.join(commandsDir, 'agent-vibes');
+    await fs.mkdir(agentVibesCommandsDir, { recursive: true });
+
+    // Copy all command files to agent-vibes folder
     const commandFiles = await fs.readdir(srcCommandsDir);
     console.log(chalk.cyan(`\n📋 Installing ${commandFiles.length} command files:`));
     for (const file of commandFiles) {
       const srcPath = path.join(srcCommandsDir, file);
-      const destPath = path.join(commandsDir, file);
+      const destPath = path.join(agentVibesCommandsDir, file);
       await fs.copyFile(srcPath, destPath);
-      console.log(chalk.gray(`   ✓ ${file}`));
+      console.log(chalk.gray(`   ✓ agent-vibes/${file}`));
     }
     spinner.succeed(chalk.green('Installed /agent-vibes commands!\n'));
 
@@ -135,6 +140,25 @@ async function install(options = {}) {
       console.log(chalk.gray(`   ✓ ${file} (executable)`));
     }
     spinner.succeed(chalk.green('Installed TTS scripts!\n'));
+
+    // Copy personalities folder
+    spinner.start('Installing personality templates...');
+    const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+    const destPersonalitiesDir = path.join(claudeDir, 'personalities');
+
+    // Create personalities directory
+    await fs.mkdir(destPersonalitiesDir, { recursive: true });
+
+    // Copy all personality files
+    const personalityFiles = await fs.readdir(srcPersonalitiesDir);
+    console.log(chalk.cyan(`🎭 Installing ${personalityFiles.length} personality templates:`));
+    for (const file of personalityFiles) {
+      const srcPath = path.join(srcPersonalitiesDir, file);
+      const destPath = path.join(destPersonalitiesDir, file);
+      await fs.copyFile(srcPath, destPath);
+      console.log(chalk.gray(`   ✓ ${file}`));
+    }
+    spinner.succeed(chalk.green('Installed personality templates!\n'));
 
     // Copy output styles
     spinner.start('Installing output styles...');
@@ -177,14 +201,18 @@ async function install(options = {}) {
     console.log(chalk.cyan('📦 Installation Summary:'));
     console.log(chalk.white(`   • ${commandFiles.length} slash commands installed`));
     console.log(chalk.white(`   • ${hookFiles.length} TTS scripts installed`));
+    console.log(chalk.white(`   • ${personalityFiles.length} personality templates installed`));
     console.log(chalk.white(`   • ${outputStyleFiles.length} output styles installed`));
     console.log(chalk.white(`   • Voice manager ready`));
-    console.log(chalk.white(`   • 15+ character voices available\n`));
+    console.log(chalk.white(`   • 15+ ElevenLabs voices available\n`));
 
     // Success message
     console.log(
       boxen(
         chalk.green.bold('✨ Installation Complete! ✨\n\n') +
+        chalk.yellow.bold('⚠️  IMPORTANT SETUP STEP:\n') +
+        chalk.white('In Claude Code, run this command:\n') +
+        chalk.cyan.bold('/output-style agent-vibes') + '\n\n' +
         chalk.white('🎤 Available Commands:\n\n') +
         chalk.cyan('  /agent-vibes') + chalk.gray(' ................. Show all commands\n') +
         chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............ List available voices\n') +
@@ -202,10 +230,13 @@ async function install(options = {}) {
       )
     );
 
-    console.log(chalk.gray('\n💡 Next steps:'));
-    console.log(chalk.gray('   1. Set output style: /output-style agent-vibes'));
-    console.log(chalk.gray('   2. Try /agent-vibes:list to see all voices'));
-    console.log(chalk.gray('   3. Use /agent-vibes:switch to change your voice\n'));
+    console.log(chalk.yellow.bold('\n⚠️  REQUIRED SETUP:'));
+    console.log(chalk.white('   1. In Claude Code, run: ') + chalk.cyan.bold('/output-style agent-vibes'));
+    console.log(chalk.gray('      This enables TTS narration for your sessions\n'));
+    console.log(chalk.gray('💡 Then try these commands:'));
+    console.log(chalk.gray('   • /agent-vibes:list - See all available voices'));
+    console.log(chalk.gray('   • /agent-vibes:switch <name> - Change your voice'));
+    console.log(chalk.gray('   • /agent-vibes:personality <style> - Set personality\n'));
 
   } catch (error) {
     spinner.fail('Installation failed!');
@@ -229,18 +260,156 @@ program
   });
 
 program
+  .command('update')
+  .description('Update AgentVibes to latest version from source')
+  .option('-d, --directory <path>', 'Installation directory (default: current directory)')
+  .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
+  .action(async (options) => {
+    const targetDir = options.directory || process.cwd();
+
+    console.log(chalk.cyan('\n🔄 AgentVibes Update\n'));
+    console.log(chalk.gray(`   Target directory: ${targetDir}`));
+    console.log(chalk.gray(`   Source: ${__dirname}/../\n`));
+
+    // Check if already installed
+    const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
+    let isInstalled = false;
+    try {
+      await fs.access(commandsDir);
+      isInstalled = true;
+    } catch {}
+
+    if (!isInstalled) {
+      console.log(chalk.red('❌ AgentVibes is not installed in this directory.'));
+      console.log(chalk.gray('   Run: node src/installer.js install\n'));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan('📦 What will be updated:'));
+    console.log(chalk.gray('   • Slash commands (keep your customizations)'));
+    console.log(chalk.gray('   • TTS scripts'));
+    console.log(chalk.gray('   • Personality templates (new personalities added)'));
+    console.log(chalk.gray('   • Output styles\n'));
+
+    // Confirmation
+    if (!options.yes) {
+      const { confirm } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: chalk.yellow('Update AgentVibes to latest version?'),
+          default: true,
+        },
+      ]);
+
+      if (!confirm) {
+        console.log(chalk.red('\n❌ Update cancelled.\n'));
+        process.exit(0);
+      }
+    } else {
+      console.log(chalk.green('✓ Auto-confirmed (--yes flag)\n'));
+    }
+
+    const spinner = ora('Updating AgentVibes...').start();
+
+    try {
+      const claudeDir = path.join(targetDir, '.claude');
+      const hooksDir = path.join(claudeDir, 'hooks');
+      const outputStylesDir = path.join(claudeDir, 'output-styles');
+      const personalitiesDir = path.join(claudeDir, 'personalities');
+
+      // Update commands
+      spinner.text = 'Updating commands...';
+      const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
+      const commandFiles = await fs.readdir(srcCommandsDir);
+
+      for (const file of commandFiles) {
+        const srcPath = path.join(srcCommandsDir, file);
+        const destPath = path.join(commandsDir, file);
+        await fs.copyFile(srcPath, destPath);
+      }
+      console.log(chalk.green(`\n✓ Updated ${commandFiles.length} commands`));
+
+      // Update hooks
+      spinner.text = 'Updating TTS scripts...';
+      const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
+      const hookFiles = await fs.readdir(srcHooksDir);
+
+      for (const file of hookFiles) {
+        const srcPath = path.join(srcHooksDir, file);
+        const destPath = path.join(hooksDir, file);
+        await fs.copyFile(srcPath, destPath);
+        await fs.chmod(destPath, 0o755);
+      }
+      console.log(chalk.green(`✓ Updated ${hookFiles.length} TTS scripts`));
+
+      // Update personalities (only add new ones, don't overwrite existing)
+      spinner.text = 'Updating personality templates...';
+      const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+      const srcPersonalityFiles = await fs.readdir(srcPersonalitiesDir);
+      let newPersonalities = 0;
+      let updatedPersonalities = 0;
+
+      for (const file of srcPersonalityFiles) {
+        const srcPath = path.join(srcPersonalitiesDir, file);
+        const destPath = path.join(personalitiesDir, file);
+
+        try {
+          await fs.access(destPath);
+          // File exists - update it
+          await fs.copyFile(srcPath, destPath);
+          updatedPersonalities++;
+        } catch {
+          // File doesn't exist - add it
+          await fs.copyFile(srcPath, destPath);
+          newPersonalities++;
+        }
+      }
+      console.log(chalk.green(`✓ Updated ${updatedPersonalities} personalities, added ${newPersonalities} new`));
+
+      // Update output styles
+      spinner.text = 'Updating output styles...';
+      const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
+      const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
+
+      for (const file of outputStyleFiles) {
+        const srcPath = path.join(srcOutputStylesDir, file);
+        const destPath = path.join(outputStylesDir, file);
+        await fs.copyFile(srcPath, destPath);
+      }
+      console.log(chalk.green(`✓ Updated ${outputStyleFiles.length} output styles`));
+
+      spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
+
+      console.log(chalk.cyan('📦 Update Summary:'));
+      console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
+      console.log(chalk.white(`   • ${hookFiles.length} TTS scripts updated`));
+      console.log(chalk.white(`   • ${srcPersonalityFiles.length} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
+      console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
+
+      console.log(chalk.gray('💡 Changes will take effect immediately!'));
+      console.log(chalk.gray('   Try the new personalities with: /agent-vibes:personality list\n'));
+
+    } catch (error) {
+      spinner.fail('Update failed!');
+      console.error(chalk.red('\n❌ Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('status')
   .description('Show installation status')
   .action(async () => {
     console.log(chalk.cyan('Checking AgentVibes installation...\n'));
 
     const targetDir = process.cwd();
-    const commandsDir = path.join(targetDir, '.claude', 'commands');
+    const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
     const hooksDir = path.join(targetDir, '.claude', 'hooks');
 
     let installed = false;
     try {
-      await fs.access(path.join(commandsDir, 'agent-vibes.md'));
+      await fs.access(commandsDir);
       installed = true;
     } catch {}
 
@@ -250,7 +419,7 @@ program
       console.log(chalk.gray(`   Hooks: ${hooksDir}`));
     } else {
       console.log(chalk.yellow('⚠️  AgentVibes is not installed.'));
-      console.log(chalk.gray('   Run: npx agentvibes install'));
+      console.log(chalk.gray('   Run: node src/installer.js install'));
     }
 
     // Check API key

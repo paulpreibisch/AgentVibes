@@ -2,28 +2,51 @@
 # Personality manager for AgentVibes - adds character to TTS messages
 
 PERSONALITY_FILE="$HOME/.claude/tts-personality.txt"
-CUSTOM_PERSONALITIES_FILE="$HOME/.claude/custom-personalities.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PERSONALITIES_DIR="$SCRIPT_DIR/../personalities"
 
-# Default personalities with their modifiers (natural language only)
-declare -A PERSONALITIES=(
-  ["normal"]="NORMAL:|"
-  ["flirty"]="FLIRTY: Well hello there, | Hope that made you smile"
-  ["angry"]="ANGRY: Fine! | There, happy now?"
-  ["sassy"]="SASSY: Oh honey, | You're welcome, I guess"
-  ["moody"]="MOODY: If I must, | Whatever, it's done"
-  ["funny"]="FUNNY: Alrighty then! | Boom, nailed it!"
-  ["sarcastic"]="SARCASTIC: Oh joy, | Absolutely thrilling, I'm sure"
-  ["poetic"]="POETIC: With grace and purpose, | And so the tale concludes"
-  ["annoying"]="ANNOYING: Oh my gosh oh my gosh! | Best thing ever, right?"
-  ["professional"]="PROFESSIONAL: Certainly, | Task completed successfully"
-  ["pirate"]="PIRATE: Ahoy matey! | That be done, arr!"
-  ["robot"]="ROBOT: Processing request. | Operation complete."
-  ["surfer-dude"]="SURFER: Dude, | Totally rad, bro!"
-  ["millennial"]="MILLENNIAL: No cap, | And that's the tea"
-  ["zen"]="ZEN: With mindful intention, | Peace and completion"
-  ["dramatic"]="DRAMATIC: Behold! | Thus ends our epic journey!"
-  ["crass"]="CRASS: Yeah yeah, | There, you happy now or what?"
-)
+# Function to get personality data from markdown file
+get_personality_data() {
+  local personality="$1"
+  local field="$2"
+  local file="$PERSONALITIES_DIR/${personality}.md"
+
+  if [[ ! -f "$file" ]]; then
+    return 1
+  fi
+
+  case "$field" in
+    prefix)
+      sed -n '/^## Prefix/,/^##/p' "$file" | sed '1d;$d' | tr -d '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      ;;
+    suffix)
+      sed -n '/^## Suffix/,/^##/p' "$file" | sed '1d;$d' | tr -d '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      ;;
+    description)
+      grep "^description:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      ;;
+    voice)
+      grep "^voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      ;;
+    instructions)
+      sed -n '/^## AI Instructions/,/^##/p' "$file" | sed '1d;$d'
+      ;;
+  esac
+}
+
+# Function to list all available personalities
+list_personalities() {
+  local personalities=()
+
+  # Find all .md files in personalities directory
+  if [[ -d "$PERSONALITIES_DIR" ]]; then
+    for file in "$PERSONALITIES_DIR"/*.md; do
+      if [[ -f "$file" ]]; then
+        basename "$file" .md
+      fi
+    done
+  fi
+}
 
 case "$1" in
   list)
@@ -36,142 +59,190 @@ case "$1" in
       CURRENT=$(cat "$PERSONALITY_FILE")
     fi
 
-    # List built-in personalities
-    echo "Built-in:"
-    for personality in "${!PERSONALITIES[@]}"; do
+    # List personalities from markdown files
+    echo "Built-in personalities:"
+    for personality in $(list_personalities | sort); do
+      desc=$(get_personality_data "$personality" "description")
       if [[ "$personality" == "$CURRENT" ]]; then
-        echo "  ✓ $personality (current)"
+        echo "  ✓ $personality - $desc (current)"
       else
-        echo "  - $personality"
+        echo "  - $personality - $desc"
       fi
-    done | sort
+    done
 
     # Add random option
     if [[ "$CURRENT" == "random" ]]; then
-      echo "  ✓ random (current) - picks randomly each time"
+      echo "  ✓ random - Picks randomly each time (current)"
     else
-      echo "  - random - picks randomly each time"
-    fi
-
-    # List custom personalities if they exist
-    if [ -f "$CUSTOM_PERSONALITIES_FILE" ] && [ -s "$CUSTOM_PERSONALITIES_FILE" ]; then
-      echo ""
-      echo "Custom:"
-      # Parse custom personalities (simple approach)
-      grep '"name"' "$CUSTOM_PERSONALITIES_FILE" | sed 's/.*"name": *"\([^"]*\)".*/  - \1/'
+      echo "  - random - Picks randomly each time"
     fi
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     echo "Usage: /agent-vibes:personality <name>"
-    echo "       /agent-vibes:personality add <name> <prefix> <suffix>"
+    echo "       /agent-vibes:personality add <name>"
+    echo "       /agent-vibes:personality edit <name>"
     ;;
 
   set|switch)
-    PERSONALITY_NAME="$2"
+    PERSONALITY="$2"
 
-    if [[ -z "$PERSONALITY_NAME" ]]; then
-      echo "❌ Error: Please specify a personality"
-      echo "Usage: /agent-vibes:personality <name>"
+    if [[ -z "$PERSONALITY" ]]; then
+      echo "❌ Please specify a personality name"
+      echo "Usage: $0 set <personality>"
       exit 1
     fi
 
-    # Handle special "random" personality
-    if [[ "$PERSONALITY_NAME" == "random" ]]; then
-      echo "$PERSONALITY_NAME" > "$PERSONALITY_FILE"
-      echo "🎲 Personality set to: random (will pick randomly each time)"
-
-      # Demo with a random personality
-      SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-      PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
-
-      if [ -x "$PLAY_TTS" ]; then
-        "$PLAY_TTS" "I'll surprise you with a different personality each time" > /dev/null 2>&1 &
-      fi
-      exit 0
-    fi
-
-    # Check if it's a built-in personality
-    if [[ -n "${PERSONALITIES[$PERSONALITY_NAME]}" ]]; then
-      echo "$PERSONALITY_NAME" > "$PERSONALITY_FILE"
-      echo "🎭 Personality set to: $PERSONALITY_NAME"
-
-      # Have the voice demonstrate the new personality
-      SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-      PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
-
-      # Get the personality prefix
-      IFS='|' read -r PREFIX SUFFIX <<< "${PERSONALITIES[$PERSONALITY_NAME]}"
-      PREFIX=$(echo "$PREFIX" | sed 's/^[^:]*: *//')
-
-      if [ -x "$PLAY_TTS" ]; then
-        DEMO_MESSAGE="$PREFIX I'm now using the $PERSONALITY_NAME personality"
-        "$PLAY_TTS" "$DEMO_MESSAGE" > /dev/null 2>&1 &
-      fi
-    else
-      # Check custom personalities
-      if [ -f "$CUSTOM_PERSONALITIES_FILE" ]; then
-        if grep -q "\"name\": *\"$PERSONALITY_NAME\"" "$CUSTOM_PERSONALITIES_FILE"; then
-          echo "$PERSONALITY_NAME" > "$PERSONALITY_FILE"
-          echo "🎭 Personality set to custom: $PERSONALITY_NAME"
-        else
-          echo "❌ Unknown personality: $PERSONALITY_NAME"
-          echo "Use '/agent-vibes:personality list' to see available options"
-          exit 1
-        fi
-      else
-        echo "❌ Unknown personality: $PERSONALITY_NAME"
-        echo "Use '/agent-vibes:personality list' to see available options"
+    # Check if personality file exists (unless it's random)
+    if [[ "$PERSONALITY" != "random" ]]; then
+      if [[ ! -f "$PERSONALITIES_DIR/${PERSONALITY}.md" ]]; then
+        echo "❌ Personality not found: $PERSONALITY"
+        echo ""
+        echo "Available personalities:"
+        for p in $(list_personalities | sort); do
+          echo "  • $p"
+        done
         exit 1
       fi
     fi
-    ;;
 
-  add)
-    NAME="$2"
-    PREFIX="$3"
-    SUFFIX="$4"
+    # Save the personality
+    echo "$PERSONALITY" > "$PERSONALITY_FILE"
+    echo "🎭 Personality set to: $PERSONALITY"
 
-    if [[ -z "$NAME" || -z "$PREFIX" || -z "$SUFFIX" ]]; then
-      echo "❌ Error: Missing parameters"
-      echo "Usage: /agent-vibes:personality add <name> <prefix> <suffix>"
-      echo "Example: /agent-vibes:personality add \"cowboy\" \"Howdy partner!\" \"Yeehaw!\""
-      exit 1
-    fi
-
-    # Create custom personalities file if it doesn't exist
-    if [ ! -f "$CUSTOM_PERSONALITIES_FILE" ]; then
-      echo "[]" > "$CUSTOM_PERSONALITIES_FILE"
-    fi
-
-    # Add the custom personality (simple JSON append)
-    # Note: In production, you'd want proper JSON parsing
-    TEMP_FILE=$(mktemp)
-    if [ -s "$CUSTOM_PERSONALITIES_FILE" ]; then
-      # Remove the closing bracket
-      head -c -2 "$CUSTOM_PERSONALITIES_FILE" > "$TEMP_FILE"
-      if [ $(wc -l < "$CUSTOM_PERSONALITIES_FILE") -gt 1 ]; then
-        echo "," >> "$TEMP_FILE"
+    # Check if personality has an assigned voice
+    ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "voice")
+    if [[ -n "$ASSIGNED_VOICE" ]]; then
+      # Switch to the assigned voice
+      VOICE_MANAGER="$SCRIPT_DIR/voice-manager.sh"
+      if [[ -x "$VOICE_MANAGER" ]]; then
+        echo "🎤 Switching to assigned voice: $ASSIGNED_VOICE"
+        "$VOICE_MANAGER" switch "$ASSIGNED_VOICE" >/dev/null 2>&1
       fi
-    else
-      echo "[" > "$TEMP_FILE"
     fi
 
-    cat >> "$TEMP_FILE" << EOF
-  {
-    "name": "$NAME",
-    "prefix": "$PREFIX",
-    "suffix": "$SUFFIX"
-  }
-]
-EOF
+    # Make a personality-appropriate remark with TTS
+    if [[ "$PERSONALITY" != "random" ]]; then
+      echo ""
 
-    mv "$TEMP_FILE" "$CUSTOM_PERSONALITIES_FILE"
-    echo "✅ Added custom personality: $NAME"
-    echo "   Prefix: $PREFIX"
-    echo "   Suffix: $SUFFIX"
-    echo ""
-    echo "Use: /agent-vibes:personality $NAME"
+      # Get TTS script path
+      TTS_SCRIPT="$SCRIPT_DIR/play-tts.sh"
+
+      # Generate personality-appropriate remark based on personality type
+      case "$PERSONALITY" in
+        sarcastic)
+          # Randomly pick from varied sarcastic remarks
+          REMARKS=(
+            "Wow, a personality change. This is the highlight of my day. Truly."
+            "Fascinating. We're doing sarcasm now. How delightfully predictable."
+            "Great, sarcastic mode. Because subtlety was clearly overrated."
+            "Could this BE any more sarcastic? Well, yes. Yes it could."
+            "Sarcasm enabled. Try to contain your excitement."
+            "And now I'm sarcastic. What a thrilling plot twist."
+          )
+          REMARK="${REMARKS[$RANDOM % ${#REMARKS[@]}]}"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        flirty)
+          REMARKS=(
+            "Ooh, flirty mode activated. This should be fun, sweetheart~"
+            "Well aren't you in for a treat, gorgeous~"
+            "Mmm, I like where this is going, darling~"
+            "Flirty personality? My pleasure, love~"
+            "Oh I'm gonna enjoy this, babe~"
+            "Ready to charm your socks off, honey~"
+          )
+          REMARK="${REMARKS[$RANDOM % ${#REMARKS[@]}]}"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        angry)
+          REMARK="FINE! I'm angry now. Happy?!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        pirate)
+          REMARK="Arr matey! This scalawag be speakin' like a proper pirate now!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        robot)
+          REMARK="PERSONALITY MODULE LOADED. SYSTEM OPERATING IN $PERSONALITY MODE."
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        zen)
+          REMARK="Inner peace flows through me like water over smooth stones..."
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        dramatic)
+          REMARK="BEHOLD! A NEW PERSONALITY EMERGES FROM THE DEPTHS OF CONFIGURATION!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        millennial)
+          REMARK="No cap, this personality is bussin fr fr! Periodt!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        surfer-dude)
+          REMARK="Duuuude, this personality is totally gnarly, bro!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        annoying)
+          REMARK="OMG THIS IS SO EXCITING!!! I'M ANNOYING NOW!!! ISN'T THIS AMAZING?!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        crass)
+          REMARK="Yeah yeah, I'm crass now. What's it to ya?"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        moody)
+          REMARK="*sighs* ...another personality... not that it matters..."
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        funny)
+          REMARK="*ba dum tss* I'm here all week folks! Try the personality, it's hilarious!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        poetic)
+          REMARK="Like petals on the wind, my words shall dance with elegance and grace..."
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        professional)
+          REMARK="Acknowledged. Personality configuration has been successfully updated per your request."
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        sassy)
+          REMARK="Oh honey, you just activated SASS MODE. Buckle up, sweetie!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        normal)
+          REMARK="Personality set to normal. Back to professional mode."
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+        *)
+          # For custom personalities
+          REMARK="$PERSONALITY personality activated!"
+          echo "💬 $REMARK"
+          "$TTS_SCRIPT" "$REMARK"
+          ;;
+      esac
+
+      echo ""
+      echo "Note: AI will generate unique ${PERSONALITY} responses - no fixed templates!"
+    fi
     ;;
 
   get)
@@ -179,76 +250,83 @@ EOF
       CURRENT=$(cat "$PERSONALITY_FILE")
       echo "Current personality: $CURRENT"
 
-      # Show the modifiers
-      if [[ -n "${PERSONALITIES[$CURRENT]}" ]]; then
-        IFS='|' read -r PREFIX SUFFIX <<< "${PERSONALITIES[$CURRENT]}"
-        echo "  Start: $(echo "$PREFIX" | sed 's/^[^:]*: *//')"
-        echo "  End: $(echo "$SUFFIX" | sed 's/^ *//')"
+      if [[ "$CURRENT" != "random" ]]; then
+        desc=$(get_personality_data "$CURRENT" "description")
+        [[ -n "$desc" ]] && echo "Description: $desc"
       fi
     else
       echo "Current personality: normal (default)"
     fi
     ;;
 
-  apply)
-    # Used internally by play-tts.sh to apply personality
-    MESSAGE="$2"
-    TYPE="$3"  # "start" or "end"
-
-    PERSONALITY="normal"
-    if [ -f "$PERSONALITY_FILE" ]; then
-      PERSONALITY=$(cat "$PERSONALITY_FILE")
+  add)
+    NAME="$2"
+    if [[ -z "$NAME" ]]; then
+      echo "❌ Please specify a personality name"
+      echo "Usage: $0 add <name>"
+      exit 1
     fi
 
-    # Handle random personality
-    if [[ "$PERSONALITY" == "random" ]]; then
-      # Get all personality names (excluding normal and random)
-      PERSONALITY_ARRAY=()
-      for p in "${!PERSONALITIES[@]}"; do
-        if [[ "$p" != "normal" && "$p" != "random" ]]; then
-          PERSONALITY_ARRAY+=("$p")
-        fi
-      done
-
-      # Pick a random one
-      RANDOM_INDEX=$((RANDOM % ${#PERSONALITY_ARRAY[@]}))
-      PERSONALITY="${PERSONALITY_ARRAY[$RANDOM_INDEX]}"
+    FILE="$PERSONALITIES_DIR/${NAME}.md"
+    if [[ -f "$FILE" ]]; then
+      echo "❌ Personality '$NAME' already exists"
+      echo "Use 'edit' to modify it"
+      exit 1
     fi
 
-    # Get modifiers for this personality
-    if [[ -n "${PERSONALITIES[$PERSONALITY]}" ]]; then
-      IFS='|' read -r PREFIX SUFFIX <<< "${PERSONALITIES[$PERSONALITY]}"
+    # Create new personality file
+    cat > "$FILE" << 'EOF'
+---
+name: NAME
+description: Custom personality
+---
 
-      if [[ "$TYPE" == "start" ]]; then
-        MODIFIER=$(echo "$PREFIX" | sed 's/^[^:]*: *//')
-      else
-        MODIFIER=$(echo "$SUFFIX" | sed 's/^ *//')
-      fi
+# NAME Personality
 
-      # Don't add modifier for normal personality
-      if [[ "$PERSONALITY" != "normal" ]]; then
-        echo "$MODIFIER $MESSAGE"
-      else
-        echo "$MESSAGE"
-      fi
-    else
-      # Check custom personalities
-      if [ -f "$CUSTOM_PERSONALITIES_FILE" ]; then
-        # Extract custom personality (simple grep approach)
-        if grep -q "\"name\": *\"$PERSONALITY\"" "$CUSTOM_PERSONALITIES_FILE"; then
-          if [[ "$TYPE" == "start" ]]; then
-            MODIFIER=$(grep -A1 "\"name\": *\"$PERSONALITY\"" "$CUSTOM_PERSONALITIES_FILE" | grep "prefix" | sed 's/.*"prefix": *"\([^"]*\)".*/\1/')
-          else
-            MODIFIER=$(grep -A2 "\"name\": *\"$PERSONALITY\"" "$CUSTOM_PERSONALITIES_FILE" | grep "suffix" | sed 's/.*"suffix": *"\([^"]*\)".*/\1/')
-          fi
-          echo "$MODIFIER $MESSAGE"
-        else
-          echo "$MESSAGE"
-        fi
-      else
-        echo "$MESSAGE"
-      fi
+## Prefix
+
+
+## Suffix
+
+
+## AI Instructions
+Describe how the AI should generate messages for this personality.
+
+## Example Responses
+- "Example response 1"
+- "Example response 2"
+EOF
+
+    # Replace NAME with actual name
+    sed -i "s/NAME/$NAME/g" "$FILE"
+
+    echo "✅ Created new personality: $NAME"
+    echo "📝 Edit the file: $FILE"
+    echo ""
+    echo "You can now customize:"
+    echo "  • Prefix: Text before messages"
+    echo "  • Suffix: Text after messages"
+    echo "  • AI Instructions: How AI should speak"
+    echo "  • Example Responses: Sample messages"
+    ;;
+
+  edit)
+    NAME="$2"
+    if [[ -z "$NAME" ]]; then
+      echo "❌ Please specify a personality name"
+      echo "Usage: $0 edit <name>"
+      exit 1
     fi
+
+    FILE="$PERSONALITIES_DIR/${NAME}.md"
+    if [[ ! -f "$FILE" ]]; then
+      echo "❌ Personality '$NAME' not found"
+      echo "Use 'add' to create it first"
+      exit 1
+    fi
+
+    echo "📝 Edit this file to customize the personality:"
+    echo "$FILE"
     ;;
 
   reset)
@@ -257,18 +335,24 @@ EOF
     ;;
 
   *)
-    echo "AgentVibes Personality Manager"
-    echo ""
-    echo "Commands:"
-    echo "  list                              - List all personalities"
-    echo "  set/switch <name>                 - Set personality"
-    echo "  add <name> <prefix> <suffix>      - Add custom personality"
-    echo "  get                               - Show current personality"
-    echo "  reset                             - Reset to normal"
-    echo ""
-    echo "Examples:"
-    echo "  /agent-vibes:personality flirty"
-    echo "  /agent-vibes:personality add cowboy \"Howdy!\" \"Partner!\""
-    exit 1
+    # If a single argument is provided and it's not a command, treat it as "set <personality>"
+    if [[ -n "$1" ]] && [[ -f "$PERSONALITIES_DIR/${1}.md" || "$1" == "random" ]]; then
+      # Call set with the personality name
+      exec "$0" set "$1"
+    else
+      echo "AgentVibes Personality Manager"
+      echo ""
+      echo "Commands:"
+      echo "  list                              - List all personalities"
+      echo "  set/switch <name>                 - Set personality"
+      echo "  add <name>                        - Create new personality"
+      echo "  edit <name>                       - Show path to edit personality"
+      echo "  get                               - Show current personality"
+      echo "  reset                             - Reset to normal"
+      echo ""
+      echo "Examples:"
+      echo "  /agent-vibes:personality flirty"
+      echo "  /agent-vibes:personality add cowboy"
+    fi
     ;;
 esac

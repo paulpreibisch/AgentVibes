@@ -1,6 +1,6 @@
 ---
 description: Switch to a different ElevenLabs TTS voice
-argument-hint: [voice_name_or_number]
+argument-hint: [voice_name_or_number] [--sentiment personality_name]
 ---
 
 # Voice Selection
@@ -28,4 +28,26 @@ Then check current voice with: !bash .claude/hooks/voice-manager.sh get
 
 And inform user: "To switch voices, use `/agent-vibes:switch <number>` or `/agent-vibes:switch <name>`"
 
-If arguments ARE provided, execute: !bash .claude/hooks/voice-manager.sh switch $ARGUMENTS
+If arguments ARE provided:
+
+1. Parse arguments for --sentiment flag
+2. If --sentiment is present:
+   - Extract voice name/number (everything before --sentiment)
+   - Extract sentiment name (after --sentiment)
+   - Execute: !bash .claude/hooks/voice-manager.sh switch <voice>
+   - Then execute: !bash .claude/hooks/sentiment-manager.sh set <sentiment>
+3. If no --sentiment flag:
+   - Execute: !bash .claude/hooks/voice-manager.sh switch $ARGUMENTS
+
+## Examples
+
+```bash
+# Switch voice only
+/agent-vibes:switch Jessica Anne Bogart
+
+# Switch voice and set sentiment
+/agent-vibes:switch Aria --sentiment sarcastic
+
+# Switch by number with sentiment
+/agent-vibes:switch 5 --sentiment flirty
+```

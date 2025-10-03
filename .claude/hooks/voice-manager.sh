@@ -4,23 +4,9 @@
 
 VOICE_FILE="/tmp/claude-tts-voice-${USER}.txt"
 
-# Voice mapping - Official ElevenLabs Character Voices
-declare -A VOICES=(
-  ["Northern Terry"]="wo6udizrrtpIxWGp2qJk"
-  ["Grandpa Spuds Oxley"]="NOpBlnGInO9m6vDvFkFC"
-  ["Ms. Walker"]="DLsHlh26Ugcm6ELvS0qi"
-  ["Ralf Eisend"]="A9evEp8yGjv4c3WsIKuY"
-  ["Amy"]="bhJUNIXWQQ94l8eI2VUf"
-  ["Michael"]="U1Vk2oyatMdYs096Ety7"
-  ["Jessica Anne Bogart"]="flHkNRp1BlvT73UL6gyz"
-  ["Aria"]="TC0Zp7WVFzhA8zpTlRqV"
-  ["Lutz Laugh"]="9yzdeviXkFddZ4Oz8Mok"
-  ["Dr. Von Fusion"]="yjJ45q8TVCrtMhEKurxY"
-  ["Matthew Schmitz"]="0SpgpJ4D3MpHCiWdyTg3"
-  ["Demon Monster"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["Cowboy Bob"]="KTPVrSVAEUSJRClDzBw7"
-  ["Drill Sergeant"]="DGzg6RaUqxGRTHSBjfgF"
-)
+# Source the single voice configuration file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/voices-config.sh"
 
 case "$1" in
   list)
@@ -41,12 +27,34 @@ case "$1" in
     ;;
 
   preview)
-    echo "🎤 Voice Preview - Playing first 3 voices..."
-    echo ""
-
     # Get play-tts.sh path
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     TTS_SCRIPT="$SCRIPT_DIR/play-tts.sh"
+
+    # Check if a specific voice name was provided
+    if [[ -n "$2" ]] && [[ "$2" != "first" ]] && [[ "$2" != "last" ]] && ! [[ "$2" =~ ^[0-9]+$ ]]; then
+      # User specified a voice name
+      VOICE_NAME="$2"
+
+      # Check if voice exists
+      if [[ -n "${VOICES[$VOICE_NAME]}" ]]; then
+        echo "🎤 Previewing voice: ${VOICE_NAME}"
+        echo ""
+        "$TTS_SCRIPT" "Hello, this is ${VOICE_NAME}. How do you like my voice?" "${VOICE_NAME}"
+      else
+        echo "❌ Voice not found: ${VOICE_NAME}"
+        echo ""
+        echo "Available voices:"
+        for voice in "${!VOICES[@]}"; do
+          echo "  • $voice"
+        done | sort
+      fi
+      exit 0
+    fi
+
+    # Original preview logic for first/last/number
+    echo "🎤 Voice Preview - Playing first 3 voices..."
+    echo ""
 
     # Sort voices and preview first 3
     VOICE_ARRAY=()
@@ -196,6 +204,41 @@ case "$1" in
     else
       echo "Cowboy Bob"
     fi
+    ;;
+
+  whoami)
+    echo "🎤 Current Voice Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # Get current voice
+    if [ -f "$VOICE_FILE" ]; then
+      CURRENT_VOICE=$(cat "$VOICE_FILE")
+    else
+      CURRENT_VOICE="Cowboy Bob"
+    fi
+    echo "Voice: $CURRENT_VOICE"
+
+    # Get current sentiment (priority)
+    if [ -f "$HOME/.claude/tts-sentiment.txt" ]; then
+      SENTIMENT=$(cat "$HOME/.claude/tts-sentiment.txt")
+      echo "Sentiment: $SENTIMENT (active)"
+
+      # Also show personality if set
+      if [ -f "$HOME/.claude/tts-personality.txt" ]; then
+        PERSONALITY=$(cat "$HOME/.claude/tts-personality.txt")
+        echo "Personality: $PERSONALITY (overridden by sentiment)"
+      fi
+    else
+      # No sentiment, check personality
+      if [ -f "$HOME/.claude/tts-personality.txt" ]; then
+        PERSONALITY=$(cat "$HOME/.claude/tts-personality.txt")
+        echo "Personality: $PERSONALITY (active)"
+      else
+        echo "Personality: normal"
+      fi
+    fi
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     ;;
 
   list-simple)

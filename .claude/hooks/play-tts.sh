@@ -30,24 +30,9 @@ if [ ${#TEXT} -gt 500 ]; then
   echo "⚠️ Text truncated to 500 characters for API safety"
 fi
 
-# Voice mapping (keep in sync with voice-manager.sh)
-declare -A VOICES=(
-  ["Amy"]="bhJUNIXWQQ94l8eI2VUf"
-  ["Cowboy Bob"]="KTPVrSVAEUSJRClDzBw7"
-  ["Demon Monster"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["Dr. Von Fusion"]="2cOq9bH3Wv1Io7H0QjuK"
-  ["Drill Sergeant"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["El Nero"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["Grandpa Spuds Oxley"]="NOpBlnGInO9m6vDvFkFC"
-  ["Jessica Anne Bogart"]="yjJ45q8TVCrtMhEKurxY"
-  ["Lutz Laugh"]="flHkNRp1BlvT73UL6gyz"
-  ["Matthew Schmitz"]="0SpgpJ4D3MpHCiWdyTg3"
-  ["Michael"]="0SpgpJ4D3MpHCiWdyTg3"
-  ["Ms. Walker"]="DLsHlh26Ugcm6ELvS0qi"
-  ["Northern Terry"]="wo6udizrrtpIxWGp2qJk"
-  ["Ralf Eisend"]="9yzdeviXkFddZ4Oz8Mok"
-  ["Aria"]="pFZP5JQG7iQjIQuC4Bku"
-)
+# Source the single voice configuration file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/voices-config.sh"
 
 # Determine which voice to use
 VOICE_ID=""
@@ -103,9 +88,9 @@ curl -s -X POST "https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}" \
   -d "{\"text\":\"${TEXT}\",\"model_id\":\"eleven_monolingual_v1\",\"voice_settings\":{\"stability\":0.5,\"similarity_boost\":0.75}}" \
   -o "${TEMP_FILE}"
 
-# Play audio (WSL/Linux)
+# Play audio (WSL/Linux) in background to avoid blocking
 if [ -f "${TEMP_FILE}" ]; then
-  paplay "${TEMP_FILE}" 2>/dev/null || aplay "${TEMP_FILE}" 2>/dev/null || mpg123 "${TEMP_FILE}" 2>/dev/null
+  (paplay "${TEMP_FILE}" 2>/dev/null || aplay "${TEMP_FILE}" 2>/dev/null || mpg123 "${TEMP_FILE}" 2>/dev/null) &
   # Keep temp files for later review - cleaned up weekly by cron
   echo "🎵 Saved to: ${TEMP_FILE}"
 else
