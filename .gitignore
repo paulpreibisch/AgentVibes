@@ -13,5 +13,8 @@ yarn-error.log*
 *~
 .claude/audio/
 .claude/journal/
+.claude/tts-*.txt
+.claude/config/
+.claude/settings.local.json
 *.tgz
 *.code-workspace
