@@ -76,8 +76,26 @@ if [ -z "$API_KEY" ]; then
   exit 1
 fi
 
-# Create audio file in persistent storage
-AUDIO_DIR="$HOME/.claude/audio"
+# Create audio file in project-local storage
+# Use project directory if available, otherwise fall back to global
+if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+  AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
+else
+  # Fallback: try to find .claude directory in current path
+  CURRENT_DIR="$PWD"
+  while [[ "$CURRENT_DIR" != "/" ]]; do
+    if [[ -d "$CURRENT_DIR/.claude" ]]; then
+      AUDIO_DIR="$CURRENT_DIR/.claude/audio"
+      break
+    fi
+    CURRENT_DIR=$(dirname "$CURRENT_DIR")
+  done
+  # Final fallback to global if no project .claude found
+  if [[ -z "$AUDIO_DIR" ]]; then
+    AUDIO_DIR="$HOME/.claude/audio"
+  fi
+fi
+
 mkdir -p "$AUDIO_DIR"
 TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).mp3"
 
