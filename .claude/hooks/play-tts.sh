@@ -9,6 +9,9 @@
 #
 # This allows different sessions to use different voices for easy identification!
 
+# Fix locale warnings
+export LC_ALL=C
+
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice name or direct voice ID
 API_KEY="${ELEVENLABS_API_KEY}"
@@ -111,6 +114,7 @@ if [ -f "${TEMP_FILE}" ]; then
   (paplay "${TEMP_FILE}" 2>/dev/null || aplay "${TEMP_FILE}" 2>/dev/null || mpg123 "${TEMP_FILE}" 2>/dev/null) &
   # Keep temp files for later review - cleaned up weekly by cron
   echo "🎵 Saved to: ${TEMP_FILE}"
+  echo "🎤 Voice used: ${VOICE_NAME} (${VOICE_ID})"
 else
   echo "Failed to generate audio"
   exit 1
