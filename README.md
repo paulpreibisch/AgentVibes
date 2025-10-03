@@ -431,6 +431,9 @@ The update command will:
 - [Claude Code](https://claude.com/claude-code)
 - Licensed under Apache 2.0
 
+**Inspired by:**
+- 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler) - Original inspiration for Claude Code customization and hooks
+
 ---
 
 ## 🤝 Show Some Love
