@@ -15,9 +15,9 @@
 
 ## 📰 Latest Release
 
-**[v1.0.11 - Detailed Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.11)** 🚀
+**[v1.0.12 - Detailed Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.12)** 🔒
 
-Complete the AI-powered release workflow with a single `/release` command that automatically updates README, generates AI notes, and publishes to npm.
+Security enhancements with pre-release scanning to prevent accidental exposure of sensitive information, plus cleaner npm package distribution.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
