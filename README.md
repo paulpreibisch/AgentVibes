@@ -33,16 +33,28 @@ Imagine Claude speaking to you with different voices and personalities as you co
 
 ### Step 1: Install AgentVibes
 
-**Option A: Using npx (Recommended - Coming Soon)**
+Choose your preferred installation method:
+
+#### **Option A: Using npx (Recommended)** ⚡
+No installation needed! Run directly:
 ```bash
-cd ~/my-project
 npx agentvibes install
 ```
 
-**Option B: Local Development (Current)**
+#### **Option B: Install globally via npm** 📦
+Install once, use anywhere:
 ```bash
-cd ~/my-project
-node ~/claude/AgentVibes/bin/agent-vibes install
+npm install -g agentvibes
+agentvibes install
+```
+
+#### **Option C: From source (Development)** 🔧
+Clone and run from repository:
+```bash
+git clone https://github.com/paulpreibisch/AgentVibes.git
+cd AgentVibes
+npm install
+node bin/agent-vibes install
 ```
 
 ### Step 2: Get Your ElevenLabs API Key
@@ -373,6 +385,36 @@ I'll do the task
 ✅ Done
 [Bash: .claude/hooks/play-tts.sh "Complete" "Cowboy Bob"]
 ```
+
+---
+
+## 🔄 Updating AgentVibes
+
+### If installed via npx:
+```bash
+npx agentvibes update --yes
+```
+
+### If installed globally via npm:
+```bash
+npm update -g agentvibes
+agentvibes update --yes
+```
+
+### If installed from source:
+```bash
+cd ~/AgentVibes
+git pull origin master
+npm install
+node bin/agent-vibes update --yes
+```
+
+The update command will:
+- ✅ Update all slash commands
+- ✅ Update TTS scripts
+- ✅ Add new personalities (keeps your custom ones)
+- ✅ Update output styles
+- ⚠️  Preserves your voice settings and configurations
 
 ---
 
