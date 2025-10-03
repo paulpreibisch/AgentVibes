@@ -15,9 +15,9 @@
 
 ## 📰 Latest Release
 
-**[v1.0.12 - Detailed Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.12)** 🔒
+**[v1.0.13 - Detailed Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.13)** 🐛
 
-Security enhancements with pre-release scanning to prevent accidental exposure of sensitive information, plus cleaner npm package distribution.
+Critical bug fixes for update command and personality system, plus new dry humor personality and comprehensive voice mapping tests.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
@@ -32,7 +32,7 @@ Imagine Claude speaking to you with different voices and personalities as you co
 ### 🎯 Key Features
 
 - 🎙️ **17+ Professional AI Voices** - Character voices, accents, and unique personalities
-- 🎭 **18 Built-in Personalities** - From sarcastic to flirty, pirate to professional
+- 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
 - 💬 **Sentiment System** - Apply personality styles to ANY voice
 - 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions
 - 🎵 **Voice Preview** - Listen before you choose

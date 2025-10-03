@@ -1,148 +1,149 @@
-# Release v1.0.12
+# Release v1.0.13
 
 ## 🤖 AI Summary
 
-This release enhances security and improves the npm package distribution by adding pre-release security scanning and excluding maintainer-only files from the published package. The `/release` command now includes comprehensive security checks to prevent accidental exposure of sensitive information, and the npm package is streamlined to only include user-facing functionality.
+This release fixes critical bugs in the update command and personality system, adds comprehensive testing for voice mappings, and introduces a new dry humor personality. The update command was copying outdated files, causing users to miss the latest project-local isolation features. New tests prevent future voice mapping regressions, and the personality system has been refactored for better maintainability.
 
-## 🔒 Security Enhancements
+## 🐛 Critical Bug Fixes
 
-### Pre-Release Security Scanning
-- **Automated security checks** before every release
-- Scans for API keys, tokens, and secrets in changed files
-- Detects hardcoded passwords and credentials
-- Reviews commit messages for leaked secrets
-- Validates `.gitignore` and `.npmignore` protection
-- **Blocks release** if sensitive content detected
+### Update Command Fixed
+- **Fixed**: Update command was copying outdated output style files from `templates/` instead of `.claude/`
+- **Impact**: Users running `npx agentvibes update` were getting October 2nd version instead of current files
+- **Resolution**: Now correctly copies from `.claude/output-styles/` with latest project-local support
+- **Files affected**: `src/installer.js` line 381
 
-**What Gets Scanned:**
-- All files modified since last release
-- Commit messages and diffs
-- RELEASE_NOTES.md content
-- README.md updates
-- Configuration files
+### Voice Mapping Corrections
+- **Fixed**: Crass personality incorrectly using Northern Terry voice
+- **Restored**: Proper Ralf Eisend voice for crass personality
+- **Prevention**: Added comprehensive test suite to lock in personality-voice mappings
+- **Root cause**: Accidental change during troubleshooting
 
-**Common Patterns Detected:**
-- API keys (OpenAI, ElevenLabs, AWS, etc.)
-- Tokens (JWT, GitHub, npm)
-- Passwords and credentials
-- Private keys and certificates
-- Database connection strings
+## ✨ New Features
 
-### Improved Package Distribution
-- **Excluded maintainer-only files** from npm package
-- `/release` and `/prepare-release` commands removed from distribution
-- `RELEASE_NOTES.md` and `RELEASE_PROCESS.md` kept in repo only
-- Smaller, cleaner npm package focused on user features
-- Users no longer see internal release tooling
+### Dry Humor Personality
+- Added British dry wit personality with deadpan delivery
+- Uses understated humor and quintessentially British reserve
+- Powered by Aria voice
+- Example acknowledgments:
+  - "Rather less than ideal, this error"
+  - "I'll attempt to salvage this disaster. Low expectations, naturally"
+  - "Right. I suppose someone ought to address this shambles"
 
-## ✨ What's New
+### Enhanced Update Command
+- Now displays current AgentVibes version from package.json
+- Shows recent changes via git commit log (last 5 commits)
+- Better visibility into what's being updated
+- Example output:
+  ```
+  🔄 AgentVibes Update
+     Version: 1.0.13
 
-### Security Features
-- **Pre-release security scanning** - Automatic detection of sensitive content
-- **Release blocking** - Won't publish if security issues found
-- **Pattern matching** - Detects common secret formats (API keys, tokens, passwords)
-- **Commit message scanning** - Ensures no secrets in commit history
+  📝 Recent Changes:
+     8005930 fix: Update command copies outdated output style
+     fc55226 feat: Add dry-humor personality with British wit
+     702cfb3 feat: Show version and changelog in update command
+  ```
 
-### Package Improvements
-- **Cleaner distribution** - Maintainer tools excluded from npm
-- **Reduced confusion** - Users only see commands relevant to them
-- **Smaller package size** - Fewer unnecessary files
-- **Better separation** - Development vs. production files
+### Project-Local Isolation
+- Personality, sentiment, and voice settings now check project-local `.claude/` first
+- Falls back to global `~/.claude/` if not found
+- Enables different personalities per project
+- Applies to `tts-personality.txt`, `tts-sentiment.txt`, and `tts-voice.txt`
+- Output style updated to support: `.claude/tts-sentiment.txt` → `~/.claude/tts-sentiment.txt`
 
-### README Updates
-- **Simplified release link** - Changed to "v1.0.11 - Detailed Release Notes"
-- **Removed redundant links** - Single "View All Releases" link
-- **Cleaner format** - More focused on what users need
+### Voice Information Display
+- TTS output now shows voice name and ID used
+- Example: `🎤 Voice used: Aria (TC0Zp7WVFzhA8zpTlRqV)`
+- Fixed locale warnings in play-tts.sh
+- Helps debug which voice is actually being used
 
-## 📝 Technical Details
+## 🧪 Testing Improvements
 
-**Files Changed:**
-- `.npmignore` - Added maintainer-only file exclusions
-- `README.md` - Updated release link format
-- `.claude/commands/release.md` - Added security documentation (maintainer-only)
+### Personality-Voice Mapping Tests
+- Added `test/unit/personality-voice-mapping.bats` with 4 comprehensive tests
+- Validates all personality files have correct voice assignments
+- Ensures voice IDs remain stable across releases
+- Catches missing voice fields (discovered and fixed normal.md)
+- Total test count: **35** (up from 27)
 
-**Security Scan Implementation:**
+### Test Coverage
+- ✅ Correct voice assignments for all 18 personalities
+- ✅ Stable voice IDs in voices-config.sh
+- ✅ All personality files have voice field
+- ✅ Assigned voices exist in configuration
+
+**Expected Mappings Validated:**
 ```bash
-# Performed before every release:
-1. git diff v1.0.11..HEAD | grep sensitive patterns
-2. Check commit messages for leaked secrets
-3. Validate file protection (.gitignore/.npmignore)
-4. Block release if issues found
+crass → Ralf Eisend
+sarcastic → Jessica Anne Bogart
+flirty → Jessica Anne Bogart
+annoying → Lutz Laugh
+angry → Demon Monster
+pirate → Pirate Marshal
+robot → Dr. Von Fusion
+zen → Aria
+dramatic → Northern Terry
+millennial → Amy
+surfer-dude → Cowboy Bob
+sassy → Ms. Walker
+normal → Aria
+professional → Matthew Schmitz
+moody → Michael
+funny → Lutz Laugh
+poetic → Aria
+grandpa → Grandpa Spuds Oxley
+dry-humor → Aria
 ```
 
-**Excluded from npm package:**
-```
-.claude/commands/release.md
-.claude/commands/prepare-release.md
-.claude/hooks/prepare-release.sh
-RELEASE_NOTES.md
-RELEASE_PROCESS.md
-```
+## 🔧 Technical Improvements
 
-## 🎯 User Impact
+### Refactored Personality System
+- Made personality and sentiment acknowledgments data-driven
+- Removed hardcoded responses in favor of flexible generation
+- Simplified personality-manager.sh (141 lines removed, cleaner logic)
+- Enhanced sentiment-manager.sh for better fallback handling
+- Each personality response is now AI-generated fresh each time
 
-**For Maintainers:**
-- Peace of mind with automatic security scanning
-- Won't accidentally publish API keys or secrets
-- Release process validates safety before pushing
+### Configuration Management
+- Added `.gitignore` entries for personal TTS settings
+- Prevents `.claude/tts-voice.txt`, `.claude/tts-personality.txt`, `.claude/tts-sentiment.txt` from being committed
+- Keeps user preferences local
+- Synced `templates/output-styles/agent-vibes.md` with latest version
 
-**For End Users:**
-- Cleaner npm package without confusing maintainer commands
-- Smaller package size (faster install)
-- Only see commands relevant to using AgentVibes
-- No exposure to internal release tooling
+## 📊 Changes Summary
 
-## 🔧 Example Security Scan
+- **12 files changed**: 306 insertions(+), 161 deletions(-)
+- **New personality**: dry-humor
+- **Bug fixes**: 2 critical issues resolved
+- **Test coverage**: +8 tests (27 → 35)
+- **Code quality**: Simplified personality management
 
-```bash
-User: /release patch
-
-Claude:
-🔒 Running security scan...
-   ✓ No API keys detected
-   ✓ No tokens found
-   ✓ No passwords in commits
-   ✓ No credentials exposed
-   ✓ .gitignore properly configured
-   ✓ .npmignore properly configured
-
-✅ Security check passed!
-
-📊 Analyzing changes since v1.0.11...
-   - 2 commits found
-   - 2 files changed
-...
-```
-
-## 💡 Security Patterns Blocked
-
-If sensitive content is detected, the release is blocked:
-
-```bash
-❌ SECURITY ISSUE DETECTED!
-
-Found potential API key in:
-  src/config.js:12 - ELEVENLABS_API_KEY="sk-abc123..."
-
-🛑 Release blocked for security review.
-
-Please:
-1. Remove the sensitive content
-2. Add the file to .gitignore
-3. Update environment variables
-4. Run /release again
-```
-
-## 📦 Installation
+## 🚀 Upgrade Instructions
 
 ```bash
-npx agentvibes@1.0.12 install
+npx agentvibes update
 ```
+
+The update command will now show you exactly what version you're getting and what's changed!
+
+## 💡 What This Fixes For Users
+
+**Before (Broken):**
+- Update command copied old files without project-local support
+- Projects couldn't have different personalities
+- Crass personality used wrong voice
+- No tests to prevent voice mapping regressions
+
+**After (Fixed):**
+- Update command copies latest files with all features
+- Each project can have its own personality/sentiment/voice settings
+- Crass personality uses correct Ralf Eisend voice
+- Comprehensive tests ensure voices stay correct
 
 ## 🔗 Links
 
-- [View this release on GitHub](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.12)
-- [npm package](https://www.npmjs.com/package/agentvibes/v/1.0.12)
+- [View this release on GitHub](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.13)
+- [npm package](https://www.npmjs.com/package/agentvibes/v/1.0.13)
 - [Full Documentation](https://github.com/paulpreibisch/AgentVibes#readme)
 
 ---
