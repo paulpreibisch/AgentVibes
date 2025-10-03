@@ -79,104 +79,6 @@ source ~/.bashrc
 
 ---
 
-## 💰 ElevenLabs Usage & Costs
-
-### **Important: Monitor Your Usage!**
-
-AgentVibes generates TTS audio for **every task acknowledgment and completion** - this can add up quickly during active coding sessions!
-
-### 📊 **Typical Usage Patterns**
-
-**Light coding (1-2 hours/day):**
-- ~50-100 TTS messages
-- ~2,500-5,000 characters/day
-- ✅ **Free tier works** (10,000 chars/month)
-
-**Moderate coding (4-5 hours/day):**
-- ~200-300 TTS messages
-- ~10,000-15,000 characters/day
-- ⚠️ **Starter plan needed** ($5/month, 30,000 chars)
-
-**Heavy coding (8+ hours/day):**
-- ~400-600 TTS messages
-- ~20,000-30,000 characters/day
-- ⚠️ **Creator/Pro plan needed** ($22-$99/month)
-- 💡 **May need to upgrade mid-month** if coding intensively
-
-### 💳 **ElevenLabs Pricing (2025)**
-
-| Plan | Monthly Cost | Characters/Month | Best For |
-|------|-------------|------------------|----------|
-| **Free** | $0 | 10,000 | Trying it out, light use |
-| **Starter** | $5 | 30,000 | Casual coding |
-| **Creator** | $22 | 100,000 | Regular coding |
-| **Pro** | $99 | 500,000 | Heavy daily use |
-| **Scale** | $330 | 2,000,000 | Professional/teams |
-
-**Overage costs** (if you exceed your plan):
-- Creator: $0.30 per 1,000 characters
-- Pro: $0.24 per 1,000 characters
-- Scale: $0.18 per 1,000 characters
-
-### 📈 **Monitor Your Usage**
-
-**Track your consumption in real-time:**
-
-1. **Go to ElevenLabs Dashboard:**
-   - Visit: https://elevenlabs.io/app/usage
-   - Click "My Account" → "Usage Analytics"
-   - Or: "Developers" → "Usage" tab
-
-2. **What to monitor:**
-   - ✅ **Credits used** - Daily and monthly totals
-   - ✅ **Character breakdown** - By voice/API key
-   - ✅ **Billing period alignment** - See when your plan resets
-   - ✅ **Export to CSV** - Download usage data
-
-3. **Set up alerts:**
-   - Check your usage weekly
-   - Watch for unexpected spikes
-   - Upgrade before hitting limits
-
-### 💡 **Tips to Manage Costs**
-
-1. **Use selectively**: Disable TTS when doing quick edits
-   ```bash
-   /output-style default  # Turn off voice
-   /output-style agent-vibes  # Turn back on
-   ```
-
-2. **Monitor analytics**: Check https://elevenlabs.io/app/usage regularly
-
-3. **Shorter messages**: Personality styles affect message length
-   - "Normal" personality = shortest messages
-   - "Sarcastic/Grandpa" = longer messages
-
-4. **Upgrade proactively**: If coding 8+ hours/day, start with Creator plan
-
-### 🔗 **Useful Links**
-
-- 📊 **Usage Dashboard**: https://elevenlabs.io/app/usage
-- 💳 **Pricing Page**: https://elevenlabs.io/pricing
-- 📖 **Usage Analytics Docs**: https://elevenlabs.io/docs/product-guides/administration/usage-analytics
-- 🆘 **Support**: https://help.elevenlabs.io/
-
-### ⚠️ **Fair Warning**
-
-If you're coding **8 hours/day with Claude Code**, expect to use:
-- ~600-800 TTS messages daily
-- ~30,000-40,000 characters daily
-- ~900,000-1,200,000 characters/month
-
-**You'll likely need:**
-- **Pro plan ($99/month)** minimum
-- Or **Creator plan + overages** (~$140/month)
-- Possibly **two Pro subscriptions** if coding intensively 6-7 days/week
-
-**Always monitor your ElevenLabs analytics dashboard!** 📊
-
----
-
 ## 🎤 Available Commands
 
 All commands are prefixed with `/agent-vibes:`
@@ -515,6 +417,102 @@ The update command will:
 - ⚠️  Preserves your voice settings and configurations
 
 ---
+
+## 💰 ElevenLabs Usage & Costs
+
+### **Important: Monitor Your Usage!**
+
+AgentVibes generates TTS audio for **every task acknowledgment and completion** - this can add up quickly during active coding sessions!
+
+### 📊 **Typical Usage Patterns**
+
+**Light coding (1-2 hours/day):**
+- ~50-100 TTS messages
+- ~2,500-5,000 characters/day
+- ✅ **Free tier works** (10,000 chars/month)
+
+**Moderate coding (4-5 hours/day):**
+- ~200-300 TTS messages
+- ~10,000-15,000 characters/day
+- ⚠️ **Starter plan needed** ($5/month, 30,000 chars)
+
+**Heavy coding (8+ hours/day):**
+- ~400-600 TTS messages
+- ~20,000-30,000 characters/day
+- ⚠️ **Creator/Pro plan needed** ($22-$99/month)
+- 💡 **May need to upgrade mid-month** if coding intensively
+
+### 💳 **ElevenLabs Pricing (2025)**
+
+| Plan | Monthly Cost | Characters/Month | Best For |
+|------|-------------|------------------|----------|
+| **Free** | $0 | 10,000 | Trying it out, light use |
+| **Starter** | $5 | 30,000 | Casual coding |
+| **Creator** | $22 | 100,000 | Regular coding |
+| **Pro** | $99 | 500,000 | Heavy daily use |
+| **Scale** | $330 | 2,000,000 | Professional/teams |
+
+**Overage costs** (if you exceed your plan):
+- Creator: $0.30 per 1,000 characters
+- Pro: $0.24 per 1,000 characters
+- Scale: $0.18 per 1,000 characters
+
+### 📈 **Monitor Your Usage**
+
+**Track your consumption in real-time:**
+
+1. **Go to ElevenLabs Dashboard:**
+   - Visit: https://elevenlabs.io/app/usage
+   - Click "My Account" → "Usage Analytics"
+   - Or: "Developers" → "Usage" tab
+
+2. **What to monitor:**
+   - ✅ **Credits used** - Daily and monthly totals
+   - ✅ **Character breakdown** - By voice/API key
+   - ✅ **Billing period alignment** - See when your plan resets
+   - ✅ **Export to CSV** - Download usage data
+
+3. **Set up alerts:**
+   - Check your usage weekly
+   - Watch for unexpected spikes
+   - Upgrade before hitting limits
+
+### 💡 **Tips to Manage Costs**
+
+1. **Use selectively**: Disable TTS when doing quick edits
+   ```bash
+   /output-style default  # Turn off voice
+   /output-style agent-vibes  # Turn back on
+   ```
+
+2. **Monitor analytics**: Check https://elevenlabs.io/app/usage regularly
+
+3. **Shorter messages**: Personality styles affect message length
+   - "Normal" personality = shortest messages
+   - "Sarcastic/Grandpa" = longer messages
+
+4. **Upgrade proactively**: If coding 8+ hours/day, start with Creator plan
+
+### 🔗 **Useful Links**
+
+- 📊 **Usage Dashboard**: https://elevenlabs.io/app/usage
+- 💳 **Pricing Page**: https://elevenlabs.io/pricing
+- 📖 **Usage Analytics Docs**: https://elevenlabs.io/docs/product-guides/administration/usage-analytics
+- 🆘 **Support**: https://help.elevenlabs.io/
+
+### ⚠️ **Fair Warning**
+
+If you're coding **8 hours/day with Claude Code**, expect to use:
+- ~600-800 TTS messages daily
+- ~30,000-40,000 characters daily
+- ~900,000-1,200,000 characters/month
+
+**You'll likely need:**
+- **Pro plan ($99/month)** minimum
+- Or **Creator plan + overages** (~$140/month)
+- Possibly **two Pro subscriptions** if coding intensively 6-7 days/week
+
+**Always monitor your ElevenLabs analytics dashboard!** 📊
 
 ## 🙏 Credits
 
