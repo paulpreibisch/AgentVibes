@@ -178,24 +178,26 @@ All commands are prefixed with `/agent-vibes:`
 
 AgentVibes includes **17 unique ElevenLabs voices:**
 
-| Voice | Character | Best For |
-|-------|-----------|----------|
-| Aria | Clear professional | Default, all-purpose |
-| Jessica Anne Bogart | Wickedly eloquent | Sarcastic, flirty |
-| Pirate Marshal | Authentic pirate | Pirate personality |
-| Grandpa Werthers | Nostalgic elder | Grandpa personality |
-| Drill Sergeant | Military authority | Angry personality |
-| Cowboy Bob | Western charm | Casual, friendly |
-| Northern Terry | Eccentric British | Quirky responses |
-| Ms. Walker | Warm teacher | Professional |
-| Dr. Von Fusion | Mad scientist | Robot personality |
-| Matthew Schmitz | Deep baritone | Dramatic |
-| Grandpa Spuds Oxley | Wise elder | Wisdom |
-| Michael | British urban | Professional |
-| Ralf Eisend | International | Multi-cultural |
-| Amy | Chinese accent | Diverse |
-| Lutz Laugh | Jovial | Funny |
-| Demon Monster | Deep and spooky | Dramatic |
+| Voice | Character | Best For | Listen |
+|-------|-----------|----------|--------|
+| [Aria](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) | Clear professional | Default, all-purpose | [Preview](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) |
+| [Jessica Anne Bogart](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) | Wickedly eloquent | Sarcastic, flirty | [Preview](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) |
+| [Pirate Marshal](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) | Authentic pirate | Pirate personality | [Preview](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) |
+| [Grandpa Werthers](https://elevenlabs.io/voice-library/grandpa-werthers/MKlLqCItoCkvdhrxgtLv) | Nostalgic elder | Grandpa personality | [Preview](https://elevenlabs.io/voice-library/grandpa-werthers/MKlLqCItoCkvdhrxgtLv) |
+| [Drill Sergeant](https://elevenlabs.io/voice-library/drill-sergeant/vfaqCOvlrKi4Zp7C2IAm) | Military authority | Angry personality | [Preview](https://elevenlabs.io/voice-library/drill-sergeant/vfaqCOvlrKi4Zp7C2IAm) |
+| [Cowboy Bob](https://elevenlabs.io/voice-library/cowboy-bob/KTPVrSVAEUSJRClDzBw7) | Western charm | Casual, friendly | [Preview](https://elevenlabs.io/voice-library/cowboy-bob/KTPVrSVAEUSJRClDzBw7) |
+| [Northern Terry](https://elevenlabs.io/voice-library/northern-terry/wo6udizrrtpIxWGp2qJk) | Eccentric British | Quirky responses | [Preview](https://elevenlabs.io/voice-library/northern-terry/wo6udizrrtpIxWGp2qJk) |
+| [Ms. Walker](https://elevenlabs.io/voice-library/ms-walker/DLsHlh26Ugcm6ELvS0qi) | Warm teacher | Professional | [Preview](https://elevenlabs.io/voice-library/ms-walker/DLsHlh26Ugcm6ELvS0qi) |
+| [Dr. Von Fusion](https://elevenlabs.io/voice-library/dr-von-fusion/yjJ45q8TVCrtMhEKurxY) | Mad scientist | Robot personality | [Preview](https://elevenlabs.io/voice-library/dr-von-fusion/yjJ45q8TVCrtMhEKurxY) |
+| [Matthew Schmitz](https://elevenlabs.io/voice-library/matthew-schmitz/0SpgpJ4D3MpHCiWdyTg3) | Deep baritone | Dramatic | [Preview](https://elevenlabs.io/voice-library/matthew-schmitz/0SpgpJ4D3MpHCiWdyTg3) |
+| [Grandpa Spuds Oxley](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) | Wise elder | Wisdom | [Preview](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) |
+| [Michael](https://elevenlabs.io/voice-library/michael/U1Vk2oyatMdYs096Ety7) | British urban | Professional | [Preview](https://elevenlabs.io/voice-library/michael/U1Vk2oyatMdYs096Ety7) |
+| [Ralf Eisend](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) | International | Multi-cultural | [Preview](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) |
+| [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse | [Preview](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) |
+| [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny | [Preview](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) |
+| [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep and spooky | Dramatic | [Preview](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) |
+
+**💡 Tip:** Click voice names or Preview links to hear samples on ElevenLabs before choosing!
 
 ---
 
