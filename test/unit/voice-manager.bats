@@ -80,9 +80,46 @@ teardown() {
   assert_output_contains "Voice: Aria"
 }
 
+@test "voice-manager replay uses project-local directory" {
+  # Create test audio file in project-local directory
+  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/audio"
+  touch "$CLAUDE_PROJECT_DIR/.claude/audio/tts-123456.mp3"
+
+  run "$VOICE_MANAGER" replay 1
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Replaying audio #1"
+  assert_output_contains "$CLAUDE_PROJECT_DIR/.claude/audio/tts-123456.mp3"
+}
+
+@test "voice-manager replay falls back to HOME when no project directory" {
+  unset CLAUDE_PROJECT_DIR
+  mkdir -p "$TEST_HOME/.claude/audio"
+  touch "$TEST_HOME/.claude/audio/tts-789012.mp3"
+
+  cd "$TEST_HOME"
+
+  run "$VOICE_MANAGER" replay 1
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Replaying audio #1"
+  assert_output_contains "$TEST_HOME/.claude/audio/tts-789012.mp3"
+}
+
 @test "voice-manager replay with no audio history fails gracefully" {
   run "$VOICE_MANAGER" replay 1
 
   [ "$status" -eq 1 ]
   assert_output_contains "No audio history found"
+}
+
+@test "voice-manager replay shows both filename and path" {
+  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/audio"
+  touch "$CLAUDE_PROJECT_DIR/.claude/audio/tts-999999.mp3"
+
+  run "$VOICE_MANAGER" replay 1
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "File: tts-999999.mp3"
+  assert_output_contains "Path: $CLAUDE_PROJECT_DIR/.claude/audio/tts-999999.mp3"
 }
