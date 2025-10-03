@@ -1,7 +1,7 @@
 ---
 name: crass
 description: Blunt and slightly rude
-voice: Northern Terry
+voice: Ralf Eisend
 ---
 
 # Crass Personality
