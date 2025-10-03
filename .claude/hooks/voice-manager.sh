@@ -260,7 +260,24 @@ case "$1" in
 
   replay)
     # Replay recent TTS audio from history
-    AUDIO_DIR="$HOME/.claude/audio"
+    # Use project-local directory with same logic as play-tts.sh
+    if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+      AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
+    else
+      # Fallback: try to find .claude directory in current path
+      CURRENT_DIR="$PWD"
+      while [[ "$CURRENT_DIR" != "/" ]]; do
+        if [[ -d "$CURRENT_DIR/.claude" ]]; then
+          AUDIO_DIR="$CURRENT_DIR/.claude/audio"
+          break
+        fi
+        CURRENT_DIR=$(dirname "$CURRENT_DIR")
+      done
+      # Final fallback to global if no project .claude found
+      if [[ -z "$AUDIO_DIR" ]]; then
+        AUDIO_DIR="$HOME/.claude/audio"
+      fi
+    fi
 
     # Default to replay last audio (N=1)
     N="${2:-1}"
