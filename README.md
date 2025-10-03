@@ -13,6 +13,16 @@
 
 ---
 
+## 📰 Latest Release
+
+**[v1.0.10 - AI-Powered Release Preparation System](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.10)** 🤖
+
+This release introduces an AI-powered release preparation system that allows Claude to analyze changes and generate comprehensive release notes locally before publishing.
+
+[→ View Full Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.10) | [→ All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+
+---
+
 ## ✨ What is AgentVibes?
 
 **AgentVibes adds lively voice narration to your Claude Code sessions!**
