@@ -95,7 +95,17 @@ EOF
 
 # Copy AgentVibes scripts to test location
 setup_agentvibes_scripts() {
-  local REPO_ROOT="${BATS_TEST_DIRNAME}/.."
+  # BATS_TEST_DIRNAME points to test/unit/, so go up two levels to repo root
+  local REPO_ROOT="${BATS_TEST_DIRNAME}/../.."
+
+  # Verify paths exist before copying
+  if [[ ! -d "$REPO_ROOT/.claude/hooks" ]]; then
+    echo "Error: Cannot find .claude/hooks at $REPO_ROOT/.claude/hooks"
+    echo "BATS_TEST_DIRNAME: $BATS_TEST_DIRNAME"
+    echo "REPO_ROOT: $REPO_ROOT"
+    ls -la "$REPO_ROOT" || true
+    return 1
+  fi
 
   # Copy hooks to test .claude directory
   cp -r "$REPO_ROOT/.claude/hooks" "$TEST_CLAUDE_DIR/"
