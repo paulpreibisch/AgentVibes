@@ -141,6 +141,13 @@ All commands are prefixed with `/agent-vibes:`
 | `/agent-vibes:replay [N]` | Replay recent TTS audio |
 | `/agent-vibes:get` | Get currently selected voice |
 
+### System Commands
+
+| Command | Description |
+|---------|-------------|
+| `/agent-vibes:version` | Show installed AgentVibes version |
+| `/agent-vibes:update [--yes]` | Update to latest version |
+
 ### Personality Commands
 
 | Command | Description |
@@ -629,18 +636,30 @@ node ~/claude/AgentVibes/bin/agent-vibes install --yes
 
 ## 🔄 Updating
 
-### If installed via npx:
+### Quick Update (From Claude Code)
+
+The fastest way to update is directly from Claude Code:
+
+```bash
+/agent-vibes:update
+```
+
+This checks for the latest version and updates with confirmation.
+
+### Alternative Methods
+
+#### If installed via npx:
 ```bash
 npx agentvibes update --yes
 ```
 
-### If installed globally via npm:
+#### If installed globally via npm:
 ```bash
 npm update -g agentvibes
 agentvibes update --yes
 ```
 
-### If installed from source:
+#### If installed from source:
 ```bash
 cd ~/AgentVibes
 git pull origin master
@@ -648,11 +667,20 @@ npm install
 node bin/agent-vibes update --yes
 ```
 
+### Check Your Version
+
+```bash
+/agent-vibes:version
+```
+
+### What Gets Updated
+
 The update command will:
 - ✅ Update all slash commands
 - ✅ Update TTS scripts and plugins
 - ✅ Add new personalities (keeps your custom ones)
 - ✅ Update output styles
+- ✅ Show recent changes and release notes
 - ⚠️  Preserves your voice settings and configurations
 
 [↑ Back to top](#-table-of-contents)

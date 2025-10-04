@@ -1,3 +1,114 @@
+# 🎤 AgentVibes Release Notes
+
+## 📦 v1.1.0 - Self-Update & Version Management (2025-01-04)
+
+### 🤖 AI Summary
+
+This minor release introduces self-update capabilities to AgentVibes! Users can now update directly from Claude Code with `/agent-vibes:update` and check their version with `/agent-vibes:version`. The update process includes a beautiful confirmation screen with ASCII art, shows recent changes and release notes, and preserves all custom settings. This eliminates the need for manual npm/git commands and provides full transparency into what's changing during updates.
+
+### ✨ New Features
+
+#### Self-Update System
+- **`/agent-vibes:version`** - Check installed version instantly
+- **`/agent-vibes:update`** - Update to latest version with one command
+  - Beautiful confirmation screen with two-tone ASCII art
+  - Shows recent changes and release notes (from git or RELEASE_NOTES.md)
+  - Preserves all custom settings, voices, and configurations
+  - Works from npx, npm global, or source installations
+  - Optional `--yes` flag for non-interactive updates
+
+#### Quick Update Workflow
+```bash
+/agent-vibes:version           # Check current version
+/agent-vibes:update            # Update with confirmation
+/agent-vibes:update --yes      # Update without prompts
+```
+
+### 📚 Documentation Improvements
+
+- **Enhanced README**: Added "System Commands" section with version and update commands
+- **Better Update Instructions**: Reorganized update section with clearer methods
+- **Version Checking Guide**: Documented how to check and verify versions
+- **Release Notes Display**: Updates now show what's changed in the latest version
+- **Quick Update Section**: Highlighted fastest update method at top of section
+
+### 🔧 Technical Changes
+
+**New Command Files:**
+- `.claude/commands/agent-vibes/update.md` - Update command definition with examples
+- `.claude/commands/agent-vibes/version.md` - Version command definition
+
+**Documentation Updates:**
+- Updated README.md with system commands table
+- Improved update documentation flow
+- Added "Quick Update (From Claude Code)" section
+- Enhanced "What Gets Updated" list with release notes item
+
+**Implementation Details:**
+- Update command wraps existing `npx agentvibes update` installer function
+- Version command wraps `npx agentvibes --version` for consistent output
+- Both commands work seamlessly from within Claude Code sessions
+
+### 🎯 Why This Matters
+
+**Before v1.1.0:**
+Users had to exit Claude Code and manually run:
+```bash
+npm update -g agentvibes
+# or
+cd ~/AgentVibes && git pull && npm install
+```
+
+**After v1.1.0:**
+Users can update directly from Claude Code:
+```bash
+/agent-vibes:update
+```
+
+The update process now includes:
+- ✅ Visual confirmation with package version
+- ✅ Recent changes from git log or RELEASE_NOTES.md
+- ✅ File-by-file update progress with counts
+- ✅ Summary of what was updated
+- ✅ Preservation of all custom configurations
+
+### 📝 What Gets Updated
+
+When you run `/agent-vibes:update`, these components are refreshed:
+- ✅ All slash commands (11+ commands)
+- ✅ TTS scripts and hooks (6+ scripts)
+- ✅ Personality templates (new ones added, existing updated)
+- ✅ Output styles (agent-vibes.md)
+- ✅ BMAD plugin configurations
+- ✅ Voice configuration mappings
+
+**Safe Updates**: Your voice settings, custom personalities, sentiment preferences, language settings, and all user configurations are always preserved!
+
+### 📊 Release Stats
+
+- **3 files changed**: 2 new command files, 1 README update
+- **2 new commands**: `/agent-vibes:version`, `/agent-vibes:update`
+- **1 documentation section** enhanced: "🔄 Updating"
+- **0 breaking changes**
+
+### 💡 User Experience Improvements
+
+1. **Convenience**: Update without leaving Claude Code
+2. **Transparency**: See what's changing before confirming
+3. **Safety**: Settings and customizations always preserved
+4. **Visibility**: Version command helps troubleshooting
+5. **Consistency**: Same update experience across all install methods
+
+---
+
+## 📝 Recent Commits
+
+```
+75b1cf8 docs: Update version to v1.0.23 [skip ci]
+```
+
+---
+
 # Release v1.0.20
 
 ## 🤖 AI Summary
