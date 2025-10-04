@@ -96,7 +96,7 @@ async function install(options = {}) {
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 11 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
-  console.log(chalk.gray(`   • 4 TTS scripts → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • 6 TTS scripts → ${targetDir}/.claude/hooks/`));
   console.log(chalk.gray(`   • 10+ personality templates → ${targetDir}/.claude/personalities/`));
   console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
   console.log(chalk.gray(`   • Voice configuration files`));
@@ -173,7 +173,12 @@ async function install(options = {}) {
 
     // Copy hook scripts
     spinner.start('Installing TTS helper scripts...');
-    const hookFiles = await fs.readdir(srcHooksDir);
+    const allHookFiles = await fs.readdir(srcHooksDir);
+    // Only copy AgentVibes-related scripts, exclude project-specific files
+    const hookFiles = allHookFiles.filter(file =>
+      !file.includes('prepare-release') &&
+      !file.startsWith('.')
+    );
     console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
     for (const file of hookFiles) {
       const srcPath = path.join(srcHooksDir, file);
@@ -457,7 +462,12 @@ program
       // Update hooks
       spinner.text = 'Updating TTS scripts...';
       const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
-      const hookFiles = await fs.readdir(srcHooksDir);
+      const allHookFiles = await fs.readdir(srcHooksDir);
+      // Only copy AgentVibes-related scripts, exclude project-specific files
+      const hookFiles = allHookFiles.filter(file =>
+        !file.includes('prepare-release') &&
+        !file.startsWith('.')
+      );
 
       for (const file of hookFiles) {
         const srcPath = path.join(srcHooksDir, file);
