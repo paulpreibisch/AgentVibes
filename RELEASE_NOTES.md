@@ -1,3 +1,223 @@
+# Release v1.0.19
+
+## 🤖 AI Summary
+
+This release brings powerful multilingual support to AgentVibes! Users can now make Claude speak in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and many more. The system automatically selects optimal multilingual voices and seamlessly integrates with existing personalities and the BMAD plugin. Additionally, this release includes critical bug fixes for slash command discovery and comprehensive documentation updates.
+
+## ✨ New Features
+
+### 🌍 Multilingual Language Support
+
+**Speak in 30+ Languages**
+- Added `/agent-vibes:set-language <language>` command
+- Support for Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, and 20+ more languages
+- Automatic multilingual voice selection based on language
+- Works seamlessly with personalities and BMAD plugin
+- Language settings persist across sessions
+
+**Language Manager System**
+- New `language-manager.sh` script handles language switching
+- Intelligent voice recommendations per language:
+  - Spanish → Antoni/Matilda
+  - French → Rachel/Charlotte
+  - German → Domi/Charlotte
+  - Italian → Bella
+  - Portuguese → Matilda
+- Stores language preference in `.claude/tts-language.txt`
+
+**New Multilingual Voices Added**
+- **Antoni** - Optimized for Spanish, general multilingual (30+ languages)
+- **Rachel** - Optimized for French, professional multilingual
+- **Domi** - Optimized for German, strong confident voice
+- **Bella** - Optimized for Italian, soft engaging voice
+- **Charlotte** - European languages specialist
+- **Matilda** - Latin languages specialist
+
+### 📚 Documentation Enhancements
+
+**Updated README**
+- Added comprehensive "Change Language" section with examples
+- New "Language Commands" table in Commands Reference
+- Added "🌍 Multilingual Support" to Table of Contents
+- Documented all 30+ supported languages
+- Included multilingual voice recommendations and usage tips
+
+**New Language Command Documentation**
+- Created `.claude/commands/agent-vibes/set-language.md`
+- Detailed usage examples and language list
+- Explains how language system works
+- Voice recommendations per language
+
+## 🐛 Bug Fixes
+
+### Slash Command Discovery Fix
+- **Fixed**: Commands in `.claude/commands/agent-vibes/` were not appearing in autocomplete
+- **Root Cause**: Missing `commands.json` registration file
+- **Impact**: All `/agent-vibes:*` subcommands are now discoverable
+- **Added**: Proper `commands.json` with all 13 subcommands registered:
+  - list, preview, switch, whoami, sample, replay
+  - personality, sentiment, set-pretext, set-language
+  - add, get
+
+### Installer File Filtering
+- **Fixed**: Project-specific files being included in installer
+- **Impact**: Cleaner installations without unnecessary local files
+- **Changed**: Added filters to exclude `.claude/tts-*.txt` and other session files
+
+## 📝 Technical Changes
+
+### New Files Added
+
+**Language Management System**
+- `.claude/commands/agent-vibes/set-language.md` - Command documentation
+- `.claude/hooks/language-manager.sh` - Language switching logic
+- `.claude/commands/agent-vibes/commands.json` - Command registration
+
+**Voice Configuration**
+- Added 6 multilingual voices to `voices-config.sh`:
+  - Antoni (ErXwobaYiN019PkySvjV)
+  - Rachel (21m00Tcm4TlvDq8ikWAM)
+  - Domi (AZnzlk1XvdvUeBnXmlld)
+  - Bella (EXAVITQu4vr4xnSDxMaL)
+  - Charlotte (XB0fDUnXU5powFXDhCwa)
+  - Matilda (XrExE9yKIg1WjnnlVkGX)
+
+### Modified Files
+
+**Output Style Updates** (`agent-vibes.md`)
+- Enhanced language detection logic
+- Added multilingual voice fallback system
+- Priority order: Language → Sentiment → Personality → Default
+- Improved BMAD integration with language support
+
+**Installer Improvements** (`src/installer.js`)
+- Enhanced file filtering to exclude session-specific files
+- Better validation of ElevenLabs voice IDs
+- Improved installation messaging
+
+### Key Implementation Details
+
+**Language Priority System:**
+```bash
+# Check order:
+1. Language setting (.claude/tts-language.txt)
+2. Sentiment setting (.claude/tts-sentiment.txt)
+3. Personality setting (.claude/tts-personality.txt)
+4. Default voice
+```
+
+**Multilingual Voice Mapping:**
+```bash
+declare -A LANGUAGE_VOICES=(
+    ["spanish"]="Antoni"
+    ["french"]="Rachel"
+    ["german"]="Domi"
+    ["italian"]="Bella"
+    # ... 20+ more languages
+)
+```
+
+**BMAD + Language Integration:**
+- When BMAD agent is active AND language is set:
+  - Tries agent's assigned voice first
+  - Falls back to multilingual voice if agent's voice doesn't support language
+  - Maintains agent's personality style in chosen language
+
+## 🔄 Migration Notes
+
+### For Users
+
+**To Start Using Multilingual Features:**
+```bash
+# Set your preferred language
+/agent-vibes:set-language spanish
+
+# Claude will now speak in Spanish!
+# To go back to English:
+/agent-vibes:set-language english
+```
+
+**Recommended Voices for Languages:**
+- Use `/agent-vibes:set-language list` to see all supported languages
+- System auto-selects best voice for your language
+- Can manually switch voices with `/agent-vibes:switch <voice>`
+
+### For Existing AgentVibes Users
+
+**No Breaking Changes:**
+- Existing voice/personality settings preserved
+- Language defaults to English
+- All previous commands work exactly the same
+- New language feature is opt-in
+
+## 📊 Release Stats
+
+- **7 commits** since v1.0.18
+- **8 files changed**:
+  - 3 new files (set-language.md, language-manager.sh, commands.json)
+  - 5 modified files (README.md, agent-vibes.md, voices-config.sh, installer.js)
+- **467 insertions**, **45 deletions**
+- **2 major features**: Multilingual support, Command registration fix
+- **2 bug fixes**: Slash commands, Installer filtering
+- **0 breaking changes**
+
+## 🎯 User Experience Improvements
+
+1. **Global Language Support**: Speak with Claude in your native language
+2. **Automatic Voice Selection**: System picks best multilingual voice
+3. **Seamless Integration**: Works with all existing features
+4. **Better Discovery**: All commands now show in autocomplete
+5. **Comprehensive Docs**: Complete guide to using languages
+
+## 💡 Usage Examples
+
+### Basic Language Switching
+```bash
+# Switch to Spanish
+/agent-vibes:set-language spanish
+
+# Claude responds in Spanish
+"¡Voy a hacer esa tarea para ti!"
+
+# Switch back to English
+/agent-vibes:set-language english
+```
+
+### Language + Personality
+```bash
+# Set language to French
+/agent-vibes:set-language french
+
+# Use pirate personality
+/agent-vibes:personality pirate
+
+# Get French pirate responses!
+"Arr, je vais conquérir ce code pour toi, moussaillon!"
+```
+
+### Language + BMAD
+```bash
+# Set language to German
+/agent-vibes:set-language german
+
+# Activate BMAD PM agent
+/BMad:agents:pm
+
+# PM speaks in German with professional voice
+"Ich werde diese Anforderungen für Sie analysieren"
+```
+
+## 🌍 Supported Languages
+
+**Complete List (30+ languages):**
+Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Polish, Dutch, Turkish, Russian, Arabic, Hindi, Swedish, Danish, Norwegian, Finnish, Czech, Romanian, Ukrainian, Greek, Bulgarian, Croatian, Slovak, and more!
+
+## 🙏 Credits
+
+Special thanks to the ElevenLabs team for their amazing multilingual voice technology! The new Multilingual v2 model makes it possible to provide natural-sounding TTS in 30+ languages.
+
+---
+
 # Release v1.0.18
 
 ## 🤖 AI Summary
