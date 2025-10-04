@@ -278,26 +278,34 @@ async function install(options = {}) {
         const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
         const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
 
-        // Extract latest release section (first release in the file)
+        // Extract commits from "Recent Commits" section
         const lines = releaseNotes.split('\n');
-        const releaseHeader = lines.find(line => line.startsWith('# Release v'));
-        const summaryIndex = lines.findIndex(line => line.includes('## 🤖 AI Summary'));
+        const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
 
-        if (releaseHeader && summaryIndex > 0) {
-          // Get the summary paragraph (next non-empty line after AI Summary)
-          let summaryText = '';
-          for (let i = summaryIndex + 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line && !line.startsWith('#')) {
-              summaryText = line;
-              break;
+        if (commitsIndex >= 0) {
+          console.log(chalk.cyan('📝 Recent Changes:\n'));
+
+          // Find the code block with commits (between ``` markers)
+          let inCodeBlock = false;
+          for (let i = commitsIndex + 1; i < lines.length; i++) {
+            const line = lines[i];
+
+            if (line.trim() === '```') {
+              if (inCodeBlock) break; // End of code block
+              inCodeBlock = true;
+              continue;
+            }
+
+            if (inCodeBlock && line.trim()) {
+              // Parse commit line: "hash message"
+              const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+              if (match) {
+                const [, hash, message] = match;
+                console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+              }
             }
           }
-
-          if (summaryText) {
-            console.log(chalk.cyan(`📰 ${releaseHeader.replace('# ', '')}\n`));
-            console.log(chalk.white(`   ${summaryText}\n`));
-          }
+          console.log();
         }
       } catch {
         // No release notes available
@@ -573,26 +581,34 @@ program
           const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
           const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
 
-          // Extract latest release section (first release in the file)
+          // Extract commits from "Recent Commits" section
           const lines = releaseNotes.split('\n');
-          const releaseHeader = lines.find(line => line.startsWith('# Release v'));
-          const summaryIndex = lines.findIndex(line => line.includes('## 🤖 AI Summary'));
+          const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
 
-          if (releaseHeader && summaryIndex > 0) {
-            // Get the summary paragraph (next non-empty line after AI Summary)
-            let summaryText = '';
-            for (let i = summaryIndex + 1; i < lines.length; i++) {
-              const line = lines[i].trim();
-              if (line && !line.startsWith('#')) {
-                summaryText = line;
-                break;
+          if (commitsIndex >= 0) {
+            console.log(chalk.cyan('📝 Recent Changes:\n'));
+
+            // Find the code block with commits (between ``` markers)
+            let inCodeBlock = false;
+            for (let i = commitsIndex + 1; i < lines.length; i++) {
+              const line = lines[i];
+
+              if (line.trim() === '```') {
+                if (inCodeBlock) break; // End of code block
+                inCodeBlock = true;
+                continue;
+              }
+
+              if (inCodeBlock && line.trim()) {
+                // Parse commit line: "hash message"
+                const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+                if (match) {
+                  const [, hash, message] = match;
+                  console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+                }
               }
             }
-
-            if (summaryText) {
-              console.log(chalk.cyan(`📰 ${releaseHeader.replace('# ', '')}\n`));
-              console.log(chalk.white(`   ${summaryText}\n`));
-            }
+            console.log();
           }
         } catch {
           // No release notes available

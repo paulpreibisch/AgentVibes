@@ -56,12 +56,22 @@ try {
 - RELEASE_NOTES.md now serves as fallback documentation
 - Better user experience for npm package installations
 
+## 📝 Recent Commits
+
+```
+456abb0 docs: Update version to v1.0.21 [skip ci]
+3dfdcb5 fix: Include RELEASE_NOTES.md in npm package for installer fallback
+96f8a9b docs: Update README and RELEASE_NOTES to v1.0.20 [skip ci]
+5e2e3cc chore: Bump version to 1.0.20 for npm publish
+1636b14 feat: Show release notes from RELEASE_NOTES.md when git is unavailable
+```
+
 ## 📊 Release Stats
 
-- **2 commits** since v1.0.19
-- **1 file changed**: src/installer.js
-- **56 insertions**, **4 deletions**
-- **1 bug fix**: Release notes display in npx installations
+- **5 commits** since v1.0.19
+- **3 files changed**: .npmignore, README.md, RELEASE_NOTES.md
+- **10 insertions**, **4 deletions**
+- **1 bug fix**: RELEASE_NOTES.md now included in npm package
 - **0 breaking changes**
 
 ## 🎯 User Experience Improvements
