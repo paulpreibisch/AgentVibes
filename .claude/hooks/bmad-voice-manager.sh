@@ -50,17 +50,92 @@ is_plugin_enabled() {
 # Enable plugin
 enable_plugin() {
     mkdir -p "$PLUGIN_DIR"
+
+    # Save current settings before enabling
+    BACKUP_FILE="$PLUGIN_DIR/.bmad-previous-settings"
+
+    # Save current voice
+    if [[ -f ".claude/tts-voice.txt" ]]; then
+        CURRENT_VOICE=$(cat .claude/tts-voice.txt 2>/dev/null)
+    elif [[ -f "$HOME/.claude/tts-voice.txt" ]]; then
+        CURRENT_VOICE=$(cat "$HOME/.claude/tts-voice.txt" 2>/dev/null)
+    else
+        CURRENT_VOICE="Aria"
+    fi
+
+    # Save current personality
+    if [[ -f ".claude/tts-personality.txt" ]]; then
+        CURRENT_PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null)
+    elif [[ -f "$HOME/.claude/tts-personality.txt" ]]; then
+        CURRENT_PERSONALITY=$(cat "$HOME/.claude/tts-personality.txt" 2>/dev/null)
+    else
+        CURRENT_PERSONALITY="normal"
+    fi
+
+    # Save current sentiment
+    if [[ -f ".claude/tts-sentiment.txt" ]]; then
+        CURRENT_SENTIMENT=$(cat .claude/tts-sentiment.txt 2>/dev/null)
+    elif [[ -f "$HOME/.claude/tts-sentiment.txt" ]]; then
+        CURRENT_SENTIMENT=$(cat "$HOME/.claude/tts-sentiment.txt" 2>/dev/null)
+    else
+        CURRENT_SENTIMENT=""
+    fi
+
+    # Write backup
+    cat > "$BACKUP_FILE" <<EOF
+VOICE=$CURRENT_VOICE
+PERSONALITY=$CURRENT_PERSONALITY
+SENTIMENT=$CURRENT_SENTIMENT
+EOF
+
     touch "$ENABLED_FLAG"
     echo "✅ BMAD voice plugin enabled"
+    echo "💾 Previous settings backed up:"
+    echo "   Voice: $CURRENT_VOICE"
+    echo "   Personality: $CURRENT_PERSONALITY"
+    [[ -n "$CURRENT_SENTIMENT" ]] && echo "   Sentiment: $CURRENT_SENTIMENT"
     echo ""
     list_mappings
 }
 
 # Disable plugin
 disable_plugin() {
+    BACKUP_FILE="$PLUGIN_DIR/.bmad-previous-settings"
+
+    # Check if we have a backup to restore
+    if [[ -f "$BACKUP_FILE" ]]; then
+        source "$BACKUP_FILE"
+
+        echo "❌ BMAD voice plugin disabled"
+        echo "🔄 Restoring previous settings:"
+        echo "   Voice: $VOICE"
+        echo "   Personality: $PERSONALITY"
+        [[ -n "$SENTIMENT" ]] && echo "   Sentiment: $SENTIMENT"
+
+        # Restore voice
+        if [[ -n "$VOICE" ]]; then
+            echo "$VOICE" > .claude/tts-voice.txt 2>/dev/null || echo "$VOICE" > "$HOME/.claude/tts-voice.txt"
+        fi
+
+        # Restore personality
+        if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "normal" ]]; then
+            echo "$PERSONALITY" > .claude/tts-personality.txt 2>/dev/null || echo "$PERSONALITY" > "$HOME/.claude/tts-personality.txt"
+        fi
+
+        # Restore sentiment
+        if [[ -n "$SENTIMENT" ]]; then
+            echo "$SENTIMENT" > .claude/tts-sentiment.txt 2>/dev/null || echo "$SENTIMENT" > "$HOME/.claude/tts-sentiment.txt"
+        fi
+
+        # Clean up backup
+        rm -f "$BACKUP_FILE"
+    else
+        echo "❌ BMAD voice plugin disabled"
+        echo "⚠️  No previous settings found to restore"
+        echo "AgentVibes will use current voice/personality settings"
+    fi
+
     rm -f "$ENABLED_FLAG"
-    echo "❌ BMAD voice plugin disabled"
-    echo "AgentVibes will use default voice behavior for BMAD agents"
 }
 
 # List all mappings

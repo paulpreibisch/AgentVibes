@@ -16,5 +16,7 @@ yarn-error.log*
 .claude/tts-*.txt
 .claude/config/
 .claude/settings.local.json
+.claude/plugins/.bmad-previous-settings
+.bmad-agent-context
 *.tgz
 *.code-workspace
