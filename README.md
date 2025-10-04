@@ -267,10 +267,10 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 |-------|------|-------|-------------|
 | **pm** | Product Manager | Jessica Anne Bogart | professional |
 | **dev** | Developer | Matthew Schmitz | normal |
-| **qa** | QA Engineer | Ralf Eisend | professional |
+| **qa** | QA Engineer | Lutz Laugh | professional |
 | **architect** | Architect | Michael | normal |
 | **po** | Product Owner | Amy | professional |
-| **analyst** | Analyst | Lutz Laugh | normal |
+| **analyst** | Analyst | Ralf Eisend | normal |
 | **sm** | Scrum Master | Ms. Walker | professional |
 | **ux-expert** | UX Expert | Aria | normal |
 | **bmad-master** | BMAD Master | Aria | zen |
