@@ -9,7 +9,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.0.15
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.0.16
 
 ---
 
@@ -42,7 +42,7 @@
 
 ## 📰 Latest Release
 
-**[v1.0.15 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.15)** 🎤
+**[v1.0.16 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.16)** 🎤
 
 Voice library expansion with 5 new professional voices (Burt Reynolds, Tiffany, Archer, Tom, Juniper) and optimized BMAD agent voice assignments for better role fit.
 
