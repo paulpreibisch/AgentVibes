@@ -1,3 +1,122 @@
+# Release v1.0.14
+
+## 🤖 AI Summary
+
+This release introduces the BMAD Plugin - a powerful integration that automatically switches AgentVibes voices based on which BMAD agent is active. When you activate a BMAD agent (like `/BMad:agents:pm`), AgentVibes now intelligently uses that agent's assigned voice for all TTS acknowledgments and completions. The plugin includes auto-detection of BMAD installations, preserves your previous voice settings when toggling the plugin, and provides comprehensive management commands. Additionally, this release adds a nostalgic "grandpa" personality and includes a major README restructure with improved navigation.
+
+## ✨ New Features
+
+### BMAD Plugin Integration
+- **Automatic voice switching** for BMAD agents based on their role
+- **Auto-detection**: Plugin automatically enables when BMAD installation is detected (`.bmad-core/install-manifest.yaml`)
+- **Settings preservation**: Backs up and restores your previous voice/personality/sentiment settings when enabling/disabling plugin
+- **10 agent voice mappings** included by default:
+  - PM (Product Manager): Jessica Anne Bogart with professional personality
+  - Developer: Matthew Schmitz with normal personality
+  - QA Engineer: Ralf Eisend with professional personality
+  - Architect: Michael with normal personality
+  - Product Owner: Amy with professional personality
+  - Analyst: Lutz Laugh with normal personality
+  - Scrum Master: Ms. Walker with professional personality
+  - UX Expert: Aria with normal personality
+  - BMAD Master: Aria with zen personality
+  - Orchestrator: Ms. Walker with professional personality
+
+### Plugin Management Commands
+- `/agent-vibes-bmad enable` - Enable BMAD voice plugin
+- `/agent-vibes-bmad disable` - Disable and restore previous settings
+- `/agent-vibes-bmad status` - Show plugin status and agent mappings
+- `/agent-vibes-bmad list` - List all agent voice assignments
+- `/agent-vibes-bmad set <agent-id> <voice> [personality]` - Customize agent voices
+- `/agent-vibes-bmad edit` - Open configuration for manual editing
+
+### Grandpa Personality
+- Added nostalgic rambling storyteller personality
+- Uses Grandpa Spuds Oxley voice
+- Perfect for agents that need a folksy, nostalgic communication style
+- Example acknowledgments:
+  - "Well now, let me tell you about fixing bugs back in my day..."
+  - "Reminds me of the time I debugged a system with punch cards..."
+
+### README Improvements
+- Complete restructure with comprehensive table of contents
+- Organized into logical categories: Getting Started, Core Features, Advanced Topics
+- Added "Back to top" navigation links throughout
+- New dedicated BMAD Plugin section with usage examples
+- Improved discoverability and user experience
+
+## 🔧 Technical Implementation
+
+### Plugin Architecture
+- Voice mappings stored in `.claude/plugins/bmad-voices.md` (markdown table format)
+- Management script at `.claude/hooks/bmad-voice-manager.sh`
+- Enable/disable flag at `.claude/plugins/bmad-voices-enabled.flag`
+- Auto-detection function checks for BMAD on every voice lookup
+- Settings backup stored in `.claude/plugins/.bmad-previous-settings` (gitignored)
+
+### Voice Priority System
+The plugin follows this priority order:
+1. BMAD plugin voice (if agent active and plugin enabled)
+2. Sentiment mode (if set)
+3. Personality mode (if set)
+4. Default voice
+
+### Output Style Integration
+- Added BMAD plugin detection to Agent Vibes output style
+- Automatic agent context tracking
+- Seamless integration with existing personality/sentiment system
+- Template files updated for new installations
+
+## 📝 Changed Files
+
+- `.claude/commands/agent-vibes-bmad.md` - New command documentation (132 lines)
+- `.claude/hooks/bmad-voice-manager.sh` - New management script (278 lines)
+- `.claude/output-styles/agent-vibes.md` - Added BMAD integration section (58 new lines)
+- `.claude/personalities/grandpa.md` - Fixed voice name (Grandpa Spuds Oxley)
+- `.claude/plugins/bmad-voices.md` - New plugin configuration (42 lines)
+- `.claude/plugins/bmad-voices-enabled.flag` - Plugin enable flag (empty file)
+- `.gitignore` - Added plugin backup file exclusion
+- `README.md` - Complete restructure (418 lines changed)
+- `templates/output-styles/agent-vibes.md` - Updated template (58 new lines)
+
+**Total changes**: 791 insertions(+), 199 deletions(-)
+
+## 🐛 Bug Fixes
+
+### Grandpa Personality Voice
+- **Fixed**: Grandpa personality was using non-existent "Grandpa Werthers" voice
+- **Corrected**: Now uses proper "Grandpa Spuds Oxley" voice
+- **Impact**: Grandpa personality now works correctly
+
+## 🔄 Migration Notes
+
+### For Existing Users
+- BMAD plugin will **auto-enable** if BMAD is detected in your project
+- Your existing voice/personality settings are **automatically backed up** when plugin enables
+- Disable plugin with `/agent-vibes-bmad disable` to restore previous settings
+- Plugin is **completely optional** - AgentVibes works exactly as before if BMAD isn't installed
+
+### For BMAD Users
+- Plugin activates automatically when BMAD installation is detected
+- Each BMAD agent has a pre-assigned voice (see table above)
+- Customize voice mappings with `/agent-vibes-bmad set <agent-id> <voice>`
+- Edit `.claude/plugins/bmad-voices.md` directly for bulk changes
+
+## 📊 Stats
+
+- **5 commits** since v1.0.13
+- **9 files changed**
+- **2 new features**: BMAD Plugin, Grandpa Personality
+- **6 new commands**: BMAD plugin management suite
+- **10 agent voice mappings**: Pre-configured professional voice assignments
+- **1 major documentation update**: README restructure with TOC
+
+## 🙏 Credits
+
+Special thanks to the BMAD project for the inspiration and to all users who requested better agent voice customization!
+
+---
+
 # Release v1.0.13
 
 ## 🤖 AI Summary
@@ -48,104 +167,3 @@ This release fixes critical bugs in the update command and personality system, a
 - Personality, sentiment, and voice settings now check project-local `.claude/` first
 - Falls back to global `~/.claude/` if not found
 - Enables different personalities per project
-- Applies to `tts-personality.txt`, `tts-sentiment.txt`, and `tts-voice.txt`
-- Output style updated to support: `.claude/tts-sentiment.txt` → `~/.claude/tts-sentiment.txt`
-
-### Voice Information Display
-- TTS output now shows voice name and ID used
-- Example: `🎤 Voice used: Aria (TC0Zp7WVFzhA8zpTlRqV)`
-- Fixed locale warnings in play-tts.sh
-- Helps debug which voice is actually being used
-
-## 🧪 Testing Improvements
-
-### Personality-Voice Mapping Tests
-- Added `test/unit/personality-voice-mapping.bats` with 4 comprehensive tests
-- Validates all personality files have correct voice assignments
-- Ensures voice IDs remain stable across releases
-- Catches missing voice fields (discovered and fixed normal.md)
-- Total test count: **35** (up from 27)
-
-### Test Coverage
-- ✅ Correct voice assignments for all 18 personalities
-- ✅ Stable voice IDs in voices-config.sh
-- ✅ All personality files have voice field
-- ✅ Assigned voices exist in configuration
-
-**Expected Mappings Validated:**
-```bash
-crass → Ralf Eisend
-sarcastic → Jessica Anne Bogart
-flirty → Jessica Anne Bogart
-annoying → Lutz Laugh
-angry → Demon Monster
-pirate → Pirate Marshal
-robot → Dr. Von Fusion
-zen → Aria
-dramatic → Northern Terry
-millennial → Amy
-surfer-dude → Cowboy Bob
-sassy → Ms. Walker
-normal → Aria
-professional → Matthew Schmitz
-moody → Michael
-funny → Lutz Laugh
-poetic → Aria
-grandpa → Grandpa Spuds Oxley
-dry-humor → Aria
-```
-
-## 🔧 Technical Improvements
-
-### Refactored Personality System
-- Made personality and sentiment acknowledgments data-driven
-- Removed hardcoded responses in favor of flexible generation
-- Simplified personality-manager.sh (141 lines removed, cleaner logic)
-- Enhanced sentiment-manager.sh for better fallback handling
-- Each personality response is now AI-generated fresh each time
-
-### Configuration Management
-- Added `.gitignore` entries for personal TTS settings
-- Prevents `.claude/tts-voice.txt`, `.claude/tts-personality.txt`, `.claude/tts-sentiment.txt` from being committed
-- Keeps user preferences local
-- Synced `templates/output-styles/agent-vibes.md` with latest version
-
-## 📊 Changes Summary
-
-- **12 files changed**: 306 insertions(+), 161 deletions(-)
-- **New personality**: dry-humor
-- **Bug fixes**: 2 critical issues resolved
-- **Test coverage**: +8 tests (27 → 35)
-- **Code quality**: Simplified personality management
-
-## 🚀 Upgrade Instructions
-
-```bash
-npx agentvibes update
-```
-
-The update command will now show you exactly what version you're getting and what's changed!
-
-## 💡 What This Fixes For Users
-
-**Before (Broken):**
-- Update command copied old files without project-local support
-- Projects couldn't have different personalities
-- Crass personality used wrong voice
-- No tests to prevent voice mapping regressions
-
-**After (Fixed):**
-- Update command copies latest files with all features
-- Each project can have its own personality/sentiment/voice settings
-- Crass personality uses correct Ralf Eisend voice
-- Comprehensive tests ensure voices stay correct
-
-## 🔗 Links
-
-- [View this release on GitHub](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.13)
-- [npm package](https://www.npmjs.com/package/agentvibes/v/1.0.13)
-- [Full Documentation](https://github.com/paulpreibisch/AgentVibes#readme)
-
----
-
-**Built with ❤️ by Paul Preibisch | Powered by ElevenLabs AI & Claude AI**
