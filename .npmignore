@@ -41,5 +41,7 @@ Thumbs.db
 .claude/commands/release.md
 .claude/commands/prepare-release.md
 .claude/hooks/prepare-release.sh
-RELEASE_NOTES.md
 RELEASE_PROCESS.md
+
+# NOTE: RELEASE_NOTES.md is intentionally NOT ignored - it's used by the installer
+# to display release information when git is unavailable (e.g., when running via npx)
