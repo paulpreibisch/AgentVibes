@@ -230,7 +230,7 @@ All commands are prefixed with `/agent-vibes:`
 
 ## 🗣️ Voice Library
 
-AgentVibes includes **17 unique ElevenLabs voices:**
+AgentVibes includes **18 unique ElevenLabs voices:**
 
 | Voice | Character | Best For |
 |-------|-----------|----------|
@@ -247,6 +247,7 @@ AgentVibes includes **17 unique ElevenLabs voices:**
 | [Ralf Eisend](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) | International | Multi-cultural |
 | [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse |
 | [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny |
+| [Burt Reynolds](https://elevenlabs.io/voice-library/burt-reynolds/4YYIPFl9wE5c4L2eu2Gb) | Smooth baritone | Confident, charismatic |
 | [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep and spooky | Dramatic |
 
 💡 **Tip:** Click voice names to hear samples on ElevenLabs!
@@ -267,7 +268,7 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 |-------|------|-------|-------------|
 | **pm** | Product Manager | Jessica Anne Bogart | professional |
 | **dev** | Developer | Matthew Schmitz | normal |
-| **qa** | QA Engineer | Lutz Laugh | professional |
+| **qa** | QA Engineer | Burt Reynolds | professional |
 | **architect** | Architect | Michael | normal |
 | **po** | Product Owner | Amy | professional |
 | **analyst** | Analyst | Ralf Eisend | normal |
