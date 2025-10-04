@@ -24,6 +24,7 @@
 - [🎤 Commands Reference](#-commands-reference) - All available commands
 - [🎭 Personalities vs Sentiments](#-personalities-vs-sentiments) - Two systems explained
 - [🗣️ Voice Library](#️-voice-library) - 17+ professional voices
+- [🌍 Multilingual Support](#change-language) - Speak in 30+ languages
 - [🔌 BMAD Plugin](#-bmad-plugin) - Auto voice switching for BMAD agents
 
 ### Advanced Topics
@@ -159,6 +160,15 @@ All commands are prefixed with `/agent-vibes:`
 | `/agent-vibes:sentiment list` | Show all available sentiments |
 | `/agent-vibes:sentiment get` | Show current sentiment |
 | `/agent-vibes:sentiment clear` | Remove sentiment |
+
+### Language Commands
+
+| Command | Description |
+|---------|-------------|
+| `/agent-vibes:set-language <language>` | Set TTS language (30+ supported) |
+| `/agent-vibes:set-language english` | Reset to English |
+| `/agent-vibes:set-language list` | Show all supported languages |
+| `/agent-vibes:whoami` | Show current language + voice |
 
 ### BMAD Plugin Commands
 
@@ -445,6 +455,47 @@ Settings persist across Claude Code sessions!
 /agent-vibes:preview 10              # Hear first 10
 /agent-vibes:preview last 5          # Hear last 5
 ```
+
+### Change Language
+
+Make Claude speak in **30+ languages** using multilingual voices:
+
+```bash
+# Set to Spanish
+/agent-vibes:set-language spanish
+
+# Set to French
+/agent-vibes:set-language french
+
+# Set to German
+/agent-vibes:set-language german
+
+# See all supported languages
+/agent-vibes:set-language list
+
+# Reset to English
+/agent-vibes:set-language english
+```
+
+**Supported Languages:**
+- Spanish, French, German, Italian, Portuguese
+- Chinese, Japanese, Korean, Hindi, Arabic
+- Polish, Dutch, Turkish, Swedish, Russian
+- And 15+ more!
+
+**How It Works:**
+1. AgentVibes detects your language setting
+2. Automatically switches to multilingual voices (Antoni, Rachel, Domi, Bella)
+3. All TTS messages are spoken in your chosen language
+4. Works with personalities and BMAD plugin
+
+**Best Multilingual Voices:**
+- **Antoni** - Optimized for Spanish
+- **Rachel** - Optimized for French
+- **Domi** - Optimized for German
+- **Bella** - Optimized for Italian
+- **Charlotte** - European languages
+- **Matilda** - Latin languages
 
 [↑ Back to top](#-table-of-contents)
 
