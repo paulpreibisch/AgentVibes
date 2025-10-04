@@ -5,6 +5,7 @@
 declare -A VOICES=(
   ["Amy"]="bhJUNIXWQQ94l8eI2VUf"
   ["Aria"]="TC0Zp7WVFzhA8zpTlRqV"
+  ["Burt Reynolds"]="4YYIPFl9wE5c4L2eu2Gb"
   ["Cowboy Bob"]="KTPVrSVAEUSJRClDzBw7"
   ["Demon Monster"]="vfaqCOvlrKi4Zp7C2IAm"
   ["Dr. Von Fusion"]="yjJ45q8TVCrtMhEKurxY"

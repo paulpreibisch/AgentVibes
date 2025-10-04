@@ -15,7 +15,7 @@ This plugin automatically assigns voices to BMAD agents based on their role.
 |----------|------------|-------|-------------|
 | pm | John (Product Manager) | Jessica Anne Bogart | professional |
 | dev | James (Developer) | Matthew Schmitz | normal |
-| qa | Quinn (QA) | Lutz Laugh | professional |
+| qa | Quinn (QA) | Burt Reynolds | professional |
 | architect | Winston (Architect) | Michael | normal |
 | po | Product Owner | Amy | professional |
 | analyst | Analyst | Ralf Eisend | normal |
