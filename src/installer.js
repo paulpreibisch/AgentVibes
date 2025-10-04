@@ -339,10 +339,10 @@ async function install(options = {}) {
     } else {
       console.log(
         boxen(
-          chalk.cyan.bold('💡 Want AI Agent Teams?\n\n') +
-          chalk.white('Check out BMAD - AI agent collaboration framework\n') +
+          chalk.cyan.bold('💡 We also Recommend:\n\n') +
+          chalk.white.bold('BMAD-METHOD™: Universal AI Agent Framework\n\n') +
           chalk.gray('AgentVibes auto-detects BMAD and assigns voices to agents!\n\n') +
-          chalk.cyan('https://github.com/loremattei/bmad'),
+          chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD'),
           {
             padding: 1,
             margin: 1,
