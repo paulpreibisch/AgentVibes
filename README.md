@@ -13,9 +13,36 @@
 
 ---
 
+## 📑 Table of Contents
+
+### Getting Started
+- [🚀 Quick Start](#-quick-start) - Install in 3 steps
+- [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
+- [📰 Latest Release](#-latest-release) - What's new
+
+### Core Features
+- [🎤 Commands Reference](#-commands-reference) - All available commands
+- [🎭 Personalities vs Sentiments](#-personalities-vs-sentiments) - Two systems explained
+- [🗣️ Voice Library](#️-voice-library) - 17+ professional voices
+- [🔌 BMAD Plugin](#-bmad-plugin) - Auto voice switching for BMAD agents
+
+### Advanced Topics
+- [📦 Installation Structure](#-installation-structure) - What gets installed
+- [💡 Usage Examples](#-usage-examples) - Common workflows
+- [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
+- [💰 Pricing & Usage](#-pricing--usage) - ElevenLabs costs & monitoring
+- [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
+
+### Additional Resources
+- [🔄 Updating](#-updating) - Keep AgentVibes current
+- [🙏 Credits](#-credits) - Acknowledgments
+- [🤝 Contributing](#-contributing) - Show support
+
+---
+
 ## 📰 Latest Release
 
-**[v1.0.13 - Detailed Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.13)** 🐛
+**[v1.0.13 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.13)** 🐛
 
 Critical bug fixes for update command and personality system, plus new dry humor personality and comprehensive voice mapping tests.
 
@@ -34,10 +61,13 @@ Imagine Claude speaking to you with different voices and personalities as you co
 - 🎙️ **17+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
 - 💬 **Sentiment System** - Apply personality styles to ANY voice
+- 🔌 **BMAD Plugin** - Auto voice switching for BMAD agents
 - 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions
 - 🎵 **Voice Preview** - Listen before you choose
 - 🔄 **Audio Replay** - Replay the last 10 TTS messages
 - ⚡ **One-Command Install** - Get started in seconds
+
+[↑ Back to top](#-table-of-contents)
 
 ---
 
@@ -89,9 +119,11 @@ source ~/.bashrc
 
 **That's it! Claude will now speak to you!** 🎉
 
+[↑ Back to top](#-table-of-contents)
+
 ---
 
-## 🎤 Available Commands
+## 🎤 Commands Reference
 
 All commands are prefixed with `/agent-vibes:`
 
@@ -128,11 +160,18 @@ All commands are prefixed with `/agent-vibes:`
 | `/agent-vibes:sentiment get` | Show current sentiment |
 | `/agent-vibes:sentiment clear` | Remove sentiment |
 
-### Advanced Commands
+### BMAD Plugin Commands
 
 | Command | Description |
 |---------|-------------|
-| `/agent-vibes:set-pretext <text>` | Add prefix to all TTS messages |
+| `/agent-vibes-bmad status` | Show BMAD plugin status & mappings |
+| `/agent-vibes-bmad enable` | Enable automatic voice switching |
+| `/agent-vibes-bmad disable` | Disable plugin (restores previous settings) |
+| `/agent-vibes-bmad list` | List all BMAD agent voice mappings |
+| `/agent-vibes-bmad set <agent> <voice> [personality]` | Update agent mapping |
+| `/agent-vibes-bmad edit` | Edit configuration file |
+
+[↑ Back to top](#-table-of-contents)
 
 ---
 
@@ -147,13 +186,14 @@ All commands are prefixed with `/agent-vibes:`
 | **sarcastic** | Jessica Anne Bogart | Dry wit and cutting observations |
 | **flirty** | Jessica Anne Bogart | Playful charm and compliments |
 | **pirate** | Pirate Marshal | Seafaring swagger - "Arr matey!" |
-| **grandpa** | Grandpa Werthers | Rambling nostalgic stories |
-| **angry** | Drill Sergeant | Frustrated and loud |
+| **grandpa** | Grandpa Spuds Oxley | Rambling nostalgic stories |
+| **dry-humor** | Aria | British wit and deadpan delivery |
+| **angry** | Demon Monster | Frustrated and loud |
 | **robot** | Dr. Von Fusion | Mechanical and precise |
 | **zen** | Aria | Peaceful and mindful |
-| **professional** | Michael | Formal and corporate |
+| **professional** | Matthew Schmitz | Formal and corporate |
 
-**All 18 personalities:** sarcastic, flirty, pirate, grandpa, angry, robot, zen, professional, dramatic, millennial, surfer-dude, sassy, poetic, moody, funny, annoying, crass, normal, random
+**All 19 personalities:** sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, dramatic, millennial, surfer-dude, sassy, poetic, moody, funny, annoying, crass, normal, random
 
 ```bash
 /agent-vibes:personality sarcastic
@@ -184,64 +224,109 @@ All commands are prefixed with `/agent-vibes:`
 /agent-vibes:switch Aria --sentiment sarcastic
 ```
 
+[↑ Back to top](#-table-of-contents)
+
 ---
 
-## 🗣️ Available Voices
+## 🗣️ Voice Library
 
 AgentVibes includes **17 unique ElevenLabs voices:**
 
-| Voice | Character | Best For | Listen |
-|-------|-----------|----------|--------|
-| [Aria](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) | Clear professional | Default, all-purpose | [Preview](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) |
-| [Jessica Anne Bogart](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) | Wickedly eloquent | Sarcastic, flirty | [Preview](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) |
-| [Pirate Marshal](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) | Authentic pirate | Pirate personality | [Preview](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) |
-| [Grandpa Werthers](https://elevenlabs.io/voice-library/grandpa-werthers/MKlLqCItoCkvdhrxgtLv) | Nostalgic elder | Grandpa personality | [Preview](https://elevenlabs.io/voice-library/grandpa-werthers/MKlLqCItoCkvdhrxgtLv) |
-| [Drill Sergeant](https://elevenlabs.io/voice-library/drill-sergeant/vfaqCOvlrKi4Zp7C2IAm) | Military authority | Angry personality | [Preview](https://elevenlabs.io/voice-library/drill-sergeant/vfaqCOvlrKi4Zp7C2IAm) |
-| [Cowboy Bob](https://elevenlabs.io/voice-library/cowboy-bob/KTPVrSVAEUSJRClDzBw7) | Western charm | Casual, friendly | [Preview](https://elevenlabs.io/voice-library/cowboy-bob/KTPVrSVAEUSJRClDzBw7) |
-| [Northern Terry](https://elevenlabs.io/voice-library/northern-terry/wo6udizrrtpIxWGp2qJk) | Eccentric British | Quirky responses | [Preview](https://elevenlabs.io/voice-library/northern-terry/wo6udizrrtpIxWGp2qJk) |
-| [Ms. Walker](https://elevenlabs.io/voice-library/ms-walker/DLsHlh26Ugcm6ELvS0qi) | Warm teacher | Professional | [Preview](https://elevenlabs.io/voice-library/ms-walker/DLsHlh26Ugcm6ELvS0qi) |
-| [Dr. Von Fusion](https://elevenlabs.io/voice-library/dr-von-fusion/yjJ45q8TVCrtMhEKurxY) | Mad scientist | Robot personality | [Preview](https://elevenlabs.io/voice-library/dr-von-fusion/yjJ45q8TVCrtMhEKurxY) |
-| [Matthew Schmitz](https://elevenlabs.io/voice-library/matthew-schmitz/0SpgpJ4D3MpHCiWdyTg3) | Deep baritone | Dramatic | [Preview](https://elevenlabs.io/voice-library/matthew-schmitz/0SpgpJ4D3MpHCiWdyTg3) |
-| [Grandpa Spuds Oxley](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) | Wise elder | Wisdom | [Preview](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) |
-| [Michael](https://elevenlabs.io/voice-library/michael/U1Vk2oyatMdYs096Ety7) | British urban | Professional | [Preview](https://elevenlabs.io/voice-library/michael/U1Vk2oyatMdYs096Ety7) |
-| [Ralf Eisend](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) | International | Multi-cultural | [Preview](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) |
-| [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse | [Preview](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) |
-| [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny | [Preview](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) |
-| [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep and spooky | Dramatic | [Preview](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) |
+| Voice | Character | Best For |
+|-------|-----------|----------|
+| [Aria](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) | Clear professional | Default, all-purpose |
+| [Jessica Anne Bogart](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) | Wickedly eloquent | Sarcastic, flirty |
+| [Pirate Marshal](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) | Authentic pirate | Pirate personality |
+| [Grandpa Spuds Oxley](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) | Wise elder | Grandpa personality |
+| [Matthew Schmitz](https://elevenlabs.io/voice-library/matthew-schmitz/0SpgpJ4D3MpHCiWdyTg3) | Deep baritone | Professional |
+| [Cowboy Bob](https://elevenlabs.io/voice-library/cowboy-bob/KTPVrSVAEUSJRClDzBw7) | Western charm | Casual, friendly |
+| [Northern Terry](https://elevenlabs.io/voice-library/northern-terry/wo6udizrrtpIxWGp2qJk) | Eccentric British | Quirky responses |
+| [Ms. Walker](https://elevenlabs.io/voice-library/ms-walker/DLsHlh26Ugcm6ELvS0qi) | Warm teacher | Professional |
+| [Dr. Von Fusion](https://elevenlabs.io/voice-library/dr-von-fusion/yjJ45q8TVCrtMhEKurxY) | Mad scientist | Robot personality |
+| [Michael](https://elevenlabs.io/voice-library/michael/U1Vk2oyatMdYs096Ety7) | British urban | Professional |
+| [Ralf Eisend](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) | International | Multi-cultural |
+| [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse |
+| [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny |
+| [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep and spooky | Dramatic |
 
-**💡 Tip:** Click voice names or Preview links to hear samples on ElevenLabs before choosing!
+💡 **Tip:** Click voice names to hear samples on ElevenLabs!
+
+[↑ Back to top](#-table-of-contents)
 
 ---
 
-## 📦 What Gets Installed?
+## 🔌 BMAD Plugin
+
+**Automatically switch voices when using BMAD agents!**
+
+The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`) and automatically uses the assigned voice for that role.
+
+### Default BMAD Voice Mappings
+
+| Agent | Role | Voice | Personality |
+|-------|------|-------|-------------|
+| **pm** | Product Manager | Jessica Anne Bogart | professional |
+| **dev** | Developer | Matthew Schmitz | normal |
+| **qa** | QA Engineer | Ralf Eisend | professional |
+| **architect** | Architect | Michael | normal |
+| **po** | Product Owner | Amy | professional |
+| **analyst** | Analyst | Lutz Laugh | normal |
+| **sm** | Scrum Master | Ms. Walker | professional |
+| **ux-expert** | UX Expert | Aria | normal |
+| **bmad-master** | BMAD Master | Aria | zen |
+| **bmad-orchestrator** | Orchestrator | Ms. Walker | professional |
+
+### Plugin Management
+
+```bash
+# Check status (auto-enables if BMAD detected)
+/agent-vibes-bmad status
+
+# Disable plugin
+/agent-vibes-bmad disable
+
+# Re-enable plugin
+/agent-vibes-bmad enable
+
+# Customize agent voice
+/agent-vibes-bmad set pm "Aria" zen
+
+# Edit configuration
+/agent-vibes-bmad edit
+```
+
+### How It Works
+
+1. **Auto-Detection**: Plugin checks for `.bmad-core/install-manifest.yaml`
+2. **Auto-Enable**: Enables automatically when BMAD is detected
+3. **Settings Preservation**: Saves your previous voice/personality when enabling
+4. **Restore on Disable**: Restores previous settings when disabling
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 📦 Installation Structure
 
 ```
 your-project/
 └── .claude/
     ├── commands/
-    │   └── agent-vibes/              # All slash commands
-    │       ├── agent-vibes.md
-    │       ├── agent-vibes:list.md
-    │       ├── agent-vibes:switch.md
-    │       ├── agent-vibes:whoami.md
-    │       ├── agent-vibes:personality.md
-    │       ├── agent-vibes:sentiment.md
-    │       └── ... (12 total)
+    │   ├── agent-vibes/              # Voice commands
+    │   └── agent-vibes-bmad.md       # BMAD plugin command
     ├── hooks/
     │   ├── voice-manager.sh          # Voice switching
     │   ├── personality-manager.sh    # Personality system
     │   ├── sentiment-manager.sh      # Sentiment system
+    │   ├── bmad-voice-manager.sh     # BMAD plugin
     │   ├── play-tts.sh              # TTS playback
     │   └── voices-config.sh         # Voice ID mappings
-    ├── personalities/               # 18 personality templates
-    │   ├── sarcastic.md
-    │   ├── flirty.md
-    │   ├── pirate.md
-    │   └── ... (15 more)
+    ├── personalities/               # 19 personality templates
+    ├── plugins/
+    │   └── bmad-voices.md           # BMAD voice mappings
     ├── output-styles/
     │   └── agent-vibes.md           # Voice output style
     └── audio/                       # Generated TTS files
-        └── tts-*.mp3               # Last 10 kept
 ```
 
 ### Voice Settings Storage
@@ -252,20 +337,7 @@ your-project/
 
 Settings persist across Claude Code sessions!
 
----
-
-## 🔧 CLI Management
-
-```bash
-# Check installation status
-node ~/claude/AgentVibes/bin/agent-vibes status
-
-# Update to latest version
-node ~/claude/AgentVibes/bin/agent-vibes update
-
-# Install with options
-node ~/claude/AgentVibes/bin/agent-vibes install --yes --directory ~/my-project
-```
+[↑ Back to top](#-table-of-contents)
 
 ---
 
@@ -285,8 +357,8 @@ node ~/claude/AgentVibes/bin/agent-vibes install --yes --directory ~/my-project
 ```bash
 /agent-vibes:personality sarcastic   # Sarcastic + Jessica Anne Bogart
 /agent-vibes:personality pirate      # Pirate + Pirate Marshal
-/agent-vibes:personality grandpa     # Grandpa + Grandpa Werthers
-/agent-vibes:personality list        # See all 18 personalities
+/agent-vibes:personality dry-humor   # British wit + Aria
+/agent-vibes:personality list        # See all 19 personalities
 ```
 
 ### Use Sentiments
@@ -312,50 +384,11 @@ node ~/claude/AgentVibes/bin/agent-vibes install --yes --directory ~/my-project
 /agent-vibes:preview last 5          # Hear last 5
 ```
 
----
-
-## 🌟 Best Voice/Personality Combos
-
-- **Debugging**: Sarcastic + Jessica Anne Bogart 😏
-- **Learning**: Professional + Michael 📚
-- **Fun Coding**: Pirate + Pirate Marshal 🏴‍☠️
-- **Late Night**: Zen + Aria 🧘
-- **Pair Programming**: Grandpa + Grandpa Werthers 👴
+[↑ Back to top](#-table-of-contents)
 
 ---
 
-## ❓ Troubleshooting
-
-### No Audio Playing?
-
-1. Check API key: `echo $ELEVENLABS_API_KEY`
-2. Check output style: `/output-style agent-vibes`
-3. Test playback: `/agent-vibes:sample Aria`
-
-### Commands Not Found?
-
-```bash
-# Verify installation
-node ~/claude/AgentVibes/bin/agent-vibes status
-
-# Reinstall
-node ~/claude/AgentVibes/bin/agent-vibes install --yes
-```
-
-### Wrong Voice Playing?
-
-```bash
-# Check current setup
-/agent-vibes:whoami
-
-# Reset if needed
-/agent-vibes:personality reset
-/agent-vibes:sentiment clear
-```
-
----
-
-## 🔧 Advanced Usage
+## 🔧 Advanced Features
 
 ### Custom Personalities
 
@@ -388,7 +421,7 @@ node ~/claude/AgentVibes/bin/agent-vibes install --yes
 /agent-vibes:add "My Voice" abc123xyz789
 ```
 
-### Use in Output Styles
+### Use in Custom Output Styles
 
 ```markdown
 I'll do the task
@@ -400,9 +433,88 @@ I'll do the task
 [Bash: .claude/hooks/play-tts.sh "Complete" "Cowboy Bob"]
 ```
 
+[↑ Back to top](#-table-of-contents)
+
 ---
 
-## 🔄 Updating AgentVibes
+## 💰 Pricing & Usage
+
+### ElevenLabs Pricing (2025)
+
+| Plan | Monthly Cost | Characters/Month | Best For |
+|------|-------------|------------------|----------|
+| **Free** | $0 | 10,000 | Trying it out, light use |
+| **Starter** | $5 | 30,000 | Casual coding (1-2 hrs/day) |
+| **Creator** | $22 | 100,000 | Regular coding (4-5 hrs/day) |
+| **Pro** | $99 | 500,000 | Heavy daily use (8+ hrs/day) |
+| **Scale** | $330 | 2,000,000 | Professional/teams |
+
+### Monitor Your Usage
+
+**Track consumption in real-time:**
+
+1. **Go to ElevenLabs Dashboard**: https://elevenlabs.io/app/usage
+2. **Monitor**: Credits used, character breakdown, billing period
+3. **Set alerts**: Check usage weekly, watch for spikes
+
+### Tips to Manage Costs
+
+1. **Use selectively**: Disable TTS when doing quick edits
+   ```bash
+   /output-style default         # Turn off voice
+   /output-style agent-vibes     # Turn back on
+   ```
+
+2. **Monitor analytics**: Check usage dashboard regularly
+
+3. **Shorter messages**: "Normal" personality = shortest messages
+
+4. **Upgrade proactively**: If coding 8+ hrs/day, start with Creator plan
+
+### Useful Links
+
+- 📊 **Usage Dashboard**: https://elevenlabs.io/app/usage
+- 💳 **Pricing Page**: https://elevenlabs.io/pricing
+- 🆘 **Support**: https://help.elevenlabs.io/
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## ❓ Troubleshooting
+
+### No Audio Playing?
+
+1. Check API key: `echo $ELEVENLABS_API_KEY`
+2. Check output style: `/output-style agent-vibes`
+3. Test playback: `/agent-vibes:sample Aria`
+
+### Commands Not Found?
+
+```bash
+# Verify installation
+node ~/claude/AgentVibes/bin/agent-vibes status
+
+# Reinstall
+node ~/claude/AgentVibes/bin/agent-vibes install --yes
+```
+
+### Wrong Voice Playing?
+
+```bash
+# Check current setup
+/agent-vibes:whoami
+
+# Reset if needed
+/agent-vibes:personality reset
+/agent-vibes:sentiment clear
+```
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🔄 Updating
 
 ### If installed via npx:
 ```bash
@@ -425,108 +537,14 @@ node bin/agent-vibes update --yes
 
 The update command will:
 - ✅ Update all slash commands
-- ✅ Update TTS scripts
+- ✅ Update TTS scripts and plugins
 - ✅ Add new personalities (keeps your custom ones)
 - ✅ Update output styles
 - ⚠️  Preserves your voice settings and configurations
 
+[↑ Back to top](#-table-of-contents)
+
 ---
-
-## 💰 ElevenLabs Usage & Costs
-
-### **Important: Monitor Your Usage!**
-
-AgentVibes generates TTS audio for **every task acknowledgment and completion** - this can add up quickly during active coding sessions!
-
-### 📊 **Typical Usage Patterns**
-
-**Light coding (1-2 hours/day):**
-- ~50-100 TTS messages
-- ~2,500-5,000 characters/day
-- ✅ **Free tier works** (10,000 chars/month)
-
-**Moderate coding (4-5 hours/day):**
-- ~200-300 TTS messages
-- ~10,000-15,000 characters/day
-- ⚠️ **Starter plan needed** ($5/month, 30,000 chars)
-
-**Heavy coding (8+ hours/day):**
-- ~400-600 TTS messages
-- ~20,000-30,000 characters/day
-- ⚠️ **Creator/Pro plan needed** ($22-$99/month)
-- 💡 **May need to upgrade mid-month** if coding intensively
-
-### 💳 **ElevenLabs Pricing (2025)**
-
-| Plan | Monthly Cost | Characters/Month | Best For |
-|------|-------------|------------------|----------|
-| **Free** | $0 | 10,000 | Trying it out, light use |
-| **Starter** | $5 | 30,000 | Casual coding |
-| **Creator** | $22 | 100,000 | Regular coding |
-| **Pro** | $99 | 500,000 | Heavy daily use |
-| **Scale** | $330 | 2,000,000 | Professional/teams |
-
-**Overage costs** (if you exceed your plan):
-- Creator: $0.30 per 1,000 characters
-- Pro: $0.24 per 1,000 characters
-- Scale: $0.18 per 1,000 characters
-
-### 📈 **Monitor Your Usage**
-
-**Track your consumption in real-time:**
-
-1. **Go to ElevenLabs Dashboard:**
-   - Visit: https://elevenlabs.io/app/usage
-   - Click "My Account" → "Usage Analytics"
-   - Or: "Developers" → "Usage" tab
-
-2. **What to monitor:**
-   - ✅ **Credits used** - Daily and monthly totals
-   - ✅ **Character breakdown** - By voice/API key
-   - ✅ **Billing period alignment** - See when your plan resets
-   - ✅ **Export to CSV** - Download usage data
-
-3. **Set up alerts:**
-   - Check your usage weekly
-   - Watch for unexpected spikes
-   - Upgrade before hitting limits
-
-### 💡 **Tips to Manage Costs**
-
-1. **Use selectively**: Disable TTS when doing quick edits
-   ```bash
-   /output-style default  # Turn off voice
-   /output-style agent-vibes  # Turn back on
-   ```
-
-2. **Monitor analytics**: Check https://elevenlabs.io/app/usage regularly
-
-3. **Shorter messages**: Personality styles affect message length
-   - "Normal" personality = shortest messages
-   - "Sarcastic/Grandpa" = longer messages
-
-4. **Upgrade proactively**: If coding 8+ hours/day, start with Creator plan
-
-### 🔗 **Useful Links**
-
-- 📊 **Usage Dashboard**: https://elevenlabs.io/app/usage
-- 💳 **Pricing Page**: https://elevenlabs.io/pricing
-- 📖 **Usage Analytics Docs**: https://elevenlabs.io/docs/product-guides/administration/usage-analytics
-- 🆘 **Support**: https://help.elevenlabs.io/
-
-### ⚠️ **Fair Warning**
-
-If you're coding **8 hours/day with Claude Code**, expect to use:
-- ~600-800 TTS messages daily
-- ~30,000-40,000 characters daily
-- ~900,000-1,200,000 characters/month
-
-**You'll likely need:**
-- **Pro plan ($99/month)** minimum
-- Or **Creator plan + overages** (~$140/month)
-- Possibly **two Pro subscriptions** if coding intensively 6-7 days/week
-
-**Always monitor your ElevenLabs analytics dashboard!** 📊
 
 ## 🙏 Credits
 
@@ -542,11 +560,13 @@ If you're coding **8 hours/day with Claude Code**, expect to use:
 - Licensed under Apache 2.0
 
 **Inspired by:**
-- 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler) - Original inspiration for Claude Code customization and hooks
+- 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler)
+
+[↑ Back to top](#-table-of-contents)
 
 ---
 
-## 🤝 Show Some Love
+## 🤝 Contributing
 
 If AgentVibes makes your coding more fun:
 - ⭐ **Star this repo** on GitHub
@@ -557,3 +577,5 @@ If AgentVibes makes your coding more fun:
 ---
 
 **Ready to give Claude a voice? Install now and code with personality! 🎤✨**
+
+[↑ Back to top](#-table-of-contents)
