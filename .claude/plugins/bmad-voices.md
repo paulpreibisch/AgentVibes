@@ -13,8 +13,8 @@ This plugin automatically assigns voices to BMAD agents based on their role.
 
 | Agent ID | Agent Name | Voice | Personality |
 |----------|------------|-------|-------------|
-| pm | John (Product Manager) | Matthew Schmitz | professional |
-| dev | James (Developer) | Jessica Anne Bogart | normal |
+| pm | John (Product Manager) | Jessica Anne Bogart | professional |
+| dev | James (Developer) | Matthew Schmitz | normal |
 | qa | Quinn (QA) | Ralf Eisend | professional |
 | architect | Winston (Architect) | Michael | normal |
 | po | Product Owner | Amy | professional |
