@@ -65,7 +65,9 @@ function showWelcome() {
 async function install(options = {}) {
   showWelcome();
 
-  const currentDir = process.cwd();
+  // When running via npx, process.cwd() returns the npm cache directory
+  // Use INIT_CWD (set by npm/npx) to get the actual user's working directory
+  const currentDir = process.env.INIT_CWD || process.cwd();
   const targetDir = options.directory || currentDir;
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
@@ -421,7 +423,9 @@ program
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
-    const currentDir = process.cwd();
+    // When running via npx, process.cwd() returns the npm cache directory
+    // Use INIT_CWD (set by npm/npx) to get the actual user's working directory
+    const currentDir = process.env.INIT_CWD || process.cwd();
     const targetDir = options.directory || currentDir;
 
     // Read version from package.json
@@ -846,7 +850,9 @@ program
   .action(async () => {
     console.log(chalk.cyan('Checking AgentVibes installation...\n'));
 
-    const targetDir = process.cwd();
+    // When running via npx, process.cwd() returns the npm cache directory
+    // Use INIT_CWD (set by npm/npx) to get the actual user's working directory
+    const targetDir = process.env.INIT_CWD || process.cwd();
     const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
     const hooksDir = path.join(targetDir, '.claude', 'hooks');
 

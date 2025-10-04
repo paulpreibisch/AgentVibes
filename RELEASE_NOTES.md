@@ -1,5 +1,79 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v1.1.2 - NPX Installation Fix (2025-10-04)
+
+### 🤖 AI Summary
+
+This patch release fixes a critical bug where `npx agentvibes install` incorrectly installed files to the npm cache directory instead of the user's actual project directory. The installer now properly detects the original working directory when run via npx by using the `INIT_CWD` environment variable, ensuring files are installed in the correct location every time.
+
+### 🐛 Bug Fixes
+
+#### NPX Installation Directory Bug
+- **Fixed**: Installer using wrong directory when run via `npx agentvibes install`
+- **Root Cause**: `process.cwd()` returns npm cache location during npx execution
+- **Impact**: Files were installed to `/home/user/.npm/_npx/...` instead of project directory
+- **Solution**: Use `process.env.INIT_CWD` (set by npm/npx) to get actual user's working directory
+- **Benefit**: Installations now work correctly in all scenarios
+
+**What Was Broken:**
+```bash
+$ cd /my/project
+$ npx agentvibes install
+
+# Before: Installed to /home/user/.npm/_npx/.../node_modules/agentvibes/.claude/
+# After:  Installs to /my/project/.claude/ ✓
+```
+
+### 🔧 Technical Changes
+
+**Modified Files:**
+- `src/installer.js` - Fixed directory detection in all 3 command handlers
+
+**Implementation:**
+```javascript
+// Before (broken):
+const currentDir = process.cwd();
+
+// After (fixed):
+const currentDir = process.env.INIT_CWD || process.cwd();
+```
+
+**Commands Fixed:**
+- `install` command (line 70)
+- `update` command (line 428)
+- `status` command (line 855)
+
+### 💡 Why INIT_CWD?
+
+When you run `npx agentvibes install`:
+1. npm downloads package to cache: `/home/user/.npm/_npx/...`
+2. npm sets `INIT_CWD` to your original directory: `/my/project`
+3. npm runs the script from cache directory
+4. `process.cwd()` returns cache directory (wrong!)
+5. `process.env.INIT_CWD` returns your project directory (correct!)
+
+### 📊 Release Stats
+
+- **1 file changed**: src/installer.js
+- **3 functions fixed**: install, update, status
+- **6 lines added**: Comments explaining the fix
+- **1 critical bug fixed**
+- **0 breaking changes**
+
+---
+
+## 📝 Recent Commits
+
+```
+2ce7910 docs: Update version to v1.1.1 [skip ci]
+5dc3ed1 docs: Update README to version v1.1.1 [skip ci]
+2a46ab9 feat: Release v1.1.1 - Enhanced update display
+c07d3fe feat: Enhance update display with both release notes and commit messages
+047accd docs: Update version to v1.1.0 [skip ci]
+```
+
+---
+
 ## 📦 v1.1.1 - Enhanced Update Display (2025-01-04)
 
 ### 🤖 AI Summary
