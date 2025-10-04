@@ -43,9 +43,9 @@
 
 ## 📰 Latest Release
 
-**[v1.1.0 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.0)** 🌍
+**[v1.1.0 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.0)** 🔄
 
-Multilingual support is here! Speak with Claude in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and more. Added 6 multilingual voices, fixed slash command discovery, and improved update experience with release notes fallback.
+Self-update system is here! Update AgentVibes directly from Claude Code with `/agent-vibes:update` and check your version with `/agent-vibes:version`. No more manual npm/git commands - everything happens inside your Claude session with beautiful confirmations and release notes.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
