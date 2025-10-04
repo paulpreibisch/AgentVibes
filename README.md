@@ -9,7 +9,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.0.18
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.0.19
 
 ---
 
@@ -43,9 +43,9 @@
 
 ## 📰 Latest Release
 
-**[v1.0.18 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.18)** 🎤
+**[v1.0.19 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.19)** 🌍
 
-Voice library expansion with 5 new professional voices (Burt Reynolds, Tiffany, Archer, Tom, Juniper) and optimized BMAD agent voice assignments for better role fit.
+Multilingual support is here! Speak with Claude in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and more. Added 6 multilingual voices and fixed slash command discovery.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
