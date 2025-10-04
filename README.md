@@ -9,7 +9,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.1.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.1.1
 
 ---
 
@@ -43,7 +43,7 @@
 
 ## 📰 Latest Release
 
-**[v1.1.0 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.0)** 🔄
+**[v1.1.1 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.1)** 🔄
 
 Self-update system is here! Update AgentVibes directly from Claude Code with `/agent-vibes:update` and check your version with `/agent-vibes:version`. No more manual npm/git commands - everything happens inside your Claude session with beautiful confirmations and release notes.
 
