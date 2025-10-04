@@ -254,7 +254,7 @@ async function install(options = {}) {
     console.log(chalk.white(`   • Voice manager ready`));
     console.log(chalk.white(`   • 22 unique ElevenLabs voices available\n`));
 
-    // Show recent changes from git log (if available)
+    // Show recent changes from git log or RELEASE_NOTES.md
     try {
       const { execSync } = await import('node:child_process');
       const gitLog = execSync(
@@ -273,7 +273,35 @@ async function install(options = {}) {
         console.log();
       }
     } catch (error) {
-      // Git not available or not a git repo - skip changelog
+      // Git not available or not a git repo - try RELEASE_NOTES.md
+      try {
+        const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+        const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+
+        // Extract latest release section (first release in the file)
+        const lines = releaseNotes.split('\n');
+        const releaseHeader = lines.find(line => line.startsWith('# Release v'));
+        const summaryIndex = lines.findIndex(line => line.includes('## 🤖 AI Summary'));
+
+        if (releaseHeader && summaryIndex > 0) {
+          // Get the summary paragraph (next non-empty line after AI Summary)
+          let summaryText = '';
+          for (let i = summaryIndex + 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line && !line.startsWith('#')) {
+              summaryText = line;
+              break;
+            }
+          }
+
+          if (summaryText) {
+            console.log(chalk.cyan(`📰 ${releaseHeader.replace('# ', '')}\n`));
+            console.log(chalk.white(`   ${summaryText}\n`));
+          }
+        }
+      } catch {
+        // No release notes available
+      }
     }
 
     // Success message
@@ -521,7 +549,7 @@ program
       console.log(chalk.white(`   • ${srcPersonalityFiles.length} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
       console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
 
-      // Show recent changes from git log
+      // Show recent changes from git log or RELEASE_NOTES.md
       try {
         const { execSync } = await import('node:child_process');
         const gitLog = execSync(
@@ -540,7 +568,35 @@ program
           console.log();
         }
       } catch (error) {
-        // Git not available or not a git repo - skip changelog
+        // Git not available or not a git repo - try RELEASE_NOTES.md
+        try {
+          const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+          const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+
+          // Extract latest release section (first release in the file)
+          const lines = releaseNotes.split('\n');
+          const releaseHeader = lines.find(line => line.startsWith('# Release v'));
+          const summaryIndex = lines.findIndex(line => line.includes('## 🤖 AI Summary'));
+
+          if (releaseHeader && summaryIndex > 0) {
+            // Get the summary paragraph (next non-empty line after AI Summary)
+            let summaryText = '';
+            for (let i = summaryIndex + 1; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (line && !line.startsWith('#')) {
+                summaryText = line;
+                break;
+              }
+            }
+
+            if (summaryText) {
+              console.log(chalk.cyan(`📰 ${releaseHeader.replace('# ', '')}\n`));
+              console.log(chalk.white(`   ${summaryText}\n`));
+            }
+          }
+        } catch {
+          // No release notes available
+        }
       }
 
       console.log(chalk.gray('💡 Changes will take effect immediately!'));
