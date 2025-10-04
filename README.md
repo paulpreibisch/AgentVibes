@@ -230,11 +230,12 @@ All commands are prefixed with `/agent-vibes:`
 
 ## 🗣️ Voice Library
 
-AgentVibes includes **18 unique ElevenLabs voices:**
+AgentVibes includes **22 unique ElevenLabs voices:**
 
 | Voice | Character | Best For |
 |-------|-----------|----------|
 | [Aria](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) | Clear professional | Default, all-purpose |
+| [Archer](https://elevenlabs.io/voice-library/archer/L0Dsvb3SLTyegXwtm47J) | Authoritative, commanding | Leadership, orchestration |
 | [Jessica Anne Bogart](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) | Wickedly eloquent | Sarcastic, flirty |
 | [Pirate Marshal](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) | Authentic pirate | Pirate personality |
 | [Grandpa Spuds Oxley](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) | Wise elder | Grandpa personality |
@@ -248,6 +249,9 @@ AgentVibes includes **18 unique ElevenLabs voices:**
 | [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse |
 | [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny |
 | [Burt Reynolds](https://elevenlabs.io/voice-library/burt-reynolds/4YYIPFl9wE5c4L2eu2Gb) | Smooth baritone | Confident, charismatic |
+| [Juniper](https://elevenlabs.io/voice-library/juniper/aMSt68OGf4xUZAnLpTU8) | Warm, friendly | Stakeholder relations |
+| [Tiffany](https://elevenlabs.io/voice-library/tiffany/6aDn1KB0hjpdcocrUkmq) | Professional, clear | Product ownership, leadership |
+| [Tom](https://elevenlabs.io/voice-library/tom/DYkrAHD8iwork3YSUBbs) | Professional, organized | Orchestration, coordination |
 | [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep and spooky | Dramatic |
 
 💡 **Tip:** Click voice names to hear samples on ElevenLabs!
@@ -270,12 +274,12 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 | **dev** | Developer | Matthew Schmitz | normal |
 | **qa** | QA Engineer | Burt Reynolds | professional |
 | **architect** | Architect | Michael | normal |
-| **po** | Product Owner | Amy | professional |
+| **po** | Product Owner | Tiffany | professional |
 | **analyst** | Analyst | Ralf Eisend | normal |
 | **sm** | Scrum Master | Ms. Walker | professional |
 | **ux-expert** | UX Expert | Aria | normal |
-| **bmad-master** | BMAD Master | Aria | zen |
-| **bmad-orchestrator** | Orchestrator | Ms. Walker | professional |
+| **bmad-master** | BMAD Master | Archer | zen |
+| **bmad-orchestrator** | Orchestrator | Tom | professional |
 
 ### Plugin Management
 

@@ -17,12 +17,12 @@ This plugin automatically assigns voices to BMAD agents based on their role.
 | dev | James (Developer) | Matthew Schmitz | normal |
 | qa | Quinn (QA) | Burt Reynolds | professional |
 | architect | Winston (Architect) | Michael | normal |
-| po | Product Owner | Amy | professional |
+| po | Product Owner | Tiffany | professional |
 | analyst | Analyst | Ralf Eisend | normal |
 | sm | Scrum Master | Ms. Walker | professional |
 | ux-expert | UX Expert | Aria | normal |
-| bmad-master | BMAD Master | Aria | zen |
-| bmad-orchestrator | Orchestrator | Ms. Walker | professional |
+| bmad-master | BMAD Master | Archer | zen |
+| bmad-orchestrator | Orchestrator | Tom | professional |
 
 ## How to Edit
 
