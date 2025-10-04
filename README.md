@@ -230,12 +230,32 @@ All commands are prefixed with `/agent-vibes:`
 
 ## 🗣️ Voice Library
 
-AgentVibes includes **22 unique ElevenLabs voices:**
+AgentVibes includes **27 unique ElevenLabs voices** with multilingual support:
+
+### 🌍 Multilingual Voices (Supports 30+ Languages)
+
+Perfect for international projects! These voices work with Spanish, French, German, Italian, Portuguese, and many more languages using ElevenLabs' Multilingual v2 model.
+
+| Voice | Character | Languages | Best For |
+|-------|-----------|-----------|----------|
+| [Antoni](https://elevenlabs.io/voice-library/antoni/ErXwobaYiN019PkySvjV) | Well-balanced | 30+ | International, Spanish |
+| [Rachel](https://elevenlabs.io/voice-library/rachel/21m00Tcm4TlvDq8ikWAM) | Clear, professional | 30+ | Global communication, French |
+| [Domi](https://elevenlabs.io/voice-library/domi/AZnzlk1XvdvUeBnXmlld) | Strong, confident | 30+ | Leadership, German |
+| [Bella](https://elevenlabs.io/voice-library/bella/EXAVITQu4vr4xnSDxMaL) | Soft, engaging | 30+ | Friendly, Italian |
+
+### 🗣️ Language-Optimized Voices
+
+| Voice | Character | Optimized For |
+|-------|-----------|---------------|
+| [Charlotte](https://elevenlabs.io/voice-library/charlotte/XB0fDUnXU5powFXDhCwa) | Expressive | French, German, Spanish |
+| [Matilda](https://elevenlabs.io/voice-library/matilda/XrExE9yKIg1WjnnlVkGX) | Warm | Spanish, Portuguese |
+
+### 🎭 English Character Voices
 
 | Voice | Character | Best For |
 |-------|-----------|----------|
 | [Aria](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) | Clear professional | Default, all-purpose |
-| [Archer](https://elevenlabs.io/voice-library/archer/L0Dsvb3SLTyegXwtm47J) | Authoritative, commanding | Leadership, orchestration |
+| [Archer](https://elevenlabs.io/voice-library/archer/L0Dsvb3SLTyegXwtm47J) | Authoritative | Leadership, orchestration |
 | [Jessica Anne Bogart](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) | Wickedly eloquent | Sarcastic, flirty |
 | [Pirate Marshal](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) | Authentic pirate | Pirate personality |
 | [Grandpa Spuds Oxley](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) | Wise elder | Grandpa personality |
@@ -248,13 +268,14 @@ AgentVibes includes **22 unique ElevenLabs voices:**
 | [Ralf Eisend](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) | International | Multi-cultural |
 | [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse |
 | [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny |
-| [Burt Reynolds](https://elevenlabs.io/voice-library/burt-reynolds/4YYIPFl9wE5c4L2eu2Gb) | Smooth baritone | Confident, charismatic |
-| [Juniper](https://elevenlabs.io/voice-library/juniper/aMSt68OGf4xUZAnLpTU8) | Warm, friendly | Stakeholder relations |
-| [Tiffany](https://elevenlabs.io/voice-library/tiffany/6aDn1KB0hjpdcocrUkmq) | Professional, clear | Product ownership, leadership |
-| [Tom](https://elevenlabs.io/voice-library/tom/DYkrAHD8iwork3YSUBbs) | Professional, organized | Orchestration, coordination |
-| [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep and spooky | Dramatic |
+| [Burt Reynolds](https://elevenlabs.io/voice-library/burt-reynolds/4YYIPFl9wE5c4L2eu2Gb) | Smooth baritone | Confident |
+| [Juniper](https://elevenlabs.io/voice-library/juniper/aMSt68OGf4xUZAnLpTU8) | Warm, friendly | Relations |
+| [Tiffany](https://elevenlabs.io/voice-library/tiffany/6aDn1KB0hjpdcocrUkmq) | Professional | Leadership |
+| [Tom](https://elevenlabs.io/voice-library/tom/DYkrAHD8iwork3YSUBbs) | Professional | Coordination |
+| [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep, spooky | Dramatic |
 
 💡 **Tip:** Click voice names to hear samples on ElevenLabs!
+🌍 **Multilingual:** Use Antoni, Rachel, Domi, or Bella for automatic language detection
 
 [↑ Back to top](#-table-of-contents)
 
