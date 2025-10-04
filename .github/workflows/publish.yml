@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -111,7 +114,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add README.md
           git diff --staged --quiet || git commit -m "docs: Update README to version v${{ steps.version.outputs.VERSION }} [skip ci]"
-          git push
+          git push origin master
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
