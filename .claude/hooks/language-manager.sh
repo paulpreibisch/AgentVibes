@@ -3,8 +3,13 @@
 # Manages language settings and multilingual voice selection
 
 # Determine project or global config
-if [[ -d ".claude" ]]; then
-    LANGUAGE_FILE=".claude/tts-language.txt"
+# Use logical path (not physical) to handle symlinked .claude directories
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+
+# Check if we have a project-local .claude directory
+if [[ -d "$CLAUDE_DIR" ]] && [[ "$CLAUDE_DIR" != "$HOME/.claude" ]]; then
+    LANGUAGE_FILE="$CLAUDE_DIR/tts-language.txt"
 else
     LANGUAGE_FILE="$HOME/.claude/tts-language.txt"
     mkdir -p "$HOME/.claude"

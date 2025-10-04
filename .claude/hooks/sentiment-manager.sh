@@ -5,9 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PERSONALITIES_DIR="$SCRIPT_DIR/../personalities"
 
 # Project-local file first, global fallback
-PROJECT_ROOT="$SCRIPT_DIR/../.."
-if [[ -d "$PROJECT_ROOT/.claude" ]]; then
-  SENTIMENT_FILE="$PROJECT_ROOT/.claude/tts-sentiment.txt"
+# Use logical path (not physical) to handle symlinked .claude directories
+# Script is at .claude/hooks/sentiment-manager.sh, so .claude is ..
+CLAUDE_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+
+# Check if we have a project-local .claude directory
+if [[ -d "$CLAUDE_DIR" ]] && [[ "$CLAUDE_DIR" != "$HOME/.claude" ]]; then
+  SENTIMENT_FILE="$CLAUDE_DIR/tts-sentiment.txt"
 else
   SENTIMENT_FILE="$HOME/.claude/tts-sentiment.txt"
 fi

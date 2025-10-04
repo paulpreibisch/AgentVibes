@@ -2,15 +2,21 @@
 # Voice Manager - Handle voice switching and listing
 # Usage: voice-manager.sh [list|switch|get] [voice_name]
 
-# Source the single voice configuration file
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get script directory (physical path for sourcing files)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/voices-config.sh"
 
 # Project-local file first, global fallback
-PROJECT_ROOT="$SCRIPT_DIR/../.."
-if [[ -d "$PROJECT_ROOT/.claude" ]]; then
-  VOICE_FILE="$PROJECT_ROOT/.claude/tts-voice.txt"
+# Use the logical path from BASH_SOURCE to find .claude directory
+# This handles both normal installations and symlinked hooks directories correctly
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_DIR="$(dirname "$SCRIPT_PATH")"
+
+# Check if we have a project-local .claude directory
+if [[ -d "$CLAUDE_DIR" ]] && [[ "$CLAUDE_DIR" != "$HOME/.claude" ]]; then
+  VOICE_FILE="$CLAUDE_DIR/tts-voice.txt"
 else
+  # Fallback to global
   VOICE_FILE="$HOME/.claude/tts-voice.txt"
 fi
 
