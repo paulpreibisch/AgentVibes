@@ -9,7 +9,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.1.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.1.2
 
 ---
 
@@ -43,7 +43,7 @@
 
 ## 📰 Latest Release
 
-**[v1.1.1 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.1)** 📋
+**[v1.1.2 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.2)** 📋
 
 Enhanced update display! The update command now shows both the AI-generated release summary AND the 5 latest commit messages with hashes. See the big picture and the details - better transparency during updates.
 
