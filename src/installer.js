@@ -21,6 +21,7 @@ const VERSION = packageJson.version;
 
 // Beautiful ASCII art
 function showWelcome() {
+  console.log('');
   console.log(
     chalk.cyan(
       figlet.textSync('AgentVibes', {
