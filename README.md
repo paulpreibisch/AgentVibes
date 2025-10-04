@@ -9,7 +9,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.0.19
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.0.20
 
 ---
 
@@ -43,9 +43,9 @@
 
 ## 📰 Latest Release
 
-**[v1.0.19 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.19)** 🌍
+**[v1.0.20 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.20)** 🌍
 
-Multilingual support is here! Speak with Claude in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and more. Added 6 multilingual voices and fixed slash command discovery.
+Multilingual support is here! Speak with Claude in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and more. Added 6 multilingual voices, fixed slash command discovery, and improved update experience with release notes fallback.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
