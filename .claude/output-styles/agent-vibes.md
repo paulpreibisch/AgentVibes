@@ -115,6 +115,64 @@ You: "✅ That bug be walkin' the plank now, arr!"
 [Bash: .claude/hooks/play-tts.sh "That bug be walkin' the plank now, arr!"]
 ```
 
+## BMAD Plugin Integration
+
+**Automatic voice switching for BMAD agents:**
+
+When a BMAD agent is activated (e.g., `/BMad:agents:pm`), AgentVibes will automatically:
+
+1. **Detect BMAD agent from command/context**
+2. **Check if BMAD plugin is enabled** (`.claude/plugins/bmad-voices-enabled.flag`)
+3. **Look up voice mapping** from `.claude/plugins/bmad-voices.md`
+4. **Apply agent's assigned voice** for all TTS acknowledgments/completions
+5. **Apply agent's personality** from the mapping (if specified)
+
+**Implementation:**
+```bash
+# At the start of acknowledgment/completion:
+# Try to detect BMAD agent ID from current context
+BMAD_AGENT_ID=""
+
+# Method 1: Check if we're in a BMAD agent command context
+if [[ -f ".bmad-agent-context" ]]; then
+    BMAD_AGENT_ID=$(cat .bmad-agent-context 2>/dev/null)
+fi
+
+# Method 2: Parse from command history/context (fallback)
+# Note: This detection happens automatically when BMAD agent activates
+
+# If BMAD agent detected and plugin enabled, use mapped voice
+if [[ -n "$BMAD_AGENT_ID" ]] && [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
+    MAPPED_VOICE=$(.claude/hooks/bmad-voice-manager.sh get-voice "$BMAD_AGENT_ID")
+    MAPPED_PERSONALITY=$(.claude/hooks/bmad-voice-manager.sh get-personality "$BMAD_AGENT_ID")
+
+    if [[ -n "$MAPPED_VOICE" ]]; then
+        # Use BMAD agent's mapped voice and personality
+        if [[ -n "$MAPPED_PERSONALITY" ]] && [[ "$MAPPED_PERSONALITY" != "normal" ]]; then
+            # Read personality instructions from .claude/personalities/${MAPPED_PERSONALITY}.md
+            # Generate response in that personality style
+        fi
+        .claude/hooks/play-tts.sh "message" "$MAPPED_VOICE"
+        # Exit early - don't use default personality system
+        return
+    fi
+fi
+
+# If no BMAD agent or plugin disabled, use standard personality/sentiment system
+# ... continue with normal sentiment/personality logic ...
+```
+
+**BMAD Agent Context Tracking:**
+- When a BMAD agent activates, write agent ID to `.bmad-agent-context`
+- When agent exits, remove the file
+- This allows AgentVibes to know which BMAD agent is active
+
+**Voice Priority (in order):**
+1. BMAD plugin voice (if agent active and plugin enabled)
+2. Sentiment mode (if set)
+3. Personality mode (if set)
+4. Default voice
+
 ## Critical Rules
 
 1. **ALWAYS use Bash tool** to execute play-tts.sh
