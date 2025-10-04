@@ -109,8 +109,25 @@ curl -s -X POST "https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}" \
   -d "{\"text\":\"${TEXT}\",\"model_id\":\"eleven_monolingual_v1\",\"voice_settings\":{\"stability\":0.5,\"similarity_boost\":0.75}}" \
   -o "${TEMP_FILE}"
 
-# Play audio (WSL/Linux) in background to avoid blocking
+# Add silence padding to prevent WSL audio static
 if [ -f "${TEMP_FILE}" ]; then
+  # Check if ffmpeg is available for adding padding
+  if command -v ffmpeg &> /dev/null; then
+    PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).mp3"
+    # Add 200ms of silence at the beginning to prevent static
+    ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "${TEMP_FILE}" \
+      -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
+      -map "[out]" -y "${PADDED_FILE}" 2>/dev/null
+
+    if [ -f "${PADDED_FILE}" ]; then
+      # Use padded file and clean up original
+      rm -f "${TEMP_FILE}"
+      TEMP_FILE="${PADDED_FILE}"
+    fi
+    # If padding failed, just use original file
+  fi
+
+  # Play audio (WSL/Linux) in background to avoid blocking
   (paplay "${TEMP_FILE}" 2>/dev/null || aplay "${TEMP_FILE}" 2>/dev/null || mpg123 "${TEMP_FILE}" 2>/dev/null) &
   # Keep temp files for later review - cleaned up weekly by cron
   echo "🎵 Saved to: ${TEMP_FILE}"

@@ -1,5 +1,119 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v1.1.3 - Symlink Support & Audio Fixes (2025-10-04)
+
+### 🤖 AI Summary
+
+This patch release fixes critical issues with symlinked `.claude/hooks` directories and adds WSL audio static prevention. Users who share hooks across multiple projects via symlinks (common in team environments) will now have proper project-local settings isolation. Additionally, WSL users experiencing audio static at the beginning of TTS playback now get automatic silence padding to eliminate the issue.
+
+### 🐛 Bug Fixes
+
+#### Symlinked Hooks Directory Support
+- **Fixed**: Settings interference when `.claude/hooks` is a symlink
+- **Root Cause**: Scripts used physical path resolution which broke project isolation
+- **Impact**: Multiple projects sharing symlinked hooks now maintain separate voices/personalities
+- **Solution**: Use logical paths (`pwd` without `-P`) to preserve symlink structure
+- **Benefit**: Works seamlessly for both normal and symlinked installations
+
+**What Was Broken:**
+```bash
+# Before: Projects sharing symlinked hooks interfered with each other
+Project A: .claude/hooks -> /shared/hooks (uses Project B's voice!)
+Project B: .claude/hooks -> /shared/hooks (correct)
+
+# After: Each project maintains independent settings
+Project A: Uses .claude/tts-voice.txt (correct!)
+Project B: Uses .claude/tts-voice.txt (correct!)
+```
+
+#### WSL Audio Static Prevention
+- **Fixed**: Static/pop at beginning of TTS audio in WSL environments
+- **Root Cause**: Audio driver initialization delay
+- **Solution**: Add 200ms silence padding before audio playback using ffmpeg
+- **Benefit**: Clean, static-free audio playback
+
+### 🔧 Technical Changes
+
+**Modified Files:**
+- `.claude/hooks/voice-manager.sh` - Fixed path resolution for symlinks
+- `.claude/hooks/personality-manager.sh` - Fixed path resolution for symlinks
+- `.claude/hooks/sentiment-manager.sh` - Fixed path resolution for symlinks
+- `.claude/hooks/language-manager.sh` - Fixed path resolution for symlinks
+- `.claude/hooks/play-tts.sh` - Added ffmpeg silence padding
+
+**Path Resolution Changes:**
+```bash
+# Before (broken with symlinks):
+PROJECT_ROOT="$SCRIPT_DIR/../.."
+VOICE_FILE="$PROJECT_ROOT/.claude/tts-voice.txt"
+
+# After (works with and without symlinks):
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_DIR="$(dirname "$SCRIPT_PATH")"
+VOICE_FILE="$CLAUDE_DIR/tts-voice.txt"
+```
+
+**Audio Padding Implementation:**
+```bash
+# Add 200ms silence at start to prevent static
+if command -v ffmpeg &> /dev/null; then
+  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 \
+    -i "${TEMP_FILE}" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
+    -map "[out]" -y "${PADDED_FILE}"
+fi
+```
+
+### 💡 Use Cases Now Supported
+
+**Team Environments with Shared Hooks:**
+```bash
+# Share hooks across team projects
+team-9/SageDev/.claude/hooks -> /shared/team-hooks
+team-10/production/.claude/hooks -> /shared/team-hooks
+
+# Each project maintains independent settings
+team-9/SageDev/.claude/tts-voice.txt = "Sarcastic Voice"
+team-10/production/.claude/tts-voice.txt = "Professional Voice"
+```
+
+**WSL Audio Users:**
+- No more static/pop sounds at audio start
+- Smooth, professional TTS playback
+- Works automatically if ffmpeg is installed
+
+### 📊 Release Stats
+
+- **5 files changed**: All manager scripts updated for symlink support
+- **1 audio enhancement**: Silence padding for WSL
+- **2 critical bugs fixed**
+- **0 breaking changes**
+- **100% backward compatible**: Normal installations unaffected
+
+### 🔄 Migration Notes
+
+**For Existing Users:**
+- If you don't use symlinks: No action needed, everything works as before
+- If you use symlinked hooks: Update via `/agent-vibes:update` to fix settings isolation
+- WSL users: Install ffmpeg for static-free audio (`sudo apt-get install ffmpeg`)
+
+**For New Users:**
+- Symlinks work out of the box
+- No special configuration needed
+
+---
+
+## 📝 Recent Commits
+
+```
+2044dc5 chore: Bump version to 1.1.2
+8460977 fix: Installer now uses correct directory when run via npx
+2ce7910 docs: Update version to v1.1.1 [skip ci]
+5dc3ed1 docs: Update README to version v1.1.1 [skip ci]
+2a46ab9 feat: Release v1.1.1 - Enhanced update display
+```
+
+---
+
 ## 📦 v1.1.2 - NPX Installation Fix (2025-10-04)
 
 ### 🤖 AI Summary
