@@ -489,7 +489,66 @@ program
       process.exit(1);
     }
 
-    // Show recent changes from git log or RELEASE_NOTES.md
+    // Show latest release notes from RELEASE_NOTES.md
+    try {
+      const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+      const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+
+      // Extract latest release summary
+      const lines = releaseNotes.split('\n');
+
+      // Find the first release version header
+      const versionIndex = lines.findIndex(line => line.match(/^## 📦 v\d+\.\d+\.\d+/));
+
+      if (versionIndex >= 0) {
+        // Extract version
+        const versionMatch = lines[versionIndex].match(/v(\d+\.\d+\.\d+)/);
+        const version = versionMatch ? versionMatch[1] : 'unknown';
+
+        // Find the AI Summary section
+        const summaryIndex = lines.findIndex((line, idx) =>
+          idx > versionIndex && line.includes('### 🤖 AI Summary')
+        );
+
+        if (summaryIndex >= 0) {
+          console.log(chalk.cyan(`📰 Latest Release (v${version}):\n`));
+
+          // Extract summary text (lines between AI Summary and next ###)
+          let summaryText = '';
+          for (let i = summaryIndex + 1; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.startsWith('###') || line.startsWith('##')) break;
+            if (line.trim()) {
+              summaryText += line.trim() + ' ';
+            }
+          }
+
+          // Wrap text at ~80 chars for better readability
+          const words = summaryText.split(' ');
+          let currentLine = '';
+          const wrappedLines = [];
+
+          words.forEach(word => {
+            if ((currentLine + word).length > 80) {
+              wrappedLines.push(currentLine.trim());
+              currentLine = word + ' ';
+            } else {
+              currentLine += word + ' ';
+            }
+          });
+          if (currentLine.trim()) wrappedLines.push(currentLine.trim());
+
+          wrappedLines.forEach(line => {
+            console.log(chalk.white(`   ${line}`));
+          });
+          console.log();
+        }
+      }
+    } catch {
+      // Release notes not available - no problem
+    }
+
+    // Show latest commit messages
     try {
       const { execSync } = await import('node:child_process');
       const gitLog = execSync(
@@ -498,7 +557,7 @@ program
       ).trim();
 
       if (gitLog) {
-        console.log(chalk.cyan('📰 Latest Release Notes:\n'));
+        console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
         const commits = gitLog.split('\n');
         commits.forEach(commit => {
           const [hash, ...messageParts] = commit.split(' ');
@@ -508,7 +567,7 @@ program
         console.log();
       }
     } catch (error) {
-      // Git not available or not a git repo - try RELEASE_NOTES.md
+      // Git not available - try RELEASE_NOTES.md fallback
       try {
         const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
         const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
@@ -518,7 +577,7 @@ program
         const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
 
         if (commitsIndex >= 0) {
-          console.log(chalk.cyan('📰 Latest Release Notes:\n'));
+          console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
 
           // Find the code block with commits (between ``` markers)
           let inCodeBlock = false;
@@ -654,7 +713,66 @@ program
       console.log(chalk.white(`   • ${srcPersonalityFiles.length} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
       console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
 
-      // Show recent changes from git log or RELEASE_NOTES.md
+      // Show latest release notes from RELEASE_NOTES.md
+      try {
+        const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+        const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+
+        // Extract latest release summary
+        const lines = releaseNotes.split('\n');
+
+        // Find the first release version header
+        const versionIndex = lines.findIndex(line => line.match(/^## 📦 v\d+\.\d+\.\d+/));
+
+        if (versionIndex >= 0) {
+          // Extract version
+          const versionMatch = lines[versionIndex].match(/v(\d+\.\d+\.\d+)/);
+          const version = versionMatch ? versionMatch[1] : 'unknown';
+
+          // Find the AI Summary section
+          const summaryIndex = lines.findIndex((line, idx) =>
+            idx > versionIndex && line.includes('### 🤖 AI Summary')
+          );
+
+          if (summaryIndex >= 0) {
+            console.log(chalk.cyan(`📰 Latest Release (v${version}):\n`));
+
+            // Extract summary text (lines between AI Summary and next ###)
+            let summaryText = '';
+            for (let i = summaryIndex + 1; i < lines.length; i++) {
+              const line = lines[i];
+              if (line.startsWith('###') || line.startsWith('##')) break;
+              if (line.trim()) {
+                summaryText += line.trim() + ' ';
+              }
+            }
+
+            // Wrap text at ~80 chars for better readability
+            const words = summaryText.split(' ');
+            let currentLine = '';
+            const wrappedLines = [];
+
+            words.forEach(word => {
+              if ((currentLine + word).length > 80) {
+                wrappedLines.push(currentLine.trim());
+                currentLine = word + ' ';
+              } else {
+                currentLine += word + ' ';
+              }
+            });
+            if (currentLine.trim()) wrappedLines.push(currentLine.trim());
+
+            wrappedLines.forEach(line => {
+              console.log(chalk.white(`   ${line}`));
+            });
+            console.log();
+          }
+        }
+      } catch {
+        // Release notes not available - no problem
+      }
+
+      // Show latest commit messages
       try {
         const { execSync } = await import('node:child_process');
         const gitLog = execSync(
@@ -663,7 +781,7 @@ program
         ).trim();
 
         if (gitLog) {
-          console.log(chalk.cyan('📝 Recent Changes:\n'));
+          console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
           const commits = gitLog.split('\n');
           commits.forEach(commit => {
             const [hash, ...messageParts] = commit.split(' ');
@@ -673,7 +791,7 @@ program
           console.log();
         }
       } catch (error) {
-        // Git not available or not a git repo - try RELEASE_NOTES.md
+        // Git not available - try RELEASE_NOTES.md fallback
         try {
           const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
           const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
@@ -683,7 +801,7 @@ program
           const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
 
           if (commitsIndex >= 0) {
-            console.log(chalk.cyan('📝 Recent Changes:\n'));
+            console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
 
             // Find the code block with commits (between ``` markers)
             let inCodeBlock = false;
