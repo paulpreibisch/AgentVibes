@@ -4,9 +4,24 @@ PLUGIN_DIR=".claude/plugins"
 PLUGIN_FILE="$PLUGIN_DIR/bmad-voices.md"
 ENABLED_FLAG="$PLUGIN_DIR/bmad-voices-enabled.flag"
 
+# Auto-enable plugin if BMAD is detected
+auto_enable_if_bmad_detected() {
+    # Check if BMAD is installed
+    if [[ -f ".bmad-core/install-manifest.yaml" ]] && [[ ! -f "$ENABLED_FLAG" ]]; then
+        # BMAD detected but plugin not enabled - enable it silently
+        mkdir -p "$PLUGIN_DIR"
+        touch "$ENABLED_FLAG"
+        return 0
+    fi
+    return 1
+}
+
 # Parse markdown table to get voice mapping
 get_agent_voice() {
     local agent_id="$1"
+
+    # Auto-enable if BMAD is detected
+    auto_enable_if_bmad_detected
 
     if [[ ! -f "$ENABLED_FLAG" ]]; then
         echo ""  # Plugin disabled
@@ -184,10 +199,22 @@ set_agent_voice() {
 
 # Show status
 show_status() {
+    # Check for BMAD installation
+    local bmad_installed="false"
+    if [[ -f ".bmad-core/install-manifest.yaml" ]]; then
+        bmad_installed="true"
+    fi
+
     if [[ $(is_plugin_enabled) == "true" ]]; then
         echo "✅ BMAD voice plugin: ENABLED"
+        if [[ "$bmad_installed" == "true" ]]; then
+            echo "🔍 BMAD detected: Auto-enabled"
+        fi
     else
         echo "❌ BMAD voice plugin: DISABLED"
+        if [[ "$bmad_installed" == "true" ]]; then
+            echo "⚠️  BMAD detected but plugin disabled (enable with: /agent-vibes-bmad enable)"
+        fi
     fi
     echo ""
     list_mappings
