@@ -430,11 +430,50 @@ program
     );
     const version = packageJson.version;
 
-    console.log(chalk.cyan('\n🔄 AgentVibes Update\n'));
-    console.log(chalk.bold(`   Version: ${version}`));
-    console.log(chalk.gray(`   Current directory: ${currentDir}`));
-    console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
-    console.log(chalk.gray(`   Source: ${__dirname}/../\n`));
+    // Generate two-tone ASCII art
+    const agentText = figlet.textSync('Agent', {
+      font: 'ANSI Shadow',
+      horizontalLayout: 'default',
+    });
+    const vibesText = figlet.textSync('Vibes', {
+      font: 'ANSI Shadow',
+      horizontalLayout: 'default',
+    });
+
+    // Add blank line for spacing
+    console.log();
+
+    // Combine the two parts with different colors
+    const agentLines = agentText.split('\n');
+    const vibesLines = vibesText.split('\n');
+    const maxLength = Math.max(...agentLines.map(line => line.length));
+
+    for (let i = 0; i < agentLines.length; i++) {
+      const agentLine = agentLines[i].padEnd(maxLength);
+      const vibesLine = vibesLines[i] || '';
+      console.log(chalk.cyan(agentLine) + chalk.magenta(vibesLine));
+    }
+    console.log();
+
+    // Welcome box
+    console.log(
+      boxen(
+        chalk.white('🎤 Beautiful ElevenLabs TTS Voice Commands for Claude Code\n\n') +
+        chalk.gray('Add professional text-to-speech narration to your AI coding sessions\n\n') +
+        chalk.cyan('📦 https://github.com/paulpreibisch/AgentVibes'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
+        }
+      )
+    );
+
+    console.log(chalk.cyan('📍 Update Details:'));
+    console.log(chalk.white(`   Current directory: ${currentDir}`));
+    console.log(chalk.white(`   Update location: ${targetDir}/.claude/ (project-local)`));
+    console.log(chalk.white(`   Package version: ${version}\n`));
 
     // Check if already installed
     const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
@@ -448,6 +487,64 @@ program
       console.log(chalk.red('❌ AgentVibes is not installed in this directory.'));
       console.log(chalk.gray('   Run: node src/installer.js install\n'));
       process.exit(1);
+    }
+
+    // Show recent changes from git log or RELEASE_NOTES.md
+    try {
+      const { execSync } = await import('node:child_process');
+      const gitLog = execSync(
+        'git log --oneline --no-decorate -5',
+        { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+      ).trim();
+
+      if (gitLog) {
+        console.log(chalk.cyan('📰 Latest Release Notes:\n'));
+        const commits = gitLog.split('\n');
+        commits.forEach(commit => {
+          const [hash, ...messageParts] = commit.split(' ');
+          const message = messageParts.join(' ');
+          console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+        });
+        console.log();
+      }
+    } catch (error) {
+      // Git not available or not a git repo - try RELEASE_NOTES.md
+      try {
+        const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+        const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+
+        // Extract commits from "Recent Commits" section
+        const lines = releaseNotes.split('\n');
+        const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
+
+        if (commitsIndex >= 0) {
+          console.log(chalk.cyan('📰 Latest Release Notes:\n'));
+
+          // Find the code block with commits (between ``` markers)
+          let inCodeBlock = false;
+          for (let i = commitsIndex + 1; i < lines.length; i++) {
+            const line = lines[i];
+
+            if (line.trim() === '```') {
+              if (inCodeBlock) break; // End of code block
+              inCodeBlock = true;
+              continue;
+            }
+
+            if (inCodeBlock && line.trim()) {
+              // Parse commit line: "hash message"
+              const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+              if (match) {
+                const [, hash, message] = match;
+                console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+              }
+            }
+          }
+          console.log();
+        }
+      } catch {
+        // No release notes available
+      }
     }
 
     console.log(chalk.cyan('📦 What will be updated:'));
