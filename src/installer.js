@@ -49,10 +49,11 @@ function showWelcome() {
 async function install(options = {}) {
   showWelcome();
 
-  const homeDir = process.env.HOME || process.env.USERPROFILE;
-  const targetDir = options.directory || homeDir;
+  const currentDir = process.cwd();
+  const targetDir = options.directory || currentDir;
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
+  console.log(chalk.gray(`   Current directory: ${currentDir}`));
   console.log(chalk.gray(`   Install location: ${targetDir}/.claude/ (project-local)`));
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
@@ -70,7 +71,7 @@ async function install(options = {}) {
       {
         type: 'confirm',
         name: 'confirm',
-        message: chalk.yellow('Install AgentVibes in this directory?'),
+        message: chalk.yellow(`Install AgentVibes in ${targetDir}/.claude/ ?`),
         default: true,
       },
     ]);
@@ -280,7 +281,7 @@ program
 program
   .command('install')
   .description('Install AgentVibes voice commands')
-  .option('-d, --directory <path>', 'Installation directory (default: home directory)')
+  .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
     await install(options);
@@ -289,11 +290,11 @@ program
 program
   .command('update')
   .description('Update AgentVibes to latest version from source')
-  .option('-d, --directory <path>', 'Installation directory (default: home directory)')
+  .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
-    const homeDir = process.env.HOME || process.env.USERPROFILE;
-    const targetDir = options.directory || homeDir;
+    const currentDir = process.cwd();
+    const targetDir = options.directory || currentDir;
 
     // Read version from package.json
     const packageJson = JSON.parse(
@@ -303,7 +304,8 @@ program
 
     console.log(chalk.cyan('\n🔄 AgentVibes Update\n'));
     console.log(chalk.bold(`   Version: ${version}`));
-    console.log(chalk.gray(`   Target directory: ${targetDir}`));
+    console.log(chalk.gray(`   Current directory: ${currentDir}`));
+    console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
     console.log(chalk.gray(`   Source: ${__dirname}/../\n`));
 
     // Check if already installed
