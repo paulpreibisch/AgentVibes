@@ -13,7 +13,11 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const VERSION = '1.0.0';
+// Read version from package.json
+const packageJson = JSON.parse(
+  await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8')
+);
+const VERSION = packageJson.version;
 
 // Beautiful ASCII art
 function showWelcome() {
@@ -49,7 +53,7 @@ async function install(options = {}) {
   const targetDir = options.directory || homeDir;
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
-  console.log(chalk.gray(`   Target directory: ${targetDir}`));
+  console.log(chalk.gray(`   Install location: ${targetDir}/.claude/ (project-local)`));
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
@@ -58,7 +62,7 @@ async function install(options = {}) {
   console.log(chalk.gray(`   • 10+ personality templates → ${targetDir}/.claude/personalities/`));
   console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
   console.log(chalk.gray(`   • Voice configuration files`));
-  console.log(chalk.gray(`   • 15+ ElevenLabs character voices\n`));
+  console.log(chalk.gray(`   • 22 unique ElevenLabs voices\n`));
 
   // Confirmation prompt (unless --yes flag is used)
   if (!options.yes) {
@@ -205,7 +209,29 @@ async function install(options = {}) {
     console.log(chalk.white(`   • ${personalityFiles.length} personality templates installed`));
     console.log(chalk.white(`   • ${outputStyleFiles.length} output styles installed`));
     console.log(chalk.white(`   • Voice manager ready`));
-    console.log(chalk.white(`   • 15+ ElevenLabs voices available\n`));
+    console.log(chalk.white(`   • 22 unique ElevenLabs voices available\n`));
+
+    // Show recent changes from git log (if available)
+    try {
+      const { execSync } = await import('node:child_process');
+      const gitLog = execSync(
+        'git log --oneline --no-decorate -5',
+        { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+      ).trim();
+
+      if (gitLog) {
+        console.log(chalk.cyan('📝 Recent Changes:\n'));
+        const commits = gitLog.split('\n');
+        commits.forEach(commit => {
+          const [hash, ...messageParts] = commit.split(' ');
+          const message = messageParts.join(' ');
+          console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+        });
+        console.log();
+      }
+    } catch (error) {
+      // Git not available or not a git repo - skip changelog
+    }
 
     // Success message
     console.log(
