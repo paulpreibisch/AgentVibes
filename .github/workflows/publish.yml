@@ -95,6 +95,24 @@ jobs:
           echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Update README with version
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          # Update version after author line in README
+          sed -i "s/^\*\*Author\*\*: Paul Preibisch.*/\*\*Author\*\*: Paul Preibisch ([@997Fire](https:\/\/x.com\/997Fire)) | \*\*Version\*\*: v${VERSION}/" README.md
+
+          # Also update the Latest Release section
+          sed -i "s/\*\*\[v[0-9]\+\.[0-9]\+\.[0-9]\+ - Release Notes\]/\*\*[v${VERSION} - Release Notes]/" README.md
+          sed -i "s/releases\/tag\/v[0-9]\+\.[0-9]\+\.[0-9]\+/releases\/tag\/v${VERSION}/" README.md
+
+      - name: Commit README changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add README.md
+          git diff --staged --quiet || git commit -m "docs: Update README to version v${{ steps.version.outputs.VERSION }} [skip ci]"
+          git push
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         env:
