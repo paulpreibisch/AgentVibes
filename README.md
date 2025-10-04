@@ -42,9 +42,9 @@
 
 ## 📰 Latest Release
 
-**[v1.0.13 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.13)** 🐛
+**[v1.0.15 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.0.15)** 🎤
 
-Critical bug fixes for update command and personality system, plus new dry humor personality and comprehensive voice mapping tests.
+Voice library expansion with 5 new professional voices (Burt Reynolds, Tiffany, Archer, Tom, Juniper) and optimized BMAD agent voice assignments for better role fit.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
