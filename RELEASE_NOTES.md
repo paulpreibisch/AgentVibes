@@ -1,5 +1,67 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v1.1.1 - Enhanced Update Display (2025-01-04)
+
+### 🤖 AI Summary
+
+This patch release improves the update experience by displaying both the AI-generated release summary AND the 5 latest commit messages. Users now see the high-level "what changed" from release notes plus the detailed commit history with hashes and titles. This provides better transparency during updates and helps users understand exactly what's being installed.
+
+### ✨ Improvements
+
+**Dual Information Display:**
+- **📰 Latest Release** - Shows AI summary from RELEASE_NOTES.md with version
+- **📝 Latest Commit Messages** - Shows 5 most recent commits with hashes and titles
+- Applies to both pre-update confirmation screen and post-update summary
+- Text wrapping at 80 characters for better readability
+
+**What You See Now:**
+```
+📰 Latest Release (v1.1.0):
+
+   This minor release introduces self-update capabilities to AgentVibes!
+   Users can now update directly from Claude Code with...
+
+📝 Latest Commit Messages:
+
+   047accd docs: Update version to v1.1.0 [skip ci]
+   f972e54 docs: Update version to v1.1.0 [skip ci]
+   fa6dcf6 chore: Bump version to 1.1.0
+   4a83777 feat: Add self-update system with commands
+   75b1cf8 docs: Update version to v1.0.23 [skip ci]
+```
+
+### 🔧 Technical Changes
+
+**Modified Files:**
+- `src/installer.js` - Enhanced both pre-update and post-update display sections
+
+**Implementation:**
+- Extracts AI summary from RELEASE_NOTES.md first (priority)
+- Falls back to git log for commit messages
+- If git unavailable, reads commits from RELEASE_NOTES.md
+- Word-wraps long summaries for terminal display
+
+### 💡 Benefits
+
+1. **Context**: See the big picture (release summary) AND the details (commits)
+2. **Transparency**: Know exactly what commits you're getting
+3. **Traceability**: Commit hashes let you review changes on GitHub
+4. **Better UX**: No more choosing between commits OR summary - get both!
+
+---
+
+## 📝 Recent Commits
+
+```
+c07d3fe feat: Enhance update display with both release notes and commit messages
+047accd docs: Update version to v1.1.0 [skip ci]
+f972e54 docs: Update version to v1.1.0 [skip ci]
+fa6dcf6 chore: Bump version to 1.1.0
+4a83777 feat: Add self-update system with commands
+```
+
+---
+
 ## 📦 v1.1.0 - Self-Update & Version Management (2025-01-04)
 
 ### 🤖 AI Summary
