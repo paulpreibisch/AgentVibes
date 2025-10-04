@@ -22,14 +22,28 @@ const VERSION = packageJson.version;
 // Beautiful ASCII art
 function showWelcome() {
   console.log('');
-  console.log(
-    chalk.cyan(
-      figlet.textSync('AgentVibes', {
-        font: 'ANSI Shadow',
-        horizontalLayout: 'default',
-      })
-    )
-  );
+
+  // Generate separate ASCII art for "Agent" and "Vibes"
+  const agentText = figlet.textSync('Agent', {
+    font: 'ANSI Shadow',
+    horizontalLayout: 'default',
+  });
+
+  const vibesText = figlet.textSync('Vibes', {
+    font: 'ANSI Shadow',
+    horizontalLayout: 'default',
+  });
+
+  // Split into lines and combine with different colors
+  const agentLines = agentText.split('\n');
+  const vibesLines = vibesText.split('\n');
+  const maxLines = Math.max(agentLines.length, vibesLines.length);
+
+  for (let i = 0; i < maxLines; i++) {
+    const agentLine = agentLines[i] || '';
+    const vibesLine = vibesLines[i] || '';
+    console.log(chalk.cyan(agentLine) + chalk.magenta(vibesLine));
+  }
 
   console.log(
     boxen(
