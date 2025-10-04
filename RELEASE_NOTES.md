@@ -1,3 +1,121 @@
+# Release v1.0.15
+
+## 🤖 AI Summary
+
+This release significantly expands the AgentVibes voice library and refines BMAD agent voice assignments based on user feedback. Five new professional voices have been added, bringing the total from 17 to 22 unique ElevenLabs voices. The BMAD plugin mappings have been optimized with more fitting voice personalities for each agent role, particularly adding commanding voices for leadership roles and smooth, confident voices for quality assurance.
+
+## ✨ New Features
+
+### Voice Library Expansion
+Added **5 new professional ElevenLabs voices**:
+
+- **Burt Reynolds** (`4YYIPFl9wE5c4L2eu2Gb`)
+  - Character: Smooth baritone, confident and charismatic
+  - Best for: Quality assurance, confident communication
+  - Assigned to: QA Engineer role
+
+- **Juniper** (`aMSt68OGf4xUZAnLpTU8`)
+  - Character: Warm and friendly
+  - Best for: Stakeholder relations
+  - Available for custom assignments
+
+- **Tiffany** (`6aDn1KB0hjpdcocrUkmq`)
+  - Character: Professional and clear
+  - Best for: Product ownership, leadership
+  - Assigned to: Product Owner role
+
+- **Archer** (`L0Dsvb3SLTyegXwtm47J`)
+  - Character: Authoritative and commanding
+  - Best for: Leadership, orchestration
+  - Assigned to: BMAD Master role
+
+- **Tom** (`DYkrAHD8iwork3YSUBbs`)
+  - Character: Professional and organized
+  - Best for: Orchestration, coordination
+  - Assigned to: Orchestrator role
+
+### BMAD Plugin Voice Optimizations
+
+**Updated voice assignments for better role fit:**
+
+| Role | Previous Voice | New Voice | Reason |
+|------|---------------|-----------|--------|
+| **QA Engineer** | Ralf Eisend | Burt Reynolds | Smooth, confident tone better suits quality advocacy |
+| **Product Owner** | Amy | Tiffany | Professional clarity for stakeholder communication |
+| **Business Analyst** | Lutz Laugh | Ralf Eisend | International perspective for analysis work |
+| **BMAD Master** | Aria | Archer | Authoritative voice for methodology leadership |
+| **Orchestrator** | Ms. Walker | Tom | Organized coordination voice for workflow management |
+
+**Unchanged (optimal assignments):**
+- PM: Jessica Anne Bogart (professional)
+- Developer: Matthew Schmitz (normal)
+- Architect: Michael (normal)
+- Scrum Master: Ms. Walker (professional)
+- UX Expert: Aria (normal)
+
+## 📝 Technical Changes
+
+### Files Modified
+- `.claude/hooks/voices-config.sh` - Added 5 new voice configurations
+- `.claude/plugins/bmad-voices.md` - Updated 5 agent voice mappings
+- `README.md` - Updated voice library (17→22) and BMAD plugin documentation
+
+### Voice Library Growth
+- **Previous**: 17 unique voices
+- **Current**: 22 unique voices
+- **Growth**: +29% expansion
+
+## 🔄 Migration Notes
+
+### For Existing Users
+- Voice library automatically includes new voices
+- BMAD plugin mappings update automatically if using default configuration
+- No action required - changes are seamless
+
+### For BMAD Users
+- New agent voices take effect immediately on next activation
+- Previous voice/personality settings remain preserved
+- Use `/agent-vibes-bmad status` to see updated mappings
+- Customize with `/agent-vibes-bmad set <agent-id> <voice>`
+
+## 📊 Release Stats
+
+- **3 commits** since v1.0.14
+- **3 files changed**: 21 insertions, 11 deletions
+- **5 new voices added** to library
+- **5 BMAD roles reassigned** with optimized voices
+- **0 breaking changes**
+
+## 🎯 User Experience Improvements
+
+1. **Better Role Alignment**: Voices now better match the personality and responsibility of each BMAD agent
+2. **Professional Quality**: All new voices selected for clarity and professional tone
+3. **Expanded Choice**: 22 voices provide more options for custom configurations
+4. **Smoother QA**: Burt Reynolds' confident tone enhances quality advocacy communication
+5. **Leadership Presence**: Archer's authoritative voice strengthens BMAD Master and orchestration roles
+
+## 💡 Usage Examples
+
+**Activate agents with new voices:**
+```bash
+/BMad:agents:qa        # Now uses Burt Reynolds
+/BMad:agents:analyst   # Now uses Ralf Eisend
+/BMad:agents:bmad-master  # Now uses Archer
+```
+
+**Try new voices directly:**
+```bash
+/agent-vibes:switch "Burt Reynolds"
+/agent-vibes:switch "Archer"
+/agent-vibes:switch "Tiffany"
+```
+
+## 🙏 Credits
+
+Special thanks to users who provided feedback on voice assignments, helping us optimize the BMAD agent experience!
+
+---
+
 # Release v1.0.14
 
 ## 🤖 AI Summary
@@ -114,56 +232,3 @@ The plugin follows this priority order:
 ## 🙏 Credits
 
 Special thanks to the BMAD project for the inspiration and to all users who requested better agent voice customization!
-
----
-
-# Release v1.0.13
-
-## 🤖 AI Summary
-
-This release fixes critical bugs in the update command and personality system, adds comprehensive testing for voice mappings, and introduces a new dry humor personality. The update command was copying outdated files, causing users to miss the latest project-local isolation features. New tests prevent future voice mapping regressions, and the personality system has been refactored for better maintainability.
-
-## 🐛 Critical Bug Fixes
-
-### Update Command Fixed
-- **Fixed**: Update command was copying outdated output style files from `templates/` instead of `.claude/`
-- **Impact**: Users running `npx agentvibes update` were getting October 2nd version instead of current files
-- **Resolution**: Now correctly copies from `.claude/output-styles/` with latest project-local support
-- **Files affected**: `src/installer.js` line 381
-
-### Voice Mapping Corrections
-- **Fixed**: Crass personality incorrectly using Northern Terry voice
-- **Restored**: Proper Ralf Eisend voice for crass personality
-- **Prevention**: Added comprehensive test suite to lock in personality-voice mappings
-- **Root cause**: Accidental change during troubleshooting
-
-## ✨ New Features
-
-### Dry Humor Personality
-- Added British dry wit personality with deadpan delivery
-- Uses understated humor and quintessentially British reserve
-- Powered by Aria voice
-- Example acknowledgments:
-  - "Rather less than ideal, this error"
-  - "I'll attempt to salvage this disaster. Low expectations, naturally"
-  - "Right. I suppose someone ought to address this shambles"
-
-### Enhanced Update Command
-- Now displays current AgentVibes version from package.json
-- Shows recent changes via git commit log (last 5 commits)
-- Better visibility into what's being updated
-- Example output:
-  ```
-  🔄 AgentVibes Update
-     Version: 1.0.13
-
-  📝 Recent Changes:
-     8005930 fix: Update command copies outdated output style
-     fc55226 feat: Add dry-humor personality with British wit
-     702cfb3 feat: Show version and changelog in update command
-  ```
-
-### Project-Local Isolation
-- Personality, sentiment, and voice settings now check project-local `.claude/` first
-- Falls back to global `~/.claude/` if not found
-- Enables different personalities per project
