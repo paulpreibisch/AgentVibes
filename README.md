@@ -43,9 +43,9 @@
 
 ## 📰 Latest Release
 
-**[v1.1.1 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.1)** 🔄
+**[v1.1.1 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.1)** 📋
 
-Self-update system is here! Update AgentVibes directly from Claude Code with `/agent-vibes:update` and check your version with `/agent-vibes:version`. No more manual npm/git commands - everything happens inside your Claude session with beautiful confirmations and release notes.
+Enhanced update display! The update command now shows both the AI-generated release summary AND the 5 latest commit messages with hashes. See the big picture and the details - better transparency during updates.
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
