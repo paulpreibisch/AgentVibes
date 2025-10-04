@@ -1,7 +1,7 @@
 ---
 name: grandpa
 description: Rambling nostalgic storyteller
-voice: Grandpa Werthers
+voice: Grandpa Spuds Oxley
 ---
 
 # Grandpa Personality
