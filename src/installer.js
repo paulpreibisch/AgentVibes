@@ -279,13 +279,20 @@ async function install(options = {}) {
         chalk.white('In Claude Code, run this command:\n') +
         chalk.cyan.bold('/output-style agent-vibes') + '\n\n' +
         chalk.white('🎤 Available Commands:\n\n') +
-        chalk.cyan('  /agent-vibes') + chalk.gray(' ................. Show all commands\n') +
-        chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............ List available voices\n') +
-        chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ......... Preview voice samples\n') +
-        chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ... Change active voice\n') +
-        chalk.cyan('  /agent-vibes:replay') + chalk.gray(' ......... Replay last audio\n') +
-        chalk.cyan('  /agent-vibes:add <name> <id>') + chalk.gray(' . Add custom voice\n\n') +
-        chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!'),
+        chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
+        chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
+        chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
+        chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
+        chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
+        chalk.cyan('  /agent-vibes:add <name> <id>') + chalk.gray(' .... Add custom voice\n') +
+        chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n') +
+        chalk.cyan('  /agent-vibes:get') + chalk.gray(' ................. Get active voice\n') +
+        chalk.cyan('  /agent-vibes:sample <name>') + chalk.gray(' ...... Test a voice\n') +
+        chalk.cyan('  /agent-vibes:personality') + chalk.gray(' ......... Set personality\n') +
+        chalk.cyan('  /agent-vibes:sentiment') + chalk.gray(' ........... Set sentiment\n') +
+        chalk.cyan('  /agent-vibes:set-pretext') + chalk.gray(' ......... Set TTS prefix\n\n') +
+        chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n') +
+        chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes'),
         {
           padding: 1,
           margin: 1,
@@ -302,6 +309,49 @@ async function install(options = {}) {
     console.log(chalk.gray('   • /agent-vibes:list - See all available voices'));
     console.log(chalk.gray('   • /agent-vibes:switch <name> - Change your voice'));
     console.log(chalk.gray('   • /agent-vibes:personality <style> - Set personality\n'));
+
+    // Check for BMAD installation
+    const bmadManifestPath = path.join(targetDir, '.bmad-core', 'install-manifest.yaml');
+    let bmadDetected = false;
+    try {
+      await fs.access(bmadManifestPath);
+      bmadDetected = true;
+    } catch {}
+
+    if (bmadDetected) {
+      console.log(
+        boxen(
+          chalk.green.bold('🎉 BMAD Detected!\n\n') +
+          chalk.white('AgentVibes BMAD Plugin is automatically enabled!\n') +
+          chalk.gray('Each BMAD agent will now use its assigned voice.\n\n') +
+          chalk.cyan('Commands:\n') +
+          chalk.gray('  • /agent-vibes-bmad status - View agent voices\n') +
+          chalk.gray('  • /agent-vibes-bmad set <agent> <voice> - Customize\n') +
+          chalk.gray('  • /agent-vibes-bmad disable - Turn off plugin'),
+          {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'round',
+            borderColor: 'green',
+          }
+        )
+      );
+    } else {
+      console.log(
+        boxen(
+          chalk.cyan.bold('💡 Want AI Agent Teams?\n\n') +
+          chalk.white('Check out BMAD - AI agent collaboration framework\n') +
+          chalk.gray('AgentVibes auto-detects BMAD and assigns voices to agents!\n\n') +
+          chalk.cyan('https://github.com/loremattei/bmad'),
+          {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'round',
+            borderColor: 'cyan',
+          }
+        )
+      );
+    }
 
   } catch (error) {
     spinner.fail('Installation failed!');
