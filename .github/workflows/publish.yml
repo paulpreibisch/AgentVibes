@@ -32,15 +32,36 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Update README with version
+      - name: Update README with version and release description
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
+
           # Update version after author line in README
           sed -i "s/^\*\*Author\*\*: Paul Preibisch.*/\*\*Author\*\*: Paul Preibisch ([@997Fire](https:\/\/x.com\/997Fire)) | \*\*Version\*\*: v${VERSION}/" README.md
 
-          # Also update the Latest Release section
+          # Update the Latest Release section header and link
           sed -i "s/\*\*\[v[0-9]\+\.[0-9]\+\.[0-9]\+ - Release Notes\]/\*\*[v${VERSION} - Release Notes]/" README.md
           sed -i "s/releases\/tag\/v[0-9]\+\.[0-9]\+\.[0-9]\+/releases\/tag\/v${VERSION}/" README.md
+
+          # Extract release description from RELEASE_NOTES.md (first summary paragraph after ## Summary)
+          if [ -f "RELEASE_NOTES.md" ]; then
+            # Get the AI Summary from the latest release
+            DESCRIPTION=$(sed -n '/^## 📦 v'${VERSION}'/,/^---$/p' RELEASE_NOTES.md | \
+                         sed -n '/^### 🤖 AI Summary/,/^###/p' | \
+                         sed '1d;$d' | \
+                         sed 's/^$//' | \
+                         tr '\n' ' ' | \
+                         sed 's/  */ /g' | \
+                         sed 's/^ //;s/ $//')
+
+            if [ -n "$DESCRIPTION" ]; then
+              # Update the description line (the line after the release header)
+              # Escape special characters for sed
+              ESCAPED_DESC=$(echo "$DESCRIPTION" | sed 's/[\/&]/\\&/g')
+              # Find and replace the line after the release header
+              sed -i "/^\*\*\[v${VERSION} - Release Notes\]/{ n; s/.*/$ESCAPED_DESC/ }" README.md
+            fi
+          fi
 
       - name: Publish to npm
         run: npm publish
