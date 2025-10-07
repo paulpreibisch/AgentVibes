@@ -97,12 +97,14 @@ async function install(options = {}) {
   }
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
-  console.log(chalk.gray(`   • 11 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
-  console.log(chalk.gray(`   • 6 TTS scripts → ${targetDir}/.claude/hooks/`));
-  console.log(chalk.gray(`   • 10+ personality templates → ${targetDir}/.claude/personalities/`));
+  console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
+  console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • 19 personality templates → ${targetDir}/.claude/personalities/`));
   console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
-  console.log(chalk.gray(`   • Voice configuration files`));
-  console.log(chalk.gray(`   • 22 unique ElevenLabs voices\n`));
+  console.log(chalk.gray(`   • 27+ curated voices (ElevenLabs premium)`));
+  console.log(chalk.gray(`   • 50+ neural voices (Piper TTS - free & offline)`));
+  console.log(chalk.gray(`   • 30+ language support with native voices`));
+  console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
 
   // Confirmation prompt (unless --yes flag is used)
   if (!options.yes) {
