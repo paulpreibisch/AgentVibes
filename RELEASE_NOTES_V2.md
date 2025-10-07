@@ -1,5 +1,3 @@
-# 🎉 AgentVibes v2.0.0 - The Multi-Provider Revolution
-
 **Release Date:** October 2025
 **Breaking Changes:** None - Fully backward compatible!
 
