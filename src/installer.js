@@ -177,6 +177,10 @@ async function install(options = {}) {
 
     // Copy hook scripts
     spinner.start('Installing TTS helper scripts...');
+
+    // Ensure hooks directory exists
+    await fs.mkdir(hooksDir, { recursive: true });
+
     const allHookFiles = await fs.readdir(srcHooksDir);
 
     // Filter to only include files (not directories) and exclude project-specific files
