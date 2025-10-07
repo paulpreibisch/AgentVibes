@@ -20,3 +20,13 @@ yarn-error.log*
 .bmad-agent-context
 *.tgz
 *.code-workspace
+
+# BMAD Documentation (never commit)
+.bmad-core/
+.claude/commands/BMad/
+docs/stories/
+docs/prd.md
+PRODUCT_REQUIREMENTS.md
+WORKSPACE_GUIDE.md
+WORKSPACE_SETUP_SUMMARY.md
+.claude/commands/agent-vibes-bmad.md

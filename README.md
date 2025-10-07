@@ -2,14 +2,16 @@
 
 > **Bring your Claude Code sessions to life with voice!**
 >
-> Professional text-to-speech narration powered by ElevenLabs AI
+> 🌐 **[agentvibes.org](https://agentvibes.org)**
+>
+> Professional text-to-speech narration with multi-provider support - **ElevenLabs AI** or **Piper TTS (Free!)**
 
 [![npm version](https://badge.fury.io/js/agentvibes.svg)](https://badge.fury.io/js/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.1.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.0
 
 ---
 
@@ -43,11 +45,18 @@
 
 ## 📰 Latest Release
 
-**[v1.1.3 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.3)** 📋
+**[v2.0.0 - The Multi-Provider Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.0)** 🎉
 
-Symlink support & WSL audio fixes! Projects can now share hooks via symlinks while maintaining independent settings. Plus, WSL users get automatic silence padding to eliminate audio static.
+The biggest update ever! **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, expanded voice library (27+ voices), advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support. Choose between premium ElevenLabs voices or free offline Piper TTS!
 
-[→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+**Key highlights:**
+- 🎭 Multi-Provider Support - Switch between ElevenLabs (150+ voices) and Piper TTS (50+ free voices)
+- 🌍 30+ Languages - Speak in Spanish, French, German, Chinese, Japanese, and more
+- 🎤 27+ Professional Voices - Expanded voice library with multilingual support
+- 💬 Advanced Sentiment System - Apply personality styles to ANY voice
+- 🔌 Enhanced BMAD Plugin - Multilingual agent voices with personality mapping
+
+[→ View Full Release Notes](RELEASE_NOTES_V2.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 ---
 
@@ -59,13 +68,15 @@ Imagine Claude speaking to you with different voices and personalities as you co
 
 ### 🎯 Key Features
 
-- 🎙️ **17+ Professional AI Voices** - Character voices, accents, and unique personalities
+- 🎭 **Multi-Provider Support** - Choose ElevenLabs (150+ premium voices) or Piper TTS (50+ free voices)
+- 🌍 **30+ Languages** - Multilingual support with native voice quality
+- 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
-- 💬 **Sentiment System** - Apply personality styles to ANY voice
-- 🔌 **BMAD Plugin** - Auto voice switching for BMAD agents
-- 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions
-- 🎵 **Voice Preview** - Listen before you choose
-- 🔄 **Audio Replay** - Replay the last 10 TTS messages
+- 💬 **Advanced Sentiment System** - Apply personality styles to ANY voice without changing it
+- 🔌 **Enhanced BMAD Plugin** - Auto voice switching for BMAD agents with multilingual support
+- 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions in any language
+- 🎵 **Voice Preview & Replay** - Listen before you choose, replay last 10 TTS messages
+- 🆓 **Free Option Available** - Use Piper TTS with no API key required
 - ⚡ **One-Command Install** - Get started in seconds
 
 [↑ Back to top](#-table-of-contents)
@@ -100,9 +111,34 @@ npm install
 node bin/agent-vibes install
 ```
 
-### Step 2: Get Your ElevenLabs API Key
+### Step 2: Choose Your TTS Provider
 
-1. Sign up at [elevenlabs.io](https://elevenlabs.io/) (free tier available!)
+AgentVibes supports two TTS providers - pick the one that fits your needs:
+
+#### **Option A: Piper TTS (Free, Recommended for Getting Started)** 🆓
+
+**No setup required!** Piper TTS works out of the box with zero configuration.
+
+- ✅ Completely free, no API key needed
+- ✅ Works offline (perfect for Windows, WSL, Linux)
+- ✅ 50+ neural voices
+- ✅ 18 languages supported
+- ✅ Privacy-focused local processing
+
+**To use:** Just install AgentVibes and you're done! The installer will set Piper as default if no ElevenLabs key is detected.
+
+#### **Option B: ElevenLabs (Premium AI Voices)** 🎤
+
+**Best for production and variety.** Requires API key but offers 150+ premium voices.
+
+- ✅ 150+ professional AI voices
+- ✅ 30+ languages with multilingual v2
+- ✅ Studio-quality audio with emotional range
+- ✅ Character voices and unique personalities
+
+**Setup steps:**
+
+1. Sign up at [elevenlabs.io](https://elevenlabs.io/) (free tier: 10,000 chars/month)
 2. Copy your API key from the dashboard
 3. Add it to your environment:
 
@@ -112,6 +148,8 @@ echo 'export ELEVENLABS_API_KEY="your-api-key-here"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
+**Switch providers anytime:** `/agent-vibes:provider switch`
+
 ### Step 3: Enable Voice in Claude Code
 
 ```bash
@@ -119,6 +157,117 @@ source ~/.bashrc
 ```
 
 **That's it! Claude will now speak to you!** 🎉
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🎭 Multi-Provider Support
+
+AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premium ElevenLabs AI voices or free offline Piper TTS!
+
+### 🎤 ElevenLabs (Premium AI Voices)
+
+**Features:**
+- 150+ professional AI voices
+- 30+ languages with multilingual v2 model
+- Studio-quality audio with emotional range
+- Character voices, accents, and unique personalities
+- Voices include: Aria, Archer, Cowboy Bob, Pirate Marshal, Grandpa Spuds, Jessica Anne Bogart, and more!
+
+**Requirements:**
+- ElevenLabs API key (get free tier at [elevenlabs.io](https://elevenlabs.io))
+- Internet connection for API calls
+
+**Pricing (2025):**
+- Free: 10,000 chars/month (light use)
+- Starter: $5/month - 30,000 chars
+- Creator: $22/month - 100,000 chars
+- Pro: $99/month - 500,000 chars
+
+### 🆓 Piper TTS (Free, Offline)
+
+**Features:**
+- 50+ neural voices, completely free
+- 18 languages supported
+- No API key required
+- Works offline (perfect for Windows, WSL, and Linux)
+- Privacy-focused local processing
+- Cross-platform support (Windows, macOS, Linux)
+
+**Requirements:**
+- None! Works out of the box
+- Automatic voice download on first use
+- Native Windows support - no additional setup needed
+
+### Provider Commands
+
+```bash
+# View current provider
+/agent-vibes:provider info
+
+# List available providers
+/agent-vibes:provider list
+
+# Switch providers instantly
+/agent-vibes:provider switch
+
+# Test provider functionality
+/agent-vibes:provider test
+```
+
+### Switching Between Providers
+
+**During Installation:**
+The installer asks which provider you prefer and sets it up automatically.
+
+**After Installation:**
+```bash
+# Switch to Piper TTS (free)
+/agent-vibes:provider switch
+# Select: piper
+
+# Switch to ElevenLabs (premium)
+/agent-vibes:provider switch
+# Select: elevenlabs
+```
+
+**Automatic Fallback:**
+If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper TTS.
+
+### Provider Comparison
+
+| Feature | ElevenLabs | Piper TTS |
+|---------|-----------|-----------|
+| **Voices** | 150+ premium AI | 50+ neural voices |
+| **Cost** | $0-99/month | Free forever |
+| **Quality** | Studio-grade | High-quality neural |
+| **Languages** | 30+ with multilingual v2 | 18 languages |
+| **Offline** | ❌ Requires internet | ✅ Works offline |
+| **API Key** | ✅ Required | ❌ Not needed |
+| **Emotional Range** | ✅ Advanced | ⚠️ Limited |
+| **Character Voices** | ✅ Extensive library | ⚠️ Standard voices |
+| **Platform Support** | All platforms | Windows, macOS, Linux, WSL |
+| **Best For** | Production, demos, variety | Development, privacy, Windows users |
+
+### Which Provider Should I Choose?
+
+**Choose ElevenLabs if:**
+- You want premium studio-quality voices
+- You need extensive character voice variety
+- You're creating demos or production content
+- You want advanced emotional range
+- You have a budget for API costs
+
+**Choose Piper TTS if:**
+- You want completely free TTS (especially great for Windows!)
+- You prefer offline/local processing
+- You're on Windows, WSL, or Linux
+- You value privacy and data control
+- You're in development/testing phase
+- You don't want to manage API keys or billing
+
+**Pro Tip:** Use Piper for development and ElevenLabs for production/demos!
 
 [↑ Back to top](#-table-of-contents)
 
@@ -391,28 +540,46 @@ When you set a language, AgentVibes intelligently selects the best voice:
 your-project/
 └── .claude/
     ├── commands/
-    │   ├── agent-vibes/              # Voice commands
+    │   ├── agent-vibes/              # 15 voice commands
     │   └── agent-vibes-bmad.md       # BMAD plugin command
     ├── hooks/
+    │   ├── play-tts.sh               # Main TTS (provider-aware)
+    │   ├── play-tts-elevenlabs.sh    # ElevenLabs implementation
+    │   ├── play-tts-piper.sh         # Piper implementation
+    │   ├── provider-manager.sh       # Provider switching
+    │   ├── provider-commands.sh      # Provider CLI
+    │   ├── language-manager.sh       # Language system
     │   ├── voice-manager.sh          # Voice switching
     │   ├── personality-manager.sh    # Personality system
     │   ├── sentiment-manager.sh      # Sentiment system
-    │   ├── bmad-voice-manager.sh     # BMAD plugin
-    │   ├── play-tts.sh              # TTS playback
-    │   └── voices-config.sh         # Voice ID mappings
-    ├── personalities/               # 19 personality templates
+    │   ├── bmad-voice-manager.sh     # BMAD integration
+    │   ├── piper-voice-manager.sh    # Piper voices
+    │   ├── piper-download-voices.sh  # Piper downloader
+    │   └── voices-config.sh          # Voice ID mappings
+    ├── personalities/                # 19 personality templates
     ├── plugins/
-    │   └── bmad-voices.md           # BMAD voice mappings
+    │   └── bmad-voices.md            # BMAD voice mappings
     ├── output-styles/
-    │   └── agent-vibes.md           # Voice output style
-    └── audio/                       # Generated TTS files
+    │   └── agent-vibes.md            # Voice output style
+    └── audio/                        # Generated TTS files
 ```
 
 ### Voice Settings Storage
 
-- **Current Voice**: `~/.claude/tts-voice.txt`
-- **Current Personality**: `~/.claude/tts-personality.txt`
-- **Current Sentiment**: `~/.claude/tts-sentiment.txt`
+**Project-Local Settings** (`.claude/` in project):
+- **Current Provider**: `tts-provider.txt` - Active TTS provider (elevenlabs/piper)
+- **Current Voice**: `tts-voice.txt` - Selected voice name
+- **Current Personality**: `tts-personality.txt` - Active personality
+- **Current Sentiment**: `tts-sentiment.txt` - Active sentiment
+- **Current Language**: `tts-language.txt` - Selected language
+
+**Global Fallback** (`~/.claude/`):
+Settings fall back to global config if project-local doesn't exist.
+
+**How it works:**
+1. AgentVibes checks `.claude/` in current project first
+2. Falls back to `~/.claude/` if project setting doesn't exist
+3. This allows different voices/personalities per project!
 
 Settings persist across Claude Code sessions!
 
@@ -687,6 +854,38 @@ The update command will:
 
 ---
 
+## ⚠️ Important Disclaimers
+
+**API Costs & Usage:**
+- ElevenLabs usage may incur charges based on your subscription tier and character usage
+- Users are solely responsible for their own API costs and usage
+- Free tier: 10,000 characters/month | Paid plans: $5-99/month
+- See [ElevenLabs Pricing](https://elevenlabs.io/pricing) for current rates
+
+**Third-Party Services:**
+- This project integrates with ElevenLabs (TTS API) and Piper TTS (local processing)
+- We are **not affiliated with, endorsed by, or officially connected** to ElevenLabs, Anthropic, or Claude
+- ElevenLabs and Piper TTS are subject to their respective terms of service
+
+**Privacy & Data:**
+- **ElevenLabs**: Your text prompts are sent to ElevenLabs servers for processing
+- **Piper TTS**: All processing happens locally on your machine, no external data transmission
+- Review [ElevenLabs Privacy Policy](https://elevenlabs.io/privacy) for their data handling
+
+**Software License:**
+- Provided "as-is" under Apache 2.0 License without warranty of any kind
+- See [LICENSE](LICENSE) file for full terms
+- No liability for data loss, bugs, service interruptions, or any damages
+
+**Use at Your Own Risk:**
+- This is open-source software maintained by the community
+- Always test in development before production use
+- Monitor your API usage and costs regularly
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
 ## 🙏 Credits
 
 **Built with ❤️ by [Paul Preibisch](https://github.com/paulpreibisch)**
@@ -696,12 +895,14 @@ The update command will:
 - 🌐 GitHub: [paulpreibisch](https://github.com/paulpreibisch)
 
 **Powered by:**
-- [ElevenLabs](https://elevenlabs.io/) AI voices
-- [Claude Code](https://claude.com/claude-code)
+- [ElevenLabs](https://elevenlabs.io/) - Premium AI voices
+- [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
+- [Claude Code](https://claude.com/claude-code) - AI coding assistant
 - Licensed under Apache 2.0
 
-**Inspired by:**
-- 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler)
+**Special Thanks:**
+- 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler) - Hooks inspiration
+- 🤖 [BMAD METHOD](https://github.com/bmad-code-org/BMAD-METHOD) - Multi-agent framework with auto voice switching integration
 
 [↑ Back to top](#-table-of-contents)
 
