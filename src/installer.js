@@ -201,10 +201,22 @@ async function install(options = {}) {
     // Create personalities directory
     await fs.mkdir(destPersonalitiesDir, { recursive: true });
 
-    // Copy all personality files
+    // Copy all personality files (excluding directories like 'backups')
     const personalityFiles = await fs.readdir(srcPersonalitiesDir);
-    console.log(chalk.cyan(`🎭 Installing ${personalityFiles.length} personality templates:`));
+    const personalityMdFiles = [];
+
     for (const file of personalityFiles) {
+      const srcPath = path.join(srcPersonalitiesDir, file);
+      const stat = await fs.stat(srcPath);
+
+      // Only copy .md files, skip directories
+      if (stat.isFile() && file.endsWith('.md')) {
+        personalityMdFiles.push(file);
+      }
+    }
+
+    console.log(chalk.cyan(`🎭 Installing ${personalityMdFiles.length} personality templates:`));
+    for (const file of personalityMdFiles) {
       const srcPath = path.join(srcPersonalitiesDir, file);
       const destPath = path.join(destPersonalitiesDir, file);
       await fs.copyFile(srcPath, destPath);

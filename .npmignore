@@ -4,6 +4,7 @@
 .claude/config/
 .claude/settings.local.json
 .claude/tts-*.txt
+.claude/personalities/backups/
 *.code-workspace
 
 # Git files
