@@ -178,11 +178,22 @@ async function install(options = {}) {
     // Copy hook scripts
     spinner.start('Installing TTS helper scripts...');
     const allHookFiles = await fs.readdir(srcHooksDir);
-    // Only copy AgentVibes-related scripts, exclude project-specific files
-    const hookFiles = allHookFiles.filter(file =>
-      !file.includes('prepare-release') &&
-      !file.startsWith('.')
-    );
+
+    // Filter to only include files (not directories) and exclude project-specific files
+    const hookFiles = [];
+    for (const file of allHookFiles) {
+      const srcPath = path.join(srcHooksDir, file);
+      const stat = await fs.stat(srcPath);
+
+      // Only copy shell script files, skip directories and unwanted files
+      if (stat.isFile() &&
+          file.endsWith('.sh') &&
+          !file.includes('prepare-release') &&
+          !file.startsWith('.')) {
+        hookFiles.push(file);
+      }
+    }
+
     console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
     for (const file of hookFiles) {
       const srcPath = path.join(srcHooksDir, file);
