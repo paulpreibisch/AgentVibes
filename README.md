@@ -9,7 +9,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v1.1.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.0
 
 ---
 
@@ -43,7 +43,7 @@
 
 ## 📰 Latest Release
 
-**[v1.1.3 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v1.1.3)** 📋
+**[v2.0.0 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.0)** 📋
 
 Symlink support & WSL audio fixes! Projects can now share hooks via symlinks while maintaining independent settings. Plus, WSL users get automatic silence padding to eliminate audio static.
 
