@@ -2,7 +2,8 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "agentvibes",
   "version": "2.0.0",
-  "description": "Beautiful ElevenLabs TTS voice commands for Claude Code - Add professional narration to your AI coding sessions",
+  "description": "Bring your Claude Code sessions to life with voice! Professional TTS narration with multi-provider support.",
+  "homepage": "https://agentvibes.org",
   "keywords": [
     "elevenlabs",
     "tts",
