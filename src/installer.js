@@ -73,25 +73,38 @@ async function install(options = {}) {
   console.log(chalk.gray(`   Install location: ${currentDir}/.claude/`));
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
-  // Show latest release notes from git log
+  // Show latest release notes from RELEASE_NOTES.md
   try {
-    const { execSync } = await import('node:child_process');
-    const gitLog = execSync(
-      'git log --oneline --no-decorate -5',
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
-    ).trim();
+    const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+    const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+    const lines = releaseNotes.split('\n');
 
-    if (gitLog) {
-      console.log(chalk.cyan('\n📰 Latest Release Notes:'));
-      const commits = gitLog.split('\n');
-      commits.forEach(commit => {
-        const [hash, ...messageParts] = commit.split(' ');
-        const message = messageParts.join(' ');
-        console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-      });
+    // Extract the first release section (v2.0.x format)
+    console.log(chalk.cyan('\n📰 Latest Release Notes:'));
+
+    let foundFirstRelease = false;
+    let lineCount = 0;
+    const maxLines = 8; // Show first 8 lines of latest release
+
+    for (const line of lines) {
+      if (line.startsWith('## 📦 v')) {
+        if (foundFirstRelease) break; // Stop at second release
+        foundFirstRelease = true;
+        console.log(chalk.white(line.replace('## 📦 ', '')));
+        continue;
+      }
+      if (foundFirstRelease && line.trim()) {
+        if (line.startsWith('###')) {
+          console.log(chalk.gray(line));
+        } else if (line.startsWith('- ')) {
+          console.log(chalk.gray('   ' + line));
+        }
+        lineCount++;
+        if (lineCount >= maxLines) break;
+      }
     }
   } catch (error) {
-    // Git not available or not a git repo - skip release notes
+    // RELEASE_NOTES.md not available - skip release notes
   }
 
   // Provider selection prompt
@@ -730,25 +743,38 @@ program
     console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
     console.log(chalk.gray(`   Package version: ${version}`));
 
-    // Show latest release notes from git log
+    // Show latest release notes from RELEASE_NOTES.md
     try {
-      const { execSync } = await import('node:child_process');
-      const gitLog = execSync(
-        'git log --oneline --no-decorate -5',
-        { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
-      ).trim();
+      const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+      const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+      const lines = releaseNotes.split('\n');
 
-      if (gitLog) {
-        console.log(chalk.cyan('\n📰 Latest Release Notes:'));
-        const commits = gitLog.split('\n');
-        commits.forEach(commit => {
-          const [hash, ...messageParts] = commit.split(' ');
-          const message = messageParts.join(' ');
-          console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-        });
+      // Extract the first release section (v2.0.x format)
+      console.log(chalk.cyan('\n📰 Latest Release Notes:'));
+
+      let foundFirstRelease = false;
+      let lineCount = 0;
+      const maxLines = 8; // Show first 8 lines of latest release
+
+      for (const line of lines) {
+        if (line.startsWith('## 📦 v')) {
+          if (foundFirstRelease) break; // Stop at second release
+          foundFirstRelease = true;
+          console.log(chalk.white(line.replace('## 📦 ', '')));
+          continue;
+        }
+        if (foundFirstRelease && line.trim()) {
+          if (line.startsWith('###')) {
+            console.log(chalk.gray(line));
+          } else if (line.startsWith('- ')) {
+            console.log(chalk.gray('   ' + line));
+          }
+          lineCount++;
+          if (lineCount >= maxLines) break;
+        }
       }
     } catch (error) {
-      // Git not available or not a git repo - skip release notes
+      // RELEASE_NOTES.md not available - skip release notes
     }
 
     // Check if already installed
