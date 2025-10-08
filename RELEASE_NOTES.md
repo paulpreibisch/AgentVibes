@@ -1,5 +1,28 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.9 - Installer Release Notes Fix (2025-01-07)
+
+### 🤖 AI Summary
+
+This patch release fixes a critical bug where the installer and updater commands were showing outdated v1.1.x commit messages instead of the current v2.0.8+ release notes. The commands now correctly read from RELEASE_NOTES.md which is included in the npm package.
+
+### 🐛 Bug Fixes
+
+#### Installer Release Notes Display
+- **Fixed install command** - Now reads from RELEASE_NOTES.md instead of git log
+- **Fixed update command** - Now shows actual v2.0.x release notes instead of v1.1.x commits
+- **npm package compatibility** - Works correctly when installed via `npx agentvibes` (not a git repo)
+- **Consistent display** - Both install and update show the same latest release information
+
+### 🎯 User Impact
+
+**Before:** Running `npx agentvibes update` showed confusing old commit messages from v1.1.2 era.
+
+**After:** Both `install` and `update` commands show the correct latest release notes from v2.0.9, including the provider-aware personalities feature and all recent improvements.
+
+### 📊 Files Changed
+- Modified: src/installer.js (57 insertions, 31 deletions)
+
 ## 📦 v2.0.8 - Provider-Aware Personalities (2025-01-07)
 
 ### 🤖 AI Summary
