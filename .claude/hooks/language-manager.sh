@@ -139,52 +139,54 @@ get_best_voice_for_language() {
     echo "${LANGUAGE_VOICES[$lang]}"
 }
 
-# Main command handler
-case "${1:-}" in
-    set)
-        if [[ -z "$2" ]]; then
-            echo "Usage: language-manager.sh set <language>"
+# Main command handler - only run if script is executed directly, not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    case "${1:-}" in
+        set)
+            if [[ -z "$2" ]]; then
+                echo "Usage: language-manager.sh set <language>"
+                exit 1
+            fi
+            set_language "$2"
+            ;;
+        get)
+            get_language
+            ;;
+        code)
+            get_language_code
+            ;;
+        check-voice)
+            if [[ -z "$2" ]]; then
+                echo "Usage: language-manager.sh check-voice <voice-name>"
+                exit 1
+            fi
+            if is_voice_multilingual "$2"; then
+                echo "yes"
+            else
+                echo "no"
+            fi
+            ;;
+        best-voice)
+            get_best_voice_for_language
+            ;;
+        list)
+            echo "Supported languages and recommended voices:"
+            echo ""
+            for lang in "${!LANGUAGE_VOICES[@]}"; do
+                printf "%-15s → %s\n" "$lang" "${LANGUAGE_VOICES[$lang]}"
+            done | sort
+            ;;
+        *)
+            echo "AgentVibes Language Manager"
+            echo ""
+            echo "Usage:"
+            echo "  language-manager.sh set <language>     Set language"
+            echo "  language-manager.sh get                Get current language"
+            echo "  language-manager.sh code               Get language code only"
+            echo "  language-manager.sh check-voice <name> Check if voice is multilingual"
+            echo "  language-manager.sh best-voice         Get best voice for current language"
+            echo "  language-manager.sh list               List all supported languages"
             exit 1
-        fi
-        set_language "$2"
-        ;;
-    get)
-        get_language
-        ;;
-    code)
-        get_language_code
-        ;;
-    check-voice)
-        if [[ -z "$2" ]]; then
-            echo "Usage: language-manager.sh check-voice <voice-name>"
-            exit 1
-        fi
-        if is_voice_multilingual "$2"; then
-            echo "yes"
-        else
-            echo "no"
-        fi
-        ;;
-    best-voice)
-        get_best_voice_for_language
-        ;;
-    list)
-        echo "Supported languages and recommended voices:"
-        echo ""
-        for lang in "${!LANGUAGE_VOICES[@]}"; do
-            printf "%-15s → %s\n" "$lang" "${LANGUAGE_VOICES[$lang]}"
-        done | sort
-        ;;
-    *)
-        echo "AgentVibes Language Manager"
-        echo ""
-        echo "Usage:"
-        echo "  language-manager.sh set <language>     Set language"
-        echo "  language-manager.sh get                Get current language"
-        echo "  language-manager.sh code               Get language code only"
-        echo "  language-manager.sh check-voice <name> Check if voice is multilingual"
-        echo "  language-manager.sh best-voice         Get best voice for current language"
-        echo "  language-manager.sh list               List all supported languages"
-        exit 1
-        ;;
-esac
+            ;;
+    esac
+fi

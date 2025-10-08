@@ -292,10 +292,49 @@ provider_preview() {
       ;;
     piper)
       # Use the Piper voice manager's list functionality
-      # For Piper, we'll list and play sample from available voices
       source "$SCRIPT_DIR/piper-voice-manager.sh"
 
-      # Play intro announcement
+      # Check if a specific voice was requested
+      local voice_arg="$1"
+
+      if [[ -n "$voice_arg" ]]; then
+        # User requested a specific voice - check if it's a valid Piper voice
+        # Piper voice names are like: en_US-lessac-medium
+        # Try to find a matching voice model
+
+        # Check if the voice arg looks like a Piper model name (contains underscores/hyphens)
+        if [[ "$voice_arg" =~ ^[a-z]{2}_[A-Z]{2}- ]]; then
+          # Looks like a Piper voice model name
+          if verify_voice "$voice_arg"; then
+            echo "🎤 Previewing Piper voice: $voice_arg"
+            echo ""
+            "$SCRIPT_DIR/play-tts.sh" "Hello, this is the $voice_arg voice. How do you like it?" "$voice_arg"
+          else
+            echo "❌ Voice model not found: $voice_arg"
+            echo ""
+            echo "💡 Piper voice names look like: en_US-lessac-medium"
+            echo "   Run /agent-vibes:list to see available Piper voices"
+          fi
+        else
+          # Looks like an ElevenLabs voice name (like "Antoni", "Jessica")
+          echo "❌ '$voice_arg' appears to be an ElevenLabs voice"
+          echo ""
+          echo "You're currently using Piper TTS (free provider)."
+          echo "Piper has different voices than ElevenLabs."
+          echo ""
+          echo "Options:"
+          echo "  1. Run /agent-vibes:list to see available Piper voices"
+          echo "  2. Switch to ElevenLabs: /agent-vibes:provider switch elevenlabs"
+          echo ""
+          echo "Popular Piper voices to try:"
+          echo "  • en_US-lessac-medium  (clear, professional)"
+          echo "  • en_US-amy-medium     (warm, friendly)"
+          echo "  • en_US-joe-medium     (casual, natural)"
+        fi
+        return
+      fi
+
+      # No specific voice - preview first 3 voices
       echo "🎤 Piper Preview of 3 people"
       echo ""
 

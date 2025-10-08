@@ -32,7 +32,7 @@ DEFAULT_VOICE="en_US-lessac-medium"
 VOICE_MODEL=""
 
 # Get current language setting
-CURRENT_LANGUAGE=$(get_current_language)
+CURRENT_LANGUAGE=$(get_language_code)
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Use override if provided
