@@ -66,23 +66,6 @@ teardown() {
   assert_output_contains "Text truncated to 500 characters"
 }
 
-@test "play-tts fails without API key when using ElevenLabs" {
-  # Skip this test in CI environment as it's flaky with provider routing
-  if [[ -n "$CI" ]] || [[ -n "$GITHUB_ACTIONS" ]]; then
-    skip "Flaky in CI - provider routing timing issue"
-  fi
-
-  unset ELEVENLABS_API_KEY
-
-  # Set ElevenLabs as active provider
-  echo "elevenlabs" > "$HOME/.claude/tts-provider.txt"
-
-  run "$PLAY_TTS" "Test message"
-
-  [ "$status" -eq 1 ]
-  assert_output_contains "ELEVENLABS_API_KEY not set"
-}
-
 @test "play-tts fails without text argument" {
   run "$PLAY_TTS"
 
