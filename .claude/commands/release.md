@@ -12,16 +12,13 @@ This command automatically:
 2. Reads actual code diffs to understand what changed
 3. Generates an intelligent AI summary
 4. Creates/updates RELEASE_NOTES.md with comprehensive notes
-5. **Updates BOTH install and update commands in src/installer.js**:
-   - Both commands must show identical version info and release notes
-   - Counts slash commands in .claude/commands/agent-vibes/
-   - Counts personality templates in .claude/personalities/
-   - Updates voice counts and feature list
-   - Ensures consistency between install and update output
+5. Verifies installer.js (automatically reads from RELEASE_NOTES.md and package.json)
 6. Bumps the version using npm version
 7. Commits everything together
 8. Pushes to master with --follow-tags
-9. Updates v1 branch
+9. Creates GitHub release
+10. Updates v1 branch
+11. **Publishes to npm** (makes new version available via npx agentvibes)
 
 ## Usage
 
@@ -45,7 +42,9 @@ This command automatically:
 - **Categorized Changes**: Features, fixes, docs, tests
 - **Version Bump**: Updates package.json
 - **Auto Push**: Pushes to master with tags
+- **GitHub Release**: Creates public release with notes
 - **Branch Update**: Syncs v1 branch
+- **NPM Publish**: Makes new version available globally
 
 ## Example
 
@@ -58,7 +57,9 @@ This will:
 - Generate comprehensive release notes
 - Bump from 1.0.10 → 1.1.0
 - Commit and push everything
+- Create GitHub release
 - Update v1 branch to point to new release
+- Publish to npm registry
 
 ## Implementation
 
