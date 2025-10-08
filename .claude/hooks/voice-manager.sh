@@ -217,6 +217,10 @@ case "$1" in
       if [ -x "$PLAY_TTS" ]; then
         "$PLAY_TTS" "Hi, I'm $FOUND. I'll be your voice assistant moving forward." "$FOUND" > /dev/null 2>&1 &
       fi
+
+      echo ""
+      echo "💡 Tip: To hear automatic TTS narration, enable the agent-vibes output style:"
+      echo "   /output-style agent-vibes"
     fi
     ;;
 
