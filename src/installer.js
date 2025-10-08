@@ -70,7 +70,7 @@ async function install(options = {}) {
   const currentDir = process.env.INIT_CWD || process.cwd();
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
-  console.log(chalk.gray(`   Current directory: ${currentDir}`));
+  console.log(chalk.gray(`   Install location: ${currentDir}/.claude/`));
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
   // Show latest release notes from git log
@@ -284,34 +284,9 @@ async function install(options = {}) {
     }
   }
 
-  // Ask for installation directory
-  let targetDir = options.directory || currentDir;
+  // Use current directory for installation (where installer was run)
+  const targetDir = options.directory || currentDir;
 
-  if (!options.yes) {
-    console.log(chalk.cyan('\n📂 AgentVibes Installation Location:\n'));
-    console.log(chalk.gray('   AgentVibes will be installed in the .claude/ subdirectory'));
-    console.log(chalk.gray('   of your chosen location.\n'));
-
-    const { installDir } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'installDir',
-        message: 'Where should AgentVibes be installed?',
-        default: currentDir,
-        validate: (input) => {
-          if (!input || input.trim() === '') {
-            return 'Please provide a valid directory path';
-          }
-          return true;
-        },
-      },
-    ]);
-
-    targetDir = installDir;
-    console.log(chalk.green(`✓ AgentVibes will be installed in: ${targetDir}/.claude/`));
-  }
-
-  // Show installation summary
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
   console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
