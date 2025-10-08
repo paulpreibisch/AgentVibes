@@ -890,41 +890,50 @@ program
       console.log(chalk.white(`   • ${newPersonalities + updatedPersonalities} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
       console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
 
-      // Show latest release notes from RELEASE_NOTES.md
+      // Show latest release notes from RELEASE_NOTES_V2.md (v2.0+) or RELEASE_NOTES.md (legacy)
       try {
-        const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
-        const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+        // Try v2.0 format first
+        let releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES_V2.md');
+        let releaseNotes;
+        let isV2Format = true;
 
-        // Extract latest release summary
+        try {
+          releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+        } catch {
+          // Fallback to legacy format
+          releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+          releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+          isV2Format = false;
+        }
+
         const lines = releaseNotes.split('\n');
 
-        // Find the first release version header
-        const versionIndex = lines.findIndex(line => line.match(/^## 📦 v\d+\.\d+\.\d+/));
+        if (isV2Format) {
+          // v2.0 format - extract summary from top of file
+          const packageVersion = packageJson.version;
+          console.log(chalk.cyan(`📰 Latest Release (v${packageVersion}):\n`));
 
-        if (versionIndex >= 0) {
-          // Extract version
-          const versionMatch = lines[versionIndex].match(/v(\d+\.\d+\.\d+)/);
-          const version = versionMatch ? versionMatch[1] : 'unknown';
+          // Find content after "## 🚀 Major Features" line
+          let summaryText = '';
+          let foundMajorFeatures = false;
 
-          // Find the AI Summary section
-          const summaryIndex = lines.findIndex((line, idx) =>
-            idx > versionIndex && line.includes('### 🤖 AI Summary')
-          );
-
-          if (summaryIndex >= 0) {
-            console.log(chalk.cyan(`📰 Latest Release (v${version}):\n`));
-
-            // Extract summary text (lines between AI Summary and next ###)
-            let summaryText = '';
-            for (let i = summaryIndex + 1; i < lines.length; i++) {
-              const line = lines[i];
-              if (line.startsWith('###') || line.startsWith('##')) break;
-              if (line.trim()) {
+          for (const line of lines) {
+            if (line.includes('## 🚀 Major Features')) {
+              foundMajorFeatures = true;
+              continue;
+            }
+            if (foundMajorFeatures) {
+              // Stop at next major heading or after 200 chars
+              if (line.startsWith('##') && !line.includes('Major Features')) break;
+              if (summaryText.length > 200) break;
+              if (line.trim() && !line.startsWith('#') && !line.startsWith('**Release Date')) {
                 summaryText += line.trim() + ' ';
               }
             }
+          }
 
-            // Wrap text at ~80 chars for better readability
+          // Wrap text at ~80 chars
+          if (summaryText) {
             const words = summaryText.split(' ');
             let currentLine = '';
             const wrappedLines = [];
@@ -943,6 +952,50 @@ program
               console.log(chalk.white(`   ${line}`));
             });
             console.log();
+          }
+        } else {
+          // Legacy format (v1.x)
+          const versionIndex = lines.findIndex(line => line.match(/^## 📦 v\d+\.\d+\.\d+/));
+
+          if (versionIndex >= 0) {
+            const versionMatch = lines[versionIndex].match(/v(\d+\.\d+\.\d+)/);
+            const version = versionMatch ? versionMatch[1] : 'unknown';
+
+            const summaryIndex = lines.findIndex((line, idx) =>
+              idx > versionIndex && line.includes('### 🤖 AI Summary')
+            );
+
+            if (summaryIndex >= 0) {
+              console.log(chalk.cyan(`📰 Latest Release (v${version}):\n`));
+
+              let summaryText = '';
+              for (let i = summaryIndex + 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.startsWith('###') || line.startsWith('##')) break;
+                if (line.trim()) {
+                  summaryText += line.trim() + ' ';
+                }
+              }
+
+              const words = summaryText.split(' ');
+              let currentLine = '';
+              const wrappedLines = [];
+
+              words.forEach(word => {
+                if ((currentLine + word).length > 80) {
+                  wrappedLines.push(currentLine.trim());
+                  currentLine = word + ' ';
+                } else {
+                  currentLine += word + ' ';
+                }
+              });
+              if (currentLine.trim()) wrappedLines.push(currentLine.trim());
+
+              wrappedLines.forEach(line => {
+                console.log(chalk.white(`   ${line}`));
+              });
+              console.log();
+            }
           }
         }
       } catch {
