@@ -1,5 +1,80 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.8 - Provider-Aware Personalities (2025-01-07)
+
+### 🤖 AI Summary
+
+This patch release makes the personality system fully provider-aware, fixing a critical issue where personality switching would fail to play TTS acknowledgments when using Piper TTS. Users can now seamlessly switch personalities regardless of which TTS provider they're using, with each personality automatically selecting the appropriate voice for the active provider.
+
+### ✨ New Features
+
+#### Provider-Aware Personality Voice Switching
+- **Dual voice mappings** - All 19 personality files now include both `elevenlabs_voice` and `piper_voice` fields
+- **Automatic voice selection** - Personality manager detects active TTS provider and switches to appropriate voice automatically
+- **Piper voice mappings**:
+  - Female personalities (sarcastic, flirty, sassy, dramatic) → `en_US-amy-medium`
+  - Male casual (funny, pirate, surfer-dude, crass) → `en_US-joe-medium`
+  - Professional (professional, normal, dry-humor, poetic, zen) → `en_US-lessac-medium`
+  - Energetic (angry, annoying, robot) → `en_US-ryan-high`
+  - Character voices (grandpa, moody) → `en_US-libritts-high`
+
+#### Output Style Detection Helper
+- **New check-output-style.sh** - Helper script for future output style detection features
+- **User-friendly tips** - Voice and personality commands now show helpful tip about enabling agent-vibes output style
+- **Better UX** - Users are guided to `/output-style agent-vibes` when needed
+
+### 🐛 Bug Fixes
+
+#### Whoami Command Provider Detection
+- **Fixed provider display** - `/agent-vibes:whoami` now correctly shows active provider (Piper TTS or ElevenLabs)
+- **Updated command description** - Metadata now mentions both providers instead of hardcoding "ElevenLabs"
+- **Accurate information** - Users see "Provider: Piper TTS (Free, Offline)" when using Piper
+
+#### Voice Manager Provider Support
+- **Piper model name recognition** - Voice manager now accepts Piper voice model names (e.g., `en_US-amy-medium`)
+- **Provider-aware validation** - Skips ElevenLabs voice validation when using Piper with Piper model names
+- **Smart voice ID display** - Only shows ElevenLabs voice ID when actually using ElevenLabs
+
+#### Piper TTS Voice File Reading
+- **Fixed voice file lookup** - `play-tts-piper.sh` now correctly reads voice from `.claude/tts-voice.txt`
+- **Project-local support** - Checks project-local `.claude/tts-voice.txt` first, then global `~/.claude/tts-voice.txt`
+- **Piper model detection** - Validates voice names contain underscore and dash pattern for Piper models
+
+### 🔧 Technical Changes
+
+#### Personality Manager Improvements
+- **Provider detection** - Reads `tts-provider.txt` to determine active provider
+- **Conditional voice selection** - Uses `piper_voice` field when Piper is active, `elevenlabs_voice` for ElevenLabs
+- **Fallback voice** - Defaults to `en_US-lessac-medium` if no Piper voice specified
+- **New field support** - Added `piper_voice` field extraction to `get_personality_data` function
+
+#### Voice Manager Refactoring
+- **Provider-aware switch logic** - Detects Piper model names and bypasses ElevenLabs validation
+- **Pattern matching** - Uses `*"_"*"-"*` pattern to identify Piper voice model names
+- **Cleaner output** - Removed voice ID display for Piper voices since they don't use IDs
+
+#### Personality File Structure
+- **Clearer naming** - Renamed `voice:` to `elevenlabs_voice:` in all personality frontmatter
+- **Dual provider support** - Every personality now has both ElevenLabs and Piper voice assignments
+- **Consistency** - Standardized field naming across all 19 personality files
+
+### 🎯 User Impact
+
+**Before:** Setting a personality like `/agent-vibes:personality sarcastic` while using Piper TTS would try to use an ElevenLabs voice name that doesn't exist in Piper, resulting in no audio playback for acknowledgments/completions.
+
+**After:** Personality switching seamlessly works with both providers:
+- Using Piper? Gets `en_US-amy-medium` for sarcastic personality
+- Using ElevenLabs? Gets "Jessica Anne Bogart" voice
+- Always hear proper TTS acknowledgments and completions!
+
+### 📊 Files Changed
+- Modified: 3 hook scripts (personality-manager.sh, voice-manager.sh, play-tts-piper.sh)
+- Modified: 19 personality files (all now have dual voice mappings)
+- Modified: 1 command file (whoami.md)
+- Added: 1 new helper script (check-output-style.sh)
+
+**Total Changes:** 247 insertions, 69 deletions across 25 files
+
 ## 📦 v2.0.7 - Bug Fixes & UX Improvements (2025-01-07)
 
 ### 🤖 AI Summary
