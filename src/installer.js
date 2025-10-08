@@ -887,7 +887,7 @@ program
       console.log(chalk.cyan('📦 Update Summary:'));
       console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
       console.log(chalk.white(`   • ${hookFiles.length} TTS scripts updated`));
-      console.log(chalk.white(`   • ${srcPersonalityFiles.length} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
+      console.log(chalk.white(`   • ${newPersonalities + updatedPersonalities} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
       console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
 
       // Show latest release notes from RELEASE_NOTES.md
