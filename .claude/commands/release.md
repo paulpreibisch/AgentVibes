@@ -12,10 +12,12 @@ This command automatically:
 2. Reads actual code diffs to understand what changed
 3. Generates an intelligent AI summary
 4. Creates/updates RELEASE_NOTES.md with comprehensive notes
-5. **Updates installer message in src/installer.js** with accurate counts:
+5. **Updates BOTH install and update commands in src/installer.js**:
+   - Both commands must show identical version info and release notes
    - Counts slash commands in .claude/commands/agent-vibes/
    - Counts personality templates in .claude/personalities/
    - Updates voice counts and feature list
+   - Ensures consistency between install and update output
 6. Bumps the version using npm version
 7. Commits everything together
 8. Pushes to master with --follow-tags

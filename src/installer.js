@@ -727,9 +727,29 @@ program
     );
 
     console.log(chalk.cyan('📍 Update Details:'));
-    console.log(chalk.white(`   Current directory: ${currentDir}`));
-    console.log(chalk.white(`   Update location: ${targetDir}/.claude/ (project-local)`));
-    console.log(chalk.white(`   Package version: ${version}\n`));
+    console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
+    console.log(chalk.gray(`   Package version: ${version}`));
+
+    // Show latest release notes from git log
+    try {
+      const { execSync } = await import('node:child_process');
+      const gitLog = execSync(
+        'git log --oneline --no-decorate -5',
+        { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+      ).trim();
+
+      if (gitLog) {
+        console.log(chalk.cyan('\n📰 Latest Release Notes:'));
+        const commits = gitLog.split('\n');
+        commits.forEach(commit => {
+          const [hash, ...messageParts] = commit.split(' ');
+          const message = messageParts.join(' ');
+          console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+        });
+      }
+    } catch (error) {
+      // Git not available or not a git repo - skip release notes
+    }
 
     // Check if already installed
     const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
@@ -740,127 +760,11 @@ program
     } catch {}
 
     if (!isInstalled) {
-      console.log(chalk.red('❌ AgentVibes is not installed in this directory.'));
-      console.log(chalk.gray('   Run: node src/installer.js install\n'));
+      console.log(chalk.red('\n❌ AgentVibes is not installed in this directory.'));
+      console.log(chalk.gray('   Run: npx agentvibes install\n'));
       process.exit(1);
     }
 
-    // Show latest release notes from RELEASE_NOTES.md
-    try {
-      const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
-      const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
-
-      // Extract latest release summary
-      const lines = releaseNotes.split('\n');
-
-      // Find the first release version header
-      const versionIndex = lines.findIndex(line => line.match(/^## 📦 v\d+\.\d+\.\d+/));
-
-      if (versionIndex >= 0) {
-        // Extract version
-        const versionMatch = lines[versionIndex].match(/v(\d+\.\d+\.\d+)/);
-        const version = versionMatch ? versionMatch[1] : 'unknown';
-
-        // Find the AI Summary section
-        const summaryIndex = lines.findIndex((line, idx) =>
-          idx > versionIndex && line.includes('### 🤖 AI Summary')
-        );
-
-        if (summaryIndex >= 0) {
-          console.log(chalk.cyan(`📰 Latest Release (v${version}):\n`));
-
-          // Extract summary text (lines between AI Summary and next ###)
-          let summaryText = '';
-          for (let i = summaryIndex + 1; i < lines.length; i++) {
-            const line = lines[i];
-            if (line.startsWith('###') || line.startsWith('##')) break;
-            if (line.trim()) {
-              summaryText += line.trim() + ' ';
-            }
-          }
-
-          // Wrap text at ~80 chars for better readability
-          const words = summaryText.split(' ');
-          let currentLine = '';
-          const wrappedLines = [];
-
-          words.forEach(word => {
-            if ((currentLine + word).length > 80) {
-              wrappedLines.push(currentLine.trim());
-              currentLine = word + ' ';
-            } else {
-              currentLine += word + ' ';
-            }
-          });
-          if (currentLine.trim()) wrappedLines.push(currentLine.trim());
-
-          wrappedLines.forEach(line => {
-            console.log(chalk.white(`   ${line}`));
-          });
-          console.log();
-        }
-      }
-    } catch {
-      // Release notes not available - no problem
-    }
-
-    // Show latest commit messages
-    try {
-      const { execSync } = await import('node:child_process');
-      const gitLog = execSync(
-        'git log --oneline --no-decorate -5',
-        { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
-      ).trim();
-
-      if (gitLog) {
-        console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
-        const commits = gitLog.split('\n');
-        commits.forEach(commit => {
-          const [hash, ...messageParts] = commit.split(' ');
-          const message = messageParts.join(' ');
-          console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-        });
-        console.log();
-      }
-    } catch (error) {
-      // Git not available - try RELEASE_NOTES.md fallback
-      try {
-        const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
-        const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
-
-        // Extract commits from "Recent Commits" section
-        const lines = releaseNotes.split('\n');
-        const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
-
-        if (commitsIndex >= 0) {
-          console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
-
-          // Find the code block with commits (between ``` markers)
-          let inCodeBlock = false;
-          for (let i = commitsIndex + 1; i < lines.length; i++) {
-            const line = lines[i];
-
-            if (line.trim() === '```') {
-              if (inCodeBlock) break; // End of code block
-              inCodeBlock = true;
-              continue;
-            }
-
-            if (inCodeBlock && line.trim()) {
-              // Parse commit line: "hash message"
-              const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
-              if (match) {
-                const [, hash, message] = match;
-                console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-              }
-            }
-          }
-          console.log();
-        }
-      } catch {
-        // No release notes available
-      }
-    }
 
     console.log(chalk.cyan('📦 What will be updated:'));
     console.log(chalk.gray('   • Slash commands (keep your customizations)'));
