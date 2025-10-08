@@ -68,11 +68,9 @@ async function install(options = {}) {
   // When running via npx, process.cwd() returns the npm cache directory
   // Use INIT_CWD (set by npm/npx) to get the actual user's working directory
   const currentDir = process.env.INIT_CWD || process.cwd();
-  const targetDir = options.directory || currentDir;
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
   console.log(chalk.gray(`   Current directory: ${currentDir}`));
-  console.log(chalk.gray(`   Install location: ${targetDir}/.claude/ (project-local)`));
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
   // Show latest release notes from git log
@@ -96,6 +94,224 @@ async function install(options = {}) {
     // Git not available or not a git repo - skip release notes
   }
 
+  // Provider selection prompt
+  let selectedProvider = 'piper';
+  let elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+
+  if (!options.yes) {
+    console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
+
+    const { provider } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'provider',
+        message: 'Which TTS provider would you like to use?',
+        choices: [
+          {
+            name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
+            value: 'piper',
+          },
+          {
+            name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
+            value: 'elevenlabs',
+          },
+        ],
+        default: 'piper',
+      },
+    ]);
+
+    selectedProvider = provider;
+
+    // If Piper selected, ask for voice storage location
+    let piperVoicesPath = null;
+    if (selectedProvider === 'piper') {
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
+
+      console.log(chalk.cyan('\n📁 Piper Voice Storage Location:\n'));
+      console.log(chalk.gray('   Piper voice models are ~25MB each. They can be stored globally'));
+      console.log(chalk.gray('   to be shared across all your projects, or locally per project.\n'));
+
+      const { piperPath } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'piperPath',
+          message: 'Where should Piper voice models be downloaded?',
+          default: defaultPiperPath,
+          validate: (input) => {
+            if (!input || input.trim() === '') {
+              return 'Please provide a valid path';
+            }
+            return true;
+          },
+        },
+      ]);
+
+      piperVoicesPath = piperPath;
+      console.log(chalk.green(`✓ Piper voices will be stored in: ${piperVoicesPath}`));
+    }
+
+    // If ElevenLabs selected, handle API key
+    if (selectedProvider === 'elevenlabs') {
+      if (elevenLabsKey) {
+        console.log(chalk.green(`\n✓ ElevenLabs API key detected from environment`));
+        console.log(chalk.gray(`  Key: ${elevenLabsKey.substring(0, 10)}...`));
+
+        const { useExisting } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'useExisting',
+            message: 'Use this existing API key?',
+            default: true,
+          },
+        ]);
+
+        if (!useExisting) {
+          elevenLabsKey = null;
+        }
+      }
+
+      if (!elevenLabsKey) {
+        console.log(chalk.yellow('\n⚠️  ElevenLabs API Key Required'));
+        console.log(chalk.gray('   Get your free API key at: https://elevenlabs.io'));
+        console.log(chalk.gray('   Free tier: 10,000 characters/month\n'));
+
+        const { setupMethod } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'setupMethod',
+            message: 'How would you like to set up your API key?',
+            choices: [
+              {
+                name: 'Add to shell config (recommended)',
+                value: 'shell',
+              },
+              {
+                name: 'Enter manually (I\'ll set it up myself later)',
+                value: 'manual',
+              },
+              {
+                name: 'Skip (use Piper TTS instead)',
+                value: 'skip',
+              },
+            ],
+          },
+        ]);
+
+        if (setupMethod === 'skip') {
+          console.log(chalk.yellow('\n→ Switching to Piper TTS (free option)\n'));
+          selectedProvider = 'piper';
+        } else if (setupMethod === 'manual') {
+          const { apiKey } = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'apiKey',
+              message: 'Enter your ElevenLabs API key:',
+              validate: (input) => input.length > 0 || 'API key cannot be empty',
+            },
+          ]);
+          elevenLabsKey = apiKey;
+          console.log(chalk.yellow('\n⚠️  Remember to add this to your environment variables later:'));
+          console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+        } else if (setupMethod === 'shell') {
+          const { apiKey } = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'apiKey',
+              message: 'Enter your ElevenLabs API key:',
+              validate: (input) => input.length > 0 || 'API key cannot be empty',
+            },
+          ]);
+          elevenLabsKey = apiKey;
+
+          // Detect shell
+          const shell = process.env.SHELL || '';
+          let shellConfig = '';
+          let shellName = '';
+
+          if (shell.includes('zsh')) {
+            shellConfig = path.join(process.env.HOME, '.zshrc');
+            shellName = 'zsh';
+          } else if (shell.includes('bash')) {
+            shellConfig = path.join(process.env.HOME, '.bashrc');
+            shellName = 'bash';
+          } else {
+            console.log(chalk.yellow('\n⚠️  Could not detect shell type'));
+            console.log(chalk.gray('   Please add manually to your shell config:'));
+            console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+          }
+
+          if (shellConfig && shellName) {
+            console.log(chalk.cyan(`\n🐚 Detected shell: ${shellName}`));
+            console.log(chalk.gray(`   Config file: ${shellConfig}`));
+
+            const { confirmShell } = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'confirmShell',
+                message: `Add ELEVENLABS_API_KEY to ${shellConfig}?`,
+                default: true,
+              },
+            ]);
+
+            if (confirmShell) {
+              try {
+                const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
+                await fs.appendFile(shellConfig, configContent);
+                console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
+                console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
+              } catch (error) {
+                console.log(chalk.red(`\n✗ Failed to write to ${shellConfig}`));
+                console.log(chalk.gray('   Please add manually:'));
+                console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    console.log(''); // Spacing
+  } else {
+    console.log(chalk.green('✓ Auto-confirmed (--yes flag)'));
+    // Auto-detect provider based on API key
+    if (elevenLabsKey) {
+      selectedProvider = 'elevenlabs';
+      console.log(chalk.green('✓ Using ElevenLabs (API key detected)\n'));
+    } else {
+      selectedProvider = 'piper';
+      console.log(chalk.green('✓ Using Piper TTS (free option)\n'));
+    }
+  }
+
+  // Ask for installation directory
+  let targetDir = options.directory || currentDir;
+
+  if (!options.yes) {
+    console.log(chalk.cyan('\n📂 AgentVibes Installation Location:\n'));
+    console.log(chalk.gray('   AgentVibes will be installed in the .claude/ subdirectory'));
+    console.log(chalk.gray('   of your chosen location.\n'));
+
+    const { installDir } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'installDir',
+        message: 'Where should AgentVibes be installed?',
+        default: currentDir,
+        validate: (input) => {
+          if (!input || input.trim() === '') {
+            return 'Please provide a valid directory path';
+          }
+          return true;
+        },
+      },
+    ]);
+
+    targetDir = installDir;
+    console.log(chalk.green(`✓ AgentVibes will be installed in: ${targetDir}/.claude/`));
+  }
+
+  // Show installation summary
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
   console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
@@ -112,7 +328,7 @@ async function install(options = {}) {
       {
         type: 'confirm',
         name: 'confirm',
-        message: chalk.yellow(`Install AgentVibes in ${targetDir}/.claude/ ?`),
+        message: chalk.yellow(`Install AgentVibes with ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'} in ${targetDir}/.claude/ ?`),
         default: true,
       },
     ]);
@@ -121,8 +337,6 @@ async function install(options = {}) {
       console.log(chalk.red('\n❌ Installation cancelled.\n'));
       process.exit(0);
     }
-  } else {
-    console.log(chalk.green('✓ Auto-confirmed (--yes flag)\n'));
   }
 
   console.log(''); // Add spacing
@@ -258,23 +472,18 @@ async function install(options = {}) {
     }
     spinner.succeed(chalk.green('Installed output styles!\n'));
 
-    // Check for API key
-    spinner.start('Checking ElevenLabs API key...');
-    const apiKey = process.env.ELEVENLABS_API_KEY;
+    // Save provider selection
+    spinner.start('Saving provider configuration...');
+    const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
+    await fs.writeFile(providerConfigPath, selectedProvider);
 
-    if (!apiKey) {
-      spinner.warn(chalk.yellow('ElevenLabs API key not found!'));
-      console.log(chalk.yellow('\n⚠️  To use AgentVibes, you need an ElevenLabs API key:\n'));
-      console.log(chalk.white('   1. Go to https://elevenlabs.io/'));
-      console.log(chalk.white('   2. Sign up or log in (free tier available)'));
-      console.log(chalk.white('   3. Copy your API key from the profile section'));
-      console.log(chalk.white('   4. Set it in your shell profile:\n'));
-      console.log(chalk.cyan('      export ELEVENLABS_API_KEY="your-key-here"'));
-      console.log(chalk.gray('\n   Add this to ~/.bashrc or ~/.zshrc to make it permanent\n'));
-    } else {
-      spinner.succeed(chalk.green('ElevenLabs API key found!'));
-      console.log(chalk.gray(`   Key: ${apiKey.substring(0, 10)}...\n`));
+    // Save Piper voices directory if Piper is selected
+    if (selectedProvider === 'piper' && piperVoicesPath) {
+      const piperConfigPath = path.join(claudeDir, 'piper-voices-dir.txt');
+      await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
+
+    spinner.succeed(chalk.green(`Provider set to: ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}\n`));
 
     // List what was installed
     console.log(chalk.cyan('📦 Installation Summary:'));
@@ -283,7 +492,21 @@ async function install(options = {}) {
     console.log(chalk.white(`   • ${personalityFiles.length} personality templates installed`));
     console.log(chalk.white(`   • ${outputStyleFiles.length} output styles installed`));
     console.log(chalk.white(`   • Voice manager ready`));
-    console.log(chalk.white(`   • 22 unique ElevenLabs voices available\n`));
+
+    if (selectedProvider === 'elevenlabs') {
+      console.log(chalk.white(`   • 27+ ElevenLabs AI voices available`));
+      console.log(chalk.white(`   • 30+ languages supported`));
+      if (elevenLabsKey) {
+        console.log(chalk.green(`   • ElevenLabs API key configured ✓`));
+      } else {
+        console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
+      }
+    } else {
+      console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
+      console.log(chalk.white(`   • 18 languages supported`));
+      console.log(chalk.green(`   • No API key needed ✓`));
+    }
+    console.log('');
 
     // Show recent changes from git log or RELEASE_NOTES.md
     try {

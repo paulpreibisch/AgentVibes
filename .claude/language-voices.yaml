@@ -1,0 +1,372 @@
+# AgentVibes Multi-Provider Language Voice Mappings
+# @fileoverview Provider-specific voice mappings for all 30 supported languages
+# @context Maps each language to appropriate voices for ElevenLabs and Piper
+# @architecture Language abstraction layer - separates language from provider
+# @related language-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh
+
+languages:
+  english:
+    code: en
+    name: English
+    elevenlabs:
+      voice: Charlotte
+      voice_id: XB0fDUnXU5powFXDhCwa
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: en_US-lessac-medium
+      locale: en_US
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/lessac/medium
+    notes: Default language, best quality on both providers
+
+  spanish:
+    code: es
+    name: Spanish
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: es_ES-sharvard-medium
+      locale: es_ES
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/es/es_ES/sharvard/medium
+    notes: Castilian Spanish for Piper, multilingual for ElevenLabs
+
+  french:
+    code: fr
+    name: French
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: fr_FR-siwis-medium
+      locale: fr_FR
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/fr/fr_FR/siwis/medium
+    notes: European French
+
+  german:
+    code: de
+    name: German
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: de_DE-thorsten-medium
+      locale: de_DE
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/de/de_DE/thorsten/medium
+    notes: Standard German (Hochdeutsch)
+
+  italian:
+    code: it
+    name: Italian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: it_IT-riccardo-x_low
+      locale: it_IT
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/it/it_IT/riccardo/x_low
+    notes: Piper uses low quality for smaller size
+
+  portuguese:
+    code: pt
+    name: Portuguese
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: pt_BR-faber-medium
+      locale: pt_BR
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/faber/medium
+    notes: Brazilian Portuguese for Piper
+
+  polish:
+    code: pl
+    name: Polish
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: pl_PL-mls_6892-low
+      locale: pl_PL
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/pl/pl_PL/mls_6892/low
+    notes: Piper uses low quality (smaller model)
+
+  turkish:
+    code: tr
+    name: Turkish
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: tr_TR-dfki-medium
+      locale: tr_TR
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/tr/tr_TR/dfki/medium
+    notes: Turkish
+
+  russian:
+    code: ru
+    name: Russian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: ru_RU-ruslan-medium
+      locale: ru_RU
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/ru/ru_RU/ruslan/medium
+    notes: Russian
+
+  dutch:
+    code: nl
+    name: Dutch
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: nl_NL-mls_5809-low
+      locale: nl_NL
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/nl/nl_NL/mls_5809/low
+    notes: Piper uses low quality (smaller model)
+
+  czech:
+    code: cs
+    name: Czech
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: cs_CZ-jirka-medium
+      locale: cs_CZ
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/cs/cs_CZ/jirka/medium
+    notes: Czech
+
+  arabic:
+    code: ar
+    name: Arabic
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  chinese-simplified:
+    code: zh-cn
+    name: Chinese (Simplified)
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  chinese-traditional:
+    code: zh-tw
+    name: Chinese (Traditional)
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  japanese:
+    code: ja
+    name: Japanese
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  korean:
+    code: ko
+    name: Korean
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  hindi:
+    code: hi
+    name: Hindi
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  finnish:
+    code: fi
+    name: Finnish
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: fi_FI-harri-medium
+      locale: fi_FI
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/fi/fi_FI/harri/medium
+    notes: Finnish
+
+  swedish:
+    code: sv
+    name: Swedish
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: sv_SE-nst-medium
+      locale: sv_SE
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/sv/sv_SE/nst/medium
+    notes: Swedish
+
+  danish:
+    code: da
+    name: Danish
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: da_DK-talesyntese-medium
+      locale: da_DK
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/da/da_DK/talesyntese/medium
+    notes: Danish
+
+  norwegian:
+    code: no
+    name: Norwegian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: no_NO-talesyntese-medium
+      locale: no_NO
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/no/no_NO/talesyntese/medium
+    notes: Norwegian Bokmål
+
+  romanian:
+    code: ro
+    name: Romanian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  ukrainian:
+    code: uk
+    name: Ukrainian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: uk_UA-lada-x_low
+      locale: uk_UA
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/uk/uk_UA/lada/x_low
+    notes: Piper uses low quality (smaller model)
+
+  greek:
+    code: el
+    name: Greek
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: el_GR-rapunzelina-low
+      locale: el_GR
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/el/el_GR/rapunzelina/low
+    notes: Piper uses low quality (smaller model)
+
+  bulgarian:
+    code: bg
+    name: Bulgarian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  indonesian:
+    code: id
+    name: Indonesian
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  malay:
+    code: ms
+    name: Malay
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  filipino:
+    code: fil
+    name: Filipino
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English
+
+  vietnamese:
+    code: vi
+    name: Vietnamese
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      voice: vi_VN-vais1000-medium
+      locale: vi_VN
+      preview: https://huggingface.co/rhasspy/piper-voices/tree/main/vi/vi_VN/vais1000/medium
+    notes: Vietnamese
+
+  tamil:
+    code: ta
+    name: Tamil
+    elevenlabs:
+      voice: Antoni
+      voice_id: ErXwobaYiN019PkySvjV
+      preview: https://elevenlabs.io/app/voice-library
+    piper:
+      fallback: english
+      notes: No native Piper support, falls back to English

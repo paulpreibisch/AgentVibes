@@ -1,0 +1,53 @@
+{
+  "mcpServers": {
+    "sentry": {
+      "command": "npx",
+      "args": [
+        "@sentry/mcp-server@latest",
+        "--host=sentry.io"
+      ],
+      "env": {
+        "SENTRY_ACCESS_TOKEN": "${SENTRY_ACCESS_TOKEN}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+      }
+    },
+     "whatsapp": {
+      "command": "/home/fire/.local/bin/uv",
+      "args": [
+        "--directory",
+        "/home/fire/claude/whatsapp-mcp/whatsapp-mcp-server",
+        "run",
+        "main.py"
+      ]
+    },
+     "chrome-devtools": {
+      "command": "/home/fire/.nvm/versions/node/v22.20.0/bin/npx",
+      "args": [
+        "chrome-devtools-mcp@latest",
+        "--browserUrl=http://localhost:9222"
+      ],
+      "env": {
+        "PATH": "/home/fire/.nvm/versions/node/v22.20.0/bin:${PATH}",
+        "NODE_PATH": "/home/fire/.nvm/versions/node/v22.20.0/lib/node_modules"
+      }
+    },
+    "elevenlabs": {
+      "command": "npx",
+      "args": ["@microagents/mcp-server-elevenlabs"],
+      "env": {
+        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}",
+        "ELEVENLABS_MCP_BASE_PATH": "/home/fire/claude/SoraSage/teams/team-10/dev__globify__production/.claude/audio"
+      }
+    },
+    "spaceship": {
+      "command": "node",
+      "args": [
+        "/home/fire/claude/spaceship-mcp/dist/index.js"
+      ],
+      "env": {
+        "SPACESHIP_API_KEY": "${SPACESHIP_API_KEY}",
+        "SPACESHIP_API_SECRET": "${SPACESHIP_API_SECRET}"
+      }
+    }
+  }
+}
