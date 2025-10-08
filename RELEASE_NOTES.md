@@ -1,5 +1,207 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.7 - Bug Fixes & UX Improvements (2025-01-07)
+
+### 🤖 AI Summary
+
+This patch release fixes critical issues with the voice preview command and significantly improves the installer UX. The `/agent-vibes:preview` command now correctly handles provider-specific voices and provides helpful guidance when users try to preview voices from the wrong provider. The installer adds interactive provider selection with automatic API key setup and shell configuration, making first-time setup much smoother.
+
+### 🐛 Bug Fixes
+
+#### Voice Preview Command Fixed
+- **Fixed provider-aware voice previewing** - The `/agent-vibes:preview` command now correctly routes through the provider system instead of directly calling ElevenLabs-specific code
+- **Intelligent voice detection** - Detects when you try to preview an ElevenLabs voice (like "Antoni") while using Piper and provides helpful guidance with alternatives
+- **Support for specific voice previews** - Can now preview individual Piper voices by model name (e.g., `/agent-vibes:preview en_US-lessac-medium`)
+- **Fixed language-manager error** - Resolved issue where sourcing `language-manager.sh` would trigger unwanted command handler execution showing "AgentVibes Language Manager" usage text
+- **Fixed function name mismatch** - Corrected `get_current_language` to `get_language_code` in play-tts-piper.sh
+
+#### Provider Routing Improvements
+- **Simplified play-tts.sh router** - Streamlined routing logic for cleaner provider delegation
+- **Fixed provider routing** - Ensures TTS requests always route to the active provider correctly
+- **Better error handling** - Clear, helpful messages when voice/provider mismatch occurs
+
+### ✨ Installer UX Enhancements
+
+#### Interactive Provider Selection
+- **Provider choice prompt** - Installer now asks which TTS provider you want (Piper or ElevenLabs) with clear descriptions
+- **Automatic API key setup** - Detects your shell (bash/zsh) and offers to add ELEVENLABS_API_KEY to shell config file
+- **Shell detection** - Intelligently detects whether you're using bash or zsh and configures the correct file
+- **Multiple setup paths** - Choose between automatic shell config, manual setup, or skip API key configuration
+- **Piper voices path configuration** - Added prompt for custom Piper voice storage location
+
+#### Clearer Installation Messaging
+- **Better location explanation** - Clear explanation of why AgentVibes installs in `.claude/` directory (Claude Code auto-discovery)
+- **Removed confusing prompts** - Simplified installation directory selection to avoid confusion
+- **Better confirmation flow** - Two-step confirmation: location first, then provider/installation
+- **Installation summary** - Shows exactly what will be installed before proceeding
+
+### 🔧 Update Command Improvements
+
+- **Fixed version display** - Update command now correctly shows v2.0.x instead of v1.1.3
+- **Synced with install command** - Both install and update commands now show identical release notes and formatting
+- **Directory filtering** - Properly filters out directories when counting hooks and personalities
+- **Consistent formatting** - Matches install command's beautiful display style
+
+### 🛠️ Code Quality
+
+- **Fixed undefined variable** - Replaced `srcPersonalityFiles` with correct variable name
+- **Proper scope management** - Moved `piperVoicesPath` declaration to correct scope to avoid undefined errors
+- **Command handler isolation** - Wrapped language-manager.sh case statement to only run when executed directly, not when sourced
+
+---
+
+### 📊 Changes Summary
+
+**Files Modified:** 8 files
+- `.claude/commands/agent-vibes/preview.md` - Provider-aware routing
+- `.claude/hooks/language-manager.sh` - Command handler isolation fix
+- `.claude/hooks/play-tts-piper.sh` - Function name correction
+- `.claude/hooks/play-tts.sh` - Simplified router
+- `.claude/hooks/provider-commands.sh` - Enhanced Piper preview support
+- `src/installer.js` - Interactive setup & UX improvements
+- `.claude/commands/release.md` - Documentation update
+- `.claude/piper-voices-dir.txt` - Storage config
+
+**Lines Changed:**
+- Added: 275 lines
+- Removed: 354 lines
+- Net: -79 lines (cleaner codebase!)
+
+---
+
+### 🎯 What's Improved
+
+#### For New Users
+- **Much easier setup** - Interactive prompts guide you through provider selection and API key configuration
+- **Clearer explanations** - Better messaging about where files are installed and why (Claude Code auto-discovery)
+- **Faster onboarding** - Shell detection and automatic config file modification save manual steps
+
+#### For Existing Users
+- **Preview command works correctly** - No more language-manager errors when previewing voices
+- **Provider switching is seamless** - Better error messages when voice/provider mismatch occurs
+- **Update command is accurate** - Shows correct version and release notes instead of old v1.1.3
+
+#### For Developers
+- **Cleaner codebase** - Removed 79 lines of unnecessary code
+- **Better separation of concerns** - Command handlers only run when appropriate
+- **Improved maintainability** - More consistent code patterns across scripts
+
+---
+
+### 🔧 Technical Details
+
+#### Provider Preview Architecture
+The preview command now uses a three-tier detection system:
+
+1. **ElevenLabs Provider**: Routes to `voice-manager.sh preview` for ElevenLabs voice listing
+2. **Piper Provider with voice arg**:
+   - Detects Piper voice format (`en_US-*-medium`)
+   - Detects ElevenLabs voice names (shows helpful error with alternatives)
+   - Validates voice model exists before previewing
+3. **Piper Provider without args**: Shows first 3 sample voices (Lessac, Amy, Joe)
+
+#### Language Manager Fix
+The `language-manager.sh` script now checks if it's being executed directly vs sourced:
+
+```bash
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Only run command handler when executed directly
+    case "${1:-}" in
+        set|get|code|check-voice|best-voice|list)
+            # Handle commands
+        ;;
+    esac
+fi
+```
+
+This prevents the case statement from executing when the script is sourced by other scripts like `play-tts-piper.sh`.
+
+#### Installer Flow
+```
+1. Show installation details and location
+2. Provider selection (Piper/ElevenLabs)
+   ├─ If ElevenLabs: Check for API key
+   │  ├─ Detect shell (bash/zsh)
+   │  ├─ Offer to add to shell config
+   │  ├─ Manual setup option
+   │  └─ Skip option
+   └─ If Piper: Ask for voice storage path
+3. Explain .claude/ installation location with reasoning
+4. Confirm installation location
+5. Show installation summary
+6. Final confirmation
+7. Install all files
+8. Show success summary with next steps
+```
+
+---
+
+### 💡 Usage Examples
+
+#### Preview Commands
+```bash
+# Preview with Piper (no args = first 3 voices)
+/agent-vibes:preview
+
+# Preview specific Piper voice
+/agent-vibes:preview en_US-lessac-medium
+
+# Try to preview ElevenLabs voice while using Piper
+/agent-vibes:preview Antoni
+# ❌ 'Antoni' appears to be an ElevenLabs voice
+# You're currently using Piper TTS (free provider).
+# Options:
+#   1. Run /agent-vibes:list to see available Piper voices
+#   2. Switch to ElevenLabs: /agent-vibes:provider switch elevenlabs
+```
+
+#### Installer Provider Selection
+```bash
+npx agentvibes install
+
+# 🎭 Choose Your TTS Provider:
+# ? Which TTS provider would you like to use?
+#   🆓 Piper TTS (Free, Offline) - 50+ neural voices, no API key needed
+#   🎤 ElevenLabs (Premium) - 150+ AI voices, requires API key
+```
+
+---
+
+### 📦 Upgrade Notes
+
+**From v2.0.6:**
+```bash
+npm update -g agentvibes
+# or
+/agent-vibes:update
+```
+
+**No breaking changes** - This is a pure bug fix and UX improvement release. All existing configurations, voices, personalities, and settings are preserved.
+
+---
+
+### 🙏 Credits
+
+- **Voice Preview Fix**: Resolved GitHub issue reported by users experiencing language-manager errors
+- **Provider Architecture**: Multi-provider system improvements continue to mature
+- **Installer UX**: Community feedback on first-time setup experience led to these improvements
+
+---
+
+### 📚 Resources
+
+- **Documentation**: https://agentvibes.org
+- **GitHub**: https://github.com/paulpreibisch/AgentVibes
+- **Issues**: https://github.com/paulpreibisch/AgentVibes/issues
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+---
+
 ## 📦 v1.1.3 - Symlink Support & Audio Fixes (2025-10-04)
 
 ### 🤖 AI Summary
