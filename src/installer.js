@@ -287,6 +287,31 @@ async function install(options = {}) {
   // Use current directory for installation (where installer was run)
   const targetDir = options.directory || currentDir;
 
+  // Explain why installing in .claude/ and confirm
+  if (!options.yes) {
+    console.log(chalk.cyan('\n📂 Installation Location:\n'));
+    console.log(chalk.white('   AgentVibes will be installed in:'));
+    console.log(chalk.yellow(`   ${targetDir}/.claude/\n`));
+    console.log(chalk.gray('   Why .claude/?'));
+    console.log(chalk.gray('   • Claude Code automatically discovers tools in .claude/ directories'));
+    console.log(chalk.gray('   • This makes slash commands and TTS features immediately available'));
+    console.log(chalk.gray('   • Project-specific installation keeps your setup isolated\n'));
+
+    const { confirmLocation } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirmLocation',
+        message: `Install AgentVibes in ${targetDir}/.claude/ ?`,
+        default: true,
+      },
+    ]);
+
+    if (!confirmLocation) {
+      console.log(chalk.red('\n❌ Installation cancelled.\n'));
+      process.exit(0);
+    }
+  }
+
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
   console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
@@ -297,13 +322,13 @@ async function install(options = {}) {
   console.log(chalk.gray(`   • 30+ language support with native voices`));
   console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
 
-  // Confirmation prompt (unless --yes flag is used)
+  // Final confirmation prompt (unless --yes flag is used)
   if (!options.yes) {
     const { confirm } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
-        message: chalk.yellow(`Install AgentVibes with ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'} in ${targetDir}/.claude/ ?`),
+        message: chalk.yellow(`Proceed with installation using ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}?`),
         default: true,
       },
     ]);
