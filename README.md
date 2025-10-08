@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.6
 
 ---
 
@@ -45,7 +45,7 @@
 
 ## 📰 Latest Release
 
-**[v2.0.0 - The Multi-Provider Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.3)** 🎉
+**[v2.0.0 - The Multi-Provider Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.6)** 🎉
 
 The biggest update ever! **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, expanded voice library (27+ voices), advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support. Choose between premium ElevenLabs voices or free offline Piper TTS!
 
