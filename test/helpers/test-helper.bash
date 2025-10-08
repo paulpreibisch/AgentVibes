@@ -118,13 +118,15 @@ setup_agentvibes_scripts() {
 # Create a test personality file
 create_test_personality() {
   local name="$1"
-  local voice="${2:-}"
+  local elevenlabs_voice="${2:-}"
+  local piper_voice="${3:-en_US-lessac-medium}"
 
   cat > "$TEST_PERSONALITIES_DIR/${name}.md" << EOF
 ---
 name: ${name}
 description: Test personality
-voice: ${voice}
+elevenlabs_voice: ${elevenlabs_voice}
+piper_voice: ${piper_voice}
 ---
 
 # ${name} Personality

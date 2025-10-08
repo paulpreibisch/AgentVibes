@@ -11,9 +11,9 @@ setup() {
 
   PERSONALITY_MANAGER="$TEST_CLAUDE_DIR/hooks/personality-manager.sh"
 
-  # Create test personalities
-  create_test_personality "sarcastic" "Jessica Anne Bogart"
-  create_test_personality "normal"
+  # Create test personalities with both ElevenLabs and Piper voices
+  create_test_personality "sarcastic" "Jessica Anne Bogart" "en_US-amy-medium"
+  create_test_personality "normal" "Aria" "en_US-lessac-medium"
 }
 
 teardown() {
@@ -50,7 +50,8 @@ teardown() {
 }
 
 @test "personality-manager set with assigned voice switches voice silently" {
-  # sarcastic personality has assigned voice "Jessica Anne Bogart"
+  # Set default provider (no provider file defaults to elevenlabs)
+  # sarcastic personality has assigned voice "Jessica Anne Bogart" (ElevenLabs)
   run "$PERSONALITY_MANAGER" set "sarcastic"
 
   [ "$status" -eq 0 ]
@@ -58,6 +59,17 @@ teardown() {
 
   # Should NOT contain duplicate "Hi, I'm Jessica..." introduction
   # (that would indicate double audio bug)
+}
+
+@test "personality-manager set with piper provider uses piper voice" {
+  # Set Piper as active provider
+  echo "piper" > "$HOME/.claude/tts-provider.txt"
+
+  # sarcastic personality should use en_US-amy-medium (Piper voice)
+  run "$PERSONALITY_MANAGER" set "sarcastic"
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Switching to assigned voice: en_US-amy-medium"
 }
 
 @test "personality-manager reset changes to normal" {

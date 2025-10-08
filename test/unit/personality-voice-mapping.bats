@@ -83,9 +83,13 @@ declare -A EXPECTED_VOICES=(
   for personality_file in "$REPO_ROOT/.claude/personalities"/*.md; do
     personality_name=$(basename "$personality_file" .md)
 
-    # Check if file has voice field
-    if ! grep -q "^voice:" "$personality_file"; then
-      errors="${errors}Personality '${personality_name}' missing voice field\n"
+    # Check if file has both elevenlabs_voice and piper_voice fields
+    if ! grep -q "^elevenlabs_voice:" "$personality_file"; then
+      errors="${errors}Personality '${personality_name}' missing elevenlabs_voice field\n"
+      failed=1
+    fi
+    if ! grep -q "^piper_voice:" "$personality_file"; then
+      errors="${errors}Personality '${personality_name}' missing piper_voice field\n"
       failed=1
     fi
   done
@@ -103,11 +107,16 @@ declare -A EXPECTED_VOICES=(
 
   for personality_file in "$REPO_ROOT/.claude/personalities"/*.md; do
     personality_name=$(basename "$personality_file" .md)
-    assigned_voice=$(grep "^voice:" "$personality_file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    assigned_voice=$(grep "^elevenlabs_voice:" "$personality_file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-    # Check if voice exists in config
+    # Skip if no elevenlabs_voice assigned
+    if [[ -z "$assigned_voice" ]]; then
+      continue
+    fi
+
+    # Check if ElevenLabs voice exists in config
     if [[ -z "${VOICES[$assigned_voice]}" ]]; then
-      errors="${errors}Personality '${personality_name}' uses undefined voice: ${assigned_voice}\n"
+      errors="${errors}Personality '${personality_name}' uses undefined ElevenLabs voice: ${assigned_voice}\n"
       failed=1
     fi
   done

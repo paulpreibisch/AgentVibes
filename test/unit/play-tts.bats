@@ -66,8 +66,11 @@ teardown() {
   assert_output_contains "Text truncated to 500 characters"
 }
 
-@test "play-tts fails without API key" {
+@test "play-tts fails without API key when using ElevenLabs" {
   unset ELEVENLABS_API_KEY
+
+  # Set ElevenLabs as active provider
+  echo "elevenlabs" > "$HOME/.claude/tts-provider.txt"
 
   run "$PLAY_TTS" "Test message"
 
