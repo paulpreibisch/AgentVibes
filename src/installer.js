@@ -97,6 +97,7 @@ async function install(options = {}) {
   // Provider selection prompt
   let selectedProvider = 'piper';
   let elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+  let piperVoicesPath = null;
 
   if (!options.yes) {
     console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
@@ -123,7 +124,6 @@ async function install(options = {}) {
     selectedProvider = provider;
 
     // If Piper selected, ask for voice storage location
-    let piperVoicesPath = null;
     if (selectedProvider === 'piper') {
       const homeDir = process.env.HOME || process.env.USERPROFILE;
       const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
