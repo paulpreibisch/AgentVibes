@@ -236,6 +236,26 @@ case "$1" in
     echo "🎤 Current Voice Configuration"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+    # Get active TTS provider
+    PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    if [[ ! -f "$PROVIDER_FILE" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
+    fi
+
+    if [ -f "$PROVIDER_FILE" ]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+      if [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
+        echo "Provider: ElevenLabs (Premium AI)"
+      elif [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+        echo "Provider: Piper TTS (Free, Offline)"
+      else
+        echo "Provider: $ACTIVE_PROVIDER"
+      fi
+    else
+      # Default to ElevenLabs if no provider file
+      echo "Provider: ElevenLabs (Premium AI)"
+    fi
+
     # Get current voice
     if [ -f "$VOICE_FILE" ]; then
       CURRENT_VOICE=$(cat "$VOICE_FILE")
