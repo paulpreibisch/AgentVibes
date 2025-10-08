@@ -815,11 +815,20 @@ program
       spinner.text = 'Updating TTS scripts...';
       const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
       const allHookFiles = await fs.readdir(srcHooksDir);
-      // Only copy AgentVibes-related scripts, exclude project-specific files
-      const hookFiles = allHookFiles.filter(file =>
-        !file.includes('prepare-release') &&
-        !file.startsWith('.')
-      );
+
+      // Filter to only include files (not directories) and exclude project-specific files
+      const hookFiles = [];
+      for (const file of allHookFiles) {
+        const srcPath = path.join(srcHooksDir, file);
+        const stat = await fs.stat(srcPath);
+
+        if (stat.isFile() &&
+            file.endsWith('.sh') &&
+            !file.includes('prepare-release') &&
+            !file.startsWith('.')) {
+          hookFiles.push(file);
+        }
+      }
 
       for (const file of hookFiles) {
         const srcPath = path.join(srcHooksDir, file);
@@ -832,12 +841,20 @@ program
       // Update personalities (only add new ones, don't overwrite existing)
       spinner.text = 'Updating personality templates...';
       const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
-      const srcPersonalityFiles = await fs.readdir(srcPersonalitiesDir);
+      const allPersonalityFiles = await fs.readdir(srcPersonalitiesDir);
       let newPersonalities = 0;
       let updatedPersonalities = 0;
 
-      for (const file of srcPersonalityFiles) {
+      // Filter to only .md files, skip directories
+      for (const file of allPersonalityFiles) {
         const srcPath = path.join(srcPersonalitiesDir, file);
+        const stat = await fs.stat(srcPath);
+
+        // Only copy .md files, skip directories
+        if (!stat.isFile() || !file.endsWith('.md')) {
+          continue;
+        }
+
         const destPath = path.join(personalitiesDir, file);
 
         try {
