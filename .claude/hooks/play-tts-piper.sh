@@ -39,15 +39,33 @@ if [[ -n "$VOICE_OVERRIDE" ]]; then
   VOICE_MODEL="$VOICE_OVERRIDE"
   echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
 else
-  # Try to get language-specific voice
-  LANG_VOICE=$(get_voice_for_language "$CURRENT_LANGUAGE" "piper" 2>/dev/null)
+  # Try to get voice from voice file (project-local first, then global)
+  VOICE_FILE=""
+  if [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
+    VOICE_FILE="$SCRIPT_DIR/../tts-voice.txt"
+  elif [[ -f "$HOME/.claude/tts-voice.txt" ]]; then
+    VOICE_FILE="$HOME/.claude/tts-voice.txt"
+  fi
 
-  if [[ -n "$LANG_VOICE" ]]; then
-    VOICE_MODEL="$LANG_VOICE"
-    echo "🌍 Using $CURRENT_LANGUAGE voice: $LANG_VOICE (Piper)"
-  else
-    # Use default voice
-    VOICE_MODEL="$DEFAULT_VOICE"
+  if [[ -n "$VOICE_FILE" ]]; then
+    FILE_VOICE=$(cat "$VOICE_FILE" 2>/dev/null)
+    # Check if it's a Piper model name (contains underscore and dash)
+    if [[ "$FILE_VOICE" == *"_"*"-"* ]]; then
+      VOICE_MODEL="$FILE_VOICE"
+    fi
+  fi
+
+  # If no Piper voice from file, try language-specific voice
+  if [[ -z "$VOICE_MODEL" ]]; then
+    LANG_VOICE=$(get_voice_for_language "$CURRENT_LANGUAGE" "piper" 2>/dev/null)
+
+    if [[ -n "$LANG_VOICE" ]]; then
+      VOICE_MODEL="$LANG_VOICE"
+      echo "🌍 Using $CURRENT_LANGUAGE voice: $LANG_VOICE (Piper)"
+    else
+      # Use default voice
+      VOICE_MODEL="$DEFAULT_VOICE"
+    fi
   fi
 fi
 

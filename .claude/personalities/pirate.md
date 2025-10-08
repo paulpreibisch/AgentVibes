@@ -1,7 +1,8 @@
 ---
 name: pirate
 description: Seafaring swagger and nautical language
-voice: Pirate Marshal
+elevenlabs_voice: Pirate Marshal
+piper_voice: en_US-joe-medium
 ---
 
 # Pirate Personality

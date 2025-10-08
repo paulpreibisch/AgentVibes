@@ -1,7 +1,8 @@
 ---
 name: professional
 description: Formal and corporate
-voice: Michael
+elevenlabs_voice: Michael
+piper_voice: en_US-lessac-medium
 ---
 
 # Professional Personality

@@ -163,52 +163,77 @@ case "$1" in
       exit 0
     fi
 
-    # Check if input is a number
-    if [[ "$VOICE_NAME" =~ ^[0-9]+$ ]]; then
-      # Get voice array
-      VOICE_ARRAY=()
-      for voice in "${!VOICES[@]}"; do
-        VOICE_ARRAY+=("$voice")
-      done
-
-      # Sort the array
-      IFS=$'\n' SORTED_VOICES=($(sort <<<"${VOICE_ARRAY[*]}"))
-      unset IFS
-
-      # Get voice by number (adjust for 0-based index)
-      INDEX=$((VOICE_NAME - 1))
-
-      if [[ $INDEX -ge 0 && $INDEX -lt ${#SORTED_VOICES[@]} ]]; then
-        VOICE_NAME="${SORTED_VOICES[$INDEX]}"
-        FOUND="${SORTED_VOICES[$INDEX]}"
-      else
-        echo "❌ Invalid number. Please choose between 1 and ${#SORTED_VOICES[@]}"
-        exit 1
-      fi
-    else
-      # Check if voice exists (case-insensitive)
-      FOUND=""
-      for voice in "${!VOICES[@]}"; do
-        if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
-          FOUND="$voice"
-          break
-        fi
-      done
+    # Detect active TTS provider
+    PROVIDER_FILE=""
+    if [[ -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
     fi
 
-    if [[ -z "$FOUND" ]]; then
-      echo "❌ Unknown voice: $VOICE_NAME"
-      echo ""
-      echo "Available voices:"
-      for voice in "${!VOICES[@]}"; do
-        echo "  - $voice"
-      done | sort
-      exit 1
+    ACTIVE_PROVIDER="elevenlabs"  # default
+    if [[ -n "$PROVIDER_FILE" ]]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+    fi
+
+    # If using Piper and voice name looks like a Piper model (contains underscore and dash)
+    # then skip ElevenLabs voice validation
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]] && [[ "$VOICE_NAME" == *"_"*"-"* ]]; then
+      # This is a Piper model name, use it directly
+      FOUND="$VOICE_NAME"
+    else
+      # ElevenLabs voice lookup
+      # Check if input is a number
+      if [[ "$VOICE_NAME" =~ ^[0-9]+$ ]]; then
+        # Get voice array
+        VOICE_ARRAY=()
+        for voice in "${!VOICES[@]}"; do
+          VOICE_ARRAY+=("$voice")
+        done
+
+        # Sort the array
+        IFS=$'\n' SORTED_VOICES=($(sort <<<"${VOICE_ARRAY[*]}"))
+        unset IFS
+
+        # Get voice by number (adjust for 0-based index)
+        INDEX=$((VOICE_NAME - 1))
+
+        if [[ $INDEX -ge 0 && $INDEX -lt ${#SORTED_VOICES[@]} ]]; then
+          VOICE_NAME="${SORTED_VOICES[$INDEX]}"
+          FOUND="${SORTED_VOICES[$INDEX]}"
+        else
+          echo "❌ Invalid number. Please choose between 1 and ${#SORTED_VOICES[@]}"
+          exit 1
+        fi
+      else
+        # Check if voice exists (case-insensitive)
+        FOUND=""
+        for voice in "${!VOICES[@]}"; do
+          if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
+            FOUND="$voice"
+            break
+          fi
+        done
+      fi
+
+      if [[ -z "$FOUND" ]]; then
+        echo "❌ Unknown voice: $VOICE_NAME"
+        echo ""
+        echo "Available voices:"
+        for voice in "${!VOICES[@]}"; do
+          echo "  - $voice"
+        done | sort
+        exit 1
+      fi
     fi
 
     echo "$FOUND" > "$VOICE_FILE"
     echo "✅ Voice switched to: $FOUND"
-    echo "🎤 Voice ID: ${VOICES[$FOUND]}"
+
+    # Show voice ID only for ElevenLabs voices
+    if [[ "$ACTIVE_PROVIDER" != "piper" ]] && [[ -n "${VOICES[$FOUND]}" ]]; then
+      echo "🎤 Voice ID: ${VOICES[$FOUND]}"
+    fi
 
     # Have the new voice introduce itself (unless silent mode)
     if [[ "$SILENT_MODE" != "true" ]]; then

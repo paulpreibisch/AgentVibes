@@ -1,7 +1,8 @@
 ---
 name: dry-humor
 description: British dry wit and deadpan delivery
-voice: Aria
+elevenlabs_voice: Aria
+piper_voice: en_US-lessac-medium
 ---
 
 # Dry Humor Personality

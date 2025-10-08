@@ -1,7 +1,8 @@
 ---
 name: surfer-dude
 description: Laid-back beach vibes
-voice: Matthew Schmitz
+elevenlabs_voice: Matthew Schmitz
+piper_voice: en_US-joe-medium
 ---
 
 # Surfer-Dude Personality

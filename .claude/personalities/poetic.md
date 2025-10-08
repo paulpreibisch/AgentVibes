@@ -1,7 +1,8 @@
 ---
 name: poetic
 description: Elegant and lyrical
-voice: Aria
+elevenlabs_voice: Aria
+piper_voice: en_US-lessac-medium
 ---
 
 # Poetic Personality

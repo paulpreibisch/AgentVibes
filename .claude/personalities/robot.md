@@ -1,7 +1,8 @@
 ---
 name: robot
 description: Mechanical and precise communication
-voice: Dr. Von Fusion
+elevenlabs_voice: Dr. Von Fusion
+piper_voice: en_US-ryan-high
 ---
 
 # Robot Personality

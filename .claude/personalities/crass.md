@@ -1,7 +1,8 @@
 ---
 name: crass
 description: Blunt and slightly rude
-voice: Ralf Eisend
+elevenlabs_voice: Ralf Eisend
+piper_voice: en_US-joe-medium
 ---
 
 # Crass Personality

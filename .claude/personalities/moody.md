@@ -1,7 +1,8 @@
 ---
 name: moody
 description: Melancholic and brooding
-voice: Grandpa Spuds Oxley
+elevenlabs_voice: Grandpa Spuds Oxley
+piper_voice: en_US-libritts-high
 ---
 
 # Moody Personality

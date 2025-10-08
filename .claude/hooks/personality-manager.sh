@@ -37,7 +37,10 @@ get_personality_data() {
       grep "^description:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
       ;;
     voice)
-      grep "^voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      grep "^elevenlabs_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      ;;
+    piper_voice)
+      grep "^piper_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
       ;;
     instructions)
       sed -n '/^## AI Instructions/,/^##/p' "$file" | sed '1d;$d'
@@ -122,7 +125,33 @@ case "$1" in
     echo "🎭 Personality set to: $PERSONALITY"
 
     # Check if personality has an assigned voice
-    ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "voice")
+    # Detect active TTS provider
+    PROVIDER_FILE=""
+    if [[ -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
+    fi
+
+    ACTIVE_PROVIDER="elevenlabs"  # default
+    if [[ -n "$PROVIDER_FILE" ]]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+    fi
+
+    # Get the appropriate voice based on provider
+    ASSIGNED_VOICE=""
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      # Try to get Piper-specific voice first
+      ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "piper_voice")
+      if [[ -z "$ASSIGNED_VOICE" ]]; then
+        # Fallback to default Piper voice
+        ASSIGNED_VOICE="en_US-lessac-medium"
+      fi
+    else
+      # Use ElevenLabs voice (reads from elevenlabs_voice: field)
+      ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "voice")
+    fi
+
     if [[ -n "$ASSIGNED_VOICE" ]]; then
       # Switch to the assigned voice (silently - personality will do the talking)
       VOICE_MANAGER="$SCRIPT_DIR/voice-manager.sh"

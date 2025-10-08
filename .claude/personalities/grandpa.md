@@ -1,7 +1,8 @@
 ---
 name: grandpa
 description: Rambling nostalgic storyteller
-voice: Grandpa Spuds Oxley
+elevenlabs_voice: Grandpa Spuds Oxley
+piper_voice: en_US-libritts-high
 ---
 
 # Grandpa Personality

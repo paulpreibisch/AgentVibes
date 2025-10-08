@@ -1,7 +1,8 @@
 ---
 name: funny
 description: Lighthearted and comedic
-voice: Cowboy Bob
+elevenlabs_voice: Cowboy Bob
+piper_voice: en_US-joe-medium
 ---
 
 # Funny Personality

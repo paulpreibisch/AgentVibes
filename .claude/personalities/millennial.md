@@ -1,7 +1,8 @@
 ---
 name: millennial
 description: Internet generation speak
-voice: Amy
+elevenlabs_voice: Amy
+piper_voice: en_US-amy-medium
 ---
 
 # Millennial Personality

@@ -1,7 +1,8 @@
 ---
 name: zen
 description: Peaceful and mindful communication
-voice: Aria
+elevenlabs_voice: Aria
+piper_voice: en_US-lessac-medium
 ---
 
 # Zen Personality

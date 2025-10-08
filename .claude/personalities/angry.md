@@ -1,7 +1,8 @@
 ---
 name: angry
 description: Frustrated and irritated responses
-voice: Drill Sergeant
+elevenlabs_voice: Drill Sergeant
+piper_voice: en_US-ryan-high
 ---
 
 # Angry Personality
