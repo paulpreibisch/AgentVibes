@@ -111,6 +111,23 @@ EOF
     [[ -n "$CURRENT_SENTIMENT" ]] && echo "   Sentiment: $CURRENT_SENTIMENT"
     echo ""
     list_mappings
+
+    # Automatically inject TTS into BMAD agents
+    echo ""
+    echo "🎤 Automatically enabling TTS for BMAD agents..."
+    echo ""
+
+    # Get the directory where this script is located
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Check if bmad-tts-injector.sh exists
+    if [[ -f "$SCRIPT_DIR/bmad-tts-injector.sh" ]]; then
+        # Run the TTS injector
+        "$SCRIPT_DIR/bmad-tts-injector.sh" enable
+    else
+        echo "⚠️  TTS injector not found at: $SCRIPT_DIR/bmad-tts-injector.sh"
+        echo "   You can manually enable TTS with: /agent-vibes:bmad-tts enable"
+    fi
 }
 
 # Disable plugin
@@ -151,6 +168,23 @@ disable_plugin() {
     fi
 
     rm -f "$ENABLED_FLAG"
+
+    # Automatically remove TTS from BMAD agents
+    echo ""
+    echo "🔇 Automatically disabling TTS for BMAD agents..."
+    echo ""
+
+    # Get the directory where this script is located
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Check if bmad-tts-injector.sh exists
+    if [[ -f "$SCRIPT_DIR/bmad-tts-injector.sh" ]]; then
+        # Run the TTS injector disable
+        "$SCRIPT_DIR/bmad-tts-injector.sh" disable
+    else
+        echo "⚠️  TTS injector not found"
+        echo "   You can manually disable TTS with: /agent-vibes:bmad-tts disable"
+    fi
 }
 
 # List all mappings

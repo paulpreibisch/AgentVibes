@@ -1,6 +1,6 @@
 # /agent-vibes:bmad Command
 
-Manage BMAD voice plugin integration for automatic voice assignment to BMAD agents.
+Complete BMAD voice integration - assigns unique voices to each BMAD agent AND makes them speak when activated.
 
 ## Usage
 
@@ -11,7 +11,13 @@ Manage BMAD voice plugin integration for automatic voice assignment to BMAD agen
 ## Subcommands
 
 ### `enable`
-Enables automatic voice assignment for BMAD agents.
+Enables voice assignment for BMAD agents AND automatically injects TTS into agent activation instructions.
+
+**What it does:**
+1. ✅ Enables BMAD voice plugin (assigns voices to agents)
+2. ✅ Backs up current voice/personality settings
+3. ✅ Injects TTS hooks into all BMAD agent files
+4. ✅ BMAD agents will now SPEAK when they activate!
 
 **Example:**
 ```
@@ -19,12 +25,35 @@ Enables automatic voice assignment for BMAD agents.
 ```
 
 **Output:**
-- Creates `.claude/plugins/bmad-voices-enabled.flag`
-- Shows current agent voice mappings
-- Confirms activation
+```
+✅ BMAD voice plugin enabled
+💾 Previous settings backed up:
+   Voice: Aria
+   Personality: normal
+
+📊 BMAD Agent Voice Mappings:
+   pm → Matthew Schmitz [professional]
+   dev → Jessica Anne Bogart [normal]
+   qa → Ralf Eisend [professional]
+
+🎤 Automatically enabling TTS for BMAD agents...
+
+✅ Injected TTS into: pm.md → Voice: Matthew Schmitz
+✅ Injected TTS into: dev.md → Voice: Jessica Anne Bogart
+✅ Injected TTS into: qa.md → Voice: Ralf Eisend
+
+🎉 TTS enabled for 10 agents
+💡 BMAD agents will now speak when activated!
+```
 
 ### `disable`
-Disables BMAD voice plugin (reverts to default AgentVibes behavior).
+Disables BMAD voice plugin AND removes TTS from all BMAD agents.
+
+**What it does:**
+1. ✅ Restores your previous voice/personality settings
+2. ✅ Removes TTS hooks from all BMAD agent files
+3. ✅ Disables BMAD voice plugin
+4. ✅ Agents return to normal (silent) behavior
 
 **Example:**
 ```
@@ -32,8 +61,20 @@ Disables BMAD voice plugin (reverts to default AgentVibes behavior).
 ```
 
 **Output:**
-- Removes activation flag
-- AgentVibes uses default voice settings
+```
+❌ BMAD voice plugin disabled
+🔄 Restoring previous settings:
+   Voice: Aria
+   Personality: normal
+
+🔇 Automatically disabling TTS for BMAD agents...
+
+✅ Removed TTS from: pm.md
+✅ Removed TTS from: dev.md
+✅ Removed TTS from: qa.md
+
+✅ TTS disabled for 10 agents
+```
 
 ### `status`
 Shows plugin status and current voice mappings.
@@ -90,12 +131,35 @@ Edit the markdown table directly to change voice mappings.
 
 ## How It Works
 
-1. **Plugin File**: `.claude/plugins/bmad-voices.md` contains voice mappings
-2. **Activation Flag**: `.claude/plugins/bmad-voices-enabled.flag` enables/disables plugin
-3. **Auto-Detection**: When a BMAD agent activates (e.g., `/BMad:agents:pm`), AgentVibes automatically:
-   - Detects the agent ID from the command
-   - Looks up voice mapping in plugin file
-   - Uses assigned voice for TTS acknowledgments/completions
+### Voice Assignment
+1. **Plugin File**: `.claude/plugins/bmad-voices.md` contains voice-to-agent mappings
+2. **Activation Flag**: `.claude/plugins/bmad-voices-enabled.flag` enables/disables the plugin
+
+### TTS Injection (Automatic)
+When you run `/agent-vibes:bmad enable`, the system automatically:
+
+1. **Scans BMAD agents**: Finds all `.md` files in `.bmad-core/agents/` or `bmad-core/agents/`
+2. **Injects TTS hooks**: Modifies each agent's `activation-instructions` YAML block
+3. **Assigns voices**: Uses the voice mapping from the plugin file
+4. **Creates backups**: Saves `.backup-pre-tts` files before modifying
+
+**What gets injected:**
+```yaml
+activation-instructions:
+  - STEP 4: Greet user with your name/role and immediately run `*help`
+  - # AGENTVIBES-TTS-INJECTION: Speak agent greeting with assigned voice
+  - Run this bash command to announce activation: .claude/hooks/play-tts.sh "Agent pm activated and ready" "Matthew Schmitz"
+```
+
+**Result**: When you activate a BMAD agent with `/BMad:agents:pm`, you'll hear:
+🔊 "Agent pm activated and ready" (spoken in Matthew Schmitz's voice)
+
+### Provider Support
+The TTS injection works with **any configured TTS provider**:
+- ✅ **ElevenLabs** - Uses AI voices with full voice mapping
+- ✅ **Piper TTS** - Uses neural voices (free, offline)
+
+The system automatically detects your configured provider via `/agent-vibes:provider info` and uses the appropriate TTS engine. You can switch providers anytime with `/agent-vibes:provider switch` and the BMAD agents will continue speaking using the new provider.
 
 ## Available BMAD Agents
 
