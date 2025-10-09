@@ -193,8 +193,8 @@ case "$1" in
       echo ""
       echo "Note: AI will generate unique ${PERSONALITY} responses - no fixed templates!"
       echo ""
-      echo "💡 Tip: To hear automatic TTS narration, enable the agent-vibes output style:"
-      echo "   /output-style agent-vibes"
+      echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
+      echo "   /output-style Agent Vibes"
     fi
     ;;
 

@@ -244,8 +244,8 @@ case "$1" in
       fi
 
       echo ""
-      echo "💡 Tip: To hear automatic TTS narration, enable the agent-vibes output style:"
-      echo "   /output-style agent-vibes"
+      echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
+      echo "   /output-style Agent Vibes"
     fi
     ;;
 

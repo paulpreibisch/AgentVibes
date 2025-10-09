@@ -49,11 +49,38 @@ VOICE_ID=""
 LANGUAGE_CODE="en"  # Default to English
 
 # Get current language setting
-CURRENT_LANGUAGE=$(get_current_language)
+CURRENT_LANGUAGE=$(get_language_code)
 
 # Get language code for API
-LANGUAGE_CODE=$(get_language_code_for_name "$CURRENT_LANGUAGE")
-[[ -z "$LANGUAGE_CODE" ]] && LANGUAGE_CODE="en"
+# ElevenLabs uses 2-letter ISO codes
+case "$CURRENT_LANGUAGE" in
+  spanish) LANGUAGE_CODE="es" ;;
+  french) LANGUAGE_CODE="fr" ;;
+  german) LANGUAGE_CODE="de" ;;
+  italian) LANGUAGE_CODE="it" ;;
+  portuguese) LANGUAGE_CODE="pt" ;;
+  chinese) LANGUAGE_CODE="zh" ;;
+  japanese) LANGUAGE_CODE="ja" ;;
+  korean) LANGUAGE_CODE="ko" ;;
+  russian) LANGUAGE_CODE="ru" ;;
+  polish) LANGUAGE_CODE="pl" ;;
+  dutch) LANGUAGE_CODE="nl" ;;
+  turkish) LANGUAGE_CODE="tr" ;;
+  arabic) LANGUAGE_CODE="ar" ;;
+  hindi) LANGUAGE_CODE="hi" ;;
+  swedish) LANGUAGE_CODE="sv" ;;
+  danish) LANGUAGE_CODE="da" ;;
+  norwegian) LANGUAGE_CODE="no" ;;
+  finnish) LANGUAGE_CODE="fi" ;;
+  czech) LANGUAGE_CODE="cs" ;;
+  romanian) LANGUAGE_CODE="ro" ;;
+  ukrainian) LANGUAGE_CODE="uk" ;;
+  greek) LANGUAGE_CODE="el" ;;
+  bulgarian) LANGUAGE_CODE="bg" ;;
+  croatian) LANGUAGE_CODE="hr" ;;
+  slovak) LANGUAGE_CODE="sk" ;;
+  english|*) LANGUAGE_CODE="en" ;;
+esac
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Check if override is a voice name (lookup in mapping)

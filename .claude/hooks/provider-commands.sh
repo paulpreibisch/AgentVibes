@@ -12,6 +12,35 @@ source "$SCRIPT_DIR/language-manager.sh"
 
 COMMAND="${1:-help}"
 
+# @function is_language_supported
+# @intent Check if a language is supported by a provider
+# @param $1 {string} language - Language code (e.g., "spanish", "french")
+# @param $2 {string} provider - Provider name (e.g., "elevenlabs", "piper")
+# @returns 0 if supported, 1 if not
+is_language_supported() {
+  local language="$1"
+  local provider="$2"
+
+  # English is always supported
+  if [[ "$language" == "english" ]] || [[ "$language" == "en" ]]; then
+    return 0
+  fi
+
+  case "$provider" in
+    elevenlabs)
+      # ElevenLabs supports all languages via multilingual voices
+      return 0
+      ;;
+    piper)
+      # Piper only supports English natively
+      return 1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 # @function provider_list
 # @intent Display all available providers with status
 provider_list() {
@@ -99,7 +128,7 @@ provider_switch() {
 
   # Check language compatibility
   local current_language
-  current_language=$(get_current_language)
+  current_language=$(get_language_code)
 
   if [[ "$current_language" != "english" ]]; then
     if ! is_language_supported "$current_language" "$new_provider" 2>/dev/null; then

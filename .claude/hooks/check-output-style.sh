@@ -39,10 +39,10 @@ check_output_style() {
 # Show warning if output style is not agent-vibes
 show_output_style_warning() {
   echo ""
-  echo "⚠️  Voice commands require the agent-vibes output style"
+  echo "⚠️  Voice commands require the Agent Vibes output style"
   echo ""
   echo "To enable voice narration, run:"
-  echo "  /output-style agent-vibes"
+  echo "  /output-style Agent Vibes"
   echo ""
   echo "This will make Claude speak with TTS for all responses."
   echo "You can still use voice commands manually with agent-vibes disabled,"
