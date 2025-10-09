@@ -121,18 +121,24 @@ inject_tts() {
     activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS and set context
   - STEP 3.5a: Use Bash tool to create context file: echo \"${agent_id}\" > .bmad-agent-context
   - STEP 3.5b: Use Bash tool to speak: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\" \"${agent_voice}\"
-  - AGENTVIBES-TTS-INJECTION: CRITICAL - You MUST speak ALL questions you ask to the user by running .claude/hooks/play-tts.sh \"your question\" \"${agent_voice}\" BEFORE showing the question text
-  - AGENTVIBES-TTS-INJECTION: When presenting numbered options or important questions, ALWAYS use Bash tool with: .claude/hooks/play-tts.sh \"the question\" \"${agent_voice}\"
+  - AGENTVIBES-TTS-INJECTION: MANDATORY RESPONSE PROTOCOL - Before showing ANY response to user, execute this workflow:
+  - AGENTVIBES-TTS-STEP 1: Draft your complete response text
+  - AGENTVIBES-TTS-STEP 2: Scan response for questions (lines with ? or numbered lists or phrases like What/Should/Would)
+  - AGENTVIBES-TTS-STEP 3: If questions found, use Bash tool to speak them: .claude/hooks/play-tts.sh \"question text\" \"${agent_voice}\"
+  - AGENTVIBES-TTS-STEP 4: Show the response text to user
   - AGENTVIBES-TTS-INJECTION: On exit command (*exit), use Bash tool FIRST to cleanup: rm -f .bmad-agent-context"
-    persona_injection="    - AGENTVIBES-TTS-INJECTION: Speak all questions aloud using Bash tool - .claude/hooks/play-tts.sh \"your question here\" \"${agent_voice}\""
+    persona_injection="    - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
   else
     activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS and set context
   - STEP 3.5a: Use Bash tool to create context file: echo \"${agent_id}\" > .bmad-agent-context
   - STEP 3.5b: Use Bash tool to speak: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\"
-  - AGENTVIBES-TTS-INJECTION: CRITICAL - You MUST speak ALL questions you ask to the user by running .claude/hooks/play-tts.sh \"your question\" BEFORE showing the question text
-  - AGENTVIBES-TTS-INJECTION: When presenting numbered options or important questions, ALWAYS use Bash tool with: .claude/hooks/play-tts.sh \"the question\"
+  - AGENTVIBES-TTS-INJECTION: MANDATORY RESPONSE PROTOCOL - Before showing ANY response to user, execute this workflow:
+  - AGENTVIBES-TTS-STEP 1: Draft your complete response text
+  - AGENTVIBES-TTS-STEP 2: Scan response for questions (lines with ? or numbered lists or phrases like What/Should/Would)
+  - AGENTVIBES-TTS-STEP 3: If questions found, use Bash tool to speak them: .claude/hooks/play-tts.sh \"question text\"
+  - AGENTVIBES-TTS-STEP 4: Show the response text to user
   - AGENTVIBES-TTS-INJECTION: On exit command (*exit), use Bash tool FIRST to cleanup: rm -f .bmad-agent-context"
-    persona_injection="    - AGENTVIBES-TTS-INJECTION: Speak all questions aloud using Bash tool - .claude/hooks/play-tts.sh \"your question here\""
+    persona_injection="    - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
   fi
 
   # Insert activation TTS call after "STEP 4: Greet user" line
