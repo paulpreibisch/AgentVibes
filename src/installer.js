@@ -47,7 +47,7 @@ function showWelcome() {
 
   console.log(
     boxen(
-      chalk.white.bold('🎤 Beautiful ElevenLabs TTS Voice Commands for Claude Code\n\n') +
+      chalk.white.bold('🎤 Now your AI Agents can finally talk back! TTS Voice for Claude Code\n\n') +
       chalk.gray('Add professional text-to-speech narration to your AI coding sessions\n\n') +
       chalk.cyan('📦 https://github.com/paulpreibisch/AgentVibes'),
       {
@@ -676,7 +676,7 @@ async function install(options = {}) {
 // CLI setup
 program
   .version(VERSION)
-  .description('AgentVibes - Beautiful ElevenLabs TTS Voice Commands for Claude Code');
+  .description('AgentVibes - Now your AI Agents can finally talk back! TTS Voice for Claude Code');
 
 program
   .command('install')
@@ -732,7 +732,7 @@ program
     // Welcome box
     console.log(
       boxen(
-        chalk.white('🎤 Beautiful ElevenLabs TTS Voice Commands for Claude Code\n\n') +
+        chalk.white('🎤 Now your AI Agents can finally talk back! TTS Voice for Claude Code\n\n') +
         chalk.gray('Add professional text-to-speech narration to your AI coding sessions\n\n') +
         chalk.cyan('📦 https://github.com/paulpreibisch/AgentVibes'),
         {
