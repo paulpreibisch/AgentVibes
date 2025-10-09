@@ -1,5 +1,218 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.10 - GitHub Star Reminder & Provider Fixes (2025-01-10)
+
+### 🤖 AI Summary
+
+This patch release adds a gentle daily GitHub star reminder system and fixes critical bugs in provider switching and output style commands. Users can now be reminded to star the project (once per day, easily disabled), the ElevenLabs provider switching now works correctly with proper language support for 30+ languages, and all documentation now shows the correct output style command `Agent Vibes` instead of the lowercase `agent-vibes`.
+
+### ✨ New Features
+
+#### Daily GitHub Star Reminder System
+- **Gentle reminders** - Shows once per day when using TTS
+- **Easy to disable** - Run `echo "disabled" > .claude/github-star-reminder.txt`
+- **Non-intrusive** - Beautiful formatted message with clear instructions
+- **Community support** - Encourages users to support the project
+- **Smart tracking** - Date-based reminder system prevents spam
+
+**Example Reminder:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⭐ Enjoying AgentVibes?
+
+   If you find this project helpful, please consider giving us
+   a star on GitHub! It helps others discover AgentVibes and
+   motivates us to keep improving it.
+
+   👉 https://github.com/paulpreibisch/AgentVibes
+
+   Thank you for your support! 🙏
+
+   💡 To disable these reminders, run:
+   echo "disabled" > .claude/github-star-reminder.txt
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+#### Piper TTS Installer Script
+- **Automated installation** - Created `.claude/hooks/piper-installer.sh`
+- **Platform detection** - Checks for WSL/Linux compatibility
+- **Dependency management** - Installs pipx automatically if needed
+- **Voice downloads** - Offers to download voice models after installation
+- **Clear instructions** - Provides next steps and usage guide
+
+### 🐛 Bug Fixes
+
+#### Provider Switching Function Fixes
+- **Fixed function name mismatch** - `get_current_language()` → `get_language_code()` in provider-commands.sh:102
+- **Fixed ElevenLabs language support** - `get_current_language()` → `get_language_code()` in play-tts-elevenlabs.sh:52
+- **Added language validation** - New `is_language_supported()` function validates provider/language compatibility
+- **Implemented language mapping** - Full 30+ language code mapping (spanish→es, french→fr, etc.)
+- **Provider switching works** - Users can now switch between ElevenLabs and Piper without errors
+
+**What Was Broken:**
+```bash
+# Before: Provider switching failed with "command not found" error
+/agent-vibes:provider switch elevenlabs
+# .claude/hooks/provider-commands.sh: line 102: get_current_language: command not found
+
+# After: Works perfectly
+/agent-vibes:provider switch elevenlabs
+# ✓ Provider switched to: elevenlabs
+```
+
+#### Output Style Command Correction
+- **Fixed installer** - Updated `src/installer.js` (2 locations)
+- **Fixed hooks** - Updated check-output-style.sh, personality-manager.sh, voice-manager.sh
+- **Correct command** - Changed `/output-style agent-vibes` → `/output-style Agent Vibes`
+- **Consistent docs** - All documentation now shows the correct command
+
+**Why This Matters:**
+The output style name is case-sensitive in Claude Code. The incorrect lowercase command would fail silently, preventing users from enabling TTS narration.
+
+### 🔧 Technical Changes
+
+#### GitHub Star Reminder Implementation
+**New Files:**
+- `.claude/hooks/github-star-reminder.sh` - Main reminder script with disable support
+- `.claude/github-star-reminder.txt` - Tracks last reminder date
+
+**Integration:**
+- Added to `play-tts.sh` router (runs before TTS playback)
+- Silent errors (2>/dev/null || true) prevent disruption
+- Project-local or global config support
+
+**Disable Options:**
+1. Echo "disabled" to reminder file
+2. Create `.claude/github-star-reminder-disabled.flag`
+3. Create `~/.claude/github-star-reminder-disabled.flag`
+
+#### Provider Command Fixes
+**Modified Functions:**
+- `provider-commands.sh`:
+  - Added `is_language_supported()` function (lines 15-42)
+  - Fixed `get_current_language()` call to `get_language_code()` (line 131)
+
+- `play-tts-elevenlabs.sh`:
+  - Fixed `get_current_language()` call to `get_language_code()` (line 52)
+  - Replaced `get_language_code_for_name()` with full case statement (lines 56-83)
+  - Supports all 30+ languages with ISO 639-1 codes
+
+**Language Code Mapping:**
+```bash
+case "$CURRENT_LANGUAGE" in
+  spanish) LANGUAGE_CODE="es" ;;
+  french) LANGUAGE_CODE="fr" ;;
+  german) LANGUAGE_CODE="de" ;;
+  italian) LANGUAGE_CODE="it" ;;
+  # ... 26 more languages
+  english|*) LANGUAGE_CODE="en" ;;
+esac
+```
+
+#### Output Style Updates
+**Files Modified:**
+- `src/installer.js` - Lines 588, 614
+- `.claude/hooks/check-output-style.sh` - Line 45
+- `.claude/hooks/personality-manager.sh` - Line 197
+- `.claude/hooks/voice-manager.sh` - Line 248
+
+All now correctly reference `/output-style Agent Vibes` instead of the incorrect lowercase version.
+
+### 🎯 User Impact
+
+**Before v2.0.10:**
+- Provider switching failed with cryptic "command not found" errors
+- Users couldn't switch between ElevenLabs and Piper
+- Documentation showed wrong output style command
+- No gentle reminder to support the project
+
+**After v2.0.10:**
+- Provider switching works seamlessly
+- Full 30+ language support with ElevenLabs
+- Correct output style command everywhere
+- Optional daily star reminder (easily disabled)
+- Piper TTS installer for easy setup
+
+### 📊 Files Changed
+
+**Added (3 files):**
+- `.claude/hooks/github-star-reminder.sh` (94 lines)
+- `.claude/hooks/piper-installer.sh` (144 lines)
+- `.claude/github-star-reminder.txt` (1 line)
+
+**Modified (8 files):**
+- `.claude/hooks/check-output-style.sh` (4 lines changed)
+- `.claude/hooks/personality-manager.sh` (4 lines changed)
+- `.claude/hooks/play-tts-elevenlabs.sh` (33 lines added)
+- `.claude/hooks/play-tts.sh` (3 lines added)
+- `.claude/hooks/provider-commands.sh` (31 lines added)
+- `.claude/hooks/voice-manager.sh` (4 lines changed)
+- `README.md` (4 lines changed)
+- `src/installer.js` (4 lines changed)
+
+**Test Updates (3 files):**
+- `test/helpers/test-helper.bash` (6 lines changed)
+- `test/unit/personality-manager.bats` (20 lines changed)
+- `test/unit/personality-voice-mapping.bats` (21 lines changed)
+- `test/unit/play-tts.bats` (9 lines removed)
+
+**Total Changes:** 347 insertions, 35 deletions across 15 files
+
+### 🔄 Migration Notes
+
+**For All Users:**
+- Update via `/agent-vibes:update` or `npx agentvibes update`
+- No breaking changes - all existing settings preserved
+- GitHub star reminder shows once per day (easily disabled)
+- Provider switching now works correctly
+
+**To Disable GitHub Star Reminders:**
+```bash
+echo "disabled" > .claude/github-star-reminder.txt
+```
+
+**To Install Piper TTS:**
+```bash
+.claude/hooks/piper-installer.sh
+```
+
+### 💡 What's Next
+
+The next release (v2.1.0) will focus on:
+- Enhanced Piper TTS voice management
+- Improved multilingual voice selection
+- Additional personality styles
+- BMAD plugin enhancements
+
+### 📝 Commits in This Release
+
+```
+869b1e8 feat: Add Piper TTS installer and improve GitHub star reminders
+a9f3b0b feat: Add daily GitHub star reminder system
+18c389e fix: Update output style command and provider switching functions
+07ee376 test: Remove flaky API key test
+5a1a78b test: Skip flaky API key test in CI environments
+4ff1075 Merge branch 'master' of github.com:paulpreibisch/AgentVibes
+73d8303 test: Update tests for provider-aware personality system
+ec21c34 docs: Update README to version v2.0.9 [skip ci]
+```
+
+### 🙏 Credits
+
+- Thanks to users who reported the provider switching issues
+- Special appreciation to the community for supporting AgentVibes
+- ElevenLabs team for their excellent multilingual API
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+---
+
+# 🎤 AgentVibes Release Notes
+
 ## 📦 v2.0.9 - Installer Release Notes Fix (2025-01-07)
 
 ### 🤖 AI Summary
