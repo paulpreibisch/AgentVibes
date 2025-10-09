@@ -617,7 +617,8 @@ async function install(options = {}) {
     console.log(chalk.gray('      This enables TTS narration for your sessions'));
     console.log(chalk.magenta('\n   💡 Optional: Enable BMAD plugin integration:'));
     console.log(chalk.white('   2. In Claude Code, run: ') + chalk.magenta.bold('/agent-vibes:bmad enable'));
-    console.log(chalk.gray('      This assigns unique voices to each BMAD agent\n'));
+    console.log(chalk.gray('      This assigns unique voices to each BMAD agent'));
+    console.log(chalk.gray('      Get BMAD: ') + chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD\n'));
     console.log(chalk.gray('💡 Then try these commands:'));
     console.log(chalk.gray('   • /agent-vibes:list - See all available voices'));
     console.log(chalk.gray('   • /agent-vibes:switch <name> - Change your voice'));
