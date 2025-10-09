@@ -485,6 +485,36 @@ async function install(options = {}) {
     }
     spinner.succeed(chalk.green('Installed output styles!\n'));
 
+    // Copy plugins folder (BMAD voice mappings)
+    spinner.start('Installing BMAD plugin files...');
+    const srcPluginsDir = path.join(__dirname, '..', '.claude', 'plugins');
+    const destPluginsDir = path.join(claudeDir, 'plugins');
+
+    // Create plugins directory
+    await fs.mkdir(destPluginsDir, { recursive: true });
+
+    // Copy only .md files from plugins directory
+    let pluginFiles = [];
+    try {
+      const allPluginFiles = await fs.readdir(srcPluginsDir);
+      for (const file of allPluginFiles) {
+        const srcPath = path.join(srcPluginsDir, file);
+        const stat = await fs.stat(srcPath);
+
+        // Only copy .md files, skip .flag files (those are runtime generated)
+        if (stat.isFile() && file.endsWith('.md')) {
+          pluginFiles.push(file);
+          const destPath = path.join(destPluginsDir, file);
+          await fs.copyFile(srcPath, destPath);
+          console.log(chalk.gray(`   ✓ ${file}`));
+        }
+      }
+      spinner.succeed(chalk.green('Installed BMAD plugin files!\n'));
+    } catch (error) {
+      // Plugins directory might not exist in source - that's okay
+      spinner.info(chalk.yellow('No plugin files found (optional)\n'));
+    }
+
     // Save provider selection
     spinner.start('Saving provider configuration...');
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
@@ -502,8 +532,11 @@ async function install(options = {}) {
     console.log(chalk.cyan('📦 Installation Summary:'));
     console.log(chalk.white(`   • ${commandFiles.length} slash commands installed`));
     console.log(chalk.white(`   • ${hookFiles.length} TTS scripts installed`));
-    console.log(chalk.white(`   • ${personalityFiles.length} personality templates installed`));
+    console.log(chalk.white(`   • ${personalityMdFiles.length} personality templates installed`));
     console.log(chalk.white(`   • ${outputStyleFiles.length} output styles installed`));
+    if (pluginFiles.length > 0) {
+      console.log(chalk.white(`   • ${pluginFiles.length} BMAD plugin files installed`));
+    }
     console.log(chalk.white(`   • Voice manager ready`));
 
     if (selectedProvider === 'elevenlabs') {
@@ -914,13 +947,47 @@ program
       }
       console.log(chalk.green(`✓ Updated ${outputStyleFiles.length} output styles`));
 
+      // Update plugins folder (BMAD voice mappings)
+      spinner.text = 'Updating BMAD plugin files...';
+      const srcPluginsDir = path.join(__dirname, '..', '.claude', 'plugins');
+      const destPluginsDir = path.join(claudeDir, 'plugins');
+
+      // Create plugins directory if it doesn't exist
+      await fs.mkdir(destPluginsDir, { recursive: true });
+
+      // Copy only .md files from plugins directory
+      let pluginFiles = [];
+      try {
+        const allPluginFiles = await fs.readdir(srcPluginsDir);
+        for (const file of allPluginFiles) {
+          const srcPath = path.join(srcPluginsDir, file);
+          const stat = await fs.stat(srcPath);
+
+          // Only copy .md files, skip .flag files (those are runtime generated)
+          if (stat.isFile() && file.endsWith('.md')) {
+            pluginFiles.push(file);
+            const destPath = path.join(destPluginsDir, file);
+            await fs.copyFile(srcPath, destPath);
+          }
+        }
+        if (pluginFiles.length > 0) {
+          console.log(chalk.green(`✓ Updated ${pluginFiles.length} BMAD plugin files`));
+        }
+      } catch (error) {
+        // Plugins directory might not exist in source - that's okay
+      }
+
       spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
 
       console.log(chalk.cyan('📦 Update Summary:'));
       console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
       console.log(chalk.white(`   • ${hookFiles.length} TTS scripts updated`));
       console.log(chalk.white(`   • ${newPersonalities + updatedPersonalities} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
-      console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated\n`));
+      console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated`));
+      if (pluginFiles.length > 0) {
+        console.log(chalk.white(`   • ${pluginFiles.length} BMAD plugin files updated`));
+      }
+      console.log('');
 
       // Show latest release notes from RELEASE_NOTES_V2.md (v2.0+) or RELEASE_NOTES.md (legacy)
       try {
