@@ -113,23 +113,31 @@ inject_tts() {
     return 1
   fi
 
-  # Create TTS injection script
-  local tts_injection=""
+  # Create TTS injection script for activation
+  local activation_injection=""
+  local persona_injection=""
 
   if [[ -n "$agent_voice" ]]; then
-    tts_injection="  - # AGENTVIBES-TTS-INJECTION: Speak agent greeting with assigned voice
+    activation_injection="  - # AGENTVIBES-TTS-INJECTION: Speak agent greeting with assigned voice
   - Run this bash command to announce activation: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\" \"${agent_voice}\""
+    persona_injection="    - AGENTVIBES-TTS-INJECTION: When asking important questions or presenting options to user, speak them aloud using: .claude/hooks/play-tts.sh \"your question here\" \"${agent_voice}\""
   else
-    tts_injection="  - # AGENTVIBES-TTS-INJECTION: Speak agent greeting with default voice
+    activation_injection="  - # AGENTVIBES-TTS-INJECTION: Speak agent greeting with default voice
   - Run this bash command to announce activation: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\""
+    persona_injection="    - AGENTVIBES-TTS-INJECTION: When asking important questions or presenting options to user, speak them aloud using: .claude/hooks/play-tts.sh \"your question here\""
   fi
 
-  # Insert TTS call after "STEP 4: Greet user" line
-  # We want to inject right after the greeting step
-  awk -v injection="$tts_injection" '
+  # Insert activation TTS call after "STEP 4: Greet user" line
+  # Insert persona TTS instruction in core_principles section
+  awk -v activation="$activation_injection" -v persona="$persona_injection" '
     /STEP 4:.*[Gg]reet/ {
       print
-      print injection
+      print activation
+      next
+    }
+    /^  core_principles:/ {
+      print
+      print persona
       next
     }
     { print }
