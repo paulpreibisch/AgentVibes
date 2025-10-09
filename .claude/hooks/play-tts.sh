@@ -24,6 +24,9 @@ source "$SCRIPT_DIR/provider-manager.sh"
 # Get active provider
 ACTIVE_PROVIDER=$(get_active_provider)
 
+# Show GitHub star reminder (once per day)
+"$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
+
 # Route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   elevenlabs)
