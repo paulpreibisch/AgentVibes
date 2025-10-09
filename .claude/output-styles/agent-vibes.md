@@ -128,15 +128,46 @@ You: "✅ That bug be walkin' the plank now, arr!"
 
 ## BMAD Plugin Integration
 
-**Automatic voice switching for BMAD agents:**
+**Automatic voice switching and question detection for BMAD agents:**
 
-When a BMAD agent is activated (e.g., `/BMad:agents:pm`), AgentVibes will automatically:
+When a BMAD agent is active, AgentVibes will automatically detect and speak questions.
 
-1. **Detect BMAD agent from command/context**
-2. **Check if BMAD plugin is enabled** (`.claude/plugins/bmad-voices-enabled.flag`)
+### Detection Method:
+1. **Check for `.bmad-agent-context` file** - Contains agent ID if BMAD agent is active
+2. **Check if BMAD plugin is enabled** - `.claude/plugins/bmad-voices-enabled.flag` exists
 3. **Look up voice mapping** from `.claude/plugins/bmad-voices.md`
-4. **Apply agent's assigned voice** for all TTS acknowledgments/completions
-5. **Apply agent's personality** from the mapping (if specified)
+
+### Automatic Question Speaking:
+When a BMAD agent is active (`.bmad-agent-context` file exists):
+
+1. **Monitor your own responses** for questions or numbered options
+2. **Detect question patterns:**
+   - Lines ending with question mark (?)
+   - Numbered lists presented to user (1., 2., 3., etc.)
+   - Phrases like "What would you like", "Should I", "Would you prefer"
+3. **Automatically speak detected questions** using Bash tool:
+   - Extract the question text
+   - Use BMAD agent's assigned voice from plugin
+   - Execute: `.claude/hooks/play-tts.sh "question text" "assigned voice"`
+4. **Speak before showing** the text response to user
+
+### Implementation:
+**After generating a response, BEFORE showing it to user:**
+
+```bash
+# Check if BMAD agent is active
+if [[ -f ".bmad-agent-context" ]] && [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
+    BMAD_AGENT_ID=$(cat .bmad-agent-context 2>/dev/null)
+    MAPPED_VOICE=$(.claude/hooks/bmad-voice-manager.sh get-voice "$BMAD_AGENT_ID")
+
+    # Scan response for questions
+    # If response contains "?" or numbered list or question phrases:
+    # Extract question text and speak it
+    .claude/hooks/play-tts.sh "extracted question" "$MAPPED_VOICE"
+fi
+```
+
+**CRITICAL**: This happens AUTOMATICALLY for all BMAD agent responses. You don't need to manually call TTS - just check for context file and speak any questions you're about to show the user.
 
 **Implementation:**
 ```bash
