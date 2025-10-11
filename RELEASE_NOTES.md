@@ -1,5 +1,46 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.13 - Workflow Fix & Clean Release (2025-10-11)
+
+### 🤖 AI Summary
+
+This patch release fixes the npm publish workflow's README update patterns and provides a clean version without the experimental remote-SSH features that were accidentally included in v2.0.11 and v2.0.12. The workflow now correctly updates the README version information during releases, and users get a stable version based on v2.0.10.
+
+### 🐛 Bug Fixes
+
+#### Publish Workflow README Update Fix
+- **Fixed sed patterns** - Workflow now correctly matches and updates README release section
+- **Flexible pattern matching** - Handles different release title formats ("Multi-Provider Revolution" vs "Release Notes")
+- **Correct version display** - README now shows v2.0.13 in both author line and latest release section
+
+#### Clean Version Without Remote-SSH Features
+- **Skipped v2.0.11/v2.0.12** - These versions included experimental remote TTS forwarding features
+- **Based on v2.0.10** - This is a clean release from the stable master branch
+- **No breaking changes** - All existing functionality from v2.0.10 is preserved
+
+### 📝 Technical Changes
+
+**Modified: `.github/workflows/publish.yml`**
+- Updated sed pattern from exact "Release Notes" match to flexible `[^\]]*` pattern
+- Improved pattern to match any title format in release section header
+- Added comment explaining the flexible matching approach
+
+**Modified: `package.json`, `package-lock.json`**
+- Bumped version from 2.0.10 to 2.0.13
+
+### 🔄 Migration Notes
+
+**For All Users:**
+- Update via `/agent-vibes:update` or `npx agentvibes@latest install`
+- No breaking changes - all settings and configurations preserved
+- If you were on v2.0.12, this removes the remote-SSH code
+
+**Deprecation Notice:**
+- v2.0.12 includes experimental features and should be avoided
+- v2.0.13 is the recommended stable version
+
+---
+
 ## 📦 v2.0.10 - GitHub Star Reminder & Provider Fixes (2025-01-10)
 
 ### 🤖 AI Summary
