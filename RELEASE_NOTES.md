@@ -1,5 +1,37 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.14 - README Version Fix for npm (2025-10-11)
+
+### 🤖 AI Summary
+
+This patch release updates the npm package's README to display the correct version numbers. Since v2.0.13 was published before the README was corrected, the npm website displayed outdated version information. This release ensures users see v2.0.14 everywhere.
+
+### 🐛 Bug Fixes
+
+#### npm README Version Display
+- **Fixed**: npm package page now shows correct version (v2.0.14)
+- **Root Cause**: v2.0.13 was published with uncorrected README
+- **Impact**: Users visiting npmjs.com/package/agentvibes now see accurate version info
+- **Solution**: Republish with corrected README
+
+### 📝 What Changed
+
+**Modified: `README.md`**
+- Author line now shows v2.0.14
+- Latest Release section shows v2.0.14
+
+**Modified: `package.json`, `package-lock.json`**
+- Bumped version from 2.0.13 to 2.0.14
+
+### 🔄 Migration Notes
+
+**For All Users:**
+- No functional changes - this is purely a documentation update
+- Update via `/agent-vibes:update` to get latest version
+- All features from v2.0.13 are identical
+
+---
+
 ## 📦 v2.0.13 - Workflow Fix & Clean Release (2025-10-11)
 
 ### 🤖 AI Summary
