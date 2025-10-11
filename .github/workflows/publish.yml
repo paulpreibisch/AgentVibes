@@ -39,8 +39,8 @@ jobs:
           # Update version after author line in README
           sed -i "s/^\*\*Author\*\*: Paul Preibisch.*/\*\*Author\*\*: Paul Preibisch ([@997Fire](https:\/\/x.com\/997Fire)) | \*\*Version\*\*: v${VERSION}/" README.md
 
-          # Update the Latest Release section header and link
-          sed -i "s/\*\*\[v[0-9]\+\.[0-9]\+\.[0-9]\+ - Release Notes\]/\*\*[v${VERSION} - Release Notes]/" README.md
+          # Update the Latest Release section header and link (flexible pattern to match any title)
+          sed -i "s/\*\*\[v[0-9]\+\.[0-9]\+\.[0-9]\+ - [^\]]*\]/\*\*[v${VERSION} - Release Notes]/" README.md
           sed -i "s/releases\/tag\/v[0-9]\+\.[0-9]\+\.[0-9]\+/releases\/tag\/v${VERSION}/" README.md
 
           # Extract release description from RELEASE_NOTES.md (first summary paragraph after ## Summary)
@@ -59,7 +59,8 @@ jobs:
               # Escape special characters for sed
               ESCAPED_DESC=$(echo "$DESCRIPTION" | sed 's/[\/&]/\\&/g')
               # Find and replace the line after the release header
-              sed -i "/^\*\*\[v${VERSION} - Release Notes\]/{ n; s/.*/$ESCAPED_DESC/ }" README.md
+              # Match any title pattern, not just "Release Notes"
+              sed -i "/^\*\*\[v${VERSION} - /{ n; s/.*/$ESCAPED_DESC/ }" README.md
             fi
           fi
 
