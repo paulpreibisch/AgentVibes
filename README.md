@@ -45,7 +45,7 @@
 
 ## 📰 Latest Release
 
-**[v2.0.0 - The Multi-Provider Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.13)** 🎉
+**[v2.0.13 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.13)** 🎉
 
 The biggest update ever! **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, expanded voice library (27+ voices), advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support. Choose between premium ElevenLabs voices or free offline Piper TTS!
 
