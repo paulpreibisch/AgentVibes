@@ -46,7 +46,7 @@
 ## 📰 Latest Release
 
 **[v2.0.14 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.14)** 🎉
-
+This patch release updates the npm package's README to display the correct version numbers. Since v2.0.13 was published before the README was corrected, the npm website displayed outdated version information. This release ensures users see v2.0.14 everywhere.
 The biggest update ever! **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, expanded voice library (27+ voices), advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support. Choose between premium ElevenLabs voices or free offline Piper TTS!
 
 **Key highlights:**
