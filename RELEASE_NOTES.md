@@ -1,5 +1,239 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.16 - Remote Audio Setup Guide & Scripts (2025-10-12)
+
+### 🤖 AI Summary
+
+This patch release adds comprehensive documentation and automated setup scripts for running AgentVibes TTS on remote servers with local audio playback. Users can now easily configure PulseAudio to tunnel audio from their remote Linux servers (cloud VPS, home servers) to their local Windows speakers via SSH. Perfect for remote development workflows with VS Code Remote-SSH, this release includes interactive setup scripts for both Linux and Windows, complete with backups, validation, and troubleshooting guides.
+
+### ✨ New Features
+
+#### 📚 Remote Audio Setup Documentation
+- **Comprehensive guide** - Complete docs at `docs/remote-audio-setup.md`
+- **Architecture explained** - Detailed breakdown: Server → SSH Tunnel → WSL → Windows Speakers
+- **Manual & automatic setup** - Choose your path: scripts or manual configuration
+- **Troubleshooting section** - Common issues with solutions
+- **VS Code integration** - Works seamlessly with Remote-SSH extension
+- **Security considerations** - Explains encrypted tunneling and port configuration
+
+**What's Covered:**
+```
+- Prerequisites and system requirements
+- Step-by-step manual setup (Linux + Windows)
+- Automated scripts (see below)
+- Port configuration (4713, 14713)
+- Verification commands and testing
+- Common issues and fixes
+- Multiple server configurations
+```
+
+#### 🐧 Linux Setup Script (`setup-remote-audio.sh`)
+- **Automated PulseAudio configuration** - Sets up network support automatically
+- **Shell detection** - Auto-detects bash/zsh and configures appropriately
+- **Environment variables** - Adds `PULSE_SERVER=tcp:localhost:14713`
+- **Automatic backups** - Creates timestamped backups before any changes
+- **Colorful CLI** - Beautiful progress indicators and clear messaging
+- **Verification steps** - Shows commands to test audio after setup
+- **Safe execution** - Validates prerequisites before making changes
+
+**Usage:**
+```bash
+curl -O https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/scripts/setup-remote-audio.sh
+chmod +x setup-remote-audio.sh
+./setup-remote-audio.sh
+```
+
+#### 🪟 Windows PowerShell Script (`setup-windows-audio.ps1`)
+- **SSH tunnel configuration** - Automatically adds RemoteForward to SSH config
+- **WSL validation** - Checks for WSL2 with GUI support (WSLg)
+- **OpenSSH detection** - Verifies OpenSSH Client is installed
+- **Host alias creation** - Generates friendly SSH host names
+- **Backup and safety** - Creates timestamped backups of SSH config
+- **Connection testing** - Optional SSH connection test after setup
+- **Parameter support** - Flexible options for users and ports
+
+**Usage:**
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/scripts/setup-windows-audio.ps1" -OutFile "setup-windows-audio.ps1"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\setup-windows-audio.ps1 -RemoteHost "192.168.1.100"
+```
+
+**Parameters:**
+- `-RemoteHost` (required) - Server hostname or IP
+- `-RemoteUser` (optional) - SSH username (defaults to current user)
+- `-TunnelPort` (optional) - Audio tunnel port (default: 14713)
+- `-SSHConfigPath` (optional) - Custom SSH config location
+
+#### 📖 Scripts Documentation
+- **New scripts README** - Complete documentation at `scripts/README.md`
+- **Usage examples** - Shows common workflows and scenarios
+- **Troubleshooting guide** - Script-specific issues and solutions
+- **Setup order** - Clear steps: Windows first, then Linux
+- **Common issues** - Audio doesn't play, connection refused, etc.
+
+### 📝 Documentation Updates
+
+#### Main README Enhancements
+- **Remote Audio Setup section** - New major section with quick setup
+- **Table of Contents update** - Added 🔊 Remote Audio Setup entry
+- **Quick setup commands** - Copy-paste ready PowerShell and bash commands
+- **Architecture visualization** - Clear diagram of audio flow
+- **Resource links** - Links to detailed docs and script READMEs
+
+**New README Section:**
+```markdown
+## 🔊 Remote Audio Setup
+
+**Running AgentVibes on a remote server but want to hear TTS on your local machine?**
+
+Perfect for:
+- Remote development on cloud/VPS servers
+- Home server with local audio playback
+- VS Code Remote-SSH workflows
+- Any SSH-based remote development
+
+[Complete documentation, scripts, and setup guide included]
+```
+
+### 🛠️ What Gets Configured
+
+#### On Linux Server:
+- **PulseAudio config** - `~/.config/pulse/default.pa` with network support
+- **Environment variable** - `PULSE_SERVER=tcp:localhost:14713` in shell config
+- **Automatic backups** - Preserves your existing configurations
+- **Shell integration** - Works with bash or zsh automatically
+
+#### On Windows Client:
+- **SSH tunnel** - `RemoteForward 14713 localhost:14713` in SSH config
+- **WSL compatibility** - Leverages WSLg for audio routing
+- **Host configuration** - Clean SSH config entries with keep-alive
+- **Backup safety** - Timestamps existing configs before changes
+
+### 🎯 Use Cases
+
+**Perfect for:**
+1. **Cloud Development** - Run AgentVibes on AWS/GCP/Azure, hear TTS locally
+2. **Home Lab Servers** - Powerful remote server, convenient local audio
+3. **VS Code Remote-SSH** - Seamless integration with Remote-SSH extension
+4. **Team Environments** - Shared remote development with personal audio
+5. **Resource-heavy Tasks** - Use remote CPU/RAM, enjoy local audio feedback
+
+### 📊 Files Added
+
+**Documentation (2 files):**
+- `docs/remote-audio-setup.md` (265 lines) - Complete setup guide
+- `scripts/README.md` (117 lines) - Scripts documentation
+
+**Setup Scripts (2 files):**
+- `scripts/setup-remote-audio.sh` (214 lines) - Linux automation
+- `scripts/setup-windows-audio.ps1` (274 lines) - Windows automation
+
+**Main README:**
+- Updated `README.md` (61 lines added) - Remote audio section
+
+**Total Changes:** 931 insertions across 5 files
+
+### 🔧 Technical Architecture
+
+```
+┌─────────────────┐
+│  Remote Linux   │
+│     Server      │
+│                 │
+│  PulseAudio     │
+│   Port 4713     │
+└────────┬────────┘
+         │
+         │ SSH Tunnel
+         │ (RemoteForward 14713:localhost:14713)
+         │
+┌────────▼────────┐
+│  Windows        │
+│   Client        │
+│                 │
+│  WSL → Speakers │
+└─────────────────┘
+```
+
+**Key Components:**
+- **Port 4713** - Standard PulseAudio TCP port on remote
+- **Port 14713** - SSH tunnel port for forwarding
+- **WSLg** - Windows Subsystem for Linux with GUI support
+- **RemoteForward** - SSH reverse tunnel (server → client)
+
+### 💡 Usage Examples
+
+#### Quick Setup
+```bash
+# 1. On Windows (configure SSH tunnel)
+.\setup-windows-audio.ps1 -RemoteHost "myserver.com"
+
+# 2. On Linux server (configure PulseAudio)
+./setup-remote-audio.sh
+
+# 3. Reconnect via SSH
+ssh myserver.com
+
+# 4. Test audio
+speaker-test -t sine -f 1000 -l 1
+```
+
+#### VS Code Remote-SSH
+```bash
+# Tunnel is automatically established by VS Code
+# No manual SSH connection needed!
+1. Open VS Code
+2. Connect to remote host
+3. Audio just works 🎵
+```
+
+#### Verification Commands
+```bash
+# Check environment variable
+echo $PULSE_SERVER
+# Should show: tcp:localhost:14713
+
+# Verify tunnel
+ss -tlnp | grep :14713
+# Should show listening socket
+
+# Test PulseAudio
+pactl info
+# Should show server: tcp:localhost:14713
+```
+
+### 🔄 Migration Notes
+
+**For All Users:**
+- This is a documentation and tooling release
+- No changes to AgentVibes core functionality
+- Existing installations work exactly the same
+- Remote audio setup is optional and opt-in
+
+**To Use Remote Audio:**
+1. Follow the guide at `docs/remote-audio-setup.md`
+2. Run automated scripts or configure manually
+3. Reconnect via SSH and test audio
+
+**Requirements:**
+- Remote Linux server with PulseAudio
+- Local Windows machine with WSL2
+- SSH access to remote server
+- Internet connection for initial setup
+
+### 🙏 Credits
+
+This feature was developed based on a working remote audio configuration. Special thanks to the community members who shared their setups and helped test the automation scripts!
+
+### 📚 Additional Resources
+
+- [Remote Audio Setup Guide](docs/remote-audio-setup.md) - Complete documentation
+- [Scripts README](scripts/README.md) - Script usage and troubleshooting
+- [AgentVibes Website](https://agentvibes.org) - Main documentation
+
+---
+
 ## 📦 v2.0.15 - BMAD Plugin Auto-Enable Fix (2025-10-12)
 
 ### 🤖 AI Summary
