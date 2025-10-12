@@ -144,7 +144,11 @@ You can change port `14713` to any available port if needed, but make sure it ma
 
 4. **Test AgentVibes TTS:**
    ```bash
-   echo "Testing remote audio" | espeak-ng --stdout | paplay
+   # If AgentVibes is installed
+   .claude/hooks/play-tts.sh "Testing remote audio"
+
+   # Or test with paplay directly
+   paplay /usr/share/sounds/alsa/Front_Center.wav
    ```
 
 ### Troubleshooting Commands
