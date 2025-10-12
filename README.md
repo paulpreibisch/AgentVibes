@@ -33,6 +33,7 @@
 - [📦 Installation Structure](#-installation-structure) - What gets installed
 - [💡 Usage Examples](#-usage-examples) - Common workflows
 - [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
+- [🔊 Remote Audio Setup](#-remote-audio-setup) - Play TTS from remote servers on local speakers
 - [💰 Pricing & Usage](#-pricing--usage) - ElevenLabs costs & monitoring
 - [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
 
@@ -719,6 +720,62 @@ I'll do the task
 ✅ Done
 [Bash: .claude/hooks/play-tts.sh "Complete" "Cowboy Bob"]
 ```
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🔊 Remote Audio Setup
+
+**Running AgentVibes on a remote server but want to hear TTS on your local machine?**
+
+We've got you covered! Our remote audio setup guides you through configuring PulseAudio to tunnel audio from your remote Linux server to your local Windows speakers via SSH.
+
+### 🎯 Perfect For:
+- Running AgentVibes on a remote server (cloud, VPS, home server)
+- Hearing TTS announcements on your local Windows speakers
+- Development via VS Code Remote-SSH
+- Any SSH-based remote development workflow
+
+### 📚 Complete Documentation
+
+**[→ Remote Audio Setup Guide](docs/remote-audio-setup.md)**
+
+Comprehensive guide covering:
+- Architecture and how it works
+- Automatic setup scripts for Linux and Windows
+- Manual configuration steps
+- Troubleshooting common issues
+- VS Code Remote-SSH integration
+
+### ⚡ Quick Setup
+
+#### 1. On Your Windows Machine:
+```powershell
+# Download and run the Windows setup script
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/scripts/setup-windows-audio.ps1" -OutFile "setup-windows-audio.ps1"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\setup-windows-audio.ps1 -RemoteHost "your-server-ip"
+```
+
+#### 2. On Your Remote Linux Server:
+```bash
+# Download and run the Linux setup script
+curl -O https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/scripts/setup-remote-audio.sh
+chmod +x setup-remote-audio.sh
+./setup-remote-audio.sh
+```
+
+#### 3. Reconnect via SSH and enjoy audio! 🎵
+
+### 🛠️ What Gets Configured:
+- **Linux Server**: PulseAudio network support + environment variables
+- **Windows Client**: SSH tunnel configuration for audio forwarding
+- **Architecture**: Server → SSH Tunnel → WSL → Windows Speakers
+
+### 📖 Additional Resources:
+- [Setup Scripts README](scripts/README.md) - Detailed script documentation
+- [Remote Audio Guide](docs/remote-audio-setup.md) - Full manual setup and troubleshooting
 
 [↑ Back to top](#-table-of-contents)
 
