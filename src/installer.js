@@ -665,16 +665,93 @@ async function install(options = {}) {
       bmadDetected = true;
     } catch {}
 
+    // Auto-enable BMAD plugin and create activation-instructions if BMAD detected
+    if (bmadDetected) {
+      const pluginsDir = path.join(claudeDir, 'plugins');
+      const enabledFlagPath = path.join(pluginsDir, 'bmad-voices-enabled.flag');
+      const activationInstructionsPath = path.join(claudeDir, 'activation-instructions');
+
+      // Auto-enable the plugin (create the flag file)
+      await fs.mkdir(pluginsDir, { recursive: true });
+      await fs.writeFile(enabledFlagPath, '');
+      console.log(chalk.green('🎤 Auto-enabled BMAD voice plugin'));
+
+      // Only create if doesn't exist (don't overwrite user customizations)
+      try {
+        await fs.access(activationInstructionsPath);
+      } catch {
+        // File doesn't exist - create it
+        const activationContent = `# BMAD Agent Activation Instructions
+
+When a BMAD agent activates, follow these steps EXACTLY:
+
+## STEP 3.5a: Create BMAD Context File (CRITICAL)
+
+**IMMEDIATELY after agent identification, create the context file:**
+
+\`\`\`bash
+echo "$AGENT_ID" > .bmad-agent-context
+\`\`\`
+
+Where \`$AGENT_ID\` is one of:
+- \`pm\` (Product Manager)
+- \`dev\` (Developer)
+- \`qa\` (QA)
+- \`architect\` (Architect)
+- \`po\` (Product Owner)
+- \`analyst\` (Analyst)
+- \`sm\` (Scrum Master)
+- \`ux-expert\` (UX Expert)
+- \`bmad-master\` (BMAD Master)
+- \`bmad-orchestrator\` (Orchestrator)
+
+**Example:**
+\`\`\`bash
+# For Product Manager agent
+echo "pm" > .bmad-agent-context
+\`\`\`
+
+This file allows AgentVibes to:
+1. Detect which BMAD agent is active
+2. Look up the correct voice mapping
+3. Automatically speak questions using the agent's assigned voice
+
+## STEP 10: Clean Up on Exit
+
+**Before exiting the agent, remove the context file:**
+
+\`\`\`bash
+rm -f .bmad-agent-context
+\`\`\`
+
+This ensures voice switching only happens when an agent is active.
+
+## Why This Matters
+
+Without the \`.bmad-agent-context\` file:
+- AgentVibes cannot detect which agent is active
+- Questions won't be spoken automatically
+- Voice switching won't work
+- The BMAD voice plugin becomes non-functional
+
+**This is MANDATORY for BMAD voice integration to work!**
+`;
+        await fs.writeFile(activationInstructionsPath, activationContent);
+        console.log(chalk.green('📝 Created BMAD activation instructions'));
+      }
+    }
+
     if (bmadDetected) {
       console.log(
         boxen(
           chalk.green.bold('🎉 BMAD Detected!\n\n') +
-          chalk.white('AgentVibes BMAD Plugin is automatically enabled!\n') +
-          chalk.gray('Each BMAD agent will now use its assigned voice.\n\n') +
+          chalk.white('✅ BMAD Voice Plugin: AUTO-ENABLED\n') +
+          chalk.gray('Each BMAD agent will automatically use its assigned voice\n') +
+          chalk.gray('and speak when activated!\n\n') +
           chalk.cyan('Commands:\n') +
-          chalk.gray('  • /agent-vibes-bmad status - View agent voices\n') +
-          chalk.gray('  • /agent-vibes-bmad set <agent> <voice> - Customize\n') +
-          chalk.gray('  • /agent-vibes-bmad disable - Turn off plugin'),
+          chalk.gray('  • /agent-vibes:bmad status - View agent voices\n') +
+          chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize\n') +
+          chalk.gray('  • /agent-vibes:bmad disable - Turn off if unwanted'),
           {
             padding: 1,
             margin: 1,

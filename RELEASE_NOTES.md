@@ -1,5 +1,164 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.15 - BMAD Plugin Auto-Enable Fix (2025-10-12)
+
+### 🤖 AI Summary
+
+This patch release fixes a critical bug where the BMAD voice plugin was not automatically enabled during installation, even when BMAD was detected. Users installing AgentVibes with BMAD present would find plugin files created but the plugin non-functional because the crucial `.claude/activation-instructions` file was missing and the plugin wasn't enabled. Now, when BMAD is detected, the installer automatically creates activation instructions, enables the plugin, and sets everything up to work out of the box.
+
+### 🐛 Bug Fixes
+
+#### BMAD Plugin Auto-Enable Not Working
+- **Fixed**: Plugin not enabled when BMAD detected during installation
+- **Fixed**: Missing `.claude/activation-instructions` file prevented BMAD agents from creating context
+- **Root Cause**: Installer created plugin files but never enabled the plugin or created activation instructions
+- **Impact**: BMAD voice integration was non-functional after fresh installs
+- **Solution**: Auto-enable plugin and create activation-instructions when BMAD detected
+
+**What Was Broken:**
+```bash
+# Before: Plugin files created but not actually working
+npx agentvibes install  # (with BMAD present)
+# ✓ Created .claude/plugins/bmad-voices.md
+# ✗ No .claude/plugins/bmad-voices-enabled.flag (plugin disabled!)
+# ✗ No .claude/activation-instructions (agents don't know what to do!)
+
+# Result: BMAD agents don't speak, voice switching doesn't work
+```
+
+**After Fix:**
+```bash
+# After: Plugin fully configured and working
+npx agentvibes install  # (with BMAD present)
+# ✓ Created .claude/plugins/bmad-voices.md
+# ✓ Created .claude/plugins/bmad-voices-enabled.flag (auto-enabled!)
+# ✓ Created .claude/activation-instructions (agents know what to do!)
+# 🎤 Auto-enabled BMAD voice plugin
+
+# Result: BMAD agents speak automatically with assigned voices!
+```
+
+#### Missing Activation Instructions
+- **Fixed**: `.claude/activation-instructions` not created by installer
+- **Fixed**: Manual `/agent-vibes:bmad enable` also didn't create instructions
+- **Impact**: BMAD agents couldn't create `.bmad-agent-context` file
+- **Solution**: Both installer and manual enable now create comprehensive activation instructions
+
+**Why This File Matters:**
+
+The `.claude/activation-instructions` file tells BMAD agents to:
+1. Create `.bmad-agent-context` file with agent ID when activating
+2. Clean up the context file when exiting
+3. This allows AgentVibes to detect which agent is active and switch voices
+
+Without this file, agents never create the context file, so AgentVibes can't detect them and voice switching fails silently.
+
+### 📝 Technical Changes
+
+**Modified: `src/installer.js`** (Lines 668-743)
+- Added auto-enable logic when BMAD detected
+- Creates `.claude/plugins/bmad-voices-enabled.flag` automatically
+- Creates `.claude/activation-instructions` with full BMAD agent instructions
+- Updates success message to reflect auto-enable status
+- Fixed command examples in BMAD detection box (was `/agent-vibes-bmad`, now `/agent-vibes:bmad`)
+
+**Modified: `.claude/hooks/bmad-voice-manager.sh`** (Lines 106-168)
+- Added automatic creation of `.claude/activation-instructions` when enabling
+- Uses heredoc to embed full activation instructions
+- Only creates file if it doesn't exist (preserves customizations)
+- Shows confirmation message when file created
+
+**Added: `templates/activation-instructions-bmad.md`**
+- Template file documenting the activation instructions
+- Reference for what gets created by the system
+- Explains why the file is critical for BMAD integration
+
+### 🎯 User Impact
+
+**Before v2.0.15:**
+- Fresh AgentVibes install with BMAD: Voice integration didn't work
+- Users had to manually debug why BMAD agents weren't speaking
+- Required manual creation of activation-instructions file
+- Plugin appeared "enabled" but wasn't actually functional
+
+**After v2.0.15:**
+- Fresh install with BMAD: Everything works immediately
+- BMAD agents speak automatically with assigned voices
+- Voice switching works out of the box
+- No manual configuration needed
+
+### 🔄 Opt-Out Design
+
+**Philosophy: Auto-enable with easy opt-out**
+- If you have BMAD installed, you probably want voice integration
+- Better to work by default than require manual setup
+- Users can easily disable with `/agent-vibes:bmad disable` if unwanted
+
+### 📊 Files Changed
+
+**Modified (2 files):**
+- `src/installer.js` (87 lines added, 6 lines removed)
+- `.claude/hooks/bmad-voice-manager.sh` (63 lines added)
+
+**Added (1 file):**
+- `templates/activation-instructions-bmad.md` (54 lines)
+
+**Total Changes:** 204 insertions, 6 deletions across 3 files
+
+### 🔄 Migration Notes
+
+**For New Users:**
+- No action needed - BMAD plugin auto-enables and works immediately
+- Just run `npx agentvibes install` in directory with BMAD
+
+**For Existing Users (v2.0.14 and earlier):**
+
+If you previously installed AgentVibes and found BMAD voice integration not working:
+
+```bash
+# Update AgentVibes
+/agent-vibes:update
+
+# The plugin will auto-enable on next install if BMAD detected
+# Or manually enable:
+/agent-vibes:bmad enable
+```
+
+**To Disable BMAD Plugin (if unwanted):**
+```bash
+/agent-vibes:bmad disable
+```
+
+### 💡 What Gets Created
+
+When BMAD is detected during installation, the system creates:
+
+1. **`.claude/plugins/bmad-voices.md`** - Voice-to-agent mappings
+2. **`.claude/plugins/bmad-voices-enabled.flag`** - Enables the plugin
+3. **`.claude/activation-instructions`** - Instructions for BMAD agents
+
+**Sample Activation Instructions:**
+```markdown
+## STEP 3.5a: Create BMAD Context File (CRITICAL)
+
+**IMMEDIATELY after agent identification, create the context file:**
+
+```bash
+echo "$AGENT_ID" > .bmad-agent-context
+```
+
+This allows AgentVibes to:
+1. Detect which BMAD agent is active
+2. Look up the correct voice mapping
+3. Automatically speak questions using the agent's assigned voice
+```
+
+### 🙏 Credits
+
+Thanks to the user who reported this issue in the md-presentations directory! This led to discovering that the BMAD plugin setup was incomplete for all fresh installations.
+
+---
+
 ## 📦 v2.0.14 - README Version Fix for npm (2025-10-11)
 
 ### 🤖 AI Summary

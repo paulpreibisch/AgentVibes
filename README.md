@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.14
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.15
 
 ---
 
@@ -45,8 +45,8 @@
 
 ## 📰 Latest Release
 
-**[v2.0.14 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.14)** 🎉
-This patch release updates the npm package's README to display the correct version numbers. Since v2.0.13 was published before the README was corrected, the npm website displayed outdated version information. This release ensures users see v2.0.14 everywhere.
+**[v2.0.15 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.15)** 🎉
+This patch release fixes a critical bug where the BMAD voice plugin was not automatically enabled during installation. Users installing AgentVibes with BMAD present will now have the plugin fully configured and working immediately, with automatic voice switching and proper activation instructions created out of the box.
 The biggest update ever! **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, expanded voice library (27+ voices), advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support. Choose between premium ElevenLabs voices or free offline Piper TTS!
 
 **Key highlights:**
