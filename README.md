@@ -46,7 +46,7 @@
 ## 📰 Latest Release
 
 **[v2.0.15 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.15)** 🎉
-This patch release fixes a critical bug where the BMAD voice plugin was not automatically enabled during installation. Users installing AgentVibes with BMAD present will now have the plugin fully configured and working immediately, with automatic voice switching and proper activation instructions created out of the box.
+This patch release fixes a critical bug where the BMAD voice plugin was not automatically enabled during installation, even when BMAD was detected. Users installing AgentVibes with BMAD present would find plugin files created but the plugin non-functional because the crucial `.claude/activation-instructions` file was missing and the plugin wasn't enabled. Now, when BMAD is detected, the installer automatically creates activation instructions, enables the plugin, and sets everything up to work out of the box.
 The biggest update ever! **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, expanded voice library (27+ voices), advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support. Choose between premium ElevenLabs voices or free offline Piper TTS!
 
 **Key highlights:**
