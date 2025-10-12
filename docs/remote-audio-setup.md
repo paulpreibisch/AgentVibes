@@ -18,6 +18,7 @@ Remote Linux Server (PulseAudio) → SSH Reverse Tunnel → Windows Client (RDP 
 - PulseAudio installed
 - SSH access configured
 - Linux shell (bash or zsh)
+- Optional: Piper TTS for testing (see setup below)
 
 ### On Windows Client:
 - Windows Subsystem for Linux (WSL2) with GUI support
@@ -121,6 +122,79 @@ You can change port `14713` to any available port if needed, but make sure it ma
 1. The `PULSE_SERVER` environment variable
 2. The SSH `RemoteForward` configuration
 
+## Optional: Installing Piper TTS for Testing
+
+Piper TTS is a fast, local neural text-to-speech system perfect for testing your remote audio setup.
+
+### Download Piper Binary
+
+```bash
+# Create directory for Piper
+mkdir -p ~/piper && cd ~/piper
+
+# Download Piper binary (Linux x86_64)
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz
+
+# Extract
+tar -xzf piper_amd64.tar.gz
+rm piper_amd64.tar.gz
+
+# Make executable
+chmod +x piper
+```
+
+### Download a Voice Model
+
+```bash
+# Download a quality English voice (Amy - medium quality)
+wget https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx
+wget https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json
+```
+
+### Test Piper TTS
+
+```bash
+# Test Piper locally (without PulseAudio tunnel)
+echo "Hello from Piper" | ~/piper/piper -m ~/piper/en_US-amy-medium.onnx --output_raw | aplay -r 22050 -f S16_LE -t raw -
+
+# Test through PulseAudio tunnel (after SSH connection is established)
+echo "Testing remote audio" | ~/piper/piper -m ~/piper/en_US-amy-medium.onnx --output_raw | paplay --raw --rate=22050 --format=s16le
+```
+
+### Create Helper Script
+
+Create `~/test-audio.sh` for easy testing:
+
+```bash
+cat > ~/test-audio.sh << 'EOF'
+#!/bin/bash
+# Test remote audio with Piper TTS
+
+TEXT="${1:-Testing remote audio through SSH tunnel}"
+PIPER_DIR="$HOME/piper"
+MODEL="$PIPER_DIR/en_US-amy-medium.onnx"
+
+if [ ! -f "$MODEL" ]; then
+    echo "Error: Piper model not found at $MODEL"
+    echo "Run setup first!"
+    exit 1
+fi
+
+echo "$TEXT" | "$PIPER_DIR/piper" -m "$MODEL" --output_raw | paplay --raw --rate=22050 --format=s16le
+EOF
+
+chmod +x ~/test-audio.sh
+```
+
+**Usage:**
+```bash
+# Test with default message
+~/test-audio.sh
+
+# Test with custom message
+~/test-audio.sh "Hello from my remote server"
+```
+
 ## Usage
 
 ### Connecting and Testing
@@ -142,12 +216,15 @@ You can change port `14713` to any available port if needed, but make sure it ma
    speaker-test -t sine -f 1000 -l 1
    ```
 
-4. **Test AgentVibes TTS:**
+4. **Test TTS audio:**
    ```bash
-   # If AgentVibes is installed
+   # Option 1: If AgentVibes is installed
    .claude/hooks/play-tts.sh "Testing remote audio"
 
-   # Or test with paplay directly
+   # Option 2: If you installed Piper TTS (see above)
+   ~/test-audio.sh "Testing remote audio"
+
+   # Option 3: Test with system sound
    paplay /usr/share/sounds/alsa/Front_Center.wav
    ```
 
