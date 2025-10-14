@@ -1,0 +1,251 @@
+#!/bin/bash
+# Language Learning Mode Manager for AgentVibes
+# Handles dual-language TTS for language learning
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR/../.."
+
+# Configuration files (project-local first, then global fallback)
+MAIN_LANG_FILE="$PROJECT_DIR/.claude/tts-main-language.txt"
+TARGET_LANG_FILE="$PROJECT_DIR/.claude/tts-target-language.txt"
+TARGET_VOICE_FILE="$PROJECT_DIR/.claude/tts-target-voice.txt"
+LEARN_MODE_FILE="$PROJECT_DIR/.claude/tts-learn-mode.txt"
+
+GLOBAL_MAIN_LANG_FILE="$HOME/.claude/tts-main-language.txt"
+GLOBAL_TARGET_LANG_FILE="$HOME/.claude/tts-target-language.txt"
+GLOBAL_TARGET_VOICE_FILE="$HOME/.claude/tts-target-voice.txt"
+GLOBAL_LEARN_MODE_FILE="$HOME/.claude/tts-learn-mode.txt"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Get main language
+get_main_language() {
+    if [[ -f "$MAIN_LANG_FILE" ]]; then
+        cat "$MAIN_LANG_FILE"
+    elif [[ -f "$GLOBAL_MAIN_LANG_FILE" ]]; then
+        cat "$GLOBAL_MAIN_LANG_FILE"
+    else
+        echo "english"
+    fi
+}
+
+# Set main language
+set_main_language() {
+    local language="$1"
+    if [[ -z "$language" ]]; then
+        echo -e "${YELLOW}Usage: learn-manager.sh set-main-language <language>${NC}"
+        exit 1
+    fi
+
+    mkdir -p "$PROJECT_DIR/.claude"
+    echo "$language" > "$MAIN_LANG_FILE"
+    echo -e "${GREEN}✓${NC} Main language set to: $language"
+}
+
+# Get target language
+get_target_language() {
+    if [[ -f "$TARGET_LANG_FILE" ]]; then
+        cat "$TARGET_LANG_FILE"
+    elif [[ -f "$GLOBAL_TARGET_LANG_FILE" ]]; then
+        cat "$GLOBAL_TARGET_LANG_FILE"
+    else
+        echo ""
+    fi
+}
+
+# Set target language
+set_target_language() {
+    local language="$1"
+    if [[ -z "$language" ]]; then
+        echo -e "${YELLOW}Usage: learn-manager.sh set-target-language <language>${NC}"
+        exit 1
+    fi
+
+    mkdir -p "$PROJECT_DIR/.claude"
+    echo "$language" > "$TARGET_LANG_FILE"
+    echo -e "${GREEN}✓${NC} Target language set to: $language"
+
+    # Suggest a good voice for this language
+    suggest_voice_for_language "$language"
+}
+
+# Suggest voice based on target language
+suggest_voice_for_language() {
+    local language="$1"
+    local suggested_voice=""
+
+    case "${language,,}" in
+        spanish|español)
+            suggested_voice="Antoni"
+            ;;
+        french|français)
+            suggested_voice="Rachel"
+            ;;
+        german|deutsch)
+            suggested_voice="Domi"
+            ;;
+        italian|italiano)
+            suggested_voice="Bella"
+            ;;
+        portuguese|português)
+            suggested_voice="Matilda"
+            ;;
+        chinese|中文|mandarin)
+            suggested_voice="Amy"
+            ;;
+        *)
+            suggested_voice="Antoni"
+            ;;
+    esac
+
+    echo ""
+    echo -e "${BLUE}💡 Tip:${NC} For $language, we recommend the voice: $suggested_voice"
+    echo -e "   Set it with: ${YELLOW}/agent-vibes:target-voice $suggested_voice${NC}"
+}
+
+# Get target voice
+get_target_voice() {
+    if [[ -f "$TARGET_VOICE_FILE" ]]; then
+        cat "$TARGET_VOICE_FILE"
+    elif [[ -f "$GLOBAL_TARGET_VOICE_FILE" ]]; then
+        cat "$GLOBAL_TARGET_VOICE_FILE"
+    else
+        echo ""
+    fi
+}
+
+# Set target voice
+set_target_voice() {
+    local voice="$1"
+    if [[ -z "$voice" ]]; then
+        echo -e "${YELLOW}Usage: learn-manager.sh set-target-voice <voice>${NC}"
+        exit 1
+    fi
+
+    mkdir -p "$PROJECT_DIR/.claude"
+    echo "$voice" > "$TARGET_VOICE_FILE"
+    echo -e "${GREEN}✓${NC} Target voice set to: $voice"
+}
+
+# Check if learning mode is enabled
+is_learn_mode_enabled() {
+    if [[ -f "$LEARN_MODE_FILE" ]]; then
+        local mode=$(cat "$LEARN_MODE_FILE")
+        [[ "$mode" == "ON" ]]
+    elif [[ -f "$GLOBAL_LEARN_MODE_FILE" ]]; then
+        local mode=$(cat "$GLOBAL_LEARN_MODE_FILE")
+        [[ "$mode" == "ON" ]]
+    else
+        return 1
+    fi
+}
+
+# Enable learning mode
+enable_learn_mode() {
+    mkdir -p "$PROJECT_DIR/.claude"
+    echo "ON" > "$LEARN_MODE_FILE"
+    echo -e "${GREEN}✓${NC} Language learning mode: ${GREEN}ENABLED${NC}"
+    echo ""
+    show_status
+}
+
+# Disable learning mode
+disable_learn_mode() {
+    mkdir -p "$PROJECT_DIR/.claude"
+    echo "OFF" > "$LEARN_MODE_FILE"
+    echo -e "${GREEN}✓${NC} Language learning mode: ${YELLOW}DISABLED${NC}"
+}
+
+# Show learning mode status
+show_status() {
+    local main_lang=$(get_main_language)
+    local target_lang=$(get_target_language)
+    local target_voice=$(get_target_voice)
+    local learn_mode="OFF"
+
+    if is_learn_mode_enabled; then
+        learn_mode="ON"
+    fi
+
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}   Language Learning Mode Status${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  ${BLUE}Learning Mode:${NC}    $(if [[ "$learn_mode" == "ON" ]]; then echo -e "${GREEN}ENABLED${NC}"; else echo -e "${YELLOW}DISABLED${NC}"; fi)"
+    echo -e "  ${BLUE}Main Language:${NC}    $main_lang"
+    echo -e "  ${BLUE}Target Language:${NC}  ${target_lang:-"(not set)"}"
+    echo -e "  ${BLUE}Target Voice:${NC}     ${target_voice:-"(not set)"}"
+    echo ""
+
+    if [[ "$learn_mode" == "ON" ]]; then
+        if [[ -z "$target_lang" ]]; then
+            echo -e "  ${YELLOW}⚠${NC}  Please set a target language: ${YELLOW}/agent-vibes:target <language>${NC}"
+        fi
+        if [[ -z "$target_voice" ]]; then
+            echo -e "  ${YELLOW}⚠${NC}  Please set a target voice: ${YELLOW}/agent-vibes:target-voice <voice>${NC}"
+        fi
+
+        if [[ -n "$target_lang" ]] && [[ -n "$target_voice" ]]; then
+            echo -e "  ${GREEN}✓${NC}  All set! TTS will speak in both languages."
+            echo ""
+            echo -e "  ${BLUE}How it works:${NC}"
+            echo -e "    1. First: Speak in ${BLUE}$main_lang${NC} (your current voice)"
+            echo -e "    2. Then: Speak in ${BLUE}$target_lang${NC} ($target_voice voice)"
+        fi
+    else
+        echo -e "  ${BLUE}💡 Tip:${NC} Enable learning mode with: ${YELLOW}/agent-vibes:learn${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+# Main command handler
+case "${1:-}" in
+    get-main-language)
+        get_main_language
+        ;;
+    set-main-language)
+        set_main_language "$2"
+        ;;
+    get-target-language)
+        get_target_language
+        ;;
+    set-target-language)
+        set_target_language "$2"
+        ;;
+    get-target-voice)
+        get_target_voice
+        ;;
+    set-target-voice)
+        set_target_voice "$2"
+        ;;
+    is-enabled)
+        if is_learn_mode_enabled; then
+            echo "ON"
+            exit 0
+        else
+            echo "OFF"
+            exit 1
+        fi
+        ;;
+    enable)
+        enable_learn_mode
+        ;;
+    disable)
+        disable_learn_mode
+        ;;
+    status)
+        show_status
+        ;;
+    *)
+        echo "Usage: learn-manager.sh {get-main-language|set-main-language|get-target-language|set-target-language|get-target-voice|set-target-voice|is-enabled|enable|disable|status}"
+        exit 1
+        ;;
+esac
