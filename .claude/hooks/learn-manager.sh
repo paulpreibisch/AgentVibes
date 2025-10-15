@@ -79,33 +79,52 @@ set_target_language() {
 suggest_voice_for_language() {
     local language="$1"
     local suggested_voice=""
+    local provider=""
 
-    case "${language,,}" in
-        spanish|español)
-            suggested_voice="Antoni"
-            ;;
-        french|français)
-            suggested_voice="Rachel"
-            ;;
-        german|deutsch)
-            suggested_voice="Domi"
-            ;;
-        italian|italiano)
-            suggested_voice="Bella"
-            ;;
-        portuguese|português)
-            suggested_voice="Matilda"
-            ;;
-        chinese|中文|mandarin)
-            suggested_voice="Amy"
-            ;;
-        *)
-            suggested_voice="Antoni"
-            ;;
-    esac
+    # Detect active provider
+    if [[ -f "$PROJECT_DIR/.claude/tts-provider.txt" ]]; then
+        provider=$(cat "$PROJECT_DIR/.claude/tts-provider.txt")
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+        provider=$(cat "$HOME/.claude/tts-provider.txt")
+    else
+        provider="elevenlabs"  # Default
+    fi
+
+    # Source language manager and get provider-specific voice
+    if [[ -f "$SCRIPT_DIR/language-manager.sh" ]]; then
+        source "$SCRIPT_DIR/language-manager.sh"
+        suggested_voice=$(get_voice_for_language "$language" "$provider")
+    fi
+
+    # Fallback to hardcoded suggestions if function failed
+    if [[ -z "$suggested_voice" ]]; then
+        case "${language,,}" in
+            spanish|español)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "es_ES-davefx-medium" || echo "Antoni")
+                ;;
+            french|français)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "fr_FR-siwis-medium" || echo "Rachel")
+                ;;
+            german|deutsch)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "de_DE-thorsten-medium" || echo "Domi")
+                ;;
+            italian|italiano)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "it_IT-riccardo-x_low" || echo "Bella")
+                ;;
+            portuguese|português)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "pt_BR-faber-medium" || echo "Matilda")
+                ;;
+            chinese|中文|mandarin)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "zh_CN-huayan-medium" || echo "Amy")
+                ;;
+            *)
+                suggested_voice=$([ "$provider" = "piper" ] && echo "en_US-lessac-medium" || echo "Antoni")
+                ;;
+        esac
+    fi
 
     echo ""
-    echo -e "${BLUE}💡 Tip:${NC} For $language, we recommend the voice: $suggested_voice"
+    echo -e "${BLUE}💡 Tip:${NC} For $language (using ${GREEN}$provider${NC} TTS), we recommend: ${YELLOW}$suggested_voice${NC}"
     echo -e "   Set it with: ${YELLOW}/agent-vibes:target-voice $suggested_voice${NC}"
 }
 

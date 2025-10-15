@@ -29,7 +29,68 @@ fi
 LANGUAGE_FILE="$CLAUDE_DIR/tts-language.txt"
 mkdir -p "$CLAUDE_DIR"
 
-# Language to multilingual voice mapping
+# Source provider manager to detect active provider
+source "$SCRIPT_DIR/provider-manager.sh" 2>/dev/null || true
+
+# Language to ElevenLabs multilingual voice mapping
+declare -A ELEVENLABS_VOICES=(
+    ["spanish"]="Antoni"
+    ["french"]="Rachel"
+    ["german"]="Domi"
+    ["italian"]="Bella"
+    ["portuguese"]="Matilda"
+    ["chinese"]="Antoni"
+    ["japanese"]="Antoni"
+    ["korean"]="Antoni"
+    ["russian"]="Domi"
+    ["polish"]="Antoni"
+    ["dutch"]="Rachel"
+    ["turkish"]="Antoni"
+    ["arabic"]="Antoni"
+    ["hindi"]="Antoni"
+    ["swedish"]="Rachel"
+    ["danish"]="Rachel"
+    ["norwegian"]="Rachel"
+    ["finnish"]="Rachel"
+    ["czech"]="Domi"
+    ["romanian"]="Rachel"
+    ["ukrainian"]="Domi"
+    ["greek"]="Antoni"
+    ["bulgarian"]="Domi"
+    ["croatian"]="Domi"
+    ["slovak"]="Domi"
+)
+
+# Language to Piper voice model mapping
+declare -A PIPER_VOICES=(
+    ["spanish"]="es_ES-davefx-medium"
+    ["french"]="fr_FR-siwis-medium"
+    ["german"]="de_DE-thorsten-medium"
+    ["italian"]="it_IT-riccardo-x_low"
+    ["portuguese"]="pt_BR-faber-medium"
+    ["chinese"]="zh_CN-huayan-medium"
+    ["japanese"]="ja_JP-hikari-medium"
+    ["korean"]="ko_KR-eunyoung-medium"
+    ["russian"]="ru_RU-dmitri-medium"
+    ["polish"]="pl_PL-darkman-medium"
+    ["dutch"]="nl_NL-rdh-medium"
+    ["turkish"]="tr_TR-dfki-medium"
+    ["arabic"]="ar_JO-kareem-medium"
+    ["hindi"]="hi_IN-amitabh-medium"
+    ["swedish"]="sv_SE-nst-medium"
+    ["danish"]="da_DK-talesyntese-medium"
+    ["norwegian"]="no_NO-talesyntese-medium"
+    ["finnish"]="fi_FI-harri-medium"
+    ["czech"]="cs_CZ-jirka-medium"
+    ["romanian"]="ro_RO-mihai-medium"
+    ["ukrainian"]="uk_UA-lada-x_low"
+    ["greek"]="el_GR-rapunzelina-low"
+    ["bulgarian"]="bg_BG-valentin-medium"
+    ["croatian"]="hr_HR-gorana-medium"
+    ["slovak"]="sk_SK-lili-medium"
+)
+
+# Backward compatibility: Keep LANGUAGE_VOICES for existing code
 declare -A LANGUAGE_VOICES=(
     ["spanish"]="Antoni"
     ["french"]="Rachel"
@@ -91,13 +152,27 @@ set_language() {
     # Save language
     echo "$lang" > "$LANGUAGE_FILE"
 
-    # Get recommended voice
-    local recommended_voice="${LANGUAGE_VOICES[$lang]}"
+    # Detect active provider and get recommended voice
+    local provider=""
+    if [[ -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
+        provider=$(cat "$CLAUDE_DIR/tts-provider.txt")
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+        provider=$(cat "$HOME/.claude/tts-provider.txt")
+    else
+        provider="elevenlabs"
+    fi
+
+    local recommended_voice=$(get_voice_for_language "$lang" "$provider")
+
+    # Fallback to old mapping if provider-aware function returns empty
+    if [[ -z "$recommended_voice" ]]; then
+        recommended_voice="${LANGUAGE_VOICES[$lang]}"
+    fi
 
     echo "✓ Language set to: $lang"
-    echo "📢 Recommended multilingual voice: $recommended_voice"
+    echo "📢 Recommended voice for $provider TTS: $recommended_voice"
     echo ""
-    echo "TTS will now speak in $lang using multilingual voices."
+    echo "TTS will now speak in $lang."
     echo "Switch voice with: /agent-vibes:switch \"$recommended_voice\""
 }
 
@@ -105,9 +180,26 @@ set_language() {
 get_language() {
     if [[ -f "$LANGUAGE_FILE" ]]; then
         local lang=$(cat "$LANGUAGE_FILE")
-        local recommended_voice="${LANGUAGE_VOICES[$lang]}"
+
+        # Detect active provider
+        local provider=""
+        if [[ -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
+            provider=$(cat "$CLAUDE_DIR/tts-provider.txt")
+        elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+            provider=$(cat "$HOME/.claude/tts-provider.txt")
+        else
+            provider="elevenlabs"
+        fi
+
+        local recommended_voice=$(get_voice_for_language "$lang" "$provider")
+
+        # Fallback to old mapping
+        if [[ -z "$recommended_voice" ]]; then
+            recommended_voice="${LANGUAGE_VOICES[$lang]}"
+        fi
+
         echo "Current language: $lang"
-        echo "Recommended voice: $recommended_voice"
+        echo "Recommended voice ($provider): $recommended_voice"
     else
         echo "Current language: english (default)"
         echo "No multilingual voice required"
@@ -153,6 +245,60 @@ get_best_voice_for_language() {
     echo "${LANGUAGE_VOICES[$lang]}"
 }
 
+# Function to get voice for a specific language and provider
+# Usage: get_voice_for_language <language> [provider]
+# Provider: "elevenlabs" or "piper" (auto-detected if not provided)
+get_voice_for_language() {
+    local language="$1"
+    local provider="${2:-}"
+
+    # Convert to lowercase
+    language=$(echo "$language" | tr '[:upper:]' '[:lower:]')
+
+    # Auto-detect provider if not specified
+    if [[ -z "$provider" ]]; then
+        if command -v get_active_provider &>/dev/null; then
+            provider=$(get_active_provider 2>/dev/null)
+        else
+            # Fallback to checking provider file directly
+            # Try current directory first, then search up the tree
+            local search_dir="$PWD"
+            local found=false
+
+            while [[ "$search_dir" != "/" ]]; do
+                if [[ -f "$search_dir/.claude/tts-provider.txt" ]]; then
+                    provider=$(cat "$search_dir/.claude/tts-provider.txt")
+                    found=true
+                    break
+                fi
+                search_dir=$(dirname "$search_dir")
+            done
+
+            # If not found in project tree, check global
+            if [[ "$found" = false ]]; then
+                if [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+                    provider=$(cat "$HOME/.claude/tts-provider.txt")
+                else
+                    provider="elevenlabs"  # Default
+                fi
+            fi
+        fi
+    fi
+
+    # Return appropriate voice based on provider
+    case "$provider" in
+        piper)
+            echo "${PIPER_VOICES[$language]:-}"
+            ;;
+        elevenlabs)
+            echo "${ELEVENLABS_VOICES[$language]:-}"
+            ;;
+        *)
+            echo "${ELEVENLABS_VOICES[$language]:-}"
+            ;;
+    esac
+}
+
 # Main command handler - only run if script is executed directly, not sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     case "${1:-}" in
@@ -183,6 +329,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         best-voice)
             get_best_voice_for_language
             ;;
+        voice-for-language)
+            if [[ -z "$2" ]]; then
+                echo "Usage: language-manager.sh voice-for-language <language> [provider]"
+                exit 1
+            fi
+            get_voice_for_language "$2" "$3"
+            ;;
         list)
             echo "Supported languages and recommended voices:"
             echo ""
@@ -194,12 +347,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             echo "AgentVibes Language Manager"
             echo ""
             echo "Usage:"
-            echo "  language-manager.sh set <language>     Set language"
-            echo "  language-manager.sh get                Get current language"
-            echo "  language-manager.sh code               Get language code only"
-            echo "  language-manager.sh check-voice <name> Check if voice is multilingual"
-            echo "  language-manager.sh best-voice         Get best voice for current language"
-            echo "  language-manager.sh list               List all supported languages"
+            echo "  language-manager.sh set <language>                    Set language"
+            echo "  language-manager.sh get                               Get current language"
+            echo "  language-manager.sh code                              Get language code only"
+            echo "  language-manager.sh check-voice <name>                Check if voice is multilingual"
+            echo "  language-manager.sh best-voice                        Get best voice for current language"
+            echo "  language-manager.sh voice-for-language <lang> [prov] Get voice for language & provider"
+            echo "  language-manager.sh list                              List all supported languages"
             exit 1
             ;;
     esac
