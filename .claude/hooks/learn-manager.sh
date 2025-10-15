@@ -71,14 +71,32 @@ set_target_language() {
     echo "$language" > "$TARGET_LANG_FILE"
     echo -e "${GREEN}✓${NC} Target language set to: $language"
 
-    # Suggest a good voice for this language
-    suggest_voice_for_language "$language"
+    # Automatically set the recommended voice for this language
+    local recommended_voice=$(get_recommended_voice_for_language "$language")
+    if [[ -n "$recommended_voice" ]]; then
+        echo "$recommended_voice" > "$TARGET_VOICE_FILE"
+        echo -e "${GREEN}✓${NC} Target voice automatically set to: ${YELLOW}$recommended_voice${NC}"
+
+        # Detect provider for display
+        local provider=""
+        if [[ -f "$PROJECT_DIR/.claude/tts-provider.txt" ]]; then
+            provider=$(cat "$PROJECT_DIR/.claude/tts-provider.txt")
+        elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+            provider=$(cat "$HOME/.claude/tts-provider.txt")
+        else
+            provider="elevenlabs"
+        fi
+        echo -e "   (for ${GREEN}$provider${NC} TTS)"
+    else
+        # Fallback to suggestion if auto-set failed
+        suggest_voice_for_language "$language"
+    fi
 }
 
-# Suggest voice based on target language
-suggest_voice_for_language() {
+# Get recommended voice for a language (returns voice string, no output)
+get_recommended_voice_for_language() {
     local language="$1"
-    local suggested_voice=""
+    local recommended_voice=""
     local provider=""
 
     # Detect active provider
@@ -92,35 +110,53 @@ suggest_voice_for_language() {
 
     # Source language manager and get provider-specific voice
     if [[ -f "$SCRIPT_DIR/language-manager.sh" ]]; then
-        source "$SCRIPT_DIR/language-manager.sh"
-        suggested_voice=$(get_voice_for_language "$language" "$provider")
+        source "$SCRIPT_DIR/language-manager.sh" 2>/dev/null
+        recommended_voice=$(get_voice_for_language "$language" "$provider" 2>/dev/null)
     fi
 
     # Fallback to hardcoded suggestions if function failed
-    if [[ -z "$suggested_voice" ]]; then
+    if [[ -z "$recommended_voice" ]]; then
         case "${language,,}" in
             spanish|español)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "es_ES-davefx-medium" || echo "Antoni")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "es_ES-davefx-medium" || echo "Antoni")
                 ;;
             french|français)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "fr_FR-siwis-medium" || echo "Rachel")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "fr_FR-siwis-medium" || echo "Rachel")
                 ;;
             german|deutsch)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "de_DE-thorsten-medium" || echo "Domi")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "de_DE-thorsten-medium" || echo "Domi")
                 ;;
             italian|italiano)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "it_IT-riccardo-x_low" || echo "Bella")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "it_IT-riccardo-x_low" || echo "Bella")
                 ;;
             portuguese|português)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "pt_BR-faber-medium" || echo "Matilda")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "pt_BR-faber-medium" || echo "Matilda")
                 ;;
             chinese|中文|mandarin)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "zh_CN-huayan-medium" || echo "Amy")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "zh_CN-huayan-medium" || echo "Amy")
                 ;;
             *)
-                suggested_voice=$([ "$provider" = "piper" ] && echo "en_US-lessac-medium" || echo "Antoni")
+                recommended_voice=$([ "$provider" = "piper" ] && echo "en_US-lessac-medium" || echo "Antoni")
                 ;;
         esac
+    fi
+
+    echo "$recommended_voice"
+}
+
+# Suggest voice based on target language (displays suggestion message)
+suggest_voice_for_language() {
+    local language="$1"
+    local suggested_voice=$(get_recommended_voice_for_language "$language")
+
+    # Detect provider for display
+    local provider=""
+    if [[ -f "$PROJECT_DIR/.claude/tts-provider.txt" ]]; then
+        provider=$(cat "$PROJECT_DIR/.claude/tts-provider.txt")
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+        provider=$(cat "$HOME/.claude/tts-provider.txt")
+    else
+        provider="elevenlabs"
     fi
 
     echo ""
@@ -171,6 +207,32 @@ enable_learn_mode() {
     echo "ON" > "$LEARN_MODE_FILE"
     echo -e "${GREEN}✓${NC} Language learning mode: ${GREEN}ENABLED${NC}"
     echo ""
+
+    # Auto-set target voice if target language is set but voice is not
+    local target_lang=$(get_target_language)
+    local target_voice=$(get_target_voice)
+
+    if [[ -n "$target_lang" ]] && [[ -z "$target_voice" ]]; then
+        echo -e "${BLUE}ℹ${NC}  Auto-configuring voice for $target_lang..."
+        local recommended_voice=$(get_recommended_voice_for_language "$target_lang")
+        if [[ -n "$recommended_voice" ]]; then
+            echo "$recommended_voice" > "$TARGET_VOICE_FILE"
+            echo -e "${GREEN}✓${NC} Target voice automatically set to: ${YELLOW}$recommended_voice${NC}"
+
+            # Detect provider for display
+            local provider=""
+            if [[ -f "$PROJECT_DIR/.claude/tts-provider.txt" ]]; then
+                provider=$(cat "$PROJECT_DIR/.claude/tts-provider.txt")
+            elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+                provider=$(cat "$HOME/.claude/tts-provider.txt")
+            else
+                provider="elevenlabs"
+            fi
+            echo -e "   (for ${GREEN}$provider${NC} TTS)"
+            echo ""
+        fi
+    fi
+
     show_status
 }
 
