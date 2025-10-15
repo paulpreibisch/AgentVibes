@@ -27,14 +27,15 @@ class AgentVibesServer:
         self.hooks_dir = self.claude_dir / "hooks"
 
     def _find_claude_dir(self) -> Path:
-        """Find the .claude directory (project-local first, then global)"""
-        # Try current directory and parents
-        current = Path.cwd()
-        while current != current.parent:
-            claude_dir = current / ".claude"
-            if claude_dir.exists() and claude_dir.is_dir():
-                return claude_dir
-            current = current.parent
+        """Find the .claude directory relative to this script"""
+        # Get the AgentVibes root directory (parent of mcp-server)
+        script_dir = Path(__file__).resolve().parent  # mcp-server/
+        agentvibes_root = script_dir.parent  # AgentVibes/
+        claude_dir = agentvibes_root / ".claude"
+
+        # Use project-local .claude if it exists
+        if claude_dir.exists() and claude_dir.is_dir():
+            return claude_dir
 
         # Fallback to global ~/.claude
         return Path.home() / ".claude"
