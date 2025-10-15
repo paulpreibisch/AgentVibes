@@ -76,9 +76,9 @@ class AgentVibesServer:
                 original_language = await self._get_language()
                 await self._run_script("language-manager.sh", ["set", language])
 
-            # Call the TTS script
+            # Call the TTS script via bash explicitly
             play_tts = self.hooks_dir / "play-tts.sh"
-            args = [str(play_tts), text]
+            args = ["bash", str(play_tts), text]
             if voice:
                 args.append(voice)
 
@@ -103,7 +103,9 @@ class AgentVibesServer:
                 return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
             else:
                 error = stderr.decode().strip()
-                return f"❌ TTS failed: {error}"
+                stdout_output = stdout.decode().strip()
+                full_error = f"{error}\nStdout: {stdout_output}" if stdout_output else error
+                return f"❌ TTS failed: {full_error}"
 
         finally:
             # Restore original settings
@@ -239,7 +241,8 @@ class AgentVibesServer:
         if not script_path.exists():
             return f"Script not found: {script_path}"
 
-        cmd = [str(script_path)] + args
+        # Explicitly call bash to run the script
+        cmd = ["bash", str(script_path)] + args
         try:
             result = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -247,7 +250,13 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await result.communicate()
-            return stdout.decode().strip() if result.returncode == 0 else stderr.decode().strip()
+            if result.returncode == 0:
+                return stdout.decode().strip()
+            else:
+                error_msg = stderr.decode().strip()
+                if not error_msg:  # If stderr is empty, include stdout for debugging
+                    error_msg = f"Return code {result.returncode}. Stdout: {stdout.decode().strip()}"
+                return error_msg
         except Exception as e:
             return f"Error running script: {e}"
 
