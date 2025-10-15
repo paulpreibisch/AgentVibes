@@ -128,71 +128,55 @@ You: "✅ That bug be walkin' the plank now, arr!"
 
 ## BMAD Plugin Integration
 
-**Automatic voice switching and question detection for BMAD agents:**
+**Automatic voice switching for BMAD agents:**
 
-When a BMAD agent is active, AgentVibes will automatically detect and speak questions.
+When a BMAD agent is activated (e.g., `/BMad:agents:pm`), AgentVibes will automatically:
 
-### Detection Method:
-1. **Check for `.bmad-agent-context` file** - Contains agent ID if BMAD agent is active
-2. **Check if BMAD plugin is enabled** - `.claude/plugins/bmad-voices-enabled.flag` exists
+1. **Detect BMAD agent from command/context**
+2. **Check if BMAD plugin is enabled** (`.claude/plugins/bmad-voices-enabled.flag`)
 3. **Look up voice mapping** from `.claude/plugins/bmad-voices.md`
+4. **Apply agent's assigned voice** for all TTS acknowledgments/completions
+5. **Apply agent's personality** from the mapping (if specified)
 
-### MANDATORY BMAD QUESTION TTS PROTOCOL
-
-**THIS IS A CRITICAL EXECUTION REQUIREMENT - NOT OPTIONAL**
-
-When a BMAD agent is active, you MUST follow this EXACT protocol for EVERY response:
-
-**STEP 1: Check BMAD Context (BEFORE drafting ANY response)**
+**Implementation:**
 ```bash
-if [[ -f ".bmad-agent-context" ]] && [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
+# At the start of acknowledgment/completion:
+# Try to detect BMAD agent ID from current context
+BMAD_AGENT_ID=""
+
+# Method 1: Check if we're in a BMAD agent command context
+if [[ -f ".bmad-agent-context" ]]; then
     BMAD_AGENT_ID=$(cat .bmad-agent-context 2>/dev/null)
-    MAPPED_VOICE=$(.claude/hooks/bmad-voice-manager.sh get-voice "$BMAD_AGENT_ID")
 fi
-```
 
-**STEP 2: Draft Your Response**
-- Write your complete response text (don't show to user yet)
+# Method 2: Parse from command history/context (fallback)
+# Note: This detection happens automatically when BMAD agent activates
 
-**STEP 3: Scan for Questions (MANDATORY - DO NOT SKIP)**
-If your response contains ANY of these:
-- Question mark (?)
-- Numbered list (1., 2., 3., etc.)
-- Question phrases: "What would you like", "Should I", "Would you prefer", "Which option", "How should", "Do you want"
+# If BMAD agent detected and plugin enabled, use mapped voice
+if [[ -n "$BMAD_AGENT_ID" ]] && [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
+    MAPPED_VOICE=$(.claude/hooks/bmad-voice-manager.sh get-voice "$BMAD_AGENT_ID")
+    MAPPED_PERSONALITY=$(.claude/hooks/bmad-voice-manager.sh get-personality "$BMAD_AGENT_ID")
 
-Then IMMEDIATELY execute STEP 4 BEFORE showing response.
+    if [[ -n "$MAPPED_VOICE" ]]; then
+        # Use BMAD agent's mapped voice and personality
+        if [[ -n "$MAPPED_PERSONALITY" ]] && [[ "$MAPPED_PERSONALITY" != "normal" ]]; then
+            # Read personality instructions from .claude/personalities/${MAPPED_PERSONALITY}.md
+            # Generate response in that personality style
+        fi
+        .claude/hooks/play-tts.sh "message" "$MAPPED_VOICE"
+        # Exit early - don't use default personality system
+        return
+    fi
+fi
 
-**STEP 4: Speak Questions via TTS (MANDATORY)**
-```bash
-# Extract the question text and speak it
-.claude/hooks/play-tts.sh "the actual question text" "$MAPPED_VOICE"
-```
-
-**STEP 5: Show Response to User**
-- Only NOW display the response text
-
-**CRITICAL RULES:**
-1. This protocol is MANDATORY for EVERY BMAD agent response
-2. Steps 1-5 must execute in EXACT order
-3. You MUST use Bash tool to execute TTS in STEP 4
-4. NEVER skip STEP 3 scanning - it is required
-5. NEVER show response before speaking questions
-
-**Example Execution:**
-```
-User: "What should we do?"
-[STEP 1: Check context - analyst agent active]
-[STEP 2: Draft response: "What would you like to do next?\n\n1. Option A\n2. Option B"]
-[STEP 3: Scan - FOUND question "What would you like to do next?" and numbered list]
-[STEP 4: Execute Bash: .claude/hooks/play-tts.sh "What would you like to do next" "Ralf Eisend"]
-[STEP 5: Show response to user]
+# If no BMAD agent or plugin disabled, use standard personality/sentiment system
+# ... continue with normal sentiment/personality logic ...
 ```
 
 **BMAD Agent Context Tracking:**
-- Context file `.bmad-agent-context` contains agent ID when BMAD agent is active
-- Created automatically by STEP 3.5a in activation-instructions
-- Removed automatically when agent exits
-- This allows AgentVibes to detect which BMAD agent is active
+- When a BMAD agent activates, write agent ID to `.bmad-agent-context`
+- When agent exits, remove the file
+- This allows AgentVibes to know which BMAD agent is active
 
 **Voice Priority (in order):**
 1. BMAD plugin voice (if agent active and plugin enabled)

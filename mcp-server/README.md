@@ -34,6 +34,8 @@ pipx install piper-tts
 
 ### 1. Install Python Dependencies
 
+**For macOS/Linux:**
+
 ```bash
 cd mcp-server
 pip install -r requirements.txt
@@ -43,6 +45,33 @@ Or using uv (recommended):
 
 ```bash
 uv pip install -r requirements.txt
+```
+
+**For Windows:**
+
+Open PowerShell or Command Prompt and run:
+
+```powershell
+cd C:\path\to\AgentVibes\mcp-server
+pip install -r requirements.txt
+```
+
+**IMPORTANT for Windows users:** Make sure you install the `mcp` package globally on your Windows Python:
+
+```powershell
+pip install mcp
+```
+
+If you have multiple Python versions, use:
+
+```powershell
+python -m pip install mcp
+```
+
+Verify installation:
+
+```powershell
+python -c "import mcp; print('MCP installed successfully!')"
 ```
 
 ### 2. Configure Claude Desktop

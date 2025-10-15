@@ -31,6 +31,22 @@
         "NODE_PATH": "/home/fire/.nvm/versions/node/v22.20.0/lib/node_modules"
       }
     },
+    "obsidian": {
+      "command": "/home/fire/.local/bin/uv",
+      "args": [
+        "--directory",
+        "/home/fire/claude/mcp_obsidian",
+        "run",
+        "mcp-obsidian"
+      ],
+      "env": {
+        "OBSIDIAN_API_KEY": "${MAIN_VAULT_OBSIDIAN_KEY}",
+        "OBSIDIAN_HOST": "${OBSIDIAN_HOST:-127.0.0.1}",
+        "OBSIDIAN_PORT": "27124",
+        "OBSIDIAN_HTTPS": "true",
+        "OBSIDIAN_VERIFY_SSL": "false"
+      }
+    },
     "elevenlabs": {
       "command": "npx",
       "args": ["@microagents/mcp-server-elevenlabs"],

@@ -28,6 +28,8 @@
   },
   "scripts": {
     "install-local": "node src/installer.js install",
+    "postinstall": "node mcp-server/install-deps.js",
+    "install-mcp-deps": "node mcp-server/install-deps.js",
     "test": "bats test/unit/*.bats",
     "test:verbose": "bats -t test/unit/*.bats"
   },
