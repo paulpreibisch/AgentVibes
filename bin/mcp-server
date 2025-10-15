@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#
+# AgentVibes MCP Server Wrapper
+#
+# This script is called by Claude Desktop via npx:
+#   npx -y agentvibes mcp-server
+#
+# It locates the AgentVibes package and runs the Python MCP server.
+#
+
+set -e
+
+# Find the directory where this script lives
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Package root is one level up from bin/
+PACKAGE_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Path to the Python MCP server
+MCP_SERVER="$PACKAGE_ROOT/mcp-server/server.py"
+
+# Ensure the server file exists
+if [ ! -f "$MCP_SERVER" ]; then
+    echo "❌ Error: MCP server not found at $MCP_SERVER" >&2
+    exit 1
+fi
+
+# Run the Python MCP server
+exec python3 "$MCP_SERVER"

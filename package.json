@@ -2,13 +2,16 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "agentvibes",
   "version": "2.0.16",
-  "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code with multi-provider support.",
+  "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code and Claude Desktop (via MCP) with multi-provider support.",
   "homepage": "https://agentvibes.org",
   "keywords": [
     "elevenlabs",
     "tts",
     "text-to-speech",
     "claude-code",
+    "claude-desktop",
+    "mcp",
+    "model-context-protocol",
     "voice",
     "ai",
     "narration",
@@ -24,7 +27,8 @@
   "main": "src/installer.js",
   "bin": {
     "agentvibes": "./bin/agent-vibes",
-    "agent-vibes": "./bin/agent-vibes"
+    "agent-vibes": "./bin/agent-vibes",
+    "agentvibes-mcp-server": "./bin/mcp-server"
   },
   "scripts": {
     "install-local": "node src/installer.js install",
