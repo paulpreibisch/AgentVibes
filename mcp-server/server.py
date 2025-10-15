@@ -25,6 +25,8 @@ class AgentVibesServer:
         # Find the .claude directory (project-local or global)
         self.claude_dir = self._find_claude_dir()
         self.hooks_dir = self.claude_dir / "hooks"
+        # Store AgentVibes root directory for environment variable
+        self.agentvibes_root = self.claude_dir.parent
 
     def _find_claude_dir(self) -> Path:
         """Find the .claude directory relative to this script"""
@@ -82,10 +84,15 @@ class AgentVibesServer:
             if voice:
                 args.append(voice)
 
+            # Set environment with AgentVibes project directory
+            env = os.environ.copy()
+            env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+
             result = await asyncio.create_subprocess_exec(
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
             stdout, stderr = await result.communicate()
 
@@ -243,11 +250,17 @@ class AgentVibesServer:
 
         # Explicitly call bash to run the script
         cmd = ["bash", str(script_path)] + args
+
+        # Set environment with AgentVibes project directory
+        env = os.environ.copy()
+        env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+
         try:
             result = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
             stdout, stderr = await result.communicate()
             if result.returncode == 0:
