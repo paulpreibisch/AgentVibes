@@ -59,6 +59,62 @@ get_target_language() {
     fi
 }
 
+# Get greeting message for a language
+get_greeting_for_language() {
+    local language="$1"
+
+    case "${language,,}" in
+        spanish|español)
+            echo "¡Hola! Soy tu profesor de español. ¡Vamos a aprender juntos!"
+            ;;
+        french|français)
+            echo "Bonjour! Je suis votre professeur de français. Apprenons ensemble!"
+            ;;
+        german|deutsch)
+            echo "Hallo! Ich bin dein Deutschlehrer. Lass uns zusammen lernen!"
+            ;;
+        italian|italiano)
+            echo "Ciao! Sono il tuo insegnante di italiano. Impariamo insieme!"
+            ;;
+        portuguese|português)
+            echo "Olá! Sou seu professor de português. Vamos aprender juntos!"
+            ;;
+        chinese|中文|mandarin)
+            echo "你好！我是你的中文老师。让我们一起学习吧！"
+            ;;
+        japanese|日本語)
+            echo "こんにちは！私はあなたの日本語の先生です。一緒に勉強しましょう！"
+            ;;
+        korean|한국어)
+            echo "안녕하세요! 저는 당신의 한국어 선생님입니다. 함께 배워봅시다!"
+            ;;
+        russian|русский)
+            echo "Здравствуйте! Я ваш учитель русского языка. Давайте учиться вместе!"
+            ;;
+        arabic|العربية)
+            echo "مرحبا! أنا معلمك للغة العربية. دعونا نتعلم معا!"
+            ;;
+        hindi|हिन्दी)
+            echo "नमस्ते! मैं आपका हिंदी शिक्षक हूं। आइए साथ में सीखें!"
+            ;;
+        dutch|nederlands)
+            echo "Hallo! Ik ben je Nederlandse leraar. Laten we samen leren!"
+            ;;
+        polish|polski)
+            echo "Cześć! Jestem twoim nauczycielem polskiego. Uczmy się razem!"
+            ;;
+        turkish|türkçe)
+            echo "Merhaba! Ben Türkçe öğretmeninizim. Birlikte öğrenelim!"
+            ;;
+        swedish|svenska)
+            echo "Hej! Jag är din svenskalärare. Låt oss lära tillsammans!"
+            ;;
+        *)
+            echo "Hello! I am your language teacher. Let's learn together!"
+            ;;
+    esac
+}
+
 # Set target language
 set_target_language() {
     local language="$1"
@@ -87,6 +143,26 @@ set_target_language() {
             provider="elevenlabs"
         fi
         echo -e "   (for ${GREEN}$provider${NC} TTS)"
+        echo ""
+
+        # Greet user in the target language with the target voice
+        local greeting=$(get_greeting_for_language "$language")
+        echo -e "${BLUE}🎓${NC} Your language teacher says:"
+
+        # Check if we're using Piper and if the voice is available
+        if [[ "$provider" == "piper" ]]; then
+            # Quick check: does the voice file exist?
+            local voice_dir="${HOME}/.claude/piper-voices"
+            if [[ -f "${voice_dir}/${recommended_voice}.onnx" ]]; then
+                # Voice exists, play greeting in background
+                nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$recommended_voice" >/dev/null 2>&1 &
+            else
+                echo -e "${YELLOW}   (Voice not yet downloaded - greeting will play after first download)${NC}"
+            fi
+        else
+            # ElevenLabs - just play it in background
+            nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$recommended_voice" >/dev/null 2>&1 &
+        fi
     else
         # Fallback to suggestion if auto-set failed
         suggest_voice_for_language "$language"
@@ -211,12 +287,14 @@ enable_learn_mode() {
     # Auto-set target voice if target language is set but voice is not
     local target_lang=$(get_target_language)
     local target_voice=$(get_target_voice)
+    local voice_was_set=false
 
     if [[ -n "$target_lang" ]] && [[ -z "$target_voice" ]]; then
         echo -e "${BLUE}ℹ${NC}  Auto-configuring voice for $target_lang..."
         local recommended_voice=$(get_recommended_voice_for_language "$target_lang")
         if [[ -n "$recommended_voice" ]]; then
             echo "$recommended_voice" > "$TARGET_VOICE_FILE"
+            target_voice="$recommended_voice"
             echo -e "${GREEN}✓${NC} Target voice automatically set to: ${YELLOW}$recommended_voice${NC}"
 
             # Detect provider for display
@@ -230,10 +308,43 @@ enable_learn_mode() {
             fi
             echo -e "   (for ${GREEN}$provider${NC} TTS)"
             echo ""
+            voice_was_set=true
         fi
     fi
 
     show_status
+
+    # Greet user with language teacher if everything is configured
+    if [[ -n "$target_lang" ]] && [[ -n "$target_voice" ]]; then
+        echo ""
+        local greeting=$(get_greeting_for_language "$target_lang")
+        echo -e "${BLUE}🎓${NC} Your language teacher says:"
+
+        # Detect provider
+        local provider=""
+        if [[ -f "$PROJECT_DIR/.claude/tts-provider.txt" ]]; then
+            provider=$(cat "$PROJECT_DIR/.claude/tts-provider.txt")
+        elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+            provider=$(cat "$HOME/.claude/tts-provider.txt")
+        else
+            provider="elevenlabs"
+        fi
+
+        # Check if we're using Piper and if the voice is available
+        if [[ "$provider" == "piper" ]]; then
+            # Quick check: does the voice file exist?
+            local voice_dir="${HOME}/.claude/piper-voices"
+            if [[ -f "${voice_dir}/${target_voice}.onnx" ]]; then
+                # Voice exists, play greeting in background
+                nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$target_voice" >/dev/null 2>&1 &
+            else
+                echo -e "${YELLOW}   (Voice not yet downloaded - greeting will play after first download)${NC}"
+            fi
+        else
+            # ElevenLabs - just play it in background
+            nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$target_voice" >/dev/null 2>&1 &
+        fi
+    fi
 }
 
 # Disable learning mode
