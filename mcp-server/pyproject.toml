@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentvibes-mcp"
+version = "1.0.0"
+description = "MCP Server for AgentVibes - Text-to-Speech with personality, voices, and multi-language support"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "AgentVibes Contributors" }
+]
+keywords = ["mcp", "tts", "text-to-speech", "elevenlabs", "piper", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "mcp>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/paulpreibisch/AgentVibes"
+Repository = "https://github.com/paulpreibisch/AgentVibes"
+Issues = "https://github.com/paulpreibisch/AgentVibes/issues"
+
+[project.scripts]
+agentvibes-mcp = "server:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

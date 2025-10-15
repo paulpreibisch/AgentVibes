@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agentvibes": {
+      "command": "python",
+      "args": ["/home/user/AgentVibes/mcp-server/server.py"],
+      "env": {
+        "ELEVENLABS_API_KEY": "your-elevenlabs-api-key-here"
+      }
+    }
+  }
+}
