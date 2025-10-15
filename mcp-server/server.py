@@ -84,9 +84,17 @@ class AgentVibesServer:
             if voice:
                 args.append(voice)
 
-            # Set environment with AgentVibes project directory
+            # Set environment with AgentVibes project directory and ensure PATH includes .local/bin
             env = os.environ.copy()
             env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+            # Add common locations for piper to PATH
+            home_dir = Path.home()
+            local_bin = str(home_dir / ".local" / "bin")
+            if "PATH" in env:
+                if local_bin not in env["PATH"]:
+                    env["PATH"] = f"{local_bin}:{env['PATH']}"
+            else:
+                env["PATH"] = local_bin
 
             result = await asyncio.create_subprocess_exec(
                 *args,
@@ -251,9 +259,17 @@ class AgentVibesServer:
         # Explicitly call bash to run the script
         cmd = ["bash", str(script_path)] + args
 
-        # Set environment with AgentVibes project directory
+        # Set environment with AgentVibes project directory and ensure PATH includes .local/bin
         env = os.environ.copy()
         env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+        # Add common locations for piper to PATH
+        home_dir = Path.home()
+        local_bin = str(home_dir / ".local" / "bin")
+        if "PATH" in env:
+            if local_bin not in env["PATH"]:
+                env["PATH"] = f"{local_bin}:{env['PATH']}"
+        else:
+            env["PATH"] = local_bin
 
         try:
             result = await asyncio.create_subprocess_exec(
