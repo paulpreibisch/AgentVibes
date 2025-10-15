@@ -186,8 +186,9 @@ fi
 # @why Support multiple audio players
 # @param Uses global: $TEMP_FILE
 # @sideeffects Plays audio in background
-# Play audio (WSL/Linux) in background
-(mpv "$TEMP_FILE" 2>/dev/null || aplay "$TEMP_FILE" 2>/dev/null || paplay "$TEMP_FILE" 2>/dev/null) &
+# Play audio (WSL/Linux) in background, fully detached
+(mpv "$TEMP_FILE" || aplay "$TEMP_FILE" || paplay "$TEMP_FILE") >/dev/null 2>&1 &
+disown
 
 echo "🎵 Saved to: $TEMP_FILE"
 echo "🎤 Voice used: $VOICE_MODEL (Piper TTS)"

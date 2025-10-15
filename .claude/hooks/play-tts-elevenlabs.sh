@@ -216,8 +216,9 @@ if [ -f "${TEMP_FILE}" ]; then
   # @param Uses global: $TEMP_FILE
   # @sideeffects Plays audio in background
   # @edgecases Falls through players until one works
-  # Play audio (WSL/Linux) in background to avoid blocking
-  (paplay "${TEMP_FILE}" 2>/dev/null || aplay "${TEMP_FILE}" 2>/dev/null || mpg123 "${TEMP_FILE}" 2>/dev/null) &
+  # Play audio (WSL/Linux) in background to avoid blocking, fully detached
+  (paplay "${TEMP_FILE}" || aplay "${TEMP_FILE}" || mpg123 "${TEMP_FILE}") >/dev/null 2>&1 &
+  disown
 
   # Keep temp files for later review - cleaned up weekly by cron
   echo "🎵 Saved to: ${TEMP_FILE}"
