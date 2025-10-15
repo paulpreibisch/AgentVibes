@@ -9,6 +9,7 @@ import figlet from 'figlet';
 import boxen from 'boxen';
 import ora from 'ora';
 import { fileURLToPath } from 'node:url';
+import { installMCP } from './commands/install-mcp.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1281,6 +1282,13 @@ program
       console.log(chalk.yellow('\n⚠️  ElevenLabs API key not found'));
       console.log(chalk.gray('   Set: export ELEVENLABS_API_KEY="your-key"'));
     }
+  });
+
+program
+  .command('install-mcp')
+  .description('Install AgentVibes MCP server for Claude Desktop')
+  .action(async () => {
+    await installMCP();
   });
 
 program.parse(process.argv);
