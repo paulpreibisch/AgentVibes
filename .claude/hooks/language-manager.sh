@@ -2,18 +2,32 @@
 # Language Manager for AgentVibes
 # Manages language settings and multilingual voice selection
 
-# Determine project or global config
-# Use logical path (not physical) to handle symlinked .claude directories
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+# Determine target .claude directory based on context
+# Priority:
+# 1. CLAUDE_PROJECT_DIR env var (set by MCP for project-specific settings)
+# 2. Script location (for direct slash command usage)
+# 3. Global ~/.claude (fallback)
 
-# Check if we have a project-local .claude directory
-if [[ -d "$CLAUDE_DIR" ]] && [[ "$CLAUDE_DIR" != "$HOME/.claude" ]]; then
-    LANGUAGE_FILE="$CLAUDE_DIR/tts-language.txt"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  # MCP context: Use the project directory where MCP was invoked
+  CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
 else
-    LANGUAGE_FILE="$HOME/.claude/tts-language.txt"
-    mkdir -p "$HOME/.claude"
+  # Direct usage context: Use script location
+  CLAUDE_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+
+  # If script is in global ~/.claude, use that
+  if [[ "$CLAUDE_DIR" == "$HOME/.claude" ]]; then
+    CLAUDE_DIR="$HOME/.claude"
+  elif [[ ! -d "$CLAUDE_DIR" ]]; then
+    # Fallback to global if directory doesn't exist
+    CLAUDE_DIR="$HOME/.claude"
+  fi
 fi
+
+LANGUAGE_FILE="$CLAUDE_DIR/tts-language.txt"
+mkdir -p "$CLAUDE_DIR"
 
 # Language to multilingual voice mapping
 declare -A LANGUAGE_VOICES=(

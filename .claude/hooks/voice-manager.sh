@@ -6,19 +6,30 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/voices-config.sh"
 
-# Project-local file first, global fallback
-# Use the logical path from BASH_SOURCE to find .claude directory
-# This handles both normal installations and symlinked hooks directories correctly
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="$(dirname "$SCRIPT_PATH")"
+# Determine target .claude directory based on context
+# Priority:
+# 1. CLAUDE_PROJECT_DIR env var (set by MCP for project-specific settings)
+# 2. Script location (for direct slash command usage)
+# 3. Global ~/.claude (fallback)
 
-# Check if we have a project-local .claude directory
-if [[ -d "$CLAUDE_DIR" ]] && [[ "$CLAUDE_DIR" != "$HOME/.claude" ]]; then
-  VOICE_FILE="$CLAUDE_DIR/tts-voice.txt"
+if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  # MCP context: Use the project directory where MCP was invoked
+  CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
 else
-  # Fallback to global
-  VOICE_FILE="$HOME/.claude/tts-voice.txt"
+  # Direct usage context: Use script location
+  SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  CLAUDE_DIR="$(dirname "$SCRIPT_PATH")"
+
+  # If script is in global ~/.claude, use that
+  if [[ "$CLAUDE_DIR" == "$HOME/.claude" ]]; then
+    CLAUDE_DIR="$HOME/.claude"
+  elif [[ ! -d "$CLAUDE_DIR" ]]; then
+    # Fallback to global if directory doesn't exist
+    CLAUDE_DIR="$HOME/.claude"
+  fi
 fi
+
+VOICE_FILE="$CLAUDE_DIR/tts-voice.txt"
 
 case "$1" in
   list)

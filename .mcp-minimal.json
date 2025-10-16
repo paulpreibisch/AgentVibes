@@ -64,6 +64,15 @@
         "SPACESHIP_API_KEY": "${SPACESHIP_API_KEY}",
         "SPACESHIP_API_SECRET": "${SPACESHIP_API_SECRET}"
       }
+    },
+    "agentvibes": {
+      "command": "python3",
+      "args": [
+        "/home/fire/claude/AgentVibes/mcp-server/server.py"
+      ],
+      "env": {
+        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
+      }
     }
   }
 }
