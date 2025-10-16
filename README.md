@@ -223,7 +223,7 @@ This means different projects can have different voices/personalities!
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Claude Code Quick Start
 
 ### Step 1: Install AgentVibes
 
@@ -428,7 +428,7 @@ All commands are prefixed with `/agent-vibes:`
 
 ### Voice Commands
 
-| Command | MCP Equivalent | Description |
+| Command | AgentVibes MCP Equivalent | Description |
 |---------|----------------|-------------|
 | `/agent-vibes:list` | "List all voices" or "What voices are available?" | Show all available voices |
 | `/agent-vibes:switch <voice>` | "Switch to Aria voice" or "Change voice to Cowboy Bob" | Change to a different voice |
@@ -441,14 +441,14 @@ All commands are prefixed with `/agent-vibes:`
 
 ### System Commands
 
-| Command | MCP Equivalent | Description |
+| Command | AgentVibes MCP Equivalent | Description |
 |---------|----------------|-------------|
 | `/agent-vibes:version` | "What version of AgentVibes?" or "Show version" | Show installed AgentVibes version |
 | `/agent-vibes:update [--yes]` | "Update AgentVibes" or "Upgrade to latest version" | Update to latest version |
 
 ### Personality Commands
 
-| Command | MCP Equivalent | Description |
+| Command | AgentVibes MCP Equivalent | Description |
 |---------|----------------|-------------|
 | `/agent-vibes:personality <name>` | "Set personality to pirate" or "Change to sarcastic personality" | Set personality (changes voice + style) |
 | `/agent-vibes:personality list` | "List all personalities" or "What personalities are available?" | Show all personalities |
@@ -459,7 +459,7 @@ All commands are prefixed with `/agent-vibes:`
 
 ### Sentiment Commands
 
-| Command | MCP Equivalent | Description |
+| Command | AgentVibes MCP Equivalent | Description |
 |---------|----------------|-------------|
 | `/agent-vibes:sentiment <name>` | "Apply sarcastic sentiment" or "Add flirty sentiment to voice" | Apply sentiment to current voice |
 | `/agent-vibes:sentiment list` | "List all sentiments" or "What sentiments are available?" | Show all available sentiments |
@@ -468,7 +468,7 @@ All commands are prefixed with `/agent-vibes:`
 
 ### Language Commands
 
-| Command | MCP Equivalent | Description |
+| Command | AgentVibes MCP Equivalent | Description |
 |---------|----------------|-------------|
 | `/agent-vibes:set-language <language>` | "Speak in Spanish" or "Change language to French" | Set TTS language (30+ supported) |
 | `/agent-vibes:set-language english` | "Reset to English" or "Change language to English" | Reset to English |
@@ -477,7 +477,7 @@ All commands are prefixed with `/agent-vibes:`
 
 ### BMAD Plugin Commands
 
-| Command | MCP Equivalent | Description |
+| Command | AgentVibes MCP Equivalent | Description |
 |---------|----------------|-------------|
 | `/agent-vibes-bmad status` | "Show BMAD plugin status" or "What's the BMAD configuration?" | Show BMAD plugin status & mappings |
 | `/agent-vibes-bmad enable` | "Enable BMAD voice plugin" or "Turn on BMAD voices" | Enable automatic voice switching |
