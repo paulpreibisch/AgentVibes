@@ -105,8 +105,11 @@ Instead of remembering slash commands like `/agent-vibes:switch Aria`, just say:
 ### Why Use AgentVibes MCP?
 
 ✅ **Natural language** - No commands to memorize
+
 ✅ **Works everywhere** - Claude Desktop, Claude Code, Warp Terminal
+
 ✅ **Unified interface** - Same tools across all apps
+
 ✅ **Smart context** - Project-specific or global settings
 
 ### Quick MCP Setup
