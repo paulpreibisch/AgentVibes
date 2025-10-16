@@ -22,16 +22,59 @@ fi
 
 case "$1" in
   list)
-    echo "🎤 Available TTS Voices:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    CURRENT_VOICE=$(cat "$VOICE_FILE" 2>/dev/null || echo "Cowboy")
-    for voice in "${!VOICES[@]}"; do
-      if [ "$voice" = "$CURRENT_VOICE" ]; then
-        echo "  ▶ $voice (current)"
-      else
-        echo "    $voice"
+    # Get active provider
+    PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    if [[ ! -f "$PROVIDER_FILE" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
+    fi
+
+    ACTIVE_PROVIDER="elevenlabs"  # default
+    if [ -f "$PROVIDER_FILE" ]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+    fi
+
+    CURRENT_VOICE=$(cat "$VOICE_FILE" 2>/dev/null || echo "Cowboy Bob")
+
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      echo "🎤 Available Piper TTS Voices:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # List downloaded Piper voices
+      if [[ -f "$SCRIPT_DIR/piper-voice-manager.sh" ]]; then
+        source "$SCRIPT_DIR/piper-voice-manager.sh"
+        VOICE_DIR=$(get_voice_storage_dir)
+        VOICE_COUNT=0
+        for onnx_file in "$VOICE_DIR"/*.onnx; do
+          if [[ -f "$onnx_file" ]]; then
+            voice=$(basename "$onnx_file" .onnx)
+            if [ "$voice" = "$CURRENT_VOICE" ]; then
+              echo "  ▶ $voice (current)"
+            else
+              echo "    $voice"
+            fi
+            ((VOICE_COUNT++))
+          fi
+        done | sort
+
+        if [[ $VOICE_COUNT -eq 0 ]]; then
+          echo "  (No Piper voices downloaded yet)"
+          echo ""
+          echo "Download voices with: /agent-vibes:provider download <voice-name>"
+          echo "Examples: en_US-lessac-medium, en_GB-alba-medium"
+        fi
       fi
-    done | sort
+    else
+      echo "🎤 Available ElevenLabs TTS Voices:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      for voice in "${!VOICES[@]}"; do
+        if [ "$voice" = "$CURRENT_VOICE" ]; then
+          echo "  ▶ $voice (current)"
+        else
+          echo "    $voice"
+        fi
+      done | sort
+    fi
+
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     echo "Usage: voice-manager.sh switch <name>"
@@ -314,9 +357,34 @@ case "$1" in
 
   list-simple)
     # Simple list for AI to parse and display
-    for voice in "${!VOICES[@]}"; do
-      echo "$voice"
-    done | sort
+    # Get active provider
+    PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    if [[ ! -f "$PROVIDER_FILE" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
+    fi
+
+    ACTIVE_PROVIDER="elevenlabs"  # default
+    if [ -f "$PROVIDER_FILE" ]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+    fi
+
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      # List downloaded Piper voices
+      if [[ -f "$SCRIPT_DIR/piper-voice-manager.sh" ]]; then
+        source "$SCRIPT_DIR/piper-voice-manager.sh"
+        VOICE_DIR=$(get_voice_storage_dir)
+        for onnx_file in "$VOICE_DIR"/*.onnx; do
+          if [[ -f "$onnx_file" ]]; then
+            basename "$onnx_file" .onnx
+          fi
+        done | sort
+      fi
+    else
+      # List ElevenLabs voices
+      for voice in "${!VOICES[@]}"; do
+        echo "$voice"
+      done | sort
+    fi
     ;;
 
   replay)
