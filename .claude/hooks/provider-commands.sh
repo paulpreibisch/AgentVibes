@@ -80,10 +80,21 @@ provider_list() {
 # @intent Switch to a different TTS provider
 provider_switch() {
   local new_provider="$1"
+  local force_mode=false
+
+  # Check for --force or --yes flag
+  if [[ "$2" == "--force" ]] || [[ "$2" == "--yes" ]] || [[ "$2" == "-y" ]]; then
+    force_mode=true
+  fi
+
+  # Auto-enable force mode if running non-interactively (e.g., from MCP)
+  if [[ ! -t 0 ]]; then
+    force_mode=true
+  fi
 
   if [[ -z "$new_provider" ]]; then
     echo "❌ Error: Provider name required"
-    echo "Usage: /agent-vibes:provider switch <provider>"
+    echo "Usage: /agent-vibes:provider switch <provider> [--force]"
     echo "Available: elevenlabs, piper"
     return 1
   fi
@@ -148,42 +159,51 @@ provider_switch() {
       read -p "Choose option [1-3]: " -n 1 -r
       echo
 
-      case $REPLY in
-        1)
-          echo "⏩ Continuing with fallback to English..."
-          ;;
-        2)
-          echo "🔄 Switching language to English..."
-          "$SCRIPT_DIR/language-manager.sh" set english
-          ;;
-        3)
-          echo "❌ Provider switch cancelled"
-          return 1
-          ;;
-        *)
-          echo "❌ Invalid option, cancelling"
-          return 1
-          ;;
-      esac
+      # Skip prompt in force mode
+      if [[ "$force_mode" == true ]]; then
+        echo "⏩ Force mode: Continuing with fallback to English..."
+      else
+        case $REPLY in
+          1)
+            echo "⏩ Continuing with fallback to English..."
+            ;;
+          2)
+            echo "🔄 Switching language to English..."
+            "$SCRIPT_DIR/language-manager.sh" set english
+            ;;
+          3)
+            echo "❌ Provider switch cancelled"
+            return 1
+            ;;
+          *)
+            echo "❌ Invalid option, cancelling"
+            return 1
+            ;;
+        esac
+      fi
     fi
   fi
 
-  # Confirm switch
-  echo ""
-  echo "⚠️  Switch to $(echo $new_provider | tr '[:lower:]' '[:upper:]')?"
-  echo ""
-  echo "Current: $current_provider"
-  echo "New:     $new_provider"
-  if [[ "$current_language" != "english" ]]; then
-    echo "Language: $current_language"
-  fi
-  echo ""
-  read -p "Continue? [y/N]: " -n 1 -r
-  echo
+  # Confirm switch (skip in force mode)
+  if [[ "$force_mode" != true ]]; then
+    echo ""
+    echo "⚠️  Switch to $(echo $new_provider | tr '[:lower:]' '[:upper:]')?"
+    echo ""
+    echo "Current: $current_provider"
+    echo "New:     $new_provider"
+    if [[ "$current_language" != "english" ]]; then
+      echo "Language: $current_language"
+    fi
+    echo ""
+    read -p "Continue? [y/N]: " -n 1 -r
+    echo
 
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "❌ Switch cancelled"
-    return 1
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "❌ Switch cancelled"
+      return 1
+    fi
+  else
+    echo "⏩ Force mode: Switching to $new_provider..."
   fi
 
   # Perform switch
@@ -421,7 +441,7 @@ case "$COMMAND" in
     provider_list
     ;;
   switch)
-    provider_switch "$2"
+    provider_switch "$2" "$3"
     ;;
   info)
     provider_info "$2"
