@@ -135,24 +135,94 @@ class AgentVibesServer:
 
     async def list_voices(self) -> str:
         """
-        List all available TTS voices.
+        List all available TTS voices for the active provider.
 
         Returns:
             Formatted list of available voices
         """
-        result = await self._run_script("voice-manager.sh", ["list-simple"])
-        if result:
-            voices = result.strip().split("\n")
-            current_voice = await self._get_current_voice()
+        # Get active provider
+        provider_file = self.claude_dir / "tts-provider.txt"
+        if not provider_file.exists():
+            provider_file = Path.home() / ".claude" / "tts-provider.txt"
 
-            output = "🎤 Available TTS Voices:\n"
-            output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            for voice in voices:
-                marker = " ✓ (current)" if voice == current_voice else ""
-                output += f"  • {voice}{marker}\n"
-            output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            return output
-        return "❌ Failed to list voices"
+        provider = "elevenlabs"  # default
+        if provider_file.exists():
+            provider = provider_file.read_text().strip()
+
+        current_voice = await self._get_current_voice()
+
+        # List voices based on provider
+        if provider == "piper":
+            # For Piper, source piper-voice-manager.sh and list downloaded voices
+            piper_script = self.hooks_dir / "piper-voice-manager.sh"
+            if not piper_script.exists():
+                return "❌ Piper voice manager not found"
+
+            # Call a bash script to source piper-voice-manager.sh and list voices
+            cmd = [
+                "bash",
+                "-c",
+                f"source '{piper_script}' && "
+                f"for onnx in \"$(get_voice_storage_dir)\"/*.onnx; do "
+                f"[ -f \"$onnx\" ] && basename \"$onnx\" .onnx; "
+                f"done | sort",
+            ]
+
+            env = os.environ.copy()
+            env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+            home_dir = Path.home()
+            local_bin = str(home_dir / ".local" / "bin")
+            if "PATH" in env:
+                if local_bin not in env["PATH"]:
+                    env["PATH"] = f"{local_bin}:{env['PATH']}"
+            else:
+                env["PATH"] = local_bin
+
+            try:
+                result = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                )
+                stdout, stderr = await result.communicate()
+                if result.returncode == 0:
+                    voices = stdout.decode().strip().split("\n")
+                    voices = [v for v in voices if v]  # Filter empty strings
+
+                    if not voices:
+                        return (
+                            "📦 No Piper voices downloaded yet\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            "Download voices using /agent-vibes:provider download <voice-name>\n"
+                            "Example: en_US-lessac-medium, en_GB-alba-medium"
+                        )
+
+                    output = "🎤 Available Piper TTS Voices:\n"
+                    output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    for voice in voices:
+                        marker = " ✓ (current)" if voice == current_voice else ""
+                        output += f"  • {voice}{marker}\n"
+                    output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    return output
+                else:
+                    return "❌ Failed to list Piper voices"
+            except Exception as e:
+                return f"❌ Error listing Piper voices: {e}"
+        else:
+            # ElevenLabs voices
+            result = await self._run_script("voice-manager.sh", ["list-simple"])
+            if result:
+                voices = result.strip().split("\n")
+
+                output = "🎤 Available ElevenLabs TTS Voices:\n"
+                output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                for voice in voices:
+                    marker = " ✓ (current)" if voice == current_voice else ""
+                    output += f"  • {voice}{marker}\n"
+                output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                return output
+            return "❌ Failed to list ElevenLabs voices"
 
     async def set_voice(self, voice_name: str) -> str:
         """
