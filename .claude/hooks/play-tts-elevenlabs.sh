@@ -197,9 +197,10 @@ if [ -f "${TEMP_FILE}" ]; then
   if command -v ffmpeg &> /dev/null; then
     PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).mp3"
     # Add 200ms of silence at the beginning to prevent static
-    ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "${TEMP_FILE}" \
+    # Note: ElevenLabs returns mono audio, so we use mono silence
+    ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono:d=0.2 -i "${TEMP_FILE}" \
       -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
-      -map "[out]" -y "${PADDED_FILE}" 2>/dev/null
+      -map "[out]" -c:a libmp3lame -y "${PADDED_FILE}" 2>/dev/null
 
     if [ -f "${PADDED_FILE}" ]; then
       # Use padded file and clean up original
