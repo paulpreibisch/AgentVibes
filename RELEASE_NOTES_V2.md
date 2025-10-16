@@ -91,6 +91,107 @@ AgentVibes now speaks **30+ languages** with native voice quality!
 
 ---
 
+### 🎓 Language Learning Mode (Beta)
+
+**Learn languages naturally with dual-language TTS!**
+
+AgentVibes now includes a **language learning mode** that helps you learn new languages through context and repetition. Every acknowledgment and completion is spoken TWICE - first in your main language (English), then in your target language.
+
+#### **How It Works:**
+
+1. **Set your target language** - Choose from 30+ supported languages
+2. **Enable learning mode** - Activates dual-language TTS
+3. **Natural repetition** - Hear everything twice in context
+4. **Adjustable speed** - Slow down target language for better comprehension
+
+#### **New Learning Commands:**
+
+```bash
+# Set the language you want to learn
+/agent-vibes:target spanish
+/agent-vibes:target french
+/agent-vibes:target german
+
+# Set voice for target language (auto-selected based on provider)
+/agent-vibes:target-voice Antoni          # ElevenLabs
+/agent-vibes:target-voice es_ES-davefx-medium  # Piper
+
+# Enable/disable learning mode
+/agent-vibes:learn
+
+# Set your main/native language
+/agent-vibes:language english
+
+# Adjust speech speed (Piper only)
+/agent-vibes:set-speed 2x          # 2x slower (great for learning)
+/agent-vibes:set-speed target 2x   # Slow down target language only
+/agent-vibes:set-speed normal      # Reset to normal speed
+```
+
+#### **Example Learning Session:**
+
+```
+User: "hello"
+
+Claude (English): "Hey there! Great to hear from you!"
+🔊 Plays in English with your configured voice
+
+Claude (Spanish): "¡Hola! ¡Qué bueno saber de ti!"
+🔊 Plays in Spanish with target voice (Antoni/es_ES-davefx-medium)
+```
+
+#### **Advanced Features:**
+
+**🎚️ Speech Rate Control (Piper TTS):**
+- Slow down target language for better comprehension
+- Separate speed controls for main and target languages
+- Intuitive syntax: `2x` = 2x slower, `0.5x` = 2x faster
+- Perfect for language learners who need more time to process
+
+**🔄 Mixed Provider Support:**
+- Use **ElevenLabs for English** (premium quality)
+- Use **Piper for Spanish** (free, slower speech)
+- System auto-detects provider from voice name
+- Seamless switching between providers
+
+**🎯 Auto-Voice Selection:**
+- System automatically selects the best voice for your target language
+- Provider-aware: ElevenLabs voices for ElevenLabs, Piper voices for Piper
+- Smart fallback if preferred voice unavailable
+
+**🌍 Supported Target Languages:**
+Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Russian, Arabic, Hindi, Polish, Dutch, Turkish, Swedish, Danish, Norwegian, Finnish, Czech, Romanian, Ukrainian, Greek, Bulgarian, Croatian, Slovak, and more!
+
+#### **Voice Mappings by Provider:**
+
+**ElevenLabs Voices:**
+- Spanish → Antoni
+- French → Rachel
+- German → Domi
+- Italian → Bella
+- Portuguese → Matilda
+- Chinese, Japanese, Korean → Antoni (multilingual)
+
+**Piper Voices (Free, Offline):**
+- Spanish → es_ES-davefx-medium
+- French → fr_FR-siwis-medium
+- German → de_DE-thorsten-medium
+- Italian → it_IT-riccardo-x_low
+- Portuguese → pt_BR-faber-medium
+- Chinese → zh_CN-huayan-medium
+- Japanese → ja_JP-hikari-medium
+
+#### **Why This Helps Learning:**
+
+1. **Context-based learning** - Hear words/phrases in real situations
+2. **Natural repetition** - Every message twice, reinforcing vocabulary
+3. **Pronunciation practice** - Native-quality voices model correct pronunciation
+4. **Adjustable pace** - Slow down difficult phrases with speed control
+5. **Consistent exposure** - Learn while coding, naturally building vocabulary
+6. **No extra effort** - Learning happens passively as you work
+
+---
+
 ### 🎤 Expanded Voice Library (27+ Voices)
 
 **New multilingual voices added:**
@@ -269,6 +370,8 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 │   ├── provider-manager.sh      # Provider switching
 │   ├── provider-commands.sh     # Provider CLI
 │   ├── language-manager.sh      # Language system
+│   ├── learn-manager.sh         # Language learning mode
+│   ├── speed-manager.sh         # Speech rate control (Piper)
 │   ├── voice-manager.sh         # Voice switching
 │   ├── personality-manager.sh   # Personality system
 │   ├── sentiment-manager.sh     # Sentiment system
@@ -289,6 +392,12 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 - `tts-personality.txt` - Active personality
 - `tts-sentiment.txt` - Active sentiment
 - `tts-language.txt` - Selected language
+- `tts-learn-mode.txt` - Learning mode status (ON/OFF)
+- `tts-target-language.txt` - Target language for learning
+- `tts-target-voice.txt` - Voice for target language
+- `tts-main-language.txt` - Main/native language
+- `config/piper-speech-rate.txt` - Main voice speech rate (Piper)
+- `config/piper-target-speech-rate.txt` - Target voice speech rate (Piper)
 
 ---
 
@@ -314,6 +423,15 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 - `/agent-vibes:set-language <lang>` - Set TTS language
 - `/agent-vibes:set-language list` - Show languages
 - `/agent-vibes:set-language english` - Reset to English
+
+### Language Learning Commands:
+- `/agent-vibes:target <language>` - Set target language to learn
+- `/agent-vibes:target-voice <voice>` - Set voice for target language
+- `/agent-vibes:learn` - Enable/disable learning mode
+- `/agent-vibes:language <language>` - Set main/native language
+- `/agent-vibes:set-speed <speed>` - Set speech rate (Piper only)
+- `/agent-vibes:set-speed target <speed>` - Set target language speed
+- `/agent-vibes:set-speed get` - Show current speed settings
 
 ### Personality Commands:
 - `/agent-vibes:personality <name>` - Set personality
@@ -407,6 +525,17 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 
 ## 🐛 Bug Fixes
 
+### v2.0.17-beta Series (Language Learning Mode):
+- **Fixed ElevenLabs audio static** - Added MP3 codec (`-c:a libmp3lame`) to prevent WAV format issues
+- **Fixed MCP provider switching** - Enhanced non-interactive detection with `CLAUDE_PROJECT_DIR` check
+- **Fixed target voice sync** - Auto-updates target voice when switching providers
+- **Fixed voice/provider mismatches** - Output style now lets system choose voice based on active provider
+- **Fixed learning mode config** - Corrected file names (`tts-learn-mode.txt`) and value checks (`ON`/`OFF`)
+- **Fixed Piper speech rate** - Properly reads numeric values from config files (strips comments)
+- **Fixed interactive prompts in MCP** - Provider switch commands now work seamlessly via slash commands
+- **Fixed Spanish voice download** - Voice models now download automatically with user consent
+
+### v2.0.0 Core Fixes:
 - Fixed symlink support for shared hooks
 - Fixed WSL audio static with silence padding
 - Fixed installer directory detection for npx
@@ -419,15 +548,17 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 
 ## 📊 Statistics
 
-**v2.0.0 by the numbers:**
+**v2.0.17-beta by the numbers:**
 - 🎤 **200+ voices** across both providers
-- 🌍 **30+ languages** supported
+- 🌍 **30+ languages** supported (learning mode for all)
+- 🎓 **1 language learning mode** with dual-language TTS
 - 🎭 **19 personalities** included
 - 💭 **19 sentiments** available
-- 📝 **15 slash commands** total
-- 🔧 **12 hook scripts** installed
-- 🔌 **2 TTS providers** available
+- 📝 **20+ slash commands** total (incl. learning commands)
+- 🔧 **14 hook scripts** installed (incl. learn-manager, speed-manager)
+- 🔌 **2 TTS providers** available (mixed provider support)
 - 🤖 **10 BMAD agents** with voice mapping
+- 🎚️ **Adjustable speech rate** for Piper TTS (0.5x - 3x)
 
 ---
 
