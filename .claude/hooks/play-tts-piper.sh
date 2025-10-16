@@ -144,15 +144,60 @@ fi
 mkdir -p "$AUDIO_DIR"
 TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).wav"
 
+# @function get_speech_rate
+# @intent Determine speech rate for Piper synthesis
+# @why Allow slower speech for language learning (default 2.0 for non-English)
+# @returns Speech rate value (default 1.0 for English, 2.0 for others)
+get_speech_rate() {
+  local target_config=""
+  local main_config=""
+
+  # Check for target-specific config first (used for learning mode target language)
+  if [[ -f "$SCRIPT_DIR/../config/piper-target-speech-rate.txt" ]]; then
+    target_config="$SCRIPT_DIR/../config/piper-target-speech-rate.txt"
+  elif [[ -f "$HOME/.claude/config/piper-target-speech-rate.txt" ]]; then
+    target_config="$HOME/.claude/config/piper-target-speech-rate.txt"
+  fi
+
+  # Check for main config
+  if [[ -f "$SCRIPT_DIR/../config/piper-speech-rate.txt" ]]; then
+    main_config="$SCRIPT_DIR/../config/piper-speech-rate.txt"
+  elif [[ -f "$HOME/.claude/config/piper-speech-rate.txt" ]]; then
+    main_config="$HOME/.claude/config/piper-speech-rate.txt"
+  fi
+
+  # If this is a non-English voice and target config exists, use it
+  if [[ "$CURRENT_LANGUAGE" != "english" ]] && [[ -n "$target_config" ]]; then
+    cat "$target_config" 2>/dev/null
+    return
+  fi
+
+  # Otherwise use main config if available
+  if [[ -n "$main_config" ]]; then
+    # Read only the last non-comment line (the actual number)
+    grep -v '^#' "$main_config" 2>/dev/null | grep -v '^$' | tail -1
+    return
+  fi
+
+  # Default: 2x slower for non-English (better for language learning)
+  if [[ "$CURRENT_LANGUAGE" != "english" ]]; then
+    echo "2.0"
+  else
+    echo "1.0"
+  fi
+}
+
+SPEECH_RATE=$(get_speech_rate)
+
 # @function synthesize_with_piper
 # @intent Generate speech using Piper TTS
 # @why Provides free, offline TTS alternative
-# @param Uses globals: $TEXT, $VOICE_PATH
+# @param Uses globals: $TEXT, $VOICE_PATH, $SPEECH_RATE
 # @returns Creates WAV file at $TEMP_FILE
 # @exitcode 0=success, 4=synthesis error
 # @sideeffects Creates audio file
 # @edgecases Handles piper errors, invalid models
-echo "$TEXT" | piper --model "$VOICE_PATH" --output_file "$TEMP_FILE" 2>/dev/null
+echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --output_file "$TEMP_FILE" 2>/dev/null
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
   echo "❌ Failed to synthesize speech with Piper"

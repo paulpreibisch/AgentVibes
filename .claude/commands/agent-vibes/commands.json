@@ -48,6 +48,30 @@
     {
       "name": "get",
       "description": "Get personality details"
+    },
+    {
+      "name": "language",
+      "description": "Set main/native language"
+    },
+    {
+      "name": "learn",
+      "description": "Enable/disable language learning mode"
+    },
+    {
+      "name": "target",
+      "description": "Set target language to learn"
+    },
+    {
+      "name": "target-voice",
+      "description": "Set voice for target language"
+    },
+    {
+      "name": "set-speed",
+      "description": "Set speech speed for Piper TTS voices"
+    },
+    {
+      "name": "provider",
+      "description": "Manage TTS providers (ElevenLabs, Piper)"
     }
   ]
 }

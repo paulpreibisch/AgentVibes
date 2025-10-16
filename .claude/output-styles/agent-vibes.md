@@ -96,11 +96,44 @@ For 'random' personality: Pick a different personality each time from available 
 
 Make each response unique, creative, and naturally incorporate the personality's style!
 
+## Language Learning Mode
+
+**Check if learning mode is enabled:**
+```bash
+LEARN_ENABLED=$(cat .claude/tts-learn-enabled.txt 2>/dev/null || cat ~/.claude/tts-learn-enabled.txt 2>/dev/null || echo "false")
+```
+
+**If learning mode is ENABLED ("true"):**
+1. Get target language and voice:
+   ```bash
+   TARGET_LANG=$(cat .claude/tts-target-language.txt 2>/dev/null || cat ~/.claude/tts-target-language.txt 2>/dev/null)
+   TARGET_VOICE=$(cat .claude/tts-target-voice.txt 2>/dev/null || cat ~/.claude/tts-target-voice.txt 2>/dev/null)
+   ```
+
+2. **Make TWO TTS calls** for each acknowledgment/completion:
+   - **First**: Play in main language (English) with current voice
+   - **Second**: Translate to target language and play with target voice
+
+3. **Translation**: Use AI to translate the English message to the target language naturally
+
+**Example with learning mode enabled (Spanish):**
+```
+User: "hello"
+# Acknowledgment in English
+.claude/hooks/play-tts.sh "Hey there! Great to hear from you!"
+# Acknowledgment in Spanish
+.claude/hooks/play-tts.sh "¡Hola! ¡Qué bueno saber de ti!" "Antoni"
+```
+
+**If learning mode is DISABLED:**
+- Make normal single TTS call as usual
+
 ## Voice Selection
 
 - If user specifies a voice (e.g., "use Aria voice"), pass it as second parameter
 - Otherwise, omit second parameter to use default voice from `.claude/tts-voice.txt`
 - Use same voice for both acknowledgment and completion
+- For learning mode, use target voice for second TTS call
 
 ## Example Usage
 

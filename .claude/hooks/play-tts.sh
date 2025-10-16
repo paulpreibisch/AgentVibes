@@ -27,6 +27,29 @@ ACTIVE_PROVIDER=$(get_active_provider)
 # Show GitHub star reminder (once per day)
 "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
 
+# @function detect_voice_provider
+# @intent Auto-detect provider from voice name (for mixed-provider support)
+# @why Allow ElevenLabs for main language + Piper for target language
+# @param $1 voice name/ID
+# @returns Provider name (elevenlabs or piper)
+detect_voice_provider() {
+  local voice="$1"
+  # Piper voice names contain underscore and dash (e.g., es_ES-davefx-medium)
+  if [[ "$voice" == *"_"*"-"* ]]; then
+    echo "piper"
+  else
+    echo "$ACTIVE_PROVIDER"
+  fi
+}
+
+# Override provider if voice indicates different provider (mixed-provider mode)
+if [[ -n "$VOICE_OVERRIDE" ]]; then
+  DETECTED_PROVIDER=$(detect_voice_provider "$VOICE_OVERRIDE")
+  if [[ "$DETECTED_PROVIDER" != "$ACTIVE_PROVIDER" ]]; then
+    ACTIVE_PROVIDER="$DETECTED_PROVIDER"
+  fi
+fi
+
 # Normal single-language mode - route to appropriate provider implementation
 # Note: For learning mode, the output style will call this script TWICE:
 # 1. First call with main language text and current voice
