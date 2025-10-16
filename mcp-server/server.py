@@ -86,9 +86,22 @@ class AgentVibesServer:
 
             # Set environment and ensure PATH includes .local/bin
             env = os.environ.copy()
-            # Use AgentVibes root directory - same as slash commands use
-            # This ensures MCP and slash commands save to the same location
-            env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+
+            # Determine where to save settings based on context:
+            # 1. If cwd has .claude/ → Use cwd (real project)
+            # 2. If cwd == AgentVibes dir → Use global ~/.claude/ (Warp)
+            # 3. Otherwise → Use AgentVibes/.claude/ (development)
+            cwd = Path.cwd()
+            if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
+                # Real project with .claude directory
+                env["CLAUDE_PROJECT_DIR"] = str(cwd)
+            elif cwd == self.agentvibes_root:
+                # Running from AgentVibes itself (Warp) - use global
+                # Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
+                pass
+            else:
+                # Development context - use AgentVibes directory
+                env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
             # Add common locations for piper to PATH
             home_dir = Path.home()
             local_bin = str(home_dir / ".local" / "bin")
@@ -284,9 +297,22 @@ class AgentVibesServer:
 
         # Set environment and ensure PATH includes .local/bin
         env = os.environ.copy()
-        # Use AgentVibes root directory - same as slash commands use
-        # This ensures MCP and slash commands save to the same location
-        env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
+
+        # Determine where to save settings based on context:
+        # 1. If cwd has .claude/ → Use cwd (real project)
+        # 2. If cwd == AgentVibes dir → Use global ~/.claude/ (Warp)
+        # 3. Otherwise → Use AgentVibes/.claude/ (development)
+        cwd = Path.cwd()
+        if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
+            # Real project with .claude directory
+            env["CLAUDE_PROJECT_DIR"] = str(cwd)
+        elif cwd == self.agentvibes_root:
+            # Running from AgentVibes itself (Warp) - use global
+            # Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
+            pass
+        else:
+            # Development context - use AgentVibes directory
+            env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
         # Add common locations for piper to PATH
         home_dir = Path.home()
         local_bin = str(home_dir / ".local" / "bin")
