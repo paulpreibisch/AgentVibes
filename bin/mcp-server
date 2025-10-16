@@ -154,6 +154,33 @@ if [ "$PROVIDER" = "piper" ]; then
     else
         echo "✅ Piper TTS already installed" >&2
     fi
+
+    # Auto-download default voice if needed
+    if command -v piper &> /dev/null; then
+        # Source the voice manager for download functions
+        if [ -f "$PACKAGE_ROOT/.claude/hooks/piper-voice-manager.sh" ]; then
+            source "$PACKAGE_ROOT/.claude/hooks/piper-voice-manager.sh"
+
+            # Default voice for Piper
+            DEFAULT_VOICE="en_US-lessac-medium"
+
+            # Check if default voice is downloaded
+            if ! verify_voice "$DEFAULT_VOICE" 2>/dev/null; then
+                print_section "📥 Downloading Default Voice"
+                echo "Downloading voice model: $DEFAULT_VOICE (~25MB)..." >&2
+                echo "Source: HuggingFace (rhasspy/piper-voices)" >&2
+
+                if download_voice "$DEFAULT_VOICE" 2>&1 | grep -v "^📥" | grep -v "Source:" | grep -v "Size:" >&2; then
+                    echo "✅ Default voice downloaded successfully!" >&2
+                else
+                    echo "⚠️  Could not download default voice" >&2
+                    echo "   Voice will download on first TTS request" >&2
+                fi
+            else
+                echo "✅ Default Piper voice ready" >&2
+            fi
+        fi
+    fi
 elif [ "$PROVIDER" = "elevenlabs" ]; then
     # Check for ElevenLabs API key
     if [ -z "$ELEVENLABS_API_KEY" ]; then
