@@ -84,10 +84,11 @@ class AgentVibesServer:
             if voice:
                 args.append(voice)
 
-            # Set environment with current project directory and ensure PATH includes .local/bin
+            # Set environment and ensure PATH includes .local/bin
             env = os.environ.copy()
-            # Use current working directory as project directory for project-specific settings
-            env["CLAUDE_PROJECT_DIR"] = os.getcwd()
+            # Use AgentVibes root directory - same as slash commands use
+            # This ensures MCP and slash commands save to the same location
+            env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
             # Add common locations for piper to PATH
             home_dir = Path.home()
             local_bin = str(home_dir / ".local" / "bin")
@@ -281,10 +282,11 @@ class AgentVibesServer:
         # Explicitly call bash to run the script
         cmd = ["bash", str(script_path)] + args
 
-        # Set environment with current project directory and ensure PATH includes .local/bin
+        # Set environment and ensure PATH includes .local/bin
         env = os.environ.copy()
-        # Use current working directory as project directory for project-specific settings
-        env["CLAUDE_PROJECT_DIR"] = os.getcwd()
+        # Use AgentVibes root directory - same as slash commands use
+        # This ensures MCP and slash commands save to the same location
+        env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
         # Add common locations for piper to PATH
         home_dir = Path.home()
         local_bin = str(home_dir / ".local" / "bin")
