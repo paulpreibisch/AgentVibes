@@ -92,7 +92,7 @@ Expanded voice library (27+ voices), **Multi-provider TTS support** (ElevenLabs 
 
 **🎯 The easiest way to control AgentVibes - just talk naturally!**
 
-In addition to installing AgentVibes in Claude Code using the NPX installer, we **highly recommend** installing the AgentVibes MCP server. This allows you to control AgentVibes simply by talking naturally to it, rather than having to remember slash commands.
+In addition to installing AgentVibes in Claude Code using the NPX installer, we **highly recommend** installing the AgentVibes MCP server. This allows you to control AgentVibes simply by talking naturally to it (especially if you've installed [WhisperTyping](https://whispertyping.com/)), rather than having to remember slash commands.
 
 **Note:** Slash commands (`/agent-vibes:*`) only work in Claude Code. For Claude Desktop and Warp Terminal, you **must** use the AgentVibes MCP for voice control.
 
