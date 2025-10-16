@@ -209,6 +209,47 @@ provider_switch() {
   # Perform switch
   set_active_provider "$new_provider"
 
+  # Update target voice if language learning mode is active
+  local target_lang_file=""
+  local target_voice_file=""
+
+  # Check project-local first, then global
+  if [[ -d "$SCRIPT_DIR/../.." ]]; then
+    local project_dir="$SCRIPT_DIR/../.."
+    if [[ -f "$project_dir/.claude/tts-target-language.txt" ]]; then
+      target_lang_file="$project_dir/.claude/tts-target-language.txt"
+      target_voice_file="$project_dir/.claude/tts-target-voice.txt"
+    fi
+  fi
+
+  # Fallback to global
+  if [[ -z "$target_lang_file" ]]; then
+    if [[ -f "$HOME/.claude/tts-target-language.txt" ]]; then
+      target_lang_file="$HOME/.claude/tts-target-language.txt"
+      target_voice_file="$HOME/.claude/tts-target-voice.txt"
+    fi
+  fi
+
+  # If target language is set, update voice for new provider
+  if [[ -n "$target_lang_file" ]] && [[ -f "$target_lang_file" ]]; then
+    local target_lang
+    target_lang=$(cat "$target_lang_file")
+
+    if [[ -n "$target_lang" ]]; then
+      # Get the recommended voice for this language with new provider
+      local new_target_voice
+      new_target_voice=$(get_voice_for_language "$target_lang" "$new_provider")
+
+      if [[ -n "$new_target_voice" ]]; then
+        echo "$new_target_voice" > "$target_voice_file"
+        echo ""
+        echo "🔄 Updated target language voice:"
+        echo "   Language: $target_lang"
+        echo "   Voice: $new_target_voice (for $new_provider)"
+      fi
+    fi
+  fi
+
   # Test new provider
   echo ""
   echo "🔊 Testing provider..."
