@@ -88,7 +88,8 @@ provider_switch() {
   fi
 
   # Auto-enable force mode if running non-interactively (e.g., from MCP)
-  if [[ ! -t 0 ]]; then
+  # Check multiple conditions for MCP/non-interactive context
+  if [[ ! -t 0 ]] || [[ -n "$CLAUDE_PROJECT_DIR" ]] || [[ -n "$MCP_SERVER" ]]; then
     force_mode=true
   fi
 
@@ -156,13 +157,14 @@ provider_switch() {
       echo "  2. Switch language to English"
       echo "  3. Cancel provider switch"
       echo ""
-      read -p "Choose option [1-3]: " -n 1 -r
-      echo
 
       # Skip prompt in force mode
       if [[ "$force_mode" == true ]]; then
         echo "⏩ Force mode: Continuing with fallback to English..."
       else
+        read -p "Choose option [1-3]: " -n 1 -r
+        echo
+
         case $REPLY in
           1)
             echo "⏩ Continuing with fallback to English..."
