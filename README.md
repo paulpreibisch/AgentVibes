@@ -116,7 +116,12 @@ Instead of remembering slash commands like `/agent-vibes:switch Aria`, just say:
 
 #### For Claude Desktop
 
-**⚠️ IMPORTANT:** Claude Desktop on Windows requires WSL (Windows Subsystem for Linux) enabled. The MCP server will also automatically install Python dependencies (Python MCP package, pipx, Piper TTS) on first run.
+**⚠️ IMPORTANT Requirements:**
+
+- **Windows:** WSL (Windows Subsystem for Linux) must be enabled
+- **Python 3:** Must be installed on your system ([Download Python](https://www.python.org/downloads/))
+  - The MCP server will automatically install Python packages (mcp, pipx, Piper TTS)
+  - But Python 3 itself must be installed first by you
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
