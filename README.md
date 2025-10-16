@@ -15,6 +15,28 @@
 
 ---
 
+## ✨ What is AgentVibes?
+
+**AgentVibes adds lively voice narration to your Claude AI sessions!**
+
+Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp Terminal - AgentVibes brings AI to life with professional voices and personalities.
+
+### 🎯 Key Features
+
+- 🎙️ **AgentVibes MCP** - **NEW!** Natural language control for Claude Code, Claude Desktop & Warp (no slash commands!)
+- 🎭 **Multi-Provider Support** - Choose ElevenLabs (150+ premium voices) or Piper TTS (50+ free voices)
+- 🌍 **30+ Languages** - Multilingual support with native voice quality
+- 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
+- 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
+- 💬 **Advanced Sentiment System** - Apply personality styles to ANY voice without changing it
+- 🔌 **Enhanced BMAD Plugin** - Auto voice switching for BMAD agents with multilingual support
+- 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions in any language
+- 🎵 **Voice Preview & Replay** - Listen before you choose, replay last 10 TTS messages
+- 🆓 **Free Option Available** - Use Piper TTS with no API key required
+- ⚡ **One-Command Install** - Get started in seconds
+
+---
+
 ## 📑 Table of Contents
 
 ### Getting Started
@@ -63,30 +85,6 @@ Expanded voice library (27+ voices), **Multi-provider TTS support** (ElevenLabs 
 - 🔌 **Enhanced BMAD Plugin** - Multilingual agent voices with personality mapping
 
 [→ View Full Release Notes](RELEASE_NOTES_V2.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
-
----
-
-## ✨ What is AgentVibes?
-
-**AgentVibes adds lively voice narration to your Claude AI sessions!**
-
-Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp Terminal - AgentVibes brings AI to life with professional voices and personalities.
-
-### 🎯 Key Features
-
-- 🎙️ **AgentVibes MCP** - **NEW!** Natural language control for Claude Code, Claude Desktop & Warp (no slash commands!)
-- 🎭 **Multi-Provider Support** - Choose ElevenLabs (150+ premium voices) or Piper TTS (50+ free voices)
-- 🌍 **30+ Languages** - Multilingual support with native voice quality
-- 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
-- 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
-- 💬 **Advanced Sentiment System** - Apply personality styles to ANY voice without changing it
-- 🔌 **Enhanced BMAD Plugin** - Auto voice switching for BMAD agents with multilingual support
-- 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions in any language
-- 🎵 **Voice Preview & Replay** - Listen before you choose, replay last 10 TTS messages
-- 🆓 **Free Option Available** - Use Piper TTS with no API key required
-- ⚡ **One-Command Install** - Get started in seconds
-
-[↑ Back to top](#-table-of-contents)
 
 ---
 
