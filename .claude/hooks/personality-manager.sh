@@ -333,6 +333,85 @@ EOF
     echo "🎭 Personality reset to: normal"
     ;;
 
+  set-favorite-voice)
+    PERSONALITY="$2"
+    NEW_VOICE="$3"
+
+    if [[ -z "$PERSONALITY" ]] || [[ -z "$NEW_VOICE" ]]; then
+      echo "❌ Please specify both personality name and voice name"
+      echo "Usage: $0 set-favorite-voice <personality> <voice>"
+      exit 1
+    fi
+
+    FILE="$PERSONALITIES_DIR/${PERSONALITY}.md"
+    if [[ ! -f "$FILE" ]]; then
+      echo "❌ Personality '$PERSONALITY' not found"
+      exit 1
+    fi
+
+    # Detect active TTS provider
+    PROVIDER_FILE=""
+    if [[ -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
+    fi
+
+    ACTIVE_PROVIDER="elevenlabs"  # default
+    if [[ -n "$PROVIDER_FILE" ]]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+    fi
+
+    # Determine which field to update based on provider
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      VOICE_FIELD="piper_voice"
+      CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "piper_voice")
+    else
+      VOICE_FIELD="elevenlabs_voice"
+      CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "voice")
+    fi
+
+    # Check if personality already has a favorite voice assigned
+    if [[ -n "$CURRENT_VOICE" ]] && [[ "$CURRENT_VOICE" != "$NEW_VOICE" ]]; then
+      echo "⚠️  WARNING: Personality '$PERSONALITY' already has a favorite voice assigned!"
+      echo ""
+      echo "   Current favorite ($ACTIVE_PROVIDER): $CURRENT_VOICE"
+      echo "   New voice: $NEW_VOICE"
+      echo ""
+      echo "Do you want to replace the favorite voice?"
+      echo ""
+      read -p "Enter your choice (yes/no): " CHOICE
+
+      case "$CHOICE" in
+        yes|y|YES|Y)
+          echo "✅ Replacing favorite voice..."
+          ;;
+        no|n|NO|N)
+          echo "❌ Keeping current favorite voice: $CURRENT_VOICE"
+          exit 0
+          ;;
+        *)
+          echo "❌ Invalid choice. Keeping current favorite voice: $CURRENT_VOICE"
+          exit 1
+          ;;
+      esac
+    fi
+
+    # Update the voice in the personality file
+    if grep -q "^${VOICE_FIELD}:" "$FILE"; then
+      # Field exists, replace it
+      sed -i "s/^${VOICE_FIELD}:.*/${VOICE_FIELD}: ${NEW_VOICE}/" "$FILE"
+    else
+      # Field doesn't exist, add it after the frontmatter
+      sed -i "/^---$/,/^---$/ { /^---$/a\\
+${VOICE_FIELD}: ${NEW_VOICE}
+}" "$FILE"
+    fi
+
+    echo "✅ Favorite voice for '$PERSONALITY' personality set to: $NEW_VOICE ($ACTIVE_PROVIDER)"
+    echo "📝 Updated file: $FILE"
+    ;;
+
   *)
     # If a single argument is provided and it's not a command, treat it as "set <personality>"
     if [[ -n "$1" ]] && [[ -f "$PERSONALITIES_DIR/${1}.md" || "$1" == "random" ]]; then
@@ -347,11 +426,13 @@ EOF
       echo "  add <name>                        - Create new personality"
       echo "  edit <name>                       - Show path to edit personality"
       echo "  get                               - Show current personality"
+      echo "  set-favorite-voice <name> <voice> - Set favorite voice for a personality"
       echo "  reset                             - Reset to normal"
       echo ""
       echo "Examples:"
       echo "  /agent-vibes:personality flirty"
       echo "  /agent-vibes:personality add cowboy"
+      echo "  /agent-vibes:personality set-favorite-voice flirty \"Aria\""
     fi
     ;;
 esac

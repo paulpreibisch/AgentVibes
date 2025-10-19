@@ -75,8 +75,18 @@ else
 
   if [[ -n "$VOICE_FILE" ]]; then
     FILE_VOICE=$(cat "$VOICE_FILE" 2>/dev/null)
-    # Check if it's a Piper model name (contains underscore and dash)
-    if [[ "$FILE_VOICE" == *"_"*"-"* ]]; then
+
+    # Check for multi-speaker voice (model + speaker ID stored separately)
+    MODEL_FILE="$SCRIPT_DIR/../tts-piper-model.txt"
+    SPEAKER_ID_FILE="$SCRIPT_DIR/../tts-piper-speaker-id.txt"
+
+    if [[ -f "$MODEL_FILE" ]] && [[ -f "$SPEAKER_ID_FILE" ]]; then
+      # Multi-speaker voice
+      VOICE_MODEL=$(cat "$MODEL_FILE" 2>/dev/null)
+      SPEAKER_ID=$(cat "$SPEAKER_ID_FILE" 2>/dev/null)
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: $SPEAKER_ID)"
+    # Check if it's a standard Piper model name or custom voice (just use as-is)
+    elif [[ -n "$FILE_VOICE" ]]; then
       VOICE_MODEL="$FILE_VOICE"
     fi
   fi
@@ -232,12 +242,18 @@ SPEECH_RATE=$(get_speech_rate)
 # @function synthesize_with_piper
 # @intent Generate speech using Piper TTS
 # @why Provides free, offline TTS alternative
-# @param Uses globals: $TEXT, $VOICE_PATH, $SPEECH_RATE
+# @param Uses globals: $TEXT, $VOICE_PATH, $SPEECH_RATE, $SPEAKER_ID (optional)
 # @returns Creates WAV file at $TEMP_FILE
 # @exitcode 0=success, 4=synthesis error
 # @sideeffects Creates audio file
-# @edgecases Handles piper errors, invalid models
-echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --output_file "$TEMP_FILE" 2>/dev/null
+# @edgecases Handles piper errors, invalid models, multi-speaker voices
+if [[ -n "$SPEAKER_ID" ]]; then
+  # Multi-speaker voice: Pass speaker ID
+  echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --output_file "$TEMP_FILE" 2>/dev/null
+else
+  # Single-speaker voice
+  echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --output_file "$TEMP_FILE" 2>/dev/null
+fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
   echo "❌ Failed to synthesize speech with Piper"

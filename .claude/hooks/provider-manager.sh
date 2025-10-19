@@ -141,12 +141,31 @@ set_active_provider() {
     voice_file="$HOME/.claude/tts-voice.txt"
   fi
 
-  # Remove voice file to force default voice for new provider
-  if [[ -f "$voice_file" ]]; then
-    rm -f "$voice_file"
-  fi
+  # Set default voice for the new provider
+  local default_voice
+  case "$provider" in
+    piper)
+      # Default Piper voice
+      default_voice="en_US-lessac-medium"
+      ;;
+    elevenlabs)
+      # Default ElevenLabs voice (first in alphabetical order from voices-config.sh)
+      default_voice="Amy"
+      ;;
+    *)
+      # Unknown provider - remove voice file
+      if [[ -f "$voice_file" ]]; then
+        rm -f "$voice_file"
+      fi
+      echo "✓ Active provider set to: $provider (voice reset)"
+      return 0
+      ;;
+  esac
 
-  echo "✓ Active provider set to: $provider (voice reset to default)"
+  # Write default voice to file
+  echo "$default_voice" > "$voice_file"
+
+  echo "✓ Active provider set to: $provider (voice set to: $default_voice)"
 }
 
 # @function list_providers

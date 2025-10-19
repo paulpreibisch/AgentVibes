@@ -416,6 +416,24 @@ class AgentVibesServer:
         result = await self._run_script("speed-manager.sh", ["get"])
         return result if result else "❌ Failed to get speed settings"
 
+    async def download_extra_voices(self, auto_yes: bool = False) -> str:
+        """
+        Download extra high-quality Piper voices from HuggingFace.
+
+        Downloads custom voices: Kristin, Jenny, and Tracy/16Speakers.
+
+        Args:
+            auto_yes: If True, skips confirmation prompt and downloads automatically
+
+        Returns:
+            Success message with download summary
+        """
+        args = ["--yes"] if auto_yes else []
+        result = await self._run_script("download-extra-voices.sh", args)
+        if result and ("✅" in result or "Successfully downloaded" in result or "already downloaded" in result):
+            return result
+        return f"❌ Failed to download extra voices: {result}"
+
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
         """Run a bash script and return output"""
@@ -679,6 +697,20 @@ Examples:
             description="Get current speech speed settings for main and target voices",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="download_extra_voices",
+            description="Download extra high-quality custom Piper voices from HuggingFace. Includes: Kristin (US female), Jenny (UK female with Irish accent), and Tracy/16Speakers (multi-speaker). Perfect for adding variety to your TTS voices.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "auto_yes": {
+                        "type": "boolean",
+                        "description": "Skip confirmation prompt and download automatically (default: False)",
+                        "default": False
+                    }
+                },
+            },
+        ),
     ]
 
 
@@ -717,6 +749,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.set_speed(arguments["speed"], target)
         elif name == "get_speed":
             result = await agent_vibes.get_speed()
+        elif name == "download_extra_voices":
+            auto_yes = arguments.get("auto_yes", False)
+            result = await agent_vibes.download_extra_voices(auto_yes)
         else:
             result = f"Unknown tool: {name}"
 

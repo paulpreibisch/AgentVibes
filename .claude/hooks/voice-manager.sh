@@ -262,11 +262,96 @@ case "$1" in
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
     fi
 
-    # If using Piper and voice name looks like a Piper model (contains underscore and dash)
-    # then skip ElevenLabs voice validation
-    if [[ "$ACTIVE_PROVIDER" == "piper" ]] && [[ "$VOICE_NAME" == *"_"*"-"* ]]; then
-      # This is a Piper model name, use it directly
-      FOUND="$VOICE_NAME"
+    # Voice lookup strategy depends on active provider
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      # Piper voice lookup: Scan voice directory for .onnx files
+      source "$SCRIPT_DIR/piper-voice-manager.sh"
+      VOICE_DIR=$(get_voice_storage_dir)
+
+      # Check if voice file exists (case-insensitive)
+      FOUND=""
+      shopt -s nullglob
+      for onnx_file in "$VOICE_DIR"/*.onnx; do
+        if [[ -f "$onnx_file" ]]; then
+          voice=$(basename "$onnx_file" .onnx)
+          if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
+            FOUND="$voice"
+            break
+          fi
+        fi
+      done
+      shopt -u nullglob
+
+      # If not found, check multi-speaker registry
+      if [[ -z "$FOUND" ]] && [[ -f "$SCRIPT_DIR/piper-multispeaker-registry.sh" ]]; then
+        source "$SCRIPT_DIR/piper-multispeaker-registry.sh"
+
+        MULTISPEAKER_INFO=$(get_multispeaker_info "$VOICE_NAME")
+        if [[ -n "$MULTISPEAKER_INFO" ]]; then
+          MODEL="${MULTISPEAKER_INFO%%:*}"
+          SPEAKER_ID="${MULTISPEAKER_INFO#*:}"
+
+          # Verify the model file exists
+          if [[ -f "$VOICE_DIR/${MODEL}.onnx" ]]; then
+            # Store speaker name in tts-voice.txt
+            echo "$VOICE_NAME" > "$VOICE_FILE"
+
+            # Store model and speaker ID separately for play-tts-piper.sh
+            echo "$MODEL" > "$CLAUDE_DIR/tts-piper-model.txt"
+            echo "$SPEAKER_ID" > "$CLAUDE_DIR/tts-piper-speaker-id.txt"
+
+            DESCRIPTION=$(get_multispeaker_description "$VOICE_NAME")
+            echo "✅ Multi-speaker voice switched to: $VOICE_NAME"
+            echo "🎤 Model: $MODEL.onnx (Speaker ID: $SPEAKER_ID)"
+            if [[ -n "$DESCRIPTION" ]]; then
+              echo "📝 Description: $DESCRIPTION"
+            fi
+
+            # Have the new voice introduce itself (unless silent mode)
+            if [[ "$SILENT_MODE" != "true" ]]; then
+              PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
+              if [ -x "$PLAY_TTS" ]; then
+                "$PLAY_TTS" "Hi, I'm $VOICE_NAME. I'll be your voice assistant moving forward." > /dev/null 2>&1 &
+              fi
+
+              echo ""
+              echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
+              echo "   /output-style Agent Vibes"
+            fi
+            exit 0
+          else
+            echo "❌ Multi-speaker model not found: $MODEL.onnx"
+            echo ""
+            echo "Download it with: /agent-vibes:provider download"
+            exit 1
+          fi
+        fi
+      fi
+
+      if [[ -z "$FOUND" ]]; then
+        echo "❌ Piper voice not found: $VOICE_NAME"
+        echo ""
+        echo "Available Piper voices:"
+        shopt -s nullglob
+        for onnx_file in "$VOICE_DIR"/*.onnx; do
+          if [[ -f "$onnx_file" ]]; then
+            echo "  - $(basename "$onnx_file" .onnx)"
+          fi
+        done | sort
+        shopt -u nullglob
+        echo ""
+        if [[ -f "$SCRIPT_DIR/piper-multispeaker-registry.sh" ]]; then
+          echo "Multi-speaker voices (requires 16Speakers.onnx):"
+          source "$SCRIPT_DIR/piper-multispeaker-registry.sh"
+          for entry in "${MULTISPEAKER_VOICES[@]}"; do
+            name="${entry%%:*}"
+            echo "  - $name"
+          done | sort
+          echo ""
+        fi
+        echo "Download extra voices with: /agent-vibes:provider download"
+        exit 1
+      fi
     else
       # ElevenLabs voice lookup
       # Check if input is a number

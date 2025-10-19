@@ -72,6 +72,10 @@
     {
       "name": "provider",
       "description": "Manage TTS providers (ElevenLabs, Piper)"
+    },
+    {
+      "name": "set-favorite-voice",
+      "description": "Set or update the favorite voice for a personality"
     }
   ]
 }
