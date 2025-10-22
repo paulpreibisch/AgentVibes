@@ -311,9 +311,11 @@ DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wr
 DURATION=${DURATION%.*}  # Round to integer
 DURATION=${DURATION:-1}   # Default to 1 second if detection fails
 
-# Play audio in background
-(mpv "$TEMP_FILE" || aplay "$TEMP_FILE" || paplay "$TEMP_FILE") >/dev/null 2>&1 &
-PLAYER_PID=$!
+# Play audio in background (skip if in test mode)
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
+  (mpv "$TEMP_FILE" || aplay "$TEMP_FILE" || paplay "$TEMP_FILE") >/dev/null 2>&1 &
+  PLAYER_PID=$!
+fi
 
 # Wait for audio to finish, then release lock
 (sleep $DURATION; rm -f "$LOCK_FILE") &

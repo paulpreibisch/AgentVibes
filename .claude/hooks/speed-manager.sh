@@ -191,20 +191,18 @@ set_speed() {
   echo ""
   echo "Note: Speed control works with both Piper and ElevenLabs providers"
 
-  # Array of tongue twisters to demonstrate speed
-  local tongue_twisters=(
-    "Peter Piper picked a peck of pickled peppers"
-    "She sells seashells by the seashore"
-    "How much wood would a woodchuck chuck if a woodchuck could chuck wood"
-    "Fuzzy Wuzzy was a bear, Fuzzy Wuzzy had no hair"
-    "I scream, you scream, we all scream for ice cream"
-    "Red lorry, yellow lorry, red lorry, yellow lorry"
-    "Six slippery snails slid slowly seaward"
+  # Array of simple test messages to demonstrate speed
+  local test_messages=(
+    "Testing speed change"
+    "Speed test in progress"
+    "Checking audio speed"
+    "Speed configuration test"
+    "Audio speed test"
   )
 
-  # Pick a random tongue twister
-  local random_index=$((RANDOM % ${#tongue_twisters[@]}))
-  local test_msg="${tongue_twisters[$random_index]}"
+  # Pick a random test message
+  local random_index=$((RANDOM % ${#test_messages[@]}))
+  local test_msg="${test_messages[$random_index]}"
 
   echo ""
   echo "🔊 Testing new speed with: \"$test_msg\""

@@ -382,24 +382,22 @@ class AgentVibesServer:
         args = ["target", speed] if target else [speed]
         result = await self._run_script("speed-manager.sh", args)
         if result and "✓" in result:
-            # Tongue twisters to demonstrate the new speed
-            tongue_twisters = [
-                "Peter Piper picked a peck of pickled peppers",
-                "She sells seashells by the seashore",
-                "How much wood would a woodchuck chuck if a woodchuck could chuck wood",
-                "Fuzzy Wuzzy was a bear, Fuzzy Wuzzy had no hair",
-                "I scream, you scream, we all scream for ice cream",
-                "Red lorry, yellow lorry, red lorry, yellow lorry",
-                "Six slippery snails slid slowly seaward",
+            # Simple test messages to demonstrate the new speed
+            test_messages = [
+                "Testing speed change",
+                "Speed test in progress",
+                "Checking audio speed",
+                "Speed configuration test",
+                "Audio speed test",
             ]
 
-            # Pick a random tongue twister and speak it
-            tongue_twister = random.choice(tongue_twisters)
+            # Pick a random test message and speak it
+            test_message = random.choice(test_messages)
 
             try:
-                # Speak the tongue twister to demonstrate the new speed
-                await self.text_to_speech(tongue_twister)
-                return f"{result}\n🔊 Testing new speed: \"{tongue_twister}\""
+                # Speak the test message to demonstrate the new speed
+                await self.text_to_speech(test_message)
+                return f"{result}\n🔊 Testing new speed: \"{test_message}\""
             except Exception as e:
                 # If TTS fails, still return success for the speed change
                 return f"{result}\n⚠️ Speed changed but demo failed: {e}"

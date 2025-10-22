@@ -257,15 +257,15 @@ teardown() {
   [ "$status" -eq 0 ]
   assert_output_contains "Testing new speed with:"
 
-  # Should contain one of the tongue twisters
-  [[ "$output" =~ "Peter Piper"|"She sells seashells"|"woodchuck"|"Fuzzy Wuzzy"|"ice cream"|"lorry"|"slippery snails" ]]
+  # Should contain one of the test messages
+  [[ "$output" =~ "Testing speed"|"Speed test"|"Checking audio"|"Speed configuration"|"Audio speed" ]]
 }
 
-@test "speed-manager shows tongue twister text before playing" {
+@test "speed-manager shows test message text before playing" {
   run "$SPEED_MANAGER" "1x"
 
   [ "$status" -eq 0 ]
-  # Should show the actual tongue twister being played
+  # Should show the actual test message being played
   assert_output_contains "Testing new speed with:"
 }
 

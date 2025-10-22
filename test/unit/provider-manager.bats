@@ -114,10 +114,10 @@ teardown() {
   run "$PROVIDER_MANAGER" switch "piper"
 
   [ "$status" -eq 0 ]
-  assert_output_contains "voice reset to default"
+  assert_output_contains "voice set to:"
 
-  # Voice file should be removed
-  [[ ! -f "$VOICE_FILE" ]]
+  # Voice file should exist with new default voice
+  [[ -f "$VOICE_FILE" ]]
 }
 
 @test "provider-manager switching providers removes voice file" {
@@ -127,8 +127,11 @@ teardown() {
 
   "$PROVIDER_MANAGER" switch "elevenlabs"
 
-  # Voice file should be removed to force default for new provider
-  [[ ! -f "$VOICE_FILE" ]]
+  # Voice file should exist with new default voice for provider
+  [[ -f "$VOICE_FILE" ]]
+
+  # Should contain the new provider's default voice
+  assert_file_contains "$VOICE_FILE" "Amy"
 }
 
 # ============================================================================

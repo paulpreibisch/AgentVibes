@@ -20,6 +20,9 @@ yarn-error.log*
 .bmad-agent-context
 *.tgz
 *.code-workspace
+*.db
+*.sqlite
+*.sqlite3
 
 # BMAD Documentation (never commit)
 .bmad-core/
@@ -31,6 +34,7 @@ WORKSPACE_GUIDE.md
 WORKSPACE_SETUP_SUMMARY.md
 .claude/commands/agent-vibes-bmad.md
 agentvibes.org/
+agentvibes/org/
 
 # LinkedIn articles (personal drafts)
 linkedin/

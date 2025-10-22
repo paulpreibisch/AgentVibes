@@ -1,5 +1,67 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.0.21 - Test Suite & Quality Improvements (2025-10-22)
+
+### 🎯 Overview
+
+This patch release focuses on **test reliability** and **user experience improvements**, making the testing process completely silent and replacing distracting tongue twisters with simple test messages.
+
+**Release Date:** October 22, 2025
+**Git Tag:** v2.0.21
+**NPM tests:** All 110 tests passing ✅
+
+---
+
+### ✨ New Features
+
+- **Silent Test Mode**: Tests now run completely silently when `AGENTVIBES_TEST_MODE=true` is set
+
+### 🐛 Bug Fixes
+
+- **Fixed provider-manager tests**: Updated 2 failing tests that expected "voice reset to default" but code outputs "voice set to: [voice_name]"
+- **Removed tongue twisters**: Replaced distracting tongue twisters with simple test messages:
+  - "Testing speed change"
+  - "Speed test in progress"
+  - "Checking audio speed"
+  - "Speed configuration test"
+  - "Audio speed test"
+
+### 🧪 Testing Improvements
+
+- **Test configuration**: `npm test` now automatically sets `AGENTVIBES_TEST_MODE=true` for silent execution
+- **Audio playback control**: Both Piper and ElevenLabs TTS scripts now respect `AGENTVIBES_TEST_MODE` flag
+- **Updated test assertions**: Speed manager tests now check for simple messages instead of tongue twisters
+
+### 📝 Files Changed
+
+- `.claude/hooks/play-tts-piper.sh` - Added AGENTVIBES_TEST_MODE check
+- `.claude/hooks/play-tts-elevenlabs.sh` - Added AGENTVIBES_TEST_MODE check
+- `.claude/hooks/speed-manager.sh` - Replaced tongue twisters with simple messages
+- `mcp-server/server.py` - Replaced tongue twisters with simple messages
+- `test/unit/provider-manager.bats` - Fixed 2 failing tests
+- `test/unit/speed-manager.bats` - Updated test assertions
+- `package.json` - Added AGENTVIBES_TEST_MODE to test scripts
+
+### 🎓 User Impact
+
+**For Developers:**
+- Running `npm test` is now completely silent - no more disruptive audio during test runs
+- Clearer test output without tongue twister noise
+- More reliable test suite (all 110 tests passing)
+
+**For Users:**
+- Speed change demos now use simple, professional messages instead of tongue twisters
+- No functional changes to TTS or voice features
+
+### 📊 Test Coverage
+
+- **110 tests passing** ✅
+- **0 tests failing**
+- **Silent execution** when run via npm test
+
+---
+
+
 ## 📦 v2.0.17 - Major Feature Release (2025-10-17)
 
 ### 🎯 Overview

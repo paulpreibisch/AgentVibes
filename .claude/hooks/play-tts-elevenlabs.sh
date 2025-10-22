@@ -384,9 +384,11 @@ if [ -f "${TEMP_FILE}" ]; then
     fi
   fi
 
-  # Play audio (WSL/Linux) in background to avoid blocking, fully detached
-  (paplay "${TEMP_FILE}" || aplay "${TEMP_FILE}" || mpg123 "${TEMP_FILE}") >/dev/null 2>&1 &
-  PLAYER_PID=$!
+  # Play audio (WSL/Linux) in background to avoid blocking, fully detached (skip if in test mode)
+  if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
+    (paplay "${TEMP_FILE}" || aplay "${TEMP_FILE}" || mpg123 "${TEMP_FILE}") >/dev/null 2>&1 &
+    PLAYER_PID=$!
+  fi
 
   # Wait for audio to finish, then release lock
   (sleep $DURATION; rm -f "$LOCK_FILE") &
