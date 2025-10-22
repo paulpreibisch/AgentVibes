@@ -61,3 +61,6 @@ mcp-server/bmad-bundles/VOICE_MAPPINGS.md
 
 # Internal documentation
 docs/huggingface-setup-guide.md
+
+# Sensitive/internal directories (not for public npm)
+agentvibes.org/
