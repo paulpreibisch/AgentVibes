@@ -609,7 +609,7 @@ async function install(options = {}) {
 
         // Check if piper is installed
         try {
-          execSync('piper --version', { stdio: 'ignore' });
+          execSync('command -v piper', { stdio: 'ignore' });
           console.log(chalk.green('✅ Piper TTS is already installed\n'));
         } catch {
           // Piper not installed - offer to install it
