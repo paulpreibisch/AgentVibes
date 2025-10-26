@@ -78,6 +78,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 - [💡 Common Workflows](#-common-workflows) - Quick examples
 - [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
 - [🔊 Remote Audio Setup](#-remote-audio-setup) - Play TTS from remote servers
+- [🔬 How AgentVibes Works Under the Hood](#-how-agentvibes-works-under-the-hood) - Technical deep dive
 - [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
 
 ### Additional Resources
@@ -317,6 +318,123 @@ AgentVibes supports **custom personalities**, **custom voices**, and **integrati
 - 💳 **[Pricing Page](https://elevenlabs.io/pricing)** - ElevenLabs plans
 - 🐛 **[Issues](https://github.com/paulpreibisch/AgentVibes/issues)** - Report bugs
 - 📝 **[Changelog](https://github.com/paulpreibisch/AgentVibes/releases)** - Version history
+- 📰 **[Technical Deep Dive - LinkedIn Article](https://www.linkedin.com/pulse/agent-vibes-add-voice-claude-code-deep-dive-npx-paul-preibisch-8zrcc/)** - How AgentVibes works under the hood
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🔬 How AgentVibes Works Under the Hood
+
+**Want to understand the architecture, design patterns, and implementation details that make AgentVibes work?**
+
+AgentVibes is built on four interconnected systems that work together to transform Claude Code from a silent text assistant into a voice-enabled AI companion with personality:
+
+### The Four Core Systems
+
+**1. Output Style System** - The AI's instructions for when to speak
+- Two-Point TTS Protocol (acknowledgment + completion)
+- Settings priority system (Language → Sentiment → Personality)
+- Unique AI-generated responses each time
+
+**2. Hook System** - The bash scripts that generate and play audio
+- `play-tts.sh` - Provider router that delegates to ElevenLabs or Piper
+- `personality-manager.sh` - Handles 19 personalities with assigned voices
+- `voice-manager.sh` - Voice switching and management
+- `provider-manager.sh` - Seamless switching between TTS providers
+
+**3. Provider System** - Two TTS engines, one interface
+- **ElevenLabs**: Cloud-based API, 150+ premium voices, 29 languages
+- **Piper**: Local neural TTS, completely free, works offline
+- SSH audio optimization (auto-converts MP3 to OGG for clean playback)
+
+**4. MCP Server** - Natural language control interface
+- Python-based MCP server exposes 20+ tools
+- Project-specific vs global settings management
+- Natural language commands instead of slash commands
+
+### Architecture Highlights
+
+**Configuration as Simple Text Files:**
+```
+.claude/
+├── tts-voice.txt          # Current voice (e.g., "Aria")
+├── tts-personality.txt    # Current personality (e.g., "sarcastic")
+├── tts-provider.txt       # Active provider (e.g., "elevenlabs")
+├── tts-language.txt       # Language (e.g., "spanish")
+└── tts-sentiment.txt      # Sentiment override (e.g., "flirty")
+```
+
+**The Data Flow:**
+1. User asks Claude to perform a task
+2. Output style reads personality/sentiment settings
+3. AI generates unique acknowledgment in that style
+4. `play-tts.sh` routes to active provider (ElevenLabs/Piper)
+5. Provider generates audio and plays it (non-blocking)
+6. Claude proceeds with task while audio plays
+7. After completion, AI generates unique completion message
+8. Same TTS flow repeats for completion
+
+**Key Design Patterns:**
+- **Separation of Concerns**: Output style, hooks, providers are independent
+- **Provider Pattern**: Multiple TTS engines behind single interface
+- **Configuration as Data**: Text files instead of databases
+- **Progressive Enhancement**: Core works minimally, advanced features layer on
+- **Graceful Degradation**: Missing features don't cause crashes
+
+### Advanced Features Explained
+
+**Language Learning Mode:**
+- Every TTS message plays twice (English → Target language)
+- AI translations or language-specific voice models
+- Learn Spanish, French, German, etc. while you code!
+
+**SSH Audio Optimization:**
+- Auto-detects SSH sessions (`$SSH_CONNECTION`)
+- Converts MP3 to OGG/Opus to prevent audio corruption
+- Perfect for VS Code Remote SSH, cloud dev environments
+
+**BMAD Plugin Integration:**
+- Auto-switches voices when BMAD agents activate
+- Creates illusion of multiple distinct AI personalities
+
+### Performance & Resilience
+
+**Non-Blocking Audio:**
+- TTS runs asynchronously - Claude continues working immediately
+- Audio plays in background while tasks execute
+
+**Error Handling:**
+- API failures don't crash Claude - task continues without audio
+- Missing config files use sensible defaults
+- Clear error messages help users fix issues
+
+**Text Length Limits:**
+- Truncates at 500 characters to prevent excessive costs and slow generation
+
+### Testing & Quality
+
+**Comprehensive Test Suite:**
+- 110 BATS tests covering all core functionality
+- Tests voice resolution, personality parsing, provider switching
+- CI/CD with GitHub Actions runs tests on every push
+
+**📰 Read the Full Technical Deep Dive:**
+
+For a complete walkthrough with code examples, architecture diagrams, and implementation details, read the full article on LinkedIn:
+
+**[→ How AgentVibes Works Under the Hood: A Technical Deep Dive](https://www.linkedin.com/pulse/agent-vibes-add-voice-claude-code-deep-dive-npx-paul-preibisch-8zrcc/)**
+
+The article covers:
+- Complete code walkthroughs for each system
+- Personality configuration file format and AI instructions
+- Provider implementations (ElevenLabs vs Piper)
+- MCP server architecture and tool registration
+- Installation process and directory structure
+- Error handling and resilience patterns
+- Performance considerations and optimization
+
+Whether you're building your own AI integrations, designing CLI tools, or just curious about how AgentVibes works, the full article provides a comprehensive understanding of the architecture.
 
 [↑ Back to top](#-table-of-contents)
 
