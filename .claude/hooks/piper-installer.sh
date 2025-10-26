@@ -58,9 +58,9 @@ fi
 
 # Check if Piper is already installed
 if command -v piper &> /dev/null; then
-  PIPER_VERSION=$(piper --version 2>&1 || echo "unknown")
+  # Piper doesn't have a --version flag, just check if it exists
   echo "✅ Piper TTS is already installed!"
-  echo "   Version: $PIPER_VERSION"
+  echo "   Location: $(which piper)"
   echo ""
   echo "   Download voices with: .claude/hooks/piper-download-voices.sh"
   exit 0

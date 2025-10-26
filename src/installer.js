@@ -689,7 +689,7 @@ async function install(options = {}) {
       const { execSync } = await import('node:child_process');
       const gitLog = execSync(
         'git log --oneline --no-decorate -5',
-        { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+        { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
       ).trim();
 
       if (gitLog) {
@@ -1367,7 +1367,7 @@ program
         const { execSync } = await import('node:child_process');
         const gitLog = execSync(
           'git log --oneline --no-decorate -5',
-          { cwd: path.join(__dirname, '..'), encoding: 'utf8' }
+          { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
         ).trim();
 
         if (gitLog) {
