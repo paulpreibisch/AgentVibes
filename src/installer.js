@@ -794,7 +794,7 @@ async function install(options = {}) {
         chalk.white.bold('AgentVibes MCP Server - Easiest Way to Use AgentVibes!\n\n') +
         chalk.gray('Use Claude Desktop or Warp Terminal to control TTS with natural language:\n') +
         chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
-        chalk.gray('   "Set personality to flirty" instead of /agent-vibes:personality flirty\n\n') +
+        chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
         chalk.cyan('👉 Setup Guide:\n') +
         chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#-mcp-server-easiest-way-to-use-agentvibes\n\n') +
         chalk.gray('Quick Install:\n') +
@@ -1430,7 +1430,7 @@ program
           chalk.white.bold('AgentVibes MCP Server - Easiest Way to Use AgentVibes!\n\n') +
           chalk.gray('Use Claude Desktop or Warp Terminal to control TTS with natural language:\n') +
           chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
-          chalk.gray('   "Set personality to flirty" instead of /agent-vibes:personality flirty\n\n') +
+          chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
           chalk.cyan('👉 Setup Guide:\n') +
           chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#-mcp-server-easiest-way-to-use-agentvibes\n\n') +
           chalk.gray('Quick Install:\n') +
