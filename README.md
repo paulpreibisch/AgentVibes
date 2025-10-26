@@ -90,21 +90,18 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.0.17-beta - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.1.0-beta)** 🎉
+**[v2.1.0 - Streamlined Installation & CI Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.1.0)** 🎉
 
-**NEW: Automatic SSH Audio Optimization!** AgentVibes now automatically detects remote SSH sessions and optimizes audio for perfect playback - no more static or clicking sounds!
-
-Plus: **Language Learning Mode** (e.g., Learn Spanish while you program!) with dual-language TTS, **Unified Speech Speed Control**, and **Enhanced MCP Integration** with smart project-specific settings.
+**NEW: Automatic Piper Installation!** No more manual steps - when you select Piper TTS, AgentVibes now automatically detects if it's installed and offers to install it for you. Plus streamlined CI workflow improvements!
 
 **Key highlights:**
-- 🔊 **SSH Audio Optimization** - Auto-detects and converts audio for remote SSH sessions (VS Code Remote, regular SSH, cloud dev)
-- 📚 **Language Learning Mode** - Dual-language TTS with sequential playback and target language replay
-- ⚡ **Unified Speech Speed Control** - Single control for both ElevenLabs and Piper TTS providers
-- 🎙️ **Enhanced MCP Integration** - Smart context detection with project-specific settings
-- 🎤 **Audio Quality Improvements** - Better bitrate preservation and non-blocking playback
-- 🔧 **Improved Provider Switching** - Seamless transitions between ElevenLabs and Piper
+- 🚀 **Automatic Piper Installation** - Auto-detects missing Piper binary and prompts to install it during setup
+- ⚡ **One-Command Setup** - Runs `.claude/hooks/piper-installer.sh` seamlessly with human approval
+- 🎯 **Fully Unattended Mode** - Support for `--yes` flag for automated installation
+- 🔧 **CI Workflow Cleanup** - Removed deprecated v1 branch references, tests now run on master only
+- ✅ **110 Tests Passing** - Comprehensive test coverage with optimized GitHub Actions workflow
 
-[→ View Full Release Notes](RELEASE_NOTES_V2.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+[→ View Full Release Notes](RELEASE_NOTES.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 
