@@ -602,6 +602,62 @@ async function install(options = {}) {
 
     spinner.succeed(chalk.green(`Provider set to: ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}\n`));
 
+    // Auto-install Piper if selected and not already installed
+    if (selectedProvider === 'piper') {
+      try {
+        const { execSync } = await import('node:child_process');
+
+        // Check if piper is installed
+        try {
+          execSync('piper --version', { stdio: 'ignore' });
+          console.log(chalk.green('✅ Piper TTS is already installed\n'));
+        } catch {
+          // Piper not installed - offer to install it
+          console.log(chalk.yellow('⚠️  Piper TTS binary not detected\n'));
+
+          let installPiper = true;
+          if (!options.yes) {
+            const { confirmPiperInstall } = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'confirmPiperInstall',
+                message: 'Would you like to install Piper TTS now? (Recommended)',
+                default: true,
+              },
+            ]);
+            installPiper = confirmPiperInstall;
+          }
+
+          if (installPiper) {
+            console.log(chalk.cyan('\n📦 Installing Piper TTS...\n'));
+            const piperInstallerPath = path.join(hooksDir, 'piper-installer.sh');
+
+            try {
+              execSync(`bash "${piperInstallerPath}"`, {
+                stdio: 'inherit',
+                env: process.env
+              });
+              console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
+            } catch (error) {
+              console.log(chalk.yellow('\n⚠️  Piper installation failed or was cancelled'));
+              console.log(chalk.gray('   You can install it later by running:'));
+              console.log(chalk.cyan(`   bash "${piperInstallerPath}"`));
+              console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+            }
+          } else {
+            console.log(chalk.yellow('\n⚠️  Skipping Piper installation'));
+            console.log(chalk.gray('   You can install it later by running:'));
+            console.log(chalk.cyan(`   ${targetDir}/.claude/hooks/piper-installer.sh`));
+            console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+          }
+        }
+      } catch (error) {
+        // execSync import failed - skip auto-install
+        console.log(chalk.yellow('⚠️  Unable to auto-detect Piper installation'));
+        console.log(chalk.gray('   Install manually if needed: pipx install piper-tts\n'));
+      }
+    }
+
     // List what was installed
     console.log(chalk.cyan('📦 Installation Summary:'));
     console.log(chalk.white(`   • ${commandFiles.length} slash commands installed`));
