@@ -65,11 +65,22 @@ if [[ -n "$VOICE_OVERRIDE" ]]; then
   VOICE_MODEL="$VOICE_OVERRIDE"
   echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
 else
-  # Try to get voice from voice file (project-local first, then global)
+  # Try to get voice from voice file (check CLAUDE_PROJECT_DIR first for MCP context)
   VOICE_FILE=""
-  if [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
+
+  # Priority order:
+  # 1. CLAUDE_PROJECT_DIR env var (set by MCP for project-specific settings)
+  # 2. Script location (for direct slash command usage)
+  # 3. Global ~/.claude (fallback)
+
+  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+    # MCP context: Use the project directory where MCP was invoked
+    VOICE_FILE="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
+  elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
+    # Direct usage: Use script location
     VOICE_FILE="$SCRIPT_DIR/../tts-voice.txt"
   elif [[ -f "$HOME/.claude/tts-voice.txt" ]]; then
+    # Fallback: Use global
     VOICE_FILE="$HOME/.claude/tts-voice.txt"
   fi
 
@@ -77,8 +88,10 @@ else
     FILE_VOICE=$(cat "$VOICE_FILE" 2>/dev/null)
 
     # Check for multi-speaker voice (model + speaker ID stored separately)
-    MODEL_FILE="$SCRIPT_DIR/../tts-piper-model.txt"
-    SPEAKER_ID_FILE="$SCRIPT_DIR/../tts-piper-speaker-id.txt"
+    # Use same directory as VOICE_FILE for consistency
+    VOICE_DIR=$(dirname "$VOICE_FILE")
+    MODEL_FILE="$VOICE_DIR/tts-piper-model.txt"
+    SPEAKER_ID_FILE="$VOICE_DIR/tts-piper-speaker-id.txt"
 
     if [[ -f "$MODEL_FILE" ]] && [[ -f "$SPEAKER_ID_FILE" ]]; then
       # Multi-speaker voice

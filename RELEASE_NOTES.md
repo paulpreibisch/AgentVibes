@@ -1,5 +1,90 @@
 # 🎤 AgentVibes Release Notes
 
+## 📦 v2.1.4 - Critical Voice Switching Fix for MCP Projects (2025-10-26)
+
+### 🎯 Overview
+
+This patch release fixes a **critical bug** where voice switching didn't work correctly when using AgentVibes via MCP (Model Context Protocol) in project-specific directories. After switching voices, TTS would continue using the old voice instead of the newly selected one.
+
+**Release Date:** October 26, 2025
+**Git Tag:** v2.1.4
+**Type:** Patch release (bug fix)
+**Impact:** Voice switching now works correctly in all contexts (MCP, direct commands, global settings)
+
+---
+
+### 🤖 AI Summary
+
+Medium bug fix: Voice switching now works correctly in MCP project contexts. Previously, after switching voices via MCP (Claude Desktop, Claude Code), TTS would continue using the old voice. This release fixes play-tts-piper.sh to respect CLAUDE_PROJECT_DIR environment variable, ensuring project-specific voice settings take priority. Voice switching now persists correctly across all contexts (MCP, direct commands, global settings).
+
+---
+
+### 🐛 Bug Fixes
+
+- **Fixed Voice Switching in MCP Project Contexts** 🎤
+  - Voice switches now persist correctly when using AgentVibes MCP server
+  - `play-tts-piper.sh` now respects `CLAUDE_PROJECT_DIR` environment variable
+  - Project-specific voice settings take priority over package/global settings
+  - Multi-speaker voice configurations (model + speaker ID) also fixed
+
+### 🔧 Technical Details
+
+**Root Cause:**
+- When MCP server runs in a project directory (e.g., `/home/user/my-project/`), it sets `CLAUDE_PROJECT_DIR` environment variable
+- Voice switching correctly saved to project's `.claude/tts-voice.txt`
+- However, `play-tts-piper.sh` didn't check `CLAUDE_PROJECT_DIR`, so it read voice from package directory instead
+- Result: Voice appeared switched in config, but TTS still used old voice
+
+**Solution:**
+- Updated voice file resolution priority in `play-tts-piper.sh`:
+  1. Check `CLAUDE_PROJECT_DIR/.claude/tts-voice.txt` (MCP project context)
+  2. Check script location `$SCRIPT_DIR/../tts-voice.txt` (direct usage)
+  3. Fall back to `~/.claude/tts-voice.txt` (global)
+- Applied same logic to multi-speaker model/speaker ID files
+
+### 📝 Files Changed
+
+- `.claude/hooks/play-tts-piper.sh` (lines 68-94)
+  - Added `CLAUDE_PROJECT_DIR` environment variable check
+  - Updated multi-speaker file path resolution
+  - Added detailed comments explaining priority order
+
+### 🎓 User Impact
+
+**Before This Fix:**
+```bash
+# In project directory
+/agent-vibes:switch kristin
+# ✅ Shows: "Voice switched to: kristin"
+
+# But when TTS runs...
+# 🐛 Still plays with old voice (e.g., lessac)
+```
+
+**After This Fix:**
+```bash
+# In project directory
+/agent-vibes:switch kristin
+# ✅ Shows: "Voice switched to: kristin"
+
+# TTS runs...
+# ✅ Plays with kristin voice correctly!
+```
+
+### 🧪 Testing
+
+Verified fix with:
+- ✅ MCP server context with project-local `.claude/` directory
+- ✅ Direct slash command usage
+- ✅ Global `~/.claude/` fallback
+- ✅ Multi-speaker voices (16Speakers model)
+
+### 📚 Related Issues
+
+This fix resolves user-reported issue where voices weren't switching in MCP-enabled projects like Claude Desktop and Claude Code.
+
+---
+
 ## 📦 v2.1.0 - Streamlined Installation & CI Improvements (2025-10-26)
 
 ### 🎯 Overview
@@ -50,111 +135,24 @@ This minor release delivers **automated Piper TTS installation** and **improved 
   # ✅ Done! Fully automated.
   ```
 
-**For Developers:**
-- CI workflow now only monitors `master` branch (v1 deprecated)
-- Tests run on all PRs to master with 110 test coverage
-- Cleaner GitHub Actions logs
+**For CI/CD Automation:**
+- Unattended installation now possible:
+  ```bash
+  npx agentvibes install --provider piper --yes
+  # Piper installed automatically without prompts
+  ```
 
-**Technical Details:**
-The installer now checks for Piper binary (`piper --version`) after provider selection. If not found, it prompts for installation and executes `piper-installer.sh` which handles:
-1. pipx installation (if needed)
-2. Piper TTS installation via pipx
-3. Optional voice download
-4. PATH configuration
+### 🔄 Upgrade Path
 
-### 🤖 AI Summary
+No breaking changes. Existing installations continue working.
 
-This release eliminates manual steps for Piper TTS users by auto-installing the binary during setup, and streamlines the CI workflow by removing deprecated branch references. Installation is now fully hands-off with human approval checkpoints.
-
----
-
-## 📦 v2.0.24 - Performance Optimization (2025-10-21)
-
-### 🎯 Overview
-
-This patch release delivers a **significant performance optimization** to the output style, reducing CLI overhead by consolidating multiple bash commands into a single efficient call. This makes TTS acknowledgments and completions faster and produces cleaner output.
-
-**Release Date:** October 21, 2025
-**Git Tag:** v2.0.24
-**Impact:** Performance improvement, cleaner CLI output
+To benefit from automatic Piper installation:
+```bash
+npx agentvibes update
+```
 
 ---
 
-### ⚡ Performance Improvements
+## 📦 v2.0.18 - Speed Control & AI Documentation Standards (2025-10-19)
 
-- **Optimized Settings Check**: Reduced three separate bash commands (checking language, sentiment, and personality settings) into one efficient `eval` command
-  - **Before**: 3 separate `cat` commands for each setting file
-  - **After**: Single compound command that checks all three settings at once
-  - **Result**: Faster acknowledgment/completion responses, cleaner CLI output
-
-### 📝 Files Changed
-
-- `.claude/output-styles/agent-vibes.md` - Optimized settings check from 3 commands to 1
-
-### 🎓 User Impact
-
-**For All Users:**
-- Faster TTS acknowledgments and completions
-- Cleaner CLI output with less visual noise
-- No behavioral changes - all features work exactly the same
-
-**Technical Details:**
-The optimization uses bash `eval` to combine three sequential file reads into a single compound operation, reducing the number of bash tool calls visible in the Claude Code CLI from 3 to 1 per acknowledgment/completion.
-
----
-
-## 📦 v2.0.21 - Test Suite & Quality Improvements (2025-10-22)
-
-### 🎯 Overview
-
-This patch release focuses on **test reliability** and **user experience improvements**, making the testing process completely silent and replacing distracting tongue twisters with simple test messages.
-
-**Release Date:** October 22, 2025
-**Git Tag:** v2.0.21
-**NPM tests:** All 110 tests passing ✅
-
----
-
-### ✨ New Features
-
-- **Silent Test Mode**: Tests now run completely silently when `AGENTVIBES_TEST_MODE=true` is set
-
-### 🐛 Bug Fixes
-
-- **Fixed provider-manager tests**: Updated 2 failing tests that expected "voice reset to default" but code outputs "voice set to: [voice_name]"
-- **Removed tongue twisters**: Replaced distracting tongue twisters with simple test messages:
-  - "Testing speed change"
-  - "Speed test in progress"
-  - "Checking audio speed"
-  - "Speed configuration test"
-  - "Audio speed test"
-
-### 🧪 Testing Improvements
-
-- **Test configuration**: `npm test` now automatically sets `AGENTVIBES_TEST_MODE=true` for silent execution
-- **Audio playback control**: Both Piper and ElevenLabs TTS scripts now respect `AGENTVIBES_TEST_MODE` flag
-- **Updated test assertions**: Speed manager tests now check for simple messages instead of tongue twisters
-
-### 📝 Files Changed
-
-- `.claude/hooks/play-tts-piper.sh` - Added AGENTVIBES_TEST_MODE check
-- `.claude/hooks/play-tts-elevenlabs.sh` - Added AGENTVIBES_TEST_MODE check
-- `.claude/hooks/speed-manager.sh` - Replaced tongue twisters with simple messages
-- `mcp-server/server.py` - Replaced tongue twisters with simple messages
-- `test/unit/provider-manager.bats` - Fixed 2 failing tests
-- `test/unit/speed-manager.bats` - Updated test assertions
-- `package.json` - Added AGENTVIBES_TEST_MODE to test scripts
-
-### 🎓 User Impact
-
-**For Developers:**
-- Running `npm test` is now completely silent - no more disruptive audio during test runs
-- Clearer test output without tongue twister noise
-- More reliable test suite (all 110 tests passing)
-
-**For Users:**
-- Speed changes still announce themselves during normal use
-- Test mode only affects automated testing, not regular usage
-- No changes to normal TTS behavior
-
----
+[Previous release notes continue below...]
