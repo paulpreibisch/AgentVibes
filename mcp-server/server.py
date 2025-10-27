@@ -203,13 +203,16 @@ class AgentVibesServer:
                     "Example: en_US-lessac-medium, en_GB-alba-medium"
                 )
 
-            # Determine provider label for display
+            # Determine provider label and alternative provider
             if "Piper" in provider:
                 provider_label = "Piper TTS"
+                alternative_provider = "ElevenLabs"
             elif "ElevenLabs" in provider:
                 provider_label = "ElevenLabs"
+                alternative_provider = "Piper"
             else:
                 provider_label = "TTS"
+                alternative_provider = None
 
             output = f"🎤 Available {provider_label} Voices:\n"
             output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -217,6 +220,11 @@ class AgentVibesServer:
                 marker = " ✓ (current)" if voice == current_voice else ""
                 output += f"  • {voice}{marker}\n"
             output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+            # Add provider switch hint
+            if alternative_provider:
+                output += f"\n💡 Switch to {alternative_provider}? Use: set_provider(provider=\"{alternative_provider.lower()}\")\n"
+
             return output
         return "❌ Failed to list voices"
 
