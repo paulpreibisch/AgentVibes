@@ -50,8 +50,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install BATS
-        run: brew install bats-core
+      - name: Install BATS and Bash 5.x
+        run: |
+          # Install bash 5.x (macOS ships with bash 3.2 which doesn't support associative arrays)
+          brew install bash bats-core
+          echo "Installed Bash version:"
+          $(brew --prefix)/bin/bash --version | head -n 1
 
       - name: Check for ffmpeg (needed for Piper audio)
         run: |
@@ -83,7 +87,12 @@ jobs:
         env:
           ELEVENLABS_API_KEY: test_mock_key
           AGENTVIBES_TEST_MODE: "true"
-        run: npm test
+        run: |
+          # Ensure we're using bash 5.x for associative array support in tests
+          export PATH="$(brew --prefix)/bin:$PATH"
+          echo "Using Bash version: $(bash --version | head -n 1)"
+          which bash
+          npm test
 
       - name: Test installation process
         run: |

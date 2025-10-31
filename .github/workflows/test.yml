@@ -29,19 +29,29 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install BATS
+      - name: Install BATS and Bash 4+
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt-get update
             sudo apt-get install -y bats
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            brew install bats-core
+            # Install bash 5.x (required for associative arrays in tests)
+            brew install bash bats-core
+            # Add to PATH
+            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
 
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
-        run: npm test
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Ensure BATS uses bash 5.x for associative array support
+            export PATH="$(brew --prefix)/bin:$PATH"
+            echo "Using Bash version: $(bash --version | head -n 1)"
+          fi
+          npm test
 
       - name: Report test results
         if: always()
