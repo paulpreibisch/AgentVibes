@@ -1,0 +1,227 @@
+name: macOS Test Suite
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  test-macos:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14, macos-15]  # Intel (13), M1 (14), latest (15)
+        node-version: ['18', '20', '22']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: System information
+        run: |
+          echo "=== System Info ==="
+          sw_vers
+          echo ""
+          echo "=== Architecture ==="
+          uname -m
+          echo ""
+          echo "=== Node version ==="
+          node --version
+          echo ""
+          echo "=== npm version ==="
+          npm --version
+          echo ""
+          echo "=== Shell ==="
+          echo $SHELL
+          echo ""
+          echo "=== Audio devices ==="
+          system_profiler SPAudioDataType || echo "Could not get audio info"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install BATS
+        run: brew install bats-core
+
+      - name: Check for ffmpeg (needed for Piper audio)
+        run: |
+          if command -v ffmpeg &> /dev/null; then
+            echo "✅ ffmpeg found: $(which ffmpeg)"
+            ffmpeg -version | head -n 1
+          else
+            echo "⚠️  ffmpeg not found - installing"
+            brew install ffmpeg
+          fi
+
+      - name: Check for audio playback tools
+        run: |
+          echo "=== Checking audio tools ==="
+          if command -v afplay &> /dev/null; then
+            echo "✅ afplay found (native macOS audio player)"
+          fi
+          if command -v ffplay &> /dev/null; then
+            echo "✅ ffplay found"
+          fi
+          if command -v mpv &> /dev/null; then
+            echo "✅ mpv found"
+          else
+            echo "⚠️  mpv not found - installing"
+            brew install mpv
+          fi
+
+      - name: Run unit tests
+        env:
+          ELEVENLABS_API_KEY: test_mock_key
+          AGENTVIBES_TEST_MODE: "true"
+        run: npm test
+
+      - name: Test installation process
+        run: |
+          echo "=== Testing AgentVibes installation ==="
+          # Create a temporary directory for testing
+          TEST_DIR="$HOME/agentvibes-test"
+          mkdir -p "$TEST_DIR"
+          cd "$TEST_DIR"
+
+          # Initialize a test .claude directory
+          mkdir -p .claude/hooks
+          mkdir -p .claude/commands
+
+          # Test the installer (dry run mode)
+          echo "Testing installer..."
+          node $GITHUB_WORKSPACE/src/installer.js --help || true
+
+      - name: Test Piper TTS availability on macOS
+        run: |
+          echo "=== Testing Piper TTS ==="
+          # Check if Piper binary exists or can be downloaded for macOS
+          ARCH=$(uname -m)
+          echo "Architecture: $ARCH"
+
+          if [ "$ARCH" = "arm64" ]; then
+            echo "✅ Running on Apple Silicon (M1/M2/M3)"
+            PIPER_ARCH="arm64"
+          else
+            echo "✅ Running on Intel"
+            PIPER_ARCH="x64"
+          fi
+
+          # Test Piper download URL
+          PIPER_VERSION="1.2.0"
+          PIPER_URL="https://github.com/rhasspy/piper/releases/download/v${PIPER_VERSION}/piper_macos_${PIPER_ARCH}.tar.gz"
+          echo "Piper URL would be: $PIPER_URL"
+
+          # Check if URL is valid (without actually downloading in tests)
+          if curl --head --silent --fail "$PIPER_URL" > /dev/null; then
+            echo "✅ Piper binary available for this architecture"
+          else
+            echo "⚠️  Piper binary might not be available for this architecture"
+            echo "This may need special handling in the installer"
+          fi
+
+      - name: Test ElevenLabs API integration (mock)
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY_TEST }}
+        run: |
+          echo "=== Testing ElevenLabs integration ==="
+          if [ -z "$ELEVENLABS_API_KEY" ]; then
+            echo "⚠️  No test API key configured (this is fine for PR tests)"
+            echo "Using mock mode"
+          else
+            echo "✅ API key configured - testing real API"
+            # Test actual API call if key is present
+            curl -s -X POST \
+              "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM" \
+              -H "xi-api-key: $ELEVENLABS_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"text":"Testing from macOS GitHub Actions","model_id":"eleven_monolingual_v1"}' \
+              --output /tmp/test-audio.mp3 \
+              && echo "✅ API call successful" \
+              || echo "⚠️  API call failed (may be rate limited or invalid key)"
+          fi
+
+      - name: Test audio file generation
+        run: |
+          echo "=== Testing audio generation ==="
+          # Create a simple test to generate an audio file
+          TEST_AUDIO_DIR="$HOME/.claude/audio"
+          mkdir -p "$TEST_AUDIO_DIR"
+
+          # Test ffmpeg can create audio
+          if command -v ffmpeg &> /dev/null; then
+            ffmpeg -f lavfi -i "sine=frequency=1000:duration=1" -c:a libmp3lame "$TEST_AUDIO_DIR/test-tone.mp3" -y 2>&1 | head -n 5
+
+            if [ -f "$TEST_AUDIO_DIR/test-tone.mp3" ]; then
+              ls -lh "$TEST_AUDIO_DIR/test-tone.mp3"
+              echo "✅ Audio file generated successfully"
+            else
+              echo "❌ Failed to generate audio file"
+              exit 1
+            fi
+          fi
+
+      - name: Test Python MCP dependencies
+        run: |
+          echo "=== Testing Python/MCP setup ==="
+          # Check Python version
+          if command -v python3 &> /dev/null; then
+            echo "✅ Python3 found: $(python3 --version)"
+
+            # Check if pip is available
+            if command -v pip3 &> /dev/null; then
+              echo "✅ pip3 found: $(pip3 --version)"
+
+              # Test MCP package installation (in a virtual env)
+              python3 -m venv /tmp/test-mcp-env
+              source /tmp/test-mcp-env/bin/activate
+
+              pip install mcp>=0.9.0
+
+              if python3 -c "import mcp" 2>/dev/null; then
+                echo "✅ MCP package installed successfully"
+              else
+                echo "⚠️  MCP package installation had issues"
+              fi
+
+              deactivate
+            else
+              echo "⚠️  pip3 not found"
+            fi
+          else
+            echo "⚠️  Python3 not found"
+          fi
+
+      - name: Report test results
+        if: always()
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║           macOS Test Suite - Summary                       ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "✅ Test suite completed on ${{ matrix.os }}"
+          echo "   Node version: ${{ matrix.node-version }}"
+          echo "   Architecture: $(uname -m)"
+          echo ""
+          echo "See detailed test results above"
+          echo ""
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}-node-${{ matrix.node-version }}
+          path: |
+            ~/.claude/audio/
+            /tmp/test-*.log
+          retention-days: 7

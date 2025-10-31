@@ -84,6 +84,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 ### Additional Resources
 - [🔗 Useful Links](#-useful-links) - Voice typing & AI tools
 - [🔄 Updating](#-updating) - Keep AgentVibes current
+- [🍎 macOS Testing](docs/macos-testing.md) - Automated testing on macOS with GitHub Actions
 - [🙏 Credits](#-credits) - Acknowledgments
 - [🤝 Contributing](#-contributing) - Show support
 

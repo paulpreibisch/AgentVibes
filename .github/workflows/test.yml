@@ -8,7 +8,14 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: ['18', '20']
 
     steps:
       - name: Checkout code
@@ -17,15 +24,19 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
         run: npm install
 
       - name: Install BATS
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y bats
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install bats-core
+          fi
 
       - name: Run tests
         env:
@@ -35,5 +46,5 @@ jobs:
       - name: Report test results
         if: always()
         run: |
-          echo "✅ Test suite completed"
+          echo "✅ Test suite completed on ${{ matrix.os }} with Node ${{ matrix.node-version }}"
           echo "See test results above"
