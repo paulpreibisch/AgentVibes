@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.1.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.1.5
 
 ---
 
@@ -92,16 +92,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.1.0 - Streamlined Installation & CI Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.1.0)** 🎉
+**[v2.1.5 - Critical macOS Compatibility Fix + GitHub Actions Testing](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.1.5)** 🍎
 
-**NEW: Automatic Piper Installation!** No more manual steps - when you select Piper TTS, AgentVibes now automatically detects if it's installed and offers to install it for you. Plus streamlined CI workflow improvements!
+**CRITICAL macOS FIX!** All shell scripts now use `#!/usr/bin/env bash` instead of `#!/bin/bash`, enabling AgentVibes to work on macOS. The old shebang forced bash 3.2 (from 2007) which doesn't support associative arrays or modern bash syntax. Plus FREE automated macOS testing on Intel and Apple Silicon Macs!
 
 **Key highlights:**
-- 🚀 **Automatic Piper Installation** - Auto-detects missing Piper binary and prompts to install it during setup
-- ⚡ **One-Command Setup** - Runs `.claude/hooks/piper-installer.sh` seamlessly with human approval
-- 🎯 **Fully Unattended Mode** - Support for `--yes` flag for automated installation
-- 🔧 **CI Workflow Cleanup** - Removed deprecated v1 branch references, tests now run on master only
-- ✅ **110 Tests Passing** - Comprehensive test coverage with optimized GitHub Actions workflow
+- 🍎 **macOS Now Supported** - Fixed all 23 shell scripts to work with Homebrew bash 5.x
+- 🔧 **Voice Switching Works** - No more syntax errors on Mac
+- 🤖 **FREE macOS Testing** - GitHub Actions tests on macOS 13/14/15 (Intel + M1/M2/M3)
+- 🚀 **Automated CI** - 13 parallel test jobs on every commit
+- ✅ **All Features Work** - Personalities, providers, speed control now functional on Mac
 
 [→ View Full Release Notes](RELEASE_NOTES.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
