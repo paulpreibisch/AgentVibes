@@ -119,46 +119,31 @@ async function install(options = {}) {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.0.17 - Major Feature Release\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.1.5 - Critical macOS Fix\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('🌟 BREAKTHROUGH FEATURES:\n\n') +
-      chalk.cyan('🌍 Language Learning Mode\n') +
-      chalk.gray('   • Learn a second language while coding!\n') +
-      chalk.gray('   • Spanish, Italian, French, Mandarin - you name it!\n') +
-      chalk.gray('   • Dual-language TTS (English → target language)\n') +
-      chalk.gray('   • Adjustable speech speed for comprehension\n\n') +
-      chalk.cyan('🎤 MCP Integration (Claude Desktop + Claude Code)\n') +
-      chalk.gray('   • Natural language control: "Switch to pirate personality"\n') +
-      chalk.gray('   • Works in Claude Desktop, Claude Code, and Warp\n') +
-      chalk.gray('   • No slash commands needed - just talk naturally!\n\n') +
-      chalk.cyan('⚡ Unified Speed Control\n') +
-      chalk.gray('   • 0.5x = Slower, 2x = Faster, 3x = Very Fast\n') +
-      chalk.gray('   • Works with BOTH ElevenLabs and Piper\n') +
-      chalk.gray('   • Automatic tongue twister demos\n\n') +
-      chalk.cyan('🔊 SSH Audio Optimization\n') +
-      chalk.gray('   • Crystal-clear audio over VS Code Remote SSH\n') +
-      chalk.gray('   • Auto-detects remote sessions\n\n') +
-      chalk.cyan('🎛️ Enhanced Multi-Provider Support\n') +
-      chalk.gray('   • Seamless ElevenLabs ↔ Piper switching\n') +
-      chalk.gray('   • Mixed provider support for learning mode\n\n') +
+      chalk.red.bold('🐛 CRITICAL macOS FIX:\n\n') +
+      chalk.cyan('All 23 shell scripts now use #!/usr/bin/env bash instead of\n') +
+      chalk.cyan('#!/bin/bash, enabling AgentVibes to work on macOS. The old\n') +
+      chalk.cyan('shebang forced bash 3.2 (from 2007) which doesn\'t support\n') +
+      chalk.cyan('associative arrays or modern bash syntax, causing complete\n') +
+      chalk.cyan('failure on Mac.\n\n') +
+      chalk.green('Mac users: brew install bash (one-time setup)\n') +
+      chalk.green('Then AgentVibes works perfectly!\n\n') +
+      chalk.white.bold('✨ NEW FEATURES:\n\n') +
+      chalk.cyan('🤖 FREE GitHub Actions macOS Testing\n') +
+      chalk.gray('   • Tests on macOS 13/14/15 (Intel + M1/M2/M3)\n') +
+      chalk.gray('   • Node 18, 20, 22 tested automatically\n') +
+      chalk.gray('   • 13 parallel test jobs on every push\n') +
+      chalk.gray('   • Saves $60-276/year vs Mac VPS!\n\n') +
+      chalk.cyan('💡 Provider Switch Hint\n') +
+      chalk.gray('   • Helpful hints in voice list output\n') +
+      chalk.gray('   • Discover ElevenLabs ↔ Piper switching\n\n') +
       chalk.white('───────────────────────────────────────────────────────────────\n\n') +
-      chalk.yellow.bold('🐛 20+ BUG FIXES:\n') +
-      chalk.gray('   ✓ Fixed MP3 bitrate preservation (128kbps)\n') +
-      chalk.gray('   ✓ Fixed audio player hanging issues\n') +
-      chalk.gray('   ✓ Fixed voice/provider mismatches\n') +
-      chalk.gray('   ✓ Fixed Windows npx execution\n') +
-      chalk.gray('   ✓ Fixed JSON escaping in ElevenLabs API\n\n') +
-      chalk.white('───────────────────────────────────────────────────────────────\n\n') +
-      chalk.magenta.bold('📚 DOCUMENTATION OVERHAUL:\n') +
-      chalk.gray('   • 10 new documentation files\n') +
-      chalk.gray('   • Windows Setup Guide (NPX-based)\n') +
-      chalk.gray('   • README reduced 60% (1,285 → 502 lines)\n\n') +
-      chalk.white('───────────────────────────────────────────────────────────────\n\n') +
-      chalk.blue.bold('📊 BY THE NUMBERS:\n') +
-      chalk.gray('   • 75 commits since v2.0.16\n') +
-      chalk.gray('   • 72 files changed (+8,652 lines)\n') +
-      chalk.gray('   • 110 tests (79 new tests added)\n') +
-      chalk.gray('   • 5 major features, 20+ bug fixes\n\n') +
+      chalk.blue.bold('📊 IMPACT:\n') +
+      chalk.gray('   • 30 files changed\n') +
+      chalk.gray('   • 877 insertions, 31 deletions\n') +
+      chalk.gray('   • AgentVibes now works on macOS!\n') +
+      chalk.gray('   • FREE automated testing on all platforms\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
       chalk.cyan('  /agent-vibes:language english\n') +
@@ -1015,46 +1000,31 @@ program
     console.log(
       boxen(
         chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-        chalk.cyan.bold('  📦 AgentVibes v2.0.17 - Major Feature Release\n') +
+        chalk.cyan.bold('  📦 AgentVibes v2.1.5 - Critical macOS Fix\n') +
         chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-        chalk.green.bold('🌟 BREAKTHROUGH FEATURES:\n\n') +
-        chalk.cyan('🌍 Language Learning Mode\n') +
-        chalk.gray('   • Learn a second language while coding!\n') +
-        chalk.gray('   • Spanish, Italian, French, Mandarin - you name it!\n') +
-        chalk.gray('   • Dual-language TTS (English → target language)\n') +
-        chalk.gray('   • Adjustable speech speed for comprehension\n\n') +
-        chalk.cyan('🎤 MCP Integration (Claude Desktop + Claude Code)\n') +
-        chalk.gray('   • Natural language control: "Switch to pirate personality"\n') +
-        chalk.gray('   • Works in Claude Desktop, Claude Code, and Warp\n') +
-        chalk.gray('   • No slash commands needed - just talk naturally!\n\n') +
-        chalk.cyan('⚡ Unified Speed Control\n') +
-        chalk.gray('   • 0.5x = Slower, 2x = Faster, 3x = Very Fast\n') +
-        chalk.gray('   • Works with BOTH ElevenLabs and Piper\n') +
-        chalk.gray('   • Automatic tongue twister demos\n\n') +
-        chalk.cyan('🔊 SSH Audio Optimization\n') +
-        chalk.gray('   • Crystal-clear audio over VS Code Remote SSH\n') +
-        chalk.gray('   • Auto-detects remote sessions\n\n') +
-        chalk.cyan('🎛️ Enhanced Multi-Provider Support\n') +
-        chalk.gray('   • Seamless ElevenLabs ↔ Piper switching\n') +
-        chalk.gray('   • Mixed provider support for learning mode\n\n') +
+        chalk.red.bold('🐛 CRITICAL macOS FIX:\n\n') +
+        chalk.cyan('All 23 shell scripts now use #!/usr/bin/env bash instead of\n') +
+        chalk.cyan('#!/bin/bash, enabling AgentVibes to work on macOS. The old\n') +
+        chalk.cyan('shebang forced bash 3.2 (from 2007) which doesn\'t support\n') +
+        chalk.cyan('associative arrays or modern bash syntax, causing complete\n') +
+        chalk.cyan('failure on Mac.\n\n') +
+        chalk.green('Mac users: brew install bash (one-time setup)\n') +
+        chalk.green('Then AgentVibes works perfectly!\n\n') +
+        chalk.white.bold('✨ NEW FEATURES:\n\n') +
+        chalk.cyan('🤖 FREE GitHub Actions macOS Testing\n') +
+        chalk.gray('   • Tests on macOS 13/14/15 (Intel + M1/M2/M3)\n') +
+        chalk.gray('   • Node 18, 20, 22 tested automatically\n') +
+        chalk.gray('   • 13 parallel test jobs on every push\n') +
+        chalk.gray('   • Saves $60-276/year vs Mac VPS!\n\n') +
+        chalk.cyan('💡 Provider Switch Hint\n') +
+        chalk.gray('   • Helpful hints in voice list output\n') +
+        chalk.gray('   • Discover ElevenLabs ↔ Piper switching\n\n') +
         chalk.white('───────────────────────────────────────────────────────────────\n\n') +
-        chalk.yellow.bold('🐛 20+ BUG FIXES:\n') +
-        chalk.gray('   ✓ Fixed MP3 bitrate preservation (128kbps)\n') +
-        chalk.gray('   ✓ Fixed audio player hanging issues\n') +
-        chalk.gray('   ✓ Fixed voice/provider mismatches\n') +
-        chalk.gray('   ✓ Fixed Windows npx execution\n') +
-        chalk.gray('   ✓ Fixed JSON escaping in ElevenLabs API\n\n') +
-        chalk.white('───────────────────────────────────────────────────────────────\n\n') +
-        chalk.magenta.bold('📚 DOCUMENTATION OVERHAUL:\n') +
-        chalk.gray('   • 10 new documentation files\n') +
-        chalk.gray('   • Windows Setup Guide (NPX-based)\n') +
-        chalk.gray('   • README reduced 60% (1,285 → 502 lines)\n\n') +
-        chalk.white('───────────────────────────────────────────────────────────────\n\n') +
-        chalk.blue.bold('📊 BY THE NUMBERS:\n') +
-        chalk.gray('   • 75 commits since v2.0.16\n') +
-        chalk.gray('   • 72 files changed (+8,652 lines)\n') +
-        chalk.gray('   • 110 tests (79 new tests added)\n') +
-        chalk.gray('   • 5 major features, 20+ bug fixes\n\n') +
+        chalk.blue.bold('📊 IMPACT:\n') +
+        chalk.gray('   • 30 files changed\n') +
+        chalk.gray('   • 877 insertions, 31 deletions\n') +
+        chalk.gray('   • AgentVibes now works on macOS!\n') +
+        chalk.gray('   • FREE automated testing on all platforms\n\n') +
         chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
         chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
         chalk.cyan('  /agent-vibes:language english\n') +
