@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # File: .claude/hooks/language-manager.sh
 #

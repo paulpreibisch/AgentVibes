@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # File: .claude/hooks/play-tts-elevenlabs.sh
 #
