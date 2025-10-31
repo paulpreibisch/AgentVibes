@@ -137,6 +137,17 @@ Just say "Switch to Aria voice" or "Speak in Spanish" instead of typing commands
 
 ## 🚀 Quick Start
 
+### 🍎 macOS Users - Read This First!
+
+**REQUIRED:** Install bash 5.x before using AgentVibes:
+```bash
+brew install bash  # One-time setup
+```
+
+macOS ships with bash 3.2 (from 2007) which lacks modern bash features AgentVibes needs. After installing bash 5.x via Homebrew, everything works perfectly!
+
+---
+
 Get AgentVibes running in 3 steps: **Install** → **Choose Provider** (Piper/ElevenLabs) → **Enable Voice**
 
 **[→ View Complete Quick Start Guide](docs/quick-start.md)** - Full installation options, provider setup, and activation steps

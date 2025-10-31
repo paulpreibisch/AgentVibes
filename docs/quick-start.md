@@ -2,6 +2,23 @@
 
 Get AgentVibes up and running in 3 simple steps!
 
+## 🍎 macOS Users - Important Prerequisite
+
+**REQUIRED:** macOS ships with bash 3.2 (from 2007) which is incompatible with AgentVibes. Install bash 5.x first:
+
+```bash
+# One-time setup
+brew install bash
+
+# Verify installation
+bash --version
+# Should show: GNU bash, version 5.x
+```
+
+**Why?** AgentVibes uses modern bash features (associative arrays, advanced string manipulation) that aren't available in bash 3.2. The `#!/usr/bin/env bash` shebang in our scripts will automatically use Homebrew's bash 5.x once installed.
+
+---
+
 ## Step 1: Install AgentVibes
 
 Choose your preferred installation method:
