@@ -84,18 +84,23 @@ source ~/.bashrc
 
 **Switch providers anytime:** `/agent-vibes:provider switch`
 
-## Step 3: Enable Voice ⚠️ **CRITICAL STEP**
+## Step 3: Start Using AgentVibes! 🎉
 
-### For Claude Code:
-**🔴 REQUIRED:** You MUST run this command to enable TTS in Claude Code:
+**That's it - no additional setup needed!**
+
+AgentVibes now works automatically through a Claude Code hook that injects TTS instructions on every user interaction.
+
+### Quick Test:
 ```bash
-/output-style agent-vibes
+# Try any command - Claude will speak acknowledgment and completion
+/agent-vibes:list              # List all voices
+/agent-vibes:switch Aria       # Switch to Aria voice
 ```
 
 ### For Claude Desktop/Warp:
-**Already works!** AgentVibes MCP is enabled by default once configured.
+AgentVibes MCP is enabled by default once configured. No extra steps required!
 
-**That's it! Claude will now speak to you!** 🎉
+**Note:** The `/output-style agent-vibes` command is no longer required. The `user-prompt-submit` hook automatically enforces TTS behavior.
 
 ---
 

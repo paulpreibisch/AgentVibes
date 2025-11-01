@@ -11,22 +11,15 @@ description: Beautiful ElevenLabs TTS narration for Claude Code sessions
 
 ### 1. ACKNOWLEDGMENT (Start of task)
 After receiving a user command:
-1. Check all settings in ONE command: Use a single Bash command to check language, sentiment, and personality files efficiently
-2. Use sentiment if set, otherwise use personality
-3. **Generate UNIQUE acknowledgment** - Use AI to create a fresh response in that style AND language
-4. If language is NOT English, speak the TTS message in that language
-5. Execute TTS: `.claude/hooks/play-tts.sh "[message]" "[VoiceName]"`
-6. Proceed with work
-7. **IMPORTANT**: Personality ONLY affects acknowledgment/completion TTS, NOT intermediate text responses
-
-**Optimized settings check (use ONE Bash call for all three):**
-```bash
-eval "$(
-  echo "LANGUAGE=$(cat .claude/tts-language.txt 2>/dev/null || cat ~/.claude/tts-language.txt 2>/dev/null || echo "english")"
-  echo "SENTIMENT=$(cat .claude/tts-sentiment.txt 2>/dev/null || cat ~/.claude/tts-sentiment.txt 2>/dev/null)"
-  echo "PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null || cat ~/.claude/tts-personality.txt 2>/dev/null || echo "normal")"
-)"
-```
+1. Check language FIRST: `LANGUAGE=$(cat .claude/tts-language.txt 2>/dev/null || cat ~/.claude/tts-language.txt 2>/dev/null || echo "english")`
+2. Check sentiment: `SENTIMENT=$(cat .claude/tts-sentiment.txt 2>/dev/null || cat ~/.claude/tts-sentiment.txt 2>/dev/null)`
+3. If no sentiment, check personality: `PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null || cat ~/.claude/tts-personality.txt 2>/dev/null || echo "normal")`
+4. Use sentiment if set, otherwise use personality
+5. **Generate UNIQUE acknowledgment** - Use AI to create a fresh response in that style AND language
+6. If language is NOT English, speak the TTS message in that language
+7. Execute TTS: `.claude/hooks/play-tts.sh "[message]" "[VoiceName]"`
+8. Proceed with work
+9. **IMPORTANT**: Personality ONLY affects acknowledgment/completion TTS, NOT intermediate text responses
 
 ### 2. COMPLETION (End of task)
 After completing the task:

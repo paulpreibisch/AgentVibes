@@ -545,9 +545,9 @@ async function install(options = {}) {
       const srcPath = path.join(srcHooksDir, file);
       const stat = await fs.stat(srcPath);
 
-      // Only copy shell script files, skip directories and unwanted files
+      // Copy shell scripts and hooks.json, skip directories and unwanted files
       if (stat.isFile() &&
-          file.endsWith('.sh') &&
+          (file.endsWith('.sh') || file === 'hooks.json') &&
           !file.includes('prepare-release') &&
           !file.startsWith('.')) {
         hookFiles.push(file);
@@ -559,8 +559,13 @@ async function install(options = {}) {
       const srcPath = path.join(srcHooksDir, file);
       const destPath = path.join(hooksDir, file);
       await fs.copyFile(srcPath, destPath);
-      await fs.chmod(destPath, 0o755); // Make executable
-      console.log(chalk.gray(`   ✓ ${file} (executable)`));
+      // Make shell scripts executable, but not JSON files
+      if (file.endsWith('.sh')) {
+        await fs.chmod(destPath, 0o755);
+        console.log(chalk.gray(`   ✓ ${file} (executable)`));
+      } else {
+        console.log(chalk.gray(`   ✓ ${file}`));
+      }
     }
     spinner.succeed(chalk.green('Installed TTS scripts!\n'));
 
@@ -642,6 +647,62 @@ async function install(options = {}) {
     } catch (error) {
       // Plugins directory might not exist in source - that's okay
       spinner.info(chalk.yellow('No plugin files found (optional)\n'));
+    }
+
+    // Install settings.json with SessionStart hook
+    spinner.start('Configuring AgentVibes hook for automatic TTS...');
+    const settingsPath = path.join(claudeDir, 'settings.json');
+    const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
+
+    try {
+      // Check if settings.json already exists
+      let existingSettings = {};
+      try {
+        const existingContent = await fs.readFile(settingsPath, 'utf8');
+        existingSettings = JSON.parse(existingContent);
+      } catch {
+        // File doesn't exist or is invalid - use template
+      }
+
+      // Read template settings
+      const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
+      const templateSettings = JSON.parse(templateContent);
+
+      // Merge: Add SessionStart hook if not already present
+      if (!existingSettings.hooks) {
+        existingSettings.hooks = {};
+      }
+
+      if (!existingSettings.hooks.SessionStart) {
+        existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
+
+        // Add schema if not present
+        if (!existingSettings.$schema) {
+          existingSettings.$schema = templateSettings.$schema;
+        }
+
+        // Write merged settings
+        await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
+        spinner.succeed(chalk.green('SessionStart hook configured!\n'));
+      } else {
+        spinner.info(chalk.yellow('SessionStart hook already configured\n'));
+      }
+    } catch (error) {
+      spinner.fail(chalk.red('Failed to configure hook: ' + error.message + '\n'));
+    }
+
+    // Install plugin manifest (.claude-plugin/plugin.json)
+    spinner.start('Installing AgentVibes plugin manifest...');
+    const pluginDir = path.join(targetDir, '.claude-plugin');
+    const srcPluginManifest = path.join(__dirname, '..', '.claude-plugin', 'plugin.json');
+    const destPluginManifest = path.join(pluginDir, 'plugin.json');
+
+    try {
+      await fs.mkdir(pluginDir, { recursive: true });
+      await fs.copyFile(srcPluginManifest, destPluginManifest);
+      spinner.succeed(chalk.green('Plugin manifest installed!\n'));
+    } catch (error) {
+      spinner.fail(chalk.red('Failed to install plugin manifest: ' + error.message + '\n'));
     }
 
     // Save provider selection
@@ -1141,8 +1202,9 @@ program
         const srcPath = path.join(srcHooksDir, file);
         const stat = await fs.stat(srcPath);
 
+        // Copy shell scripts and hooks.json, skip directories and unwanted files
         if (stat.isFile() &&
-            file.endsWith('.sh') &&
+            (file.endsWith('.sh') || file === 'hooks.json') &&
             !file.includes('prepare-release') &&
             !file.startsWith('.')) {
           hookFiles.push(file);
@@ -1153,7 +1215,10 @@ program
         const srcPath = path.join(srcHooksDir, file);
         const destPath = path.join(hooksDir, file);
         await fs.copyFile(srcPath, destPath);
-        await fs.chmod(destPath, 0o755);
+        // Make shell scripts executable, but not JSON files
+        if (file.endsWith('.sh')) {
+          await fs.chmod(destPath, 0o755);
+        }
       }
       console.log(chalk.green(`✓ Updated ${hookFiles.length} TTS scripts`));
 
@@ -1229,6 +1294,48 @@ program
         }
       } catch (error) {
         // Plugins directory might not exist in source - that's okay
+      }
+
+      // Update settings.json with SessionStart hook
+      spinner.text = 'Updating AgentVibes hook configuration...';
+      const settingsPath = path.join(claudeDir, 'settings.json');
+      const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
+
+      try {
+        // Check if settings.json already exists
+        let existingSettings = {};
+        try {
+          const existingContent = await fs.readFile(settingsPath, 'utf8');
+          existingSettings = JSON.parse(existingContent);
+        } catch {
+          // File doesn't exist or is invalid - use template
+        }
+
+        // Read template settings
+        const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
+        const templateSettings = JSON.parse(templateContent);
+
+        // Merge: Add SessionStart hook if not already present
+        if (!existingSettings.hooks) {
+          existingSettings.hooks = {};
+        }
+
+        if (!existingSettings.hooks.SessionStart) {
+          existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
+
+          // Add schema if not present
+          if (!existingSettings.$schema) {
+            existingSettings.$schema = templateSettings.$schema;
+          }
+
+          // Write merged settings
+          await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
+          console.log(chalk.green('✓ SessionStart hook configured'));
+        } else {
+          console.log(chalk.gray('✓ SessionStart hook already configured'));
+        }
+      } catch (error) {
+        console.log(chalk.yellow('⚠ Failed to configure hook: ' + error.message));
       }
 
       spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
