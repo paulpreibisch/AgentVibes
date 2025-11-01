@@ -43,9 +43,61 @@ PLUGIN_DIR=".claude/plugins"
 PLUGIN_FILE="$PLUGIN_DIR/bmad-voices.md"
 ENABLED_FLAG="$PLUGIN_DIR/bmad-voices-enabled.flag"
 
-# AI NOTE: Auto-enable pattern - When BMAD is detected via .bmad-core/install-manifest.yaml,
+# AI NOTE: Auto-enable pattern - When BMAD is detected via install-manifest.yaml,
 # automatically enable the voice plugin to provide seamless multi-agent voice support.
 # This avoids requiring manual plugin activation after BMAD installation.
+# Supports both BMAD v4 (.bmad-core/) and v6-alpha (bmad/) directory structures.
+
+# @function detect_bmad_version
+# @intent Detect BMAD installation and return version number
+# @why Support both v4 and v6-alpha installations with different directory structures
+# @param None
+# @returns Echoes version number (4, 6, or 0 for not installed) to stdout
+# @exitcode 0=detected, 1=not installed
+# @sideeffects None
+# @edgecases Checks v6 first (newer version), falls back to v4
+# @calledby auto_enable_if_bmad_detected, get_bmad_config_path
+# @calls None
+detect_bmad_version() {
+    if [[ -f "bmad/_cfg/manifest.yaml" ]]; then
+        # v6 detected
+        echo "6"
+        return 0
+    elif [[ -f ".bmad-core/install-manifest.yaml" ]]; then
+        # v4 detected
+        echo "4"
+        return 0
+    else
+        # Not installed
+        echo "0"
+        return 1
+    fi
+}
+
+# @function get_bmad_config_path
+# @intent Get BMAD configuration file path based on detected version
+# @why v4 and v6 use different directory structures for config files
+# @param None
+# @returns Echoes config path to stdout, empty string if not installed
+# @exitcode 0=path returned, 1=not installed
+# @sideeffects None
+# @edgecases Returns empty string if BMAD not detected
+# @calledby Commands that need to read BMAD config (future use)
+# @calls detect_bmad_version
+get_bmad_config_path() {
+    local version=$(detect_bmad_version)
+
+    if [[ "$version" == "6" ]]; then
+        echo "bmad/core/config.yaml"
+        return 0
+    elif [[ "$version" == "4" ]]; then
+        echo ".bmad-core/config.yaml"
+        return 0
+    else
+        echo ""
+        return 1
+    fi
+}
 
 # @function auto_enable_if_bmad_detected
 # @intent Automatically enable BMAD voice plugin when BMAD framework is detected
@@ -56,10 +108,12 @@ ENABLED_FLAG="$PLUGIN_DIR/bmad-voices-enabled.flag"
 # @sideeffects Creates enabled flag file, creates plugin directory
 # @edgecases Only auto-enables if plugin not already enabled, silent operation
 # @calledby get_agent_voice
-# @calls mkdir, touch
+# @calls mkdir, touch, detect_bmad_version
 auto_enable_if_bmad_detected() {
-    # Check if BMAD is installed
-    if [[ -f ".bmad-core/install-manifest.yaml" ]] && [[ ! -f "$ENABLED_FLAG" ]]; then
+    local version=$(detect_bmad_version)
+
+    # Check if BMAD is installed (any version) and plugin not already enabled
+    if [[ "$version" != "0" ]] && [[ ! -f "$ENABLED_FLAG" ]]; then
         # BMAD detected but plugin not enabled - enable it silently
         mkdir -p "$PLUGIN_DIR"
         touch "$ENABLED_FLAG"

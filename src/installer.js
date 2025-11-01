@@ -47,6 +47,7 @@ import fs from 'node:fs/promises';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import figlet from 'figlet';
+import { detectBMAD } from './bmad-detector.js';
 import boxen from 'boxen';
 import ora from 'ora';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +102,75 @@ function showWelcome() {
       }
     )
   );
+}
+
+/**
+ * Generate BMAD activation instructions based on version
+ * @param {number} version - BMAD version (4 or 6)
+ * @returns {string} Activation instructions content
+ */
+function generateActivationInstructions(version) {
+  const configPathExample = version === 6
+    ? 'bmad/core/config.yaml'
+    : '.bmad-core/config.yaml';
+
+  return `# BMAD Agent Activation Instructions (v${version})
+
+When a BMAD agent activates, follow these steps EXACTLY:
+
+## STEP 3.5a: Create BMAD Context File (CRITICAL)
+
+**IMMEDIATELY after agent identification, create the context file:**
+
+\`\`\`bash
+echo "$AGENT_ID" > .bmad-agent-context
+\`\`\`
+
+Where \`$AGENT_ID\` is one of:
+- \`pm\` (Product Manager)
+- \`dev\` (Developer)
+- \`qa\` (QA)
+- \`architect\` (Architect)
+- \`po\` (Product Owner)
+- \`analyst\` (Analyst)
+- \`sm\` (Scrum Master)
+- \`ux-expert\` (UX Expert)
+- \`bmad-master\` (BMAD Master)
+- \`bmad-orchestrator\` (Orchestrator)
+
+**Example:**
+\`\`\`bash
+# For Product Manager agent
+echo "pm" > .bmad-agent-context
+\`\`\`
+
+**Configuration Location**: ${configPathExample}
+
+This file allows AgentVibes to:
+1. Detect which BMAD agent is active
+2. Look up the correct voice mapping
+3. Automatically speak questions using the agent's assigned voice
+
+## STEP 10: Clean Up on Exit
+
+**Before exiting the agent, remove the context file:**
+
+\`\`\`bash
+rm -f .bmad-agent-context
+\`\`\`
+
+This ensures voice switching only happens when an agent is active.
+
+## Why This Matters
+
+Without the \`.bmad-agent-context\` file:
+- AgentVibes cannot detect which agent is active
+- Questions won't be spoken automatically
+- Voice switching won't work
+- The BMAD voice plugin becomes non-functional
+
+**This is MANDATORY for BMAD voice integration to work!**
+`;
 }
 
 // Installation function
@@ -794,16 +864,19 @@ async function install(options = {}) {
       )
     );
 
-    // Check for BMAD installation
-    const bmadManifestPath = path.join(targetDir, '.bmad-core', 'install-manifest.yaml');
-    let bmadDetected = false;
-    try {
-      await fs.access(bmadManifestPath);
-      bmadDetected = true;
-    } catch {}
+    // Check for BMAD installation (both v4 and v6)
+    const bmadDetection = await detectBMAD(targetDir);
+    const bmadDetected = bmadDetection.installed;
 
     // Auto-enable BMAD plugin and create activation-instructions if BMAD detected
     if (bmadDetected) {
+      const versionLabel = bmadDetection.version === 6
+        ? `v6 (${bmadDetection.detailedVersion})`
+        : 'v4';
+
+      console.log(chalk.green(`\n🎉 BMAD-METHOD ${versionLabel} detected!`));
+      console.log(chalk.gray(`   Location: ${bmadDetection.bmadPath}`));
+
       const pluginsDir = path.join(claudeDir, 'plugins');
       const enabledFlagPath = path.join(pluginsDir, 'bmad-voices-enabled.flag');
       const activationInstructionsPath = path.join(claudeDir, 'activation-instructions');
@@ -817,71 +890,21 @@ async function install(options = {}) {
       try {
         await fs.access(activationInstructionsPath);
       } catch {
-        // File doesn't exist - create it
-        const activationContent = `# BMAD Agent Activation Instructions
-
-When a BMAD agent activates, follow these steps EXACTLY:
-
-## STEP 3.5a: Create BMAD Context File (CRITICAL)
-
-**IMMEDIATELY after agent identification, create the context file:**
-
-\`\`\`bash
-echo "$AGENT_ID" > .bmad-agent-context
-\`\`\`
-
-Where \`$AGENT_ID\` is one of:
-- \`pm\` (Product Manager)
-- \`dev\` (Developer)
-- \`qa\` (QA)
-- \`architect\` (Architect)
-- \`po\` (Product Owner)
-- \`analyst\` (Analyst)
-- \`sm\` (Scrum Master)
-- \`ux-expert\` (UX Expert)
-- \`bmad-master\` (BMAD Master)
-- \`bmad-orchestrator\` (Orchestrator)
-
-**Example:**
-\`\`\`bash
-# For Product Manager agent
-echo "pm" > .bmad-agent-context
-\`\`\`
-
-This file allows AgentVibes to:
-1. Detect which BMAD agent is active
-2. Look up the correct voice mapping
-3. Automatically speak questions using the agent's assigned voice
-
-## STEP 10: Clean Up on Exit
-
-**Before exiting the agent, remove the context file:**
-
-\`\`\`bash
-rm -f .bmad-agent-context
-\`\`\`
-
-This ensures voice switching only happens when an agent is active.
-
-## Why This Matters
-
-Without the \`.bmad-agent-context\` file:
-- AgentVibes cannot detect which agent is active
-- Questions won't be spoken automatically
-- Voice switching won't work
-- The BMAD voice plugin becomes non-functional
-
-**This is MANDATORY for BMAD voice integration to work!**
-`;
+        // File doesn't exist - create it with version-specific instructions
+        const activationContent = generateActivationInstructions(bmadDetection.version);
         await fs.writeFile(activationInstructionsPath, activationContent);
         console.log(chalk.green('📝 Created BMAD activation instructions'));
       }
     }
 
     if (bmadDetected) {
+      const versionLabel = bmadDetection.version === 6
+        ? `v${bmadDetection.detailedVersion}`
+        : 'v4';
+
       console.log(
         boxen(
-          chalk.green.bold('🎉 BMAD Detected!\n\n') +
+          chalk.green.bold(`🎉 BMAD-METHOD ${versionLabel} Detected!\n\n`) +
           chalk.white('✅ BMAD Voice Plugin: AUTO-ENABLED\n') +
           chalk.gray('Each BMAD agent will automatically use its assigned voice\n') +
           chalk.gray('and speak when activated!\n\n') +

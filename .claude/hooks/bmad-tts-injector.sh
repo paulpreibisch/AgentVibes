@@ -48,24 +48,29 @@ CYAN='\033[0;36m'
 GRAY='\033[0;90m'
 NC='\033[0m' # No Color
 
-# Detect BMAD installation
+# Detect BMAD installation and version
+# Supports both v4 (.bmad-core/) and v6-alpha (bmad/) installations
 detect_bmad() {
   local bmad_core_dir=""
 
-  # Check current directory first
-  if [[ -d ".bmad-core" ]]; then
+  # Check for v6-alpha first (newer version)
+  if [[ -d "bmad" ]]; then
+    bmad_core_dir="bmad"
+  elif [[ -d "../bmad" ]]; then
+    bmad_core_dir="../bmad"
+  # Check for v4 (legacy)
+  elif [[ -d ".bmad-core" ]]; then
     bmad_core_dir=".bmad-core"
-  # Check parent directory
   elif [[ -d "../.bmad-core" ]]; then
     bmad_core_dir="../.bmad-core"
-  # Check for bmad-core (without dot prefix)
+  # Check for bmad-core (without dot prefix, legacy variant)
   elif [[ -d "bmad-core" ]]; then
     bmad_core_dir="bmad-core"
   elif [[ -d "../bmad-core" ]]; then
     bmad_core_dir="../bmad-core"
   else
     echo -e "${RED}❌ BMAD installation not found${NC}" >&2
-    echo -e "${GRAY}   Looked for .bmad-core or bmad-core directory${NC}" >&2
+    echo -e "${GRAY}   Looked for bmad/, .bmad-core/, or bmad-core/ directory${NC}" >&2
     return 1
   fi
 

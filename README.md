@@ -236,6 +236,8 @@ AgentVibes includes **27 unique ElevenLabs voices** with multilingual support.
 
 The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`) and automatically uses the assigned voice for that role.
 
+**Version Support**: AgentVibes supports both BMAD v4 and v6-alpha installations. Version detection is automatic - just install BMAD and AgentVibes will detect and configure itself correctly!
+
 **[→ View Complete BMAD Documentation](docs/bmad-plugin.md)** - All agent mappings, language support, plugin management, and customization
 
 [↑ Back to top](#-table-of-contents)

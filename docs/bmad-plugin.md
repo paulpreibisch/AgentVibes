@@ -38,9 +38,36 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 /agent-vibes-bmad edit
 ```
 
+## 🔄 BMAD Version Support
+
+AgentVibes automatically detects and supports both BMAD v4 and v6-alpha:
+
+- **v4 (Legacy)**: Uses `.bmad-core/` directory structure
+- **v6-alpha (Current)**: Uses unified `bmad/` directory structure
+
+The plugin automatically detects which version you have installed and configures paths accordingly. **No manual configuration needed!**
+
+### How Detection Works
+
+1. Checks for `bmad/_cfg/manifest.yaml` (v6)
+2. Falls back to `.bmad-core/install-manifest.yaml` (v4)
+3. Resolves configuration paths based on detected version
+
+### Upgrading from v4 to v6
+
+If you upgrade BMAD from v4 to v6-alpha:
+
+1. Reinstall AgentVibes: `npx agentvibes update --yes`
+2. AgentVibes will auto-detect the new v6 structure
+3. All voice mappings will continue working
+
+**No manual intervention required!**
+
+For detailed version support information, see [BMAD v6 Support Documentation](bmad-v6-support.md).
+
 ## How It Works
 
-1. **Auto-Detection**: Plugin checks for `.bmad-core/install-manifest.yaml`
+1. **Auto-Detection**: Plugin checks for BMAD installation (both v4 and v6)
 2. **Auto-Enable**: Enables automatically when BMAD is detected
 3. **Settings Preservation**: Saves your previous voice/personality when enabling
 4. **Restore on Disable**: Restores previous settings when disabling
