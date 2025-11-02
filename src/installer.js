@@ -930,7 +930,7 @@ async function install(options = {}) {
         '  "mcpServers": {\n' +
         '    "agentvibes": {\n' +
         '      "command": "npx",\n' +
-        '      "args": ["-y", "agentvibes-mcp-server"]\n' +
+        '      "args": ["-y", "--package=agentvibes@beta", "agentvibes-mcp-server"]\n' +
         '    }\n' +
         '  }\n' +
         '}\n\n' +
