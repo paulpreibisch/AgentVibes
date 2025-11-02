@@ -18,7 +18,7 @@ This plugin automatically assigns voices to BMAD agents based on their role and 
 | qa | Quinn (QA) | Aria | en_US-amy-medium | professional |
 | architect | Winston (Architect) | Michael | en_GB-alan-medium | normal |
 | po | Product Owner | Aria | en_US-amy-medium | professional |
-| analyst | Analyst | Matthew Schmitz | en_US-joe-medium | normal |
+| analyst | Analyst | Matthew Schmitz | kristin | normal |
 | sm | Scrum Master | Jessica Anne Bogart | kristin | professional |
 | ux-expert | UX Expert | Aria | jenny | normal |
 | bmad-master | BMAD Master | Michael | en_GB-alan-medium | zen |
