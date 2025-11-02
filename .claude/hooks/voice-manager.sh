@@ -63,6 +63,21 @@ fi
 
 VOICE_FILE="$CLAUDE_DIR/tts-voice.txt"
 
+# Helper function to get default voice based on active provider
+get_default_voice() {
+  local provider_file="$CLAUDE_DIR/tts-provider.txt"
+  [[ ! -f "$provider_file" ]] && provider_file="$HOME/.claude/tts-provider.txt"
+
+  local active_provider="elevenlabs"
+  [[ -f "$provider_file" ]] && active_provider=$(cat "$provider_file")
+
+  if [[ "$active_provider" == "piper" ]]; then
+    echo "en_US-lessac-medium"  # Piper default
+  else
+    echo "Cowboy Bob"  # ElevenLabs default
+  fi
+}
+
 case "$1" in
   list)
     # Get active provider
@@ -76,7 +91,7 @@ case "$1" in
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
     fi
 
-    CURRENT_VOICE=$(cat "$VOICE_FILE" 2>/dev/null || echo "Cowboy Bob")
+    CURRENT_VOICE=$(cat "$VOICE_FILE" 2>/dev/null || get_default_voice)
 
     if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
       echo "🎤 Available Piper TTS Voices:"
@@ -86,24 +101,28 @@ case "$1" in
       if [[ -f "$SCRIPT_DIR/piper-voice-manager.sh" ]]; then
         source "$SCRIPT_DIR/piper-voice-manager.sh"
         VOICE_DIR=$(get_voice_storage_dir)
-        VOICE_COUNT=0
+
+        # Collect voices first to count them properly
+        VOICE_LIST=()
         for onnx_file in "$VOICE_DIR"/*.onnx; do
           if [[ -f "$onnx_file" ]]; then
             voice=$(basename "$onnx_file" .onnx)
             if [ "$voice" = "$CURRENT_VOICE" ]; then
-              echo "  ▶ $voice (current)"
+              VOICE_LIST+=("  ▶ $voice (current)")
             else
-              echo "    $voice"
+              VOICE_LIST+=("    $voice")
             fi
-            ((VOICE_COUNT++))
           fi
-        done | sort
+        done
 
-        if [[ $VOICE_COUNT -eq 0 ]]; then
+        if [[ ${#VOICE_LIST[@]} -eq 0 ]]; then
           echo "  (No Piper voices downloaded yet)"
           echo ""
           echo "Download voices with: /agent-vibes:provider download <voice-name>"
           echo "Examples: en_US-lessac-medium, en_GB-alba-medium"
+        else
+          # Sort and display voices
+          printf "%s\n" "${VOICE_LIST[@]}" | sort
         fi
       fi
     else
@@ -197,10 +216,7 @@ case "$1" in
       echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # Get current voice
-      CURRENT="Cowboy Bob"
-      if [ -f "$VOICE_FILE" ]; then
-        CURRENT=$(cat "$VOICE_FILE")
-      fi
+      CURRENT=$(cat "$VOICE_FILE" 2>/dev/null || get_default_voice)
 
       # Create array of voice names
       VOICE_ARRAY=()
@@ -424,7 +440,7 @@ case "$1" in
     if [ -f "$VOICE_FILE" ]; then
       cat "$VOICE_FILE"
     else
-      echo "Cowboy Bob"
+      get_default_voice
     fi
     ;;
 
@@ -453,11 +469,7 @@ case "$1" in
     fi
 
     # Get current voice
-    if [ -f "$VOICE_FILE" ]; then
-      CURRENT_VOICE=$(cat "$VOICE_FILE")
-    else
-      CURRENT_VOICE="Cowboy Bob"
-    fi
+    CURRENT_VOICE=$(cat "$VOICE_FILE" 2>/dev/null || get_default_voice)
     echo "Voice: $CURRENT_VOICE"
 
     # Get current sentiment (priority)

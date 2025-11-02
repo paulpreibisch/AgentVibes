@@ -1,11 +1,25 @@
 ---
-description: Switch to a different ElevenLabs TTS voice
+description: Switch to a different TTS voice (provider-aware)
 argument-hint: [voice_name_or_number] [--sentiment personality_name]
 ---
 
 # Voice Selection
 
-If no arguments provided, display this list:
+## Step 1: Detect Active Provider
+
+First, check which TTS provider is active by running:
+
+```bash
+!bash .claude/hooks/voice-manager.sh whoami
+```
+
+This will show the current provider (ElevenLabs or Piper) and current voice.
+
+## Step 2: Display Voice List Based on Provider
+
+### If Provider is ElevenLabs:
+
+Show this list:
 
 ## 🎤 Available ElevenLabs Voices
 
@@ -24,11 +38,19 @@ If no arguments provided, display this list:
 13. **Northern Terry** - Eccentric British
 14. **Ralf Eisend** - International speaker
 
-Then check current voice with: !bash .claude/hooks/voice-manager.sh get
+### If Provider is Piper:
 
-And inform user: "To switch voices, use `/agent-vibes:switch <number>` or `/agent-vibes:switch <name>`"
+Run this command to list Piper voices:
 
-If arguments ARE provided:
+```bash
+!bash .claude/hooks/voice-manager.sh list
+```
+
+This will show all downloaded Piper voices including multi-speaker voices.
+
+## Step 3: Voice Switching
+
+If user provides a voice name or number:
 
 1. Parse arguments for --sentiment flag
 2. If --sentiment is present:
@@ -39,15 +61,27 @@ If arguments ARE provided:
 3. If no --sentiment flag:
    - Execute: !bash .claude/hooks/voice-manager.sh switch $ARGUMENTS
 
+If no arguments provided:
+- Show the voice list based on active provider (as described in Step 2)
+- Inform user: "To switch voices, use `/agent-vibes:switch <number>` or `/agent-vibes:switch <name>`"
+
 ## Examples
 
 ```bash
 # Switch voice only
-/agent-vibes:switch Jessica Anne Bogart
+/agent-vibes:switch Jessica Anne Bogart  # ElevenLabs
+/agent-vibes:switch en_US-lessac-medium  # Piper
+
+# Switch voice by number
+/agent-vibes:switch 5
 
 # Switch voice and set sentiment
 /agent-vibes:switch Aria --sentiment sarcastic
-
-# Switch by number with sentiment
 /agent-vibes:switch 5 --sentiment flirty
 ```
+
+## Important Notes
+
+- The voice list MUST match the active provider (don't show ElevenLabs voices when Piper is active!)
+- Always check whoami first to determine which provider is active
+- For Piper, use `voice-manager.sh list` to get the actual downloaded voices
