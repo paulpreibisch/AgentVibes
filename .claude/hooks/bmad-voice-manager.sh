@@ -123,7 +123,7 @@ auto_enable_if_bmad_detected() {
 }
 
 # @function get_agent_voice
-# @intent Retrieve TTS voice assigned to specific BMAD agent
+# @intent Retrieve TTS voice assigned to specific BMAD agent (provider-aware)
 # @why Each BMAD agent needs unique voice for multi-agent conversation differentiation
 # @param $1 {string} agent_id - BMAD agent identifier (pm, dev, qa, architect, etc.)
 # @returns Echoes voice name to stdout, empty string if plugin disabled or agent not found
@@ -132,6 +132,7 @@ auto_enable_if_bmad_detected() {
 # @edgecases Returns empty string if plugin disabled/missing, parses markdown table syntax
 # @calledby bmad-tts-injector.sh, play-tts.sh when BMAD agent is active
 # @calls auto_enable_if_bmad_detected, grep, awk, sed
+# @version 2.0.0 - Now provider-aware: returns ElevenLabs or Piper voice based on active provider
 get_agent_voice() {
     local agent_id="$1"
 
@@ -148,9 +149,28 @@ get_agent_voice() {
         return
     fi
 
-    # Extract voice from markdown table
+    # Detect active TTS provider
+    local provider_file=""
+    if [[ -f ".claude/tts-provider.txt" ]]; then
+        provider_file=".claude/tts-provider.txt"
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+        provider_file="$HOME/.claude/tts-provider.txt"
+    fi
+
+    local active_provider="elevenlabs"  # default
+    if [[ -n "$provider_file" ]] && [[ -f "$provider_file" ]]; then
+        active_provider=$(cat "$provider_file")
+    fi
+
+    # Extract voice from markdown table based on provider
+    # Column 4 = ElevenLabs Voice, Column 5 = Piper Voice
+    local column=4  # Default to ElevenLabs (column 4)
+    if [[ "$active_provider" == "piper" ]]; then
+        column=5  # Use Piper column
+    fi
+
     local voice=$(grep "^| $agent_id " "$PLUGIN_FILE" | \
-                  awk -F'|' '{print $4}' | \
+                  awk -F'|' "{print \$$column}" | \
                   sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     echo "$voice"
@@ -163,9 +183,10 @@ get_agent_voice() {
 # @returns Echoes personality name to stdout, empty string if not found
 # @exitcode Always 0
 # @sideeffects None
-# @edgecases Returns empty string if plugin file missing, parses column 5 of markdown table
+# @edgecases Returns empty string if plugin file missing, parses column 6 of markdown table
 # @calledby bmad-tts-injector.sh for personality-aware voice synthesis
 # @calls grep, awk, sed
+# @version 2.0.0 - Updated to column 6 (was 5) due to new provider-aware format
 get_agent_personality() {
     local agent_id="$1"
 
@@ -174,8 +195,9 @@ get_agent_personality() {
         return
     fi
 
+    # Column 6 = Personality (changed from 5 due to new ElevenLabs/Piper columns)
     local personality=$(grep "^| $agent_id " "$PLUGIN_FILE" | \
-                       awk -F'|' '{print $5}' | \
+                       awk -F'|' '{print $6}' | \
                        sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     echo "$personality"
