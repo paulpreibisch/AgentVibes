@@ -868,16 +868,6 @@ async function install(options = {}) {
       }
     }
 
-    // Pause to let user review recent changes
-    await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'continue',
-        message: chalk.cyan('📝 Review the recent changes above. Continue?'),
-        default: true,
-      }
-    ]);
-
     // Success message
     console.log(
       boxen(
