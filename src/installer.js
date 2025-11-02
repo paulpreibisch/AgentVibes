@@ -800,6 +800,16 @@ async function install(options = {}) {
     }
     console.log('');
 
+    // Pause to let user review installation summary
+    await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continue',
+        message: chalk.cyan('📋 Review the installation summary above. Continue?'),
+        default: true,
+      }
+    ]);
+
     // Show recent changes from git log or RELEASE_NOTES.md
     try {
       const { execSync } = await import('node:child_process');
@@ -858,6 +868,16 @@ async function install(options = {}) {
       }
     }
 
+    // Pause to let user review recent changes
+    await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continue',
+        message: chalk.cyan('📝 Review the recent changes above. Continue?'),
+        default: true,
+      }
+    ]);
+
     // Success message
     console.log(
       boxen(
@@ -903,19 +923,38 @@ async function install(options = {}) {
     console.log(chalk.gray('   • /agent-vibes:switch <name> - Change your voice'));
     console.log(chalk.gray('   • /agent-vibes:personality <style> - Set personality\n'));
 
+    // Pause to let user review setup instructions
+    await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continue',
+        message: chalk.yellow('⚠️  Important: Did you note the setup steps above? Continue?'),
+        default: true,
+      }
+    ]);
+
     // Recommend MCP Server installation
     console.log(
       boxen(
         chalk.cyan.bold('🎙️ Want Natural Language Control?\n\n') +
-        chalk.white.bold('AgentVibes MCP Server - Easiest Way to Use AgentVibes!\n\n') +
-        chalk.gray('Use Claude Desktop or Warp Terminal to control TTS with natural language:\n') +
+        chalk.white.bold('AgentVibes MCP Server - Control TTS with Natural Language!\n\n') +
+        chalk.gray('Use natural language instead of slash commands:\n') +
         chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
         chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
-        chalk.cyan('👉 Setup Guide:\n') +
-        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#-mcp-server-easiest-way-to-use-agentvibes\n\n') +
-        chalk.gray('Quick Install:\n') +
-        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop') + chalk.gray(' (Claude Desktop)\n') +
-        chalk.white('   npx -y agentvibes-mcp-server') + chalk.gray(' (Direct run)'),
+        chalk.cyan('📋 Claude Code MCP Configuration:\n\n') +
+        chalk.white('Add this to your ') + chalk.cyan('~/.claude/mcp.json') + chalk.white(':\n\n') +
+        chalk.gray('{\n') +
+        chalk.gray('  "mcpServers": {\n') +
+        chalk.gray('    "agentvibes": {\n') +
+        chalk.gray('      "command": "npx",\n') +
+        chalk.gray('      "args": ["-y", "agentvibes-mcp-server"]\n') +
+        chalk.gray('    }\n') +
+        chalk.gray('  }\n') +
+        chalk.gray('}\n\n') +
+        chalk.cyan('📱 Claude Desktop / Warp Terminal:\n') +
+        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop\n\n') +
+        chalk.cyan('📖 Full Guide:\n') +
+        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
         {
           padding: 1,
           margin: 1,
@@ -924,6 +963,16 @@ async function install(options = {}) {
         }
       )
     );
+
+    // Pause to let user review MCP server info
+    await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continue',
+        message: chalk.cyan('🎙️  Review MCP Server setup info above. Continue?'),
+        default: true,
+      }
+    ]);
 
     // Check for BMAD installation (both v4 and v6)
     const bmadDetection = await detectBMAD(targetDir);
