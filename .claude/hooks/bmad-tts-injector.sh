@@ -80,10 +80,17 @@ detect_bmad() {
 # Find all BMAD agents
 find_agents() {
   local bmad_core="$1"
-  local agents_dir="$bmad_core/agents"
+  local agents_dir=""
 
-  if [[ ! -d "$agents_dir" ]]; then
-    echo -e "${RED}❌ Agents directory not found: $agents_dir${NC}"
+  # Check for v6-alpha structure (bmad/bmm/agents/)
+  if [[ -d "$bmad_core/bmm/agents" ]]; then
+    agents_dir="$bmad_core/bmm/agents"
+  # Check for v4 structure (.bmad-core/agents/)
+  elif [[ -d "$bmad_core/agents" ]]; then
+    agents_dir="$bmad_core/agents"
+  else
+    echo -e "${RED}❌ Agents directory not found in $bmad_core${NC}" >&2
+    echo -e "${GRAY}   Tried: $bmad_core/bmm/agents/ and $bmad_core/agents/${NC}" >&2
     return 1
   fi
 
@@ -94,9 +101,20 @@ find_agents() {
 has_tts_injection() {
   local agent_file="$1"
 
+  # Check for v4 marker (YAML comment)
   if grep -q "# AGENTVIBES-TTS-INJECTION" "$agent_file" 2>/dev/null; then
     return 0
   fi
+
+  # Check for v6 marker (XML attribute or text)
+  if grep -q "AGENTVIBES TTS INJECTION" "$agent_file" 2>/dev/null; then
+    return 0
+  fi
+
+  if grep -q 'tts="agentvibes"' "$agent_file" 2>/dev/null; then
+    return 0
+  fi
+
   return 1
 }
 
@@ -190,55 +208,78 @@ inject_tts() {
   # Create backup
   cp "$agent_file" "$agent_file.backup-pre-tts"
 
-  # Find the activation-instructions section
-  if ! grep -q "activation-instructions:" "$agent_file"; then
-    echo -e "${RED}❌ No activation-instructions found in: $(basename "$agent_file")${NC}"
+  # Detect v4 vs v6 structure
+  local is_v6=false
+  if grep -q "<activation" "$agent_file"; then
+    is_v6=true
+  elif ! grep -q "activation-instructions:" "$agent_file"; then
+    echo -e "${RED}❌ No activation section found in: $(basename "$agent_file")${NC}"
     return 1
   fi
 
-  # Create TTS injection script for activation
-  local activation_injection=""
-  local persona_injection=""
+  # Create TTS injection script based on version
+  if [[ "$is_v6" == "true" ]]; then
+    # v6 format: XML-style with <step n="4.5">
+    local tts_step=""
+    if [[ -n "$agent_voice" ]]; then
+      tts_step="  <step n=\"4.5\" tts=\"agentvibes\">🎤 AGENTVIBES TTS INJECTION:
+      - Create context: echo \"${agent_id}\" > .bmad-agent-context (Bash tool)
+      - Speak greeting: .claude/hooks/play-tts.sh \"Hello! I'm ready to help you.\" \"${agent_voice}\" (Bash tool)
+      - CRITICAL: Before EVERY response, scan for questions/prompts and speak them using Bash tool</step>"
+    else
+      tts_step="  <step n=\"4.5\" tts=\"agentvibes\">🎤 AGENTVIBES TTS INJECTION:
+      - Create context: echo \"${agent_id}\" > .bmad-agent-context (Bash tool)
+      - Speak greeting: .claude/hooks/play-tts.sh \"Hello! I'm ready to help you.\" (Bash tool)
+      - CRITICAL: Before EVERY response, scan for questions/prompts and speak them using Bash tool</step>"
+    fi
 
-  if [[ -n "$agent_voice" ]]; then
-    activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS and set context
+    # Insert after step 4 (greeting) - only first match
+    awk -v tts="$tts_step" '
+      !done && /<step n="4">.*[Gg]reet/ {
+        print
+        print tts
+        done=1
+        next
+      }
+      { print }
+    ' "$agent_file" > "$agent_file.tmp"
+
+    # If no change (step 4 didn't match), restore backup and report
+    if ! diff -q "$agent_file.backup-pre-tts" "$agent_file.tmp" > /dev/null 2>&1; then
+      : # Changes were made, continue
+    else
+      # No changes - step 4 pattern didn't match
+      rm "$agent_file.tmp"
+      mv "$agent_file.backup-pre-tts" "$agent_file"
+      echo -e "${RED}❌ Could not find step 4 with greeting in: $(basename "$agent_file")${NC}"
+      return 1
+    fi
+
+  else
+    # v4 format: YAML-style with STEP 4:
+    local activation_injection=""
+    if [[ -n "$agent_voice" ]]; then
+      activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS
   - STEP 3.5a: Use Bash tool to create context file: echo \"${agent_id}\" > .bmad-agent-context
   - STEP 3.5b: Use Bash tool to speak: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\" \"${agent_voice}\"
-  - AGENTVIBES-TTS-INJECTION: MANDATORY RESPONSE PROTOCOL - Before showing ANY response to user, execute this workflow:
-  - AGENTVIBES-TTS-STEP 1: Draft your complete response text
-  - AGENTVIBES-TTS-STEP 2: Scan response for questions (lines with ? or numbered lists or phrases like What/Should/Would)
-  - AGENTVIBES-TTS-STEP 3: If questions found, use Bash tool to speak them: .claude/hooks/play-tts.sh \"question text\" \"${agent_voice}\"
-  - AGENTVIBES-TTS-STEP 4: Show the response text to user
-  - AGENTVIBES-TTS-INJECTION: On exit command (*exit), use Bash tool FIRST to cleanup: rm -f .bmad-agent-context"
-    persona_injection="    - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
-  else
-    activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS and set context
+  - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
+    else
+      activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS
   - STEP 3.5a: Use Bash tool to create context file: echo \"${agent_id}\" > .bmad-agent-context
   - STEP 3.5b: Use Bash tool to speak: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\"
-  - AGENTVIBES-TTS-INJECTION: MANDATORY RESPONSE PROTOCOL - Before showing ANY response to user, execute this workflow:
-  - AGENTVIBES-TTS-STEP 1: Draft your complete response text
-  - AGENTVIBES-TTS-STEP 2: Scan response for questions (lines with ? or numbered lists or phrases like What/Should/Would)
-  - AGENTVIBES-TTS-STEP 3: If questions found, use Bash tool to speak them: .claude/hooks/play-tts.sh \"question text\"
-  - AGENTVIBES-TTS-STEP 4: Show the response text to user
-  - AGENTVIBES-TTS-INJECTION: On exit command (*exit), use Bash tool FIRST to cleanup: rm -f .bmad-agent-context"
-    persona_injection="    - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
-  fi
+  - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
+    fi
 
-  # Insert activation TTS call after "STEP 4: Greet user" line
-  # Insert persona TTS instruction in core_principles section
-  awk -v activation="$activation_injection" -v persona="$persona_injection" '
-    /STEP 4:.*[Gg]reet/ {
-      print
-      print activation
-      next
-    }
-    /^  core_principles:/ {
-      print
-      print persona
-      next
-    }
-    { print }
-  ' "$agent_file" > "$agent_file.tmp"
+    # Insert after STEP 4: Greet
+    awk -v activation="$activation_injection" '
+      /STEP 4:.*[Gg]reet/ {
+        print
+        print activation
+        next
+      }
+      { print }
+    ' "$agent_file" > "$agent_file.tmp"
+  fi
 
   mv "$agent_file.tmp" "$agent_file"
 
@@ -366,7 +407,17 @@ restore_backup() {
   echo -e "${CYAN}🔄 Restoring agents from backup...${NC}"
   echo ""
 
-  local agents_dir="$bmad_core/agents"
+  # Determine agents directory (v6 vs v4)
+  local agents_dir=""
+  if [[ -d "$bmad_core/bmm/agents" ]]; then
+    agents_dir="$bmad_core/bmm/agents"
+  elif [[ -d "$bmad_core/agents" ]]; then
+    agents_dir="$bmad_core/agents"
+  else
+    echo -e "${RED}❌ Agents directory not found${NC}"
+    return 1
+  fi
+
   local backup_count=0
 
   for backup_file in "$agents_dir"/*.backup-pre-tts; do

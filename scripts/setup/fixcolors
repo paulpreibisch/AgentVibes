@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# fixcolors - Apply vibrant purple color scheme to AgentVibes VS Code workspace
+# Usage: ./fixcolors
+
+set -e
+
+PURPLE_ACTIVE="#7b2cbf"
+PURPLE_INACTIVE="#5a189a"
+PURPLE_DEBUG="#9d4edd"
+WHITE="#ffffff"
+LIGHT_GRAY="#e0e0e0"
+
+echo "🎨 Applying vibrant purple color scheme to AgentVibes workspace..."
+echo ""
+
+# Function to update JSON files with purple colors
+update_colors() {
+  local file="$1"
+  local temp_file="${file}.tmp"
+
+  if [[ ! -f "$file" ]]; then
+    echo "⚠️  File not found: $file"
+    return 1
+  fi
+
+  echo "📝 Updating: $file"
+
+  # Use Python to safely update JSON
+  python3 << EOF
+import json
+import sys
+
+try:
+    with open('$file', 'r') as f:
+        data = json.load(f)
+
+    # Ensure settings exists
+    if 'settings' in data:
+        settings = data['settings']
+    else:
+        settings = data
+
+    # Ensure workbench.colorCustomizations exists
+    if 'workbench.colorCustomizations' not in settings:
+        settings['workbench.colorCustomizations'] = {}
+
+    colors = settings['workbench.colorCustomizations']
+
+    # Apply purple theme
+    colors['titleBar.activeBackground'] = '$PURPLE_ACTIVE'
+    colors['titleBar.activeForeground'] = '$WHITE'
+    colors['titleBar.inactiveBackground'] = '$PURPLE_INACTIVE'
+    colors['titleBar.inactiveForeground'] = '$LIGHT_GRAY'
+    colors['statusBar.background'] = '$PURPLE_ACTIVE'
+    colors['statusBar.foreground'] = '$WHITE'
+    colors['statusBar.noFolderBackground'] = '$PURPLE_INACTIVE'
+    colors['statusBar.debuggingBackground'] = '$PURPLE_DEBUG'
+
+    # Write back
+    with open('$temp_file', 'w') as f:
+        json.dump(data, f, indent=2)
+
+    print("   ✓ Colors updated")
+
+except Exception as e:
+    print(f"   ✗ Error: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+
+  if [[ $? -eq 0 ]]; then
+    mv "$temp_file" "$file"
+    echo "   ✓ File saved"
+  else
+    rm -f "$temp_file"
+    echo "   ✗ Failed to update"
+    return 1
+  fi
+}
+
+# Update AgentVibes workspace
+echo "🔧 AgentVibes workspace:"
+update_colors "/home/fire/claude/AgentVibes/AgentVibes.code-workspace"
+echo ""
+
+echo "✅ All done! Reload VS Code window to see the purple theme."
+echo ""
+echo "💡 To reload: Press Ctrl+Shift+P → 'Developer: Reload Window'"

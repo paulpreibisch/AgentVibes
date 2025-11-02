@@ -344,7 +344,7 @@ AgentVibes supports **custom personalities**, **custom voices**, and **integrati
 
 **No Audio Playing?**
 1. Check API key: `echo $ELEVENLABS_API_KEY`
-2. Enable output style: `/output-style agent-vibes`
+2. Verify hook is installed: `ls -la ~/.claude/hooks/user-prompt-submit.sh`
 3. Test: `/agent-vibes:sample Aria`
 
 **Commands Not Found?**

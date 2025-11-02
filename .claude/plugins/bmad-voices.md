@@ -1,35 +1,44 @@
 ---
 plugin: bmad-voices
-version: 1.0.0
+version: 2.0.0
 enabled: true
-description: Voice mappings for BMAD agents
+description: Provider-aware voice mappings for BMAD agents
 ---
 
 # BMAD Voice Plugin
 
-This plugin automatically assigns voices to BMAD agents based on their role.
+This plugin automatically assigns voices to BMAD agents based on their role and active TTS provider.
 
-## Agent Voice Mappings
+## Agent Voice Mappings (Provider-Aware)
 
-| Agent ID | Agent Name | Voice | Personality |
-|----------|------------|-------|-------------|
-| pm | John (Product Manager) | Jessica Anne Bogart | professional |
-| dev | James (Developer) | Matthew Schmitz | normal |
-| qa | Quinn (QA) | Burt Reynolds | professional |
-| architect | Winston (Architect) | Michael | normal |
-| po | Product Owner | Tiffany | professional |
-| analyst | Analyst | Ralf Eisend | normal |
-| sm | Scrum Master | Ms. Walker | professional |
-| ux-expert | UX Expert | Aria | normal |
-| bmad-master | BMAD Master | Archer | zen |
-| bmad-orchestrator | Orchestrator | Tom | professional |
+| Agent ID | Agent Name | ElevenLabs Voice | Piper Voice | Personality |
+|----------|------------|------------------|-------------|-------------|
+| pm | John (Product Manager) | Jessica Anne Bogart | en_US-ryan-high | professional |
+| dev | James (Developer) | Matthew Schmitz | en_US-joe-medium | normal |
+| qa | Quinn (QA) | Aria | en_US-amy-medium | professional |
+| architect | Winston (Architect) | Michael | en_GB-alan-medium | normal |
+| po | Product Owner | Aria | en_US-amy-medium | professional |
+| analyst | Analyst | Matthew Schmitz | kristin | normal |
+| sm | Scrum Master | Jessica Anne Bogart | kristin | professional |
+| ux-expert | UX Expert | Aria | jenny | normal |
+| bmad-master | BMAD Master | Michael | en_GB-alan-medium | zen |
+| bmad-orchestrator | Orchestrator | Matthew Schmitz | en_US-ryan-high | professional |
+
+## How It Works
+
+The voice manager automatically selects the appropriate voice based on your active TTS provider:
+- **ElevenLabs active**: Uses voices from the "ElevenLabs Voice" column
+- **Piper active**: Uses voices from the "Piper Voice" column
+
+This ensures BMAD agents work seamlessly regardless of which provider you're using.
 
 ## How to Edit
 
 Simply edit the table above to change voice mappings. The format is:
-- **Agent ID**: Must match BMAD's `agent.id` field
+- **Agent ID**: Must match BMAD's `agent.id` field (pm, dev, qa, etc.)
 - **Agent Name**: Display name (for reference only)
-- **Voice**: Must be a valid AgentVibes voice name
+- **ElevenLabs Voice**: Voice name for ElevenLabs provider
+- **Piper Voice**: Voice model name for Piper provider
 - **Personality**: Optional personality to apply (or "normal" for none)
 
 ## Commands
@@ -39,4 +48,4 @@ Simply edit the table above to change voice mappings. The format is:
 - `/agent-vibes:bmad status` - Show plugin status
 - `/agent-vibes:bmad edit` - Open this file for editing
 - `/agent-vibes:bmad list` - List all agent voice mappings
-- `/agent-vibes:bmad set <agent-id> <voice> [personality]` - Set voice for specific agent
+- `/agent-vibes:bmad set <agent-id> <elevenlabs-voice> <piper-voice> [personality]` - Set voices for specific agent
