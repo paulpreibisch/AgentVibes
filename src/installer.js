@@ -882,9 +882,8 @@ async function install(options = {}) {
     console.log(
       boxen(
         chalk.green.bold('✨ Installation Complete! ✨\n\n') +
-        chalk.yellow.bold('⚠️  IMPORTANT SETUP STEP:\n') +
-        chalk.white('In Claude Code, run this command:\n') +
-        chalk.cyan.bold('/output-style Agent Vibes') + '\n\n' +
+        chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
+        chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n') +
         chalk.magenta('💡 Optional: Enable BMAD plugin integration:\n') +
         chalk.magenta('/agent-vibes:bmad enable') + '\n\n' +
         chalk.white('🎤 Available Commands:\n\n') +
@@ -911,17 +910,17 @@ async function install(options = {}) {
       )
     );
 
-    console.log(chalk.yellow.bold('\n⚠️  REQUIRED SETUP:'));
-    console.log(chalk.white('   1. In Claude Code, run: ') + chalk.cyan.bold('/output-style Agent Vibes'));
-    console.log(chalk.gray('      This enables TTS narration for your sessions'));
-    console.log(chalk.magenta('\n   💡 Optional: Enable BMAD plugin integration:'));
-    console.log(chalk.white('   2. In Claude Code, run: ') + chalk.magenta.bold('/agent-vibes:bmad enable'));
-    console.log(chalk.gray('      This assigns unique voices to each BMAD agent'));
-    console.log(chalk.gray('      Get BMAD: ') + chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD\n'));
-    console.log(chalk.gray('💡 Then try these commands:'));
-    console.log(chalk.gray('   • /agent-vibes:list - See all available voices'));
-    console.log(chalk.gray('   • /agent-vibes:switch <name> - Change your voice'));
-    console.log(chalk.gray('   • /agent-vibes:personality <style> - Set personality\n'));
+    console.log(chalk.green.bold('\n✅ AgentVibes is Ready!'));
+    console.log(chalk.white('   TTS protocol automatically loads on every Claude Code session'));
+    console.log(chalk.gray('   via SessionStart hook - no additional setup needed!\n'));
+    console.log(chalk.magenta('💡 Optional: Enable BMAD plugin integration:'));
+    console.log(chalk.white('   In Claude Code, run: ') + chalk.magenta.bold('/agent-vibes:bmad enable'));
+    console.log(chalk.gray('   This assigns unique voices to each BMAD agent'));
+    console.log(chalk.gray('   Get BMAD: ') + chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD\n'));
+    console.log(chalk.cyan('🎤 Try these commands:'));
+    console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
+    console.log(chalk.white('   • /agent-vibes:switch <name>') + chalk.gray(' - Change your voice'));
+    console.log(chalk.white('   • /agent-vibes:personality <style>') + chalk.gray(' - Set personality\n'));
 
     // Pause to let user review setup instructions
     await inquirer.prompt([

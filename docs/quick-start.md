@@ -88,19 +88,23 @@ source ~/.bashrc
 
 **That's it - no additional setup needed!**
 
-AgentVibes now works automatically through a Claude Code hook that injects TTS instructions on every user interaction.
+AgentVibes works automatically through the **SessionStart hook** that injects TTS protocol instructions at the beginning of every Claude Code session.
+
+### How It Works:
+- ✅ **Automatic activation**: TTS protocol loads on every session start
+- ✅ **No commands needed**: Claude automatically speaks acknowledgments and completions
+- ✅ **SessionStart hook**: `.claude/settings.json` → `session-start-tts.sh`
 
 ### Quick Test:
 ```bash
 # Try any command - Claude will speak acknowledgment and completion
 /agent-vibes:list              # List all voices
 /agent-vibes:switch Aria       # Switch to Aria voice
+/agent-vibes:personality flirty # Set personality
 ```
 
 ### For Claude Desktop/Warp:
 AgentVibes MCP is enabled by default once configured. No extra steps required!
-
-**Note:** The `/output-style agent-vibes` command is no longer required. The `user-prompt-submit` hook automatically enforces TTS behavior.
 
 ---
 
