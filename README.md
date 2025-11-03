@@ -92,18 +92,18 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.1.5 - Critical macOS Compatibility Fix + GitHub Actions Testing](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.1.5)** 🍎
+**[v2.2.0 - Provider-Aware Features, BMAD v6 Support & MCP Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.2.0)** 🎉
 
-**CRITICAL macOS FIX!** All shell scripts now use `#!/usr/bin/env bash` instead of `#!/bin/bash`, enabling AgentVibes to work on macOS. The old shebang forced bash 3.2 (from 2007) which doesn't support associative arrays or modern bash syntax. Plus FREE automated macOS testing on Intel and Apple Silicon Macs!
+Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha.
 
 **Key highlights:**
-- 🍎 **macOS Now Supported** - Fixed all 23 shell scripts to work with Homebrew bash 5.x
-- 🔧 **Voice Switching Works** - No more syntax errors on Mac
-- 🤖 **FREE macOS Testing** - GitHub Actions tests on macOS 13/14/15 (Intel + M1/M2/M3)
-- 🚀 **Automated CI** - 13 parallel test jobs on every commit
-- ✅ **All Features Work** - Personalities, providers, speed control now functional on Mac
+- 🎯 **Provider-Aware Voice Switching** - Automatically detects and uses the correct provider (ElevenLabs or Piper)
+- 🤖 **BMAD v6 Support** - Full backward compatibility with v4, with improved agent voice mappings
+- 🔧 **MCP NPX Fix** - Corrected NPX configuration for seamless MCP server setup
+- ✨ **Improved Installer UX** - Cleaner prompts and better visual formatting
+- 🎭 **Better Voice Mappings** - Provider-aware BMAD agent voices (PM: Ryan, Analyst: Kristin)
 
-[→ View Full Release Notes](RELEASE_NOTES.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+[→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 

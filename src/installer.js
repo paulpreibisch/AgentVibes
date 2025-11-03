@@ -925,15 +925,31 @@ async function install(options = {}) {
         chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
         chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
         chalk.cyan('📋 Claude Code MCP Configuration:\n\n') +
-        chalk.white('Add this to your ') + chalk.cyan('~/.claude/mcp.json') + chalk.white(':\n\n') +
-        '{\n' +
-        '  "mcpServers": {\n' +
-        '    "agentvibes": {\n' +
-        '      "command": "npx",\n' +
-        '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
-        '    }\n' +
-        '  }\n' +
-        '}\n\n' +
+        chalk.white('Add this to your ') + chalk.cyan('~/.claude/mcp.json') + chalk.white(':'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
+        }
+      )
+    );
+
+    // Display JSON config without border
+    console.log(
+      '\n{\n' +
+      '  "mcpServers": {\n' +
+      '    "agentvibes": {\n' +
+      '      "command": "npx",\n' +
+      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
+      '    }\n' +
+      '  }\n' +
+      '}\n'
+    );
+
+    // Bottom section with border
+    console.log(
+      boxen(
         chalk.cyan('📱 Claude Desktop / Warp Terminal:\n') +
         chalk.white('   npx agentvibes setup-mcp-for-claude-desktop\n\n') +
         chalk.cyan('📖 Full Guide:\n') +

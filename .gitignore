@@ -41,3 +41,4 @@ linkedin/
 
 # Scripts folder - user-specific config
 scripts/audio-tunnel.config
+.sonarqube-storage/
