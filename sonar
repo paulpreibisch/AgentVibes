@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+#
+# SonarQube Analysis Wrapper Script
+# Run SonarCloud analysis on the AgentVibes project
+#
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Configuration
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STORAGE_DIR="$PROJECT_DIR/.sonarqube-storage"
+CONTAINER_NAME="sonarqube-mcp-server-agentvibes"
+IMAGE_NAME="mcp/sonarqube"
+
+# Check required environment variables
+check_env_vars() {
+    local missing=0
+
+    # Use AgentVibes-prefixed environment variables
+    if [[ -z "${AGENTVIBES_SONARQUBE_TOKEN:-}" ]]; then
+        echo -e "${RED}❌ AGENTVIBES_SONARQUBE_TOKEN is not set${NC}"
+        missing=1
+    fi
+
+    if [[ -z "${AGENTVIBES_SONARQUBE_ORG:-}" ]]; then
+        echo -e "${RED}❌ AGENTVIBES_SONARQUBE_ORG is not set${NC}"
+        missing=1
+    fi
+
+    if [[ -z "${AGENTVIBES_SONARQUBE_PROJECT:-}" ]]; then
+        echo -e "${RED}❌ AGENTVIBES_SONARQUBE_PROJECT is not set${NC}"
+        missing=1
+    fi
+
+    if [[ $missing -eq 1 ]]; then
+        echo -e "\n${YELLOW}💡 Set these environment variables in ~/.zshrc:${NC}"
+        echo "   export AGENTVIBES_SONARQUBE_TOKEN='your-token'"
+        echo "   export AGENTVIBES_SONARQUBE_ORG='paulpreibisch'"
+        echo "   export AGENTVIBES_SONARQUBE_PROJECT='AgentVibes'"
+        echo -e "\n${YELLOW}Then reload: source ~/.zshrc${NC}"
+        exit 1
+    fi
+
+    # Set standard variable names for Docker container
+    export SONARQUBE_TOKEN="${AGENTVIBES_SONARQUBE_TOKEN}"
+    export SONARQUBE_ORG="${AGENTVIBES_SONARQUBE_ORG}"
+    export SONARQUBE_PROJECT="${AGENTVIBES_SONARQUBE_PROJECT}"
+}
+
+# Check if Docker is available
+check_docker() {
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}❌ Docker is not available${NC}"
+        echo -e "${YELLOW}💡 Please start Docker Desktop or enable Docker in WSL2${NC}"
+        exit 1
+    fi
+
+    if ! docker info &> /dev/null; then
+        echo -e "${RED}❌ Docker daemon is not running${NC}"
+        echo -e "${YELLOW}💡 Please start Docker Desktop${NC}"
+        exit 1
+    fi
+}
+
+# Create storage directory if it doesn't exist
+setup_storage() {
+    if [[ ! -d "$STORAGE_DIR" ]]; then
+        echo -e "${CYAN}📁 Creating storage directory...${NC}"
+        mkdir -p "$STORAGE_DIR"
+    fi
+}
+
+# Pull the latest image if needed
+pull_image() {
+    if ! docker images | grep -q "mcp/sonarqube"; then
+        echo -e "${CYAN}📦 Pulling SonarQube MCP image...${NC}"
+        docker pull "$IMAGE_NAME" || {
+            echo -e "${RED}❌ Failed to pull image${NC}"
+            echo -e "${YELLOW}💡 Make sure you have access to the mcp/sonarqube image${NC}"
+            exit 1
+        }
+    fi
+}
+
+# Stop any existing container
+cleanup() {
+    if docker ps -a | grep -q "$CONTAINER_NAME"; then
+        echo -e "${CYAN}🧹 Cleaning up existing container...${NC}"
+        docker rm -f "$CONTAINER_NAME" &> /dev/null || true
+    fi
+}
+
+# Run the analysis
+run_analysis() {
+    echo -e "${GREEN}🚀 Starting SonarCloud analysis...${NC}"
+    echo -e "${CYAN}   Organization: ${SONARQUBE_ORG}${NC}"
+    echo -e "${CYAN}   Project: ${SONARQUBE_PROJECT}${NC}"
+    echo -e "${CYAN}   URL: https://sonarcloud.io${NC}"
+    echo ""
+
+    docker run -i \
+        --name "$CONTAINER_NAME" \
+        --rm \
+        -e "SONARQUBE_TOKEN=${SONARQUBE_TOKEN}" \
+        -e "SONARQUBE_URL=https://sonarcloud.io" \
+        -e "SONARQUBE_ORG=${SONARQUBE_ORG}" \
+        -e "SONARQUBE_PROJECT=${SONARQUBE_PROJECT}" \
+        -v "${STORAGE_DIR}:/storage" \
+        "$IMAGE_NAME" "$@"
+}
+
+# Main execution
+main() {
+    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
+    echo -e "${CYAN}   SonarQube Analysis - AgentVibes${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
+    echo ""
+
+    check_env_vars
+    check_docker
+    setup_storage
+    pull_image
+    cleanup
+    run_analysis "$@"
+
+    echo ""
+    echo -e "${GREEN}✅ Analysis complete!${NC}"
+    echo -e "${CYAN}🔗 View results: https://sonarcloud.io/project/overview?id=${SONARQUBE_PROJECT}${NC}"
+}
+
+# Handle Ctrl+C gracefully
+trap cleanup EXIT
+
+main "$@"
