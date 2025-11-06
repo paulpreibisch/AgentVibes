@@ -105,6 +105,48 @@ function showWelcome() {
 }
 
 /**
+ * Display latest release information box
+ * Shown during install and update commands
+ */
+function showReleaseInfo() {
+  console.log(
+    boxen(
+      chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.3.0 - Command Visibility Management\n') +
+      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
+      chalk.green.bold('✨ WHAT\'S NEW:\n\n') +
+      chalk.cyan('👁️  Command Visibility Management\n') +
+      chalk.gray('   • Use /agent-vibes:hide to hide all slash commands from palette\n') +
+      chalk.gray('   • MCP functionality remains fully operational when hidden\n') +
+      chalk.gray('   • Perfect for users who prefer MCP tools over slash commands\n') +
+      chalk.gray('   • Use /agent-vibes:show to restore commands anytime\n\n') +
+      chalk.cyan('🔧 Maintenance Improvements\n') +
+      chalk.gray('   • Enhanced .gitignore for runtime/user-generated files\n') +
+      chalk.gray('   • Cleaner version control and repository management\n\n') +
+      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
+      chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
+      chalk.cyan('  /agent-vibes:language english\n') +
+      chalk.cyan('  /agent-vibes:target spanish\n') +
+      chalk.cyan('  /agent-vibes:learn\n\n') +
+      chalk.white('  Now while coding, you can also learn a second language\n') +
+      chalk.white('  such as Spanish, Italian, French, Mandarin, you name it! 🌍\n\n') +
+      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
+      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
+      chalk.gray('🌐 Website: https://agentvibes.org\n') +
+      chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
+      chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
+      chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License'),
+      {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'cyan',
+      }
+    )
+  );
+}
+
+/**
  * Generate BMAD activation instructions based on version
  * @param {number} version - BMAD version (4 or 6)
  * @returns {string} Activation instructions content
@@ -186,41 +228,7 @@ async function install(options = {}) {
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
   // Show AI summary of latest release
-  console.log(
-    boxen(
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.3.0 - Command Visibility Management\n') +
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('✨ WHAT\'S NEW:\n\n') +
-      chalk.cyan('👁️  Command Visibility Management\n') +
-      chalk.gray('   • Use /agent-vibes:hide to hide all slash commands from palette\n') +
-      chalk.gray('   • MCP functionality remains fully operational when hidden\n') +
-      chalk.gray('   • Perfect for users who prefer MCP tools over slash commands\n') +
-      chalk.gray('   • Use /agent-vibes:show to restore commands anytime\n\n') +
-      chalk.cyan('🔧 Maintenance Improvements\n') +
-      chalk.gray('   • Enhanced .gitignore for runtime/user-generated files\n') +
-      chalk.gray('   • Cleaner version control and repository management\n\n') +
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
-      chalk.cyan('  /agent-vibes:language english\n') +
-      chalk.cyan('  /agent-vibes:target spanish\n') +
-      chalk.cyan('  /agent-vibes:learn\n\n') +
-      chalk.white('  Now while coding, you can also learn a second language\n') +
-      chalk.white('  such as Spanish, Italian, French, Mandarin, you name it! 🌍\n\n') +
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
-      chalk.gray('🌐 Website: https://agentvibes.org\n') +
-      chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
-      chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-      chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License'),
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'cyan',
-      }
-    )
-  );
+  showReleaseInfo();
 
   // Provider selection prompt
   let selectedProvider = 'piper';
@@ -1115,41 +1123,7 @@ program
     console.log(chalk.gray(`   Package version: ${version}`));
 
     // Show AI summary of latest release
-    console.log(
-      boxen(
-        chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-        chalk.cyan.bold('  📦 AgentVibes v2.3.0 - Command Visibility Management\n') +
-        chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-        chalk.green.bold('✨ WHAT\'S NEW:\n\n') +
-        chalk.cyan('👁️  Command Visibility Management\n') +
-        chalk.gray('   • Use /agent-vibes:hide to hide all slash commands from palette\n') +
-        chalk.gray('   • MCP functionality remains fully operational when hidden\n') +
-        chalk.gray('   • Perfect for users who prefer MCP tools over slash commands\n') +
-        chalk.gray('   • Use /agent-vibes:show to restore commands anytime\n\n') +
-        chalk.cyan('🔧 Maintenance Improvements\n') +
-        chalk.gray('   • Enhanced .gitignore for runtime/user-generated files\n') +
-        chalk.gray('   • Cleaner version control and repository management\n\n') +
-        chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-        chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
-        chalk.cyan('  /agent-vibes:language english\n') +
-        chalk.cyan('  /agent-vibes:target spanish\n') +
-        chalk.cyan('  /agent-vibes:learn\n\n') +
-        chalk.white('  Now while coding, you can also learn a second language\n') +
-        chalk.white('  such as Spanish, Italian, French, Mandarin, you name it! 🌍\n\n') +
-        chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-        chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
-        chalk.gray('🌐 Website: https://agentvibes.org\n') +
-        chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
-        chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-        chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
+    showReleaseInfo();
 
     // Check if already installed
     const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
