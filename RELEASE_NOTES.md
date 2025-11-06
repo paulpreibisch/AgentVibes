@@ -1,5 +1,61 @@
 # AgentVibes Release Notes
 
+## v2.3.0 - Command Visibility Management & Maintenance (2025-11-06)
+
+### 🤖 AI Summary
+
+This minor release introduces command visibility management features allowing MCP users to hide/show AgentVibes slash commands, plus important maintenance improvements. Users who primarily interact with AgentVibes through MCP tools can now declutter their Claude Code command palette by hiding slash commands, while still retaining full MCP functionality. The release also includes improved .gitignore rules to exclude runtime and user-generated files from version control.
+
+### 📋 Changes
+
+#### ✨ New Features
+- **Command Visibility Management**: New `/agent-vibes:hide` and `/agent-vibes:show` commands
+  - Hide all AgentVibes slash commands from Claude Code interface
+  - Keeps only hide/show commands visible when hidden
+  - MCP functionality remains completely unaffected
+  - Commands safely backed up to `.claude/.agentvibes-backup/`
+  - Perfect for users who prefer MCP tools over slash commands
+
+#### 🔧 Maintenance
+- **Enhanced .gitignore**: Improved exclusion rules for runtime files
+  - `.claude/plugins/*.flag` - Plugin state flags
+  - `.claude/piper-voices/` - Downloaded voice models
+  - `.claude/piper-voices-dir.txt` - Voice directory config
+  - `.claude/github-star-reminder.txt` - UI reminder state
+  - `.claude/.agentvibes-backup/` - Hidden command backups
+  - `.claude/.agentvibes-hidden.flag` - Command visibility state
+
+#### 📚 Documentation
+- **README**: Updated version to v2.2.3
+- **MCP Config**: Cleaned up `.mcp-minimal.json` configuration
+
+### 🎯 User Impact
+
+**For MCP Users**: If you primarily use AgentVibes through MCP tools and find the slash commands cluttering your command palette, you can now use `/agent-vibes:hide` to clean up the interface. Your MCP functionality will work exactly the same. Use `/agent-vibes:show` anytime to restore commands.
+
+**For All Users**: The improved .gitignore ensures that runtime-generated files (voice models, state flags, reminders) are never accidentally committed to version control, keeping your git history clean.
+
+**Command Organization**: The 29 AgentVibes slash commands can now be completely hidden with a single command, leaving only the hide/show toggles visible. This is ideal for users who:
+- Prefer using MCP tools directly
+- Want a cleaner command palette
+- Are setting up AgentVibes for others
+- Have memorized their favorite commands
+
+### 📦 Files Changed
+- `.claude/commands/agent-vibes/hide.md` - NEW: Hide commands feature
+- `.claude/commands/agent-vibes/show.md` - NEW: Show commands feature
+- `.gitignore` - Enhanced runtime file exclusions
+- `.mcp-minimal.json` - Configuration cleanup
+- `README.md` - Version update to v2.2.3
+
+### 🔄 Breaking Changes
+None. This release is fully backward compatible.
+
+### 🚀 Upgrade Notes
+Simply run `npx agentvibes@latest` to get the new features. Existing configurations and settings are preserved.
+
+---
+
 ## v2.2.1 - Documentation & Installer UX Improvements (2025-11-03)
 
 ### 🤖 AI Summary
@@ -48,59 +104,3 @@ This patch release improves the user experience during installation and updates 
 ### 🤖 AI Summary
 
 Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha with complete backward compatibility to v4.
-
-### 📋 Changes
-
-#### ✨ New Features
-- **Provider-Aware Voice Switching**: Automatically detects whether you're using ElevenLabs or Piper TTS
-- **BMAD v6 Support**: Full support for BMAD-METHOD v6-alpha with backward compatibility to v4
-- **Improved Voice Mappings**: Provider-aware BMAD agent voices (PM: Ryan on Piper, Analyst: Kristin)
-- **SessionStart Hook Support**: Reorganized repository structure for better hook integration
-
-#### 🔧 Fixes
-- **MCP NPX Configuration**: Corrected NPX command configuration for seamless MCP server setup
-- **Voice Manager**: Made `/agent-vibes:switch` and `voice-manager.sh` provider-aware
-- **Installer Prompts**: Removed redundant BMAD enable messages and duplicate pause prompts
-- **JSON Formatting**: Removed color codes from MCP JSON output for clean copy-paste
-
-#### 📚 Documentation
-- Added prominent macOS bash 5.x requirement to README
-- Updated documentation to remove deprecated output-style references
-- Improved BMAD v6 TTS support documentation
-
-### 🎯 User Impact
-
-**Provider Awareness**: AgentVibes now intelligently works with both ElevenLabs and Piper TTS providers without manual configuration. Voice switching commands automatically use the correct provider's voice list.
-
-**BMAD Integration**: If you're using BMAD-METHOD (v4 or v6), AgentVibes will automatically assign appropriate voices to each agent based on your TTS provider, with full backward compatibility.
-
-**MCP Setup**: The corrected NPX configuration means MCP server setup is now seamless with the command: `npx -y --package=agentvibes agentvibes-mcp-server`
-
-### 📦 Commits Since v2.1.5
-```
-01f5283 docs: Update README version to v2.2.0
-ca47e74 chore: Release v2.2.0
-8b6cae9 Merge v6-alpha: Provider-aware features, BMAD improvements, MCP NPX fix
-a9c5439 fix: Correct MCP server NPX configuration
-9965372 chore: Bump version to 2.2.0-beta.9
-3d2c9da feat: Set BMAD analyst voice to Kristin (Piper)
-0241dc0 feat: Make BMAD voice mappings provider-aware
-bfd887d feat: Change BMAD Project Manager voice to Ryan (Piper)
-34ae021 chore: Bump version to 2.2.0-beta.8
-041c475 fix: Make /agent-vibes:switch and voice-manager.sh provider-aware
-eb0b3ec fix: Remove color codes from MCP JSON for clean copy-paste
-0ae1c4d fix: Remove redundant BMAD enable message and simplify prompts
-cf6e1cd fix: Remove duplicate 'recent changes' pause in installer
-d01de85 docs: Remove deprecated output-style references
-ffa1696 feat: Add BMAD v6 TTS support and improve installer UX
-24d77f3 chore: Bump version to 2.2.0-beta.2
-18ce2d3 refactor: Reorganize repository structure and add SessionStart hook support
-8dec688 chore: Bump version to 2.2.0-beta.1 for beta release
-ccad898 feat: Add BMAD-METHOD v6-alpha support with backward compatibility
-```
-
----
-
-## Previous Releases
-
-For release notes prior to v2.2.0, please see the [GitHub Releases page](https://github.com/paulpreibisch/AgentVibes/releases).

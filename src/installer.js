@@ -189,13 +189,17 @@ async function install(options = {}) {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.2.2 - MCP JSON Display Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.3.0 - Command Visibility Management\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('✨ WHAT\'S NEW:\n\n') +
-      chalk.cyan('🎯 MCP Configuration Display Improvement\n') +
-      chalk.gray('   • JSON now displays outside bordered box for easy copy-paste\n') +
-      chalk.gray('   • Cleaner visual separation of installation sections\n') +
-      chalk.gray('   • Better user experience during setup\n\n') +
+      chalk.cyan('👁️  Command Visibility Management\n') +
+      chalk.gray('   • Use /agent-vibes:hide to hide all slash commands from palette\n') +
+      chalk.gray('   • MCP functionality remains fully operational when hidden\n') +
+      chalk.gray('   • Perfect for users who prefer MCP tools over slash commands\n') +
+      chalk.gray('   • Use /agent-vibes:show to restore commands anytime\n\n') +
+      chalk.cyan('🔧 Maintenance Improvements\n') +
+      chalk.gray('   • Enhanced .gitignore for runtime/user-generated files\n') +
+      chalk.gray('   • Cleaner version control and repository management\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
       chalk.cyan('  /agent-vibes:language english\n') +
@@ -1114,13 +1118,17 @@ program
     console.log(
       boxen(
         chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-        chalk.cyan.bold('  📦 AgentVibes v2.2.2 - MCP JSON Display Fix\n') +
+        chalk.cyan.bold('  📦 AgentVibes v2.3.0 - Command Visibility Management\n') +
         chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
         chalk.green.bold('✨ WHAT\'S NEW:\n\n') +
-        chalk.cyan('🎯 MCP Configuration Display Improvement\n') +
-        chalk.gray('   • JSON now displays outside bordered box for easy copy-paste\n') +
-        chalk.gray('   • Cleaner visual separation of installation sections\n') +
-        chalk.gray('   • Better user experience during setup\n\n') +
+        chalk.cyan('👁️  Command Visibility Management\n') +
+        chalk.gray('   • Use /agent-vibes:hide to hide all slash commands from palette\n') +
+        chalk.gray('   • MCP functionality remains fully operational when hidden\n') +
+        chalk.gray('   • Perfect for users who prefer MCP tools over slash commands\n') +
+        chalk.gray('   • Use /agent-vibes:show to restore commands anytime\n\n') +
+        chalk.cyan('🔧 Maintenance Improvements\n') +
+        chalk.gray('   • Enhanced .gitignore for runtime/user-generated files\n') +
+        chalk.gray('   • Cleaner version control and repository management\n\n') +
         chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
         chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
         chalk.cyan('  /agent-vibes:language english\n') +
