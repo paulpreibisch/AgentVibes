@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.2.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.3.0
 
 ---
 
@@ -92,16 +92,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.2.0 - Provider-Aware Features, BMAD v6 Support & MCP Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.2.3)** 🎉
+**[v2.3.0 - Command Visibility Management & Maintenance](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.3.0)** 🎉
 
-Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha.
+This minor release introduces command visibility management features allowing MCP users to hide/show AgentVibes slash commands, plus important maintenance improvements. Users who primarily interact with AgentVibes through MCP tools can now declutter their Claude Code command palette by hiding slash commands, while still retaining full MCP functionality.
 
 **Key highlights:**
-- 🎯 **Provider-Aware Voice Switching** - Automatically detects and uses the correct provider (ElevenLabs or Piper)
-- 🤖 **BMAD v6 Support** - Full backward compatibility with v4, with improved agent voice mappings
-- 🔧 **MCP NPX Fix** - Corrected NPX configuration for seamless MCP server setup
-- ✨ **Improved Installer UX** - Cleaner prompts and better visual formatting
-- 🎭 **Better Voice Mappings** - Provider-aware BMAD agent voices (PM: Ryan, Analyst: Kristin)
+- 👁️ **Command Visibility Management** - Hide/show slash commands with `/agent-vibes:hide` and `/agent-vibes:show`
+- 🎯 **MCP Functionality Preserved** - MCP tools work perfectly even when slash commands are hidden
+- 🔧 **Enhanced .gitignore** - Runtime and user-generated files automatically excluded from version control
+- ✨ **Cleaner Command Palette** - Perfect for users who prefer MCP tools over slash commands
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
