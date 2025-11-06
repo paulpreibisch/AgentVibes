@@ -14,11 +14,12 @@ This command:
 4. **PAUSES for human review of RELEASE_NOTES.md** ⏸️
 5. **PAUSES for human review of AI summary** ⏸️
 6. Updates installer.js and update scripts with AI summary
-7. Bumps the version using npm version
-8. Commits everything together
-9. Pushes to master with --follow-tags
-10. Creates GitHub release
-11. **Publishes to npm** (makes new version available via npx agentvibes)
+7. **Updates README.md with new version and release info**
+8. Bumps the version using npm version
+9. Commits everything together
+10. Pushes to master with --follow-tags
+11. Creates GitHub release
+12. **Publishes to npm** (makes new version available via npx agentvibes)
 
 ## Usage
 
@@ -74,6 +75,12 @@ console.log('\n📦 Latest Release: v2.0.18');
 console.log('\n' + latestReleaseSummary);
 console.log('\nSee RELEASE_NOTES.md for full details\n');
 ```
+
+### README.md
+Updated with new version and release information:
+- Version badge updated (e.g., `v2.3.0`)
+- Latest Release section updated with new title and link
+- AI summary updated with key highlights from the release
 
 ### Update Scripts
 Updated to show during `npx agentvibes update`:
@@ -156,6 +163,7 @@ with intuitive 0.5x-3.0x scaling."
 **Step 4: Update & Publish**
 ```
 ✅ Updating installer.js with release info...
+✅ Updating README.md with new version...
 ✅ Bumping version: 2.0.17 → 2.1.0
 ✅ Creating commit: "Release v2.1.0"
 ✅ Creating tag: v2.1.0
@@ -177,12 +185,13 @@ with intuitive 0.5x-3.0x scaling."
 4. **Human Review**: You review and approve/edit release notes
 5. **Summary Review**: You approve AI summary for installer/update
 6. **Installer Update**: Adds release info to installation flow
-7. **Update Script Update**: Adds release info to update flow
-8. **Version Bump**: Updates package.json (npm version)
-9. **Commit**: Single atomic commit with all changes
-10. **Push**: Pushes to **master** branch with tags
-11. **GitHub Release**: Creates public release with notes
-12. **NPM Publish**: Makes new version available globally
+7. **README Update**: Updates version badge and latest release section
+8. **Update Script Update**: Adds release info to update flow
+9. **Version Bump**: Updates package.json (npm version)
+10. **Commit**: Single atomic commit with all changes
+11. **Push**: Pushes to **master** branch with tags
+12. **GitHub Release**: Creates public release with notes
+13. **NPM Publish**: Makes new version available globally
 
 ## Safety Features
 
@@ -195,6 +204,7 @@ with intuitive 0.5x-3.0x scaling."
 ## Files Modified
 
 - `RELEASE_NOTES.md` - New release entry
+- `README.md` - Version badge and latest release section
 - `package.json` - Version bump
 - `package-lock.json` - Version bump
 - `src/installer.js` - Release info display
