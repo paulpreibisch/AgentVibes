@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.2.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.2.3
 
 ---
 
@@ -92,7 +92,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.2.0 - Provider-Aware Features, BMAD v6 Support & MCP Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.2.1)** 🎉
+**[v2.2.0 - Provider-Aware Features, BMAD v6 Support & MCP Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.2.3)** 🎉
 
 Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha.
 
