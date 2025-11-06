@@ -14,12 +14,14 @@ This command:
 4. **PAUSES for human review of RELEASE_NOTES.md** ⏸️
 5. **PAUSES for human review of AI summary** ⏸️
 6. Updates installer.js and update scripts with AI summary
-7. **Updates README.md with new version and release info**
+7. **Updates README.md with new version and release info** ⚠️
 8. Bumps the version using npm version
-9. Commits everything together
+9. Commits everything together (including updated README)
 10. Pushes to master with --follow-tags
 11. Creates GitHub release
-12. **Publishes to npm** (makes new version available via npx agentvibes)
+12. **Publishes to npm** (packages README at this moment!)
+
+**⚠️ CRITICAL ORDER**: README must be updated (step 7) BEFORE npm publish (step 12) because npm packages whatever README exists at publish time. This ensures the npm package page displays current release info.
 
 ## Usage
 
@@ -185,13 +187,15 @@ with intuitive 0.5x-3.0x scaling."
 4. **Human Review**: You review and approve/edit release notes
 5. **Summary Review**: You approve AI summary for installer/update
 6. **Installer Update**: Adds release info to installation flow
-7. **README Update**: Updates version badge and latest release section
+7. **README Update**: Updates version badge and latest release section ⚠️ **CRITICAL: Must happen BEFORE npm publish!**
 8. **Update Script Update**: Adds release info to update flow
 9. **Version Bump**: Updates package.json (npm version)
-10. **Commit**: Single atomic commit with all changes
+10. **Commit**: Single atomic commit with all changes (includes README with correct version)
 11. **Push**: Pushes to **master** branch with tags
 12. **GitHub Release**: Creates public release with notes
-13. **NPM Publish**: Makes new version available globally
+13. **NPM Publish**: Makes new version available globally (packages README at this point)
+
+**⚠️ ORDER IS CRITICAL**: README must be updated BEFORE running `npm publish` because npm packages the README from the current working directory. If you publish first, the npm package page will show outdated README content.
 
 ## Safety Features
 
