@@ -17,6 +17,10 @@ yarn-error.log*
 .claude/config/
 .claude/settings.local.json
 .claude/plugins/.bmad-previous-settings
+.claude/plugins/*.flag
+.claude/piper-voices/
+.claude/piper-voices-dir.txt
+.claude/github-star-reminder.txt
 .bmad-agent-context
 *.tgz
 *.code-workspace
@@ -42,3 +46,7 @@ linkedin/
 # Scripts folder - user-specific config
 scripts/audio-tunnel.config
 .sonarqube-storage/
+
+# AgentVibes hide/show feature - local user state (never commit)
+.claude/.agentvibes-backup/
+.claude/.agentvibes-hidden.flag
