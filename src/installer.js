@@ -680,9 +680,18 @@ async function configureSessionStartHook(targetDir, spinner) {
  * @param {Object} spinner - Ora spinner instance
  */
 async function installPluginManifest(targetDir, spinner) {
+  const srcPluginManifest = path.join(__dirname, '..', '.claude-plugin', 'plugin.json');
+
+  // Check if source plugin manifest exists (optional feature)
+  try {
+    await fs.access(srcPluginManifest);
+  } catch {
+    // Source doesn't exist - skip silently as this is optional
+    return;
+  }
+
   spinner.start('Installing AgentVibes plugin manifest...');
   const pluginDir = path.join(targetDir, '.claude-plugin');
-  const srcPluginManifest = path.join(__dirname, '..', '.claude-plugin', 'plugin.json');
   const destPluginManifest = path.join(pluginDir, 'plugin.json');
 
   try {
