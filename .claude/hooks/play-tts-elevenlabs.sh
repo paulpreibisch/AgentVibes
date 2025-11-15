@@ -29,7 +29,7 @@
 # @fileoverview ElevenLabs TTS Provider Implementation - Premium cloud-based TTS
 # @context Provider-specific implementation for ElevenLabs API integration with multilingual support
 # @architecture Part of multi-provider TTS system - implements provider interface contract
-# @dependencies Requires ELEVENLABS_API_KEY, curl, ffmpeg, paplay/aplay/mpg123, jq
+# @dependencies Requires ELEVENLABS_API_KEY, curl, ffmpeg, afplay (macOS) or paplay/aplay/mpg123 (Linux/WSL), jq
 # @entrypoints Called by play-tts.sh router with ($1=text, $2=voice_name) when provider=elevenlabs
 # @patterns Follows provider contract: accept text/voice, output audio file path, API error handling, SSH audio optimization
 # @related play-tts.sh, provider-manager.sh, voices-config.sh, language-manager.sh, GitHub Issue #25
@@ -384,10 +384,18 @@ if [ -f "${TEMP_FILE}" ]; then
     fi
   fi
 
-  # Play audio (WSL/Linux) in background to avoid blocking, fully detached (skip if in test mode)
+  # Play audio in background to avoid blocking, fully detached (skip if in test mode)
   if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
-    (paplay "${TEMP_FILE}" || aplay "${TEMP_FILE}" || mpg123 "${TEMP_FILE}") >/dev/null 2>&1 &
-    PLAYER_PID=$!
+    # Detect platform and use appropriate audio player
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      # macOS: Use afplay (native macOS audio player)
+      afplay "${TEMP_FILE}" >/dev/null 2>&1 &
+      PLAYER_PID=$!
+    else
+      # Linux/WSL: Try paplay, aplay, or mpg123
+      (paplay "${TEMP_FILE}" || aplay "${TEMP_FILE}" || mpg123 "${TEMP_FILE}") >/dev/null 2>&1 &
+      PLAYER_PID=$!
+    fi
   fi
 
   # Wait for audio to finish, then release lock
