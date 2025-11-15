@@ -1,3 +1,77 @@
+# Release v2.4.2 - BMAD TTS Auto-Injection (2025-01-15)
+
+## 🤖 AI Summary
+
+This patch release makes BMAD integration completely automatic! Previously, the installer only created documentation about BMAD integration but didn't actually modify the agent files. Now the installer automatically runs `bmad-tts-injector.sh enable` when BMAD is detected, ensuring BMAD agents will speak immediately after installation without requiring manual configuration steps.
+
+## 📋 Changes
+
+### ✨ Improvements
+- **Automatic BMAD TTS Injection**
+  - Installer now automatically injects TTS hooks into BMAD agent files
+  - Detects BMAD installation and enables TTS during AgentVibes installation
+  - No manual steps required - agents speak immediately after install
+  - File: `src/installer.js` lines 1004-1036
+
+### 🔧 Technical Changes
+- **Enhanced Installer Logic**
+  - Import `execSync` from `node:child_process` to run shell scripts
+  - Automatically execute `bmad-tts-injector.sh enable` when BMAD detected
+  - Add comprehensive error handling with user-friendly fallback messages
+  - Update success message to reflect automatic TTS injection status
+  - Show injection status and available commands in completion box
+
+## 🎯 User Impact
+
+**For BMAD Users**: When you install AgentVibes, TTS is now **automatically injected** into all your BMAD agent files. Your agents will speak immediately - no need to run `bmad-tts-injector.sh enable` manually!
+
+**What Changed**: The installer detects BMAD and automatically runs the TTS injection script, modifying agent files to include TTS hooks. If injection fails for any reason, you'll see a friendly error message with manual fallback instructions.
+
+**Installation is Simple**:
+```bash
+npx agentvibes install --yes
+# TTS is automatically injected into BMAD agents!
+```
+
+## 📦 Files Changed
+
+### Modified
+- `src/installer.js` - Added automatic BMAD TTS injection during installation
+
+### Statistics
+- 1 file changed
+- 40 insertions(+)
+- 4 deletions(-)
+
+## 🔄 Breaking Changes
+
+None. This release enhances the installation experience for BMAD users without affecting existing functionality.
+
+## 🚀 Upgrade Notes
+
+Simply run:
+```bash
+npx agentvibes@latest install --yes
+```
+
+If you previously installed AgentVibes and manually ran `bmad-tts-injector.sh enable`, this update won't affect you. The injection script is idempotent and safe to run multiple times.
+
+## 🙏 Credits
+
+This improvement eliminates a manual configuration step that users frequently asked about, making BMAD integration seamless.
+
+## 🔗 Related
+
+- v2.4.1 - macOS Audio Playback Fix
+- v2.4.0 - macOS Piper TTS Support
+- BMAD Plugin Documentation: `docs/bmad-plugin.md`
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.4.1...v2.4.2
+
+---
+
 # Release v2.4.1 - macOS Audio Playback Fix (2025-01-15)
 
 ## 🤖 AI Summary
