@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.3.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.4.0
 
 ---
 
@@ -92,15 +92,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.3.0 - Command Visibility Management & Maintenance](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.3.0)** 🎉
+**[v2.4.0 - macOS Piper TTS Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.4.0)** 🎉
 
-This minor release introduces command visibility management features allowing MCP users to hide/show AgentVibes slash commands, plus important maintenance improvements. Users who primarily interact with AgentVibes through MCP tools can now declutter their Claude Code command palette by hiding slash commands, while still retaining full MCP functionality.
+This release brings **full Piper TTS support to macOS** via precompiled binaries! Mac users can now enjoy completely free offline TTS with zero Python dependencies. The installer automatically detects your Mac architecture (Intel or Apple Silicon) and downloads the appropriate binary.
 
 **Key highlights:**
-- 👁️ **Command Visibility Management** - Hide/show slash commands with `/agent-vibes:hide` and `/agent-vibes:show`
-- 🎯 **MCP Functionality Preserved** - MCP tools work perfectly even when slash commands are hidden
-- 🔧 **Enhanced .gitignore** - Runtime and user-generated files automatically excluded from version control
-- ✨ **Cleaner Command Palette** - Perfect for users who prefer MCP tools over slash commands
+- 🍎 **macOS Piper TTS Support** - Install via precompiled binaries (no Python/pipx needed!)
+- 🏗️ **Architecture Auto-Detection** - Supports both Apple Silicon (M1/M2/M3) and Intel Macs
+- 🐛 **Fixed Installation Issues** - Resolved pipx dependency conflicts on macOS
+- ✅ **Comprehensive CI Testing** - Validated across 9 macOS configurations (macOS 13/14/15)
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 

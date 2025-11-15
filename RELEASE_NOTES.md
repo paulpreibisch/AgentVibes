@@ -1,4 +1,121 @@
-# AgentVibes Release Notes
+# Release v2.4.0 - macOS Piper TTS Support (2025-01-15)
+
+## 🤖 AI Summary
+
+This minor release brings **full Piper TTS support to macOS** via precompiled binaries, eliminating the Python dependency conflicts that previously prevented macOS users from using free offline TTS. Mac users can now install Piper TTS with zero Python dependencies - just download and run! The installer automatically detects your Mac architecture (Intel or Apple Silicon) and downloads the appropriate binary. This release also includes comprehensive GitHub Actions CI testing to validate Piper installation across all macOS versions (13, 14, 15) and both architectures.
+
+## 📋 Changes
+
+### ✨ New Features
+- **macOS Piper TTS Support via Precompiled Binaries**
+  - Downloads official Piper binaries from rhasspy/piper releases
+  - Automatic architecture detection (Apple Silicon M1/M2/M3 vs Intel)
+  - Installs to `~/.local/bin/piper` with no Python dependencies
+  - Zero pipx or pip conflicts - pure binary installation
+  - Supports both `arm64` (Apple Silicon) and `x86_64` (Intel) architectures
+
+- **Comprehensive macOS CI Testing**
+  - Tests Piper binary installation on macOS 13, 14, and 15
+  - Tests user-reported `--no-deps` pip workaround method
+  - Validates both Intel and Apple Silicon architectures
+  - Confirms standard pipx failure and binary success
+  - Runs across 9 macOS configurations (3 OS × 3 Node versions)
+
+### 🐛 Bug Fixes
+- **Fixed macOS Piper Installation Failures**
+  - Resolved pipx dependency conflict issues reported by users
+  - Removed incorrect platform restriction blocking macOS
+  - Fixed "Piper TTS is only supported on WSL and Linux" error
+
+### 📚 Documentation
+- **Updated Provider Documentation**
+  - Corrected platform support matrix to include macOS
+  - Added macOS-specific installation requirements
+  - Clarified binary vs pipx installation methods
+  - Updated "Choose Piper TTS if" section with macOS callout
+
+- **Installer Script Documentation**
+  - Added platform detection logic documentation
+  - Documented binary download and extraction process
+  - Added PATH setup instructions for macOS users
+
+### 🔧 Maintenance
+- **Refactored Release Process**
+  - Extracted `showReleaseInfo()` function for code reuse
+  - Added critical ordering warning to `/release` command
+  - Documented README update before npm publish requirement
+
+## 🎯 User Impact
+
+**For macOS Users**: You can now use **completely free offline Piper TTS** on your Mac! No more ElevenLabs API key required. No more Python/pipx dependency hell. Just run `.claude/hooks/piper-installer.sh` and you're done. Works on both Intel Macs and Apple Silicon (M1/M2/M3).
+
+**For All Users**: The updated documentation now correctly reflects that Piper TTS works on **ALL platforms**: Windows, macOS, Linux, and WSL.
+
+**Installation is Simple**:
+```bash
+# Run AgentVibes installer
+npx agentvibes install --yes
+
+# Or directly run Piper installer
+.claude/hooks/piper-installer.sh
+
+# Add to PATH (if needed)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Architecture Support**:
+- ✅ Apple Silicon (M1/M2/M3): Downloads `piper_macos_aarch64.tar.gz`
+- ✅ Intel Mac (x86_64): Downloads `piper_macos_x64.tar.gz`
+
+## 📦 Files Changed
+
+### Modified
+- `.claude/hooks/piper-installer.sh` - Added macOS binary installation support
+- `.github/workflows/test-macos.yml` - Added comprehensive Piper installation tests
+- `docs/providers.md` - Updated macOS support documentation
+- `.claude/commands/release.md` - Added README update ordering warning
+- `src/installer.js` - Refactored release info display
+
+### Statistics
+- 5 files changed
+- 241 insertions(+)
+- 130 deletions(-)
+
+## 🔄 Breaking Changes
+
+None. This release is fully backward compatible. Linux/WSL users continue using pipx installation, macOS users now get binary installation.
+
+## 🚀 Upgrade Notes
+
+Simply run:
+```bash
+npx agentvibes@latest install --yes
+```
+
+Existing configurations are preserved. If you're on macOS and previously couldn't install Piper, it will work now!
+
+## 🙏 Credits
+
+Special thanks to:
+- **BMadCode** for reporting the macOS installation issue
+- **rhasspy/piper** project for providing macOS binaries
+- Community members who suggested the `--no-deps` workaround
+
+## 📊 Testing
+
+This release includes extensive CI testing:
+- ✅ 9 macOS configurations (macOS 13/14/15 × Node 18/20/22)
+- ✅ Both architecture types (Intel and Apple Silicon)
+- ✅ Binary download and extraction validation
+- ✅ Piper execution tests
+- ✅ Fallback to pipx testing (confirms original issue)
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.3.1...v2.4.0
+
+---
 
 ## v2.3.0 - Command Visibility Management & Maintenance (2025-11-06)
 
@@ -103,4 +220,122 @@ This patch release improves the user experience during installation and updates 
 
 ### 🤖 AI Summary
 
-Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha with complete backward compatibility to v4.
+Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha with complete backward compatibility to v4.# Release v2.4.0 - macOS Piper TTS Support (2025-01-15)
+
+## 🤖 AI Summary
+
+This minor release brings **full Piper TTS support to macOS** via precompiled binaries, eliminating the Python dependency conflicts that previously prevented macOS users from using free offline TTS. Mac users can now install Piper TTS with zero Python dependencies - just download and run! The installer automatically detects your Mac architecture (Intel or Apple Silicon) and downloads the appropriate binary. This release also includes comprehensive GitHub Actions CI testing to validate Piper installation across all macOS versions (13, 14, 15) and both architectures.
+
+## 📋 Changes
+
+### ✨ New Features
+- **macOS Piper TTS Support via Precompiled Binaries**
+  - Downloads official Piper binaries from rhasspy/piper releases
+  - Automatic architecture detection (Apple Silicon M1/M2/M3 vs Intel)
+  - Installs to `~/.local/bin/piper` with no Python dependencies
+  - Zero pipx or pip conflicts - pure binary installation
+  - Supports both `arm64` (Apple Silicon) and `x86_64` (Intel) architectures
+
+- **Comprehensive macOS CI Testing**
+  - Tests Piper binary installation on macOS 13, 14, and 15
+  - Tests user-reported `--no-deps` pip workaround method
+  - Validates both Intel and Apple Silicon architectures
+  - Confirms standard pipx failure and binary success
+  - Runs across 9 macOS configurations (3 OS × 3 Node versions)
+
+### 🐛 Bug Fixes
+- **Fixed macOS Piper Installation Failures**
+  - Resolved pipx dependency conflict issues reported by users
+  - Removed incorrect platform restriction blocking macOS
+  - Fixed "Piper TTS is only supported on WSL and Linux" error
+
+### 📚 Documentation
+- **Updated Provider Documentation**
+  - Corrected platform support matrix to include macOS
+  - Added macOS-specific installation requirements
+  - Clarified binary vs pipx installation methods
+  - Updated "Choose Piper TTS if" section with macOS callout
+
+- **Installer Script Documentation**
+  - Added platform detection logic documentation
+  - Documented binary download and extraction process
+  - Added PATH setup instructions for macOS users
+
+### 🔧 Maintenance
+- **Refactored Release Process**
+  - Extracted `showReleaseInfo()` function for code reuse
+  - Added critical ordering warning to `/release` command
+  - Documented README update before npm publish requirement
+
+## 🎯 User Impact
+
+**For macOS Users**: You can now use **completely free offline Piper TTS** on your Mac! No more ElevenLabs API key required. No more Python/pipx dependency hell. Just run `.claude/hooks/piper-installer.sh` and you're done. Works on both Intel Macs and Apple Silicon (M1/M2/M3).
+
+**For All Users**: The updated documentation now correctly reflects that Piper TTS works on **ALL platforms**: Windows, macOS, Linux, and WSL.
+
+**Installation is Simple**:
+```bash
+# Run AgentVibes installer
+npx agentvibes install --yes
+
+# Or directly run Piper installer
+.claude/hooks/piper-installer.sh
+
+# Add to PATH (if needed)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Architecture Support**:
+- ✅ Apple Silicon (M1/M2/M3): Downloads `piper_macos_aarch64.tar.gz`
+- ✅ Intel Mac (x86_64): Downloads `piper_macos_x64.tar.gz`
+
+## 📦 Files Changed
+
+### Modified
+- `.claude/hooks/piper-installer.sh` - Added macOS binary installation support
+- `.github/workflows/test-macos.yml` - Added comprehensive Piper installation tests
+- `docs/providers.md` - Updated macOS support documentation
+- `.claude/commands/release.md` - Added README update ordering warning
+- `src/installer.js` - Refactored release info display
+
+### Statistics
+- 5 files changed
+- 241 insertions(+)
+- 130 deletions(-)
+
+## 🔄 Breaking Changes
+
+None. This release is fully backward compatible. Linux/WSL users continue using pipx installation, macOS users now get binary installation.
+
+## 🚀 Upgrade Notes
+
+Simply run:
+```bash
+npx agentvibes@latest install --yes
+```
+
+Existing configurations are preserved. If you're on macOS and previously couldn't install Piper, it will work now!
+
+## 🙏 Credits
+
+Special thanks to:
+- **BMadCode** for reporting the macOS installation issue
+- **rhasspy/piper** project for providing macOS binaries
+- Community members who suggested the `--no-deps` workaround
+
+## 📊 Testing
+
+This release includes extensive CI testing:
+- ✅ 9 macOS configurations (macOS 13/14/15 × Node 18/20/22)
+- ✅ Both architecture types (Intel and Apple Silicon)
+- ✅ Binary download and extraction validation
+- ✅ Piper execution tests
+- ✅ Fallback to pipx testing (confirms original issue)
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.3.1...v2.4.0
+
+---
+

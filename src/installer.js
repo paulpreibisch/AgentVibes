@@ -112,17 +112,22 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.3.0 - Command Visibility Management\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.4.0 - macOS Piper TTS Support\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('✨ WHAT\'S NEW:\n\n') +
-      chalk.cyan('👁️  Command Visibility Management\n') +
-      chalk.gray('   • Use /agent-vibes:hide to hide all slash commands from palette\n') +
-      chalk.gray('   • MCP functionality remains fully operational when hidden\n') +
-      chalk.gray('   • Perfect for users who prefer MCP tools over slash commands\n') +
-      chalk.gray('   • Use /agent-vibes:show to restore commands anytime\n\n') +
-      chalk.cyan('🔧 Maintenance Improvements\n') +
-      chalk.gray('   • Enhanced .gitignore for runtime/user-generated files\n') +
-      chalk.gray('   • Cleaner version control and repository management\n\n') +
+      chalk.cyan('🍎 macOS Piper TTS Support\n') +
+      chalk.gray('   • Install via precompiled binaries (no Python/pipx needed!)\n') +
+      chalk.gray('   • Architecture auto-detection (Apple Silicon M1/M2/M3 & Intel)\n') +
+      chalk.gray('   • Completely free offline TTS for Mac users\n') +
+      chalk.gray('   • Zero dependency conflicts - just download and run\n\n') +
+      chalk.cyan('🐛 Bug Fixes\n') +
+      chalk.gray('   • Fixed macOS Piper installation failures\n') +
+      chalk.gray('   • Resolved pipx dependency conflicts on macOS\n') +
+      chalk.gray('   • Removed incorrect platform restrictions\n\n') +
+      chalk.cyan('✅ Comprehensive Testing\n') +
+      chalk.gray('   • CI tests across 9 macOS configurations\n') +
+      chalk.gray('   • Validated on macOS 13, 14, and 15\n') +
+      chalk.gray('   • Tested on both Intel and Apple Silicon\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
       chalk.cyan('  /agent-vibes:language english\n') +
