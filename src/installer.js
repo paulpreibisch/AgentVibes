@@ -44,6 +44,7 @@
 import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import figlet from 'figlet';
@@ -1000,6 +1001,39 @@ async function install(options = {}) {
         await fs.writeFile(activationInstructionsPath, activationContent);
         console.log(chalk.green('📝 Created BMAD activation instructions'));
       }
+
+      // Automatically inject TTS into BMAD agent files
+      console.log(chalk.cyan('\n🎤 Injecting TTS into BMAD agents...'));
+      try {
+        const injectorScript = path.join(claudeDir, 'hooks', 'bmad-tts-injector.sh');
+
+        // Check if the script exists
+        try {
+          await fs.access(injectorScript);
+        } catch {
+          console.log(chalk.yellow('⚠️  bmad-tts-injector.sh not found, skipping automatic injection'));
+          console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
+          return;
+        }
+
+        // Make script executable
+        await fs.chmod(injectorScript, 0o755);
+
+        // Run the injection in the target directory
+        const result = execSync(`bash "${injectorScript}" enable`, {
+          cwd: targetDir,
+          encoding: 'utf8',
+          stdio: 'pipe'
+        });
+
+        // Show the output from the injection script
+        console.log(result);
+
+      } catch (error) {
+        console.log(chalk.yellow('⚠️  TTS injection encountered an issue:'));
+        console.log(chalk.gray(`   ${error.message}`));
+        console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
+      }
     }
 
     if (bmadDetected) {
@@ -1009,14 +1043,16 @@ async function install(options = {}) {
 
       console.log(
         boxen(
-          chalk.green.bold(`🎉 BMAD-METHOD ${versionLabel} Detected!\n\n`) +
+          chalk.green.bold(`🎉 BMAD-METHOD ${versionLabel} Integration Complete!\n\n`) +
           chalk.white('✅ BMAD Voice Plugin: AUTO-ENABLED\n') +
+          chalk.white('✅ TTS Hooks: INJECTED into all agent files\n') +
           chalk.gray('Each BMAD agent will automatically use its assigned voice\n') +
           chalk.gray('and speak when activated!\n\n') +
           chalk.cyan('Commands:\n') +
-          chalk.gray('  • /agent-vibes:bmad status - View agent voices\n') +
-          chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize\n') +
-          chalk.gray('  • /agent-vibes:bmad disable - Turn off if unwanted'),
+          chalk.gray('  • /agent-vibes:bmad status - View TTS injection status\n') +
+          chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices\n') +
+          chalk.gray('  • /agent-vibes:bmad disable - Disable TTS for all agents\n') +
+          chalk.gray('  • /agent-vibes:bmad restore - Restore agents from backup'),
           {
             padding: 1,
             margin: 1,
