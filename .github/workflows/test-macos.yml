@@ -110,32 +110,85 @@ jobs:
           echo "Testing installer..."
           node $GITHUB_WORKSPACE/src/installer.js --help || true
 
-      - name: Test Piper TTS availability on macOS
+      - name: Test Piper TTS installation on macOS
         run: |
-          echo "=== Testing Piper TTS ==="
+          echo "=== Testing Piper TTS Installation on macOS ==="
+
+          # Create test virtual environment
+          python3 -m venv /tmp/test-piper-env
+          source /tmp/test-piper-env/bin/activate
+
+          # Attempt installation with user's suggested method
+          echo "📥 Attempting: pip install piper-tts --no-deps piper-phonemize-cross onnxruntime numpy"
+          if pip install piper-tts --no-deps piper-phonemize-cross onnxruntime numpy; then
+            echo "✅ Piper TTS installed successfully using --no-deps method!"
+
+            # Verify piper command is available
+            if command -v piper &> /dev/null; then
+              echo "✅ piper command found in PATH"
+              PIPER_PATH=$(which piper)
+              echo "   Location: $PIPER_PATH"
+
+              # Try to get version
+              piper --version 2>&1 || echo "   (version check may not be supported)"
+
+              # Test if piper can run (basic execution test)
+              echo "Testing basic piper execution..."
+              if piper --help &> /dev/null; then
+                echo "✅ Piper executes successfully on macOS!"
+              else
+                echo "⚠️  Piper installed but execution failed"
+              fi
+            else
+              echo "⚠️  Piper installed but command not found in PATH"
+              echo "Checking installation location..."
+              python3 -c "import sys; print(sys.path)"
+            fi
+
+            # Check installed packages
+            echo ""
+            echo "Installed packages:"
+            pip list | grep -E "(piper|onnxruntime|phonemize)" || true
+          else
+            echo "❌ Piper TTS installation failed on macOS"
+            echo ""
+            echo "Trying alternative: pipx install piper-tts"
+            if pip install pipx; then
+              pipx install piper-tts 2>&1 | tee /tmp/pipx-piper-install.log || true
+
+              if grep -q "ResolutionImpossible\|Cannot install" /tmp/pipx-piper-install.log; then
+                echo "❌ Confirmed: Standard pipx installation fails with dependency conflicts"
+                echo "✅ User's workaround (--no-deps) is required for macOS"
+              fi
+            fi
+          fi
+
+          deactivate
+
+          echo ""
+          echo "=== Piper Binary Availability Check ==="
           # Check if Piper binary exists or can be downloaded for macOS
           ARCH=$(uname -m)
           echo "Architecture: $ARCH"
 
           if [ "$ARCH" = "arm64" ]; then
-            echo "✅ Running on Apple Silicon (M1/M2/M3)"
+            echo "Running on Apple Silicon (M1/M2/M3)"
             PIPER_ARCH="arm64"
           else
-            echo "✅ Running on Intel"
+            echo "Running on Intel"
             PIPER_ARCH="x64"
           fi
 
           # Test Piper download URL
           PIPER_VERSION="1.2.0"
           PIPER_URL="https://github.com/rhasspy/piper/releases/download/v${PIPER_VERSION}/piper_macos_${PIPER_ARCH}.tar.gz"
-          echo "Piper URL would be: $PIPER_URL"
+          echo "Piper binary URL: $PIPER_URL"
 
-          # Check if URL is valid (without actually downloading in tests)
+          # Check if URL is valid
           if curl --head --silent --fail "$PIPER_URL" > /dev/null; then
-            echo "✅ Piper binary available for this architecture"
+            echo "✅ Piper binary available for download"
           else
             echo "⚠️  Piper binary might not be available for this architecture"
-            echo "This may need special handling in the installer"
           fi
 
       - name: Test ElevenLabs API integration (mock)
