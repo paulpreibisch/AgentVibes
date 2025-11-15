@@ -150,6 +150,50 @@ function showReleaseInfo() {
 }
 
 /**
+ * Get user's shell and shell config file path
+ * @returns {{shell: string, shellName: string, shellConfig: string}}
+ */
+function getUserShell() {
+  const shellPath = process.env.SHELL || '/bin/bash';
+  const shellName = shellPath.split('/').pop();
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+
+  let shellConfig;
+  if (shellName === 'zsh') {
+    shellConfig = path.join(homeDir, '.zshrc');
+  } else if (shellName === 'bash') {
+    shellConfig = path.join(homeDir, '.bashrc');
+  } else {
+    // Default to bash if unknown
+    shellConfig = path.join(homeDir, '.bashrc');
+  }
+
+  return {
+    shell: shellPath,
+    shellName,
+    shellConfig
+  };
+}
+
+/**
+ * Execute a shell script using the user's default shell with environment loaded
+ * @param {string} scriptPath - Path to the script to execute
+ * @param {object} options - execSync options
+ * @returns {Buffer} - Output from the script
+ */
+function execScript(scriptPath, options = {}) {
+  const { shell, shellConfig } = getUserShell();
+
+  // Source the shell config to load environment variables, then run the script
+  const command = `source "${shellConfig}" 2>/dev/null; ${shell} "${scriptPath}"`;
+
+  return execSync(command, {
+    shell: shell,
+    ...options
+  });
+}
+
+/**
  * Generate BMAD activation instructions based on version
  * @param {number} version - BMAD version (4 or 6)
  * @returns {string} Activation instructions content
@@ -218,215 +262,779 @@ Without the \`.bmad-agent-context\` file:
 `;
 }
 
+// ============================================================================
+// HELPER FUNCTIONS FOR INSTALL/UPDATE REFACTORING
+// ============================================================================
+
+/**
+ * Prompt user to select TTS provider (Piper or ElevenLabs)
+ * @param {Object} options - Installation options
+ * @returns {Promise<string>} Selected provider ('piper' or 'elevenlabs')
+ */
+async function promptProviderSelection(options) {
+  if (options.yes) {
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+    if (elevenLabsKey) {
+      console.log(chalk.green('✓ Using ElevenLabs (API key detected)\n'));
+      return 'elevenlabs';
+    }
+    console.log(chalk.green('✓ Using Piper TTS (free option)\n'));
+    return 'piper';
+  }
+
+  console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
+
+  const { provider } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'provider',
+      message: 'Which TTS provider would you like to use?',
+      choices: [
+        {
+          name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
+          value: 'piper',
+        },
+        {
+          name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
+          value: 'elevenlabs',
+        },
+      ],
+      default: 'piper',
+    },
+  ]);
+
+  return provider;
+}
+
+/**
+ * Handle Piper TTS configuration (voice storage location)
+ * @returns {Promise<string>} Path where Piper voices will be stored
+ */
+async function handlePiperConfiguration() {
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
+
+  console.log(chalk.cyan('\n📁 Piper Voice Storage Location:\n'));
+  console.log(chalk.gray('   Piper voice models are ~25MB each. They can be stored globally'));
+  console.log(chalk.gray('   to be shared across all your projects, or locally per project.\n'));
+
+  const { piperPath } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'piperPath',
+      message: 'Where should Piper voice models be downloaded?',
+      default: defaultPiperPath,
+      validate: (input) => {
+        if (!input || input.trim() === '') {
+          return 'Please provide a valid path';
+        }
+        return true;
+      },
+    },
+  ]);
+
+  console.log(chalk.green(`✓ Piper voices will be stored in: ${piperPath}`));
+  return piperPath;
+}
+
+/**
+ * Handle ElevenLabs API key setup
+ * @param {Object} options - Installation options
+ * @returns {Promise<string|null>} API key or null
+ */
+async function handleElevenLabsApiKey(options) {
+  let elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+
+  if (elevenLabsKey) {
+    console.log(chalk.green(`\n✓ ElevenLabs API key detected from environment`));
+    console.log(chalk.gray(`  Key: ${elevenLabsKey.substring(0, 10)}...`));
+
+    if (!options.yes) {
+      const { useExisting } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'useExisting',
+          message: 'Use this existing API key?',
+          default: true,
+        },
+      ]);
+
+      if (!useExisting) {
+        elevenLabsKey = null;
+      }
+    }
+  }
+
+  if (!elevenLabsKey) {
+    console.log(chalk.yellow('\n⚠️  ElevenLabs API Key Required'));
+    console.log(chalk.gray('   Get your free API key at: https://elevenlabs.io'));
+    console.log(chalk.gray('   Free tier: 10,000 characters/month\n'));
+
+    const { setupMethod } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'setupMethod',
+        message: 'How would you like to set up your API key?',
+        choices: [
+          {
+            name: 'Add to shell config (recommended)',
+            value: 'shell',
+          },
+          {
+            name: 'Enter manually (I\'ll set it up myself later)',
+            value: 'manual',
+          },
+          {
+            name: 'Skip (use Piper TTS instead)',
+            value: 'skip',
+          },
+        ],
+      },
+    ]);
+
+    if (setupMethod === 'skip') {
+      return 'SWITCH_TO_PIPER';
+    }
+
+    const { apiKey } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'apiKey',
+        message: 'Enter your ElevenLabs API key:',
+        validate: (input) => input.length > 0 || 'API key cannot be empty',
+      },
+    ]);
+    elevenLabsKey = apiKey;
+
+    if (setupMethod === 'manual') {
+      console.log(chalk.yellow('\n⚠️  Remember to add this to your environment variables later:'));
+      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+    } else if (setupMethod === 'shell') {
+      await addApiKeyToShellConfig(apiKey);
+    }
+  }
+
+  return elevenLabsKey;
+}
+
+/**
+ * Add ElevenLabs API key to shell configuration
+ * @param {string} apiKey - The API key to add
+ */
+async function addApiKeyToShellConfig(apiKey) {
+  const { shellName, shellConfig } = getUserShell();
+
+  if (!shellName || !shellConfig) {
+    console.log(chalk.yellow('\n⚠️  Could not detect shell type'));
+    console.log(chalk.gray('   Please add manually to your shell config:'));
+    console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+    return;
+  }
+
+  console.log(chalk.cyan(`\n🐚 Detected shell: ${shellName}`));
+  console.log(chalk.gray(`   Config file: ${shellConfig}`));
+
+  const { confirmShell } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirmShell',
+      message: `Add ELEVENLABS_API_KEY to ${shellConfig}?`,
+      default: true,
+    },
+  ]);
+
+  if (confirmShell) {
+    try {
+      const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
+      await fs.appendFile(shellConfig, configContent);
+      console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
+      console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
+    } catch (error) {
+      console.log(chalk.red(`\n✗ Failed to write to ${shellConfig}`));
+      console.log(chalk.gray('   Please add manually:'));
+      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+    }
+  }
+}
+
+/**
+ * Copy command files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyCommandFiles(targetDir, spinner) {
+  spinner.start('Installing /agent-vibes slash commands...');
+  const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
+  const commandsDir = path.join(targetDir, '.claude', 'commands');
+  const agentVibesCommandsDir = path.join(commandsDir, 'agent-vibes');
+
+  await fs.mkdir(agentVibesCommandsDir, { recursive: true });
+
+  const commandFiles = await fs.readdir(srcCommandsDir);
+  console.log(chalk.cyan(`\n📋 Installing ${commandFiles.length} command files:`));
+
+  for (const file of commandFiles) {
+    const srcPath = path.join(srcCommandsDir, file);
+    const destPath = path.join(agentVibesCommandsDir, file);
+    await fs.copyFile(srcPath, destPath);
+    console.log(chalk.gray(`   ✓ agent-vibes/${file}`));
+  }
+
+  spinner.succeed(chalk.green('Installed /agent-vibes commands!\n'));
+  return commandFiles.length;
+}
+
+/**
+ * Copy hook files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyHookFiles(targetDir, spinner) {
+  spinner.start('Installing TTS helper scripts...');
+  const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
+  const hooksDir = path.join(targetDir, '.claude', 'hooks');
+
+  await fs.mkdir(hooksDir, { recursive: true });
+
+  const allHookFiles = await fs.readdir(srcHooksDir);
+  const hookFiles = [];
+
+  for (const file of allHookFiles) {
+    const srcPath = path.join(srcHooksDir, file);
+    const stat = await fs.stat(srcPath);
+
+    if (stat.isFile() &&
+        (file.endsWith('.sh') || file === 'hooks.json') &&
+        !file.includes('prepare-release') &&
+        !file.startsWith('.')) {
+      hookFiles.push(file);
+    }
+  }
+
+  console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
+  for (const file of hookFiles) {
+    const srcPath = path.join(srcHooksDir, file);
+    const destPath = path.join(hooksDir, file);
+    await fs.copyFile(srcPath, destPath);
+
+    if (file.endsWith('.sh')) {
+      await fs.chmod(destPath, 0o755);
+      console.log(chalk.gray(`   ✓ ${file} (executable)`));
+    } else {
+      console.log(chalk.gray(`   ✓ ${file}`));
+    }
+  }
+
+  spinner.succeed(chalk.green('Installed TTS scripts!\n'));
+  return hookFiles.length;
+}
+
+/**
+ * Copy personality files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyPersonalityFiles(targetDir, spinner) {
+  spinner.start('Installing personality templates...');
+  const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+  const destPersonalitiesDir = path.join(targetDir, '.claude', 'personalities');
+
+  await fs.mkdir(destPersonalitiesDir, { recursive: true });
+
+  const personalityFiles = await fs.readdir(srcPersonalitiesDir);
+  const personalityMdFiles = [];
+
+  for (const file of personalityFiles) {
+    const srcPath = path.join(srcPersonalitiesDir, file);
+    const stat = await fs.stat(srcPath);
+
+    if (stat.isFile() && file.endsWith('.md')) {
+      personalityMdFiles.push(file);
+    }
+  }
+
+  console.log(chalk.cyan(`🎭 Installing ${personalityMdFiles.length} personality templates:`));
+  for (const file of personalityMdFiles) {
+    const srcPath = path.join(srcPersonalitiesDir, file);
+    const destPath = path.join(destPersonalitiesDir, file);
+    await fs.copyFile(srcPath, destPath);
+    console.log(chalk.gray(`   ✓ ${file}`));
+  }
+
+  spinner.succeed(chalk.green('Installed personality templates!\n'));
+  return personalityMdFiles.length;
+}
+
+/**
+ * Copy output style files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyOutputStyles(targetDir, spinner) {
+  spinner.start('Installing output styles...');
+  const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
+  const outputStylesDir = path.join(targetDir, '.claude', 'output-styles');
+
+  await fs.mkdir(outputStylesDir, { recursive: true });
+
+  const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
+  console.log(chalk.cyan(`📝 Installing ${outputStyleFiles.length} output styles:`));
+
+  for (const file of outputStyleFiles) {
+    const srcPath = path.join(srcOutputStylesDir, file);
+    const destPath = path.join(outputStylesDir, file);
+    await fs.copyFile(srcPath, destPath);
+    console.log(chalk.gray(`   ✓ ${file}`));
+  }
+
+  spinner.succeed(chalk.green('Installed output styles!\n'));
+  return outputStyleFiles.length;
+}
+
+/**
+ * Copy plugin files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyPluginFiles(targetDir, spinner) {
+  spinner.start('Installing BMAD plugin files...');
+  const srcPluginsDir = path.join(__dirname, '..', '.claude', 'plugins');
+  const destPluginsDir = path.join(targetDir, '.claude', 'plugins');
+
+  await fs.mkdir(destPluginsDir, { recursive: true });
+
+  let pluginFiles = [];
+  try {
+    const allPluginFiles = await fs.readdir(srcPluginsDir);
+    for (const file of allPluginFiles) {
+      const srcPath = path.join(srcPluginsDir, file);
+      const stat = await fs.stat(srcPath);
+
+      if (stat.isFile() && file.endsWith('.md')) {
+        pluginFiles.push(file);
+        const destPath = path.join(destPluginsDir, file);
+        await fs.copyFile(srcPath, destPath);
+        console.log(chalk.gray(`   ✓ ${file}`));
+      }
+    }
+    spinner.succeed(chalk.green('Installed BMAD plugin files!\n'));
+  } catch (error) {
+    spinner.info(chalk.yellow('No plugin files found (optional)\n'));
+  }
+
+  return pluginFiles.length;
+}
+
+/**
+ * Configure SessionStart hook in settings.json
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function configureSessionStartHook(targetDir, spinner) {
+  spinner.start('Configuring AgentVibes hook for automatic TTS...');
+  const claudeDir = path.join(targetDir, '.claude');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
+
+  try {
+    let existingSettings = {};
+    try {
+      const existingContent = await fs.readFile(settingsPath, 'utf8');
+      existingSettings = JSON.parse(existingContent);
+    } catch {
+      // File doesn't exist or is invalid - use template
+    }
+
+    const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
+    const templateSettings = JSON.parse(templateContent);
+
+    if (!existingSettings.hooks) {
+      existingSettings.hooks = {};
+    }
+
+    if (!existingSettings.hooks.SessionStart) {
+      existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
+
+      if (!existingSettings.$schema) {
+        existingSettings.$schema = templateSettings.$schema;
+      }
+
+      await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
+      spinner.succeed(chalk.green('SessionStart hook configured!\n'));
+    } else {
+      spinner.info(chalk.yellow('SessionStart hook already configured\n'));
+    }
+  } catch (error) {
+    spinner.fail(chalk.red('Failed to configure hook: ' + error.message + '\n'));
+  }
+}
+
+/**
+ * Install plugin manifest
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function installPluginManifest(targetDir, spinner) {
+  spinner.start('Installing AgentVibes plugin manifest...');
+  const pluginDir = path.join(targetDir, '.claude-plugin');
+  const srcPluginManifest = path.join(__dirname, '..', '.claude-plugin', 'plugin.json');
+  const destPluginManifest = path.join(pluginDir, 'plugin.json');
+
+  try {
+    await fs.mkdir(pluginDir, { recursive: true });
+    await fs.copyFile(srcPluginManifest, destPluginManifest);
+    spinner.succeed(chalk.green('Plugin manifest installed!\n'));
+  } catch (error) {
+    spinner.fail(chalk.red('Failed to install plugin manifest: ' + error.message + '\n'));
+  }
+}
+
+/**
+ * Check if Piper is installed and optionally install it
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} options - Installation options
+ */
+async function checkAndInstallPiper(targetDir, options) {
+  try {
+    const { execSync } = await import('node:child_process');
+
+    try {
+      execSync('command -v piper', { stdio: 'ignore' });
+      console.log(chalk.green('✅ Piper TTS is already installed\n'));
+      return;
+    } catch {
+      console.log(chalk.yellow('⚠️  Piper TTS binary not detected\n'));
+
+      let installPiper = true;
+      if (!options.yes) {
+        const { confirmPiperInstall } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirmPiperInstall',
+            message: 'Would you like to install Piper TTS now? (Recommended)',
+            default: true,
+          },
+        ]);
+        installPiper = confirmPiperInstall;
+      }
+
+      if (installPiper) {
+        console.log(chalk.cyan('\n📦 Installing Piper TTS...\n'));
+        const piperInstallerPath = path.join(targetDir, '.claude', 'hooks', 'piper-installer.sh');
+
+        try {
+          execScript(piperInstallerPath, {
+            stdio: 'inherit',
+            env: process.env
+          });
+          console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
+        } catch (error) {
+          console.log(chalk.yellow('\n⚠️  Piper installation failed or was cancelled'));
+          console.log(chalk.gray('   You can install it later by running:'));
+          console.log(chalk.cyan(`   ${piperInstallerPath}`));
+          console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+        }
+      } else {
+        console.log(chalk.yellow('\n⚠️  Skipping Piper installation'));
+        console.log(chalk.gray('   You can install it later by running:'));
+        console.log(chalk.cyan(`   ${targetDir}/.claude/hooks/piper-installer.sh`));
+        console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+      }
+    }
+  } catch (error) {
+    console.log(chalk.yellow('⚠️  Unable to auto-detect Piper installation'));
+    console.log(chalk.gray('   Install manually if needed: pipx install piper-tts\n'));
+  }
+}
+
+/**
+ * Handle BMAD integration (detection and TTS injection)
+ * @param {string} targetDir - Target installation directory
+ * @returns {Promise<Object>} BMAD detection result
+ */
+async function handleBmadIntegration(targetDir) {
+  const bmadDetection = await detectBMAD(targetDir);
+  const bmadDetected = bmadDetection.installed;
+
+  if (!bmadDetected) {
+    return bmadDetection;
+  }
+
+  const claudeDir = path.join(targetDir, '.claude');
+  const versionLabel = bmadDetection.version === 6
+    ? `v6 (${bmadDetection.detailedVersion})`
+    : 'v4';
+
+  console.log(chalk.green(`\n🎉 BMAD-METHOD ${versionLabel} detected!`));
+  console.log(chalk.gray(`   Location: ${bmadDetection.bmadPath}`));
+
+  const pluginsDir = path.join(claudeDir, 'plugins');
+  const enabledFlagPath = path.join(pluginsDir, 'bmad-voices-enabled.flag');
+  const activationInstructionsPath = path.join(claudeDir, 'activation-instructions');
+
+  await fs.mkdir(pluginsDir, { recursive: true });
+  await fs.writeFile(enabledFlagPath, '');
+  console.log(chalk.green('🎤 Auto-enabled BMAD voice plugin'));
+
+  try {
+    await fs.access(activationInstructionsPath);
+  } catch {
+    const activationContent = generateActivationInstructions(bmadDetection.version);
+    await fs.writeFile(activationInstructionsPath, activationContent);
+    console.log(chalk.green('📝 Created BMAD activation instructions'));
+  }
+
+  console.log(chalk.cyan('\n🎤 Injecting TTS into BMAD agents...'));
+  try {
+    const injectorScript = path.join(claudeDir, 'hooks', 'bmad-tts-injector.sh');
+
+    try {
+      await fs.access(injectorScript);
+    } catch {
+      console.log(chalk.yellow('⚠️  bmad-tts-injector.sh not found, skipping automatic injection'));
+      console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
+      return bmadDetection;
+    }
+
+    await fs.chmod(injectorScript, 0o755);
+
+    const result = execScript(`${injectorScript} enable`, {
+      cwd: targetDir,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+
+    console.log(result);
+  } catch (error) {
+    console.log(chalk.yellow('⚠️  TTS injection encountered an issue:'));
+    console.log(chalk.gray(`   ${error.message}`));
+    console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
+  }
+
+  return bmadDetection;
+}
+
+/**
+ * Show git commit history or fallback to release notes
+ * @param {string} sourceDir - Source directory containing git repo or release notes
+ */
+async function showRecentChanges(sourceDir) {
+  try {
+    const { execSync } = await import('node:child_process');
+    const gitLog = execSync(
+      'git log --oneline --no-decorate -5',
+      { cwd: sourceDir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
+    ).trim();
+
+    if (gitLog) {
+      console.log(chalk.cyan('📝 Recent Changes:\n'));
+      const commits = gitLog.split('\n');
+      commits.forEach(commit => {
+        const [hash, ...messageParts] = commit.split(' ');
+        const message = messageParts.join(' ');
+        console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+      });
+      console.log();
+    }
+  } catch (error) {
+    // Git not available - try RELEASE_NOTES.md fallback
+    try {
+      const releaseNotesPath = path.join(sourceDir, 'RELEASE_NOTES.md');
+      const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
+      const lines = releaseNotes.split('\n');
+      const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
+
+      if (commitsIndex >= 0) {
+        console.log(chalk.cyan('📝 Recent Changes:\n'));
+        let inCodeBlock = false;
+        for (let i = commitsIndex + 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.trim() === '```') {
+            if (inCodeBlock) break;
+            inCodeBlock = true;
+            continue;
+          }
+          if (inCodeBlock && line.trim()) {
+            const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+            if (match) {
+              const [, hash, message] = match;
+              console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
+            }
+          }
+        }
+        console.log();
+      }
+    } catch {
+      // No release notes available
+    }
+  }
+}
+
+/**
+ * Update personality files (add new, update existing)
+ * @param {string} targetDir - Target installation directory
+ * @param {string} srcPersonalitiesDir - Source personalities directory
+ * @returns {Promise<{new: number, updated: number}>} Counts of new and updated files
+ */
+async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
+  const destPersonalitiesDir = path.join(targetDir, '.claude', 'personalities');
+  const allPersonalityFiles = await fs.readdir(srcPersonalitiesDir);
+  let newPersonalities = 0;
+  let updatedPersonalities = 0;
+
+  for (const file of allPersonalityFiles) {
+    const srcPath = path.join(srcPersonalitiesDir, file);
+    const stat = await fs.stat(srcPath);
+
+    if (!stat.isFile() || !file.endsWith('.md')) {
+      continue;
+    }
+
+    const destPath = path.join(destPersonalitiesDir, file);
+
+    try {
+      await fs.access(destPath);
+      await fs.copyFile(srcPath, destPath);
+      updatedPersonalities++;
+    } catch {
+      await fs.copyFile(srcPath, destPath);
+      newPersonalities++;
+    }
+  }
+
+  return { new: newPersonalities, updated: updatedPersonalities };
+}
+
+/**
+ * Update AgentVibes files in target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} options - Update options
+ */
+async function updateAgentVibes(targetDir, options) {
+  const spinner = ora('Updating AgentVibes...').start();
+
+  try {
+    const claudeDir = path.join(targetDir, '.claude');
+    const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
+
+    // Update commands
+    spinner.text = 'Updating commands...';
+    const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
+    const commandFiles = await fs.readdir(srcCommandsDir);
+
+    for (const file of commandFiles) {
+      const srcPath = path.join(srcCommandsDir, file);
+      const destPath = path.join(commandsDir, file);
+      await fs.copyFile(srcPath, destPath);
+    }
+    console.log(chalk.green(`\n✓ Updated ${commandFiles.length} commands`));
+
+    // Update hooks
+    spinner.text = 'Updating TTS scripts...';
+    const hookFileCount = await copyHookFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    console.log(chalk.green(`✓ Updated ${hookFileCount} TTS scripts`));
+
+    // Update personalities
+    spinner.text = 'Updating personality templates...';
+    const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+    const personalityResult = await updatePersonalityFiles(targetDir, srcPersonalitiesDir);
+    console.log(chalk.green(`✓ Updated ${personalityResult.updated} personalities, added ${personalityResult.new} new`));
+
+    // Update output styles
+    spinner.text = 'Updating output styles...';
+    const srcOutputStylesDir = path.join(__dirname, '..', '.claude', 'output-styles');
+    const outputStylesDir = path.join(claudeDir, 'output-styles');
+    const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
+
+    for (const file of outputStyleFiles) {
+      const srcPath = path.join(srcOutputStylesDir, file);
+      const destPath = path.join(outputStylesDir, file);
+      await fs.copyFile(srcPath, destPath);
+    }
+    console.log(chalk.green(`✓ Updated ${outputStyleFiles.length} output styles`));
+
+    // Update plugin files
+    const pluginFileCount = await copyPluginFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (pluginFileCount > 0) {
+      console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
+    }
+
+    // Update settings.json
+    spinner.text = 'Updating AgentVibes hook configuration...';
+    await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+
+    spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
+
+    console.log(chalk.cyan('📦 Update Summary:'));
+    console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
+    console.log(chalk.white(`   • ${hookFileCount} TTS scripts updated`));
+    console.log(chalk.white(`   • ${personalityResult.new + personalityResult.updated} personality templates (${personalityResult.new} new, ${personalityResult.updated} updated)`));
+    console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated`));
+    if (pluginFileCount > 0) {
+      console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files updated`));
+    }
+    console.log('');
+
+    // Show recent changes
+    await showRecentChanges(path.join(__dirname, '..'));
+
+    console.log(chalk.gray('💡 Changes will take effect immediately!'));
+    console.log(chalk.gray('   Try the new personalities with: /agent-vibes:personality list\n'));
+
+  } catch (error) {
+    spinner.fail('Update failed!');
+    console.error(chalk.red('\n❌ Error:'), error.message);
+    process.exit(1);
+  }
+}
+
 // Installation function
 async function install(options = {}) {
   showWelcome();
 
-  // When running via npx, process.cwd() returns the npm cache directory
-  // Use INIT_CWD (set by npm/npx) to get the actual user's working directory
   const currentDir = process.env.INIT_CWD || process.cwd();
 
   console.log(chalk.cyan('\n📍 Installation Details:'));
   console.log(chalk.gray(`   Install location: ${currentDir}/.claude/`));
   console.log(chalk.gray(`   Package version: ${VERSION}`));
 
-  // Show AI summary of latest release
   showReleaseInfo();
 
-  // Provider selection prompt
-  let selectedProvider = 'piper';
-  let elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+  // Provider selection
+  let selectedProvider = await promptProviderSelection(options);
+  let elevenLabsKey = null;
   let piperVoicesPath = null;
 
-  if (!options.yes) {
-    console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
-
-    const { provider } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'provider',
-        message: 'Which TTS provider would you like to use?',
-        choices: [
-          {
-            name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
-            value: 'piper',
-          },
-          {
-            name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
-            value: 'elevenlabs',
-          },
-        ],
-        default: 'piper',
-      },
-    ]);
-
-    selectedProvider = provider;
-
-    // If Piper selected, ask for voice storage location
-    if (selectedProvider === 'piper') {
-      const homeDir = process.env.HOME || process.env.USERPROFILE;
-      const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
-
-      console.log(chalk.cyan('\n📁 Piper Voice Storage Location:\n'));
-      console.log(chalk.gray('   Piper voice models are ~25MB each. They can be stored globally'));
-      console.log(chalk.gray('   to be shared across all your projects, or locally per project.\n'));
-
-      const { piperPath } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'piperPath',
-          message: 'Where should Piper voice models be downloaded?',
-          default: defaultPiperPath,
-          validate: (input) => {
-            if (!input || input.trim() === '') {
-              return 'Please provide a valid path';
-            }
-            return true;
-          },
-        },
-      ]);
-
-      piperVoicesPath = piperPath;
-      console.log(chalk.green(`✓ Piper voices will be stored in: ${piperVoicesPath}`));
-    }
-
-    // If ElevenLabs selected, handle API key
-    if (selectedProvider === 'elevenlabs') {
-      if (elevenLabsKey) {
-        console.log(chalk.green(`\n✓ ElevenLabs API key detected from environment`));
-        console.log(chalk.gray(`  Key: ${elevenLabsKey.substring(0, 10)}...`));
-
-        const { useExisting } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'useExisting',
-            message: 'Use this existing API key?',
-            default: true,
-          },
-        ]);
-
-        if (!useExisting) {
-          elevenLabsKey = null;
-        }
-      }
-
-      if (!elevenLabsKey) {
-        console.log(chalk.yellow('\n⚠️  ElevenLabs API Key Required'));
-        console.log(chalk.gray('   Get your free API key at: https://elevenlabs.io'));
-        console.log(chalk.gray('   Free tier: 10,000 characters/month\n'));
-
-        const { setupMethod } = await inquirer.prompt([
-          {
-            type: 'list',
-            name: 'setupMethod',
-            message: 'How would you like to set up your API key?',
-            choices: [
-              {
-                name: 'Add to shell config (recommended)',
-                value: 'shell',
-              },
-              {
-                name: 'Enter manually (I\'ll set it up myself later)',
-                value: 'manual',
-              },
-              {
-                name: 'Skip (use Piper TTS instead)',
-                value: 'skip',
-              },
-            ],
-          },
-        ]);
-
-        if (setupMethod === 'skip') {
-          console.log(chalk.yellow('\n→ Switching to Piper TTS (free option)\n'));
-          selectedProvider = 'piper';
-        } else if (setupMethod === 'manual') {
-          const { apiKey } = await inquirer.prompt([
-            {
-              type: 'input',
-              name: 'apiKey',
-              message: 'Enter your ElevenLabs API key:',
-              validate: (input) => input.length > 0 || 'API key cannot be empty',
-            },
-          ]);
-          elevenLabsKey = apiKey;
-          console.log(chalk.yellow('\n⚠️  Remember to add this to your environment variables later:'));
-          console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
-        } else if (setupMethod === 'shell') {
-          const { apiKey } = await inquirer.prompt([
-            {
-              type: 'input',
-              name: 'apiKey',
-              message: 'Enter your ElevenLabs API key:',
-              validate: (input) => input.length > 0 || 'API key cannot be empty',
-            },
-          ]);
-          elevenLabsKey = apiKey;
-
-          // Detect shell
-          const shell = process.env.SHELL || '';
-          let shellConfig = '';
-          let shellName = '';
-
-          if (shell.includes('zsh')) {
-            shellConfig = path.join(process.env.HOME, '.zshrc');
-            shellName = 'zsh';
-          } else if (shell.includes('bash')) {
-            shellConfig = path.join(process.env.HOME, '.bashrc');
-            shellName = 'bash';
-          } else {
-            console.log(chalk.yellow('\n⚠️  Could not detect shell type'));
-            console.log(chalk.gray('   Please add manually to your shell config:'));
-            console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
-          }
-
-          if (shellConfig && shellName) {
-            console.log(chalk.cyan(`\n🐚 Detected shell: ${shellName}`));
-            console.log(chalk.gray(`   Config file: ${shellConfig}`));
-
-            const { confirmShell } = await inquirer.prompt([
-              {
-                type: 'confirm',
-                name: 'confirmShell',
-                message: `Add ELEVENLABS_API_KEY to ${shellConfig}?`,
-                default: true,
-              },
-            ]);
-
-            if (confirmShell) {
-              try {
-                const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
-                await fs.appendFile(shellConfig, configContent);
-                console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
-                console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
-              } catch (error) {
-                console.log(chalk.red(`\n✗ Failed to write to ${shellConfig}`));
-                console.log(chalk.gray('   Please add manually:'));
-                console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
-              }
-            }
-          }
-        }
-      }
-    }
-
-    console.log(''); // Spacing
-  } else {
+  if (options.yes) {
     console.log(chalk.green('✓ Auto-confirmed (--yes flag)'));
-    // Auto-detect provider based on API key
-    if (elevenLabsKey) {
-      selectedProvider = 'elevenlabs';
-      console.log(chalk.green('✓ Using ElevenLabs (API key detected)\n'));
-    } else {
+  }
+
+  // Handle provider-specific configuration
+  if (selectedProvider === 'piper' && !options.yes) {
+    piperVoicesPath = await handlePiperConfiguration();
+  }
+
+  if (selectedProvider === 'elevenlabs') {
+    elevenLabsKey = await handleElevenLabsApiKey(options);
+    if (elevenLabsKey === 'SWITCH_TO_PIPER') {
+      console.log(chalk.yellow('\n→ Switching to Piper TTS (free option)\n'));
       selectedProvider = 'piper';
-      console.log(chalk.green('✓ Using Piper TTS (free option)\n'));
+      elevenLabsKey = null;
     }
   }
 
-  // Use current directory for installation (where installer was run)
+  if (!options.yes) {
+    console.log(''); // Spacing
+  }
+
   const targetDir = options.directory || currentDir;
 
-  // Explain why installing in .claude/ and confirm
+  // Confirm installation location
   if (!options.yes) {
     console.log(chalk.cyan('\n📂 Installation Location:\n'));
     console.log(chalk.white('   AgentVibes will be installed in:'));
@@ -461,7 +1069,7 @@ async function install(options = {}) {
   console.log(chalk.gray(`   • 30+ language support with native voices`));
   console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
 
-  // Final confirmation prompt (unless --yes flag is used)
+  // Final confirmation
   if (!options.yes) {
     const { confirm } = await inquirer.prompt([
       {
@@ -478,11 +1086,11 @@ async function install(options = {}) {
     }
   }
 
-  console.log(''); // Add spacing
+  console.log('');
   const spinner = ora('Checking installation directory...').start();
 
   try {
-    // Check if .claude directory exists
+    // Create .claude directory structure
     const claudeDir = path.join(targetDir, '.claude');
     const commandsDir = path.join(claudeDir, 'commands');
     const hooksDir = path.join(claudeDir, 'hooks');
@@ -508,206 +1116,22 @@ async function install(options = {}) {
       console.log(chalk.gray(`   Location: ${claudeDir}\n`));
     }
 
-    // Copy command files
-    spinner.start('Installing /agent-vibes slash commands...');
-    const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
-    const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
+    // Copy all files using helper functions
+    const commandFileCount = await copyCommandFiles(targetDir, spinner);
+    const hookFileCount = await copyHookFiles(targetDir, spinner);
+    const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
+    const outputStyleCount = await copyOutputStyles(targetDir, spinner);
+    const pluginFileCount = await copyPluginFiles(targetDir, spinner);
 
-    // Create agent-vibes commands directory
-    const agentVibesCommandsDir = path.join(commandsDir, 'agent-vibes');
-    await fs.mkdir(agentVibesCommandsDir, { recursive: true });
+    // Configure hooks and manifests
+    await configureSessionStartHook(targetDir, spinner);
+    await installPluginManifest(targetDir, spinner);
 
-    // Copy all command files to agent-vibes folder
-    const commandFiles = await fs.readdir(srcCommandsDir);
-    console.log(chalk.cyan(`\n📋 Installing ${commandFiles.length} command files:`));
-    for (const file of commandFiles) {
-      const srcPath = path.join(srcCommandsDir, file);
-      const destPath = path.join(agentVibesCommandsDir, file);
-      await fs.copyFile(srcPath, destPath);
-      console.log(chalk.gray(`   ✓ agent-vibes/${file}`));
-    }
-    spinner.succeed(chalk.green('Installed /agent-vibes commands!\n'));
-
-    // Copy hook scripts
-    spinner.start('Installing TTS helper scripts...');
-
-    // Ensure hooks directory exists
-    await fs.mkdir(hooksDir, { recursive: true });
-
-    const allHookFiles = await fs.readdir(srcHooksDir);
-
-    // Filter to only include files (not directories) and exclude project-specific files
-    const hookFiles = [];
-    for (const file of allHookFiles) {
-      const srcPath = path.join(srcHooksDir, file);
-      const stat = await fs.stat(srcPath);
-
-      // Copy shell scripts and hooks.json, skip directories and unwanted files
-      if (stat.isFile() &&
-          (file.endsWith('.sh') || file === 'hooks.json') &&
-          !file.includes('prepare-release') &&
-          !file.startsWith('.')) {
-        hookFiles.push(file);
-      }
-    }
-
-    console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
-    for (const file of hookFiles) {
-      const srcPath = path.join(srcHooksDir, file);
-      const destPath = path.join(hooksDir, file);
-      await fs.copyFile(srcPath, destPath);
-      // Make shell scripts executable, but not JSON files
-      if (file.endsWith('.sh')) {
-        await fs.chmod(destPath, 0o755);
-        console.log(chalk.gray(`   ✓ ${file} (executable)`));
-      } else {
-        console.log(chalk.gray(`   ✓ ${file}`));
-      }
-    }
-    spinner.succeed(chalk.green('Installed TTS scripts!\n'));
-
-    // Copy personalities folder
-    spinner.start('Installing personality templates...');
-    const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
-    const destPersonalitiesDir = path.join(claudeDir, 'personalities');
-
-    // Create personalities directory
-    await fs.mkdir(destPersonalitiesDir, { recursive: true });
-
-    // Copy all personality files (excluding directories like 'backups')
-    const personalityFiles = await fs.readdir(srcPersonalitiesDir);
-    const personalityMdFiles = [];
-
-    for (const file of personalityFiles) {
-      const srcPath = path.join(srcPersonalitiesDir, file);
-      const stat = await fs.stat(srcPath);
-
-      // Only copy .md files, skip directories
-      if (stat.isFile() && file.endsWith('.md')) {
-        personalityMdFiles.push(file);
-      }
-    }
-
-    console.log(chalk.cyan(`🎭 Installing ${personalityMdFiles.length} personality templates:`));
-    for (const file of personalityMdFiles) {
-      const srcPath = path.join(srcPersonalitiesDir, file);
-      const destPath = path.join(destPersonalitiesDir, file);
-      await fs.copyFile(srcPath, destPath);
-      console.log(chalk.gray(`   ✓ ${file}`));
-    }
-    spinner.succeed(chalk.green('Installed personality templates!\n'));
-
-    // Copy output styles
-    spinner.start('Installing output styles...');
-    const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
-
-    // Create output-styles directory if it doesn't exist
-    try {
-      await fs.mkdir(outputStylesDir, { recursive: true });
-    } catch {}
-
-    const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
-    console.log(chalk.cyan(`📝 Installing ${outputStyleFiles.length} output styles:`));
-    for (const file of outputStyleFiles) {
-      const srcPath = path.join(srcOutputStylesDir, file);
-      const destPath = path.join(outputStylesDir, file);
-      await fs.copyFile(srcPath, destPath);
-      console.log(chalk.gray(`   ✓ ${file}`));
-    }
-    spinner.succeed(chalk.green('Installed output styles!\n'));
-
-    // Copy plugins folder (BMAD voice mappings)
-    spinner.start('Installing BMAD plugin files...');
-    const srcPluginsDir = path.join(__dirname, '..', '.claude', 'plugins');
-    const destPluginsDir = path.join(claudeDir, 'plugins');
-
-    // Create plugins directory
-    await fs.mkdir(destPluginsDir, { recursive: true });
-
-    // Copy only .md files from plugins directory
-    let pluginFiles = [];
-    try {
-      const allPluginFiles = await fs.readdir(srcPluginsDir);
-      for (const file of allPluginFiles) {
-        const srcPath = path.join(srcPluginsDir, file);
-        const stat = await fs.stat(srcPath);
-
-        // Only copy .md files, skip .flag files (those are runtime generated)
-        if (stat.isFile() && file.endsWith('.md')) {
-          pluginFiles.push(file);
-          const destPath = path.join(destPluginsDir, file);
-          await fs.copyFile(srcPath, destPath);
-          console.log(chalk.gray(`   ✓ ${file}`));
-        }
-      }
-      spinner.succeed(chalk.green('Installed BMAD plugin files!\n'));
-    } catch (error) {
-      // Plugins directory might not exist in source - that's okay
-      spinner.info(chalk.yellow('No plugin files found (optional)\n'));
-    }
-
-    // Install settings.json with SessionStart hook
-    spinner.start('Configuring AgentVibes hook for automatic TTS...');
-    const settingsPath = path.join(claudeDir, 'settings.json');
-    const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
-
-    try {
-      // Check if settings.json already exists
-      let existingSettings = {};
-      try {
-        const existingContent = await fs.readFile(settingsPath, 'utf8');
-        existingSettings = JSON.parse(existingContent);
-      } catch {
-        // File doesn't exist or is invalid - use template
-      }
-
-      // Read template settings
-      const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
-      const templateSettings = JSON.parse(templateContent);
-
-      // Merge: Add SessionStart hook if not already present
-      if (!existingSettings.hooks) {
-        existingSettings.hooks = {};
-      }
-
-      if (!existingSettings.hooks.SessionStart) {
-        existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
-
-        // Add schema if not present
-        if (!existingSettings.$schema) {
-          existingSettings.$schema = templateSettings.$schema;
-        }
-
-        // Write merged settings
-        await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
-        spinner.succeed(chalk.green('SessionStart hook configured!\n'));
-      } else {
-        spinner.info(chalk.yellow('SessionStart hook already configured\n'));
-      }
-    } catch (error) {
-      spinner.fail(chalk.red('Failed to configure hook: ' + error.message + '\n'));
-    }
-
-    // Install plugin manifest (.claude-plugin/plugin.json)
-    spinner.start('Installing AgentVibes plugin manifest...');
-    const pluginDir = path.join(targetDir, '.claude-plugin');
-    const srcPluginManifest = path.join(__dirname, '..', '.claude-plugin', 'plugin.json');
-    const destPluginManifest = path.join(pluginDir, 'plugin.json');
-
-    try {
-      await fs.mkdir(pluginDir, { recursive: true });
-      await fs.copyFile(srcPluginManifest, destPluginManifest);
-      spinner.succeed(chalk.green('Plugin manifest installed!\n'));
-    } catch (error) {
-      spinner.fail(chalk.red('Failed to install plugin manifest: ' + error.message + '\n'));
-    }
-
-    // Save provider selection
+    // Save provider configuration
     spinner.start('Saving provider configuration...');
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
     await fs.writeFile(providerConfigPath, selectedProvider);
 
-    // Save Piper voices directory if Piper is selected
     if (selectedProvider === 'piper' && piperVoicesPath) {
       const piperConfigPath = path.join(claudeDir, 'piper-voices-dir.txt');
       await fs.writeFile(piperConfigPath, piperVoicesPath);
@@ -715,70 +1139,19 @@ async function install(options = {}) {
 
     spinner.succeed(chalk.green(`Provider set to: ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}\n`));
 
-    // Auto-install Piper if selected and not already installed
+    // Auto-install Piper if selected
     if (selectedProvider === 'piper') {
-      try {
-        const { execSync } = await import('node:child_process');
-
-        // Check if piper is installed
-        try {
-          execSync('command -v piper', { stdio: 'ignore' });
-          console.log(chalk.green('✅ Piper TTS is already installed\n'));
-        } catch {
-          // Piper not installed - offer to install it
-          console.log(chalk.yellow('⚠️  Piper TTS binary not detected\n'));
-
-          let installPiper = true;
-          if (!options.yes) {
-            const { confirmPiperInstall } = await inquirer.prompt([
-              {
-                type: 'confirm',
-                name: 'confirmPiperInstall',
-                message: 'Would you like to install Piper TTS now? (Recommended)',
-                default: true,
-              },
-            ]);
-            installPiper = confirmPiperInstall;
-          }
-
-          if (installPiper) {
-            console.log(chalk.cyan('\n📦 Installing Piper TTS...\n'));
-            const piperInstallerPath = path.join(hooksDir, 'piper-installer.sh');
-
-            try {
-              execSync(`bash "${piperInstallerPath}"`, {
-                stdio: 'inherit',
-                env: process.env
-              });
-              console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
-            } catch (error) {
-              console.log(chalk.yellow('\n⚠️  Piper installation failed or was cancelled'));
-              console.log(chalk.gray('   You can install it later by running:'));
-              console.log(chalk.cyan(`   bash "${piperInstallerPath}"`));
-              console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
-            }
-          } else {
-            console.log(chalk.yellow('\n⚠️  Skipping Piper installation'));
-            console.log(chalk.gray('   You can install it later by running:'));
-            console.log(chalk.cyan(`   ${targetDir}/.claude/hooks/piper-installer.sh`));
-            console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
-          }
-        }
-      } catch (error) {
-        // execSync import failed - skip auto-install
-        console.log(chalk.yellow('⚠️  Unable to auto-detect Piper installation'));
-        console.log(chalk.gray('   Install manually if needed: pipx install piper-tts\n'));
-      }
+      await checkAndInstallPiper(targetDir, options);
     }
 
-    // List what was installed
+    // Display installation summary
     console.log(chalk.cyan('📦 Installation Summary:'));
-    console.log(chalk.white(`   • ${commandFiles.length} slash commands installed`));
-    console.log(chalk.white(`   • ${hookFiles.length} TTS scripts installed`));
-    console.log(chalk.white(`   • ${personalityMdFiles.length} personality templates installed`));
-    console.log(chalk.white(`   • ${outputStyleFiles.length} output styles installed`));
-    if (pluginFiles.length > 0) {
-      console.log(chalk.white(`   • ${pluginFiles.length} BMAD plugin files installed`));
+    console.log(chalk.white(`   • ${commandFileCount} slash commands installed`));
+    console.log(chalk.white(`   • ${hookFileCount} TTS scripts installed`));
+    console.log(chalk.white(`   • ${personalityFileCount} personality templates installed`));
+    console.log(chalk.white(`   • ${outputStyleCount} output styles installed`));
+    if (pluginFileCount > 0) {
+      console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files installed`));
     }
     console.log(chalk.white(`   • Voice manager ready`));
 
@@ -970,71 +1343,9 @@ async function install(options = {}) {
       }
     ]);
 
-    // Check for BMAD installation (both v4 and v6)
-    const bmadDetection = await detectBMAD(targetDir);
+    // Handle BMAD integration
+    const bmadDetection = await handleBmadIntegration(targetDir);
     const bmadDetected = bmadDetection.installed;
-
-    // Auto-enable BMAD plugin and create activation-instructions if BMAD detected
-    if (bmadDetected) {
-      const versionLabel = bmadDetection.version === 6
-        ? `v6 (${bmadDetection.detailedVersion})`
-        : 'v4';
-
-      console.log(chalk.green(`\n🎉 BMAD-METHOD ${versionLabel} detected!`));
-      console.log(chalk.gray(`   Location: ${bmadDetection.bmadPath}`));
-
-      const pluginsDir = path.join(claudeDir, 'plugins');
-      const enabledFlagPath = path.join(pluginsDir, 'bmad-voices-enabled.flag');
-      const activationInstructionsPath = path.join(claudeDir, 'activation-instructions');
-
-      // Auto-enable the plugin (create the flag file)
-      await fs.mkdir(pluginsDir, { recursive: true });
-      await fs.writeFile(enabledFlagPath, '');
-      console.log(chalk.green('🎤 Auto-enabled BMAD voice plugin'));
-
-      // Only create if doesn't exist (don't overwrite user customizations)
-      try {
-        await fs.access(activationInstructionsPath);
-      } catch {
-        // File doesn't exist - create it with version-specific instructions
-        const activationContent = generateActivationInstructions(bmadDetection.version);
-        await fs.writeFile(activationInstructionsPath, activationContent);
-        console.log(chalk.green('📝 Created BMAD activation instructions'));
-      }
-
-      // Automatically inject TTS into BMAD agent files
-      console.log(chalk.cyan('\n🎤 Injecting TTS into BMAD agents...'));
-      try {
-        const injectorScript = path.join(claudeDir, 'hooks', 'bmad-tts-injector.sh');
-
-        // Check if the script exists
-        try {
-          await fs.access(injectorScript);
-        } catch {
-          console.log(chalk.yellow('⚠️  bmad-tts-injector.sh not found, skipping automatic injection'));
-          console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
-          return;
-        }
-
-        // Make script executable
-        await fs.chmod(injectorScript, 0o755);
-
-        // Run the injection in the target directory
-        const result = execSync(`bash "${injectorScript}" enable`, {
-          cwd: targetDir,
-          encoding: 'utf8',
-          stdio: 'pipe'
-        });
-
-        // Show the output from the injection script
-        console.log(result);
-
-      } catch (error) {
-        console.log(chalk.yellow('⚠️  TTS injection encountered an issue:'));
-        console.log(chalk.gray(`   ${error.message}`));
-        console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
-      }
-    }
 
     if (bmadDetected) {
       const versionLabel = bmadDetection.version === 6
@@ -1105,62 +1416,15 @@ program
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
-    // When running via npx, process.cwd() returns the npm cache directory
-    // Use INIT_CWD (set by npm/npx) to get the actual user's working directory
     const currentDir = process.env.INIT_CWD || process.cwd();
     const targetDir = options.directory || currentDir;
 
-    // Read version from package.json
-    const packageJson = JSON.parse(
-      await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8')
-    );
-    const version = packageJson.version;
-
-    // Generate two-tone ASCII art
-    const agentText = figlet.textSync('Agent', {
-      font: 'ANSI Shadow',
-      horizontalLayout: 'default',
-    });
-    const vibesText = figlet.textSync('Vibes', {
-      font: 'ANSI Shadow',
-      horizontalLayout: 'default',
-    });
-
-    // Add blank line for spacing
-    console.log();
-
-    // Combine the two parts with different colors
-    const agentLines = agentText.split('\n');
-    const vibesLines = vibesText.split('\n');
-    const maxLength = Math.max(...agentLines.map(line => line.length));
-
-    for (let i = 0; i < agentLines.length; i++) {
-      const agentLine = agentLines[i].padEnd(maxLength);
-      const vibesLine = vibesLines[i] || '';
-      console.log(chalk.cyan(agentLine) + chalk.magenta(vibesLine));
-    }
-    console.log();
-
-    // Welcome box
-    console.log(
-      boxen(
-        chalk.white('🎤 Now your AI Agents can finally talk back! TTS Voice for Claude Code\n\n') +
-        chalk.gray('Add professional text-to-speech narration to your AI coding sessions\n\n') +
-        chalk.cyan('📦 https://github.com/paulpreibisch/AgentVibes'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
+    showWelcome();
 
     console.log(chalk.cyan('📍 Update Details:'));
     console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
-    console.log(chalk.gray(`   Package version: ${version}`));
+    console.log(chalk.gray(`   Package version: ${VERSION}`));
 
-    // Show AI summary of latest release
     showReleaseInfo();
 
     // Check if already installed
@@ -1176,7 +1440,6 @@ program
       console.log(chalk.gray('   Run: npx agentvibes install\n'));
       process.exit(1);
     }
-
 
     console.log(chalk.cyan('📦 What will be updated:'));
     console.log(chalk.gray('   • Slash commands (keep your customizations)'));
@@ -1203,385 +1466,30 @@ program
       console.log(chalk.green('✓ Auto-confirmed (--yes flag)\n'));
     }
 
-    const spinner = ora('Updating AgentVibes...').start();
+    // Perform update using helper function
+    await updateAgentVibes(targetDir, options);
 
-    try {
-      const claudeDir = path.join(targetDir, '.claude');
-      const hooksDir = path.join(claudeDir, 'hooks');
-      const outputStylesDir = path.join(claudeDir, 'output-styles');
-      const personalitiesDir = path.join(claudeDir, 'personalities');
-
-      // Update commands
-      spinner.text = 'Updating commands...';
-      const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
-      const commandFiles = await fs.readdir(srcCommandsDir);
-
-      for (const file of commandFiles) {
-        const srcPath = path.join(srcCommandsDir, file);
-        const destPath = path.join(commandsDir, file);
-        await fs.copyFile(srcPath, destPath);
-      }
-      console.log(chalk.green(`\n✓ Updated ${commandFiles.length} commands`));
-
-      // Update hooks
-      spinner.text = 'Updating TTS scripts...';
-      const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
-      const allHookFiles = await fs.readdir(srcHooksDir);
-
-      // Filter to only include files (not directories) and exclude project-specific files
-      const hookFiles = [];
-      for (const file of allHookFiles) {
-        const srcPath = path.join(srcHooksDir, file);
-        const stat = await fs.stat(srcPath);
-
-        // Copy shell scripts and hooks.json, skip directories and unwanted files
-        if (stat.isFile() &&
-            (file.endsWith('.sh') || file === 'hooks.json') &&
-            !file.includes('prepare-release') &&
-            !file.startsWith('.')) {
-          hookFiles.push(file);
+    // Recommend MCP Server installation
+    console.log(
+      boxen(
+        chalk.cyan.bold('🎙️ Want Natural Language Control?\n\n') +
+        chalk.white.bold('AgentVibes MCP Server - Easiest Way to Use AgentVibes!\n\n') +
+        chalk.gray('Use Claude Desktop or Warp Terminal to control TTS with natural language:\n') +
+        chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
+        chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
+        chalk.cyan('👉 Setup Guide:\n') +
+        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#-mcp-server-easiest-way-to-use-agentvibes\n\n') +
+        chalk.gray('Quick Install:\n') +
+        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop') + chalk.gray(' (Claude Desktop)\n') +
+        chalk.white('   npx -y agentvibes-mcp-server') + chalk.gray(' (Direct run)'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
         }
-      }
-
-      for (const file of hookFiles) {
-        const srcPath = path.join(srcHooksDir, file);
-        const destPath = path.join(hooksDir, file);
-        await fs.copyFile(srcPath, destPath);
-        // Make shell scripts executable, but not JSON files
-        if (file.endsWith('.sh')) {
-          await fs.chmod(destPath, 0o755);
-        }
-      }
-      console.log(chalk.green(`✓ Updated ${hookFiles.length} TTS scripts`));
-
-      // Update personalities (only add new ones, don't overwrite existing)
-      spinner.text = 'Updating personality templates...';
-      const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
-      const allPersonalityFiles = await fs.readdir(srcPersonalitiesDir);
-      let newPersonalities = 0;
-      let updatedPersonalities = 0;
-
-      // Filter to only .md files, skip directories
-      for (const file of allPersonalityFiles) {
-        const srcPath = path.join(srcPersonalitiesDir, file);
-        const stat = await fs.stat(srcPath);
-
-        // Only copy .md files, skip directories
-        if (!stat.isFile() || !file.endsWith('.md')) {
-          continue;
-        }
-
-        const destPath = path.join(personalitiesDir, file);
-
-        try {
-          await fs.access(destPath);
-          // File exists - update it
-          await fs.copyFile(srcPath, destPath);
-          updatedPersonalities++;
-        } catch {
-          // File doesn't exist - add it
-          await fs.copyFile(srcPath, destPath);
-          newPersonalities++;
-        }
-      }
-      console.log(chalk.green(`✓ Updated ${updatedPersonalities} personalities, added ${newPersonalities} new`));
-
-      // Update output styles
-      spinner.text = 'Updating output styles...';
-      const srcOutputStylesDir = path.join(__dirname, '..', '.claude', 'output-styles');
-      const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
-
-      for (const file of outputStyleFiles) {
-        const srcPath = path.join(srcOutputStylesDir, file);
-        const destPath = path.join(outputStylesDir, file);
-        await fs.copyFile(srcPath, destPath);
-      }
-      console.log(chalk.green(`✓ Updated ${outputStyleFiles.length} output styles`));
-
-      // Update plugins folder (BMAD voice mappings)
-      spinner.text = 'Updating BMAD plugin files...';
-      const srcPluginsDir = path.join(__dirname, '..', '.claude', 'plugins');
-      const destPluginsDir = path.join(claudeDir, 'plugins');
-
-      // Create plugins directory if it doesn't exist
-      await fs.mkdir(destPluginsDir, { recursive: true });
-
-      // Copy only .md files from plugins directory
-      let pluginFiles = [];
-      try {
-        const allPluginFiles = await fs.readdir(srcPluginsDir);
-        for (const file of allPluginFiles) {
-          const srcPath = path.join(srcPluginsDir, file);
-          const stat = await fs.stat(srcPath);
-
-          // Only copy .md files, skip .flag files (those are runtime generated)
-          if (stat.isFile() && file.endsWith('.md')) {
-            pluginFiles.push(file);
-            const destPath = path.join(destPluginsDir, file);
-            await fs.copyFile(srcPath, destPath);
-          }
-        }
-        if (pluginFiles.length > 0) {
-          console.log(chalk.green(`✓ Updated ${pluginFiles.length} BMAD plugin files`));
-        }
-      } catch (error) {
-        // Plugins directory might not exist in source - that's okay
-      }
-
-      // Update settings.json with SessionStart hook
-      spinner.text = 'Updating AgentVibes hook configuration...';
-      const settingsPath = path.join(claudeDir, 'settings.json');
-      const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
-
-      try {
-        // Check if settings.json already exists
-        let existingSettings = {};
-        try {
-          const existingContent = await fs.readFile(settingsPath, 'utf8');
-          existingSettings = JSON.parse(existingContent);
-        } catch {
-          // File doesn't exist or is invalid - use template
-        }
-
-        // Read template settings
-        const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
-        const templateSettings = JSON.parse(templateContent);
-
-        // Merge: Add SessionStart hook if not already present
-        if (!existingSettings.hooks) {
-          existingSettings.hooks = {};
-        }
-
-        if (!existingSettings.hooks.SessionStart) {
-          existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
-
-          // Add schema if not present
-          if (!existingSettings.$schema) {
-            existingSettings.$schema = templateSettings.$schema;
-          }
-
-          // Write merged settings
-          await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
-          console.log(chalk.green('✓ SessionStart hook configured'));
-        } else {
-          console.log(chalk.gray('✓ SessionStart hook already configured'));
-        }
-      } catch (error) {
-        console.log(chalk.yellow('⚠ Failed to configure hook: ' + error.message));
-      }
-
-      spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
-
-      console.log(chalk.cyan('📦 Update Summary:'));
-      console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
-      console.log(chalk.white(`   • ${hookFiles.length} TTS scripts updated`));
-      console.log(chalk.white(`   • ${newPersonalities + updatedPersonalities} personality templates (${newPersonalities} new, ${updatedPersonalities} updated)`));
-      console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated`));
-      if (pluginFiles.length > 0) {
-        console.log(chalk.white(`   • ${pluginFiles.length} BMAD plugin files updated`));
-      }
-      console.log('');
-
-      // Show latest release notes from RELEASE_NOTES_V2.md (v2.0+) or RELEASE_NOTES.md (legacy)
-      try {
-        // Try v2.0 format first
-        let releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES_V2.md');
-        let releaseNotes;
-        let isV2Format = true;
-
-        try {
-          releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
-        } catch {
-          // Fallback to legacy format
-          releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
-          releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
-          isV2Format = false;
-        }
-
-        const lines = releaseNotes.split('\n');
-
-        if (isV2Format) {
-          // v2.0 format - extract summary from top of file
-          const packageVersion = packageJson.version;
-          console.log(chalk.cyan(`📰 Latest Release (v${packageVersion}):\n`));
-
-          // Find content after "## 🚀 Major Features" line
-          let summaryText = '';
-          let foundMajorFeatures = false;
-
-          for (const line of lines) {
-            if (line.includes('## 🚀 Major Features')) {
-              foundMajorFeatures = true;
-              continue;
-            }
-            if (foundMajorFeatures) {
-              // Stop at next major heading or after 200 chars
-              if (line.startsWith('##') && !line.includes('Major Features')) break;
-              if (summaryText.length > 200) break;
-              if (line.trim() && !line.startsWith('#') && !line.startsWith('**Release Date')) {
-                summaryText += line.trim() + ' ';
-              }
-            }
-          }
-
-          // Wrap text at ~80 chars
-          if (summaryText) {
-            const words = summaryText.split(' ');
-            let currentLine = '';
-            const wrappedLines = [];
-
-            words.forEach(word => {
-              if ((currentLine + word).length > 80) {
-                wrappedLines.push(currentLine.trim());
-                currentLine = word + ' ';
-              } else {
-                currentLine += word + ' ';
-              }
-            });
-            if (currentLine.trim()) wrappedLines.push(currentLine.trim());
-
-            wrappedLines.forEach(line => {
-              console.log(chalk.white(`   ${line}`));
-            });
-            console.log();
-          }
-        } else {
-          // Legacy format (v1.x)
-          const versionIndex = lines.findIndex(line => line.match(/^## 📦 v\d+\.\d+\.\d+/));
-
-          if (versionIndex >= 0) {
-            const versionMatch = lines[versionIndex].match(/v(\d+\.\d+\.\d+)/);
-            const version = versionMatch ? versionMatch[1] : 'unknown';
-
-            const summaryIndex = lines.findIndex((line, idx) =>
-              idx > versionIndex && line.includes('### 🤖 AI Summary')
-            );
-
-            if (summaryIndex >= 0) {
-              console.log(chalk.cyan(`📰 Latest Release (v${version}):\n`));
-
-              let summaryText = '';
-              for (let i = summaryIndex + 1; i < lines.length; i++) {
-                const line = lines[i];
-                if (line.startsWith('###') || line.startsWith('##')) break;
-                if (line.trim()) {
-                  summaryText += line.trim() + ' ';
-                }
-              }
-
-              const words = summaryText.split(' ');
-              let currentLine = '';
-              const wrappedLines = [];
-
-              words.forEach(word => {
-                if ((currentLine + word).length > 80) {
-                  wrappedLines.push(currentLine.trim());
-                  currentLine = word + ' ';
-                } else {
-                  currentLine += word + ' ';
-                }
-              });
-              if (currentLine.trim()) wrappedLines.push(currentLine.trim());
-
-              wrappedLines.forEach(line => {
-                console.log(chalk.white(`   ${line}`));
-              });
-              console.log();
-            }
-          }
-        }
-      } catch {
-        // Release notes not available - no problem
-      }
-
-      // Show latest commit messages
-      try {
-        const { execSync } = await import('node:child_process');
-        const gitLog = execSync(
-          'git log --oneline --no-decorate -5',
-          { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
-        ).trim();
-
-        if (gitLog) {
-          console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
-          const commits = gitLog.split('\n');
-          commits.forEach(commit => {
-            const [hash, ...messageParts] = commit.split(' ');
-            const message = messageParts.join(' ');
-            console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-          });
-          console.log();
-        }
-      } catch (error) {
-        // Git not available - try RELEASE_NOTES.md fallback
-        try {
-          const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
-          const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
-
-          // Extract commits from "Recent Commits" section
-          const lines = releaseNotes.split('\n');
-          const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
-
-          if (commitsIndex >= 0) {
-            console.log(chalk.cyan('📝 Latest Commit Messages:\n'));
-
-            // Find the code block with commits (between ``` markers)
-            let inCodeBlock = false;
-            for (let i = commitsIndex + 1; i < lines.length; i++) {
-              const line = lines[i];
-
-              if (line.trim() === '```') {
-                if (inCodeBlock) break; // End of code block
-                inCodeBlock = true;
-                continue;
-              }
-
-              if (inCodeBlock && line.trim()) {
-                // Parse commit line: "hash message"
-                const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
-                if (match) {
-                  const [, hash, message] = match;
-                  console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-                }
-              }
-            }
-            console.log();
-          }
-        } catch {
-          // No release notes available
-        }
-      }
-
-      console.log(chalk.gray('💡 Changes will take effect immediately!'));
-      console.log(chalk.gray('   Try the new personalities with: /agent-vibes:personality list\n'));
-
-      // Recommend MCP Server installation
-      console.log(
-        boxen(
-          chalk.cyan.bold('🎙️ Want Natural Language Control?\n\n') +
-          chalk.white.bold('AgentVibes MCP Server - Easiest Way to Use AgentVibes!\n\n') +
-          chalk.gray('Use Claude Desktop or Warp Terminal to control TTS with natural language:\n') +
-          chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
-          chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
-          chalk.cyan('👉 Setup Guide:\n') +
-          chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#-mcp-server-easiest-way-to-use-agentvibes\n\n') +
-          chalk.gray('Quick Install:\n') +
-          chalk.white('   npx agentvibes setup-mcp-for-claude-desktop') + chalk.gray(' (Claude Desktop)\n') +
-          chalk.white('   npx -y agentvibes-mcp-server') + chalk.gray(' (Direct run)'),
-          {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'round',
-            borderColor: 'cyan',
-          }
-        )
-      );
-
-    } catch (error) {
-      spinner.fail('Update failed!');
-      console.error(chalk.red('\n❌ Error:'), error.message);
-      process.exit(1);
-    }
+      )
+    );
   });
 
 program
@@ -1636,8 +1544,7 @@ program
     const mcpServerScript = path.join(__dirname, '..', 'bin', 'mcp-server');
 
     try {
-      const { execSync } = await import('node:child_process');
-      execSync(`bash "${mcpServerScript}"`, {
+      execScript(mcpServerScript, {
         stdio: 'inherit',
         env: process.env
       });
