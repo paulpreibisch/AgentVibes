@@ -1,3 +1,67 @@
+# Release v2.4.1 - macOS Audio Playback Fix (2025-01-15)
+
+## 🤖 AI Summary
+
+This patch release fixes a critical audio playback issue on macOS where Piper TTS audio files were being created but not playing. The fix adds platform detection to use the native macOS `afplay` audio player instead of trying to use Linux-only audio players (mpv/aplay/paplay) that don't exist on macOS.
+
+## 📋 Changes
+
+### 🐛 Bug Fixes
+- **Fixed macOS Audio Playback in Piper TTS**
+  - Added platform detection to use `afplay` on macOS (Darwin)
+  - Keeps existing Linux audio players (mpv/aplay/paplay) for WSL/Linux
+  - Audio files now play correctly on macOS instead of silently failing
+  - File: `.claude/hooks/play-tts-piper.sh` line 329-339
+
+## 🎯 User Impact
+
+**For macOS Users**: Audio playback now works! If you were seeing "🎵 Saved to:" messages but hearing no sound, this update fixes that. Simply run `npx agentvibes@latest install --yes` to get the fix.
+
+**What Was Broken**: After v2.4.0 added macOS Piper TTS support, audio files were being generated successfully but the playback failed silently because the script was trying to use Linux audio players that don't exist on macOS.
+
+**What's Fixed**: The script now detects macOS and uses the native `afplay` command for audio playback.
+
+## 📦 Files Changed
+
+### Modified
+- `.claude/hooks/play-tts-piper.sh` - Added macOS platform detection for audio playback
+
+### Statistics
+- 1 file changed
+- 10 insertions(+)
+- 2 deletions(-)
+
+## 🔄 Breaking Changes
+
+None. This is a pure bug fix release.
+
+## 🚀 Upgrade Notes
+
+Simply run:
+```bash
+npx agentvibes@latest install --yes
+```
+
+This will update the hooks with the fixed audio playback script.
+
+## 🙏 Credits
+
+Special thanks to:
+- **BMadCode** for reporting the issue and testing on macOS! (Official AgentVibes contributor 🎉)
+- macOS users who helped identify the silent audio playback problem
+
+## 🔗 Related
+
+- v2.4.0 - Initial macOS Piper TTS support
+- Issue: Audio files created but not playing on macOS
+- Fix: Platform detection for native audio player selection
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.4.0...v2.4.1
+
+---
+
 # Release v2.4.0 - macOS Piper TTS Support (2025-01-15)
 
 ## 🤖 AI Summary

@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.4.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.4.1
 
 ---
 
@@ -92,15 +92,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.4.0 - macOS Piper TTS Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.4.0)** 🎉
+**[v2.4.1 - macOS Audio Playback Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.4.1)** 🎉
 
-This release brings **full Piper TTS support to macOS** via precompiled binaries! Mac users can now enjoy completely free offline TTS with zero Python dependencies. The installer automatically detects your Mac architecture (Intel or Apple Silicon) and downloads the appropriate binary.
+This patch release fixes a critical audio playback issue on macOS where Piper TTS audio files were being created but not playing. The fix adds platform detection to use the native macOS `afplay` audio player.
 
 **Key highlights:**
-- 🍎 **macOS Piper TTS Support** - Install via precompiled binaries (no Python/pipx needed!)
-- 🏗️ **Architecture Auto-Detection** - Supports both Apple Silicon (M1/M2/M3) and Intel Macs
-- 🐛 **Fixed Installation Issues** - Resolved pipx dependency conflicts on macOS
-- ✅ **Comprehensive CI Testing** - Validated across 9 macOS configurations (macOS 13/14/15)
+- 🔊 **Fixed macOS Audio Playback** - Audio now plays correctly using native `afplay` command
+- 🐛 **Critical Bug Fix** - Resolved silent audio playback on macOS after v2.4.0 install
+- 🙏 **Community Contribution** - Thanks to BMadCode for reporting and testing!
+- 🍎 **macOS Support Complete** - Both installation (v2.4.0) and playback (v2.4.1) now working
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
