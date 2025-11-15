@@ -50,3 +50,6 @@ scripts/audio-tunnel.config
 # AgentVibes hide/show feature - local user state (never commit)
 .claude/.agentvibes-backup/
 .claude/.agentvibes-hidden.flag
+
+# Stargazer CMS - Private project (separate repo)
+../agentvibes-stargazers/
