@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.4.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.4.3
 
 ---
 
@@ -92,15 +92,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.4.2 - BMAD TTS Auto-Injection](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.4.2)** 🎉
+**[v2.4.3 - macOS Compatibility Fixes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.4.3)** 🎉
 
-This patch release makes BMAD integration completely automatic! Previously, the installer only created documentation about BMAD integration but didn't modify the agent files. Now AgentVibes automatically enables TTS for BMAD agents during installation.
+This patch release resolves three critical macOS installation issues discovered during user testing, completing the macOS compatibility work started in v2.4.0.
 
 **Key highlights:**
-- 🤖 **Automatic BMAD TTS Injection** - BMAD agents speak immediately after installation
-- ⚡ **Zero Manual Configuration** - No need to run bmad-tts-injector.sh manually
-- 🎯 **Intelligent Detection** - Automatically detects BMAD and enables TTS
-- 🛡️ **Enhanced Error Handling** - User-friendly fallback messages with clear instructions
+- 🍎 **ElevenLabs Audio Playback** - Uses native afplay on macOS
+- 🐚 **Shell Environment Detection** - Detects zsh vs bash correctly
+- 🎤 **Piper Version Check** - Uses full path to avoid false errors
+- 📦 **Plugin Manifest Handling** - Gracefully handles optional files
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 

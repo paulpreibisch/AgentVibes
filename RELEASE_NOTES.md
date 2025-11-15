@@ -1,3 +1,96 @@
+# Release v2.4.3 - macOS Compatibility Fixes (2025-01-15)
+
+## 🤖 AI Summary
+
+This patch release resolves three critical macOS installation issues discovered during user testing. The fixes ensure seamless installation on macOS by adding proper audio playback support for ElevenLabs TTS, detecting the user's shell environment correctly (zsh vs bash), fixing Piper installer PATH issues, and handling optional plugin manifest files gracefully. These changes complete the macOS compatibility work started in v2.4.0, making AgentVibes fully functional across all platforms.
+
+## 📋 Changes
+
+### 🐛 Bug Fixes
+
+- **Fixed ElevenLabs Audio Playback on macOS**
+  - Added platform detection to use native `afplay` on macOS
+  - Previously used Linux-only players (paplay/aplay) that don't exist on macOS
+  - Audio files now play correctly instead of failing silently
+  - File: `.claude/hooks/play-tts-elevenlabs.sh` lines 387-399
+
+- **Fixed Shell Environment Detection**
+  - Installer now detects user's default shell (zsh vs bash)
+  - Environment variables written to correct config file (.zshrc or .bashrc)
+  - Scripts now execute using user's shell with proper environment
+  - Replaced hardcoded `bash` calls with shell-aware execution
+  - File: `src/installer.js` - Added `getUserShell()` and `execScript()` helpers
+
+- **Fixed Piper Version Check on macOS**
+  - Version check now uses full path `$INSTALL_DIR/piper --version`
+  - Previously failed because PATH wasn't updated in same shell session
+  - Eliminates false "piper: command not found" error after successful install
+  - File: `.claude/hooks/piper-installer.sh` line 200
+
+- **Fixed Plugin Manifest Installation Error**
+  - Installer now checks if source `.claude-plugin/plugin.json` exists
+  - Skips silently if file doesn't exist (optional feature)
+  - Prevents ENOENT error: "no such file or directory" during installation
+  - File: `src/installer.js` lines 682-704
+
+## 🎯 User Impact
+
+**For macOS Users**: All three critical installation issues are now fixed! You can install AgentVibes on macOS without errors:
+
+1. **ElevenLabs TTS audio plays correctly** - Uses native macOS `afplay` command
+2. **Environment variables work** - Installer detects zsh and writes to .zshrc
+3. **Piper installer succeeds** - No more false "command not found" errors
+4. **No plugin manifest errors** - Installation completes cleanly
+
+**What Was Broken**:
+- ElevenLabs audio generated but didn't play (wrong audio player for macOS)
+- API keys written to .zshrc but scripts ran with bash (no environment)
+- Piper binary installed successfully but version check failed
+- Plugin manifest copy failed with ENOENT error
+
+**What's Fixed**: Complete macOS installation workflow now works end-to-end.
+
+## 📦 Files Changed
+
+### Modified
+- `.claude/hooks/play-tts-elevenlabs.sh` - Added macOS audio playback support
+- `.claude/hooks/piper-installer.sh` - Fixed version check PATH issue
+- `src/installer.js` - Added shell detection, fixed plugin manifest handling
+
+### Statistics
+- 3 files changed
+- 26 insertions(+)
+- 7 deletions(-)
+
+## 🔄 Breaking Changes
+
+None. This release only fixes bugs without changing any existing functionality.
+
+## 🚀 Upgrade Notes
+
+Simply run:
+```bash
+npx agentvibes@latest install --yes
+```
+
+All fixes are applied automatically during installation. No manual configuration needed!
+
+## 🙏 Credits
+
+Special thanks to **Tyler Worley** and **Brian Madison** for thorough macOS testing and reporting these issues! Their detailed bug reports with screenshots made these fixes possible.
+
+## 🔗 Related
+
+- v2.4.2 - BMAD TTS Auto-Injection
+- v2.4.1 - macOS Piper Audio Playback Fix
+- v2.4.0 - macOS Piper TTS Support
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.4.2...v2.4.3
+
+---
+
 # Release v2.4.2 - BMAD TTS Auto-Injection (2025-01-15)
 
 ## 🤖 AI Summary
@@ -358,122 +451,4 @@ This patch release improves the user experience during installation and updates 
 
 ### 🤖 AI Summary
 
-Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha with complete backward compatibility to v4.# Release v2.4.0 - macOS Piper TTS Support (2025-01-15)
-
-## 🤖 AI Summary
-
-This minor release brings **full Piper TTS support to macOS** via precompiled binaries, eliminating the Python dependency conflicts that previously prevented macOS users from using free offline TTS. Mac users can now install Piper TTS with zero Python dependencies - just download and run! The installer automatically detects your Mac architecture (Intel or Apple Silicon) and downloads the appropriate binary. This release also includes comprehensive GitHub Actions CI testing to validate Piper installation across all macOS versions (13, 14, 15) and both architectures.
-
-## 📋 Changes
-
-### ✨ New Features
-- **macOS Piper TTS Support via Precompiled Binaries**
-  - Downloads official Piper binaries from rhasspy/piper releases
-  - Automatic architecture detection (Apple Silicon M1/M2/M3 vs Intel)
-  - Installs to `~/.local/bin/piper` with no Python dependencies
-  - Zero pipx or pip conflicts - pure binary installation
-  - Supports both `arm64` (Apple Silicon) and `x86_64` (Intel) architectures
-
-- **Comprehensive macOS CI Testing**
-  - Tests Piper binary installation on macOS 13, 14, and 15
-  - Tests user-reported `--no-deps` pip workaround method
-  - Validates both Intel and Apple Silicon architectures
-  - Confirms standard pipx failure and binary success
-  - Runs across 9 macOS configurations (3 OS × 3 Node versions)
-
-### 🐛 Bug Fixes
-- **Fixed macOS Piper Installation Failures**
-  - Resolved pipx dependency conflict issues reported by users
-  - Removed incorrect platform restriction blocking macOS
-  - Fixed "Piper TTS is only supported on WSL and Linux" error
-
-### 📚 Documentation
-- **Updated Provider Documentation**
-  - Corrected platform support matrix to include macOS
-  - Added macOS-specific installation requirements
-  - Clarified binary vs pipx installation methods
-  - Updated "Choose Piper TTS if" section with macOS callout
-
-- **Installer Script Documentation**
-  - Added platform detection logic documentation
-  - Documented binary download and extraction process
-  - Added PATH setup instructions for macOS users
-
-### 🔧 Maintenance
-- **Refactored Release Process**
-  - Extracted `showReleaseInfo()` function for code reuse
-  - Added critical ordering warning to `/release` command
-  - Documented README update before npm publish requirement
-
-## 🎯 User Impact
-
-**For macOS Users**: You can now use **completely free offline Piper TTS** on your Mac! No more ElevenLabs API key required. No more Python/pipx dependency hell. Just run `.claude/hooks/piper-installer.sh` and you're done. Works on both Intel Macs and Apple Silicon (M1/M2/M3).
-
-**For All Users**: The updated documentation now correctly reflects that Piper TTS works on **ALL platforms**: Windows, macOS, Linux, and WSL.
-
-**Installation is Simple**:
-```bash
-# Run AgentVibes installer
-npx agentvibes install --yes
-
-# Or directly run Piper installer
-.claude/hooks/piper-installer.sh
-
-# Add to PATH (if needed)
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Architecture Support**:
-- ✅ Apple Silicon (M1/M2/M3): Downloads `piper_macos_aarch64.tar.gz`
-- ✅ Intel Mac (x86_64): Downloads `piper_macos_x64.tar.gz`
-
-## 📦 Files Changed
-
-### Modified
-- `.claude/hooks/piper-installer.sh` - Added macOS binary installation support
-- `.github/workflows/test-macos.yml` - Added comprehensive Piper installation tests
-- `docs/providers.md` - Updated macOS support documentation
-- `.claude/commands/release.md` - Added README update ordering warning
-- `src/installer.js` - Refactored release info display
-
-### Statistics
-- 5 files changed
-- 241 insertions(+)
-- 130 deletions(-)
-
-## 🔄 Breaking Changes
-
-None. This release is fully backward compatible. Linux/WSL users continue using pipx installation, macOS users now get binary installation.
-
-## 🚀 Upgrade Notes
-
-Simply run:
-```bash
-npx agentvibes@latest install --yes
-```
-
-Existing configurations are preserved. If you're on macOS and previously couldn't install Piper, it will work now!
-
-## 🙏 Credits
-
-Special thanks to:
-- **BMadCode** for reporting the macOS installation issue
-- **rhasspy/piper** project for providing macOS binaries
-- Community members who suggested the `--no-deps` workaround
-
-## 📊 Testing
-
-This release includes extensive CI testing:
-- ✅ 9 macOS configurations (macOS 13/14/15 × Node 18/20/22)
-- ✅ Both architecture types (Intel and Apple Silicon)
-- ✅ Binary download and extraction validation
-- ✅ Piper execution tests
-- ✅ Fallback to pipx testing (confirms original issue)
-
----
-
-**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.3.1...v2.4.0
-
----
-
+Major enhancements to multi-provider support, BMAD integration, and MCP server configuration! This release makes AgentVibes smarter about which TTS provider you're using and adds full support for BMAD-METHOD v6-alpha with complete backward compatibility to v4.
