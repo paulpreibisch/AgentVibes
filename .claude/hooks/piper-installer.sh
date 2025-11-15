@@ -196,7 +196,8 @@ echo ""
 echo "✅ Piper TTS installed successfully!"
 echo ""
 
-PIPER_VERSION=$(piper --version 2>&1 || echo "unknown")
+# Use full path since PATH hasn't been updated in current session
+PIPER_VERSION=$($INSTALL_DIR/piper --version 2>&1 || echo "unknown")
 echo "   Version: $PIPER_VERSION"
 echo ""
 
