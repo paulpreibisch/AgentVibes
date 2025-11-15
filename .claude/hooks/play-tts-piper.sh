@@ -326,8 +326,16 @@ DURATION=${DURATION:-1}   # Default to 1 second if detection fails
 
 # Play audio in background (skip if in test mode)
 if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
-  (mpv "$TEMP_FILE" || aplay "$TEMP_FILE" || paplay "$TEMP_FILE") >/dev/null 2>&1 &
-  PLAYER_PID=$!
+  # Detect platform and use appropriate audio player
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    # macOS: Use afplay (native macOS audio player)
+    afplay "$TEMP_FILE" >/dev/null 2>&1 &
+    PLAYER_PID=$!
+  else
+    # Linux/WSL: Try mpv, aplay, or paplay
+    (mpv "$TEMP_FILE" || aplay "$TEMP_FILE" || paplay "$TEMP_FILE") >/dev/null 2>&1 &
+    PLAYER_PID=$!
+  fi
 fi
 
 # Wait for audio to finish, then release lock
