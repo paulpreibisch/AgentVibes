@@ -27,14 +27,15 @@ AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premi
 - 50+ neural voices, completely free
 - 18 languages supported
 - No API key required
-- Works offline (perfect for Windows, WSL, and Linux)
+- Works offline (perfect for all platforms!)
 - Privacy-focused local processing
-- Cross-platform support (Windows, macOS, Linux)
+- Cross-platform support (Windows, macOS, Linux, WSL)
 
 **Requirements:**
-- None! Works out of the box
+- **macOS**: Precompiled binaries (no Python dependencies!)
+- **Linux/WSL**: Python pipx (auto-installed)
+- **Windows**: Native support - no additional setup
 - Automatic voice download on first use
-- Native Windows support - no additional setup needed
 
 ## Provider Commands
 
@@ -100,12 +101,13 @@ If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper T
 - You have a budget for API costs
 
 **Choose Piper TTS if:**
-- You want completely free TTS (especially great for Windows!)
+- You want completely free TTS (works on ALL platforms!)
 - You prefer offline/local processing
-- You're on Windows, WSL, or Linux
+- You're on macOS, Windows, WSL, or Linux
 - You value privacy and data control
 - You're in development/testing phase
 - You don't want to manage API keys or billing
+- **macOS users**: Piper now works via precompiled binaries!
 
 **Pro Tip:** Use Piper for development and ElevenLabs for production/demos!
 

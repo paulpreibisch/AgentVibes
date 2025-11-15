@@ -46,12 +46,21 @@ echo "🎤 Piper TTS Installer"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Check if running on WSL or Linux
-if ! grep -qi microsoft /proc/version 2>/dev/null && [[ "$(uname -s)" != "Linux" ]]; then
-  echo "❌ Piper TTS is only supported on WSL and Linux"
-  echo "   Your platform: $(uname -s)"
+# Detect platform
+PLATFORM="$(uname -s)"
+ARCH="$(uname -m)"
+
+# Check if running on macOS, WSL, or Linux
+if [[ "$PLATFORM" == "Darwin" ]]; then
+  IS_MACOS=true
+  echo "🍎 Detected macOS"
+elif grep -qi microsoft /proc/version 2>/dev/null || [[ "$PLATFORM" == "Linux" ]]; then
+  IS_MACOS=false
+  echo "🐧 Detected Linux/WSL"
+else
+  echo "❌ Unsupported platform: $PLATFORM"
   echo ""
-  echo "   For macOS/Windows, use ElevenLabs instead:"
+  echo "   For Windows, use ElevenLabs instead:"
   echo "   /agent-vibes:provider switch elevenlabs"
   exit 1
 fi
@@ -69,49 +78,118 @@ fi
 echo "📦 Installing Piper TTS..."
 echo ""
 
-# Check if pipx is installed
-if ! command -v pipx &> /dev/null; then
-  echo "⚠️  pipx not found. Installing pipx first..."
+# macOS: Use precompiled binaries
+if [[ "$IS_MACOS" == true ]]; then
+  echo "🍎 Installing Piper TTS from precompiled binaries for macOS..."
   echo ""
 
-  # Try to install pipx
-  if command -v apt-get &> /dev/null; then
-    # Debian/Ubuntu
-    sudo apt-get update
-    sudo apt-get install -y pipx
-  elif command -v brew &> /dev/null; then
-    # macOS (though Piper doesn't run on macOS)
-    brew install pipx
-  elif command -v dnf &> /dev/null; then
-    # Fedora
-    sudo dnf install -y pipx
-  elif command -v pacman &> /dev/null; then
-    # Arch Linux
-    sudo pacman -S python-pipx
+  # Determine architecture
+  if [[ "$ARCH" == "arm64" ]]; then
+    echo "Detected Apple Silicon (M1/M2/M3)"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_aarch64.tar.gz"
+  elif [[ "$ARCH" == "x86_64" ]]; then
+    echo "Detected Intel Mac"
+    PIPER_URL="https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_x64.tar.gz"
   else
-    echo "❌ Unable to install pipx automatically."
-    echo ""
-    echo "   Please install pipx manually:"
-    echo "   https://pipx.pypa.io/stable/installation/"
+    echo "❌ Unsupported macOS architecture: $ARCH"
     exit 1
   fi
 
-  # Ensure pipx is in PATH
-  pipx ensurepath
-  echo ""
-fi
+  # Create installation directory
+  INSTALL_DIR="$HOME/.local/bin"
+  mkdir -p "$INSTALL_DIR"
 
-# Install Piper TTS
-echo "📥 Installing Piper TTS via pipx..."
-pipx install piper-tts
+  # Download and extract
+  echo "📥 Downloading Piper from: $PIPER_URL"
+  TEMP_DIR=$(mktemp -d)
+  cd "$TEMP_DIR"
 
-if ! command -v piper &> /dev/null; then
-  echo ""
-  echo "❌ Installation completed but piper command not found in PATH"
-  echo ""
-  echo "   Try running: pipx ensurepath"
-  echo "   Then restart your terminal"
-  exit 1
+  if curl -L "$PIPER_URL" | tar -xz; then
+    echo "✅ Downloaded and extracted successfully"
+
+    # Copy binaries to ~/.local/bin
+    if [[ -d "piper" ]]; then
+      cp -r piper/* "$INSTALL_DIR/"
+      chmod +x "$INSTALL_DIR/piper"
+      chmod +x "$INSTALL_DIR/piper_phonemize"
+
+      echo "✅ Installed Piper to: $INSTALL_DIR/piper"
+
+      # Add to PATH if not already there
+      if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        echo ""
+        echo "⚠️  Add $INSTALL_DIR to your PATH:"
+        echo ""
+        if [[ "$SHELL" == *"zsh"* ]]; then
+          echo "   echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+          echo "   source ~/.zshrc"
+        else
+          echo "   echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bash_profile"
+          echo "   source ~/.bash_profile"
+        fi
+      fi
+    else
+      echo "❌ Failed to extract Piper binaries"
+      cd -
+      rm -rf "$TEMP_DIR"
+      exit 1
+    fi
+  else
+    echo "❌ Failed to download Piper"
+    cd -
+    rm -rf "$TEMP_DIR"
+    exit 1
+  fi
+
+  cd -
+  rm -rf "$TEMP_DIR"
+
+# Linux/WSL: Use pipx
+else
+  # Check if pipx is installed
+  if ! command -v pipx &> /dev/null; then
+    echo "⚠️  pipx not found. Installing pipx first..."
+    echo ""
+
+    # Try to install pipx
+    if command -v apt-get &> /dev/null; then
+      # Debian/Ubuntu
+      sudo apt-get update
+      sudo apt-get install -y pipx
+    elif command -v brew &> /dev/null; then
+      # Linux with Homebrew
+      brew install pipx
+    elif command -v dnf &> /dev/null; then
+      # Fedora
+      sudo dnf install -y pipx
+    elif command -v pacman &> /dev/null; then
+      # Arch Linux
+      sudo pacman -S python-pipx
+    else
+      echo "❌ Unable to install pipx automatically."
+      echo ""
+      echo "   Please install pipx manually:"
+      echo "   https://pipx.pypa.io/stable/installation/"
+      exit 1
+    fi
+
+    # Ensure pipx is in PATH
+    pipx ensurepath
+    echo ""
+  fi
+
+  # Install Piper TTS
+  echo "📥 Installing Piper TTS via pipx..."
+  pipx install piper-tts
+
+  if ! command -v piper &> /dev/null; then
+    echo ""
+    echo "❌ Installation completed but piper command not found in PATH"
+    echo ""
+    echo "   Try running: pipx ensurepath"
+    echo "   Then restart your terminal"
+    exit 1
+  fi
 fi
 
 echo ""
