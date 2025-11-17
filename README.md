@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.4.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.5.0
 
 ---
 
@@ -94,15 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.4.3 - macOS Compatibility Fixes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.4.3)** 🎉
+**[v2.5.0 - Verbosity Control System](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.5.0)** 🎉
 
-This patch release resolves three critical macOS installation issues discovered during user testing, completing the macOS compatibility work started in v2.4.0.
+This minor release introduces intelligent verbosity control - giving you precise control over how much Claude speaks while working.
 
 **Key highlights:**
-- 🍎 **ElevenLabs Audio Playback** - Uses native afplay on macOS
-- 🐚 **Shell Environment Detection** - Detects zsh vs bash correctly
-- 🎤 **Piper Version Check** - Uses full path to avoid false errors
-- 📦 **Plugin Manifest Handling** - Gracefully handles optional files
+- 🎙️ **Verbosity Control** - Three levels: LOW (minimal), MEDIUM (balanced), HIGH (full transparency)
+- 💭 **Emoji Markers** - Uses 💭 🤔 ✓ for automatic TTS detection
+- ⚙️ **Slash Command** - `/agent-vibes:verbosity [low|medium|high]`
+- 🔌 **MCP Integration** - Control via natural language
+- 🎯 **Smart Detection** - No manual Bash calls needed
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 

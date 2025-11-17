@@ -113,26 +113,31 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.4.1 - macOS Audio Playback Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.5.0 - Verbosity Control System\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('🔊 CRITICAL FIX:\n\n') +
-      chalk.cyan('Fixed macOS Audio Playback\n') +
-      chalk.gray('   • Audio now plays correctly on macOS using native afplay\n') +
-      chalk.gray('   • Resolved silent audio playback issue from v2.4.0\n') +
-      chalk.gray('   • Platform detection for Linux/WSL vs macOS audio players\n') +
-      chalk.gray('   • Thanks to BMadCode for reporting! 🙏\n\n') +
-      chalk.cyan('🍎 macOS Support Complete (v2.4.0 + v2.4.1)\n') +
-      chalk.gray('   • Install via precompiled binaries (no Python/pipx!)\n') +
-      chalk.gray('   • Architecture auto-detection (Apple Silicon & Intel)\n') +
-      chalk.gray('   • Audio playback now working perfectly\n') +
-      chalk.gray('   • Completely free offline TTS for Mac users\n\n') +
+      chalk.green.bold('🎙️ NEW FEATURE:\n\n') +
+      chalk.cyan('Intelligent Verbosity Control\n') +
+      chalk.gray('   • Control how much Claude speaks while working\n') +
+      chalk.gray('   • LOW: Acknowledgments + completions only (minimal)\n') +
+      chalk.gray('   • MEDIUM: + Major decisions and findings (balanced)\n') +
+      chalk.gray('   • HIGH: Full reasoning process (maximum transparency)\n') +
+      chalk.gray('   • Uses emoji markers (💭 🤔 ✓) for automatic TTS\n') +
+      chalk.gray('   • No manual Bash calls needed!\n\n') +
+      chalk.cyan('How to Use:\n') +
+      chalk.gray('   /agent-vibes:verbosity high    # Maximum transparency\n') +
+      chalk.gray('   /agent-vibes:verbosity medium  # Balanced\n') +
+      chalk.gray('   /agent-vibes:verbosity low     # Minimal (default)\n\n') +
+      chalk.cyan('Perfect For:\n') +
+      chalk.gray('   • LOW: Quiet, focused work sessions\n') +
+      chalk.gray('   • MEDIUM: Understanding major decisions\n') +
+      chalk.gray('   • HIGH: Learning mode, debugging complex tasks\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
       chalk.cyan('  /agent-vibes:language english\n') +
       chalk.cyan('  /agent-vibes:target spanish\n') +
       chalk.cyan('  /agent-vibes:learn\n\n') +
-      chalk.white('  Now while coding, you can also learn a second language\n') +
-      chalk.white('  such as Spanish, Italian, French, Mandarin, you name it! 🌍\n\n') +
+      chalk.white('  Learn a second language while coding!\n') +
+      chalk.white('  Spanish, Italian, French, Mandarin, and more! 🌍\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
