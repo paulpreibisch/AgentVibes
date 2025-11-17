@@ -36,6 +36,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ### 🎯 Key Features
 
+- 🎙️ **Verbosity Control** - **NEW!** Control how much Claude speaks (LOW: minimal, MEDIUM: balanced, HIGH: full transparency)
 - 🎙️ **AgentVibes MCP** - **NEW!** Natural language control for Claude Code, Claude Desktop & Warp (no slash commands!)
 - 📚 **Language Learning Mode** - **NEW!** Learn a second language while you program (e.g., Learn Spanish as you code!)
 - 🔊 **SSH Audio Optimization** - **NEW!** Auto-detects remote sessions and eliminates static (VS Code Remote SSH, cloud dev)
@@ -68,6 +69,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ### Core Features
 - [🎤 Commands Reference](#-commands-reference) - All available commands
+- [🎙️ Verbosity Control](#%EF%B8%8F-verbosity-control) - **NEW!** Control how much Claude speaks (low/medium/high)
 - [📚 Language Learning Mode](#-language-learning-mode) - **NEW!** Learn Spanish while you program
 - [🎭 Personalities vs Sentiments](#-personalities-vs-sentiments) - Two systems explained
 - [🗣️ Voice Library](#%EF%B8%8F-voice-library) - 27+ professional voices
@@ -185,6 +187,51 @@ AgentVibes provides **50+ slash commands** and **natural language MCP equivalent
 ```
 
 **[→ View Complete Command Reference](docs/commands.md)** - All voice, system, personality, sentiment, language, and BMAD commands with MCP equivalents
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🎙️ Verbosity Control
+
+**Control how much Claude speaks while working!** 🔊
+
+Choose from three verbosity levels:
+
+### LOW (Minimal) 🔇
+- Acknowledgments only (start of task)
+- Completions only (end of task)
+- Perfect for quiet work sessions
+
+### MEDIUM (Balanced) 🤔
+- Acknowledgments + completions
+- Major decisions ("I'll use grep to search")
+- Key findings ("Found 12 instances")
+- Perfect for understanding decisions without full narration
+
+### HIGH (Maximum Transparency) 💭
+- All reasoning ("Let me search for all instances")
+- All decisions ("I'll use grep for this")
+- All findings ("Found it at line 1323")
+- Perfect for learning mode, debugging complex tasks
+
+**Quick Commands:**
+```bash
+/agent-vibes:verbosity           # Show current level
+/agent-vibes:verbosity high      # Maximum transparency
+/agent-vibes:verbosity medium    # Balanced
+/agent-vibes:verbosity low       # Minimal (default)
+```
+
+**MCP Equivalent:**
+```
+"Set verbosity to high"
+"What's my current verbosity level?"
+```
+
+💡 **How it works:** Claude uses emoji markers (💭 🤔 ✓) in its text, and AgentVibes automatically detects and speaks them based on your verbosity level. No manual TTS calls needed!
+
+⚠️ **Note:** Changes take effect on next Claude Code session restart.
 
 [↑ Back to top](#-table-of-contents)
 

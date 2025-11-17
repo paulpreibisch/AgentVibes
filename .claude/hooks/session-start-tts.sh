@@ -33,6 +33,9 @@ else
   STYLE_NAME="$PERSONALITY"
 fi
 
+# Get verbosity level (Issue #32)
+VERBOSITY=$(cat .claude/tts-verbosity.txt 2>/dev/null || cat ~/.claude/tts-verbosity.txt 2>/dev/null || echo "low")
+
 # Output TTS protocol instructions to stdout
 # Claude Code will add this to the conversation context
 cat <<'EOF'
@@ -69,6 +72,70 @@ User: "check git status"
 
 EOF
 
-# Add current style info
+# Add verbosity-specific protocol (Issue #32)
+case "$VERBOSITY" in
+  low)
+    cat <<'EOF'
+## Verbosity: LOW (Minimal)
+- Speak only at acknowledgment (start) and completion (end)
+- Do NOT speak reasoning, decisions, or findings during work
+- Keep it quiet and focused
+
+EOF
+    ;;
+
+  medium)
+    cat <<'EOF'
+## Verbosity: MEDIUM (Balanced)
+- Speak at acknowledgment and completion (always)
+- Also speak major decisions and key findings during work
+- Use emoji markers for automatic TTS:
+  🤔 [decision text] - Major decisions (e.g., "🤔 I'll use grep to search all files")
+  ✓ [finding text] - Key findings (e.g., "✓ Found 12 instances at line 1323")
+
+Example:
+```
+User: "Find all TODO comments"
+[TTS: Acknowledgment]
+🤔 I'll use grep to search for TODO comments
+[Work happens...]
+✓ Found 12 TODO comments across 5 files
+[TTS: Completion]
+```
+
+EOF
+    ;;
+
+  high)
+    cat <<'EOF'
+## Verbosity: HIGH (Maximum Transparency)
+- Speak acknowledgment and completion (always)
+- Speak ALL reasoning, decisions, and findings as you work
+- Use emoji markers for automatic TTS:
+  💭 [reasoning text] - Thought process (e.g., "💭 Let me search for all instances")
+  🤔 [decision text] - Decisions (e.g., "🤔 I'll use grep for this")
+  ✓ [finding text] - Findings (e.g., "✓ Found it at line 1323")
+
+Example:
+```
+User: "Find all TODO comments"
+[TTS: Acknowledgment]
+💭 Let me search through the codebase for TODO comments
+🤔 I'll use the Grep tool with pattern "TODO"
+[Grep runs...]
+✓ Found 12 TODO comments across 5 files
+💭 Let me organize these results by file
+[Processing...]
+[TTS: Completion]
+```
+
+IMPORTANT: Use emoji markers naturally in your reasoning text. They trigger automatic TTS.
+
+EOF
+    ;;
+esac
+
+# Add current style and verbosity info
 echo "Current Style: ${STYLE_NAME} (${STYLE_MODE})"
+echo "Current Verbosity: ${VERBOSITY}"
 echo ""

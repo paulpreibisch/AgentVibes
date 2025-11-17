@@ -440,6 +440,40 @@ class AgentVibesServer:
             return result
         return f"❌ Failed to download extra voices: {result}"
 
+    async def get_verbosity(self) -> str:
+        """
+        Get current verbosity level.
+
+        Returns:
+            Current verbosity level with description
+        """
+        result = await self._run_script("verbosity-manager.sh", ["get"])
+        if result:
+            level = result.strip()
+            descriptions = {
+                "low": "LOW - Acknowledgments + Completions only (minimal)",
+                "medium": "MEDIUM - + Major decisions and findings (balanced)",
+                "high": "HIGH - All reasoning (maximum transparency)"
+            }
+            desc = descriptions.get(level, level)
+            return f"🎙️ Current Verbosity: {desc}\n\n💡 Change with: set_verbosity(level=\"low|medium|high\")"
+        return "❌ Failed to get verbosity level"
+
+    async def set_verbosity(self, level: str) -> str:
+        """
+        Set verbosity level to control how much Claude speaks.
+
+        Args:
+            level: Verbosity level (low, medium, or high)
+
+        Returns:
+            Success or error message
+        """
+        result = await self._run_script("verbosity-manager.sh", ["set", level])
+        if result and "✅" in result:
+            return f"{result}\n\n⚠️  Restart Claude Code for changes to take effect"
+        return f"❌ Failed to set verbosity: {result}"
+
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
         """Run a bash script and return output"""
@@ -717,6 +751,38 @@ Examples:
                 },
             },
         ),
+        Tool(
+            name="get_verbosity",
+            description="Get current AgentVibes verbosity level (low/medium/high). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken).",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_verbosity",
+            description="""Set AgentVibes verbosity level to control how much Claude speaks while working.
+
+Verbosity Levels:
+- LOW: Only acknowledgments (start) and completions (end). Minimal interruption.
+- MEDIUM: + Major decisions and key findings. Balanced transparency.
+- HIGH: All reasoning, decisions, and findings. Maximum transparency.
+
+Perfect for:
+- LOW: Quiet work sessions, minimal distraction
+- MEDIUM: Understanding major decisions without full narration
+- HIGH: Full transparency, learning mode, debugging complex tasks
+
+Note: Changes take effect on next Claude Code session restart.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "string",
+                        "description": "Verbosity level to set",
+                        "enum": ["low", "medium", "high"]
+                    }
+                },
+                "required": ["level"],
+            },
+        ),
     ]
 
 
@@ -758,6 +824,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "download_extra_voices":
             auto_yes = arguments.get("auto_yes", False)
             result = await agent_vibes.download_extra_voices(auto_yes)
+        elif name == "get_verbosity":
+            result = await agent_vibes.get_verbosity()
+        elif name == "set_verbosity":
+            result = await agent_vibes.set_verbosity(arguments["level"])
         else:
             result = f"Unknown tool: {name}"
 
