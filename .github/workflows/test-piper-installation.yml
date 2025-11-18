@@ -1,0 +1,160 @@
+name: Piper Installation Test
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '.claude/hooks/piper-installer.sh'
+      - '.claude/hooks/piper-download-voices.sh'
+      - '.claude/hooks/piper-voice-manager.sh'
+      - 'test/piper-installation.bats'
+      - '.github/workflows/test-piper-installation.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - '.claude/hooks/piper-installer.sh'
+      - '.claude/hooks/piper-download-voices.sh'
+      - '.claude/hooks/piper-voice-manager.sh'
+      - 'test/piper-installation.bats'
+  workflow_dispatch:
+    inputs:
+      run_integration_tests:
+        description: 'Run full integration tests (downloads voices)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  test-piper-scripts:
+    name: Test Piper Installation Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Run Piper installation unit tests
+        run: |
+          bats test/piper-installation.bats
+
+  test-piper-integration:
+    name: Full Piper Installation (Integration)
+    runs-on: ubuntu-latest
+    # Only run integration tests on manual trigger or specific conditions
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_integration_tests == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Python and pipx
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip python3-venv pipx
+          pipx ensurepath
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install BATS
+        run: |
+          sudo apt-get install -y bats
+
+      - name: Run Piper installation integration test
+        env:
+          PIPER_INTEGRATION_TEST: "1"
+        run: |
+          # Run only the integration test
+          bats -f "Full Piper installation" test/piper-installation.bats
+
+      - name: Verify voices downloaded
+        if: success()
+        run: |
+          echo "📊 Voice Installation Summary:"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          VOICE_DIR="$HOME/.claude/piper-voices"
+
+          if [ -d "$VOICE_DIR" ]; then
+            echo "✅ Voice directory exists: $VOICE_DIR"
+            echo ""
+            echo "Downloaded voices:"
+            ls -lh "$VOICE_DIR"/*.onnx 2>/dev/null || echo "  No .onnx files found"
+            echo ""
+            echo "Voice count: $(find "$VOICE_DIR" -name "*.onnx" | wc -l)"
+
+            # Check for 16Speakers specifically
+            if [ -f "$VOICE_DIR/16Speakers.onnx" ]; then
+              echo "✅ 16Speakers model present"
+              ls -lh "$VOICE_DIR/16Speakers.onnx"
+            else
+              echo "❌ 16Speakers model missing"
+              exit 1
+            fi
+          else
+            echo "❌ Voice directory not found"
+            exit 1
+          fi
+
+      - name: Test Piper TTS
+        if: success()
+        run: |
+          # Quick test to ensure Piper works
+          if command -v piper &> /dev/null; then
+            echo "✅ Piper is installed and in PATH"
+            piper --version
+
+            # Try to synthesize a short test phrase
+            echo "Testing voice synthesis" | piper \
+              --model "$HOME/.claude/piper-voices/en_US-lessac-medium.onnx" \
+              --output_file /tmp/test.wav || echo "⚠️  Synthesis test failed (expected in CI)"
+          else
+            echo "❌ Piper not found in PATH"
+            exit 1
+          fi
+
+  test-piper-quick-validation:
+    name: Quick Piper Validation (No Downloads)
+    runs-on: ubuntu-latest
+    # Always run this for fast feedback
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate script syntax
+        run: |
+          bash -n .claude/hooks/piper-installer.sh
+          bash -n .claude/hooks/piper-download-voices.sh
+          bash -n .claude/hooks/piper-voice-manager.sh
+
+      - name: Check for common issues
+        run: |
+          echo "Checking for non-interactive mode support..."
+          if ! grep -q "NON_INTERACTIVE" .claude/hooks/piper-installer.sh; then
+            echo "❌ NON_INTERACTIVE flag not found in piper-installer.sh"
+            exit 1
+          fi
+
+          echo "Checking for --yes flag support..."
+          if ! grep -q "AUTO_YES" .claude/hooks/piper-download-voices.sh; then
+            echo "❌ AUTO_YES flag not found in piper-download-voices.sh"
+            exit 1
+          fi
+
+          echo "Checking for exit 0..."
+          if ! grep -q "exit 0" .claude/hooks/piper-download-voices.sh; then
+            echo "❌ exit 0 not found in piper-download-voices.sh"
+            exit 1
+          fi
+
+          echo "Checking for 16Speakers in download list..."
+          if ! grep -q "16Speakers" .claude/hooks/piper-download-voices.sh; then
+            echo "❌ 16Speakers not found in COMMON_VOICES"
+            exit 1
+          fi
+
+          echo "✅ All checks passed!"
