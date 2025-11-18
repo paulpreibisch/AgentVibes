@@ -133,8 +133,8 @@ You: "✅ That bug be walkin' the plank now, arr!"
 When a BMAD agent is activated (e.g., `/BMad:agents:pm`), AgentVibes will automatically:
 
 1. **Detect BMAD agent from command/context**
-2. **Check if BMAD plugin is enabled** (`.claude/plugins/bmad-voices-enabled.flag`)
-3. **Look up voice mapping** from `.claude/plugins/bmad-voices.md`
+2. **Check if BMAD plugin is enabled** (`.claude/config/bmad-voices-enabled.flag`)
+3. **Look up voice mapping** from `.claude/config/bmad-voices.md`
 4. **Apply agent's assigned voice** for all TTS acknowledgments/completions
 5. **Apply agent's personality** from the mapping (if specified)
 
@@ -153,7 +153,7 @@ fi
 # Note: This detection happens automatically when BMAD agent activates
 
 # If BMAD agent detected and plugin enabled, use mapped voice
-if [[ -n "$BMAD_AGENT_ID" ]] && [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
+if [[ -n "$BMAD_AGENT_ID" ]] && [[ -f ".claude/config/bmad-voices-enabled.flag" ]]; then
     MAPPED_VOICE=$(.claude/hooks/bmad-voice-manager.sh get-voice "$BMAD_AGENT_ID")
     MAPPED_PERSONALITY=$(.claude/hooks/bmad-voice-manager.sh get-personality "$BMAD_AGENT_ID")
 

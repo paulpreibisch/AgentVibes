@@ -119,7 +119,7 @@ Quickly change voice for specific agent.
 - `personality` (optional): Personality to apply (default: normal)
 
 ### `edit`
-Opens `.claude/plugins/bmad-voices.md` for manual editing.
+Opens `.claude/config/bmad-voices.md` for manual editing.
 
 **Example:**
 ```
@@ -132,8 +132,8 @@ Edit the markdown table directly to change voice mappings.
 ## How It Works
 
 ### Voice Assignment
-1. **Plugin File**: `.claude/plugins/bmad-voices.md` contains voice-to-agent mappings
-2. **Activation Flag**: `.claude/plugins/bmad-voices-enabled.flag` enables/disables the plugin
+1. **Plugin File**: `.claude/config/bmad-voices.md` contains voice-to-agent mappings
+2. **Activation Flag**: `.claude/config/bmad-voices-enabled.flag` enables/disables the plugin
 
 ### TTS Injection (Automatic)
 When you run `/agent-vibes:bmad enable`, the system automatically:
