@@ -453,8 +453,8 @@ disable_plugin() {
 }
 
 # @function list_mappings
-# @intent Display all BMAD agent-to-voice mappings in readable format
-# @why Help users see which voice is assigned to each agent
+# @intent Display all BMAD agent-to-voice mappings in readable format (provider-aware)
+# @why Help users see which voice is assigned to each agent based on active TTS provider
 # @param None
 # @returns None
 # @exitcode 0=success, 1=plugin file not found
@@ -462,21 +462,43 @@ disable_plugin() {
 # @edgecases Parses markdown table format, skips header and separator rows
 # @calledby enable_plugin, show_status, main command dispatcher with "list"
 # @calls grep, sed, echo
+# @version 2.1.0 - Now provider-aware: shows ElevenLabs or Piper voices based on active provider
 list_mappings() {
     if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
         echo "❌ Plugin file not found: $VOICE_CONFIG_FILE"
         return 1
     fi
 
-    echo "📊 BMAD Agent Voice Mappings:"
+    # Detect active TTS provider
+    local provider_file=""
+    if [[ -f ".claude/tts-provider.txt" ]]; then
+        provider_file=".claude/tts-provider.txt"
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+        provider_file="$HOME/.claude/tts-provider.txt"
+    fi
+
+    local active_provider="elevenlabs"  # default
+    if [[ -n "$provider_file" ]] && [[ -f "$provider_file" ]]; then
+        active_provider=$(cat "$provider_file")
+    fi
+
+    # Display provider info
+    echo "📊 BMAD Agent Voice Mappings (Provider: $active_provider):"
     echo ""
 
+    # Table: Agent ID | Agent Name | Intro | ElevenLabs Voice | Piper Voice | Personality
+    # AWK columns: $1=empty | $2=ID | $3=Name | $4=Intro | $5=ElevenLabs | $6=Piper | $7=Personality
+    local voice_column=5  # Default to ElevenLabs (AWK column 5)
+    if [[ "$active_provider" == "piper" ]]; then
+        voice_column=6  # Use Piper (AWK column 6)
+    fi
+
     grep "^| " "$VOICE_CONFIG_FILE" | grep -v "Agent ID" | grep -v "^|---" | \
-    while IFS='|' read -r _ agent_id name voice personality _; do
-        agent_id=$(echo "$agent_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        name=$(echo "$name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        voice=$(echo "$voice" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        personality=$(echo "$personality" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    while IFS='|' read -r line; do
+        agent_id=$(echo "$line" | awk -F'|' '{print $2}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        name=$(echo "$line" | awk -F'|' '{print $3}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        voice=$(echo "$line" | awk -F'|' "{print \$$voice_column}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        personality=$(echo "$line" | awk -F'|' '{print $7}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
         [[ -n "$agent_id" ]] && echo "   $agent_id → $voice [$personality]"
     done
