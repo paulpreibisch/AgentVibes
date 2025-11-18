@@ -53,6 +53,13 @@ import boxen from 'boxen';
 import ora from 'ora';
 import { fileURLToPath } from 'node:url';
 import { installMCP } from './commands/install-mcp.js';
+import {
+  previewVoice,
+  listAvailableVoices,
+  listBmadAssignedVoices,
+  assignVoice,
+  resetBmadVoices,
+} from './commands/bmad-voices.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -868,7 +875,7 @@ bmad-master,en_US-libritts_r-high
 
 /**
  * Proactively create default BMAD voice assignments
- * Works even if BMAD is not installed yet - creates files in both .bmad and bmad folders
+ * Only creates if BMAD folder already exists (doesn't create folders proactively to avoid false legacy detection)
  * @param {string} targetDir - Target installation directory
  */
 async function createDefaultBmadVoiceAssignmentsProactive(targetDir) {
@@ -891,6 +898,14 @@ bmad-master,en_US-libritts_r-high
 `;
 
   for (const bmadPath of bmadPaths) {
+    // Only create if BMAD folder already exists
+    // Don't create folders proactively - this triggers false legacy v4 detection in BMAD installer
+    try {
+      await fs.access(bmadPath);
+    } catch {
+      continue; // Folder doesn't exist, skip
+    }
+
     const configDir = path.join(bmadPath, '_cfg');
     const voiceMapFile = path.join(configDir, 'agent-voice-map.csv');
 
@@ -908,7 +923,7 @@ bmad-master,en_US-libritts_r-high
       console.log(`✓ Created default BMAD voice assignments in ${bmadPath}`);
     } catch (error) {
       // Non-fatal error - voice assignments are optional
-      // Silent fail - BMAD folder might not exist yet
+      // Silent fail
     }
   }
 }
@@ -1694,6 +1709,44 @@ program
     } catch (error) {
       process.exit(error.status || 1);
     }
+  });
+
+// BMAD Voice Management Commands
+program
+  .command('preview-voice <voice-name>')
+  .description('Preview a voice with sample text')
+  .option('-t, --text <text>', 'Custom text to speak (default: sample text)')
+  .action(async (voiceName, options) => {
+    await previewVoice(voiceName, options);
+  });
+
+program
+  .command('list-available-voices')
+  .description('Show all available voices grouped by provider')
+  .action(async () => {
+    await listAvailableVoices();
+  });
+
+program
+  .command('list-bmad-assigned-voices')
+  .description('Show all BMAD agents with their current voice assignments')
+  .action(async () => {
+    await listBmadAssignedVoices();
+  });
+
+program
+  .command('assign-voice <agent-id> <voice-name>')
+  .description('Assign a voice to a specific BMAD agent')
+  .action(async (agentId, voiceName) => {
+    await assignVoice(agentId, voiceName);
+  });
+
+program
+  .command('reset-bmad-voices')
+  .description('Reset all BMAD agents to default voice assignments')
+  .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
+  .action(async (options) => {
+    await resetBmadVoices(options);
   });
 
 program.parse(process.argv);
