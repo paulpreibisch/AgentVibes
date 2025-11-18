@@ -94,16 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.5.0 - Verbosity Control System](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.5.0)** 🎉
+**[v2.6.0 - BMAD Integration & Voice Management CLI](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.6.0)** 🎉
 
-This minor release introduces intelligent verbosity control - giving you precise control over how much Claude speaks while working.
+AgentVibes v2.6.0 brings comprehensive BMAD integration with unique AI voices for all agents! BMAD is a revolutionary AI-driven agile framework that automatically adapts from single bug fixes to enterprise-scale systems.
 
 **Key highlights:**
-- 🎙️ **Verbosity Control** - Three levels: LOW (minimal), MEDIUM (balanced), HIGH (full transparency)
-- 💭 **Emoji Markers** - Uses 💭 🤔 ✓ for automatic TTS detection
-- ⚙️ **Slash Command** - `/agent-vibes:verbosity [low|medium|high]`
-- 🔌 **MCP Integration** - Control via natural language
-- 🎯 **Smart Detection** - No manual Bash calls needed
+- 🎙️ **BMAD TTS Integration** - All BMAD agents can now speak with unique voices
+- 🛠️ **Voice Management CLI** - 5 new commands for managing agent voices
+- 🔍 **Fuzzy Voice Matching** - Use short names like "ryan" instead of full voice IDs
+- 📚 **Improved Help** - Built-in help command lists all available commands
+- 🔧 **BMAD v6 Support** - Detects and works with latest BMAD folder structure
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 

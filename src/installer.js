@@ -127,31 +127,26 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.5.0 - Verbosity Control System\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.6.0 - BMAD Integration & Voice Management CLI\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('🎙️ NEW FEATURE:\n\n') +
-      chalk.cyan('Intelligent Verbosity Control\n') +
-      chalk.gray('   • Control how much Claude speaks while working\n') +
-      chalk.gray('   • LOW: Acknowledgments + completions only (minimal)\n') +
-      chalk.gray('   • MEDIUM: + Major decisions and findings (balanced)\n') +
-      chalk.gray('   • HIGH: Full reasoning process (maximum transparency)\n') +
-      chalk.gray('   • Uses emoji markers (💭 🤔 ✓) for automatic TTS\n') +
-      chalk.gray('   • No manual Bash calls needed!\n\n') +
-      chalk.cyan('How to Use:\n') +
-      chalk.gray('   /agent-vibes:verbosity high    # Maximum transparency\n') +
-      chalk.gray('   /agent-vibes:verbosity medium  # Balanced\n') +
-      chalk.gray('   /agent-vibes:verbosity low     # Minimal (default)\n\n') +
-      chalk.cyan('Perfect For:\n') +
-      chalk.gray('   • LOW: Quiet, focused work sessions\n') +
-      chalk.gray('   • MEDIUM: Understanding major decisions\n') +
-      chalk.gray('   • HIGH: Learning mode, debugging complex tasks\n\n') +
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('🚀 TRY LANGUAGE LEARNING MODE:\n\n') +
-      chalk.cyan('  /agent-vibes:language english\n') +
-      chalk.cyan('  /agent-vibes:target spanish\n') +
-      chalk.cyan('  /agent-vibes:learn\n\n') +
-      chalk.white('  Learn a second language while coding!\n') +
-      chalk.white('  Spanish, Italian, French, Mandarin, and more! 🌍\n\n') +
+      chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
+      chalk.cyan('AgentVibes v2.6.0 brings comprehensive BMAD integration with unique\n') +
+      chalk.cyan('AI voices for all agents! BMAD is a revolutionary AI-driven agile\n') +
+      chalk.cyan('framework that automatically adapts from single bug fixes to\n') +
+      chalk.cyan('enterprise-scale systems. This release includes 5 new CLI commands\n') +
+      chalk.cyan('for voice management, fuzzy voice matching (use short names like\n') +
+      chalk.cyan('"ryan"), BMAD v6 support with backward compatibility, and an\n') +
+      chalk.cyan('improved help system.\n\n') +
+      chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
+      chalk.gray('   🎙️ BMAD TTS Integration - All BMAD agents can now speak!\n') +
+      chalk.gray('   🛠️ Voice Management CLI - 5 new commands for managing voices\n') +
+      chalk.gray('   🔍 Fuzzy Voice Matching - Use "ryan" instead of "en_US-ryan-high"\n') +
+      chalk.gray('   📚 Improved Help - Built-in help command lists all commands\n') +
+      chalk.gray('   🔧 BMAD v6 Support - Detects latest BMAD folder structure\n\n') +
+      chalk.cyan('Try the new commands:\n') +
+      chalk.gray('   npx agentvibes help\n') +
+      chalk.gray('   npx agentvibes preview-voice ryan\n') +
+      chalk.gray('   npx agentvibes list-available-voices\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

@@ -1,3 +1,258 @@
+# Release v2.6.0 - BMAD Integration & Voice Management CLI
+
+**Release Date:** 2025-11-18
+**Type:** Minor Release (New Features)
+
+## 🎯 AI Summary
+
+**What is BMAD?** BMAD (Building Multi-Agent Development) is a revolutionary AI-driven agile framework for software and game development. It automatically adapts from single bug fixes to enterprise-scale systems. AgentVibes whole-heartedly supports BMAD by providing Text to Speech capabilities, enabling great flow for developers working with BMAD when developing code.
+
+AgentVibes v2.6.0 brings comprehensive BMAD integration, enabling all BMAD agents to speak with unique AI voices. This release includes a provider-agnostic TTS injection system, five new CLI commands for easy voice management, and improved user experience with fuzzy voice matching and help documentation.
+
+**Key Highlights:**
+- 🎙️ **BMAD TTS Integration** - All BMAD agents can now speak with unique voices
+- 🛠️ **Voice Management CLI** - 5 new commands for managing agent voices
+- 🔍 **Fuzzy Voice Matching** - Use short names like "ryan" instead of full voice IDs
+- 📚 **Improved Help** - Built-in help command lists all available commands
+- 🔧 **BMAD v6 Support** - Detects and works with latest BMAD folder structure
+
+---
+
+## ✨ New Features
+
+### BMAD Integration
+
+**TTS Injection System** (commits: bedbc783, a2203ffa)
+- Provider-agnostic `TTS_INJECTION` marker system
+- Automatic detection and injection during BMAD installation
+- Works with both `.bmad/` (v6) and `bmad/` (legacy) folders
+- Supports individual agent voices and party mode multi-agent discussions
+
+**Voice Assignment** (commits: 361c522a, 3cef9d1c)
+- Auto-creates default voice assignments for 10 BMAD agents
+- Each agent gets a unique voice matching their personality:
+  - PM (John) - Professional male voice
+  - Architect (Marcus) - Deep authoritative voice
+  - Developer (Alex) - Casual friendly voice
+  - Analyst (Emma) - Articulate female voice
+  - UX Designer (Sara) - Warm professional voice
+  - And 5 more specialized voices
+- Smart folder detection prevents false legacy warnings
+
+**Agent ID Support** (commits: 638a3d75, 3e6fe609)
+- Extracts agent IDs from file paths (`.bmad/bmm/agents/pm.md` → `pm`)
+- Strips escaped special characters to prevent speech artifacts
+- Supports both agent IDs and display names
+
+### Voice Management CLI
+
+**5 New Commands** (commit: 560e51bb)
+1. `npx agentvibes preview-voice <voice-name>` - Preview any voice with sample text
+2. `npx agentvibes list-available-voices` - Show all Piper TTS voices
+3. `npx agentvibes list-bmad-assigned-voices` - Show current agent assignments
+4. `npx agentvibes assign-voice <agent-id> <voice-name>` - Change voice assignments
+5. `npx agentvibes reset-bmad-voices` - Reset all agents to defaults
+
+### User Experience Improvements
+
+**Fuzzy Voice Matching** (commit: b4160ab0)
+- Use short names: `npx agentvibes preview-voice ryan`
+- Automatically matches to full voice ID: `en_US-ryan-high`
+- Shows friendly "Matched 'ryan' to 'en_US-ryan-high'" message
+- Prevents accidental download prompts
+
+**Help Command** (commit: 45409a3a)
+- `npx agentvibes help` - Lists all available commands
+- Also works with `--help` and `-h` flags
+- Properly configured CLI metadata (name, description, version)
+
+### Technical Improvements
+
+**BMAD v6 Detection** (commit: e75be413)
+- Updated `bmad-detector.js` to detect `.bmad/` folder structure
+- Updated `bmad-tts-injector.sh` to prioritize `.bmad/` over `bmad/`
+- Maintains backward compatibility with legacy `bmad/` folders
+
+---
+
+## 🐛 Bug Fixes
+
+**Voice Assignment Creation** (commit: 3cef9d1c)
+- Fixed: Voice assignments weren't created when AgentVibes installed before BMAD
+- Solution: Only create assignments if `.bmad/` folder already exists
+- Prevents false "legacy BMAD v4" detection warnings
+
+**Special Character Handling** (commit: 3e6fe609)
+- Fixed: Escaped characters (like `\!`) in speech caused artifacts
+- Solution: Strip escape sequences before sending text to TTS
+- Clean speech output without "backslash exclamation" sounds
+
+**Agent ID Extraction** (commit: 638a3d75)
+- Fixed: File paths weren't properly converted to agent IDs
+- Solution: Extract basename from paths like `.bmad/bmm/agents/pm.md`
+- Correct voice assignment lookup for all agents
+
+---
+
+## 📦 Chores & Maintenance
+
+**.gitignore Updates** (commit: e75be413)
+- Added `.bmad/` folder (BMAD v6 installations)
+- Added `.mcp.json` (user-specific MCP config)
+- Added documentation patterns (screenshots, drafts, release notes)
+- Removed obsolete `user-prompt-output.sh` hook
+
+---
+
+## 🔧 Technical Details
+
+### Files Added
+- `src/commands/bmad-voices.js` (388 lines) - Voice management commands module
+
+### Files Modified
+- `src/installer.js` - Added CLI command definitions and program config
+- `src/bmad-detector.js` - Updated for `.bmad/` folder detection
+- `.claude/hooks/bmad-speak.sh` - Enhanced agent ID and path handling
+- `.claude/hooks/bmad-tts-injector.sh` - Added `.bmad/` detection
+- `.gitignore` - Comprehensive ignore patterns
+
+### GitHub Issues Resolved
+- #36 - Support BMAD agent IDs in bmad-speak.sh
+- #37 - Add CLI commands for BMAD voice management
+
+---
+
+## 📊 Stats
+
+- **Commits:** 10
+- **Files Changed:** 8
+- **Lines Added:** ~600
+- **Lines Removed:** ~150
+- **New Commands:** 5
+- **Issues Closed:** 2
+
+---
+
+## 🚀 Upgrade Guide
+
+### From v2.5.0
+
+**No breaking changes** - this is a backward-compatible feature release.
+
+To get the new features:
+
+```bash
+# Update AgentVibes
+npx agentvibes update
+
+# If you have BMAD installed, voice assignments will be created automatically
+# Test the new commands:
+npx agentvibes help
+npx agentvibes list-available-voices
+npx agentvibes preview-voice ryan
+```
+
+---
+
+## 💡 Usage Examples
+
+### Preview Voices (New Fuzzy Matching)
+```bash
+# Short names now work!
+npx agentvibes preview-voice ryan
+npx agentvibes preview-voice kristin
+npx agentvibes preview-voice danny
+
+# Full names still work
+npx agentvibes preview-voice en_US-ryan-high
+```
+
+### Manage BMAD Agent Voices
+```bash
+# List all available voices
+npx agentvibes list-available-voices
+
+# See current BMAD agent assignments
+npx agentvibes list-bmad-assigned-voices
+
+# Change an agent's voice
+npx agentvibes assign-voice pm en_US-danny-low
+
+# Reset all agents to defaults
+npx agentvibes reset-bmad-voices
+```
+
+### Get Help
+```bash
+# All these work:
+npx agentvibes help
+npx agentvibes --help
+npx agentvibes -h
+```
+
+---
+
+## 🤝 Contributors
+
+- Paul Preibisch (@paulpreibisch)
+- Claude AI (code generation assistant)
+
+---
+
+## 📝 Notes
+
+### BMAD Installation Order
+
+For automatic voice assignment setup, install BMAD first, then AgentVibes:
+
+```bash
+npx bmad install
+npx agentvibes install
+```
+
+If you install AgentVibes first, you'll need to manually create voice assignments:
+
+```bash
+mkdir -p .bmad/_cfg
+cat > .bmad/_cfg/agent-voice-map.csv << 'EOF'
+agent_id,voice_name
+pm,en_US-ryan-high
+architect,en_US-danny-low
+dev,en_US-joe-medium
+analyst,en_US-amy-medium
+ux-designer,en_US-kristin-medium
+tea,en_US-lessac-medium
+sm,en_US-bryce-medium
+tech-writer,en_US-kathleen-low
+frame-expert,en_US-kusal-medium
+bmad-master,en_US-libritts_r-high
+EOF
+```
+
+### Provider-Agnostic Design
+
+The `TTS_INJECTION` marker system is intentionally generic. Future TTS providers can integrate by:
+1. Creating a hook script at `.claude/hooks/bmad-speak.sh`
+2. Implementing the interface: `bmad-speak.sh <agent-id> <text>`
+3. BMAD will automatically detect and use the custom implementation
+
+---
+
+## 🔗 Links
+
+- **npm Package:** https://www.npmjs.com/package/agentvibes
+- **GitHub Repository:** https://github.com/paulpreibisch/AgentVibes
+- **GitHub Release:** https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.6.0
+- **BMAD Integration PR:** (To be created in BMAD-METHOD repository)
+- **Issue #36:** https://github.com/paulpreibisch/AgentVibes/issues/36
+- **Issue #37:** https://github.com/paulpreibisch/AgentVibes/issues/37
+
+---
+
+**Full Changelog:** https://github.com/paulpreibisch/AgentVibes/compare/v2.5.0...v2.6.0
+
+---
+
 # Release v2.4.3 - macOS Compatibility Fixes (2025-01-15)
 
 ## 🤖 AI Summary
