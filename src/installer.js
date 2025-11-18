@@ -182,7 +182,7 @@ function getUserShell() {
 
 /**
  * Execute a shell script using the user's default shell with environment loaded
- * @param {string} scriptPath - Path to the script to execute
+ * @param {string} scriptPath - Path to the script with optional arguments (e.g., "script.sh enable")
  * @param {object} options - execSync options
  * @returns {Buffer} - Output from the script
  */
@@ -190,7 +190,8 @@ function execScript(scriptPath, options = {}) {
   const { shell, shellConfig } = getUserShell();
 
   // Source the shell config to load environment variables, then run the script
-  const command = `source "${shellConfig}" 2>/dev/null; ${shell} "${scriptPath}"`;
+  // Don't wrap scriptPath in quotes - it may contain arguments
+  const command = `source "${shellConfig}" 2>/dev/null; ${shell} ${scriptPath}`;
 
   return execSync(command, {
     shell: shell,
@@ -767,6 +768,65 @@ async function checkAndInstallPiper(targetDir, options) {
 }
 
 /**
+ * Process TTS_INJECTION markers in BMAD files
+ * Replaces markers with actual TTS instructions for both party mode and individual agents
+ * @param {string} bmadPath - Path to BMAD installation (e.g., .bmad or bmad)
+ */
+async function processBmadTtsInjections(bmadPath) {
+  const partyModeMarker = '<!-- TTS_INJECTION:party-mode -->';
+  const agentTtsMarker = '<!-- TTS_INJECTION:agent-tts -->';
+
+  const partyModeReplacement = `If AgentVibes party mode is enabled, immediately trigger TTS with agent's voice:
+         - Use Bash tool: \`.claude/hooks/bmad-speak.sh '[Agent Name]' '[dialogue]'\`
+         - This speaks the dialogue with the agent's unique voice
+         - Run in background (&) to not block next agent`;
+
+  const agentTtsReplacement = `- When responding to user messages, speak your responses using TTS:
+   Call: \`.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'\` after each response
+   Replace {agent-id} with YOUR agent ID from <agent id="..."> tag at top of this file
+   Replace {response-text} with the text you just output to the user
+   Run in background (&) to avoid blocking`;
+
+  // Process party mode file
+  const partyModeFile = path.join(bmadPath, 'core/workflows/party-mode/instructions.md');
+  try {
+    let partyContent = await fs.readFile(partyModeFile, 'utf8');
+    if (partyContent.includes(partyModeMarker)) {
+      partyContent = partyContent.replaceAll(partyModeMarker, partyModeReplacement);
+      await fs.writeFile(partyModeFile, partyContent, 'utf8');
+    }
+  } catch (error) {
+    // Party mode file doesn't exist or already processed - skip
+  }
+
+  // Process all agent files
+  const agentDirs = [
+    path.join(bmadPath, 'bmm/agents'),
+    path.join(bmadPath, 'bmgd/agents'),
+    path.join(bmadPath, 'bmb/agents'),
+    path.join(bmadPath, 'cis/agents'),
+  ];
+
+  for (const agentDir of agentDirs) {
+    try {
+      const files = await fs.readdir(agentDir);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          const agentFile = path.join(agentDir, file);
+          let content = await fs.readFile(agentFile, 'utf8');
+          if (content.includes(agentTtsMarker)) {
+            content = content.replaceAll(agentTtsMarker, agentTtsReplacement);
+            await fs.writeFile(agentFile, content, 'utf8');
+          }
+        }
+      }
+    } catch (error) {
+      // Agent directory doesn't exist - skip
+    }
+  }
+}
+
+/**
  * Handle BMAD integration (detection and TTS injection)
  * @param {string} targetDir - Target installation directory
  * @returns {Promise<Object>} BMAD detection result
@@ -803,32 +863,11 @@ async function handleBmadIntegration(targetDir) {
     console.log(chalk.green('📝 Created BMAD activation instructions'));
   }
 
-  console.log(chalk.cyan('\n🎤 Injecting TTS into BMAD agents...'));
-  try {
-    const injectorScript = path.join(claudeDir, 'hooks', 'bmad-tts-injector.sh');
+  // Process TTS_INJECTION markers in BMAD files if they exist
+  // This handles the case where BMAD was installed before AgentVibes
+  await processBmadTtsInjections(bmadDetection.bmadPath);
 
-    try {
-      await fs.access(injectorScript);
-    } catch {
-      console.log(chalk.yellow('⚠️  bmad-tts-injector.sh not found, skipping automatic injection'));
-      console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
-      return bmadDetection;
-    }
-
-    await fs.chmod(injectorScript, 0o755);
-
-    const result = execScript(`${injectorScript} enable`, {
-      cwd: targetDir,
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
-
-    console.log(result);
-  } catch (error) {
-    console.log(chalk.yellow('⚠️  TTS injection encountered an issue:'));
-    console.log(chalk.gray(`   ${error.message}`));
-    console.log(chalk.gray('   You can manually enable it later with: .claude/hooks/bmad-tts-injector.sh enable'));
-  }
+  console.log(chalk.green('✅ BMAD agents will use agent-specific voices via bmad-speak.sh hook'));
 
   return bmadDetection;
 }
