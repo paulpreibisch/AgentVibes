@@ -223,7 +223,7 @@ download_voice() {
 
   # Download ONNX model
   echo "   Downloading model file..."
-  if ! curl -L --progress-bar -o "$voice_dir/${voice_name}.onnx" "$onnx_url"; then
+  if ! curl -L --progress-bar --connect-timeout 30 --max-time 300 -o "$voice_dir/${voice_name}.onnx" "$onnx_url"; then
     echo "❌ Failed to download voice model"
     rm -f "$voice_dir/${voice_name}.onnx"
     return 1
@@ -231,7 +231,7 @@ download_voice() {
 
   # Download JSON config
   echo "   Downloading config file..."
-  if ! curl -L -s -o "$voice_dir/${voice_name}.onnx.json" "$json_url"; then
+  if ! curl -L -s --connect-timeout 30 --max-time 60 -o "$voice_dir/${voice_name}.onnx.json" "$json_url"; then
     echo "❌ Failed to download voice config"
     rm -f "$voice_dir/${voice_name}.onnx" "$voice_dir/${voice_name}.onnx.json"
     return 1

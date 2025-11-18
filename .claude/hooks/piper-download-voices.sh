@@ -51,11 +51,12 @@ fi
 
 # Common voice models to download
 COMMON_VOICES=(
-  "en_US-lessac-medium"      # Default, clear male
-  "en_US-amy-medium"         # Warm female
-  "en_US-joe-medium"         # Professional male
-  "en_US-ryan-high"          # Expressive male
-  "en_US-libritts-high"      # Premium quality
+  "en_US-lessac-medium"      # Default, clear male (13MB)
+  "en_US-amy-medium"         # Warm female (13MB)
+  "en_US-joe-medium"         # Professional male (13MB)
+  "en_US-ryan-high"          # Expressive male (30MB)
+  "en_US-libritts-high"      # Premium quality (57MB)
+  "16Speakers"               # Multi-speaker: 12 US + 4 UK voices (77MB) - REQUIRED for BMAD agents
 )
 
 echo "🎙️  Piper Voice Model Downloader"
@@ -163,3 +164,7 @@ if [[ $DOWNLOADED -gt 0 ]]; then
   echo "  /agent-vibes:provider switch piper"
   echo "  /agent-vibes:preview"
 fi
+
+# Always exit successfully even if some downloads failed
+# (individual failures are tracked in FAILED counter)
+exit 0
