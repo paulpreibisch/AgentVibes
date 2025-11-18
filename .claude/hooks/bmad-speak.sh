@@ -59,11 +59,26 @@ map_to_agent_id() {
   fi
 
   # Otherwise map display name to agent ID (for party mode)
-  # Extract 'name' (column 1) where displayName (column 2) matches
-  local agent_id=$(grep -i ",\"*${name_or_id}\"*," "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv" | \
-                   head -1 | \
-                   cut -d',' -f1 | \
-                   tr -d '"')
+  # Extract 'name' (column 1) where displayName (column 2) contains the name
+  # displayName format in CSV: "John", "Mary", "Winston", etc. (first word before any parentheses)
+  local agent_id=$(awk -F',' -v name="$name_or_id" '
+    BEGIN { IGNORECASE=1 }
+    NR > 1 {
+      # Extract displayName (column 2)
+      display = $2
+      gsub(/^"|"$/, "", display)  # Remove surrounding quotes
+
+      # Check if display name starts with the search name (case-insensitive)
+      # This handles both "John" and "John (Product Manager)"
+      if (tolower(display) ~ "^" tolower(name) "($| |\\()") {
+        # Extract agent ID (column 1)
+        agent = $1
+        gsub(/^"|"$/, "", agent)
+        print agent
+        exit
+      }
+    }
+  ' "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv")
 
   echo "$agent_id"
 }
@@ -71,16 +86,25 @@ map_to_agent_id() {
 # Get agent ID
 AGENT_ID=$(map_to_agent_id "$AGENT_NAME_OR_ID")
 
-# Get agent's voice
+# Get agent's voice and intro text
 AGENT_VOICE=""
+AGENT_INTRO=""
 if [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
   AGENT_VOICE=$("$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null)
+  AGENT_INTRO=$("$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null)
 fi
 
-# Speak with agent's voice
+# Prepend intro text if configured (e.g., "John, Product Manager here. [dialogue]")
+FULL_TEXT="$DIALOGUE"
+if [[ -n "$AGENT_INTRO" ]]; then
+  FULL_TEXT="${AGENT_INTRO}. ${DIALOGUE}"
+fi
+
+# Speak with agent's voice using queue system (non-blocking for Claude)
+# Queue system ensures sequential playback while allowing Claude to continue
 if [[ -n "$AGENT_VOICE" ]]; then
-  bash "$SCRIPT_DIR/play-tts.sh" "$DIALOGUE" "$AGENT_VOICE" &
+  bash "$SCRIPT_DIR/tts-queue.sh" add "$FULL_TEXT" "$AGENT_VOICE" &
 else
   # Fallback to default voice
-  bash "$SCRIPT_DIR/play-tts.sh" "$DIALOGUE" &
+  bash "$SCRIPT_DIR/tts-queue.sh" add "$FULL_TEXT" &
 fi

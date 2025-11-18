@@ -46,6 +46,11 @@ export LC_ALL=C
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice name or ID
 
+# Remove backslash escaping that Claude might add for special chars like ! and $
+# In single quotes these don't need escaping, but Claude sometimes adds \! anyway
+TEXT="${TEXT//\\!/!}"
+TEXT="${TEXT//\\\$/\$}"
+
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

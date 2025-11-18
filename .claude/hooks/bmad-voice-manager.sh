@@ -34,14 +34,14 @@
 # @fileoverview BMAD Voice Plugin Manager - Maps BMAD agents to unique TTS voices
 # @context Enables each BMAD agent to have its own distinct voice for multi-agent sessions
 # @architecture Markdown table-based voice mapping with enable/disable flag, auto-detection of BMAD
-# @dependencies .claude/plugins/bmad-voices.md (voice mappings), bmad-tts-injector.sh, .bmad-core/ (BMAD installation)
+# @dependencies .claude/config/bmad-voices.md (voice mappings), bmad-tts-injector.sh, .bmad-core/ (BMAD installation)
 # @entrypoints Called by /agent-vibes:bmad commands, auto-enabled on BMAD detection
 # @patterns Plugin architecture, auto-enable on dependency detection, state backup/restore on toggle
-# @related bmad-tts-injector.sh, .claude/plugins/bmad-voices.md, .bmad-agent-context file
+# @related bmad-tts-injector.sh, .claude/config/bmad-voices.md, .bmad-agent-context file
 
-PLUGIN_DIR=".claude/plugins"
-PLUGIN_FILE="$PLUGIN_DIR/bmad-voices.md"
-ENABLED_FLAG="$PLUGIN_DIR/bmad-voices-enabled.flag"
+CONFIG_DIR=".claude/config"
+VOICE_CONFIG_FILE="$CONFIG_DIR/bmad-voices.md"
+ENABLED_FLAG="$CONFIG_DIR/bmad-voices-enabled.flag"
 
 # AI NOTE: Auto-enable pattern - When BMAD is detected via install-manifest.yaml,
 # automatically enable the voice plugin to provide seamless multi-agent voice support.
@@ -115,7 +115,7 @@ auto_enable_if_bmad_detected() {
     # Check if BMAD is installed (any version) and plugin not already enabled
     if [[ "$version" != "0" ]] && [[ ! -f "$ENABLED_FLAG" ]]; then
         # BMAD detected but plugin not enabled - enable it silently
-        mkdir -p "$PLUGIN_DIR"
+        mkdir -p "$CONFIG_DIR"
         touch "$ENABLED_FLAG"
         return 0
     fi
@@ -144,7 +144,7 @@ get_agent_voice() {
         return
     fi
 
-    if [[ ! -f "$PLUGIN_FILE" ]]; then
+    if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
         echo ""  # Plugin file missing
         return
     fi
@@ -163,17 +163,45 @@ get_agent_voice() {
     fi
 
     # Extract voice from markdown table based on provider
-    # Column 4 = ElevenLabs Voice, Column 5 = Piper Voice
-    local column=4  # Default to ElevenLabs (column 4)
+    # Table: Agent ID | Agent Name | Intro | ElevenLabs Voice | Piper Voice | Personality
+    # AWK columns: $1=empty | $2=ID | $3=Name | $4=Intro | $5=ElevenLabs | $6=Piper | $7=Personality
+    local column=5  # Default to ElevenLabs (AWK column 5)
     if [[ "$active_provider" == "piper" ]]; then
-        column=5  # Use Piper column
+        column=6  # Use Piper (AWK column 6)
     fi
 
-    local voice=$(grep "^| $agent_id " "$PLUGIN_FILE" | \
+    local voice=$(grep "^| $agent_id " "$VOICE_CONFIG_FILE" | \
                   awk -F'|' "{print \$$column}" | \
                   sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     echo "$voice"
+}
+
+# @function get_agent_intro
+# @intent Retrieve intro text for BMAD agent (spoken before their message)
+# @why Helps users identify which agent is speaking in party mode
+# @param $1 {string} agent_id - BMAD agent identifier
+# @returns Echoes intro text to stdout, empty string if not configured
+# @exitcode Always 0
+# @sideeffects None
+# @edgecases Returns empty string if plugin file missing, parses column 3 of markdown table
+# @calledby bmad-speak.sh for agent identification in party mode
+# @calls grep, awk, sed
+# @version 2.1.0 - New function for customizable agent introductions
+get_agent_intro() {
+    local agent_id="$1"
+
+    if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
+        echo ""
+        return
+    fi
+
+    # AWK column 4 = Intro text
+    local intro=$(grep "^| $agent_id " "$VOICE_CONFIG_FILE" | \
+                  awk -F'|' '{print $4}' | \
+                  sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+    echo "$intro"
 }
 
 # @function get_agent_personality
@@ -190,14 +218,14 @@ get_agent_voice() {
 get_agent_personality() {
     local agent_id="$1"
 
-    if [[ ! -f "$PLUGIN_FILE" ]]; then
+    if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
         echo ""
         return
     fi
 
-    # Column 6 = Personality (changed from 5 due to new ElevenLabs/Piper columns)
-    local personality=$(grep "^| $agent_id " "$PLUGIN_FILE" | \
-                       awk -F'|' '{print $6}' | \
+    # AWK column 7 = Personality
+    local personality=$(grep "^| $agent_id " "$VOICE_CONFIG_FILE" | \
+                       awk -F'|' '{print $7}' | \
                        sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     echo "$personality"
@@ -229,10 +257,10 @@ is_plugin_enabled() {
 # @calledby Main command dispatcher with "enable" argument
 # @calls mkdir, cat, source, list_mappings, bmad-tts-injector.sh
 enable_plugin() {
-    mkdir -p "$PLUGIN_DIR"
+    mkdir -p "$CONFIG_DIR"
 
     # Save current settings before enabling
-    BACKUP_FILE="$PLUGIN_DIR/.bmad-previous-settings"
+    BACKUP_FILE="$CONFIG_DIR/.bmad-previous-settings"
 
     # Save current voice
     if [[ -f ".claude/tts-voice.txt" ]]; then
@@ -369,7 +397,7 @@ ACTIVATION_EOF
 # @calledby Main command dispatcher with "disable" argument
 # @calls source, rm, echo, bmad-tts-injector.sh
 disable_plugin() {
-    BACKUP_FILE="$PLUGIN_DIR/.bmad-previous-settings"
+    BACKUP_FILE="$CONFIG_DIR/.bmad-previous-settings"
 
     # Check if we have a backup to restore
     if [[ -f "$BACKUP_FILE" ]]; then
@@ -435,15 +463,15 @@ disable_plugin() {
 # @calledby enable_plugin, show_status, main command dispatcher with "list"
 # @calls grep, sed, echo
 list_mappings() {
-    if [[ ! -f "$PLUGIN_FILE" ]]; then
-        echo "❌ Plugin file not found: $PLUGIN_FILE"
+    if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
+        echo "❌ Plugin file not found: $VOICE_CONFIG_FILE"
         return 1
     fi
 
     echo "📊 BMAD Agent Voice Mappings:"
     echo ""
 
-    grep "^| " "$PLUGIN_FILE" | grep -v "Agent ID" | grep -v "^|---" | \
+    grep "^| " "$VOICE_CONFIG_FILE" | grep -v "Agent ID" | grep -v "^|---" | \
     while IFS='|' read -r _ agent_id name voice personality _; do
         agent_id=$(echo "$agent_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         name=$(echo "$name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
@@ -471,19 +499,19 @@ set_agent_voice() {
     local voice="$2"
     local personality="${3:-normal}"
 
-    if [[ ! -f "$PLUGIN_FILE" ]]; then
-        echo "❌ Plugin file not found: $PLUGIN_FILE"
+    if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
+        echo "❌ Plugin file not found: $VOICE_CONFIG_FILE"
         return 1
     fi
 
     # Check if agent exists
-    if ! grep -q "^| $agent_id " "$PLUGIN_FILE"; then
+    if ! grep -q "^| $agent_id " "$VOICE_CONFIG_FILE"; then
         echo "❌ Agent '$agent_id' not found in plugin"
         return 1
     fi
 
     # Update the voice and personality in the table
-    sed -i.bak "s/^| $agent_id |.*| .* | .* |$/| $agent_id | $(grep "^| $agent_id " "$PLUGIN_FILE" | awk -F'|' '{print $3}') | $voice | $personality |/" "$PLUGIN_FILE"
+    sed -i.bak "s/^| $agent_id |.*| .* | .* |$/| $agent_id | $(grep "^| $agent_id " "$VOICE_CONFIG_FILE" | awk -F'|' '{print $3}') | $voice | $personality |/" "$VOICE_CONFIG_FILE"
 
     echo "✅ Updated $agent_id → $voice [$personality]"
 }
@@ -531,12 +559,12 @@ show_status() {
 # @calledby Main command dispatcher with "edit" argument
 # @calls echo
 edit_plugin() {
-    if [[ ! -f "$PLUGIN_FILE" ]]; then
-        echo "❌ Plugin file not found: $PLUGIN_FILE"
+    if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
+        echo "❌ Plugin file not found: $VOICE_CONFIG_FILE"
         return 1
     fi
 
-    echo "Opening $PLUGIN_FILE for editing..."
+    echo "Opening $VOICE_CONFIG_FILE for editing..."
     echo "Edit the markdown table to change voice mappings"
 }
 
@@ -564,6 +592,9 @@ case "${1:-help}" in
     get-voice)
         get_agent_voice "$2"
         ;;
+    get-intro)
+        get_agent_intro "$2"
+        ;;
     get-personality)
         get_agent_personality "$2"
         ;;
@@ -571,7 +602,7 @@ case "${1:-help}" in
         edit_plugin
         ;;
     *)
-        echo "Usage: bmad-voice-manager.sh {enable|disable|status|list|set|get-voice|get-personality|edit}"
+        echo "Usage: bmad-voice-manager.sh {enable|disable|status|list|set|get-voice|get-intro|get-personality|edit}"
         echo ""
         echo "Commands:"
         echo "  enable              Enable BMAD voice plugin"
@@ -580,6 +611,7 @@ case "${1:-help}" in
         echo "  list                List all agent voice mappings"
         echo "  set <id> <voice>    Set voice for agent"
         echo "  get-voice <id>      Get voice for agent"
+        echo "  get-intro <id>      Get intro text for agent"
         echo "  get-personality <id> Get personality for agent"
         echo "  edit                Edit plugin configuration"
         exit 1
