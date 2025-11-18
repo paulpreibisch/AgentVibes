@@ -229,7 +229,7 @@ if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
 
   # Use the piper-download-voices.sh script if available
   if [[ -f "$SCRIPT_DIR/piper-download-voices.sh" ]]; then
-    "$SCRIPT_DIR/piper-download-voices.sh"
+    "$SCRIPT_DIR/piper-download-voices.sh" --yes
   else
     # Manual download of a basic voice
     mkdir -p "$VOICES_DIR"
