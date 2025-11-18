@@ -127,26 +127,24 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.6.0 - BMAD Integration & Voice Management CLI\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.7.0 - Party Mode Voice Improvements\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.6.0 brings comprehensive BMAD integration with unique\n') +
-      chalk.cyan('AI voices for all agents! BMAD is a revolutionary AI-driven agile\n') +
-      chalk.cyan('framework that automatically adapts from single bug fixes to\n') +
-      chalk.cyan('enterprise-scale systems. This release includes 5 new CLI commands\n') +
-      chalk.cyan('for voice management, fuzzy voice matching (use short names like\n') +
-      chalk.cyan('"ryan"), BMAD v6 support with backward compatibility, and an\n') +
-      chalk.cyan('improved help system.\n\n') +
+      chalk.cyan('AgentVibes v2.7.0 transforms BMAD party mode into a professional\n') +
+      chalk.cyan('multi-agent voice conversation system! This release introduces a\n') +
+      chalk.cyan('sophisticated TTS queue architecture that enables sequential voice\n') +
+      chalk.cyan('playback without blocking Claude Code, natural 2-second pauses\n') +
+      chalk.cyan('between speakers, and customizable agent introductions.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🎙️ BMAD TTS Integration - All BMAD agents can now speak!\n') +
-      chalk.gray('   🛠️ Voice Management CLI - 5 new commands for managing voices\n') +
-      chalk.gray('   🔍 Fuzzy Voice Matching - Use "ryan" instead of "en_US-ryan-high"\n') +
-      chalk.gray('   📚 Improved Help - Built-in help command lists all commands\n') +
-      chalk.gray('   🔧 BMAD v6 Support - Detects latest BMAD folder structure\n\n') +
-      chalk.cyan('Try the new commands:\n') +
-      chalk.gray('   npx agentvibes help\n') +
-      chalk.gray('   npx agentvibes preview-voice ryan\n') +
-      chalk.gray('   npx agentvibes list-available-voices\n\n') +
+      chalk.gray('   🎭 TTS Queue System - Sequential non-blocking voice playback\n') +
+      chalk.gray('   ⏸️ Natural Speaker Pauses - 2-second delay between agents\n') +
+      chalk.gray('   🎤 Speaker Introductions - Configurable intro text\n') +
+      chalk.gray('   📁 Config Reorganization - Official .claude/config/ directory\n') +
+      chalk.gray('   🐛 Text Escaping Fixes - No more "backslash exclamation"\n\n') +
+      chalk.cyan('Party mode improvements:\n') +
+      chalk.gray('   Sequential playback with correct voices\n') +
+      chalk.gray('   Natural pauses for conversation flow\n') +
+      chalk.gray('   Claude Code remains responsive during TTS\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
