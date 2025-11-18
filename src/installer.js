@@ -867,6 +867,53 @@ bmad-master,en_US-libritts_r-high
 }
 
 /**
+ * Proactively create default BMAD voice assignments
+ * Works even if BMAD is not installed yet - creates files in both .bmad and bmad folders
+ * @param {string} targetDir - Target installation directory
+ */
+async function createDefaultBmadVoiceAssignmentsProactive(targetDir) {
+  const bmadPaths = [
+    path.join(targetDir, '.bmad'),
+    path.join(targetDir, 'bmad'),
+  ];
+
+  const defaultVoices = `agent_id,voice_name
+pm,en_US-ryan-high
+architect,en_US-danny-low
+dev,en_US-joe-medium
+analyst,en_US-amy-medium
+ux-designer,en_US-kristin-medium
+tea,en_US-lessac-medium
+sm,en_US-bryce-medium
+tech-writer,en_US-kathleen-low
+frame-expert,en_US-kusal-medium
+bmad-master,en_US-libritts_r-high
+`;
+
+  for (const bmadPath of bmadPaths) {
+    const configDir = path.join(bmadPath, '_cfg');
+    const voiceMapFile = path.join(configDir, 'agent-voice-map.csv');
+
+    // Skip if voice map already exists
+    try {
+      await fs.access(voiceMapFile);
+      continue; // File exists, don't overwrite
+    } catch {
+      // File doesn't exist, create it
+    }
+
+    try {
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(voiceMapFile, defaultVoices, 'utf8');
+      console.log(`✓ Created default BMAD voice assignments in ${bmadPath}`);
+    } catch (error) {
+      // Non-fatal error - voice assignments are optional
+      // Silent fail - BMAD folder might not exist yet
+    }
+  }
+}
+
+/**
  * Handle BMAD integration (detection and TTS injection)
  * @param {string} targetDir - Target installation directory
  * @returns {Promise<Object>} BMAD detection result
@@ -1435,6 +1482,9 @@ async function install(options = {}) {
         default: true,
       }
     ]);
+
+    // Create default BMAD voice assignments (works even if BMAD not installed yet)
+    await createDefaultBmadVoiceAssignmentsProactive(targetDir);
 
     // Handle BMAD integration
     const bmadDetection = await handleBmadIntegration(targetDir);
