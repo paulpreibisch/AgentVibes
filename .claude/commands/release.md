@@ -71,12 +71,28 @@ Complete release history with:
 - Migration notes (if breaking changes)
 
 ### src/installer.js
-Updated to show during installation:
+**CRITICAL**: Update the `showReleaseInfo()` function (around line 126) with:
+- New version number in the title
+- New "WHAT'S NEW" summary (2-4 sentences about the release)
+- New "KEY HIGHLIGHTS" bullet points (3-5 items with emojis)
+
+Example structure:
 ```javascript
-console.log('\n📦 Latest Release: v2.0.18');
-console.log('\n' + latestReleaseSummary);
-console.log('\nSee RELEASE_NOTES.md for full details\n');
+function showReleaseInfo() {
+  console.log(
+    boxen(
+      chalk.white.bold('═══...═══\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.7.0 - Release Title Here\n') +
+      chalk.white.bold('═══...═══\n\n') +
+      chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
+      chalk.cyan('AgentVibes v2.7.0 summary here...\n\n') +
+      chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
+      chalk.gray('   🎭 Feature 1 - Description\n') +
+      chalk.gray('   ⏸️ Feature 2 - Description\n') +
+      // ... more highlights
 ```
+
+This appears during `npx agentvibes install` and `npx agentvibes update`.
 
 ### README.md
 Updated with new version and release information:
@@ -217,3 +233,35 @@ with intuitive 0.5x-3.0x scaling."
 ## Implementation
 
 This command tells Claude AI to prepare and push a new release with AI-generated notes and human approval checkpoints.
+
+### Step-by-Step Implementation Guide
+
+When executing this command, Claude MUST follow these steps in order:
+
+1. **Analyze Changes**: Git log since last tag, examine diffs
+2. **Generate RELEASE_NOTES.md**: AI-generated summary with categorized changes
+3. **Human Review Checkpoint 1**: Wait for approval of RELEASE_NOTES.md
+4. **Update src/installer.js**:
+   - Find the `showReleaseInfo()` function (line ~126)
+   - Replace the version number in title (e.g., `v2.6.0` → `v2.7.0`)
+   - Replace the release title (e.g., `BMAD Integration` → `Party Mode Voice Improvements`)
+   - Replace the "WHAT'S NEW" summary (2-4 sentences from RELEASE_NOTES.md AI Summary)
+   - Replace all "KEY HIGHLIGHTS" bullets (extract from RELEASE_NOTES.md)
+   - Keep the same format/structure, just update content
+5. **Update README.md**:
+   - Update version badge in header (line ~14)
+   - Update "Latest Release" section (line ~95+) with new title and summary
+   - Update key highlights list
+6. **Human Review Checkpoint 2**: Show what will be updated, wait for approval
+7. **Bump package.json**: Use npm version (patch/minor/major)
+8. **Commit all changes**: Single commit with RELEASE_NOTES.md, installer.js, README.md, package.json
+9. **Push to master with tags**
+10. **Create GitHub release**
+11. **Publish to npm**: This packages the already-updated README.md
+
+### Critical Points
+
+- **NEVER skip updating installer.js** - This is what users see during install
+- **Update installer BEFORE npm publish** - npm packages whatever installer.js exists at publish time
+- **Extract content from RELEASE_NOTES.md** - Don't make up new content, use what's in the release notes
+- **Keep the installer format consistent** - Same boxen structure, just update text content
