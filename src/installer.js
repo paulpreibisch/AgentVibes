@@ -127,24 +127,22 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.7.2 - Party Mode Voice Fixes\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.8.0 - Piper Installer Fix\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.7.2 resolves critical party mode voice issues and\n') +
-      chalk.cyan('enhances the multi-agent conversation experience! This patch fixes\n') +
-      chalk.cyan('provider-aware voice display, shows audio file locations, increases\n') +
-      chalk.cyan('speaker delay to 4s (configurable), and updates documentation paths\n') +
-      chalk.cyan('to the official .claude/config/ directory.\n\n') +
+      chalk.cyan('AgentVibes v2.8.0 fixes the Piper installer double prompt bug!\n') +
+      chalk.cyan('This minor release resolves an issue where the Piper voice installer\n') +
+      chalk.cyan('would prompt twice for confirmation, causing failures when running\n') +
+      chalk.cyan('through npx due to stdin issues. The installer now automatically\n') +
+      chalk.cyan('downloads recommended voices after the initial confirmation.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🎭 Provider-Aware Voice Display - Fixed issue #38\n') +
-      chalk.gray('   📍 Audio File Locations - Fixed issue #39 (shows paths)\n') +
-      chalk.gray('   ⏸️ Configurable Speaker Delay - 4s default, customizable\n') +
-      chalk.gray('   📁 Documentation Paths - Migrated to .claude/config/\n') +
-      chalk.gray('   🎪 Command Renamed - Prevents BMAD party mode conflicts\n\n') +
+      chalk.gray('   🔧 Piper Installer Fix - Resolves double prompt bug\n') +
+      chalk.gray('   ✅ Auto Voice Download - Recommended voices download automatically\n') +
+      chalk.gray('   🐧 Linux Compatibility - Improved installation experience\n\n') +
       chalk.cyan('Bug fixes and improvements:\n') +
-      chalk.gray('   Voice mappings show correct provider-specific voices\n') +
-      chalk.gray('   Audio file paths displayed in TTS output\n') +
-      chalk.gray('   Party mode uses project hooks (not global)\n\n') +
+      chalk.gray('   Fixed stdin issues preventing voice downloads on Linux/npx\n') +
+      chalk.gray('   Piper voices now install smoothly without manual intervention\n') +
+      chalk.gray('   Enhanced npx installation experience\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -750,7 +748,7 @@ async function checkAndInstallPiper(targetDir, options) {
         const piperInstallerPath = path.join(targetDir, '.claude', 'hooks', 'piper-installer.sh');
 
         try {
-          execScript(piperInstallerPath, {
+          execScript(`${piperInstallerPath} --non-interactive`, {
             stdio: 'inherit',
             env: process.env
           });

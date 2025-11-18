@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.7.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.8.0
 
 ---
 
@@ -94,16 +94,14 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.7.2 - Party Mode Voice Fixes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.7.2)** 🎉
+**[v2.8.0 - Piper Installer Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.8.0)** 🎉
 
-AgentVibes v2.7.2 resolves critical party mode voice issues! This patch fixes provider-aware voice display (issue #38), shows audio file locations (issue #39), increases speaker delay to 4s (configurable), and updates all documentation paths to the official `.claude/config/` directory.
+AgentVibes v2.8.0 fixes the Piper installer double prompt bug! This minor release resolves an issue where the Piper voice installer would prompt twice for confirmation, causing failures when running through npx due to stdin issues. The installer now automatically downloads recommended voices after the initial confirmation.
 
 **Key highlights:**
-- 🎭 **Provider-Aware Voice Display** - Fixed issue #38: Voice mappings show correct voices
-- 📍 **Audio File Locations** - Fixed issue #39: TTS output displays file paths
-- ⏸️ **Configurable Speaker Delay** - Increased to 4s (customizable via config file)
-- 📁 **Documentation Path Updates** - All references migrated to `.claude/config/`
-- 🎪 **Command Renamed** - Prevents conflicts with BMAD party mode
+- 🔧 **Piper Installer Fix** - Resolves double prompt bug that prevented voice downloads on Linux/npx installations
+- ✅ **Auto Voice Download** - Recommended voices now download automatically after initial confirmation
+- 🐧 **Linux Compatibility** - Improved installation experience for Linux users
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 

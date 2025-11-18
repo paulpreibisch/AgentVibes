@@ -3,6 +3,8 @@
 # File: .claude/hooks/piper-installer.sh
 #
 # AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+#
+# Usage: piper-installer.sh [--non-interactive]
 # Website: https://agentvibes.org
 # Repository: https://github.com/paulpreibisch/AgentVibes
 #
@@ -41,6 +43,12 @@
 #
 
 set -e  # Exit on error
+
+# Parse command line arguments
+NON_INTERACTIVE=false
+if [[ "$1" == "--non-interactive" ]]; then
+  NON_INTERACTIVE=true
+fi
 
 echo "🎤 Piper TTS Installer"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -218,11 +226,21 @@ fi
 echo "📁 Voice storage location: $VOICES_DIR"
 echo ""
 
-# Ask if user wants to download voices now
-read -p "Would you like to download voice models now? [Y/n] " -n 1 -r
-echo ""
+# Ask if user wants to download voices now (skip in non-interactive mode)
+DOWNLOAD_VOICES=true
+if [[ "$NON_INTERACTIVE" == "false" ]]; then
+  read -p "Would you like to download voice models now? [Y/n] " -n 1 -r
+  echo ""
 
-if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+  if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
+    DOWNLOAD_VOICES=false
+  fi
+else
+  echo "📥 Auto-downloading recommended voices (non-interactive mode)..."
+  echo ""
+fi
+
+if [[ "$DOWNLOAD_VOICES" == "true" ]]; then
   echo ""
   echo "📥 Downloading recommended voices..."
   echo ""
