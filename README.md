@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.5.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.7.0
 
 ---
 
@@ -94,16 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.6.0 - BMAD Integration & Voice Management CLI](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.6.0)** 🎉
+**[v2.7.0 - Party Mode Voice Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.7.0)** 🎉
 
-AgentVibes v2.6.0 brings comprehensive BMAD integration with unique AI voices for all agents! BMAD is a revolutionary AI-driven agile framework that automatically adapts from single bug fixes to enterprise-scale systems.
+AgentVibes v2.7.0 transforms BMAD party mode into a professional multi-agent voice conversation system! This release introduces a sophisticated TTS queue architecture enabling sequential voice playback without blocking Claude Code, natural 2-second pauses between speakers, and customizable agent introductions.
 
 **Key highlights:**
-- 🎙️ **BMAD TTS Integration** - All BMAD agents can now speak with unique voices
-- 🛠️ **Voice Management CLI** - 5 new commands for managing agent voices
-- 🔍 **Fuzzy Voice Matching** - Use short names like "ryan" instead of full voice IDs
-- 📚 **Improved Help** - Built-in help command lists all available commands
-- 🔧 **BMAD v6 Support** - Detects and works with latest BMAD folder structure
+- 🎭 **TTS Queue System** - Sequential non-blocking voice playback for party mode
+- ⏸️ **Natural Speaker Pauses** - 2-second delay between agents for conversation flow
+- 🎤 **Speaker Introductions** - Configurable intro text (e.g., "John, Product Manager here")
+- 📁 **Config Reorganization** - Moved from `.claude/plugins/` to official `.claude/config/`
+- 🐛 **Text Escaping Fixes** - No more "backslash exclamation" in speech
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
