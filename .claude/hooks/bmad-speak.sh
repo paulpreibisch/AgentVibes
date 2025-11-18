@@ -102,6 +102,7 @@ fi
 
 # Speak with agent's voice using queue system (non-blocking for Claude)
 # Queue system ensures sequential playback while allowing Claude to continue
+# Output from play-tts.sh will be displayed by the queue worker (GitHub Issue #39)
 if [[ -n "$AGENT_VOICE" ]]; then
   bash "$SCRIPT_DIR/tts-queue.sh" add "$FULL_TEXT" "$AGENT_VOICE" &
 else

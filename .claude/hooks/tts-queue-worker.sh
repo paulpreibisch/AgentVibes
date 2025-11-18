@@ -50,10 +50,11 @@ process_queue() {
     VOICE=$(echo -n "$VOICE_B64" | base64 -d)
 
     # Play TTS (this blocks until audio finishes due to lock mechanism)
+    # Display output to show file location (GitHub Issue #39)
     if [[ -n "${VOICE:-}" ]]; then
-      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" 2>/dev/null || true
+      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
     else
-      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" 2>/dev/null || true
+      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
     fi
 
     # Add 2-second pause between speakers for natural conversation flow
