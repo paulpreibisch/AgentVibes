@@ -14,6 +14,23 @@ IDLE_TIMEOUT=5  # Exit after 5 seconds of no new requests
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Configurable delay between speakers (seconds)
+# Can be overridden by .claude/tts-speaker-delay.txt or ~/.claude/tts-speaker-delay.txt
+SPEAKER_DELAY=4  # Default: 4 seconds between speakers
+
+# Check for custom delay configuration
+if [[ -f ".claude/tts-speaker-delay.txt" ]]; then
+  CUSTOM_DELAY=$(cat .claude/tts-speaker-delay.txt 2>/dev/null | tr -d '[:space:]')
+  if [[ "$CUSTOM_DELAY" =~ ^[0-9]+$ ]]; then
+    SPEAKER_DELAY=$CUSTOM_DELAY
+  fi
+elif [[ -f "$HOME/.claude/tts-speaker-delay.txt" ]]; then
+  CUSTOM_DELAY=$(cat "$HOME/.claude/tts-speaker-delay.txt" 2>/dev/null | tr -d '[:space:]')
+  if [[ "$CUSTOM_DELAY" =~ ^[0-9]+$ ]]; then
+    SPEAKER_DELAY=$CUSTOM_DELAY
+  fi
+fi
+
 # Trap to clean up on exit
 trap "rm -f $WORKER_PID_FILE" EXIT
 
@@ -57,8 +74,8 @@ process_queue() {
       bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
     fi
 
-    # Add 2-second pause between speakers for natural conversation flow
-    sleep 2
+    # Add configurable pause between speakers for natural conversation flow
+    sleep $SPEAKER_DELAY
 
     # Remove processed item
     rm -f "$queue_item"
