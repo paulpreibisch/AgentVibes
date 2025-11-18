@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.7.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.7.2
 
 ---
 
@@ -94,16 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.7.0 - Party Mode Voice Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.7.0)** 🎉
+**[v2.7.2 - Party Mode Voice Fixes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.7.2)** 🎉
 
-AgentVibes v2.7.0 transforms BMAD party mode into a professional multi-agent voice conversation system! This release introduces a sophisticated TTS queue architecture enabling sequential voice playback without blocking Claude Code, natural 2-second pauses between speakers, and customizable agent introductions.
+AgentVibes v2.7.2 resolves critical party mode voice issues! This patch fixes provider-aware voice display (issue #38), shows audio file locations (issue #39), increases speaker delay to 4s (configurable), and updates all documentation paths to the official `.claude/config/` directory.
 
 **Key highlights:**
-- 🎭 **TTS Queue System** - Sequential non-blocking voice playback for party mode
-- ⏸️ **Natural Speaker Pauses** - 2-second delay between agents for conversation flow
-- 🎤 **Speaker Introductions** - Configurable intro text (e.g., "John, Product Manager here")
-- 📁 **Config Reorganization** - Moved from `.claude/plugins/` to official `.claude/config/`
-- 🐛 **Text Escaping Fixes** - No more "backslash exclamation" in speech
+- 🎭 **Provider-Aware Voice Display** - Fixed issue #38: Voice mappings show correct voices
+- 📍 **Audio File Locations** - Fixed issue #39: TTS output displays file paths
+- ⏸️ **Configurable Speaker Delay** - Increased to 4s (customizable via config file)
+- 📁 **Documentation Path Updates** - All references migrated to `.claude/config/`
+- 🎪 **Command Renamed** - Prevents conflicts with BMAD party mode
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 

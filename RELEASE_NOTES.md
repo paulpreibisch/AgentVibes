@@ -1,3 +1,236 @@
+# Release v2.7.2 - Party Mode Voice Fixes
+
+**Release Date:** 2025-11-18
+**Type:** Patch Release (Bug Fixes)
+
+## 🎯 AI Summary
+
+AgentVibes v2.7.2 resolves critical party mode voice issues and enhances the multi-agent conversation experience. This patch fixes issue #38 where BMAD agents appeared to use the same voice due to non-provider-aware status display, and issue #39 by showing audio file locations in output. The speaker delay has been increased from 2s to 4s and made configurable, documentation paths have been updated from the old `.claude/plugins/` to the official `.claude/config/` directory, and the command has been renamed to prevent conflicts with BMAD's party mode.
+
+**Key Highlights:**
+- 🎭 **Provider-Aware Voice Display** - Fixed issue #38: Voice mappings now show correct voices for active TTS provider
+- 📍 **Audio File Locations** - Fixed issue #39: TTS output now displays file paths and voice used
+- ⏸️ **Configurable Speaker Delay** - Increased from 2s to 4s with customizable configuration
+- 📁 **Documentation Path Updates** - Migrated all references from `.claude/plugins/` to `.claude/config/`
+- 🎪 **Command Renamed** - Prevents conflict with BMAD's `/bmad:core:workflows:party-mode`
+
+---
+
+## 🐛 Bug Fixes
+
+### Issue #38: Provider-Aware Voice Mappings
+
+**Fixed Voice Display for Active Provider** (commit: 34db8510)
+- Problem: `list_mappings()` in `bmad-voice-manager.sh` always showed ElevenLabs voices regardless of active provider
+- Made agents appear to use same voice when using Piper provider
+- Solution: Added provider detection logic to `list_mappings()` function
+- Now displays correct voice column based on active TTS provider (Piper or ElevenLabs)
+- Added provider indicator to status output: "Provider: piper" or "Provider: elevenlabs"
+- Actual voice assignment was working correctly - only the display was wrong
+
+**Technical Details:**
+```bash
+# Detect active TTS provider
+local active_provider="elevenlabs"  # default
+if [[ -f ".claude/tts-provider.txt" ]]; then
+    active_provider=$(cat .claude/tts-provider.txt)
+elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+    active_provider=$(cat "$HOME/.claude/tts-provider.txt)
+fi
+
+# Select correct voice column
+local voice_column=5  # ElevenLabs (AWK column 5)
+if [[ "$active_provider" == "piper" ]]; then
+    voice_column=6  # Piper (AWK column 6)
+fi
+```
+
+### Issue #39: Display Audio File Locations
+
+**Show TTS Output in Party Mode** (commit: 3afff2b0)
+- Problem: Audio file paths were hidden due to `2>/dev/null` redirect
+- Users couldn't see which files were being played or which voices were used
+- Solution: Removed output suppression from `tts-queue-worker.sh`
+- Now displays: File path, voice used, and model information
+- Helps with debugging and transparency
+
+**Example Output:**
+```
+🎭 Using multi-speaker voice: kristin (Model: 16Speakers, Speaker ID: 2)
+🎵 Saved to: /home/fire/claude/AgentVibes/.claude/audio/tts-padded-1763498669.wav
+🎤 Voice used: 16Speakers (Piper TTS)
+```
+
+### Party Mode Hook Path Issues
+
+**Project Hooks vs Global Hooks** (commit: 34a53d67)
+- Problem: Party mode instructions didn't specify project-local hooks
+- Claude AI sometimes used `~/.claude/hooks/` instead of `.claude/hooks/`
+- Caused wrong TTS provider to be used in party mode
+- Solution: Added explicit guidance in `.bmad/core/workflows/party-mode/instructions.md`
+- Critical note: "IMPORTANT: Always use PROJECT hooks (.claude/hooks/), NEVER global hooks (~/.claude/hooks/)"
+- Also added to step 2: "If using TTS for announcement, use PROJECT hook: .claude/hooks/play-tts.sh (NOT ~/.claude/hooks/)"
+
+---
+
+## ✨ Improvements
+
+### Configurable Speaker Delay
+
+**Increased and Made Configurable** (commit: 65264c9c)
+- Changed default speaker delay from 2s to 4s between agents
+- User feedback: "there was still a little overlap in the different agents when they speak"
+- Made delay configurable via text file for user customization
+- Supports project-local `.claude/tts-speaker-delay.txt` or global `~/.claude/tts-speaker-delay.txt`
+- Project config takes precedence over global config
+- Must be a positive integer (validated with regex)
+
+**Configuration:**
+```bash
+# Set custom delay (e.g., 6 seconds)
+echo "6" > .claude/tts-speaker-delay.txt
+
+# Or globally
+echo "6" > ~/.claude/tts-speaker-delay.txt
+```
+
+**Implementation:**
+```bash
+SPEAKER_DELAY=4  # Default: 4 seconds
+
+# Check for custom delay
+if [[ -f ".claude/tts-speaker-delay.txt" ]]; then
+  CUSTOM_DELAY=$(cat .claude/tts-speaker-delay.txt 2>/dev/null | tr -d '[:space:]')
+  if [[ "$CUSTOM_DELAY" =~ ^[0-9]+$ ]]; then
+    SPEAKER_DELAY=$CUSTOM_DELAY
+  fi
+elif [[ -f "$HOME/.claude/tts-speaker-delay.txt" ]]; then
+  CUSTOM_DELAY=$(cat "$HOME/.claude/tts-speaker-delay.txt" 2>/dev/null | tr -d '[:space:]')
+  if [[ "$CUSTOM_DELAY" =~ ^[0-9]+$ ]]; then
+    SPEAKER_DELAY=$CUSTOM_DELAY
+  fi
+fi
+
+# Later in queue processing:
+sleep $SPEAKER_DELAY
+```
+
+---
+
+## 📁 Documentation Updates
+
+### Path Migration from plugins/ to config/
+
+**Updated All Path References** (commit: 34a53d67)
+- Problem: Documentation still referenced old `.claude/plugins/` path
+- Code had already moved to `.claude/config/` in v2.7.0
+- Solution: Updated all references in:
+  - `.claude/commands/agent-vibes/bmad.md`
+  - `.claude/output-styles/agent-vibes.md`
+  - `.claude/hooks/stop.sh`
+- Ensures consistency between code and documentation
+- Prevents confusion about config file locations
+
+**Files Updated:**
+- `agent-vibes/bmad.md`: All references to bmad-voices.md path
+- `agent-vibes.md`: BMAD plugin integration section
+- `stop.sh`: Config file cleanup logic
+
+### Command Renamed to Prevent Conflicts
+
+**Renamed /agent-vibes-bmad-party** (commit: 34a53d67)
+- Problem: `/agent-vibes-bmad-party` conflicted with BMAD's `/bmad:core:workflows:party-mode`
+- When typing "party", Claude Code suggested the wrong command
+- Solution: Renamed to `/agent-vibes-bmad-voices`
+- Better describes purpose (managing BMAD voice mappings)
+- No longer conflicts with BMAD party mode workflow
+- Renamed file: `.claude/commands/agent-vibes-bmad-party.md` → `.claude/commands/agent-vibes-bmad-voices.md`
+
+**Before:**
+- `/agent-vibes-bmad-party` - Control BMAD party mode voice integration
+
+**After:**
+- `/agent-vibes-bmad-voices` - Control BMAD party mode voice integration
+- Clear distinction from `/bmad:core:workflows:party-mode`
+
+---
+
+## 🔧 Technical Details
+
+### Files Modified
+- `.claude/hooks/bmad-voice-manager.sh` - Made `list_mappings()` provider-aware (lines 455-505)
+- `.claude/hooks/tts-queue-worker.sh` - Added configurable delay, removed output suppression (lines 18-32, 78)
+- `.claude/commands/agent-vibes-bmad-voices.md` - Renamed from bmad-party.md, updated paths
+- `.claude/commands/agent-vibes/bmad.md` - Updated documentation paths
+- `.claude/output-styles/agent-vibes.md` - Updated BMAD integration paths
+- `.claude/hooks/stop.sh` - Updated config file paths
+- `.bmad/core/workflows/party-mode/instructions.md` - Added project hooks guidance
+
+### BMAD-METHOD Repository Updates
+- Committed party mode instruction fixes to BMAD-METHOD repo (commit: 60635fcc)
+- **Note:** Changes not yet pushed to GitHub (manual push required)
+- PR #934 will need to be updated with latest commits
+
+---
+
+## 📊 Stats
+
+- **Commits:** 5
+- **Files Changed:** 7
+- **Lines Modified:** ~50
+- **Issues Resolved:** 2 (#38, #39)
+- **Configuration Options Added:** 1 (speaker delay)
+
+---
+
+## 🚀 Upgrade Guide
+
+### From v2.7.1
+
+**No breaking changes** - this is a backward-compatible bug fix release.
+
+To get the fixes:
+
+```bash
+# Update AgentVibes
+npx agentvibes update
+
+# Voice mappings will now show correct provider-specific voices
+# Audio file locations will display in output
+# Speaker delay automatically increased to 4s
+```
+
+### Optional: Customize Speaker Delay
+
+```bash
+# Set custom delay (e.g., 6 seconds)
+echo "6" > .claude/tts-speaker-delay.txt
+```
+
+---
+
+## 🤝 Contributors
+
+- Paul Preibisch (@paulpreibisch)
+- Claude AI (code generation assistant)
+
+---
+
+## 🔗 Links
+
+- **npm Package:** https://www.npmjs.com/package/agentvibes
+- **GitHub Repository:** https://github.com/paulpreibisch/AgentVibes
+- **GitHub Release:** https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.7.2
+- **Issue #38:** https://github.com/paulpreibisch/AgentVibes/issues/38
+- **Issue #39:** https://github.com/paulpreibisch/AgentVibes/issues/39
+
+---
+
+**Full Changelog:** https://github.com/paulpreibisch/AgentVibes/compare/v2.7.1...v2.7.2
+
+---
+
+
 # Release v2.7.0 - Party Mode Voice Improvements
 
 **Release Date:** 2025-11-18

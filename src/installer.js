@@ -127,24 +127,24 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.7.0 - Party Mode Voice Improvements\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.7.2 - Party Mode Voice Fixes\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.7.0 transforms BMAD party mode into a professional\n') +
-      chalk.cyan('multi-agent voice conversation system! This release introduces a\n') +
-      chalk.cyan('sophisticated TTS queue architecture that enables sequential voice\n') +
-      chalk.cyan('playback without blocking Claude Code, natural 2-second pauses\n') +
-      chalk.cyan('between speakers, and customizable agent introductions.\n\n') +
+      chalk.cyan('AgentVibes v2.7.2 resolves critical party mode voice issues and\n') +
+      chalk.cyan('enhances the multi-agent conversation experience! This patch fixes\n') +
+      chalk.cyan('provider-aware voice display, shows audio file locations, increases\n') +
+      chalk.cyan('speaker delay to 4s (configurable), and updates documentation paths\n') +
+      chalk.cyan('to the official .claude/config/ directory.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🎭 TTS Queue System - Sequential non-blocking voice playback\n') +
-      chalk.gray('   ⏸️ Natural Speaker Pauses - 2-second delay between agents\n') +
-      chalk.gray('   🎤 Speaker Introductions - Configurable intro text\n') +
-      chalk.gray('   📁 Config Reorganization - Official .claude/config/ directory\n') +
-      chalk.gray('   🐛 Text Escaping Fixes - No more "backslash exclamation"\n\n') +
-      chalk.cyan('Party mode improvements:\n') +
-      chalk.gray('   Sequential playback with correct voices\n') +
-      chalk.gray('   Natural pauses for conversation flow\n') +
-      chalk.gray('   Claude Code remains responsive during TTS\n\n') +
+      chalk.gray('   🎭 Provider-Aware Voice Display - Fixed issue #38\n') +
+      chalk.gray('   📍 Audio File Locations - Fixed issue #39 (shows paths)\n') +
+      chalk.gray('   ⏸️ Configurable Speaker Delay - 4s default, customizable\n') +
+      chalk.gray('   📁 Documentation Paths - Migrated to .claude/config/\n') +
+      chalk.gray('   🎪 Command Renamed - Prevents BMAD party mode conflicts\n\n') +
+      chalk.cyan('Bug fixes and improvements:\n') +
+      chalk.gray('   Voice mappings show correct provider-specific voices\n') +
+      chalk.gray('   Audio file paths displayed in TTS output\n') +
+      chalk.gray('   Party mode uses project hooks (not global)\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
