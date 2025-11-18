@@ -70,6 +70,13 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
+// Configure CLI
+program
+  .name('agentvibes')
+  .description('🎙️ AgentVibes - Text-to-Speech with personality for AI Assistants')
+  .version(VERSION, '-v, --version', 'Output the current version')
+  .helpOption('-h, --help', 'Display help for command');
+
 // Beautiful ASCII art
 function showWelcome() {
   console.log('');
@@ -1747,6 +1754,14 @@ program
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
     await resetBmadVoices(options);
+  });
+
+// Help command
+program
+  .command('help')
+  .description('Display help information')
+  .action(() => {
+    program.outputHelp();
   });
 
 program.parse(process.argv);
