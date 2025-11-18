@@ -9,7 +9,7 @@ import yaml from 'js-yaml';
  */
 export async function detectBMAD(targetDir) {
   // Check v6 first (newer version)
-  const v6Manifest = path.join(targetDir, 'bmad/_cfg/manifest.yaml');
+  const v6Manifest = path.join(targetDir, '.bmad/_cfg/manifest.yaml');
   try {
     await fs.access(v6Manifest);
     const manifestContent = await fs.readFile(v6Manifest, 'utf8');
@@ -19,8 +19,8 @@ export async function detectBMAD(targetDir) {
       version: 6,
       detailedVersion: manifest.installation?.version || '6.0.0-alpha.x',
       manifestPath: v6Manifest,
-      configPath: path.join(targetDir, 'bmad/core/config.yaml'),
-      bmadPath: path.join(targetDir, 'bmad'),
+      configPath: path.join(targetDir, '.bmad/core/config.yaml'),
+      bmadPath: path.join(targetDir, '.bmad'),
       installed: true
     };
   } catch {}

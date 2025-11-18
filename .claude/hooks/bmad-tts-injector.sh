@@ -49,12 +49,17 @@ GRAY='\033[0;90m'
 NC='\033[0m' # No Color
 
 # Detect BMAD installation and version
-# Supports both v4 (.bmad-core/) and v6-alpha (bmad/) installations
+# Supports both v4 (.bmad-core/) and v6-alpha (.bmad/) installations
 detect_bmad() {
   local bmad_core_dir=""
 
-  # Check for v6-alpha first (newer version)
-  if [[ -d "bmad" ]]; then
+  # Check for v6-alpha first (newer version with dot prefix)
+  if [[ -d ".bmad" ]]; then
+    bmad_core_dir=".bmad"
+  elif [[ -d "../.bmad" ]]; then
+    bmad_core_dir="../.bmad"
+  # Check for v6-alpha without dot (legacy naming)
+  elif [[ -d "bmad" ]]; then
     bmad_core_dir="bmad"
   elif [[ -d "../bmad" ]]; then
     bmad_core_dir="../bmad"

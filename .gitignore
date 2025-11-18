@@ -29,16 +29,31 @@ yarn-error.log*
 *.sqlite3
 
 # BMAD Documentation (never commit)
+.bmad/
 .bmad-core/
 .claude/commands/BMad/
+.claude/commands/bmad/
+.claude/commands/agent-vibes-bmad.md
+.claude/commands/agent-vibes-bmad-party.md
+.claude/hooks/bmad-party-manager.sh
+.claude/hooks/stop.sh
 docs/stories/
 docs/prd.md
+docs/*.snagx
+docs/Screenshot*.png
+docs/macos-piper-issue.md
+docs/stargazer-cms-prd.md
+docs/whatsapp-*.md
 PRODUCT_REQUIREMENTS.md
 WORKSPACE_GUIDE.md
 WORKSPACE_SETUP_SUMMARY.md
-.claude/commands/agent-vibes-bmad.md
+RELEASE_NOTES_*_DRAFT.md
+github-profile-draft.md
 agentvibes.org/
 agentvibes/org/
+
+# MCP Server config (user-specific)
+.mcp.json
 
 # LinkedIn articles (personal drafts)
 linkedin/
