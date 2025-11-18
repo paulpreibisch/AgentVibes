@@ -785,6 +785,7 @@ async function processBmadTtsInjections(bmadPath) {
    Call: \`.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'\` after each response
    Replace {agent-id} with YOUR agent ID from <agent id="..."> tag at top of this file
    Replace {response-text} with the text you just output to the user
+   IMPORTANT: Use single quotes as shown - do NOT escape special characters like ! or $ inside single quotes
    Run in background (&) to avoid blocking`;
 
   // Process party mode file

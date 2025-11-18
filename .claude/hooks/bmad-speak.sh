@@ -23,6 +23,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 AGENT_NAME_OR_ID="$1"
 DIALOGUE="$2"
 
+# Remove backslash escaping that Claude might add for special chars like ! and $
+# In single quotes these don't need escaping, but Claude sometimes adds \! anyway
+DIALOGUE="${DIALOGUE//\\!/!}"
+DIALOGUE="${DIALOGUE//\\\$/\$}"
+
 # Check if party mode is enabled
 if [[ -f "$PROJECT_ROOT/.claude/plugins/bmad-party-mode-disabled.flag" ]]; then
   exit 0
