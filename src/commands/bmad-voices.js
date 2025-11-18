@@ -155,13 +155,55 @@ async function writeVoiceAssignments(assignments) {
 }
 
 /**
+ * Find matching voice name using fuzzy matching
+ * Supports partial matches like "ryan" → "en_US-ryan-high"
+ */
+function findVoiceMatch(input) {
+  const lowerInput = input.toLowerCase();
+
+  // Exact match
+  if (PIPER_VOICES[input]) {
+    return input;
+  }
+
+  // Find voices containing the input string
+  const matches = Object.keys(PIPER_VOICES).filter(voice =>
+    voice.toLowerCase().includes(lowerInput)
+  );
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  if (matches.length > 1) {
+    // Return the shortest match (most specific)
+    return matches.reduce((a, b) => (a.length <= b.length ? a : b));
+  }
+
+  return null;
+}
+
+/**
  * Command: preview-voice <voice-name>
  * Preview a voice with sample text
  */
 export async function previewVoice(voiceName, options = {}) {
   const text = options.text || 'Hello! This is a voice preview for AgentVibes.';
 
-  console.log(chalk.cyan(`\n🔊 Previewing voice: ${voiceName}\n`));
+  // Try fuzzy matching
+  const matchedVoice = findVoiceMatch(voiceName);
+
+  if (!matchedVoice) {
+    console.error(chalk.red(`\n❌ Voice "${voiceName}" not found.`));
+    console.error(chalk.gray('   View available voices: npx agentvibes list-available-voices\n'));
+    process.exit(1);
+  }
+
+  if (matchedVoice !== voiceName) {
+    console.log(chalk.yellow(`\n💡 Matched "${voiceName}" to "${matchedVoice}"\n`));
+  }
+
+  console.log(chalk.cyan(`🔊 Previewing voice: ${matchedVoice}\n`));
   console.log(chalk.gray(`   Text: "${text}"\n`));
 
   const targetDir = getWorkingDirectory();
@@ -176,13 +218,13 @@ export async function previewVoice(voiceName, options = {}) {
   }
 
   try {
-    execSync(`bash "${playTtsPath}" "${text}" "${voiceName}"`, {
+    execSync(`bash "${playTtsPath}" "${text}" "${matchedVoice}"`, {
       stdio: 'inherit',
       cwd: targetDir,
     });
   } catch (error) {
     console.error(chalk.red('\n❌ Failed to play voice preview'));
-    console.error(chalk.gray(`   Voice: ${voiceName}`));
+    console.error(chalk.gray(`   Voice: ${matchedVoice}`));
     console.error(chalk.gray(`   Error: ${error.message}\n`));
     process.exit(1);
   }
