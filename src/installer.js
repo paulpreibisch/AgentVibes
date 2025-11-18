@@ -825,6 +825,45 @@ async function processBmadTtsInjections(bmadPath) {
       // Agent directory doesn't exist - skip
     }
   }
+
+  // Create default voice assignments for BMAD agents
+  await createDefaultBmadVoiceAssignments(bmadPath);
+}
+
+async function createDefaultBmadVoiceAssignments(bmadPath) {
+  const configDir = path.join(bmadPath, '_cfg');
+  const voiceMapFile = path.join(configDir, 'agent-voice-map.csv');
+
+  // Skip if voice map already exists
+  try {
+    await fs.access(voiceMapFile);
+    return; // File exists, don't overwrite
+  } catch {
+    // File doesn't exist, create it
+  }
+
+  // Default voice assignments for common BMAD agents
+  const defaultVoices = `agent_id,voice_name
+pm,en_US-ryan-high
+architect,en_US-danny-low
+dev,en_US-joe-medium
+analyst,en_US-amy-medium
+ux-designer,en_US-kristin-medium
+tea,en_US-lessac-medium
+sm,en_US-bryce-medium
+tech-writer,en_US-kathleen-low
+frame-expert,en_US-kusal-medium
+bmad-master,en_US-libritts_r-high
+`;
+
+  try {
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(voiceMapFile, defaultVoices, 'utf8');
+    console.log('✓ Created default BMAD agent voice assignments');
+  } catch (error) {
+    // Non-fatal error - voice assignments are optional
+    console.log('Note: Could not create default voice assignments:', error.message);
+  }
 }
 
 /**
