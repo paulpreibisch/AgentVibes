@@ -1332,8 +1332,10 @@ async function install(options = {}) {
       ];
 
       try {
+        console.error(chalk.gray(`   Debug: Checking ${piperVoicesDir}`));
         if (fs.existsSync(piperVoicesDir)) {
           const files = fs.readdirSync(piperVoicesDir);
+          console.error(chalk.gray(`   Debug: Found ${files.length} files`));
           installedVoices = files
             .filter(f => f.endsWith('.onnx'))
             .map(f => {
@@ -1345,10 +1347,12 @@ async function install(options = {}) {
                 return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
               } catch (statErr) {
                 // Skip files that can't be read (broken symlinks, etc)
+                console.error(chalk.gray(`   Debug: Skipped ${voiceName} (${statErr.message})`));
                 return null;
               }
             })
             .filter(v => v !== null);
+          console.error(chalk.gray(`   Debug: ${installedVoices.length} valid voices after filtering`));
 
           // Check which common voices are missing
           for (const voice of commonVoices) {
@@ -1356,7 +1360,9 @@ async function install(options = {}) {
               missingVoices.push(voice);
             }
           }
+          console.error(chalk.gray(`   Debug: ${missingVoices.length} missing voices`));
         } else {
+          console.error(chalk.gray(`   Debug: Directory does not exist`));
           missingVoices = commonVoices;
         }
       } catch (err) {
