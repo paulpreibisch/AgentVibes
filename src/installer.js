@@ -1339,10 +1339,16 @@ async function install(options = {}) {
             .map(f => {
               const voiceName = f.replace('.onnx', '');
               const voicePath = path.join(piperVoicesDir, f);
-              const stats = fs.statSync(voicePath);
-              const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
-              return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
-            });
+              try {
+                const stats = fs.statSync(voicePath);
+                const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
+                return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
+              } catch (statErr) {
+                // Skip files that can't be read (broken symlinks, etc)
+                return null;
+              }
+            })
+            .filter(v => v !== null);
 
           // Check which common voices are missing
           for (const voice of commonVoices) {
@@ -1354,7 +1360,10 @@ async function install(options = {}) {
           missingVoices = commonVoices;
         }
       } catch (err) {
-        // Ignore errors, just show default message
+        console.error(chalk.gray(`   Debug: Error checking voices: ${err.message}`));
+        // On error, show default message
+        installedVoices = [];
+        missingVoices = commonVoices;
       }
 
       console.log(chalk.white(`   • 18 languages supported`));
