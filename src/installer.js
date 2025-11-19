@@ -1317,6 +1317,7 @@ async function install(options = {}) {
         console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
       }
     } else {
+      console.error(chalk.red(`   DEBUG: In Piper block, selectedProvider = ${selectedProvider}`));
       // Check for installed Piper voices
       const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
       let installedVoices = [];
