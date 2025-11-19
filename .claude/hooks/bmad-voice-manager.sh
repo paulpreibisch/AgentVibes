@@ -136,7 +136,18 @@ auto_enable_if_bmad_detected() {
 get_agent_voice() {
     local agent_id="$1"
 
-    # Auto-enable if BMAD is detected
+    # Check for BMAD v6 CSV file first (preferred, loose coupling)
+    # If this exists, use it directly without requiring plugin enable flag
+    local bmad_voice_map=".bmad/_cfg/agent-voice-map.csv"
+    if [[ -f "$bmad_voice_map" ]]; then
+        # Read from BMAD's standard _cfg directory
+        # CSV format: agent_id,voice_name
+        local voice=$(grep "^$agent_id," "$bmad_voice_map" | cut -d',' -f2)
+        echo "$voice"
+        return
+    fi
+
+    # Auto-enable if BMAD is detected (for legacy markdown config)
     auto_enable_if_bmad_detected
 
     if [[ ! -f "$ENABLED_FLAG" ]]; then
@@ -144,6 +155,7 @@ get_agent_voice() {
         return
     fi
 
+    # Fallback to legacy markdown config file
     if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
         echo ""  # Plugin file missing
         return
