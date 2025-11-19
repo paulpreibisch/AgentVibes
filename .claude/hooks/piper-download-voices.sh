@@ -51,10 +51,10 @@ fi
 
 # Common voice models to download
 COMMON_VOICES=(
-  "en_US-lessac-medium"      # Default, clear male (13MB) - BMAD: Murat (tea)
+  "en_US-ryan-high"          # Default, expressive male (30MB) - BMAD: John (pm)
   "en_US-amy-medium"         # Warm female (13MB) - BMAD: Mary (analyst)
   "en_US-hfc_female-medium"  # Professional female (13MB) - BMAD: Amelia (dev)
-  "en_US-ryan-high"          # Expressive male (30MB) - BMAD: John (pm)
+  "en_US-lessac-medium"      # Clear female (13MB) - BMAD: Murat (tea) - NOTE: Female voice
   "en_US-danny-low"          # Calm male (13MB) - BMAD: Winston (architect)
   "en_US-bryce-medium"       # Professional male (13MB) - BMAD: Bob (sm)
   "en_US-kathleen-low"       # Clear female (13MB) - BMAD: Paige (tech-writer)
