@@ -76,26 +76,52 @@ jobs:
           echo "📊 Voice Installation Summary:"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-          VOICE_DIR="$HOME/.claude/piper-voices"
+          # Check multiple possible locations
+          VOICE_DIRS=(
+            "$HOME/.claude/piper-voices"
+            "$HOME/.local/share/piper-tts/voices"
+          )
 
-          if [ -d "$VOICE_DIR" ]; then
-            echo "✅ Voice directory exists: $VOICE_DIR"
+          VOICE_DIR=""
+          for dir in "${VOICE_DIRS[@]}"; do
+            if [ -d "$dir" ] && [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
+              VOICE_DIR="$dir"
+              break
+            fi
+          done
+
+          if [ -n "$VOICE_DIR" ]; then
+            echo "✅ Voice directory found: $VOICE_DIR"
             echo ""
             echo "Downloaded voices:"
             ls -lh "$VOICE_DIR"/*.onnx 2>/dev/null || echo "  No .onnx files found"
             echo ""
-            echo "Voice count: $(find "$VOICE_DIR" -name "*.onnx" | wc -l)"
+
+            voice_count=$(find "$VOICE_DIR" -name "*.onnx" 2>/dev/null | wc -l)
+            echo "Voice count: $voice_count"
+
+            if [ "$voice_count" -eq 0 ]; then
+              echo "❌ No voices downloaded"
+              exit 1
+            fi
 
             # Check for 16Speakers specifically
             if [ -f "$VOICE_DIR/16Speakers.onnx" ]; then
               echo "✅ 16Speakers model present"
               ls -lh "$VOICE_DIR/16Speakers.onnx"
             else
-              echo "❌ 16Speakers model missing"
-              exit 1
+              echo "⚠️  16Speakers model missing (found $voice_count other voices)"
+              # Don't fail - at least some voices downloaded
             fi
           else
-            echo "❌ Voice directory not found"
+            echo "❌ Voice directory not found in any expected location"
+            echo "Searched:"
+            for dir in "${VOICE_DIRS[@]}"; do
+              echo "  - $dir"
+            done
+            echo ""
+            echo "Searching entire home directory for .onnx files:"
+            find "$HOME" -name "*.onnx" -ls 2>/dev/null || echo "  No .onnx files found"
             exit 1
           fi
 

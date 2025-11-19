@@ -9,8 +9,14 @@
 setup() {
   # Test environment setup
   export AGENTVIBES_TEST_MODE="true"
-  export HOME="${BATS_TEST_TMPDIR}/home"
-  mkdir -p "$HOME"
+
+  # For integration tests, use real HOME to allow Piper installation
+  # For unit tests, use temp HOME for isolation
+  if [ -z "$PIPER_INTEGRATION_TEST" ]; then
+    export HOME="${BATS_TEST_TMPDIR}/home"
+    mkdir -p "$HOME"
+  fi
+  # else: use real $HOME for integration tests
 
   # Create temporary project directory
   export TEST_PROJECT_DIR="${BATS_TEST_TMPDIR}/agentvibes-test"
@@ -35,7 +41,11 @@ teardown() {
   # Cleanup test environment
   cd "$BATS_TEST_DIRNAME"
   rm -rf "$TEST_PROJECT_DIR"
-  rm -rf "$HOME"
+
+  # Only remove temp HOME for unit tests, not integration tests
+  if [ -z "$PIPER_INTEGRATION_TEST" ]; then
+    rm -rf "$HOME"
+  fi
 }
 
 @test "Piper installer script exists and is executable" {
