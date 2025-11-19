@@ -44,6 +44,7 @@
 import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
@@ -1334,8 +1335,8 @@ async function install(options = {}) {
 
       try {
         console.error(chalk.gray(`   Debug: Checking ${piperVoicesDir}`));
-        if (fs.existsSync(piperVoicesDir)) {
-          const files = fs.readdirSync(piperVoicesDir);
+        if (fsSync.existsSync(piperVoicesDir)) {
+          const files = fsSync.readdirSync(piperVoicesDir);
           console.error(chalk.gray(`   Debug: Found ${files.length} files`));
           installedVoices = files
             .filter(f => f.endsWith('.onnx'))
@@ -1343,7 +1344,7 @@ async function install(options = {}) {
               const voiceName = f.replace('.onnx', '');
               const voicePath = path.join(piperVoicesDir, f);
               try {
-                const stats = fs.statSync(voicePath);
+                const stats = fsSync.statSync(voicePath);
                 const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
                 return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
               } catch (statErr) {
