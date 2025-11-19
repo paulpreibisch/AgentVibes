@@ -1317,7 +1317,46 @@ async function install(options = {}) {
         console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
       }
     } else {
-      console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
+      // Check for installed Piper voices
+      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
+      let installedCount = 0;
+      let missingVoices = [];
+
+      const commonVoices = [
+        'en_US-lessac-medium',
+        'en_US-amy-medium',
+        'en_US-joe-medium',
+        'en_US-ryan-high',
+        'en_US-libritts-high',
+        '16Speakers'
+      ];
+
+      try {
+        if (fs.existsSync(piperVoicesDir)) {
+          const files = fs.readdirSync(piperVoicesDir);
+          installedCount = files.filter(f => f.endsWith('.onnx')).length;
+
+          // Check which common voices are missing
+          for (const voice of commonVoices) {
+            if (!fs.existsSync(path.join(piperVoicesDir, `${voice}.onnx`))) {
+              missingVoices.push(voice);
+            }
+          }
+        } else {
+          missingVoices = commonVoices;
+        }
+      } catch (err) {
+        // Ignore errors, just show default message
+      }
+
+      if (installedCount > 0) {
+        console.log(chalk.green(`   • ${installedCount} Piper voices installed ✓`));
+        if (missingVoices.length > 0) {
+          console.log(chalk.yellow(`   • ${missingVoices.length} common voices missing (will download)`));
+        }
+      } else {
+        console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
+      }
       console.log(chalk.white(`   • 18 languages supported`));
       console.log(chalk.green(`   • No API key needed ✓`));
     }

@@ -142,19 +142,55 @@ for voice in "${NEED_DOWNLOAD[@]}"; do
 
   if download_voice "$voice"; then
     ((DOWNLOADED++))
-    echo "✅ Downloaded: $voice"
+    local voice_path="$VOICE_DIR/${voice}.onnx"
+    local file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
+    echo "   ✓ Downloaded: $voice"
+    echo "   📁 Path: $voice_path"
+    echo "   📦 Size: $file_size"
   else
     ((FAILED++))
-    echo "❌ Failed: $voice"
+    echo "   ✗ Failed: $voice"
   fi
 done
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 Download Summary:"
-echo "   ✅ Successfully downloaded: $DOWNLOADED"
-echo "   ❌ Failed: $FAILED"
-echo "   📦 Total voices available: $((ALREADY_DOWNLOADED + DOWNLOADED))"
+echo ""
+echo "Installed voices:"
+for voice in "${ALREADY_DOWNLOADED_LIST[@]}"; do
+  local voice_path="$VOICE_DIR/${voice}.onnx"
+  local file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
+  echo "   ✓ $voice ($file_size)"
+  echo "     $voice_path"
+done
+
+if [[ $DOWNLOADED -gt 0 ]]; then
+  echo ""
+  echo "Just downloaded:"
+  for voice in "${NEED_DOWNLOAD[@]}"; do
+    local voice_path="$VOICE_DIR/${voice}.onnx"
+    if [[ -f "$voice_path" ]]; then
+      local file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
+      echo "   ✓ $voice ($file_size)"
+      echo "     $voice_path"
+    fi
+  done
+fi
+
+if [[ $FAILED -gt 0 ]]; then
+  echo ""
+  echo "Failed downloads:"
+  for voice in "${NEED_DOWNLOAD[@]}"; do
+    local voice_path="$VOICE_DIR/${voice}.onnx"
+    if [[ ! -f "$voice_path" ]]; then
+      echo "   ✗ $voice"
+    fi
+  done
+fi
+
+echo ""
+echo "Total: $((ALREADY_DOWNLOADED + DOWNLOADED)) voices available"
 echo ""
 
 if [[ $DOWNLOADED -gt 0 ]]; then
