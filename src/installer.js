@@ -1361,23 +1361,22 @@ async function install(options = {}) {
       console.log(chalk.green(`   • No API key needed ✓`));
 
       if (installedVoices.length > 0) {
-        console.log(chalk.green(`   • ${installedVoices.length} Piper voices already installed:`));
+        console.log(chalk.green(`   • ${installedVoices.length} Piper voices installed:`));
         installedVoices.forEach(voice => {
-          console.log(chalk.gray(`     ✓ ${voice.name} (${voice.size})`));
+          console.log(chalk.green(`     ✓ ${voice.name} (${voice.size})`));
           console.log(chalk.gray(`       ${voice.path}`));
         });
-        if (missingVoices.length > 0) {
-          console.log(chalk.yellow(`   • ${missingVoices.length} common voices missing (will download):`));
-          missingVoices.forEach(voice => {
-            console.log(chalk.gray(`     ✗ ${voice}`));
-          });
-        }
-      } else {
-        console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
-        console.log(chalk.yellow(`   • ${commonVoices.length} common voices will be downloaded:`));
-        commonVoices.forEach(voice => {
+      }
+
+      if (missingVoices.length > 0) {
+        console.log(chalk.yellow(`   • ${missingVoices.length} voices to download:`));
+        missingVoices.forEach(voice => {
           console.log(chalk.gray(`     → ${voice}`));
         });
+      }
+
+      if (installedVoices.length === 0 && missingVoices.length === 0) {
+        console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
       }
     }
     console.log('');
