@@ -1319,7 +1319,7 @@ async function install(options = {}) {
     } else {
       // Check for installed Piper voices
       const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
-      let installedCount = 0;
+      let installedVoices = [];
       let missingVoices = [];
 
       const commonVoices = [
@@ -1334,11 +1334,19 @@ async function install(options = {}) {
       try {
         if (fs.existsSync(piperVoicesDir)) {
           const files = fs.readdirSync(piperVoicesDir);
-          installedCount = files.filter(f => f.endsWith('.onnx')).length;
+          installedVoices = files
+            .filter(f => f.endsWith('.onnx'))
+            .map(f => {
+              const voiceName = f.replace('.onnx', '');
+              const voicePath = path.join(piperVoicesDir, f);
+              const stats = fs.statSync(voicePath);
+              const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
+              return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
+            });
 
           // Check which common voices are missing
           for (const voice of commonVoices) {
-            if (!fs.existsSync(path.join(piperVoicesDir, `${voice}.onnx`))) {
+            if (!installedVoices.some(v => v.name === voice)) {
               missingVoices.push(voice);
             }
           }
@@ -1349,16 +1357,28 @@ async function install(options = {}) {
         // Ignore errors, just show default message
       }
 
-      if (installedCount > 0) {
-        console.log(chalk.green(`   • ${installedCount} Piper voices installed ✓`));
+      console.log(chalk.white(`   • 18 languages supported`));
+      console.log(chalk.green(`   • No API key needed ✓`));
+
+      if (installedVoices.length > 0) {
+        console.log(chalk.green(`   • ${installedVoices.length} Piper voices already installed:`));
+        installedVoices.forEach(voice => {
+          console.log(chalk.gray(`     ✓ ${voice.name} (${voice.size})`));
+          console.log(chalk.gray(`       ${voice.path}`));
+        });
         if (missingVoices.length > 0) {
-          console.log(chalk.yellow(`   • ${missingVoices.length} common voices missing (will download)`));
+          console.log(chalk.yellow(`   • ${missingVoices.length} common voices missing (will download):`));
+          missingVoices.forEach(voice => {
+            console.log(chalk.gray(`     ✗ ${voice}`));
+          });
         }
       } else {
         console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
+        console.log(chalk.yellow(`   • ${commonVoices.length} common voices will be downloaded:`));
+        commonVoices.forEach(voice => {
+          console.log(chalk.gray(`     → ${voice}`));
+        });
       }
-      console.log(chalk.white(`   • 18 languages supported`));
-      console.log(chalk.green(`   • No API key needed ✓`));
     }
     console.log('');
 
