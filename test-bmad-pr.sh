@@ -50,7 +50,7 @@ echo ""
 
 read -p "Ready to continue? [Y/n]: " -n 1 -r
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
+if [[ ! $REPLY =~ ^[Yy1]$ ]] && [[ -n $REPLY ]]; then
     echo "❌ Setup cancelled"
     exit 0
 fi
@@ -187,7 +187,7 @@ echo ""
 read -p "Proceed with setup? [Y/n]: " -n 1 -r
 echo
 echo ""
-if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
+if [[ ! $REPLY =~ ^[Yy1]$ ]] && [[ -n $REPLY ]]; then
     echo "❌ Setup cancelled"
     exit 0
 fi
@@ -197,7 +197,7 @@ if [[ -d "$TEST_DIR" ]]; then
     echo "⚠️  Test directory already exists: $TEST_DIR"
     read -p "Delete and recreate? [Y/n]: " -n 1 -r
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+    if [[ $REPLY =~ ^[Yy1]$ ]] || [[ -z $REPLY ]]; then
         rm -rf "$TEST_DIR"
         echo -e "${GREEN}✓ Deleted old test directory${NC}"
     else
