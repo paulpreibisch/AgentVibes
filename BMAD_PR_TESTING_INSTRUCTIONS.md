@@ -13,7 +13,7 @@ We've made testing super simple with a single command:
 ### One-Line Install
 
 ```bash
-npx agentvibes@latest test-bmad-pr
+npx -p agentvibes@latest test-bmad-pr
 ```
 
 That's it! This command will automatically:
@@ -26,12 +26,12 @@ That's it! This command will automatically:
 ### Testing a Different PR
 
 ```bash
-npx agentvibes@latest test-bmad-pr <PR_NUMBER>
+npx -p agentvibes@latest test-bmad-pr <PR_NUMBER>
 ```
 
 For example:
 ```bash
-npx agentvibes@latest test-bmad-pr 935
+npx -p agentvibes@latest test-bmad-pr 935
 ```
 
 ### Alternative: Manual Download
