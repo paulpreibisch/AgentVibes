@@ -47,7 +47,7 @@ Set a prefix word/phrase for all TTS messages
 - `/agent-vibes:set-pretext "Project Alpha"` - Custom phrase
 - `/agent-vibes:set-pretext ""` - Clear pretext
 
-Saved locally in `.claude/config/agentvibes.json`
+Saved locally in `.agentvibes/config/agentvibes.json`
 
 ## Getting Voice IDs
 

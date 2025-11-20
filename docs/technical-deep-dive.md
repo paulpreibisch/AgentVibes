@@ -727,7 +727,7 @@ AgentVibes can integrate with the BMAD METHOD (a multi-agent framework). When a 
 1. BMAD agent activates (e.g., `/BMad:agents:pm` for project manager)
 2. BMAD writes agent ID to `.bmad-agent-context` file
 3. AgentVibes output style checks this file
-4. If BMAD plugin is enabled, looks up voice in `.claude/plugins/bmad-voices.md`
+4. If BMAD plugin is enabled, looks up voice in `.agentvibes/bmad/bmad-voices.md`
 5. Automatically switches to that voice
 
 This creates the illusion of multiple distinct AI personalities in conversations.

@@ -1,3 +1,25 @@
+# Release v2.9.5 - Legacy Output Styles Cleanup
+
+**Release Date:** TBD
+**Type:** Patch Release (Cleanup)
+
+## 🎯 AI Summary
+
+AgentVibes v2.9.5 removes legacy output styles installation that became obsolete when we switched to the SessionStart hook system for TTS activation. This cleanup reduces installation time, saves disk space, and simplifies the codebase without affecting functionality.
+
+## 🧹 Cleanup
+
+### Removed Legacy Output Styles Installation
+- Removed `copyOutputStyles()` function from installer (src/installer.js:589-608)
+- Deleted `templates/output-styles/` directory from repository
+- Removed unused `check-output-style.sh` hook
+- Updated documentation to reflect SessionStart hook system
+
+### Migration Note for Existing Users
+If you previously installed AgentVibes, you can safely delete the `.claude/output-styles/` directory from your projects. The SessionStart hook system (`.claude/hooks/session-start.sh`) now handles TTS activation automatically and is more reliable than the old output styles approach.
+
+---
+
 # Release v2.7.2 - Party Mode Voice Fixes
 
 **Release Date:** 2025-11-18

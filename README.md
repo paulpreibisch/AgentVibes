@@ -291,7 +291,7 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 
 ## 📦 Installation Structure
 
-**What gets installed:** Commands, hooks, personalities, plugins, and output styles in `.claude/` directory.
+**What gets installed:** Commands, hooks, personalities, and plugins in `.claude/` directory.
 
 **[→ View Complete Installation Structure](docs/installation-structure.md)** - Full directory tree, file descriptions, and settings storage
 
@@ -326,7 +326,7 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 
 ## 🔧 Advanced Features
 
-AgentVibes supports **custom personalities**, **custom voices**, and **integration with custom output styles**.
+AgentVibes supports **custom personalities** and **custom voices**.
 
 **Quick Examples:**
 ```bash
@@ -340,7 +340,7 @@ AgentVibes supports **custom personalities**, **custom voices**, and **integrati
 [Bash: .claude/hooks/play-tts.sh "Starting" "Aria"]
 ```
 
-**[→ View Advanced Features Guide](docs/advanced-features.md)** - Custom personalities, custom voices, output style integration
+**[→ View Advanced Features Guide](docs/advanced-features.md)** - Custom personalities, custom voices, and more
 
 [↑ Back to top](#-table-of-contents)
 

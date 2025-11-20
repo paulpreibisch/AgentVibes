@@ -961,6 +961,66 @@ bmad-master,en_US-libritts_r-high
 }
 
 /**
+ * Detect and migrate old configuration from .claude/config/ and .claude/plugins/
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<boolean>} True if migration was performed
+ */
+async function detectAndMigrateOldConfig(targetDir, spinner) {
+  const oldConfigPaths = [
+    path.join(targetDir, '.claude', 'config', 'agentvibes.json'),
+    path.join(targetDir, '.claude', 'config', 'bmad-voices.md'),
+    path.join(targetDir, '.claude', 'config', 'bmad-voices-enabled.flag'),
+    path.join(targetDir, '.claude', 'plugins', 'bmad-voices-enabled.flag'),
+    path.join(targetDir, '.claude', 'plugins', 'bmad-party-mode-disabled.flag'),
+  ];
+
+  // Check if any old config exists
+  let hasOldConfig = false;
+  for (const oldPath of oldConfigPaths) {
+    try {
+      await fs.access(oldPath);
+      hasOldConfig = true;
+      break;
+    } catch {
+      // File doesn't exist, continue
+    }
+  }
+
+  if (!hasOldConfig) {
+    return false; // No migration needed
+  }
+
+  spinner.info(chalk.yellow('🔄 Old configuration detected - migrating to .agentvibes/'));
+
+  // Run migration script
+  const migrationScript = path.join(targetDir, '.claude', 'hooks', 'migrate-to-agentvibes.sh');
+
+  try {
+    await fs.access(migrationScript);
+
+    // Execute migration script
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execPromise = promisify(exec);
+
+    await execPromise(`bash "${migrationScript}"`, { cwd: targetDir });
+
+    spinner.succeed(chalk.green('✓ Configuration migrated to .agentvibes/'));
+    console.log(chalk.gray('   Old locations: .claude/config/, .claude/plugins/'));
+    console.log(chalk.gray('   New location: .agentvibes/'));
+    console.log('');
+
+    return true;
+  } catch (error) {
+    spinner.warn(chalk.yellow('⚠️  Could not run migration script automatically'));
+    console.log(chalk.gray(`   You can run it manually: .claude/hooks/migrate-to-agentvibes.sh`));
+    console.log('');
+    return false;
+  }
+}
+
+/**
  * Handle BMAD integration (detection and TTS injection)
  * @param {string} targetDir - Target installation directory
  * @returns {Promise<Object>} BMAD detection result
@@ -981,11 +1041,11 @@ async function handleBmadIntegration(targetDir) {
   console.log(chalk.green(`\n🎉 BMAD-METHOD ${versionLabel} detected!`));
   console.log(chalk.gray(`   Location: ${bmadDetection.bmadPath}`));
 
-  const pluginsDir = path.join(claudeDir, 'plugins');
-  const enabledFlagPath = path.join(pluginsDir, 'bmad-voices-enabled.flag');
+  const bmadConfigDir = path.join(targetDir, '.agentvibes', 'bmad');
+  const enabledFlagPath = path.join(bmadConfigDir, 'bmad-voices-enabled.flag');
   const activationInstructionsPath = path.join(claudeDir, 'activation-instructions');
 
-  await fs.mkdir(pluginsDir, { recursive: true });
+  await fs.mkdir(bmadConfigDir, { recursive: true });
   await fs.writeFile(enabledFlagPath, '');
   console.log(chalk.green('🎤 Auto-enabled BMAD voice plugin'));
 
@@ -1161,6 +1221,10 @@ async function updateAgentVibes(targetDir, options) {
     spinner.text = 'Updating AgentVibes hook configuration...';
     await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
 
+    // Detect and migrate old configuration
+    spinner.text = 'Checking for old configuration...';
+    await detectAndMigrateOldConfig(targetDir, spinner);
+
     spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
 
     console.log(chalk.cyan('📦 Update Summary:'));
@@ -1332,6 +1396,9 @@ async function install(options = {}) {
     }
 
     spinner.succeed(chalk.green(`Provider set to: ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}\n`));
+
+    // Detect and migrate old configuration
+    await detectAndMigrateOldConfig(targetDir, spinner);
 
     // Auto-install Piper if selected
     if (selectedProvider === 'piper') {

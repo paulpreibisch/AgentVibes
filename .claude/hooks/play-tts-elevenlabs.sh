@@ -43,7 +43,7 @@ VOICE_OVERRIDE="$2"  # Optional: voice name or direct voice ID
 API_KEY="${ELEVENLABS_API_KEY}"
 
 # Check for project-local pretext configuration
-CONFIG_DIR="${CLAUDE_PROJECT_DIR:-.}/.claude/config"
+CONFIG_DIR="${CLAUDE_PROJECT_DIR:-.}/.agentvibes/config"
 CONFIG_FILE="$CONFIG_DIR/agentvibes.json"
 
 if [[ -f "$CONFIG_FILE" ]] && command -v jq &> /dev/null; then

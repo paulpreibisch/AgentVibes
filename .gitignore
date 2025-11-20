@@ -16,8 +16,7 @@ yarn-error.log*
 .claude/tts-*.txt
 .claude/config/
 .claude/settings.local.json
-.claude/plugins/.bmad-previous-settings
-.claude/plugins/*.flag
+.agentvibes/
 .claude/piper-voices/
 .claude/piper-voices-dir.txt
 .claude/github-star-reminder.txt

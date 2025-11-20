@@ -166,7 +166,7 @@ Each provider implements:
 - `.claude/tts-provider.txt` - Active provider name (project-local)
 - `~/.claude/tts-provider.txt` - Global fallback
 - `.claude/personalities/*.md` - Per-personality voice mappings
-- `.claude/plugins/bmad-voices.md` - BMAD agent voice table
+- `.agentvibes/bmad/bmad-voices.md` - BMAD agent voice table
 
 **State Flow:**
 ```
@@ -344,7 +344,7 @@ provider: piper  # Optional override
 
 ### BMAD Agent Voices
 
-**Location**: `.claude/plugins/bmad-voices.md`
+**Location**: `.agentvibes/bmad/bmad-voices.md`
 
 **Format**: Markdown table
 ```markdown
@@ -488,7 +488,7 @@ Create `.docs/providers/yourprovider-setup.md` with:
 |------|---------|
 | `.claude/tts-provider.txt` | Active provider name |
 | `.claude/personalities/*.md` | Voice mappings per personality |
-| `.claude/plugins/bmad-voices.md` | BMAD agent voice table |
+| `.agentvibes/bmad/bmad-voices.md` | BMAD agent voice table |
 
 ### Slash Commands
 

@@ -123,10 +123,10 @@ if (bmadDetected) {
   console.log(chalk.gray(`   Location: ${bmadDetection.bmadPath}`));
 
   // Auto-enable BMAD plugin
-  const pluginsDir = path.join(claudeDir, 'plugins');
-  const enabledFlagPath = path.join(pluginsDir, 'bmad-voices-enabled.flag');
+  const bmadConfigDir = path.join(targetDir, '.agentvibes', 'bmad');
+  const enabledFlagPath = path.join(bmadConfigDir, 'bmad-voices-enabled.flag');
 
-  await fs.mkdir(pluginsDir, { recursive: true });
+  await fs.mkdir(bmadConfigDir, { recursive: true });
   await fs.writeFile(enabledFlagPath, '');
 
   // Create activation instructions (version-aware)
@@ -347,7 +347,7 @@ Add to BMAD Plugin section (line 233-241):
    - Install BMAD v6-alpha
    - Run `npx agentvibes install`
    - Verify: "BMAD-METHOD v6 (6.0.0-alpha.X) detected!"
-   - Check: `.claude/plugins/bmad-voices-enabled.flag` created
+   - Check: `.agentvibes/bmad/bmad-voices-enabled.flag` created
 
 2. ✅ **v4 Detection (Backward Compatibility)**
    - Install BMAD v4

@@ -38,7 +38,7 @@ If you prefer party mode without voice switching:
 /agent-vibes:bmad-party disable
 ```
 
-This creates `.claude/plugins/bmad-party-mode-disabled.flag` to opt-out.
+This creates `.agentvibes/bmad/bmad-party-mode-disabled.flag` to opt-out.
 
 ## How It Works
 
@@ -51,7 +51,7 @@ The integration detects agent responses in the format:
 When detected, it:
 1. Extracts the agent's display name (e.g., "Winston", "John")
 2. Maps it to their agent ID using `.bmad/_cfg/agent-manifest.csv`
-3. Looks up their voice from `.claude/config/bmad-voices.md`
+3. Looks up their voice from `.agentvibes/bmad/bmad-voices.md`
 4. Speaks their dialogue with that specific voice
 
 ## Example
@@ -79,7 +79,7 @@ See current agent-to-voice mappings:
 
 Edit voice assignments in:
 ```
-.claude/config/bmad-voices.md
+.agentvibes/bmad/bmad-voices.md
 ```
 
 ## Requirements
@@ -93,8 +93,8 @@ Edit voice assignments in:
 **Party mode voices not working?**
 
 1. Check BMAD is installed: `ls .bmad/_cfg/agent-manifest.csv`
-2. Check voice plugin enabled: `ls .claude/config/bmad-voices-enabled.flag`
-3. Check party mode not disabled: `ls .claude/plugins/bmad-party-mode-disabled.flag`
+2. Check voice plugin enabled: `ls .agentvibes/bmad/bmad-voices-enabled.flag`
+3. Check party mode not disabled: `ls .agentvibes/bmad/bmad-party-mode-disabled.flag`
 4. View status: `/agent-vibes:bmad-party status`
 
 **Wrong voices playing?**

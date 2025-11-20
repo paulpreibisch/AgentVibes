@@ -29,7 +29,7 @@ DIALOGUE="${DIALOGUE//\\!/!}"
 DIALOGUE="${DIALOGUE//\\\$/\$}"
 
 # Check if party mode is enabled
-if [[ -f "$PROJECT_ROOT/.claude/plugins/bmad-party-mode-disabled.flag" ]]; then
+if [[ -f "$PROJECT_ROOT/.agentvibes/bmad/bmad-party-mode-disabled.flag" ]]; then
   exit 0
 fi
 

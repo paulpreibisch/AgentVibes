@@ -117,7 +117,7 @@ ls -la | grep bmad
 # - .bmad-core/     (v4)
 
 # Verify plugin is enabled
-ls -la .claude/plugins/bmad-voices-enabled.flag
+ls -la .agentvibes/bmad/bmad-voices-enabled.flag
 
 # Check activation instructions
 cat .claude/activation-instructions

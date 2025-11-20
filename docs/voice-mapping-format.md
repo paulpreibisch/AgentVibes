@@ -82,7 +82,7 @@ languages:
 
 ## BMAD Plugin Format
 
-**Agent Voice Table** (`.claude/plugins/bmad-voices.md`):
+**Agent Voice Table** (`.agentvibes/bmad/bmad-voices.md`):
 
 ```markdown
 | Agent ID | Agent Name | ElevenLabs Voice | Piper Voice | Personality |

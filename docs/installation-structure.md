@@ -23,8 +23,6 @@ your-project/
     ├── personalities/                # 19 personality templates
     ├── plugins/
     │   └── bmad-voices.md            # BMAD voice mappings
-    ├── output-styles/
-    │   └── agent-vibes.md            # Voice output style
     └── audio/                        # Generated TTS files
 ```
 

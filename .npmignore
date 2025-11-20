@@ -4,6 +4,7 @@
 .claude/config/
 .claude/settings.local.json
 .claude/tts-*.txt
+.agentvibes/
 .claude/personalities/backups/
 .claude/piper-voices/
 *.code-workspace

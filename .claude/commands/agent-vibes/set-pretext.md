@@ -35,10 +35,10 @@ When a pretext is set:
 - **Without pretext**: "I'll do the task"
 - **With pretext**: "AgentVibes: I'll do the task"
 
-The pretext is saved locally in `.claude/config/agentvibes.json` and persists across sessions.
+The pretext is saved locally in `.agentvibes/config/agentvibes.json` and persists across sessions.
 
 !bash
-CONFIG_DIR="${CLAUDE_PROJECT_DIR:-.}/.claude/config"
+CONFIG_DIR="${CLAUDE_PROJECT_DIR:-.}/.agentvibes/config"
 CONFIG_FILE="$CONFIG_DIR/agentvibes.json"
 
 # Get the pretext from arguments
