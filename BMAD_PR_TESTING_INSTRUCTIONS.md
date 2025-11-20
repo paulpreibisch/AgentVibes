@@ -3,69 +3,143 @@
 ## Prerequisites
 - Node.js and npm installed
 - Git installed
-- Fresh terminal session
+- ~500MB free disk space
+- 10-15 minutes for complete setup
 
-## Quick Test (5-10 minutes)
+## 🚀 Automated Testing (Easiest!)
 
-### Step 1: Fork and Clone BMAD
+We've made testing super simple with a single command:
+
+### One-Line Install
+
 ```bash
-# Fork the BMAD repo on GitHub first, then:
-git clone https://github.com/YOUR-USERNAME/BMAD-METHOD.git
-cd BMAD-METHOD
+npx agentvibes@latest test-bmad-pr
 ```
 
-### Step 2: Merge the PR Branch
-```bash
-# Add the upstream remote
-git remote add upstream https://github.com/bmad-code-org/BMAD-METHOD.git
+That's it! This command will automatically:
+- Download the test script
+- Clone BMAD with the PR
+- Install everything you need
+- Set up unique voices for each agent
+- Verify the installation
 
-# Fetch and merge the PR
+### Testing a Different PR
+
+```bash
+npx agentvibes@latest test-bmad-pr <PR_NUMBER>
+```
+
+For example:
+```bash
+npx agentvibes@latest test-bmad-pr 935
+```
+
+### Alternative: Manual Download
+
+If you prefer to download the script first:
+
+```bash
+# Download and run the test script
+curl -sSL https://raw.githubusercontent.com/paulpreibisch/BMAD-METHOD/feature/agentvibes-tts-integration/test-bmad-pr.sh -o test-bmad-pr.sh
+chmod +x test-bmad-pr.sh
+./test-bmad-pr.sh
+```
+
+### What the Script Does
+
+The script provides an **interactive menu** that lets you choose:
+
+1. **Test official BMAD PR #934** (recommended for most users)
+   - Automatically fetches the PR from the main BMAD repository
+   - Perfect for testing before the PR is merged
+
+2. **Test your forked repository**
+   - Use your own fork and custom branch
+   - Great for testing your own modifications
+
+The script will:
+- ✓ Clone the repository (official or your fork)
+- ✓ Checkout the correct branch
+- ✓ Install BMAD CLI tools
+- ✓ Create a test project
+- ✓ Install AgentVibes TTS
+- ✓ Configure unique voices for each agent
+- ✓ Verify the installation
+
+### After Running the Script
+
+Once setup is complete, the script will tell you exactly how to test party mode:
+
+```bash
+# Navigate to the test project
+cd ~/bmad-pr-test-*/bmad-project
+
+# Start Claude Code
+claude-code
+
+# Test party mode!
+/bmad:core:workflows:party-mode
+```
+
+---
+
+## 🛠️ Manual Testing (Advanced Users)
+
+If you prefer to do it manually or want to understand each step:
+
+### Step 1: Clone and Setup BMAD
+
+```bash
+# Clone the official BMAD repo
+git clone https://github.com/bmad-code-org/BMAD-METHOD.git
+cd BMAD-METHOD
+
+# Fetch and checkout the PR branch
+git remote add upstream https://github.com/bmad-code-org/BMAD-METHOD.git
 git fetch upstream pull/934/head:agentvibes-party-mode
 git checkout agentvibes-party-mode
+
+# Install BMAD CLI
+cd tools/cli
+npm install
+npm link
 ```
 
-### Step 3: Install BMAD from Your Fork
+### Step 2: Create Test Project
+
 ```bash
-# Navigate to the CLI installer directory
-cd tools/cli
-
-# Install dependencies
-npm install
-
-# Link it globally so you can run 'bmad' command
-npm link
-
-# Navigate to where you want to create your BMAD project
+# Create a test directory
 cd ~
 mkdir my-bmad-test
 cd my-bmad-test
 
-# Run the BMAD installer (now using your forked version with the PR)
+# Run BMAD installer
 bmad install
 
-# When prompted about AgentVibes TTS:
-# - Answer "Yes" to enable TTS for agents
-# - Answer "Yes" to assign unique voices for party mode
+# When prompted:
+# - Enable TTS for agents? → Yes
+# - Assign unique voices for party mode? → Yes
 ```
 
-### Step 4: Install AgentVibes (if not already installed)
+### Step 3: Install AgentVibes
+
 ```bash
-# If you don't have AgentVibes yet:
+# Install AgentVibes
 npx agentvibes@latest install
 
 # Follow the installer:
-# - Choose a TTS provider (ElevenLabs or Piper)
-# - For Piper (free): it will auto-download voices including 16Speakers
-# - For ElevenLabs: you'll need an API key
+# - Choose a TTS provider (Piper recommended for testing)
+# - Download voices when prompted
 ```
 
-### Step 5: Test Party Mode! 🎉
-```bash
-# Start a Claude Code session in your BMAD project directory (my-bmad-test)
-# Then run party mode:
-/bmad:core:workflows:party-mode
+### Step 4: Test Party Mode
 
-# You should hear each BMAD agent speak with their own unique voice!
+```bash
+# Start Claude Code session
+claude-code
+
+# Run party mode
+/bmad:core:workflows:party-mode
 ```
 
 ## What to Test

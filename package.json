@@ -28,7 +28,8 @@
   "bin": {
     "agentvibes": "./bin/agent-vibes",
     "agent-vibes": "./bin/agent-vibes",
-    "agentvibes-mcp-server": "./bin/mcp-server.js"
+    "agentvibes-mcp-server": "./bin/mcp-server.js",
+    "test-bmad-pr": "./bin/test-bmad-pr"
   },
   "scripts": {
     "install-local": "node src/installer.js install",
