@@ -581,33 +581,6 @@ async function copyPersonalityFiles(targetDir, spinner) {
 }
 
 /**
- * Copy output style files to target directory
- * @param {string} targetDir - Target installation directory
- * @param {Object} spinner - Ora spinner instance
- * @returns {Promise<number>} Number of files copied
- */
-async function copyOutputStyles(targetDir, spinner) {
-  spinner.start('Installing output styles...');
-  const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
-  const outputStylesDir = path.join(targetDir, '.claude', 'output-styles');
-
-  await fs.mkdir(outputStylesDir, { recursive: true });
-
-  const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
-  console.log(chalk.cyan(`📝 Installing ${outputStyleFiles.length} output styles:`));
-
-  for (const file of outputStyleFiles) {
-    const srcPath = path.join(srcOutputStylesDir, file);
-    const destPath = path.join(outputStylesDir, file);
-    await fs.copyFile(srcPath, destPath);
-    console.log(chalk.gray(`   ✓ ${file}`));
-  }
-
-  spinner.succeed(chalk.green('Installed output styles!\n'));
-  return outputStyleFiles.length;
-}
-
-/**
  * Copy plugin files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -640,6 +613,57 @@ async function copyPluginFiles(targetDir, spinner) {
   }
 
   return pluginFiles.length;
+}
+
+/**
+ * Copy BMAD template files (.bmad directory and hooks)
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyBmadTemplates(targetDir, spinner) {
+  spinner.start('Installing BMAD template files...');
+  const srcBmadDir = path.join(__dirname, '..', '.bmad');
+  const destBmadDir = path.join(targetDir, '.bmad');
+
+  let fileCount = 0;
+
+  try {
+    // Check if source .bmad directory exists
+    await fs.access(srcBmadDir);
+
+    // Copy the entire .bmad directory structure
+    await fs.mkdir(destBmadDir, { recursive: true });
+
+    // Recursively copy all files from .bmad
+    async function copyDir(src, dest) {
+      const entries = await fs.readdir(src, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+
+        if (entry.isDirectory()) {
+          await fs.mkdir(destPath, { recursive: true });
+          await copyDir(srcPath, destPath);
+        } else {
+          await fs.copyFile(srcPath, destPath);
+          fileCount++;
+          // Only show key files to avoid cluttering output
+          if (entry.name.endsWith('.csv') || entry.name.endsWith('.yaml') || entry.name === 'manifest.yaml') {
+            console.log(chalk.gray(`   ✓ ${entry.name}`));
+          }
+        }
+      }
+    }
+
+    await copyDir(srcBmadDir, destBmadDir);
+    spinner.succeed(chalk.green(`Installed ${fileCount} BMAD template files!\n`));
+  } catch (error) {
+    spinner.info(chalk.yellow('No BMAD templates found (optional)\n'));
+  }
+
+  return fileCount;
 }
 
 /**
@@ -1118,6 +1142,12 @@ async function updateAgentVibes(targetDir, options) {
       console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
     }
 
+    // Update BMAD template files
+    const bmadTemplateCount = await copyBmadTemplates(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (bmadTemplateCount > 0) {
+      console.log(chalk.green(`✓ Updated ${bmadTemplateCount} BMAD template files`));
+    }
+
     // Update settings.json
     spinner.text = 'Updating AgentVibes hook configuration...';
     await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
@@ -1274,8 +1304,8 @@ async function install(options = {}) {
     const commandFileCount = await copyCommandFiles(targetDir, spinner);
     const hookFileCount = await copyHookFiles(targetDir, spinner);
     const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
-    const outputStyleCount = await copyOutputStyles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
+    const bmadTemplateCount = await copyBmadTemplates(targetDir, spinner);
 
     // Configure hooks and manifests
     await configureSessionStartHook(targetDir, spinner);
@@ -1303,9 +1333,11 @@ async function install(options = {}) {
     console.log(chalk.white(`   • ${commandFileCount} slash commands installed`));
     console.log(chalk.white(`   • ${hookFileCount} TTS scripts installed`));
     console.log(chalk.white(`   • ${personalityFileCount} personality templates installed`));
-    console.log(chalk.white(`   • ${outputStyleCount} output styles installed`));
     if (pluginFileCount > 0) {
       console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files installed`));
+    }
+    if (bmadTemplateCount > 0) {
+      console.log(chalk.white(`   • ${bmadTemplateCount} BMAD template files installed`));
     }
     console.log(chalk.white(`   • Voice manager ready`));
 
