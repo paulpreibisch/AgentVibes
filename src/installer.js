@@ -643,6 +643,39 @@ async function copyPluginFiles(targetDir, spinner) {
 }
 
 /**
+ * Copy BMAD config files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyBmadConfigFiles(targetDir, spinner) {
+  spinner.start('Installing BMAD config files...');
+  const srcConfigDir = path.join(__dirname, '..', '.claude', 'config');
+  const destConfigDir = path.join(targetDir, '.claude', 'config');
+
+  await fs.mkdir(destConfigDir, { recursive: true });
+
+  let fileCount = 0;
+
+  // Copy bmad-voices.md if it exists
+  const bmadVoicesFile = 'bmad-voices.md';
+  const srcPath = path.join(srcConfigDir, bmadVoicesFile);
+
+  try {
+    await fs.access(srcPath);
+    const destPath = path.join(destConfigDir, bmadVoicesFile);
+    await fs.copyFile(srcPath, destPath);
+    console.log(chalk.gray(`   ✓ ${bmadVoicesFile}`));
+    fileCount++;
+    spinner.succeed(chalk.green('Installed BMAD config files!\n'));
+  } catch (error) {
+    spinner.info(chalk.yellow('No BMAD config files found (optional)\n'));
+  }
+
+  return fileCount;
+}
+
+/**
  * Configure SessionStart hook in settings.json
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -1118,6 +1151,12 @@ async function updateAgentVibes(targetDir, options) {
       console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
     }
 
+    // Update BMAD config files
+    const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (bmadConfigFileCount > 0) {
+      console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
+    }
+
     // Update settings.json
     spinner.text = 'Updating AgentVibes hook configuration...';
     await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
@@ -1276,6 +1315,7 @@ async function install(options = {}) {
     const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
     const outputStyleCount = await copyOutputStyles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
+    const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
 
     // Configure hooks and manifests
     await configureSessionStartHook(targetDir, spinner);
@@ -1306,6 +1346,9 @@ async function install(options = {}) {
     console.log(chalk.white(`   • ${outputStyleCount} output styles installed`));
     if (pluginFileCount > 0) {
       console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files installed`));
+    }
+    if (bmadConfigFileCount > 0) {
+      console.log(chalk.white(`   • ${bmadConfigFileCount} BMAD config files installed`));
     }
     console.log(chalk.white(`   • Voice manager ready`));
 
