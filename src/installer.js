@@ -650,20 +650,20 @@ async function copyPluginFiles(targetDir, spinner) {
  */
 async function copyBmadConfigFiles(targetDir, spinner) {
   spinner.start('Installing BMAD config files...');
-  const srcConfigDir = path.join(__dirname, '..', '.claude', 'config');
-  const destConfigDir = path.join(targetDir, '.claude', 'config');
+  const srcBmadDir = path.join(__dirname, '..', '.agentvibes', 'bmad');
+  const destBmadDir = path.join(targetDir, '.agentvibes', 'bmad');
 
-  await fs.mkdir(destConfigDir, { recursive: true });
+  await fs.mkdir(destBmadDir, { recursive: true });
 
   let fileCount = 0;
 
   // Copy bmad-voices.md if it exists
   const bmadVoicesFile = 'bmad-voices.md';
-  const srcPath = path.join(srcConfigDir, bmadVoicesFile);
+  const srcPath = path.join(srcBmadDir, bmadVoicesFile);
 
   try {
     await fs.access(srcPath);
-    const destPath = path.join(destConfigDir, bmadVoicesFile);
+    const destPath = path.join(destBmadDir, bmadVoicesFile);
     await fs.copyFile(srcPath, destPath);
     console.log(chalk.gray(`   ✓ ${bmadVoicesFile}`));
     fileCount++;

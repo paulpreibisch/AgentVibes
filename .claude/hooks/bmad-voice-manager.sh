@@ -39,7 +39,7 @@
 # @patterns Plugin architecture, auto-enable on dependency detection, state backup/restore on toggle
 # @related bmad-tts-injector.sh, .claude/config/bmad-voices.md, .bmad-agent-context file
 
-CONFIG_DIR=".claude/config"
+CONFIG_DIR=".agentvibes/bmad"
 VOICE_CONFIG_FILE="$CONFIG_DIR/bmad-voices.md"
 ENABLED_FLAG="$CONFIG_DIR/bmad-voices-enabled.flag"
 
