@@ -2,6 +2,7 @@
 .claude/journal/
 .claude/audio/
 .claude/config/
+!.claude/config/bmad-voices.md
 .claude/settings.local.json
 .claude/tts-*.txt
 .claude/personalities/backups/
