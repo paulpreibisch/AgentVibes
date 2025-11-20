@@ -74,8 +74,8 @@ Once setup is complete, the script will tell you exactly how to test party mode:
 # Navigate to the test project
 cd ~/bmad-pr-test-*/bmad-project
 
-# Start Claude Code
-claude-code
+# Start Claude
+claude
 
 # Test party mode!
 /bmad:core:workflows:party-mode
