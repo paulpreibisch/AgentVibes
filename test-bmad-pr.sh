@@ -9,40 +9,155 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/.test-bmad-config"
 
-echo "🎙️  BMAD PR #934 Testing Script"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+clear
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🎙️  BMAD AgentVibes Party Mode Testing Script"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${BLUE}What this script does:${NC}"
+echo ""
+echo "  This script automates the process of testing BMAD's AgentVibes"
+echo "  integration (PR #934), which adds multi-agent party mode with"
+echo "  unique voices for each BMAD agent."
+echo ""
+echo -e "${BLUE}The script will:${NC}"
+echo ""
+echo "  1. Clone the BMAD repository"
+echo "  2. Checkout the PR branch with party mode features"
+echo "  3. Install BMAD CLI tools locally"
+echo "  4. Create a test BMAD project"
+echo "  5. Install AgentVibes TTS system"
+echo "  6. Configure unique voices for each agent"
+echo "  7. Verify the installation"
+echo ""
+echo -e "${YELLOW}Prerequisites:${NC}"
+echo "  • Node.js and npm installed"
+echo "  • Git installed"
+echo "  • ~500MB free disk space"
+echo "  • 10-15 minutes for complete setup"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+read -p "Ready to continue? [Y/n]: " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
+    echo "❌ Setup cancelled"
+    exit 0
+fi
+
+clear
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔧 Testing Mode Selection"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "Choose how you want to test:"
+echo ""
+echo "  1) Test official BMAD PR #934 (recommended for most users)"
+echo "     • Uses: github.com/bmad-code-org/BMAD-METHOD"
+echo "     • Branch: PR #934 (agentvibes-party-mode)"
+echo "     • Best for: Testing the official PR before it's merged"
+echo ""
+echo "  2) Test your forked repository"
+echo "     • Uses: Your GitHub fork"
+echo "     • Branch: Your custom branch (you choose)"
+echo "     • Best for: Testing your own changes or modifications"
 echo ""
 
 # Load saved config if it exists
+SAVED_MODE=""
 SAVED_FORK=""
+SAVED_BRANCH=""
 SAVED_TEST_DIR=""
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
-    echo "📋 Loaded saved configuration:"
-    echo "   Fork: $SAVED_FORK"
-    echo "   Test directory: $SAVED_TEST_DIR"
+fi
+
+if [[ -n "$SAVED_MODE" ]]; then
+    echo -e "${BLUE}Last used: Mode $SAVED_MODE${NC}"
+    [[ -n "$SAVED_FORK" ]] && echo "  Fork: $SAVED_FORK"
+    [[ -n "$SAVED_BRANCH" ]] && echo "  Branch: $SAVED_BRANCH"
     echo ""
 fi
 
-# Ask for GitHub fork URL
-echo "Step 1: GitHub Fork"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-if [[ -n "$SAVED_FORK" ]]; then
-    read -p "GitHub fork URL [$SAVED_FORK]: " FORK_URL
-    FORK_URL="${FORK_URL:-$SAVED_FORK}"
-else
-    read -p "GitHub fork URL (e.g., https://github.com/paulpreibisch/BMAD-METHOD.git): " FORK_URL
-fi
+read -p "Select mode [1/2]: " MODE_CHOICE
 echo ""
 
+# Validate mode choice
+while [[ ! "$MODE_CHOICE" =~ ^[12]$ ]]; do
+    echo -e "${RED}Invalid choice. Please enter 1 or 2.${NC}"
+    read -p "Select mode [1/2]: " MODE_CHOICE
+    echo ""
+done
+
+# Configure based on mode
+if [[ "$MODE_CHOICE" == "1" ]]; then
+    # Official PR mode
+    REPO_URL="https://github.com/bmad-code-org/BMAD-METHOD.git"
+    BRANCH_NAME="agentvibes-party-mode"
+    FETCH_PR=true
+
+    echo -e "${GREEN}✓ Using official BMAD repository${NC}"
+    echo "  Repository: $REPO_URL"
+    echo "  Will fetch: PR #934 into branch '$BRANCH_NAME'"
+    echo ""
+else
+    # Fork mode
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🍴 Fork Configuration"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    if [[ -n "$SAVED_FORK" ]]; then
+        read -p "GitHub fork URL [$SAVED_FORK]: " FORK_INPUT
+        REPO_URL="${FORK_INPUT:-$SAVED_FORK}"
+    else
+        echo "Enter your forked repository URL:"
+        echo "(e.g., https://github.com/yourusername/BMAD-METHOD.git)"
+        read -p "Fork URL: " REPO_URL
+    fi
+    echo ""
+
+    if [[ -n "$SAVED_BRANCH" ]]; then
+        read -p "Branch name [$SAVED_BRANCH]: " BRANCH_INPUT
+        BRANCH_NAME="${BRANCH_INPUT:-$SAVED_BRANCH}"
+    else
+        echo "Enter the branch name to test:"
+        echo "(e.g., agentvibes-party-mode, main, feature-xyz)"
+        read -p "Branch: " BRANCH_NAME
+    fi
+    echo ""
+
+    FETCH_PR=false
+
+    echo -e "${GREEN}✓ Using your fork${NC}"
+    echo "  Repository: $REPO_URL"
+    echo "  Branch: $BRANCH_NAME"
+    echo ""
+fi
+
 # Ask for test directory
-echo "Step 2: Test Directory"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📁 Test Directory"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 if [[ -n "$SAVED_TEST_DIR" ]]; then
     read -p "Test directory [$SAVED_TEST_DIR]: " TEST_DIR
     TEST_DIR="${TEST_DIR:-$SAVED_TEST_DIR}"
 else
     DEFAULT_DIR="$HOME/bmad-pr-test-$(date +%Y%m%d-%H%M%S)"
+    echo "Where should we create the test environment?"
     read -p "Test directory [$DEFAULT_DIR]: " TEST_DIR
     TEST_DIR="${TEST_DIR:-$DEFAULT_DIR}"
 fi
@@ -53,24 +168,29 @@ TEST_DIR="${TEST_DIR/#\~/$HOME}"
 echo ""
 
 # Save configuration
-echo "SAVED_FORK=\"$FORK_URL\"" > "$CONFIG_FILE"
+echo "SAVED_MODE=\"$MODE_CHOICE\"" > "$CONFIG_FILE"
+[[ "$MODE_CHOICE" == "2" ]] && echo "SAVED_FORK=\"$REPO_URL\"" >> "$CONFIG_FILE"
+[[ "$MODE_CHOICE" == "2" ]] && echo "SAVED_BRANCH=\"$BRANCH_NAME\"" >> "$CONFIG_FILE"
 echo "SAVED_TEST_DIR=\"$TEST_DIR\"" >> "$CONFIG_FILE"
-echo "✅ Configuration saved to $CONFIG_FILE"
+echo -e "${GREEN}✓ Configuration saved${NC}"
 echo ""
 
 # Confirm before starting
-echo "Configuration:"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Fork:      $FORK_URL"
-echo "  Test dir:  $TEST_DIR"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📋 Summary"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-read -p "Proceed with testing? [Y/n]: " -n 1 -r
+echo "  Repository:  $REPO_URL"
+echo "  Branch:      $BRANCH_NAME"
+echo "  Test dir:    $TEST_DIR"
+echo ""
+read -p "Proceed with setup? [Y/n]: " -n 1 -r
 echo
+echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
-    echo "❌ Testing cancelled"
+    echo "❌ Setup cancelled"
     exit 0
 fi
-echo ""
 
 # Clean up old test directory if it exists
 if [[ -d "$TEST_DIR" ]]; then
@@ -79,121 +199,185 @@ if [[ -d "$TEST_DIR" ]]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
         rm -rf "$TEST_DIR"
-        echo "✅ Deleted old test directory"
+        echo -e "${GREEN}✓ Deleted old test directory${NC}"
     else
-        echo "❌ Using existing directory (may have stale data)"
+        echo -e "${YELLOW}⚠ Using existing directory (may have stale data)${NC}"
     fi
     echo ""
 fi
 
-# Step 1: Clone fork
-echo "Step 1: Cloning your fork"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-mkdir -p "$TEST_DIR"
-cd "$TEST_DIR"
-git clone "$FORK_URL" BMAD-METHOD
-cd BMAD-METHOD
-echo "✅ Cloned fork"
+clear
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀 Starting Installation"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Step 2: Fetch PR branch
-echo "Step 2: Fetching PR #934 branch"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-git remote add upstream https://github.com/bmad-code-org/BMAD-METHOD.git
-git fetch upstream pull/934/head:agentvibes-party-mode
-git checkout agentvibes-party-mode
-echo "✅ On PR branch: agentvibes-party-mode"
+# Step 1: Clone repository
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📥 Step 1/6: Cloning repository"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+mkdir -p "$TEST_DIR"
+cd "$TEST_DIR"
+git clone "$REPO_URL" BMAD-METHOD
+cd BMAD-METHOD
+echo ""
+echo -e "${GREEN}✓ Repository cloned${NC}"
+echo ""
+
+# Step 2: Checkout branch (different logic for PR vs fork)
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔀 Step 2/6: Checking out branch"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+if [[ "$FETCH_PR" == true ]]; then
+    # Fetch PR from upstream
+    echo "Fetching PR #934 from upstream..."
+    git remote add upstream https://github.com/bmad-code-org/BMAD-METHOD.git
+    git fetch upstream pull/934/head:$BRANCH_NAME
+    git checkout $BRANCH_NAME
+    echo ""
+    echo -e "${GREEN}✓ Checked out PR branch: $BRANCH_NAME${NC}"
+else
+    # Just checkout the specified branch from fork
+    git checkout $BRANCH_NAME
+    echo ""
+    echo -e "${GREEN}✓ Checked out branch: $BRANCH_NAME${NC}"
+fi
 echo ""
 
 # Step 3: Install BMAD CLI
-echo "Step 3: Installing BMAD CLI"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📦 Step 3/6: Installing BMAD CLI"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 cd tools/cli
 npm install
 npm link
-echo "✅ BMAD CLI installed and linked"
+echo ""
+echo -e "${GREEN}✓ BMAD CLI installed and linked globally${NC}"
 echo ""
 
 # Step 4: Create test project
-echo "Step 4: Creating test BMAD project"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📁 Step 4/6: Creating test project"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 cd "$TEST_DIR"
 mkdir -p bmad-project
 cd bmad-project
-echo "✅ Test project directory created: $TEST_DIR/bmad-project"
+echo -e "${GREEN}✓ Test project directory created${NC}"
+echo "  Location: $TEST_DIR/bmad-project"
 echo ""
 
-# Step 5: Run BMAD installer
-echo "Step 5: Running BMAD installer"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "⚠️  When prompted:"
-echo "   - Enable TTS for agents? → Yes"
-echo "   - Assign unique voices for party mode? → Yes"
+# Step 5: Run BMAD installer (includes AgentVibes setup)
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "⚙️  Step 5/6: Running BMAD installer with AgentVibes"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${YELLOW}Important: The BMAD installer will prompt for:${NC}"
+echo -e "  1. ${CYAN}Enable TTS for agents?${NC} → ${GREEN}Yes${NC}"
+echo -e "  2. ${CYAN}Assign unique voices for party mode?${NC} → ${GREEN}Yes${NC}"
+echo ""
+echo -e "${YELLOW}Then AgentVibes installer will start automatically.${NC}"
+echo -e "${YELLOW}Recommended TTS settings:${NC}"
+echo -e "  • Provider: ${GREEN}Piper${NC} (free, local TTS)"
+echo -e "  • Download voices: ${GREEN}Yes${NC}"
 echo ""
 read -p "Press Enter to start BMAD installer..."
 bmad install
 
 echo ""
-echo "✅ BMAD installation complete"
+echo -e "${GREEN}✓ BMAD and AgentVibes installation complete${NC}"
 echo ""
 
-# Step 6: Install AgentVibes
-echo "Step 6: Installing AgentVibes"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "⚠️  When prompted, choose:"
-echo "   - Provider: Piper (free) for testing"
-echo "   - Download voices: Yes"
-echo ""
-read -p "Press Enter to start AgentVibes installer..."
-npx agentvibes@latest install
-
-echo ""
-echo "✅ AgentVibes installation complete"
+# Step 6: Verification
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ Step 6/6: Verifying installation"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Verification
-echo "Step 7: Verification"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
+VERIFICATION_PASSED=true
 
 # Check for voice map file
 if [[ -f ".bmad/_cfg/agent-voice-map.csv" ]]; then
-    echo "✅ Voice map file created: .bmad/_cfg/agent-voice-map.csv"
+    echo -e "${GREEN}✓ Voice map file created${NC}"
+    echo "  Location: .bmad/_cfg/agent-voice-map.csv"
     echo ""
-    echo "Voice assignments:"
-    cat .bmad/_cfg/agent-voice-map.csv
+    echo "  Voice assignments:"
+    cat .bmad/_cfg/agent-voice-map.csv | sed 's/^/    /'
     echo ""
 else
-    echo "❌ Voice map file NOT found: .bmad/_cfg/agent-voice-map.csv"
-    echo "   This is a problem - agents won't have unique voices!"
+    echo -e "${RED}✗ Voice map file NOT found${NC}"
+    echo "  Expected: .bmad/_cfg/agent-voice-map.csv"
+    echo "  ${YELLOW}Warning: Agents may not have unique voices!${NC}"
     echo ""
+    VERIFICATION_PASSED=false
 fi
 
 # Check for AgentVibes hooks
 if [[ -f ".claude/hooks/bmad-speak.sh" ]]; then
-    echo "✅ BMAD TTS hooks installed"
+    echo -e "${GREEN}✓ BMAD TTS hooks installed${NC}"
+    echo "  Location: .claude/hooks/bmad-speak.sh"
 else
-    echo "❌ BMAD TTS hooks NOT found"
-    echo ""
+    echo -e "${RED}✗ BMAD TTS hooks NOT found${NC}"
+    echo "  Expected: .claude/hooks/bmad-speak.sh"
+    VERIFICATION_PASSED=false
 fi
+echo ""
 
 # Check for Piper installation
 if command -v piper &> /dev/null; then
-    echo "✅ Piper TTS installed"
-    piper --version
+    PIPER_VERSION=$(piper --version 2>&1 || echo "unknown")
+    echo -e "${GREEN}✓ Piper TTS installed${NC}"
+    echo "  Version: $PIPER_VERSION"
+elif [[ -f ".agentvibes/providers/piper/piper" ]]; then
+    echo -e "${GREEN}✓ Piper TTS installed (local)${NC}"
+    echo "  Location: .agentvibes/providers/piper/piper"
 else
-    echo "⚠️  Piper not found in PATH (may still work if installed locally)"
+    echo -e "${YELLOW}⚠ Piper not detected${NC}"
+    echo "  (May still work if using ElevenLabs)"
 fi
+echo ""
 
+# Final status
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [[ "$VERIFICATION_PASSED" == true ]]; then
+    echo -e "${GREEN}🎉 Setup Complete - All Checks Passed!${NC}"
+else
+    echo -e "${YELLOW}⚠️  Setup Complete - With Warnings${NC}"
+    echo ""
+    echo "Some verification checks failed. The installation may still work,"
+    echo "but you might experience issues with party mode voices."
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🎉 Testing setup complete!"
+echo -e "${BLUE}Next Steps:${NC}"
 echo ""
-echo "Next steps:"
-echo "  1. cd $TEST_DIR/bmad-project"
-echo "  2. Start Claude Code session"
-echo "  3. Run: /bmad:core:workflows:party-mode"
-echo "  4. Verify each agent speaks with a unique voice"
+echo "  1. Navigate to test project:"
+echo -e "     ${GREEN}cd $TEST_DIR/bmad-project${NC}"
 echo ""
-echo "Test project location: $TEST_DIR/bmad-project"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  2. Start Claude Code session:"
+echo -e "     ${GREEN}claude-code${NC}"
+echo ""
+echo "  3. Test party mode:"
+echo -e "     ${GREEN}/bmad:core:workflows:party-mode${NC}"
+echo ""
+echo "  4. Verify each agent speaks with a unique voice!"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${BLUE}Troubleshooting:${NC}"
+echo ""
+echo "  • No audio? Check: .claude/hooks/play-tts.sh exists"
+echo "  • Same voice for all agents? Check: .bmad/_cfg/agent-voice-map.csv"
+echo "  • Test current voice: /agent-vibes:whoami"
+echo "  • List available voices: /agent-vibes:list"
+echo ""
+echo -e "${BLUE}Report Issues:${NC}"
+echo "  https://github.com/bmad-code-org/BMAD-METHOD/pull/934"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
