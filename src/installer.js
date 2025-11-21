@@ -128,22 +128,27 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.8.0 - Piper Installer Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.10.0 - .agentvibes/ Directory Migration\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.8.0 fixes the Piper installer double prompt bug!\n') +
-      chalk.cyan('This minor release resolves an issue where the Piper voice installer\n') +
-      chalk.cyan('would prompt twice for confirmation, causing failures when running\n') +
-      chalk.cyan('through npx due to stdin issues. The installer now automatically\n') +
-      chalk.cyan('downloads recommended voices after the initial confirmation.\n\n') +
+      chalk.cyan('AgentVibes v2.10.0 introduces a comprehensive directory reorganization,\n') +
+      chalk.cyan('migrating all AgentVibes configuration to a dedicated .agentvibes/ directory.\n') +
+      chalk.cyan('This eliminates namespace confusion with Claude Code and provides a clear,\n') +
+      chalk.cyan('predictable location for all AgentVibes state. Migration is fully automatic—\n') +
+      chalk.cyan('your settings are seamlessly moved during upgrade. Also includes BMAD testing\n') +
+      chalk.cyan('improvements and enhanced Piper voice installation.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔧 Piper Installer Fix - Resolves double prompt bug\n') +
-      chalk.gray('   ✅ Auto Voice Download - Recommended voices download automatically\n') +
-      chalk.gray('   🐧 Linux Compatibility - Improved installation experience\n\n') +
-      chalk.cyan('Bug fixes and improvements:\n') +
-      chalk.gray('   Fixed stdin issues preventing voice downloads on Linux/npx\n') +
-      chalk.gray('   Piper voices now install smoothly without manual intervention\n') +
-      chalk.gray('   Enhanced npx installation experience\n\n') +
+      chalk.gray('   📁 Dedicated .agentvibes/ Directory - Clear namespace separation\n') +
+      chalk.gray('   🔄 Automatic Migration - Seamless upgrade from old locations\n') +
+      chalk.gray('   ✅ 100% Backward Compatible - No manual intervention needed\n') +
+      chalk.gray('   🧪 32 Passing Tests - Comprehensive migration validation\n') +
+      chalk.gray('   🎭 npx test-bmad-pr - One-line BMAD PR testing command\n') +
+      chalk.gray('   🎤 Enhanced Voice Detection - Better Piper installation status\n\n') +
+      chalk.cyan('Configuration Migration:\n') +
+      chalk.gray('   .claude/config/ → .agentvibes/config/\n') +
+      chalk.gray('   .claude/plugins/ → .agentvibes/bmad/\n') +
+      chalk.gray('   Automatic migration runs during update\n') +
+      chalk.gray('   All settings and voice mappings preserved\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

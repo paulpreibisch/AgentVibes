@@ -1,3 +1,344 @@
+# Release v2.10.0 - .agentvibes/ Directory Migration
+
+**Release Date:** 2025-11-20
+**Type:** Minor Release (Breaking Change - Automatic Migration)
+
+## 🎯 AI Summary
+
+AgentVibes v2.10.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. The migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved. This release also includes extensive BMAD testing improvements with the new `npx test-bmad-pr` command and comprehensive Piper voice installation enhancements.
+
+**Key Highlights:**
+- 📁 **Dedicated .agentvibes/ Directory** - Clear namespace separation from Claude Code
+- 🔄 **Automatic Migration** - Seamless upgrade from .claude/config/ and .claude/plugins/
+- ✅ **100% Backward Compatible** - No manual intervention required
+- 🧪 **32 Passing Tests** - Comprehensive test suite validates all migration scenarios
+- 🎭 **BMAD Testing Made Easy** - New `npx test-bmad-pr` command for one-line testing
+- 🎤 **Improved Voice Installation** - Better Piper voice detection and status display
+
+---
+
+## 🚀 Major Features
+
+### Dedicated .agentvibes/ Directory Structure
+
+**Complete namespace reorganization** (commits: ab293d05, 04f2f97d, 99134216)
+
+The `.agentvibes/` directory replaces scattered configuration across `.claude/config/` and `.claude/plugins/`:
+
+```
+.agentvibes/
+├── bmad/                    # BMAD integration
+│   ├── bmad-voices.md       # Agent-to-voice mappings
+│   ├── bmad-voices-enabled.flag
+│   ├── bmad-party-mode-disabled.flag
+│   └── .bmad-previous-settings
+└── config/                  # AgentVibes configuration
+    ├── agentvibes.json      # Pretext configuration
+    ├── personality-voice-defaults.json
+    └── README-personality-defaults.md
+```
+
+**Migration Paths:**
+- `.claude/config/agentvibes.json` → `.agentvibes/config/agentvibes.json`
+- `.claude/plugins/bmad-voices-enabled.flag` → `.agentvibes/bmad/bmad-voices-enabled.flag`
+- `.claude/config/bmad-voices.md` → `.agentvibes/bmad/bmad-voices.md`
+
+**Benefits:**
+- ✅ Clear ownership - `.agentvibes/` is obviously AgentVibes-managed
+- ✅ No collision risk - Claude Code may add official plugins in the future
+- ✅ Easier troubleshooting - All state in one predictable location
+- ✅ Better organization - Separate BMAD integration from core config
+
+### Automatic Migration System
+
+**Seamless upgrade experience** (commit: ab293d05)
+
+- **Detection:** Installer automatically detects old configuration on startup
+- **Execution:** Runs `.claude/hooks/migrate-to-agentvibes.sh` automatically
+- **Preservation:** All settings, voice mappings, and flags preserved
+- **Cleanup:** Removes empty `.claude/plugins/` directory after migration
+- **Graceful Fallback:** Manual migration option if auto-migration fails
+
+**Migration Script Features:**
+- Color-coded progress output
+- File-by-file migration reporting
+- Duplicate detection and handling
+- Preserves `.claude/config/` for runtime state files (like `tts-speech-rate.txt`)
+
+### Comprehensive Test Suite
+
+**32 passing tests across 6 scenarios** (commit: ab293d05)
+
+Created `test-migration.sh` with full coverage:
+
+1. **Fresh Install** (6 assertions)
+   - Verifies `.agentvibes/` created directly
+   - Ensures old directories NOT created
+
+2. **Upgrade from v2.9.x** (9 assertions)
+   - Auto-migration of all config files
+   - Cleanup of old locations
+   - Value preservation
+
+3. **Manual Migration** (4 assertions)
+   - Script execution
+   - File movement
+   - Old location cleanup
+
+4. **BMAD Integration** (5 assertions)
+   - Voice mappings in new location
+   - Hook scripts read from new paths
+   - Party mode functionality
+
+5. **Pretext Configuration** (3 assertions)
+   - Config in new location
+   - Scripts reference new paths
+
+6. **No Old Config** (4 assertions)
+   - No errors when nothing to migrate
+   - Idempotent behavior
+
+**Test Results:**
+```
+Total Tests:  32
+Passed:       32
+Failed:       0
+Success Rate: 100%
+```
+
+### BMAD Testing Command
+
+**One-line BMAD PR testing** (commits: c86b0cd2, fc70b5c5)
+
+Added `npx test-bmad-pr` command for effortless BMAD integration testing:
+
+```bash
+# Test default PR #934
+npx agentvibes@latest test-bmad-pr
+
+# Test specific PR
+npx agentvibes@latest test-bmad-pr 935
+```
+
+**Features:**
+- Downloads and runs automated test script
+- Supports testing any BMAD PR by number
+- Handles both fork and official repo scenarios
+- Zero manual downloads or git cloning required
+- Fallback to official repo if fork unavailable
+- Complete setup validation and environment checks
+
+**Testing Flow:**
+1. Clone BMAD PR into temporary directory
+2. Setup test environment with proper permissions
+3. Run BMAD installer (includes AgentVibes)
+4. Validate party mode and voice assignments
+5. Test agent activation and TTS integration
+6. Cleanup on completion
+
+### Enhanced Voice Installation
+
+**Better Piper voice detection and status** (commits: 5f5eb30b, 9e6b2423, 4dd39606)
+
+- **Verbose Output:** Shows complete list of installed vs missing voices
+- **Status Display:** Clear indication of which voices need downloading
+- **Error Handling:** Graceful handling of broken symlinks (commit: 30c72a05)
+- **Voice Detection:** Fixed fsSync usage for file system operations (commit: 3e9d8769)
+- **Default Voice:** Set ryan-high as default with correct gender labels (commit: de9744d7)
+
+**Example Output:**
+```
+📊 Piper Voice Installation Status
+
+Installed (5/10):
+  ✅ en_US-lessac-medium
+  ✅ en_US-ryan-high
+  ✅ en_US-amy-medium
+  ✅ en_US-joe-medium
+  ✅ en_GB-alan-medium
+
+Missing (5/10):
+  ❌ en_US-hfc_female-medium
+  ❌ en_US-kristin-medium
+  ❌ en_US-kusal-medium
+  ❌ en_US-l2arctic-medium
+  ❌ en_US-libritts-high
+```
+
+---
+
+## 🐛 Bug Fixes
+
+### BMAD Configuration Packaging
+
+**Fixed bmad-voices.md npm packaging** (commits: 8cb250d2, a7209e39)
+- Added exception to `.npmignore` to include `bmad-voices.md`
+- Previously excluded because `.claude/config/` was ignored
+- Essential for party mode agent intros to work
+- Without this, `copyBmadConfigFiles()` had nothing to copy
+
+### BMAD Config Installation
+
+**Added BMAD config file copying** (commits: 8e0c9c1a, 1e1bc623)
+- Copies `bmad-voices.md` to project during installation
+- Contains agent intro text and voice mappings
+- Fixes party mode agents not speaking intros
+- Called in both main install and quick update flows
+
+### Test Script Improvements
+
+**User experience enhancements** (commits: 0532ac5d, d0e67624, 5f7e4d97)
+- Accept '1' as yes in test script prompts (0532ac5d)
+- Changed 'claude-code' command to correct 'claude' (d0e67624)
+- Removed duplicate AgentVibes installation step (5f7e4d97)
+- Fixed npx command syntax in documentation (967ab67e)
+
+### Voice Detection Fixes
+
+**Robustness improvements** (commits: 30c72a05, 3e9d8769)
+- Error handling for broken symlinks in voice file detection
+- Use fsSync methods for file system checks
+- Prevents crashes during voice scanning
+
+---
+
+## 📚 Documentation
+
+### Updated All Path References
+
+**Comprehensive documentation updates** (commit: ab293d05)
+
+Updated 24 files to reference new `.agentvibes/` paths:
+
+**Command Files (4):**
+- `.claude/commands/agent-vibes-bmad-voices.md`
+- `.claude/commands/agent-vibes/agent-vibes.md`
+- `.claude/commands/agent-vibes/bmad.md`
+- `.claude/commands/agent-vibes/set-pretext.md`
+
+**Hook Scripts (3):**
+- `.claude/hooks/bmad-speak.sh`
+- `.claude/hooks/bmad-voice-manager.sh`
+- `.claude/hooks/play-tts-elevenlabs.sh`
+
+**Documentation Files (5):**
+- `docs/architecture/provider-system.md`
+- `docs/bmad-v6-support.md`
+- `docs/installation-structure.md`
+- `docs/technical-deep-dive.md`
+- `docs/voice-mapping-format.md`
+
+**Configuration Files (3):**
+- `.gitignore`
+- `.npmignore`
+- `README.md`
+
+**New Documentation:**
+- `.agentvibes/README.md` - Complete guide to directory structure
+- `BMAD_PR_TESTING_INSTRUCTIONS.md` - Testing guide for BMAD PRs
+
+---
+
+## 🔧 Migration Guide
+
+### Automatic Migration (Recommended)
+
+**For users upgrading from v2.9.x:**
+
+```bash
+# Simply update - migration happens automatically
+npx agentvibes@latest update
+```
+
+**What happens:**
+1. Installer detects old configuration in `.claude/config/` or `.claude/plugins/`
+2. Runs migration script automatically
+3. Moves all files to `.agentvibes/`
+4. Preserves all settings and mappings
+5. Cleans up empty old directories
+6. Shows migration summary
+
+### Manual Migration (If Needed)
+
+**If automatic migration fails:**
+
+```bash
+# Run migration script manually
+.claude/hooks/migrate-to-agentvibes.sh
+```
+
+### Fresh Installations
+
+**New installations create `.agentvibes/` directly:**
+
+```bash
+npx agentvibes@latest install
+```
+
+No migration needed - everything goes to `.agentvibes/` from the start.
+
+### Verification
+
+**Check migration success:**
+
+```bash
+# Should exist
+ls -la .agentvibes/bmad/
+ls -la .agentvibes/config/
+
+# Should be empty or removed
+ls -la .claude/plugins/  # Should not exist
+ls -la .claude/config/   # May exist for runtime files
+```
+
+---
+
+## ⚠️ Breaking Changes
+
+### Directory Structure Reorganization
+
+**BREAKING CHANGE: Configuration locations changed**
+
+While migration is automatic, scripts or tools that directly reference old paths will need updates:
+
+**Old Paths (Deprecated):**
+- `.claude/config/agentvibes.json`
+- `.claude/plugins/bmad-voices-enabled.flag`
+- `.claude/config/bmad-voices.md`
+
+**New Paths (Current):**
+- `.agentvibes/config/agentvibes.json`
+- `.agentvibes/bmad/bmad-voices-enabled.flag`
+- `.agentvibes/bmad/bmad-voices.md`
+
+**Impact:**
+- Custom scripts reading these paths need updates
+- All official AgentVibes code updated automatically
+- BMAD integration updated in AgentVibes hooks
+
+**Mitigation:**
+- Update any custom scripts to use new paths
+- Check `.agentvibes/README.md` for path mapping
+
+---
+
+## 📊 Release Statistics
+
+- **Commits:** 26
+- **Files Changed:** 24 (in migration alone)
+- **Lines Added:** 829
+- **Lines Removed:** 363
+- **Test Coverage:** 32 tests, 100% pass rate
+- **Documentation Updated:** 17 files
+
+---
+
+## 🙏 Acknowledgments
+
+Thanks to the AgentVibes community for feedback on directory organization and namespace concerns that led to this improvement!
+
+---
+
 # Release v2.9.5 - Legacy Output Styles Cleanup
 
 **Release Date:** TBD

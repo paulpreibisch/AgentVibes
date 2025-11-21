@@ -94,14 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.8.0 - Piper Installer Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.8.0)** 🎉
+**[v2.10.0 - .agentvibes/ Directory Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.10.0)** 🎉
 
-AgentVibes v2.8.0 fixes the Piper installer double prompt bug! This minor release resolves an issue where the Piper voice installer would prompt twice for confirmation, causing failures when running through npx due to stdin issues. The installer now automatically downloads recommended voices after the initial confirmation.
+AgentVibes v2.10.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. Migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved.
 
 **Key highlights:**
-- 🔧 **Piper Installer Fix** - Resolves double prompt bug that prevented voice downloads on Linux/npx installations
-- ✅ **Auto Voice Download** - Recommended voices now download automatically after initial confirmation
-- 🐧 **Linux Compatibility** - Improved installation experience for Linux users
+- 📁 **Dedicated .agentvibes/ Directory** - Clear namespace separation from Claude Code
+- 🔄 **Automatic Migration** - Seamless upgrade from .claude/config/ and .claude/plugins/
+- ✅ **100% Backward Compatible** - No manual intervention required
+- 🧪 **32 Passing Tests** - Comprehensive test suite validates all migration scenarios
+- 🎭 **npx test-bmad-pr** - New one-line command for BMAD PR testing
+- 🎤 **Enhanced Voice Installation** - Better Piper voice detection and status display
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
