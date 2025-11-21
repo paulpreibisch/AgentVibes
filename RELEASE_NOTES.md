@@ -1,11 +1,11 @@
-# Release v2.11.0 - .agentvibes/ Directory Migration
+# Release v2.12.0 - .agentvibes/ Directory Migration
 
 **Release Date:** 2025-11-20
 **Type:** Minor Release (Breaking Change - Automatic Migration)
 
 ## 🎯 AI Summary
 
-AgentVibes v2.11.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. The migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved. This release also includes extensive BMAD testing improvements with the new `npx test-bmad-pr` command and comprehensive Piper voice installation enhancements.
+AgentVibes v2.12.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. The migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved. This release also includes extensive BMAD testing improvements with the new `npx test-bmad-pr` command and comprehensive Piper voice installation enhancements.
 
 **Key Highlights:**
 - 📁 **Dedicated .agentvibes/ Directory** - Clear namespace separation from Claude Code
