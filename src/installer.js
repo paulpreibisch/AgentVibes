@@ -1939,6 +1939,23 @@ program
     await resetBmadVoices(options);
   });
 
+// BMAD PR Testing Command
+program
+  .command('test-bmad-pr [pr-number]')
+  .description('Test BMAD PR with AgentVibes integration (default: PR #934)')
+  .action(async (prNumber = '934') => {
+    const testScript = path.join(__dirname, '..', 'bin', 'test-bmad-pr');
+
+    try {
+      execScript(`${testScript} ${prNumber}`, {
+        stdio: 'inherit',
+        env: process.env
+      });
+    } catch (error) {
+      process.exit(error.status || 1);
+    }
+  });
+
 // Help command
 program
   .command('help')
