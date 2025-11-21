@@ -94,9 +94,9 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.10.0 - .agentvibes/ Directory Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.10.0)** 🎉
+**[v2.11.0 - .agentvibes/ Directory Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.11.0)** 🎉
 
-AgentVibes v2.10.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. Migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved.
+AgentVibes v2.11.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. Migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved.
 
 **Key highlights:**
 - 📁 **Dedicated .agentvibes/ Directory** - Clear namespace separation from Claude Code

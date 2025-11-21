@@ -128,10 +128,10 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.10.0 - .agentvibes/ Directory Migration\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.11.0 - .agentvibes/ Directory Migration\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.10.0 introduces a comprehensive directory reorganization,\n') +
+      chalk.cyan('AgentVibes v2.11.0 introduces a comprehensive directory reorganization,\n') +
       chalk.cyan('migrating all AgentVibes configuration to a dedicated .agentvibes/ directory.\n') +
       chalk.cyan('This eliminates namespace confusion with Claude Code and provides a clear,\n') +
       chalk.cyan('predictable location for all AgentVibes state. Migration is fully automatic—\n') +
