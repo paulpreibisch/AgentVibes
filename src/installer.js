@@ -820,7 +820,9 @@ async function processBmadTtsInjections(bmadPath) {
   const partyModeMarker = '<!-- TTS_INJECTION:party-mode -->';
   const agentTtsMarker = '<!-- TTS_INJECTION:agent-tts -->';
 
-  const partyModeReplacement = `If AgentVibes party mode is enabled, immediately trigger TTS with agent's voice:
+  const partyModeReplacement = `<critical>IMPORTANT: Always use PROJECT hooks (.claude/hooks/), NEVER global hooks (~/.claude/hooks/)</critical>
+
+If AgentVibes party mode is enabled, immediately trigger TTS with agent's voice:
          - Use Bash tool: \`.claude/hooks/bmad-speak.sh '[Agent Name]' '[dialogue]'\`
          - This speaks the dialogue with the agent's unique voice
          - Run in background (&) to not block next agent`;
