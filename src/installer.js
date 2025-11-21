@@ -1574,7 +1574,7 @@ async function install(options = {}) {
     );
 
     console.log(chalk.green.bold('\n✅ AgentVibes is Ready!'));
-    console.log(chalk.white('   TTS protocol automatically loads on every Claude Code session'));
+    console.log(chalk.white('   TTS protocol automatically loads on every Claude session'));
     console.log(chalk.gray('   via SessionStart hook - no additional setup needed!\n'));
     console.log(chalk.cyan('🎤 Try these commands:'));
     console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
