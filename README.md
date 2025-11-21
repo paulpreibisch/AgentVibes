@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.12.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.11.0
 
 ---
 
@@ -94,7 +94,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.12.0 - .agentvibes/ Directory Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.0)** 🎉
+**[v2.12.0 - .agentvibes/ Directory Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.11.0)** 🎉
 
 AgentVibes v2.12.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. Migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved.
 
