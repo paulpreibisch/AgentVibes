@@ -585,32 +585,7 @@ async function copyPersonalityFiles(targetDir, spinner) {
   return personalityMdFiles.length;
 }
 
-/**
- * Copy output style files to target directory
- * @param {string} targetDir - Target installation directory
- * @param {Object} spinner - Ora spinner instance
- * @returns {Promise<number>} Number of files copied
- */
-async function copyOutputStyles(targetDir, spinner) {
-  spinner.start('Installing output styles...');
-  const srcOutputStylesDir = path.join(__dirname, '..', 'templates', 'output-styles');
-  const outputStylesDir = path.join(targetDir, '.claude', 'output-styles');
-
-  await fs.mkdir(outputStylesDir, { recursive: true });
-
-  const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
-  console.log(chalk.cyan(`📝 Installing ${outputStyleFiles.length} output styles:`));
-
-  for (const file of outputStyleFiles) {
-    const srcPath = path.join(srcOutputStylesDir, file);
-    const destPath = path.join(outputStylesDir, file);
-    await fs.copyFile(srcPath, destPath);
-    console.log(chalk.gray(`   ✓ ${file}`));
-  }
-
-  spinner.succeed(chalk.green('Installed output styles!\n'));
-  return outputStyleFiles.length;
-}
+// Output styles removed - deprecated in favor of SessionStart hook system
 
 /**
  * Copy plugin files to target directory
@@ -1199,18 +1174,7 @@ async function updateAgentVibes(targetDir, options) {
     const personalityResult = await updatePersonalityFiles(targetDir, srcPersonalitiesDir);
     console.log(chalk.green(`✓ Updated ${personalityResult.updated} personalities, added ${personalityResult.new} new`));
 
-    // Update output styles
-    spinner.text = 'Updating output styles...';
-    const srcOutputStylesDir = path.join(__dirname, '..', '.claude', 'output-styles');
-    const outputStylesDir = path.join(claudeDir, 'output-styles');
-    const outputStyleFiles = await fs.readdir(srcOutputStylesDir);
-
-    for (const file of outputStyleFiles) {
-      const srcPath = path.join(srcOutputStylesDir, file);
-      const destPath = path.join(outputStylesDir, file);
-      await fs.copyFile(srcPath, destPath);
-    }
-    console.log(chalk.green(`✓ Updated ${outputStyleFiles.length} output styles`));
+    // Output styles removed - deprecated in favor of SessionStart hook system
 
     // Update plugin files
     const pluginFileCount = await copyPluginFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
@@ -1327,7 +1291,7 @@ async function install(options = {}) {
   console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
   console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
   console.log(chalk.gray(`   • 19 personality templates → ${targetDir}/.claude/personalities/`));
-  console.log(chalk.gray(`   • Agent Vibes output style → ${targetDir}/.claude/output-styles/`));
+  console.log(chalk.gray(`   • SessionStart hook for automatic TTS activation`));
   console.log(chalk.gray(`   • 27+ curated voices (ElevenLabs premium)`));
   console.log(chalk.gray(`   • 50+ neural voices (Piper TTS - free & offline)`));
   console.log(chalk.gray(`   • 30+ language support with native voices`));
@@ -1358,7 +1322,6 @@ async function install(options = {}) {
     const claudeDir = path.join(targetDir, '.claude');
     const commandsDir = path.join(claudeDir, 'commands');
     const hooksDir = path.join(claudeDir, 'hooks');
-    const outputStylesDir = path.join(claudeDir, 'output-styles');
 
     let exists = false;
     try {
@@ -1370,10 +1333,8 @@ async function install(options = {}) {
       spinner.info(chalk.yellow('Creating .claude directory structure...'));
       console.log(chalk.gray(`   → ${commandsDir}`));
       console.log(chalk.gray(`   → ${hooksDir}`));
-      console.log(chalk.gray(`   → ${outputStylesDir}`));
       await fs.mkdir(commandsDir, { recursive: true });
       await fs.mkdir(hooksDir, { recursive: true });
-      await fs.mkdir(outputStylesDir, { recursive: true });
       console.log(chalk.green('   ✓ Directories created!\n'));
     } else {
       spinner.succeed(chalk.green('.claude directory found!'));
@@ -1384,7 +1345,6 @@ async function install(options = {}) {
     const commandFileCount = await copyCommandFiles(targetDir, spinner);
     const hookFileCount = await copyHookFiles(targetDir, spinner);
     const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
-    const outputStyleCount = await copyOutputStyles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
     const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
 
@@ -1417,7 +1377,7 @@ async function install(options = {}) {
     console.log(chalk.white(`   • ${commandFileCount} slash commands installed`));
     console.log(chalk.white(`   • ${hookFileCount} TTS scripts installed`));
     console.log(chalk.white(`   • ${personalityFileCount} personality templates installed`));
-    console.log(chalk.white(`   • ${outputStyleCount} output styles installed`));
+    console.log(chalk.white(`   • SessionStart hook configured for automatic TTS`));
     if (pluginFileCount > 0) {
       console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files installed`));
     }
