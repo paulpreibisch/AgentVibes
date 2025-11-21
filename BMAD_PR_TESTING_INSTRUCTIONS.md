@@ -136,7 +136,7 @@ npx agentvibes@latest install
 
 ```bash
 # Start Claude Code session
-claude-code
+claude
 
 # Run party mode
 /bmad:core:workflows:party-mode
