@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.11.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.12.4
 
 ---
 
@@ -152,6 +152,11 @@ macOS ships with bash 3.2 (from 2007) which lacks modern bash features AgentVibe
 ---
 
 Get AgentVibes running in 3 steps: **Install** → **Choose Provider** (Piper/ElevenLabs) → **Enable Voice**
+
+**Quick Install:**
+```bash
+npx agentvibes install
+```
 
 **[→ View Complete Quick Start Guide](docs/quick-start.md)** - Full installation options, provider setup, and activation steps
 
