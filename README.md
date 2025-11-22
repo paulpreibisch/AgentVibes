@@ -96,15 +96,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 **[v2.12.4 - Installer & CLI Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.0)** 🎉
 
-AgentVibes v2.12.4 includes critical installer fixes and CLI enhancements. This release fixes installer crashes caused by deprecated directory references, corrects command references from 'claude-code' to 'claude', and adds the new `npx test-bmad-pr` subcommand for testing BMAD integrations.
+AgentVibes v2.12.4 includes critical installer fixes and CLI enhancements. This release fixes installer crashes caused by deprecated directory references, corrects command references from 'claude-code' to 'claude', and adds the new `npx agentvibes test-bmad-pr` subcommand for testing BMAD integrations.
 
 **Recent updates (v2.12.0-v2.12.4):**
 - 🐛 **Critical Installer Fix** - Removed deprecated output-styles directory references
 - ✅ **Command Reference Updates** - Changed 'claude-code' to correct 'claude' command
-- 🧪 **BMAD Testing** - New `npx test-bmad-pr` subcommand for one-line BMAD testing
+- 🧪 **BMAD Testing** - New `npx agentvibes test-bmad-pr` subcommand for one-line BMAD testing
 - 📁 **Directory Migration** - Automatic migration to `.agentvibes/` directory (v2.12.0)
 - 🔄 **100% Backward Compatible** - No manual intervention required
 - 🎭 **Enhanced BMAD Integration** - Improved hook enforcement for TTS injection
+
+💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
