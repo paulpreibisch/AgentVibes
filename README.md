@@ -94,17 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.12.0 - .agentvibes/ Directory Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.11.0)** 🎉
+**[v2.12.4 - Installer & CLI Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.0)** 🎉
 
-AgentVibes v2.12.0 introduces a comprehensive directory reorganization, migrating all AgentVibes-specific configuration from `.claude/config/` and `.claude/plugins/` to a dedicated `.agentvibes/` directory. This eliminates namespace confusion with Claude Code's official directories and provides a clear, predictable location for all AgentVibes state. Migration is fully automatic during upgrade—users simply run `npx agentvibes@latest update` and their configuration is seamlessly moved.
+AgentVibes v2.12.4 includes critical installer fixes and CLI enhancements. This release fixes installer crashes caused by deprecated directory references, corrects command references from 'claude-code' to 'claude', and adds the new `npx test-bmad-pr` subcommand for testing BMAD integrations.
 
-**Key highlights:**
-- 📁 **Dedicated .agentvibes/ Directory** - Clear namespace separation from Claude Code
-- 🔄 **Automatic Migration** - Seamless upgrade from .claude/config/ and .claude/plugins/
-- ✅ **100% Backward Compatible** - No manual intervention required
-- 🧪 **32 Passing Tests** - Comprehensive test suite validates all migration scenarios
-- 🎭 **npx test-bmad-pr** - New one-line command for BMAD PR testing
-- 🎤 **Enhanced Voice Installation** - Better Piper voice detection and status display
+**Recent updates (v2.12.0-v2.12.4):**
+- 🐛 **Critical Installer Fix** - Removed deprecated output-styles directory references
+- ✅ **Command Reference Updates** - Changed 'claude-code' to correct 'claude' command
+- 🧪 **BMAD Testing** - New `npx test-bmad-pr` subcommand for one-line BMAD testing
+- 📁 **Directory Migration** - Automatic migration to `.agentvibes/` directory (v2.12.0)
+- 🔄 **100% Backward Compatible** - No manual intervention required
+- 🎭 **Enhanced BMAD Integration** - Improved hook enforcement for TTS injection
 
 [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
