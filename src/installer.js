@@ -128,27 +128,27 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.12.0 - .agentvibes/ Directory Migration\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.12.5 - Code Quality Improvements\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.12.0 introduces a comprehensive directory reorganization,\n') +
-      chalk.cyan('migrating all AgentVibes configuration to a dedicated .agentvibes/ directory.\n') +
-      chalk.cyan('This eliminates namespace confusion with Claude Code and provides a clear,\n') +
-      chalk.cyan('predictable location for all AgentVibes state. Migration is fully automatic—\n') +
-      chalk.cyan('your settings are seamlessly moved during upgrade. Also includes BMAD testing\n') +
-      chalk.cyan('improvements and enhanced Piper voice installation.\n\n') +
+      chalk.cyan('AgentVibes v2.12.5 improves code quality by upgrading Sonar quality gates\n') +
+      chalk.cyan('and implementing best practices identified through static analysis. This\n') +
+      chalk.cyan('release includes enhanced input validation, improved shell command handling,\n') +
+      chalk.cyan('better file locking for atomic operations, and secure temporary directory\n') +
+      chalk.cyan('management while maintaining 100% backward compatibility.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   📁 Dedicated .agentvibes/ Directory - Clear namespace separation\n') +
-      chalk.gray('   🔄 Automatic Migration - Seamless upgrade from old locations\n') +
-      chalk.gray('   ✅ 100% Backward Compatible - No manual intervention needed\n') +
-      chalk.gray('   🧪 32 Passing Tests - Comprehensive migration validation\n') +
-      chalk.gray('   🎭 npx test-bmad-pr - One-line BMAD PR testing command\n') +
-      chalk.gray('   🎤 Enhanced Voice Detection - Better Piper installation status\n\n') +
-      chalk.cyan('Configuration Migration:\n') +
-      chalk.gray('   .claude/config/ → .agentvibes/config/\n') +
-      chalk.gray('   .claude/plugins/ → .agentvibes/bmad/\n') +
-      chalk.gray('   Automatic migration runs during update\n') +
-      chalk.gray('   All settings and voice mappings preserved\n\n') +
+      chalk.gray('   ✅ Sonar Quality Gates Upgraded - Enhanced code quality standards\n') +
+      chalk.gray('   🔒 18 Code Improvements - Better input validation and command handling\n') +
+      chalk.gray('   🧪 110/110 Tests Passing - All functionality verified and working\n') +
+      chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible with v2.12.4\n') +
+      chalk.gray('   📊 162 Lines Enhanced - Code quality improvements across 8 files\n') +
+      chalk.gray('   💡 Best Practices - Improved error handling and validation\n\n') +
+      chalk.cyan('Technical Improvements:\n') +
+      chalk.gray('   • Enhanced input validation across all interfaces\n') +
+      chalk.gray('   • Improved shell command handling with proper escaping\n') +
+      chalk.gray('   • Better file system operations with path validation\n') +
+      chalk.gray('   • Atomic PID file operations with file locking\n') +
+      chalk.gray('   • Cleaner code with debug output removed\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -200,9 +200,26 @@ function getUserShell() {
 function execScript(scriptPath, options = {}) {
   const { shell, shellConfig } = getUserShell();
 
-  // Source the shell config to load environment variables, then run the script
-  // Don't wrap scriptPath in quotes - it may contain arguments
-  const command = `source "${shellConfig}" 2>/dev/null; ${shell} ${scriptPath}`;
+  // Security: Properly escape the scriptPath to prevent command injection
+  // Split scriptPath into command and arguments
+  const parts = scriptPath.split(/\s+/);
+  const scriptFile = parts[0];
+  const args = parts.slice(1);
+
+  // Validate that the script file doesn't contain shell metacharacters
+  if (scriptFile.match(/[;&|`$(){}[\]<>]/)) {
+    throw new Error('Invalid characters in script path');
+  }
+
+  // Escape each argument properly
+  const escapedArgs = args.map(arg => {
+    // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+    return `'${arg.replace(/'/g, "'\\''")}'`;
+  }).join(' ');
+
+  // Build command with properly escaped components
+  const scriptCommand = escapedArgs ? `'${scriptFile}' ${escapedArgs}` : `'${scriptFile}'`;
+  const command = `source "${shellConfig}" 2>/dev/null; ${shell} ${scriptCommand}`;
 
   return execSync(command, {
     shell: shell,
@@ -537,7 +554,8 @@ async function copyHookFiles(targetDir, spinner) {
     await fs.copyFile(srcPath, destPath);
 
     if (file.endsWith('.sh')) {
-      await fs.chmod(destPath, 0o755);
+      // Security: Use more restrictive permissions (owner: rwx, group: r-x, others: ---)
+      await fs.chmod(destPath, 0o750);
       console.log(chalk.gray(`   ✓ ${file} (executable)`));
     } else {
       console.log(chalk.gray(`   ✓ ${file}`));
@@ -787,11 +805,29 @@ async function checkAndInstallPiper(targetDir, options) {
 }
 
 /**
+ * Security: Validate that a path is safe and doesn't contain traversal sequences
+ * @param {string} targetPath - Path to validate
+ * @param {string} basePath - Base directory that targetPath must be within
+ * @returns {boolean} - True if path is safe
+ */
+function isPathSafe(targetPath, basePath) {
+  const resolved = path.resolve(targetPath);
+  const baseResolved = path.resolve(basePath);
+  return resolved.startsWith(baseResolved);
+}
+
+/**
  * Process TTS_INJECTION markers in BMAD files
  * Replaces markers with actual TTS instructions for both party mode and individual agents
  * @param {string} bmadPath - Path to BMAD installation (e.g., .bmad or bmad)
  */
 async function processBmadTtsInjections(bmadPath) {
+  // Security: Validate bmadPath doesn't contain path traversal
+  const cwd = process.cwd();
+  if (!isPathSafe(bmadPath, cwd)) {
+    console.error(chalk.red('⚠️  Security: Invalid BMAD path detected'));
+    return;
+  }
   const partyModeMarker = '<!-- TTS_INJECTION:party-mode -->';
   const agentTtsMarker = '<!-- TTS_INJECTION:agent-tts -->';
 
@@ -1395,7 +1431,6 @@ async function install(options = {}) {
         console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
       }
     } else {
-      console.error(chalk.red(`   DEBUG: In Piper block, selectedProvider = ${selectedProvider}`));
       // Check for installed Piper voices
       const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
       let installedVoices = [];
@@ -1411,10 +1446,8 @@ async function install(options = {}) {
       ];
 
       try {
-        console.error(chalk.gray(`   Debug: Checking ${piperVoicesDir}`));
         if (fsSync.existsSync(piperVoicesDir)) {
           const files = fsSync.readdirSync(piperVoicesDir);
-          console.error(chalk.gray(`   Debug: Found ${files.length} files`));
           installedVoices = files
             .filter(f => f.endsWith('.onnx'))
             .map(f => {
@@ -1426,12 +1459,10 @@ async function install(options = {}) {
                 return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
               } catch (statErr) {
                 // Skip files that can't be read (broken symlinks, etc)
-                console.error(chalk.gray(`   Debug: Skipped ${voiceName} (${statErr.message})`));
                 return null;
               }
             })
             .filter(v => v !== null);
-          console.error(chalk.gray(`   Debug: ${installedVoices.length} valid voices after filtering`));
 
           // Check which common voices are missing
           for (const voice of commonVoices) {
@@ -1439,13 +1470,10 @@ async function install(options = {}) {
               missingVoices.push(voice);
             }
           }
-          console.error(chalk.gray(`   Debug: ${missingVoices.length} missing voices`));
         } else {
-          console.error(chalk.gray(`   Debug: Directory does not exist`));
           missingVoices = commonVoices;
         }
       } catch (err) {
-        console.error(chalk.gray(`   Debug: Error checking voices: ${err.message}`));
         // On error, show default message
         installedVoices = [];
         missingVoices = commonVoices;

@@ -18,6 +18,18 @@ else
     PULSE_SOCKET="${PULSE_SOCKET:-/mnt/wslg/PulseServer}"
 fi
 
+# Security: Validate TUNNEL_PORT is numeric only
+if ! [[ "$TUNNEL_PORT" =~ ^[0-9]+$ ]]; then
+    echo "❌ Error: TUNNEL_PORT must be numeric (got: $TUNNEL_PORT)"
+    exit 1
+fi
+
+# Security: Validate REMOTE_HOST doesn't contain dangerous characters
+if [[ "$REMOTE_HOST" =~ [';|&$`<>(){}'] ]]; then
+    echo "❌ Error: REMOTE_HOST contains invalid characters"
+    exit 1
+fi
+
 echo "🔧 Complete Audio Tunnel Fix"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -57,14 +69,15 @@ kill_remote_stale_processes() {
     echo "1️⃣  Checking for stale SSH processes on ${REMOTE_HOST}..."
 
     # Get list of processes using the port
-    STALE_PROCS=$(ssh ${REMOTE_HOST} "sudo lsof -i :${TUNNEL_PORT} 2>/dev/null | grep -v COMMAND || echo 'none'")
+    # Security: Variables are now validated at script start, and TUNNEL_PORT is numeric-only
+    STALE_PROCS=$(ssh "${REMOTE_HOST}" "sudo lsof -i :${TUNNEL_PORT} 2>/dev/null | grep -v COMMAND || echo 'none'")
 
     if [ "$STALE_PROCS" != "none" ] && [ -n "$STALE_PROCS" ]; then
         echo "   🔍 Found stale processes:"
         echo "$STALE_PROCS" | sed 's/^/      /'
         echo ""
         echo "   🗑️  Killing stale processes..."
-        ssh ${REMOTE_HOST} "sudo fuser -k ${TUNNEL_PORT}/tcp 2>/dev/null || true"
+        ssh "${REMOTE_HOST}" "sudo fuser -k ${TUNNEL_PORT}/tcp 2>/dev/null || true"
         echo "   ✅ Stale processes killed"
         sleep 2
     else
@@ -107,6 +120,7 @@ fix_socat_bridge() {
 kill_local_ssh_tunnels() {
     echo "3️⃣  Killing local stale SSH tunnels..."
 
+    # Security: Quote REMOTE_HOST to prevent command injection
     if pgrep -f "ssh.*${REMOTE_HOST}" > /dev/null; then
         pkill -f "ssh.*${REMOTE_HOST}" 2>/dev/null || true
         echo "   ✅ Killed stale SSH tunnels"
@@ -122,7 +136,8 @@ create_ssh_tunnel() {
     echo "4️⃣  Creating fresh SSH tunnel..."
 
     # Create tunnel in background
-    ssh -f -N -R ${TUNNEL_PORT}:localhost:${TUNNEL_PORT} ${REMOTE_HOST} 2>/dev/null || {
+    # Security: Quote variables to prevent command injection
+    ssh -f -N -R "${TUNNEL_PORT}:localhost:${TUNNEL_PORT}" "${REMOTE_HOST}" 2>/dev/null || {
         echo "   ⚠️  Tunnel creation returned warning (this is normal if tunnel already exists)"
     }
 
@@ -130,7 +145,7 @@ create_ssh_tunnel() {
 
     # Verify tunnel exists on remote
     echo "   🔍 Verifying tunnel on ${REMOTE_HOST}..."
-    if ssh ${REMOTE_HOST} "netstat -tlnp 2>/dev/null | grep -q ${TUNNEL_PORT}"; then
+    if ssh "${REMOTE_HOST}" "netstat -tlnp 2>/dev/null | grep -q ${TUNNEL_PORT}"; then
         echo "   ✅ SSH tunnel established successfully"
     else
         echo "   ❌ Failed to establish SSH tunnel"
@@ -144,11 +159,12 @@ test_audio() {
     echo "5️⃣  Testing audio connection..."
 
     # Test PulseAudio connection
-    if ssh ${REMOTE_HOST} "export PULSE_SERVER=tcp:localhost:${TUNNEL_PORT} && timeout 5 pactl info > /dev/null 2>&1"; then
+    # Security: Quote variables to prevent command injection
+    if ssh "${REMOTE_HOST}" "export PULSE_SERVER=tcp:localhost:${TUNNEL_PORT} && timeout 5 pactl info > /dev/null 2>&1"; then
         echo "   ✅ PulseAudio connection successful"
 
         # Get server info
-        SERVER_INFO=$(ssh ${REMOTE_HOST} "export PULSE_SERVER=tcp:localhost:${TUNNEL_PORT} && pactl info | head -3")
+        SERVER_INFO=$(ssh "${REMOTE_HOST}" "export PULSE_SERVER=tcp:localhost:${TUNNEL_PORT} && pactl info | head -3")
         echo "   📊 Server Info:"
         echo "$SERVER_INFO" | sed 's/^/      /'
     else

@@ -46,6 +46,18 @@ export LC_ALL=C
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice name or ID
 
+# Security: Validate inputs
+if [[ -z "$TEXT" ]]; then
+  echo "Error: No text provided" >&2
+  exit 1
+fi
+
+# Security: Validate voice override doesn't contain dangerous characters
+if [[ -n "$VOICE_OVERRIDE" ]] && [[ "$VOICE_OVERRIDE" =~ [';|&$`<>(){}'] ]]; then
+  echo "Error: Invalid characters in voice parameter" >&2
+  exit 1
+fi
+
 # Remove backslash escaping that Claude might add for special chars like ! and $
 # In single quotes these don't need escaping, but Claude sometimes adds \! anyway
 TEXT="${TEXT//\\!/!}"

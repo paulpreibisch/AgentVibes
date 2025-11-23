@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.12.4
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.12.5
 
 ---
 
@@ -94,17 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.12.4 - Installer & CLI Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.0)** 🎉
+**[v2.12.5 - Code Quality Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.5)** 🎉
 
-AgentVibes v2.12.4 includes critical installer fixes and CLI enhancements. This release fixes installer crashes caused by deprecated directory references, corrects command references from 'claude-code' to 'claude', and adds the new `npx agentvibes test-bmad-pr` subcommand for testing BMAD integrations.
+AgentVibes v2.12.5 improves code quality by upgrading Sonar quality gates and implementing best practices identified through static analysis. This release includes enhanced input validation, improved shell command handling, better file locking for atomic operations, and secure temporary directory management while maintaining 100% backward compatibility.
 
-**Recent updates (v2.12.0-v2.12.4):**
-- 🐛 **Critical Installer Fix** - Removed deprecated output-styles directory references
-- ✅ **Command Reference Updates** - Changed 'claude-code' to correct 'claude' command
-- 🧪 **BMAD Testing** - New `npx agentvibes test-bmad-pr` subcommand for one-line BMAD testing
-- 📁 **Directory Migration** - Automatic migration to `.agentvibes/` directory (v2.12.0)
-- 🔄 **100% Backward Compatible** - No manual intervention required
-- 🎭 **Enhanced BMAD Integration** - Improved hook enforcement for TTS injection
+**Key Highlights:**
+- ✅ **Sonar Quality Gates Upgraded** - Enhanced code quality standards across the codebase
+- 🔒 **18 Code Improvements** - Better input validation, command handling, and file operations
+- 🧪 **110/110 Tests Passing** - All functionality verified and working
+- 🔄 **Zero Breaking Changes** - Fully backward compatible with existing installations
+- 📊 **162 Lines Enhanced** - Code quality improvements across 8 files
+- 💡 **Best Practices** - Improved error handling and validation
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

@@ -17,6 +17,11 @@ function checkPython() {
   const pythonCommands = ['python3', 'python', 'py'];
 
   for (const cmd of pythonCommands) {
+    // Security: Validate command is in our allowlist only
+    if (!pythonCommands.includes(cmd)) {
+      continue;
+    }
+
     try {
       const version = execSync(`${cmd} --version`, { encoding: 'utf8', stdio: 'pipe' });
       console.log(`✅ Found ${cmd}: ${version.trim()}`);
@@ -31,6 +36,13 @@ function checkPython() {
 
 // Function to check if mcp is installed
 function checkMcpInstalled(pythonCmd) {
+  // Security: Validate pythonCmd is in allowlist
+  const allowedCommands = ['python3', 'python', 'py'];
+  if (!allowedCommands.includes(pythonCmd)) {
+    console.error('❌ Invalid Python command');
+    return false;
+  }
+
   try {
     execSync(`${pythonCmd} -c "import mcp"`, { stdio: 'pipe' });
     return true;
@@ -41,6 +53,13 @@ function checkMcpInstalled(pythonCmd) {
 
 // Function to install mcp package
 function installMcp(pythonCmd) {
+  // Security: Validate pythonCmd is in allowlist
+  const allowedCommands = ['python3', 'python', 'py'];
+  if (!allowedCommands.includes(pythonCmd)) {
+    console.error('❌ Invalid Python command');
+    return false;
+  }
+
   try {
     console.log('\n📦 Installing Python mcp package...');
     const command = `${pythonCmd} -m pip install --user mcp`;

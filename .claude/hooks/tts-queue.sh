@@ -8,15 +8,26 @@
 
 set -euo pipefail
 
-QUEUE_DIR="/tmp/agentvibes-tts-queue"
+# Security: Use secure temp directory with restrictive permissions
+# Check if XDG_RUNTIME_DIR is available (more secure than /tmp)
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
+  QUEUE_DIR="$XDG_RUNTIME_DIR/agentvibes-tts-queue"
+else
+  # Fallback to user-specific temp directory
+  QUEUE_DIR="/tmp/agentvibes-tts-queue-$USER"
+fi
+
 QUEUE_LOCK="$QUEUE_DIR/queue.lock"
 WORKER_PID_FILE="$QUEUE_DIR/worker.pid"
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Initialize queue directory
-mkdir -p "$QUEUE_DIR"
+# Initialize queue directory with restrictive permissions
+if [[ ! -d "$QUEUE_DIR" ]]; then
+  mkdir -p "$QUEUE_DIR"
+  chmod 700 "$QUEUE_DIR"  # Only owner can read/write/execute
+fi
 
 # @function add_to_queue
 # @intent Add a TTS request to the queue for sequential playback
@@ -43,18 +54,35 @@ EOF
 # @function start_worker_if_needed
 # @intent Start the queue worker process if it's not already running
 start_worker_if_needed() {
-  # Check if worker is already running
+  # Security: Use file locking to prevent race condition
+  # Open file descriptor 200 for locking
+  exec 200>"$QUEUE_LOCK"
+
+  # Acquire exclusive lock (flock -x) with timeout
+  if ! flock -x -w 5 200; then
+    echo "Warning: Could not acquire queue lock" >&2
+    return 1
+  fi
+
+  # Check if worker is already running (within lock)
   if [[ -f "$WORKER_PID_FILE" ]]; then
     local pid=$(cat "$WORKER_PID_FILE")
     if kill -0 "$pid" 2>/dev/null; then
-      # Worker is running
+      # Worker is running, release lock and return
+      flock -u 200
+      exec 200>&-
       return 0
     fi
   fi
 
   # Start worker in background
   "$SCRIPT_DIR/tts-queue-worker.sh" &
-  echo $! > "$WORKER_PID_FILE"
+  local worker_pid=$!
+  echo $worker_pid > "$WORKER_PID_FILE"
+
+  # Release lock
+  flock -u 200
+  exec 200>&-
 }
 
 # @function clear_queue

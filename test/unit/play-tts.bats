@@ -88,5 +88,5 @@ teardown() {
   run "$PLAY_TTS"
 
   [ "$status" -eq 1 ]
-  assert_output_contains "Usage:"
+  assert_output_contains "Error: No text provided"
 }
