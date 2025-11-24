@@ -957,17 +957,17 @@ async function createDefaultBmadVoiceAssignments(bmadPath) {
   }
 
   // Default voice assignments for common BMAD agents
-  const defaultVoices = `agent_id,voice_name
-pm,en_US-ryan-high
-architect,en_US-danny-low
+  const defaultVoices = `agent,voice
+bmad-master,en_US-ryan-high
+analyst,en_US-kristin-medium
+architect,en_GB-alan-medium
 dev,en_US-joe-medium
-analyst,en_US-amy-medium
-ux-designer,en_US-kristin-medium
-tea,en_US-lessac-medium
-sm,en_US-bryce-medium
-tech-writer,en_US-kathleen-low
-frame-expert,en_US-kusal-medium
-bmad-master,en_US-libritts_r-high
+pm,en_US-lessac-medium
+sm,en_US-amy-medium
+tea,en_US-kusal-medium
+tech-writer,jenny
+ux-designer,kristin
+frame-expert,en_GB-alan-medium
 `;
 
   try {
@@ -991,17 +991,17 @@ async function createDefaultBmadVoiceAssignmentsProactive(targetDir) {
     path.join(targetDir, 'bmad'),
   ];
 
-  const defaultVoices = `agent_id,voice_name
-pm,en_US-ryan-high
-architect,en_US-danny-low
+  const defaultVoices = `agent,voice
+bmad-master,en_US-ryan-high
+analyst,en_US-kristin-medium
+architect,en_GB-alan-medium
 dev,en_US-joe-medium
-analyst,en_US-amy-medium
-ux-designer,en_US-kristin-medium
-tea,en_US-lessac-medium
-sm,en_US-bryce-medium
-tech-writer,en_US-kathleen-low
-frame-expert,en_US-kusal-medium
-bmad-master,en_US-libritts_r-high
+pm,en_US-lessac-medium
+sm,en_US-amy-medium
+tea,en_US-kusal-medium
+tech-writer,jenny
+ux-designer,kristin
+frame-expert,en_GB-alan-medium
 `;
 
   for (const bmadPath of bmadPaths) {
@@ -1135,6 +1135,9 @@ async function handleBmadIntegration(targetDir) {
   // Process TTS_INJECTION markers in BMAD files if they exist
   // This handles the case where BMAD was installed before AgentVibes
   await processBmadTtsInjections(bmadDetection.bmadPath);
+
+  // Create default voice assignments if they don't exist
+  await createDefaultBmadVoiceAssignmentsProactive(targetDir);
 
   console.log(chalk.green('✅ BMAD agents will use agent-specific voices via bmad-speak.sh hook'));
 
