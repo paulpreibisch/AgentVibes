@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.12.5
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.12.6
 
 ---
 
@@ -94,17 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.12.5 - Code Quality Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.5)** 🎉
+**[v2.12.6 - Security & Reliability Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.12.6)** 🎉
 
-AgentVibes v2.12.5 improves code quality by upgrading Sonar quality gates and implementing best practices identified through static analysis. This release includes enhanced input validation, improved shell command handling, better file locking for atomic operations, and secure temporary directory management while maintaining 100% backward compatibility.
+AgentVibes v2.12.6 brings quality improvements based on SonarCloud analysis and enhances BMAD party mode. This release improves API key privacy in terminal output, adds better cleanup for long-running sessions, includes more robust error handling, and ensures BMAD agents each get their unique voice. All improvements maintain 100% backward compatibility.
 
 **Key Highlights:**
-- ✅ **Sonar Quality Gates Upgraded** - Enhanced code quality standards across the codebase
-- 🔒 **18 Code Improvements** - Better input validation, command handling, and file operations
-- 🧪 **110/110 Tests Passing** - All functionality verified and working
-- 🔄 **Zero Breaking Changes** - Fully backward compatible with existing installations
-- 📊 **162 Lines Enhanced** - Code quality improvements across 8 files
-- 💡 **Best Practices** - Improved error handling and validation
+- 🔒 **API Key Privacy** - Masked display prevents credential leaks in terminal history
+- 🛡️ **Resource Cleanup** - Better subprocess management for long-running stability
+- ⚡ **Error Handling** - Graceful degradation instead of crashes on file operations
+- 🎭 **BMAD Voice Detection** - Party mode supports multiple directory paths
+- ✅ **110/110 Tests Passing** - All functionality verified and working
+- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.12.5
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

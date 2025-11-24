@@ -128,27 +128,27 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.12.5 - Code Quality Improvements\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.12.6 - Security & Reliability Improvements\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.12.5 improves code quality by upgrading Sonar quality gates\n') +
-      chalk.cyan('and implementing best practices identified through static analysis. This\n') +
-      chalk.cyan('release includes enhanced input validation, improved shell command handling,\n') +
-      chalk.cyan('better file locking for atomic operations, and secure temporary directory\n') +
-      chalk.cyan('management while maintaining 100% backward compatibility.\n\n') +
+      chalk.cyan('AgentVibes v2.12.6 brings quality improvements based on SonarCloud analysis\n') +
+      chalk.cyan('and enhances BMAD party mode. This release improves API key privacy in\n') +
+      chalk.cyan('terminal output, adds better cleanup for long-running sessions, includes\n') +
+      chalk.cyan('more robust error handling, and ensures BMAD agents each get their unique\n') +
+      chalk.cyan('voice. All improvements maintain 100% backward compatibility.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   ✅ Sonar Quality Gates Upgraded - Enhanced code quality standards\n') +
-      chalk.gray('   🔒 18 Code Improvements - Better input validation and command handling\n') +
-      chalk.gray('   🧪 110/110 Tests Passing - All functionality verified and working\n') +
-      chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible with v2.12.4\n') +
-      chalk.gray('   📊 162 Lines Enhanced - Code quality improvements across 8 files\n') +
-      chalk.gray('   💡 Best Practices - Improved error handling and validation\n\n') +
+      chalk.gray('   🔒 API Key Privacy - Masked display prevents credential leaks in logs\n') +
+      chalk.gray('   🛡️ Resource Cleanup - Better subprocess management for stability\n') +
+      chalk.gray('   ⚡ Error Handling - Graceful degradation instead of crashes\n') +
+      chalk.gray('   🎭 BMAD Voice Detection - Party mode supports multiple directory paths\n') +
+      chalk.gray('   ✅ 110/110 Tests Passing - All functionality verified and working\n') +
+      chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible with v2.12.5\n\n') +
       chalk.cyan('Technical Improvements:\n') +
-      chalk.gray('   • Enhanced input validation across all interfaces\n') +
-      chalk.gray('   • Improved shell command handling with proper escaping\n') +
-      chalk.gray('   • Better file system operations with path validation\n') +
-      chalk.gray('   • Atomic PID file operations with file locking\n') +
-      chalk.gray('   • Cleaner code with debug output removed\n\n') +
+      chalk.gray('   • API keys now masked in terminal output and error messages\n') +
+      chalk.gray('   • Process cleanup prevents "too many open files" errors\n') +
+      chalk.gray('   • Enhanced error handling for file operations\n') +
+      chalk.gray('   • BMAD agents now use unique voices in party mode\n') +
+      chalk.gray('   • Shell config deduplication on repeated installs\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

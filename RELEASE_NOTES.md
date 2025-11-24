@@ -1,3 +1,225 @@
+# Release v2.12.6 - Security & Reliability Improvements
+
+**Release Date:** 2025-01-24
+**Type:** Patch Release (Security & Reliability)
+
+## 🔒 AI Summary
+
+AgentVibes v2.12.6 brings quality improvements based on SonarCloud analysis and enhances BMAD party mode. This release improves API key privacy in terminal output, adds better cleanup for long-running sessions, includes more robust error handling, and ensures BMAD agents each get their unique voice. All improvements maintain 100% backward compatibility with 110/110 tests passing.
+
+**Key Highlights:**
+- 🔒 **API Key Security** - Masked API key display prevents credential leaks in terminal history
+- 🛡️ **Resource Leak Prevention** - Subprocess cleanup prevents "too many open files" errors
+- ⚡ **Enhanced Error Handling** - Graceful degradation instead of crashes on file operations
+- 🎭 **BMAD Voice Detection** - Fixed party mode to support both .bmad and bmad directory paths
+- ✅ **110/110 Tests Passing** - All functionality verified and working
+
+---
+
+## 🔧 Security Improvements
+
+### API Key Masking (Issue #45)
+**Files:** `src/installer.js` (lines 384, 445, 464, 489)
+
+**Changes:**
+- Replaced partial API key display (`first10chars...`) with masked format (`***************...`)
+- Removed full API key from error messages and manual setup instructions
+- Changed all console outputs to use placeholder `<your-api-key>`
+
+**Impact:**
+- Prevents credential leaks in terminal history (`.bash_history`, `.zsh_history`)
+- Safer during screen recordings and screenshots
+- Reduces risk during pair programming sessions
+
+### Path Validation Enhancement (Issue #45)
+**File:** `src/installer.js:214-219`
+
+**Changes:**
+- Added `path.resolve()` validation for script execution
+- Ensures scripts are within allowed `.claude/hooks` directory
+- Defense-in-depth security measure
+
+**Impact:**
+- Prevents path traversal attacks
+- Better error messages for invalid paths
+
+---
+
+## 🛡️ Reliability Improvements
+
+### Resource Leak Prevention (Issue #45)
+**Files:** `mcp-server/server.py:144-174, 510-537`
+
+**Changes:**
+- Added try-finally blocks around subprocess operations
+- Ensures processes are properly killed if still running after errors
+- Cleanup happens even on exceptions
+
+**Impact:**
+- Prevents "too many open files" errors in long-running MCP server sessions
+- Better resource management for continuous operation
+- More stable in production environments
+
+### Enhanced Error Handling - Python (Issue #45)
+**Files:** `mcp-server/server.py:544-558, 565-584`
+
+**Changes:**
+- Added error handling to `_get_personality()` function
+- Added error handling to `_get_provider()` function
+- Catches `PermissionError`, `UnicodeDecodeError`, `OSError`
+- Returns sensible defaults instead of crashing
+
+**Impact:**
+- Graceful degradation when config files are corrupted or inaccessible
+- Continues operation with defaults rather than failing
+- Better user experience in edge cases
+
+### Enhanced Error Handling - JavaScript (Issue #45)
+**Files:** `src/installer.js:500-536, 544-604`
+
+**Changes:**
+- Added comprehensive error handling to `copyCommandFiles()`
+- Added comprehensive error handling to `copyHookFiles()`
+- Tracks success/failure counts per file
+- Continues with remaining files on partial failures
+- Shows clear feedback about what succeeded vs failed
+
+**Impact:**
+- Installation continues even if individual files fail to copy
+- Users see exactly which operations succeeded
+- Partial installations are more visible and recoverable
+
+### Shell Config Deduplication (Issue #45)
+**File:** `src/installer.js:482-498`
+
+**Changes:**
+- Checks if `ELEVENLABS_API_KEY` already exists before appending
+- Shows friendly message when key already present
+- Prevents duplicate entries on repeated installations
+
+**Impact:**
+- Cleaner shell configuration files
+- No accumulation of duplicate exports
+- Better UX for repeated installs
+
+---
+
+## 🎭 BMAD Integration Improvements
+
+### Multi-Path Voice Detection (Issue #46)
+**File:** `.claude/hooks/bmad-voice-manager.sh`
+
+**Changes:**
+- Enhanced `detect_bmad_version()` to check both `.bmad/` and `bmad/` paths
+- Updated `get_bmad_config_path()` to support both v6 directory variants
+- Fixed `get_agent_voice()` to find `agent-voice-map.csv` in either location
+
+**Impact:**
+- BMAD party mode now works regardless of installation path
+- Each agent speaks with their unique assigned voice
+- Resolves all agents using default "lessac" voice
+
+**Supported Paths:**
+```
+✓ .bmad/_cfg/agent-voice-map.csv (standard)
+✓ bmad/_cfg/agent-voice-map.csv (alternative)
+✓ .bmad/core/config.yaml (standard)
+✓ bmad/core/config.yaml (alternative)
+```
+
+---
+
+## 📊 Changes Summary
+
+**Issues Resolved:**
+- #45 - SonarCloud Quality Gate: 17 Security Hotspots & C Reliability
+- #46 - BMAD Plugin: Missing agent-voice-map.csv path detection
+
+**Files Modified:** 3
+- `src/installer.js` - API key masking, error handling, shell config deduplication, path validation
+- `mcp-server/server.py` - Resource cleanup, error handling
+- `.claude/hooks/bmad-voice-manager.sh` - Multi-path BMAD detection
+
+**Lines Changed:** 180 additions, 85 deletions
+
+**Test Results:** 110/110 passing ✅
+
+---
+
+## 💡 Technical Details
+
+### SonarCloud Quality Gate Fixes
+
+**Must-Fix Items (High Priority):**
+1. ✅ API Key Logging - Prevents accidental credential exposure
+2. ✅ Resource Leaks - Prevents crashes in long-running sessions
+3. ✅ Missing Error Handling - Prevents crashes on file system errors
+
+**Nice-to-Fix Items (Medium Priority):**
+4. ✅ Shell Config Deduplication - Better UX on repeated installations
+5. ✅ Path Validation Enhancement - Defense-in-depth security
+
+### Error Handling Strategy
+
+**Python (`server.py`):**
+```python
+try:
+    if personality_file.exists():
+        return personality_file.read_text().strip()
+except (PermissionError, UnicodeDecodeError, OSError) as e:
+    print(f"Warning: Could not read file: {e}", file=sys.stderr)
+return "normal"  # Sensible default
+```
+
+**JavaScript (`installer.js`):**
+```javascript
+try {
+    await fs.copyFile(srcPath, destPath);
+    successCount++;
+} catch (err) {
+    console.log(chalk.yellow(`⚠ Failed to copy ${file}: ${err.message}`));
+    // Continue with other files
+}
+```
+
+---
+
+## ✅ Testing
+
+### Test Suite Results
+- **110 tests total**
+- **110 passing** ✅
+- **0 failing**
+- All functionality verified working
+
+### Syntax Validation
+- ✅ Node.js syntax check passed
+- ✅ Python syntax check passed
+- ✅ No runtime errors detected
+
+---
+
+## 🎯 Migration Notes
+
+**No migration required** - This is a patch release with security and reliability improvements.
+
+**Compatibility:** 100% backward compatible with v2.12.5
+
+**Recommended Action:** Update to get the latest security and stability improvements
+```bash
+npx agentvibes@latest update
+```
+
+---
+
+## 🔗 References
+
+- GitHub Issue #45: https://github.com/paulpreibisch/AgentVibes/issues/45
+- GitHub Issue #46: https://github.com/paulpreibisch/AgentVibes/issues/46
+- SonarCloud Quality Gates: Code quality and security analysis
+
+---
+
 # Release v2.12.5 - Code Quality Improvements
 
 **Release Date:** 2025-01-23
