@@ -1298,7 +1298,6 @@ async function updateAgentVibes(targetDir, options) {
     console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
     console.log(chalk.white(`   • ${hookFileCount} TTS scripts updated`));
     console.log(chalk.white(`   • ${personalityResult.new + personalityResult.updated} personality templates (${personalityResult.new} new, ${personalityResult.updated} updated)`));
-    console.log(chalk.white(`   • ${outputStyleFiles.length} output styles updated`));
     if (pluginFileCount > 0) {
       console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files updated`));
     }
