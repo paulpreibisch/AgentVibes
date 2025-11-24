@@ -59,8 +59,12 @@ ENABLED_FLAG="$CONFIG_DIR/bmad-voices-enabled.flag"
 # @calledby auto_enable_if_bmad_detected, get_bmad_config_path
 # @calls None
 detect_bmad_version() {
-    if [[ -f "bmad/_cfg/manifest.yaml" ]]; then
-        # v6 detected
+    if [[ -f ".bmad/_cfg/manifest.yaml" ]]; then
+        # v6 detected (standard path with dot prefix)
+        echo "6"
+        return 0
+    elif [[ -f "bmad/_cfg/manifest.yaml" ]]; then
+        # v6 detected (alternative path without dot prefix)
         echo "6"
         return 0
     elif [[ -f ".bmad-core/install-manifest.yaml" ]]; then
@@ -88,7 +92,12 @@ get_bmad_config_path() {
     local version=$(detect_bmad_version)
 
     if [[ "$version" == "6" ]]; then
-        echo "bmad/core/config.yaml"
+        # Check both possible v6 paths
+        if [[ -f ".bmad/core/config.yaml" ]]; then
+            echo ".bmad/core/config.yaml"
+        else
+            echo "bmad/core/config.yaml"
+        fi
         return 0
     elif [[ "$version" == "4" ]]; then
         echo ".bmad-core/config.yaml"
@@ -138,8 +147,15 @@ get_agent_voice() {
 
     # Check for BMAD v6 CSV file first (preferred, loose coupling)
     # If this exists, use it directly without requiring plugin enable flag
-    local bmad_voice_map=".bmad/_cfg/agent-voice-map.csv"
-    if [[ -f "$bmad_voice_map" ]]; then
+    # Support both .bmad (standard) and bmad (alternative) paths
+    local bmad_voice_map=""
+    if [[ -f ".bmad/_cfg/agent-voice-map.csv" ]]; then
+        bmad_voice_map=".bmad/_cfg/agent-voice-map.csv"
+    elif [[ -f "bmad/_cfg/agent-voice-map.csv" ]]; then
+        bmad_voice_map="bmad/_cfg/agent-voice-map.csv"
+    fi
+
+    if [[ -n "$bmad_voice_map" ]]; then
         # Read from BMAD's standard _cfg directory
         # CSV format: agent_id,voice_name
         local voice=$(grep "^$agent_id," "$bmad_voice_map" | cut -d',' -f2)

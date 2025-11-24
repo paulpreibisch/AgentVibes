@@ -211,6 +211,13 @@ function execScript(scriptPath, options = {}) {
     throw new Error('Invalid characters in script path');
   }
 
+  // Validate path is within expected directory (defense in depth)
+  const resolvedPath = path.resolve(scriptFile);
+  const allowedDir = path.resolve(__dirname, '..', '.claude', 'hooks');
+  if (!resolvedPath.startsWith(allowedDir)) {
+    throw new Error('Script path outside allowed directory');
+  }
+
   // Escape each argument properly
   const escapedArgs = args.map(arg => {
     // Replace single quotes with '\'' (end quote, escaped quote, start quote)
@@ -381,7 +388,7 @@ async function handleElevenLabsApiKey(options) {
 
   if (elevenLabsKey) {
     console.log(chalk.green(`\n✓ ElevenLabs API key detected from environment`));
-    console.log(chalk.gray(`  Key: ${elevenLabsKey.substring(0, 10)}...`));
+    console.log(chalk.gray(`  Key: ***************...`));
 
     if (!options.yes) {
       const { useExisting } = await inquirer.prompt([
@@ -442,7 +449,7 @@ async function handleElevenLabsApiKey(options) {
 
     if (setupMethod === 'manual') {
       console.log(chalk.yellow('\n⚠️  Remember to add this to your environment variables later:'));
-      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
     } else if (setupMethod === 'shell') {
       await addApiKeyToShellConfig(apiKey);
     }
@@ -461,7 +468,7 @@ async function addApiKeyToShellConfig(apiKey) {
   if (!shellName || !shellConfig) {
     console.log(chalk.yellow('\n⚠️  Could not detect shell type'));
     console.log(chalk.gray('   Please add manually to your shell config:'));
-    console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+    console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
     return;
   }
 
@@ -479,14 +486,27 @@ async function addApiKeyToShellConfig(apiKey) {
 
   if (confirmShell) {
     try {
-      const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
-      await fs.appendFile(shellConfig, configContent);
-      console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
-      console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
+      // Check if already exists to avoid duplicates
+      let existingContent = '';
+      try {
+        existingContent = await fs.readFile(shellConfig, 'utf8');
+      } catch (err) {
+        // File might not exist yet, which is fine
+      }
+
+      if (existingContent.includes('ELEVENLABS_API_KEY')) {
+        console.log(chalk.cyan(`\n→ API key already exists in ${shellConfig}`));
+        console.log(chalk.gray('   No changes needed'));
+      } else {
+        const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
+        await fs.appendFile(shellConfig, configContent);
+        console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
+        console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
+      }
     } catch (error) {
       console.log(chalk.red(`\n✗ Failed to write to ${shellConfig}`));
       console.log(chalk.gray('   Please add manually:'));
-      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="${apiKey}"\n`));
+      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
     }
   }
 }
@@ -503,20 +523,36 @@ async function copyCommandFiles(targetDir, spinner) {
   const commandsDir = path.join(targetDir, '.claude', 'commands');
   const agentVibesCommandsDir = path.join(commandsDir, 'agent-vibes');
 
-  await fs.mkdir(agentVibesCommandsDir, { recursive: true });
+  try {
+    await fs.mkdir(agentVibesCommandsDir, { recursive: true });
 
-  const commandFiles = await fs.readdir(srcCommandsDir);
-  console.log(chalk.cyan(`\n📋 Installing ${commandFiles.length} command files:`));
+    const commandFiles = await fs.readdir(srcCommandsDir);
+    console.log(chalk.cyan(`\n📋 Installing ${commandFiles.length} command files:`));
 
-  for (const file of commandFiles) {
-    const srcPath = path.join(srcCommandsDir, file);
-    const destPath = path.join(agentVibesCommandsDir, file);
-    await fs.copyFile(srcPath, destPath);
-    console.log(chalk.gray(`   ✓ agent-vibes/${file}`));
+    let successCount = 0;
+    for (const file of commandFiles) {
+      const srcPath = path.join(srcCommandsDir, file);
+      const destPath = path.join(agentVibesCommandsDir, file);
+      try {
+        await fs.copyFile(srcPath, destPath);
+        console.log(chalk.gray(`   ✓ agent-vibes/${file}`));
+        successCount++;
+      } catch (err) {
+        console.log(chalk.yellow(`   ⚠ Failed to copy ${file}: ${err.message}`));
+        // Continue with other files
+      }
+    }
+
+    if (successCount === commandFiles.length) {
+      spinner.succeed(chalk.green('Installed /agent-vibes commands!\n'));
+    } else {
+      spinner.warn(chalk.yellow(`Installed ${successCount}/${commandFiles.length} commands (some failed)\n`));
+    }
+    return successCount;
+  } catch (err) {
+    spinner.fail(chalk.red(`Failed to install commands: ${err.message}`));
+    throw err;
   }
-
-  spinner.succeed(chalk.green('Installed /agent-vibes commands!\n'));
-  return commandFiles.length;
 }
 
 /**
@@ -530,40 +566,61 @@ async function copyHookFiles(targetDir, spinner) {
   const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
   const hooksDir = path.join(targetDir, '.claude', 'hooks');
 
-  await fs.mkdir(hooksDir, { recursive: true });
+  try {
+    await fs.mkdir(hooksDir, { recursive: true });
 
-  const allHookFiles = await fs.readdir(srcHooksDir);
-  const hookFiles = [];
+    const allHookFiles = await fs.readdir(srcHooksDir);
+    const hookFiles = [];
 
-  for (const file of allHookFiles) {
-    const srcPath = path.join(srcHooksDir, file);
-    const stat = await fs.stat(srcPath);
+    for (const file of allHookFiles) {
+      const srcPath = path.join(srcHooksDir, file);
+      try {
+        const stat = await fs.stat(srcPath);
 
-    if (stat.isFile() &&
-        (file.endsWith('.sh') || file === 'hooks.json') &&
-        !file.includes('prepare-release') &&
-        !file.startsWith('.')) {
-      hookFiles.push(file);
+        if (stat.isFile() &&
+            (file.endsWith('.sh') || file === 'hooks.json') &&
+            !file.includes('prepare-release') &&
+            !file.startsWith('.')) {
+          hookFiles.push(file);
+        }
+      } catch (err) {
+        console.log(chalk.yellow(`   ⚠ Could not check ${file}: ${err.message}`));
+        // Continue with other files
+      }
     }
-  }
 
-  console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
-  for (const file of hookFiles) {
-    const srcPath = path.join(srcHooksDir, file);
-    const destPath = path.join(hooksDir, file);
-    await fs.copyFile(srcPath, destPath);
+    console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
+    let successCount = 0;
+    for (const file of hookFiles) {
+      const srcPath = path.join(srcHooksDir, file);
+      const destPath = path.join(hooksDir, file);
+      try {
+        await fs.copyFile(srcPath, destPath);
 
-    if (file.endsWith('.sh')) {
-      // Security: Use more restrictive permissions (owner: rwx, group: r-x, others: ---)
-      await fs.chmod(destPath, 0o750);
-      console.log(chalk.gray(`   ✓ ${file} (executable)`));
+        if (file.endsWith('.sh')) {
+          // Security: Use more restrictive permissions (owner: rwx, group: r-x, others: ---)
+          await fs.chmod(destPath, 0o750);
+          console.log(chalk.gray(`   ✓ ${file} (executable)`));
+        } else {
+          console.log(chalk.gray(`   ✓ ${file}`));
+        }
+        successCount++;
+      } catch (err) {
+        console.log(chalk.yellow(`   ⚠ Failed to copy ${file}: ${err.message}`));
+        // Continue with other files
+      }
+    }
+
+    if (successCount === hookFiles.length) {
+      spinner.succeed(chalk.green('Installed TTS scripts!\n'));
     } else {
-      console.log(chalk.gray(`   ✓ ${file}`));
+      spinner.warn(chalk.yellow(`Installed ${successCount}/${hookFiles.length} scripts (some failed)\n`));
     }
+    return successCount;
+  } catch (err) {
+    spinner.fail(chalk.red(`Failed to install hook scripts: ${err.message}`));
+    throw err;
   }
-
-  spinner.succeed(chalk.green('Installed TTS scripts!\n'));
-  return hookFiles.length;
 }
 
 /**

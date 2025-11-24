@@ -147,25 +147,31 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await result.communicate()
+            try:
+                stdout, stderr = await result.communicate()
 
-            if result.returncode == 0:
-                output = stdout.decode().strip()
-                # Extract file path from output
-                for line in output.split("\n"):
-                    if "Saved to:" in line:
-                        file_path = line.split("Saved to:")[1].strip()
-                        truncated = (
-                            f"{text[:50]}..." if len(text) > 50 else text
-                        )
-                        return f"✅ Spoke: {truncated}\n📁 Audio saved: {file_path}"
+                if result.returncode == 0:
+                    output = stdout.decode().strip()
+                    # Extract file path from output
+                    for line in output.split("\n"):
+                        if "Saved to:" in line:
+                            file_path = line.split("Saved to:")[1].strip()
+                            truncated = (
+                                f"{text[:50]}..." if len(text) > 50 else text
+                            )
+                            return f"✅ Spoke: {truncated}\n📁 Audio saved: {file_path}"
 
-                return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
-            else:
-                error = stderr.decode().strip()
-                stdout_output = stdout.decode().strip()
-                full_error = f"{error}\nStdout: {stdout_output}" if stdout_output else error
-                return f"❌ TTS failed: {full_error}"
+                    return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
+                else:
+                    error = stderr.decode().strip()
+                    stdout_output = stdout.decode().strip()
+                    full_error = f"{error}\nStdout: {stdout_output}" if stdout_output else error
+                    return f"❌ TTS failed: {full_error}"
+            finally:
+                # Ensure process cleanup
+                if result.returncode is None:
+                    result.kill()
+                    await result.wait()
 
         finally:
             # Restore original settings
@@ -513,14 +519,20 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await result.communicate()
-            if result.returncode == 0:
-                return stdout.decode().strip()
-            else:
-                error_msg = stderr.decode().strip()
-                if not error_msg:  # If stderr is empty, include stdout for debugging
-                    error_msg = f"Return code {result.returncode}. Stdout: {stdout.decode().strip()}"
-                return error_msg
+            try:
+                stdout, stderr = await result.communicate()
+                if result.returncode == 0:
+                    return stdout.decode().strip()
+                else:
+                    error_msg = stderr.decode().strip()
+                    if not error_msg:  # If stderr is empty, include stdout for debugging
+                        error_msg = f"Return code {result.returncode}. Stdout: {stdout.decode().strip()}"
+                    return error_msg
+            finally:
+                # Ensure process cleanup
+                if result.returncode is None:
+                    result.kill()
+                    await result.wait()
         except Exception as e:
             return f"Error running script: {e}"
 
@@ -536,8 +548,13 @@ class AgentVibesServer:
             # Try global
             personality_file = Path.home() / ".claude" / "tts-personality.txt"
 
-        if personality_file.exists():
-            return personality_file.read_text().strip()
+        try:
+            if personality_file.exists():
+                return personality_file.read_text().strip()
+        except (PermissionError, UnicodeDecodeError, OSError) as e:
+            # Log error but don't crash - return default
+            import sys
+            print(f"Warning: Could not read personality file: {e}", file=sys.stderr)
         return "normal"
 
     async def _get_language(self) -> str:
@@ -551,13 +568,18 @@ class AgentVibesServer:
         if not provider_file.exists():
             provider_file = Path.home() / ".claude" / "tts-provider.txt"
 
-        if provider_file.exists():
-            provider = provider_file.read_text().strip()
-            if provider == "elevenlabs":
-                return "ElevenLabs (Premium AI)"
-            elif provider == "piper":
-                return "Piper TTS (Free, Offline)"
-            return provider
+        try:
+            if provider_file.exists():
+                provider = provider_file.read_text().strip()
+                if provider == "elevenlabs":
+                    return "ElevenLabs (Premium AI)"
+                elif provider == "piper":
+                    return "Piper TTS (Free, Offline)"
+                return provider
+        except (PermissionError, UnicodeDecodeError, OSError) as e:
+            # Log error but don't crash - return default
+            import sys
+            print(f"Warning: Could not read provider file: {e}", file=sys.stderr)
         # Default to Piper (free, offline) instead of ElevenLabs
         return "Piper TTS (Free, Offline)"
 
