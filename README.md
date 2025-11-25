@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.3
 
 ---
 
@@ -94,7 +94,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.12.6 - Security & Reliability Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.2)** 🎉
+**[v2.12.6 - Security & Reliability Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.3)** 🎉
 
 AgentVibes v2.12.6 brings quality improvements based on SonarCloud analysis and enhances BMAD party mode. This release improves API key privacy in terminal output, adds better cleanup for long-running sessions, includes more robust error handling, and ensures BMAD agents each get their unique voice. All improvements maintain 100% backward compatibility.
 
