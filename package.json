@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "agentvibes",
-  "version": "2.13.7",
+  "version": "2.13.8",
   "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code and Claude Desktop (via MCP) with multi-provider support.",
   "homepage": "https://agentvibes.org",
   "keywords": [
