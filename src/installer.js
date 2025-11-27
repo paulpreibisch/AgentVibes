@@ -45,7 +45,7 @@ import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import figlet from 'figlet';
@@ -208,18 +208,12 @@ function execScript(scriptPath, options = {}) {
     throw new Error('Script path outside allowed directory');
   }
 
-  // Escape each argument properly
-  const escapedArgs = args.map(arg => {
-    // Replace single quotes with '\'' (end quote, escaped quote, start quote)
-    return `'${arg.replace(/'/g, "'\\''")}'`;
-  }).join(' ');
+  // Security: Use execFileSync with -c flag to prevent command injection
+  // The shell sources its config and executes the script with arguments passed as array
+  // This avoids string interpolation vulnerabilities
+  const shellScript = `source "${shellConfig}" 2>/dev/null; exec "${scriptFile}" "$@"`;
 
-  // Build command with properly escaped components
-  const scriptCommand = escapedArgs ? `'${scriptFile}' ${escapedArgs}` : `'${scriptFile}'`;
-  const command = `source "${shellConfig}" 2>/dev/null; ${shell} ${scriptCommand}`;
-
-  return execSync(command, {
-    shell: shell,
+  return execFileSync(shell, ['-c', shellScript, '--', ...args], {
     ...options
   });
 }
@@ -1181,7 +1175,9 @@ async function showRecentChanges(sourceDir) {
             continue;
           }
           if (inCodeBlock && line.trim()) {
-            const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+            // Security: Use bounded quantifiers to prevent ReDoS
+            // Match git short hash (7-12 hex chars) followed by single space and message
+            const match = line.match(/^([a-f0-9]{7,12}) (.*)$/);
             if (match) {
               const [, hash, message] = match;
               console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
@@ -1611,8 +1607,9 @@ async function install(options = {}) {
             }
 
             if (inCodeBlock && line.trim()) {
-              // Parse commit line: "hash message"
-              const match = line.match(/^([a-f0-9]+)\s+(.+)$/);
+              // Security: Use bounded quantifiers to prevent ReDoS
+              // Match git short hash (7-12 hex chars) followed by single space and message
+              const match = line.match(/^([a-f0-9]{7,12}) (.*)$/);
               if (match) {
                 const [, hash, message] = match;
                 console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));

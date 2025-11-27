@@ -391,7 +391,9 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        import random
+        # Security: Using secrets.choice for cryptographically secure random selection
+        # Even though this is just for UI variety, we use secrets to satisfy security scanners
+        import secrets
 
         args = ["target", speed] if target else [speed]
         result = await self._run_script("speed-manager.sh", args)
@@ -406,7 +408,7 @@ class AgentVibesServer:
             ]
 
             # Pick a random test message and speak it
-            test_message = random.choice(test_messages)
+            test_message = secrets.choice(test_messages)
 
             try:
                 # Speak the test message to demonstrate the new speed

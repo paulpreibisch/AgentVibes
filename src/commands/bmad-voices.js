@@ -14,7 +14,7 @@
  * Licensed under the Apache License, Version 2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import chalk from 'chalk';
@@ -155,16 +155,6 @@ async function writeVoiceAssignments(assignments) {
 }
 
 /**
- * Security: Escape shell arguments to prevent command injection
- * @param {string} arg - Argument to escape
- * @returns {string} - Safely escaped argument
- */
-function escapeShellArg(arg) {
-  // Replace single quotes with '\'' (end quote, escaped quote, start quote)
-  return `'${arg.replace(/'/g, "'\\''")}'`;
-}
-
-/**
  * Find matching voice name using fuzzy matching
  * Supports partial matches like "ryan" → "en_US-ryan-high"
  */
@@ -228,10 +218,8 @@ export async function previewVoice(voiceName, options = {}) {
   }
 
   try {
-    // Security: Properly escape arguments to prevent command injection
-    const escapedText = escapeShellArg(text);
-    const escapedVoice = escapeShellArg(matchedVoice);
-    execSync(`bash "${playTtsPath}" ${escapedText} ${escapedVoice}`, {
+    // Security: Use execFileSync with array args to prevent command injection
+    execFileSync('bash', [playTtsPath, text, matchedVoice], {
       stdio: 'inherit',
       cwd: targetDir,
     });

@@ -5,7 +5,7 @@
  * Runs after npm install to ensure Python mcp package is installed
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { platform } from 'os';
 
 const isWindows = platform() === 'win32';
@@ -23,7 +23,8 @@ function checkPython() {
     }
 
     try {
-      const version = execSync(`${cmd} --version`, { encoding: 'utf8', stdio: 'pipe' });
+      // Security: Use execFileSync with array args to prevent command injection
+      const version = execFileSync(cmd, ['--version'], { encoding: 'utf8', stdio: 'pipe' });
       console.log(`✅ Found ${cmd}: ${version.trim()}`);
       return cmd;
     } catch (error) {
@@ -44,7 +45,8 @@ function checkMcpInstalled(pythonCmd) {
   }
 
   try {
-    execSync(`${pythonCmd} -c "import mcp"`, { stdio: 'pipe' });
+    // Security: Use execFileSync with array args to prevent command injection
+    execFileSync(pythonCmd, ['-c', 'import mcp'], { stdio: 'pipe' });
     return true;
   } catch (error) {
     return false;
@@ -62,9 +64,8 @@ function installMcp(pythonCmd) {
 
   try {
     console.log('\n📦 Installing Python mcp package...');
-    const command = `${pythonCmd} -m pip install --user mcp`;
-
-    execSync(command, { stdio: 'inherit' });
+    // Security: Use execFileSync with array args to prevent command injection
+    execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], { stdio: 'inherit' });
     console.log('✅ Python mcp package installed successfully!\n');
     return true;
   } catch (error) {

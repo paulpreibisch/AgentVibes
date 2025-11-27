@@ -7,7 +7,7 @@
  */
 
 import inquirer from 'inquirer';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -20,7 +20,8 @@ import boxen from 'boxen';
  */
 function checkWSL() {
   try {
-    execSync('wsl --version', { stdio: 'pipe' });
+    // Security: Use execFileSync with array args to prevent command injection
+    execFileSync('wsl', ['--version'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -35,7 +36,8 @@ function checkPython() {
 
   for (const cmd of commands) {
     try {
-      const version = execSync(`${cmd} --version`, { encoding: 'utf8', stdio: 'pipe' });
+      // Security: Use execFileSync with array args to prevent command injection
+      const version = execFileSync(cmd, ['--version'], { encoding: 'utf8', stdio: 'pipe' });
       return { available: true, command: cmd, version: version.trim() };
     } catch {
       continue;
@@ -50,7 +52,8 @@ function checkPython() {
  */
 function checkMCPPackage(pythonCmd) {
   try {
-    execSync(`${pythonCmd} -c "import mcp"`, { stdio: 'pipe' });
+    // Security: Use execFileSync with array args to prevent command injection
+    execFileSync(pythonCmd, ['-c', 'import mcp'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -157,10 +160,11 @@ async function installPiper(useWSL = false) {
   const spinner = ora('Installing Piper TTS...').start();
 
   try {
+    // Security: Use execFileSync with array args to prevent command injection
     if (useWSL) {
-      execSync('wsl pipx install piper-tts', { stdio: 'inherit' });
+      execFileSync('wsl', ['pipx', 'install', 'piper-tts'], { stdio: 'inherit' });
     } else {
-      execSync('pipx install piper-tts', { stdio: 'inherit' });
+      execFileSync('pipx', ['install', 'piper-tts'], { stdio: 'inherit' });
     }
     spinner.succeed('Piper TTS installed successfully!');
     return true;
@@ -184,10 +188,11 @@ async function installMCPPackage(pythonCmd, useWSL = false) {
   const spinner = ora('Installing Python MCP package...').start();
 
   try {
+    // Security: Use execFileSync with array args to prevent command injection
     if (useWSL) {
-      execSync(`wsl ${pythonCmd} -m pip install --break-system-packages mcp`, { stdio: 'pipe' });
+      execFileSync('wsl', [pythonCmd, '-m', 'pip', 'install', '--break-system-packages', 'mcp'], { stdio: 'pipe' });
     } else {
-      execSync(`${pythonCmd} -m pip install --user mcp`, { stdio: 'pipe' });
+      execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], { stdio: 'pipe' });
     }
     spinner.succeed('Python MCP package installed successfully!');
     return true;
@@ -263,7 +268,8 @@ export async function installMCP() {
       if (installWSL) {
         console.log(chalk.cyan('\n📦 Installing WSL...'));
         try {
-          execSync('wsl --install', { stdio: 'inherit' });
+          // Security: Use execFileSync with array args to prevent command injection
+          execFileSync('wsl', ['--install'], { stdio: 'inherit' });
           console.log(chalk.green('\n✅ WSL installed successfully!'));
           console.log(chalk.yellow('⚠️  Please restart your computer and run this installer again.'));
           process.exit(0);
