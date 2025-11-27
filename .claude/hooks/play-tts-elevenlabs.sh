@@ -198,8 +198,10 @@ TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).mp3"
 # @sideeffects Creates MP3 file in audio directory
 # @edgecases Handles network failures, API errors, rate limiting
 # Choose model based on language
+# Note: eleven_monolingual_v1 deprecated for free tier as of Nov 2025
+# Using eleven_turbo_v2_5 for English (fast, high quality, free tier compatible)
 if [[ "$LANGUAGE_CODE" == "en" ]]; then
-  MODEL_ID="eleven_monolingual_v1"
+  MODEL_ID="eleven_turbo_v2_5"
 else
   MODEL_ID="eleven_multilingual_v2"
 fi
