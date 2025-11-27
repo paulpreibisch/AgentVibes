@@ -94,16 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.13.7 - Voice Intros & PR Workflow](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.9)** 🎉
+**[v2.13.9 - Provider-Aware Voice Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.9)** 🎉
 
-AgentVibes v2.13.7 adds voice map with intro messages for BMAD party mode and improves voice assignments for better persona fit.
+AgentVibes v2.13.9 fixes a critical issue where BMAD voice mappings were not provider-aware, causing "Voice model not found" errors when switching between ElevenLabs and Piper TTS providers. The release introduces intelligent voice migration that automatically maps voices when switching providers.
 
 **Key Highlights:**
-- 🎤 **Voice Map with Intros** - Default BMAD voice assignments now include intro messages for party mode
-- 🔄 **Voice Swap** - bmad-master and pm (John) voices swapped for better persona fit
-- 📋 **PR Workflow Rules** - Added CLAUDE.md guidelines for safer PR workflows
-- ✅ **110/110 Tests Passing** - All functionality verified and working
-- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.13.6
+- 🔄 **Smart Voice Migration** - Automatic voice mapping when switching TTS providers (e.g., "Amy" → "en_US-amy-medium")
+- 📝 **Provider-Aware Docs** - BMAD documentation now shows both ElevenLabs and Piper columns
+- 🎤 **Valid Piper Names** - Fixed incomplete Piper voice names (kristin → en_US-kristin-medium)
+- 🛡️ **Preserve Voice Names** - Internal spaces in voice names no longer stripped
+- ✅ **122 Tests Passing** - All functionality verified (110 bats + 12 node tests)
+- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.13.8
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
