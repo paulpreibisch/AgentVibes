@@ -128,16 +128,16 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.13.7 - Voice Intros & PR Workflow\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.13.9 - Provider-Aware Voice Migration\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.13.7 adds voice map with intro messages for BMAD party\n') +
-      chalk.cyan('mode and improves voice assignments for better persona fit.\n\n') +
+      chalk.cyan('AgentVibes v2.13.9 fixes voice mapping when switching TTS providers.\n') +
+      chalk.cyan('Voices now auto-migrate between ElevenLabs and Piper seamlessly.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🎤 Voice Map with Intros - BMAD agents now have intro messages\n') +
-      chalk.gray('   🔄 Voice Swap - bmad-master and pm voices swapped for better fit\n') +
-      chalk.gray('   📋 PR Workflow Rules - Added CLAUDE.md guidelines for safer PRs\n') +
-      chalk.gray('   ✅ All Tests Passing - Full test coverage verified\n') +
+      chalk.gray('   🔄 Smart Voice Migration - Auto-map voices when switching providers\n') +
+      chalk.gray('   📝 Provider-Aware Docs - BMAD shows both ElevenLabs & Piper columns\n') +
+      chalk.gray('   🎤 Valid Piper Names - Fixed incomplete voice names in mappings\n') +
+      chalk.gray('   ✅ 122 Tests Passing - All functionality verified\n') +
       chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
