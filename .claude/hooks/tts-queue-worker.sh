@@ -7,7 +7,14 @@
 
 set -euo pipefail
 
-QUEUE_DIR="/tmp/agentvibes-tts-queue"
+# Security: Use secure temp directory with restrictive permissions
+# Must match the logic in tts-queue.sh exactly
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
+  QUEUE_DIR="$XDG_RUNTIME_DIR/agentvibes-tts-queue"
+else
+  # Fallback to user-specific temp directory
+  QUEUE_DIR="/tmp/agentvibes-tts-queue-$USER"
+fi
 WORKER_PID_FILE="$QUEUE_DIR/worker.pid"
 IDLE_TIMEOUT=5  # Exit after 5 seconds of no new requests
 
