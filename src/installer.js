@@ -957,18 +957,20 @@ async function createDefaultBmadVoiceAssignments(bmadPath) {
     // File doesn't exist, create it
   }
 
-  // Default voice assignments for common BMAD agents
-  const defaultVoices = `agent,voice
-bmad-master,en_US-ryan-high
-analyst,en_US-kristin-medium
-architect,en_GB-alan-medium
-dev,en_US-joe-medium
-pm,en_US-lessac-medium
-sm,en_US-amy-medium
-tea,en_US-kusal-medium
-tech-writer,jenny
-ux-designer,kristin
-frame-expert,en_GB-alan-medium
+  // Default voice assignments and intros for common BMAD agents
+  // Note: BMAD installer also generates this file - these are fallback defaults
+  // if AgentVibes is installed without BMAD or before BMAD
+  const defaultVoices = `agent,voice,intro
+bmad-master,en_US-lessac-medium,"Greetings! The BMad Master is here to orchestrate and guide you through any workflow."
+analyst,en_US-kristin-medium,"Hi there! I'm Mary, your Business Analyst. I'll help uncover the real requirements."
+architect,en_GB-alan-medium,"Hello! Winston here, your Architect. I'll ensure we build something scalable and pragmatic."
+dev,en_US-joe-medium,"Hey! Amelia here, your Developer. Ready to turn specs into working code."
+pm,en_US-ryan-high,"Hey team! John here, your Product Manager. Let's make sure we're building the right thing."
+sm,en_US-amy-medium,"Hi everyone! Bob here, your Scrum Master. I'll keep us focused and moving forward."
+tea,en_US-kusal-medium,"Hello! Murat here, your Test Architect. Quality is my obsession."
+tech-writer,jenny,"Hi! I'm Paige, your Technical Writer. I'll make sure everything is documented clearly."
+ux-designer,kristin,"Hey! Sally here, your UX Designer. The user experience is my top priority."
+frame-expert,en_GB-alan-medium,"Hello! Saif here, your Visual Design Expert. I'll help visualize your ideas."
 `;
 
   try {

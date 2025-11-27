@@ -4,6 +4,22 @@
 AgentVibes is a Text-to-Speech system for AI assistants with personality support.
 This document defines coding standards and quality requirements for all contributions.
 
+## CRITICAL: PR and Commit Workflow
+
+**NEVER push to a PR or commit changes without explicit user approval.**
+
+When working on PRs or making changes to external repositories:
+1. **Always describe the changes first** - Explain what you plan to modify
+2. **Wait for user to test locally** - Do not push until user confirms testing is complete
+3. **Ask before pushing** - Get explicit "yes, push it" or similar confirmation
+4. **If user says "let me know before adding to PR"** - This means STOP and WAIT for approval
+
+This rule applies to:
+- All commits to any repository
+- All pushes to remote branches
+- All PR updates
+- Any changes to BMAD-METHOD or other external projects
+
 ## Sonar Quality Gates (REQUIRED)
 
 All code MUST pass SonarCloud quality gates before merging. The following checks are mandatory:
