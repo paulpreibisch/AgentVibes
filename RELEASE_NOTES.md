@@ -1,3 +1,115 @@
+# Release v2.13.4 - BMAD Integration Fix
+
+**Release Date:** 2025-01-27
+**Type:** Patch Release (Bug Fix)
+
+## 🔧 AI Summary
+
+AgentVibes v2.13.4 fixes a critical bug in BMAD integration where path security validation was using `process.cwd()` instead of the actual target installation directory. This caused false "Security: Invalid BMAD path detected" errors when AgentVibes was called from BMAD's installer via `npx`.
+
+**Key Highlights:**
+- 🔧 **BMAD Path Fix** - Security validation now correctly uses the `targetDir` parameter
+- 🛡️ **Edge Case Fixed** - `/projectX` no longer incorrectly matches `/project` prefix
+- 🧪 **New Test Suite** - 12 comprehensive tests for path security validation
+- ✅ **All Tests Passing** - Full test coverage verified
+- 🔄 **Zero Breaking Changes** - Fully backward compatible
+
+---
+
+## 🔧 Bug Fix
+
+### BMAD Path Security Validation (PR #934 Integration)
+**Files:** `src/installer.js` (lines 870-895, 1138)
+
+**Problem:**
+When BMAD's installer called AgentVibes via `npx agentvibes@latest install`, the `processBmadTtsInjections` function was using `process.cwd()` for security validation. However, `process.cwd()` reflects where the command was run from, not the target installation directory. This caused legitimate BMAD paths to be rejected as security violations.
+
+**Solution:**
+- Modified `processBmadTtsInjections` to accept a `targetDir` parameter
+- Changed security validation from `isPathSafe(bmadPath, process.cwd())` to `isPathSafe(bmadPath, targetDir)`
+- Enhanced `isPathSafe` function to check for path separator, preventing prefix attacks (e.g., `/projectX` should NOT match `/project`)
+
+**Code Change:**
+```javascript
+// Before (buggy)
+async function processBmadTtsInjections(bmadPath) {
+  const cwd = process.cwd();
+  if (!isPathSafe(bmadPath, cwd)) {
+    console.error('⚠️  Security: Invalid BMAD path detected');
+    return;
+  }
+}
+
+// After (fixed)
+async function processBmadTtsInjections(bmadPath, targetDir) {
+  if (!isPathSafe(bmadPath, targetDir)) {
+    console.error('⚠️  Security: Invalid BMAD path detected');
+    return;
+  }
+}
+```
+
+**Impact:**
+- BMAD integration now works correctly when called via `npx` from any directory
+- Security validation still prevents path traversal attacks
+- No changes required for existing installations
+
+---
+
+## 🧪 New Tests
+
+### Path Security Validation Test Suite
+**File:** `test/unit/bmad-path-security.test.js`
+
+**12 new tests covering:**
+1. Valid paths within targetDir
+2. Nested paths within targetDir
+3. Path traversal attack prevention (e.g., `../../etc/passwd`)
+4. Completely different paths rejection
+5. Parent directory rejection
+6. Relative path handling
+7. Actual directory validation
+8. BMAD integration scenario simulation
+9. Paths outside installation directory rejection
+10. Trailing slashes handling
+11. Multiple slashes handling
+12. Similar prefix edge cases (`/projectX` vs `/project`)
+
+---
+
+## 📊 Changes Summary
+
+**Files Modified:** 2
+- `src/installer.js` - Fixed path security validation, updated showReleaseInfo
+- `package.json` - Added Node.js test runner support
+
+**Files Added:** 1
+- `test/unit/bmad-path-security.test.js` - Comprehensive path security tests
+
+**Lines Changed:** ~180 additions, ~10 deletions
+
+---
+
+## 🎯 Migration Notes
+
+**No migration required** - This is a patch release with a bug fix.
+
+**Compatibility:** 100% backward compatible with v2.13.3
+
+**Recommended Action:** Update to fix BMAD integration issues
+```bash
+npx agentvibes@latest update
+```
+
+---
+
+## 🔗 References
+
+- BMAD-METHOD PR #934: BMAD installer integration
+- Issue: "Security: Invalid BMAD path detected" false positives
+
+---
+
 # Release v2.12.6 - Security & Reliability Improvements
 
 **Release Date:** 2025-01-24

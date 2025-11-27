@@ -128,27 +128,24 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.12.6 - Security & Reliability Improvements\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.13.4 - BMAD Integration Fix\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.12.6 brings quality improvements based on SonarCloud analysis\n') +
-      chalk.cyan('and enhances BMAD party mode. This release improves API key privacy in\n') +
-      chalk.cyan('terminal output, adds better cleanup for long-running sessions, includes\n') +
-      chalk.cyan('more robust error handling, and ensures BMAD agents each get their unique\n') +
-      chalk.cyan('voice. All improvements maintain 100% backward compatibility.\n\n') +
+      chalk.cyan('AgentVibes v2.13.4 fixes a critical bug in BMAD integration where path\n') +
+      chalk.cyan('security validation was using process.cwd() instead of the actual target\n') +
+      chalk.cyan('installation directory. This caused false "Security: Invalid BMAD path\n') +
+      chalk.cyan('detected" errors when AgentVibes was called from BMAD\'s installer.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔒 API Key Privacy - Masked display prevents credential leaks in logs\n') +
-      chalk.gray('   🛡️ Resource Cleanup - Better subprocess management for stability\n') +
-      chalk.gray('   ⚡ Error Handling - Graceful degradation instead of crashes\n') +
-      chalk.gray('   🎭 BMAD Voice Detection - Party mode supports multiple directory paths\n') +
-      chalk.gray('   ✅ 110/110 Tests Passing - All functionality verified and working\n') +
-      chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible with v2.12.5\n\n') +
+      chalk.gray('   🔧 BMAD Path Fix - Security validation now uses targetDir parameter\n') +
+      chalk.gray('   🛡️ Edge Case Fixed - /projectX no longer matches /project prefix\n') +
+      chalk.gray('   🧪 New Test Suite - Comprehensive path security validation tests\n') +
+      chalk.gray('   ✅ All Tests Passing - Full test coverage verified\n') +
+      chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible\n\n') +
       chalk.cyan('Technical Improvements:\n') +
-      chalk.gray('   • API keys now masked in terminal output and error messages\n') +
-      chalk.gray('   • Process cleanup prevents "too many open files" errors\n') +
-      chalk.gray('   • Enhanced error handling for file operations\n') +
-      chalk.gray('   • BMAD agents now use unique voices in party mode\n') +
-      chalk.gray('   • Shell config deduplication on repeated installs\n\n') +
+      chalk.gray('   • processBmadTtsInjections now accepts targetDir parameter\n') +
+      chalk.gray('   • isPathSafe checks for path separator to prevent prefix attacks\n') +
+      chalk.gray('   • Added Node.js test runner support to package.json\n') +
+      chalk.gray('   • 12 new tests for path security validation\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
