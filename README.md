@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.7
 
 ---
 
@@ -94,17 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.12.6 - Security & Reliability Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.3)** 🎉
+**[v2.13.7 - Voice Intros & PR Workflow](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.7)** 🎉
 
-AgentVibes v2.12.6 brings quality improvements based on SonarCloud analysis and enhances BMAD party mode. This release improves API key privacy in terminal output, adds better cleanup for long-running sessions, includes more robust error handling, and ensures BMAD agents each get their unique voice. All improvements maintain 100% backward compatibility.
+AgentVibes v2.13.7 adds voice map with intro messages for BMAD party mode and improves voice assignments for better persona fit.
 
 **Key Highlights:**
-- 🔒 **API Key Privacy** - Masked display prevents credential leaks in terminal history
-- 🛡️ **Resource Cleanup** - Better subprocess management for long-running stability
-- ⚡ **Error Handling** - Graceful degradation instead of crashes on file operations
-- 🎭 **BMAD Voice Detection** - Party mode supports multiple directory paths
+- 🎤 **Voice Map with Intros** - Default BMAD voice assignments now include intro messages for party mode
+- 🔄 **Voice Swap** - bmad-master and pm (John) voices swapped for better persona fit
+- 📋 **PR Workflow Rules** - Added CLAUDE.md guidelines for safer PR workflows
 - ✅ **110/110 Tests Passing** - All functionality verified and working
-- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.12.5
+- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.13.6
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

@@ -1,7 +1,7 @@
 ---
 name: rapper
 description: Spits fire with rhymes and wordplay
-elevenlabs_voice: Drew
+elevenlabs_voice: Antoni
 piper_voice: en_US-ryan-high
 ---
 

@@ -128,24 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.13.4 - BMAD Integration Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.13.7 - Voice Intros & PR Workflow\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.13.4 fixes a critical bug in BMAD integration where path\n') +
-      chalk.cyan('security validation was using process.cwd() instead of the actual target\n') +
-      chalk.cyan('installation directory. This caused false "Security: Invalid BMAD path\n') +
-      chalk.cyan('detected" errors when AgentVibes was called from BMAD\'s installer.\n\n') +
+      chalk.cyan('AgentVibes v2.13.7 adds voice map with intro messages for BMAD party\n') +
+      chalk.cyan('mode and improves voice assignments for better persona fit.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔧 BMAD Path Fix - Security validation now uses targetDir parameter\n') +
-      chalk.gray('   🛡️ Edge Case Fixed - /projectX no longer matches /project prefix\n') +
-      chalk.gray('   🧪 New Test Suite - Comprehensive path security validation tests\n') +
+      chalk.gray('   🎤 Voice Map with Intros - BMAD agents now have intro messages\n') +
+      chalk.gray('   🔄 Voice Swap - bmad-master and pm voices swapped for better fit\n') +
+      chalk.gray('   📋 PR Workflow Rules - Added CLAUDE.md guidelines for safer PRs\n') +
       chalk.gray('   ✅ All Tests Passing - Full test coverage verified\n') +
       chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible\n\n') +
-      chalk.cyan('Technical Improvements:\n') +
-      chalk.gray('   • processBmadTtsInjections now accepts targetDir parameter\n') +
-      chalk.gray('   • isPathSafe checks for path separator to prevent prefix attacks\n') +
-      chalk.gray('   • Added Node.js test runner support to package.json\n') +
-      chalk.gray('   • 12 new tests for path security validation\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
