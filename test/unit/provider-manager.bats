@@ -107,31 +107,35 @@ teardown() {
   assert_output_contains "Error: Provider name required"
 }
 
-@test "provider-manager switch resets voice to default" {
-  # Set a voice first
+@test "provider-manager switch migrates voice to new provider" {
+  # Set an unknown voice first (not in mapping)
   echo "TestVoice" > "$VOICE_FILE"
 
   run "$PROVIDER_MANAGER" switch "piper"
 
   [ "$status" -eq 0 ]
-  assert_output_contains "voice set to:"
+  # Should migrate to default when voice is not in mapping table
+  assert_output_contains "Voice migrated:"
 
-  # Voice file should exist with new default voice
+  # Voice file should exist with migrated voice
   [[ -f "$VOICE_FILE" ]]
+  # Should contain a Piper voice format
+  assert_file_contains "$VOICE_FILE" "en_US"
 }
 
-@test "provider-manager switching providers removes voice file" {
-  # Create voice file
+@test "provider-manager switch preserves known voice mappings" {
+  # Create voice file with a known ElevenLabs voice
   mkdir -p "$(dirname "$VOICE_FILE")"
   echo "Jessica Anne Bogart" > "$VOICE_FILE"
 
   "$PROVIDER_MANAGER" switch "elevenlabs"
 
-  # Voice file should exist with new default voice for provider
+  # Voice file should exist
   [[ -f "$VOICE_FILE" ]]
 
-  # Should contain the new provider's default voice
-  assert_file_contains "$VOICE_FILE" "Amy"
+  # Should preserve existing voice when staying in same provider type
+  # Jessica Anne Bogart is ElevenLabs, so stays the same
+  assert_file_contains "$VOICE_FILE" "Jessica Anne Bogart"
 }
 
 # ============================================================================

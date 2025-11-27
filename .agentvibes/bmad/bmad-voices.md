@@ -15,11 +15,11 @@ This plugin automatically assigns voices to BMAD agents based on their role and 
 |----------|------------|-------|------------------|-------------|-------------|
 | pm | John (Product Manager) | John, Product Manager here | Matthew Schmitz | en_US-ryan-high | professional |
 | dev | Amelia (Developer) | Amelia, Developer here | Aria | en_US-amy-medium | normal |
-| analyst | Mary (Business Analyst) | Mary, Business Analyst here | Jessica Anne Bogart | kristin | normal |
+| analyst | Mary (Business Analyst) | Mary, Business Analyst here | Jessica Anne Bogart | en_US-kristin-medium | normal |
 | architect | Winston (Architect) | Winston, Architect here | Michael | en_GB-alan-medium | normal |
 | sm | Bob (Scrum Master) | Bob, Scrum Master here | Matthew Schmitz | en_US-joe-medium | professional |
 | tea | Murat (Test Architect) | Murat, Test Architect here | Michael | en_US-arctic-medium | normal |
-| tech-writer | Paige (Technical Writer) | Paige, Technical Writer here | Aria | jenny | normal |
+| tech-writer | Paige (Technical Writer) | Paige, Technical Writer here | Aria | en_US-lessac-medium | normal |
 | ux-designer | Sally (UX Designer) | Sally, UX Designer here | Jessica Anne Bogart | en_US-lessac-medium | normal |
 | frame-expert | Saif (Visual Designer) | Saif, Visual Designer here | Matthew Schmitz | en_GB-alan-medium | normal |
 | bmad-master | BMad Master | BMad Master here | Michael | en_US-danny-low | zen |

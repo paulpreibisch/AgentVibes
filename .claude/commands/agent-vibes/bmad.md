@@ -161,20 +161,22 @@ The TTS injection works with **any configured TTS provider**:
 
 The system automatically detects your configured provider via `/agent-vibes:provider info` and uses the appropriate TTS engine. You can switch providers anytime with `/agent-vibes:provider switch` and the BMAD agents will continue speaking using the new provider.
 
-## Available BMAD Agents
+## Available BMAD Agents (Provider-Aware)
 
-| Agent ID | Role | Default Voice |
-|----------|------|---------------|
-| pm | Product Manager | Matthew Schmitz |
-| dev | Developer | Jessica Anne Bogart |
-| qa | QA Engineer | Ralf Eisend |
-| architect | Architect | Michael |
-| po | Product Owner | Amy |
-| analyst | Analyst | Lutz Laugh |
-| sm | Scrum Master | Ms. Walker |
-| ux-expert | UX Expert | Aria |
-| bmad-master | BMAD Master | Aria |
-| bmad-orchestrator | Orchestrator | Ms. Walker |
+The voice used depends on your active TTS provider. Run `/agent-vibes:provider info` to check your provider.
+
+| Agent ID | Role | ElevenLabs Voice | Piper Voice |
+|----------|------|------------------|-------------|
+| pm | Product Manager | Matthew Schmitz | en_US-ryan-high |
+| dev | Developer | Aria | en_US-amy-medium |
+| analyst | Business Analyst | Jessica Anne Bogart | en_US-kristin-medium |
+| architect | Architect | Michael | en_GB-alan-medium |
+| sm | Scrum Master | Matthew Schmitz | en_US-joe-medium |
+| tea | Test Architect | Michael | en_US-arctic-medium |
+| tech-writer | Technical Writer | Aria | en_US-lessac-medium |
+| ux-designer | UX Designer | Jessica Anne Bogart | en_US-lessac-medium |
+| frame-expert | Visual Designer | Matthew Schmitz | en_GB-alan-medium |
+| bmad-master | BMAD Master | Michael | en_US-danny-low |
 
 ## Implementation Details
 

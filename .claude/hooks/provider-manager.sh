@@ -141,31 +141,120 @@ set_active_provider() {
     voice_file="$HOME/.claude/tts-voice.txt"
   fi
 
-  # Set default voice for the new provider
-  local default_voice
-  case "$provider" in
-    piper)
-      # Default Piper voice
-      default_voice="en_US-lessac-medium"
-      ;;
-    elevenlabs)
-      # Default ElevenLabs voice (first in alphabetical order from voices-config.sh)
-      default_voice="Amy"
-      ;;
-    *)
-      # Unknown provider - remove voice file
-      if [[ -f "$voice_file" ]]; then
-        rm -f "$voice_file"
-      fi
-      echo "✓ Active provider set to: $provider (voice reset)"
-      return 0
-      ;;
+  # Migrate voice to equivalent in new provider
+  local current_voice=""
+  if [[ -f "$voice_file" ]]; then
+    # Strip only leading/trailing whitespace and newlines, preserve internal spaces
+    current_voice=$(cat "$voice_file" | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  fi
+
+  local new_voice
+  new_voice=$(migrate_voice_to_provider "$current_voice" "$provider")
+
+  # Write new voice to file
+  echo "$new_voice" > "$voice_file"
+
+  if [[ -n "$current_voice" ]] && [[ "$current_voice" != "$new_voice" ]]; then
+    echo "✓ Active provider set to: $provider"
+    echo "🔄 Voice migrated: $current_voice → $new_voice"
+  else
+    echo "✓ Active provider set to: $provider (voice: $new_voice)"
+  fi
+}
+
+# @function migrate_voice_to_provider
+# @intent Migrate a voice from one provider to an equivalent in the target provider
+# @why Users shouldn't have to manually reconfigure voices when switching providers
+# @param $1 {string} current_voice - Current voice name (may be from any provider)
+# @param $2 {string} target_provider - Target provider to migrate to
+# @returns Echoes equivalent voice name for target provider
+# @exitcode 0=always succeeds (returns default if no mapping found)
+# @sideeffects None
+# @edgecases Returns provider default if voice not found in mapping table
+migrate_voice_to_provider() {
+  local current_voice="$1"
+  local target_provider="$2"
+
+  # Voice mapping table: ElevenLabs <-> Piper equivalents
+  # Format: "elevenlabs_voice:piper_voice"
+  local voice_mappings=(
+    "Amy:en_US-amy-medium"
+    "Aria:en_US-amy-medium"
+    "Matthew Schmitz:en_US-ryan-high"
+    "Michael:en_GB-alan-medium"
+    "Jessica Anne Bogart:en_US-kristin-medium"
+    "Ms. Walker:en_US-lessac-medium"
+    "Cowboy Bob:en_US-joe-medium"
+    "Ralf Eisend:en_US-arctic-medium"
+    "Northern Terry:en_GB-alan-medium"
+    "Lutz Laugh:en_US-joe-medium"
+    "Dr. Von Fusion:en_US-danny-low"
+    "Demon Monster:en_US-danny-low"
+    "Drill Sergeant:en_US-ryan-high"
+    "Grandpa Spuds Oxley:en_US-joe-medium"
+  )
+
+  # Default voices by provider
+  local elevenlabs_default="Amy"
+  local piper_default="en_US-lessac-medium"
+
+  # If no current voice, return default for target provider
+  if [[ -z "$current_voice" ]]; then
+    case "$target_provider" in
+      piper) echo "$piper_default" ;;
+      elevenlabs) echo "$elevenlabs_default" ;;
+      *) echo "$piper_default" ;;
+    esac
+    return 0
+  fi
+
+  # Convert to lowercase for case-insensitive comparison (portable)
+  local current_voice_lower
+  current_voice_lower=$(echo "$current_voice" | tr '[:upper:]' '[:lower:]')
+
+  # Search for mapping
+  for mapping in "${voice_mappings[@]}"; do
+    local el_voice="${mapping%%:*}"
+    local piper_voice="${mapping#*:}"
+    local el_voice_lower
+    local piper_voice_lower
+    el_voice_lower=$(echo "$el_voice" | tr '[:upper:]' '[:lower:]')
+    piper_voice_lower=$(echo "$piper_voice" | tr '[:upper:]' '[:lower:]')
+
+    case "$target_provider" in
+      piper)
+        # Switching to Piper: look for ElevenLabs voice match
+        if [[ "$current_voice_lower" == "$el_voice_lower" ]]; then
+          echo "$piper_voice"
+          return 0
+        fi
+        # Already a Piper voice? Keep it if valid format
+        if [[ "$current_voice" =~ ^en_ ]]; then
+          echo "$current_voice"
+          return 0
+        fi
+        ;;
+      elevenlabs)
+        # Switching to ElevenLabs: look for Piper voice match
+        if [[ "$current_voice_lower" == "$piper_voice_lower" ]]; then
+          echo "$el_voice"
+          return 0
+        fi
+        # Already an ElevenLabs voice? Keep it
+        if [[ ! "$current_voice" =~ ^en_ ]]; then
+          echo "$current_voice"
+          return 0
+        fi
+        ;;
+    esac
+  done
+
+  # No mapping found - return default for target provider
+  case "$target_provider" in
+    piper) echo "$piper_default" ;;
+    elevenlabs) echo "$elevenlabs_default" ;;
+    *) echo "$piper_default" ;;
   esac
-
-  # Write default voice to file
-  echo "$default_voice" > "$voice_file"
-
-  echo "✓ Active provider set to: $provider (voice set to: $default_voice)"
 }
 
 # @function list_providers
