@@ -177,7 +177,8 @@ function findVoiceMatch(input) {
 
   if (matches.length > 1) {
     // Return the shortest match (most specific)
-    return matches.reduce((a, b) => (a.length <= b.length ? a : b));
+    // Initial value prevents TypeError if array were empty
+    return matches.reduce((a, b) => (a.length <= b.length ? a : b), matches[0]);
   }
 
   return null;
