@@ -94,7 +94,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.13.7 - Voice Intros & PR Workflow](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.8)** 🎉
+**[v2.13.7 - Voice Intros & PR Workflow](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.9)** 🎉
 
 AgentVibes v2.13.7 adds voice map with intro messages for BMAD party mode and improves voice assignments for better persona fit.
 
