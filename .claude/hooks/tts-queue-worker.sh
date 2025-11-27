@@ -15,6 +15,19 @@ else
   # Fallback to user-specific temp directory
   QUEUE_DIR="/tmp/agentvibes-tts-queue-$USER"
 fi
+
+# Security: Validate queue directory exists and has correct ownership
+if [[ ! -d "$QUEUE_DIR" ]]; then
+  echo "Error: Queue directory does not exist: $QUEUE_DIR" >&2
+  exit 1
+fi
+
+# Security: Verify we own the queue directory (prevent symlink attacks)
+if [[ "$(stat -c '%u' "$QUEUE_DIR" 2>/dev/null || stat -f '%u' "$QUEUE_DIR" 2>/dev/null)" != "$(id -u)" ]]; then
+  echo "Error: Queue directory not owned by current user" >&2
+  exit 1
+fi
+
 WORKER_PID_FILE="$QUEUE_DIR/worker.pid"
 IDLE_TIMEOUT=5  # Exit after 5 seconds of no new requests
 
@@ -39,7 +52,7 @@ elif [[ -f "$HOME/.claude/tts-speaker-delay.txt" ]]; then
 fi
 
 # Trap to clean up on exit
-trap "rm -f $WORKER_PID_FILE" EXIT
+trap 'rm -f "$WORKER_PID_FILE"' EXIT
 
 # Process queue items
 process_queue() {
