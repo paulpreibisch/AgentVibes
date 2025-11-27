@@ -35,7 +35,9 @@
     "install-local": "node src/installer.js install",
     "postinstall": "node mcp-server/install-deps.js",
     "install-mcp-deps": "node mcp-server/install-deps.js",
-    "test": "AGENTVIBES_TEST_MODE=true bats test/unit/*.bats",
+    "test": "AGENTVIBES_TEST_MODE=true bats test/unit/*.bats && node --test test/unit/*.test.js",
+    "test:bats": "AGENTVIBES_TEST_MODE=true bats test/unit/*.bats",
+    "test:node": "node --test test/unit/*.test.js",
     "test:verbose": "AGENTVIBES_TEST_MODE=true bats -t test/unit/*.bats"
   },
   "dependencies": {

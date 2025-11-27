@@ -870,18 +870,22 @@ async function checkAndInstallPiper(targetDir, options) {
 function isPathSafe(targetPath, basePath) {
   const resolved = path.resolve(targetPath);
   const baseResolved = path.resolve(basePath);
-  return resolved.startsWith(baseResolved);
+  // Ensure the resolved path is actually within basePath, not just a prefix match
+  // e.g., /projectX should NOT be considered within /project
+  // We check that resolved either equals baseResolved or starts with baseResolved + separator
+  return resolved === baseResolved || resolved.startsWith(baseResolved + path.sep);
 }
 
 /**
  * Process TTS_INJECTION markers in BMAD files
  * Replaces markers with actual TTS instructions for both party mode and individual agents
- * @param {string} bmadPath - Path to BMAD installation (e.g., .bmad or bmad)
+ * @param {string} bmadPath - Absolute path to BMAD installation (e.g., /path/to/.bmad)
+ * @param {string} targetDir - Base installation directory to validate bmadPath is within
  */
-async function processBmadTtsInjections(bmadPath) {
-  // Security: Validate bmadPath doesn't contain path traversal
-  const cwd = process.cwd();
-  if (!isPathSafe(bmadPath, cwd)) {
+async function processBmadTtsInjections(bmadPath, targetDir) {
+  // Security: Validate bmadPath is within targetDir (not process.cwd() which may differ
+  // when called from BMAD's installer via npx with a different cwd)
+  if (!isPathSafe(bmadPath, targetDir)) {
     console.error(chalk.red('⚠️  Security: Invalid BMAD path detected'));
     return;
   }
@@ -1134,7 +1138,7 @@ async function handleBmadIntegration(targetDir) {
 
   // Process TTS_INJECTION markers in BMAD files if they exist
   // This handles the case where BMAD was installed before AgentVibes
-  await processBmadTtsInjections(bmadDetection.bmadPath);
+  await processBmadTtsInjections(bmadDetection.bmadPath, targetDir);
 
   // Create default voice assignments if they don't exist
   await createDefaultBmadVoiceAssignmentsProactive(targetDir);
