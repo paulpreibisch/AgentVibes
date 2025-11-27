@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.7
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.8
 
 ---
 
@@ -94,7 +94,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.13.7 - Voice Intros & PR Workflow](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.7)** 🎉
+**[v2.13.7 - Voice Intros & PR Workflow](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.8)** 🎉
 
 AgentVibes v2.13.7 adds voice map with intro messages for BMAD party mode and improves voice assignments for better persona fit.
 
