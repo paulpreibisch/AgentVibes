@@ -128,17 +128,18 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.13.9 - Provider-Aware Voice Migration\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.0 - Auto-Translation for BMAD & Learning Mode\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.13.9 fixes voice mapping when switching TTS providers.\n') +
-      chalk.cyan('Voices now auto-migrate between ElevenLabs and Piper seamlessly.\n\n') +
+      chalk.cyan('AgentVibes v2.14.0 introduces automatic translation for TTS output.\n') +
+      chalk.cyan('BMAD users hear spoken messages in their communication_language.\n') +
+      chalk.cyan('Language Learning Mode now uses Google Translate - saving tokens!\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔄 Smart Voice Migration - Auto-map voices when switching providers\n') +
-      chalk.gray('   📝 Provider-Aware Docs - BMAD shows both ElevenLabs & Piper columns\n') +
-      chalk.gray('   🎤 Valid Piper Names - Fixed incomplete voice names in mappings\n') +
-      chalk.gray('   ✅ 122 Tests Passing - All functionality verified\n') +
-      chalk.gray('   🔄 Zero Breaking Changes - Fully backward compatible\n\n') +
+      chalk.gray('   🌐 BMAD Multi-Language TTS - Auto-translate to your communication_language\n') +
+      chalk.gray('   🎓 Learning Mode Auto-Translation - Google does it free, not Claude!\n') +
+      chalk.gray('   🔄 Translation Manager - New /agent-vibes:translate command\n') +
+      chalk.gray('   🐍 translator.py - Core engine using deep-translator (Google)\n') +
+      chalk.gray('   ✅ 140 Tests Passing - 18 new translation tests + existing\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

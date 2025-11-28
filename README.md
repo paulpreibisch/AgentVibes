@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.13.9
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.0
 
 ---
 
@@ -94,17 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.13.9 - Provider-Aware Voice Migration](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.13.9)** 🎉
+**[v2.14.0 - Auto-Translation for BMAD & Learning Mode](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.0)** 🎉
 
-AgentVibes v2.13.9 fixes a critical issue where BMAD voice mappings were not provider-aware, causing "Voice model not found" errors when switching between ElevenLabs and Piper TTS providers. The release introduces intelligent voice migration that automatically maps voices when switching providers.
+AgentVibes v2.14.0 introduces automatic translation for TTS output (Issues #50 and #51). When AgentVibes speaks acknowledgments like "Starting the build" or completions like "All tests passed!", this text is normally in English. Now, BMAD users who set `communication_language: Spanish` in `.bmad/core/config.yaml` will hear these spoken messages automatically translated to Spanish - matching their project's communication preference. This version also updates our Language Learning Mode feature to utilize Google Deep Translate, reducing token usage (Claude no longer needs to do the translation! Google now does it for free!).
 
 **Key Highlights:**
-- 🔄 **Smart Voice Migration** - Automatic voice mapping when switching TTS providers (e.g., "Amy" → "en_US-amy-medium")
-- 📝 **Provider-Aware Docs** - BMAD documentation now shows both ElevenLabs and Piper columns
-- 🎤 **Valid Piper Names** - Fixed incomplete Piper voice names (kristin → en_US-kristin-medium)
-- 🛡️ **Preserve Voice Names** - Internal spaces in voice names no longer stripped
-- ✅ **122 Tests Passing** - All functionality verified (110 bats + 12 node tests)
-- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.13.8
+- 🌐 **BMAD Multi-Language TTS** - Auto-detect `communication_language` from BMAD config and translate TTS
+- 🎓 **Learning Mode Auto-Translation** - Hear English + auto-translated target language (Google does it free!)
+- 🔄 **Translation Manager** - New `/agent-vibes:translate` command for manual control
+- 🐍 **translator.py** - Core translation engine using deep-translator (Google Translate)
+- ✅ **140 Tests Passing** - 18 new translation tests + all existing tests
+- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.13.9
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
