@@ -1,0 +1,6 @@
+# AgentVibes TTS Hooks Requirements
+# Install with: pip install -r requirements.txt
+
+# Translation support for multi-language TTS and learning mode
+deep-translator>=1.11.4
+langdetect>=1.0.9

@@ -15,8 +15,11 @@ AgentVibes' Language Learning Mode is a **breakthrough feature** that helps prog
 1. **Set your target language** - Choose from 30+ languages (Spanish, French, German, etc.)
 2. **Enable learning mode** - One simple command
 3. **Code normally** - AgentVibes handles the rest
-4. **Hear everything twice** - English first, then your target language
-5. **Adjust speed** - Slow down target language for better comprehension
+4. **Automatic translation** - **NEW!** AgentVibes auto-translates TTS to your target language using Google Translate
+5. **Hear everything twice** - English first, then your target language (auto-translated!)
+6. **Adjust speed** - Slow down target language for better comprehension
+
+> **New in v2.14!** Auto-translation means Claude doesn't need to manually translate messages. AgentVibes automatically translates any English TTS text to your target language using deep-translator (Google Translate). Zero extra effort from Claude, zero extra prompting from you!
 
 ## 🚀 Quick Start (Learn Spanish Example)
 
@@ -99,6 +102,48 @@ Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Russian
 | `/agent-vibes:language <language>` | Set your native/main language |
 | `/agent-vibes:set-speed target <speed>` | Adjust target language speed |
 | `/agent-vibes:set-speed get` | Show current speed settings |
+| `/agent-vibes:replay-target` | Replay last target language audio |
+
+## 🌐 Translation Mode (Single Language)
+
+Not doing language learning, but want TTS in a different language? Use **Translation Mode** to speak ONLY in your preferred language:
+
+```bash
+# Set Spanish as your TTS language (no English, just Spanish)
+/agent-vibes:translate set spanish
+
+# Or use BMAD's communication_language setting (auto-detected)
+/agent-vibes:translate auto
+
+# Disable translation (speak English)
+/agent-vibes:translate off
+
+# Check current settings
+/agent-vibes:translate status
+```
+
+**Translation Mode vs Learning Mode:**
+| Feature | Translation Mode | Learning Mode |
+|---------|-----------------|---------------|
+| **Use Case** | Native speaker of target language | Learning a new language |
+| **Output** | Single language only | Both languages sequentially |
+| **Command** | `/agent-vibes:translate set <lang>` | `/agent-vibes:learn` |
+| **BMAD Integration** | Auto-detects from config.yaml | Manual configuration |
+
+### BMAD Integration
+
+If you use BMAD and have `communication_language` set in your config:
+
+```yaml
+# .bmad/core/config.yaml
+communication_language: Spanish
+document_output_language: Spanish
+```
+
+AgentVibes will automatically detect this and translate TTS to Spanish when you run:
+```bash
+/agent-vibes:translate auto
+```
 
 ## 💡 Pro Tips
 

@@ -34,10 +34,19 @@
 # @patterns Dual-voice orchestration, auto-configuration, greeting on activation, provider-aware voice selection
 # @related language-manager.sh, play-tts.sh, .claude/tts-learn-mode.txt, .claude/tts-target-language.txt
 
-set -e
+# Only set strict mode when executed directly, not when sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -e
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$SCRIPT_DIR/../.."
+
+# Use PWD for project dir when called from project context, fall back to script-relative
+if [[ -d "$PWD/.claude" ]]; then
+    PROJECT_DIR="$PWD"
+else
+    PROJECT_DIR="$SCRIPT_DIR/../.."
+fi
 
 # Configuration files (project-local first, then global fallback)
 MAIN_LANG_FILE="$PROJECT_DIR/.claude/tts-main-language.txt"
@@ -430,7 +439,8 @@ show_status() {
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
-# Main command handler
+# Main command handler - only run if script is executed directly, not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 case "${1:-}" in
     get-main-language)
         get_main_language
@@ -473,3 +483,4 @@ case "${1:-}" in
         exit 1
         ;;
 esac
+fi

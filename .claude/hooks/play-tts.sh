@@ -31,13 +31,13 @@
 #
 # ---
 #
-# @fileoverview TTS Provider Router with Language Learning Support
-# @context Routes TTS requests to active provider (ElevenLabs or Piper)
-# @architecture Provider abstraction layer - single entry point for all TTS
-# @dependencies provider-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, github-star-reminder.sh
+# @fileoverview TTS Provider Router with Translation and Language Learning Support
+# @context Routes TTS requests to active provider (ElevenLabs or Piper) with optional translation
+# @architecture Provider abstraction layer - single entry point for all TTS, handles translation and learning mode
+# @dependencies provider-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, translator.py, translate-manager.sh, learn-manager.sh
 # @entrypoints Called by hooks, slash commands, personality-manager.sh, and all TTS features
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
-# @related provider-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, learn-manager.sh
+# @related provider-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
 #
 
 # Fix locale warnings
@@ -98,10 +98,133 @@ if [[ -n "$VOICE_OVERRIDE" ]]; then
   fi
 fi
 
+# @function speak_text
+# @intent Route text to appropriate TTS provider
+# @why Reusable function for speaking, used by both single and learning modes
+# @param $1 text to speak
+# @param $2 voice override (optional)
+# @param $3 provider override (optional)
+speak_text() {
+  local text="$1"
+  local voice="${2:-}"
+  local provider="${3:-$ACTIVE_PROVIDER}"
+
+  case "$provider" in
+    elevenlabs)
+      "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$text" "$voice"
+      ;;
+    piper)
+      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice"
+      ;;
+    *)
+      echo "❌ Unknown provider: $provider" >&2
+      return 1
+      ;;
+  esac
+}
+
+# Note: learn-manager.sh and translate-manager.sh are sourced inside their
+# respective handler functions to avoid triggering their main handlers
+
+# @function handle_learning_mode
+# @intent Speak in both main language and target language for learning
+# @why Issue #51 - Auto-translate and speak twice for immersive language learning
+# @returns 0 if learning mode handled, 1 if not in learning mode
+handle_learning_mode() {
+  # Source learn-manager for learning mode functions
+  source "$SCRIPT_DIR/learn-manager.sh" 2>/dev/null || return 1
+
+  # Check if learning mode is enabled
+  if ! is_learn_mode_enabled 2>/dev/null; then
+    return 1
+  fi
+
+  local target_lang
+  target_lang=$(get_target_language 2>/dev/null || echo "")
+  local target_voice
+  target_voice=$(get_target_voice 2>/dev/null || echo "")
+
+  # Need both target language and voice for learning mode
+  if [[ -z "$target_lang" ]] || [[ -z "$target_voice" ]]; then
+    return 1
+  fi
+
+  # 1. Speak in main language (current voice)
+  speak_text "$TEXT" "$VOICE_OVERRIDE" "$ACTIVE_PROVIDER"
+
+  # 2. Auto-translate to target language
+  local translated
+  translated=$(python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
+
+  # Small pause between languages
+  sleep 0.5
+
+  # 3. Speak translated text with target voice
+  local target_provider
+  target_provider=$(detect_voice_provider "$target_voice")
+  speak_text "$translated" "$target_voice" "$target_provider"
+
+  return 0
+}
+
+# @function handle_translation_mode
+# @intent Translate and speak in target language (non-learning mode)
+# @why Issue #50 - BMAD multi-language TTS support
+# @returns 0 if translation handled, 1 if not translating
+handle_translation_mode() {
+  # Source translate-manager to get translation settings
+  source "$SCRIPT_DIR/translate-manager.sh" 2>/dev/null || return 1
+
+  # Check if translation is enabled
+  if ! is_translation_enabled 2>/dev/null; then
+    return 1
+  fi
+
+  local translate_to
+  translate_to=$(get_translate_to 2>/dev/null || echo "")
+
+  if [[ -z "$translate_to" ]] || [[ "$translate_to" == "english" ]]; then
+    return 1
+  fi
+
+  # Translate text
+  local translated
+  translated=$(python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
+
+  # Get voice for target language if no override specified
+  local voice_to_use="$VOICE_OVERRIDE"
+  if [[ -z "$voice_to_use" ]]; then
+    source "$SCRIPT_DIR/language-manager.sh" 2>/dev/null || true
+    voice_to_use=$(get_voice_for_language "$translate_to" "$ACTIVE_PROVIDER" 2>/dev/null || echo "")
+  fi
+
+  # Update provider if voice indicates different provider
+  local provider_to_use="$ACTIVE_PROVIDER"
+  if [[ -n "$voice_to_use" ]]; then
+    provider_to_use=$(detect_voice_provider "$voice_to_use")
+  fi
+
+  # Speak translated text
+  speak_text "$translated" "$voice_to_use" "$provider_to_use"
+  return 0
+}
+
+# Mode priority:
+# 1. Learning mode (speaks twice: main + translated)
+# 2. Translation mode (speaks translated only)
+# 3. Normal mode (speaks as-is)
+
+# Try learning mode first (Issue #51)
+if handle_learning_mode; then
+  exit 0
+fi
+
+# Try translation mode (Issue #50)
+if handle_translation_mode; then
+  exit 0
+fi
+
 # Normal single-language mode - route to appropriate provider implementation
-# Note: For learning mode, the output style will call this script TWICE:
-# 1. First call with main language text and current voice
-# 2. Second call with translated text and target voice
 case "$ACTIVE_PROVIDER" in
   elevenlabs)
     exec "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"
