@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+#
+# File: .claude/hooks/play-tts-macos.sh
+#
+# AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+# Website: https://agentvibes.org
+# Repository: https://github.com/paulpreibisch/AgentVibes
+#
+# Co-created by Paul Preibisch with Claude AI
+# Copyright (c) 2025 Paul Preibisch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DISCLAIMER: This software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# express or implied. Use at your own risk. See the Apache License for details.
+#
+# ---
+#
+# @fileoverview macOS Say Provider Implementation - Native macOS TTS using the 'say' command
+# @context Provides zero-dependency, offline TTS for macOS users using built-in Apple voices
+# @architecture Implements provider interface contract for macOS 'say' command integration
+# @dependencies macOS only (Darwin), say command (built-in), afplay (built-in)
+# @entrypoints Called by play-tts.sh router when provider=macos
+# @patterns Provider contract: text/voice → audio file path, voice validation, platform guard
+# @related play-tts.sh, macos-voice-manager.sh, provider-manager.sh
+#
+
+# Platform guard - fail fast on non-macOS systems
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "❌ Error: macOS provider only works on macOS"
+  echo "   Current platform: $(uname -s)"
+  echo ""
+  echo "   Switch to a different provider:"
+  echo "   /agent-vibes:provider switch piper"
+  exit 1
+fi
+
+TEXT="$1"
+VOICE_OVERRIDE="$2"  # Optional: voice name (e.g., "Samantha", "Daniel")
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Default voice for macOS
+DEFAULT_VOICE="Samantha"
+
+# Common macOS voices with descriptions
+# These are typically available on all macOS systems
+declare -A MACOS_VOICE_INFO
+MACOS_VOICE_INFO=(
+  ["Alex"]="American English male (enhanced)"
+  ["Samantha"]="American English female (enhanced)"
+  ["Victoria"]="American English female"
+  ["Daniel"]="British English male (enhanced)"
+  ["Karen"]="Australian English female (enhanced)"
+  ["Moira"]="Irish English female (enhanced)"
+  ["Tessa"]="South African English female (enhanced)"
+  ["Fiona"]="Scottish English female (enhanced)"
+  ["Veena"]="Indian English female (enhanced)"
+)
+
+# @function get_voice_file_path
+# @intent Determine path to voice configuration file
+# @returns Echoes path to tts-voice.txt
+get_voice_file_path() {
+  local voice_file=""
+
+  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+    voice_file="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
+  elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
+    voice_file="$SCRIPT_DIR/../tts-voice.txt"
+  elif [[ -f "$HOME/.claude/tts-voice.txt" ]]; then
+    voice_file="$HOME/.claude/tts-voice.txt"
+  fi
+
+  echo "$voice_file"
+}
+
+# @function determine_voice
+# @intent Resolve which voice to use
+# @returns Sets $VOICE_NAME global variable
+VOICE_NAME=""
+
+if [[ -n "$VOICE_OVERRIDE" ]]; then
+  VOICE_NAME="$VOICE_OVERRIDE"
+  echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+else
+  VOICE_FILE=$(get_voice_file_path)
+
+  if [[ -n "$VOICE_FILE" ]] && [[ -f "$VOICE_FILE" ]]; then
+    FILE_VOICE=$(cat "$VOICE_FILE" 2>/dev/null | tr -d '\n\r')
+    if [[ -n "$FILE_VOICE" ]]; then
+      VOICE_NAME="$FILE_VOICE"
+    fi
+  fi
+
+  # Fallback to default if no voice set
+  if [[ -z "$VOICE_NAME" ]]; then
+    VOICE_NAME="$DEFAULT_VOICE"
+  fi
+fi
+
+# @function validate_inputs
+# @intent Check required parameters
+if [[ -z "$TEXT" ]]; then
+  echo "Usage: $0 \"text to speak\" [voice_name]"
+  echo ""
+  echo "Available voices (run 'say -v ?' for full list):"
+  for voice in "${!MACOS_VOICE_INFO[@]}"; do
+    echo "  $voice - ${MACOS_VOICE_INFO[$voice]}"
+  done | sort
+  exit 1
+fi
+
+# @function validate_voice
+# @intent Check if the specified voice exists on this system
+# @param $1 Voice name to validate
+# @returns 0 if valid, 1 if not found
+validate_voice() {
+  local voice="$1"
+  say -v ? 2>/dev/null | grep -qi "^${voice} "
+}
+
+# Validate voice exists (case-insensitive search)
+if ! validate_voice "$VOICE_NAME"; then
+  echo "⚠️  Voice '$VOICE_NAME' not found on this system"
+  echo "   Falling back to default: $DEFAULT_VOICE"
+  VOICE_NAME="$DEFAULT_VOICE"
+
+  # If default also doesn't exist, try to find any English voice
+  if ! validate_voice "$VOICE_NAME"; then
+    VOICE_NAME=$(say -v ? 2>/dev/null | grep -i "en_" | head -1 | awk '{print $1}')
+    if [[ -z "$VOICE_NAME" ]]; then
+      echo "❌ No English voices found on this system"
+      exit 2
+    fi
+    echo "   Using first available English voice: $VOICE_NAME"
+  fi
+fi
+
+# @function determine_audio_directory
+# @intent Find appropriate directory for audio file storage
+if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+  AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
+else
+  CURRENT_DIR="$PWD"
+  while [[ "$CURRENT_DIR" != "/" ]]; do
+    if [[ -d "$CURRENT_DIR/.claude" ]]; then
+      AUDIO_DIR="$CURRENT_DIR/.claude/audio"
+      break
+    fi
+    CURRENT_DIR=$(dirname "$CURRENT_DIR")
+  done
+  if [[ -z "$AUDIO_DIR" ]]; then
+    AUDIO_DIR="$HOME/.claude/audio"
+  fi
+fi
+
+mkdir -p "$AUDIO_DIR"
+
+# Generate unique filename
+TIMESTAMP=$(date +%s)
+TEMP_FILE="$AUDIO_DIR/tts-${TIMESTAMP}.aiff"
+FINAL_FILE="$AUDIO_DIR/tts-padded-${TIMESTAMP}.wav"
+
+# @function get_speech_rate
+# @intent Determine speech rate for synthesis
+# @returns Speech rate value (words per minute, default ~175-200)
+get_speech_rate() {
+  local rate_config=""
+
+  # Check for rate config file
+  if [[ -f "$SCRIPT_DIR/../config/tts-speech-rate.txt" ]]; then
+    rate_config="$SCRIPT_DIR/../config/tts-speech-rate.txt"
+  elif [[ -f "$HOME/.claude/config/tts-speech-rate.txt" ]]; then
+    rate_config="$HOME/.claude/config/tts-speech-rate.txt"
+  fi
+
+  if [[ -n "$rate_config" ]]; then
+    local user_speed=$(cat "$rate_config" 2>/dev/null | grep -v '^#' | grep -v '^$' | tail -1)
+    # Convert multiplier to words per minute (base ~200 WPM)
+    # User: 0.5=slower, 1.0=normal, 2.0=faster
+    echo "scale=0; 200 * $user_speed / 1" | bc -l 2>/dev/null || echo "200"
+    return
+  fi
+
+  # Default: 200 WPM (normal rate)
+  echo "200"
+}
+
+SPEECH_RATE=$(get_speech_rate)
+
+# @function synthesize_with_say
+# @intent Generate speech using macOS 'say' command
+# @returns Creates audio file at $TEMP_FILE
+echo "$TEXT" | say -v "$VOICE_NAME" -r "$SPEECH_RATE" -o "$TEMP_FILE" 2>/dev/null
+
+if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
+  echo "❌ Failed to synthesize speech with macOS say command"
+  echo "Voice: $VOICE_NAME"
+  exit 3
+fi
+
+# @function convert_and_pad_audio
+# @intent Convert AIFF to WAV and add silence padding for consistency
+# @why Maintains consistent audio format across providers
+if command -v ffmpeg &> /dev/null; then
+  # Add 200ms of silence at the beginning and convert to WAV
+  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
+    -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
+    -map "[out]" -y "$FINAL_FILE" 2>/dev/null
+
+  if [[ -f "$FINAL_FILE" ]]; then
+    rm -f "$TEMP_FILE"
+    TEMP_FILE="$FINAL_FILE"
+  fi
+else
+  # No ffmpeg - use AIFF directly (rename for consistency)
+  FINAL_FILE="$AUDIO_DIR/tts-padded-${TIMESTAMP}.aiff"
+  mv "$TEMP_FILE" "$FINAL_FILE"
+  TEMP_FILE="$FINAL_FILE"
+fi
+
+# @function play_audio
+# @intent Play generated audio using macOS native player
+LOCK_FILE="/tmp/agentvibes-audio.lock"
+
+# Wait for previous audio to finish (max 30 seconds)
+for i in {1..60}; do
+  if [ ! -f "$LOCK_FILE" ]; then
+    break
+  fi
+  sleep 0.5
+done
+
+# Create lock and play audio
+touch "$LOCK_FILE"
+
+# Get audio duration for proper lock timing
+if command -v ffprobe &> /dev/null; then
+  DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null)
+  DURATION=${DURATION%.*}  # Round to integer
+else
+  # Estimate duration based on text length (~150 WPM)
+  WORD_COUNT=$(echo "$TEXT" | wc -w)
+  DURATION=$(( (WORD_COUNT * 60 / 150) + 1 ))
+fi
+DURATION=${DURATION:-2}  # Default to 2 seconds if detection fails
+
+# Play audio in background (skip if in test mode)
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
+  afplay "$TEMP_FILE" >/dev/null 2>&1 &
+  PLAYER_PID=$!
+fi
+
+# Wait for audio to finish, then release lock
+(sleep $DURATION; rm -f "$LOCK_FILE") &
+disown
+
+echo "🎵 Saved to: $TEMP_FILE"
+echo "🎤 Voice used: $VOICE_NAME (macOS Say)"

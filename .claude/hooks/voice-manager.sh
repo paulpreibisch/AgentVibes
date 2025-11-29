@@ -71,11 +71,17 @@ get_default_voice() {
   local active_provider="elevenlabs"
   [[ -f "$provider_file" ]] && active_provider=$(cat "$provider_file")
 
-  if [[ "$active_provider" == "piper" ]]; then
-    echo "en_US-lessac-medium"  # Piper default
-  else
-    echo "Cowboy Bob"  # ElevenLabs default
-  fi
+  case "$active_provider" in
+    piper)
+      echo "en_US-lessac-medium"  # Piper default
+      ;;
+    macos)
+      echo "Samantha"  # macOS default
+      ;;
+    *)
+      echo "Cowboy Bob"  # ElevenLabs default
+      ;;
+  esac
 }
 
 case "$1" in
@@ -124,6 +130,29 @@ case "$1" in
           # Sort and display voices
           printf "%s\n" "${VOICE_LIST[@]}" | sort
         fi
+      fi
+    elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
+      echo "🎤 Available macOS TTS Voices:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # Check if we're on macOS
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        # List macOS voices using say -v ?
+        say -v ? 2>/dev/null | while read -r line; do
+          voice=$(echo "$line" | awk '{print $1}')
+          lang=$(echo "$line" | awk '{print $2}')
+          if [ "$voice" = "$CURRENT_VOICE" ]; then
+            printf "  ▶ %-15s %s (current)\n" "$voice" "$lang"
+          else
+            printf "    %-15s %s\n" "$voice" "$lang"
+          fi
+        done
+      else
+        echo "  (macOS voices only available on macOS)"
+        echo ""
+        echo "Switch to a compatible provider:"
+        echo "  /agent-vibes:provider switch piper"
+        echo "  /agent-vibes:provider switch elevenlabs"
       fi
     else
       echo "🎤 Available ElevenLabs TTS Voices:"
@@ -460,6 +489,8 @@ case "$1" in
         echo "Provider: ElevenLabs (Premium AI)"
       elif [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
         echo "Provider: Piper TTS (Free, Offline)"
+      elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
+        echo "Provider: macOS Say (Built-in, Free)"
       else
         echo "Provider: $ACTIVE_PROVIDER"
       fi
@@ -519,6 +550,13 @@ case "$1" in
           fi
         done | sort
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
+      # List macOS voices (voice names only)
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        say -v ? 2>/dev/null | awk '{print $1}' | sort
+      else
+        echo "(macOS voices only available on macOS)"
+      fi
     else
       # List ElevenLabs voices
       for voice in "${!VOICES[@]}"; do
@@ -574,11 +612,11 @@ case "$1" in
       exit 1
     fi
 
-    # Get the Nth most recent file
-    AUDIO_FILE=$(ls -t "$AUDIO_DIR"/tts-*.mp3 2>/dev/null | sed -n "${N}p")
+    # Get the Nth most recent file (check all supported formats)
+    AUDIO_FILE=$(ls -t "$AUDIO_DIR"/tts-*.{mp3,wav,aiff} 2>/dev/null | sed -n "${N}p")
 
     if [[ -z "$AUDIO_FILE" ]]; then
-      TOTAL=$(ls -t "$AUDIO_DIR"/tts-*.mp3 2>/dev/null | wc -l)
+      TOTAL=$(ls -t "$AUDIO_DIR"/tts-*.{mp3,wav,aiff} 2>/dev/null | wc -l)
       echo "❌ Audio #$N not found in history"
       echo "Total audio files available: $TOTAL"
       exit 1
@@ -588,8 +626,12 @@ case "$1" in
     echo "   File: $(basename "$AUDIO_FILE")"
     echo "   Path: $AUDIO_FILE"
 
-    # Play the audio file in background
-    (paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE" 2>/dev/null || mpg123 "$AUDIO_FILE" 2>/dev/null) &
+    # Play the audio file in background (afplay for macOS, paplay/aplay/mpg123 for Linux)
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      afplay "$AUDIO_FILE" &
+    else
+      (paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE" 2>/dev/null || mpg123 "$AUDIO_FILE" 2>/dev/null) &
+    fi
     ;;
 
   *)

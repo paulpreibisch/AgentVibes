@@ -50,7 +50,7 @@ COMMAND="${1:-help}"
 # @function is_language_supported
 # @intent Check if a language is supported by a provider
 # @param $1 {string} language - Language code (e.g., "spanish", "french")
-# @param $2 {string} provider - Provider name (e.g., "elevenlabs", "piper")
+# @param $2 {string} provider - Provider name (e.g., "elevenlabs", "piper", "macos")
 # @returns 0 if supported, 1 if not
 is_language_supported() {
   local language="$1"
@@ -70,6 +70,10 @@ is_language_supported() {
       # Piper only supports English natively
       return 1
       ;;
+    macos)
+      # macOS has voices for 40+ languages built-in
+      return 0
+      ;;
     *)
       return 1
       ;;
@@ -82,9 +86,28 @@ provider_list() {
   local current_provider
   current_provider=$(get_active_provider)
 
+  # Check if running on macOS
+  local is_macos=false
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    is_macos=true
+  fi
+
   echo "┌────────────────────────────────────────────────────────────┐"
   echo "│ Available TTS Providers                                    │"
   echo "├────────────────────────────────────────────────────────────┤"
+
+  # macOS Say (show first on macOS systems)
+  if [[ "$is_macos" == true ]]; then
+    if [[ "$current_provider" == "macos" ]]; then
+      echo "│ ✓ macOS Say     Built-in, free     ⭐⭐⭐⭐      [ACTIVE]    │"
+    else
+      echo "│   macOS Say     Built-in, free     ⭐⭐⭐⭐   [RECOMMENDED] │"
+    fi
+    echo "│   Cost: Free (built-in)                                   │"
+    echo "│   Platform: macOS only                                    │"
+    echo "│   Offline: Yes                                            │"
+    echo "│                                                            │"
+  fi
 
   # ElevenLabs
   if [[ "$current_provider" == "elevenlabs" ]]; then
@@ -106,6 +129,20 @@ provider_list() {
   echo "│   Cost: Free forever                                       │"
   echo "│   Platform: WSL, Linux only                                │"
   echo "│   Offline: Yes                                             │"
+
+  # macOS Say (show at end for non-macOS systems)
+  if [[ "$is_macos" != true ]]; then
+    echo "│                                                            │"
+    if [[ "$current_provider" == "macos" ]]; then
+      echo "│ ✓ macOS Say     Built-in, free     ⭐⭐⭐⭐      [ACTIVE]    │"
+    else
+      echo "│   macOS Say     Built-in, free     ⭐⭐⭐⭐   (macOS only)  │"
+    fi
+    echo "│   Cost: Free (built-in)                                   │"
+    echo "│   Platform: macOS only                                    │"
+    echo "│   Offline: Yes                                            │"
+  fi
+
   echo "└────────────────────────────────────────────────────────────┘"
   echo ""
   echo "Learn more: agentvibes.org/providers"
@@ -131,7 +168,7 @@ provider_switch() {
   if [[ -z "$new_provider" ]]; then
     echo "❌ Error: Provider name required"
     echo "Usage: /agent-vibes:provider switch <provider> [--force]"
-    echo "Available: elevenlabs, piper"
+    echo "Available: elevenlabs, piper, macos"
     return 1
   fi
 
@@ -169,6 +206,21 @@ provider_switch() {
       echo "Or run: .claude/hooks/piper-installer.sh"
       echo ""
       echo "Visit: agentvibes.org/install-piper"
+      return 1
+    fi
+  fi
+
+  # Platform check for macOS
+  if [[ "$new_provider" == "macos" ]]; then
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+      echo "❌ macOS Say provider is only supported on macOS"
+      echo "Your platform: $(uname -s)"
+      echo ""
+      echo "Alternative providers:"
+      echo "  • Piper TTS (free, offline) - for Linux/WSL"
+      echo "  • ElevenLabs (premium) - for all platforms"
+      echo ""
+      echo "See: agentvibes.org/platform-support"
       return 1
     fi
   fi
@@ -353,9 +405,33 @@ provider_info() {
       echo "Full comparison: agentvibes.org/providers"
       ;;
 
+    macos)
+      echo "┌────────────────────────────────────────────────────────────┐"
+      echo "│ macOS Say - Native macOS TTS Provider                      │"
+      echo "├────────────────────────────────────────────────────────────┤"
+      echo "│ Quality:     ⭐⭐⭐⭐  (Very good, Siri-quality on Mojave+)   │"
+      echo "│ Cost:        Free (built-in)                               │"
+      echo "│ Platform:    macOS only (all versions since 10.0)          │"
+      echo "│ Offline:     Yes (fully local)                             │"
+      echo "│                                                            │"
+      echo "│ Trade-offs:                                                │"
+      echo "│ + Zero setup - built into every Mac                       │"
+      echo "│ + 100+ voices in 40+ languages                            │"
+      echo "│ + Completely free, no API costs                           │"
+      echo "│ + Works offline, no internet needed                       │"
+      echo "│ - macOS only (no Windows/Linux)                           │"
+      echo "│                                                            │"
+      echo "│ Popular voices: Samantha, Alex, Daniel, Victoria          │"
+      echo "│                                                            │"
+      echo "│ Best for: Mac users wanting free, zero-setup TTS          │"
+      echo "└────────────────────────────────────────────────────────────┘"
+      echo ""
+      echo "Full comparison: agentvibes.org/providers"
+      ;;
+
     *)
       echo "❌ Unknown provider: $provider_name"
-      echo "Available: elevenlabs, piper"
+      echo "Available: elevenlabs, piper, macos"
       ;;
   esac
 }
@@ -394,6 +470,11 @@ provider_get() {
     piper)
       echo "Quality: ⭐⭐⭐⭐"
       echo "Cost: Free forever"
+      echo "Offline: Yes"
+      ;;
+    macos)
+      echo "Quality: ⭐⭐⭐⭐"
+      echo "Cost: Free (built-in)"
       echo "Offline: Yes"
       ;;
   esac
@@ -487,6 +568,54 @@ provider_preview() {
       echo "✓ Preview complete"
       echo "💡 Use /agent-vibes:list to see all available Piper voices"
       ;;
+    macos)
+      # Check if running on macOS
+      if [[ "$(uname -s)" != "Darwin" ]]; then
+        echo "❌ macOS voices only available on macOS"
+        echo "Your platform: $(uname -s)"
+        return 1
+      fi
+
+      # Check if a specific voice was requested
+      local voice_arg="$1"
+
+      if [[ -n "$voice_arg" ]]; then
+        # User requested a specific voice - check if it's valid
+        if say -v ? 2>/dev/null | grep -qi "^${voice_arg} "; then
+          echo "🎤 Previewing macOS voice: $voice_arg"
+          echo ""
+          "$SCRIPT_DIR/play-tts.sh" "Hello, this is ${voice_arg}. How do you like my voice?" "$voice_arg"
+        else
+          echo "❌ Voice not found: $voice_arg"
+          echo ""
+          echo "Available macOS voices (showing English):"
+          say -v ? 2>/dev/null | grep -i "en_" | head -10
+          echo ""
+          echo "Run /agent-vibes:list to see all available voices"
+        fi
+        return
+      fi
+
+      # No specific voice - preview first 3 English voices
+      echo "🎤 macOS Preview of 3 voices"
+      echo ""
+
+      # Preview common English voices
+      local sample_voices=("Samantha" "Alex" "Daniel")
+
+      for voice in "${sample_voices[@]}"; do
+        if say -v ? 2>/dev/null | grep -qi "^${voice} "; then
+          echo "🔊 ${voice}..."
+          "$SCRIPT_DIR/play-tts.sh" "Hi, my name is ${voice}" "$voice"
+          sleep 3
+        fi
+      done
+
+      echo ""
+      echo "✓ Preview complete"
+      echo "💡 Use /agent-vibes:list to see all available macOS voices"
+      ;;
+
     *)
       echo "❌ Unknown provider: $current_provider"
       ;;

@@ -2,9 +2,9 @@
 description: ElevenLabs TTS voice management commands
 ---
 
-# 🎤 ElevenLabs Voice Management
+# 🎤 AgentVibes Voice Management
 
-Manage your ElevenLabs text-to-speech voices with these commands:
+Manage your text-to-speech voices across multiple providers (ElevenLabs, Piper, macOS Say).
 
 ## Available Commands
 
@@ -49,9 +49,33 @@ Set a prefix word/phrase for all TTS messages
 
 Saved locally in `.agentvibes/config/agentvibes.json`
 
-## Getting Voice IDs
+## Provider Management
 
-To add your own custom voices:
+### `/agent-vibes:provider list`
+Show all available TTS providers
+
+### `/agent-vibes:provider switch <name>`
+Switch between providers:
+- `/agent-vibes:provider switch piper` - Free, offline (Linux/WSL)
+- `/agent-vibes:provider switch elevenlabs` - Premium AI voices
+- `/agent-vibes:provider switch macos` - Native macOS (Mac only)
+
+### `/agent-vibes:provider info <name>`
+Get details about a specific provider
+
+## Providers
+
+| Provider | Platform | Cost | Quality |
+|----------|----------|------|---------|
+| **macOS Say** | macOS only | Free (built-in) | ⭐⭐⭐⭐ |
+| **Piper** | Linux/WSL | Free | ⭐⭐⭐⭐ |
+| **ElevenLabs** | All | Free tier + paid | ⭐⭐⭐⭐⭐ |
+
+On macOS, the native `say` provider is automatically detected and recommended.
+
+## Getting Voice IDs (ElevenLabs)
+
+To add your own custom ElevenLabs voices:
 1. Go to https://elevenlabs.io/app/voice-library
 2. Select or create a voice
 3. Copy the voice ID (15-30 character alphanumeric string)
@@ -59,10 +83,10 @@ To add your own custom voices:
 
 ## Default Voices
 
-The system comes with these Character Voices from ElevenLabs:
-- Northern Terry, Grandpa Spuds Oxley, Ms. Walker
-- Ralf Eisend, Amy, Michael, Jessica Anne Bogart
-- Aria, Lutz Laugh, Dr. Von Fusion, Matthew Schmitz
-- Demon Monster, Cowboy Bob, Drill Sergeant
+**ElevenLabs:** Northern Terry, Grandpa Spuds Oxley, Ms. Walker, Ralf Eisend, Amy, Michael, Jessica Anne Bogart, Aria, Lutz Laugh, Dr. Von Fusion, Matthew Schmitz, Demon Monster, Cowboy Bob, Drill Sergeant
+
+**Piper:** en_US-lessac-medium, en_US-amy-medium, en_GB-alan-medium, and many more
+
+**macOS Say:** Samantha, Alex, Daniel, Victoria, Karen, Moira, and 100+ more built-in voices
 
 Enjoy your TTS experience! 🎵
