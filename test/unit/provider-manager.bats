@@ -44,10 +44,11 @@ teardown() {
 }
 
 @test "provider-manager list works with no providers (edge case)" {
-  # Temporarily rename provider files to test no providers case
+  # Temporarily rename all provider files to test no providers case
   local hooks_dir="$TEST_CLAUDE_DIR/hooks"
   mv "$hooks_dir/play-tts-elevenlabs.sh" "$hooks_dir/play-tts-elevenlabs.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-piper.sh" "$hooks_dir/play-tts-piper.sh.bak" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-macos.sh" "$hooks_dir/play-tts-macos.sh.bak" 2>/dev/null || true
 
   run "$PROVIDER_MANAGER" list
 
@@ -57,6 +58,7 @@ teardown() {
   # Restore files
   mv "$hooks_dir/play-tts-elevenlabs.sh.bak" "$hooks_dir/play-tts-elevenlabs.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-piper.sh.bak" "$hooks_dir/play-tts-piper.sh" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-macos.sh.bak" "$hooks_dir/play-tts-macos.sh" 2>/dev/null || true
 }
 
 # ============================================================================
