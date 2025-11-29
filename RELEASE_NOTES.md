@@ -1,7 +1,9 @@
-# Release v2.14.1 - Native macOS TTS Provider
+# Release v2.14.2 - Native macOS TTS Provider
 
 **Release Date:** 2025-11-29
 **Type:** Patch Release (New Provider)
+
+> Note: v2.14.2 is identical to v2.14.1 - version bump for CI badge fix only.
 
 ## AI Summary
 

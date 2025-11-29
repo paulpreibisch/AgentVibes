@@ -128,7 +128,7 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.1 - Native macOS TTS Provider\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.2 - Native macOS TTS Provider\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
       chalk.cyan('AgentVibes v2.14.1 introduces native macOS TTS support via the\n') +
