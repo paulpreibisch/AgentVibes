@@ -128,18 +128,18 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.0 - Auto-Translation for BMAD & Learning Mode\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.1 - Native macOS TTS Provider\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.0 introduces automatic translation for TTS output.\n') +
-      chalk.cyan('BMAD users hear spoken messages in their communication_language.\n') +
-      chalk.cyan('Language Learning Mode now uses Google Translate - saving tokens!\n\n') +
+      chalk.cyan('AgentVibes v2.14.1 introduces native macOS TTS support via the\n') +
+      chalk.cyan('built-in `say` command. Mac users can now use AgentVibes with\n') +
+      chalk.cyan('zero setup - no API keys, no downloads, no configuration!\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🌐 BMAD Multi-Language TTS - Auto-translate to your communication_language\n') +
-      chalk.gray('   🎓 Learning Mode Auto-Translation - Google does it free, not Claude!\n') +
-      chalk.gray('   🔄 Translation Manager - New /agent-vibes:translate command\n') +
-      chalk.gray('   🐍 translator.py - Core engine using deep-translator (Google)\n') +
-      chalk.gray('   ✅ 140 Tests Passing - 18 new translation tests + existing\n\n') +
+      chalk.gray('   🍎 macOS Say Provider - Native TTS using macOS `say` (zero deps!)\n') +
+      chalk.gray('   🎤 100+ Built-in Voices - Access all Apple voices incl. Siri\n') +
+      chalk.gray('   🌍 40+ Languages - Full Apple voice library support\n') +
+      chalk.gray('   🔄 Three-Way Provider Switching - ElevenLabs, Piper, and macOS\n') +
+      chalk.gray('   🎉 Smarter BMAD Detection - Party mode recommendation on install\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -1743,16 +1743,16 @@ async function install(options = {}) {
 
       console.log(
         boxen(
-          chalk.green.bold(`🎉 BMAD-METHOD ${versionLabel} Integration Complete!\n\n`) +
-          chalk.white('✅ BMAD Voice Plugin: AUTO-ENABLED\n') +
-          chalk.white('✅ TTS Hooks: INJECTED into all agent files\n') +
-          chalk.gray('Each BMAD agent will automatically use its assigned voice\n') +
-          chalk.gray('and speak when activated!\n\n') +
-          chalk.cyan('Commands:\n') +
-          chalk.gray('  • /agent-vibes:bmad status - View TTS injection status\n') +
-          chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices\n') +
-          chalk.gray('  • /agent-vibes:bmad disable - Disable TTS for all agents\n') +
-          chalk.gray('  • /agent-vibes:bmad restore - Restore agents from backup'),
+          chalk.green.bold(`🎉 BMAD-METHOD™ ${versionLabel} Detected!\n\n`) +
+          chalk.white.bold('We detected you ALREADY have the BMAD-METHOD™\n') +
+          chalk.white.bold('The Universal AI Agent Framework installed!\n\n') +
+          chalk.cyan('✨ Try the Party Mode command:\n') +
+          chalk.yellow.bold('   /bmad:core:workflows:party-mode\n\n') +
+          chalk.gray('AgentVibes will assign a unique voice to each agent\n') +
+          chalk.gray('while they help you with your project!\n\n') +
+          chalk.cyan('Other Commands:\n') +
+          chalk.gray('  • /agent-vibes:bmad status - View voice assignments\n') +
+          chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices'),
           {
             padding: 1,
             margin: 1,

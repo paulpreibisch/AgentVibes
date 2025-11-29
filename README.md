@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.1
 
 ---
 
@@ -94,17 +94,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.0 - Auto-Translation for BMAD & Learning Mode](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.0)** 🎉
+**[v2.14.1 - Native macOS TTS Provider](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.1)** 🎉
 
-AgentVibes v2.14.0 introduces automatic translation for TTS output (Issues #50 and #51). When AgentVibes speaks acknowledgments like "Starting the build" or completions like "All tests passed!", this text is normally in English. Now, BMAD users who set `communication_language: Spanish` in `.bmad/core/config.yaml` will hear these spoken messages automatically translated to Spanish - matching their project's communication preference. This version also updates our Language Learning Mode feature to utilize Google Deep Translate, reducing token usage (Claude no longer needs to do the translation! Google now does it for free!).
+AgentVibes v2.14.1 introduces native macOS TTS support via the built-in `say` command. Mac users can now use AgentVibes with **zero setup required** - no API keys, no downloads, no configuration. Simply switch to the macOS provider and start talking! The new provider automatically detects 100+ built-in Apple voices across 40+ languages, with Siri-quality enhanced voices available on macOS Mojave (10.14) and later.
 
 **Key Highlights:**
-- 🌐 **BMAD Multi-Language TTS** - Auto-detect `communication_language` from BMAD config and translate TTS
-- 🎓 **Learning Mode Auto-Translation** - Hear English + auto-translated target language (Google does it free!)
-- 🔄 **Translation Manager** - New `/agent-vibes:translate` command for manual control
-- 🐍 **translator.py** - Core translation engine using deep-translator (Google Translate)
-- ✅ **140 Tests Passing** - 18 new translation tests + all existing tests
-- 🔄 **Zero Breaking Changes** - Fully backward compatible with v2.13.9
+- 🍎 **macOS Say Provider** - Native TTS using macOS `say` command (zero dependencies!)
+- 🎤 **100+ Built-in Voices** - Access all Apple voices including enhanced Siri voices
+- 🌍 **40+ Languages** - Full language support from Apple's voice library
+- 🔄 **Three-Way Provider Switching** - Seamless migration between ElevenLabs, Piper, and macOS
+- 🎉 **Smarter BMAD Detection** - Improved installer message when BMAD-METHOD™ is detected
+- ✅ **Zero Breaking Changes** - Fully backward compatible with v2.14.0
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

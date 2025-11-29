@@ -1,92 +1,94 @@
-# Release v2.14.0 - Auto-Translation for BMAD and Language Learning Mode
+# Release v2.14.1 - Native macOS TTS Provider
 
-**Release Date:** 2025-11-28
-**Type:** Minor Release (New Features)
+**Release Date:** 2025-11-29
+**Type:** Patch Release (New Provider)
 
 ## AI Summary
 
-AgentVibes v2.14.0 introduces automatic translation for TTS output (Issues #50 and #51). When AgentVibes speaks acknowledgments like "Starting the build" or completions like "All tests passed!", this text is normally in English. Now, BMAD users who set `communication_language: Spanish` in `.bmad/core/config.yaml` will hear these spoken messages automatically translated to Spanish - matching their project's communication preference. This version also updates our Language Learning Mode feature to utilize Google Deep Translate, reducing token usage (Claude no longer needs to do the translation! Google now does it for free!).
+AgentVibes v2.14.1 introduces native macOS TTS support via the built-in `say` command. Mac users can now use AgentVibes with **zero setup required** - no API keys, no downloads, no configuration. Simply switch to the macOS provider and start talking! The new provider automatically detects 100+ built-in Apple voices across 40+ languages, with Siri-quality enhanced voices available on macOS Mojave (10.14) and later.
 
 **Key Highlights:**
-- 🌐 **BMAD Multi-Language TTS** - Auto-detect `communication_language` from BMAD config and translate TTS
-- 🎓 **Learning Mode Auto-Translation** - Hear English + auto-translated target language (no manual translation!)
-- 🔄 **Translation Manager** - New `/agent-vibes:translate` command for manual control
-- 🐍 **translator.py** - Core translation engine using deep-translator (Google Translate)
-- ✅ **140 Tests Passing** - 18 new translation tests + all existing tests
+- 🍎 **macOS Say Provider** - Native TTS using macOS `say` command (zero dependencies!)
+- 🎤 **100+ Built-in Voices** - Access all Apple voices including enhanced Siri voices
+- 🌍 **40+ Languages** - Full language support from Apple's voice library
+- 🔄 **Three-Way Provider Switching** - Seamless migration between ElevenLabs, Piper, and macOS
+- 🎉 **Smarter BMAD Detection** - Improved installer message when BMAD-METHOD™ is detected
+- ✅ **Test Coverage Updated** - All provider tests account for new macOS option
 
 ---
 
 ## New Features
 
-### BMAD Multi-Language TTS (Issue #50)
-**Files:** `.claude/hooks/translate-manager.sh`, `.claude/hooks/translator.py`, `.claude/hooks/play-tts.sh`
+### macOS Say TTS Provider
+**Files:** `.claude/hooks/play-tts-macos.sh`, `.claude/hooks/macos-voice-manager.sh`
 
-BMAD users can now have TTS automatically translated based on their communication language preference:
-
-```yaml
-# .bmad/core/config.yaml
-communication_language: Spanish
-```
+Mac users can now use AgentVibes with zero setup using the native `say` command:
 
 ```bash
-# Enable auto-detection from BMAD config
-/agent-vibes:translate auto
+# Switch to macOS provider (Mac only)
+/agent-vibes:provider switch macos
 
-# All TTS is now automatically translated to Spanish!
+# List available voices
+/agent-vibes:list
+
+# Preview voices
+/agent-vibes:preview
+
+# Switch voices
+/agent-vibes:switch Samantha
 ```
 
-**Priority Cascade:**
-1. Manual override (`/agent-vibes:translate set spanish`)
-2. BMAD config (`communication_language` in `.bmad/core/config.yaml`)
-3. Default (no translation - English)
+**Why macOS Provider?**
+- ✅ Zero setup - works out of the box on any Mac
+- ✅ No API keys required
+- ✅ No downloads or installations
+- ✅ Works offline
+- ✅ 100+ voices included
+- ✅ Siri-quality enhanced voices on macOS 10.14+
 
-### Learning Mode Auto-Translation (Issue #51)
-**Files:** `.claude/hooks/play-tts.sh`, `.claude/hooks/learn-manager.sh`
+**Recommended Voices:**
+- `Samantha` - American English female (enhanced)
+- `Alex` - American English male (enhanced)
+- `Daniel` - British English male (enhanced)
+- `Karen` - Australian English female (enhanced)
+- `Moira` - Irish English female (enhanced)
 
-Language Learning Mode now automatically translates TTS to your target language:
+### Voice Management for macOS
+**File:** `.claude/hooks/macos-voice-manager.sh`
+
+Full voice management capabilities for macOS:
 
 ```bash
-# Set up learning mode
-/agent-vibes:target spanish
-/agent-vibes:learn
+# List all voices
+/agent-vibes:list
 
-# Now when Claude speaks:
-# 1st: "Starting the build" (English)
-# 2nd: "Iniciando la compilación" (Spanish - AUTO-TRANSLATED!)
+# Filter by language (English voices)
+# Voices include: Alex, Samantha, Victoria, Daniel, Karen, etc.
+
+# Get voice info
+/agent-vibes:whoami
 ```
 
-**Before v2.14.0:** Claude had to manually translate each message
-**After v2.14.0:** AgentVibes auto-translates using Google Translate - zero effort!
+### Three-Way Provider Switching
+**Files:** `.claude/hooks/provider-manager.sh`, `.claude/hooks/provider-commands.sh`
 
-### New Translation Commands
-**File:** `.claude/commands/agent-vibes/translate.md`
-
-| Command | Description |
-|---------|-------------|
-| `/agent-vibes:translate` | Show current translation settings |
-| `/agent-vibes:translate set <lang>` | Set translation language (e.g., `spanish`) |
-| `/agent-vibes:translate auto` | Use BMAD `communication_language` setting |
-| `/agent-vibes:translate off` | Disable translation (speak English) |
-| `/agent-vibes:translate status` | Show detailed translation status |
-
-### translator.py - Core Translation Engine
-**File:** `.claude/hooks/translator.py`
-
-New Python translation engine using deep-translator:
-- Uses Google Translate (free, no API key required)
-- Supports 25+ languages
-- Language detection with langdetect
-- CLI and library mode support
+Provider switching now supports three-way voice migration:
 
 ```bash
-# CLI usage
-python3 translator.py "Hello world" spanish
-# Output: Hola mundo
+# Show available providers (macOS shows as recommended on Mac)
+/agent-vibes:provider list
 
-# Language detection
-python3 translator.py detect "Bonjour le monde"
-# Output: fr
+# Switch to macOS provider with voice migration
+/agent-vibes:provider switch macos
+
+# Switch back to Piper
+/agent-vibes:provider switch piper
 ```
+
+**Provider Detection:**
+- On macOS: Shows "macos" as recommended provider
+- On Linux/WSL: Shows "piper" as recommended
+- ElevenLabs available on all platforms (requires API key)
 
 ---
 
@@ -94,89 +96,76 @@ python3 translator.py detect "Bonjour le monde"
 
 | File | Description |
 |------|-------------|
-| `.claude/hooks/translator.py` | Core translation engine (237 lines) |
-| `.claude/hooks/translate-manager.sh` | Translation settings management (341 lines) |
-| `.claude/hooks/requirements.txt` | pip dependencies (deep-translator, langdetect) |
-| `.claude/commands/agent-vibes/translate.md` | Slash command documentation |
-| `test/unit/translator.bats` | 18 comprehensive tests |
+| `.claude/hooks/play-tts-macos.sh` | macOS TTS provider implementation (270 lines) |
+| `.claude/hooks/macos-voice-manager.sh` | macOS voice discovery and management (205 lines) |
+| `.github/workflows/test-macos-tts.yml` | Cost-optimized macOS CI workflow (210 lines) |
+| `scripts/fix-wsl-audio.sh` | WSL audio troubleshooting utility (106 lines) |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `.claude/hooks/play-tts.sh` | Added translation/learning mode integration (+139 lines) |
-| `.claude/hooks/learn-manager.sh` | Added source guards for function sharing |
-| `docs/language-learning-mode.md` | Added auto-translation docs, translation mode section |
+| `.claude/hooks/provider-manager.sh` | Added macOS provider detection, three-way migration (+83 lines) |
+| `.claude/hooks/provider-commands.sh` | macOS provider support in commands (+135 lines) |
+| `.claude/hooks/voice-manager.sh` | Provider-aware voice routing for macOS (+62 lines) |
+| `.claude/commands/agent-vibes/agent-vibes.md` | macOS provider documentation (+42 lines) |
+| `.claude/commands/agent-vibes/provider.md` | Updated provider docs (+28 lines) |
+| `README.md` | macOS provider documentation (+19 lines) |
+| `src/installer.js` | Improved BMAD detection message with party-mode recommendation |
+| `test/unit/provider-manager.bats` | Updated tests for macOS provider (+4 lines) |
 
 ---
 
 ## Changes Summary
 
-**Commits:** 4
-- feat: Add auto-translation for BMAD and Language Learning Mode
-- docs: Update README with v2.13.9 release notes
-- fix: Add initial value to reduce() call for reliability
+**Commits:** 2
+- feat: Add macOS Say TTS provider for native Mac support
+- fix: Update provider-manager test to account for macOS provider
 
-**Files Changed:** 10
-**Lines Added:** 1,100
-**Lines Removed:** 21
-
-**Test Results:** 140/140 passing (128 bats + 12 node)
+**Files Changed:** 12
+**Lines Added:** 1,104
+**Lines Removed:** 61
 
 ---
 
-## Supported Languages
+## Platform Support Matrix
 
-Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Russian, Polish, Dutch, Turkish, Arabic, Hindi, Swedish, Danish, Norwegian, Finnish, Czech, Romanian, Ukrainian, Greek, Bulgarian, Croatian, Slovak
+| Platform | ElevenLabs | Piper | macOS Say |
+|----------|------------|-------|-----------|
+| macOS | ✅ | ✅ | ✅ (recommended) |
+| Linux | ✅ | ✅ (recommended) | ❌ |
+| WSL | ✅ | ✅ (recommended) | ❌ |
+| Windows | ✅ | ✅ | ❌ |
 
 ---
 
 ## Migration Notes
 
-**No migration required** - This is a minor release with new features.
+**No migration required** - This is a patch release with a new provider option.
 
-**New Dependencies:**
-- `deep-translator>=1.11.4` (pip)
-- `langdetect>=1.0.9` (pip)
+**New Dependencies:** None! The macOS provider uses only built-in macOS commands.
 
-Install with:
+**Compatibility:** 100% backward compatible with v2.14.0
+
+**Recommended Action for Mac Users:**
 ```bash
-pip install deep-translator langdetect
-```
+# Try the new macOS provider
+/agent-vibes:provider switch macos
 
-**Compatibility:** 100% backward compatible with v2.13.9
-
-**Recommended Action:** Update to get auto-translation features
-```bash
-npx agentvibes@latest update
+# If you prefer cloud quality, switch back anytime
+/agent-vibes:provider switch elevenlabs
 ```
 
 ---
 
-## References
+## Testing
 
-- GitHub Issue #50: BMAD Multi-Language TTS
-- GitHub Issue #51: Auto-translate in Language Learning Mode
-- deep-translator: https://github.com/nidhaloff/deep-translator
+All tests pass including the new macOS-aware test updates:
 
----
+```bash
+# Run tests
+npm test
 
-# Release v2.13.9 - Provider-Aware Voice Migration
-
-**Release Date:** 2025-11-27
-**Type:** Patch Release (Bug Fix & Enhancement)
-
-## AI Summary
-
-AgentVibes v2.13.9 fixes a critical issue where BMAD voice mappings were not provider-aware, causing "Voice model not found" errors when switching between ElevenLabs and Piper TTS providers. The release introduces intelligent voice migration that automatically maps voices when switching providers (e.g., "Amy" → "en_US-amy-medium"), ensuring seamless provider switching without manual reconfiguration.
-
-**Key Highlights:**
-- Smart Voice Migration - Automatic voice mapping when switching TTS providers
-- Provider-Aware Docs - BMAD documentation now shows both ElevenLabs and Piper columns
-- Valid Piper Names - Fixed incomplete Piper voice names (kristin → en_US-kristin-medium)
-- Preserve Voice Names - Internal spaces in voice names no longer stripped
-- 122 Tests Passing - All functionality verified (110 bats + 12 node tests)
-
----
-
-[Previous release notes continue below...]
+# macOS-specific tests run on macOS CI only
+# See: .github/workflows/test-macos-tts.yml
+```
