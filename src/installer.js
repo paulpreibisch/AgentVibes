@@ -128,17 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.4 - Fully Automated Install\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.7 - macOS Say Provider Support\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.4 fixes the --yes flag to skip ALL prompts.\n') +
-      chalk.cyan('Now `npx agentvibes install --yes` runs fully unattended,\n') +
-      chalk.cyan('perfect for CI/CD pipelines and automated deployments.\n\n') +
+      chalk.cyan('AgentVibes v2.14.7 adds macOS Say to the provider selection.\n') +
+      chalk.cyan('Mac users now see all 3 TTS options during install:\n') +
+      chalk.cyan('Piper (free), macOS Say (built-in), and ElevenLabs (premium).\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   ⚡ Fully Automated Install - --yes skips ALL interactive prompts\n') +
-      chalk.gray('   🤖 CI/CD Ready - Perfect for automated deployments\n') +
-      chalk.gray('   ✅ No Breaking Changes - Interactive mode unchanged\n') +
-      chalk.gray('   🎯 133 Tests Passing - Full test suite coverage\n\n') +
+      chalk.gray('   🍎 macOS Say Provider - Zero setup, built-in system voices\n') +
+      chalk.gray('   🔧 BMAD Fix - core/agents now get TTS injection\n') +
+      chalk.gray('   ⚡ Fully Automated Install - --yes for CI/CD pipelines\n') +
+      chalk.gray('   🎯 All Tests Passing - Full test suite coverage\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
