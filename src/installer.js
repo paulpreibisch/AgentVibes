@@ -128,18 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.2 - Native macOS TTS Provider\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.3 - macOS Provider Routing Fix\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.1 introduces native macOS TTS support via the\n') +
-      chalk.cyan('built-in `say` command. Mac users can now use AgentVibes with\n') +
-      chalk.cyan('zero setup - no API keys, no downloads, no configuration!\n\n') +
+      chalk.cyan('AgentVibes v2.14.3 fixes a critical bug where the macOS TTS\n') +
+      chalk.cyan('provider would not speak when selected. The TTS router was\n') +
+      chalk.cyan('missing case handlers for the macOS provider.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🍎 macOS Say Provider - Native TTS using macOS `say` (zero deps!)\n') +
-      chalk.gray('   🎤 100+ Built-in Voices - Access all Apple voices incl. Siri\n') +
-      chalk.gray('   🌍 40+ Languages - Full Apple voice library support\n') +
-      chalk.gray('   🔄 Three-Way Provider Switching - ElevenLabs, Piper, and macOS\n') +
-      chalk.gray('   🎉 Smarter BMAD Detection - Party mode recommendation on install\n\n') +
+      chalk.gray('   🐛 Fixed macOS Provider Routing - macOS `say` now works (Issue #52)\n') +
+      chalk.gray('   ✅ New Provider Tests - 4 tests ensure macOS is properly routed\n') +
+      chalk.gray('   🔧 Fixed Translator Tests - 3 pre-existing test failures resolved\n') +
+      chalk.gray('   🎯 133 Tests Passing - Full test suite with macOS coverage\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

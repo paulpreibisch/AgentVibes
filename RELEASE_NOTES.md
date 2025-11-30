@@ -1,3 +1,120 @@
+# Release v2.14.3 - macOS Provider Routing Fix
+
+**Release Date:** 2025-11-30
+**Type:** Patch Release (Bug Fix)
+
+## AI Summary
+
+AgentVibes v2.14.3 fixes a critical bug where the macOS TTS provider would not speak when selected. The TTS router (`play-tts.sh`) was missing the case handler for the macOS provider, causing it to fail silently. This release adds the missing routing and includes comprehensive test coverage to prevent regression.
+
+**Key Highlights:**
+- 🐛 **Fixed macOS Provider Routing** - macOS `say` provider now works when selected (Issue #52)
+- ✅ **New Provider Tests** - 4 new tests ensure macOS provider is properly detected and routed
+- 🔧 **Fixed Translator Tests** - Fixed 3 pre-existing failing tests related to PWD and locale warnings
+- 🎯 **133 Tests Passing** - Full test suite now passes with comprehensive macOS coverage
+
+---
+
+## Bug Fixes
+
+### macOS Provider Routing Fix (Issue #52)
+**File:** `.claude/hooks/play-tts.sh`
+
+The TTS router was missing case handlers for the `macos` provider in two locations:
+1. The `speak_text()` function (used by translation/learning modes)
+2. The main routing case statement
+
+**Before:** Switching to macOS provider would silently fail - no TTS output
+**After:** macOS provider correctly routes to `play-tts-macos.sh`
+
+```bash
+# This now works correctly:
+/agent-vibes:provider switch macos
+# TTS output will now use macOS say command
+```
+
+---
+
+## Test Improvements
+
+### New macOS Provider Tests
+**Files:** `test/unit/provider-manager.bats`, `test/unit/play-tts.bats`
+
+Added 4 new tests to ensure macOS provider is properly supported:
+
+| Test | Description |
+|------|-------------|
+| `provider-manager list shows available providers` | Verifies `macos` appears in provider list |
+| `provider-manager switch to macos` | Tests switching to macOS provider |
+| `provider-manager validate macos provider exists` | Validates macOS provider script exists |
+| `play-tts routes to macos provider when configured` | Tests actual TTS routing to macOS |
+| `play-tts speak_text function routes to macos` | Verifies internal routing function |
+
+### Fixed Translator Tests
+**File:** `test/unit/translator.bats`
+
+Fixed 3 pre-existing failing tests:
+- Tests now properly `cd` to project directory before running commands
+- Fixed locale warning filtering using `env LC_ALL=C bash -c`
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `.claude/hooks/play-tts.sh` | Added macOS case handlers (+6 lines) |
+| `test/unit/provider-manager.bats` | Added macOS provider tests (+24 lines) |
+| `test/unit/play-tts.bats` | Added macOS routing tests (+45 lines) |
+| `test/unit/translator.bats` | Fixed PWD and locale issues (+13 lines) |
+
+---
+
+## Changes Summary
+
+**Commits:** 2
+- `fix: Add macOS provider routing to play-tts.sh`
+- `test: Add macOS provider tests and fix translator tests`
+
+**Files Changed:** 4
+**Lines Added:** 88
+**Lines Removed:** 11
+
+---
+
+## Migration Notes
+
+**No migration required** - This is a bug fix release.
+
+**Who is affected:** Mac users who updated to v2.14.1/v2.14.2 and tried to use the macOS provider.
+
+**Fix verification:**
+```bash
+# Update AgentVibes
+npx agentvibes update
+
+# Switch to macOS provider - should now speak
+/agent-vibes:provider switch macos
+```
+
+---
+
+## Testing
+
+All 133 tests pass:
+
+```bash
+npm test
+
+# Key tests:
+# ok 21 play-tts routes to macos provider when configured
+# ok 22 play-tts speak_text function routes to macos
+# ok 29 provider-manager switch to macos
+# ok 30 provider-manager validate macos provider exists
+```
+
+---
+
 # Release v2.14.2 - Native macOS TTS Provider
 
 **Release Date:** 2025-11-29

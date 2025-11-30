@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.3
 
 ---
 
@@ -94,17 +94,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.2 - Native macOS TTS Provider](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.2)** 🎉
+**[v2.14.3 - macOS Provider Routing Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.3)** 🎉
 
-AgentVibes v2.14.1 introduces native macOS TTS support via the built-in `say` command. Mac users can now use AgentVibes with **zero setup required** - no API keys, no downloads, no configuration. Simply switch to the macOS provider and start talking! The new provider automatically detects 100+ built-in Apple voices across 40+ languages, with Siri-quality enhanced voices available on macOS Mojave (10.14) and later.
+AgentVibes v2.14.3 fixes a critical bug where the macOS TTS provider would not speak when selected. The TTS router (`play-tts.sh`) was missing the case handler for the macOS provider, causing it to fail silently. This release adds the missing routing and includes comprehensive test coverage to prevent regression.
 
 **Key Highlights:**
-- 🍎 **macOS Say Provider** - Native TTS using macOS `say` command (zero dependencies!)
-- 🎤 **100+ Built-in Voices** - Access all Apple voices including enhanced Siri voices
-- 🌍 **40+ Languages** - Full language support from Apple's voice library
-- 🔄 **Three-Way Provider Switching** - Seamless migration between ElevenLabs, Piper, and macOS
-- 🎉 **Smarter BMAD Detection** - Improved installer message when BMAD-METHOD™ is detected
-- ✅ **Zero Breaking Changes** - Fully backward compatible with v2.14.0
+- 🐛 **Fixed macOS Provider Routing** - macOS `say` provider now works when selected (Issue #52)
+- ✅ **New Provider Tests** - 4 new tests ensure macOS provider is properly detected and routed
+- 🔧 **Fixed Translator Tests** - Fixed 3 pre-existing failing tests related to PWD and locale warnings
+- 🎯 **133 Tests Passing** - Full test suite now passes with comprehensive macOS coverage
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
