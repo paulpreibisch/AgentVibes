@@ -904,6 +904,7 @@ If AgentVibes party mode is enabled, immediately trigger TTS with agent's voice:
 
   // Process all agent files
   const agentDirs = [
+    path.join(bmadPath, 'core/agents'),
     path.join(bmadPath, 'bmm/agents'),
     path.join(bmadPath, 'bmgd/agents'),
     path.join(bmadPath, 'bmb/agents'),
