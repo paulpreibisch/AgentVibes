@@ -55,18 +55,18 @@ DEFAULT_VOICE="Samantha"
 
 # Common macOS voices with descriptions
 # These are typically available on all macOS systems
-declare -A MACOS_VOICE_INFO
-MACOS_VOICE_INFO=(
-  ["Alex"]="American English male (enhanced)"
-  ["Samantha"]="American English female (enhanced)"
-  ["Victoria"]="American English female"
-  ["Daniel"]="British English male (enhanced)"
-  ["Karen"]="Australian English female (enhanced)"
-  ["Moira"]="Irish English female (enhanced)"
-  ["Tessa"]="South African English female (enhanced)"
-  ["Fiona"]="Scottish English female (enhanced)"
-  ["Veena"]="Indian English female (enhanced)"
-)
+# Using simple list format for bash 3.x compatibility (macOS default)
+show_common_voices() {
+  echo "  Alex - American English male (enhanced)"
+  echo "  Daniel - British English male (enhanced)"
+  echo "  Fiona - Scottish English female (enhanced)"
+  echo "  Karen - Australian English female (enhanced)"
+  echo "  Moira - Irish English female (enhanced)"
+  echo "  Samantha - American English female (enhanced)"
+  echo "  Tessa - South African English female (enhanced)"
+  echo "  Veena - Indian English female (enhanced)"
+  echo "  Victoria - American English female"
+}
 
 # @function get_voice_file_path
 # @intent Determine path to voice configuration file
@@ -114,10 +114,8 @@ fi
 if [[ -z "$TEXT" ]]; then
   echo "Usage: $0 \"text to speak\" [voice_name]"
   echo ""
-  echo "Available voices (run 'say -v ?' for full list):"
-  for voice in "${!MACOS_VOICE_INFO[@]}"; do
-    echo "  $voice - ${MACOS_VOICE_INFO[$voice]}"
-  done | sort
+  echo "Common voices (run 'say -v ?' for full list):"
+  show_common_voices
   exit 1
 fi
 
