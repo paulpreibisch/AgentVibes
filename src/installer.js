@@ -1404,13 +1404,16 @@ async function install(options = {}) {
   console.log(chalk.gray(`   • 30+ language support with native voices`));
   console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
 
+  // Provider labels for display
+  const providerLabels = { elevenlabs: 'ElevenLabs', piper: 'Piper TTS', macos: 'macOS Say' };
+
   // Final confirmation
   if (!options.yes) {
     const { confirm } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
-        message: chalk.yellow(`Proceed with installation using ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}?`),
+        message: chalk.yellow(`Proceed with installation using ${providerLabels[selectedProvider] || selectedProvider}?`),
         default: true,
       },
     ]);
@@ -1469,7 +1472,6 @@ async function install(options = {}) {
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
 
-    const providerLabels = { elevenlabs: 'ElevenLabs', piper: 'Piper TTS', macos: 'macOS Say' };
     spinner.succeed(chalk.green(`Provider set to: ${providerLabels[selectedProvider] || selectedProvider}\n`));
 
     // Detect and migrate old configuration
@@ -1502,6 +1504,12 @@ async function install(options = {}) {
       } else {
         console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
       }
+    } else if (selectedProvider === 'macos') {
+      // macOS Say provider summary
+      console.log(chalk.white(`   • Using macOS built-in Say command`));
+      console.log(chalk.white(`   • System voices available (Samantha, Alex, etc.)`));
+      console.log(chalk.green(`   • No API key needed ✓`));
+      console.log(chalk.green(`   • Zero setup required ✓`));
     } else {
       // Check for installed Piper voices
       const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
