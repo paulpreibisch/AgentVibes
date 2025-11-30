@@ -292,16 +292,23 @@ Without the \`.bmad-agent-context\` file:
 // ============================================================================
 
 /**
- * Prompt user to select TTS provider (Piper or ElevenLabs)
+ * Prompt user to select TTS provider (Piper, ElevenLabs, or macOS Say)
  * @param {Object} options - Installation options
- * @returns {Promise<string>} Selected provider ('piper' or 'elevenlabs')
+ * @returns {Promise<string>} Selected provider ('piper', 'elevenlabs', or 'macos')
  */
 async function promptProviderSelection(options) {
+  const isMacOS = process.platform === 'darwin';
+
   if (options.yes) {
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
     if (elevenLabsKey) {
       console.log(chalk.green('✓ Using ElevenLabs (API key detected)\n'));
       return 'elevenlabs';
+    }
+    // On macOS with --yes, default to macOS say (simpler setup)
+    if (isMacOS) {
+      console.log(chalk.green('✓ Using macOS Say (built-in option)\n'));
+      return 'macos';
     }
     console.log(chalk.green('✓ Using Piper TTS (free option)\n'));
     return 'piper';
@@ -309,21 +316,33 @@ async function promptProviderSelection(options) {
 
   console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
 
+  // Build choices based on platform
+  const choices = [
+    {
+      name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
+      value: 'piper',
+    },
+  ];
+
+  // Add macOS Say option on macOS
+  if (isMacOS) {
+    choices.push({
+      name: chalk.yellow('🍎 macOS Say (Built-in)') + chalk.gray(' - System voices, zero setup required'),
+      value: 'macos',
+    });
+  }
+
+  choices.push({
+    name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
+    value: 'elevenlabs',
+  });
+
   const { provider } = await inquirer.prompt([
     {
       type: 'list',
       name: 'provider',
       message: 'Which TTS provider would you like to use?',
-      choices: [
-        {
-          name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
-          value: 'piper',
-        },
-        {
-          name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
-          value: 'elevenlabs',
-        },
-      ],
+      choices,
       default: 'piper',
     },
   ]);
@@ -1450,7 +1469,8 @@ async function install(options = {}) {
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
 
-    spinner.succeed(chalk.green(`Provider set to: ${selectedProvider === 'elevenlabs' ? 'ElevenLabs' : 'Piper TTS'}\n`));
+    const providerLabels = { elevenlabs: 'ElevenLabs', piper: 'Piper TTS', macos: 'macOS Say' };
+    spinner.succeed(chalk.green(`Provider set to: ${providerLabels[selectedProvider] || selectedProvider}\n`));
 
     // Detect and migrate old configuration
     await detectAndMigrateOldConfig(targetDir, spinner);
