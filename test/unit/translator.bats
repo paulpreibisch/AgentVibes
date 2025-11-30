@@ -132,7 +132,9 @@ teardown() {
 @test "translate-manager.sh get-translate-to returns language" {
   "$TRANSLATE_MANAGER" set french > /dev/null 2>&1
 
-  run bash -c "LC_ALL=C $TRANSLATE_MANAGER get-translate-to 2>/dev/null"
+  # Must run from same directory where 'set' wrote the config
+  # Set LC_ALL=C before bash to suppress locale warnings
+  run env LC_ALL=C bash -c "cd '$CLAUDE_PROJECT_DIR' && $TRANSLATE_MANAGER get-translate-to" 2>/dev/null
 
   [ "$status" -eq 0 ]
   [[ "$output" == "french" ]]
@@ -171,29 +173,33 @@ teardown() {
 # ============================================
 
 @test "translate-manager.sh detects BMAD communication_language" {
-  # Create mock BMAD config
-  mkdir -p ".bmad/core"
-  cat > ".bmad/core/config.yaml" << 'EOF'
+  # Create mock BMAD config in the project directory
+  mkdir -p "$CLAUDE_PROJECT_DIR/.bmad/core"
+  cat > "$CLAUDE_PROJECT_DIR/.bmad/core/config.yaml" << 'EOF'
 communication_language: Spanish
 document_output_language: Spanish
 EOF
 
-  run bash -c "LC_ALL=C $TRANSLATE_MANAGER get-bmad-language 2>/dev/null"
+  # Must run from project directory where BMAD config exists
+  # Set LC_ALL=C before bash to suppress locale warnings
+  run env LC_ALL=C bash -c "cd '$CLAUDE_PROJECT_DIR' && $TRANSLATE_MANAGER get-bmad-language" 2>/dev/null
 
   [ "$status" -eq 0 ]
   [[ "$output" == "spanish" ]]
 }
 
 @test "translate-manager.sh auto uses BMAD language when set" {
-  # Create mock BMAD config
-  mkdir -p ".bmad/core"
-  cat > ".bmad/core/config.yaml" << 'EOF'
+  # Create mock BMAD config in the project directory
+  mkdir -p "$CLAUDE_PROJECT_DIR/.bmad/core"
+  cat > "$CLAUDE_PROJECT_DIR/.bmad/core/config.yaml" << 'EOF'
 communication_language: French
 EOF
 
   "$TRANSLATE_MANAGER" auto > /dev/null 2>&1
 
-  run bash -c "LC_ALL=C $TRANSLATE_MANAGER get-translate-to 2>/dev/null"
+  # Must run from project directory where BMAD config and tts-translate-to.txt exist
+  # Set LC_ALL=C before bash to suppress locale warnings
+  run env LC_ALL=C bash -c "cd '$CLAUDE_PROJECT_DIR' && $TRANSLATE_MANAGER get-translate-to" 2>/dev/null
 
   [ "$status" -eq 0 ]
   [[ "$output" == "french" ]]

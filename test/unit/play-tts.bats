@@ -90,3 +90,48 @@ teardown() {
   [ "$status" -eq 1 ]
   assert_output_contains "Error: No text provided"
 }
+
+# ============================================================================
+# Provider Routing Tests (Issue #52)
+# ============================================================================
+
+@test "play-tts routes to macos provider when configured" {
+  # Issue #52: macOS provider routing was missing
+  # This test ensures the macos case exists in play-tts.sh
+  echo "macos" > "$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
+
+  # Create a mock play-tts-macos.sh that we can detect was called
+  local macos_script="$TEST_CLAUDE_DIR/hooks/play-tts-macos.sh"
+  cat > "$macos_script" << 'EOF'
+#!/usr/bin/env bash
+echo "MACOS_PROVIDER_CALLED"
+echo "Text: $1"
+echo "Voice: $2"
+exit 0
+EOF
+  chmod +x "$macos_script"
+
+  run "$PLAY_TTS" "Test macOS routing"
+
+  [ "$status" -eq 0 ]
+  # Should have called the macos provider
+  assert_output_contains "MACOS_PROVIDER_CALLED"
+}
+
+@test "play-tts speak_text function routes to macos" {
+  # Test the speak_text function also routes to macos (for translation/learning modes)
+  echo "macos" > "$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
+
+  # Source play-tts.sh and test speak_text function
+  # We verify by checking the macos case exists in the script
+  run grep -A2 'case "\$provider" in' "$PLAY_TTS"
+
+  [ "$status" -eq 0 ]
+  # The macos case should exist in the speak_text function
+  run grep 'macos)' "$PLAY_TTS"
+  [ "$status" -eq 0 ]
+
+  # Count occurrences - should be 2 (one in speak_text, one in main routing)
+  local count=$(grep -c 'macos)' "$PLAY_TTS")
+  [ "$count" -ge 2 ]
+}

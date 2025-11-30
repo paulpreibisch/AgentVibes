@@ -27,9 +27,10 @@ teardown() {
 
   [ "$status" -eq 0 ]
 
-  # Should show at least elevenlabs and piper
+  # Should show all three providers: elevenlabs, piper, and macos
   assert_output_contains "elevenlabs"
   assert_output_contains "piper"
+  assert_output_contains "macos"
 }
 
 @test "provider-manager list finds providers from play-tts files" {
@@ -38,9 +39,10 @@ teardown() {
   [ "$status" -eq 0 ]
 
   # Verify it's detecting actual provider scripts
-  # Both elevenlabs and piper should be present
+  # All three providers should be present (Issue #52)
   [[ "$output" =~ "elevenlabs" ]]
   [[ "$output" =~ "piper" ]]
+  [[ "$output" =~ "macos" ]]
 }
 
 @test "provider-manager list works with no providers (edge case)" {
@@ -92,6 +94,24 @@ teardown() {
   [ "$status" -eq 0 ]
   assert_output_contains "Active provider set to: elevenlabs"
   assert_file_contains "$PROVIDER_FILE" "elevenlabs"
+}
+
+@test "provider-manager switch to macos" {
+  # Issue #52: macOS provider must be switchable
+  run "$PROVIDER_MANAGER" switch "macos"
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Active provider set to: macos"
+
+  assert_file_exists "$PROVIDER_FILE"
+  assert_file_contains "$PROVIDER_FILE" "macos"
+}
+
+@test "provider-manager validate macos provider exists" {
+  # Issue #52: macOS provider must be recognized as valid
+  run "$PROVIDER_MANAGER" validate "macos"
+
+  [ "$status" -eq 0 ]
 }
 
 @test "provider-manager switch with invalid provider fails" {
