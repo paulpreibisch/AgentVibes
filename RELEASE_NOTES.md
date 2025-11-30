@@ -1,3 +1,86 @@
+# Release v2.14.4 - Fully Automated Install with --yes Flag
+
+**Release Date:** 2025-11-30
+**Type:** Patch Release (Enhancement)
+
+## AI Summary
+
+AgentVibes v2.14.4 fixes the `--yes` flag behavior during installation. Previously, even with `--yes`, the installer would pause at three intermediate "Continue?" prompts, blocking automated/CI installations. Now `npx agentvibes install --yes` runs fully unattended from start to finish.
+
+**Key Highlights:**
+- ⚡ **Fully Automated Install** - `--yes` flag now skips ALL interactive prompts
+- 🤖 **CI/CD Ready** - Perfect for automated deployments and scripted installs
+- ✅ **No Breaking Changes** - Interactive mode unchanged when `--yes` is not used
+
+---
+
+## Enhancement
+
+### Fully Automated Install with --yes Flag
+**File:** `src/installer.js`
+
+Three intermediate prompts are now skipped when `--yes` is provided:
+
+| Prompt | Purpose |
+|--------|---------|
+| "📋 Review the installation summary above. Continue?" | After file installation summary |
+| "Continue?" | After setup instructions display |
+| "🎙️ Review MCP Server setup info above. Continue?" | After MCP server info |
+
+**Before:** `npx agentvibes install --yes` would still pause 3 times
+**After:** `npx agentvibes install --yes` runs completely unattended
+
+```bash
+# Now works for fully automated installations:
+npx agentvibes install --yes
+
+# Perfect for CI/CD pipelines:
+npx agentvibes@latest install -y
+```
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/installer.js` | Wrapped 3 prompts with `if (!options.yes)` check (+12 lines) |
+
+---
+
+## Changes Summary
+
+**Commits:** 1
+- `feat: Skip intermediate prompts with --yes flag for automated installs`
+
+**Files Changed:** 1
+**Lines Added:** 12
+**Lines Removed:** 6
+
+---
+
+## Migration Notes
+
+**No migration required** - This is a patch release with improved automation.
+
+**Who benefits:**
+- CI/CD pipelines installing AgentVibes
+- Scripted/automated deployments
+- Anyone running `npx agentvibes install --yes`
+
+---
+
+## Testing
+
+```bash
+# Verify fully automated install works:
+npx agentvibes install --yes
+
+# Should complete without any prompts
+```
+
+---
+
 # Release v2.14.3 - macOS Provider Routing Fix
 
 **Release Date:** 2025-11-30

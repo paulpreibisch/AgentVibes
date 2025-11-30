@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.4
 
 ---
 
@@ -94,15 +94,14 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.3 - macOS Provider Routing Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.3)** 🎉
+**[v2.14.4 - Fully Automated Install](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.4)** 🎉
 
-AgentVibes v2.14.3 fixes a critical bug where the macOS TTS provider would not speak when selected. The TTS router (`play-tts.sh`) was missing the case handler for the macOS provider, causing it to fail silently. This release adds the missing routing and includes comprehensive test coverage to prevent regression.
+AgentVibes v2.14.4 fixes the `--yes` flag to skip ALL interactive prompts during installation. Previously, even with `--yes`, the installer would pause at three "Continue?" prompts. Now `npx agentvibes install --yes` runs fully unattended, perfect for CI/CD pipelines and automated deployments.
 
 **Key Highlights:**
-- 🐛 **Fixed macOS Provider Routing** - macOS `say` provider now works when selected (Issue #52)
-- ✅ **New Provider Tests** - 4 new tests ensure macOS provider is properly detected and routed
-- 🔧 **Fixed Translator Tests** - Fixed 3 pre-existing failing tests related to PWD and locale warnings
-- 🎯 **133 Tests Passing** - Full test suite now passes with comprehensive macOS coverage
+- ⚡ **Fully Automated Install** - `--yes` flag now skips ALL interactive prompts
+- 🤖 **CI/CD Ready** - Perfect for automated deployments and scripted installs
+- ✅ **No Breaking Changes** - Interactive mode unchanged when `--yes` is not used
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

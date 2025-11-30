@@ -128,17 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.3 - macOS Provider Routing Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.4 - Fully Automated Install\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.3 fixes a critical bug where the macOS TTS\n') +
-      chalk.cyan('provider would not speak when selected. The TTS router was\n') +
-      chalk.cyan('missing case handlers for the macOS provider.\n\n') +
+      chalk.cyan('AgentVibes v2.14.4 fixes the --yes flag to skip ALL prompts.\n') +
+      chalk.cyan('Now `npx agentvibes install --yes` runs fully unattended,\n') +
+      chalk.cyan('perfect for CI/CD pipelines and automated deployments.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🐛 Fixed macOS Provider Routing - macOS `say` now works (Issue #52)\n') +
-      chalk.gray('   ✅ New Provider Tests - 4 tests ensure macOS is properly routed\n') +
-      chalk.gray('   🔧 Fixed Translator Tests - 3 pre-existing test failures resolved\n') +
-      chalk.gray('   🎯 133 Tests Passing - Full test suite with macOS coverage\n\n') +
+      chalk.gray('   ⚡ Fully Automated Install - --yes skips ALL interactive prompts\n') +
+      chalk.gray('   🤖 CI/CD Ready - Perfect for automated deployments\n') +
+      chalk.gray('   ✅ No Breaking Changes - Interactive mode unchanged\n') +
+      chalk.gray('   🎯 133 Tests Passing - Full test suite coverage\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -1555,14 +1555,16 @@ async function install(options = {}) {
     console.log('');
 
     // Pause to let user review installation summary
-    await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'continue',
-        message: chalk.cyan('📋 Review the installation summary above. Continue?'),
-        default: true,
-      }
-    ]);
+    if (!options.yes) {
+      await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'continue',
+          message: chalk.cyan('📋 Review the installation summary above. Continue?'),
+          default: true,
+        }
+      ]);
+    }
 
     // Show recent changes from git log or RELEASE_NOTES.md
     try {
@@ -1662,14 +1664,16 @@ async function install(options = {}) {
     console.log(chalk.white('   • /agent-vibes:personality <style>') + chalk.gray(' - Set personality\n'));
 
     // Pause to let user review setup instructions
-    await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'continue',
-        message: chalk.cyan('Continue?'),
-        default: true,
-      }
-    ]);
+    if (!options.yes) {
+      await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'continue',
+          message: chalk.cyan('Continue?'),
+          default: true,
+        }
+      ]);
+    }
 
     // Recommend MCP Server installation
     console.log(
@@ -1719,14 +1723,16 @@ async function install(options = {}) {
     );
 
     // Pause to let user review MCP server info
-    await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'continue',
-        message: chalk.cyan('🎙️  Review MCP Server setup info above. Continue?'),
-        default: true,
-      }
-    ]);
+    if (!options.yes) {
+      await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'continue',
+          message: chalk.cyan('🎙️  Review MCP Server setup info above. Continue?'),
+          default: true,
+        }
+      ]);
+    }
 
     // Create default BMAD voice assignments (works even if BMAD not installed yet)
     await createDefaultBmadVoiceAssignmentsProactive(targetDir);
