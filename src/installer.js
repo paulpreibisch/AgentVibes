@@ -128,17 +128,16 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.14 - Test Suite Fixes & Affiliate Links\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.15 - CI/CD Publish Workflow Fix\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.14 fixes test suite failures from voice names\n') +
-      chalk.cyan('with spaces causing bash syntax errors. Also adds ElevenLabs\n') +
-      chalk.cyan('affiliate links and requires tests to pass before releases.\n\n') +
+      chalk.cyan('AgentVibes v2.14.15 fixes the GitHub Actions publish workflow\n') +
+      chalk.cyan('that was failing with E403 errors. The workflow now checks if\n') +
+      chalk.cyan('a version already exists on npm before attempting to publish.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🐛 Test Fix - Fixed syntax errors from spaced voice names\n') +
-      chalk.gray('   🧪 CI/CD - All 132 bats + 12 Node.js tests now pass\n') +
-      chalk.gray('   📚 Release Safety - Tests must pass before npm publish\n') +
-      chalk.gray('   🔗 Affiliate Links - ElevenLabs URLs updated\n\n') +
+      chalk.gray('   🔧 Workflow Fix - publish.yml checks version before publish\n') +
+      chalk.gray('   ✅ Green Badges - No more E403 "already published" errors\n') +
+      chalk.gray('   🚀 CI/CD - Graceful skip if version already on npm\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

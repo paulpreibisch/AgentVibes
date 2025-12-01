@@ -1,3 +1,19 @@
+# Release v2.14.15 - CI/CD Publish Workflow Fix
+
+**Release Date:** 2025-12-01
+**Type:** Patch Release (CI/CD Fix)
+
+## AI Summary
+
+AgentVibes v2.14.15 fixes the GitHub Actions "Publish to npm" workflow that was failing with E403 errors. The issue occurred because the `/release` command publishes to npm locally, then when GitHub Actions receives the tag push, it tried to publish again. This release adds version existence checking to the workflow - it now gracefully skips publishing if the version already exists on npm.
+
+**Key Highlights:**
+- 🔧 **Workflow Fix** - publish.yml now checks if version exists before attempting npm publish
+- ✅ **Green Badges** - Prevents E403 "already published" errors from failing the workflow
+- 🚀 **CI/CD** - Workflow skips publish step gracefully if version already on npm
+
+---
+
 # Release v2.14.14 - Test Suite Fixes & Affiliate Links
 
 **Release Date:** 2025-12-01
