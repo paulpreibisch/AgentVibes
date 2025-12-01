@@ -32,6 +32,19 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Check if version already published
+        id: check_version
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          # Check if this version already exists on npm
+          if npm view agentvibes@${VERSION} version 2>/dev/null; then
+            echo "Version ${VERSION} already exists on npm - skipping publish"
+            echo "SKIP_PUBLISH=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version ${VERSION} not found on npm - will publish"
+            echo "SKIP_PUBLISH=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update README with version and release description
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
@@ -65,9 +78,14 @@ jobs:
           fi
 
       - name: Publish to npm
+        if: steps.check_version.outputs.SKIP_PUBLISH != 'true'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Skip publish (already exists)
+        if: steps.check_version.outputs.SKIP_PUBLISH == 'true'
+        run: echo "✅ Version ${{ steps.version.outputs.VERSION }} already published to npm - skipping"
 
       - name: Generate changelog with AI summary
         id: changelog
