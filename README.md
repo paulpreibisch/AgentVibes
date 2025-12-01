@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.4
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.10
 
 ---
 
@@ -94,14 +94,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.4 - Fully Automated Install](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.4)** 🎉
+**[v2.14.10 - macOS Bash 3.2 Compatibility Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.10)** 🎉
 
-AgentVibes v2.14.4 fixes the `--yes` flag to skip ALL interactive prompts during installation. Previously, even with `--yes`, the installer would pause at three "Continue?" prompts. Now `npx agentvibes install --yes` runs fully unattended, perfect for CI/CD pipelines and automated deployments.
+AgentVibes v2.14.10 fixes critical bash compatibility issues affecting all macOS users. Voice switching now works on Macs with the default bash 3.2. The installer also detects existing Piper voice models and skips the download prompt on reinstalls.
 
 **Key Highlights:**
-- ⚡ **Fully Automated Install** - `--yes` flag now skips ALL interactive prompts
-- 🤖 **CI/CD Ready** - Perfect for automated deployments and scripted installs
-- ✅ **No Breaking Changes** - Interactive mode unchanged when `--yes` is not used
+- 🍎 **macOS Compatibility** - Fixed bash 3.2 compatibility for all voice scripts
+- 🔧 **No More "bad substitution"** - Replaced `${var,,}` with POSIX-compatible `tr` commands
+- ⚡ **Smarter Reinstalls** - Installer detects existing Piper voices and skips download prompt
+- ✅ **All 132 Tests Pass** - Full test suite validated
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

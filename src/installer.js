@@ -128,17 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.7 - macOS Say Provider Support\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.10 - macOS Bash 3.2 Compatibility Fix\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.7 adds macOS Say to the provider selection.\n') +
-      chalk.cyan('Mac users now see all 3 TTS options during install:\n') +
-      chalk.cyan('Piper (free), macOS Say (built-in), and ElevenLabs (premium).\n\n') +
+      chalk.cyan('AgentVibes v2.14.10 fixes critical bash compatibility issues\n') +
+      chalk.cyan('affecting all macOS users. Voice switching now works on Macs\n') +
+      chalk.cyan('with the default bash 3.2. Installer also detects existing voices.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🍎 macOS Say Provider - Zero setup, built-in system voices\n') +
-      chalk.gray('   🔧 BMAD Fix - core/agents now get TTS injection\n') +
-      chalk.gray('   ⚡ Fully Automated Install - --yes for CI/CD pipelines\n') +
-      chalk.gray('   🎯 All Tests Passing - Full test suite coverage\n\n') +
+      chalk.gray('   🍎 macOS Compatibility - Fixed bash 3.2 for all voice scripts\n') +
+      chalk.gray('   🔧 No More "bad substitution" - POSIX-compatible commands\n') +
+      chalk.gray('   ⚡ Smarter Reinstalls - Detects existing Piper voices\n') +
+      chalk.gray('   ✅ All 132 Tests Pass - Full test suite validated\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -351,12 +351,54 @@ async function promptProviderSelection(options) {
 }
 
 /**
+ * Check if Piper voices are already installed at a given path
+ * @param {string} voicesPath - Path to check for voice models
+ * @returns {Promise<{installed: boolean, voices: string[]}>} Whether voices are installed and list of voice names
+ */
+async function checkExistingPiperVoices(voicesPath) {
+  try {
+    const files = await fs.readdir(voicesPath);
+    const voiceFiles = files.filter(f => f.endsWith('.onnx'));
+
+    if (voiceFiles.length > 0) {
+      const voiceNames = voiceFiles.map(f => f.replace('.onnx', ''));
+      return { installed: true, voices: voiceNames };
+    }
+  } catch {
+    // Directory doesn't exist or can't be read
+  }
+
+  return { installed: false, voices: [] };
+}
+
+/**
  * Handle Piper TTS configuration (voice storage location)
+ * Detects existing voice installations and skips download prompt if voices already exist
  * @returns {Promise<string>} Path where Piper voices will be stored
  */
 async function handlePiperConfiguration() {
   const homeDir = process.env.HOME || process.env.USERPROFILE;
   const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
+
+  // Check if voices are already installed at the default location
+  const existingVoices = await checkExistingPiperVoices(defaultPiperPath);
+
+  if (existingVoices.installed) {
+    console.log(chalk.green(`\n✓ Piper voices already installed at ${defaultPiperPath}`));
+    console.log(chalk.gray(`   Found ${existingVoices.voices.length} voice model(s):`));
+
+    // Show first 5 voices, then indicate more if applicable
+    const displayVoices = existingVoices.voices.slice(0, 5);
+    displayVoices.forEach(voice => {
+      console.log(chalk.gray(`     • ${voice}`));
+    });
+    if (existingVoices.voices.length > 5) {
+      console.log(chalk.gray(`     ... and ${existingVoices.voices.length - 5} more`));
+    }
+
+    console.log(chalk.green('\n✓ Skipping download - using existing voices\n'));
+    return defaultPiperPath;
+  }
 
   console.log(chalk.cyan('\n📁 Piper Voice Storage Location:\n'));
   console.log(chalk.gray('   Piper voice models are ~25MB each. They can be stored globally'));

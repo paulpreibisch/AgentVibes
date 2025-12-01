@@ -38,6 +38,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/voices-config.sh"
 
+# Bash 3.2 compatible lowercase function (macOS ships with bash 3.2)
+# ${var,,} syntax requires bash 4.0+
+to_lower() {
+  echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 # Determine target .claude directory based on context
 # Priority:
 # 1. CLAUDE_PROJECT_DIR env var (set by MCP for project-specific settings)
@@ -319,7 +325,7 @@ case "$1" in
       for onnx_file in "$VOICE_DIR"/*.onnx; do
         if [[ -f "$onnx_file" ]]; then
           voice=$(basename "$onnx_file" .onnx)
-          if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
+          if [[ "$(to_lower "$voice")" == "$(to_lower "$VOICE_NAME")" ]]; then
             FOUND="$voice"
             break
           fi
@@ -425,7 +431,7 @@ case "$1" in
         # Check if voice exists (case-insensitive)
         FOUND=""
         for voice in "${!VOICES[@]}"; do
-          if [[ "${voice,,}" == "${VOICE_NAME,,}" ]]; then
+          if [[ "$(to_lower "$voice")" == "$(to_lower "$VOICE_NAME")" ]]; then
             FOUND="$voice"
             break
           fi

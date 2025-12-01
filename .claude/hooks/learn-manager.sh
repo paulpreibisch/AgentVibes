@@ -41,6 +41,12 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Bash 3.2 compatible lowercase function (macOS ships with bash 3.2)
+# ${var,,} syntax requires bash 4.0+
+_to_lower() {
+  echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 # Use PWD for project dir when called from project context, fall back to script-relative
 if [[ -d "$PWD/.claude" ]]; then
     PROJECT_DIR="$PWD"
@@ -104,7 +110,7 @@ get_target_language() {
 get_greeting_for_language() {
     local language="$1"
 
-    case "${language,,}" in
+    case "$(_to_lower "$language")" in
         spanish|español)
             echo "¡Hola! Soy tu profesor de español. ¡Vamos a aprender juntos!"
             ;;
@@ -233,7 +239,7 @@ get_recommended_voice_for_language() {
 
     # Fallback to hardcoded suggestions if function failed
     if [[ -z "$recommended_voice" ]]; then
-        case "${language,,}" in
+        case "$(_to_lower "$language")" in
             spanish|español)
                 recommended_voice=$([ "$provider" = "piper" ] && echo "es_ES-davefx-medium" || echo "Antoni")
                 ;;

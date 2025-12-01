@@ -40,6 +40,12 @@
 # @related voice-manager.sh, play-tts-piper.sh, 16Speakers.onnx.json (speaker_id_map)
 #
 
+# Bash 3.2 compatible lowercase function (macOS ships with bash 3.2)
+# ${var,,} syntax requires bash 4.0+
+_to_lower() {
+  echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 # Registry of multi-speaker models and their speaker names
 # Format: "SpeakerName:model_file:speaker_id:description"
 #
@@ -88,7 +94,7 @@ get_multispeaker_info() {
     rest="${rest#*:}"
     speaker_id="${rest%%:*}"
 
-    if [[ "${name,,}" == "${speaker_name,,}" ]]; then
+    if [[ "$(_to_lower "$name")" == "$(_to_lower "$speaker_name")" ]]; then
       echo "$model:$speaker_id"
       return 0
     fi
@@ -156,7 +162,7 @@ get_multispeaker_description() {
     rest="${rest#*:}"
     description="${rest}"
 
-    if [[ "${name,,}" == "${speaker_name,,}" ]]; then
+    if [[ "$(_to_lower "$name")" == "$(_to_lower "$speaker_name")" ]]; then
       echo "$description"
       return 0
     fi
