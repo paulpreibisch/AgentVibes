@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.13
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.14
 
 ---
 
@@ -94,15 +94,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.13 - Free Providers as Default](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.13)** 🎉
+**[v2.14.14 - Test Suite Fixes & Affiliate Links](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.14)** 🎉
 
-AgentVibes v2.14.13 changes the `--yes` flag to always use free TTS providers by default. No more failures from expired ElevenLabs API keys! macOS defaults to macOS Say, Linux defaults to Piper TTS.
+AgentVibes v2.14.14 fixes critical test suite failures from voice names with spaces causing bash syntax errors. Also adds ElevenLabs affiliate links and requires tests to pass before releases.
 
 **Key Highlights:**
-- 🆓 **Free-First Defaults** - `--yes` flag now always picks free providers
-- 🍎 **macOS Default** - macOS Say (built-in, zero setup)
-- 🐧 **Linux Default** - Piper TTS (free, offline)
-- 🎤 **ElevenLabs Manual** - Requires interactive selection (no more expired key failures)
+- 🐛 **Test Fix** - Fixed syntax errors from voice names with spaces in bash
+- 🧪 **CI/CD** - All 132 bats + 12 Node.js tests now pass
+- 📚 **Release Safety** - `/release` command now requires tests to pass first
+- 🔗 **Affiliate Links** - ElevenLabs URLs updated to affiliate link
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

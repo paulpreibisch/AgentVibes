@@ -1,3 +1,82 @@
+# Release v2.14.14 - Test Suite Fixes & Affiliate Links
+
+**Release Date:** 2025-12-01
+**Type:** Patch Release (Bug Fix + Documentation)
+
+## AI Summary
+
+AgentVibes v2.14.14 fixes critical test suite failures that were blocking CI/CD pipelines. The root cause was the `voices-config.sh` refactoring for bash 3.2 (macOS) compatibility - it switched from associative arrays to functions, but some files still used the old syntax. Voice names with spaces like "Ralf Eisend" and "Cowboy Bob" caused syntax errors. This release also adds ElevenLabs affiliate links and makes the `/release` command require passing tests before publishing.
+
+**Key Highlights:**
+- 🐛 **Test Fix** - Fixed syntax errors from voice names with spaces in bash
+- 🧪 **CI/CD** - All 132 bats + 12 Node.js tests now pass
+- 📚 **Release Safety** - `/release` command now requires tests to pass first
+- 🔗 **Affiliate Links** - ElevenLabs URLs updated to affiliate link
+
+---
+
+## Bug Fixes
+
+### Voice Lookup Syntax Errors
+**Files:** `.claude/hooks/play-tts-elevenlabs.sh`, `test/unit/personality-voice-mapping.bats`
+
+The `voices-config.sh` was refactored to use functions (`get_voice_id()`) instead of associative arrays for bash 3.2 compatibility. However, two files still used the old `${VOICES[...]}` syntax:
+
+```bash
+# Before: Caused syntax errors with spaced names
+if [[ -n "${VOICES[$VOICE_OVERRIDE]}" ]]; then
+  VOICE_ID="${VOICES[$VOICE_OVERRIDE]}"
+# Error: "syntax error in expression (error token is "Eisend")"
+```
+
+**Fix:** Updated to use the new function-based lookup:
+
+```bash
+# After: Works with all voice names
+OVERRIDE_VOICE_ID=$(get_voice_id "$VOICE_OVERRIDE")
+if [[ -n "$OVERRIDE_VOICE_ID" ]]; then
+  VOICE_ID="$OVERRIDE_VOICE_ID"
+```
+
+---
+
+## Documentation Updates
+
+### Release Workflow Safety
+**File:** `.claude/commands/release.md`
+
+Added mandatory test suite execution as the first step of the release process. If any tests fail, the release is immediately aborted to prevent publishing broken code to npm.
+
+### ElevenLabs Affiliate Links
+**Files:** `README.md`, `src/installer.js`, `mcp-server/docs/elevenlabs-setup.md`
+
+Updated ElevenLabs URLs to use affiliate link (`https://try.elevenlabs.io/agentvibes`) for sign-up references while keeping functional links (dashboard, pricing, privacy) pointing to their actual pages.
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `.claude/hooks/play-tts-elevenlabs.sh` | Fixed voice lookup to use `get_voice_id()` function |
+| `test/unit/personality-voice-mapping.bats` | Fixed test assertions to use `get_voice_id()` function |
+| `.claude/commands/release.md` | Added mandatory test requirement before release |
+| `README.md` | Added ElevenLabs affiliate links |
+| `src/installer.js` | Added ElevenLabs affiliate link to API key prompt |
+| `mcp-server/docs/elevenlabs-setup.md` | Added ElevenLabs affiliate link to setup guide |
+
+---
+
+## Upgrade
+
+```bash
+npx agentvibes update
+```
+
+---
+
+---
+
 # Release v2.14.13 - Free Providers as Default
 
 **Release Date:** 2025-12-01

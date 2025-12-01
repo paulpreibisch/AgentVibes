@@ -128,18 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.13 - Free Providers as Default\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.14 - Test Suite Fixes & Affiliate Links\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.13 changes --yes flag to always use free TTS\n') +
-      chalk.cyan('providers. No more failures from expired ElevenLabs API keys!\n') +
-      chalk.cyan('macOS defaults to Say, Linux defaults to Piper TTS.\n\n') +
+      chalk.cyan('AgentVibes v2.14.14 fixes test suite failures from voice names\n') +
+      chalk.cyan('with spaces causing bash syntax errors. Also adds ElevenLabs\n') +
+      chalk.cyan('affiliate links and requires tests to pass before releases.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🆓 Free-First Defaults - --yes flag picks free providers\n') +
-      chalk.gray('   🍎 macOS Default - macOS Say (built-in, zero setup)\n') +
-      chalk.gray('   🐧 Linux Default - Piper TTS (free, offline)\n') +
-      chalk.gray('   🎤 ElevenLabs Manual - Requires interactive selection\n') +
-      chalk.gray('   ✅ No More Expired Key Failures - Always works out of box\n\n') +
+      chalk.gray('   🐛 Test Fix - Fixed syntax errors from spaced voice names\n') +
+      chalk.gray('   🧪 CI/CD - All 132 bats + 12 Node.js tests now pass\n') +
+      chalk.gray('   📚 Release Safety - Tests must pass before npm publish\n') +
+      chalk.gray('   🔗 Affiliate Links - ElevenLabs URLs updated\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
