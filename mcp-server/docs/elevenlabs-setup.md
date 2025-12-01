@@ -23,7 +23,7 @@
 ## Step 1: Get Your ElevenLabs API Key
 
 1. **Sign up for ElevenLabs**:
-   - Go to https://elevenlabs.io
+   - Go to https://try.elevenlabs.io/agentvibes
    - Click "Sign Up" (or "Log In" if you have an account)
    - Complete registration
 

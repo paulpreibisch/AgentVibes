@@ -4,7 +4,7 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **ElevenLabs AI**, **Piper TTS (Free!)**, or **macOS Say (Built-in!)**
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **[ElevenLabs AI](https://try.elevenlabs.io/agentvibes)**, **Piper TTS (Free!)**, or **macOS Say (Built-in!)**
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
@@ -40,7 +40,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 - 🎙️ **AgentVibes MCP** - **NEW!** Natural language control for Claude Code, Claude Desktop & Warp (no slash commands!)
 - 📚 **Language Learning Mode** - **NEW!** Learn a second language while you program (e.g., Learn Spanish as you code!)
 - 🔊 **SSH Audio Optimization** - **NEW!** Auto-detects remote sessions and eliminates static (VS Code Remote SSH, cloud dev)
-- 🎭 **Multi-Provider Support** - Choose ElevenLabs (150+ premium voices), Piper TTS (50+ free voices), or macOS Say (100+ built-in voices)
+- 🎭 **Multi-Provider Support** - Choose [ElevenLabs](https://try.elevenlabs.io/agentvibes) (150+ premium voices), Piper TTS (50+ free voices), or macOS Say (100+ built-in voices)
 - 🌍 **30+ Languages** - Multilingual support with native voice quality
 - 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
@@ -172,7 +172,7 @@ npx agentvibes install
 |----------|----------|------|---------|-------|
 | **macOS Say** | macOS only | Free (built-in) | ⭐⭐⭐⭐ | Zero config |
 | **Piper** | Linux/WSL | Free | ⭐⭐⭐⭐ | Auto-downloads |
-| **ElevenLabs** | All | Free tier + paid | ⭐⭐⭐⭐⭐ | API key required |
+| **[ElevenLabs](https://try.elevenlabs.io/agentvibes)** | All | Free tier + paid | ⭐⭐⭐⭐⭐ | [API key required](https://try.elevenlabs.io/agentvibes) |
 
 On macOS, the native `say` provider is automatically detected and recommended!
 
@@ -279,7 +279,7 @@ Every task acknowledgment plays **twice** - first in English, then in your targe
 
 ## 🗣️ Voice Library
 
-AgentVibes includes **27 unique ElevenLabs voices** with multilingual support.
+AgentVibes includes **27 unique [ElevenLabs](https://try.elevenlabs.io/agentvibes) voices** with multilingual support.
 
 💡 **Tip:** Click voice names to hear samples on ElevenLabs!
 🎧 **Try in Claude Code:** `/agent-vibes:preview` to hear all voices
@@ -382,7 +382,7 @@ AgentVibes supports **custom personalities** and **custom voices**.
 
 - 🎤 **[WhisperTyping](https://whispertyping.com/)** - Fast voice-to-text typing for developers
 - 🗣️ **[OpenWhisper (Azure)](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/whisper-overview)** - Microsoft's speech-to-text service
-- 🎙️ **[ElevenLabs](https://elevenlabs.io/)** - Premium AI voice synthesis
+- 🎙️ **[ElevenLabs](https://try.elevenlabs.io/agentvibes)** - Premium AI voice synthesis
 - 🆓 **[Piper TTS](https://github.com/rhasspy/piper)** - Free offline neural TTS
 - 🤖 **[Claude Code](https://claude.com/claude-code)** - AI coding assistant
 - 🎭 **[BMAD METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** - Multi-agent framework

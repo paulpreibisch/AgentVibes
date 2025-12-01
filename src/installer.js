@@ -450,7 +450,7 @@ async function handleElevenLabsApiKey(options) {
 
   if (!elevenLabsKey) {
     console.log(chalk.yellow('\n⚠️  ElevenLabs API Key Required'));
-    console.log(chalk.gray('   Get your free API key at: https://elevenlabs.io'));
+    console.log(chalk.gray('   Get your free API key at: https://try.elevenlabs.io/agentvibes'));
     console.log(chalk.gray('   Free tier: 10,000 characters/month\n'));
 
     const { setupMethod } = await inquirer.prompt([
