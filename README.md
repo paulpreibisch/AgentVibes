@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.12
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.13
 
 ---
 
@@ -94,16 +94,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.12 - macOS Bash 3.2 Full Compatibility & MCP Config Installer](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.12)** 🎉
+**[v2.14.13 - Free Providers as Default](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.13)** 🎉
 
-AgentVibes v2.14.12 completes macOS Bash 3.2 compatibility by eliminating ALL `declare -A` associative arrays that caused errors on stock macOS. The installer now offers to create `.mcp.json` automatically for easier MCP setup!
+AgentVibes v2.14.13 changes the `--yes` flag to always use free TTS providers by default. No more failures from expired ElevenLabs API keys! macOS defaults to macOS Say, Linux defaults to Piper TTS.
 
 **Key Highlights:**
-- 🍎 **Full macOS Compatibility** - All `declare -A` associative arrays replaced with functions
-- 🔧 **Fixed language-manager.sh** - `declare: -A: invalid option` error resolved
-- 🔧 **Fixed voices-config.sh** - ElevenLabs voice lookups now work on Bash 3.2
-- 📦 **MCP Config Installer** - Installer offers to create `.mcp.json` automatically
-- 🍎 **macOS Default Provider** - Installer now defaults to macOS Say on Mac
+- 🆓 **Free-First Defaults** - `--yes` flag now always picks free providers
+- 🍎 **macOS Default** - macOS Say (built-in, zero setup)
+- 🐧 **Linux Default** - Piper TTS (free, offline)
+- 🎤 **ElevenLabs Manual** - Requires interactive selection (no more expired key failures)
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

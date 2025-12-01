@@ -128,18 +128,18 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.12 - macOS Bash 3.2 Full Compatibility\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.13 - Free Providers as Default\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.12 completes macOS Bash 3.2 compatibility by\n') +
-      chalk.cyan('eliminating ALL declare -A associative arrays. The installer now\n') +
-      chalk.cyan('offers to create .mcp.json automatically for easier MCP setup.\n\n') +
+      chalk.cyan('AgentVibes v2.14.13 changes --yes flag to always use free TTS\n') +
+      chalk.cyan('providers. No more failures from expired ElevenLabs API keys!\n') +
+      chalk.cyan('macOS defaults to Say, Linux defaults to Piper TTS.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🍎 Full macOS Compatibility - All declare -A arrays replaced\n') +
-      chalk.gray('   🔧 Fixed language-manager.sh - No more invalid option errors\n') +
-      chalk.gray('   🔧 Fixed voices-config.sh - Voice lookups work on Bash 3.2\n') +
-      chalk.gray('   📦 MCP Config Installer - Auto-create .mcp.json on install\n') +
-      chalk.gray('   🍎 macOS Default Provider - Installer defaults to macOS Say\n\n') +
+      chalk.gray('   🆓 Free-First Defaults - --yes flag picks free providers\n') +
+      chalk.gray('   🍎 macOS Default - macOS Say (built-in, zero setup)\n') +
+      chalk.gray('   🐧 Linux Default - Piper TTS (free, offline)\n') +
+      chalk.gray('   🎤 ElevenLabs Manual - Requires interactive selection\n') +
+      chalk.gray('   ✅ No More Expired Key Failures - Always works out of box\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

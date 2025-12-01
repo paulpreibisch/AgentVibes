@@ -1,3 +1,68 @@
+# Release v2.14.13 - Free Providers as Default
+
+**Release Date:** 2025-12-01
+**Type:** Patch Release (Bug Fix)
+
+## AI Summary
+
+AgentVibes v2.14.13 changes the `--yes` flag behavior to always use free TTS providers by default. Previously, the installer would auto-select ElevenLabs if an API key existed in the environment, but this caused failures when keys were expired or invalid. Now, macOS defaults to macOS Say and Linux defaults to Piper TTS. Users who want ElevenLabs must run the installer without `--yes` to manually select it.
+
+**Key Highlights:**
+- 🆓 **Free-First Defaults** - `--yes` flag now always picks free providers
+- 🍎 **macOS Default** - macOS Say (built-in, zero setup)
+- 🐧 **Linux Default** - Piper TTS (free, offline)
+- 🎤 **ElevenLabs Manual** - Requires interactive selection (no more expired key failures)
+
+---
+
+## Bug Fixes
+
+### Expired API Key Failures
+**File:** `src/installer.js`
+
+Previously, if `ELEVENLABS_API_KEY` existed in the environment, the `--yes` flag would auto-select ElevenLabs even if the subscription was expired:
+
+```javascript
+// Before: Would fail silently with expired keys
+if (options.yes) {
+  if (process.env.ELEVENLABS_API_KEY) {
+    return 'elevenlabs'; // Key might be expired!
+  }
+}
+```
+
+**Fix:** Free providers are now always the default with `--yes`:
+
+```javascript
+// After: Always works, free providers first
+if (options.yes) {
+  if (isMacOS) {
+    return 'macos';  // Built-in, always works
+  }
+  return 'piper';    // Free, offline
+}
+```
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/installer.js` | Removed ElevenLabs auto-detection with `--yes` flag |
+
+---
+
+## Upgrade
+
+```bash
+npx agentvibes update
+```
+
+---
+
+---
+
 # Release v2.14.12 - macOS Bash 3.2 Full Compatibility & MCP Config Installer
 
 **Release Date:** 2025-12-01
