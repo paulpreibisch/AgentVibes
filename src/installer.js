@@ -923,6 +923,182 @@ function isPathSafe(targetPath, basePath) {
 }
 
 /**
+ * Handle MCP configuration file creation/detection
+ * Offers to create .mcp.json in project directory if it doesn't exist
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} options - Installation options (includes 'yes' for auto-confirm)
+ */
+async function handleMcpConfiguration(targetDir, options) {
+  const mcpConfigPath = path.join(targetDir, '.mcp.json');
+
+  // MCP server configuration for AgentVibes
+  const mcpConfig = {
+    mcpServers: {
+      agentvibes: {
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
+      }
+    }
+  };
+
+  // Check if .mcp.json already exists
+  let mcpExists = false;
+  try {
+    await fs.access(mcpConfigPath);
+    mcpExists = true;
+  } catch {
+    // File doesn't exist
+  }
+
+  if (mcpExists) {
+    // Scenario 3: Config already exists - show manual instructions
+    console.log(
+      boxen(
+        chalk.yellow.bold('ℹ️  MCP Configuration Already Exists\n\n') +
+        chalk.white('An ') + chalk.cyan('.mcp.json') + chalk.white(' file already exists in this project.\n\n') +
+        chalk.white('To add AgentVibes MCP server manually, add this\n') +
+        chalk.white('to your ') + chalk.cyan('mcpServers') + chalk.white(' section:'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'yellow',
+        }
+      )
+    );
+
+    // Display the snippet to add
+    console.log(
+      '\n"agentvibes": {\n' +
+      '  "command": "npx",\n' +
+      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
+      '}\n'
+    );
+
+    console.log(
+      boxen(
+        chalk.cyan('To use with Claude Code:\n') +
+        chalk.white('   claude --mcp-config .mcp.json\n\n') +
+        chalk.cyan('📖 Full Guide:\n') +
+        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
+        }
+      )
+    );
+    return;
+  }
+
+  // Scenario 1 & 2: Config doesn't exist - offer to create
+  console.log(
+    boxen(
+      chalk.cyan.bold('🎙️ MCP Server Configuration\n\n') +
+      chalk.white.bold('AgentVibes MCP Server - Control TTS with Natural Language!\n\n') +
+      chalk.gray('Use natural language instead of slash commands:\n') +
+      chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
+      chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
+      chalk.white('No ') + chalk.cyan('.mcp.json') + chalk.white(' found in this project.'),
+      {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'cyan',
+      }
+    )
+  );
+
+  let createConfig = options.yes; // Auto-create if --yes flag
+
+  if (!options.yes) {
+    const { confirmCreate } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirmCreate',
+        message: chalk.cyan('Would you like to create .mcp.json for this project?'),
+        default: true,
+      },
+    ]);
+    createConfig = confirmCreate;
+  }
+
+  if (createConfig) {
+    // Scenario 1: User says YES - create the config
+    try {
+      await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+
+      console.log(
+        boxen(
+          chalk.green.bold('✅ MCP Configuration Created!\n\n') +
+          chalk.white('Your ') + chalk.cyan('.mcp.json') + chalk.white(' has been created in this project.\n\n') +
+          chalk.white('To use AgentVibes MCP server with Claude, run:\n') +
+          chalk.cyan.bold('   claude --mcp-config .mcp.json\n\n') +
+          chalk.green('The MCP server is now installed and ready to use!'),
+          {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'double',
+            borderColor: 'green',
+          }
+        )
+      );
+    } catch (error) {
+      console.log(chalk.red(`\n✗ Failed to create .mcp.json: ${error.message}`));
+      console.log(chalk.gray('   You can create it manually with the config shown below.\n'));
+      // Fall through to show manual instructions
+      createConfig = false;
+    }
+  }
+
+  if (!createConfig) {
+    // Scenario 2: User says NO - show manual instructions
+    console.log(
+      boxen(
+        chalk.cyan.bold('📋 Manual MCP Configuration\n\n') +
+        chalk.white('Create a ') + chalk.cyan('.mcp.json') + chalk.white(' file in your project with:'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
+        }
+      )
+    );
+
+    // Display JSON config
+    console.log(
+      '\n{\n' +
+      '  "mcpServers": {\n' +
+      '    "agentvibes": {\n' +
+      '      "command": "npx",\n' +
+      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
+      '    }\n' +
+      '  }\n' +
+      '}\n'
+    );
+
+    console.log(
+      boxen(
+        chalk.cyan('To use with Claude Code:\n') +
+        chalk.white('   claude --mcp-config .mcp.json\n\n') +
+        chalk.cyan('📱 Claude Desktop / Warp Terminal:\n') +
+        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop\n\n') +
+        chalk.cyan('📖 Full Guide:\n') +
+        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
+        }
+      )
+    );
+  }
+}
+
+/**
  * Process TTS_INJECTION markers in BMAD files
  * Replaces markers with actual TTS instructions for both party mode and individual agents
  * @param {string} bmadPath - Absolute path to BMAD installation (e.g., /path/to/.bmad)
@@ -1747,64 +1923,8 @@ async function install(options = {}) {
       ]);
     }
 
-    // Recommend MCP Server installation
-    console.log(
-      boxen(
-        chalk.cyan.bold('🎙️ Want Natural Language Control?\n\n') +
-        chalk.white.bold('AgentVibes MCP Server - Control TTS with Natural Language!\n\n') +
-        chalk.gray('Use natural language instead of slash commands:\n') +
-        chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
-        chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
-        chalk.cyan('📋 Claude Code MCP Configuration:\n\n') +
-        chalk.white('Add this to your ') + chalk.cyan('~/.claude/mcp.json') + chalk.white(':'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
-
-    // Display JSON config without border
-    console.log(
-      '\n{\n' +
-      '  "mcpServers": {\n' +
-      '    "agentvibes": {\n' +
-      '      "command": "npx",\n' +
-      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
-      '    }\n' +
-      '  }\n' +
-      '}\n'
-    );
-
-    // Bottom section with border
-    console.log(
-      boxen(
-        chalk.cyan('📱 Claude Desktop / Warp Terminal:\n') +
-        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop\n\n') +
-        chalk.cyan('📖 Full Guide:\n') +
-        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
-
-    // Pause to let user review MCP server info
-    if (!options.yes) {
-      await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'continue',
-          message: chalk.cyan('🎙️  Review MCP Server setup info above. Continue?'),
-          default: true,
-        }
-      ]);
-    }
+    // Handle MCP configuration - offer to create .mcp.json if not exists
+    await handleMcpConfiguration(targetDir, options);
 
     // Create default BMAD voice assignments (works even if BMAD not installed yet)
     await createDefaultBmadVoiceAssignmentsProactive(targetDir);
