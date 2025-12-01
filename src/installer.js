@@ -301,17 +301,13 @@ async function promptProviderSelection(options) {
   const isMacOS = process.platform === 'darwin';
 
   if (options.yes) {
-    const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-    if (elevenLabsKey) {
-      console.log(chalk.green('✓ Using ElevenLabs (API key detected)\n'));
-      return 'elevenlabs';
-    }
-    // On macOS with --yes, default to macOS say (simpler setup)
+    // Free-first approach: Always use free providers with --yes flag
+    // ElevenLabs requires manual selection (API key may be expired/invalid)
     if (isMacOS) {
-      console.log(chalk.green('✓ Using macOS Say (built-in option)\n'));
+      console.log(chalk.green('✓ Using macOS Say (built-in, zero setup)\n'));
       return 'macos';
     }
-    console.log(chalk.green('✓ Using Piper TTS (free option)\n'));
+    console.log(chalk.green('✓ Using Piper TTS (free, offline)\n'));
     return 'piper';
   }
 
