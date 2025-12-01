@@ -109,9 +109,10 @@ case "$CURRENT_LANGUAGE" in
 esac
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
-  # Check if override is a voice name (lookup in mapping)
-  if [[ -n "${VOICES[$VOICE_OVERRIDE]}" ]]; then
-    VOICE_ID="${VOICES[$VOICE_OVERRIDE]}"
+  # Check if override is a voice name (lookup in mapping using get_voice_id function)
+  OVERRIDE_VOICE_ID=$(get_voice_id "$VOICE_OVERRIDE")
+  if [[ -n "$OVERRIDE_VOICE_ID" ]]; then
+    VOICE_ID="$OVERRIDE_VOICE_ID"
     echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
   # Check if override looks like a voice ID (alphanumeric string ~20 chars)
   elif [[ "$VOICE_OVERRIDE" =~ ^[a-zA-Z0-9]{15,30}$ ]]; then
@@ -126,22 +127,26 @@ fi
 if [[ -z "$VOICE_ID" ]]; then
   # Try to get voice for current language
   LANG_VOICE=$(get_voice_for_language "$CURRENT_LANGUAGE" "elevenlabs" 2>/dev/null)
+  LANG_VOICE_ID=""
+  if [[ -n "$LANG_VOICE" ]]; then
+    LANG_VOICE_ID=$(get_voice_id "$LANG_VOICE")
+  fi
 
-  if [[ -n "$LANG_VOICE" ]] && [[ -n "${VOICES[$LANG_VOICE]}" ]]; then
-    VOICE_ID="${VOICES[$LANG_VOICE]}"
+  if [[ -n "$LANG_VOICE" ]] && [[ -n "$LANG_VOICE_ID" ]]; then
+    VOICE_ID="$LANG_VOICE_ID"
     echo "🌍 Using $CURRENT_LANGUAGE voice: $LANG_VOICE"
   else
     # Fall back to voice manager
     VOICE_MANAGER_SCRIPT="$(dirname "$0")/voice-manager.sh"
     if [[ -f "$VOICE_MANAGER_SCRIPT" ]]; then
       VOICE_NAME=$("$VOICE_MANAGER_SCRIPT" get)
-      VOICE_ID="${VOICES[$VOICE_NAME]}"
+      VOICE_ID=$(get_voice_id "$VOICE_NAME")
     fi
 
     # Final fallback to default
     if [[ -z "$VOICE_ID" ]]; then
       echo "⚠️ No voice configured, using default"
-      VOICE_ID="${VOICES[Aria]}"
+      VOICE_ID=$(get_voice_id "Aria")
     fi
   fi
 fi

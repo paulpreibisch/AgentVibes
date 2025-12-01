@@ -68,12 +68,12 @@ declare -A EXPECTED_VOICES=(
   # These voice IDs should remain constant
   source "$REPO_ROOT/.claude/hooks/voices-config.sh"
 
-  # Critical voice IDs that must not change
-  [[ "${VOICES[Ralf Eisend]}" == "A9evEp8yGjv4c3WsIKuY" ]]
-  [[ "${VOICES[Jessica Anne Bogart]}" == "flHkNRp1BlvT73UL6gyz" ]]
-  [[ "${VOICES[Northern Terry]}" == "wo6udizrrtpIxWGp2qJk" ]]
-  [[ "${VOICES[Cowboy Bob]}" == "KTPVrSVAEUSJRClDzBw7" ]]
-  [[ "${VOICES[Lutz Laugh]}" == "9yzdeviXkFddZ4Oz8Mok" ]]
+  # Critical voice IDs that must not change (using get_voice_id function)
+  [[ "$(get_voice_id 'Ralf Eisend')" == "A9evEp8yGjv4c3WsIKuY" ]]
+  [[ "$(get_voice_id 'Jessica Anne Bogart')" == "flHkNRp1BlvT73UL6gyz" ]]
+  [[ "$(get_voice_id 'Northern Terry')" == "wo6udizrrtpIxWGp2qJk" ]]
+  [[ "$(get_voice_id 'Cowboy Bob')" == "KTPVrSVAEUSJRClDzBw7" ]]
+  [[ "$(get_voice_id 'Lutz Laugh')" == "9yzdeviXkFddZ4Oz8Mok" ]]
 }
 
 @test "all personality files have voice field" {
@@ -114,8 +114,10 @@ declare -A EXPECTED_VOICES=(
       continue
     fi
 
-    # Check if ElevenLabs voice exists in config
-    if [[ -z "${VOICES[$assigned_voice]}" ]]; then
+    # Check if ElevenLabs voice exists in config (using get_voice_id function)
+    local voice_id
+    voice_id=$(get_voice_id "$assigned_voice")
+    if [[ -z "$voice_id" ]]; then
       errors="${errors}Personality '${personality_name}' uses undefined ElevenLabs voice: ${assigned_voice}\n"
       failed=1
     fi
