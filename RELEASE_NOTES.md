@@ -1,3 +1,144 @@
+# Release v2.14.12 - macOS Bash 3.2 Full Compatibility & MCP Config Installer
+
+**Release Date:** 2025-12-01
+**Type:** Patch Release (Bug Fix + Feature)
+
+## AI Summary
+
+AgentVibes v2.14.12 completes macOS Bash 3.2 compatibility by eliminating ALL `declare -A` associative arrays that caused errors on stock macOS. This fixes the critical bug where users saw `declare: -A: invalid option` errors. Additionally, the installer now offers to automatically create `.mcp.json` in your project directory, making MCP server setup one click instead of manual copy-paste.
+
+**Key Highlights:**
+- 🍎 **Full macOS Compatibility** - All `declare -A` associative arrays replaced with functions
+- 🔧 **Fixed language-manager.sh** - `declare: -A: invalid option` error resolved
+- 🔧 **Fixed voices-config.sh** - ElevenLabs voice lookups now work on Bash 3.2
+- 🔧 **Fixed voice-manager.sh** - Voice listing and preview commands fixed
+- 📦 **MCP Config Installer** - Installer offers to create `.mcp.json` automatically
+- 🍎 **macOS Default Provider** - Installer now defaults to macOS Say on Mac
+
+---
+
+## Bug Fixes
+
+### Bash 3.2 Associative Array Compatibility (Critical)
+**Files:** `language-manager.sh`, `voices-config.sh`, `voice-manager.sh`
+
+macOS ships with Bash 3.2 (from 2007) which doesn't support `declare -A` associative arrays (added in Bash 4.0). This caused errors like:
+
+```
+declare: -A: invalid option
+declare: usage: declare [-afFirtx] [-p] [name[=value] ...]
+```
+
+**Fix:** Replaced all associative arrays with function-based lookups using `case` statements:
+
+```bash
+# Before (Bash 4+ only):
+declare -A ELEVENLABS_VOICES=(
+    ["spanish"]="Antoni"
+    ...
+)
+echo "${ELEVENLABS_VOICES[$lang]}"
+
+# After (Bash 3.2 compatible):
+_get_elevenlabs_voice() {
+    case "$1" in
+        spanish) echo "Antoni" ;;
+        ...
+    esac
+}
+_get_elevenlabs_voice "$lang"
+```
+
+### Fixed `local` Usage in For Loops
+**File:** `language-manager.sh`
+
+Bash 3.2 doesn't allow `local` declarations inside loops that aren't in functions:
+
+```bash
+# Before (fails on Bash 3.2):
+for lang in ...; do
+    local voice
+    voice=$(_get_language_voice "$lang")
+done
+
+# After (works everywhere):
+for lang in ...; do
+    printf "%-15s → %s\n" "$lang" "$(_get_language_voice "$lang")"
+done
+```
+
+---
+
+## New Features
+
+### Interactive MCP Config Creation
+**File:** `src/installer.js`
+
+The installer now offers to create `.mcp.json` in your project directory:
+
+**Scenario 1: No config exists, user approves**
+```
+┌──────────────────────────────────────────────────────────┐
+│  ✅ MCP Configuration Created!                           │
+│                                                          │
+│  Your .mcp.json has been created in this project.        │
+│  To use AgentVibes MCP server with Claude, run:          │
+│     claude --mcp-config .mcp.json                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Scenario 2: No config exists, user declines**
+Shows full manual configuration instructions with copy-paste JSON.
+
+**Scenario 3: Config already exists**
+Shows instructions to manually add AgentVibes to existing `mcpServers`.
+
+### macOS Say as Default Provider
+**File:** `src/installer.js`
+
+On macOS, the installer now:
+- Lists macOS Say first (marked as "Recommended")
+- Defaults to macOS Say instead of Piper
+- Reduces friction for new Mac users (zero setup required)
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `.claude/hooks/language-manager.sh` | Replaced 3 `declare -A` with functions (+80/-85 lines) |
+| `.claude/hooks/voices-config.sh` | Replaced VOICES array with `get_voice_id()` function |
+| `.claude/hooks/voice-manager.sh` | Updated to use new function-based voice lookups |
+| `src/installer.js` | Added `handleMcpConfiguration()` (+178/-58 lines) |
+
+---
+
+## Testing
+
+- ✅ Verified on macOS Bash 3.2.57 (via SSH to cloud Mac)
+- ✅ Verified on Linux Bash 5.x (WSL)
+- ✅ All language commands work: `set`, `get`, `list`, `voice-for-language`
+- ✅ Voice management commands work on macOS
+- ✅ MCP config creation tested in fresh directories
+
+---
+
+## Upgrade
+
+```bash
+npx agentvibes update
+```
+
+Or for fresh install:
+```bash
+npx agentvibes install
+```
+
+---
+
+---
+
 # Release v2.14.11 - macOS SSH Audio Tunnel Support
 
 **Release Date:** 2025-11-30

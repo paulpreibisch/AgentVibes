@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.11
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.12
 
 ---
 
@@ -94,16 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.11 - macOS SSH Audio Tunnel Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.11)** 🎉
+**[v2.14.12 - macOS Bash 3.2 Full Compatibility & MCP Config Installer](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.12)** 🎉
 
-AgentVibes v2.14.11 enables macOS TTS audio to play through remote Windows speakers when accessing a Mac via SSH. Perfect for testing macOS features on cloud Macs (e.g., Scaleway) without owning one!
+AgentVibes v2.14.12 completes macOS Bash 3.2 compatibility by eliminating ALL `declare -A` associative arrays that caused errors on stock macOS. The installer now offers to create `.mcp.json` automatically for easier MCP setup!
 
 **Key Highlights:**
-- 🔊 **SSH Audio Tunneling** - macOS TTS now plays on Windows speakers when SSHed into Mac
-- 🍎 **Cloud Mac Testing** - Test macOS features without owning a Mac (Scaleway recommended)
-- 🎵 **SSH Login Greeting** - Hear "Connected to Mac OS" on login to confirm tunnel works
-- 📖 **Full Documentation** - Step-by-step guide for SSH PulseAudio tunnel setup
-- ✅ **Backwards Compatible** - Local Mac users unaffected (still uses `afplay`)
+- 🍎 **Full macOS Compatibility** - All `declare -A` associative arrays replaced with functions
+- 🔧 **Fixed language-manager.sh** - `declare: -A: invalid option` error resolved
+- 🔧 **Fixed voices-config.sh** - ElevenLabs voice lookups now work on Bash 3.2
+- 📦 **MCP Config Installer** - Installer offers to create `.mcp.json` automatically
+- 🍎 **macOS Default Provider** - Installer now defaults to macOS Say on Mac
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

@@ -39,32 +39,80 @@
 # @patterns Centralized configuration, DRY principle for voice mappings
 # @related voice-manager.sh, play-tts-elevenlabs.sh, personality/*.md files
 
-declare -A VOICES=(
-  ["Amy"]="bhJUNIXWQQ94l8eI2VUf"
-  ["Antoni"]="ErXwobaYiN019PkySvjV"
-  ["Archer"]="L0Dsvb3SLTyegXwtm47J"
-  ["Aria"]="TC0Zp7WVFzhA8zpTlRqV"
-  ["Bella"]="EXAVITQu4vr4xnSDxMaL"
-  ["Burt Reynolds"]="4YYIPFl9wE5c4L2eu2Gb"
-  ["Charlotte"]="XB0fDUnXU5powFXDhCwa"
-  ["Cowboy Bob"]="KTPVrSVAEUSJRClDzBw7"
-  ["Demon Monster"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["Domi"]="AZnzlk1XvdvUeBnXmlld"
-  ["Dr. Von Fusion"]="yjJ45q8TVCrtMhEKurxY"
-  ["Drill Sergeant"]="vfaqCOvlrKi4Zp7C2IAm"
-  ["Grandpa Spuds Oxley"]="NOpBlnGInO9m6vDvFkFC"
-  ["Grandpa Werthers"]="MKlLqCItoCkvdhrxgtLv"
-  ["Jessica Anne Bogart"]="flHkNRp1BlvT73UL6gyz"
-  ["Juniper"]="aMSt68OGf4xUZAnLpTU8"
-  ["Lutz Laugh"]="9yzdeviXkFddZ4Oz8Mok"
-  ["Matilda"]="XrExE9yKIg1WjnnlVkGX"
-  ["Matthew Schmitz"]="0SpgpJ4D3MpHCiWdyTg3"
-  ["Michael"]="U1Vk2oyatMdYs096Ety7"
-  ["Ms. Walker"]="DLsHlh26Ugcm6ELvS0qi"
-  ["Northern Terry"]="wo6udizrrtpIxWGp2qJk"
-  ["Pirate Marshal"]="PPzYpIqttlTYA83688JI"
-  ["Rachel"]="21m00Tcm4TlvDq8ikWAM"
-  ["Ralf Eisend"]="A9evEp8yGjv4c3WsIKuY"
-  ["Tiffany"]="6aDn1KB0hjpdcocrUkmq"
-  ["Tom"]="DYkrAHD8iwork3YSUBbs"
-)
+# Bash 3.2 compatible voice lookup functions
+# macOS ships with bash 3.2 which doesn't support associative arrays (declare -A)
+# We use simple functions instead for compatibility
+
+# Get voice ID by name
+get_voice_id() {
+  local name="$1"
+  case "$name" in
+    "Amy") echo "bhJUNIXWQQ94l8eI2VUf" ;;
+    "Antoni") echo "ErXwobaYiN019PkySvjV" ;;
+    "Archer") echo "L0Dsvb3SLTyegXwtm47J" ;;
+    "Aria") echo "TC0Zp7WVFzhA8zpTlRqV" ;;
+    "Bella") echo "EXAVITQu4vr4xnSDxMaL" ;;
+    "Burt Reynolds") echo "4YYIPFl9wE5c4L2eu2Gb" ;;
+    "Charlotte") echo "XB0fDUnXU5powFXDhCwa" ;;
+    "Cowboy Bob") echo "KTPVrSVAEUSJRClDzBw7" ;;
+    "Demon Monster") echo "vfaqCOvlrKi4Zp7C2IAm" ;;
+    "Domi") echo "AZnzlk1XvdvUeBnXmlld" ;;
+    "Dr. Von Fusion") echo "yjJ45q8TVCrtMhEKurxY" ;;
+    "Drill Sergeant") echo "vfaqCOvlrKi4Zp7C2IAm" ;;
+    "Grandpa Spuds Oxley") echo "NOpBlnGInO9m6vDvFkFC" ;;
+    "Grandpa Werthers") echo "MKlLqCItoCkvdhrxgtLv" ;;
+    "Jessica Anne Bogart") echo "flHkNRp1BlvT73UL6gyz" ;;
+    "Juniper") echo "aMSt68OGf4xUZAnLpTU8" ;;
+    "Lutz Laugh") echo "9yzdeviXkFddZ4Oz8Mok" ;;
+    "Matilda") echo "XrExE9yKIg1WjnnlVkGX" ;;
+    "Matthew Schmitz") echo "0SpgpJ4D3MpHCiWdyTg3" ;;
+    "Michael") echo "U1Vk2oyatMdYs096Ety7" ;;
+    "Ms. Walker") echo "DLsHlh26Ugcm6ELvS0qi" ;;
+    "Northern Terry") echo "wo6udizrrtpIxWGp2qJk" ;;
+    "Pirate Marshal") echo "PPzYpIqttlTYA83688JI" ;;
+    "Rachel") echo "21m00Tcm4TlvDq8ikWAM" ;;
+    "Ralf Eisend") echo "A9evEp8yGjv4c3WsIKuY" ;;
+    "Tiffany") echo "6aDn1KB0hjpdcocrUkmq" ;;
+    "Tom") echo "DYkrAHD8iwork3YSUBbs" ;;
+    *) echo "" ;;
+  esac
+}
+
+# List all ElevenLabs voice names
+list_elevenlabs_voices() {
+  echo "Amy"
+  echo "Antoni"
+  echo "Archer"
+  echo "Aria"
+  echo "Bella"
+  echo "Burt Reynolds"
+  echo "Charlotte"
+  echo "Cowboy Bob"
+  echo "Demon Monster"
+  echo "Domi"
+  echo "Dr. Von Fusion"
+  echo "Drill Sergeant"
+  echo "Grandpa Spuds Oxley"
+  echo "Grandpa Werthers"
+  echo "Jessica Anne Bogart"
+  echo "Juniper"
+  echo "Lutz Laugh"
+  echo "Matilda"
+  echo "Matthew Schmitz"
+  echo "Michael"
+  echo "Ms. Walker"
+  echo "Northern Terry"
+  echo "Pirate Marshal"
+  echo "Rachel"
+  echo "Ralf Eisend"
+  echo "Tiffany"
+  echo "Tom"
+}
+
+# Check if voice exists
+is_elevenlabs_voice() {
+  local name="$1"
+  local id
+  id=$(get_voice_id "$name")
+  [[ -n "$id" ]]
+}

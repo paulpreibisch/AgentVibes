@@ -128,18 +128,18 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.11 - macOS SSH Audio Tunnel Support\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.12 - macOS Bash 3.2 Full Compatibility\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.11 enables macOS TTS to play through remote\n') +
-      chalk.cyan('Windows speakers via SSH tunnel. Perfect for testing macOS\n') +
-      chalk.cyan('features on cloud Macs (e.g., Scaleway) without owning one.\n\n') +
+      chalk.cyan('AgentVibes v2.14.12 completes macOS Bash 3.2 compatibility by\n') +
+      chalk.cyan('eliminating ALL declare -A associative arrays. The installer now\n') +
+      chalk.cyan('offers to create .mcp.json automatically for easier MCP setup.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔊 SSH Audio Tunneling - macOS TTS plays on Windows speakers\n') +
-      chalk.gray('   🍎 Cloud Mac Testing - Test macOS without owning a Mac\n') +
-      chalk.gray('   🎵 SSH Login Greeting - Audio confirms tunnel works on login\n') +
-      chalk.gray('   📖 Full Documentation - Step-by-step PulseAudio tunnel guide\n') +
-      chalk.gray('   ✅ Backwards Compatible - Local Mac users unaffected\n\n') +
+      chalk.gray('   🍎 Full macOS Compatibility - All declare -A arrays replaced\n') +
+      chalk.gray('   🔧 Fixed language-manager.sh - No more invalid option errors\n') +
+      chalk.gray('   🔧 Fixed voices-config.sh - Voice lookups work on Bash 3.2\n') +
+      chalk.gray('   📦 MCP Config Installer - Auto-create .mcp.json on install\n') +
+      chalk.gray('   🍎 macOS Default Provider - Installer defaults to macOS Say\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -317,21 +317,21 @@ async function promptProviderSelection(options) {
 
   console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
 
-  // Build choices based on platform
-  const choices = [
-    {
-      name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
-      value: 'piper',
-    },
-  ];
+  // Build choices based on platform - macOS Say first on macOS
+  const choices = [];
 
-  // Add macOS Say option on macOS
   if (isMacOS) {
+    // On macOS, put macOS Say first as the recommended default
     choices.push({
-      name: chalk.yellow('🍎 macOS Say (Built-in)') + chalk.gray(' - System voices, zero setup required'),
+      name: chalk.yellow('🍎 macOS Say (Recommended)') + chalk.gray(' - Built-in, zero setup required'),
       value: 'macos',
     });
   }
+
+  choices.push({
+    name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
+    value: 'piper',
+  });
 
   choices.push({
     name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
@@ -344,7 +344,7 @@ async function promptProviderSelection(options) {
       name: 'provider',
       message: 'Which TTS provider would you like to use?',
       choices,
-      default: 'piper',
+      default: isMacOS ? 'macos' : 'piper',
     },
   ]);
 
