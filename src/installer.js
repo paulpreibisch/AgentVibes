@@ -128,17 +128,18 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.10 - macOS Bash 3.2 Compatibility Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.11 - macOS SSH Audio Tunnel Support\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.10 fixes critical bash compatibility issues\n') +
-      chalk.cyan('affecting all macOS users. Voice switching now works on Macs\n') +
-      chalk.cyan('with the default bash 3.2. Installer also detects existing voices.\n\n') +
+      chalk.cyan('AgentVibes v2.14.11 enables macOS TTS to play through remote\n') +
+      chalk.cyan('Windows speakers via SSH tunnel. Perfect for testing macOS\n') +
+      chalk.cyan('features on cloud Macs (e.g., Scaleway) without owning one.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🍎 macOS Compatibility - Fixed bash 3.2 for all voice scripts\n') +
-      chalk.gray('   🔧 No More "bad substitution" - POSIX-compatible commands\n') +
-      chalk.gray('   ⚡ Smarter Reinstalls - Detects existing Piper voices\n') +
-      chalk.gray('   ✅ All 132 Tests Pass - Full test suite validated\n\n') +
+      chalk.gray('   🔊 SSH Audio Tunneling - macOS TTS plays on Windows speakers\n') +
+      chalk.gray('   🍎 Cloud Mac Testing - Test macOS without owning a Mac\n') +
+      chalk.gray('   🎵 SSH Login Greeting - Audio confirms tunnel works on login\n') +
+      chalk.gray('   📖 Full Documentation - Step-by-step PulseAudio tunnel guide\n') +
+      chalk.gray('   ✅ Backwards Compatible - Local Mac users unaffected\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

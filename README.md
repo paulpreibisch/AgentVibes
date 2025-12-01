@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.10
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.11
 
 ---
 
@@ -94,15 +94,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.10 - macOS Bash 3.2 Compatibility Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.10)** 🎉
+**[v2.14.11 - macOS SSH Audio Tunnel Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.11)** 🎉
 
-AgentVibes v2.14.10 fixes critical bash compatibility issues affecting all macOS users. Voice switching now works on Macs with the default bash 3.2. The installer also detects existing Piper voice models and skips the download prompt on reinstalls.
+AgentVibes v2.14.11 enables macOS TTS audio to play through remote Windows speakers when accessing a Mac via SSH. Perfect for testing macOS features on cloud Macs (e.g., Scaleway) without owning one!
 
 **Key Highlights:**
-- 🍎 **macOS Compatibility** - Fixed bash 3.2 compatibility for all voice scripts
-- 🔧 **No More "bad substitution"** - Replaced `${var,,}` with POSIX-compatible `tr` commands
-- ⚡ **Smarter Reinstalls** - Installer detects existing Piper voices and skips download prompt
-- ✅ **All 132 Tests Pass** - Full test suite validated
+- 🔊 **SSH Audio Tunneling** - macOS TTS now plays on Windows speakers when SSHed into Mac
+- 🍎 **Cloud Mac Testing** - Test macOS features without owning a Mac (Scaleway recommended)
+- 🎵 **SSH Login Greeting** - Hear "Connected to Mac OS" on login to confirm tunnel works
+- 📖 **Full Documentation** - Step-by-step guide for SSH PulseAudio tunnel setup
+- ✅ **Backwards Compatible** - Local Mac users unaffected (still uses `afplay`)
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
