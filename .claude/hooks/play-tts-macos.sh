@@ -229,7 +229,7 @@ else
 fi
 
 # @function play_audio
-# @intent Play generated audio using macOS native player
+# @intent Play generated audio - via PulseAudio tunnel for SSH, afplay for local
 LOCK_FILE="/tmp/agentvibes-audio.lock"
 
 # Wait for previous audio to finish (max 30 seconds)
@@ -256,8 +256,23 @@ DURATION=${DURATION:-2}  # Default to 2 seconds if detection fails
 
 # Play audio in background (skip if in test mode)
 if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
-  afplay "$TEMP_FILE" >/dev/null 2>&1 &
-  PLAYER_PID=$!
+  # Check if we're in an SSH session with PulseAudio tunnel available
+  if [[ -n "$SSH_CONNECTION" ]] && [[ -n "$PULSE_SERVER" ]]; then
+    # Use paplay to send audio through PulseAudio tunnel to remote machine
+    if command -v /opt/homebrew/bin/paplay &> /dev/null; then
+      /opt/homebrew/bin/paplay "$TEMP_FILE" >/dev/null 2>&1 &
+      PLAYER_PID=$!
+      echo "🔊 Playing via PulseAudio tunnel"
+    else
+      echo "⚠️  paplay not found - install pulseaudio for SSH audio"
+      afplay "$TEMP_FILE" >/dev/null 2>&1 &
+      PLAYER_PID=$!
+    fi
+  else
+    # Local session - use native macOS player
+    afplay "$TEMP_FILE" >/dev/null 2>&1 &
+    PLAYER_PID=$!
+  fi
 fi
 
 # Wait for audio to finish, then release lock
