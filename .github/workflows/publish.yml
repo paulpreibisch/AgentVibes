@@ -32,18 +32,35 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Wait for npm registry propagation
+        run: |
+          echo "⏳ Waiting 30 seconds for npm registry to propagate any recent publishes..."
+          echo "   This prevents race conditions when /release command publishes locally"
+          sleep 30
+          echo "✅ Wait complete, checking npm registry"
+
       - name: Check if version already published
         id: check_version
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          # Check if this version already exists on npm
-          if npm view agentvibes@${VERSION} version 2>/dev/null; then
-            echo "Version ${VERSION} already exists on npm - skipping publish"
-            echo "SKIP_PUBLISH=true" >> $GITHUB_OUTPUT
-          else
-            echo "Version ${VERSION} not found on npm - will publish"
-            echo "SKIP_PUBLISH=false" >> $GITHUB_OUTPUT
-          fi
+          # Check if this version already exists on npm (with retry for propagation)
+          echo "Checking npm for version ${VERSION}..."
+
+          # Try up to 3 times with 10 second delays
+          for i in 1 2 3; do
+            if npm view agentvibes@${VERSION} version 2>/dev/null; then
+              echo "✅ Version ${VERSION} already exists on npm - skipping publish"
+              echo "SKIP_PUBLISH=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            if [ $i -lt 3 ]; then
+              echo "Attempt $i: Version not found, waiting 10s before retry..."
+              sleep 10
+            fi
+          done
+
+          echo "Version ${VERSION} not found on npm after 3 checks - will publish"
+          echo "SKIP_PUBLISH=false" >> $GITHUB_OUTPUT
 
       - name: Update README with version and release description
         run: |
