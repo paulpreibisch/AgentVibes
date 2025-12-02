@@ -67,3 +67,7 @@ scripts/audio-tunnel.config
 
 # Stargazer CMS - Private project (separate repo)
 ../agentvibes-stargazers/
+
+# Journal files (may contain sensitive conversation logs)
+.claude/journal/
+agentvibes.org/.claude/journal/

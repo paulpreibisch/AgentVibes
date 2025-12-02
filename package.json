@@ -46,7 +46,7 @@
     "commander": "^10.0.0",
     "figlet": "^1.6.0",
     "inquirer": "^12.0.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "ora": "^6.0.0"
   },
   "engines": {
