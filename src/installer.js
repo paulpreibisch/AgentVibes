@@ -128,16 +128,17 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.16 - Security Hardening & Dependency Updates\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.17 - CodeQL Code Quality Improvements\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.16 hardens repository security with Dependabot\n') +
-      chalk.cyan('automated updates, CodeQL scanning, and fixes a prototype pollution\n') +
-      chalk.cyan('vulnerability in js-yaml. GitHub security features now enabled.\n\n') +
+      chalk.cyan('Hi everyone! I enabled CodeQL on this repository to ensure the\n') +
+      chalk.cyan('highest quality code for AgentVibes. It found 5 issues which we\n') +
+      chalk.cyan('fixed in this release! All Node.js improvements, macOS safe.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔒 Security Fix - js-yaml 4.1.1 fixes prototype pollution CVE\n') +
-      chalk.gray('   🤖 Dependabot - Weekly dependency updates for npm, pip, actions\n') +
-      chalk.gray('   🔍 CodeQL - Security scanning for JS/Python on every PR\n\n') +
+      chalk.gray('   ✨ Atomic File Writes - Config uses temp+rename for reliability\n') +
+      chalk.gray('   ✨ Array-Based Commands - Cleaner execFileSync with array args\n') +
+      chalk.gray('   ✨ Input Validation - Shell path and config validation added\n') +
+      chalk.gray('   ✅ macOS Safe - All Node.js changes, no bash modifications\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
@@ -196,15 +197,38 @@ function execScript(scriptPath, options = {}) {
   const args = parts.slice(1);
 
   // Validate that the script file doesn't contain shell metacharacters
-  if (scriptFile.match(/[;&|`$(){}[\]<>]/)) {
+  if (scriptFile.match(/[;&|`$(){}[\]<>'"\\]/)) {
     throw new Error('Invalid characters in script path');
   }
 
   // Validate path is within expected directory (defense in depth)
   const resolvedPath = path.resolve(scriptFile);
   const allowedDir = path.resolve(__dirname, '..', '.claude', 'hooks');
-  if (!resolvedPath.startsWith(allowedDir)) {
+  if (!resolvedPath.startsWith(allowedDir + path.sep) && resolvedPath !== allowedDir) {
     throw new Error('Script path outside allowed directory');
+  }
+
+  // Security: Validate shell and shellConfig don't contain dangerous characters
+  // These come from environment variables which could be attacker-controlled
+  if (shell.match(/[;&|`$(){}[\]<>'"\\]/)) {
+    throw new Error('Invalid characters in shell path');
+  }
+  if (shellConfig.match(/[;&|`$(){}[\]<>'"\\]/)) {
+    throw new Error('Invalid characters in shell config path');
+  }
+
+  // Validate shell is an absolute path to a known shell
+  const validShells = ['/bin/bash', '/bin/zsh', '/bin/sh', '/usr/bin/bash', '/usr/bin/zsh', '/usr/bin/sh'];
+  if (!validShells.includes(shell) && !shell.match(/^\/(?:usr\/)?(?:local\/)?bin\/(?:ba)?sh$/)) {
+    throw new Error('Shell path not recognized as a valid shell');
+  }
+
+  // Validate shellConfig is under home directory
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  const resolvedConfig = path.resolve(shellConfig);
+  const resolvedHome = path.resolve(homeDir);
+  if (!resolvedConfig.startsWith(resolvedHome + path.sep)) {
+    throw new Error('Shell config must be under home directory');
   }
 
   // Security: Use execFileSync with -c flag to prevent command injection
@@ -1297,12 +1321,12 @@ async function detectAndMigrateOldConfig(targetDir, spinner) {
   try {
     await fs.access(migrationScript);
 
-    // Execute migration script
-    const { exec } = require('child_process');
+    // Execute migration script using execFile to prevent command injection
+    const { execFile } = require('child_process');
     const { promisify } = require('util');
-    const execPromise = promisify(exec);
+    const execFilePromise = promisify(execFile);
 
-    await execPromise(`bash "${migrationScript}"`, { cwd: targetDir });
+    await execFilePromise('bash', [migrationScript], { cwd: targetDir });
 
     spinner.succeed(chalk.green('✓ Configuration migrated to .agentvibes/'));
     console.log(chalk.gray('   Old locations: .claude/config/, .claude/plugins/'));

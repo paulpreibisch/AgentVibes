@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.16
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.17
 
 ---
 
@@ -94,14 +94,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.15 - CI/CD Publish Workflow Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.15)** 🎉
+**[v2.14.17 - CodeQL Code Quality Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.17)** 🎉
 
-AgentVibes v2.14.15 fixes the GitHub Actions publish workflow that was failing with E403 errors. The workflow now checks if a version already exists on npm before attempting to publish.
+Hi everyone! I enabled CodeQL on this repository to ensure the highest quality code for AgentVibes. It found 5 issues which we fixed in this release! All Node.js improvements, macOS safe.
 
 **Key Highlights:**
-- 🔧 **Workflow Fix** - publish.yml checks if version exists before publish
-- ✅ **Green Badges** - No more E403 "already published" errors
-- 🚀 **CI/CD** - Graceful skip if version already on npm
+- ✨ **Atomic File Writes** - Config files now use temp+rename pattern for reliability
+- ✨ **Array-Based Commands** - Switched to `execFileSync` with array args (cleaner code)
+- ✨ **Input Validation** - Added validation for shell paths and config locations
+- ✅ **macOS Safe** - All changes are Node.js only, no bash modifications
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

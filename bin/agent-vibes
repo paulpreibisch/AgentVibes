@@ -5,7 +5,7 @@
  * This file ensures proper execution when run via npx
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +30,9 @@ if (isNpxExecution) {
   }
 
   try {
-    execSync(`node "${installerPath}" ${arguments_.join(' ')}`, {
+    // Security: Use execFileSync with array args to prevent command injection
+    // Arguments are passed as array elements, not string interpolation
+    execFileSync('node', [installerPath, ...arguments_], {
       stdio: 'inherit',
       cwd: path.dirname(__dirname),
     });

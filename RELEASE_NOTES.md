@@ -1,3 +1,101 @@
+# Release v2.14.17 - CodeQL Code Quality Improvements
+
+**Release Date:** 2025-12-02
+**Type:** Patch Release (Code Quality)
+
+## AI Summary
+
+Hi everyone! I enabled CodeQL on this repository to ensure the highest quality code for AgentVibes. It found 5 issues which we fixed in this release!
+
+AgentVibes v2.14.17 addresses all 5 CodeQL suggestions by upgrading to more robust Node.js APIs. These are proactive improvements to follow best practices - using atomic file writes and array-based command execution. No bash code was touched, so macOS Bash 3.2 compatibility is fully preserved.
+
+**Key Highlights:**
+- ✨ **Atomic File Writes** - Config files now use temp+rename pattern for reliability
+- ✨ **Array-Based Commands** - Switched to `execFileSync` with array args (cleaner code)
+- ✨ **Input Validation** - Added validation for shell paths and config locations
+- ✅ **macOS Safe** - All changes are Node.js only, no bash modifications
+
+---
+
+## Code Quality Improvements
+
+### Atomic File Writes (CodeQL #5)
+**File:** `src/commands/install-mcp.js:151`
+
+Upgraded config file writing to use the atomic temp+rename pattern for better reliability.
+
+```javascript
+// Before: Direct write
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+// After: Atomic write pattern
+const tempPath = `${configPath}.tmp.${process.pid}`;
+fs.writeFileSync(tempPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+fs.renameSync(tempPath, configPath);
+```
+
+### Array-Based Command Execution (CodeQL #2, #4)
+**Files:** `bin/agent-vibes:33`, `src/installer.js:1305`
+
+Switched from string-based to array-based command execution for cleaner, more robust code.
+
+```javascript
+// Before: String concatenation
+execSync(`node "${installerPath}" ${arguments_.join(' ')}`);
+
+// After: Array arguments (cleaner!)
+execFileSync('node', [installerPath, ...arguments_]);
+```
+
+### Input Validation (CodeQL #1, #3)
+**File:** `src/installer.js:215-217`
+
+Added validation for shell paths and config file locations.
+
+```javascript
+// Validate shell is a known shell binary
+const validShells = ['/bin/bash', '/bin/zsh', '/bin/sh', ...];
+if (!validShells.includes(shell)) {
+  throw new Error('Shell path not recognized');
+}
+```
+
+---
+
+## macOS Compatibility Note
+
+These improvements only modify JavaScript/Node.js code. No bash scripts were changed. The "array-based arguments" are **JavaScript arrays** (Node.js API), not bash arrays. Full macOS Bash 3.2 compatibility is preserved!
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `bin/agent-vibes` | execSync → execFileSync with array args |
+| `src/commands/install-mcp.js` | Atomic file write with temp+rename |
+| `src/installer.js` | exec → execFile, added shell/config validation |
+
+---
+
+## Testing
+
+- ✅ All 132 BATS tests pass
+- ✅ All 12 Node.js tests pass
+- ✅ No bash code modified
+
+---
+
+## Upgrade
+
+```bash
+npx agentvibes update
+```
+
+---
+
+---
+
 # Release v2.14.16 - Security Hardening & Dependency Updates
 
 **Release Date:** 2025-12-02

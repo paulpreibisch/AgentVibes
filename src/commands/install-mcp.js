@@ -147,8 +147,17 @@ function updateClaudeConfig(agentVibesPath, provider, apiKey = null) {
     config.mcpServers.agentvibes.env.ELEVENLABS_API_KEY = apiKey;
   }
 
-  // Write config
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  // Write config atomically to prevent race conditions (TOCTOU)
+  // Write to temp file first, then rename atomically
+  const tempPath = `${configPath}.tmp.${process.pid}`;
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+    fs.renameSync(tempPath, configPath);
+  } catch (error) {
+    // Clean up temp file if rename fails
+    try { fs.unlinkSync(tempPath); } catch { /* ignore cleanup errors */ }
+    throw error;
+  }
 
   return configPath;
 }
