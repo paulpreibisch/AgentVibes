@@ -128,16 +128,16 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.15 - CI/CD Publish Workflow Fix\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.16 - Security Hardening & Dependency Updates\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.15 fixes the GitHub Actions publish workflow\n') +
-      chalk.cyan('that was failing with E403 errors. The workflow now checks if\n') +
-      chalk.cyan('a version already exists on npm before attempting to publish.\n\n') +
+      chalk.cyan('AgentVibes v2.14.16 hardens repository security with Dependabot\n') +
+      chalk.cyan('automated updates, CodeQL scanning, and fixes a prototype pollution\n') +
+      chalk.cyan('vulnerability in js-yaml. GitHub security features now enabled.\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔧 Workflow Fix - publish.yml checks version before publish\n') +
-      chalk.gray('   ✅ Green Badges - No more E403 "already published" errors\n') +
-      chalk.gray('   🚀 CI/CD - Graceful skip if version already on npm\n\n') +
+      chalk.gray('   🔒 Security Fix - js-yaml 4.1.1 fixes prototype pollution CVE\n') +
+      chalk.gray('   🤖 Dependabot - Weekly dependency updates for npm, pip, actions\n') +
+      chalk.gray('   🔍 CodeQL - Security scanning for JS/Python on every PR\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

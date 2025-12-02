@@ -1,3 +1,20 @@
+# Release v2.14.16 - Security Hardening & Dependency Updates
+
+**Release Date:** 2025-12-02
+**Type:** Patch Release (Security)
+
+## AI Summary
+
+AgentVibes v2.14.16 hardens repository security with Dependabot automated dependency updates, CodeQL security scanning, and fixes a moderate prototype pollution vulnerability in js-yaml. GitHub security features including Dependabot alerts and security updates are now enabled for the repository.
+
+**Key Highlights:**
+- 🔒 **Security Fix** - Updated js-yaml from 4.1.0 to 4.1.1 (fixes prototype pollution CVE)
+- 🤖 **Dependabot** - Automated weekly dependency updates for npm, pip, and GitHub Actions
+- 🔍 **CodeQL** - Security scanning for JavaScript and Python on every PR
+- ✅ **Security Updates** - Enabled Dependabot alerts and automatic security PRs
+
+---
+
 # Release v2.14.15 - CI/CD Publish Workflow Fix
 
 **Release Date:** 2025-12-01
