@@ -53,6 +53,27 @@ agentvibes/org/
 
 # MCP Server config (user-specific)
 .mcp.json
+.mcp-minimal.json
+
+# Local symlinks (user-specific paths)
+screenshots
+sounds
+personalities
+
+# Local utility scripts
+fixcolors
+sonar
+
+# Test state files
+.test-bmad-config
+
+# Windows NTFS metadata
+*:Zone.Identifier
+
+# Backup and temp files
+*.backup-*
+*.new
+.claude/personalities/backups/
 
 # LinkedIn articles (personal drafts)
 linkedin/
