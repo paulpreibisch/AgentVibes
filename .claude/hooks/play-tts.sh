@@ -43,6 +43,20 @@
 # Fix locale warnings
 export LC_ALL=C
 
+# Get script directory (needed for mute file check)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Check if muted (persists across sessions)
+# Supports both global (~/.agentvibes-muted) and project-local (.claude/agentvibes-muted) mute files
+GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
+PROJECT_MUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-muted"
+
+if [[ -f "$GLOBAL_MUTE_FILE" ]] || [[ -f "$PROJECT_MUTE_FILE" ]]; then
+  echo "🔇 TTS muted"
+  exit 0
+fi
+
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice name or ID
 
@@ -62,9 +76,6 @@ fi
 # In single quotes these don't need escaping, but Claude sometimes adds \! anyway
 TEXT="${TEXT//\\!/!}"
 TEXT="${TEXT//\\\$/\$}"
-
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"

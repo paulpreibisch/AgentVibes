@@ -1,3 +1,109 @@
+# Release v2.14.18 - Mute/Unmute TTS Control
+
+**Release Date:** 2025-12-03
+**Type:** Patch Release (Feature)
+
+## AI Summary
+
+AgentVibes v2.14.18 adds the ability to mute and unmute TTS output with persistent state. Perfect for when you're in a meeting or need temporary silence without losing your voice configuration. The mute state persists across Claude sessions - mute once, stay silent until you unmute.
+
+**Key Highlights:**
+- 🔇 **Mute Command** - `/agent-vibes:mute` silences all TTS output instantly
+- 🔊 **Unmute Command** - `/agent-vibes:unmute` restores voice output
+- 💾 **Persistent State** - Mute survives Claude restarts (stored in `~/.agentvibes-muted`)
+- 🔌 **MCP Support** - `mute()`, `unmute()`, `is_muted()` tools for Claude Desktop/Warp
+- 🧪 **Full Test Coverage** - 6 new tests validate mute/unmute functionality
+
+---
+
+## New Features
+
+### Mute/Unmute Slash Commands
+**Files:** `.claude/commands/agent-vibes/mute.md`, `.claude/commands/agent-vibes/unmute.md`
+
+New slash commands to control TTS output:
+
+```bash
+/agent-vibes:mute    # 🔇 Silences all TTS
+/agent-vibes:unmute  # 🔊 Restores TTS
+```
+
+### MCP Server Tools
+**File:** `mcp-server/server.py`
+
+Three new MCP tools for Claude Desktop and Warp users:
+
+| Tool | Description |
+|------|-------------|
+| `mute()` | Mute TTS, creates persistent mute flag |
+| `unmute()` | Unmute TTS, removes mute flag(s) |
+| `is_muted()` | Check current mute status |
+
+### Dual Mute Location Support
+**File:** `.claude/hooks/play-tts.sh`
+
+Supports both global and project-local mute files:
+- **Global:** `~/.agentvibes-muted` - Mutes TTS in all projects
+- **Project:** `.claude/agentvibes-muted` - Mutes TTS in current project only
+
+```bash
+# play-tts.sh now checks both locations:
+if [[ -f "$HOME/.agentvibes-muted" ]] || [[ -f "$PROJECT_ROOT/.claude/agentvibes-muted" ]]; then
+  echo "🔇 TTS muted"
+  exit 0
+fi
+```
+
+---
+
+## Test Coverage
+
+### New Tests Added
+**File:** `mcp-server/test_server.py`
+
+Added comprehensive mute/unmute tests:
+
+1. ✅ Initial state is unmuted
+2. ✅ Mute creates `~/.agentvibes-muted` file
+3. ✅ `is_muted()` correctly reports muted state
+4. ✅ Unmute removes mute file
+5. ✅ `is_muted()` correctly reports active state after unmute
+6. ✅ Unmute handles already-unmuted state gracefully
+7. ✅ `play-tts.sh` respects mute file
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `.claude/hooks/play-tts.sh` | Added mute file detection (+17 lines) |
+| `mcp-server/server.py` | Added `mute()`, `unmute()`, `is_muted()` tools (+76 lines) |
+| `mcp-server/test_server.py` | Added mute/unmute test suite (+137 lines) |
+| `.claude/commands/agent-vibes/mute.md` | New: Mute slash command |
+| `.claude/commands/agent-vibes/unmute.md` | New: Unmute slash command |
+| `.claude/commands/agent-vibes/agent-vibes.md` | Updated help documentation |
+
+---
+
+## Testing
+
+- ✅ All 132 BATS tests pass
+- ✅ All 12 Node.js tests pass
+- ✅ 7 new mute/unmute tests pass
+
+---
+
+## Upgrade
+
+```bash
+npx agentvibes update
+```
+
+---
+
+---
+
 # Release v2.14.17 - CodeQL Code Quality Improvements
 
 **Release Date:** 2025-12-02

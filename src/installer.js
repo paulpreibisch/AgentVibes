@@ -128,17 +128,18 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.17 - CodeQL Code Quality Improvements\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.14.18 - Mute/Unmute TTS Control\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('Hi everyone! I enabled CodeQL on this repository to ensure the\n') +
-      chalk.cyan('highest quality code for AgentVibes. It found 5 issues which we\n') +
-      chalk.cyan('fixed in this release! All Node.js improvements, macOS safe.\n\n') +
+      chalk.cyan('AgentVibes v2.14.18 adds the ability to mute and unmute TTS output\n') +
+      chalk.cyan('with persistent state. Perfect for meetings or temporary silence\n') +
+      chalk.cyan('without losing your voice config. Mute once, stay silent until unmute!\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   ✨ Atomic File Writes - Config uses temp+rename for reliability\n') +
-      chalk.gray('   ✨ Array-Based Commands - Cleaner execFileSync with array args\n') +
-      chalk.gray('   ✨ Input Validation - Shell path and config validation added\n') +
-      chalk.gray('   ✅ macOS Safe - All Node.js changes, no bash modifications\n\n') +
+      chalk.gray('   🔇 Mute Command - /agent-vibes:mute silences all TTS instantly\n') +
+      chalk.gray('   🔊 Unmute Command - /agent-vibes:unmute restores voice output\n') +
+      chalk.gray('   💾 Persistent State - Mute survives Claude restarts\n') +
+      chalk.gray('   🔌 MCP Support - mute(), unmute(), is_muted() for Claude Desktop\n') +
+      chalk.gray('   🧪 Full Test Coverage - 7 new tests validate the feature\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +

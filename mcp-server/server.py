@@ -482,6 +482,61 @@ class AgentVibesServer:
             return f"{result}\n\n⚠️  Restart Claude Code for changes to take effect"
         return f"❌ Failed to set verbosity: {result}"
 
+    async def mute(self) -> str:
+        """
+        Mute all TTS output. Creates a persistent mute flag.
+
+        Returns:
+            Success message confirming mute is active
+        """
+        mute_file = Path.home() / ".agentvibes-muted"
+        try:
+            mute_file.touch()
+            return "🔇 AgentVibes TTS muted. All voice output is now silenced.\n\n💡 To unmute, use: unmute()"
+        except Exception as e:
+            return f"❌ Failed to mute: {e}"
+
+    async def unmute(self) -> str:
+        """
+        Unmute TTS output. Removes the mute flag.
+
+        Returns:
+            Success message confirming TTS is restored
+        """
+        global_mute = Path.home() / ".agentvibes-muted"
+        project_mute = Path.cwd() / ".claude" / "agentvibes-muted"
+
+        removed = []
+        try:
+            if global_mute.exists():
+                global_mute.unlink()
+                removed.append("global")
+            if project_mute.exists():
+                project_mute.unlink()
+                removed.append("project")
+
+            if removed:
+                return f"🔊 AgentVibes TTS unmuted. Voice output is now restored.\n   (Removed: {', '.join(removed)} mute flag)"
+            else:
+                return "🔊 AgentVibes TTS was not muted. Voice output is active."
+        except Exception as e:
+            return f"❌ Failed to unmute: {e}"
+
+    async def is_muted(self) -> str:
+        """
+        Check if TTS is currently muted.
+
+        Returns:
+            Current mute status
+        """
+        global_mute = Path.home() / ".agentvibes-muted"
+        project_mute = Path.cwd() / ".claude" / "agentvibes-muted"
+
+        if global_mute.exists() or project_mute.exists():
+            return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
+        else:
+            return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
+
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
         """Run a bash script and return output"""
@@ -807,6 +862,21 @@ Note: Changes take effect on next Claude Code session restart.""",
                 "required": ["level"],
             },
         ),
+        Tool(
+            name="mute",
+            description="Mute all AgentVibes TTS output. Creates a persistent mute flag that silences all voice output until unmuted. Persists across sessions.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="unmute",
+            description="Unmute AgentVibes TTS output. Removes the mute flag and restores voice output.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="is_muted",
+            description="Check if TTS is currently muted.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -852,6 +922,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.get_verbosity()
         elif name == "set_verbosity":
             result = await agent_vibes.set_verbosity(arguments["level"])
+        elif name == "mute":
+            result = await agent_vibes.mute()
+        elif name == "unmute":
+            result = await agent_vibes.unmute()
+        elif name == "is_muted":
+            result = await agent_vibes.is_muted()
         else:
             result = f"Unknown tool: {name}"
 

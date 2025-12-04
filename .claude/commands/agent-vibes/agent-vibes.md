@@ -8,6 +8,15 @@ Manage your text-to-speech voices across multiple providers (ElevenLabs, Piper, 
 
 ## Available Commands
 
+### `/agent-vibes:mute`
+Mute all TTS output (persists across sessions)
+- Creates a mute flag that silences all voice output
+- Shows 🔇 indicator when TTS would have played
+
+### `/agent-vibes:unmute`
+Unmute TTS output
+- Removes mute flag and restores voice output
+
 ### `/agent-vibes:list [first|last] [N]`
 List all available voices, with optional filtering
 - `/agent-vibes:list` - Show all voices
