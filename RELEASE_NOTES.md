@@ -1,3 +1,114 @@
+# Release v2.14.19 - BMAD TTS Injection Improvements
+
+**Release Date:** 2025-12-05
+**Type:** Patch Release
+
+## AI Summary
+
+AgentVibes v2.14.19 improves the BMAD TTS injection feature with better file handling, organized backups, and a more informative summary when enabling voice support for your BMAD agents.
+
+**Key Highlights:**
+- 📦 **Organized Backups** - All backups now saved in `.agentvibes/backups/agents/` with timestamps
+- 📋 **Better Summary** - See exactly which files were modified and how to restore them
+- 🔧 **Improved Reliability** - Better file handling to ensure agent files are always preserved
+- 🐚 **Shell Compatibility** - Works on more systems including older bash versions
+
+---
+
+## What is TTS Injection?
+
+**TTS (Text-to-Speech) Injection** is a feature that makes your BMAD agents talk! When you install BMAD with AgentVibes, it adds voice instructions to each agent file so they can speak their responses aloud.
+
+### How it works:
+
+1. **Before TTS Injection** - Your BMAD agents (PM, Architect, UX Designer, etc.) only display text responses
+2. **After TTS Injection** - Each agent can speak their responses using your chosen voice
+
+### Example:
+
+When you activate the PM agent, instead of just seeing text, you'll hear:
+> "Hey! I'm Marcus, your Project Manager. What can I help you with today?"
+
+The injection adds a small instruction to each agent file that tells it to use AgentVibes for voice output. Your original agent files are always backed up before any changes.
+
+---
+
+## What's New in This Release
+
+### Organized Backup System
+
+When TTS is enabled on your agents, backups are now saved in one central location:
+
+```
+.agentvibes/backups/agents/
+├── pm_20251205_143022.md
+├── architect_20251205_143022.md
+├── ux-designer_20251205_143022.md
+└── ...
+```
+
+Each backup includes a timestamp so you can see exactly when it was created.
+
+### Informative Summary
+
+After enabling TTS, you'll see a clear summary:
+
+```
+═══════════════════════════════════════════════════════════════
+                    TTS INJECTION SUMMARY
+═══════════════════════════════════════════════════════════════
+
+✅ Successfully modified: 11 agents
+
+📝 Modified Files:
+   • .bmad/bmm/agents/pm.md
+   • .bmad/bmm/agents/architect.md
+   • .bmad/bmm/agents/ux-designer.md
+   • ...
+
+📦 Backups saved to:
+   .agentvibes/backups/agents/
+
+🔄 To restore original files, run:
+   .claude/hooks/bmad-tts-injector.sh restore
+
+💡 BMAD agents will now speak when activated!
+```
+
+### Improved Reliability
+
+The script now includes extra checks to make sure your agent files are always safe:
+- Creates a backup before making any changes
+- Verifies changes were successful before saving
+- Automatically restores from backup if anything goes wrong
+
+---
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `.claude/hooks/bmad-tts-injector.sh` | Backup organization, summary output, reliability improvements |
+
+---
+
+## Testing
+
+- ✅ All 132 BATS tests pass
+- ✅ All 12 Node.js tests pass
+
+---
+
+## Upgrade
+
+```bash
+npx agentvibes update
+```
+
+---
+
+---
+
 # Release v2.14.18 - Mute/Unmute TTS Control
 
 **Release Date:** 2025-12-03

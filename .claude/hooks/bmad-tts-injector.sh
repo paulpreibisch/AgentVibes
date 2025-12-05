@@ -210,8 +210,19 @@ inject_tts() {
     return 0
   fi
 
-  # Create backup
+  # Create backup directory for centralized timestamped backups
+  local backup_dir=".agentvibes/backups/agents"
+  mkdir -p "$backup_dir"
+
+  # Create timestamped backup in central location (for permanent archive)
+  local timestamp=$(date +%Y%m%d_%H%M%S)
+  local backup_name="$(basename "$agent_file" .md)_${timestamp}.md"
+  cp "$agent_file" "$backup_dir/$backup_name"
+
+  # Also create quick-restore backup next to original file
   cp "$agent_file" "$agent_file.backup-pre-tts"
+
+  echo -e "${GRAY}   📦 Backup saved: $backup_dir/$backup_name${NC}"
 
   # Detect v4 vs v6 structure
   local is_v6=false
@@ -249,6 +260,15 @@ inject_tts() {
       { print }
     ' "$agent_file" > "$agent_file.tmp"
 
+    # SAFETY CHECK: Verify the tmp file is not empty before comparing
+    local tmp_size=$(stat -c%s "$agent_file.tmp" 2>/dev/null || stat -f%z "$agent_file.tmp" 2>/dev/null || echo "0")
+    if [[ "$tmp_size" -eq 0 ]]; then
+      echo -e "${RED}❌ SAFETY: Refusing to overwrite - tmp file is empty: $(basename "$agent_file")${NC}" >&2
+      rm -f "$agent_file.tmp"
+      mv "$agent_file.backup-pre-tts" "$agent_file"
+      return 1
+    fi
+
     # If no change (step 4 didn't match), restore backup and report
     if ! diff -q "$agent_file.backup-pre-tts" "$agent_file.tmp" > /dev/null 2>&1; then
       : # Changes were made, continue
@@ -284,6 +304,29 @@ inject_tts() {
       }
       { print }
     ' "$agent_file" > "$agent_file.tmp"
+
+    # SAFETY CHECK: Verify the tmp file is not empty and has similar size to original
+    # This prevents data loss if awk fails or produces empty output
+    local original_size=$(stat -c%s "$agent_file" 2>/dev/null || stat -f%z "$agent_file" 2>/dev/null || echo "0")
+    local tmp_size=$(stat -c%s "$agent_file.tmp" 2>/dev/null || stat -f%z "$agent_file.tmp" 2>/dev/null || echo "0")
+
+    if [[ "$tmp_size" -eq 0 ]]; then
+      echo -e "${RED}❌ SAFETY: Refusing to overwrite - tmp file is empty: $(basename "$agent_file")${NC}" >&2
+      rm -f "$agent_file.tmp"
+      mv "$agent_file.backup-pre-tts" "$agent_file"
+      return 1
+    fi
+
+    # Tmp file should be at least 80% of original size (protects against truncation)
+    # No upper limit since injection adds substantial content (typically 300-500 bytes)
+    local min_size=$((original_size * 80 / 100))
+
+    if [[ "$tmp_size" -lt "$min_size" ]]; then
+      echo -e "${RED}❌ SAFETY: Refusing to overwrite - file would shrink too much (orig: ${original_size}B, tmp: ${tmp_size}B): $(basename "$agent_file")${NC}" >&2
+      rm -f "$agent_file.tmp"
+      mv "$agent_file.backup-pre-tts" "$agent_file"
+      return 1
+    fi
   fi
 
   mv "$agent_file.tmp" "$agent_file"
@@ -336,10 +379,10 @@ show_status() {
     if has_tts_injection "$agent_file"; then
       local voice=$(get_agent_voice "$agent_id")
       echo -e "   ${GREEN}✅${NC} $agent_name (${agent_id}) → Voice: ${voice:-default}"
-      ((enabled_count++))
+      enabled_count=$((enabled_count + 1))
     else
       echo -e "   ${GRAY}❌ $agent_name (${agent_id})${NC}"
-      ((disabled_count++))
+      disabled_count=$((disabled_count + 1))
     fi
   done <<< "$agents"
 
@@ -360,21 +403,62 @@ enable_all() {
   local agents=$(find_agents "$bmad_core")
   local success_count=0
   local skip_count=0
+  local fail_count=0
+
+  # Track modified files and backups for summary
+  local modified_files=()
+  local backup_files=()
 
   while IFS= read -r agent_file; do
     if has_tts_injection "$agent_file"; then
-      ((skip_count++))
+      skip_count=$((skip_count + 1))
       continue
     fi
 
     if inject_tts "$agent_file"; then
-      ((success_count++))
+      success_count=$((success_count + 1))
+      modified_files+=("$agent_file")
+      # Track the backup file that was created
+      local timestamp=$(date +%Y%m%d_%H%M%S)
+      local backup_name="$(basename "$agent_file" .md)_${timestamp}.md"
+      backup_files+=(".agentvibes/backups/agents/$backup_name")
+    else
+      fail_count=$((fail_count + 1))
     fi
   done <<< "$agents"
 
   echo ""
-  echo -e "${GREEN}🎉 TTS enabled for $success_count agents${NC}"
-  [[ $skip_count -gt 0 ]] && echo -e "${YELLOW}   Skipped $skip_count agents (already enabled)${NC}"
+  echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+  echo -e "${CYAN}                    TTS INJECTION SUMMARY                       ${NC}"
+  echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+  echo ""
+
+  # Show results
+  echo -e "${GREEN}✅ Successfully modified: $success_count agents${NC}"
+  [[ $skip_count -gt 0 ]] && echo -e "${YELLOW}⏭️  Skipped (already enabled): $skip_count agents${NC}"
+  [[ $fail_count -gt 0 ]] && echo -e "${RED}❌ Failed: $fail_count agents${NC}"
+  echo ""
+
+  # List modified files
+  if [[ ${#modified_files[@]} -gt 0 ]]; then
+    echo -e "${CYAN}📝 Modified Files:${NC}"
+    for file in "${modified_files[@]}"; do
+      echo -e "   • $file"
+    done
+    echo ""
+  fi
+
+  # Show backup location
+  if [[ ${#modified_files[@]} -gt 0 ]]; then
+    echo -e "${CYAN}📦 Backups saved to:${NC}"
+    echo -e "   .agentvibes/backups/agents/"
+    echo ""
+    echo -e "${CYAN}🔄 To restore original files, run:${NC}"
+    echo -e "   ${GREEN}.claude/hooks/bmad-tts-injector.sh restore${NC}"
+    echo ""
+  fi
+
+  echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
   echo ""
   echo -e "${CYAN}💡 BMAD agents will now speak when activated!${NC}"
 }
@@ -394,7 +478,7 @@ disable_all() {
 
   while IFS= read -r agent_file; do
     if remove_tts "$agent_file"; then
-      ((success_count++))
+      success_count=$((success_count + 1))
     fi
   done <<< "$agents"
 
@@ -430,7 +514,7 @@ restore_backup() {
       local original_file="${backup_file%.backup-pre-tts}"
       cp "$backup_file" "$original_file"
       echo -e "${GREEN}✅ Restored: $(basename "$original_file")${NC}"
-      ((backup_count++))
+      backup_count=$((backup_count + 1))
     fi
   done
 
