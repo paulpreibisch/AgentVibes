@@ -295,6 +295,24 @@ if command -v ffmpeg &> /dev/null; then
   fi
 fi
 
+# @function apply_audio_effects
+# @intent Apply sox effects and background music via audio-processor.sh
+# @param Uses global: $TEMP_FILE
+# @returns Updates $TEMP_FILE to processed version
+# @sideeffects Applies audio effects and background music
+if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
+  PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
+  "$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null || {
+    echo "Warning: Audio processing failed, using unprocessed audio" >&2
+    PROCESSED_FILE="$TEMP_FILE"
+  }
+
+  if [[ -f "$PROCESSED_FILE" ]] && [[ "$PROCESSED_FILE" != "$TEMP_FILE" ]]; then
+    rm -f "$TEMP_FILE"
+    TEMP_FILE="$PROCESSED_FILE"
+  fi
+fi
+
 # @function play_audio
 # @intent Play generated audio using available player with sequential playback
 # @why Support multiple audio players and prevent overlapping audio in learning mode
@@ -302,13 +320,19 @@ fi
 # @sideeffects Plays audio with lock mechanism for sequential playback
 LOCK_FILE="/tmp/agentvibes-audio.lock"
 
-# Wait for previous audio to finish (max 30 seconds)
-for i in {1..60}; do
+# Wait for previous audio to finish (max 2 seconds to prevent blocking)
+for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
     break
   fi
   sleep 0.5
 done
+
+# If still locked after 2 seconds, skip this TTS to prevent blocking Claude
+if [ -f "$LOCK_FILE" ]; then
+  echo "⏭️  Skipping TTS (previous audio still playing)" >&2
+  exit 0
+fi
 
 # Track last target language audio for replay command
 if [[ "$CURRENT_LANGUAGE" != "english" ]]; then
