@@ -198,10 +198,18 @@ mix_background() {
         fi
     fi
 
-    # Calculate new position after this clip
+    # Extend total duration by 2 seconds for background music fade out
+    local total_duration
+    if command -v bc &> /dev/null; then
+        total_duration=$(echo "$duration + 2" | bc -l)
+    else
+        total_duration=$(awk "BEGIN {print $duration + 2}")
+    fi
+
+    # Calculate new position after this clip (including fade out time)
     local new_pos
     if command -v bc &> /dev/null; then
-        new_pos=$(echo "$start_pos + $duration" | bc -l)
+        new_pos=$(echo "$start_pos + $total_duration" | bc -l)
         # Wrap around if needed
         if [[ -n "$bg_duration" ]] && (( $(echo "$new_pos >= $bg_duration" | bc -l) )); then
             new_pos=$(echo "$new_pos % $bg_duration" | bc -l)
@@ -211,10 +219,18 @@ mix_background() {
     fi
 
     # Mix: Seek to position in background, apply volume and fades
+    # Background fades in at start (0.3s), continues under speech, then fades out over 2s after speech ends
     # -ss before -i seeks efficiently without decoding
+    local bg_fade_out_start
+    if command -v bc &> /dev/null; then
+        bg_fade_out_start=$(echo "$duration" | bc -l)
+    else
+        bg_fade_out_start="$duration"
+    fi
+
     ffmpeg -y -i "$voice" -ss "$start_pos" -stream_loop -1 -i "$background" \
-        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=$(echo "$duration - 0.3" | bc):d=0.3[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[out]" \
-        -map "[out]" -t "$duration" "$output" 2>/dev/null || {
+        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_start}:d=2[bg];[0:a]apad=pad_dur=2[voice_padded];[voice_padded][bg]amix=inputs=2:duration=first:dropout_transition=2[out]" \
+        -map "[out]" -t "$total_duration" "$output" 2>/dev/null || {
         echo "Warning: Background mixing failed, using voice only" >&2
         cp "$voice" "$output"
         return

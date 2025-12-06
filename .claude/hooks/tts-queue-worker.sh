@@ -85,13 +85,21 @@ process_queue() {
     # Decode base64 values
     TEXT=$(echo -n "$TEXT_B64" | base64 -d)
     VOICE=$(echo -n "$VOICE_B64" | base64 -d)
+    AGENT=$(echo -n "${AGENT_B64:-}" | base64 -d 2>/dev/null || echo "default")
 
-    # Play TTS (this blocks until audio finishes due to lock mechanism)
-    # Display output to show file location (GitHub Issue #39)
-    if [[ -n "${VOICE:-}" ]]; then
-      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
+    # Use enhanced TTS with agent-specific background music if agent is specified
+    # and background music is enabled
+    if [[ -f "$SCRIPT_DIR/play-tts-enhanced.sh" ]] && [[ "$AGENT" != "default" ]] && [[ -n "$AGENT" ]]; then
+      # Party mode: each agent gets their unique background music from audio-effects.cfg
+      bash "$SCRIPT_DIR/play-tts-enhanced.sh" "$TEXT" "$AGENT" "$VOICE" || true
     else
-      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
+      # Standard TTS without background music
+      # Display output to show file location (GitHub Issue #39)
+      if [[ -n "${VOICE:-}" ]]; then
+        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
+      else
+        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
+      fi
     fi
 
     # Add configurable pause between speakers for natural conversation flow

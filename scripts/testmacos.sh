@@ -1,0 +1,1 @@
+ssh -o LogLevel=QUIET macos 'bash -l -c "export PULSE_SERVER=tcp:localhost:14714 && export PULSE_COOKIE_FILE=~/.config/pulse/cookie_wsl && say -o /tmp/test.aiff \"Testing Windows speakers from Mac\" && /opt/homebrew/bin/paplay /tmp/test.aiff && rm /tmp/test.aiff"'

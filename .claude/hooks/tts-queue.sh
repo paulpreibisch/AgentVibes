@@ -33,9 +33,11 @@ fi
 # @intent Add a TTS request to the queue for sequential playback
 # @param $1 dialogue text
 # @param $2 voice name (optional)
+# @param $3 agent name (optional, for background music in party mode)
 add_to_queue() {
   local text="$1"
   local voice="${2:-}"
+  local agent="${3:-default}"
 
   # Create unique queue item with timestamp
   local timestamp=$(date +%s%N)
@@ -45,6 +47,7 @@ add_to_queue() {
   cat > "$queue_file" <<EOF
 TEXT_B64=$(echo -n "$text" | base64 -w0)
 VOICE_B64=$(echo -n "$voice" | base64 -w0)
+AGENT_B64=$(echo -n "$agent" | base64 -w0)
 EOF
 
   # Start queue worker if not already running
@@ -113,7 +116,7 @@ show_queue() {
 # Main command dispatcher
 case "${1:-help}" in
   add)
-    add_to_queue "${2:-}" "${3:-}"
+    add_to_queue "${2:-}" "${3:-}" "${4:-default}"
     ;;
   clear)
     clear_queue
@@ -125,9 +128,9 @@ case "${1:-help}" in
     echo "Usage: tts-queue.sh {add|clear|status}"
     echo ""
     echo "Commands:"
-    echo "  add <text> [voice]  Add TTS request to queue"
-    echo "  clear               Clear all pending requests"
-    echo "  status              Show queue status"
+    echo "  add <text> [voice] [agent]  Add TTS request to queue with optional agent for background music"
+    echo "  clear                       Clear all pending requests"
+    echo "  status                      Show queue status"
     exit 1
     ;;
 esac
