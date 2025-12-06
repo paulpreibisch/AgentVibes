@@ -215,6 +215,10 @@ To change my personality, just type, "change personality to sarcastic."
 
 Or to change my voice, type, "try a different voice."
 
+We recently have added background music to your agents. You can turn it on or off by saying "Turn background music on" or "Turn background music off."
+
+Lastly, Agent Vibes is updated frequently. Use npx agentvibes update to keep up to date.
+
 We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!"`;
 
   // Stop spinner and display the welcome script in a box
