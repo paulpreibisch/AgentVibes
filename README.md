@@ -51,6 +51,23 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 - 🆓 **Free Option Available** - Use Piper TTS with no API key required
 - ⚡ **One-Command Install** - Get started in seconds
 
+### 🤗 Hugging Face AI Voice Models
+
+**AgentVibes' Piper TTS uses 100% Hugging Face-trained AI voice models** from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices).
+
+**What are Hugging Face voice models?**
+
+Hugging Face voice models are pre-trained artificial intelligence models hosted on the Hugging Face Model Hub platform, designed to convert text into human-like speech (Text-to-Speech or TTS) or perform other speech tasks like voice cloning and speech-to-speech translation. They're accessible via their Transformers library for easy use in applications like voice assistants, audio generation, and more.
+
+**Key Benefits:**
+- 🎯 **Human-like Speech** - VITS-based neural models for natural pronunciation and intonation
+- 🌍 **35+ Languages** - Multilingual support with native accents
+- 🆓 **100% Open Source** - All Piper voices are free HF models (Tacotron2, FastSpeech2, VITS)
+- 🔧 **Developer-Friendly** - Fine-tune, customize, or deploy for various audio projects
+- ⚡ **Offline & Fast** - No API keys, no internet needed once installed
+
+All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-source AI voice models, ensuring high-quality, natural-sounding speech synthesis across all supported platforms.
+
 ---
 
 ## 📑 Table of Contents

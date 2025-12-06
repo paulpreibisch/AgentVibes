@@ -163,226 +163,37 @@ function showReleaseInfo() {
  * @param {object} spinner - ora spinner instance
  */
 async function playWelcomeDemo(targetDir, spinner) {
-  const voiceName = 'en_US-ryan-high';
-  const backgroundMusic = path.join(__dirname, '..', 'templates', 'audio', 'welcome-music.mp3');
-  const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
-  const voiceModel = path.join(piperVoicesDir, `${voiceName}.onnx`);
-
-  // Check if MCP is configured
-  const mcpConfigPath = path.join(targetDir, '.mcp.json');
-  const hasMcp = fsSync.existsSync(mcpConfigPath);
-
-  // Build the script segments with pauses
-  const segment1 = "Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.";
-  const segment2 = "We have added a lot of commands, but don't worry, you can hide them by typing forward slash agent vibes colon highed, and colon show to bring them back.";
-
-  // MCP segments with pauses between example commands
-  const segment3a_mcp = hasMcp ? "" : "To control Agent Vibes with natural language, install the MCP server. That way you can just say things like,";
-  const segment3b_mcp = hasMcp ? "" : "change my voice.";
-  const segment3c_mcp = hasMcp ? "" : "or,";
-  const segment3d_mcp = hasMcp ? "" : "mute the audio.";
-
-  // Personality segments with pauses between example commands
-  const segment4a = "To change my personality, just type,";
-  const segment4b = "change personality to sarcastic.";
-  const segment4c = "Or to change my voice, type,";
-  const segment4d = "try a different voice.";
-
-  const segment5 = "We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!";
-
-  // Check if we have the required tools
-  let hasPiper = false;
-  let hasFfmpeg = false;
-  let hasSox = false;
+  // Check if we have audio player
   let hasMpv = false;
-
-  try {
-    execSync('which piper 2>/dev/null || command -v piper 2>/dev/null', { stdio: 'pipe' });
-    hasPiper = true;
-  } catch {}
-
-  try {
-    execSync('which ffmpeg 2>/dev/null || command -v ffmpeg 2>/dev/null', { stdio: 'pipe' });
-    hasFfmpeg = true;
-  } catch {}
-
-  try {
-    execSync('which sox 2>/dev/null || command -v sox 2>/dev/null', { stdio: 'pipe' });
-    hasSox = true;
-  } catch {}
 
   try {
     execSync('which mpv 2>/dev/null || command -v mpv 2>/dev/null || which afplay 2>/dev/null', { stdio: 'pipe' });
     hasMpv = true;
   } catch {}
 
-  // Check if voice model exists
-  const hasVoiceModel = fsSync.existsSync(voiceModel);
-  const hasBackgroundMusic = fsSync.existsSync(backgroundMusic);
+  if (!hasMpv) {
+    console.log(chalk.gray('\n   (Welcome demo skipped - requires mpv or afplay)'));
+    return;
+  }
 
-  if (!hasPiper || !hasVoiceModel || !hasFfmpeg || !hasMpv) {
-    console.log(chalk.gray('\n   (Welcome demo skipped - requires piper, ffmpeg, and mpv)'));
+  // Use pre-generated welcome demo audio
+  const welcomeDemoAudio = path.join(__dirname, '..', 'templates', 'audio', 'welcome-demo.wav');
+
+  if (!fsSync.existsSync(welcomeDemoAudio)) {
+    console.log(chalk.gray('\n   (Welcome demo skipped - audio file not found)'));
     return;
   }
 
   spinner.start('🎵 Playing welcome demo...');
 
   try {
-    const tempDir = path.join(process.env.XDG_RUNTIME_DIR || '/tmp', 'agentvibes-welcome');
-    await fs.mkdir(tempDir, { recursive: true });
-
-    // Generate TTS for each segment
-    spinner.text = '🎤 Generating voice segments...';
-
-    // All segments in order (empty strings will be filtered out)
-    const allSegments = [
-      segment1,           // Welcome
-      segment2,           // Hide/show commands
-      segment3a_mcp,      // MCP intro (if no MCP)
-      segment3b_mcp,      // "change my voice"
-      segment3c_mcp,      // "or"
-      segment3d_mcp,      // "mute the audio"
-      segment4a,          // Personality intro
-      segment4b,          // "change personality to sarcastic"
-      segment4c,          // "Or to change my voice"
-      segment4d,          // "try a different voice"
-      segment5            // Thank you
-    ].filter(s => s && s.length > 0);
-
-    const segmentFiles = [];
-
-    for (let i = 0; i < allSegments.length; i++) {
-      const ttsFile = path.join(tempDir, `segment-${i}.wav`);
-      const reverbFile = path.join(tempDir, `segment-${i}-reverb.wav`);
-
-      // Generate TTS
-      execSync(`echo "${allSegments[i]}" | piper --model "${voiceModel}" --output_file "${ttsFile}"`, {
-        stdio: 'pipe',
-        timeout: 30000
-      });
-
-      // Add reverb if sox available
-      if (hasSox) {
-        try {
-          execSync(`sox "${ttsFile}" "${reverbFile}" reverb 35 50 80 gain -2`, {
-            stdio: 'pipe',
-            timeout: 15000
-          });
-        } catch {
-          await fs.copyFile(ttsFile, reverbFile);
-        }
-      } else {
-        await fs.copyFile(ttsFile, reverbFile);
-      }
-
-      segmentFiles.push(reverbFile);
-    }
-
-    // Create silence files for pauses
-    spinner.text = '🎵 Adding pauses...';
-    const silence3s = path.join(tempDir, 'silence-3s.wav');
-    const silence2s = path.join(tempDir, 'silence-2s.wav');
-    const silence1s = path.join(tempDir, 'silence-1s.wav');
-    execSync(`ffmpeg -y -f lavfi -i anullsrc=r=22050:cl=mono -t 3 "${silence3s}" 2>/dev/null`, { stdio: 'pipe' });
-    execSync(`ffmpeg -y -f lavfi -i anullsrc=r=22050:cl=mono -t 2 "${silence2s}" 2>/dev/null`, { stdio: 'pipe' });
-    execSync(`ffmpeg -y -f lavfi -i anullsrc=r=22050:cl=mono -t 1 "${silence1s}" 2>/dev/null`, { stdio: 'pipe' });
-
-    spinner.text = '🎼 Mixing audio...';
-
-    // Create intro silence (will be replaced by music)
-    const introSilence = path.join(tempDir, 'intro-5s.wav');
-    execSync(`ffmpeg -y -f lavfi -i anullsrc=r=22050:cl=mono -t 5 "${introSilence}" 2>/dev/null`, { stdio: 'pipe' });
-
-    // Create outro silence (will have music)
-    const outroSilence = path.join(tempDir, 'outro-3s.wav');
-    execSync(`ffmpeg -y -f lavfi -i anullsrc=r=22050:cl=mono -t 3 "${outroSilence}" 2>/dev/null`, { stdio: 'pipe' });
-
-    // Build concat list for speech track with proper pauses
-    const concatList = path.join(tempDir, 'concat-list.txt');
-    let concatContent = `file '${introSilence}'\n`;
-
-    let idx = 0;
-    // Segment 1: Welcome
-    concatContent += `file '${segmentFiles[idx++]}'\n`;
-    concatContent += `file '${silence3s}'\n`;
-
-    // Segment 2: Hide/show commands
-    concatContent += `file '${segmentFiles[idx++]}'\n`;
-    concatContent += `file '${silence2s}'\n`;
-
-    // Segments 3a-3d: MCP (if no MCP installed)
-    if (!hasMcp) {
-      concatContent += `file '${segmentFiles[idx++]}'\n`;  // "install MCP... say things like,"
-      concatContent += `file '${silence2s}'\n`;
-      concatContent += `file '${segmentFiles[idx++]}'\n`;  // "change my voice"
-      concatContent += `file '${silence2s}'\n`;
-      concatContent += `file '${segmentFiles[idx++]}'\n`;  // "or"
-      concatContent += `file '${silence1s}'\n`;
-      concatContent += `file '${segmentFiles[idx++]}'\n`;  // "mute the audio"
-      concatContent += `file '${silence2s}'\n`;
-    }
-
-    // Segments 4a-4d: Personality commands
-    concatContent += `file '${segmentFiles[idx++]}'\n`;  // "To change my personality, just type,"
-    concatContent += `file '${silence2s}'\n`;
-    concatContent += `file '${segmentFiles[idx++]}'\n`;  // "change personality to sarcastic"
-    concatContent += `file '${silence2s}'\n`;
-    concatContent += `file '${segmentFiles[idx++]}'\n`;  // "Or to change my voice, type,"
-    concatContent += `file '${silence2s}'\n`;
-    concatContent += `file '${segmentFiles[idx++]}'\n`;  // "try a different voice"
-    concatContent += `file '${silence2s}'\n`;
-
-    // Segment 5: Thank you
-    concatContent += `file '${segmentFiles[idx++]}'\n`;
-    concatContent += `file '${outroSilence}'\n`;  // 3s outro
-
-    await fs.writeFile(concatList, concatContent);
-
-    // Concatenate all speech segments
-    const speechTrack = path.join(tempDir, 'speech-full.wav');
-    execSync(`ffmpeg -y -f concat -safe 0 -i "${concatList}" -c copy "${speechTrack}" 2>/dev/null`, {
-      stdio: 'pipe',
-      timeout: 60000
+    // Play the pre-generated welcome demo audio
+    execSync(`mpv --no-video --really-quiet "${welcomeDemoAudio}" 2>/dev/null || afplay "${welcomeDemoAudio}"`, {
+      stdio: 'inherit',
+      timeout: 120000
     });
 
-    // Get total speech duration
-    const totalSpeechDuration = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${speechTrack}"`, {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    }).trim();
-
-    const totalDuration = parseFloat(totalSpeechDuration);
-
-    // Mix with background music
-    const finalOutput = path.join(tempDir, 'welcome-final.wav');
-
-    if (hasBackgroundMusic) {
-      // Create music track with:
-      // - First 5s at higher volume (intro)
-      // - Then lower volume under speech
-      // - Last 3s at higher volume (outro)
-      const fadeOutStart = totalDuration - 1;
-
-      execSync(`ffmpeg -y -stream_loop -1 -i "${backgroundMusic}" -i "${speechTrack}" -filter_complex "[0:a]volume=0.5,afade=t=in:st=0:d=1,afade=t=out:st=${fadeOutStart}:d=1[music];[music][1:a]amix=inputs=2:duration=first:dropout_transition=2,volume=1.5[out]" -map "[out]" -t ${totalDuration} "${finalOutput}" 2>/dev/null`, {
-        stdio: 'pipe',
-        timeout: 60000
-      });
-    } else {
-      await fs.copyFile(speechTrack, finalOutput);
-    }
-
-    // Play the final audio
     spinner.succeed('🎵 Welcome to AgentVibes!');
-    console.log('');
-
-    const playCommand = process.platform === 'darwin'
-      ? `afplay "${finalOutput}"`
-      : `mpv --no-terminal "${finalOutput}" 2>/dev/null || aplay "${finalOutput}" 2>/dev/null`;
-
-    execSync(playCommand, { stdio: 'pipe', timeout: 120000 });
-
-    // Cleanup
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
 
   } catch (error) {
     spinner.info(chalk.gray('Welcome demo skipped'));
