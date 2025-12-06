@@ -537,6 +537,97 @@ class AgentVibesServer:
         else:
             return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
 
+    async def list_background_music(self) -> str:
+        """
+        List all available background music tracks.
+
+        Returns:
+            Formatted list of all pre-packaged background music files
+        """
+        result = await self._run_script("background-music-manager.sh", ["list"])
+        return result if result else "❌ Failed to list background music"
+
+    async def set_background_music(self, track_name: Optional[str] = None) -> str:
+        """
+        Set the default background music track. If no track specified, randomly selects one.
+
+        Args:
+            track_name: Track filename or partial name (optional). If omitted, randomly selects a track.
+
+        Returns:
+            Success or error message
+        """
+        # Security: Using secrets.choice for cryptographically secure random selection
+        import secrets
+        import re
+
+        # If no track specified, list all tracks and randomly select one
+        if not track_name:
+            result = await self._run_script("background-music-manager.sh", ["list"])
+            if not result or "❌" in result:
+                return "❌ Failed to list background music tracks"
+
+            # Parse track names from output (lines that start with numbers)
+            tracks = []
+            for line in result.split("\n"):
+                # Match lines like " 1. Agent Vibes ChillWave v2.mp3"
+                match = re.match(r'\s*\d+\.\s+(.+)', line)
+                if match:
+                    tracks.append(match.group(1))
+
+            if not tracks:
+                return "❌ No background music tracks found"
+
+            # Randomly select a track
+            track_name = secrets.choice(tracks)
+            result = await self._run_script("background-music-manager.sh", ["set-default", track_name])
+            if result and "✅" in result:
+                return f"{result}\n\n🎲 Randomly selected from {len(tracks)} available tracks"
+            return f"❌ Failed to set background music: {result}"
+
+        # Track name provided - try to match it
+        # First, get list of available tracks
+        list_result = await self._run_script("background-music-manager.sh", ["list"])
+        if not list_result or "❌" in list_result:
+            return "❌ Failed to list background music tracks"
+
+        # Parse track names
+        tracks = []
+        for line in list_result.split("\n"):
+            match = re.match(r'\s*\d+\.\s+(.+)', line)
+            if match:
+                tracks.append(match.group(1))
+
+        # Try to find a matching track (case-insensitive partial match)
+        track_lower = track_name.lower()
+        matched_track = None
+
+        # First try exact match
+        for track in tracks:
+            if track.lower() == track_lower:
+                matched_track = track
+                break
+
+        # If no exact match, try partial match
+        if not matched_track:
+            for track in tracks:
+                if track_lower in track.lower():
+                    matched_track = track
+                    break
+
+        if not matched_track:
+            # Show available tracks to help user
+            available = "\n".join([f"  • {t}" for t in tracks])
+            return f"❌ No track matching '{track_name}' found.\n\nAvailable tracks:\n{available}\n\n💡 Try a partial match like 'celtic' or 'chillwave'"
+
+        # Set the matched track
+        result = await self._run_script("background-music-manager.sh", ["set-default", matched_track])
+        if result and "✅" in result:
+            if matched_track.lower() != track_name.lower():
+                return f"{result}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
+            return result
+        return f"❌ Failed to set background music: {result}"
+
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
         """Run a bash script and return output"""
@@ -877,6 +968,38 @@ Note: Changes take effect on next Claude Code session restart.""",
             description="Check if TTS is currently muted.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="list_background_music",
+            description="List all available pre-packaged background music tracks. Shows all audio files that can be used as background music for TTS.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_background_music",
+            description="""Set the default background music track for TTS. Supports smart selection:
+
+- If no track specified: Randomly selects from available tracks
+- If track name provided: Uses fuzzy matching to find the track
+
+Perfect for:
+- "change background music" - Random selection
+- "set background music to celtic harp" - Specific track
+- "use chillwave background" - Partial match
+
+Examples:
+- set_background_music() - Random selection
+- set_background_music(track_name="celtic") - Matches "Agent Vibes Celtic Harp v1.mp3"
+- set_background_music(track_name="bossa nova") - Matches "Agent Vibes Bossa Nova v2.mp3"
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "track_name": {
+                        "type": "string",
+                        "description": "Track filename or partial name (optional). If omitted, randomly selects a track. Supports fuzzy matching (e.g., 'celtic' matches 'Celtic Harp').",
+                    }
+                },
+            },
+        ),
     ]
 
 
@@ -928,6 +1051,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.unmute()
         elif name == "is_muted":
             result = await agent_vibes.is_muted()
+        elif name == "list_background_music":
+            result = await agent_vibes.list_background_music()
+        elif name == "set_background_music":
+            track_name = arguments.get("track_name")
+            result = await agent_vibes.set_background_music(track_name)
         else:
             result = f"Unknown tool: {name}"
 

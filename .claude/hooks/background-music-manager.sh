@@ -10,6 +10,8 @@
 #   background-music-manager.sh on       - Enable background music
 #   background-music-manager.sh off      - Disable background music
 #   background-music-manager.sh volume X - Set volume (0.0-1.0)
+#   background-music-manager.sh list     - List all pre-packaged background music
+#   background-music-manager.sh set-default TRACK - Set default background music
 #   background-music-manager.sh get-enabled - Returns "true" or "false"
 #   background-music-manager.sh get-volume  - Returns current volume
 #
@@ -87,6 +89,100 @@ set_volume() {
     echo "$value" > "$VOLUME_FILE"
 }
 
+# @function list_tracks
+# @intent List all pre-packaged background music files
+list_tracks() {
+    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+
+    if [[ ! -d "$bg_dir" ]]; then
+        echo "❌ No backgrounds folder found at $bg_dir"
+        return 1
+    fi
+
+    echo "🎵 Available Background Music Tracks"
+    echo "===================================="
+    echo ""
+
+    local count=0
+    while IFS= read -r -d '' file; do
+        local basename
+        basename=$(basename "$file")
+        count=$((count + 1))
+        printf "%2d. %s\n" "$count" "$basename"
+    done < <(find "$bg_dir" -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.ogg" \) -print0 2>/dev/null | sort -z)
+
+    if [[ $count -eq 0 ]]; then
+        echo "No audio files found in backgrounds folder"
+    else
+        echo ""
+        echo "Total: $count track(s)"
+    fi
+}
+
+# @function get_default_track
+# @intent Get the current default background music track
+get_default_track() {
+    local audio_effects_cfg="$SCRIPT_DIR/../config/audio-effects.cfg"
+
+    if [[ ! -f "$audio_effects_cfg" ]]; then
+        echo ""
+        return
+    fi
+
+    # Extract the background file from the default entry
+    grep "^default|" "$audio_effects_cfg" 2>/dev/null | cut -d'|' -f3 || echo ""
+}
+
+# @function set_default_track
+# @intent Set the default background music track
+# @param $1 Track filename
+set_default_track() {
+    local track="$1"
+    local audio_effects_cfg="$SCRIPT_DIR/../config/audio-effects.cfg"
+    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+
+    if [[ -z "$track" ]]; then
+        echo "❌ Error: No track name provided"
+        echo "Usage: $0 set-default TRACK_NAME"
+        return 1
+    fi
+
+    # Check if track exists
+    if [[ ! -f "$bg_dir/$track" ]]; then
+        echo "❌ Error: Track '$track' not found in backgrounds folder"
+        echo "Run '$0 list' to see available tracks"
+        return 1
+    fi
+
+    # Check if audio-effects.cfg exists
+    if [[ ! -f "$audio_effects_cfg" ]]; then
+        echo "❌ Error: audio-effects.cfg not found at $audio_effects_cfg"
+        return 1
+    fi
+
+    # Update the default entry in audio-effects.cfg
+    # Preserve the sox effects and volume, just update the background file
+    local temp_file
+    temp_file=$(mktemp)
+
+    if grep -q "^default|" "$audio_effects_cfg"; then
+        # Replace existing default entry - preserve effects and volume
+        awk -F'|' -v track="$track" '
+            /^default\|/ {
+                print $1 "|" $2 "|" track "|" $4
+                next
+            }
+            { print }
+        ' "$audio_effects_cfg" > "$temp_file"
+
+        mv "$temp_file" "$audio_effects_cfg"
+        echo "✅ Default background music set to: $track"
+    else
+        echo "❌ Error: No default entry found in audio-effects.cfg"
+        return 1
+    fi
+}
+
 # @function show_status
 # @intent Display current background music status
 show_status() {
@@ -100,6 +196,15 @@ show_status() {
     fi
 
     echo "Volume: $(get_volume) ($(echo "scale=0; $(get_volume) * 100 / 1" | bc -l 2>/dev/null || echo "?")%)"
+
+    # Show default track
+    local default_track
+    default_track=$(get_default_track)
+    if [[ -n "$default_track" ]]; then
+        echo "Default Track: $default_track"
+    else
+        echo "Default Track: (none)"
+    fi
 
     # Check for background files
     local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
@@ -147,6 +252,18 @@ case "${1:-status}" in
             echo "🎵 Background music volume set to $2"
         fi
         ;;
+    list)
+        list_tracks
+        ;;
+    set-default)
+        if [[ -z "${2:-}" ]]; then
+            echo "❌ Error: No track name provided"
+            echo "Usage: $0 set-default TRACK_NAME"
+            echo "Run '$0 list' to see available tracks"
+            exit 1
+        fi
+        set_default_track "$2"
+        ;;
     get-enabled)
         if is_enabled; then
             echo "true"
@@ -158,7 +275,7 @@ case "${1:-status}" in
         get_volume
         ;;
     *)
-        echo "Usage: $0 {status|on|off|volume [X]|get-enabled|get-volume}"
+        echo "Usage: $0 {status|on|off|volume [X]|list|set-default TRACK|get-enabled|get-volume}"
         exit 1
         ;;
 esac

@@ -184,6 +184,40 @@ async function playWelcomeDemo(targetDir, spinner) {
     return;
   }
 
+  // Check if MCP is configured to determine which script to show
+  const mcpConfigPath = path.join(targetDir, '.mcp.json');
+  const hasMcp = fsSync.existsSync(mcpConfigPath);
+
+  // Build the welcome script
+  let welcomeScript = `"Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.
+
+We have added a lot of commands, but don't worry, you can hide them by typing /agent-vibes:hide, and :show to bring them back.`;
+
+  if (!hasMcp) {
+    welcomeScript += `
+
+To control Agent Vibes with natural language, install the MCP server. That way you can just say things like, "change my voice" or "mute the audio."`;
+  }
+
+  welcomeScript += `
+
+To change my personality, just type, "change personality to sarcastic."
+
+Or to change my voice, type, "try a different voice."
+
+We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!"`;
+
+  // Stop spinner and display the welcome script in a box
+  spinner.stop();
+  console.log('\n' + boxen(welcomeScript, {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: 'cyan',
+    title: '🎵 AgentVibes Welcome',
+    titleAlignment: 'center'
+  }));
+
   spinner.start('🎵 Playing welcome demo...');
 
   try {
