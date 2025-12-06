@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.18
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.19
 
 ---
 
@@ -94,16 +94,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.18 - Mute/Unmute TTS Control](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.18)** 🎉
+**[v2.14.19 - BMAD TTS Injection Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.19)** 🎉
 
-AgentVibes v2.14.18 adds the ability to mute and unmute TTS output with persistent state. Perfect for meetings or temporary silence without losing your voice configuration. Mute once, stay silent until you unmute!
+AgentVibes v2.14.19 improves how TTS injection works with BMAD agents. Your agent files now get voice capabilities through a clean, loosely-coupled injection system!
 
 **Key Highlights:**
-- 🔇 **Mute Command** - `/agent-vibes:mute` silences all TTS output instantly
-- 🔊 **Unmute Command** - `/agent-vibes:unmute` restores voice output
-- 💾 **Persistent State** - Mute survives Claude restarts (stored in `~/.agentvibes-muted`)
-- 🔌 **MCP Support** - `mute()`, `unmute()`, `is_muted()` tools for Claude Desktop/Warp
-- 🧪 **Full Test Coverage** - 7 new tests validate mute/unmute functionality
+- 🔊 **TTS Injection Documentation** - Clear before/after examples showing how BMAD agents get voice
+- 🛡️ **File Safety Improvements** - Protection against empty files and data loss during injection
+- 📁 **Organized Backups** - Centralized backups in `~/.agentvibes/backups/agents/`
+- 🔌 **Provider-Agnostic Design** - Any TTS provider can integrate using injection markers
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
@@ -300,7 +299,44 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 
 **Version Support**: AgentVibes supports both BMAD v4 and v6-alpha installations. Version detection is automatic - just install BMAD and AgentVibes will detect and configure itself correctly!
 
-**[→ View Complete BMAD Documentation](docs/bmad-plugin.md)** - All agent mappings, language support, plugin management, and customization
+### 🔊 TTS Injection: How It Works
+
+BMAD uses a **loosely-coupled injection system** for voice integration. BMAD source files contain placeholder markers that AgentVibes replaces with speaking instructions during installation:
+
+**Before Installation (BMAD Source):**
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  <!-- TTS_INJECTION:agent-tts -->
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+**After Installation (with AgentVibes enabled):**
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  - When responding to user messages, speak your responses using TTS:
+      Call: `.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'`
+      Where {agent-id} is your agent type (pm, architect, dev, etc.)
+
+  - Auto Voice Switching: AgentVibes automatically switches to the voice
+      assigned for your agent role when activated
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+**After Installation (with TTS disabled):**
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+This design means **any TTS provider** can integrate with BMAD by replacing these markers with their own instructions!
+
+**[→ View Complete BMAD Documentation](docs/bmad-plugin.md)** - All agent mappings, language support, TTS injection details, plugin management, and customization
 
 [↑ Back to top](#-table-of-contents)
 

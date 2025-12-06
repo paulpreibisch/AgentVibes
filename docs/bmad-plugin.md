@@ -109,4 +109,94 @@ When you set a language, AgentVibes intelligently selects the best voice:
 
 ---
 
+## 🔊 TTS Injection: How BMAD Agents Get Their Voice
+
+When you install BMAD with AgentVibes enabled, the installer adds voice instructions to each agent file. This is called **TTS Injection** - a loosely-coupled system where BMAD contains placeholder markers that AgentVibes (or any TTS provider) can replace with speaking instructions.
+
+### How TTS Injection Works
+
+BMAD agent files contain **injection point markers** - special comments that tell installers where TTS instructions should go:
+
+#### Before Installation (BMAD Source)
+
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  <!-- TTS_INJECTION:agent-tts -->
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+The `<!-- TTS_INJECTION:agent-tts -->` marker tells the installer: "Replace me with TTS instructions!"
+
+#### After Installation (with AgentVibes enabled)
+
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  - When responding to user messages, speak your responses using TTS:
+      Call: `.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'`
+      Where {agent-id} is your agent type (pm, architect, dev, etc.)
+
+  - Auto Voice Switching: AgentVibes automatically switches to the voice
+      assigned for your agent role when activated
+
+  - Speak naturally as your character. Your assigned voice and personality
+      will be used automatically.
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+#### After Installation (with AgentVibes disabled)
+
+If TTS is disabled, the marker is simply stripped clean:
+
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+### How Other TTS Providers Can Integrate
+
+The injection point system is **provider-agnostic**. Any TTS tool can create their own installer that replaces these markers. For example:
+
+```xml
+<!-- TTS_INJECTION:agent-tts -->
+```
+
+Could become (for a different TTS provider):
+
+```xml
+- When responding, use OtherTTS to speak:
+    Call: `other-tts-command '{agent-id}' '{message}'`
+```
+
+This keeps BMAD source files clean while allowing any voice system to integrate seamlessly!
+
+### Existing BMAD Installations
+
+Already have BMAD installed? Use the **BMAD TTS Injector** to add voice support:
+
+```bash
+# Check current status
+.claude/hooks/bmad-tts-injector.sh status
+
+# Enable TTS for BMAD agents
+.claude/hooks/bmad-tts-injector.sh enable
+
+# Disable TTS (restores original files from backup)
+.claude/hooks/bmad-tts-injector.sh disable
+```
+
+**Safety Features:**
+- Creates timestamped backups before any modifications
+- Verifies file integrity after processing
+- Can restore original files at any time
+
+**Backup Location:** `~/.agentvibes/backups/agents/`
+
+---
+
 [↑ Back to Main README](../README.md)
