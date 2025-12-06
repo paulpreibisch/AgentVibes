@@ -199,7 +199,7 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
   const hasMcp = fsSync.existsSync(mcpConfigPath);
 
   // Build the welcome script
-  let welcomeScript = `"Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.
+  let welcomeScript = `Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.
 
 We have added a lot of commands, but don't worry, you can hide them by typing /agent-vibes:hide, and :show to bring them back.`;
 
@@ -219,7 +219,7 @@ We recently have added background music to your agents. You can turn it on or of
 
 Lastly, Agent Vibes is updated frequently. Use npx agentvibes update to keep up to date.
 
-We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!"`;
+We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!`;
 
   // Stop spinner and display the welcome script in a box
   spinner.stop();

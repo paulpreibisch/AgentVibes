@@ -228,9 +228,23 @@ mix_background() {
         bg_fade_out_start="$duration"
     fi
 
+    # Auto-detect remote sessions (SSH/RDP) and enable compression
+    if [[ -z "${AGENTVIBES_RDP_MODE:-}" ]]; then
+        if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${DISPLAY:-}" =~ ^localhost:.* ]]; then
+            export AGENTVIBES_RDP_MODE=true
+        fi
+    fi
+
+    # RDP-optimized audio settings: mono 22kHz for lower bandwidth
+    # Automatically enabled for remote desktop/SSH environments
+    local audio_settings=""
+    if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]]; then
+        audio_settings="-ac 1 -ar 22050 -b:a 64k"
+    fi
+
     ffmpeg -y -i "$voice" -ss "$start_pos" -stream_loop -1 -i "$background" \
         -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_start}:d=2[bg];[0:a]apad=pad_dur=2[voice_padded];[voice_padded][bg]amix=inputs=2:duration=first:dropout_transition=2[out]" \
-        -map "[out]" -t "$total_duration" "$output" 2>/dev/null || {
+        -map "[out]" $audio_settings -t "$total_duration" "$output" 2>/dev/null || {
         echo "Warning: Background mixing failed, using voice only" >&2
         cp "$voice" "$output"
         return

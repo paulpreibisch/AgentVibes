@@ -275,6 +275,36 @@ if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
   exit 4
 fi
 
+# @function detect_remote_session
+# @intent Auto-detect SSH/RDP sessions and enable audio compression
+# @why Remote desktop audio is choppy without compression
+# @returns Sets AGENTVIBES_RDP_MODE environment variable
+# @detection Checks SSH_CLIENT, SSH_TTY, and DISPLAY variables
+if [[ -z "${AGENTVIBES_RDP_MODE:-}" ]]; then
+  # Auto-detect remote session
+  if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${DISPLAY:-}" =~ ^localhost:.* ]]; then
+    export AGENTVIBES_RDP_MODE=true
+    echo "🌐 Remote session detected - enabling audio compression"
+  fi
+fi
+
+# @function compress_for_remote
+# @intent Compress TTS audio for remote sessions (SSH/RDP)
+# @why Reduces bandwidth and prevents choppy playback
+# @param Uses global: $TEMP_FILE, $AGENTVIBES_RDP_MODE
+# @returns Updates $TEMP_FILE to compressed version
+# @sideeffects Converts to mono 22kHz for lower bandwidth
+if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &> /dev/null; then
+  COMPRESSED_FILE="$AUDIO_DIR/tts-compressed-$(date +%s).wav"
+  # Convert to mono, 22kHz, 64kbps for remote sessions
+  ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
+
+  if [[ -f "$COMPRESSED_FILE" ]]; then
+    rm -f "$TEMP_FILE"
+    TEMP_FILE="$COMPRESSED_FILE"
+  fi
+fi
+
 # @function add_silence_padding
 # @intent Add silence to prevent WSL audio static
 # @why WSL audio subsystem cuts off first ~200ms
