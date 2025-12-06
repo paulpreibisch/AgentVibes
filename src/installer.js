@@ -45,7 +45,7 @@ import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { execSync, execFileSync } from 'node:child_process';
+import { execSync, execFileSync, spawn } from 'node:child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import figlet from 'figlet';
@@ -162,16 +162,26 @@ function showReleaseInfo() {
  * @param {string} targetDir - Installation directory
  * @param {object} spinner - ora spinner instance
  */
-async function playWelcomeDemo(targetDir, spinner) {
+async function playWelcomeDemo(targetDir, spinner, options = {}) {
+  // Skip welcome demo if --yes flag is used (non-interactive install)
+  if (options.yes) {
+    return;
+  }
+
   // Check if we have audio player
-  let hasMpv = false;
+  let audioPlayer = null;
 
   try {
-    execSync('which mpv 2>/dev/null || command -v mpv 2>/dev/null || which afplay 2>/dev/null', { stdio: 'pipe' });
-    hasMpv = true;
-  } catch {}
+    execSync('which mpv 2>/dev/null', { stdio: 'pipe' });
+    audioPlayer = 'mpv';
+  } catch {
+    try {
+      execSync('which afplay 2>/dev/null', { stdio: 'pipe' });
+      audioPlayer = 'afplay';
+    } catch {}
+  }
 
-  if (!hasMpv) {
+  if (!audioPlayer) {
     console.log(chalk.gray('\n   (Welcome demo skipped - requires mpv or afplay)'));
     return;
   }
@@ -218,20 +228,25 @@ We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. 
     titleAlignment: 'center'
   }));
 
-  spinner.start('🎵 Playing welcome demo...');
+  console.log(chalk.cyan('🎵 Playing welcome demo in background...\n'));
 
   try {
-    // Play the pre-generated welcome demo audio
-    execSync(`mpv --no-video --really-quiet "${welcomeDemoAudio}" 2>/dev/null || afplay "${welcomeDemoAudio}"`, {
-      stdio: 'inherit',
-      timeout: 120000
+    // Play the audio in the background (non-blocking)
+    const args = audioPlayer === 'mpv'
+      ? ['--no-video', '--really-quiet', welcomeDemoAudio]
+      : [welcomeDemoAudio];
+
+    const audioProcess = spawn(audioPlayer, args, {
+      detached: true,
+      stdio: 'ignore'
     });
 
-    spinner.succeed('🎵 Welcome to AgentVibes!');
+    // Detach the process so it continues running after parent exits
+    audioProcess.unref();
 
   } catch (error) {
-    spinner.info(chalk.gray('Welcome demo skipped'));
     // Silent fail - demo is optional
+    console.log(chalk.gray('   (Welcome demo skipped)'));
   }
 }
 
@@ -2006,7 +2021,7 @@ async function install(options = {}) {
     console.log(chalk.gray('   via SessionStart hook - no additional setup needed!\n'));
 
     // Play welcome demo with harpsichord intro and reverb voice
-    await playWelcomeDemo(targetDir, spinner);
+    await playWelcomeDemo(targetDir, spinner, options);
 
     console.log(chalk.cyan('🎤 Try these commands:'));
     console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
