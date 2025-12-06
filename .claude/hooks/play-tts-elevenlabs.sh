@@ -391,8 +391,9 @@ if [ -f "${TEMP_FILE}" ]; then
     fi
   fi
 
-  # Play audio in background to avoid blocking, fully detached (skip if in test mode)
-  if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
+  # Play audio in background to avoid blocking, fully detached (skip if in test mode or no-playback mode)
+  # AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+  if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
     # Detect platform and use appropriate audio player
     if [[ "$(uname -s)" == "Darwin" ]]; then
       # macOS: Use afplay (native macOS audio player)

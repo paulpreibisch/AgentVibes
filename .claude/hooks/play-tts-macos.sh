@@ -254,8 +254,9 @@ else
 fi
 DURATION=${DURATION:-2}  # Default to 2 seconds if detection fails
 
-# Play audio in background (skip if in test mode)
-if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
+# Play audio in background (skip if in test mode or no-playback mode)
+# AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
   # Check if we're in an SSH session with PulseAudio tunnel available
   if [[ -n "$SSH_CONNECTION" ]] && [[ -n "$PULSE_SERVER" ]]; then
     # Use paplay to send audio through PulseAudio tunnel to remote machine
