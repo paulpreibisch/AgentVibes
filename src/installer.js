@@ -1933,6 +1933,40 @@ async function install(options = {}) {
       }
     }
 
+    // Configure verbosity level (if not using --yes flag)
+    if (!options.yes) {
+      console.log(''); // Blank line for spacing
+
+      const verbosityChoice = await promptUser({
+        type: 'list',
+        name: 'level',
+        message: 'Choose TTS verbosity level (how much Claude speaks):',
+        choices: [
+          { name: '🔊 High - Maximum transparency (speaks all reasoning, decisions, findings)', value: 'high' },
+          { name: '🔉 Medium - Balanced (speaks acknowledgments and key updates)', value: 'medium' },
+          { name: '🔈 Low - Minimal (only essential notifications)', value: 'low' }
+        ],
+        default: 'high'
+      });
+
+      // Write verbosity level to config
+      const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
+      await fs.writeFile(verbosityFile, verbosityChoice.level);
+
+      console.log(chalk.green(`\n✅ Verbosity set to: ${verbosityChoice.level}`));
+
+      const verbosityDescriptions = {
+        high: 'Claude will speak acknowledgments, completions, reasoning, decisions, and findings',
+        medium: 'Claude will speak acknowledgments, completions, and key updates',
+        low: 'Claude will only speak essential notifications'
+      };
+
+      console.log(chalk.white(`   ${verbosityDescriptions[verbosityChoice.level]}`));
+      console.log('');
+      console.log(chalk.cyan('💡 Tip: Change verbosity anytime:'));
+      console.log(chalk.white('   • /agent-vibes:verbosity <low|medium|high>'));
+    }
+
     if (selectedProvider === 'macos') {
       // macOS Say provider summary
       console.log(chalk.white(`   • Using macOS built-in Say command`));
