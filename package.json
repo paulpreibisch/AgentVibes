@@ -31,6 +31,17 @@
     "agentvibes-mcp-server": "./bin/mcp-server.js",
     "test-bmad-pr": "./bin/test-bmad-pr"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "mcp-server/",
+    ".claude/",
+    ".bmad/",
+    ".mcp.json",
+    "README.md",
+    "LICENSE",
+    "CLAUDE.md"
+  ],
   "scripts": {
     "install-local": "node src/installer.js install",
     "postinstall": "node mcp-server/install-deps.js",
