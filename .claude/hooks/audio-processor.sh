@@ -270,10 +270,20 @@ mix_background() {
         audio_settings="-ac 1 -ar 22050 -b:a 64k"
     fi
 
-    # Fade in background music only (not voice) - background fades in over 0.3s at start
-    # Voice remains at full volume throughout
+    # Add 2 seconds of background music intro before voice starts
+    # Background: fades in (0.3s), plays solo (2s), then voice joins, fades out at end (2s)
+    # Voice: delayed by 2000ms (2s), no fade-in (full volume from first word)
+    local voice_delay_ms="2000"  # adelay takes milliseconds
+    local voice_delay_sec="2.0"
+    local bg_fade_out_adjusted
+    if command -v bc &> /dev/null; then
+        bg_fade_out_adjusted=$(echo "$duration + $voice_delay_sec" | bc -l)
+    else
+        bg_fade_out_adjusted=$(echo "$duration + 2" | bc)
+    fi
+
     ffmpeg -y -i "$voice" -ss "$start_pos" -stream_loop -1 -i "$background" \
-        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_start}:d=2[bg];[0:a][bg]amix=inputs=2:duration=longest[out]" \
+        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_adjusted}:d=2[bg];[0:a]adelay=${voice_delay_ms}|${voice_delay_ms}[v];[v][bg]amix=inputs=2:duration=longest[out]" \
         -map "[out]" $audio_settings -t "$total_duration" "$output" 2>/dev/null || {
         echo "Warning: Background mixing failed, using voice only" >&2
         cp "$voice" "$output"
