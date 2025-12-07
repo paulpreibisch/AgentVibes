@@ -773,8 +773,8 @@ async function copyBmadConfigFiles(targetDir, spinner) {
  */
 async function copyBackgroundMusicFiles(targetDir, spinner) {
   spinner.start('Installing background music tracks...');
-  const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks', 'optimized');
-  const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'tracks', 'optimized');
+  const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+  const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'tracks');
 
   await fs.mkdir(destBackgroundsDir, { recursive: true });
 
