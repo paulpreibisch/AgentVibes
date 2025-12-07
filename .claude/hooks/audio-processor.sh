@@ -35,9 +35,9 @@ INPUT_FILE="${1:-}"
 AGENT_NAME="${2:-default}"
 OUTPUT_FILE="${3:-}"
 
-# Config and directories
-CONFIG_FILE="$SCRIPT_DIR/../config/audio-effects.cfg"
-BACKGROUNDS_DIR="$SCRIPT_DIR/../audio/backgrounds"
+# Config and directories (resolve to absolute paths)
+CONFIG_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/audio-effects.cfg"
+BACKGROUNDS_DIR="$(cd "$SCRIPT_DIR/../audio" && pwd)/backgrounds"
 
 # Validate inputs
 if [[ -z "$INPUT_FILE" ]] || [[ ! -f "$INPUT_FILE" ]]; then
@@ -191,6 +191,18 @@ mix_background() {
     local start_pos
     start_pos=$(get_background_position "$background")
 
+    # Validate start_pos: if too small (floating point error) or invalid, reset to 0
+    if command -v bc &> /dev/null; then
+        if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]] || (( $(echo "$start_pos < 0.001" | bc -l) )); then
+            start_pos="0"
+        fi
+    else
+        # Without bc, just check if it's a valid number
+        if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+            start_pos="0"
+        fi
+    fi
+
     # If position exceeds track length, wrap around
     if command -v bc &> /dev/null && [[ -n "$bg_duration" ]]; then
         if (( $(echo "$start_pos >= $bg_duration" | bc -l) )); then
@@ -243,7 +255,7 @@ mix_background() {
     fi
 
     ffmpeg -y -i "$voice" -ss "$start_pos" -stream_loop -1 -i "$background" \
-        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_start}:d=2[bg];[0:a]apad=pad_dur=2[voice_padded];[voice_padded][bg]amix=inputs=2:duration=first:dropout_transition=2[out]" \
+        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_start}:d=2[bg];[0:a][bg]amix=inputs=2:duration=longest[out]" \
         -map "[out]" $audio_settings -t "$total_duration" "$output" 2>/dev/null || {
         echo "Warning: Background mixing failed, using voice only" >&2
         cp "$voice" "$output"
