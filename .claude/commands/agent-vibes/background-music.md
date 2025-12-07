@@ -3,6 +3,13 @@ description: Toggle background music for TTS (on/off/status)
 tags: [user]
 ---
 
+Run the background music manager script with the provided command.
+
+If no arguments provided, show status. Otherwise execute:
+`bash .claude/hooks/background-music-manager.sh {command}`
+
+Valid commands: on, off, status, list, volume {0.0-1.0}, set-default {filename}, set-agent {agent_name} {filename}, set-all {filename}
+
 Control background music that plays behind TTS voice output.
 
 ## Usage
