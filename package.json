@@ -5,9 +5,9 @@
   "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code and Claude Desktop (via MCP) with multi-provider support.",
   "homepage": "https://agentvibes.org",
   "keywords": [
-    "elevenlabs",
     "tts",
     "text-to-speech",
+    "piper-tts",
     "claude-code",
     "claude-desktop",
     "mcp",

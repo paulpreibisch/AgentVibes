@@ -2,7 +2,7 @@
 
 ## 🎪 Personalities (Voice + Style)
 
-**Personalities change BOTH voice AND how Claude talks.** Each has a dedicated ElevenLabs voice:
+**Personalities change BOTH voice AND how Claude talks.** Each has a dedicated Piper TTS voice:
 
 | Personality | Voice | Style |
 |------------|-------|-------|

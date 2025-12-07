@@ -27,12 +27,12 @@
 # ---
 #
 # @fileoverview Language Manager - Manages multilingual TTS with 30+ language support
-# @context Enables TTS in multiple languages with provider-specific voice recommendations (ElevenLabs multilingual vs Piper native)
-# @architecture Dual-map system: ELEVENLABS_VOICES and PIPER_VOICES for provider-aware voice selection
+# @context Enables TTS in multiple languages with provider-specific voice recommendations (Piper native voices)
+# @architecture Dual-map system: PIPER_VOICES for provider-aware voice selection
 # @dependencies provider-manager.sh for active provider detection, .claude/tts-language.txt for state
 # @entrypoints Called by /agent-vibes:language commands, play-tts-*.sh for voice resolution
 # @patterns Provider abstraction, language-to-voice mapping, backward compatibility with legacy LANGUAGE_VOICES
-# @related play-tts-elevenlabs.sh, play-tts-piper.sh, provider-manager.sh, learn-manager.sh
+# @related play-tts-piper.sh, provider-manager.sh, learn-manager.sh
 
 # Determine target .claude directory based on context
 # Priority:
@@ -69,38 +69,6 @@ source "$SCRIPT_DIR/provider-manager.sh" 2>/dev/null || true
 # macOS ships with Bash 3.2 which doesn't support declare -A (added in Bash 4.0)
 # =============================================================================
 
-# Get ElevenLabs voice for a language
-_get_elevenlabs_voice() {
-    local lang="$1"
-    case "$lang" in
-        spanish) echo "Antoni" ;;
-        french) echo "Rachel" ;;
-        german) echo "Domi" ;;
-        italian) echo "Bella" ;;
-        portuguese) echo "Matilda" ;;
-        chinese) echo "Antoni" ;;
-        japanese) echo "Antoni" ;;
-        korean) echo "Antoni" ;;
-        russian) echo "Domi" ;;
-        polish) echo "Antoni" ;;
-        dutch) echo "Rachel" ;;
-        turkish) echo "Antoni" ;;
-        arabic) echo "Antoni" ;;
-        hindi) echo "Antoni" ;;
-        swedish) echo "Rachel" ;;
-        danish) echo "Rachel" ;;
-        norwegian) echo "Rachel" ;;
-        finnish) echo "Rachel" ;;
-        czech) echo "Domi" ;;
-        romanian) echo "Rachel" ;;
-        ukrainian) echo "Domi" ;;
-        greek) echo "Antoni" ;;
-        bulgarian) echo "Domi" ;;
-        croatian) echo "Domi" ;;
-        slovak) echo "Domi" ;;
-        *) echo "" ;;
-    esac
-}
 
 # Get Piper voice for a language
 _get_piper_voice() {
@@ -135,16 +103,16 @@ _get_piper_voice() {
     esac
 }
 
-# Get default (ElevenLabs) voice for a language - backward compatibility
+# Get default (Piper) voice for a language - backward compatibility
 _get_language_voice() {
-    _get_elevenlabs_voice "$1"
+    _get_piper_voice "$1"
 }
 
 # Check if language is supported
 _is_language_supported() {
     local lang="$1"
     local voice
-    voice=$(_get_elevenlabs_voice "$lang")
+    voice=$(_get_piper_voice "$lang")
     [[ -n "$voice" ]]
 }
 
@@ -188,7 +156,7 @@ set_language() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider=$(cat "$HOME/.claude/tts-provider.txt")
     else
-        provider="elevenlabs"
+        provider="piper"
     fi
 
     local recommended_voice
@@ -218,7 +186,7 @@ get_language() {
         elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
             provider=$(cat "$HOME/.claude/tts-provider.txt")
         else
-            provider="elevenlabs"
+            provider="piper"
         fi
 
         local recommended_voice
@@ -278,7 +246,7 @@ get_best_voice_for_language() {
 
 # Function to get voice for a specific language and provider
 # Usage: get_voice_for_language <language> [provider]
-# Provider: "elevenlabs" or "piper" (auto-detected if not provided)
+# Provider: "piper" or "macos" (auto-detected if not provided)
 get_voice_for_language() {
     local language="$1"
     local provider="${2:-}"
@@ -310,7 +278,7 @@ get_voice_for_language() {
                 if [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
                     provider=$(cat "$HOME/.claude/tts-provider.txt")
                 else
-                    provider="elevenlabs"  # Default
+                    provider="piper"  # Default
                 fi
             fi
         fi
@@ -321,11 +289,12 @@ get_voice_for_language() {
         piper)
             _get_piper_voice "$language"
             ;;
-        elevenlabs)
-            _get_elevenlabs_voice "$language"
+        macos)
+            # macOS doesn't have per-language voices, use default
+            echo ""
             ;;
         *)
-            _get_elevenlabs_voice "$language"
+            _get_piper_voice "$language"
             ;;
     esac
 }

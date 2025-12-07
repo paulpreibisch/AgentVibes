@@ -268,7 +268,7 @@ mix_background() {
 
 # Main processing
 main() {
-    echo "🎛️ Processing audio for agent: $AGENT_NAME"
+    echo "🎛️ Processing audio for agent: $AGENT_NAME" >&2
 
     # Get agent config
     local config
@@ -288,7 +288,7 @@ main() {
 
     # Step 1: Apply sox effects
     if [[ -n "$sox_effects" ]]; then
-        echo "  → Applying effects: $sox_effects"
+        echo "  → Applying effects: $sox_effects" >&2
         apply_sox_effects "$INPUT_FILE" "$temp_effects" "$sox_effects"
     else
         cp "$INPUT_FILE" "$temp_effects"
@@ -300,9 +300,11 @@ main() {
         background_path="$BACKGROUNDS_DIR/$background_file"
     fi
 
+    local used_background=""
     if [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
-        echo "  → Mixing background: $background_file at ${bg_volume} volume"
+        echo "  → Mixing background: $background_file at ${bg_volume} volume" >&2
         mix_background "$temp_effects" "$background_path" "$bg_volume" "$temp_final"
+        used_background="$background_path"  # Return full path instead of just filename
     else
         cp "$temp_effects" "$temp_final"
     fi
@@ -310,8 +312,9 @@ main() {
     # Move to final output
     mv "$temp_final" "$OUTPUT_FILE"
 
-    echo "  ✓ Processed: $OUTPUT_FILE"
-    echo "$OUTPUT_FILE"
+    # Return the output file path (stdout for caller to capture)
+    # Format: OUTPUT_FILE|BACKGROUND_FILE_PATH (background is empty if not used)
+    echo "$OUTPUT_FILE|$used_background"
 }
 
 main

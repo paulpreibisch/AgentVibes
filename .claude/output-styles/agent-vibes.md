@@ -1,6 +1,6 @@
 ---
 name: Agent Vibes
-description: Beautiful ElevenLabs TTS narration for Claude Code sessions
+description: Beautiful Piper TTS TTS narration for Claude Code sessions
 ---
 
 # Agent Vibes Output Style

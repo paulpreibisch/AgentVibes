@@ -13,15 +13,15 @@ First, check which TTS provider is active by running:
 !bash .claude/hooks/voice-manager.sh whoami
 ```
 
-This will show the current provider (ElevenLabs or Piper) and current voice.
+This will show the current provider (Piper TTS or Piper) and current voice.
 
 ## Step 2: Display Voice List Based on Provider
 
-### If Provider is ElevenLabs:
+### If Provider is Piper TTS:
 
 Show this list:
 
-## 🎤 Available ElevenLabs Voices
+## 🎤 Available Piper TTS Voices
 
 1. **Amy** - Young and friendly
 2. **Aria** - Clear professional
@@ -69,7 +69,7 @@ If no arguments provided:
 
 ```bash
 # Switch voice only
-/agent-vibes:switch Jessica Anne Bogart  # ElevenLabs
+/agent-vibes:switch Jessica Anne Bogart  # Piper TTS
 /agent-vibes:switch en_US-lessac-medium  # Piper
 
 # Switch voice by number
@@ -82,6 +82,6 @@ If no arguments provided:
 
 ## Important Notes
 
-- The voice list MUST match the active provider (don't show ElevenLabs voices when Piper is active!)
+- The voice list MUST match the active provider (don't show Piper TTS voices when Piper is active!)
 - Always check whoami first to determine which provider is active
 - For Piper, use `voice-manager.sh list` to get the actual downloaded voices

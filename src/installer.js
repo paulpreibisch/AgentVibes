@@ -424,16 +424,15 @@ Without the \`.bmad-agent-context\` file:
 // ============================================================================
 
 /**
- * Prompt user to select TTS provider (Piper, ElevenLabs, or macOS Say)
+ * Prompt user to select TTS provider (Piper or macOS Say)
  * @param {Object} options - Installation options
- * @returns {Promise<string>} Selected provider ('piper', 'elevenlabs', or 'macos')
+ * @returns {Promise<string>} Selected provider ('piper' or 'macos')
  */
 async function promptProviderSelection(options) {
   const isMacOS = process.platform === 'darwin';
 
   if (options.yes) {
     // Free-first approach: Always use free providers with --yes flag
-    // ElevenLabs requires manual selection (API key may be expired/invalid)
     if (isMacOS) {
       console.log(chalk.green('✓ Using macOS Say (built-in, zero setup)\n'));
       return 'macos';
@@ -458,11 +457,6 @@ async function promptProviderSelection(options) {
   choices.push({
     name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
     value: 'piper',
-  });
-
-  choices.push({
-    name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
-    value: 'elevenlabs',
   });
 
   const { provider } = await inquirer.prompt([
@@ -551,138 +545,6 @@ async function handlePiperConfiguration() {
   return piperPath;
 }
 
-/**
- * Handle ElevenLabs API key setup
- * @param {Object} options - Installation options
- * @returns {Promise<string|null>} API key or null
- */
-async function handleElevenLabsApiKey(options) {
-  let elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-
-  if (elevenLabsKey) {
-    console.log(chalk.green(`\n✓ ElevenLabs API key detected from environment`));
-    console.log(chalk.gray(`  Key: ***************...`));
-
-    if (!options.yes) {
-      const { useExisting } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'useExisting',
-          message: 'Use this existing API key?',
-          default: true,
-        },
-      ]);
-
-      if (!useExisting) {
-        elevenLabsKey = null;
-      }
-    }
-  }
-
-  if (!elevenLabsKey) {
-    console.log(chalk.yellow('\n⚠️  ElevenLabs API Key Required'));
-    console.log(chalk.gray('   Get your free API key at: https://try.elevenlabs.io/agentvibes'));
-    console.log(chalk.gray('   Free tier: 10,000 characters/month\n'));
-
-    const { setupMethod } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'setupMethod',
-        message: 'How would you like to set up your API key?',
-        choices: [
-          {
-            name: 'Add to shell config (recommended)',
-            value: 'shell',
-          },
-          {
-            name: 'Enter manually (I\'ll set it up myself later)',
-            value: 'manual',
-          },
-          {
-            name: 'Skip (use Piper TTS instead)',
-            value: 'skip',
-          },
-        ],
-      },
-    ]);
-
-    if (setupMethod === 'skip') {
-      return 'SWITCH_TO_PIPER';
-    }
-
-    const { apiKey } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'apiKey',
-        message: 'Enter your ElevenLabs API key:',
-        validate: (input) => input.length > 0 || 'API key cannot be empty',
-      },
-    ]);
-    elevenLabsKey = apiKey;
-
-    if (setupMethod === 'manual') {
-      console.log(chalk.yellow('\n⚠️  Remember to add this to your environment variables later:'));
-      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
-    } else if (setupMethod === 'shell') {
-      await addApiKeyToShellConfig(apiKey);
-    }
-  }
-
-  return elevenLabsKey;
-}
-
-/**
- * Add ElevenLabs API key to shell configuration
- * @param {string} apiKey - The API key to add
- */
-async function addApiKeyToShellConfig(apiKey) {
-  const { shellName, shellConfig } = getUserShell();
-
-  if (!shellName || !shellConfig) {
-    console.log(chalk.yellow('\n⚠️  Could not detect shell type'));
-    console.log(chalk.gray('   Please add manually to your shell config:'));
-    console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
-    return;
-  }
-
-  console.log(chalk.cyan(`\n🐚 Detected shell: ${shellName}`));
-  console.log(chalk.gray(`   Config file: ${shellConfig}`));
-
-  const { confirmShell } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'confirmShell',
-      message: `Add ELEVENLABS_API_KEY to ${shellConfig}?`,
-      default: true,
-    },
-  ]);
-
-  if (confirmShell) {
-    try {
-      // Check if already exists to avoid duplicates
-      let existingContent = '';
-      try {
-        existingContent = await fs.readFile(shellConfig, 'utf8');
-      } catch (err) {
-        // File might not exist yet, which is fine
-      }
-
-      if (existingContent.includes('ELEVENLABS_API_KEY')) {
-        console.log(chalk.cyan(`\n→ API key already exists in ${shellConfig}`));
-        console.log(chalk.gray('   No changes needed'));
-      } else {
-        const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
-        await fs.appendFile(shellConfig, configContent);
-        console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
-        console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
-      }
-    } catch (error) {
-      console.log(chalk.red(`\n✗ Failed to write to ${shellConfig}`));
-      console.log(chalk.gray('   Please add manually:'));
-      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
-    }
-  }
-}
 
 /**
  * Copy command files to target directory
@@ -1733,7 +1595,6 @@ async function install(options = {}) {
 
   // Provider selection
   let selectedProvider = await promptProviderSelection(options);
-  let elevenLabsKey = null;
   let piperVoicesPath = null;
 
   if (options.yes) {
@@ -1743,15 +1604,6 @@ async function install(options = {}) {
   // Handle provider-specific configuration
   if (selectedProvider === 'piper' && !options.yes) {
     piperVoicesPath = await handlePiperConfiguration();
-  }
-
-  if (selectedProvider === 'elevenlabs') {
-    elevenLabsKey = await handleElevenLabsApiKey(options);
-    if (elevenLabsKey === 'SWITCH_TO_PIPER') {
-      console.log(chalk.yellow('\n→ Switching to Piper TTS (free option)\n'));
-      selectedProvider = 'piper';
-      elevenLabsKey = null;
-    }
   }
 
   if (!options.yes) {
@@ -1787,16 +1639,15 @@ async function install(options = {}) {
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
-  console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • Multi-provider TTS system (Piper TTS + macOS Say) → ${targetDir}/.claude/hooks/`));
   console.log(chalk.gray(`   • 19 personality templates → ${targetDir}/.claude/personalities/`));
   console.log(chalk.gray(`   • SessionStart hook for automatic TTS activation`));
-  console.log(chalk.gray(`   • 27+ curated voices (ElevenLabs premium)`));
   console.log(chalk.gray(`   • 50+ neural voices (Piper TTS - free & offline)`));
   console.log(chalk.gray(`   • 30+ language support with native voices`));
   console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
 
   // Provider labels for display
-  const providerLabels = { elevenlabs: 'ElevenLabs', piper: 'Piper TTS', macos: 'macOS Say' };
+  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say' };
 
   // Final confirmation
   if (!options.yes) {
@@ -1882,11 +1733,8 @@ async function install(options = {}) {
         defaultVoice = 'en_US-lessac-medium';
         break;
       case 'macos':
-        defaultVoice = 'Samantha';
-        break;
-      case 'elevenlabs':
       default:
-        defaultVoice = 'Cowboy Bob';
+        defaultVoice = 'Samantha';
         break;
     }
     await fs.writeFile(voiceConfigPath, defaultVoice);
@@ -1935,15 +1783,7 @@ async function install(options = {}) {
 
     console.log(chalk.white(`   • Voice manager ready`));
 
-    if (selectedProvider === 'elevenlabs') {
-      console.log(chalk.white(`   • 27+ ElevenLabs AI voices available`));
-      console.log(chalk.white(`   • 30+ languages supported`));
-      if (elevenLabsKey) {
-        console.log(chalk.green(`   • ElevenLabs API key configured ✓`));
-      } else {
-        console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
-      }
-    } else if (selectedProvider === 'macos') {
+    if (selectedProvider === 'macos') {
       // macOS Say provider summary
       console.log(chalk.white(`   • Using macOS built-in Say command`));
       console.log(chalk.white(`   • System voices available (Samantha, Alex, etc.)`));
@@ -2357,14 +2197,8 @@ program
       console.log(chalk.gray('   Run: node src/installer.js install'));
     }
 
-    // Check API key
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (apiKey) {
-      console.log(chalk.green('\n✅ ElevenLabs API key is set'));
-    } else {
-      console.log(chalk.yellow('\n⚠️  ElevenLabs API key not found'));
-      console.log(chalk.gray('   Set: export ELEVENLABS_API_KEY="your-key"'));
-    }
+    // TTS providers configured
+    console.log(chalk.green('\n✅ TTS providers: Piper TTS (free) and macOS Say (macOS only)'));
   });
 
 program

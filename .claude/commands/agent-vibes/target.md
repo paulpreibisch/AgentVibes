@@ -12,16 +12,16 @@ Usage:
 ```
 
 Recommended voices by target language:
-- Spanish → Antoni (ElevenLabs) / es_ES-davefx-medium (Piper)
-- French → Rachel (ElevenLabs) / fr_FR-siwis-medium (Piper)
-- German → Domi (ElevenLabs) / de_DE-thorsten-medium (Piper)
-- Italian → Bella (ElevenLabs) / it_IT-riccardo-x_low (Piper)
-- Portuguese → Matilda (ElevenLabs) / pt_BR-faber-medium (Piper)
-- Chinese → Amy (ElevenLabs) / zh_CN-huayan-medium (Piper)
-- Japanese → Antoni (ElevenLabs) / ja_JP-hikari-medium (Piper)
-- Other languages → Antoni (ElevenLabs) / check available Piper voices
+- Spanish → Antoni (Piper TTS) / es_ES-davefx-medium (Piper)
+- French → Rachel (Piper TTS) / fr_FR-siwis-medium (Piper)
+- German → Domi (Piper TTS) / de_DE-thorsten-medium (Piper)
+- Italian → Bella (Piper TTS) / it_IT-riccardo-x_low (Piper)
+- Portuguese → Matilda (Piper TTS) / pt_BR-faber-medium (Piper)
+- Chinese → Amy (Piper TTS) / zh_CN-huayan-medium (Piper)
+- Japanese → Antoni (Piper TTS) / ja_JP-hikari-medium (Piper)
+- Other languages → Antoni (Piper TTS) / check available Piper voices
 
-**Note:** The system will automatically suggest the correct voice based on your active TTS provider. After setting your target language, the suggestion will match whether you're using ElevenLabs or Piper.
+**Note:** The system will automatically suggest the correct voice based on your active TTS provider. After setting your target language, the suggestion will match whether you're using Piper TTS or Piper.
 
 After setting your target language:
 1. Set the voice for target language with `/agent-vibes:target-voice <voice>`

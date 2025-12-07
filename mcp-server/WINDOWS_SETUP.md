@@ -241,7 +241,7 @@ Fix:
 
 The free Piper voices are good, but if you want **premium AI voices**, see:
 
-📖 **[ElevenLabs Setup Guide](docs/elevenlabs-setup.md)** - Premium voices (paid)
+📖 **[Piper TTS Setup Guide](docs/piper-setup.md)** - Premium voices (paid)
 
 ---
 

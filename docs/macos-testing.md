@@ -19,7 +19,7 @@ AgentVibes uses GitHub Actions to automatically test on macOS runners, ensuring 
 2. **Installation Process** - npm package installation
 3. **Audio Tools** - ffmpeg, afplay, mpv availability
 4. **Piper TTS** - Binary availability for Intel/ARM architectures
-5. **ElevenLabs API** - Mock API integration tests
+5. **Piper TTS API** - Mock API integration tests
 6. **Python/MCP** - MCP server dependencies
 7. **Audio Generation** - Actual audio file creation using ffmpeg
 
@@ -68,7 +68,7 @@ More comprehensive macOS-specific testing:
 
 ### AgentVibes Features
 ```bash
-✅ ElevenLabs API integration (mock)
+✅ Piper TTS API integration (mock)
 ✅ Piper TTS binary availability
 ✅ Voice configuration
 ✅ Audio file management
@@ -278,7 +278,7 @@ This badge shows if tests are passing on latest commit (including macOS tests).
 ## 📈 Future Improvements
 
 Planned enhancements:
-- [ ] Test actual ElevenLabs API with secrets
+- [ ] Test actual Piper TTS API with secrets
 - [ ] Test Piper TTS full installation on macOS
 - [ ] Test Claude Desktop integration
 - [ ] Performance benchmarks on Apple Silicon

@@ -19,7 +19,7 @@
    - ✅ System compatibility checks
    - ✅ Audio stack validation (afplay, ffmpeg, mpv)
    - ✅ Piper TTS architecture detection
-   - ✅ ElevenLabs API mock testing
+   - ✅ Piper TTS API mock testing
    - ✅ Python MCP dependencies
    - ✅ Audio file generation
    - ✅ Installation process
@@ -164,7 +164,7 @@ See [docs/macos-testing.md](docs/macos-testing.md) for:
 3. ✅ Verify all pass
 
 ### Future Enhancements:
-- [ ] Test real ElevenLabs API (with secrets)
+- [ ] Test real Piper TTS API (with secrets)
 - [ ] Test Piper TTS full installation
 - [ ] Test Claude Desktop integration
 - [ ] Performance benchmarks

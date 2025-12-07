@@ -28,7 +28,7 @@
 #
 # @fileoverview Personality Manager - Adds character and emotional style to TTS voices
 # @context Enables voices to have distinct personalities (flirty, sarcastic, pirate, etc.) with provider-aware voice assignment
-# @architecture Markdown-based personality templates with provider-specific voice mappings (ElevenLabs vs Piper)
+# @architecture Markdown-based personality templates with provider-specific voice mappings (Piper vs macOS)
 # @dependencies .claude/personalities/*.md files, voice-manager.sh, play-tts.sh, provider-manager.sh
 # @entrypoints Called by /agent-vibes:personality slash commands
 # @patterns Template-based configuration, provider abstraction, random personality support
@@ -83,7 +83,7 @@ get_personality_data() {
       grep "^description:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
       ;;
     voice)
-      grep "^elevenlabs_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      grep "^piper_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
       ;;
     piper_voice)
       grep "^piper_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
@@ -179,7 +179,7 @@ case "$1" in
       PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
     fi
 
-    ACTIVE_PROVIDER="elevenlabs"  # default
+    ACTIVE_PROVIDER="piper"  # default
     if [[ -n "$PROVIDER_FILE" ]]; then
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
     fi
@@ -194,7 +194,7 @@ case "$1" in
         ASSIGNED_VOICE="en_US-lessac-medium"
       fi
     else
-      # Use ElevenLabs voice (reads from elevenlabs_voice: field)
+      # Use Piper voice (reads from piper_voice: field)
       ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "voice")
     fi
 
@@ -357,7 +357,7 @@ EOF
       PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
     fi
 
-    ACTIVE_PROVIDER="elevenlabs"  # default
+    ACTIVE_PROVIDER="piper"  # default
     if [[ -n "$PROVIDER_FILE" ]]; then
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
     fi

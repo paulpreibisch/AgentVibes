@@ -32,7 +32,7 @@ AgentVibes implements a **multi-provider TTS architecture** that allows seamless
 - ⚡ **Zero-downtime switching** with immediate effect
 
 **Current Providers:**
-- **ElevenLabs** - Premium AI voices (150+ voices, 30+ languages)
+- **Piper TTS** - Premium AI voices (150+ voices, 30+ languages)
 - **Piper TTS** - Free offline neural voices (50+ voices, 18 languages)
 
 ---
@@ -61,8 +61,8 @@ AgentVibes implements a **multi-provider TTS architecture** that allows seamless
 
 ### 4. Backward Compatibility
 **Seamless migration from single-provider**
-- Old `voice:` format still works (treated as ElevenLabs)
-- New `voices: {elevenlabs: X, piper: Y}` format preferred
+- Old `voice:` format still works (treated as Piper TTS)
+- New `voices: {piper: X, piper: Y}` format preferred
 - Migration warnings guide users to new format
 - No forced breaking changes
 
@@ -87,7 +87,7 @@ AgentVibes implements a **multi-provider TTS architecture** that allows seamless
           │                                  │
           ▼                                  ▼
 ┌──────────────────────┐         ┌──────────────────────┐
-│ play-tts-elevenlabs  │         │   play-tts-piper     │
+│ play-tts-piper  │         │   play-tts-piper     │
 │                      │         │                      │
 │ • API requests       │         │ • Local synthesis    │
 │ • Voice mapping      │         │ • Voice models       │
@@ -141,7 +141,7 @@ Each provider implements:
 - Audio playback integration
 
 **Current Implementations:**
-- `play-tts-elevenlabs.sh` - ElevenLabs API integration
+- `play-tts-piper.sh` - Piper TTS API integration
 - `play-tts-piper.sh` - Piper TTS local synthesis
 
 **Future Providers:**
@@ -174,7 +174,7 @@ Project-local (.claude/tts-provider.txt)
           ↓
    Global fallback (~/.claude/tts-provider.txt)
           ↓
-   Default (elevenlabs)
+   Default (piper)
 ```
 
 ---
@@ -200,7 +200,7 @@ Project-local (.claude/tts-provider.txt)
 4. Fall back to global provider (if no override)
    • provider-manager.sh: get_active_provider()
    • Read .claude/tts-provider.txt
-   • Default to "elevenlabs" if not set
+   • Default to "piper" if not set
    │
    ▼
 5. Resolve provider script path
@@ -283,7 +283,7 @@ play-tts-{provider}.sh <text> [voice_name]
 ```bash
 ❌ Provider 'foo' not found
 ⚠️  Language 'arabic' not supported by piper, using English
-🔑 ElevenLabs API key not found
+🔑 Piper TTS API key not found
 ```
 
 ### Audio Output
@@ -319,7 +319,7 @@ Providers must support:
 
 **Format**: Plain text, single line
 ```
-elevenlabs
+piper
 ```
 
 **Read by**: `get_active_provider()`
@@ -334,7 +334,7 @@ elevenlabs
 ---
 name: pirate
 voices:
-  elevenlabs: Pirate Marshal
+  piper: Pirate Marshal
   piper: en_GB-northern_english_male-medium
 provider: piper  # Optional override
 ---
@@ -348,7 +348,7 @@ provider: piper  # Optional override
 
 **Format**: Markdown table
 ```markdown
-| Agent ID | Name | ElevenLabs Voice | Piper Voice | Personality |
+| Agent ID | Name | Piper TTS Voice | Piper Voice | Personality |
 |----------|------|------------------|-------------|-------------|
 | pm | John | Jessica Anne Bogart | en_US-lessac-medium | professional |
 ```
@@ -401,7 +401,7 @@ Update all personality files in `.claude/personalities/*.md`:
 ---
 name: sarcastic
 voices:
-  elevenlabs: Jessica Anne Bogart
+  piper: Jessica Anne Bogart
   piper: en_US-amy-medium
   yourprovider: your-voice-name  # Add this line
 ---
@@ -413,7 +413,7 @@ Add provider option to `bin/agent-vibes` installer:
 
 ```javascript
 const providers = [
-  { name: 'ElevenLabs', value: 'elevenlabs', ... },
+  { name: 'Piper TTS', value: 'piper', ... },
   { name: 'Piper', value: 'piper', ... },
   { name: 'Your Provider', value: 'yourprovider', ... }  // Add this
 ];
@@ -425,7 +425,7 @@ Update `.claude/hooks/provider-commands.sh`:
 
 ```bash
 case "$provider_name" in
-  elevenlabs) ... ;;
+  piper) ... ;;
   piper) ... ;;
   yourprovider)  # Add this
     echo "Your Provider - Description"
@@ -469,7 +469,7 @@ Create `.docs/providers/yourprovider-setup.md` with:
 |------|---------|
 | `.claude/hooks/play-tts.sh` | Router - main entry point |
 | `.claude/hooks/provider-manager.sh` | Provider management functions |
-| `.claude/hooks/play-tts-elevenlabs.sh` | ElevenLabs implementation |
+| `.claude/hooks/play-tts-piper.sh` | Piper TTS implementation |
 | `.claude/hooks/play-tts-piper.sh` | Piper implementation |
 | `.claude/hooks/provider-commands.sh` | Slash commands for providers |
 
@@ -519,12 +519,12 @@ voice: Jessica Anne Bogart
 ---
 name: sarcastic
 voices:
-  elevenlabs: Jessica Anne Bogart
+  piper: Jessica Anne Bogart
   piper: en_US-amy-medium
 ---
 ```
 
-**Migration**: Old format still works (treated as `voices.elevenlabs`), but new format recommended for multi-provider support.
+**Migration**: Old format still works (treated as `voices.piper`), but new format recommended for multi-provider support.
 
 #### BMAD Plugin
 
@@ -537,12 +537,12 @@ voices:
 
 **New Format (v2.x)**:
 ```markdown
-| Agent | Name | ElevenLabs Voice | Piper Voice | Personality |
+| Agent | Name | Piper TTS Voice | Piper Voice | Personality |
 |-------|------|------------------|-------------|-------------|
 | pm | John | Jessica Anne Bogart | en_US-lessac-medium | professional |
 ```
 
-**Migration**: Automatic detection in `bmad-voice-manager.sh` - checks for "| ElevenLabs Voice |" header to determine format.
+**Migration**: Automatic detection in `bmad-voice-manager.sh` - checks for "| Piper TTS Voice |" header to determine format.
 
 #### API Changes
 

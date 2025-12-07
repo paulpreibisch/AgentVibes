@@ -40,7 +40,7 @@ AgentVibes now **auto-detects SSH sessions** and **converts audio format** for p
 
 **Technical details:**
 ```bash
-# Detection code (play-tts-elevenlabs.sh:351-359)
+# Detection code (play-tts-piper.sh:351-359)
 if [[ -n "$SSH_CONNECTION" ]] || [[ -n "$SSH_CLIENT" ]] || [[ -n "$VSCODE_IPC_HOOK_CLI" ]]; then
   # Convert to 48kHz stereo WAV for SSH tunnel compatibility
   ffmpeg -i input.mp3 -ar 48000 -ac 2 output.wav
@@ -51,7 +51,7 @@ fi
 
 ### 🎚️ Unified Speech Speed Control
 
-**Single command to control speech rate across both ElevenLabs and Piper TTS!**
+**Single command to control speech rate across both Piper TTS and Piper TTS!**
 
 #### **New Speed Commands:**
 ```bash
@@ -68,14 +68,14 @@ fi
 ```
 
 #### **Features:**
-- ✅ **Unified control** - Works with both ElevenLabs and Piper
+- ✅ **Unified control** - Works with both Piper TTS and Piper
 - ✅ **Intuitive syntax** - `2x` = 2x slower, `0.5x` = 2x faster
 - ✅ **Learning mode support** - Separate speeds for main and target languages
 - ✅ **Tongue twister demos** - Automatic demo after speed changes
 
 #### **Range:**
 - **Piper TTS:** 0.5x to 3x speed (0.5x = 2x faster, 3x = 3x slower)
-- **ElevenLabs:** 0.25x to 4x speed (0.25x = 4x faster, 4x = 4x slower)
+- **Piper TTS:** 0.25x to 4x speed (0.25x = 4x faster, 4x = 4x slower)
 
 ---
 
@@ -108,7 +108,7 @@ AgentVibes MCP now intelligently saves settings based on context:
 #### **Bitrate Preservation:**
 - ✅ Fixed 128kbps bitrate during audio padding
 - ✅ Eliminates static noise from format conversion
-- ✅ Better quality for ElevenLabs voice previews
+- ✅ Better quality for Piper TTS voice previews
 
 #### **Non-Blocking Playback:**
 - ✅ TTS scripts no longer hang
@@ -130,7 +130,7 @@ The biggest update in AgentVibes history! **Choose your TTS provider** and switc
 
 #### **Two Provider Options:**
 
-**🎤 ElevenLabs (Premium AI Voices)**
+**🎤 Piper TTS (Premium AI Voices)**
 - 150+ professional AI voices
 - 30+ languages with multilingual v2 model
 - Studio-quality audio with emotional range
@@ -200,7 +200,7 @@ AgentVibes now speaks **30+ languages** with native voice quality!
 - **Language-optimized voices** - Auto-switches to Antoni (Spanish), Rachel (French), Domi (German), Bella (Italian)
 - **BMAD integration** - Agents speak in your chosen language
 - **Personality support** - All 19 personalities work in any language
-- **Provider-aware** - Works with both ElevenLabs and Piper TTS
+- **Provider-aware** - Works with both Piper TTS and Piper TTS
 
 #### **Language Priority System:**
 1. BMAD Agent + Language Set → Uses multilingual version of agent voice
@@ -232,7 +232,7 @@ AgentVibes now includes a **language learning mode** that helps you learn new la
 /agent-vibes:target german
 
 # Set voice for target language (auto-selected based on provider)
-/agent-vibes:target-voice Antoni          # ElevenLabs
+/agent-vibes:target-voice Antoni          # Piper TTS
 /agent-vibes:target-voice es_ES-davefx-medium  # Piper
 
 # Enable/disable learning mode
@@ -268,14 +268,14 @@ Claude (Spanish): "¡Hola! ¡Qué bueno saber de ti!"
 - Perfect for language learners who need more time to process
 
 **🔄 Mixed Provider Support:**
-- Use **ElevenLabs for English** (premium quality)
+- Use **Piper TTS for English** (premium quality)
 - Use **Piper for Spanish** (free, slower speech)
 - System auto-detects provider from voice name
 - Seamless switching between providers
 
 **🎯 Auto-Voice Selection:**
 - System automatically selects the best voice for your target language
-- Provider-aware: ElevenLabs voices for ElevenLabs, Piper voices for Piper
+- Provider-aware: Piper TTS voices for Piper TTS, Piper voices for Piper
 - Smart fallback if preferred voice unavailable
 
 **🌍 Supported Target Languages:**
@@ -283,7 +283,7 @@ Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Russian
 
 #### **Voice Mappings by Provider:**
 
-**ElevenLabs Voices:**
+**Piper TTS Voices:**
 - Spanish → Antoni
 - French → Rachel
 - German → Domi
@@ -452,7 +452,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 - ✅ Adds new personalities (preserves custom ones)
 - ✅ Shows release notes and commit history
 - ✅ Preserves your settings and configurations
-- ✅ Provider-aware (updates both ElevenLabs & Piper files)
+- ✅ Provider-aware (updates both Piper TTS & Piper files)
 
 ---
 
@@ -484,7 +484,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 ├── commands/agent-vibes/        # 15 slash commands
 ├── hooks/
 │   ├── play-tts.sh             # Main TTS (provider-aware)
-│   ├── play-tts-elevenlabs.sh  # ElevenLabs implementation
+│   ├── play-tts-piper.sh  # Piper TTS implementation
 │   ├── play-tts-piper.sh       # Piper implementation
 │   ├── provider-manager.sh      # Provider switching
 │   ├── provider-commands.sh     # Provider CLI
@@ -506,7 +506,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 ```
 
 ### Settings Storage:
-- `tts-provider.txt` - Active provider (elevenlabs/piper)
+- `tts-provider.txt` - Active provider (piper/piper)
 - `tts-voice.txt` - Current voice
 - `tts-personality.txt` - Active personality
 - `tts-sentiment.txt` - Active sentiment
@@ -594,7 +594,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
    ```
 
 2. **Choose your provider:**
-   - If you have ElevenLabs API key → Keep using ElevenLabs
+   - If you have Piper TTS API key → Keep using Piper TTS
    - Want free/offline → Switch to Piper TTS:
      ```bash
      /agent-vibes:provider switch
@@ -620,7 +620,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 
 ## 💰 Pricing & Cost Management
 
-### ElevenLabs Pricing (2025):
+### Piper TTS Pricing (2025):
 - **Free:** $0/month - 10,000 chars (light use)
 - **Starter:** $5/month - 30,000 chars (casual)
 - **Creator:** $22/month - 100,000 chars (regular)
@@ -634,7 +634,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 
 ### Cost-Saving Tips:
 1. Use Piper TTS for development
-2. Use ElevenLabs for demos/production
+2. Use Piper TTS for demos/production
 3. Switch providers with one command:
    ```bash
    /agent-vibes:provider switch
@@ -646,7 +646,7 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 
 ### v2.0.17-beta Series (SSH Audio + Learning Mode):
 - **Fixed SSH audio tunnel static** - Auto-converts 44.1kHz mono MP3 to 48kHz stereo WAV for remote sessions
-- **Fixed ElevenLabs audio static** - Added MP3 codec (`-c:a libmp3lame`) to prevent WAV format issues
+- **Fixed Piper TTS audio static** - Added MP3 codec (`-c:a libmp3lame`) to prevent WAV format issues
 - **Fixed audio bitrate** - Preserves 128kbps during padding to eliminate static noise
 - **Fixed MCP provider switching** - Enhanced non-interactive detection with `CLAUDE_PROJECT_DIR` check
 - **Fixed target voice sync** - Auto-updates target voice when switching providers
@@ -689,13 +689,13 @@ sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, 
 **Built with ❤️ by [Paul Preibisch](https://github.com/paulpreibisch)**
 
 **Powered by:**
-- [ElevenLabs](https://elevenlabs.io/) - Premium AI voices
+- [Piper TTS](https://piper.io/) - Premium AI voices
 - [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
 - [Claude Code](https://claude.com/claude-code) - AI coding assistant
 
 **Special Thanks:**
 - [@disler](https://github.com/disler) for Claude Code hooks inspiration
-- ElevenLabs team for incredible voice technology
+- Piper TTS team for incredible voice technology
 - Piper TTS community for open-source excellence
 - BMAD community for multi-agent framework
 

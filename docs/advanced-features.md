@@ -27,7 +27,7 @@
 ## Add Custom Voices
 
 ```bash
-# Get voice ID from elevenlabs.io
+# Get voice ID from piper.io
 /agent-vibes:add "My Voice" abc123xyz789
 ```
 

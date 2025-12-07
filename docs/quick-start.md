@@ -59,9 +59,9 @@ AgentVibes supports two TTS providers - pick the one that fits your needs:
 - ✅ 18 languages supported
 - ✅ Privacy-focused local processing
 
-**To use:** Just install AgentVibes and you're done! The installer will set Piper as default if no ElevenLabs key is detected.
+**To use:** Just install AgentVibes and you're done! The installer will set Piper as default if no Piper TTS key is detected.
 
-### **Option B: ElevenLabs (Premium AI Voices)** 🎤
+### **Option B: Piper TTS (Premium AI Voices)** 🎤
 
 **Best for production and variety.** Requires API key but offers 150+ premium voices.
 
@@ -72,13 +72,12 @@ AgentVibes supports two TTS providers - pick the one that fits your needs:
 
 **Setup steps:**
 
-1. Sign up at [elevenlabs.io](https://elevenlabs.io/) (free tier: 10,000 chars/month)
+1. Sign up at [piper.io](https://piper.io/) (free tier: 10,000 chars/month)
 2. Copy your API key from the dashboard
 3. Add it to your environment:
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-echo 'export ELEVENLABS_API_KEY="your-api-key-here"' >> ~/.bashrc
 source ~/.bashrc
 ```
 

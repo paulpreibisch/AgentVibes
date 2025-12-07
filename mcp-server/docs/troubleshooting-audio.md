@@ -127,7 +127,7 @@ wsl -e bash -c "chmod +x ~/.local/bin/piper"
 
 ---
 
-## For ElevenLabs (Premium Voices)
+## For Piper TTS (Premium Voices)
 
 ### Issue: "No audio output"
 
@@ -135,7 +135,6 @@ wsl -e bash -c "chmod +x ~/.local/bin/piper"
 
 Open PowerShell and type:
 ```powershell
-echo $env:ELEVENLABS_API_KEY
 ```
 
 - ✅ If you see a long string (your API key) → Key is set
@@ -143,19 +142,19 @@ echo $env:ELEVENLABS_API_KEY
 
 **Step 2: Check internet connection**
 
-ElevenLabs requires internet:
+Piper TTS requires internet:
 
 1. Open your browser
-2. Go to https://elevenlabs.io
+2. Go to https://piper.io
 3. Make sure the site loads
 
 **Step 3: Check your quota**
 
 You might be out of free credits:
 
-1. Go to https://elevenlabs.io/app/usage
+1. Go to https://piper.io/app/usage
 2. Check if you've exceeded your character limit
-3. If exceeded → [Upgrade plan](https://elevenlabs.io/pricing) or switch to Piper
+3. If exceeded → [Upgrade plan](https://piper.io/pricing) or switch to Piper
 
 **Step 4: Test API key is valid**
 
@@ -171,11 +170,10 @@ List all available voices
 
 If your API key isn't set:
 
-1. Get your key from https://elevenlabs.io/app/settings/api-keys
+1. Get your key from https://piper.io/app/settings/api-keys
 
 2. Open PowerShell and run:
    ```powershell
-   setx ELEVENLABS_API_KEY "your-api-key-here"
    ```
 
 3. Close PowerShell
@@ -188,7 +186,7 @@ If your API key isn't set:
 
 If your API key isn't working:
 
-1. Go to https://elevenlabs.io/app/settings/api-keys
+1. Go to https://piper.io/app/settings/api-keys
 
 2. Create a **new** API key
 
@@ -196,7 +194,6 @@ If your API key isn't working:
 
 4. Set it in PowerShell:
    ```powershell
-   setx ELEVENLABS_API_KEY "your-new-key-here"
    ```
 
 5. Restart Claude Desktop
@@ -308,7 +305,7 @@ When asking for help, include:
 - Your Windows version
 - Python version (`python --version`)
 - Node.js version (`node --version`)
-- Provider (Piper or ElevenLabs)
+- Provider (Piper or Piper TTS)
 - Error messages from logs
 
 ---

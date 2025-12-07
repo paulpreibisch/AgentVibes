@@ -83,13 +83,13 @@ Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Russian
 ```
 
 **Mixed Provider Support:**
-- Use **ElevenLabs** for English (premium quality)
+- Use **Piper TTS** for English (premium quality)
 - Use **Piper TTS** for Spanish (free, adjustable speed)
 - System auto-detects provider from voice name
 
 **Auto-Voice Selection:**
 - System picks the best voice for your target language
-- Provider-aware (ElevenLabs voices for ElevenLabs, Piper voices for Piper)
+- Provider-aware (Piper TTS voices for Piper TTS, Piper voices for Piper)
 - Smart fallback if preferred voice unavailable
 
 ## 📝 All Language Learning Commands

@@ -197,7 +197,7 @@ Please comment on the PR with:
 - ✅ What worked
 - ❌ What didn't work
 - 📋 Your OS (Linux/Mac/Windows)
-- 🎤 TTS provider used (Piper/ElevenLabs)
+- 🎤 TTS provider used (Piper/Piper TTS)
 
 ---
 

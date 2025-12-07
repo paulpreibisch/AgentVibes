@@ -11,7 +11,7 @@ This plugin automatically assigns voices to BMAD agents based on their role and 
 
 ## Agent Voice Mappings (Provider-Aware)
 
-| Agent ID | Agent Name | Intro | ElevenLabs Voice | Piper Voice | Personality |
+| Agent ID | Agent Name | Intro | Piper TTS Voice | Piper Voice | Personality |
 |----------|------------|-------|------------------|-------------|-------------|
 | pm | John (Product Manager) | John, Product Manager here | Matthew Schmitz | en_US-ryan-high | professional |
 | dev | Amelia (Developer) | Amelia, Developer here | Aria | en_US-amy-medium | normal |
@@ -27,7 +27,7 @@ This plugin automatically assigns voices to BMAD agents based on their role and 
 ## How It Works
 
 The voice manager automatically selects the appropriate voice based on your active TTS provider:
-- **ElevenLabs active**: Uses voices from the "ElevenLabs Voice" column
+- **Piper TTS active**: Uses voices from the "Piper TTS Voice" column
 - **Piper active**: Uses voices from the "Piper Voice" column
 
 This ensures BMAD agents work seamlessly regardless of which provider you're using.
@@ -54,7 +54,7 @@ Simply edit the table above to change voice mappings. The format is:
 - **Agent ID**: Must match BMAD's `agent.id` field (pm, dev, qa, etc.)
 - **Agent Name**: Display name (for reference only)
 - **Intro**: Text spoken before agent's message (e.g., "John, Product Manager here"). Leave empty to disable.
-- **ElevenLabs Voice**: Voice name for ElevenLabs provider
+- **Piper TTS Voice**: Voice name for Piper TTS provider
 - **Piper Voice**: Voice model name for Piper provider
 - **Personality**: Optional personality to apply (or "normal" for none)
 
@@ -65,4 +65,4 @@ Simply edit the table above to change voice mappings. The format is:
 - `/agent-vibes:bmad status` - Show plugin status
 - `/agent-vibes:bmad edit` - Open this file for editing
 - `/agent-vibes:bmad list` - List all agent voice mappings
-- `/agent-vibes:bmad set <agent-id> <elevenlabs-voice> <piper-voice> [personality]` - Set voices for specific agent
+- `/agent-vibes:bmad set <agent-id> <piper-voice> <piper-voice> [personality]` - Set voices for specific agent

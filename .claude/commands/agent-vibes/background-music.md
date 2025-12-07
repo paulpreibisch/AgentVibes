@@ -13,6 +13,8 @@ Control background music that plays behind TTS voice output.
 - `/agent-vibes:background-music volume 0.3` - Set volume (0.0-1.0)
 - `/agent-vibes:background-music list` - List all pre-packaged background music tracks
 - `/agent-vibes:background-music set-default TRACK` - Set default background music track
+- `/agent-vibes:background-music set-agent AGENT TRACK` - Set background music for a specific agent
+- `/agent-vibes:background-music set-all TRACK` - Set the same background music for all agents
 
 ## How It Works
 
@@ -63,8 +65,14 @@ Install on Linux/WSL: `apt install sox ffmpeg`
  3. Agent Vibes Celtic Harp v1.mp3
 ...
 
-/agent-vibes:background-music set-default "Agent Vibes ChillWave v2.mp3"
-✅ Default background music set to: Agent Vibes ChillWave v2.mp3
+/agent-vibes:background-music set-default agent_vibes_chillwave_v2_loop.mp3
+✅ Default background music set to: agent_vibes_chillwave_v2_loop.mp3
+
+/agent-vibes:background-music set-agent John optimized/agent_vibes_goa_trance_v2_loop.mp3
+✅ Updated background music for John: optimized/agent_vibes_goa_trance_v2_loop.mp3
+
+/agent-vibes:background-music set-all optimized/dreamy_house_loop.mp3
+✅ Updated background music for 10 agents: optimized/dreamy_house_loop.mp3
 
 /agent-vibes:background-music off
 🔇 Background music disabled

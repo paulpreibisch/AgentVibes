@@ -2,7 +2,6 @@
 
 ## No Audio Playing?
 
-1. Check API key: `echo $ELEVENLABS_API_KEY`
 2. Check output style: `/output-style agent-vibes`
 3. Test playback: `/agent-vibes:sample Aria`
 

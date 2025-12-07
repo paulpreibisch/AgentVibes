@@ -295,8 +295,9 @@ Every task acknowledgment plays **twice** - first in English, then in your targe
 
 ## 🗣️ Voice Library
 
-AgentVibes includes professional AI voices from Piper TTS and macOS Say with multilingual support.
+AgentVibes includes **27 unique [ElevenLabs](https://try.elevenlabs.io/agentvibes) voices** with multilingual support.
 
+💡 **Tip:** Click voice names to hear samples on ElevenLabs!
 🎧 **Try in Claude Code:** `/agent-vibes:preview` to hear all voices
 🌍 **Multilingual:** Use Antoni, Rachel, Domi, or Bella for automatic language detection
 
@@ -401,7 +402,7 @@ AgentVibes supports **custom personalities** and **custom voices**.
 # Create custom personality
 /agent-vibes:personality add mycustom
 
-# Add custom Piper voice
+# Add custom ElevenLabs voice
 /agent-vibes:add "My Voice" abc123xyz789
 
 # Use in custom output styles
@@ -434,12 +435,15 @@ AgentVibes supports **custom personalities** and **custom voices**.
 
 - 🎤 **[WhisperTyping](https://whispertyping.com/)** - Fast voice-to-text typing for developers
 - 🗣️ **[OpenWhisper (Azure)](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/whisper-overview)** - Microsoft's speech-to-text service
+- 🎙️ **[ElevenLabs](https://try.elevenlabs.io/agentvibes)** - Premium AI voice synthesis
 - 🆓 **[Piper TTS](https://github.com/rhasspy/piper)** - Free offline neural TTS
 - 🤖 **[Claude Code](https://claude.com/claude-code)** - AI coding assistant
 - 🎭 **[BMAD METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** - Multi-agent framework
 
 ### AgentVibes Resources
 
+- 📊 **[Usage Dashboard](https://elevenlabs.io/app/usage)** - Monitor ElevenLabs usage
+- 💳 **[Pricing Page](https://elevenlabs.io/pricing)** - ElevenLabs plans
 - 🐛 **[Issues](https://github.com/paulpreibisch/AgentVibes/issues)** - Report bugs
 - 📝 **[Changelog](https://github.com/paulpreibisch/AgentVibes/releases)** - Version history
 - 📰 **[Technical Deep Dive - LinkedIn Article](https://www.linkedin.com/pulse/agent-vibes-add-voice-claude-code-deep-dive-npx-paul-preibisch-8zrcc/)** - How AgentVibes works under the hood
@@ -453,6 +457,7 @@ AgentVibes supports **custom personalities** and **custom voices**.
 **Common Issues:**
 
 **No Audio Playing?**
+1. Check API key: `echo $ELEVENLABS_API_KEY`
 2. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
 3. Test: `/agent-vibes:sample Aria`
 
@@ -494,18 +499,21 @@ npm update -g agentvibes && agentvibes update --yes
 ## ⚠️ Important Disclaimers
 
 **API Costs & Usage:**
-- Usage is completely free with Piper TTS (no API costs)
+- ElevenLabs usage may incur charges based on your subscription tier and character usage
 - Users are solely responsible for their own API costs and usage
 - Free tier: 10,000 characters/month | Paid plans: $5-99/month
+- See [ElevenLabs Pricing](https://elevenlabs.io/pricing) for current rates
 
 **Third-Party Services:**
-- This project integrates with Piper TTS (local processing) and macOS Say (system built-in)
-- We are **not affiliated with, endorsed by, or officially connected** to Anthropic, Apple, or Claude
-- Piper TTS is subject to its terms of service
+- This project integrates with ElevenLabs (TTS API), Piper TTS (local processing), and macOS Say (system built-in)
+- We are **not affiliated with, endorsed by, or officially connected** to ElevenLabs, Anthropic, Apple, or Claude
+- ElevenLabs and Piper TTS are subject to their respective terms of service
 
 **Privacy & Data:**
+- **ElevenLabs**: Your text prompts are sent to ElevenLabs servers for processing
 - **Piper TTS**: All processing happens locally on your machine, no external data transmission
 - **macOS Say**: All processing happens locally using Apple's built-in speech synthesis
+- Review [ElevenLabs Privacy Policy](https://elevenlabs.io/privacy) for their data handling
 
 **Software License:**
 - Provided "as-is" under Apache 2.0 License without warranty of any kind
@@ -530,6 +538,7 @@ npm update -g agentvibes && agentvibes update --yes
 - 🌐 GitHub: [paulpreibisch](https://github.com/paulpreibisch)
 
 **Powered by:**
+- [ElevenLabs](https://elevenlabs.io/) - Premium AI voices
 - [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
 - [Claude Code](https://claude.com/claude-code) - AI coding assistant
 - Licensed under Apache 2.0

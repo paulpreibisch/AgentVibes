@@ -3,15 +3,15 @@
   "commands": [
     {
       "name": "list",
-      "description": "List all available ElevenLabs voices"
+      "description": "List all available TTS voices"
     },
     {
       "name": "preview",
-      "description": "Preview ElevenLabs voices by playing audio samples"
+      "description": "Preview TTS voices by playing audio samples"
     },
     {
       "name": "switch",
-      "description": "Switch to a different ElevenLabs voice"
+      "description": "Switch to a different TTS voice"
     },
     {
       "name": "whoami",
@@ -71,7 +71,7 @@
     },
     {
       "name": "provider",
-      "description": "Manage TTS providers (ElevenLabs, Piper)"
+      "description": "Manage TTS providers (Piper, macOS)"
     },
     {
       "name": "set-favorite-voice",
@@ -127,7 +127,7 @@
     },
     {
       "name": "agent-vibes",
-      "description": "ElevenLabs TTS voice management commands"
+      "description": "TTS voice management commands"
     },
     {
       "name": "bmad",

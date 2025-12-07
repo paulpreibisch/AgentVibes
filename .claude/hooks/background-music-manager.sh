@@ -231,6 +231,101 @@ show_status() {
     fi
 }
 
+# Set background music for a specific agent
+set_agent_track() {
+    local agent="$1"
+    local track="$2"
+    local config_file="$SCRIPT_DIR/../config/audio-effects.cfg"
+
+    if [[ -z "$agent" ]] || [[ -z "$track" ]]; then
+        echo "❌ Error: Agent name and track required"
+        echo "Usage: $0 set-agent AGENT_NAME TRACK_NAME"
+        exit 1
+    fi
+
+    # Verify track exists
+    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    if [[ ! -f "$bg_dir/$track" ]] && [[ ! -f "$bg_dir/optimized/$track" ]]; then
+        echo "❌ Error: Track not found: $track"
+        echo "Run '$0 list' to see available tracks"
+        exit 1
+    fi
+
+    # Add optimized/ prefix if not present and file exists there
+    if [[ ! "$track" =~ ^optimized/ ]] && [[ -f "$bg_dir/optimized/$track" ]]; then
+        track="optimized/$track"
+    fi
+
+    # Update or add agent config line
+    if grep -q "^${agent}|" "$config_file" 2>/dev/null; then
+        # Agent exists - update track (preserve effects and volume)
+        local temp_file
+        temp_file=$(mktemp)
+        awk -F'|' -v agent="$agent" -v track="$track" '
+            $1 == agent {
+                print $1 "|" $2 "|" track "|" $4
+                next
+            }
+            { print }
+        ' "$config_file" > "$temp_file"
+        mv "$temp_file" "$config_file"
+        echo "✅ Updated background music for $agent: $track"
+    else
+        # Agent doesn't exist - add new line with track
+        echo "${agent}||${track}|0.30" >> "$config_file"
+        echo "✅ Added background music for $agent: $track"
+    fi
+}
+
+# Set background music for all agents
+set_all_agents_track() {
+    local track="$1"
+    local config_file="$SCRIPT_DIR/../config/audio-effects.cfg"
+
+    if [[ -z "$track" ]]; then
+        echo "❌ Error: Track name required"
+        echo "Usage: $0 set-all TRACK_NAME"
+        exit 1
+    fi
+
+    # Verify track exists
+    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    if [[ ! -f "$bg_dir/$track" ]] && [[ ! -f "$bg_dir/optimized/$track" ]]; then
+        echo "❌ Error: Track not found: $track"
+        echo "Run '$0 list' to see available tracks"
+        exit 1
+    fi
+
+    # Add optimized/ prefix if not present and file exists there
+    if [[ ! "$track" =~ ^optimized/ ]] && [[ -f "$bg_dir/optimized/$track" ]]; then
+        track="optimized/$track"
+    fi
+
+    # Update all non-comment, non-empty, non-default lines
+    local temp_file
+    temp_file=$(mktemp)
+    local count=0
+
+    awk -F'|' -v track="$track" '
+        # Skip comments and empty lines
+        /^#/ || /^[[:space:]]*$/ { print; next }
+
+        # Skip default and _party_mode
+        $1 == "default" || $1 == "_party_mode" { print; next }
+
+        # Update all other agent lines
+        {
+            print $1 "|" $2 "|" track "|" $4
+        }
+    ' "$config_file" > "$temp_file"
+
+    # Count updated agents
+    count=$(grep -v '^#' "$config_file" | grep -v '^[[:space:]]*$' | grep -v '^default|' | grep -v '^_party_mode|' | wc -l)
+
+    mv "$temp_file" "$config_file"
+    echo "✅ Updated background music for $count agents: $track"
+}
+
 # Main command handler
 case "${1:-status}" in
     status|"")
@@ -264,6 +359,24 @@ case "${1:-status}" in
         fi
         set_default_track "$2"
         ;;
+    set-agent)
+        if [[ -z "${2:-}" ]] || [[ -z "${3:-}" ]]; then
+            echo "❌ Error: Agent name and track required"
+            echo "Usage: $0 set-agent AGENT_NAME TRACK_NAME"
+            echo "Run '$0 list' to see available tracks"
+            exit 1
+        fi
+        set_agent_track "$2" "$3"
+        ;;
+    set-all)
+        if [[ -z "${2:-}" ]]; then
+            echo "❌ Error: Track name required"
+            echo "Usage: $0 set-all TRACK_NAME"
+            echo "Run '$0 list' to see available tracks"
+            exit 1
+        fi
+        set_all_agents_track "$2"
+        ;;
     get-enabled)
         if is_enabled; then
             echo "true"
@@ -275,7 +388,7 @@ case "${1:-status}" in
         get_volume
         ;;
     *)
-        echo "Usage: $0 {status|on|off|volume [X]|list|set-default TRACK|get-enabled|get-volume}"
+        echo "Usage: $0 {status|on|off|volume [X]|list|set-default TRACK|set-agent AGENT TRACK|set-all TRACK|get-enabled|get-volume}"
         exit 1
         ;;
 esac

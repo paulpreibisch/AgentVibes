@@ -5,7 +5,7 @@ argument-hint: [command] [args...]
 
 # Provider Management Commands
 
-Manage TTS providers (ElevenLabs, Piper, macOS Say) - switch between providers, view details, and test.
+Manage TTS providers (Piper TTS, Piper, macOS Say) - switch between providers, view details, and test.
 
 ## Usage
 
@@ -27,8 +27,8 @@ Manage TTS providers (ElevenLabs, Piper, macOS Say) - switch between providers, 
 # Switch to Piper (free, offline)
 /agent-vibes:provider switch piper
 
-# Switch to ElevenLabs (premium quality)
-/agent-vibes:provider switch elevenlabs
+# Switch to Piper TTS (premium quality)
+/agent-vibes:provider switch piper
 
 # Switch to macOS Say (native macOS, free)
 /agent-vibes:provider switch macos
@@ -46,7 +46,7 @@ Manage TTS providers (ElevenLabs, Piper, macOS Say) - switch between providers, 
 
 ## Provider Comparison
 
-| Feature | ElevenLabs | Piper | macOS Say |
+| Feature | Piper TTS | Piper | macOS Say |
 |---------|------------|-------|-----------|
 | Quality | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 | Cost | Free tier + $5-22/mo | Free forever | Free (built-in) |

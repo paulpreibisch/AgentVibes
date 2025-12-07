@@ -86,7 +86,7 @@ Edit voice assignments in:
 
 - BMAD v6-alpha or later
 - AgentVibes with BMAD plugin enabled
-- Piper or ElevenLabs TTS provider configured
+- Piper or Piper TTS TTS provider configured
 
 ## Troubleshooting
 

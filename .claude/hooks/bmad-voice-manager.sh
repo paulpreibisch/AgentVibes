@@ -141,7 +141,7 @@ auto_enable_if_bmad_detected() {
 # @edgecases Returns empty string if plugin disabled/missing, parses markdown table syntax
 # @calledby bmad-tts-injector.sh, play-tts.sh when BMAD agent is active
 # @calls auto_enable_if_bmad_detected, grep, awk, sed
-# @version 2.0.0 - Now provider-aware: returns ElevenLabs or Piper voice based on active provider
+# @version 2.0.0 - Now provider-aware: returns Piper or macOS voice based on active provider
 get_agent_voice() {
     local agent_id="$1"
 
@@ -185,15 +185,15 @@ get_agent_voice() {
         provider_file="$HOME/.claude/tts-provider.txt"
     fi
 
-    local active_provider="elevenlabs"  # default
+    local active_provider="piper"  # default
     if [[ -n "$provider_file" ]] && [[ -f "$provider_file" ]]; then
         active_provider=$(cat "$provider_file")
     fi
 
     # Extract voice from markdown table based on provider
-    # Table: Agent ID | Agent Name | Intro | ElevenLabs Voice | Piper Voice | Personality
-    # AWK columns: $1=empty | $2=ID | $3=Name | $4=Intro | $5=ElevenLabs | $6=Piper | $7=Personality
-    local column=5  # Default to ElevenLabs (AWK column 5)
+    # Table: Agent ID | Agent Name | Intro | Piper Voice | macOS Voice | Personality
+    # AWK columns: $1=empty | $2=ID | $3=Name | $4=Intro | $5=Piper | $6=macOS | $7=Personality
+    local column=5  # Default to Piper (AWK column 5)
     if [[ "$active_provider" == "piper" ]]; then
         column=6  # Use Piper (AWK column 6)
     fi
@@ -490,7 +490,7 @@ disable_plugin() {
 # @edgecases Parses markdown table format, skips header and separator rows
 # @calledby enable_plugin, show_status, main command dispatcher with "list"
 # @calls grep, sed, echo
-# @version 2.1.0 - Now provider-aware: shows ElevenLabs or Piper voices based on active provider
+# @version 2.1.0 - Now provider-aware: shows Piper or macOS voices based on active provider
 list_mappings() {
     if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
         echo "❌ Plugin file not found: $VOICE_CONFIG_FILE"
@@ -505,7 +505,7 @@ list_mappings() {
         provider_file="$HOME/.claude/tts-provider.txt"
     fi
 
-    local active_provider="elevenlabs"  # default
+    local active_provider="piper"  # default
     if [[ -n "$provider_file" ]] && [[ -f "$provider_file" ]]; then
         active_provider=$(cat "$provider_file")
     fi
@@ -514,9 +514,9 @@ list_mappings() {
     echo "📊 BMAD Agent Voice Mappings (Provider: $active_provider):"
     echo ""
 
-    # Table: Agent ID | Agent Name | Intro | ElevenLabs Voice | Piper Voice | Personality
-    # AWK columns: $1=empty | $2=ID | $3=Name | $4=Intro | $5=ElevenLabs | $6=Piper | $7=Personality
-    local voice_column=5  # Default to ElevenLabs (AWK column 5)
+    # Table: Agent ID | Agent Name | Intro | Piper Voice | macOS Voice | Personality
+    # AWK columns: $1=empty | $2=ID | $3=Name | $4=Intro | $5=Piper | $6=macOS | $7=Personality
+    local voice_column=5  # Default to Piper (AWK column 5)
     if [[ "$active_provider" == "piper" ]]; then
         voice_column=6  # Use Piper (AWK column 6)
     fi

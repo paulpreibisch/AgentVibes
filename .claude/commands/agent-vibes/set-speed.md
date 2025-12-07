@@ -5,7 +5,7 @@ argument-hint: [target] <speed>
 
 # Set Speech Speed
 
-Control the speech rate for Piper TTS voices (ElevenLabs doesn't support speed control).
+Control the speech rate for Piper TTS voices (Piper TTS doesn't support speed control).
 
 ## Usage
 

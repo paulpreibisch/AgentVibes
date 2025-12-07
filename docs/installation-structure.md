@@ -8,7 +8,7 @@ your-project/
     │   └── agent-vibes-bmad.md       # BMAD plugin command
     ├── hooks/
     │   ├── play-tts.sh               # Main TTS (provider-aware)
-    │   ├── play-tts-elevenlabs.sh    # ElevenLabs implementation
+    │   ├── play-tts-piper.sh    # Piper TTS implementation
     │   ├── play-tts-piper.sh         # Piper implementation
     │   ├── provider-manager.sh       # Provider switching
     │   ├── provider-commands.sh      # Provider CLI
@@ -29,7 +29,7 @@ your-project/
 ## Voice Settings Storage
 
 **Project-Local Settings** (`.claude/` in project):
-- **Current Provider**: `tts-provider.txt` - Active TTS provider (elevenlabs/piper)
+- **Current Provider**: `tts-provider.txt` - Active TTS provider (piper/piper)
 - **Current Voice**: `tts-voice.txt` - Selected voice name
 - **Current Personality**: `tts-personality.txt` - Active personality
 - **Current Sentiment**: `tts-sentiment.txt` - Active sentiment

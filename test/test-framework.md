@@ -19,7 +19,7 @@ test/
 │   └── sentiment.bats
 ├── fixtures/               # Test data and mocks
 │   ├── mock-voices.sh
-│   ├── mock-elevenlabs-api.sh
+│   ├── mock-piper-api.sh
 │   └── test-personalities/
 └── helpers/                # Test utilities
     └── test-helper.bash
@@ -28,7 +28,7 @@ test/
 
 ## Testing Philosophy
 
-1. **Mock External Dependencies**: Don't call real ElevenLabs API in tests
+1. **Mock External Dependencies**: Don't call real Piper TTS API in tests
 2. **Test Each Script in Isolation**: Use mocks for dependencies
 3. **Verify Side Effects**: Check file writes, TTS calls, output messages
 4. **Test Error Paths**: Invalid inputs, missing files, API failures
@@ -80,7 +80,7 @@ test/
 GitHub Actions workflow will:
 1. Install BATS
 2. Set up test environment
-3. Mock ElevenLabs API
+3. Mock Piper TTS API
 4. Run unit tests
 5. Run integration tests
 6. Report coverage
@@ -104,8 +104,8 @@ bats -t test/unit/voice-manager.bats
 
 ## Mock Strategy
 
-**ElevenLabs API Mock:**
-- Intercept curl calls to api.elevenlabs.io
+**Piper TTS API Mock:**
+- Intercept curl calls to api.piper.io
 - Return fake MP3 data
 - No actual API charges during tests
 

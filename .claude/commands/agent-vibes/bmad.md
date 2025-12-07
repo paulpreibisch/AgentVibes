@@ -156,7 +156,7 @@ activation-instructions:
 
 ### Provider Support
 The TTS injection works with **any configured TTS provider**:
-- ✅ **ElevenLabs** - Uses AI voices with full voice mapping
+- ✅ **Piper TTS** - Uses AI voices with full voice mapping
 - ✅ **Piper TTS** - Uses neural voices (free, offline)
 
 The system automatically detects your configured provider via `/agent-vibes:provider info` and uses the appropriate TTS engine. You can switch providers anytime with `/agent-vibes:provider switch` and the BMAD agents will continue speaking using the new provider.
@@ -165,7 +165,7 @@ The system automatically detects your configured provider via `/agent-vibes:prov
 
 The voice used depends on your active TTS provider. Run `/agent-vibes:provider info` to check your provider.
 
-| Agent ID | Role | ElevenLabs Voice | Piper Voice |
+| Agent ID | Role | Piper TTS Voice | Piper Voice |
 |----------|------|------------------|-------------|
 | pm | Product Manager | Matthew Schmitz | en_US-ryan-high |
 | dev | Developer | Aria | en_US-amy-medium |

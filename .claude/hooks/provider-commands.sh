@@ -50,7 +50,7 @@ COMMAND="${1:-help}"
 # @function is_language_supported
 # @intent Check if a language is supported by a provider
 # @param $1 {string} language - Language code (e.g., "spanish", "french")
-# @param $2 {string} provider - Provider name (e.g., "elevenlabs", "piper", "macos")
+# @param $2 {string} provider - Provider name (e.g., "piper", "macos")
 # @returns 0 if supported, 1 if not
 is_language_supported() {
   local language="$1"
@@ -62,10 +62,6 @@ is_language_supported() {
   fi
 
   case "$provider" in
-    elevenlabs)
-      # ElevenLabs supports all languages via multilingual voices
-      return 0
-      ;;
     piper)
       # Piper only supports English natively
       return 1
@@ -108,17 +104,6 @@ provider_list() {
     echo "│   Offline: Yes                                            │"
     echo "│                                                            │"
   fi
-
-  # ElevenLabs
-  if [[ "$current_provider" == "elevenlabs" ]]; then
-    echo "│ ✓ ElevenLabs    Premium quality    ⭐⭐⭐⭐⭐    [ACTIVE]    │"
-  else
-    echo "│   ElevenLabs    Premium quality    ⭐⭐⭐⭐⭐               │"
-  fi
-  echo "│   Cost: Free tier + \$5-22/mo                               │"
-  echo "│   Platform: All (Windows, macOS, Linux, WSL)               │"
-  echo "│   Offline: No                                              │"
-  echo "│                                                            │"
 
   # Piper
   if [[ "$current_provider" == "piper" ]]; then
@@ -168,7 +153,7 @@ provider_switch() {
   if [[ -z "$new_provider" ]]; then
     echo "❌ Error: Provider name required"
     echo "Usage: /agent-vibes:provider switch <provider> [--force]"
-    echo "Available: elevenlabs, piper, macos"
+    echo "Available: piper, macos"
     return 1
   fi
 
@@ -218,7 +203,6 @@ provider_switch() {
       echo ""
       echo "Alternative providers:"
       echo "  • Piper TTS (free, offline) - for Linux/WSL"
-      echo "  • ElevenLabs (premium) - for all platforms"
       echo ""
       echo "See: agentvibes.org/platform-support"
       return 1
@@ -361,28 +345,6 @@ provider_info() {
   fi
 
   case "$provider_name" in
-    elevenlabs)
-      echo "┌────────────────────────────────────────────────────────────┐"
-      echo "│ ElevenLabs - Premium TTS Provider                          │"
-      echo "├────────────────────────────────────────────────────────────┤"
-      echo "│ Quality:     ⭐⭐⭐⭐⭐  (Highest available)                   │"
-      echo "│ Cost:        Free tier + \$5-22/mo                          │"
-      echo "│ Platform:    All (Windows, macOS, Linux, WSL)              │"
-      echo "│ Offline:     No (requires internet)                        │"
-      echo "│                                                            │"
-      echo "│ Trade-offs:                                                │"
-      echo "│ + Highest voice quality and naturalness                   │"
-      echo "│ + 50+ premium voices available                            │"
-      echo "│ + Multilingual support (30+ languages)                    │"
-      echo "│ - Requires API key and internet                           │"
-      echo "│ - Costs money after free tier                             │"
-      echo "│                                                            │"
-      echo "│ Best for: Premium quality, multilingual needs             │"
-      echo "└────────────────────────────────────────────────────────────┘"
-      echo ""
-      echo "Full comparison: agentvibes.org/providers"
-      ;;
-
     piper)
       echo "┌────────────────────────────────────────────────────────────┐"
       echo "│ Piper TTS - Free Offline Provider                          │"
@@ -397,7 +359,6 @@ provider_info() {
       echo "│ + Works offline, no internet needed                       │"
       echo "│ + Fast synthesis (local processing)                       │"
       echo "│ - WSL/Linux only (no macOS/Windows)                       │"
-      echo "│ - Slightly lower quality than ElevenLabs                  │"
       echo "│                                                            │"
       echo "│ Best for: Budget-conscious, offline use, privacy          │"
       echo "└────────────────────────────────────────────────────────────┘"
@@ -431,7 +392,7 @@ provider_info() {
 
     *)
       echo "❌ Unknown provider: $provider_name"
-      echo "Available: elevenlabs, piper, macos"
+      echo "Available: piper, macos"
       ;;
   esac
 }
@@ -462,11 +423,6 @@ provider_get() {
 
   # Show brief info
   case "$current_provider" in
-    elevenlabs)
-      echo "Quality: ⭐⭐⭐⭐⭐"
-      echo "Cost: Free tier + \$5-22/mo"
-      echo "Offline: No"
-      ;;
     piper)
       echo "Quality: ⭐⭐⭐⭐"
       echo "Cost: Free forever"
@@ -494,10 +450,6 @@ provider_preview() {
   echo ""
 
   case "$current_provider" in
-    elevenlabs)
-      # Use the ElevenLabs voice manager
-      "$SCRIPT_DIR/voice-manager.sh" preview "$@"
-      ;;
     piper)
       # Use the Piper voice manager's list functionality
       source "$SCRIPT_DIR/piper-voice-manager.sh"
@@ -524,15 +476,11 @@ provider_preview() {
             echo "   Run /agent-vibes:list to see available Piper voices"
           fi
         else
-          # Looks like an ElevenLabs voice name (like "Antoni", "Jessica")
-          echo "❌ '$voice_arg' appears to be an ElevenLabs voice"
+          # Invalid voice format
+          echo "❌ Invalid voice format: '$voice_arg'"
           echo ""
-          echo "You're currently using Piper TTS (free provider)."
-          echo "Piper has different voices than ElevenLabs."
-          echo ""
-          echo "Options:"
-          echo "  1. Run /agent-vibes:list to see available Piper voices"
-          echo "  2. Switch to ElevenLabs: /agent-vibes:provider switch elevenlabs"
+          echo "💡 Piper voice names look like: en_US-lessac-medium"
+          echo "   Run /agent-vibes:list to see available Piper voices"
           echo ""
           echo "Popular Piper voices to try:"
           echo "  • en_US-lessac-medium  (clear, professional)"
@@ -637,7 +585,7 @@ provider_help() {
   echo ""
   echo "Examples:"
   echo "  /agent-vibes:provider switch piper"
-  echo "  /agent-vibes:provider info elevenlabs"
+  echo "  /agent-vibes:provider info piper"
   echo ""
   echo "Learn more: agentvibes.org/docs/providers"
 }

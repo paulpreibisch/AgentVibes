@@ -76,9 +76,9 @@ Every file must begin with a comprehensive context header that provides AI assis
 ```javascript
 /**
  * @fileoverview Provider abstraction layer for multi-TTS system
- * @context Supports switching between ElevenLabs and Piper TTS without code changes
+ * @context Supports switching between Piper TTS and Piper TTS without code changes
  * @architecture Router pattern - delegates to provider-specific implementations
- * @dependencies .claude/tts-provider.txt, play-tts-elevenlabs.sh, play-tts-piper.sh
+ * @dependencies .claude/tts-provider.txt, play-tts-piper.sh, play-tts-piper.sh
  * @entrypoints Called by personality-manager.sh, language-manager.sh
  * @patterns Provider registry pattern, fail-fast validation
  * @related GitHub issue #25, docs/prd.md, provider-manager.sh
@@ -90,7 +90,7 @@ Every file must begin with a comprehensive context header that provides AI assis
 ```bash
 #!/bin/bash
 #
-# File: .claude/hooks/play-tts-elevenlabs.sh
+# File: .claude/hooks/play-tts-piper.sh
 #
 # AgentVibes - Professional Text-to-Speech for AI Assistants
 # Website: https://agentvibes.org
@@ -116,11 +116,10 @@ Every file must begin with a comprehensive context header that provides AI assis
 #
 # ---
 #
-# @fileoverview ElevenLabs TTS provider implementation
-# @context Handles all ElevenLabs API interactions for voice synthesis
+# @fileoverview Piper TTS TTS provider implementation
+# @context Handles all Piper TTS API interactions for voice synthesis
 # @architecture Provider interface implementation, follows play-tts.sh contract
-# @dependencies ELEVENLABS_API_KEY, curl, mpv/afplay/aplay
-# @entrypoints Called by play-tts.sh router when provider=elevenlabs
+# @entrypoints Called by play-tts.sh router when provider=piper
 # @patterns Error code propagation, temp file cleanup, audio fallback chain
 # @related play-tts.sh, provider-manager.sh, docs/providers.md
 ```
@@ -166,10 +165,10 @@ Each function must include comprehensive intent-based documentation:
 # @intent Determine which TTS provider is currently active
 # @why Needed to route TTS requests to correct provider implementation
 # @param None
-# @returns Provider name (elevenlabs|piper) to stdout
+# @returns Provider name (piper|piper) to stdout
 # @exitcode 0=success, 1=no provider configured, 2=invalid provider
 # @sideeffects Reads .claude/tts-provider.txt or ~/.claude/tts-provider.txt
-# @edgecases Returns "elevenlabs" if file missing (backward compat)
+# @edgecases Returns "piper" if file missing (backward compat)
 # @calledby play-tts.sh, provider-manager.sh, personality-manager.sh
 # @calls cat, validate_provider_name
 get_active_provider() {
@@ -180,8 +179,8 @@ get_active_provider() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider_file="$HOME/.claude/tts-provider.txt"
     else
-        # Default to elevenlabs for backward compatibility
-        echo "elevenlabs"
+        # Default to piper for backward compatibility
+        echo "piper"
         return 0
     fi
 
@@ -195,7 +194,7 @@ get_active_provider() {
 /**
  * @function selectTTSProvider
  * @intent Interactive provider selection during installation
- * @why Allows users to choose between ElevenLabs (premium) and Piper (free)
+ * @why Allows users to choose between Piper TTS (premium) and Piper (free)
  * @param {Object} options - Configuration options
  * @param {string} options.platform - Detected platform (wsl|linux|macos|windows)
  * @param {boolean} options.piperAvailable - Whether Piper can be installed
@@ -208,8 +207,8 @@ get_active_provider() {
 async function selectTTSProvider(options) {
     const choices = [
         {
-            name: 'ElevenLabs - Premium quality [API key required]',
-            value: 'elevenlabs',
+            name: 'Piper TTS - Premium quality [API key required]',
+            value: 'piper',
         }
     ];
 
@@ -241,7 +240,7 @@ Use `# AI NOTE:` comments for non-obvious logic that might confuse AI assistants
 
 ```bash
 # AI NOTE: We check project-local .claude/ before global ~/.claude/ to support
-# per-project provider configurations. This allows users to use ElevenLabs for
+# per-project provider configurations. This allows users to use Piper TTS for
 # work projects and Piper for personal projects.
 if [[ -f ".claude/tts-provider.txt" ]]; then
     provider_file=".claude/tts-provider.txt"
@@ -272,7 +271,7 @@ For complex systems, include navigation aids:
 # Provider Management:
 #   - play-tts.sh              → Router (entry point)
 #   - provider-manager.sh      → Core provider logic
-#   - play-tts-elevenlabs.sh   → ElevenLabs implementation
+#   - play-tts-piper.sh   → Piper TTS implementation
 #   - play-tts-piper.sh        → Piper implementation
 #
 # State Files:
@@ -293,11 +292,11 @@ For extensibility, provide pattern examples:
 #    - Exit codes: 0=success, 1=error
 #
 # 2. Add provider to provider-manager.sh:
-#    PROVIDERS=("elevenlabs" "piper" "newprovider")
+#    PROVIDERS=("piper" "piper" "newprovider")
 #
 # 3. Add voice mappings to personality files:
 #    voices:
-#      elevenlabs: "Aria"
+#      piper: "Aria"
 #      piper: "en_US-amy-medium"
 #      newprovider: "voice-id-here"
 ```
@@ -309,9 +308,9 @@ Document all state file formats:
 ```bash
 # STATE FILE: .claude/tts-provider.txt
 # Format: Single line containing provider name
-# Valid values: elevenlabs, piper
+# Valid values: piper, piper
 # Example:
-#   elevenlabs
+#   piper
 #
 # Location precedence:
 #   1. .claude/tts-provider.txt (project-local)

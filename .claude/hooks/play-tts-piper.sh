@@ -328,14 +328,21 @@ fi
 # @function apply_audio_effects
 # @intent Apply sox effects and background music via audio-processor.sh
 # @param Uses global: $TEMP_FILE
-# @returns Updates $TEMP_FILE to processed version
+# @returns Updates $TEMP_FILE to processed version, sets $BACKGROUND_MUSIC if used
 # @sideeffects Applies audio effects and background music
+BACKGROUND_MUSIC=""
 if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
-  "$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null || {
+  # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
+  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
     PROCESSED_FILE="$TEMP_FILE"
+    PROCESSOR_OUTPUT="$TEMP_FILE|"
   }
+
+  # Parse output: FILE|BACKGROUND
+  PROCESSED_FILE="${PROCESSOR_OUTPUT%%|*}"
+  BACKGROUND_MUSIC="${PROCESSOR_OUTPUT##*|}"
 
   if [[ -f "$PROCESSED_FILE" ]] && [[ "$PROCESSED_FILE" != "$TEMP_FILE" ]]; then
     rm -f "$TEMP_FILE"
@@ -398,4 +405,7 @@ fi
 disown
 
 echo "🎵 Saved to: $TEMP_FILE"
+if [[ -n "$BACKGROUND_MUSIC" ]]; then
+  echo "🎶 Background music: $BACKGROUND_MUSIC"
+fi
 echo "🎤 Voice used: $VOICE_MODEL (Piper TTS)"
