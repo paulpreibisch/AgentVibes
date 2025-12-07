@@ -409,3 +409,27 @@ if [[ -n "$BACKGROUND_MUSIC" ]]; then
   echo "🎶 Background music: $BACKGROUND_MUSIC"
 fi
 echo "🎤 Voice used: $VOICE_MODEL (Piper TTS)"
+
+# Show status indicators
+GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
+PROJECT_MUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-muted"
+PROJECT_UNMUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-unmuted"
+BACKGROUND_ENABLED_FILE="$PROJECT_ROOT/.claude/config/background-music-enabled.txt"
+
+# Mute status indicator
+if [[ -f "$PROJECT_UNMUTE_FILE" ]] && [[ -f "$GLOBAL_MUTE_FILE" ]]; then
+  echo "🔊 Status: Unmuted (project overrides global mute)"
+elif [[ -f "$PROJECT_MUTE_FILE" ]]; then
+  echo "🔇 Status: Muted (project)"
+elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
+  echo "🔇 Status: Would be muted (global) - but this project is speaking"
+fi
+
+# Background music status indicator
+if [[ -z "$BACKGROUND_MUSIC" ]]; then
+  if [[ -f "$BACKGROUND_ENABLED_FILE" ]] && grep -q "true" "$BACKGROUND_ENABLED_FILE" 2>/dev/null; then
+    echo "🎵 Background music: Enabled but not playing (check config)"
+  else
+    echo "🎵 Background music: Disabled"
+  fi
+fi

@@ -1874,10 +1874,10 @@ async function install(options = {}) {
       if (enableBackgroundMusic.enable) {
         // Define track choices with user-friendly names
         const trackChoices = [
+          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
           { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
           { name: '💃 Salsa (Latin - Upbeat brass & percussion)', value: 'agent_vibes_salsa_v2_loop.mp3' },
           { name: '🎸 Cumbia (Latin - Accordion & drums)', value: 'agent_vibes_cumbia_v1_loop.mp3' },
-          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
           { name: '🌸 Bossa Nova (Brazilian jazz)', value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
           { name: '🏙️  Japanese City Pop (80s synth)', value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
           { name: '🌊 Chillwave (Electronic ambient)', value: 'agent_vibes_chillwave_v2_loop.mp3' },
@@ -1897,7 +1897,7 @@ async function install(options = {}) {
           name: 'track',
           message: 'Choose default background music track:',
           choices: trackChoices,
-          default: 'agent_vibes_bachata_v1_loop.mp3'
+          default: 'agentvibes_soft_flamenco_loop.mp3'
         });
 
         // Enable background music and set default track

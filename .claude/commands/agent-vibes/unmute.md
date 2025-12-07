@@ -15,11 +15,19 @@ done
 
 if [[ -d "$PROJECT_ROOT/.claude" ]]; then
   PROJECT_MUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-muted"
-  if [[ -f "$PROJECT_MUTE_FILE" ]]; then
-    rm -f "$PROJECT_MUTE_FILE"
-    echo "🔊 **AgentVibes TTS unmuted for this project.** Voice output is now restored."
+  PROJECT_UNMUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-unmuted"
+
+  # Remove project mute file if it exists
+  rm -f "$PROJECT_MUTE_FILE"
+
+  # Create project unmute file (overrides global mute if present)
+  touch "$PROJECT_UNMUTE_FILE"
+
+  # Check if global mute is set
+  if [[ -f "$HOME/.agentvibes-muted" ]]; then
+    echo "🔊 **AgentVibes TTS unmuted for this project** (overriding global mute). Voice output restored."
   else
-    echo "ℹ️ TTS was not muted for this project."
+    echo "🔊 **AgentVibes TTS unmuted for this project.** Voice output is now restored."
   fi
 else
   echo "⚠️ No .claude directory found."
