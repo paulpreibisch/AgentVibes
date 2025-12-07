@@ -89,10 +89,14 @@ if [[ -n "$VOICE_OVERRIDE" ]] && [[ "$VOICE_OVERRIDE" =~ [';|&$`<>(){}'] ]]; the
   exit 1
 fi
 
-# Remove backslash escaping that Claude might add for special chars like ! and $
-# In single quotes these don't need escaping, but Claude sometimes adds \! anyway
-TEXT="${TEXT//\\!/!}"
-TEXT="${TEXT//\\\$/\$}"
+# Remove backslash escaping that Claude might add for special chars
+# In single quotes these don't need escaping, but Claude sometimes adds backslashes
+TEXT="${TEXT//\\!/!}"        # Remove \!
+TEXT="${TEXT//\\\$/\$}"      # Remove \$
+TEXT="${TEXT//\\?/?}"        # Remove \?
+TEXT="${TEXT//\\,/,}"        # Remove \,
+TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
+TEXT="${TEXT//\\\\/\\}"      # Remove \\ (escaped backslash)
 
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
