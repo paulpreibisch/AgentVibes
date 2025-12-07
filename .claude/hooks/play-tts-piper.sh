@@ -262,10 +262,12 @@ SPEECH_RATE=$(get_speech_rate)
 # @edgecases Handles piper errors, invalid models, multi-speaker voices
 if [[ -n "$SPEAKER_ID" ]]; then
   # Multi-speaker voice: Pass speaker ID
-  echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --output_file "$TEMP_FILE" 2>/dev/null
+  # Add 2-second pause between sentences for better pacing
+  echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 else
   # Single-speaker voice
-  echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --output_file "$TEMP_FILE" 2>/dev/null
+  # Add 2-second pause between sentences for better pacing
+  echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
