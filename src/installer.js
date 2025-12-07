@@ -168,21 +168,26 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
     return;
   }
 
-  // Check if we have audio player
+  // Check if we have audio player (prefer paplay for WSL)
   let audioPlayer = null;
 
   try {
-    execSync('which mpv 2>/dev/null', { stdio: 'pipe' });
-    audioPlayer = 'mpv';
+    execSync('which paplay 2>/dev/null', { stdio: 'pipe' });
+    audioPlayer = 'paplay';
   } catch {
     try {
       execSync('which afplay 2>/dev/null', { stdio: 'pipe' });
       audioPlayer = 'afplay';
-    } catch {}
+    } catch {
+      try {
+        execSync('which mpv 2>/dev/null', { stdio: 'pipe' });
+        audioPlayer = 'mpv';
+      } catch {}
+    }
   }
 
   if (!audioPlayer) {
-    console.log(chalk.gray('\n   (Welcome demo skipped - requires mpv or afplay)'));
+    console.log(chalk.gray('\n   (Welcome demo skipped - requires paplay, afplay, or mpv)'));
     return;
   }
 
@@ -236,9 +241,14 @@ We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. 
 
   try {
     // Play the audio in the background (non-blocking)
-    const args = audioPlayer === 'mpv'
-      ? ['--no-video', '--really-quiet', welcomeDemoAudio]
-      : [welcomeDemoAudio];
+    let args;
+    if (audioPlayer === 'mpv') {
+      args = ['--no-video', '--really-quiet', welcomeDemoAudio];
+    } else if (audioPlayer === 'paplay') {
+      args = [welcomeDemoAudio];
+    } else {
+      args = [welcomeDemoAudio]; // afplay
+    }
 
     const audioProcess = spawn(audioPlayer, args, {
       detached: true,
@@ -1807,6 +1817,23 @@ async function install(options = {}) {
       const piperConfigPath = path.join(claudeDir, 'piper-voices-dir.txt');
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
+
+    // Set default voice based on provider to prevent fallback to mismatched global voice
+    const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
+    let defaultVoice;
+    switch (selectedProvider) {
+      case 'piper':
+        defaultVoice = 'en_US-lessac-medium';
+        break;
+      case 'macos':
+        defaultVoice = 'Samantha';
+        break;
+      case 'elevenlabs':
+      default:
+        defaultVoice = 'Cowboy Bob';
+        break;
+    }
+    await fs.writeFile(voiceConfigPath, defaultVoice);
 
     spinner.succeed(chalk.green(`Provider set to: ${providerLabels[selectedProvider] || selectedProvider}\n`));
 
