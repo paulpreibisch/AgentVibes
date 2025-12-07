@@ -270,6 +270,8 @@ mix_background() {
         audio_settings="-ac 1 -ar 22050 -b:a 64k"
     fi
 
+    # Fade in background music only (not voice) - background fades in over 0.3s at start
+    # Voice remains at full volume throughout
     ffmpeg -y -i "$voice" -ss "$start_pos" -stream_loop -1 -i "$background" \
         -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_start}:d=2[bg];[0:a][bg]amix=inputs=2:duration=longest[out]" \
         -map "[out]" $audio_settings -t "$total_duration" "$output" 2>/dev/null || {
