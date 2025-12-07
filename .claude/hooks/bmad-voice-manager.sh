@@ -159,9 +159,63 @@ get_agent_voice() {
         # Read from BMAD's standard _cfg directory
         # CSV format: agent_id,voice_name
         local voice=$(grep "^$agent_id," "$bmad_voice_map" | cut -d',' -f2)
-        echo "$voice"
-        return
+
+        # If voice is empty or generic (same for all), use defaults
+        if [[ -n "$voice" ]] && [[ "$voice" != "en_US-lessac-medium" ]]; then
+            echo "$voice"
+            return
+        fi
+        # If empty or generic, fall through to defaults below
     fi
+
+    # Default voice mappings (hardcoded fallback when CSV is missing or has generic values)
+    # These match the BMAD-METHOD defaults for consistency
+    case "$agent_id" in
+        bmad-master)
+            echo "en_US-lessac-medium"
+            return
+            ;;
+        analyst)
+            echo "en_US-kristin-medium"
+            return
+            ;;
+        architect)
+            echo "en_GB-alan-medium"
+            return
+            ;;
+        dev)
+            echo "en_US-joe-medium"
+            return
+            ;;
+        pm)
+            echo "en_US-ryan-high"
+            return
+            ;;
+        quick-flow-solo-dev)
+            echo "en_US-joe-medium"
+            return
+            ;;
+        sm)
+            echo "en_US-amy-medium"
+            return
+            ;;
+        tea)
+            echo "en_US-kusal-medium"
+            return
+            ;;
+        tech-writer)
+            echo "en_US-kristin-medium"
+            return
+            ;;
+        ux-designer)
+            echo "en_US-kristin-medium"
+            return
+            ;;
+        frame-expert)
+            echo "en_GB-alan-medium"
+            return
+            ;;
+    esac
 
     # Auto-enable if BMAD is detected (for legacy markdown config)
     auto_enable_if_bmad_detected
@@ -212,13 +266,106 @@ get_agent_voice() {
 # @returns Echoes intro text to stdout, empty string if not configured
 # @exitcode Always 0
 # @sideeffects None
-# @edgecases Returns empty string if plugin file missing, parses column 3 of markdown table
+# @edgecases Returns empty string if plugin file missing, parses column 3 of CSV or markdown table
 # @calledby bmad-speak.sh for agent identification in party mode
-# @calls grep, awk, sed
-# @version 2.1.0 - New function for customizable agent introductions
+# @calls grep, awk, sed, cut
+# @version 2.2.0 - Now supports CSV file format, falls back to agent name from manifest if intro missing
 get_agent_intro() {
     local agent_id="$1"
 
+    # Check for BMAD v6 CSV file first (preferred, loose coupling)
+    # If this exists, use it directly without requiring plugin enable flag
+    # Support both .bmad (standard) and bmad (alternative) paths
+    local bmad_voice_map=""
+    if [[ -f ".bmad/_cfg/agent-voice-map.csv" ]]; then
+        bmad_voice_map=".bmad/_cfg/agent-voice-map.csv"
+    elif [[ -f "bmad/_cfg/agent-voice-map.csv" ]]; then
+        bmad_voice_map="bmad/_cfg/agent-voice-map.csv"
+    fi
+
+    if [[ -n "$bmad_voice_map" ]]; then
+        # Read from BMAD's standard _cfg directory
+        # CSV format: agent,voice,intro
+        local intro=$(grep "^$agent_id," "$bmad_voice_map" | cut -d',' -f3 | sed 's/^"//;s/"$//')
+
+        # If intro is empty or generic, fall back to agent display name from manifest
+        if [[ -z "$intro" ]] || [[ "$intro" == "Hello! Ready to help with the discussion." ]]; then
+            # Try to get display name from agent-manifest.csv
+            local manifest_file=""
+            if [[ -f ".bmad/_cfg/agent-manifest.csv" ]]; then
+                manifest_file=".bmad/_cfg/agent-manifest.csv"
+            elif [[ -f "bmad/_cfg/agent-manifest.csv" ]]; then
+                manifest_file="bmad/_cfg/agent-manifest.csv"
+            fi
+
+            if [[ -n "$manifest_file" ]]; then
+                # Extract displayName (column 2) where name (column 1) matches agent_id
+                # CSV format: name,displayName,title,icon,role,...
+                local display_name=$(grep "^\"*${agent_id}\"*," "$manifest_file" | cut -d',' -f2 | sed 's/^"//;s/"$//')
+                if [[ -n "$display_name" ]]; then
+                    intro="$display_name here"
+                fi
+            fi
+        fi
+
+        # If we got an intro, return it
+        if [[ -n "$intro" ]]; then
+            echo "$intro"
+            return
+        fi
+        # Otherwise fall through to hardcoded defaults below
+    fi
+
+    # Hardcoded default intro mappings (final fallback)
+    # These match the BMAD-METHOD agent display names for consistency
+    case "$agent_id" in
+        bmad-master)
+            echo "BMad Master here"
+            return
+            ;;
+        analyst)
+            echo "Mary here"
+            return
+            ;;
+        architect)
+            echo "Winston here"
+            return
+            ;;
+        dev)
+            echo "Amelia here"
+            return
+            ;;
+        pm)
+            echo "John here"
+            return
+            ;;
+        quick-flow-solo-dev)
+            echo "Barry here"
+            return
+            ;;
+        sm)
+            echo "Bob here"
+            return
+            ;;
+        tea)
+            echo "Murat here"
+            return
+            ;;
+        tech-writer)
+            echo "Paige here"
+            return
+            ;;
+        ux-designer)
+            echo "Sally here"
+            return
+            ;;
+        frame-expert)
+            echo "Frame Expert here"
+            return
+            ;;
+    esac
+
+    # Fallback to legacy markdown config file
     if [[ ! -f "$VOICE_CONFIG_FILE" ]]; then
         echo ""
         return

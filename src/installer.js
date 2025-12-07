@@ -137,9 +137,9 @@ function showReleaseInfo() {
       chalk.cyan('Breaking: ElevenLabs removed (cost impractical for heavy daily use).\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
       chalk.gray('   🎶 16 Background Music Tracks - Latin, World, Electronic, Classical\n') +
-      chalk.gray('   🎛️ Audio Effects Processor - Per-agent reverb, pitch, EQ, compression\n') +
+      chalk.gray('   🎛️  Audio Effects Processor - Per-agent reverb, pitch, EQ, compression\n') +
       chalk.gray('   🐛 TDD Bug Fix - Background music respects enabled/disabled flag\n') +
-      chalk.gray('   🎚️ Natural Language Control - "change to salsa" switches music\n') +
+      chalk.gray('   🎚️  Natural Language Control - "change to salsa" switches music\n') +
       chalk.gray('   🤖 BMAD v6 Support - YAML voice mappings with auto-detection\n') +
       chalk.gray('   🔊 Paplay Fix - Fixes choppy audio on Linux/WSL RDP connections\n') +
       chalk.gray('   ⚡ ElevenLabs Removed - Migrate to free local Piper TTS\n\n') +
@@ -208,6 +208,8 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
 
   // Build the welcome script
   let welcomeScript = `Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.
+
+Now integrated with the B mad Method - Artificial Intelligence Driven Agile Development That Scales From Bug Fixes to Enterprise.
 
 We have added a lot of commands, but don't worry, you can hide them by typing /agent-vibes:hide, and :show to bring them back.`;
 
@@ -494,6 +496,34 @@ async function checkExistingPiperVoices(voicesPath) {
   }
 
   return { installed: false, voices: [] };
+}
+
+/**
+ * Prompt user to select default reverb level for TTS
+ * @returns {Promise<string>} Selected reverb level
+ */
+async function promptReverbSelection() {
+  console.log(chalk.cyan('\n🎛️  Audio Effects Configuration:\n'));
+  console.log(chalk.white('   Choose a default reverb level for TTS audio'));
+  console.log(chalk.gray('   (Adds room/space ambiance to make voices sound more natural)\n'));
+
+  const { reverbLevel } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'reverbLevel',
+      message: 'Select default reverb level:',
+      choices: [
+        { name: 'Off (Dry, no reverb)', value: 'off' },
+        { name: 'Light (Small room) - Recommended', value: 'light' },
+        { name: 'Medium (Conference room)', value: 'medium' },
+        { name: 'Heavy (Large hall)', value: 'heavy' },
+        { name: 'Cathedral (Epic space)', value: 'cathedral' },
+      ],
+      default: 'light',
+    },
+  ]);
+
+  return reverbLevel;
 }
 
 /**
@@ -1933,6 +1963,28 @@ async function install(options = {}) {
       }
     }
 
+    // Configure reverb level (if not using --yes flag)
+    let selectedReverb = 'off'; // Default for --yes mode
+    if (!options.yes) {
+      console.log(''); // Blank line for spacing
+      selectedReverb = await promptReverbSelection();
+      console.log(chalk.green(`\n✅ Reverb level set to: ${selectedReverb}`));
+
+      const reverbDescriptions = {
+        off: 'No reverb - dry, direct voice',
+        light: 'Subtle room ambiance - sounds like a small room',
+        medium: 'Conference room feel - natural and balanced',
+        heavy: 'Large hall acoustics - spacious and resonant',
+        cathedral: 'Epic space reverb - grand and atmospheric'
+      };
+
+      console.log(chalk.white(`   ${reverbDescriptions[selectedReverb]}`));
+      console.log('');
+      console.log(chalk.cyan('💡 Tip: Change reverb anytime:'));
+      console.log(chalk.white('   • Via MCP: "set reverb to cathedral"'));
+      console.log(chalk.white('   • Or use: .claude/hooks/effects-manager.sh set-reverb <level>'));
+    }
+
     // Configure verbosity level (if not using --yes flag)
     if (!options.yes) {
       console.log(''); // Blank line for spacing
@@ -2174,6 +2226,20 @@ async function install(options = {}) {
         }
       )
     );
+
+    // Apply reverb setting if not "off"
+    if (selectedReverb && selectedReverb !== 'off') {
+      const effectsManagerPath = path.join(targetDir, '.claude', 'hooks', 'effects-manager.sh');
+      try {
+        const { execSync } = require('child_process');
+        execSync(`bash "${effectsManagerPath}" set-reverb ${selectedReverb} default`, {
+          stdio: 'pipe',
+        });
+        console.log(chalk.green(`✅ Reverb set to '${selectedReverb}' for default agent\n`));
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Could not apply reverb setting: ${error.message}\n`));
+      }
+    }
 
     console.log(chalk.green.bold('\n✅ AgentVibes is Ready!'));
     console.log(chalk.white('   TTS protocol automatically loads on every Claude session'));

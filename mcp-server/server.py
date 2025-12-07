@@ -648,6 +648,49 @@ class AgentVibesServer:
         result = await self._run_script("background-music-manager.sh", ["status"])
         return result if result else "❌ Failed to get background music status"
 
+    async def set_reverb(self, level: str, agent: str = "default", apply_all: bool = False) -> str:
+        """
+        Set reverb level for an agent or globally.
+
+        Args:
+            level: Reverb level (off, light, medium, heavy, cathedral)
+            agent: Agent name (default: "default")
+            apply_all: Apply to all agents (default: False)
+
+        Returns:
+            Success message
+        """
+        args = ["set-reverb", level, agent]
+        if apply_all:
+            args.append("--all")
+        result = await self._run_script("effects-manager.sh", args)
+        return result if result else f"✅ Set reverb to {level}"
+
+    async def get_reverb(self, agent: str = "default") -> str:
+        """
+        Get current reverb level for an agent.
+
+        Args:
+            agent: Agent name (default: "default")
+
+        Returns:
+            Current reverb level
+        """
+        result = await self._run_script("effects-manager.sh", ["get-reverb", agent])
+        if result:
+            return f"Current reverb level for {agent}: {result.strip()}"
+        return f"❌ Failed to get reverb for {agent}"
+
+    async def list_audio_effects(self) -> str:
+        """
+        List all audio effects for all agents.
+
+        Returns:
+            Effects configuration
+        """
+        result = await self._run_script("effects-manager.sh", ["list"])
+        return result if result else "❌ Failed to list audio effects"
+
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
         """Run a bash script and return output"""
@@ -1057,6 +1100,56 @@ Fuzzy matching examples:
             description="Get current background music configuration including enabled status, volume, default track, and number of available tracks.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="set_reverb",
+            description="""Set reverb level for TTS audio. Can apply globally (default agent), to a specific agent, or to all agents.
+
+Reverb adds room/space ambiance to the voice, making it sound like it's in a small room, conference room, or large hall.
+
+Examples:
+- set_reverb(level="medium") - Set reverb for default agent
+- set_reverb(level="cathedral", agent="Winston") - Set cathedral reverb for Winston
+- set_reverb(level="light", apply_all=True) - Set light reverb for all agents
+- set_reverb(level="off") - Turn off reverb for default agent
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "string",
+                        "description": "Reverb level",
+                        "enum": ["off", "light", "medium", "heavy", "cathedral"]
+                    },
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name (optional, defaults to 'default'). Examples: Winston, John, Mary, Amelia",
+                    },
+                    "apply_all": {
+                        "type": "boolean",
+                        "description": "Apply to all agents (optional, default: false)",
+                    }
+                },
+                "required": ["level"],
+            },
+        ),
+        Tool(
+            name="get_reverb",
+            description="Get current reverb level for a specific agent or default",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name (optional, defaults to 'default')",
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="list_audio_effects",
+            description="List current audio effects configuration for all agents, including reverb levels and other effects",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -1122,6 +1215,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.set_background_music_volume(volume)
         elif name == "get_background_music_status":
             result = await agent_vibes.get_background_music_status()
+        elif name == "set_reverb":
+            level = arguments["level"]
+            agent = arguments.get("agent", "default")
+            apply_all = arguments.get("apply_all", False)
+            result = await agent_vibes.set_reverb(level, agent, apply_all)
+        elif name == "get_reverb":
+            agent = arguments.get("agent", "default")
+            result = await agent_vibes.get_reverb(agent)
+        elif name == "list_audio_effects":
+            result = await agent_vibes.list_audio_effects()
         else:
             result = f"Unknown tool: {name}"
 
