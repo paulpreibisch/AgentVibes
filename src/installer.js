@@ -1860,6 +1860,79 @@ async function install(options = {}) {
 
     console.log(chalk.white(`   • Voice manager ready`));
 
+    // Configure background music (if tracks were installed)
+    if (backgroundMusicFileCount > 0 && !options.yes) {
+      console.log(''); // Blank line for spacing
+
+      const enableBackgroundMusic = await promptUser({
+        type: 'confirm',
+        name: 'enable',
+        message: 'Enable background music for TTS?',
+        default: true
+      });
+
+      if (enableBackgroundMusic.enable) {
+        // Define track choices with user-friendly names
+        const trackChoices = [
+          { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
+          { name: '💃 Salsa (Latin - Upbeat brass & percussion)', value: 'agent_vibes_salsa_v2_loop.mp3' },
+          { name: '🎸 Cumbia (Latin - Accordion & drums)', value: 'agent_vibes_cumbia_v1_loop.mp3' },
+          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
+          { name: '🌸 Bossa Nova (Brazilian jazz)', value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+          { name: '🏙️  Japanese City Pop (80s synth)', value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
+          { name: '🌊 Chillwave (Electronic ambient)', value: 'agent_vibes_chillwave_v2_loop.mp3' },
+          { name: '🎹 Dreamy House (Electronic dance)', value: 'dreamy_house_loop.mp3' },
+          { name: '🌙 Dark Chill Step (Electronic bass)', value: 'agent_vibes_dark_chill_step_loop.mp3' },
+          { name: '🕉️  Goa Trance (Psychedelic electronic)', value: 'agent_vibes_goa_trance_v2_loop.mp3' },
+          { name: '🎼 Harpsichord (Baroque classical)', value: 'agent_vibes_harpsichord_v2_loop.mp3' },
+          { name: '🎻 Celtic Harp (Irish traditional)', value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
+          { name: '🌺 Hawaiian Slack Key Guitar', value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
+          { name: '🏜️  Arabic Oud (Middle Eastern)', value: 'agent_vibes_arabic_v2_loop.mp3' },
+          { name: '🪘 Gnawa Ambient (North African)', value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
+          { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
+        ];
+
+        const selectedTrack = await promptUser({
+          type: 'list',
+          name: 'track',
+          message: 'Choose default background music track:',
+          choices: trackChoices,
+          default: 'agent_vibes_bachata_v1_loop.mp3'
+        });
+
+        // Enable background music and set default track
+        const configDir = path.join(claudeDir, 'config');
+        await fs.mkdir(configDir, { recursive: true });
+
+        // Write enabled flag
+        const enabledFile = path.join(configDir, 'background-music-enabled.txt');
+        await fs.writeFile(enabledFile, 'true');
+
+        // Update audio-effects.cfg with selected track
+        const audioEffectsPath = path.join(configDir, 'audio-effects.cfg');
+        let audioEffectsContent = await fs.readFile(audioEffectsPath, 'utf-8');
+
+        // Update the default entry with selected track
+        audioEffectsContent = audioEffectsContent.replace(
+          /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
+          `default|$1|${selectedTrack.track}|$3`
+        );
+
+        await fs.writeFile(audioEffectsPath, audioEffectsContent);
+
+        console.log(chalk.green(`\n✅ Background music enabled!`));
+        console.log(chalk.white(`   Default track: ${trackChoices.find(t => t.value === selectedTrack.track)?.name || selectedTrack.track}`));
+        console.log('');
+        console.log(chalk.cyan('💡 Tip: Change background music anytime:'));
+        console.log(chalk.white('   • Change globally: /agent-vibes:background-music set-default <track>'));
+        console.log(chalk.white('   • Change per-agent: /agent-vibes:background-music set-agent <agent> <track>'));
+        console.log(chalk.white('   • List all tracks: /agent-vibes:background-music list'));
+        console.log(chalk.white('   • Disable: /agent-vibes:background-music off'));
+      } else {
+        console.log(chalk.gray('\nℹ️  Background music disabled. Enable later with: /agent-vibes:background-music on'));
+      }
+    }
+
     if (selectedProvider === 'macos') {
       // macOS Say provider summary
       console.log(chalk.white(`   • Using macOS built-in Say command`));
