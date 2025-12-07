@@ -786,14 +786,28 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
       const stat = await fs.stat(srcPath);
 
       if (stat.isFile() && (file.endsWith('.mp3') || file.endsWith('.wav'))) {
-        musicFiles.push(file);
         const destPath = path.join(destBackgroundsDir, file);
         await fs.copyFile(srcPath, destPath);
-        console.log(chalk.gray(`   ✓ ${file}`));
+
+        // Format file size
+        const sizeKB = (stat.size / 1024).toFixed(1);
+
+        musicFiles.push({
+          name: file,
+          size: `${sizeKB} KB`,
+          path: destPath
+        });
       }
     }
+
     if (musicFiles.length > 0) {
       spinner.succeed(chalk.green(`Installed ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'}!\n`));
+      console.log(chalk.green(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} installed:`));
+      musicFiles.forEach(track => {
+        console.log(chalk.green(`     ✓ ${track.name} (${track.size})`));
+        console.log(chalk.gray(`       ${track.path}`));
+      });
+      console.log(''); // Add blank line for spacing
     } else {
       spinner.info(chalk.yellow('No background music files found (optional)\n'));
     }
