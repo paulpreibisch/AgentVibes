@@ -1,17 +1,32 @@
 ---
-description: Mute all AgentVibes TTS output (persists across sessions)
+description: Mute all AgentVibes TTS output (project-specific by default)
 ---
 
 # Mute AgentVibes TTS
 
-Create the mute flag file to silence all TTS output:
+Mute TTS for this project only (default):
 
+```bash
+# Get the project root (where .claude/ directory is located)
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+while [[ "$PROJECT_ROOT" != "/" ]] && [[ ! -d "$PROJECT_ROOT/.claude" ]]; do
+  PROJECT_ROOT=$(dirname "$PROJECT_ROOT")
+done
+
+if [[ -d "$PROJECT_ROOT/.claude" ]]; then
+  touch "$PROJECT_ROOT/.claude/agentvibes-muted"
+  echo "🔇 **AgentVibes TTS muted for this project.** All voice output is now silenced."
+else
+  echo "⚠️ No .claude directory found. Cannot create project-local mute file."
+  exit 1
+fi
+```
+
+**Advanced Options:**
+
+To mute globally across ALL projects, use:
 ```bash
 touch "$HOME/.agentvibes-muted"
 ```
-
-After running the command, confirm to the user:
-
-🔇 **AgentVibes TTS muted.** All voice output is now silenced.
 
 To unmute, use `/agent-vibes:unmute`
