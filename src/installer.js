@@ -1995,8 +1995,10 @@ async function install(options = {}) {
     console.log(chalk.white('   TTS protocol automatically loads on every Claude session'));
     console.log(chalk.gray('   via SessionStart hook - no additional setup needed!\n'));
 
-    // Play welcome demo with harpsichord intro and reverb voice
-    await playWelcomeDemo(targetDir, spinner, options);
+    // Play welcome demo with harpsichord intro and reverb voice (opt-in only)
+    if (options.withAudio) {
+      await playWelcomeDemo(targetDir, spinner, options);
+    }
 
     console.log(chalk.cyan('🎤 Try these commands:'));
     console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
@@ -2084,6 +2086,7 @@ program
   .description('Install AgentVibes voice commands')
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
+  .option('--with-audio', 'Play welcome demo audio after installation')
   .action(async (options) => {
     await install(options);
   });
