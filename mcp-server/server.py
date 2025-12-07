@@ -547,46 +547,20 @@ class AgentVibesServer:
         result = await self._run_script("background-music-manager.sh", ["list"])
         return result if result else "❌ Failed to list background music"
 
-    async def set_background_music(self, track_name: Optional[str] = None) -> str:
+    async def set_background_music(self, track_name: str, agent_name: Optional[str] = None) -> str:
         """
-        Set the default background music track. If no track specified, randomly selects one.
+        Set background music track for a specific agent, all agents, or as default.
 
         Args:
-            track_name: Track filename or partial name (optional). If omitted, randomly selects a track.
+            track_name: Track filename or partial name for fuzzy matching
+            agent_name: Agent name ('all' for all agents, None for default)
 
         Returns:
             Success or error message
         """
-        # Security: Using secrets.choice for cryptographically secure random selection
-        import secrets
         import re
 
-        # If no track specified, list all tracks and randomly select one
-        if not track_name:
-            result = await self._run_script("background-music-manager.sh", ["list"])
-            if not result or "❌" in result:
-                return "❌ Failed to list background music tracks"
-
-            # Parse track names from output (lines that start with numbers)
-            tracks = []
-            for line in result.split("\n"):
-                # Match lines like " 1. Agent Vibes ChillWave v2.mp3"
-                match = re.match(r'\s*\d+\.\s+(.+)', line)
-                if match:
-                    tracks.append(match.group(1))
-
-            if not tracks:
-                return "❌ No background music tracks found"
-
-            # Randomly select a track
-            track_name = secrets.choice(tracks)
-            result = await self._run_script("background-music-manager.sh", ["set-default", track_name])
-            if result and "✅" in result:
-                return f"{result}\n\n🎲 Randomly selected from {len(tracks)} available tracks"
-            return f"❌ Failed to set background music: {result}"
-
-        # Track name provided - try to match it
-        # First, get list of available tracks
+        # Get list of available tracks for fuzzy matching
         list_result = await self._run_script("background-music-manager.sh", ["list"])
         if not list_result or "❌" in list_result:
             return "❌ Failed to list background music tracks"
@@ -620,13 +594,59 @@ class AgentVibesServer:
             available = "\n".join([f"  • {t}" for t in tracks])
             return f"❌ No track matching '{track_name}' found.\n\nAvailable tracks:\n{available}\n\n💡 Try a partial match like 'celtic' or 'chillwave'"
 
-        # Set the matched track
-        result = await self._run_script("background-music-manager.sh", ["set-default", matched_track])
+        # Determine which command to use based on agent_name
+        if agent_name and agent_name.lower() == "all":
+            # Set for all agents
+            result = await self._run_script("background-music-manager.sh", ["set-all", matched_track])
+        elif agent_name:
+            # Set for specific agent
+            result = await self._run_script("background-music-manager.sh", ["set-agent", agent_name, matched_track])
+        else:
+            # Set as default
+            result = await self._run_script("background-music-manager.sh", ["set-default", matched_track])
+
         if result and "✅" in result:
             if matched_track.lower() != track_name.lower():
                 return f"{result}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
             return result
         return f"❌ Failed to set background music: {result}"
+
+    async def enable_background_music(self, enabled: bool) -> str:
+        """
+        Enable or disable background music globally.
+
+        Args:
+            enabled: True to enable, False to disable
+
+        Returns:
+            Success or error message
+        """
+        command = "on" if enabled else "off"
+        result = await self._run_script("background-music-manager.sh", [command])
+        return result if result else f"❌ Failed to {'enable' if enabled else 'disable'} background music"
+
+    async def set_background_music_volume(self, volume: float) -> str:
+        """
+        Set background music volume.
+
+        Args:
+            volume: Volume level (0.0-1.0)
+
+        Returns:
+            Success or error message
+        """
+        result = await self._run_script("background-music-manager.sh", ["volume", str(volume)])
+        return result if result else "❌ Failed to set background music volume"
+
+    async def get_background_music_status(self) -> str:
+        """
+        Get current background music configuration.
+
+        Returns:
+            Status information
+        """
+        result = await self._run_script("background-music-manager.sh", ["status"])
+        return result if result else "❌ Failed to get background music status"
 
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
@@ -975,30 +995,67 @@ Note: Changes take effect on next Claude Code session restart.""",
         ),
         Tool(
             name="set_background_music",
-            description="""Set the default background music track for TTS. Supports smart selection:
-
-- If no track specified: Randomly selects from available tracks
-- If track name provided: Uses fuzzy matching to find the track
+            description="""Set background music track for a specific agent, all agents, or as default. Supports smart fuzzy matching.
 
 Perfect for:
-- "change background music" - Random selection
-- "set background music to celtic harp" - Specific track
-- "use chillwave background" - Partial match
+- "change background music to flamenco" - Sets for all agents
+- "set John's background music to celtic harp" - Agent-specific
+- "use chillwave as default background" - Default for new agents
 
-Examples:
-- set_background_music() - Random selection
-- set_background_music(track_name="celtic") - Matches "Agent Vibes Celtic Harp v1.mp3"
-- set_background_music(track_name="bossa nova") - Matches "Agent Vibes Bossa Nova v2.mp3"
+Fuzzy matching examples:
+- "flamenco" matches "agentvibes_soft_flamenco_loop.mp3"
+- "celtic" matches "agent_vibes_celtic_harp_v1_loop.mp3"
+- "bossa" matches "agent_vibes_bossa_nova_v2_loop.mp3"
 """,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "track_name": {
                         "type": "string",
-                        "description": "Track filename or partial name (optional). If omitted, randomly selects a track. Supports fuzzy matching (e.g., 'celtic' matches 'Celtic Harp').",
+                        "description": "Track filename or partial name for fuzzy matching (e.g., 'celtic', 'flamenco', 'bossa nova')",
+                    },
+                    "agent_name": {
+                        "type": "string",
+                        "description": "Agent name to configure (optional). Use 'all' for all agents, omit for default",
+                    },
+                },
+                "required": ["track_name"],
+            },
+        ),
+        Tool(
+            name="enable_background_music",
+            description="Enable or disable background music globally. When enabled, TTS audio will be mixed with background music at configured volume (default 30%).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable background music, False to disable",
                     }
                 },
+                "required": ["enabled"],
             },
+        ),
+        Tool(
+            name="set_background_music_volume",
+            description="Set the volume level for background music (0.0-1.0). Recommended: 0.20-0.40 for subtle background ambiance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "volume": {
+                        "type": "number",
+                        "description": "Volume level (0.0 = silent, 0.30 = default, 1.0 = full volume)",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                    }
+                },
+                "required": ["volume"],
+            },
+        ),
+        Tool(
+            name="get_background_music_status",
+            description="Get current background music configuration including enabled status, volume, default track, and number of available tracks.",
+            inputSchema={"type": "object", "properties": {}},
         ),
     ]
 
@@ -1055,7 +1112,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.list_background_music()
         elif name == "set_background_music":
             track_name = arguments.get("track_name")
-            result = await agent_vibes.set_background_music(track_name)
+            agent_name = arguments.get("agent_name")
+            result = await agent_vibes.set_background_music(track_name, agent_name)
+        elif name == "enable_background_music":
+            enabled = arguments.get("enabled")
+            result = await agent_vibes.enable_background_music(enabled)
+        elif name == "set_background_music_volume":
+            volume = arguments.get("volume")
+            result = await agent_vibes.set_background_music_volume(volume)
+        elif name == "get_background_music_status":
+            result = await agent_vibes.get_background_music_status()
         else:
             result = f"Unknown tool: {name}"
 
