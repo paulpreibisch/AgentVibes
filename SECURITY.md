@@ -1,5 +1,16 @@
 # Security Policy
 
+## Disclaimer
+
+**AgentVibes is open source software provided "AS IS" without warranty of any kind**. By using this software, you acknowledge and agree that:
+
+- You use AgentVibes at your own risk
+- The authors and contributors are not liable for any damages or security issues
+- You are responsible for reviewing the code and assessing its security for your use case
+- This software is licensed under the Apache License 2.0 (see LICENSE file)
+
+While we make every effort to address security vulnerabilities promptly, we cannot guarantee the security of this software for all use cases.
+
 ## Supported Versions
 
 We actively support the following versions of AgentVibes with security updates:

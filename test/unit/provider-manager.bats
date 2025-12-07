@@ -265,7 +265,7 @@ teardown() {
 
   cd "$parent_dir/subdir"
 
-  "$PROVIDER_MANAGER" switch "elevenlabs"
+  "$PROVIDER_MANAGER" switch "piper"
 
   # Should find .claude in parent tree
   assert_file_exists "$TEST_HOME/projects/.claude/tts-provider.txt"
