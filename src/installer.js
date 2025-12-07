@@ -1787,14 +1787,24 @@ async function install(options = {}) {
 
     if (!exists) {
       spinner.info(chalk.yellow('Creating .claude directory structure...'));
+      const audioDir = path.join(claudeDir, 'audio');
+      const backgroundsDir = path.join(audioDir, 'backgrounds');
       console.log(chalk.gray(`   → ${commandsDir}`));
       console.log(chalk.gray(`   → ${hooksDir}`));
+      console.log(chalk.gray(`   → ${audioDir}`));
+      console.log(chalk.gray(`   → ${backgroundsDir}`));
       await fs.mkdir(commandsDir, { recursive: true });
       await fs.mkdir(hooksDir, { recursive: true });
+      await fs.mkdir(backgroundsDir, { recursive: true });
       console.log(chalk.green('   ✓ Directories created!\n'));
     } else {
       spinner.succeed(chalk.green('.claude directory found!'));
       console.log(chalk.gray(`   Location: ${claudeDir}\n`));
+
+      // Ensure audio/backgrounds directory exists even if .claude already exists
+      const audioDir = path.join(claudeDir, 'audio');
+      const backgroundsDir = path.join(audioDir, 'backgrounds');
+      await fs.mkdir(backgroundsDir, { recursive: true });
     }
 
     // Copy all files using helper functions

@@ -459,7 +459,7 @@ AgentVibes supports **custom personalities** and **custom voices**.
 
 **No Audio Playing?**
 1. Check API key: `echo $ELEVENLABS_API_KEY`
-2. Verify hook is installed: `ls -la ~/.claude/hooks/user-prompt-submit.sh`
+2. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
 3. Test: `/agent-vibes:sample Aria`
 
 **Commands Not Found?**
