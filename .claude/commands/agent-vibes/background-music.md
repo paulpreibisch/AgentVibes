@@ -3,6 +3,18 @@ description: Toggle background music for TTS (on/off/status)
 tags: [user]
 ---
 
+**IMPORTANT: When user requests background music changes in natural language (e.g., "change to salsa", "switch to jazz"), you MUST:**
+
+1. Run `bash .claude/hooks/background-music-manager.sh list` to see all available tracks
+2. Find the matching track by searching for keywords (e.g., "salsa" → "agent_vibes_salsa_v2_loop.mp3")
+3. Execute `bash .claude/hooks/background-music-manager.sh set-default EXACT_FILENAME`
+4. Test with TTS to confirm the change took effect
+
+**NEVER:**
+- Manually edit config files directly
+- Create new config files like "background-music.cfg"
+- Guess filenames without listing them first
+
 Run the background music manager script with the provided command.
 
 If no arguments provided, show status. Otherwise execute:
