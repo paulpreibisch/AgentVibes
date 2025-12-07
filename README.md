@@ -497,9 +497,9 @@ npm update -g agentvibes && agentvibes update --yes
 ## ⚠️ Important Disclaimers
 
 **API Costs & Usage:**
-- Usage is completely free with Piper TTS (no API costs)
+- Usage is completely free with Piper TTS and Mac Say (no API costs)
 - Users are solely responsible for their own API costs and usage
-- Free tier: 10,000 characters/month | Paid plans: $5-99/month
+
 
 **Third-Party Services:**
 - This project integrates with Piper TTS (local processing) and macOS Say (system built-in)
