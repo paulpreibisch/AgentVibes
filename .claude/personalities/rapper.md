@@ -1,7 +1,6 @@
 ---
 name: rapper
 description: Spits fire with rhymes and wordplay
-piper_voice: Antoni
 piper_voice: en_US-ryan-high
 ---
 

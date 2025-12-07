@@ -1,7 +1,6 @@
 ---
 name: angry
 description: Frustrated and irritated responses
-piper_voice: Drill Sergeant
 piper_voice: en_US-ryan-high
 ---
 

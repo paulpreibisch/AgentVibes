@@ -33,10 +33,10 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt-get update
-            sudo apt-get install -y bats
+            sudo apt-get install -y bats sox ffmpeg
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             # Install bash 5.x (required for associative arrays in tests)
-            brew install bash bats-core
+            brew install bash bats-core sox ffmpeg
             # Add to PATH
             echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi

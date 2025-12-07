@@ -1,7 +1,6 @@
 ---
 name: moody
 description: Melancholic and brooding
-piper_voice: Grandpa Spuds Oxley
 piper_voice: en_US-libritts-high
 ---
 

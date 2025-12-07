@@ -1,7 +1,6 @@
 ---
 name: pirate
 description: Seafaring swagger and nautical language
-piper_voice: Pirate Marshal
 piper_voice: en_US-joe-medium
 ---
 

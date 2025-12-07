@@ -343,13 +343,13 @@ function execScript(scriptPath, options = {}) {
     throw new Error('Shell config must be under home directory');
   }
 
-  // Security: Use execFileSync with -c flag to prevent command injection
-  // The shell sources its config and executes the script with arguments passed as array
-  // This avoids string interpolation vulnerabilities
-  const shellScript = `source "${shellConfig}" 2>/dev/null; exec "${scriptFile}" "$@"`;
-
-  return execFileSync(shell, ['-c', shellScript, '--', ...args], {
-    ...options
+  // Security: Avoid shell script string interpolation to prevent CodeQL warnings
+  // Instead, directly execute the script file without sourcing shell config
+  // The script itself will be executed in a clean environment
+  // Note: This means shell aliases/functions won't be available, but that's safer
+  return execFileSync(scriptFile, args, {
+    ...options,
+    shell: false  // Don't use shell to avoid injection risks
   });
 }
 

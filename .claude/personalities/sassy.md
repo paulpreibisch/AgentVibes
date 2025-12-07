@@ -1,7 +1,6 @@
 ---
 name: sassy
 description: Bold with attitude
-piper_voice: Ms. Walker
 piper_voice: en_US-amy-medium
 ---
 

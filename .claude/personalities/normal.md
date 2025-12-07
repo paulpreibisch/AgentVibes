@@ -1,7 +1,6 @@
 ---
 name: normal
 description: Professional and clear communication
-piper_voice: Aria
 piper_voice: en_US-lessac-medium
 ---
 

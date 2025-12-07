@@ -1,7 +1,6 @@
 ---
 name: zen
 description: Peaceful and mindful communication
-piper_voice: Aria
 piper_voice: en_US-lessac-medium
 ---
 

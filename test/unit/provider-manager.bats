@@ -27,8 +27,7 @@ teardown() {
 
   [ "$status" -eq 0 ]
 
-  # Should show all three providers: elevenlabs, piper, and macos
-  assert_output_contains "elevenlabs"
+  # Should show both providers: piper and macos (ElevenLabs removed in v2.15.0)
   assert_output_contains "piper"
   assert_output_contains "macos"
 }
@@ -39,8 +38,7 @@ teardown() {
   [ "$status" -eq 0 ]
 
   # Verify it's detecting actual provider scripts
-  # All three providers should be present (Issue #52)
-  [[ "$output" =~ "elevenlabs" ]]
+  # Both providers should be present (ElevenLabs removed in v2.15.0)
   [[ "$output" =~ "piper" ]]
   [[ "$output" =~ "macos" ]]
 }
@@ -48,7 +46,6 @@ teardown() {
 @test "provider-manager list works with no providers (edge case)" {
   # Temporarily rename all provider files to test no providers case
   local hooks_dir="$TEST_CLAUDE_DIR/hooks"
-  mv "$hooks_dir/play-tts-elevenlabs.sh" "$hooks_dir/play-tts-elevenlabs.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-piper.sh" "$hooks_dir/play-tts-piper.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-macos.sh" "$hooks_dir/play-tts-macos.sh.bak" 2>/dev/null || true
 
@@ -58,7 +55,6 @@ teardown() {
   assert_output_contains "No providers found"
 
   # Restore files
-  mv "$hooks_dir/play-tts-elevenlabs.sh.bak" "$hooks_dir/play-tts-elevenlabs.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-piper.sh.bak" "$hooks_dir/play-tts-piper.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-macos.sh.bak" "$hooks_dir/play-tts-macos.sh" 2>/dev/null || true
 }
@@ -66,17 +62,6 @@ teardown() {
 # ============================================================================
 # Provider Switching Tests
 # ============================================================================
-
-@test "provider-manager switch to elevenlabs" {
-  run "$PROVIDER_MANAGER" switch "elevenlabs"
-
-  [ "$status" -eq 0 ]
-  assert_output_contains "Active provider set to: elevenlabs"
-
-  # Verify provider was saved
-  assert_file_exists "$PROVIDER_FILE"
-  assert_file_contains "$PROVIDER_FILE" "elevenlabs"
-}
 
 @test "provider-manager switch to piper" {
   run "$PROVIDER_MANAGER" switch "piper"
@@ -89,11 +74,11 @@ teardown() {
 }
 
 @test "provider-manager set command works like switch" {
-  run "$PROVIDER_MANAGER" set "elevenlabs"
+  run "$PROVIDER_MANAGER" set "piper"
 
   [ "$status" -eq 0 ]
-  assert_output_contains "Active provider set to: elevenlabs"
-  assert_file_contains "$PROVIDER_FILE" "elevenlabs"
+  assert_output_contains "Active provider set to: piper"
+  assert_file_contains "$PROVIDER_FILE" "piper"
 }
 
 @test "provider-manager switch to macos" {
@@ -145,45 +130,30 @@ teardown() {
   assert_file_contains "$VOICE_FILE" "en_US"
 }
 
-@test "provider-manager switch preserves known voice mappings" {
-  # Create voice file with a known ElevenLabs voice
-  mkdir -p "$(dirname "$VOICE_FILE")"
-  echo "Jessica Anne Bogart" > "$VOICE_FILE"
-
-  "$PROVIDER_MANAGER" switch "elevenlabs"
-
-  # Voice file should exist
-  [[ -f "$VOICE_FILE" ]]
-
-  # Should preserve existing voice when staying in same provider type
-  # Jessica Anne Bogart is ElevenLabs, so stays the same
-  assert_file_contains "$VOICE_FILE" "Jessica Anne Bogart"
-}
-
 # ============================================================================
 # Provider Persistence Tests
 # ============================================================================
 
 @test "provider-manager provider setting persists" {
   # Set provider
-  "$PROVIDER_MANAGER" switch "elevenlabs"
+  "$PROVIDER_MANAGER" switch "piper"
 
   # Read it back
   run "$PROVIDER_MANAGER" get
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "elevenlabs" ]]
+  [[ "$output" =~ "piper" ]]
 }
 
 @test "provider-manager multiple switches persist correctly" {
   # Switch back and forth
-  "$PROVIDER_MANAGER" switch "elevenlabs"
   "$PROVIDER_MANAGER" switch "piper"
+  "$PROVIDER_MANAGER" switch "macos"
 
   run "$PROVIDER_MANAGER" get
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "piper" ]]
+  [[ "$output" =~ "macos" ]]
 }
 
 # ============================================================================
@@ -304,16 +274,6 @@ teardown() {
 # ============================================================================
 # Provider Script Path Tests
 # ============================================================================
-
-@test "provider-manager returns correct script path for elevenlabs" {
-  # Source the provider manager to use its functions
-  source "$PROVIDER_MANAGER"
-
-  run get_provider_script_path "elevenlabs"
-
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ "play-tts-elevenlabs.sh" ]]
-}
 
 @test "provider-manager returns correct script path for piper" {
   source "$PROVIDER_MANAGER"

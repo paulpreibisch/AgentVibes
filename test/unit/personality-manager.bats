@@ -58,14 +58,16 @@ teardown() {
 }
 
 @test "personality-manager set with assigned voice switches voice silently" {
-  # Set default provider (no provider file defaults to elevenlabs)
-  # sarcastic personality has assigned voice "Jessica Anne Bogart" (ElevenLabs)
+  # Set Piper as active provider (ElevenLabs removed in v2.15.0)
+  echo "piper" > "$HOME/.claude/tts-provider.txt"
+
+  # sarcastic personality has assigned voice "en_US-amy-medium" (Piper voice)
   run "$PERSONALITY_MANAGER" set "sarcastic"
 
   [ "$status" -eq 0 ]
-  assert_output_contains "Switching to assigned voice: Jessica Anne Bogart"
+  assert_output_contains "Switching to assigned voice: en_US-amy-medium"
 
-  # Should NOT contain duplicate "Hi, I'm Jessica..." introduction
+  # Should NOT contain duplicate voice introduction
   # (that would indicate double audio bug)
 }
 

@@ -67,6 +67,16 @@ jobs:
             brew install ffmpeg
           fi
 
+      - name: Check for sox (needed for background music and audio effects)
+        run: |
+          if command -v sox &> /dev/null; then
+            echo "✅ sox found: $(which sox)"
+            sox --version
+          else
+            echo "⚠️  sox not found - installing"
+            brew install sox
+          fi
+
       - name: Check for audio playback tools
         run: |
           echo "=== Checking audio tools ==="

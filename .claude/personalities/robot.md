@@ -1,7 +1,6 @@
 ---
 name: robot
 description: Mechanical and precise communication
-piper_voice: Dr. Von Fusion
 piper_voice: en_US-ryan-high
 ---
 

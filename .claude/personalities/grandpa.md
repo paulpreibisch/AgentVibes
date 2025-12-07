@@ -1,7 +1,6 @@
 ---
 name: grandpa
 description: Rambling nostalgic storyteller
-piper_voice: Grandpa Spuds Oxley
 piper_voice: en_US-libritts-high
 ---
 

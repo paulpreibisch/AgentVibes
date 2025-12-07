@@ -64,61 +64,16 @@ declare -A EXPECTED_VOICES=(
   fi
 }
 
-@test "voice IDs in voices-config.sh are stable" {
-  # These voice IDs should remain constant
-  source "$REPO_ROOT/.claude/hooks/voices-config.sh"
-
-  # Critical voice IDs that must not change (using get_voice_id function)
-  [[ "$(get_voice_id 'Ralf Eisend')" == "A9evEp8yGjv4c3WsIKuY" ]]
-  [[ "$(get_voice_id 'Jessica Anne Bogart')" == "flHkNRp1BlvT73UL6gyz" ]]
-  [[ "$(get_voice_id 'Northern Terry')" == "wo6udizrrtpIxWGp2qJk" ]]
-  [[ "$(get_voice_id 'Cowboy Bob')" == "KTPVrSVAEUSJRClDzBw7" ]]
-  [[ "$(get_voice_id 'Lutz Laugh')" == "9yzdeviXkFddZ4Oz8Mok" ]]
-}
-
-@test "all personality files have voice field" {
+@test "all personality files have piper_voice field" {
   local failed=0
   local errors=""
 
   for personality_file in "$REPO_ROOT/.claude/personalities"/*.md; do
     personality_name=$(basename "$personality_file" .md)
 
-    # Check if file has both elevenlabs_voice and piper_voice fields
-    if ! grep -q "^elevenlabs_voice:" "$personality_file"; then
-      errors="${errors}Personality '${personality_name}' missing elevenlabs_voice field\n"
-      failed=1
-    fi
+    # Check if file has piper_voice field (ElevenLabs removed in v2.15.0)
     if ! grep -q "^piper_voice:" "$personality_file"; then
       errors="${errors}Personality '${personality_name}' missing piper_voice field\n"
-      failed=1
-    fi
-  done
-
-  if [[ $failed -eq 1 ]]; then
-    echo -e "$errors"
-    return 1
-  fi
-}
-
-@test "assigned voices exist in voices-config.sh" {
-  source "$REPO_ROOT/.claude/hooks/voices-config.sh"
-  local failed=0
-  local errors=""
-
-  for personality_file in "$REPO_ROOT/.claude/personalities"/*.md; do
-    personality_name=$(basename "$personality_file" .md)
-    assigned_voice=$(grep "^elevenlabs_voice:" "$personality_file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-
-    # Skip if no elevenlabs_voice assigned
-    if [[ -z "$assigned_voice" ]]; then
-      continue
-    fi
-
-    # Check if ElevenLabs voice exists in config (using get_voice_id function)
-    local voice_id
-    voice_id=$(get_voice_id "$assigned_voice")
-    if [[ -z "$voice_id" ]]; then
-      errors="${errors}Personality '${personality_name}' uses undefined ElevenLabs voice: ${assigned_voice}\n"
       failed=1
     fi
   done

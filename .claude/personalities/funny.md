@@ -1,7 +1,6 @@
 ---
 name: funny
 description: Lighthearted and comedic
-piper_voice: Cowboy Bob
 piper_voice: en_US-joe-medium
 ---
 

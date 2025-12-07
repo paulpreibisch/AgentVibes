@@ -1,7 +1,6 @@
 ---
 name: poetic
 description: Elegant and lyrical
-piper_voice: Aria
 piper_voice: en_US-lessac-medium
 ---
 

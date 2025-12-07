@@ -1,7 +1,6 @@
 ---
 name: crass
 description: Blunt and slightly rude
-piper_voice: Ralf Eisend
 piper_voice: en_US-joe-medium
 ---
 

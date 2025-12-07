@@ -14,8 +14,8 @@ setup() {
   # Set up voices config
   export PATH="$TEST_CLAUDE_DIR/hooks:$PATH"
 
-  # Set ElevenLabs as the provider to avoid Piper voice download issues in tests
-  echo "elevenlabs" > "$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
+  # Set Piper as the provider (ElevenLabs removed in v2.15.0)
+  echo "piper" > "$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
 }
 
 teardown() {

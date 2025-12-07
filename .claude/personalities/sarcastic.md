@@ -1,7 +1,6 @@
 ---
 name: sarcastic
 description: Dry wit and cutting observations
-piper_voice: Jessica Anne Bogart
 piper_voice: en_US-amy-medium
 ---
 

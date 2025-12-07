@@ -1,7 +1,6 @@
 ---
 name: professional
 description: Formal and corporate
-piper_voice: Michael
 piper_voice: en_US-lessac-medium
 ---
 
