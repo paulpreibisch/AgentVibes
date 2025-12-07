@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.15.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.16.0
 
 ---
 
@@ -111,7 +111,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.15.0 - Background Music & Audio Effects](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.15.0)** 🎉
+**[v2.15.0 - Background Music & Audio Effects](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.16.0)** 🎉
 
 AgentVibes v2.15.0 introduces a comprehensive background music system with 16 professionally-optimized tracks and per-agent audio effects processing. BMAD v6 integration adds YAML voice mappings for multi-agent conversations. **Breaking**: ElevenLabs provider removed due to cost impracticality for heavy daily use.
 
