@@ -300,17 +300,17 @@ set_all_agents_track() {
         # Skip comments and empty lines
         /^#/ || /^[[:space:]]*$/ { print; next }
 
-        # Skip default and _party_mode
-        $1 == "default" || $1 == "_party_mode" { print; next }
+        # Skip only _party_mode (but UPDATE default!)
+        $1 == "_party_mode" { print; next }
 
-        # Update all other agent lines
+        # Update all agent lines including default
         {
             print $1 "|" $2 "|" track "|" $4
         }
     ' "$config_file" > "$temp_file"
 
-    # Count updated agents
-    count=$(grep -v '^#' "$config_file" | grep -v '^[[:space:]]*$' | grep -v '^default|' | grep -v '^_party_mode|' | wc -l)
+    # Count updated agents (including default)
+    count=$(grep -v '^#' "$config_file" | grep -v '^[[:space:]]*$' | grep -v '^_party_mode|' | wc -l)
 
     mv "$temp_file" "$config_file"
     echo "✅ Updated background music for $count agents: $track"

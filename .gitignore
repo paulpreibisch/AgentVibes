@@ -11,8 +11,10 @@ yarn-error.log*
 *.swp
 *.swo
 *~
-# Audio files (but keep backgrounds samples)
+# Audio files (but keep background music tracks)
 .claude/audio/*
+!.claude/audio/tracks/
+!.claude/audio/tracks/*.mp3
 !.claude/audio/backgrounds/
 .claude/audio/backgrounds/*
 !.claude/audio/backgrounds/README.md

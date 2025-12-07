@@ -38,6 +38,22 @@ OUTPUT_FILE="${3:-}"
 # Config and directories (resolve to absolute paths)
 CONFIG_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/audio-effects.cfg"
 BACKGROUNDS_DIR="$(cd "$SCRIPT_DIR/../audio" && pwd)/tracks"
+ENABLED_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/background-music-enabled.txt"
+
+# Check if background music is globally enabled
+is_background_music_enabled() {
+    # Default to false if file doesn't exist
+    if [[ ! -f "$ENABLED_FILE" ]]; then
+        return 1  # Disabled by default
+    fi
+
+    # Read the enabled flag
+    local enabled
+    enabled=$(cat "$ENABLED_FILE" 2>/dev/null | tr -d '[:space:]')
+
+    # Return 0 (true) if enabled, 1 (false) otherwise
+    [[ "$enabled" == "true" ]]
+}
 
 # Validate inputs
 if [[ -z "$INPUT_FILE" ]] || [[ ! -f "$INPUT_FILE" ]]; then
@@ -294,14 +310,14 @@ main() {
         cp "$INPUT_FILE" "$temp_effects"
     fi
 
-    # Step 2: Mix background if configured
+    # Step 2: Mix background if configured AND enabled
     local background_path=""
     if [[ -n "$background_file" ]]; then
         background_path="$BACKGROUNDS_DIR/$background_file"
     fi
 
     local used_background=""
-    if [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
+    if is_background_music_enabled && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
         echo "  → Mixing background: $background_file at ${bg_volume} volume" >&2
         mix_background "$temp_effects" "$background_path" "$bg_volume" "$temp_final"
         used_background="$background_path"  # Return full path instead of just filename
