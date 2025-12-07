@@ -111,15 +111,18 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.14.19 - BMAD TTS Injection Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.15.0-alpha.11)** 🎉
+**[v2.15.0 - Background Music & Audio Effects](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.15.0)** 🎉
 
-AgentVibes v2.14.19 improves how TTS injection works with BMAD agents. Your agent files now get voice capabilities through a clean, loosely-coupled injection system!
+AgentVibes v2.15.0 introduces a comprehensive background music system with 16 professionally-optimized tracks and per-agent audio effects processing. BMAD v6 integration adds YAML voice mappings for multi-agent conversations. **Breaking**: ElevenLabs provider removed due to cost impracticality for heavy daily use.
 
 **Key Highlights:**
-- 🔊 **TTS Injection Documentation** - Clear before/after examples showing how BMAD agents get voice
-- 🛡️ **File Safety Improvements** - Protection against empty files and data loss during injection
-- 📁 **Organized Backups** - Centralized backups in `~/.agentvibes/backups/agents/`
-- 🔌 **Provider-Agnostic Design** - Any TTS provider can integrate using injection markers
+- 🎶 **16 Background Music Tracks** - Latin, World, Electronic, Classical genres (Salsa, Bachata, Cumbia, Japanese City Pop, and more)
+- 🎛️ **Audio Effects Processor** - Per-agent reverb, pitch, EQ, compression with background music mixing
+- 🐛 **TDD Bug Fix** - Background music now correctly respects enabled/disabled flag
+- 🎚️ **Natural Language Control** - Switch music with conversational commands like "change to salsa"
+- 🤖 **BMAD v6 Support** - YAML voice mappings with auto-detection and XML-style TTS injection
+- 🔊 **Paplay Fix** - Fixes choppy audio on Linux/WSL RDP connections
+- ⚡ **ElevenLabs Removed** - Migrate to free local Piper TTS (already installed)
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

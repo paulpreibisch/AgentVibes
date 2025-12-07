@@ -128,18 +128,21 @@ function showReleaseInfo() {
   console.log(
     boxen(
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.14.18 - Mute/Unmute TTS Control\n') +
+      chalk.cyan.bold('  📦 AgentVibes v2.15.0 - Background Music & Audio Effects\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.14.18 adds the ability to mute and unmute TTS output\n') +
-      chalk.cyan('with persistent state. Perfect for meetings or temporary silence\n') +
-      chalk.cyan('without losing your voice config. Mute once, stay silent until unmute!\n\n') +
+      chalk.cyan('AgentVibes v2.15.0 introduces a comprehensive background music system\n') +
+      chalk.cyan('with 16 professionally-optimized tracks and per-agent audio effects.\n') +
+      chalk.cyan('BMAD v6 integration adds YAML voice mappings for multi-agent conversations.\n') +
+      chalk.cyan('Breaking: ElevenLabs removed (cost impractical for heavy daily use).\n\n') +
       chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🔇 Mute Command - /agent-vibes:mute silences all TTS instantly\n') +
-      chalk.gray('   🔊 Unmute Command - /agent-vibes:unmute restores voice output\n') +
-      chalk.gray('   💾 Persistent State - Mute survives Claude restarts\n') +
-      chalk.gray('   🔌 MCP Support - mute(), unmute(), is_muted() for Claude Desktop\n') +
-      chalk.gray('   🧪 Full Test Coverage - 7 new tests validate the feature\n\n') +
+      chalk.gray('   🎶 16 Background Music Tracks - Latin, World, Electronic, Classical\n') +
+      chalk.gray('   🎛️ Audio Effects Processor - Per-agent reverb, pitch, EQ, compression\n') +
+      chalk.gray('   🐛 TDD Bug Fix - Background music respects enabled/disabled flag\n') +
+      chalk.gray('   🎚️ Natural Language Control - "change to salsa" switches music\n') +
+      chalk.gray('   🤖 BMAD v6 Support - YAML voice mappings with auto-detection\n') +
+      chalk.gray('   🔊 Paplay Fix - Fixes choppy audio on Linux/WSL RDP connections\n') +
+      chalk.gray('   ⚡ ElevenLabs Removed - Migrate to free local Piper TTS\n\n') +
       chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
       chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
       chalk.gray('🌐 Website: https://agentvibes.org\n') +
