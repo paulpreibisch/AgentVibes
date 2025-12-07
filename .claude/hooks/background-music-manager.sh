@@ -245,15 +245,10 @@ set_agent_track() {
 
     # Verify track exists
     local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
-    if [[ ! -f "$bg_dir/$track" ]] && [[ ! -f "$bg_dir/optimized/$track" ]]; then
+    if [[ ! -f "$bg_dir/$track" ]]; then
         echo "❌ Error: Track not found: $track"
         echo "Run '$0 list' to see available tracks"
         exit 1
-    fi
-
-    # Add optimized/ prefix if not present and file exists there
-    if [[ ! "$track" =~ ^optimized/ ]] && [[ -f "$bg_dir/optimized/$track" ]]; then
-        track="optimized/$track"
     fi
 
     # Update or add agent config line
@@ -290,15 +285,10 @@ set_all_agents_track() {
 
     # Verify track exists
     local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
-    if [[ ! -f "$bg_dir/$track" ]] && [[ ! -f "$bg_dir/optimized/$track" ]]; then
+    if [[ ! -f "$bg_dir/$track" ]]; then
         echo "❌ Error: Track not found: $track"
         echo "Run '$0 list' to see available tracks"
         exit 1
-    fi
-
-    # Add optimized/ prefix if not present and file exists there
-    if [[ ! "$track" =~ ^optimized/ ]] && [[ -f "$bg_dir/optimized/$track" ]]; then
-        track="optimized/$track"
     fi
 
     # Update all non-comment, non-empty, non-default lines
