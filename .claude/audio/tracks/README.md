@@ -6,7 +6,7 @@ This folder contains background music tracks that play behind TTS voice output.
 
 1. **Copy audio files here:**
    ```bash
-   cp ~/Music/your-track.mp3 .claude/audio/backgrounds/
+   cp ~/Music/your-track.mp3 .claude/audio/tracks/
    ```
 
 2. **Edit the config** (`.claude/config/audio-effects.cfg`):

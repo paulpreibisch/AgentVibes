@@ -29,7 +29,7 @@ Background music:
 
 ## Configuration
 
-Background tracks are stored in `.claude/audio/backgrounds/`
+Background tracks are stored in `.claude/audio/tracks/`
 
 Agent-specific themes are configured in `.claude/config/audio-effects.cfg`:
 ```

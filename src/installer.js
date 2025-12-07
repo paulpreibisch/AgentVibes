@@ -773,8 +773,8 @@ async function copyBmadConfigFiles(targetDir, spinner) {
  */
 async function copyBackgroundMusicFiles(targetDir, spinner) {
   spinner.start('Installing background music tracks...');
-  const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'backgrounds', 'optimized');
-  const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'backgrounds', 'optimized');
+  const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks', 'optimized');
+  const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'tracks', 'optimized');
 
   await fs.mkdir(destBackgroundsDir, { recursive: true });
 
@@ -1684,23 +1684,23 @@ async function install(options = {}) {
     if (!exists) {
       spinner.info(chalk.yellow('Creating .claude directory structure...'));
       const audioDir = path.join(claudeDir, 'audio');
-      const backgroundsDir = path.join(audioDir, 'backgrounds');
+      const tracksDir = path.join(audioDir, 'tracks');
       console.log(chalk.gray(`   → ${commandsDir}`));
       console.log(chalk.gray(`   → ${hooksDir}`));
       console.log(chalk.gray(`   → ${audioDir}`));
-      console.log(chalk.gray(`   → ${backgroundsDir}`));
+      console.log(chalk.gray(`   → ${tracksDir}`));
       await fs.mkdir(commandsDir, { recursive: true });
       await fs.mkdir(hooksDir, { recursive: true });
-      await fs.mkdir(backgroundsDir, { recursive: true });
+      await fs.mkdir(tracksDir, { recursive: true });
       console.log(chalk.green('   ✓ Directories created!\n'));
     } else {
       spinner.succeed(chalk.green('.claude directory found!'));
       console.log(chalk.gray(`   Location: ${claudeDir}\n`));
 
-      // Ensure audio/backgrounds directory exists even if .claude already exists
+      // Ensure audio/tracks directory exists even if .claude already exists
       const audioDir = path.join(claudeDir, 'audio');
-      const backgroundsDir = path.join(audioDir, 'backgrounds');
-      await fs.mkdir(backgroundsDir, { recursive: true });
+      const tracksDir = path.join(audioDir, 'tracks');
+      await fs.mkdir(tracksDir, { recursive: true });
     }
 
     // Copy all files using helper functions
@@ -1875,10 +1875,10 @@ async function install(options = {}) {
       }
 
       // Show background music files
-      const backgroundsDir = path.join(targetDir, '.claude', 'audio', 'backgrounds');
+      const tracksDir = path.join(targetDir, '.claude', 'audio', 'tracks');
       try {
-        if (fsSync.existsSync(backgroundsDir)) {
-          const bgFiles = fsSync.readdirSync(backgroundsDir);
+        if (fsSync.existsSync(tracksDir)) {
+          const bgFiles = fsSync.readdirSync(tracksDir);
           const musicFiles = bgFiles.filter(f => f.endsWith('.mp3') || f.endsWith('.wav'));
           if (musicFiles.length > 0) {
             console.log(chalk.white(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} available`));

@@ -16,7 +16,7 @@ set -euo pipefail
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKGROUNDS_DIR="$SCRIPT_DIR/../audio/backgrounds"
+BACKGROUNDS_DIR="$SCRIPT_DIR/../audio/tracks"
 OPTIMIZED_DIR="$BACKGROUNDS_DIR/optimized"
 
 mkdir -p "$OPTIMIZED_DIR"
@@ -82,6 +82,6 @@ echo "📊 Results:"
 echo "   Original dir: $(du -sh "$BACKGROUNDS_DIR" | cut -f1)"
 echo "   Optimized dir: $(du -sh "$OPTIMIZED_DIR" | cut -f1)"
 echo ""
-echo "💡 To use optimized backgrounds:"
+echo "💡 To use optimized tracks:"
 echo "   1. Update audio-effects.cfg to point to optimized/*.mp3"
 echo "   2. Or replace originals: cp optimized/* ./"

@@ -37,7 +37,7 @@ OUTPUT_FILE="${3:-}"
 
 # Config and directories (resolve to absolute paths)
 CONFIG_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/audio-effects.cfg"
-BACKGROUNDS_DIR="$(cd "$SCRIPT_DIR/../audio" && pwd)/backgrounds"
+BACKGROUNDS_DIR="$(cd "$SCRIPT_DIR/../audio" && pwd)/tracks"
 
 # Validate inputs
 if [[ -z "$INPUT_FILE" ]] || [[ ! -f "$INPUT_FILE" ]]; then

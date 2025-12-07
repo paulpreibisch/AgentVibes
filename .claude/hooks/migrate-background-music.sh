@@ -19,7 +19,7 @@ export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-BG_DIR="$SCRIPT_DIR/../audio/backgrounds"
+BG_DIR="$SCRIPT_DIR/../audio/tracks"
 CONFIG_FILE="$SCRIPT_DIR/../config/audio-effects.cfg"
 
 # Flag to track if any changes were made

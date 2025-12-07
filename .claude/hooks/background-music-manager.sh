@@ -92,10 +92,10 @@ set_volume() {
 # @function list_tracks
 # @intent List all pre-packaged background music files
 list_tracks() {
-    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    local bg_dir="$SCRIPT_DIR/../audio/tracks"
 
     if [[ ! -d "$bg_dir" ]]; then
-        echo "❌ No backgrounds folder found at $bg_dir"
+        echo "❌ No tracks folder found at $bg_dir"
         return 1
     fi
 
@@ -112,7 +112,7 @@ list_tracks() {
     done < <(find "$bg_dir" -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.ogg" \) -print0 2>/dev/null | sort -z)
 
     if [[ $count -eq 0 ]]; then
-        echo "No audio files found in backgrounds folder"
+        echo "No audio files found in tracks folder"
     else
         echo ""
         echo "Total: $count track(s)"
@@ -139,7 +139,7 @@ get_default_track() {
 set_default_track() {
     local track="$1"
     local audio_effects_cfg="$SCRIPT_DIR/../config/audio-effects.cfg"
-    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    local bg_dir="$SCRIPT_DIR/../audio/tracks"
 
     if [[ -z "$track" ]]; then
         echo "❌ Error: No track name provided"
@@ -149,7 +149,7 @@ set_default_track() {
 
     # Check if track exists
     if [[ ! -f "$bg_dir/$track" ]]; then
-        echo "❌ Error: Track '$track' not found in backgrounds folder"
+        echo "❌ Error: Track '$track' not found in tracks folder"
         echo "Run '$0 list' to see available tracks"
         return 1
     fi
@@ -207,13 +207,13 @@ show_status() {
     fi
 
     # Check for background files
-    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    local bg_dir="$SCRIPT_DIR/../audio/tracks"
     if [[ -d "$bg_dir" ]]; then
         local count
         count=$(find "$bg_dir" -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.ogg" \) 2>/dev/null | wc -l)
-        echo "Tracks: $count audio file(s) in backgrounds folder"
+        echo "Tracks: $count audio file(s) in tracks folder"
     else
-        echo "Tracks: No backgrounds folder found"
+        echo "Tracks: No tracks folder found"
     fi
 
     # Check dependencies
@@ -244,7 +244,7 @@ set_agent_track() {
     fi
 
     # Verify track exists
-    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    local bg_dir="$SCRIPT_DIR/../audio/tracks"
     if [[ ! -f "$bg_dir/$track" ]]; then
         echo "❌ Error: Track not found: $track"
         echo "Run '$0 list' to see available tracks"
@@ -284,7 +284,7 @@ set_all_agents_track() {
     fi
 
     # Verify track exists
-    local bg_dir="$SCRIPT_DIR/../audio/backgrounds"
+    local bg_dir="$SCRIPT_DIR/../audio/tracks"
     if [[ ! -f "$bg_dir/$track" ]]; then
         echo "❌ Error: Track not found: $track"
         echo "Run '$0 list' to see available tracks"

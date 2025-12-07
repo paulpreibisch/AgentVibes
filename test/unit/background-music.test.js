@@ -14,19 +14,19 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, '../..');
 
 test('Background music directory exists', () => {
-  const bgDir = join(PROJECT_ROOT, '.claude/audio/backgrounds');
+  const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   assert.ok(existsSync(bgDir), 'Backgrounds directory should exist');
 });
 
 test('Background music files are present', () => {
-  const bgDir = join(PROJECT_ROOT, '.claude/audio/backgrounds');
+  const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   const files = readdirSync(bgDir).filter(f => f.endsWith('.mp3'));
 
   assert.ok(files.length >= 13, `Should have at least 13 background music files, found ${files.length}`);
 });
 
 test('Background music files use snake_case naming', () => {
-  const bgDir = join(PROJECT_ROOT, '.claude/audio/backgrounds');
+  const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   const files = readdirSync(bgDir).filter(f => f.endsWith('.mp3'));
 
   const invalidFiles = files.filter(f => {
@@ -43,7 +43,7 @@ test('Background music files use snake_case naming', () => {
 });
 
 test('Background music files are not empty', () => {
-  const bgDir = join(PROJECT_ROOT, '.claude/audio/backgrounds');
+  const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   const files = readdirSync(bgDir).filter(f => f.endsWith('.mp3'));
 
   files.forEach(file => {
@@ -122,7 +122,7 @@ test('Audio effects config does not reference optimized/ subdirectory', () => {
 
 test('All referenced background files exist', () => {
   const configPath = join(PROJECT_ROOT, '.claude/config/audio-effects.cfg');
-  const bgDir = join(PROJECT_ROOT, '.claude/audio/backgrounds');
+  const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   const content = readFileSync(configPath, 'utf-8');
 
   const lines = content.split('\n').filter(line => {
@@ -165,8 +165,8 @@ test('Audio processor script exists', () => {
 });
 
 test('Background music README exists', () => {
-  const readmePath = join(PROJECT_ROOT, '.claude/audio/backgrounds/README.md');
-  assert.ok(existsSync(readmePath), 'backgrounds/README.md should exist');
+  const readmePath = join(PROJECT_ROOT, '.claude/audio/tracks/README.md');
+  assert.ok(existsSync(readmePath), 'tracks/README.md should exist');
 
   const content = readFileSync(readmePath, 'utf-8');
   assert.ok(content.length > 100, 'README should have meaningful content');
