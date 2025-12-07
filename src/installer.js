@@ -1864,12 +1864,12 @@ async function install(options = {}) {
     if (backgroundMusicFileCount > 0 && !options.yes) {
       console.log(''); // Blank line for spacing
 
-      const enableBackgroundMusic = await promptUser({
+      const enableBackgroundMusic = await inquirer.prompt([{
         type: 'confirm',
         name: 'enable',
         message: 'Enable background music for TTS?',
         default: true
-      });
+      }]);
 
       if (enableBackgroundMusic.enable) {
         // Define track choices with user-friendly names
@@ -1892,13 +1892,13 @@ async function install(options = {}) {
           { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
         ];
 
-        const selectedTrack = await promptUser({
+        const selectedTrack = await inquirer.prompt([{
           type: 'list',
           name: 'track',
           message: 'Choose default background music track:',
           choices: trackChoices,
           default: 'agentvibes_soft_flamenco_loop.mp3'
-        });
+        }]);
 
         // Enable background music and set default track
         const configDir = path.join(claudeDir, 'config');
@@ -1937,7 +1937,7 @@ async function install(options = {}) {
     if (!options.yes) {
       console.log(''); // Blank line for spacing
 
-      const verbosityChoice = await promptUser({
+      const verbosityChoice = await inquirer.prompt([{
         type: 'list',
         name: 'level',
         message: 'Choose TTS verbosity level (how much Claude speaks):',
@@ -1947,7 +1947,7 @@ async function install(options = {}) {
           { name: '🔈 Low - Minimal (only essential notifications)', value: 'low' }
         ],
         default: 'high'
-      });
+      }]);
 
       // Write verbosity level to config
       const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
