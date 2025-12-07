@@ -819,6 +819,59 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
 }
 
 /**
+ * Copy configuration files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyConfigFiles(targetDir, spinner) {
+  spinner.start('Installing configuration files...');
+  const srcConfigDir = path.join(__dirname, '..', '.claude', 'config');
+  const destConfigDir = path.join(targetDir, '.claude', 'config');
+
+  await fs.mkdir(destConfigDir, { recursive: true });
+
+  let copiedFiles = [];
+  try {
+    const configFiles = await fs.readdir(srcConfigDir);
+    for (const file of configFiles) {
+      const srcPath = path.join(srcConfigDir, file);
+      const destPath = path.join(destConfigDir, file);
+      const stat = await fs.stat(srcPath);
+
+      if (stat.isFile()) {
+        // Don't overwrite existing config files (except audio-effects.cfg which is required)
+        try {
+          await fs.access(destPath);
+          if (file !== 'audio-effects.cfg') {
+            continue; // Skip if file exists and it's not audio-effects.cfg
+          }
+        } catch {
+          // File doesn't exist, proceed with copy
+        }
+
+        await fs.copyFile(srcPath, destPath);
+        copiedFiles.push(file);
+      }
+    }
+
+    if (copiedFiles.length > 0) {
+      spinner.succeed(chalk.green(`Installed ${copiedFiles.length} config file${copiedFiles.length === 1 ? '' : 's'}!\n`));
+      copiedFiles.forEach(file => {
+        console.log(chalk.gray(`   ✓ ${file}`));
+      });
+      console.log(''); // Add blank line for spacing
+    } else {
+      spinner.info(chalk.gray('Config files already exist, skipping\n'));
+    }
+  } catch (error) {
+    spinner.info(chalk.yellow('No config files found (optional)\n'));
+  }
+
+  return copiedFiles.length;
+}
+
+/**
  * Configure SessionStart hook in settings.json
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -1563,6 +1616,12 @@ async function updateAgentVibes(targetDir, options) {
       console.log(chalk.green(`✓ Installed ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'}`));
     }
 
+    // Update config files
+    const configFileCount = await copyConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (configFileCount > 0) {
+      console.log(chalk.green(`✓ Installed ${configFileCount} config file${configFileCount === 1 ? '' : 's'}`));
+    }
+
     // Update settings.json
     spinner.text = 'Updating AgentVibes hook configuration...';
     await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
@@ -1724,6 +1783,7 @@ async function install(options = {}) {
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
     const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
     const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, spinner);
+    const configFileCount = await copyConfigFiles(targetDir, spinner);
 
     // Configure hooks and manifests
     await configureSessionStartHook(targetDir, spinner);
