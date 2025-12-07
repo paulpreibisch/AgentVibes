@@ -1,6 +1,7 @@
 # Development and local files
 .claude/journal/
-.claude/audio/
+.claude/audio/*
+!.claude/audio/backgrounds/
 .claude/config/
 .claude/settings.local.json
 .claude/tts-*.txt

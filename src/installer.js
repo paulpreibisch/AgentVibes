@@ -904,6 +904,45 @@ async function copyBmadConfigFiles(targetDir, spinner) {
 }
 
 /**
+ * Copy background music files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyBackgroundMusicFiles(targetDir, spinner) {
+  spinner.start('Installing background music tracks...');
+  const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'backgrounds', 'optimized');
+  const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'backgrounds', 'optimized');
+
+  await fs.mkdir(destBackgroundsDir, { recursive: true });
+
+  let musicFiles = [];
+  try {
+    const allMusicFiles = await fs.readdir(srcBackgroundsDir);
+    for (const file of allMusicFiles) {
+      const srcPath = path.join(srcBackgroundsDir, file);
+      const stat = await fs.stat(srcPath);
+
+      if (stat.isFile() && (file.endsWith('.mp3') || file.endsWith('.wav'))) {
+        musicFiles.push(file);
+        const destPath = path.join(destBackgroundsDir, file);
+        await fs.copyFile(srcPath, destPath);
+        console.log(chalk.gray(`   ✓ ${file}`));
+      }
+    }
+    if (musicFiles.length > 0) {
+      spinner.succeed(chalk.green(`Installed ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'}!\n`));
+    } else {
+      spinner.info(chalk.yellow('No background music files found (optional)\n'));
+    }
+  } catch (error) {
+    spinner.info(chalk.yellow('No background music files found (optional)\n'));
+  }
+
+  return musicFiles.length;
+}
+
+/**
  * Configure SessionStart hook in settings.json
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -1642,6 +1681,12 @@ async function updateAgentVibes(targetDir, options) {
       console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
     }
 
+    // Update background music files
+    const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (backgroundMusicFileCount > 0) {
+      console.log(chalk.green(`✓ Installed ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'}`));
+    }
+
     // Update settings.json
     spinner.text = 'Updating AgentVibes hook configuration...';
     await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
@@ -1813,6 +1858,7 @@ async function install(options = {}) {
     const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
     const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
+    const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, spinner);
 
     // Configure hooks and manifests
     await configureSessionStartHook(targetDir, spinner);
@@ -1850,6 +1896,22 @@ async function install(options = {}) {
     // Detect and migrate old configuration
     await detectAndMigrateOldConfig(targetDir, spinner);
 
+    // Snapshot existing Piper voices BEFORE installation (for proper summary display)
+    let preExistingVoices = [];
+    if (selectedProvider === 'piper') {
+      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
+      try {
+        if (fsSync.existsSync(piperVoicesDir)) {
+          const files = fsSync.readdirSync(piperVoicesDir);
+          preExistingVoices = files
+            .filter(f => f.endsWith('.onnx'))
+            .map(f => f.replace('.onnx', ''));
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+
     // Auto-install Piper if selected
     if (selectedProvider === 'piper') {
       await checkAndInstallPiper(targetDir, options);
@@ -1867,6 +1929,10 @@ async function install(options = {}) {
     if (bmadConfigFileCount > 0) {
       console.log(chalk.white(`   • ${bmadConfigFileCount} BMAD config files installed`));
     }
+    if (backgroundMusicFileCount > 0) {
+      console.log(chalk.white(`   • ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'} installed`));
+    }
+
     console.log(chalk.white(`   • Voice manager ready`));
 
     if (selectedProvider === 'elevenlabs') {
@@ -1936,11 +2002,25 @@ async function install(options = {}) {
       console.log(chalk.green(`   • No API key needed ✓`));
 
       if (installedVoices.length > 0) {
-        console.log(chalk.green(`   • ${installedVoices.length} Piper voices installed:`));
-        installedVoices.forEach(voice => {
-          console.log(chalk.green(`     ✓ ${voice.name} (${voice.size})`));
-          console.log(chalk.gray(`       ${voice.path}`));
-        });
+        // Separate newly installed from pre-existing voices
+        const newlyInstalled = installedVoices.filter(v => !preExistingVoices.includes(v.name));
+        const alreadyInstalled = installedVoices.filter(v => preExistingVoices.includes(v.name));
+
+        if (newlyInstalled.length > 0) {
+          console.log(chalk.green(`   • ${newlyInstalled.length} Piper voice${newlyInstalled.length === 1 ? '' : 's'} newly installed:`));
+          newlyInstalled.forEach(voice => {
+            console.log(chalk.green(`     ✓ ${voice.name} (${voice.size})`));
+            console.log(chalk.gray(`       ${voice.path}`));
+          });
+        }
+
+        if (alreadyInstalled.length > 0) {
+          console.log(chalk.gray(`   • ${alreadyInstalled.length} Piper voice${alreadyInstalled.length === 1 ? '' : 's'} already installed:`));
+          alreadyInstalled.forEach(voice => {
+            console.log(chalk.gray(`     ✓ ${voice.name} (${voice.size}) - already installed`));
+            console.log(chalk.gray(`       ${voice.path}`));
+          });
+        }
       }
 
       if (missingVoices.length > 0) {
@@ -1952,6 +2032,20 @@ async function install(options = {}) {
 
       if (installedVoices.length === 0 && missingVoices.length === 0) {
         console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
+      }
+
+      // Show background music files
+      const backgroundsDir = path.join(targetDir, '.claude', 'audio', 'backgrounds');
+      try {
+        if (fsSync.existsSync(backgroundsDir)) {
+          const bgFiles = fsSync.readdirSync(backgroundsDir);
+          const musicFiles = bgFiles.filter(f => f.endsWith('.mp3') || f.endsWith('.wav'));
+          if (musicFiles.length > 0) {
+            console.log(chalk.white(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} available`));
+          }
+        }
+      } catch {
+        // Ignore errors
       }
     }
     console.log('');
