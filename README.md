@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.14.19
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.15.0-alpha.11
 
 ---
 
@@ -94,7 +94,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.14.19 - BMAD TTS Injection Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.14.19)** 🎉
+**[v2.14.19 - BMAD TTS Injection Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.15.0-alpha.11)** 🎉
 
 AgentVibes v2.14.19 improves how TTS injection works with BMAD agents. Your agent files now get voice capabilities through a clean, loosely-coupled injection system!
 
