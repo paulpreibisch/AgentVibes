@@ -227,7 +227,7 @@ We recently have added background music to your agents. You can turn it on or of
 
 Lastly, Agent Vibes is updated frequently. Use npx agentvibes update to keep up to date.
 
-We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!`;
+We hope you have fun with Agent Vibes. Please consider giving us a GitHub star. Thank you.`;
 
   // Stop spinner and display the welcome script in a box
   spinner.stop();
