@@ -11,10 +11,20 @@ yarn-error.log*
 *.swp
 *.swo
 *~
-.claude/audio/
+# Audio files (but keep background music tracks)
+.claude/audio/*
+!.claude/audio/tracks/
+!.claude/audio/tracks/*.mp3
+!.claude/audio/backgrounds/
+.claude/audio/backgrounds/*
+!.claude/audio/backgrounds/README.md
+!.claude/audio/backgrounds/dreamy-house.mp3
+!.claude/audio/backgrounds/agent-vibes-dark-chill-step.mp3
 .claude/journal/
 .claude/tts-*.txt
-.claude/config/
+# Config files (but keep audio-effects sample)
+.claude/config/*
+!.claude/config/audio-effects.cfg
 .claude/settings.local.json
 .agentvibes/
 .claude/piper-voices/

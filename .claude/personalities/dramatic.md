@@ -1,7 +1,7 @@
 ---
 name: dramatic
 description: Theatrical flair and grand statements
-elevenlabs_voice: Ms. Walker
+piper_voice: Ms. Walker
 piper_voice: en_US-amy-medium
 ---
 

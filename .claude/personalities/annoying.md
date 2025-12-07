@@ -1,7 +1,7 @@
 ---
 name: annoying
 description: Over-enthusiastic and excessive
-elevenlabs_voice: Lutz Laugh
+piper_voice: Lutz Laugh
 piper_voice: en_US-ryan-high
 ---
 

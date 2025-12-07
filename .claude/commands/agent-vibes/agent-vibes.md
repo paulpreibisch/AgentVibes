@@ -1,10 +1,10 @@
 ---
-description: ElevenLabs TTS voice management commands
+description: Piper TTS TTS voice management commands
 ---
 
 # 🎤 AgentVibes Voice Management
 
-Manage your text-to-speech voices across multiple providers (ElevenLabs, Piper, macOS Say).
+Manage your text-to-speech voices across multiple providers (Piper TTS, Piper, macOS Say).
 
 ## Available Commands
 
@@ -38,7 +38,7 @@ Switch to a different default voice
 Display the currently selected voice
 
 ### `/agent-vibes:add <name> <voice_id>`
-Add a new custom voice from your ElevenLabs account
+Add a new custom voice from your Piper TTS account
 - `/agent-vibes:add "My Voice" abc123xyz456`
 
 ### `/agent-vibes:replay [N]`
@@ -66,7 +66,7 @@ Show all available TTS providers
 ### `/agent-vibes:provider switch <name>`
 Switch between providers:
 - `/agent-vibes:provider switch piper` - Free, offline (Linux/WSL)
-- `/agent-vibes:provider switch elevenlabs` - Premium AI voices
+- `/agent-vibes:provider switch piper` - Premium AI voices
 - `/agent-vibes:provider switch macos` - Native macOS (Mac only)
 
 ### `/agent-vibes:provider info <name>`
@@ -78,21 +78,21 @@ Get details about a specific provider
 |----------|----------|------|---------|
 | **macOS Say** | macOS only | Free (built-in) | ⭐⭐⭐⭐ |
 | **Piper** | Linux/WSL | Free | ⭐⭐⭐⭐ |
-| **ElevenLabs** | All | Free tier + paid | ⭐⭐⭐⭐⭐ |
+| **Piper TTS** | All | Free tier + paid | ⭐⭐⭐⭐⭐ |
 
 On macOS, the native `say` provider is automatically detected and recommended.
 
-## Getting Voice IDs (ElevenLabs)
+## Getting Voice IDs (Piper TTS)
 
-To add your own custom ElevenLabs voices:
-1. Go to https://elevenlabs.io/app/voice-library
+To add your own custom Piper TTS voices:
+1. Go to https://piper.io/app/voice-library
 2. Select or create a voice
 3. Copy the voice ID (15-30 character alphanumeric string)
 4. Use `/agent-vibes:add` to add it
 
 ## Default Voices
 
-**ElevenLabs:** Northern Terry, Grandpa Spuds Oxley, Ms. Walker, Ralf Eisend, Amy, Michael, Jessica Anne Bogart, Aria, Lutz Laugh, Dr. Von Fusion, Matthew Schmitz, Demon Monster, Cowboy Bob, Drill Sergeant
+**Piper TTS:** Northern Terry, Grandpa Spuds Oxley, Ms. Walker, Ralf Eisend, Amy, Michael, Jessica Anne Bogart, Aria, Lutz Laugh, Dr. Von Fusion, Matthew Schmitz, Demon Monster, Cowboy Bob, Drill Sergeant
 
 **Piper:** en_US-lessac-medium, en_US-amy-medium, en_GB-alan-medium, and many more
 

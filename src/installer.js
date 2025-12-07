@@ -45,7 +45,7 @@ import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { execSync, execFileSync } from 'node:child_process';
+import { execSync, execFileSync, spawn } from 'node:child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import figlet from 'figlet';
@@ -154,6 +154,114 @@ function showReleaseInfo() {
       }
     )
   );
+}
+
+/**
+ * Play welcome demo with background music and TTS voice
+ * Extended welcome with multiple segments, pauses, and MCP detection
+ * @param {string} targetDir - Installation directory
+ * @param {object} spinner - ora spinner instance
+ */
+async function playWelcomeDemo(targetDir, spinner, options = {}) {
+  // Skip welcome demo if --yes flag is used (non-interactive install)
+  if (options.yes) {
+    return;
+  }
+
+  // Check if we have audio player (prefer paplay for WSL)
+  let audioPlayer = null;
+
+  try {
+    execSync('which paplay 2>/dev/null', { stdio: 'pipe' });
+    audioPlayer = 'paplay';
+  } catch {
+    try {
+      execSync('which afplay 2>/dev/null', { stdio: 'pipe' });
+      audioPlayer = 'afplay';
+    } catch {
+      try {
+        execSync('which mpv 2>/dev/null', { stdio: 'pipe' });
+        audioPlayer = 'mpv';
+      } catch {}
+    }
+  }
+
+  if (!audioPlayer) {
+    console.log(chalk.gray('\n   (Welcome demo skipped - requires paplay, afplay, or mpv)'));
+    return;
+  }
+
+  // Use pre-generated welcome demo audio
+  const welcomeDemoAudio = path.join(__dirname, '..', 'templates', 'audio', 'welcome-demo.wav');
+
+  if (!fsSync.existsSync(welcomeDemoAudio)) {
+    console.log(chalk.gray('\n   (Welcome demo skipped - audio file not found)'));
+    return;
+  }
+
+  // Check if MCP is configured to determine which script to show
+  const mcpConfigPath = path.join(targetDir, '.mcp.json');
+  const hasMcp = fsSync.existsSync(mcpConfigPath);
+
+  // Build the welcome script
+  let welcomeScript = `Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.
+
+We have added a lot of commands, but don't worry, you can hide them by typing /agent-vibes:hide, and :show to bring them back.`;
+
+  if (!hasMcp) {
+    welcomeScript += `
+
+To control Agent Vibes with natural language, install the MCP server. That way you can just say things like, "change my voice" or "mute the audio."`;
+  }
+
+  welcomeScript += `
+
+To change my personality, just type, "change personality to sarcastic."
+
+Or to change my voice, type, "try a different voice."
+
+We recently have added background music to your agents. You can turn it on or off by saying "Turn background music on" or "Turn background music off."
+
+Lastly, Agent Vibes is updated frequently. Use npx agentvibes update to keep up to date.
+
+We hope you have fun with Agent Vibes! Please consider giving us a GitHub star. Thank you!`;
+
+  // Stop spinner and display the welcome script in a box
+  spinner.stop();
+  console.log('\n' + boxen(welcomeScript, {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: 'cyan',
+    title: '🎵 AgentVibes Welcome',
+    titleAlignment: 'center'
+  }));
+
+  console.log(chalk.cyan('🎵 Playing welcome demo in background...\n'));
+
+  try {
+    // Play the audio in the background (non-blocking)
+    let args;
+    if (audioPlayer === 'mpv') {
+      args = ['--no-video', '--really-quiet', welcomeDemoAudio];
+    } else if (audioPlayer === 'paplay') {
+      args = [welcomeDemoAudio];
+    } else {
+      args = [welcomeDemoAudio]; // afplay
+    }
+
+    const audioProcess = spawn(audioPlayer, args, {
+      detached: true,
+      stdio: 'ignore'
+    });
+
+    // Detach the process so it continues running after parent exits
+    audioProcess.unref();
+
+  } catch (error) {
+    // Silent fail - demo is optional
+    console.log(chalk.gray('   (Welcome demo skipped)'));
+  }
 }
 
 /**
@@ -316,16 +424,15 @@ Without the \`.bmad-agent-context\` file:
 // ============================================================================
 
 /**
- * Prompt user to select TTS provider (Piper, ElevenLabs, or macOS Say)
+ * Prompt user to select TTS provider (Piper or macOS Say)
  * @param {Object} options - Installation options
- * @returns {Promise<string>} Selected provider ('piper', 'elevenlabs', or 'macos')
+ * @returns {Promise<string>} Selected provider ('piper' or 'macos')
  */
 async function promptProviderSelection(options) {
   const isMacOS = process.platform === 'darwin';
 
   if (options.yes) {
     // Free-first approach: Always use free providers with --yes flag
-    // ElevenLabs requires manual selection (API key may be expired/invalid)
     if (isMacOS) {
       console.log(chalk.green('✓ Using macOS Say (built-in, zero setup)\n'));
       return 'macos';
@@ -348,13 +455,8 @@ async function promptProviderSelection(options) {
   }
 
   choices.push({
-    name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ neural voices, no API key needed'),
+    name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
     value: 'piper',
-  });
-
-  choices.push({
-    name: chalk.cyan('🎤 ElevenLabs (Premium)') + chalk.gray(' - 150+ AI voices, requires API key'),
-    value: 'elevenlabs',
   });
 
   const { provider } = await inquirer.prompt([
@@ -443,138 +545,6 @@ async function handlePiperConfiguration() {
   return piperPath;
 }
 
-/**
- * Handle ElevenLabs API key setup
- * @param {Object} options - Installation options
- * @returns {Promise<string|null>} API key or null
- */
-async function handleElevenLabsApiKey(options) {
-  let elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-
-  if (elevenLabsKey) {
-    console.log(chalk.green(`\n✓ ElevenLabs API key detected from environment`));
-    console.log(chalk.gray(`  Key: ***************...`));
-
-    if (!options.yes) {
-      const { useExisting } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'useExisting',
-          message: 'Use this existing API key?',
-          default: true,
-        },
-      ]);
-
-      if (!useExisting) {
-        elevenLabsKey = null;
-      }
-    }
-  }
-
-  if (!elevenLabsKey) {
-    console.log(chalk.yellow('\n⚠️  ElevenLabs API Key Required'));
-    console.log(chalk.gray('   Get your free API key at: https://try.elevenlabs.io/agentvibes'));
-    console.log(chalk.gray('   Free tier: 10,000 characters/month\n'));
-
-    const { setupMethod } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'setupMethod',
-        message: 'How would you like to set up your API key?',
-        choices: [
-          {
-            name: 'Add to shell config (recommended)',
-            value: 'shell',
-          },
-          {
-            name: 'Enter manually (I\'ll set it up myself later)',
-            value: 'manual',
-          },
-          {
-            name: 'Skip (use Piper TTS instead)',
-            value: 'skip',
-          },
-        ],
-      },
-    ]);
-
-    if (setupMethod === 'skip') {
-      return 'SWITCH_TO_PIPER';
-    }
-
-    const { apiKey } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'apiKey',
-        message: 'Enter your ElevenLabs API key:',
-        validate: (input) => input.length > 0 || 'API key cannot be empty',
-      },
-    ]);
-    elevenLabsKey = apiKey;
-
-    if (setupMethod === 'manual') {
-      console.log(chalk.yellow('\n⚠️  Remember to add this to your environment variables later:'));
-      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
-    } else if (setupMethod === 'shell') {
-      await addApiKeyToShellConfig(apiKey);
-    }
-  }
-
-  return elevenLabsKey;
-}
-
-/**
- * Add ElevenLabs API key to shell configuration
- * @param {string} apiKey - The API key to add
- */
-async function addApiKeyToShellConfig(apiKey) {
-  const { shellName, shellConfig } = getUserShell();
-
-  if (!shellName || !shellConfig) {
-    console.log(chalk.yellow('\n⚠️  Could not detect shell type'));
-    console.log(chalk.gray('   Please add manually to your shell config:'));
-    console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
-    return;
-  }
-
-  console.log(chalk.cyan(`\n🐚 Detected shell: ${shellName}`));
-  console.log(chalk.gray(`   Config file: ${shellConfig}`));
-
-  const { confirmShell } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'confirmShell',
-      message: `Add ELEVENLABS_API_KEY to ${shellConfig}?`,
-      default: true,
-    },
-  ]);
-
-  if (confirmShell) {
-    try {
-      // Check if already exists to avoid duplicates
-      let existingContent = '';
-      try {
-        existingContent = await fs.readFile(shellConfig, 'utf8');
-      } catch (err) {
-        // File might not exist yet, which is fine
-      }
-
-      if (existingContent.includes('ELEVENLABS_API_KEY')) {
-        console.log(chalk.cyan(`\n→ API key already exists in ${shellConfig}`));
-        console.log(chalk.gray('   No changes needed'));
-      } else {
-        const configContent = `\n# ElevenLabs API Key for AgentVibes\nexport ELEVENLABS_API_KEY="${apiKey}"\n`;
-        await fs.appendFile(shellConfig, configContent);
-        console.log(chalk.green(`\n✓ API key added to ${shellConfig}`));
-        console.log(chalk.yellow('  Run this to use immediately: ') + chalk.cyan(`source ${shellConfig}`));
-      }
-    } catch (error) {
-      console.log(chalk.red(`\n✗ Failed to write to ${shellConfig}`));
-      console.log(chalk.gray('   Please add manually:'));
-      console.log(chalk.gray(`   export ELEVENLABS_API_KEY="<your-api-key>"\n`));
-    }
-  }
-}
 
 /**
  * Copy command files to target directory
@@ -793,6 +763,112 @@ async function copyBmadConfigFiles(targetDir, spinner) {
   }
 
   return fileCount;
+}
+
+/**
+ * Copy background music files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyBackgroundMusicFiles(targetDir, spinner) {
+  spinner.start('Installing background music tracks...');
+  const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+  const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'tracks');
+
+  await fs.mkdir(destBackgroundsDir, { recursive: true });
+
+  let musicFiles = [];
+  try {
+    const allMusicFiles = await fs.readdir(srcBackgroundsDir);
+    for (const file of allMusicFiles) {
+      const srcPath = path.join(srcBackgroundsDir, file);
+      const stat = await fs.stat(srcPath);
+
+      if (stat.isFile() && (file.endsWith('.mp3') || file.endsWith('.wav'))) {
+        const destPath = path.join(destBackgroundsDir, file);
+        await fs.copyFile(srcPath, destPath);
+
+        // Format file size
+        const sizeKB = (stat.size / 1024).toFixed(1);
+
+        musicFiles.push({
+          name: file,
+          size: `${sizeKB} KB`,
+          path: destPath
+        });
+      }
+    }
+
+    if (musicFiles.length > 0) {
+      spinner.succeed(chalk.green(`Installed ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'}!\n`));
+      console.log(chalk.green(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} installed:`));
+      musicFiles.forEach(track => {
+        console.log(chalk.green(`     ✓ ${track.name} (${track.size})`));
+        console.log(chalk.gray(`       ${track.path}`));
+      });
+      console.log(''); // Add blank line for spacing
+    } else {
+      spinner.info(chalk.yellow('No background music files found (optional)\n'));
+    }
+  } catch (error) {
+    spinner.info(chalk.yellow('No background music files found (optional)\n'));
+  }
+
+  return musicFiles.length;
+}
+
+/**
+ * Copy configuration files to target directory
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyConfigFiles(targetDir, spinner) {
+  spinner.start('Installing configuration files...');
+  const srcConfigDir = path.join(__dirname, '..', '.claude', 'config');
+  const destConfigDir = path.join(targetDir, '.claude', 'config');
+
+  await fs.mkdir(destConfigDir, { recursive: true });
+
+  let copiedFiles = [];
+  try {
+    const configFiles = await fs.readdir(srcConfigDir);
+    for (const file of configFiles) {
+      const srcPath = path.join(srcConfigDir, file);
+      const destPath = path.join(destConfigDir, file);
+      const stat = await fs.stat(srcPath);
+
+      if (stat.isFile()) {
+        // Don't overwrite existing config files (except audio-effects.cfg which is required)
+        try {
+          await fs.access(destPath);
+          if (file !== 'audio-effects.cfg') {
+            continue; // Skip if file exists and it's not audio-effects.cfg
+          }
+        } catch {
+          // File doesn't exist, proceed with copy
+        }
+
+        await fs.copyFile(srcPath, destPath);
+        copiedFiles.push(file);
+      }
+    }
+
+    if (copiedFiles.length > 0) {
+      spinner.succeed(chalk.green(`Installed ${copiedFiles.length} config file${copiedFiles.length === 1 ? '' : 's'}!\n`));
+      copiedFiles.forEach(file => {
+        console.log(chalk.gray(`   ✓ ${file}`));
+      });
+      console.log(''); // Add blank line for spacing
+    } else {
+      spinner.info(chalk.gray('Config files already exist, skipping\n'));
+    }
+  } catch (error) {
+    spinner.info(chalk.yellow('No config files found (optional)\n'));
+  }
+
+  return copiedFiles.length;
 }
 
 /**
@@ -1534,6 +1610,18 @@ async function updateAgentVibes(targetDir, options) {
       console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
     }
 
+    // Update background music files
+    const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (backgroundMusicFileCount > 0) {
+      console.log(chalk.green(`✓ Installed ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'}`));
+    }
+
+    // Update config files
+    const configFileCount = await copyConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (configFileCount > 0) {
+      console.log(chalk.green(`✓ Installed ${configFileCount} config file${configFileCount === 1 ? '' : 's'}`));
+    }
+
     // Update settings.json
     spinner.text = 'Updating AgentVibes hook configuration...';
     await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
@@ -1580,7 +1668,6 @@ async function install(options = {}) {
 
   // Provider selection
   let selectedProvider = await promptProviderSelection(options);
-  let elevenLabsKey = null;
   let piperVoicesPath = null;
 
   if (options.yes) {
@@ -1590,15 +1677,6 @@ async function install(options = {}) {
   // Handle provider-specific configuration
   if (selectedProvider === 'piper' && !options.yes) {
     piperVoicesPath = await handlePiperConfiguration();
-  }
-
-  if (selectedProvider === 'elevenlabs') {
-    elevenLabsKey = await handleElevenLabsApiKey(options);
-    if (elevenLabsKey === 'SWITCH_TO_PIPER') {
-      console.log(chalk.yellow('\n→ Switching to Piper TTS (free option)\n'));
-      selectedProvider = 'piper';
-      elevenLabsKey = null;
-    }
   }
 
   if (!options.yes) {
@@ -1634,16 +1712,15 @@ async function install(options = {}) {
 
   console.log(chalk.cyan('\n📦 What will be installed:'));
   console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
-  console.log(chalk.gray(`   • Multi-provider TTS system (ElevenLabs + Piper TTS) → ${targetDir}/.claude/hooks/`));
+  console.log(chalk.gray(`   • Multi-provider TTS system (Piper TTS + macOS Say) → ${targetDir}/.claude/hooks/`));
   console.log(chalk.gray(`   • 19 personality templates → ${targetDir}/.claude/personalities/`));
   console.log(chalk.gray(`   • SessionStart hook for automatic TTS activation`));
-  console.log(chalk.gray(`   • 27+ curated voices (ElevenLabs premium)`));
   console.log(chalk.gray(`   • 50+ neural voices (Piper TTS - free & offline)`));
   console.log(chalk.gray(`   • 30+ language support with native voices`));
   console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
 
   // Provider labels for display
-  const providerLabels = { elevenlabs: 'ElevenLabs', piper: 'Piper TTS', macos: 'macOS Say' };
+  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say' };
 
   // Final confirmation
   if (!options.yes) {
@@ -1679,14 +1756,24 @@ async function install(options = {}) {
 
     if (!exists) {
       spinner.info(chalk.yellow('Creating .claude directory structure...'));
+      const audioDir = path.join(claudeDir, 'audio');
+      const tracksDir = path.join(audioDir, 'tracks');
       console.log(chalk.gray(`   → ${commandsDir}`));
       console.log(chalk.gray(`   → ${hooksDir}`));
+      console.log(chalk.gray(`   → ${audioDir}`));
+      console.log(chalk.gray(`   → ${tracksDir}`));
       await fs.mkdir(commandsDir, { recursive: true });
       await fs.mkdir(hooksDir, { recursive: true });
+      await fs.mkdir(tracksDir, { recursive: true });
       console.log(chalk.green('   ✓ Directories created!\n'));
     } else {
       spinner.succeed(chalk.green('.claude directory found!'));
       console.log(chalk.gray(`   Location: ${claudeDir}\n`));
+
+      // Ensure audio/tracks directory exists even if .claude already exists
+      const audioDir = path.join(claudeDir, 'audio');
+      const tracksDir = path.join(audioDir, 'tracks');
+      await fs.mkdir(tracksDir, { recursive: true });
     }
 
     // Copy all files using helper functions
@@ -1695,6 +1782,8 @@ async function install(options = {}) {
     const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
     const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
+    const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, spinner);
+    const configFileCount = await copyConfigFiles(targetDir, spinner);
 
     // Configure hooks and manifests
     await configureSessionStartHook(targetDir, spinner);
@@ -1710,10 +1799,40 @@ async function install(options = {}) {
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
 
+    // Set default voice based on provider to prevent fallback to mismatched global voice
+    const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
+    let defaultVoice;
+    switch (selectedProvider) {
+      case 'piper':
+        defaultVoice = 'en_US-lessac-medium';
+        break;
+      case 'macos':
+      default:
+        defaultVoice = 'Samantha';
+        break;
+    }
+    await fs.writeFile(voiceConfigPath, defaultVoice);
+
     spinner.succeed(chalk.green(`Provider set to: ${providerLabels[selectedProvider] || selectedProvider}\n`));
 
     // Detect and migrate old configuration
     await detectAndMigrateOldConfig(targetDir, spinner);
+
+    // Snapshot existing Piper voices BEFORE installation (for proper summary display)
+    let preExistingVoices = [];
+    if (selectedProvider === 'piper') {
+      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
+      try {
+        if (fsSync.existsSync(piperVoicesDir)) {
+          const files = fsSync.readdirSync(piperVoicesDir);
+          preExistingVoices = files
+            .filter(f => f.endsWith('.onnx'))
+            .map(f => f.replace('.onnx', ''));
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
 
     // Auto-install Piper if selected
     if (selectedProvider === 'piper') {
@@ -1732,17 +1851,13 @@ async function install(options = {}) {
     if (bmadConfigFileCount > 0) {
       console.log(chalk.white(`   • ${bmadConfigFileCount} BMAD config files installed`));
     }
+    if (backgroundMusicFileCount > 0) {
+      console.log(chalk.white(`   • ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'} installed`));
+    }
+
     console.log(chalk.white(`   • Voice manager ready`));
 
-    if (selectedProvider === 'elevenlabs') {
-      console.log(chalk.white(`   • 27+ ElevenLabs AI voices available`));
-      console.log(chalk.white(`   • 30+ languages supported`));
-      if (elevenLabsKey) {
-        console.log(chalk.green(`   • ElevenLabs API key configured ✓`));
-      } else {
-        console.log(chalk.yellow(`   • ElevenLabs API key: Set manually later`));
-      }
-    } else if (selectedProvider === 'macos') {
+    if (selectedProvider === 'macos') {
       // macOS Say provider summary
       console.log(chalk.white(`   • Using macOS built-in Say command`));
       console.log(chalk.white(`   • System voices available (Samantha, Alex, etc.)`));
@@ -1801,11 +1916,25 @@ async function install(options = {}) {
       console.log(chalk.green(`   • No API key needed ✓`));
 
       if (installedVoices.length > 0) {
-        console.log(chalk.green(`   • ${installedVoices.length} Piper voices installed:`));
-        installedVoices.forEach(voice => {
-          console.log(chalk.green(`     ✓ ${voice.name} (${voice.size})`));
-          console.log(chalk.gray(`       ${voice.path}`));
-        });
+        // Separate newly installed from pre-existing voices
+        const newlyInstalled = installedVoices.filter(v => !preExistingVoices.includes(v.name));
+        const alreadyInstalled = installedVoices.filter(v => preExistingVoices.includes(v.name));
+
+        if (newlyInstalled.length > 0) {
+          console.log(chalk.green(`   • ${newlyInstalled.length} Piper voice${newlyInstalled.length === 1 ? '' : 's'} newly installed:`));
+          newlyInstalled.forEach(voice => {
+            console.log(chalk.green(`     ✓ ${voice.name} (${voice.size})`));
+            console.log(chalk.gray(`       ${voice.path}`));
+          });
+        }
+
+        if (alreadyInstalled.length > 0) {
+          console.log(chalk.gray(`   • ${alreadyInstalled.length} Piper voice${alreadyInstalled.length === 1 ? '' : 's'} already installed:`));
+          alreadyInstalled.forEach(voice => {
+            console.log(chalk.gray(`     ✓ ${voice.name} (${voice.size}) - already installed`));
+            console.log(chalk.gray(`       ${voice.path}`));
+          });
+        }
       }
 
       if (missingVoices.length > 0) {
@@ -1817,6 +1946,20 @@ async function install(options = {}) {
 
       if (installedVoices.length === 0 && missingVoices.length === 0) {
         console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
+      }
+
+      // Show background music files
+      const tracksDir = path.join(targetDir, '.claude', 'audio', 'tracks');
+      try {
+        if (fsSync.existsSync(tracksDir)) {
+          const bgFiles = fsSync.readdirSync(tracksDir);
+          const musicFiles = bgFiles.filter(f => f.endsWith('.mp3') || f.endsWith('.wav'));
+          if (musicFiles.length > 0) {
+            console.log(chalk.white(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} available`));
+          }
+        }
+      } catch {
+        // Ignore errors
       }
     }
     console.log('');
@@ -1925,6 +2068,12 @@ async function install(options = {}) {
     console.log(chalk.green.bold('\n✅ AgentVibes is Ready!'));
     console.log(chalk.white('   TTS protocol automatically loads on every Claude session'));
     console.log(chalk.gray('   via SessionStart hook - no additional setup needed!\n'));
+
+    // Play welcome demo with harpsichord intro and reverb voice (opt-in only)
+    if (options.withAudio) {
+      await playWelcomeDemo(targetDir, spinner, options);
+    }
+
     console.log(chalk.cyan('🎤 Try these commands:'));
     console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
     console.log(chalk.white('   • /agent-vibes:switch <name>') + chalk.gray(' - Change your voice'));
@@ -2011,6 +2160,7 @@ program
   .description('Install AgentVibes voice commands')
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
+  .option('--with-audio', 'Play welcome demo audio after installation')
   .action(async (options) => {
     await install(options);
   });
@@ -2124,14 +2274,8 @@ program
       console.log(chalk.gray('   Run: node src/installer.js install'));
     }
 
-    // Check API key
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (apiKey) {
-      console.log(chalk.green('\n✅ ElevenLabs API key is set'));
-    } else {
-      console.log(chalk.yellow('\n⚠️  ElevenLabs API key not found'));
-      console.log(chalk.gray('   Set: export ELEVENLABS_API_KEY="your-key"'));
-    }
+    // TTS providers configured
+    console.log(chalk.green('\n✅ TTS providers: Piper TTS (free) and macOS Say (macOS only)'));
   });
 
 program

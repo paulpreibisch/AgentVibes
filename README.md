@@ -4,7 +4,7 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **[ElevenLabs AI](https://try.elevenlabs.io/agentvibes)**, **Piper TTS (Free!)**, or **macOS Say (Built-in!)**
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
@@ -40,7 +40,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 - 🎙️ **AgentVibes MCP** - **NEW!** Natural language control for Claude Code, Claude Desktop & Warp (no slash commands!)
 - 📚 **Language Learning Mode** - **NEW!** Learn a second language while you program (e.g., Learn Spanish as you code!)
 - 🔊 **SSH Audio Optimization** - **NEW!** Auto-detects remote sessions and eliminates static (VS Code Remote SSH, cloud dev)
-- 🎭 **Multi-Provider Support** - Choose [ElevenLabs](https://try.elevenlabs.io/agentvibes) (150+ premium voices), Piper TTS (50+ free voices), or macOS Say (100+ built-in voices)
+- 🎭 **Multi-Provider Support** - Choose Piper TTS (50+ free voices) or macOS Say (100+ built-in voices)
 - 🌍 **30+ Languages** - Multilingual support with native voice quality
 - 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
@@ -50,6 +50,23 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 - 🎵 **Voice Preview & Replay** - Listen before you choose, replay last 10 TTS messages
 - 🆓 **Free Option Available** - Use Piper TTS with no API key required
 - ⚡ **One-Command Install** - Get started in seconds
+
+### 🤗 Hugging Face AI Voice Models
+
+**AgentVibes' Piper TTS uses 100% Hugging Face-trained AI voice models** from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices).
+
+**What are Hugging Face voice models?**
+
+Hugging Face voice models are pre-trained artificial intelligence models hosted on the Hugging Face Model Hub platform, designed to convert text into human-like speech (Text-to-Speech or TTS) or perform other speech tasks like voice cloning and speech-to-speech translation. They're accessible via their Transformers library for easy use in applications like voice assistants, audio generation, and more.
+
+**Key Benefits:**
+- 🎯 **Human-like Speech** - VITS-based neural models for natural pronunciation and intonation
+- 🌍 **35+ Languages** - Multilingual support with native accents
+- 🆓 **100% Open Source** - All Piper voices are free HF models (Tacotron2, FastSpeech2, VITS)
+- 🔧 **Developer-Friendly** - Fine-tune, customize, or deploy for various audio projects
+- ⚡ **Offline & Fast** - No API keys, no internet needed once installed
+
+All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-source AI voice models, ensuring high-quality, natural-sounding speech synthesis across all supported platforms.
 
 ---
 
@@ -151,7 +168,7 @@ macOS ships with bash 3.2 (from 2007) which lacks modern bash features AgentVibe
 
 ---
 
-Get AgentVibes running in 3 steps: **Install** → **Choose Provider** (Piper/ElevenLabs) → **Enable Voice**
+Get AgentVibes running in 3 steps: **Install** → **Choose Provider** (Piper/macOS) → **Enable Voice**
 
 **Quick Install:**
 ```bash
@@ -166,13 +183,12 @@ npx agentvibes install
 
 ## 🎭 Choose Your Voice Provider
 
-**ElevenLabs** (premium AI voices), **Piper TTS** (free, works offline on Linux/WSL), or **macOS Say** (free, built-in on Mac) - pick one and switch anytime.
+**Piper TTS** (free, works offline on Linux/WSL) or **macOS Say** (free, built-in on Mac) - pick one and switch anytime.
 
 | Provider | Platform | Cost | Quality | Setup |
 |----------|----------|------|---------|-------|
 | **macOS Say** | macOS only | Free (built-in) | ⭐⭐⭐⭐ | Zero config |
 | **Piper** | Linux/WSL | Free | ⭐⭐⭐⭐ | Auto-downloads |
-| **[ElevenLabs](https://try.elevenlabs.io/agentvibes)** | All | Free tier + paid | ⭐⭐⭐⭐⭐ | [API key required](https://try.elevenlabs.io/agentvibes) |
 
 On macOS, the native `say` provider is automatically detected and recommended!
 
@@ -279,9 +295,8 @@ Every task acknowledgment plays **twice** - first in English, then in your targe
 
 ## 🗣️ Voice Library
 
-AgentVibes includes **27 unique [ElevenLabs](https://try.elevenlabs.io/agentvibes) voices** with multilingual support.
+AgentVibes includes professional AI voices from Piper TTS and macOS Say with multilingual support.
 
-💡 **Tip:** Click voice names to hear samples on ElevenLabs!
 🎧 **Try in Claude Code:** `/agent-vibes:preview` to hear all voices
 🌍 **Multilingual:** Use Antoni, Rachel, Domi, or Bella for automatic language detection
 
@@ -386,7 +401,7 @@ AgentVibes supports **custom personalities** and **custom voices**.
 # Create custom personality
 /agent-vibes:personality add mycustom
 
-# Add custom ElevenLabs voice
+# Add custom Piper voice
 /agent-vibes:add "My Voice" abc123xyz789
 
 # Use in custom output styles
@@ -419,15 +434,12 @@ AgentVibes supports **custom personalities** and **custom voices**.
 
 - 🎤 **[WhisperTyping](https://whispertyping.com/)** - Fast voice-to-text typing for developers
 - 🗣️ **[OpenWhisper (Azure)](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/whisper-overview)** - Microsoft's speech-to-text service
-- 🎙️ **[ElevenLabs](https://try.elevenlabs.io/agentvibes)** - Premium AI voice synthesis
 - 🆓 **[Piper TTS](https://github.com/rhasspy/piper)** - Free offline neural TTS
 - 🤖 **[Claude Code](https://claude.com/claude-code)** - AI coding assistant
 - 🎭 **[BMAD METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** - Multi-agent framework
 
 ### AgentVibes Resources
 
-- 📊 **[Usage Dashboard](https://elevenlabs.io/app/usage)** - Monitor ElevenLabs usage
-- 💳 **[Pricing Page](https://elevenlabs.io/pricing)** - ElevenLabs plans
 - 🐛 **[Issues](https://github.com/paulpreibisch/AgentVibes/issues)** - Report bugs
 - 📝 **[Changelog](https://github.com/paulpreibisch/AgentVibes/releases)** - Version history
 - 📰 **[Technical Deep Dive - LinkedIn Article](https://www.linkedin.com/pulse/agent-vibes-add-voice-claude-code-deep-dive-npx-paul-preibisch-8zrcc/)** - How AgentVibes works under the hood
@@ -441,8 +453,7 @@ AgentVibes supports **custom personalities** and **custom voices**.
 **Common Issues:**
 
 **No Audio Playing?**
-1. Check API key: `echo $ELEVENLABS_API_KEY`
-2. Verify hook is installed: `ls -la ~/.claude/hooks/user-prompt-submit.sh`
+2. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
 3. Test: `/agent-vibes:sample Aria`
 
 **Commands Not Found?**
@@ -483,21 +494,18 @@ npm update -g agentvibes && agentvibes update --yes
 ## ⚠️ Important Disclaimers
 
 **API Costs & Usage:**
-- ElevenLabs usage may incur charges based on your subscription tier and character usage
+- Usage is completely free with Piper TTS (no API costs)
 - Users are solely responsible for their own API costs and usage
 - Free tier: 10,000 characters/month | Paid plans: $5-99/month
-- See [ElevenLabs Pricing](https://elevenlabs.io/pricing) for current rates
 
 **Third-Party Services:**
-- This project integrates with ElevenLabs (TTS API), Piper TTS (local processing), and macOS Say (system built-in)
-- We are **not affiliated with, endorsed by, or officially connected** to ElevenLabs, Anthropic, Apple, or Claude
-- ElevenLabs and Piper TTS are subject to their respective terms of service
+- This project integrates with Piper TTS (local processing) and macOS Say (system built-in)
+- We are **not affiliated with, endorsed by, or officially connected** to Anthropic, Apple, or Claude
+- Piper TTS is subject to its terms of service
 
 **Privacy & Data:**
-- **ElevenLabs**: Your text prompts are sent to ElevenLabs servers for processing
 - **Piper TTS**: All processing happens locally on your machine, no external data transmission
 - **macOS Say**: All processing happens locally using Apple's built-in speech synthesis
-- Review [ElevenLabs Privacy Policy](https://elevenlabs.io/privacy) for their data handling
 
 **Software License:**
 - Provided "as-is" under Apache 2.0 License without warranty of any kind
@@ -522,7 +530,6 @@ npm update -g agentvibes && agentvibes update --yes
 - 🌐 GitHub: [paulpreibisch](https://github.com/paulpreibisch)
 
 **Powered by:**
-- [ElevenLabs](https://elevenlabs.io/) - Premium AI voices
 - [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
 - [Claude Code](https://claude.com/claude-code) - AI coding assistant
 - Licensed under Apache 2.0

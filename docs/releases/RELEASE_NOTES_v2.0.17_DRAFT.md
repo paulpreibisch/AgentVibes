@@ -25,7 +25,7 @@ This major release transforms AgentVibes into a complete multi-platform TTS solu
 - **Cross-platform support** - Windows (via WSL), macOS, Linux
 - **Auto-dependency installation** - Python, MCP SDK installed automatically
 - **Project-local settings** - Each Claude Desktop project has independent voice/personality
-- **Provider switching** - Seamlessly switch between ElevenLabs and Piper from MCP tools
+- **Provider switching** - Seamlessly switch between Piper TTS and Piper from MCP tools
 
 #### New MCP Tools:
 1. `text_to_speech(text, voice, personality, language)` - Speak with full control
@@ -36,7 +36,7 @@ This major release transforms AgentVibes into a complete multi-platform TTS solu
 6. `set_language(language)` - Speak in 30+ languages
 7. `get_config()` - Check current voice/personality/language/provider
 8. `replay_audio(n)` - Replay recently played TTS
-9. `set_provider(provider)` - Switch between ElevenLabs/Piper
+9. `set_provider(provider)` - Switch between Piper TTS/Piper
 10. `set_learn_mode(enabled)` - Enable language learning
 11. `set_speed(speed, target)` - Control speech speed
 12. `get_speed()` - Check current speed settings
@@ -49,7 +49,7 @@ npx agentvibes install-mcp
 # The installer will:
 # 1. Auto-install Python dependencies (mcp SDK)
 # 2. Update Claude Desktop config (~/.claude/claude_desktop_config.json)
-# 3. Configure provider (ElevenLabs or Piper)
+# 3. Configure provider (Piper TTS or Piper)
 # 4. Download Piper voices if using free provider
 # 5. Show restart instructions
 ```
@@ -100,11 +100,11 @@ npx agentvibes install-mcp
 #### Provider-Aware Voice Mappings:
 ```bash
 # Spanish mappings
-ElevenLabs: Antoni, Matilda
+Piper TTS: Antoni, Matilda
 Piper: en_US-lessac-medium, en_US-amy-medium
 
 # French mappings
-ElevenLabs: Rachel, Charlotte
+Piper TTS: Rachel, Charlotte
 Piper: en_US-ryan-high, en_GB-northern_english_male-medium
 
 # German, Italian, Portuguese, Chinese, Japanese, Korean...
@@ -147,16 +147,16 @@ User: "Explain how arrays work"
 **Cross-Provider Speed Control:** Adjust TTS speed from 0.5x to 3.0x for BOTH providers!
 
 #### What's New:
-- **Unified interface** - Same speed command works for ElevenLabs and Piper
+- **Unified interface** - Same speed command works for Piper TTS and Piper
 - **Intuitive scaling** - Use `0.5x` (half speed), `1x` (normal), `2x` (double), `3x` (triple)
 - **Human aliases** - Use `slow`, `slower`, `normal`, `fast`, `faster`
 - **Provider-aware mapping** - Converts to provider-specific values automatically
 - **Tongue twister demos** - Hear speed changes instantly
 - **Independent control** - Set different speeds for main and target voices (learning mode)
 
-#### ElevenLabs Mapping:
+#### Piper TTS Mapping:
 ```
-0.5x → 0.25 (ElevenLabs scale: 0.25-4.0)
+0.5x → 0.25 (Piper TTS scale: 0.25-4.0)
 1.0x → 1.0
 2.0x → 2.0
 3.0x → 3.0
@@ -210,7 +210,7 @@ User: "Explain how arrays work"
 1. `docs/quick-start.md` (85 lines) - Installation and first steps
 2. `docs/mcp-setup.md` (147 lines) - Claude Desktop MCP integration
 3. `docs/language-learning-mode.md` (126 lines) - Complete learning mode guide
-4. `docs/providers.md` (114 lines) - ElevenLabs vs Piper comparison
+4. `docs/providers.md` (114 lines) - Piper TTS vs Piper comparison
 5. `docs/voice-library.md` (47 lines) - Voice catalog and recommendations
 6. `docs/personalities.md` (52 lines) - Personality system guide
 7. `docs/commands.md` (67 lines) - Command reference
@@ -232,7 +232,7 @@ User: "Explain how arrays work"
 #### What Changed:
 - **Prerequisites first** - Python, Node.js, Claude Desktop/Code explained upfront
 - **NPX installation** - No more `npm install`, use `npx agentvibes install`
-- **Provider choice** - Clear comparison: Piper (free, WSL required) vs ElevenLabs (paid)
+- **Provider choice** - Clear comparison: Piper (free, WSL required) vs Piper TTS (paid)
 - **Human-friendly paths** - Use `%USERNAME%` instead of hardcoded names
 - **Three-column tables** - Commands for Claude Desktop, Claude Code, Claude Code + MCP
 - **WSL setup** - Complete WSL installation guide with Ubuntu Desktop RDP
@@ -263,7 +263,7 @@ User: "Explain how arrays work"
   - Speed retrieval and validation
 
 - **provider-manager.sh** (42 new tests)
-  - Provider switching (ElevenLabs ↔ Piper)
+  - Provider switching (Piper TTS ↔ Piper)
   - Voice synchronization when switching
   - Provider info display
   - Provider testing
@@ -292,16 +292,16 @@ npm test
 ## 🐛 Bug Fixes
 
 ### Provider Switching Fixes
-- **Fixed ElevenLabs language support** - Corrected `get_current_language()` → `get_language_code()`
+- **Fixed Piper TTS language support** - Corrected `get_current_language()` → `get_language_code()`
 - **Fixed voice sync** - Auto-update target voice when switching providers
 - **Fixed non-interactive mode** - MCP provider switching works without prompts
 
 ### Audio Quality Fixes
 - **128kbps bitrate preserved** - Fixed ffmpeg downsampling from 128kbps → 64kbps
 - **No more static** - Eliminated quality degradation during audio padding
-- **ElevenLabs static fix** - Force MP3 output to prevent static audio
+- **Piper TTS static fix** - Force MP3 output to prevent static audio
 
-### JSON Escaping (ElevenLabs)
+### JSON Escaping (Piper TTS)
 - **Robust API communication** - Now uses jq for proper JSON escaping
 - **Special characters fixed** - Handles quotes, backslashes, newlines correctly
 - **Prevents API errors** - No more "Invalid \escape" errors
@@ -311,7 +311,7 @@ npm test
 - **Auto-context detection** - Improved detection of active BMAD agent
 
 ### Audio Tunnel Fixes
-- **SSH audio compatibility** - Convert ElevenLabs audio to 48kHz stereo
+- **SSH audio compatibility** - Convert Piper TTS audio to 48kHz stereo
 - **Tunnel diagnostic** - Added scripts to verify audio tunnel health
 - **Auto-monitor setup** - Scripts to automatically fix audio issues
 
@@ -441,7 +441,7 @@ Net change: +7,832 lines
 
 **Core Hooks:**
 - `.claude/hooks/language-manager.sh` (+210 lines)
-- `.claude/hooks/play-tts-elevenlabs.sh` (+166 lines)
+- `.claude/hooks/play-tts-piper.sh` (+166 lines)
 - `.claude/hooks/play-tts-piper.sh` (+104 lines)
 - `.claude/hooks/provider-commands.sh` (+137 lines)
 - `.claude/hooks/provider-manager.sh` (+60 lines)
@@ -483,7 +483,7 @@ Net change: +7,832 lines
 ✅ **30+ languages** - Spanish, French, German, Italian, Chinese, Japanese, etc.
 ✅ **Sequential playback** - No overlapping audio
 ✅ **Replay control** - Replay target language as many times as needed
-✅ **Provider-aware** - Works with both ElevenLabs and Piper
+✅ **Provider-aware** - Works with both Piper TTS and Piper
 
 ### For Power Users
 ✅ **Speed control** - 0.5x to 3.0x across both providers
@@ -501,7 +501,7 @@ Net change: +7,832 lines
 ✅ **Cleaner docs** - README 50% smaller, focused files
 ✅ **Better reliability** - 110 tests ensure everything works
 ✅ **Audio quality** - No static, preserved bitrate
-✅ **Provider switching** - Seamless ElevenLabs ↔ Piper
+✅ **Provider switching** - Seamless Piper TTS ↔ Piper
 
 ---
 
@@ -571,14 +571,14 @@ npx agentvibes install-mcp
 
 ### Speed Control
 - **Piper range limited** - Piper supports -40% to +100% (maps to 0.5x-3.0x)
-- **ElevenLabs API limits** - Speed range is 0.25 to 4.0 on ElevenLabs side
+- **Piper TTS API limits** - Speed range is 0.25 to 4.0 on Piper TTS side
 
 ---
 
 ## 💡 What's Next (v2.1.0 Roadmap)
 
 ### Planned Features
-1. **Voice cloning** - Clone your own voice with ElevenLabs
+1. **Voice cloning** - Clone your own voice with Piper TTS
 2. **Custom personalities** - Create and share personality packs
 3. **Multi-model MCP** - Support Anthropic, OpenAI, Gemini via MCP
 4. **Browser extension** - AgentVibes for web-based AI chats
@@ -594,7 +594,7 @@ npx agentvibes install-mcp
 - **Community** - Bug reports, feature requests, testing
 
 ### Special Thanks
-- **ElevenLabs** - Amazing multilingual TTS API
+- **Piper TTS** - Amazing multilingual TTS API
 - **Rhasspy/Piper** - Free, offline TTS voices
 - **Anthropic** - Claude Code and MCP platform
 - **All beta testers** - Testing v2.0.17-beta.1 through beta.25!

@@ -1,7 +1,7 @@
 ---
 name: flirty
 description: Playful and charming personality
-elevenlabs_voice: Jessica Anne Bogart
+piper_voice: Jessica Anne Bogart
 piper_voice: en_US-amy-medium
 ---
 

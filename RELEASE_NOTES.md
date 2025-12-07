@@ -353,20 +353,20 @@ AgentVibes v2.14.15 fixes the GitHub Actions "Publish to npm" workflow that was 
 
 ## AI Summary
 
-AgentVibes v2.14.14 fixes critical test suite failures that were blocking CI/CD pipelines. The root cause was the `voices-config.sh` refactoring for bash 3.2 (macOS) compatibility - it switched from associative arrays to functions, but some files still used the old syntax. Voice names with spaces like "Ralf Eisend" and "Cowboy Bob" caused syntax errors. This release also adds ElevenLabs affiliate links and makes the `/release` command require passing tests before publishing.
+AgentVibes v2.14.14 fixes critical test suite failures that were blocking CI/CD pipelines. The root cause was the `voices-config.sh` refactoring for bash 3.2 (macOS) compatibility - it switched from associative arrays to functions, but some files still used the old syntax. Voice names with spaces like "Ralf Eisend" and "Cowboy Bob" caused syntax errors. This release also adds Piper TTS affiliate links and makes the `/release` command require passing tests before publishing.
 
 **Key Highlights:**
 - 🐛 **Test Fix** - Fixed syntax errors from voice names with spaces in bash
 - 🧪 **CI/CD** - All 132 bats + 12 Node.js tests now pass
 - 📚 **Release Safety** - `/release` command now requires tests to pass first
-- 🔗 **Affiliate Links** - ElevenLabs URLs updated to affiliate link
+- 🔗 **Affiliate Links** - Piper TTS URLs updated to affiliate link
 
 ---
 
 ## Bug Fixes
 
 ### Voice Lookup Syntax Errors
-**Files:** `.claude/hooks/play-tts-elevenlabs.sh`, `test/unit/personality-voice-mapping.bats`
+**Files:** `.claude/hooks/play-tts-piper.sh`, `test/unit/personality-voice-mapping.bats`
 
 The `voices-config.sh` was refactored to use functions (`get_voice_id()`) instead of associative arrays for bash 3.2 compatibility. However, two files still used the old `${VOICES[...]}` syntax:
 
@@ -395,10 +395,10 @@ if [[ -n "$OVERRIDE_VOICE_ID" ]]; then
 
 Added mandatory test suite execution as the first step of the release process. If any tests fail, the release is immediately aborted to prevent publishing broken code to npm.
 
-### ElevenLabs Affiliate Links
-**Files:** `README.md`, `src/installer.js`, `mcp-server/docs/elevenlabs-setup.md`
+### Piper TTS Affiliate Links
+**Files:** `README.md`, `src/installer.js`, `mcp-server/docs/piper-setup.md`
 
-Updated ElevenLabs URLs to use affiliate link (`https://try.elevenlabs.io/agentvibes`) for sign-up references while keeping functional links (dashboard, pricing, privacy) pointing to their actual pages.
+Updated Piper TTS URLs to use affiliate link (`https://try.piper.io/agentvibes`) for sign-up references while keeping functional links (dashboard, pricing, privacy) pointing to their actual pages.
 
 ---
 
@@ -406,12 +406,12 @@ Updated ElevenLabs URLs to use affiliate link (`https://try.elevenlabs.io/agentv
 
 | File | Changes |
 |------|---------|
-| `.claude/hooks/play-tts-elevenlabs.sh` | Fixed voice lookup to use `get_voice_id()` function |
+| `.claude/hooks/play-tts-piper.sh` | Fixed voice lookup to use `get_voice_id()` function |
 | `test/unit/personality-voice-mapping.bats` | Fixed test assertions to use `get_voice_id()` function |
 | `.claude/commands/release.md` | Added mandatory test requirement before release |
-| `README.md` | Added ElevenLabs affiliate links |
-| `src/installer.js` | Added ElevenLabs affiliate link to API key prompt |
-| `mcp-server/docs/elevenlabs-setup.md` | Added ElevenLabs affiliate link to setup guide |
+| `README.md` | Added Piper TTS affiliate links |
+| `src/installer.js` | Added Piper TTS affiliate link to API key prompt |
+| `mcp-server/docs/piper-setup.md` | Added Piper TTS affiliate link to setup guide |
 
 ---
 
@@ -432,13 +432,13 @@ npx agentvibes update
 
 ## AI Summary
 
-AgentVibes v2.14.13 changes the `--yes` flag behavior to always use free TTS providers by default. Previously, the installer would auto-select ElevenLabs if an API key existed in the environment, but this caused failures when keys were expired or invalid. Now, macOS defaults to macOS Say and Linux defaults to Piper TTS. Users who want ElevenLabs must run the installer without `--yes` to manually select it.
+AgentVibes v2.14.13 changes the `--yes` flag behavior to always use free TTS providers by default. Previously, the installer would auto-select Piper TTS if an API key existed in the environment, but this caused failures when keys were expired or invalid. Now, macOS defaults to macOS Say and Linux defaults to Piper TTS. Users who want Piper TTS must run the installer without `--yes` to manually select it.
 
 **Key Highlights:**
 - 🆓 **Free-First Defaults** - `--yes` flag now always picks free providers
 - 🍎 **macOS Default** - macOS Say (built-in, zero setup)
 - 🐧 **Linux Default** - Piper TTS (free, offline)
-- 🎤 **ElevenLabs Manual** - Requires interactive selection (no more expired key failures)
+- 🎤 **Piper TTS Manual** - Requires interactive selection (no more expired key failures)
 
 ---
 
@@ -447,13 +447,13 @@ AgentVibes v2.14.13 changes the `--yes` flag behavior to always use free TTS pro
 ### Expired API Key Failures
 **File:** `src/installer.js`
 
-Previously, if `ELEVENLABS_API_KEY` existed in the environment, the `--yes` flag would auto-select ElevenLabs even if the subscription was expired:
+Previously, if `ELEVENLABS_API_KEY` existed in the environment, the `--yes` flag would auto-select Piper TTS even if the subscription was expired:
 
 ```javascript
 // Before: Would fail silently with expired keys
 if (options.yes) {
   if (process.env.ELEVENLABS_API_KEY) {
-    return 'elevenlabs'; // Key might be expired!
+    return 'piper'; // Key might be expired!
   }
 }
 ```
@@ -476,7 +476,7 @@ if (options.yes) {
 
 | File | Changes |
 |------|---------|
-| `src/installer.js` | Removed ElevenLabs auto-detection with `--yes` flag |
+| `src/installer.js` | Removed Piper TTS auto-detection with `--yes` flag |
 
 ---
 
@@ -502,7 +502,7 @@ AgentVibes v2.14.12 completes macOS Bash 3.2 compatibility by eliminating ALL `d
 **Key Highlights:**
 - 🍎 **Full macOS Compatibility** - All `declare -A` associative arrays replaced with functions
 - 🔧 **Fixed language-manager.sh** - `declare: -A: invalid option` error resolved
-- 🔧 **Fixed voices-config.sh** - ElevenLabs voice lookups now work on Bash 3.2
+- 🔧 **Fixed voices-config.sh** - Piper TTS voice lookups now work on Bash 3.2
 - 🔧 **Fixed voice-manager.sh** - Voice listing and preview commands fixed
 - 📦 **MCP Config Installer** - Installer offers to create `.mcp.json` automatically
 - 🍎 **macOS Default Provider** - Installer now defaults to macOS Say on Mac
@@ -532,13 +532,13 @@ declare -A ELEVENLABS_VOICES=(
 echo "${ELEVENLABS_VOICES[$lang]}"
 
 # After (Bash 3.2 compatible):
-_get_elevenlabs_voice() {
+_get_piper_voice() {
     case "$1" in
         spanish) echo "Antoni" ;;
         ...
     esac
 }
-_get_elevenlabs_voice "$lang"
+_get_piper_voice "$lang"
 ```
 
 ### Fixed `local` Usage in For Loops

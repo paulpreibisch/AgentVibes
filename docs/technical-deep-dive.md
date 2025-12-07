@@ -16,7 +16,7 @@ AgentVibes is built on four interconnected systems:
 
 1. **Output Style System** - The AI's instructions for when to speak
 2. **Hook System** - The bash scripts that generate and play audio
-3. **Provider System** - The TTS engines (ElevenLabs or Piper)
+3. **Provider System** - The TTS engines (Piper TTS or Piper)
 4. **MCP Server** - Natural language control interface
 
 Let's explore each one.
@@ -108,13 +108,13 @@ When Claude's output style executes `.claude/hooks/play-tts.sh "Hello world" "Ar
 TEXT="$1"          # "Hello world"
 VOICE_OVERRIDE="$2"  # "Aria" (optional)
 
-# Get active provider (elevenlabs or piper)
+# Get active provider (piper or piper)
 ACTIVE_PROVIDER=$(get_active_provider)
 
 # Route to provider-specific implementation
 case "$ACTIVE_PROVIDER" in
-  elevenlabs)
-    exec "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"
+  piper)
+    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   piper)
     exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
@@ -128,10 +128,10 @@ This script is a **provider router**. It doesn't generate audio itself—it dele
 
 Each provider has its own script that handles the specifics:
 
-**For ElevenLabs** (`.claude/hooks/play-tts-elevenlabs.sh`):
+**For Piper TTS** (`.claude/hooks/play-tts-piper.sh`):
 1. Resolves voice name to voice ID (looks up "Aria" → actual voice ID)
 2. Detects current language setting (for multilingual support)
-3. Makes API call to ElevenLabs with text, voice, and language
+3. Makes API call to Piper TTS with text, voice, and language
 4. Saves audio to temp file
 5. Plays audio using system player (paplay/aplay/mpg123)
 6. Handles SSH detection and audio optimization
@@ -159,7 +159,7 @@ fi
 # 2. Saves personality to config file
 echo "$PERSONALITY" > "$PERSONALITY_FILE"
 
-# 3. Detects active provider (ElevenLabs or Piper)
+# 3. Detects active provider (Piper TTS or Piper)
 ACTIVE_PROVIDER=$(cat "$CLAUDE_DIR/tts-provider.txt")
 
 # 4. Reads assigned voice from personality file
@@ -185,7 +185,7 @@ Each personality is defined in a markdown file like `.claude/personalities/sarca
 ---
 name: sarcastic
 description: Dry wit and cutting observations
-elevenlabs_voice: Jessica Anne Bogart
+piper_voice: Jessica Anne Bogart
 piper_voice: en_US-amy-medium
 ---
 
@@ -210,7 +210,7 @@ The AI reads this file and uses the "AI Instructions" section to generate unique
 
 ### Provider Manager
 
-The provider manager (`provider-manager.sh`) handles switching between ElevenLabs and Piper:
+The provider manager (`provider-manager.sh`) handles switching between Piper TTS and Piper:
 
 ```bash
 # Get active provider
@@ -224,7 +224,7 @@ get_active_provider() {
     provider_file="$HOME/.claude/tts-provider.txt"
   fi
 
-  cat "$provider_file" 2>/dev/null || echo "elevenlabs"
+  cat "$provider_file" 2>/dev/null || echo "piper"
 }
 
 # Switch provider
@@ -235,7 +235,7 @@ switch_provider() {
 }
 ```
 
-This allows seamless switching between paid (ElevenLabs) and free (Piper) TTS without changing any other configuration.
+This allows seamless switching between paid (Piper TTS) and free (Piper) TTS without changing any other configuration.
 
 ---
 
@@ -243,24 +243,24 @@ This allows seamless switching between paid (ElevenLabs) and free (Piper) TTS wi
 
 AgentVibes supports two TTS providers with the same interface:
 
-### ElevenLabs Provider
+### Piper TTS Provider
 
 **Architecture:** Cloud-based API
 
 **How it works:**
 1. Accepts text, voice name, and language code
-2. Makes HTTPS POST request to ElevenLabs API
+2. Makes HTTPS POST request to Piper TTS API
 3. Receives MP3 audio stream
 4. Detects if running over SSH (checks `$SSH_CONNECTION`)
 5. If SSH detected, converts to OGG format (prevents audio corruption)
 6. Plays audio using local audio player
 
-**Code snippet from `.claude/hooks/play-tts-elevenlabs.sh`:**
+**Code snippet from `.claude/hooks/play-tts-piper.sh`:**
 
 ```bash
 # Make API request
 RESPONSE=$(curl -s -X POST \
-  "https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}" \
+  "https://api.piper.io/v1/text-to-speech/${VOICE_ID}" \
   -H "xi-api-key: ${API_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
@@ -318,7 +318,7 @@ paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE"
 
 ### Why Two Providers?
 
-**ElevenLabs:**
+**Piper TTS:**
 - ✅ Superior voice quality
 - ✅ 150+ voices with distinct characters
 - ✅ Perfect multilingual support (29 languages)
@@ -494,15 +494,15 @@ Claude's output style instructions kick in:
 
 ```bash
 # Read active provider
-ACTIVE_PROVIDER=$(cat .claude/tts-provider.txt) → "elevenlabs"
+ACTIVE_PROVIDER=$(cat .claude/tts-provider.txt) → "piper"
 
-# Route to ElevenLabs implementation
-exec .claude/hooks/play-tts-elevenlabs.sh "$TEXT" "$VOICE"
+# Route to Piper TTS implementation
+exec .claude/hooks/play-tts-piper.sh "$TEXT" "$VOICE"
 ```
 
-### Step 3: ElevenLabs Provider Generates Audio
+### Step 3: Piper TTS Provider Generates Audio
 
-`play-tts-elevenlabs.sh` does the heavy lifting:
+`play-tts-piper.sh` does the heavy lifting:
 
 ```bash
 # 1. Resolve voice
@@ -512,8 +512,8 @@ VOICE_ID=$(lookup_voice_id "$VOICE_NAME") → "abc123xyz789"
 # 2. Detect language
 LANGUAGE_CODE=$(cat .claude/tts-language.txt) → "en"
 
-# 3. Call ElevenLabs API
-curl -X POST "https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID" \
+# 3. Call Piper TTS API
+curl -X POST "https://api.piper.io/v1/text-to-speech/$VOICE_ID" \
   -H "xi-api-key: $API_KEY" \
   -d '{"text": "Oh, the excitement. Let me check that git status for you."}' \
   --output /tmp/tts_12345.mp3
@@ -597,7 +597,7 @@ The installer:
 │       └── ... (50+ command files)
 ├── hooks/
 │   ├── play-tts.sh                     # Main TTS router
-│   ├── play-tts-elevenlabs.sh         # ElevenLabs implementation
+│   ├── play-tts-piper.sh         # Piper TTS implementation
 │   ├── play-tts-piper.sh               # Piper implementation
 │   ├── personality-manager.sh          # Personality system
 │   ├── voice-manager.sh                # Voice switching
@@ -614,7 +614,7 @@ The installer:
 │   └── agent-vibes.md                  # Output style instructions
 ├── tts-voice.txt                       # Current voice (e.g., "Aria")
 ├── tts-personality.txt                 # Current personality (e.g., "sarcastic")
-├── tts-provider.txt                    # Current provider (e.g., "elevenlabs")
+├── tts-provider.txt                    # Current provider (e.g., "piper")
 └── tts-language.txt                    # Current language (e.g., "english")
 ```
 
@@ -654,7 +654,7 @@ AgentVibes uses simple text files for configuration. This makes it easy to under
 | `tts-voice.txt` | Current voice name | `Aria` |
 | `tts-personality.txt` | Current personality | `pirate` |
 | `tts-sentiment.txt` | Current sentiment (optional) | `sarcastic` |
-| `tts-provider.txt` | Active TTS provider | `elevenlabs` |
+| `tts-provider.txt` | Active TTS provider | `piper` |
 | `tts-language.txt` | TTS language | `spanish` |
 
 ### Reading Configuration in Code
@@ -696,7 +696,7 @@ The output style is modified to call TTS twice:
 .claude/hooks/play-tts.sh "Lo verificaré para ti" "es_ES-davefx-medium"
 ```
 
-The translation happens via API (if using ElevenLabs multilingual voices) or by using language-specific Piper voices.
+The translation happens via API (if using Piper TTS multilingual voices) or by using language-specific Piper voices.
 
 ### SSH Audio Optimization
 
@@ -762,7 +762,7 @@ Files are kept for the duration of the session, allowing the `/agent-vibes:repla
 
 ### Provider Performance
 
-**ElevenLabs:**
+**Piper TTS:**
 - API latency: ~500-1000ms
 - Audio quality: Excellent (256kbps MP3)
 - Bandwidth: ~2KB per second of audio
@@ -784,7 +784,7 @@ fi
 ```
 
 This prevents:
-- Excessive API costs (ElevenLabs charges per character)
+- Excessive API costs (Piper TTS charges per character)
 - Slow generation (long audio takes time to produce)
 - User confusion (very long TTS messages are hard to follow)
 
@@ -797,7 +797,7 @@ AgentVibes has multiple layers of error handling:
 ### API Failure Handling
 
 ```bash
-# Try ElevenLabs API
+# Try Piper TTS API
 RESPONSE=$(curl -s -X POST "$API_ENDPOINT" ...)
 
 if [[ $? -ne 0 ]] || [[ ! -f "$AUDIO_FILE" ]]; then
@@ -862,7 +862,7 @@ AgentVibes demonstrates several important software engineering principles:
 
 **1. Separation of Concerns**
 - Output style (when to speak) is separate from hooks (how to speak)
-- Provider abstraction (ElevenLabs vs Piper) is separate from voice management
+- Provider abstraction (Piper TTS vs Piper) is separate from voice management
 - MCP server is separate from core functionality
 
 **2. Provider Pattern**

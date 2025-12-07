@@ -1,7 +1,7 @@
 ---
 name: sassy
 description: Bold with attitude
-elevenlabs_voice: Ms. Walker
+piper_voice: Ms. Walker
 piper_voice: en_US-amy-medium
 ---
 

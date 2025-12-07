@@ -28,11 +28,10 @@ Instead of remembering slash commands like `/agent-vibes:switch Aria`, just say:
 
 **📖 Read This First:** If you haven't installed Claude Desktop yet, [click here for the Windows Setup Guide](../mcp-server/WINDOWS_SETUP.md) - it covers WSL setup, Python installation, and all prerequisites.
 
-**Step 1: Set Your ElevenLabs API Key (Windows)**
+**Step 1: Set Your Piper TTS API Key (Windows)**
 
 Open Command Prompt or PowerShell and run:
 ```cmd
-setx ELEVENLABS_API_KEY "your-api-key-here"
 ```
 
 **Important:** After running `setx`, you must:
@@ -55,7 +54,6 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 }
 ```
 
-**Note:** The `env` section is optional. Claude Desktop automatically inherits Windows environment variables, so if you've set `ELEVENLABS_API_KEY` with `setx`, it will be available automatically.
 
 ### For Warp Terminal
 
@@ -67,7 +65,6 @@ Add to `~/.warp/mcp.json`:
     "command": "npx",
     "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"],
     "env": {
-      "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
     }
   }
 }
@@ -84,7 +81,6 @@ Add to `.mcp-minimal.json` in your project:
       "command": "npx",
       "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"],
       "env": {
-        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
       }
     }
   }

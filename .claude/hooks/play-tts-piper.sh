@@ -275,6 +275,36 @@ if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
   exit 4
 fi
 
+# @function detect_remote_session
+# @intent Auto-detect SSH/RDP sessions and enable audio compression
+# @why Remote desktop audio is choppy without compression
+# @returns Sets AGENTVIBES_RDP_MODE environment variable
+# @detection Checks SSH_CLIENT, SSH_TTY, and DISPLAY variables
+if [[ -z "${AGENTVIBES_RDP_MODE:-}" ]]; then
+  # Auto-detect remote session
+  if [[ -n "${SSH_CLIENT:-}" ]] || [[ -n "${SSH_TTY:-}" ]] || [[ "${DISPLAY:-}" =~ ^localhost:.* ]]; then
+    export AGENTVIBES_RDP_MODE=true
+    echo "🌐 Remote session detected - enabling audio compression"
+  fi
+fi
+
+# @function compress_for_remote
+# @intent Compress TTS audio for remote sessions (SSH/RDP)
+# @why Reduces bandwidth and prevents choppy playback
+# @param Uses global: $TEMP_FILE, $AGENTVIBES_RDP_MODE
+# @returns Updates $TEMP_FILE to compressed version
+# @sideeffects Converts to mono 22kHz for lower bandwidth
+if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &> /dev/null; then
+  COMPRESSED_FILE="$AUDIO_DIR/tts-compressed-$(date +%s).wav"
+  # Convert to mono, 22kHz, 64kbps for remote sessions
+  ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
+
+  if [[ -f "$COMPRESSED_FILE" ]]; then
+    rm -f "$TEMP_FILE"
+    TEMP_FILE="$COMPRESSED_FILE"
+  fi
+fi
+
 # @function add_silence_padding
 # @intent Add silence to prevent WSL audio static
 # @why WSL audio subsystem cuts off first ~200ms
@@ -295,6 +325,31 @@ if command -v ffmpeg &> /dev/null; then
   fi
 fi
 
+# @function apply_audio_effects
+# @intent Apply sox effects and background music via audio-processor.sh
+# @param Uses global: $TEMP_FILE
+# @returns Updates $TEMP_FILE to processed version, sets $BACKGROUND_MUSIC if used
+# @sideeffects Applies audio effects and background music
+BACKGROUND_MUSIC=""
+if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
+  PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
+  # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
+  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
+    echo "Warning: Audio processing failed, using unprocessed audio" >&2
+    PROCESSED_FILE="$TEMP_FILE"
+    PROCESSOR_OUTPUT="$TEMP_FILE|"
+  }
+
+  # Parse output: FILE|BACKGROUND
+  PROCESSED_FILE="${PROCESSOR_OUTPUT%%|*}"
+  BACKGROUND_MUSIC="${PROCESSOR_OUTPUT##*|}"
+
+  if [[ -f "$PROCESSED_FILE" ]] && [[ "$PROCESSED_FILE" != "$TEMP_FILE" ]]; then
+    rm -f "$TEMP_FILE"
+    TEMP_FILE="$PROCESSED_FILE"
+  fi
+fi
+
 # @function play_audio
 # @intent Play generated audio using available player with sequential playback
 # @why Support multiple audio players and prevent overlapping audio in learning mode
@@ -302,13 +357,19 @@ fi
 # @sideeffects Plays audio with lock mechanism for sequential playback
 LOCK_FILE="/tmp/agentvibes-audio.lock"
 
-# Wait for previous audio to finish (max 30 seconds)
-for i in {1..60}; do
+# Wait for previous audio to finish (max 2 seconds to prevent blocking)
+for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
     break
   fi
   sleep 0.5
 done
+
+# If still locked after 2 seconds, skip this TTS to prevent blocking Claude
+if [ -f "$LOCK_FILE" ]; then
+  echo "⏭️  Skipping TTS (previous audio still playing)" >&2
+  exit 0
+fi
 
 # Track last target language audio for replay command
 if [[ "$CURRENT_LANGUAGE" != "english" ]]; then
@@ -324,16 +385,17 @@ DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wr
 DURATION=${DURATION%.*}  # Round to integer
 DURATION=${DURATION:-1}   # Default to 1 second if detection fails
 
-# Play audio in background (skip if in test mode)
-if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
+# Play audio in background (skip if in test mode or no-playback mode)
+# AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
   # Detect platform and use appropriate audio player
   if [[ "$(uname -s)" == "Darwin" ]]; then
     # macOS: Use afplay (native macOS audio player)
     afplay "$TEMP_FILE" >/dev/null 2>&1 &
     PLAYER_PID=$!
   else
-    # Linux/WSL: Try mpv, aplay, or paplay
-    (mpv "$TEMP_FILE" || aplay "$TEMP_FILE" || paplay "$TEMP_FILE") >/dev/null 2>&1 &
+    # Linux/WSL: Prefer paplay (PulseAudio) for best WSL audio quality
+    (paplay "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
     PLAYER_PID=$!
   fi
 fi
@@ -343,4 +405,7 @@ fi
 disown
 
 echo "🎵 Saved to: $TEMP_FILE"
+if [[ -n "$BACKGROUND_MUSIC" ]]; then
+  echo "🎶 Background music: $BACKGROUND_MUSIC"
+fi
 echo "🎤 Voice used: $VOICE_MODEL (Piper TTS)"

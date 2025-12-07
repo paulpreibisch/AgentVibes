@@ -83,7 +83,7 @@ Added comprehensive macOS testing infrastructure - **no Mac VPS rental needed!**
 - ✅ Automatic bash 5.x installation
 - ✅ Audio stack validation (afplay, ffmpeg, mpv)
 - ✅ Piper TTS architecture detection
-- ✅ ElevenLabs API integration tests
+- ✅ Piper TTS API integration tests
 - ✅ Python MCP dependencies
 - ✅ Audio file generation
 - ✅ Installation process verification
@@ -114,11 +114,11 @@ Added comprehensive macOS testing infrastructure - **no Mac VPS rental needed!**
 
 #### **Provider Switch Hint in Voice List** 💡
 
-Added helpful hint when listing voices showing users how to switch between ElevenLabs and Piper TTS providers.
+Added helpful hint when listing voices showing users how to switch between Piper TTS and Piper TTS providers.
 
 **Before:**
 ```
-🎤 Available ElevenLabs TTS Voices:
+🎤 Available Piper TTS TTS Voices:
   Aria
   Cowboy Bob
   ...
@@ -126,7 +126,7 @@ Added helpful hint when listing voices showing users how to switch between Eleve
 
 **After:**
 ```
-🎤 Available ElevenLabs TTS Voices:
+🎤 Available Piper TTS TTS Voices:
   Aria
   Cowboy Bob
   ...
@@ -155,7 +155,7 @@ Added helpful hint when listing voices showing users how to switch between Eleve
 .claude/hooks/piper-installer.sh
 .claude/hooks/piper-multispeaker-registry.sh
 .claude/hooks/piper-voice-manager.sh
-.claude/hooks/play-tts-elevenlabs.sh
+.claude/hooks/play-tts-piper.sh
 .claude/hooks/play-tts-piper.sh
 .claude/hooks/play-tts.sh
 .claude/hooks/prepare-release.sh
@@ -198,7 +198,7 @@ strategy:
 4. Install audio tools (ffmpeg, mpv)
 5. Run unit tests
 6. Validate Piper TTS binaries
-7. Test ElevenLabs API integration
+7. Test Piper TTS API integration
 8. Check Python MCP dependencies
 
 ---

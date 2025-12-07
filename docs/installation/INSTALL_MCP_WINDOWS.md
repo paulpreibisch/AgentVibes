@@ -4,7 +4,7 @@
 
 1. **Python 3.10+** - Download from [python.org](https://python.org)
 2. **Node.js 16+** - Should already be installed if you have Claude Desktop
-3. **ElevenLabs API Key** (optional) - Get from [elevenlabs.io](https://elevenlabs.io)
+3. **Piper TTS API Key** (optional) - Get from [piper.io](https://piper.io)
 
 ## Installation
 
@@ -14,10 +14,9 @@ AgentVibes MCP is published to npm and can be installed automatically via NPX.
 
 #### Step 1: Set Environment Variable
 
-Open **PowerShell** and set your ElevenLabs API key (if using ElevenLabs):
+Open **PowerShell** and set your Piper TTS API key (if using Piper TTS):
 
 ```powershell
-setx ELEVENLABS_API_KEY "your-api-key-here"
 ```
 
 If you don't have an API key, Piper TTS (free, offline) will be used automatically.
@@ -43,7 +42,6 @@ Add this to the `mcpServers` section:
         "agentvibes-mcp-server"
       ],
       "env": {
-        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
       }
     }
   }
@@ -119,13 +117,11 @@ Then restart Claude Desktop to download fresh.
 
 ### Using Piper TTS (Free, Offline)
 
-Remove or omit the `ELEVENLABS_API_KEY` environment variable. Piper will be used automatically.
 
-### Using ElevenLabs (Premium)
+### Using Piper TTS (Premium)
 
 Set your API key:
 ```powershell
-setx ELEVENLABS_API_KEY "your-key"
 ```
 
 ### Beta vs Stable

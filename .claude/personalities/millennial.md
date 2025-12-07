@@ -1,7 +1,7 @@
 ---
 name: millennial
 description: Internet generation speak
-elevenlabs_voice: Amy
+piper_voice: Amy
 piper_voice: en_US-amy-medium
 ---
 

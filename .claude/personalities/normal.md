@@ -1,7 +1,7 @@
 ---
 name: normal
 description: Professional and clear communication
-elevenlabs_voice: Aria
+piper_voice: Aria
 piper_voice: en_US-lessac-medium
 ---
 

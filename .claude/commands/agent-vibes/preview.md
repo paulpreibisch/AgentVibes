@@ -8,7 +8,7 @@ Preview TTS voices by playing audio samples from your active provider.
 Usage examples:
 - `/agent-vibes:preview` - Preview first 3 voices (default)
 - `/agent-vibes:preview 5` - Preview first 5 voices
-- `/agent-vibes:preview Jessica` - Preview Jessica Anne Bogart voice (ElevenLabs)
+- `/agent-vibes:preview Jessica` - Preview Jessica Anne Bogart voice (Piper TTS)
 - `/agent-vibes:preview lessac` - Preview Lessac voice (Piper)
 - `/agent-vibes:preview "Northern Terry"` - Preview Northern Terry voice
 - `/agent-vibes:preview first 10` - Preview first 10 voices

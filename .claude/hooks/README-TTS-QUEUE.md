@@ -130,6 +130,6 @@ ls -la /tmp/agentvibes-audio.lock
 
 ## Compatibility
 
-- Works with both Piper and ElevenLabs TTS providers
+- Works with both Piper and Piper TTS TTS providers
 - Compatible with all existing BMAD voice mappings
 - No changes needed to party mode workflow instructions

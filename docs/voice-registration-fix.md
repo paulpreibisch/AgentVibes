@@ -11,24 +11,24 @@
 When users download custom Piper voices (jenny, kristin, 16Speakers), they cannot switch to them because:
 
 **Problem**: The voice-manager.sh uses two different lookup methods:
-1. **ElevenLabs voices**: Uses `voices-config.sh` associative array
+1. **Piper TTS voices**: Uses `voices-config.sh` associative array
 2. **Piper voices**: Scans `.onnx` files in the voice storage directory
 
 **Current voice-manager.sh logic (line 265-269)**:
 ```bash
 # If using Piper and voice name looks like a Piper model (contains underscore and dash)
-# then skip ElevenLabs voice validation
+# then skip Piper TTS voice validation
 if [[ "$ACTIVE_PROVIDER" == "piper" ]] && [[ "$VOICE_NAME" == *"_"*"-"* ]]; then
   # This is a Piper model name, use it directly
   FOUND="$VOICE_NAME"
 ```
 
-**Issue**: Custom voice names like `jenny`, `kristin`, and `16Speakers` DON'T contain underscore and dash, so they fail the Piper detection and fall through to ElevenLabs lookup, which fails.
+**Issue**: Custom voice names like `jenny`, `kristin`, and `16Speakers` DON'T contain underscore and dash, so they fail the Piper detection and fall through to Piper TTS lookup, which fails.
 
 **Why it fails**:
-- `jenny` → No underscore/dash → Falls to ElevenLabs lookup → Not found → Error
-- `kristin` → No underscore/dash → Falls to ElevenLabs lookup → Not found → Error
-- `16Speakers` → No underscore/dash → Falls to ElevenLabs lookup → Not found → Error
+- `jenny` → No underscore/dash → Falls to Piper TTS lookup → Not found → Error
+- `kristin` → No underscore/dash → Falls to Piper TTS lookup → Not found → Error
+- `16Speakers` → No underscore/dash → Falls to Piper TTS lookup → Not found → Error
 
 **Why standard Piper voices work**:
 - `en_US-lessac-medium` → Contains `_` and `-` → Passes Piper check → Works!
@@ -78,7 +78,7 @@ The `16Speakers.onnx` is a special multi-speaker model containing 16 different v
 
 **Modified logic**:
 ```bash
-# 1. Check if it's a number (for ElevenLabs numbered selection)
+# 1. Check if it's a number (for Piper TTS numbered selection)
 if [[ "$VOICE_NAME" =~ ^[0-9]+$ ]]; then
   # ... existing numbered selection code ...
 
@@ -109,9 +109,9 @@ elif [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
     exit 1
   fi
 
-# 3. Fall back to ElevenLabs lookup
+# 3. Fall back to Piper TTS lookup
 else
-  # ... existing ElevenLabs lookup code ...
+  # ... existing Piper TTS lookup code ...
 fi
 ```
 

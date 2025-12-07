@@ -1,8 +1,8 @@
 # Multi-Provider Support
 
-AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premium ElevenLabs AI voices or free offline Piper TTS!
+AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premium Piper TTS AI voices or free offline Piper TTS!
 
-## 🎤 ElevenLabs (Premium AI Voices)
+## 🎤 Piper TTS (Premium AI Voices)
 
 **Features:**
 - 150+ professional AI voices
@@ -12,7 +12,7 @@ AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premi
 - Voices include: Aria, Archer, Cowboy Bob, Pirate Marshal, Grandpa Spuds, Jessica Anne Bogart, and more!
 
 **Requirements:**
-- ElevenLabs API key (get free tier at [elevenlabs.io](https://elevenlabs.io))
+- Piper TTS API key (get free tier at [piper.io](https://piper.io))
 - Internet connection for API calls
 
 **Pricing (2025):**
@@ -50,11 +50,11 @@ AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premi
 
 # Switch providers instantly
 /agent-vibes:provider switch
-# MCP: "Switch to Piper TTS" or "Change provider to ElevenLabs"
+# MCP: "Switch to Piper TTS" or "Change provider to Piper TTS"
 
 # Test provider functionality
 /agent-vibes:provider test
-# MCP: "Test my TTS provider" or "Test ElevenLabs connection"
+# MCP: "Test my TTS provider" or "Test Piper TTS connection"
 ```
 
 ## Switching Between Providers
@@ -68,17 +68,17 @@ The installer asks which provider you prefer and sets it up automatically.
 /agent-vibes:provider switch
 # Select: piper
 
-# Switch to ElevenLabs (premium)
+# Switch to Piper TTS (premium)
 /agent-vibes:provider switch
-# Select: elevenlabs
+# Select: piper
 ```
 
 **Automatic Fallback:**
-If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper TTS.
+If Piper TTS API key is missing, AgentVibes automatically falls back to Piper TTS.
 
 ## Provider Comparison
 
-| Feature | ElevenLabs | Piper TTS |
+| Feature | Piper TTS | Piper TTS |
 |---------|-----------|-----------|
 | **Voices** | 150+ premium AI | 50+ neural voices |
 | **Cost** | $0-99/month | Free forever |
@@ -93,7 +93,7 @@ If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper T
 
 ## Which Provider Should I Choose?
 
-**Choose ElevenLabs if:**
+**Choose Piper TTS if:**
 - You want premium studio-quality voices
 - You need extensive character voice variety
 - You're creating demos or production content
@@ -109,7 +109,7 @@ If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper T
 - You don't want to manage API keys or billing
 - **macOS users**: Piper now works via precompiled binaries!
 
-**Pro Tip:** Use Piper for development and ElevenLabs for production/demos!
+**Pro Tip:** Use Piper for development and Piper TTS for production/demos!
 
 ---
 

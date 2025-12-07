@@ -1,9 +1,9 @@
 ---
-description: List available ElevenLabs TTS voices with optional filtering
+description: List available Piper TTS TTS voices with optional filtering
 argument-hint: [first|last] [N]
 ---
 
-List available ElevenLabs TTS voices.
+List available Piper TTS TTS voices.
 
 Usage examples:
 - `/agent-vibes:list` - Show all voices

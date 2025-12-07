@@ -37,7 +37,7 @@
 # @dependencies None - pure bash implementation
 # @entrypoints Sourced by play-tts.sh and provider management commands
 # @patterns File-based state management with project-local and global fallback
-# @related play-tts.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, provider-commands.sh
+# @related play-tts.sh, play-tts-piper.sh, provider-commands.sh
 #
 
 # @function get_provider_config_path
@@ -133,7 +133,6 @@ set_active_provider() {
   echo "$provider" > "$provider_file"
 
   # Reset voice when switching providers to avoid incompatible voices
-  # (e.g., ElevenLabs "Demon Monster" doesn't exist in Piper)
   local voice_file
   if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
     voice_file="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
@@ -175,27 +174,20 @@ migrate_voice_to_provider() {
   local current_voice="$1"
   local target_provider="$2"
 
-  # Voice mapping table: ElevenLabs <-> Piper <-> macOS equivalents
-  # Format: "elevenlabs_voice:piper_voice:macos_voice"
+  # Voice mapping table: Piper <-> macOS equivalents
+  # Format: "piper_voice:macos_voice"
   local voice_mappings=(
-    "Amy:en_US-amy-medium:Samantha"
-    "Aria:en_US-amy-medium:Samantha"
-    "Matthew Schmitz:en_US-ryan-high:Alex"
-    "Michael:en_GB-alan-medium:Daniel"
-    "Jessica Anne Bogart:en_US-kristin-medium:Victoria"
-    "Ms. Walker:en_US-lessac-medium:Samantha"
-    "Cowboy Bob:en_US-joe-medium:Alex"
-    "Ralf Eisend:en_US-arctic-medium:Alex"
-    "Northern Terry:en_GB-alan-medium:Daniel"
-    "Lutz Laugh:en_US-joe-medium:Alex"
-    "Dr. Von Fusion:en_US-danny-low:Alex"
-    "Demon Monster:en_US-danny-low:Alex"
-    "Drill Sergeant:en_US-ryan-high:Alex"
-    "Grandpa Spuds Oxley:en_US-joe-medium:Alex"
+    "en_US-amy-medium:Samantha"
+    "en_US-ryan-high:Alex"
+    "en_GB-alan-medium:Daniel"
+    "en_US-kristin-medium:Victoria"
+    "en_US-lessac-medium:Samantha"
+    "en_US-joe-medium:Alex"
+    "en_US-arctic-medium:Alex"
+    "en_US-danny-low:Alex"
   )
 
   # Default voices by provider
-  local elevenlabs_default="Amy"
   local piper_default="en_US-lessac-medium"
   local macos_default="Samantha"
 
@@ -203,7 +195,6 @@ migrate_voice_to_provider() {
   if [[ -z "$current_voice" ]]; then
     case "$target_provider" in
       piper) echo "$piper_default" ;;
-      elevenlabs) echo "$elevenlabs_default" ;;
       macos) echo "$macos_default" ;;
       *) echo "$piper_default" ;;
     esac
@@ -216,21 +207,18 @@ migrate_voice_to_provider() {
 
   # Search for mapping
   for mapping in "${voice_mappings[@]}"; do
-    # Parse three-part mapping: elevenlabs:piper:macos
-    local el_voice="${mapping%%:*}"
-    local rest="${mapping#*:}"
-    local piper_voice="${rest%%:*}"
-    local macos_voice="${rest#*:}"
+    # Parse two-part mapping: piper:macos
+    local piper_voice="${mapping%%:*}"
+    local macos_voice="${mapping#*:}"
 
-    local el_voice_lower piper_voice_lower macos_voice_lower
-    el_voice_lower=$(echo "$el_voice" | tr '[:upper:]' '[:lower:]')
+    local piper_voice_lower macos_voice_lower
     piper_voice_lower=$(echo "$piper_voice" | tr '[:upper:]' '[:lower:]')
     macos_voice_lower=$(echo "$macos_voice" | tr '[:upper:]' '[:lower:]')
 
     case "$target_provider" in
       piper)
-        # Switching to Piper: look for ElevenLabs or macOS voice match
-        if [[ "$current_voice_lower" == "$el_voice_lower" ]] || [[ "$current_voice_lower" == "$macos_voice_lower" ]]; then
+        # Switching to Piper: look for macOS voice match
+        if [[ "$current_voice_lower" == "$macos_voice_lower" ]]; then
           echo "$piper_voice"
           return 0
         fi
@@ -240,32 +228,9 @@ migrate_voice_to_provider() {
           return 0
         fi
         ;;
-      elevenlabs)
-        # Switching to ElevenLabs: look for Piper or macOS voice match
-        if [[ "$current_voice_lower" == "$piper_voice_lower" ]] || [[ "$current_voice_lower" == "$macos_voice_lower" ]]; then
-          echo "$el_voice"
-          return 0
-        fi
-        # Already an ElevenLabs voice? Keep it (not Piper format, not common macOS names)
-        if [[ ! "$current_voice" =~ ^[a-z]{2}_ ]]; then
-          # Check it's not a macOS voice
-          local is_macos=false
-          for m in "${voice_mappings[@]}"; do
-            local mv="${m##*:}"
-            if [[ "${current_voice_lower}" == "$(echo "$mv" | tr '[:upper:]' '[:lower:]')" ]]; then
-              is_macos=true
-              break
-            fi
-          done
-          if [[ "$is_macos" == "false" ]]; then
-            echo "$current_voice"
-            return 0
-          fi
-        fi
-        ;;
       macos)
-        # Switching to macOS: look for ElevenLabs or Piper voice match
-        if [[ "$current_voice_lower" == "$el_voice_lower" ]] || [[ "$current_voice_lower" == "$piper_voice_lower" ]]; then
+        # Switching to macOS: look for Piper voice match
+        if [[ "$current_voice_lower" == "$piper_voice_lower" ]]; then
           echo "$macos_voice"
           return 0
         fi
@@ -282,7 +247,6 @@ migrate_voice_to_provider() {
   # No mapping found - return default for target provider
   case "$target_provider" in
     piper) echo "$piper_default" ;;
-    elevenlabs) echo "$elevenlabs_default" ;;
     macos) echo "$macos_default" ;;
     *) echo "$piper_default" ;;
   esac

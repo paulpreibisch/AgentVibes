@@ -11,7 +11,7 @@ All commands are prefixed with `/agent-vibes:`
 | `/agent-vibes:whoami` | "What's my current voice?" or "Show my configuration" | Show current voice, sentiment & personality |
 | `/agent-vibes:preview [N]` | "Preview voices" or "Let me hear the first 5 voices" | Preview voices with audio samples |
 | `/agent-vibes:sample <voice>` | "Test Aria voice" or "Let me hear Cowboy Bob" | Test a specific voice |
-| `/agent-vibes:add <name> <id>` | "Add custom voice MyVoice with ID abc123" | Add custom ElevenLabs voice |
+| `/agent-vibes:add <name> <id>` | "Add custom voice MyVoice with ID abc123" | Add custom Piper TTS voice |
 | `/agent-vibes:replay [N]` | "Replay last message" or "Replay the 3rd message" | Replay recent TTS audio |
 | `/agent-vibes:get` | "What voice am I using?" or "Get current voice" | Get currently selected voice |
 

@@ -1,7 +1,7 @@
 ---
 name: funny
 description: Lighthearted and comedic
-elevenlabs_voice: Cowboy Bob
+piper_voice: Cowboy Bob
 piper_voice: en_US-joe-medium
 ---
 

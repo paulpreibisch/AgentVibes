@@ -3,15 +3,15 @@
   "commands": [
     {
       "name": "list",
-      "description": "List all available ElevenLabs voices"
+      "description": "List all available TTS voices"
     },
     {
       "name": "preview",
-      "description": "Preview ElevenLabs voices by playing audio samples"
+      "description": "Preview TTS voices by playing audio samples"
     },
     {
       "name": "switch",
-      "description": "Switch to a different ElevenLabs voice"
+      "description": "Switch to a different TTS voice"
     },
     {
       "name": "whoami",
@@ -71,11 +71,67 @@
     },
     {
       "name": "provider",
-      "description": "Manage TTS providers (ElevenLabs, Piper)"
+      "description": "Manage TTS providers (Piper, macOS)"
     },
     {
       "name": "set-favorite-voice",
       "description": "Set or update the favorite voice for a personality"
+    },
+    {
+      "name": "background-music",
+      "description": "Toggle background music for TTS (on/off/status)"
+    },
+    {
+      "name": "effects",
+      "description": "Configure voice effects (reverb, echo, pitch, EQ)"
+    },
+    {
+      "name": "mute",
+      "description": "Mute all AgentVibes TTS output"
+    },
+    {
+      "name": "unmute",
+      "description": "Unmute AgentVibes TTS output"
+    },
+    {
+      "name": "replay-target",
+      "description": "Replay the last target language audio"
+    },
+    {
+      "name": "translate",
+      "description": "Configure automatic TTS translation"
+    },
+    {
+      "name": "verbosity",
+      "description": "Get or set AgentVibes verbosity level"
+    },
+    {
+      "name": "hide",
+      "description": "Hide all AgentVibes slash commands"
+    },
+    {
+      "name": "show",
+      "description": "Show all AgentVibes slash commands"
+    },
+    {
+      "name": "update",
+      "description": "Update AgentVibes to the latest version"
+    },
+    {
+      "name": "version",
+      "description": "Show the installed AgentVibes version"
+    },
+    {
+      "name": "agent",
+      "description": "Activate a specialized AI agent with professional role"
+    },
+    {
+      "name": "agent-vibes",
+      "description": "TTS voice management commands"
+    },
+    {
+      "name": "bmad",
+      "description": "BMAD voice integration and agent voice assignment"
     }
   ]
 }

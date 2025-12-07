@@ -117,7 +117,7 @@ npx agentvibes@1.0.8 install
 
 ---
 
-**Built with ❤️ by Paul Preibisch | Powered by ElevenLabs AI**
+**Built with ❤️ by Paul Preibisch | Powered by Piper TTS AI**
 ```
 
 ## 🔐 Secrets Configuration

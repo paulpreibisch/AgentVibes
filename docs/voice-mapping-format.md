@@ -17,7 +17,7 @@
 name: sarcastic
 description: Dry wit and cutting observations
 voices:
-  elevenlabs: Jessica Anne Bogart
+  piper: Jessica Anne Bogart
   piper: en_US-amy-medium
 ---
 ```
@@ -26,7 +26,7 @@ voices:
 - `name` (required): Personality identifier
 - `description` (optional): Human-readable description
 - `voices` (required): Object with provider-specific voice names
-  - `elevenlabs`: ElevenLabs voice name
+  - `piper`: Piper TTS voice name
   - `piper`: Piper voice model name
 
 ---
@@ -39,7 +39,7 @@ Force a specific provider regardless of global setting:
 ---
 name: pirate
 voices:
-  elevenlabs: Pirate Marshal
+  piper: Pirate Marshal
   piper: en_GB-northern_english_male-medium
 provider: piper  # Always use Piper for this personality
 ---
@@ -47,7 +47,7 @@ provider: piper  # Always use Piper for this personality
 
 **Use Cases:**
 - Pirate personality → Piper (for local, offline feel)
-- Professional personality → ElevenLabs (for premium quality)
+- Professional personality → Piper TTS (for premium quality)
 - Budget-conscious personalities → Piper
 
 ---
@@ -61,7 +61,7 @@ languages:
   spanish:
     code: es
     name: Spanish
-    elevenlabs:
+    piper:
       voice: Antoni
       voice_id: ErXwobaYiN019PkySvjV
     piper:
@@ -70,7 +70,7 @@ languages:
   french:
     code: fr
     name: French
-    elevenlabs:
+    piper:
       voice: Thomas
       voice_id: GBv7mTt0atIp3Br8iCZE
     piper:
@@ -85,7 +85,7 @@ languages:
 **Agent Voice Table** (`.agentvibes/bmad/bmad-voices.md`):
 
 ```markdown
-| Agent ID | Agent Name | ElevenLabs Voice | Piper Voice | Personality |
+| Agent ID | Agent Name | Piper TTS Voice | Piper Voice | Personality |
 |----------|------------|------------------|-------------|-------------|
 | pm | John (Product Manager) | Jessica Anne Bogart | en_US-lessac-medium | professional |
 | dev | James (Developer) | Matthew Schmitz | en_US-joe-medium | normal |
@@ -95,7 +95,7 @@ languages:
 **Columns:**
 - `Agent ID`: Must match BMAD's `agent.id` field
 - `Agent Name`: Display name (reference only)
-- `ElevenLabs Voice`: Voice name for ElevenLabs provider
+- `Piper TTS Voice`: Voice name for Piper TTS provider
 - `Piper Voice`: Voice model for Piper provider (e.g., `en_US-lessac-medium`)
 - `Personality`: Optional personality to apply
 
@@ -112,7 +112,7 @@ voice: Jessica Anne Bogart
 ---
 ```
 
-**Behavior**: Automatically treated as `voices.elevenlabs: Jessica Anne Bogart`
+**Behavior**: Automatically treated as `voices.piper: Jessica Anne Bogart`
 
 **Migration**: Add `piper` voice to enable multi-provider support:
 
@@ -120,7 +120,7 @@ voice: Jessica Anne Bogart
 ---
 name: sarcastic
 voices:
-  elevenlabs: Jessica Anne Bogart  # From old 'voice:' field
+  piper: Jessica Anne Bogart  # From old 'voice:' field
   piper: en_US-amy-medium          # Add this
 ---
 ```
@@ -131,7 +131,7 @@ voices:
 
 1. ✅ `voices` must be an object with provider keys
 2. ✅ At least one provider voice must be specified
-3. ✅ `provider` override must match available provider (`elevenlabs`/`piper`)
+3. ✅ `provider` override must match available provider (`piper`/`piper`)
 4. ✅ Voice names must exist in provider's voice library
 5. ✅ Multilingual mappings should specify both providers (fallback to English if missing)
 
@@ -145,7 +145,7 @@ voices:
 ---
 name: minimal
 voices:
-  elevenlabs: Clyde
+  piper: Clyde
   piper: en_US-ryan-high
 ---
 ```
@@ -157,9 +157,9 @@ voices:
 name: professional
 description: Clear, articulate, and authoritative
 voices:
-  elevenlabs: Brian
+  piper: Brian
   piper: en_US-danny-low
-provider: elevenlabs  # Force ElevenLabs for premium quality
+provider: piper  # Force Piper TTS for premium quality
 sentiment: neutral
 ---
 
@@ -180,9 +180,9 @@ Use formal, corporate language. Be precise and businesslike.
 name: premium-quality
 description: Uses only highest-quality provider
 voices:
-  elevenlabs: Jeremy
+  piper: Jeremy
   piper: en_US-libritts-high
-provider: elevenlabs  # Always use ElevenLabs regardless of global setting
+provider: piper  # Always use Piper TTS regardless of global setting
 ---
 ```
 
@@ -190,11 +190,11 @@ provider: elevenlabs  # Always use ElevenLabs regardless of global setting
 
 ## Voice Name References
 
-### ElevenLabs Voices
+### Piper TTS Voices
 
-Use voice display names from ElevenLabs Voice Library:
+Use voice display names from Piper TTS Voice Library:
 - `Aria`, `Brian`, `Clyde`, `Jessica Anne Bogart`, `Pirate Marshal`, etc.
-- See: `/agent-vibes:list` or [ElevenLabs Voice Library](https://elevenlabs.io/app/voice-library)
+- See: `/agent-vibes:list` or [Piper TTS Voice Library](https://piper.io/app/voice-library)
 
 ### Piper Voices
 

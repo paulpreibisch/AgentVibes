@@ -32,12 +32,12 @@
 # ---
 #
 # @fileoverview TTS Provider Router with Translation and Language Learning Support
-# @context Routes TTS requests to active provider (ElevenLabs or Piper) with optional translation
+# @context Routes TTS requests to active provider (Piper or macOS) with optional translation
 # @architecture Provider abstraction layer - single entry point for all TTS, handles translation and learning mode
-# @dependencies provider-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, translator.py, translate-manager.sh, learn-manager.sh
+# @dependencies provider-manager.sh, play-tts-piper.sh, translator.py, translate-manager.sh, learn-manager.sh
 # @entrypoints Called by hooks, slash commands, personality-manager.sh, and all TTS features
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
-# @related provider-manager.sh, play-tts-elevenlabs.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
+# @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
 #
 
 # Fix locale warnings
@@ -88,9 +88,9 @@ ACTIVE_PROVIDER=$(get_active_provider)
 
 # @function detect_voice_provider
 # @intent Auto-detect provider from voice name (for mixed-provider support)
-# @why Allow ElevenLabs for main language + Piper for target language
+# @why Allow Piper for main language + macOS for target language
 # @param $1 voice name/ID
-# @returns Provider name (elevenlabs or piper)
+# @returns Provider name (piper or macos)
 detect_voice_provider() {
   local voice="$1"
   # Piper voice names contain underscore and dash (e.g., es_ES-davefx-medium)
@@ -121,9 +121,6 @@ speak_text() {
   local provider="${3:-$ACTIVE_PROVIDER}"
 
   case "$provider" in
-    elevenlabs)
-      "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$text" "$voice"
-      ;;
     piper)
       "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice"
       ;;
@@ -240,9 +237,6 @@ fi
 
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
-  elevenlabs)
-    exec "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"
-    ;;
   piper)
     exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;

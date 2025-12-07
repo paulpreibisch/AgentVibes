@@ -27,7 +27,7 @@ If the personality already has a favorite voice assigned, you'll see a confirmat
 ```
 ⚠️  WARNING: Personality 'flirty' already has a favorite voice assigned!
 
-   Current favorite (elevenlabs): Jessica Anne Bogart
+   Current favorite (piper): Jessica Anne Bogart
    New voice: Aria
 
 Do you want to replace the favorite voice?
@@ -42,13 +42,13 @@ Enter your choice (yes/no):
 ## Provider-Aware
 
 This command is provider-aware and will update the correct voice field:
-- **ElevenLabs** - Updates `elevenlabs_voice` field
+- **Piper TTS** - Updates `piper_voice` field
 - **Piper** - Updates `piper_voice` field
 
 ## How It Works
 
 1. Checks if the personality exists
-2. Detects the active TTS provider (ElevenLabs or Piper)
+2. Detects the active TTS provider (Piper TTS or Piper)
 3. Checks if a favorite voice is already assigned
 4. If yes, shows confirmation prompt
 5. Updates the personality markdown file with the new voice
@@ -61,7 +61,7 @@ Favorite voices are stored in personality markdown files:
 ---
 name: flirty
 description: Playful and charming personality
-elevenlabs_voice: Jessica Anne Bogart
+piper_voice: Jessica Anne Bogart
 piper_voice: en_US-amy-medium
 ---
 ```
