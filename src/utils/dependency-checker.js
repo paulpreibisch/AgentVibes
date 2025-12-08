@@ -16,10 +16,17 @@ import boxen from 'boxen';
  */
 function commandExists(command) {
   try {
+    // Try --version first (most common)
     execFileSync(command, ['--version'], { stdio: 'pipe' });
     return true;
   } catch {
-    return false;
+    // Some commands like ffmpeg use -version (single dash)
+    try {
+      execFileSync(command, ['-version'], { stdio: 'pipe' });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -103,7 +110,7 @@ function checkAudioPlayers() {
 /**
  * Get platform-specific install commands for missing dependencies
  */
-function getInstallCommands(missing, platform) {
+export function getInstallCommands(missing, platform) {
   const commands = [];
 
   if (platform === 'darwin') {
@@ -121,6 +128,16 @@ function getInstallCommands(missing, platform) {
     }
     if (missing.pipx) {
       brewPackages.push('pipx');
+    }
+    if (missing.flock) {
+      // flock is usually part of util-linux, but might need separate install on macOS
+      brewPackages.push('util-linux');
+    }
+    if (missing.curl) {
+      brewPackages.push('curl');
+    }
+    if (missing.bc) {
+      brewPackages.push('bc');
     }
 
     if (brewPackages.length > 0) {
@@ -166,6 +183,22 @@ function getInstallCommands(missing, platform) {
       aptPackages.push('pulseaudio-utils'); // provides paplay
       dnfPackages.push('pulseaudio-utils');
       pacmanPackages.push('libpulse'); // provides paplay
+    }
+    if (missing.flock) {
+      // flock is part of util-linux package on most Linux distros
+      aptPackages.push('util-linux');
+      dnfPackages.push('util-linux');
+      pacmanPackages.push('util-linux');
+    }
+    if (missing.curl) {
+      aptPackages.push('curl');
+      dnfPackages.push('curl');
+      pacmanPackages.push('curl');
+    }
+    if (missing.bc) {
+      aptPackages.push('bc');
+      dnfPackages.push('bc');
+      pacmanPackages.push('bc');
     }
 
     if (aptPackages.length > 0) {
@@ -257,6 +290,27 @@ export function checkDependencies(options = {}) {
     results.missing.pipx = true;
   }
 
+  // Check for flock (used for TTS queue file locking)
+  results.optional.flock = commandExists('flock');
+  if (!results.optional.flock) {
+    results.missing.flock = true;
+    results.warnings.push('flock command not found (required for TTS queue file locking)');
+  }
+
+  // Check for curl (used for downloading Piper TTS and voices)
+  results.optional.curl = commandExists('curl');
+  if (!results.optional.curl) {
+    results.missing.curl = true;
+    results.warnings.push('curl command not found (required for downloading Piper TTS)');
+  }
+
+  // Check for bc (used for audio processing calculations)
+  results.optional.bc = commandExists('bc');
+  if (!results.optional.bc) {
+    results.missing.bc = true;
+    results.warnings.push('bc command not found (used for audio processing calculations)');
+  }
+
   // Audio player check (Linux/WSL only)
   if (isLinux || process.env.WSL_DISTRO_NAME) {
     const audioCheck = checkAudioPlayers();
@@ -297,9 +351,12 @@ export function displayMissingDependencies(results) {
 
   // Optional tools
   const optionalMissing = [];
+  if (missing.curl) optionalMissing.push('• curl (downloading Piper TTS and voices)');
   if (missing.sox) optionalMissing.push('• sox (audio effects)');
   if (missing.ffmpeg) optionalMissing.push('• ffmpeg (background music, RDP optimization)');
+  if (missing.bc) optionalMissing.push('• bc (audio processing calculations)');
   if (missing.pipx) optionalMissing.push('• pipx (Piper TTS installation)');
+  if (missing.flock) optionalMissing.push('• flock (TTS queue file locking)');
   if (missing.audioPlayer) optionalMissing.push('• paplay/aplay (audio playback)');
 
   if (optionalMissing.length > 0) {

@@ -71,6 +71,566 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
+/**
+ * Create header and footer for installer pages
+ * @param {string} pageTitle - Title of current page
+ * @param {number} currentPage - Current page number (0-indexed, relative to section)
+ * @param {number} totalPages - Total number of pages across entire installer
+ * @param {number} pageOffset - Offset to add to currentPage for global numbering
+ * @returns {Object} - Object with header and footer strings
+ */
+function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset = 0) {
+  // Calculate consistent width for header
+  const boxWidth = 80;
+
+  // Header: Agent Vibes Installer + Version + Page Title + Page Number + Links
+  const agentText = chalk.cyan('Agent');
+  const vibesText = chalk.magentaBright('Vibes');
+  const globalPageNum = currentPage + pageOffset + 1; // Convert to 1-indexed and add offset
+  const pageNum = chalk.green(`Page ${globalPageNum}/${totalPages}`);
+  const website = chalk.gray('https://agentvibes.org');
+  const github = chalk.gray('https://github.com/paulpreibisch/AgentVibes');
+
+  const header = boxen(
+    `${agentText} ${vibesText} ${chalk.yellow(`v${VERSION}`)} ${chalk.white('Installer')} • ${pageNum}\n\n` +
+    `${chalk.cyan(pageTitle)}\n\n` +
+    `${website} • ${github}`,
+    {
+      padding: { top: 0, bottom: 0, left: 2, right: 2 },
+      borderStyle: 'round',
+      borderColor: 'cyan',
+      textAlignment: 'center',
+      width: boxWidth,
+      backgroundColor: '#1a1a1a'
+    }
+  );
+
+  // No separate footer needed - everything in header
+  const footer = '';
+
+  return { header, footer };
+}
+
+/**
+ * Display paginated installation content with Previous/Next navigation
+ * @param {Array} pages - Array of {title, content} objects to display
+ * @param {Object} options - Options for pagination (yes, continueLabel, pageOffset, totalPages, showPreviousOnFirst)
+ * @returns {Promise<void>}
+ */
+async function showPaginatedContent(pages, options = {}) {
+  if (options.yes || pages.length === 0) {
+    // In non-interactive mode or no pages, just display all content
+    pages.forEach(page => console.log(page.content));
+    return;
+  }
+
+  const continueLabel = options.continueLabel || '✓ Continue with Installation';
+  const pageOffset = options.pageOffset || 0;
+  const totalPages = options.totalPages || pages.length;
+  const showPreviousOnFirst = options.showPreviousOnFirst || false;
+  let currentPage = 0;
+
+  while (currentPage >= 0 && currentPage < pages.length) {
+    // Clear screen and show current page with header/footer
+    console.clear();
+
+    const { header, footer } = createPageHeaderFooter(
+      pages[currentPage].title,
+      currentPage,
+      totalPages,
+      pageOffset
+    );
+
+    console.log(header);
+    console.log('');
+    console.log(pages[currentPage].content);
+
+    // Build navigation message with Previous/Next on same line
+    let navMessage = '';
+    if (currentPage > 0 && currentPage < pages.length - 1) {
+      navMessage = `${chalk.cyan('←')} Previous  |  Next ${chalk.cyan('→')}  |  ${continueLabel}`;
+    } else if (currentPage > 0) {
+      navMessage = `${chalk.cyan('←')} Previous  |  ${continueLabel}`;
+    } else if (currentPage < pages.length - 1) {
+      navMessage = `Next ${chalk.cyan('→')}  |  ${continueLabel}`;
+    } else {
+      navMessage = continueLabel;
+    }
+
+    // Build navigation choices with colors
+    const choices = [];
+    if (currentPage < pages.length - 1) {
+      choices.push({ name: chalk.green('Next →'), value: 'next' });
+    } else {
+      // Only show "Start Installation" on the last page
+      choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
+    }
+    if (currentPage > 0 || showPreviousOnFirst) {
+      choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+    }
+
+    console.log('');
+    console.log(footer);
+    console.log('');
+
+    // Show navigation prompt
+    const { action } = await inquirer.prompt([{
+      type: 'list',
+      name: 'action',
+      message: chalk.cyan(`📄 ${pages[currentPage].title}`),
+      choices,
+      default: currentPage < pages.length - 1 ? 'next' : 'continue'
+    }]);
+
+    if (action === 'prev') {
+      if (currentPage > 0) {
+        currentPage--;
+      } else if (showPreviousOnFirst) {
+        // User clicked Previous on first page - signal to caller
+        return 'prev';
+      }
+    } else if (action === 'next') {
+      currentPage++;
+    } else {
+      // Continue - exit loop
+      console.clear();
+      break;
+    }
+  }
+}
+
+/**
+ * Collect all configuration answers through paginated question flow
+ * @param {Object} options - Installation options (yes, pageOffset, totalPages)
+ * @returns {Promise<Object>} Configuration object with all answers
+ */
+async function collectConfiguration(options = {}) {
+  const config = {
+    provider: null,
+    piperPath: null,
+    reverb: 'light',
+    backgroundMusic: {
+      enabled: true,
+      track: 'agentvibes_soft_flamenco_loop.mp3'
+    },
+    verbosity: 'high'
+  };
+
+  if (options.yes) {
+    // Non-interactive mode - use defaults
+    config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
+    return config;
+  }
+
+  let currentPage = 0;
+  const sectionPages = 4; // System Dependencies, Provider, Audio Settings, Verbosity
+  const pageOffset = options.pageOffset || 0;
+  const totalPages = options.totalPages || sectionPages;
+
+  console.clear();
+  console.log(chalk.cyan.bold('\n⚙️  Configuration Setup\n'));
+  console.log(chalk.white('Please configure your AgentVibes installation.\n'));
+  console.log(chalk.gray('Use arrow keys to navigate between pages.\n'));
+
+  while (currentPage >= 0 && currentPage < sectionPages) {
+    console.clear();
+
+    // Show header
+    const pageTitle = currentPage === 0 ? 'System Dependencies' :
+                      currentPage === 1 ? 'TTS Provider Configuration' :
+                      currentPage === 2 ? 'Audio Settings' :
+                      'Verbosity Settings';
+    const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
+    console.log(header);
+    console.log('');
+
+    if (currentPage === 0) {
+      // Page 1: System Dependencies Check
+      const { checkDependencies } = await import('./utils/dependency-checker.js');
+      const depResults = checkDependencies();
+
+      let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
+      depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
+
+      // Satisfied dependencies
+      if (depResults.core.node?.isCompatible) {
+        depContent += chalk.green(`✓ Node.js ${depResults.core.node.version}\n`);
+      }
+      if (depResults.core.python?.isCompatible) {
+        depContent += chalk.green(`✓ Python ${depResults.core.python.version}\n`);
+      }
+      if (depResults.core.bash?.isModern) {
+        depContent += chalk.green(`✓ Bash ${depResults.core.bash.version}\n`);
+      }
+      if (depResults.optional.curl) {
+        depContent += chalk.green('✓ curl\n');
+      }
+      if (depResults.optional.sox) {
+        depContent += chalk.green('✓ sox\n');
+      }
+      if (depResults.optional.ffmpeg) {
+        depContent += chalk.green('✓ ffmpeg\n');
+      }
+      if (depResults.optional.bc) {
+        depContent += chalk.green('✓ bc\n');
+      }
+      if (depResults.optional.flock) {
+        depContent += chalk.green('✓ flock\n');
+      }
+      if (depResults.optional.pipx) {
+        depContent += chalk.green('✓ pipx\n');
+      }
+      if (depResults.optional.audioPlayer) {
+        depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
+      }
+
+      // Missing dependencies
+      if (Object.keys(depResults.missing).length > 0) {
+        depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+        depContent += chalk.yellow.bold('Missing (Optional):\n\n');
+
+        if (depResults.missing.curl) depContent += chalk.yellow('⚠ curl - needed for downloads\n');
+        if (depResults.missing.sox) depContent += chalk.yellow('⚠ sox - audio effects\n');
+        if (depResults.missing.ffmpeg) depContent += chalk.yellow('⚠ ffmpeg - background music\n');
+        if (depResults.missing.bc) depContent += chalk.yellow('⚠ bc - audio calculations\n');
+        if (depResults.missing.flock) depContent += chalk.yellow('⚠ flock - TTS queue locking\n');
+        if (depResults.missing.pipx) depContent += chalk.yellow('⚠ pipx - Piper TTS installation\n');
+        if (depResults.missing.audioPlayer) depContent += chalk.yellow('⚠ audio player - playback\n');
+
+        depContent += '\n' + chalk.gray('TTS will still work without optional tools');
+
+        // Add install commands
+        const os = await import('os');
+        const { getInstallCommands } = await import('./utils/dependency-checker.js');
+        const platform = os.platform();
+        const installCmds = getInstallCommands(depResults.missing, platform);
+
+        if (installCmds.length > 0) {
+          depContent += '\n\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+          depContent += chalk.cyan.bold('To Install Missing Tools:\n\n');
+
+          installCmds.forEach(({ label, command }) => {
+            depContent += chalk.cyan(`${label}:\n`);
+            depContent += chalk.white(`  ${command}\n\n`);
+          });
+        }
+      }
+
+      const depsBoxen = boxen(depContent.trim(), {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
+        title: chalk.bold('🔧 System Dependencies'),
+        titleAlignment: 'center'
+      });
+
+      console.log(depsBoxen);
+    } else if (currentPage === 1) {
+      // Page 2: TTS Provider & Voice Storage
+
+      // On non-macOS platforms, only Piper is available - auto-select it
+      if (process.platform !== 'darwin') {
+        console.log(boxen(
+          chalk.gray('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Your TTS Provider:\n\n') +
+          chalk.green('🆓 Piper TTS (Free, Offline)\n') +
+          chalk.gray('   • 50+ Hugging Face AI voices\n') +
+          chalk.gray('   • Human-like speech quality\n') +
+          chalk.gray('   • No API key required\n\n') +
+          chalk.dim('(Automatically selected - only option for Linux/WSL)'),
+          {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'round',
+            borderColor: 'gray',
+            title: chalk.bold('☺ TTS Provider'),
+            titleAlignment: 'center'
+          }
+        ));
+
+        config.provider = 'piper';
+
+        // No confirmation needed - just auto-continue
+      } else {
+        // macOS - show choice between macOS Say and Piper
+        console.log(boxen(
+          chalk.gray('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Choose your Text-to-Speech provider.\n\n') +
+          chalk.yellow('🍎 macOS Say\n') +
+          chalk.gray('   • Built-in to macOS\n') +
+          chalk.gray('   • Zero setup required\n') +
+          chalk.gray('   • 40+ system voices\n\n') +
+          chalk.green('🆓 Piper TTS\n') +
+          chalk.gray('   • Free & offline\n') +
+          chalk.gray('   • 50+ Hugging Face AI voices\n') +
+          chalk.gray('   • Human-like speech quality'),
+          {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'round',
+            borderColor: 'gray',
+            title: chalk.bold('☺ TTS Provider'),
+            titleAlignment: 'center'
+          }
+        ));
+
+        // Provider selection
+        const providerChoices = [
+          {
+            name: chalk.yellow('🍎 macOS Say (Recommended)'),
+            value: 'macos'
+          },
+          {
+            name: chalk.green('🆓 Piper TTS (Free, Offline)'),
+            value: 'piper'
+          },
+          new inquirer.Separator(),
+          {
+            name: chalk.magentaBright('← Back to Welcome'),
+            value: '__back__'
+          }
+        ];
+
+        const { provider } = await inquirer.prompt([{
+          type: 'list',
+          name: 'provider',
+          message: chalk.yellow('Select TTS provider:'),
+          choices: providerChoices,
+          default: config.provider || 'macos'
+        }]);
+
+        // Check if user wants to go back
+        if (provider === '__back__') {
+          return null;
+        }
+
+        config.provider = provider;
+      }
+
+      // If Piper selected, ask for voice storage location
+      if (config.provider === 'piper') {
+        const homeDir = process.env.HOME || process.env.USERPROFILE;
+        const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
+
+        // Check if voices already exist
+        const existingVoices = await checkExistingPiperVoices(defaultPiperPath);
+
+        if (!existingVoices.installed) {
+          console.log('\n' + boxen(
+            chalk.white('Piper voice models are ~25MB each.\n') +
+            chalk.white('They can be stored globally to be shared\n') +
+            chalk.white('across all your projects, or locally per project.'),
+            {
+              padding: 1,
+              margin: { top: 1, bottom: 1, left: 1, right: 1 },
+              borderStyle: 'round',
+              borderColor: 'gray',
+              title: chalk.bold('📁 Voice Storage'),
+              titleAlignment: 'center'
+            }
+          ));
+
+          const { piperPath } = await inquirer.prompt([{
+            type: 'input',
+            name: 'piperPath',
+            message: chalk.yellow('Where should Piper voice models be downloaded?'),
+            default: config.piperPath || defaultPiperPath,
+            validate: (input) => {
+              if (!input || input.trim() === '') {
+                return 'Please provide a valid path';
+              }
+              return true;
+            }
+          }]);
+
+          config.piperPath = piperPath;
+        } else {
+          config.piperPath = defaultPiperPath;
+        }
+      }
+
+    } else if (currentPage === 2) {
+      // Page 3: Audio Settings (Reverb + Background Music)
+      console.log(boxen(
+        chalk.white('Configure audio effects and background music for your Agents.\n\n') +
+        chalk.yellow('Reverb:\n') +
+        chalk.gray('   • 💧 Reverb adds room ambiance to TTS audio, making voices sound more natural\n') +
+        chalk.gray('   • Change anytime: ') + chalk.cyan('/agent-vibes:effects reverb off/light/medium/heavy/cathedral\n\n') +
+        chalk.yellow('Background Music:\n') +
+        chalk.gray('   • Optional ambient music during TTS\n') +
+        chalk.gray('   • 16 genre choices from Flamenco to City Pop\n') +
+        chalk.gray('   • Toggle: ') + chalk.cyan('/agent-vibes:background-music on/off\n') +
+        chalk.gray('   • Change track: ') + chalk.cyan('/agent-vibes:background-music set chillwave'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'gray',
+          title: chalk.bold('☺ Audio Effects'),
+          titleAlignment: 'center'
+        }
+      ));
+
+      const { reverbLevel } = await inquirer.prompt([{
+        type: 'list',
+        name: 'reverbLevel',
+        message: chalk.yellow('Select default reverb level:'),
+        choices: [
+          { name: 'Off (Dry, no reverb)', value: 'off' },
+          { name: 'Light (Small room) - Recommended', value: 'light' },
+          { name: 'Medium (Conference room)', value: 'medium' },
+          { name: 'Heavy (Large hall)', value: 'heavy' },
+          { name: 'Cathedral (Epic space)', value: 'cathedral' }
+        ],
+        default: config.reverb || 'light'
+      }]);
+
+      config.reverb = reverbLevel;
+
+      // Add spacing before next question
+      console.log('');
+
+      // Background music
+      console.log(chalk.gray('🎵 Background music plays ambient tracks during TTS for a more engaging experience.'));
+
+      const { enableMusic } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'enableMusic',
+        message: chalk.yellow('Enable background music for TTS?'),
+        default: config.backgroundMusic.enabled !== undefined ? config.backgroundMusic.enabled : true
+      }]);
+
+      config.backgroundMusic.enabled = enableMusic;
+
+      if (enableMusic) {
+        // Add spacing before track selection
+        console.log('');
+        console.log(chalk.gray('🎼 Choose your default background music genre (you can change this anytime).'));
+
+        const trackChoices = [
+          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
+          { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
+          { name: '💃 Salsa (Latin - Upbeat brass & percussion)', value: 'agent_vibes_salsa_v2_loop.mp3' },
+          { name: '🎸 Cumbia (Latin - Accordion & drums)', value: 'agent_vibes_cumbia_v1_loop.mp3' },
+          { name: '🌸 Bossa Nova (Brazilian jazz)', value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+          { name: '🏙️  Japanese City Pop (80s synth)', value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
+          { name: '🌊 Chillwave (Electronic ambient)', value: 'agent_vibes_chillwave_v2_loop.mp3' },
+          { name: '🎹 Dreamy House (Electronic dance)', value: 'dreamy_house_loop.mp3' },
+          { name: '🌙 Dark Chill Step (Electronic bass)', value: 'agent_vibes_dark_chill_step_loop.mp3' },
+          { name: '🕉️  Goa Trance (Psychedelic electronic)', value: 'agent_vibes_goa_trance_v2_loop.mp3' },
+          { name: '🎼 Harpsichord (Baroque classical)', value: 'agent_vibes_harpsichord_v2_loop.mp3' },
+          { name: '🎻 Celtic Harp (Irish traditional)', value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
+          { name: '🌺 Hawaiian Slack Key Guitar', value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
+          { name: '🏜️  Arabic Oud (Middle Eastern)', value: 'agent_vibes_arabic_v2_loop.mp3' },
+          { name: '🪘 Gnawa Ambient (North African)', value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
+          { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
+        ];
+
+        const { selectedTrack } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedTrack',
+          message: chalk.yellow('Choose default background music track:'),
+          choices: trackChoices,
+          default: config.backgroundMusic.track || 'agentvibes_soft_flamenco_loop.mp3',
+          pageSize: 16
+        }]);
+
+        config.backgroundMusic.track = selectedTrack;
+      }
+
+    } else if (currentPage === 3) {
+      // Page 4: Verbosity Settings
+      console.log(boxen(
+        chalk.white('Choose how much Claude speaks during interactions.\n\n') +
+        chalk.yellow('🔊 High:\n') +
+        chalk.gray('   • Maximum transparency\n') +
+        chalk.gray('   • Speaks acknowledgments, reasoning, decisions, findings\n\n') +
+        chalk.yellow('🔉 Medium:\n') +
+        chalk.gray('   • Balanced approach\n') +
+        chalk.gray('   • Speaks acknowledgments and key updates\n\n') +
+        chalk.yellow('🔈 Low:\n') +
+        chalk.gray('   • Minimal notifications\n') +
+        chalk.gray('   • Only essential messages\n\n') +
+        chalk.gray('Change anytime: ') + chalk.cyan('/agent-vibes:verbosity <level>'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'gray',
+          title: chalk.bold('☺ TTS Verbosity'),
+          titleAlignment: 'center'
+        }
+      ));
+
+      console.log(chalk.gray('\n🔊 Verbosity controls how much Claude speaks during tasks (reasoning, findings, etc.).'));
+
+      const { verbosity } = await inquirer.prompt([{
+        type: 'list',
+        name: 'verbosity',
+        message: chalk.yellow('Select TTS verbosity level:'),
+        choices: [
+          { name: '🔊 High - Maximum transparency', value: 'high' },
+          { name: '🔉 Medium - Balanced', value: 'medium' },
+          { name: '🔈 Low - Minimal', value: 'low' }
+        ],
+        default: config.verbosity || 'high'
+      }]);
+
+      config.verbosity = verbosity;
+    }
+
+    // Add spacing before navigation
+    console.log('');
+
+    // Show footer before navigation
+    console.log('');
+    console.log(footer);
+    console.log('');
+
+    // Navigation
+    const navChoices = [];
+    if (currentPage < totalPages - 1) {
+      navChoices.push({ name: chalk.green('Next →'), value: 'next' });
+    } else {
+      navChoices.push({ name: chalk.cyan('✓ Continue to Installation'), value: 'continue' });
+    }
+
+    // Always show Previous button (on first page it goes back to welcome)
+    if (currentPage === 0) {
+      navChoices.push({ name: chalk.magentaBright('← Back to Welcome'), value: 'back' });
+    } else {
+      navChoices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+    }
+
+    const { action } = await inquirer.prompt([{
+      type: 'list',
+      name: 'action',
+      message: ' ',
+      choices: navChoices,
+      default: 'next'
+    }]);
+
+    if (action === 'back') {
+      // Return to welcome screen
+      console.clear();
+      return null; // Signal to caller to show welcome again
+    } else if (action === 'prev') {
+      currentPage--;
+    } else if (action === 'next') {
+      currentPage++;
+    } else {
+      // Continue - exit configuration
+      break;
+    }
+  }
+
+  console.clear();
+  return config;
+}
+
 // Configure CLI
 program
   .name('agentvibes')
@@ -124,39 +684,25 @@ function showWelcome() {
  * Display latest release information box
  * Shown during install and update commands
  */
-function showReleaseInfo() {
-  console.log(
-    boxen(
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n') +
-      chalk.cyan.bold('  📦 AgentVibes v2.15.0 - Background Music & Audio Effects\n') +
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-      chalk.cyan('AgentVibes v2.15.0 introduces a comprehensive background music system\n') +
-      chalk.cyan('with 16 professionally-optimized tracks and per-agent audio effects.\n') +
-      chalk.cyan('BMAD v6 integration adds YAML voice mappings for multi-agent conversations.\n') +
-      chalk.cyan('Breaking: ElevenLabs removed (cost impractical for heavy daily use).\n\n') +
-      chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-      chalk.gray('   🎶 16 Background Music Tracks - Latin, World, Electronic, Classical\n') +
-      chalk.gray('   🎛️  Audio Effects Processor - Per-agent reverb, pitch, EQ, compression\n') +
-      chalk.gray('   🐛 TDD Bug Fix - Background music respects enabled/disabled flag\n') +
-      chalk.gray('   🎚️  Natural Language Control - "change to salsa" switches music\n') +
-      chalk.gray('   🤖 BMAD v6 Support - YAML voice mappings with auto-detection\n') +
-      chalk.gray('   🔊 Paplay Fix - Fixes choppy audio on Linux/WSL RDP connections\n') +
-      chalk.gray('   ⚡ ElevenLabs Removed - Migrate to free local Piper TTS\n\n') +
-      chalk.white.bold('═══════════════════════════════════════════════════════════════\n\n') +
-      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
-      chalk.gray('🌐 Website: https://agentvibes.org\n') +
-      chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
-      chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-      chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License'),
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'cyan',
-      }
-    )
-  );
+function getReleaseInfoBoxen() {
+  return chalk.cyan.bold('📦 AgentVibes v2.17.0 - Installer UX Revolution\n\n') +
+    chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
+    chalk.cyan('AgentVibes v2.17.0 delivers a complete installer user experience transformation\n') +
+    chalk.cyan('with intelligent system dependency checking, paginated configuration flow, and\n') +
+    chalk.cyan('comprehensive inline help with command examples throughout.\n\n') +
+    chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
+    chalk.gray('   🔧 System Dependency Checker - Validates Node, Python, bash, sox, ffmpeg, curl, etc.\n') +
+    chalk.gray('   📄 Paginated Configuration - Beautiful headers with Agent Vibes branding on every page\n') +
+    chalk.gray('   💡 Inline Help & Commands - TTS explanations and examples throughout installer\n') +
+    chalk.gray('   🎵 New Music Track - Salsa v2 background music now available\n') +
+    chalk.gray('   🎨 Professional UI - Consistent sunshine yellow styling and dynamic page numbering\n') +
+    chalk.gray('   📋 Enhanced Navigation - Previous button, accurate page counts, README links\n') +
+    chalk.gray('   ✅ Quality Assurance - 140 tests passing, SonarCloud integration\n\n') +
+    chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
+    chalk.gray('🌐 Website: https://agentvibes.org\n') +
+    chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
+    chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
+    chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License');
 }
 
 /**
@@ -206,30 +752,35 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
   const hasMcp = fsSync.existsSync(mcpConfigPath);
 
-  // Build the welcome script
-  let welcomeScript = `Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.
-
-Now integrated with the B mad Method - Artificial Intelligence Driven Agile Development That Scales From Bug Fixes to Enterprise.
-
-We have added a lot of commands, but don't worry, you can hide them by typing /agent-vibes:hide, and :show to bring them back.`;
+  // Build the welcome script with colored commands
+  let welcomeScript = chalk.white('Welcome to Agent Vibes, the free software that enhances your developer experience and gives your agents a voice.\n\n');
+  welcomeScript += chalk.white('Now integrated with the B mad Method - Artificial Intelligence Driven Agile Development That Scales From Bug Fixes to Enterprise.\n\n');
+  welcomeScript += chalk.white('We have added a lot of commands, but don\'t worry, you can hide them by typing ');
+  welcomeScript += chalk.magentaBright('/agent-vibes:hide');
+  welcomeScript += chalk.white(', and ');
+  welcomeScript += chalk.magentaBright('/agent-vibes:show');
+  welcomeScript += chalk.white(' to bring them back.');
 
   if (!hasMcp) {
-    welcomeScript += `
-
-To control Agent Vibes with natural language, install the MCP server. That way you can just say things like, "change my voice" or "mute the audio."`;
+    welcomeScript += chalk.white('\n\nTo control Agent Vibes with natural language, install the MCP server. That way you can just say things like, ');
+    welcomeScript += chalk.magentaBright('"change my voice"');
+    welcomeScript += chalk.white(' or ');
+    welcomeScript += chalk.magentaBright('"mute the audio"');
+    welcomeScript += chalk.white('.');
   }
 
-  welcomeScript += `
-
-To change my personality, just type, "change personality to sarcastic."
-
-Or to change my voice, type, "try a different voice."
-
-We recently have added background music to your agents. You can turn it on or off by saying "Turn background music on" or "Turn background music off."
-
-Lastly, Agent Vibes is updated frequently. Use npx agentvibes update to keep up to date.
-
-We hope you have fun with Agent Vibes. Please consider giving us a GitHub star. Thank you.`;
+  welcomeScript += chalk.white('\n\nTo change my personality, just type, ');
+  welcomeScript += chalk.magentaBright('"change personality to sarcastic."');
+  welcomeScript += chalk.white('\n\nOr to change my voice, type, ');
+  welcomeScript += chalk.magentaBright('"try a different voice."');
+  welcomeScript += chalk.white('\n\nWe recently have added background music to your agents. You can turn it on or off by saying ');
+  welcomeScript += chalk.magentaBright('"Turn background music on"');
+  welcomeScript += chalk.white(' or ');
+  welcomeScript += chalk.magentaBright('"Turn background music off."');
+  welcomeScript += chalk.yellow('\n\n⭐ Please consider giving us a GitHub star! ') + chalk.yellow('https://github.com/paulpreibisch/agentvibes');
+  welcomeScript += chalk.white('\n\nLastly, Agent Vibes is updated frequently. Use ');
+  welcomeScript += chalk.magentaBright('npx agentvibes update');
+  welcomeScript += chalk.white(' to keep up to date.\n\nWe hope you have fun with Agent Vibes. Thank you!');
 
   // Stop spinner and display the welcome script in a box
   spinner.stop();
@@ -245,14 +796,14 @@ We hope you have fun with Agent Vibes. Please consider giving us a GitHub star. 
   console.log(chalk.cyan('🎵 Playing welcome demo in background...\n'));
 
   try {
-    // Play the audio in the background (non-blocking)
+    // Play the audio in the background (non-blocking) with reduced volume
     let args;
     if (audioPlayer === 'mpv') {
-      args = ['--no-video', '--really-quiet', welcomeDemoAudio];
+      args = ['--no-video', '--really-quiet', '--volume=40', welcomeDemoAudio];
     } else if (audioPlayer === 'paplay') {
-      args = [welcomeDemoAudio];
+      args = ['--volume=32768', welcomeDemoAudio]; // 50% volume (max is 65536)
     } else {
-      args = [welcomeDemoAudio]; // afplay
+      args = ['--volume=0.4', welcomeDemoAudio]; // afplay - 40% volume
     }
 
     const audioProcess = spawn(audioPlayer, args, {
@@ -446,23 +997,41 @@ async function promptProviderSelection(options) {
     return 'piper';
   }
 
-  console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
-
-  // Build choices based on platform - macOS Say first on macOS
-  const choices = [];
-
-  if (isMacOS) {
-    // On macOS, put macOS Say first as the recommended default
-    choices.push({
-      name: chalk.yellow('🍎 macOS Say (Recommended)') + chalk.gray(' - Built-in, zero setup required'),
-      value: 'macos',
-    });
+  // Auto-select if only one provider available
+  if (!isMacOS) {
+    // On Linux/WSL, only Piper is available - auto-select it
+    console.log(boxen(
+      chalk.bold('🎤 TTS Provider\n\n') +
+      chalk.green('✓ Piper TTS (Free, Offline)\n') +
+      chalk.gray('  50+ Hugging Face AI voices\n') +
+      chalk.gray('  Human-like speech quality\n') +
+      chalk.gray('  No API key required'),
+      {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'green',
+        title: chalk.bold('TTS Provider Auto-detected'),
+        titleAlignment: 'center'
+      }
+    ));
+    console.log('');
+    return 'piper';
   }
 
-  choices.push({
-    name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
-    value: 'piper',
-  });
+  // On macOS, both providers available - prompt user
+  console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
+
+  const choices = [
+    {
+      name: chalk.yellow('🍎 macOS Say (Recommended)') + chalk.gray(' - Built-in, zero setup required'),
+      value: 'macos',
+    },
+    {
+      name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
+      value: 'piper',
+    }
+  ];
 
   const { provider } = await inquirer.prompt([
     {
@@ -470,7 +1039,7 @@ async function promptProviderSelection(options) {
       name: 'provider',
       message: 'Which TTS provider would you like to use?',
       choices,
-      default: isMacOS ? 'macos' : 'piper',
+      default: 'macos',
     },
   ]);
 
@@ -539,19 +1108,7 @@ async function handlePiperConfiguration() {
   const existingVoices = await checkExistingPiperVoices(defaultPiperPath);
 
   if (existingVoices.installed) {
-    console.log(chalk.green(`\n✓ Piper voices already installed at ${defaultPiperPath}`));
-    console.log(chalk.gray(`   Found ${existingVoices.voices.length} voice model(s):`));
-
-    // Show first 5 voices, then indicate more if applicable
-    const displayVoices = existingVoices.voices.slice(0, 5);
-    displayVoices.forEach(voice => {
-      console.log(chalk.gray(`     • ${voice}`));
-    });
-    if (existingVoices.voices.length > 5) {
-      console.log(chalk.gray(`     ... and ${existingVoices.voices.length - 5} more`));
-    }
-
-    console.log(chalk.green('\n✓ Skipping download - using existing voices\n'));
+    // Voices already installed - will be shown in Installation Summary boxen
     return defaultPiperPath;
   }
 
@@ -583,7 +1140,7 @@ async function handlePiperConfiguration() {
  * Copy command files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
- * @returns {Promise<number>} Number of files copied
+ * @returns {Promise<{count: number, boxen: string}>} Number of files copied and boxen content
  */
 async function copyCommandFiles(targetDir, spinner) {
   spinner.start('Installing /agent-vibes slash commands...');
@@ -595,28 +1152,66 @@ async function copyCommandFiles(targetDir, spinner) {
     await fs.mkdir(agentVibesCommandsDir, { recursive: true });
 
     const commandFiles = await fs.readdir(srcCommandsDir);
-    console.log(chalk.cyan(`\n📋 Installing ${commandFiles.length} command files:`));
 
+    let installedCommands = [];
+    let failedCommands = [];
     let successCount = 0;
+
     for (const file of commandFiles) {
       const srcPath = path.join(srcCommandsDir, file);
       const destPath = path.join(agentVibesCommandsDir, file);
       try {
         await fs.copyFile(srcPath, destPath);
-        console.log(chalk.gray(`   ✓ agent-vibes/${file}`));
+        installedCommands.push(file);
         successCount++;
       } catch (err) {
-        console.log(chalk.yellow(`   ⚠ Failed to copy ${file}: ${err.message}`));
+        failedCommands.push({ file, error: err.message });
         // Continue with other files
       }
     }
 
     if (successCount === commandFiles.length) {
-      spinner.succeed(chalk.green('Installed /agent-vibes commands!\n'));
+      spinner.succeed(chalk.green(`Installed ${successCount} slash commands!\n`));
     } else {
       spinner.warn(chalk.yellow(`Installed ${successCount}/${commandFiles.length} commands (some failed)\n`));
     }
-    return successCount;
+
+    // Create boxen content (don't print yet - will be shown in pagination)
+    let content = chalk.bold(`${installedCommands.length} Slash Commands Installed\n\n`);
+    content += chalk.gray('Slash commands are shortcuts you type in chat to trigger actions.\n');
+    content += chalk.gray('Type them with a forward slash like: /agent-vibes:list\n\n');
+
+    installedCommands.forEach(file => {
+      // Remove .md extension and format command name
+      const commandName = file.replace('.md', '');
+
+      // Highlight show and hide commands in cyan
+      if (commandName === 'agent-vibes:show' || commandName === 'agent-vibes:hide') {
+        content += chalk.green('✓ ') + chalk.cyan(`/${commandName}\n`);
+      } else {
+        content += chalk.green(`✓ `) + chalk.yellow(`/${commandName}\n`);
+      }
+    });
+
+    // Add failures if any
+    if (failedCommands.length > 0) {
+      content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
+      content += chalk.yellow('⚠ Failed Commands\n\n');
+      failedCommands.forEach(({ file, error }) => {
+        content += chalk.gray(`✗ ${file}: ${error}\n`);
+      });
+    }
+
+    const boxenContent = boxen(content.trim(), {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'round',
+      borderColor: successCount === commandFiles.length ? 'cyan' : 'yellow',
+      title: chalk.bold('📋 Slash Commands'),
+      titleAlignment: 'center'
+    });
+
+    return { count: successCount, boxen: boxenContent };
   } catch (err) {
     spinner.fail(chalk.red(`Failed to install commands: ${err.message}`));
     throw err;
@@ -627,7 +1222,7 @@ async function copyCommandFiles(targetDir, spinner) {
  * Copy hook files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
- * @returns {Promise<number>} Number of files copied
+ * @returns {Promise<{count: number, boxen: string|null}>} Number of files copied and boxen content
  */
 async function copyHookFiles(targetDir, spinner) {
   spinner.start('Installing TTS helper scripts...');
@@ -657,8 +1252,11 @@ async function copyHookFiles(targetDir, spinner) {
       }
     }
 
-    console.log(chalk.cyan(`🔧 Installing ${hookFiles.length} TTS scripts:`));
+    spinner.start(`Installing ${hookFiles.length} TTS scripts...`);
     let successCount = 0;
+    let installedFiles = [];
+    let failedFiles = [];
+
     for (const file of hookFiles) {
       const srcPath = path.join(srcHooksDir, file);
       const destPath = path.join(hooksDir, file);
@@ -668,14 +1266,13 @@ async function copyHookFiles(targetDir, spinner) {
         if (file.endsWith('.sh')) {
           // Security: Use more restrictive permissions (owner: rwx, group: r-x, others: ---)
           await fs.chmod(destPath, 0o750);
-          console.log(chalk.gray(`   ✓ ${file} (executable)`));
+          installedFiles.push({ name: file, executable: true });
         } else {
-          console.log(chalk.gray(`   ✓ ${file}`));
+          installedFiles.push({ name: file, executable: false });
         }
         successCount++;
       } catch (err) {
-        console.log(chalk.yellow(`   ⚠ Failed to copy ${file}: ${err.message}`));
-        // Continue with other files
+        failedFiles.push({ name: file, error: err.message });
       }
     }
 
@@ -684,7 +1281,41 @@ async function copyHookFiles(targetDir, spinner) {
     } else {
       spinner.warn(chalk.yellow(`Installed ${successCount}/${hookFiles.length} scripts (some failed)\n`));
     }
-    return successCount;
+
+    // Create boxen content (don't print yet - will be shown in pagination)
+    let boxenContent = null;
+    if (installedFiles.length > 0) {
+      let content = chalk.bold(`${installedFiles.length} TTS Hook Scripts Installed\n\n`);
+      content += chalk.gray('Hook scripts automatically run at key moments during your\n');
+      content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
+      installedFiles.forEach(file => {
+        content += chalk.green(`✓ ${file.name}`);
+        if (file.executable) {
+          content += chalk.gray(' (executable)');
+        }
+        content += '\n';
+      });
+
+      if (failedFiles.length > 0) {
+        content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
+        content += chalk.bold.yellow(`${failedFiles.length} Failed\n\n`);
+        failedFiles.forEach(file => {
+          content += chalk.yellow(`⚠ ${file.name}\n`);
+          content += chalk.dim(`  ${file.error}\n`);
+        });
+      }
+
+      boxenContent = boxen(content.trim(), {
+        padding: 1,
+        margin: 1,
+        borderStyle: 'round',
+        borderColor: 'green',
+        title: chalk.bold('🔧 TTS Scripts'),
+        titleAlignment: 'center'
+      });
+    }
+
+    return { count: successCount, boxen: boxenContent };
   } catch (err) {
     spinner.fail(chalk.red(`Failed to install hook scripts: ${err.message}`));
     throw err;
@@ -695,7 +1326,7 @@ async function copyHookFiles(targetDir, spinner) {
  * Copy personality files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
- * @returns {Promise<number>} Number of files copied
+ * @returns {Promise<{count: number, boxen: string|null}>} Number of files copied and boxen content
  */
 async function copyPersonalityFiles(targetDir, spinner) {
   spinner.start('Installing personality templates...');
@@ -716,16 +1347,66 @@ async function copyPersonalityFiles(targetDir, spinner) {
     }
   }
 
-  console.log(chalk.cyan(`🎭 Installing ${personalityMdFiles.length} personality templates:`));
+  spinner.start(`Installing ${personalityMdFiles.length} personality templates...`);
+  let installedPersonalities = [];
+
   for (const file of personalityMdFiles) {
     const srcPath = path.join(srcPersonalitiesDir, file);
     const destPath = path.join(destPersonalitiesDir, file);
     await fs.copyFile(srcPath, destPath);
-    console.log(chalk.gray(`   ✓ ${file}`));
+    installedPersonalities.push(file);
   }
 
   spinner.succeed(chalk.green('Installed personality templates!\n'));
-  return personalityMdFiles.length;
+
+  // Create boxen content (don't print yet - will be shown in pagination)
+  let boxenContent = null;
+  if (installedPersonalities.length > 0) {
+    let content = chalk.bold(`${installedPersonalities.length} Personality Templates Installed\n\n`);
+    content += chalk.gray('Personalities change how Claude speaks - adding humor, emotion, or style.\n');
+    content += chalk.gray('Change with: ') + chalk.yellow('/agent-vibes:personality <name>') + chalk.gray(' or say "change personality to sassy"\n\n');
+
+    // Map personalities to emojis
+    const personalityEmojis = {
+      'angry': '😠',
+      'annoying': '😤',
+      'crass': '🤬',
+      'dramatic': '🎭',
+      'dry-humor': '😐',
+      'flirty': '😘',
+      'funny': '😂',
+      'grandpa': '👴',
+      'millennial': '🙄',
+      'moody': '😒',
+      'normal': '😊',
+      'pirate': '🏴‍☠️',
+      'poetic': '📜',
+      'professional': '👔',
+      'rapper': '🎤',
+      'robot': '🤖',
+      'sarcastic': '😏',
+      'sassy': '💁',
+      'surfer-dude': '🏄',
+      'zen': '🧘'
+    };
+
+    installedPersonalities.forEach(file => {
+      const name = file.replace('.md', '');
+      const emoji = personalityEmojis[name] || '✨';
+      content += chalk.green(`✓ ${emoji} ${name}\n`);
+    });
+
+    boxenContent = boxen(content.trim(), {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'round',
+      borderColor: 'magenta',
+      title: chalk.bold('🎭 Personalities'),
+      titleAlignment: 'center'
+    });
+  }
+
+  return { count: personalityMdFiles.length, boxen: boxenContent };
 }
 
 // Output styles removed - deprecated in favor of SessionStart hook system
@@ -802,7 +1483,7 @@ async function copyBmadConfigFiles(targetDir, spinner) {
  * Copy background music files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
- * @returns {Promise<number>} Number of files copied
+ * @returns {Promise<{count: number, boxen: string}>} Number of files copied and boxen content
  */
 async function copyBackgroundMusicFiles(targetDir, spinner) {
   spinner.start('Installing background music tracks...');
@@ -835,12 +1516,6 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
 
     if (musicFiles.length > 0) {
       spinner.succeed(chalk.green(`Installed ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'}!\n`));
-      console.log(chalk.green(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} installed:`));
-      musicFiles.forEach(track => {
-        console.log(chalk.green(`     ✓ ${track.name} (${track.size})`));
-        console.log(chalk.gray(`       ${track.path}`));
-      });
-      console.log(''); // Add blank line for spacing
     } else {
       spinner.info(chalk.yellow('No background music files found (optional)\n'));
     }
@@ -848,7 +1523,42 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
     spinner.info(chalk.yellow('No background music files found (optional)\n'));
   }
 
-  return musicFiles.length;
+  // Create boxen content (don't print yet - will be shown in pagination)
+  if (musicFiles.length > 0) {
+    let content = chalk.bold(`${musicFiles.length} Background Music Tracks Installed\n\n`);
+
+    content += chalk.cyan('Agents need to have fun too! 🎉 Spice things up with background music.\n\n');
+
+    content += chalk.white('💡 How to control background music:\n\n');
+    content += chalk.cyan('  Slash Commands:\n');
+    content += chalk.gray('    /agent-vibes:background-music on          - Enable music\n');
+    content += chalk.gray('    /agent-vibes:background-music off         - Disable music\n');
+    content += chalk.gray('    /agent-vibes:background-music set chillwave - Change track\n\n');
+    content += chalk.cyan('  MCP Natural Language:\n');
+    content += chalk.gray('    "turn on background music"\n');
+    content += chalk.gray('    "change background music to chillwave"\n');
+    content += chalk.gray('    "disable background music"\n\n');
+
+    content += chalk.gray('─'.repeat(70)) + '\n\n';
+
+    musicFiles.forEach(track => {
+      content += chalk.green(`✓ ${track.name}`) + chalk.gray(` (${track.size})\n`);
+      content += chalk.dim(`  ${track.path}\n`);
+    });
+
+    const boxenContent = boxen(content.trim(), {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'round',
+      borderColor: 'green',
+      title: chalk.bold('🎵 Background Music'),
+      titleAlignment: 'center'
+    });
+
+    return { count: musicFiles.length, boxen: boxenContent };
+  }
+
+  return { count: 0, boxen: null };
 }
 
 /**
@@ -1620,8 +2330,8 @@ async function updateAgentVibes(targetDir, options) {
 
     // Update hooks
     spinner.text = 'Updating TTS scripts...';
-    const hookFileCount = await copyHookFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    console.log(chalk.green(`✓ Updated ${hookFileCount} TTS scripts`));
+    const hookResult = await copyHookFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
 
     // Update personalities
     spinner.text = 'Updating personality templates...';
@@ -1644,9 +2354,9 @@ async function updateAgentVibes(targetDir, options) {
     }
 
     // Update background music files
-    const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (backgroundMusicFileCount > 0) {
-      console.log(chalk.green(`✓ Installed ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'}`));
+    const backgroundMusicUpdateResult = await copyBackgroundMusicFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
+    if (backgroundMusicUpdateResult.count > 0) {
+      console.log(chalk.green(`✓ Installed ${backgroundMusicUpdateResult.count} background music track${backgroundMusicUpdateResult.count === 1 ? '' : 's'}`));
     }
 
     // Update config files
@@ -1667,7 +2377,7 @@ async function updateAgentVibes(targetDir, options) {
 
     console.log(chalk.cyan('📦 Update Summary:'));
     console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
-    console.log(chalk.white(`   • ${hookFileCount} TTS scripts updated`));
+    console.log(chalk.white(`   • ${hookResult.count} TTS scripts updated`));
     console.log(chalk.white(`   • ${personalityResult.new + personalityResult.updated} personality templates (${personalityResult.new} new, ${personalityResult.updated} updated)`));
     if (pluginFileCount > 0) {
       console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files updated`));
@@ -1689,79 +2399,181 @@ async function updateAgentVibes(targetDir, options) {
 
 // Installation function
 async function install(options = {}) {
-  showWelcome();
-
   const currentDir = process.env.INIT_CWD || process.cwd();
 
-  console.log(chalk.cyan('\n📍 Installation Details:'));
-  console.log(chalk.gray(`   Install location: ${currentDir}/.claude/`));
-  console.log(chalk.gray(`   Package version: ${VERSION}`));
+  // Global pagination constants (used throughout install flow)
+  const configPages = 4; // System Dependencies + Provider + Audio + Verbosity
+  const configOffset = 0;
 
-  showReleaseInfo();
+  // Loop to allow going back to welcome screen
+  let userConfig = null;
+  while (!userConfig) {
+    showWelcome();
 
-  // Provider selection
-  let selectedProvider = await promptProviderSelection(options);
-  let piperVoicesPath = null;
+    // Show release notes and recent changes after welcome banner
+    console.log(getReleaseInfoBoxen());
+    console.log('');
+    await showRecentChanges(path.join(__dirname, '..'));
 
-  if (options.yes) {
-    console.log(chalk.green('✓ Auto-confirmed (--yes flag)'));
+    console.log(chalk.cyan('\n📍 Installation Details:'));
+    console.log(chalk.gray(`   Install location: ${currentDir}/.claude/`));
+    console.log(chalk.yellow(`   Package version: ${VERSION}`));
+
+    // Prompt to continue (gives user time to read welcome banner)
+    if (!options.yes) {
+      console.log(''); // Add spacing before prompt
+
+      const { continueToConfig } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'continueToConfig',
+        message: chalk.yellow('Ready to configure AgentVibes?'),
+        default: true
+      }]);
+
+      if (!continueToConfig) {
+        console.log(chalk.yellow('\n✋ Installation cancelled.'));
+        process.exit(0);
+      }
+    }
+
+    // Collect configuration through paginated flow (totalPages will be updated later)
+    // Returns null if user wants to go back to welcome
+    userConfig = await collectConfiguration({
+      ...options,
+      pageOffset: configOffset,
+      totalPages: configPages // Temporary, will show correct count later
+    });
   }
 
-  // Handle provider-specific configuration
-  if (selectedProvider === 'piper' && !options.yes) {
-    piperVoicesPath = await handlePiperConfiguration();
-  }
-
-  if (!options.yes) {
-    console.log(''); // Spacing
-  }
-
+  const selectedProvider = userConfig.provider;
+  const piperVoicesPath = userConfig.piperPath;
   const targetDir = options.directory || currentDir;
 
-  // Confirm installation location
+  // Collect pre-install information pages
+  const preInstallPages = [];
+
+  // Page 1: Configuration Summary
+  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say' };
+  const reverbLabels = {
+    off: 'Off',
+    light: 'Light',
+    medium: 'Medium',
+    heavy: 'Heavy',
+    cathedral: 'Cathedral'
+  };
+  const verbosityLabels = {
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low'
+  };
+
+  let configContent = chalk.bold('Your Configuration\n\n');
+  configContent += chalk.cyan('🎤 TTS Provider:\n');
+  configContent += chalk.white(`   ${providerLabels[selectedProvider]}\n`);
+  if (selectedProvider === 'piper' && piperVoicesPath) {
+    configContent += chalk.gray(`   Voice storage: ${piperVoicesPath}\n`);
+  }
+  configContent += '\n';
+  configContent += chalk.cyan('🎛️  Audio Settings:\n');
+  configContent += chalk.white(`   Reverb: ${reverbLabels[userConfig.reverb]}\n`);
+  configContent += chalk.white(`   Background Music: ${userConfig.backgroundMusic.enabled ? 'Enabled' : 'Disabled'}\n`);
+  if (userConfig.backgroundMusic.enabled) {
+    // Find the track name from the track choices
+    const trackChoices = {
+      'agentvibes_soft_flamenco_loop.mp3': 'Soft Flamenco',
+      'agent_vibes_bachata_v1_loop.mp3': 'Bachata',
+      'agent_vibes_salsa_v2_loop.mp3': 'Salsa',
+      'agent_vibes_cumbia_v1_loop.mp3': 'Cumbia',
+      'agent_vibes_bossa_nova_v2_loop.mp3': 'Bossa Nova',
+      'agent_vibes_japanese_city_pop_v1_loop.mp3': 'Japanese City Pop',
+      'agent_vibes_chillwave_v2_loop.mp3': 'Chillwave',
+      'dreamy_house_loop.mp3': 'Dreamy House',
+      'agent_vibes_dark_chill_step_loop.mp3': 'Dark Chill Step',
+      'agent_vibes_goa_trance_v2_loop.mp3': 'Goa Trance',
+      'agent_vibes_harpsichord_v2_loop.mp3': 'Harpsichord',
+      'agent_vibes_celtic_harp_v1_loop.mp3': 'Celtic Harp',
+      'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3': 'Hawaiian Slack Key Guitar',
+      'agent_vibes_arabic_v2_loop.mp3': 'Arabic Oud',
+      'agent_vibes_ganawa_ambient_v2_loop.mp3': 'Gnawa Ambient',
+      'agent_vibes_tabla_dream_pop_v1_loop.mp3': 'Tabla Dream Pop'
+    };
+    const trackName = trackChoices[userConfig.backgroundMusic.track] || userConfig.backgroundMusic.track;
+    configContent += chalk.gray(`   Default track: ${trackName}\n`);
+  }
+  configContent += '\n';
+  configContent += chalk.cyan('🔊 Verbosity:\n');
+  configContent += chalk.white(`   ${verbosityLabels[userConfig.verbosity]}\n`);
+
+  const configBoxen = boxen(configContent.trim(), {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: 'green',
+    title: chalk.bold('⚙️  Configuration Summary'),
+    titleAlignment: 'center'
+  });
+  preInstallPages.push({
+    title: 'Configuration Summary',
+    content: configBoxen
+  });
+
+  // Show pre-install info pages with pagination
   if (!options.yes) {
-    console.log(chalk.cyan('\n📂 Installation Location:\n'));
-    console.log(chalk.white('   AgentVibes will be installed in:'));
-    console.log(chalk.yellow(`   ${targetDir}/.claude/\n`));
-    console.log(chalk.gray('   Why .claude/?'));
-    console.log(chalk.gray('   • Claude Code automatically discovers tools in .claude/ directories'));
-    console.log(chalk.gray('   • This makes slash commands and TTS features immediately available'));
-    console.log(chalk.gray('   • Project-specific installation keeps your setup isolated\n'));
+    console.log(chalk.cyan('\n📖 Installation Preview\n'));
+    const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
+    // For pre-install, estimate post-install pages (will be exact in post-install)
+    const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
+    const estimatedTotal = configPages + preInstallPages.length + estimatedPostInstall;
 
-    const { confirmLocation } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirmLocation',
-        message: `Install AgentVibes in ${targetDir}/.claude/ ?`,
-        default: true,
-      },
-    ]);
+    const result = await showPaginatedContent(preInstallPages, {
+      ...options,
+      continueLabel: '✓ Start Installation',
+      pageOffset: preInstallOffset,
+      totalPages: estimatedTotal,
+      showPreviousOnFirst: true
+    });
 
-    if (!confirmLocation) {
-      console.log(chalk.red('\n❌ Installation cancelled.\n'));
-      process.exit(0);
+    // If user went back from first pre-install page, restart configuration
+    if (result === 'prev') {
+      console.log(chalk.yellow('\n↩️  Returning to configuration...\n'));
+      return install(options); // Restart the install function
     }
   }
 
-  console.log(chalk.cyan('\n📦 What will be installed:'));
-  console.log(chalk.gray(`   • 16 slash commands → ${targetDir}/.claude/commands/agent-vibes/`));
-  console.log(chalk.gray(`   • Multi-provider TTS system (Piper TTS + macOS Say) → ${targetDir}/.claude/hooks/`));
-  console.log(chalk.gray(`   • 19 personality templates → ${targetDir}/.claude/personalities/`));
-  console.log(chalk.gray(`   • SessionStart hook for automatic TTS activation`));
-  console.log(chalk.gray(`   • 50+ neural voices (Piper TTS - free & offline)`));
-  console.log(chalk.gray(`   • 30+ language support with native voices`));
-  console.log(chalk.gray(`   • BMAD integration for multi-agent sessions\n`));
+  // Ask if user wants to hear welcome message
+  if (!options.yes) {
+    // Show header for this confirmation screen
+    console.clear();
+    const currentPageNum = 3 + preInstallPages.length;
+    const { header } = createPageHeaderFooter('Installation Confirmation', 0, 15, currentPageNum);
+    console.log(header);
+    console.log('');
 
-  // Provider labels for display
-  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say' };
+    console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
 
-  // Final confirmation
+    const { playWelcome } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'playWelcome',
+        message: chalk.yellow('🎵 Listen to Welcome Message?'),
+        default: false,
+      },
+    ]);
+
+    if (playWelcome) {
+      const spinner = ora('Playing welcome message...').start();
+      await playWelcomeDemo(targetDir, spinner, options);
+      spinner.succeed(chalk.green('Welcome message complete!'));
+    }
+  }
+
+  // Final confirmation after previewing
   if (!options.yes) {
     const { confirm } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'confirm',
-        message: chalk.yellow(`Proceed with installation using ${providerLabels[selectedProvider] || selectedProvider}?`),
+        message: chalk.yellow(`\n✅ Ready to install AgentVibes with ${providerLabels[selectedProvider]}?`),
         default: true,
       },
     ]);
@@ -1810,12 +2622,12 @@ async function install(options = {}) {
     }
 
     // Copy all files using helper functions
-    const commandFileCount = await copyCommandFiles(targetDir, spinner);
-    const hookFileCount = await copyHookFiles(targetDir, spinner);
-    const personalityFileCount = await copyPersonalityFiles(targetDir, spinner);
+    const commandResult = await copyCommandFiles(targetDir, spinner);
+    const hookResult = await copyHookFiles(targetDir, spinner);
+    const personalityResult = await copyPersonalityFiles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
     const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
-    const backgroundMusicFileCount = await copyBackgroundMusicFiles(targetDir, spinner);
+    const backgroundMusicResult = await copyBackgroundMusicFiles(targetDir, spinner);
     const configFileCount = await copyConfigFiles(targetDir, spinner);
 
     // Configure hooks and manifests
@@ -1846,7 +2658,7 @@ async function install(options = {}) {
     }
     await fs.writeFile(voiceConfigPath, defaultVoice);
 
-    spinner.succeed(chalk.green(`Provider set to: ${providerLabels[selectedProvider] || selectedProvider}\n`));
+    spinner.succeed();
 
     // Detect and migrate old configuration
     await detectAndMigrateOldConfig(targetDir, spinner);
@@ -1872,68 +2684,12 @@ async function install(options = {}) {
       await checkAndInstallPiper(targetDir, options);
     }
 
-    // Display installation summary
-    console.log(chalk.cyan('📦 Installation Summary:'));
-    console.log(chalk.white(`   • ${commandFileCount} slash commands installed`));
-    console.log(chalk.white(`   • ${hookFileCount} TTS scripts installed`));
-    console.log(chalk.white(`   • ${personalityFileCount} personality templates installed`));
-    console.log(chalk.white(`   • SessionStart hook configured for automatic TTS`));
-    if (pluginFileCount > 0) {
-      console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files installed`));
-    }
-    if (bmadConfigFileCount > 0) {
-      console.log(chalk.white(`   • ${bmadConfigFileCount} BMAD config files installed`));
-    }
-    if (backgroundMusicFileCount > 0) {
-      console.log(chalk.white(`   • ${backgroundMusicFileCount} background music track${backgroundMusicFileCount === 1 ? '' : 's'} installed`));
-    }
+    // Apply background music configuration from userConfig
+    if (backgroundMusicResult.count > 0) {
+      const configDir = path.join(claudeDir, 'config');
+      await fs.mkdir(configDir, { recursive: true });
 
-    console.log(chalk.white(`   • Voice manager ready`));
-
-    // Configure background music (if tracks were installed)
-    if (backgroundMusicFileCount > 0 && !options.yes) {
-      console.log(''); // Blank line for spacing
-
-      const enableBackgroundMusic = await inquirer.prompt([{
-        type: 'confirm',
-        name: 'enable',
-        message: 'Enable background music for TTS?',
-        default: true
-      }]);
-
-      if (enableBackgroundMusic.enable) {
-        // Define track choices with user-friendly names
-        const trackChoices = [
-          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
-          { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
-          { name: '💃 Salsa (Latin - Upbeat brass & percussion)', value: 'agent_vibes_salsa_v2_loop.mp3' },
-          { name: '🎸 Cumbia (Latin - Accordion & drums)', value: 'agent_vibes_cumbia_v1_loop.mp3' },
-          { name: '🌸 Bossa Nova (Brazilian jazz)', value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
-          { name: '🏙️  Japanese City Pop (80s synth)', value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
-          { name: '🌊 Chillwave (Electronic ambient)', value: 'agent_vibes_chillwave_v2_loop.mp3' },
-          { name: '🎹 Dreamy House (Electronic dance)', value: 'dreamy_house_loop.mp3' },
-          { name: '🌙 Dark Chill Step (Electronic bass)', value: 'agent_vibes_dark_chill_step_loop.mp3' },
-          { name: '🕉️  Goa Trance (Psychedelic electronic)', value: 'agent_vibes_goa_trance_v2_loop.mp3' },
-          { name: '🎼 Harpsichord (Baroque classical)', value: 'agent_vibes_harpsichord_v2_loop.mp3' },
-          { name: '🎻 Celtic Harp (Irish traditional)', value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
-          { name: '🌺 Hawaiian Slack Key Guitar', value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
-          { name: '🏜️  Arabic Oud (Middle Eastern)', value: 'agent_vibes_arabic_v2_loop.mp3' },
-          { name: '🪘 Gnawa Ambient (North African)', value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
-          { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
-        ];
-
-        const selectedTrack = await inquirer.prompt([{
-          type: 'list',
-          name: 'track',
-          message: 'Choose default background music track:',
-          choices: trackChoices,
-          default: 'agentvibes_soft_flamenco_loop.mp3'
-        }]);
-
-        // Enable background music and set default track
-        const configDir = path.join(claudeDir, 'config');
-        await fs.mkdir(configDir, { recursive: true });
-
+      if (userConfig.backgroundMusic.enabled) {
         // Write enabled flag
         const enabledFile = path.join(configDir, 'background-music-enabled.txt');
         await fs.writeFile(enabledFile, 'true');
@@ -1945,79 +2701,22 @@ async function install(options = {}) {
         // Update the default entry with selected track
         audioEffectsContent = audioEffectsContent.replace(
           /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
-          `default|$1|${selectedTrack.track}|$3`
+          `default|$1|${userConfig.backgroundMusic.track}|$3`
         );
 
         await fs.writeFile(audioEffectsPath, audioEffectsContent);
-
-        console.log(chalk.green(`\n✅ Background music enabled!`));
-        console.log(chalk.white(`   Default track: ${trackChoices.find(t => t.value === selectedTrack.track)?.name || selectedTrack.track}`));
-        console.log('');
-        console.log(chalk.cyan('💡 Tip: Change background music anytime:'));
-        console.log(chalk.white('   • Change globally: /agent-vibes:background-music set-default <track>'));
-        console.log(chalk.white('   • Change per-agent: /agent-vibes:background-music set-agent <agent> <track>'));
-        console.log(chalk.white('   • List all tracks: /agent-vibes:background-music list'));
-        console.log(chalk.white('   • Disable: /agent-vibes:background-music off'));
-      } else {
-        console.log(chalk.gray('\nℹ️  Background music disabled. Enable later with: /agent-vibes:background-music on'));
       }
     }
 
-    // Configure reverb level (if not using --yes flag)
-    let selectedReverb = 'off'; // Default for --yes mode
-    if (!options.yes) {
-      console.log(''); // Blank line for spacing
-      selectedReverb = await promptReverbSelection();
-      console.log(chalk.green(`\n✅ Reverb level set to: ${selectedReverb}`));
+    // Apply reverb configuration from userConfig
+    const selectedReverb = userConfig.reverb;
 
-      const reverbDescriptions = {
-        off: 'No reverb - dry, direct voice',
-        light: 'Subtle room ambiance - sounds like a small room',
-        medium: 'Conference room feel - natural and balanced',
-        heavy: 'Large hall acoustics - spacious and resonant',
-        cathedral: 'Epic space reverb - grand and atmospheric'
-      };
+    // Apply verbosity configuration from userConfig
+    const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
+    await fs.writeFile(verbosityFile, userConfig.verbosity);
 
-      console.log(chalk.white(`   ${reverbDescriptions[selectedReverb]}`));
-      console.log('');
-      console.log(chalk.cyan('💡 Tip: Change reverb anytime:'));
-      console.log(chalk.white('   • Via MCP: "set reverb to cathedral"'));
-      console.log(chalk.white('   • Or use: .claude/hooks/effects-manager.sh set-reverb <level>'));
-    }
-
-    // Configure verbosity level (if not using --yes flag)
-    if (!options.yes) {
-      console.log(''); // Blank line for spacing
-
-      const verbosityChoice = await inquirer.prompt([{
-        type: 'list',
-        name: 'level',
-        message: 'Choose TTS verbosity level (how much Claude speaks):',
-        choices: [
-          { name: '🔊 High - Maximum transparency (speaks all reasoning, decisions, findings)', value: 'high' },
-          { name: '🔉 Medium - Balanced (speaks acknowledgments and key updates)', value: 'medium' },
-          { name: '🔈 Low - Minimal (only essential notifications)', value: 'low' }
-        ],
-        default: 'high'
-      }]);
-
-      // Write verbosity level to config
-      const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
-      await fs.writeFile(verbosityFile, verbosityChoice.level);
-
-      console.log(chalk.green(`\n✅ Verbosity set to: ${verbosityChoice.level}`));
-
-      const verbosityDescriptions = {
-        high: 'Claude will speak acknowledgments, completions, reasoning, decisions, and findings',
-        medium: 'Claude will speak acknowledgments, completions, and key updates',
-        low: 'Claude will only speak essential notifications'
-      };
-
-      console.log(chalk.white(`   ${verbosityDescriptions[verbosityChoice.level]}`));
-      console.log('');
-      console.log(chalk.cyan('💡 Tip: Change verbosity anytime:'));
-      console.log(chalk.white('   • /agent-vibes:verbosity <low|medium|high>'));
-    }
+    // Initialize piperVoicesBoxen outside the conditional for proper scoping
+    let piperVoicesBoxen = null;
 
     if (selectedProvider === 'macos') {
       // macOS Say provider summary
@@ -2074,27 +2773,41 @@ async function install(options = {}) {
         missingVoices = commonVoices;
       }
 
-      console.log(chalk.white(`   • 18 languages supported`));
-      console.log(chalk.green(`   • No API key needed ✓`));
-
+      // Create Piper voices boxen (only if newly installed)
       if (installedVoices.length > 0) {
         // Separate newly installed from pre-existing voices
         const newlyInstalled = installedVoices.filter(v => !preExistingVoices.includes(v.name));
         const alreadyInstalled = installedVoices.filter(v => preExistingVoices.includes(v.name));
 
+        // Only create boxen if there are newly installed voices
         if (newlyInstalled.length > 0) {
-          console.log(chalk.green(`   • ${newlyInstalled.length} Piper voice${newlyInstalled.length === 1 ? '' : 's'} newly installed:`));
+          let content = chalk.bold.green(`${newlyInstalled.length} Newly Installed\n\n`);
           newlyInstalled.forEach(voice => {
-            console.log(chalk.green(`     ✓ ${voice.name} (${voice.size})`));
-            console.log(chalk.gray(`       ${voice.path}`));
+            content += chalk.green(`✓ ${voice.name}`) + chalk.gray(` (${voice.size})\n`);
+            content += chalk.dim(`  ${voice.path}\n`);
           });
-        }
 
-        if (alreadyInstalled.length > 0) {
-          console.log(chalk.gray(`   • ${alreadyInstalled.length} Piper voice${alreadyInstalled.length === 1 ? '' : 's'} already installed:`));
-          alreadyInstalled.forEach(voice => {
-            console.log(chalk.gray(`     ✓ ${voice.name} (${voice.size}) - already installed`));
-            console.log(chalk.gray(`       ${voice.path}`));
+          if (alreadyInstalled.length > 0) {
+            content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
+            content += chalk.bold.cyan(`${alreadyInstalled.length} Already Installed\n\n`);
+            alreadyInstalled.forEach(voice => {
+              content += chalk.cyan(`✓ ${voice.name}`) + chalk.gray(` (${voice.size})\n`);
+              content += chalk.dim(`  ${voice.path}\n`);
+            });
+          }
+
+          // Add additional info at the bottom of boxen
+          content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
+          content += chalk.white('• 18 languages supported\n');
+          content += chalk.green('• No API key needed ✓');
+
+          piperVoicesBoxen = boxen(content.trim(), {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'round',
+            borderColor: 'cyan',
+            title: chalk.bold(`🎤 Piper Voices (${installedVoices.length} total)`),
+            titleAlignment: 'center'
           });
         }
       }
@@ -2109,163 +2822,28 @@ async function install(options = {}) {
       if (installedVoices.length === 0 && missingVoices.length === 0) {
         console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
       }
-
-      // Show background music files
-      const tracksDir = path.join(targetDir, '.claude', 'audio', 'tracks');
-      try {
-        if (fsSync.existsSync(tracksDir)) {
-          const bgFiles = fsSync.readdirSync(tracksDir);
-          const musicFiles = bgFiles.filter(f => f.endsWith('.mp3') || f.endsWith('.wav'));
-          if (musicFiles.length > 0) {
-            console.log(chalk.white(`   • ${musicFiles.length} background music track${musicFiles.length === 1 ? '' : 's'} available`));
-          }
-        }
-      } catch {
-        // Ignore errors
-      }
     }
     console.log('');
 
-    // Pause to let user review installation summary
-    if (!options.yes) {
-      await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'continue',
-          message: chalk.cyan('📋 Review the installation summary above. Continue?'),
-          default: true,
-        }
-      ]);
+    // Collect all boxens for pagination
+    const pages = [];
+    if (commandResult.boxen) {
+      pages.push({ title: 'Summary: Slash Commands', content: commandResult.boxen });
+    }
+    if (backgroundMusicResult.boxen) {
+      pages.push({ title: 'Summary: Background Music', content: backgroundMusicResult.boxen });
+    }
+    if (hookResult.boxen) {
+      pages.push({ title: 'Summary: TTS Scripts', content: hookResult.boxen });
+    }
+    if (personalityResult.boxen) {
+      pages.push({ title: 'Summary: Personalities', content: personalityResult.boxen });
+    }
+    if (piperVoicesBoxen) {
+      pages.push({ title: 'Summary: Piper Voices', content: piperVoicesBoxen });
     }
 
-    // Show recent changes from git log or RELEASE_NOTES.md
-    try {
-      const { execSync } = await import('node:child_process');
-      const gitLog = execSync(
-        'git log --oneline --no-decorate -5',
-        { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
-      ).trim();
-
-      if (gitLog) {
-        console.log(chalk.cyan('📝 Recent Changes:\n'));
-        const commits = gitLog.split('\n');
-        commits.forEach(commit => {
-          const [hash, ...messageParts] = commit.split(' ');
-          const message = messageParts.join(' ');
-          console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-        });
-        console.log();
-      }
-    } catch (error) {
-      // Git not available or not a git repo - try RELEASE_NOTES.md
-      try {
-        const releaseNotesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
-        const releaseNotes = await fs.readFile(releaseNotesPath, 'utf8');
-
-        // Extract commits from "Recent Commits" section
-        const lines = releaseNotes.split('\n');
-        const commitsIndex = lines.findIndex(line => line.includes('## 📝 Recent Commits'));
-
-        if (commitsIndex >= 0) {
-          console.log(chalk.cyan('📝 Recent Changes:\n'));
-
-          // Find the code block with commits (between ``` markers)
-          let inCodeBlock = false;
-          for (let i = commitsIndex + 1; i < lines.length; i++) {
-            const line = lines[i];
-
-            if (line.trim() === '```') {
-              if (inCodeBlock) break; // End of code block
-              inCodeBlock = true;
-              continue;
-            }
-
-            if (inCodeBlock && line.trim()) {
-              // Security: Use bounded quantifiers to prevent ReDoS
-              // Match git short hash (7-12 hex chars) followed by single space and message
-              const match = line.match(/^([a-f0-9]{7,12}) (.*)$/);
-              if (match) {
-                const [, hash, message] = match;
-                console.log(chalk.gray(`   ${hash}`) + ' ' + chalk.white(message));
-              }
-            }
-          }
-          console.log();
-        }
-      } catch {
-        // No release notes available
-      }
-    }
-
-    // Success message
-    console.log(
-      boxen(
-        chalk.green.bold('✨ Installation Complete! ✨\n\n') +
-        chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
-        chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n') +
-        chalk.white('🎤 Available Commands:\n\n') +
-        chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
-        chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
-        chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
-        chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
-        chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
-        chalk.cyan('  /agent-vibes:add <name> <id>') + chalk.gray(' .... Add custom voice\n') +
-        chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n') +
-        chalk.cyan('  /agent-vibes:get') + chalk.gray(' ................. Get active voice\n') +
-        chalk.cyan('  /agent-vibes:sample <name>') + chalk.gray(' ...... Test a voice\n') +
-        chalk.cyan('  /agent-vibes:personality') + chalk.gray(' ......... Set personality\n') +
-        chalk.cyan('  /agent-vibes:sentiment') + chalk.gray(' ........... Set sentiment\n') +
-        chalk.cyan('  /agent-vibes:set-pretext') + chalk.gray(' ......... Set TTS prefix\n\n') +
-        chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n') +
-        chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'double',
-          borderColor: 'green',
-        }
-      )
-    );
-
-    // Apply reverb setting if not "off"
-    if (selectedReverb && selectedReverb !== 'off') {
-      const effectsManagerPath = path.join(targetDir, '.claude', 'hooks', 'effects-manager.sh');
-      try {
-        const { execSync } = require('child_process');
-        execSync(`bash "${effectsManagerPath}" set-reverb ${selectedReverb} default`, {
-          stdio: 'pipe',
-        });
-        console.log(chalk.green(`✅ Reverb set to '${selectedReverb}' for default agent\n`));
-      } catch (error) {
-        console.log(chalk.yellow(`⚠️  Could not apply reverb setting: ${error.message}\n`));
-      }
-    }
-
-    console.log(chalk.green.bold('\n✅ AgentVibes is Ready!'));
-    console.log(chalk.white('   TTS protocol automatically loads on every Claude session'));
-    console.log(chalk.gray('   via SessionStart hook - no additional setup needed!\n'));
-
-    // Play welcome demo with harpsichord intro and reverb voice (opt-in only)
-    if (options.withAudio) {
-      await playWelcomeDemo(targetDir, spinner, options);
-    }
-
-    console.log(chalk.cyan('🎤 Try these commands:'));
-    console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
-    console.log(chalk.white('   • /agent-vibes:switch <name>') + chalk.gray(' - Change your voice'));
-    console.log(chalk.white('   • /agent-vibes:personality <style>') + chalk.gray(' - Set personality\n'));
-
-    // Pause to let user review setup instructions
-    if (!options.yes) {
-      await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'continue',
-          message: chalk.cyan('Continue?'),
-          default: true,
-        }
-      ]);
-    }
+    // Recent Changes already shown on page 2 after welcome banner - no need to show again
 
     // Handle MCP configuration - offer to create .mcp.json if not exists
     await handleMcpConfiguration(targetDir, options);
@@ -2282,41 +2860,104 @@ async function install(options = {}) {
         ? `v${bmadDetection.detailedVersion}`
         : 'v4';
 
-      console.log(
-        boxen(
-          chalk.green.bold(`🎉 BMAD-METHOD™ ${versionLabel} Detected!\n\n`) +
-          chalk.white.bold('We detected you ALREADY have the BMAD-METHOD™\n') +
-          chalk.white.bold('The Universal AI Agent Framework installed!\n\n') +
-          chalk.cyan('✨ Try the Party Mode command:\n') +
-          chalk.yellow.bold('   /bmad:core:workflows:party-mode\n\n') +
-          chalk.gray('AgentVibes will assign a unique voice to each agent\n') +
-          chalk.gray('while they help you with your project!\n\n') +
-          chalk.cyan('Other Commands:\n') +
-          chalk.gray('  • /agent-vibes:bmad status - View voice assignments\n') +
-          chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices'),
-          {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'round',
-            borderColor: 'green',
-          }
-        )
-      );
+      const bmadContent =
+        chalk.green.bold(`🎉 BMAD-METHOD™ ${versionLabel} Detected!\n\n`) +
+        chalk.white.bold('We detected you ALREADY have the BMAD-METHOD™\n') +
+        chalk.white.bold('The Universal AI Agent Framework installed!\n\n') +
+        chalk.cyan('✨ Try the Party Mode command:\n') +
+        chalk.yellow.bold('   /bmad:core:workflows:party-mode\n\n') +
+        chalk.gray('AgentVibes will assign a unique voice to each agent\n') +
+        chalk.gray('while they help you with your project!\n\n') +
+        chalk.cyan('Other Commands:\n') +
+        chalk.gray('  • /agent-vibes:bmad status - View voice assignments\n') +
+        chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices');
+
+      pages.push({ title: 'BMAD Integration', content: bmadContent });
     } else {
-      console.log(
-        boxen(
-          chalk.cyan.bold('💡 We also Recommend:\n\n') +
-          chalk.white.bold('BMAD-METHOD™: Universal AI Agent Framework\n\n') +
-          chalk.gray('AgentVibes auto-detects BMAD and assigns voices to agents!\n\n') +
-          chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD'),
-          {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'round',
-            borderColor: 'cyan',
-          }
-        )
+      const bmadRecommendBoxen = boxen(
+        chalk.cyan.bold('💡 We also Recommend:\n\n') +
+        chalk.white.bold('BMAD-METHOD™: Universal AI Agent Framework\n\n') +
+        chalk.gray('AgentVibes auto-detects BMAD and assigns voices to agents!\n\n') +
+        chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'cyan',
+        }
       );
+
+      pages.push({ title: 'Recommended Tools', content: bmadRecommendBoxen });
+    }
+
+    // Apply reverb setting if not "off" (using dynamic import for ES modules)
+    if (selectedReverb && selectedReverb !== 'off') {
+      const effectsManagerPath = path.join(targetDir, '.claude', 'hooks', 'effects-manager.sh');
+      try {
+        execSync(`bash "${effectsManagerPath}" set-reverb ${selectedReverb} default`, {
+          stdio: 'pipe',
+        });
+      } catch (error) {
+        // Silent fail - will be shown in success message if needed
+      }
+    }
+
+    // Success message as final page (no boxen)
+    const successContent =
+      chalk.green.bold('✨ Installation Complete! ✨\n\n') +
+      chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
+      chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n') +
+      chalk.white('🎤 Available Commands:\n\n') +
+      chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
+      chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
+      chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
+      chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
+      chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
+      chalk.cyan('  /agent-vibes:add <name> <id>') + chalk.gray(' .... Add custom voice\n') +
+      chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n') +
+      chalk.cyan('  /agent-vibes:get') + chalk.gray(' ................. Get active voice\n') +
+      chalk.cyan('  /agent-vibes:sample <name>') + chalk.gray(' ...... Test a voice\n') +
+      chalk.cyan('  /agent-vibes:personality') + chalk.gray(' ......... Set personality\n') +
+      chalk.cyan('  /agent-vibes:sentiment') + chalk.gray(' ........... Set sentiment\n') +
+      chalk.cyan('  /agent-vibes:set-pretext') + chalk.gray(' ......... Set TTS prefix\n\n') +
+      chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n') +
+      chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes\n') +
+      chalk.gray('📖 Docs: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes/blob/master/README.md');
+
+    pages.push({ title: 'Installation Complete', content: successContent });
+
+    // Show all pages with pagination navigation
+    const postInstallOffset = configPages + preInstallPages.length; // After config + pre-install pages
+    const actualTotalPages = configPages + preInstallPages.length + pages.length;
+
+    await showPaginatedContent(pages, {
+      ...options,
+      continueLabel: '✓ Installation Complete',
+      pageOffset: postInstallOffset,
+      totalPages: actualTotalPages
+    });
+
+    // Final message after pagination
+    console.log(chalk.green.bold('\n✅ AgentVibes is Ready!\n'));
+
+    // Check for .mcp.json file
+    const mcpConfigPath = path.join(targetDir, '.mcp.json');
+    const hasMcpConfig = fsSync.existsSync(mcpConfigPath);
+
+    if (hasMcpConfig) {
+      console.log(chalk.white('   Launch Claude Code with MCP:'));
+      console.log(chalk.cyan('   claude --mcp-config .mcp.json\n'));
+    } else {
+      console.log(chalk.white('   Start a new session to activate TTS.\n'));
+    }
+
+    console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
+    console.log(chalk.white('   • /agent-vibes:switch <name>') + chalk.gray(' - Change your voice'));
+    console.log(chalk.white('   • /agent-vibes:personality <style>') + chalk.gray(' - Set personality\n'));
+
+    // Play welcome demo with harpsichord intro and reverb voice (opt-in only)
+    if (options.withAudio) {
+      await playWelcomeDemo(targetDir, spinner, options);
     }
 
   } catch (error) {

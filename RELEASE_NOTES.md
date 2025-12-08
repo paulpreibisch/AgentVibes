@@ -864,3 +864,121 @@ Or for fresh install:
 ```bash
 npx agentvibes@latest install
 ```
+# Release v2.17.0 - Installer UX Revolution
+
+## AI Summary
+
+AgentVibes v2.17.0 delivers a complete installer user experience transformation with intelligent system dependency checking, paginated configuration flow, and comprehensive inline help. The installer now validates required tools (Node.js, Python, bash) and optional dependencies (sox, ffmpeg, curl, bc, flock, pipx) with platform-specific installation commands, provides TTS explanations and command examples throughout, and features a professional header/footer system with accurate page numbering across all configuration screens.
+
+## What's New
+
+### ✨ Major Features
+
+**🎨 Complete Installer UX Overhaul**
+- **Paginated Configuration**: Beautiful header/footer system with Agent Vibes branding on every page
+- **Dynamic Page Numbering**: Accurate global page counts (e.g., "Page 5/12" instead of hardcoded estimates)
+- **System Dependencies First**: System requirements check now appears as page 2 (right after welcome banner)
+- **Inline Help**: TTS explanations, command examples, and configuration guidance throughout
+- **Consistent Styling**: All yellow text standardized to sunshine yellow for visual coherence
+
+**📋 Enhanced Configuration Flow**
+- System Dependencies moved to first configuration page
+- TTS Provider includes inline explanation: "Text-to-Speech (TTS) converts Claude's text responses into spoken audio"
+- Reverb settings show command: `/agent-vibes:effects reverb off/light/medium/heavy/cathedral`
+- Background music includes toggle and track examples: `/agent-vibes:background-music on/off` and `set chillwave`
+- Verbosity page shows: `/agent-vibes:verbosity <level>`
+- Welcome message prompt includes description: "Play audio welcome message from Paul, creator of AgentVibes"
+
+**🎯 Navigation Improvements**
+- Previous button available on all pages including first pre-install page
+- Configuration Summary removed from duplicate pre-install section
+- Installation Complete page includes README link: `📖 Docs: https://github.com/paulpreibisch/AgentVibes/blob/master/README.md`
+- Page numbering removed from navigation footer (only in header now)
+
+**🎵 Audio & Music Enhancements**
+- New background music track: Salsa v2 (`agent_vibes_salsa_v2_loop.mp3`)
+
+**🏗️ Quality & Infrastructure**
+- ✅ SonarCloud integration for continuous code quality analysis
+- 🎨 Beautiful multi-column boxen displays for voice/personality lists
+- 🔧 System dependency checker with platform-specific install commands
+- 📝 Audio effects gray borders (was cyan/green)
+
+### 🐛 Bug Fixes
+
+- Fixed page count discrepancy (showed 15 pages when actually 11-12)
+- Fixed configPages reference error by moving constant outside while loop
+- Removed decorative equals signs from release notes display
+- Removed boxen borders from BMAD integration and Installation Complete sections
+
+### 📖 Documentation
+
+- README updated with comprehensive feature documentation
+- Added TTS provider descriptions inline during configuration
+- Enhanced command examples throughout installer
+- Improved system dependency explanations
+
+### 🔧 Technical Improvements
+
+- Dynamic page calculation: `configPages + preInstallPages.length + pages.length`
+- Header/footer system with consistent 80-character width
+- Version number repositioned: "Agent Vibes v2.17.0 Installer" (was after "Installer")
+- All `chalk.yellowBright` replaced with `chalk.yellow` for consistency
+
+## Breaking Changes
+
+None. This release is fully backward compatible.
+
+## User Impact
+
+**Positive:**
+- Much clearer installation experience with guided configuration
+- Better understanding of TTS features and how to customize them
+- Professional, polished UI with consistent colors and styling
+- Easy access to commands for changing settings after installation
+
+**Migration Required:**
+None. Existing installations continue to work without changes.
+
+## Technical Details
+
+### Files Modified
+- `src/installer.js` - Complete UX overhaul with pagination, headers, inline help
+- `src/utils/dependency-checker.js` - System dependency validation
+- `src/utils/list-formatter.js` - Multi-column display formatting
+- `.github/workflows/sonarcloud.yml` - Code quality CI
+- Various personality files updated with rapper personality refinements
+
+### Dependencies
+- No new runtime dependencies
+- SonarCloud for development quality checks
+
+## Testing
+
+✅ All 140 tests passing
+- 140 unit tests (bats + node)
+- 23 integration tests
+- BMAD path security validation
+- Background music configuration tests
+
+## Installation
+
+```bash
+# New installation
+npx agentvibes install
+
+# Update existing installation
+npx agentvibes update
+```
+
+## Links
+
+- **NPM**: https://www.npmjs.com/package/agentvibes
+- **GitHub**: https://github.com/paulpreibisch/AgentVibes
+- **Documentation**: https://github.com/paulpreibisch/AgentVibes/blob/master/README.md
+- **Website**: https://agentvibes.org
+
+---
+
+**Co-created by Paul Preibisch with Claude AI**
+Copyright © 2025 Paul Preibisch | Apache-2.0 License
