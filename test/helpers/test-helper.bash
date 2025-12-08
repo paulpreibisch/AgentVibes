@@ -117,6 +117,70 @@ exit 0
 EOF
   chmod +x "${BATS_TEST_TMPDIR}/mpg123"
 
+  # Create mock piper for TTS testing
+  cat > "${BATS_TEST_TMPDIR}/piper" << 'EOF'
+#!/bin/bash
+# Mock piper TTS - generates test audio without real TTS
+# Parse arguments to find output file
+OUTPUT_FILE=""
+MODEL_FILE=""
+SPEAKER_ID=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output_file)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL_FILE="$2"
+      shift 2
+      ;;
+    --speaker)
+      SPEAKER_ID="$2"
+      shift 2
+      ;;
+    --length-scale|--sentence-silence)
+      # Ignore these params but consume the value
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+# Read input text from stdin (piper expects this)
+read -r TEXT
+
+# If no output file specified, use default
+if [[ -z "$OUTPUT_FILE" ]]; then
+  OUTPUT_FILE="output.wav"
+fi
+
+# Create parent directory if needed
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+# Generate a minimal valid WAV file (44 bytes - smallest valid WAV)
+# RIFF header (12 bytes) + fmt chunk (24 bytes) + data chunk header (8 bytes)
+printf 'RIFF' > "$OUTPUT_FILE"
+printf '\x24\x00\x00\x00' >> "$OUTPUT_FILE"  # File size - 8
+printf 'WAVE' >> "$OUTPUT_FILE"
+printf 'fmt ' >> "$OUTPUT_FILE"
+printf '\x10\x00\x00\x00' >> "$OUTPUT_FILE"  # fmt chunk size (16)
+printf '\x01\x00' >> "$OUTPUT_FILE"           # Audio format (1 = PCM)
+printf '\x01\x00' >> "$OUTPUT_FILE"           # Channels (1 = mono)
+printf '\x44\xac\x00\x00' >> "$OUTPUT_FILE"   # Sample rate (44100)
+printf '\x88\x58\x01\x00' >> "$OUTPUT_FILE"   # Byte rate
+printf '\x02\x00' >> "$OUTPUT_FILE"           # Block align
+printf '\x10\x00' >> "$OUTPUT_FILE"           # Bits per sample (16)
+printf 'data' >> "$OUTPUT_FILE"
+printf '\x00\x00\x00\x00' >> "$OUTPUT_FILE"   # Data chunk size (0 = silent)
+
+exit 0
+EOF
+  chmod +x "${BATS_TEST_TMPDIR}/piper"
+
   export PATH="${BATS_TEST_TMPDIR}:$PATH"
 }
 
