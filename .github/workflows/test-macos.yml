@@ -7,6 +7,9 @@ on:
     branches: [ master ]
   workflow_dispatch: # Allow manual trigger
 
+# Note: Using macos-15-large (Intel), macos-14 (M1), macos-15 (latest M-series)
+# macOS-13 was retired by GitHub Actions in December 2024
+
 jobs:
   test-macos:
     name: Test on ${{ matrix.os }}
