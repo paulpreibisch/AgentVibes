@@ -111,18 +111,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.15.0 - Background Music & Audio Effects](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.16.1)** 🎉
+**[v2.16.1 - Test Suite & Audio Quality](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.16.1)** 🎉
 
-AgentVibes v2.15.0 introduces a comprehensive background music system with 16 professionally-optimized tracks and per-agent audio effects processing. BMAD v6 integration adds YAML voice mappings for multi-agent conversations. **Breaking**: ElevenLabs provider removed due to cost impracticality for heavy daily use.
+AgentVibes v2.16.1 achieves 100% test pass rate (140/140 tests), fixes audio clipping issues, and completes ElevenLabs removal. Production-ready quality with comprehensive system requirements documentation.
 
 **Key Highlights:**
-- 🎶 **16 Background Music Tracks** - Latin, World, Electronic, Classical genres (Salsa, Bachata, Cumbia, Japanese City Pop, and more)
-- 🎛️ **Audio Effects Processor** - Per-agent reverb, pitch, EQ, compression with background music mixing
-- 🐛 **TDD Bug Fix** - Background music now correctly respects enabled/disabled flag
-- 🎚️ **Natural Language Control** - Switch music with conversational commands like "change to salsa"
-- 🤖 **BMAD v6 Support** - YAML voice mappings with auto-detection and XML-style TTS injection
-- 🔊 **Paplay Fix** - Fixes choppy audio on Linux/WSL RDP connections
-- ⚡ **ElevenLabs Removed** - Migrate to free local Piper TTS (already installed)
+- ✅ **100% Test Pass Rate** - All 140 unit tests passing (12 critical fixes)
+- 🎚️ **Audio Quality Fix** - Eliminated clipping with -8 dB gain (removed compressor)
+- 🧹 **ElevenLabs Cleanup** - Complete removal from all tests, hooks, and MCP server
+- 📦 **Config Management** - Template pattern: .cfg.sample (tracked) + .cfg (gitignored)
+- 📖 **System Requirements** - Comprehensive docs for macOS, Linux, Windows WSL
+- 🔧 **Provider Updates** - MCP server now uses piper/macos validation only
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
