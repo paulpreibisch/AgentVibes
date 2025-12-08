@@ -14,6 +14,7 @@ import os from 'os';
 import chalk from 'chalk';
 import ora from 'ora';
 import boxen from 'boxen';
+import { checkDependencies, displayMissingDependencies } from '../utils/dependency-checker.js';
 
 /**
  * Check if WSL is installed on Windows
@@ -230,8 +231,38 @@ export async function installMCP() {
 
   console.log(chalk.gray(`Platform: ${platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'macOS' : 'Linux'}\n`));
 
-  // Step 1: Find AgentVibes directory
-  console.log(chalk.bold('📁 Step 1: Locating AgentVibes installation...\n'));
+  // Step 1: Check system dependencies
+  console.log(chalk.bold('🔍 Step 1: Checking system dependencies...\n'));
+
+  const depResults = checkDependencies();
+  const hasMissingDeps = displayMissingDependencies(depResults);
+
+  if (hasMissingDeps) {
+    const hasCoreMissing = depResults.missing.node || depResults.missing.python || depResults.missing.bash;
+
+    if (hasCoreMissing) {
+      console.log(chalk.red('\n❌ Critical dependencies are missing. Please install them before continuing.\n'));
+      process.exit(1);
+    } else {
+      // Only optional dependencies missing
+      const { continueAnyway } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'continueAnyway',
+        message: 'Some optional dependencies are missing. Continue anyway?',
+        default: true
+      }]);
+
+      if (!continueAnyway) {
+        console.log(chalk.yellow('\nInstallation cancelled. Please install the dependencies and try again.\n'));
+        process.exit(0);
+      }
+    }
+  } else {
+    console.log(chalk.green('✓ All dependencies installed!\n'));
+  }
+
+  // Step 2: Find AgentVibes directory
+  console.log(chalk.bold('📁 Step 2: Locating AgentVibes installation...\n'));
 
   let agentVibesDir = getAgentVibesDir();
 
@@ -255,9 +286,9 @@ export async function installMCP() {
 
   console.log(chalk.green(`✓ Found AgentVibes at: ${agentVibesDir}\n`));
 
-  // Step 2: Windows-specific checks
+  // Step 3: Windows-specific checks
   if (isWindows) {
-    console.log(chalk.bold('🪟 Step 2: Windows environment setup...\n'));
+    console.log(chalk.bold('🪟 Step 3: Windows environment setup...\n'));
 
     const hasWSL = checkWSL();
 
@@ -292,8 +323,8 @@ export async function installMCP() {
     console.log(chalk.green('✓ WSL is installed\n'));
   }
 
-  // Step 3: Choose TTS provider
-  console.log(chalk.bold('🎤 Step 3: Choose TTS provider...\n'));
+  // Step 4: Choose TTS provider
+  console.log(chalk.bold('🎤 Step 4: Choose TTS provider...\n'));
 
   const { provider } = await inquirer.prompt([{
     type: 'list',
@@ -321,8 +352,8 @@ export async function installMCP() {
     console.log(chalk.cyan('\n✅ macOS TTS uses native system voices - no installation needed'));
   }
 
-  // Step 4: Install Python dependencies
-  console.log(chalk.bold('\n🐍 Step 4: Installing Python dependencies...\n'));
+  // Step 5: Install Python dependencies
+  console.log(chalk.bold('\n🐍 Step 5: Installing Python dependencies...\n'));
 
   const pythonCheck = isWindows
     ? { available: true, command: 'python3' } // WSL Python
@@ -347,15 +378,15 @@ export async function installMCP() {
     console.log(chalk.green('✓ Python MCP package already installed\n'));
   }
 
-  // Step 5: Configure provider in AgentVibes
-  console.log(chalk.bold('⚙️  Step 5: Configuring AgentVibes...\n'));
+  // Step 6: Configure provider in AgentVibes
+  console.log(chalk.bold('⚙️  Step 6: Configuring AgentVibes...\n'));
 
   const providerFile = path.join(agentVibesDir, '.claude', 'tts-provider.txt');
   fs.writeFileSync(providerFile, provider);
   console.log(chalk.green(`✓ Set provider to: ${provider}\n`));
 
-  // Step 6: Update Claude Desktop config
-  console.log(chalk.bold('📝 Step 6: Updating Claude Desktop configuration...\n'));
+  // Step 7: Update Claude Desktop config
+  console.log(chalk.bold('📝 Step 7: Updating Claude Desktop configuration...\n'));
 
   const configPath = updateClaudeConfig(agentVibesDir, provider, apiKey);
   console.log(chalk.green(`✓ Updated: ${configPath}\n`));
