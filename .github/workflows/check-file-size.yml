@@ -1,0 +1,98 @@
+name: Check File Sizes
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  check-file-sizes:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check for large files in tracked files
+      run: |
+        echo "🔍 Checking for files larger than 10MB..."
+
+        # Check git-tracked files
+        LARGE_FILES=$(git ls-files | xargs -I {} sh -c 'test -f "{}" && stat -f "%z %N" "{}" 2>/dev/null || stat -c "%s %n" "{}" 2>/dev/null' | awk '$1 > 10485760 {print $0}')
+
+        if [ -n "$LARGE_FILES" ]; then
+          echo "❌ ERROR: Found files larger than 10MB in repository:"
+          echo "$LARGE_FILES" | while read size file; do
+            size_mb=$(echo "scale=2; $size / 1048576" | bc)
+            echo "  - $file: ${size_mb}MB"
+          done
+          echo ""
+          echo "Large files should not be committed to git."
+          echo "Consider using:"
+          echo "  - Git LFS for binary assets"
+          echo "  - External storage (S3, CDN) with download scripts"
+          echo "  - .gitignore to exclude them"
+          exit 1
+        else
+          echo "✅ No files larger than 10MB found"
+        fi
+
+    - name: Check npm package size
+      run: |
+        echo "📦 Checking npm package size..."
+
+        # Install dependencies to ensure package.json is valid
+        npm ci --ignore-scripts
+
+        # Dry-run npm pack to see what would be packaged
+        npm pack --dry-run > /tmp/pack-output.txt 2>&1 || true
+
+        # Extract package size
+        PACKAGE_SIZE=$(grep "package size:" /tmp/pack-output.txt | awk '{print $3}')
+        PACKAGE_UNIT=$(grep "package size:" /tmp/pack-output.txt | awk '{print $4}')
+
+        echo "Package size: $PACKAGE_SIZE $PACKAGE_UNIT"
+
+        # Check if package is larger than 50MB
+        if [ "$PACKAGE_UNIT" = "MB" ]; then
+          PACKAGE_SIZE_NUM=$(echo "$PACKAGE_SIZE" | tr -d 'MB')
+          if [ "$(echo "$PACKAGE_SIZE_NUM > 50" | bc)" -eq 1 ]; then
+            echo "❌ ERROR: npm package is ${PACKAGE_SIZE} ${PACKAGE_UNIT} (exceeds 50MB limit)"
+            echo ""
+            echo "Large npm packages cause:"
+            echo "  - Slow installs for users"
+            echo "  - High npm registry storage costs"
+            echo "  - Potential publish failures"
+            echo ""
+            echo "Review your package.json 'files' array to exclude unnecessary files."
+            exit 1
+          fi
+        fi
+
+        echo "✅ Package size is acceptable: $PACKAGE_SIZE $PACKAGE_UNIT"
+
+    - name: Check for voice models in npm package
+      run: |
+        echo "🔍 Checking if voice models would be included in npm package..."
+
+        npm pack --dry-run 2>&1 | grep -q "\.onnx" && {
+          echo "❌ ERROR: Voice model files (.onnx) found in npm package!"
+          echo ""
+          echo "Voice models should NOT be included in npm package."
+          echo "They should be downloaded separately during installation."
+          echo ""
+          echo "Found .onnx files:"
+          npm pack --dry-run 2>&1 | grep "\.onnx"
+          exit 1
+        }
+
+        echo "✅ No voice models in npm package"
+
+    - name: Summary
+      if: success()
+      run: |
+        echo "✅ All file size checks passed!"
+        echo ""
+        echo "Repository: No files > 10MB"
+        echo "npm package: Size acceptable, no voice models"
