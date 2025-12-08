@@ -37,7 +37,7 @@
 # @dependencies ffprobe, paplay/aplay/mpg123/mpv, .claude/last-target-audio.txt
 # @entrypoints Called by /agent-vibes:replay-target slash command
 # @patterns Sequential audio playback with lock file, duration-based lock release
-# @related play-tts-piper.sh, play-tts-elevenlabs.sh, learn-manager.sh
+# @related play-tts-piper.sh, play-tts-macos.sh, learn-manager.sh
 #
 
 # Fix locale warnings

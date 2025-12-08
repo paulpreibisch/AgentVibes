@@ -142,10 +142,6 @@ function updateClaudeConfig(agentVibesPath, provider, apiKey = null) {
     };
   }
 
-  // Add API key if using ElevenLabs
-  if (provider === 'elevenlabs' && apiKey) {
-    config.mcpServers.agentvibes.env.ELEVENLABS_API_KEY = apiKey;
-  }
 
   // Write config atomically to prevent race conditions (TOCTOU)
   // Write to temp file first, then rename atomically
@@ -305,35 +301,24 @@ export async function installMCP() {
     message: 'Select your preferred TTS provider:',
     choices: [
       {
-        name: 'Piper TTS (Free, Offline, Open Source) - Recommended for testing',
+        name: 'Piper TTS (Free, Offline, Open Source) - Recommended',
         value: 'piper',
         short: 'Piper'
       },
       {
-        name: 'ElevenLabs (Premium AI voices, requires API key)',
-        value: 'elevenlabs',
-        short: 'ElevenLabs'
+        name: 'macOS TTS (Native macOS text-to-speech)',
+        value: 'macos',
+        short: 'macOS'
       }
     ]
   }]);
 
-  let apiKey = null;
-
-  if (provider === 'elevenlabs') {
-    const { key } = await inquirer.prompt([{
-      type: 'password',
-      name: 'key',
-      message: 'Enter your ElevenLabs API key:',
-      validate: (input) => {
-        if (input.length > 0) return true;
-        return 'API key is required for ElevenLabs';
-      }
-    }]);
-    apiKey = key;
-  } else {
+  if (provider === 'piper') {
     // Install Piper
     console.log(chalk.cyan('\n📦 Installing Piper TTS...'));
     await installPiper(isWindows);
+  } else if (provider === 'macos') {
+    console.log(chalk.cyan('\n✅ macOS TTS uses native system voices - no installation needed'));
   }
 
   // Step 4: Install Python dependencies

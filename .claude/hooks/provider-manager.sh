@@ -76,10 +76,10 @@ get_provider_config_path() {
 # @function get_active_provider
 # @intent Read currently active TTS provider from config file
 # @why Central function for determining which provider to use
-# @returns Echoes provider name (e.g., "elevenlabs", "piper")
+# @returns Echoes provider name (e.g., "piper", "macos")
 # @exitcode 0=success
 # @sideeffects None
-# @edgecases Returns "elevenlabs" if file missing or empty (default)
+# @edgecases Returns "piper" if file missing or empty (default)
 get_active_provider() {
   local provider_file
   provider_file=$(get_provider_config_path)
@@ -101,7 +101,7 @@ get_active_provider() {
 # @function set_active_provider
 # @intent Write active provider to config file
 # @why Allows runtime provider switching without restart
-# @param $1 {string} provider - Provider name (e.g., "elevenlabs", "piper")
+# @param $1 {string} provider - Provider name (e.g., "piper", "macos")
 # @returns None (outputs success/error message)
 # @exitcode 0=success, 1=invalid provider
 # @sideeffects Writes to tts-provider.txt file
@@ -268,7 +268,7 @@ list_providers() {
   shopt -s nullglob  # Handle case where no files match
   for file in "$script_dir"/play-tts-*.sh; do
     if [[ -f "$file" ]] && [[ "$file" != *"play-tts.sh" ]]; then
-      # Extract provider name from filename (play-tts-elevenlabs.sh -> elevenlabs)
+      # Extract provider name from filename (play-tts-piper.sh -> piper)
       local basename
       basename=$(basename "$file")
       local provider

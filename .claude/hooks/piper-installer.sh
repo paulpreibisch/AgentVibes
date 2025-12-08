@@ -68,8 +68,8 @@ elif grep -qi microsoft /proc/version 2>/dev/null || [[ "$PLATFORM" == "Linux" ]
 else
   echo "❌ Unsupported platform: $PLATFORM"
   echo ""
-  echo "   For Windows, use ElevenLabs instead:"
-  echo "   /agent-vibes:provider switch elevenlabs"
+  echo "   For Windows, use macOS provider instead:"
+  echo "   /agent-vibes:provider switch macos"
   exit 1
 fi
 

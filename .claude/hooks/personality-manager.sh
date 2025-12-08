@@ -367,8 +367,9 @@ EOF
       VOICE_FIELD="piper_voice"
       CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "piper_voice")
     else
-      VOICE_FIELD="elevenlabs_voice"
-      CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "voice")
+      # macOS or other provider
+      VOICE_FIELD="macos_voice"
+      CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "macos_voice")
     fi
 
     # Check if personality already has a favorite voice assigned

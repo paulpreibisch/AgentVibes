@@ -212,9 +212,9 @@ class AgentVibesServer:
             # Determine provider label and alternative provider
             if "Piper" in provider:
                 provider_label = "Piper TTS"
-                alternative_provider = "ElevenLabs"
-            elif "ElevenLabs" in provider:
-                provider_label = "ElevenLabs"
+                alternative_provider = "macOS"
+            elif "macOS" in provider:
+                provider_label = "macOS TTS"
                 alternative_provider = "Piper"
             else:
                 provider_label = "TTS"
@@ -331,22 +331,22 @@ class AgentVibesServer:
 
     async def set_provider(self, provider: str) -> str:
         """
-        Switch TTS provider between ElevenLabs and Piper.
+        Switch TTS provider between Piper and macOS.
 
         Args:
-            provider: Provider name ("elevenlabs" or "piper")
+            provider: Provider name ("piper" or "macos")
 
         Returns:
             Success or error message
         """
         provider = provider.lower()
-        if provider not in ["elevenlabs", "piper"]:
-            return f"❌ Invalid provider: {provider}. Choose 'elevenlabs' or 'piper'"
+        if provider not in ["piper", "macos"]:
+            return f"❌ Invalid provider: {provider}. Choose 'piper' or 'macos'"
 
         result = await self._run_script("provider-manager.sh", ["switch", provider])
         if result and "✓" in result:
             # Automatically speak confirmation in the new provider's voice
-            provider_name = "ElevenLabs" if provider == "elevenlabs" else "Piper"
+            provider_name = "macOS" if provider == "macos" else "Piper"
             confirmation_text = f"Successfully switched to {provider_name} provider"
 
             try:
@@ -382,7 +382,7 @@ class AgentVibesServer:
         """
         Set speech speed for main or target voice.
 
-        Works with both Piper and ElevenLabs providers.
+        Works with both Piper and macOS providers.
 
         Args:
             speed: Speed value (e.g., "0.5x", "1x", "2x", "normal", "fast", "slow")
@@ -782,8 +782,8 @@ class AgentVibesServer:
         try:
             if provider_file.exists():
                 provider = provider_file.read_text().strip()
-                if provider == "elevenlabs":
-                    return "ElevenLabs (Premium AI)"
+                if provider == "macos":
+                    return "macOS TTS"
                 elif provider == "piper":
                     return "Piper TTS (Free, Offline)"
                 return provider
@@ -791,7 +791,7 @@ class AgentVibesServer:
             # Log error but don't crash - return default
             import sys
             print(f"Warning: Could not read provider file: {e}", file=sys.stderr)
-        # Default to Piper (free, offline) instead of ElevenLabs
+        # Default to Piper (free, offline)
         return "Piper TTS (Free, Offline)"
 
 
@@ -808,7 +808,7 @@ async def list_tools() -> list[Tool]:
             name="text_to_speech",
             description="""Convert text to speech using AgentVibes TTS.
 
-Supports both ElevenLabs (premium) and Piper (free, offline) providers.
+Supports both macOS TTS and Piper (free, offline) providers.
 Can use different voices, personalities, and languages.
 
 Perfect for:
@@ -919,14 +919,14 @@ Examples:
         ),
         Tool(
             name="set_provider",
-            description="Switch between ElevenLabs (premium) and Piper (free, offline) TTS providers",
+            description="Switch between macOS TTS and Piper (free, offline) TTS providers",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "provider": {
                         "type": "string",
-                        "description": "Provider name: 'elevenlabs' or 'piper'",
-                        "enum": ["elevenlabs", "piper"]
+                        "description": "Provider name: 'piper' or 'macos'",
+                        "enum": ["piper", "macos"]
                     }
                 },
                 "required": ["provider"],
@@ -948,7 +948,7 @@ Examples:
         ),
         Tool(
             name="set_speed",
-            description="Set speech speed for main or target voice. Works with both Piper and ElevenLabs providers. Use this to make voices faster or slower.",
+            description="Set speech speed for main or target voice. Works with both Piper and macOS providers. Use this to make voices faster or slower.",
             inputSchema={
                 "type": "object",
                 "properties": {

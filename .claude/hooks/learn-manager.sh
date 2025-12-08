@@ -187,7 +187,7 @@ set_target_language() {
         elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
             provider=$(cat "$HOME/.claude/tts-provider.txt")
         else
-            provider="elevenlabs"
+            provider="piper"
         fi
         echo -e "   (for ${GREEN}$provider${NC} TTS)"
         echo ""
@@ -207,7 +207,7 @@ set_target_language() {
                 echo -e "${YELLOW}   (Voice not yet downloaded - greeting will play after first download)${NC}"
             fi
         else
-            # ElevenLabs - just play it in background
+            # macOS or other provider - just play it in background
             nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$recommended_voice" >/dev/null 2>&1 &
         fi
     else
@@ -228,7 +228,7 @@ get_recommended_voice_for_language() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider=$(cat "$HOME/.claude/tts-provider.txt")
     else
-        provider="elevenlabs"  # Default
+        provider="piper"  # Default
     fi
 
     # Source language manager and get provider-specific voice
@@ -279,7 +279,7 @@ suggest_voice_for_language() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider=$(cat "$HOME/.claude/tts-provider.txt")
     else
-        provider="elevenlabs"
+        provider="piper"
     fi
 
     echo ""
@@ -351,7 +351,7 @@ enable_learn_mode() {
             elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
                 provider=$(cat "$HOME/.claude/tts-provider.txt")
             else
-                provider="elevenlabs"
+                provider="piper"
             fi
             echo -e "   (for ${GREEN}$provider${NC} TTS)"
             echo ""
@@ -374,7 +374,7 @@ enable_learn_mode() {
         elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
             provider=$(cat "$HOME/.claude/tts-provider.txt")
         else
-            provider="elevenlabs"
+            provider="piper"
         fi
 
         # Check if we're using Piper and if the voice is available
@@ -388,7 +388,7 @@ enable_learn_mode() {
                 echo -e "${YELLOW}   (Voice not yet downloaded - greeting will play after first download)${NC}"
             fi
         else
-            # ElevenLabs - just play it in background
+            # macOS or other provider - just play it in background
             nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$target_voice" >/dev/null 2>&1 &
         fi
     fi

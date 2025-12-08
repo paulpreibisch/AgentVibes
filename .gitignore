@@ -22,9 +22,11 @@ yarn-error.log*
 !.claude/audio/backgrounds/agent-vibes-dark-chill-step.mp3
 .claude/journal/
 .claude/tts-*.txt
-# Config files (but keep audio-effects sample)
+# Config files (but keep audio-effects sample template)
 .claude/config/*
-!.claude/config/audio-effects.cfg
+!.claude/config/audio-effects.cfg.sample
+# User's actual config (don't overwrite customizations)
+.claude/config/audio-effects.cfg
 .claude/settings.local.json
 .agentvibes/
 .claude/piper-voices/

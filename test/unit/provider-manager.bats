@@ -48,6 +48,7 @@ teardown() {
   local hooks_dir="$TEST_CLAUDE_DIR/hooks"
   mv "$hooks_dir/play-tts-piper.sh" "$hooks_dir/play-tts-piper.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-macos.sh" "$hooks_dir/play-tts-macos.sh.bak" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-enhanced.sh" "$hooks_dir/play-tts-enhanced.sh.bak" 2>/dev/null || true
 
   run "$PROVIDER_MANAGER" list
 
@@ -57,6 +58,7 @@ teardown() {
   # Restore files
   mv "$hooks_dir/play-tts-piper.sh.bak" "$hooks_dir/play-tts-piper.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-macos.sh.bak" "$hooks_dir/play-tts-macos.sh" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-enhanced.sh.bak" "$hooks_dir/play-tts-enhanced.sh" 2>/dev/null || true
 }
 
 # ============================================================================
@@ -162,12 +164,12 @@ teardown() {
 
 @test "provider-manager get returns current provider" {
   # Set provider
-  echo "elevenlabs" > "$PROVIDER_FILE"
+  echo "piper" > "$PROVIDER_FILE"
 
   run "$PROVIDER_MANAGER" get
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "elevenlabs" ]]
+  [[ "$output" =~ "piper" ]]
 }
 
 @test "provider-manager get returns default when no config exists" {
@@ -183,13 +185,13 @@ teardown() {
 
 @test "provider-manager get trims whitespace from provider name" {
   # Write provider with extra whitespace
-  echo "  elevenlabs  " > "$PROVIDER_FILE"
+  echo "  piper  " > "$PROVIDER_FILE"
 
   run "$PROVIDER_MANAGER" get
 
   [ "$status" -eq 0 ]
   # Should return clean provider name (may have newline)
-  [[ "$output" =~ "elevenlabs" ]]
+  [[ "$output" =~ "piper" ]]
 }
 
 # ============================================================================
@@ -197,7 +199,7 @@ teardown() {
 # ============================================================================
 
 @test "provider-manager validate checks if provider exists" {
-  run "$PROVIDER_MANAGER" validate "elevenlabs"
+  run "$PROVIDER_MANAGER" validate "piper"
 
   [ "$status" -eq 0 ]
 }
@@ -234,7 +236,7 @@ teardown() {
 
   # Create provider file in this location
   mkdir -p "$test_dir"
-  echo "elevenlabs" > "$test_dir/tts-provider.txt"
+  echo "piper" > "$test_dir/tts-provider.txt"
 
   # Verify directory and file were created
   [[ -d "$test_dir" ]]
@@ -350,12 +352,12 @@ teardown() {
   source "$PROVIDER_MANAGER"
 
   # Test get_active_provider function
-  echo "elevenlabs" > "$PROVIDER_FILE"
+  echo "piper" > "$PROVIDER_FILE"
 
   run get_active_provider
 
   [ "$status" -eq 0 ]
-  [[ "$output" == "elevenlabs" ]]
+  [[ "$output" == "piper" ]]
 }
 
 @test "provider-manager list_providers returns all providers" {
@@ -364,15 +366,15 @@ teardown() {
   run list_providers
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "elevenlabs" ]]
   [[ "$output" =~ "piper" ]]
+  [[ "$output" =~ "macos" ]]
 }
 
 @test "provider-manager validate_provider returns exit code" {
   source "$PROVIDER_MANAGER"
 
   # Valid provider - should return 0
-  validate_provider "elevenlabs"
+  validate_provider "piper"
   [ "$?" -eq 0 ]
 
   # Invalid provider - should return non-zero
@@ -407,12 +409,12 @@ teardown() {
 }
 
 @test "provider-manager handles newlines in provider file" {
-  echo -e "elevenlabs\n\n" > "$PROVIDER_FILE"
+  echo -e "piper\n\n" > "$PROVIDER_FILE"
 
   run "$PROVIDER_MANAGER" get
 
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "elevenlabs" ]]
+  [[ "$output" =~ "piper" ]]
 }
 
 # ============================================================================
@@ -442,28 +444,28 @@ teardown() {
 # ============================================================================
 
 @test "provider-manager provider persists and can be read by get command" {
-  # Switch to elevenlabs
-  "$PROVIDER_MANAGER" switch "elevenlabs"
+  # Switch to piper
+  "$PROVIDER_MANAGER" switch "piper"
 
   # Verify get returns same provider
   local result=$("$PROVIDER_MANAGER" get)
 
-  [[ "$result" == "elevenlabs" ]]
+  [[ "$result" == "piper" ]]
 }
 
 @test "provider-manager multiple provider switches work correctly" {
-  "$PROVIDER_MANAGER" switch "elevenlabs"
+  "$PROVIDER_MANAGER" switch "piper"
   local first=$("$PROVIDER_MANAGER" get)
 
-  "$PROVIDER_MANAGER" switch "piper"
+  "$PROVIDER_MANAGER" switch "macos"
   local second=$("$PROVIDER_MANAGER" get)
 
-  "$PROVIDER_MANAGER" switch "elevenlabs"
+  "$PROVIDER_MANAGER" switch "piper"
   local third=$("$PROVIDER_MANAGER" get)
 
-  [[ "$first" == "elevenlabs" ]]
-  [[ "$second" == "piper" ]]
-  [[ "$third" == "elevenlabs" ]]
+  [[ "$first" == "piper" ]]
+  [[ "$second" == "macos" ]]
+  [[ "$third" == "piper" ]]
 }
 
 # ============================================================================

@@ -318,7 +318,6 @@ teardown() {
 
   [ "$status" -eq 0 ]
   assert_output_contains "Piper"
-  assert_output_contains "ElevenLabs"
 }
 
 # ============================================================================
@@ -402,7 +401,7 @@ teardown() {
   run "$SPEED_MANAGER" "1x"
 
   [ "$status" -eq 0 ]
-  assert_output_contains "works with both Piper and ElevenLabs"
+  assert_output_contains "works with"
 }
 
 # ============================================================================

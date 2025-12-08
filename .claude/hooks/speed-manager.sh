@@ -33,11 +33,11 @@
 #
 # @fileoverview Speech Speed Manager for Multi-Provider TTS
 # @context Manage speech rate for main and target language voices
-# @architecture Simple config file manager supporting both Piper (length-scale) and ElevenLabs (speed API parameter)
+# @architecture Simple config file manager supporting Piper (length-scale) and macOS (speed API parameter)
 # @dependencies .claude/config/tts-speech-rate.txt, .claude/config/tts-target-speech-rate.txt
 # @entrypoints Called by /agent-vibes:set-speed slash command
 # @patterns Provider-agnostic speed config, legacy file migration, random tongue twisters for testing
-# @related play-tts.sh, play-tts-piper.sh, play-tts-elevenlabs.sh, learn-manager.sh
+# @related play-tts.sh, play-tts-piper.sh, play-tts-macos.sh, learn-manager.sh
 #
 
 # Get script directory
@@ -189,7 +189,7 @@ set_speed() {
   esac
 
   echo ""
-  echo "Note: Speed control works with both Piper and ElevenLabs providers"
+  echo "Note: Speed control works with Piper and macOS providers"
 
   # Array of simple test messages to demonstrate speed
   local test_messages=(
@@ -253,7 +253,7 @@ get_speed() {
 
   echo ""
   echo "Scale: 0.5x=slower, 1.0x=normal, 2.0x=faster, 3.0x=very fast"
-  echo "Works with: Piper TTS and ElevenLabs"
+  echo "Works with: Piper TTS and macOS"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 

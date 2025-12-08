@@ -83,7 +83,7 @@ get_agent_config() {
     local agent="$1"
 
     if [[ ! -f "$CONFIG_FILE" ]]; then
-        echo "default|||0.0"
+        echo "default|gain -8||0.0"
         return
     fi
 
@@ -100,7 +100,7 @@ get_agent_config() {
     if [[ -n "$config" ]]; then
         echo "$config"
     else
-        echo "default|||0.0"
+        echo "default|gain -8||0.0"
     fi
 }
 

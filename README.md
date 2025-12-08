@@ -184,6 +184,143 @@ npx agentvibes install
 
 ---
 
+## 📋 System Requirements
+
+AgentVibes requires certain system dependencies for optimal audio processing and playback. Requirements vary by operating system and TTS provider.
+
+### Core Requirements (All Platforms)
+
+| Tool | Required For | Why It's Needed |
+|------|-------------|-----------------|
+| **Node.js** ≥16.0 | All platforms | Runtime for AgentVibes installer and MCP server |
+| **Bash** ≥5.0 | macOS | Modern bash features (macOS ships with 3.2 from 2007) |
+| **Python** 3.10+ | Piper TTS, MCP server | Runs Piper voice engine and MCP server |
+
+### Audio Processing Tools (Recommended)
+
+| Tool | Status | Purpose | Impact if Missing |
+|------|--------|---------|------------------|
+| **sox** | Recommended | Audio effects (reverb, EQ, pitch, compression) | No audio effects, still works |
+| **ffmpeg** | Recommended | Background music mixing, audio padding, RDP compression | No background music or RDP optimization |
+
+### Platform-Specific Requirements
+
+#### 🐧 Linux / WSL
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y sox ffmpeg python3-pip pipx
+
+# Fedora/RHEL
+sudo dnf install -y sox ffmpeg python3-pip pipx
+
+# Arch Linux
+sudo pacman -S sox ffmpeg python-pip python-pipx
+```
+
+**Audio Playback** (one of the following):
+- `paplay` (PulseAudio - usually pre-installed)
+- `aplay` (ALSA - fallback)
+- `mpg123` (fallback)
+- `mpv` (fallback)
+
+**Why these tools?**
+- **sox**: Applies audio effects defined in `.claude/config/audio-effects.cfg` (reverb, pitch shifting, EQ, compression)
+- **ffmpeg**: Mixes background music tracks, adds silence padding to prevent audio cutoff, compresses audio for RDP/SSH sessions
+- **paplay/aplay**: Plays generated TTS audio files
+- **pipx**: Isolated Python environment manager for Piper TTS installation
+
+#### 🍎 macOS
+
+```bash
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Required: Modern bash
+brew install bash
+
+# Recommended: Audio processing tools
+brew install sox ffmpeg pipx
+```
+
+**Audio Playback**:
+- `afplay` (built-in - always available)
+- `say` (built-in - for macOS TTS provider)
+
+**Why these tools?**
+- **bash 5.x**: macOS ships with bash 3.2 which lacks associative arrays and other modern features AgentVibes uses
+- **sox**: Same audio effects processing as Linux
+- **ffmpeg**: Same background music and padding as Linux
+- **afplay**: Built-in macOS audio player
+- **say**: Built-in macOS text-to-speech (alternative to Piper)
+
+#### 🪟 Windows (WSL Required)
+
+AgentVibes requires WSL (Windows Subsystem for Linux) on Windows. Follow the [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) for complete installation.
+
+```powershell
+# Install WSL from PowerShell (Administrator)
+wsl --install -d Ubuntu
+```
+
+Then follow Linux requirements above inside WSL.
+
+**Why WSL?**
+- AgentVibes uses bash scripts extensively
+- Audio routing from WSL to Windows requires PulseAudio configuration
+- See [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) for detailed audio setup
+
+### TTS Provider Requirements
+
+#### Piper TTS (Free, Offline)
+- **Python** 3.10+
+- **pipx** (for isolated installation)
+- **Disk Space**: ~50MB per voice model
+- **Internet**: Only for initial voice downloads
+
+```bash
+# Installed automatically by AgentVibes
+pipx install piper-tts
+```
+
+#### macOS Say (Built-in, macOS Only)
+- No additional requirements
+- 100+ voices pre-installed on macOS
+- Use: `/agent-vibes:provider switch macos`
+
+### Verifying Your Setup
+
+```bash
+# Check all dependencies
+node --version    # Should be ≥16.0
+python3 --version # Should be ≥3.10
+bash --version    # Should be ≥5.0 (macOS users!)
+sox --version     # Optional but recommended
+ffmpeg -version   # Optional but recommended
+pipx --version    # Required for Piper TTS
+
+# Check audio playback (Linux/WSL)
+paplay --version || aplay --version
+
+# Check audio playback (macOS)
+which afplay      # Should return /usr/bin/afplay
+```
+
+### What Happens Without Optional Dependencies?
+
+| Missing Tool | Impact | Workaround |
+|-------------|--------|------------|
+| sox | No audio effects (reverb, EQ, pitch) | TTS still works, just no effects |
+| ffmpeg | No background music, no audio padding | TTS still works, audio may cut off slightly early |
+| paplay/aplay | No audio playback on Linux | Install at least one audio player |
+
+**All TTS generation still works** - optional tools only enhance the experience!
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
 ## 🎭 Choose Your Voice Provider
 
 **Piper TTS** (free, works offline on Linux/WSL) or **macOS Say** (free, built-in on Mac) - pick one and switch anytime.
