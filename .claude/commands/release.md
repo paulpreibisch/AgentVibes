@@ -264,10 +264,13 @@ When executing this command, Claude MUST follow these steps in order:
    - Replace the "WHAT'S NEW" summary (2-4 sentences from RELEASE_NOTES.md AI Summary)
    - Replace all "KEY HIGHLIGHTS" bullets (extract from RELEASE_NOTES.md)
    - Keep the same format/structure, just update content
-6. **Update README.md**:
-   - Update version badge in header (line ~14)
-   - Update "Latest Release" section (line ~95+) with new title and summary
-   - Update key highlights list
+6. **Update README.md** ⚠️ **CRITICAL - Must complete BEFORE npm publish**:
+   - Update version badge in header (line ~14): `**Version**: v2.X.X`
+   - Update "Latest Release" section (line ~112+):
+     - Replace the title and URL: `**[vX.X.X - Release Title](github.com/...)**`
+     - Replace the AI summary paragraph (first paragraph after title)
+     - Replace all "Key Highlights" bullet points (extract from RELEASE_NOTES.md)
+   - This ensures GitHub README and npm package page show correct version
 7. **Human Review Checkpoint 2**: Show what will be updated, wait for approval
 8. **Bump package.json**: Use npm version (patch/minor/major)
 9. **Commit all changes**: Single commit with RELEASE_NOTES.md, installer.js, README.md, package.json
