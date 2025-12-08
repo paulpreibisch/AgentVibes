@@ -140,8 +140,8 @@ fi
 # @why Provide seamless experience with automatic downloads
 # @param Uses global: $VOICE_MODEL
 # @sideeffects Downloads voice model files
-# @edgecases Prompts user for consent before downloading
-if ! verify_voice "$VOICE_MODEL"; then
+# @edgecases Prompts user for consent before downloading, skipped in test mode
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && ! verify_voice "$VOICE_MODEL"; then
   echo "📥 Voice model not found: $VOICE_MODEL"
   echo "   File size: ~25MB"
   echo "   Preview: https://huggingface.co/rhasspy/piper-voices"
@@ -162,10 +162,15 @@ if ! verify_voice "$VOICE_MODEL"; then
 fi
 
 # Get voice model path
-VOICE_PATH=$(get_voice_path "$VOICE_MODEL")
-if [[ $? -ne 0 ]]; then
-  echo "❌ Voice model path not found: $VOICE_MODEL"
-  exit 3
+# In test mode, use a fake path since we have mock piper that doesn't need real files
+if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
+  VOICE_PATH="/tmp/mock-voice-${VOICE_MODEL}.onnx"
+else
+  VOICE_PATH=$(get_voice_path "$VOICE_MODEL")
+  if [[ $? -ne 0 ]]; then
+    echo "❌ Voice model path not found: $VOICE_MODEL"
+    exit 3
+  fi
 fi
 
 # @function determine_audio_directory
