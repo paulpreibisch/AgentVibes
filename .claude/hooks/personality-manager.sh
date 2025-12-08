@@ -110,38 +110,48 @@ list_personalities() {
 
 case "$1" in
   list)
-    echo "🎭 Available Personalities:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
     # Get current personality
     CURRENT="normal"
     if [ -f "$PERSONALITY_FILE" ]; then
       CURRENT=$(cat "$PERSONALITY_FILE")
     fi
 
-    # List personalities from markdown files
-    echo "Built-in personalities:"
-    for personality in $(list_personalities | sort); do
-      desc=$(get_personality_data "$personality" "description")
-      if [[ "$personality" == "$CURRENT" ]]; then
-        echo "  ✓ $personality - $desc (current)"
-      else
-        echo "  - $personality - $desc"
-      fi
-    done
+    # Use Node.js formatter for beautiful boxen display
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    FORMATTER="$PROJECT_ROOT/src/cli/list-personalities.js"
 
-    # Add random option
-    if [[ "$CURRENT" == "random" ]]; then
-      echo "  ✓ random - Picks randomly each time (current)"
+    # Use Node.js formatter if available
+    if [[ -f "$FORMATTER" ]] && command -v node &> /dev/null; then
+      node "$FORMATTER" "$PERSONALITIES_DIR" "$CURRENT"
     else
-      echo "  - random - Picks randomly each time"
-    fi
+      # Fallback to plain text display
+      echo "🎭 Available Personalities:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "Usage: /agent-vibes:personality <name>"
-    echo "       /agent-vibes:personality add <name>"
-    echo "       /agent-vibes:personality edit <name>"
+      echo "Built-in personalities:"
+      for personality in $(list_personalities | sort); do
+        desc=$(get_personality_data "$personality" "description")
+        if [[ "$personality" == "$CURRENT" ]]; then
+          echo "  ✓ $personality - $desc (current)"
+        else
+          echo "  - $personality - $desc"
+        fi
+      done
+
+      # Add random option
+      if [[ "$CURRENT" == "random" ]]; then
+        echo "  ✓ random - Picks randomly each time (current)"
+      else
+        echo "  - random - Picks randomly each time"
+      fi
+
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo ""
+      echo "Usage: /agent-vibes:personality <name>"
+      echo "       /agent-vibes:personality add <name>"
+      echo "       /agent-vibes:personality edit <name>"
+    fi
     ;;
 
   set|switch)
