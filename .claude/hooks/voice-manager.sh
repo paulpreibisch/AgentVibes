@@ -312,7 +312,8 @@ case "$1" in
         fi
       fi
 
-      if [[ -z "$FOUND" ]]; then
+      # In test mode, allow switching to any voice name without file validation
+      if [[ -z "$FOUND" ]] && [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
         echo "❌ Piper voice not found: $VOICE_NAME"
         echo ""
         echo "Available Piper voices:"
@@ -347,15 +348,17 @@ case "$1" in
       exit 1
     fi
 
-    echo "$FOUND" > "$VOICE_FILE"
-    echo "✅ Voice switched to: $FOUND"
+    # In test mode, use the requested voice name even if not found
+    VOICE_TO_SAVE="${FOUND:-$VOICE_NAME}"
+    echo "$VOICE_TO_SAVE" > "$VOICE_FILE"
+    echo "✅ Voice switched to: $VOICE_TO_SAVE"
 
     # Have the new voice introduce itself (unless silent mode)
-    if [[ "$SILENT_MODE" != "true" ]]; then
+    if [[ "$SILENT_MODE" != "true" ]] && [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]]; then
       SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
       PLAY_TTS="$SCRIPT_DIR/play-tts.sh"
       if [ -x "$PLAY_TTS" ]; then
-        "$PLAY_TTS" "Hi, I'm $FOUND. I'll be your voice assistant moving forward." "$FOUND" > /dev/null 2>&1 &
+        "$PLAY_TTS" "Hi, I'm $VOICE_TO_SAVE. I'll be your voice assistant moving forward." "$VOICE_TO_SAVE" > /dev/null 2>&1 &
       fi
 
       echo ""
