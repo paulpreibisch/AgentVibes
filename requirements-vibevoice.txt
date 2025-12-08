@@ -1,0 +1,19 @@
+# VibeVoice Provider Requirements
+# Microsoft VibeVoice TTS for multi-speaker conversational audio
+
+# Core VibeVoice dependencies
+torch>=2.0.0
+transformers>=4.35.0
+accelerate>=0.24.0
+soundfile>=0.12.1
+scipy>=1.11.0
+
+# Audio processing
+pydub>=0.25.1
+librosa>=0.10.0
+
+# Hugging Face model download
+huggingface-hub>=0.19.0
+
+# Optional: GPU optimization
+# xformers>=0.0.22  # Uncomment for faster inference on supported GPUs
