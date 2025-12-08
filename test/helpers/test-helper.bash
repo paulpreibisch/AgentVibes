@@ -8,11 +8,13 @@ setup_test_env() {
   export TEST_CLAUDE_DIR="${TEST_HOME}/.claude"
   export TEST_AUDIO_DIR="${TEST_CLAUDE_DIR}/audio"
   export TEST_PERSONALITIES_DIR="${TEST_CLAUDE_DIR}/personalities"
+  export TEST_PIPER_VOICES_DIR="${TEST_CLAUDE_DIR}/piper-voices"
 
   mkdir -p "$TEST_HOME"
   mkdir -p "$TEST_CLAUDE_DIR"
   mkdir -p "$TEST_AUDIO_DIR"
   mkdir -p "$TEST_PERSONALITIES_DIR"
+  mkdir -p "$TEST_PIPER_VOICES_DIR"
 
   # Override HOME for isolated testing
   export HOME="$TEST_HOME"
@@ -31,6 +33,14 @@ setup_test_env() {
 
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude/audio"
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude"
+
+  # Copy bundled 16Speakers model to test voice directory
+  # This ensures voice-manager tests have access to a real voice model
+  local bundled_voices_dir="$BATS_TEST_DIRNAME/../mcp-server/voices"
+  if [[ -f "$bundled_voices_dir/16Speakers.onnx" ]]; then
+    cp "$bundled_voices_dir/16Speakers.onnx" "$TEST_PIPER_VOICES_DIR/"
+    cp "$bundled_voices_dir/16Speakers.onnx.json" "$TEST_PIPER_VOICES_DIR/"
+  fi
 }
 
 # Clean up test environment
