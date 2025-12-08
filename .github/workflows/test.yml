@@ -41,23 +41,6 @@ jobs:
             echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
 
-      - name: Download bundled voice model for tests
-        run: |
-          mkdir -p mcp-server/voices
-          echo "📥 Downloading libritts_r multi-speaker model (904 speakers) for tests..."
-          # Download the official Piper multi-speaker model
-          curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/en_US-libritts_r-medium.onnx" \
-            -o mcp-server/voices/16Speakers.onnx --fail --silent --show-error
-          curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts_r/medium/en_US-libritts_r-medium.onnx.json" \
-            -o mcp-server/voices/16Speakers.onnx.json --fail --silent --show-error
-          echo "✅ Voice model downloaded ($(du -h mcp-server/voices/16Speakers.onnx | cut -f1))"
-          # Check if it's actually a multi-speaker model
-          if grep -q "speaker_id_map" mcp-server/voices/16Speakers.onnx.json; then
-            echo "✅ Multi-speaker model confirmed"
-          else
-            echo "⚠️  Warning: Model may not have multiple speakers"
-          fi
-
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key

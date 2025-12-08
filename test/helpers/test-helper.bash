@@ -34,13 +34,8 @@ setup_test_env() {
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude/audio"
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude"
 
-  # Copy bundled 16Speakers model to test voice directory
-  # This ensures voice-manager tests have access to a real voice model
-  local bundled_voices_dir="$BATS_TEST_DIRNAME/../mcp-server/voices"
-  if [[ -f "$bundled_voices_dir/16Speakers.onnx" ]]; then
-    cp "$bundled_voices_dir/16Speakers.onnx" "$TEST_PIPER_VOICES_DIR/"
-    cp "$bundled_voices_dir/16Speakers.onnx.json" "$TEST_PIPER_VOICES_DIR/"
-  fi
+  # Note: Voice models are no longer bundled in git
+  # Tests use standard voice names without requiring actual voice files
 }
 
 # Clean up test environment
