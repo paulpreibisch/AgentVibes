@@ -2893,12 +2893,16 @@ async function install(options = {}) {
     // Apply reverb setting if not "off" (using dynamic import for ES modules)
     if (selectedReverb && selectedReverb !== 'off') {
       const effectsManagerPath = path.join(targetDir, '.claude', 'hooks', 'effects-manager.sh');
-      try {
-        execSync(`bash "${effectsManagerPath}" set-reverb ${selectedReverb} default`, {
-          stdio: 'pipe',
-        });
-      } catch (error) {
-        // Silent fail - will be shown in success message if needed
+      // Validate reverb value to prevent command injection
+      const validReverb = ['light', 'medium', 'heavy', 'cathedral'];
+      if (validReverb.includes(selectedReverb)) {
+        try {
+          execFileSync('bash', [effectsManagerPath, 'set-reverb', selectedReverb, 'default'], {
+            stdio: 'pipe',
+          });
+        } catch (error) {
+          // Silent fail - will be shown in success message if needed
+        }
       }
     }
 
