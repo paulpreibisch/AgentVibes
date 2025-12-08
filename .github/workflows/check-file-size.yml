@@ -18,13 +18,20 @@ jobs:
       run: |
         echo "🔍 Checking for files larger than 10MB..."
 
-        # Check git-tracked files
-        LARGE_FILES=$(git ls-files | xargs -I {} sh -c 'test -f "{}" && stat -f "%z %N" "{}" 2>/dev/null || stat -c "%s %n" "{}" 2>/dev/null' | awk '$1 > 10485760 {print $0}')
+        # Check git-tracked files (using find for cross-platform compatibility)
+        LARGE_FILES=$(git ls-files | while read file; do
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+            if [ "$size" -gt 10485760 ]; then
+              echo "$size $file"
+            fi
+          fi
+        done)
 
         if [ -n "$LARGE_FILES" ]; then
           echo "❌ ERROR: Found files larger than 10MB in repository:"
           echo "$LARGE_FILES" | while read size file; do
-            size_mb=$(echo "scale=2; $size / 1048576" | bc)
+            size_mb=$(awk "BEGIN {printf \"%.2f\", $size / 1048576}")
             echo "  - $file: ${size_mb}MB"
           done
           echo ""
@@ -57,7 +64,8 @@ jobs:
         # Check if package is larger than 50MB
         if [ "$PACKAGE_UNIT" = "MB" ]; then
           PACKAGE_SIZE_NUM=$(echo "$PACKAGE_SIZE" | tr -d 'MB')
-          if [ "$(echo "$PACKAGE_SIZE_NUM > 50" | bc)" -eq 1 ]; then
+          # Use awk for comparison (more portable than bc)
+          if [ "$(awk "BEGIN {print ($PACKAGE_SIZE_NUM > 50)}")" -eq 1 ]; then
             echo "❌ ERROR: npm package is ${PACKAGE_SIZE} ${PACKAGE_UNIT} (exceeds 50MB limit)"
             echo ""
             echo "Large npm packages cause:"
