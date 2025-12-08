@@ -35,7 +35,7 @@ function commandExists(command) {
  */
 function checkBashVersion() {
   try {
-    const version = execFileSync('bash', ['--version'], { encoding: 'utf8' });
+    const version = execFileSync('bash', ['--version'], { encoding: 'utf8' }); // NOSONAR - Safe: checking bash version from system PATH
     const match = version.match(/version (\d+)\.(\d+)/);
     if (match) {
       const major = parseInt(match[1]);

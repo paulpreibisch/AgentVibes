@@ -46,7 +46,7 @@ function getMacOSVoices(currentVoice) {
   }
 
   try {
-    const output = execFileSync('say', ['-v', '?'], { encoding: 'utf8' });
+    const output = execFileSync('say', ['-v', '?'], { encoding: 'utf8' }); // NOSONAR - Safe: checking macOS say voices from system PATH
     const lines = output.split('\n');
 
     for (const line of lines) {
