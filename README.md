@@ -111,7 +111,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.16.1 - Test Suite & Audio Quality](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.16.1)** 🎉
+**[v2.16.1 - Test Suite & Audio Quality](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.0)** 🎉
 
 AgentVibes v2.16.1 achieves 100% test pass rate (140/140 tests), fixes audio clipping issues, and completes ElevenLabs removal. Production-ready quality with comprehensive system requirements documentation.
 
