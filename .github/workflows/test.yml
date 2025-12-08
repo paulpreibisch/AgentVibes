@@ -41,6 +41,16 @@ jobs:
             echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
 
+      - name: Download bundled voice model for tests
+        run: |
+          mkdir -p mcp-server/voices
+          echo "📥 Downloading 16Speakers model for tests..."
+          curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx" \
+            -o mcp-server/voices/16Speakers.onnx --fail --silent --show-error
+          curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json" \
+            -o mcp-server/voices/16Speakers.onnx.json --fail --silent --show-error
+          echo "✅ Voice model downloaded"
+
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
