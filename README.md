@@ -111,17 +111,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.16.1 - Test Suite & Audio Quality](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.0)** 🎉
+**[v2.17.0 - Installer UX Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.0)** 🎉
 
-AgentVibes v2.16.1 achieves 100% test pass rate (140/140 tests), fixes audio clipping issues, and completes ElevenLabs removal. Production-ready quality with comprehensive system requirements documentation.
+AgentVibes v2.17.0 delivers a complete installer user experience transformation with intelligent system dependency checking, paginated configuration flow, and comprehensive inline help.
 
 **Key Highlights:**
-- ✅ **100% Test Pass Rate** - All 140 unit tests passing (12 critical fixes)
-- 🎚️ **Audio Quality Fix** - Eliminated clipping with -8 dB gain (removed compressor)
-- 🧹 **ElevenLabs Cleanup** - Complete removal from all tests, hooks, and MCP server
-- 📦 **Config Management** - Template pattern: .cfg.sample (tracked) + .cfg (gitignored)
-- 📖 **System Requirements** - Comprehensive docs for macOS, Linux, Windows WSL
-- 🔧 **Provider Updates** - MCP server now uses piper/macos validation only
+- 🔧 **System Dependency Checker** - Validates Node, Python, bash, sox, ffmpeg, curl, etc.
+- 📄 **Paginated Configuration** - Beautiful headers with Agent Vibes branding on every page
+- 💡 **Inline Help & Commands** - TTS explanations and examples throughout installer
+- 🎵 **New Music Track** - Salsa v2 background music now available
+- 🎨 **Professional UI** - Consistent sunshine yellow styling and dynamic page numbering
+- ✅ **Quality Assurance** - 140 tests passing, SonarCloud integration
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
