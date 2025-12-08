@@ -39,6 +39,12 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 
+# Voice model files (too large for git, download separately)
+mcp-server/voices/*.onnx
+mcp-server/voices/*.onnx.json
+templates/audio/welcome-demo.wav
+templates/audio/*.wav
+
 # BMAD Documentation (never commit)
 .bmad/
 .bmad-core/
