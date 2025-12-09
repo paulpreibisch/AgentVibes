@@ -2488,6 +2488,114 @@ async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
 }
 
 /**
+ * Create a silent spinner for update operations
+ * @returns {Object} Mock spinner object
+ */
+function createSilentSpinner() {
+  return { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} };
+}
+
+/**
+ * Update command files
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of commands updated
+ */
+async function updateCommandFiles(targetDir, spinner) {
+  spinner.text = 'Updating commands...';
+  const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
+  const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
+  const commandFiles = await fs.readdir(srcCommandsDir);
+
+  for (const file of commandFiles) {
+    const srcPath = path.join(srcCommandsDir, file);
+    const destPath = path.join(commandsDir, file);
+    await fs.copyFile(srcPath, destPath);
+  }
+
+  return commandFiles.length;
+}
+
+/**
+ * Perform all update operations
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<Object>} Update results
+ */
+async function performUpdateOperations(targetDir, spinner) {
+  const silentSpinner = createSilentSpinner();
+
+  // Update commands
+  const commandCount = await updateCommandFiles(targetDir, spinner);
+  console.log(chalk.green(`\n✓ Updated ${commandCount} commands`));
+
+  // Update hooks
+  spinner.text = 'Updating TTS scripts...';
+  const hookResult = await copyHookFiles(targetDir, silentSpinner);
+  console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
+
+  // Update personalities
+  spinner.text = 'Updating personality templates...';
+  const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+  const personalityResult = await updatePersonalityFiles(targetDir, srcPersonalitiesDir);
+  console.log(chalk.green(`✓ Updated ${personalityResult.updated} personalities, added ${personalityResult.new} new`));
+
+  // Update plugin files
+  const pluginFileCount = await copyPluginFiles(targetDir, silentSpinner);
+  if (pluginFileCount > 0) {
+    console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
+  }
+
+  // Update BMAD config files
+  const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, silentSpinner);
+  if (bmadConfigFileCount > 0) {
+    console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
+  }
+
+  // Update background music files
+  const backgroundMusicUpdateResult = await copyBackgroundMusicFiles(targetDir, silentSpinner);
+  if (backgroundMusicUpdateResult.count > 0) {
+    console.log(chalk.green(`✓ Installed ${backgroundMusicUpdateResult.count} background music track${backgroundMusicUpdateResult.count === 1 ? '' : 's'}`));
+  }
+
+  // Update config files
+  const configFileCount = await copyConfigFiles(targetDir, silentSpinner);
+  if (configFileCount > 0) {
+    console.log(chalk.green(`✓ Installed ${configFileCount} config file${configFileCount === 1 ? '' : 's'}`));
+  }
+
+  // Update settings.json
+  spinner.text = 'Updating AgentVibes hook configuration...';
+  await configureSessionStartHook(targetDir, silentSpinner);
+
+  // Detect and migrate old configuration
+  spinner.text = 'Checking for old configuration...';
+  await detectAndMigrateOldConfig(targetDir, spinner);
+
+  return {
+    commandCount,
+    hookCount: hookResult.count,
+    personalityResult,
+    pluginFileCount
+  };
+}
+
+/**
+ * Display update summary
+ * @param {Object} results - Update results
+ */
+function displayUpdateSummary(results) {
+  console.log(chalk.cyan('📦 Update Summary:'));
+  console.log(chalk.white(`   • ${results.commandCount} commands updated`));
+  console.log(chalk.white(`   • ${results.hookCount} TTS scripts updated`));
+  console.log(chalk.white(`   • ${results.personalityResult.new + results.personalityResult.updated} personality templates (${results.personalityResult.new} new, ${results.personalityResult.updated} updated)`));
+  if (results.pluginFileCount > 0) {
+    console.log(chalk.white(`   • ${results.pluginFileCount} BMAD plugin files updated`));
+  }
+  console.log('');
+}
+
+/**
  * Update AgentVibes files in target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} options - Update options
@@ -2496,76 +2604,13 @@ async function updateAgentVibes(targetDir, options) {
   const spinner = ora('Updating AgentVibes...').start();
 
   try {
-    const claudeDir = path.join(targetDir, '.claude');
-    const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
-
-    // Update commands
-    spinner.text = 'Updating commands...';
-    const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
-    const commandFiles = await fs.readdir(srcCommandsDir);
-
-    for (const file of commandFiles) {
-      const srcPath = path.join(srcCommandsDir, file);
-      const destPath = path.join(commandsDir, file);
-      await fs.copyFile(srcPath, destPath);
-    }
-    console.log(chalk.green(`\n✓ Updated ${commandFiles.length} commands`));
-
-    // Update hooks
-    spinner.text = 'Updating TTS scripts...';
-    const hookResult = await copyHookFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
-
-    // Update personalities
-    spinner.text = 'Updating personality templates...';
-    const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
-    const personalityResult = await updatePersonalityFiles(targetDir, srcPersonalitiesDir);
-    console.log(chalk.green(`✓ Updated ${personalityResult.updated} personalities, added ${personalityResult.new} new`));
-
-    // Output styles removed - deprecated in favor of SessionStart hook system
-
-    // Update plugin files
-    const pluginFileCount = await copyPluginFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (pluginFileCount > 0) {
-      console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
-    }
-
-    // Update BMAD config files
-    const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (bmadConfigFileCount > 0) {
-      console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
-    }
-
-    // Update background music files
-    const backgroundMusicUpdateResult = await copyBackgroundMusicFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (backgroundMusicUpdateResult.count > 0) {
-      console.log(chalk.green(`✓ Installed ${backgroundMusicUpdateResult.count} background music track${backgroundMusicUpdateResult.count === 1 ? '' : 's'}`));
-    }
-
-    // Update config files
-    const configFileCount = await copyConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (configFileCount > 0) {
-      console.log(chalk.green(`✓ Installed ${configFileCount} config file${configFileCount === 1 ? '' : 's'}`));
-    }
-
-    // Update settings.json
-    spinner.text = 'Updating AgentVibes hook configuration...';
-    await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-
-    // Detect and migrate old configuration
-    spinner.text = 'Checking for old configuration...';
-    await detectAndMigrateOldConfig(targetDir, spinner);
+    // Perform all update operations
+    const updateResults = await performUpdateOperations(targetDir, spinner);
 
     spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
 
-    console.log(chalk.cyan('📦 Update Summary:'));
-    console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
-    console.log(chalk.white(`   • ${hookResult.count} TTS scripts updated`));
-    console.log(chalk.white(`   • ${personalityResult.new + personalityResult.updated} personality templates (${personalityResult.new} new, ${personalityResult.updated} updated)`));
-    if (pluginFileCount > 0) {
-      console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files updated`));
-    }
-    console.log('');
+    // Display summary
+    displayUpdateSummary(updateResults);
 
     // Show recent changes
     await showRecentChanges(path.join(__dirname, '..'));
