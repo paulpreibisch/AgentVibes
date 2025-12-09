@@ -259,17 +259,101 @@ get_agent_voice() {
     echo "$voice"
 }
 
+# @function sync_intros_from_manifest
+# @intent Synchronize generic intros in agent-voice-map.csv with displayNames from agent-manifest.csv
+# @why Until BMAD PR 987 merges, CSV has generic "Hello! Ready to help with the discussion." intros
+# @param None (operates on .bmad/_cfg files)
+# @returns 0 on success, 1 on error
+# @exitcode 0 on success, 1 if files missing or sync fails
+# @sideeffects Updates agent-voice-map.csv, creates .backup on first run, writes .bmad-csv-sync-timestamp
+# @edgecases Only updates EXACT match of generic intro, preserves all custom intros, idempotent
+# @calledby get_agent_intro (lazy trigger on manifest change)
+# @calls grep, cut, sed, stat, date
+# @version 2.17.4 - Safe CSV sync utility that preserves user customizations
+sync_intros_from_manifest() {
+    # Locate the CSV and manifest files
+    local bmad_voice_map=""
+    local manifest_file=""
+
+    if [[ -f ".bmad/_cfg/agent-voice-map.csv" ]]; then
+        bmad_voice_map=".bmad/_cfg/agent-voice-map.csv"
+    elif [[ -f "bmad/_cfg/agent-voice-map.csv" ]]; then
+        bmad_voice_map="bmad/_cfg/agent-voice-map.csv"
+    fi
+
+    if [[ -f ".bmad/_cfg/agent-manifest.csv" ]]; then
+        manifest_file=".bmad/_cfg/agent-manifest.csv"
+    elif [[ -f "bmad/_cfg/agent-manifest.csv" ]]; then
+        manifest_file="bmad/_cfg/agent-manifest.csv"
+    fi
+
+    # Both files must exist for sync to work
+    if [[ -z "$bmad_voice_map" ]] || [[ -z "$manifest_file" ]]; then
+        return 1
+    fi
+
+    # Check if sync is needed based on manifest timestamp
+    local timestamp_file="${bmad_voice_map%/*}/.bmad-csv-sync-timestamp"
+    local manifest_mtime=$(stat -c '%Y' "$manifest_file" 2>/dev/null || stat -f '%m' "$manifest_file" 2>/dev/null)
+
+    if [[ -f "$timestamp_file" ]]; then
+        local last_sync=$(cat "$timestamp_file" 2>/dev/null || echo "0")
+        if [[ "$manifest_mtime" -le "$last_sync" ]]; then
+            # Manifest hasn't changed since last sync
+            return 0
+        fi
+    fi
+
+    # Create backup on first sync
+    if [[ ! -f "${bmad_voice_map}.backup" ]]; then
+        cp "$bmad_voice_map" "${bmad_voice_map}.backup"
+    fi
+
+    # Build a temp file with synced intros
+    local temp_file="${bmad_voice_map}.tmp"
+    local generic_intro="Hello! Ready to help with the discussion."
+
+    # Read header
+    head -n 1 "$bmad_voice_map" > "$temp_file"
+
+    # Process each agent entry
+    tail -n +2 "$bmad_voice_map" | while IFS=, read -r agent voice intro; do
+        # Remove quotes from intro
+        intro=$(echo "$intro" | sed 's/^"//;s/"$//')
+
+        # Only update if intro is the exact generic placeholder
+        if [[ "$intro" == "$generic_intro" ]]; then
+            # Look up displayName from manifest
+            local display_name=$(grep "^\"*${agent}\"*," "$manifest_file" | cut -d',' -f2 | sed 's/^"//;s/"$//')
+            if [[ -n "$display_name" ]]; then
+                intro="${display_name} here"
+            fi
+        fi
+
+        # Write the line (preserving custom intros, updating generic ones)
+        echo "${agent},${voice},\"${intro}\""
+    done >> "$temp_file"
+
+    # Replace original with synced version
+    mv "$temp_file" "$bmad_voice_map"
+
+    # Update timestamp
+    echo "$manifest_mtime" > "$timestamp_file"
+
+    return 0
+}
+
 # @function get_agent_intro
 # @intent Retrieve intro text for BMAD agent (spoken before their message)
 # @why Helps users identify which agent is speaking in party mode
 # @param $1 {string} agent_id - BMAD agent identifier
 # @returns Echoes intro text to stdout, empty string if not configured
 # @exitcode Always 0
-# @sideeffects None
+# @sideeffects Triggers CSV sync on first call or manifest change
 # @edgecases Returns empty string if plugin file missing, parses column 3 of CSV or markdown table
 # @calledby bmad-speak.sh for agent identification in party mode
-# @calls grep, awk, sed, cut
-# @version 2.2.0 - Now supports CSV file format, falls back to agent name from manifest if intro missing
+# @calls sync_intros_from_manifest, grep, awk, sed, cut
+# @version 2.2.1 - Added lazy CSV sync trigger
 get_agent_intro() {
     local agent_id="$1"
 
@@ -281,6 +365,11 @@ get_agent_intro() {
         bmad_voice_map=".bmad/_cfg/agent-voice-map.csv"
     elif [[ -f "bmad/_cfg/agent-voice-map.csv" ]]; then
         bmad_voice_map="bmad/_cfg/agent-voice-map.csv"
+    fi
+
+    # Lazy trigger: sync intros from manifest if needed
+    if [[ -n "$bmad_voice_map" ]]; then
+        sync_intros_from_manifest
     fi
 
     if [[ -n "$bmad_voice_map" ]]; then

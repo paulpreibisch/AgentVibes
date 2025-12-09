@@ -19,12 +19,13 @@
 
 | I want to... | Go here |
 |--------------|---------|
-| **Install AgentVibes** | [Quick Start Guide](docs/quick-start.md) |
+| **Install AgentVibes** (just `npx`, no git!) | [Quick Start Guide](docs/quick-start.md) |
+| **Understand what I need** (spoiler: just Node.js!) | [Prerequisites](#-prerequisites) |
 | **Set up on Windows (Claude Desktop)** | [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
 | **Learn Spanish while coding** | [Language Learning Mode](docs/language-learning-mode.md) |
-| **Fix issues** | [Troubleshooting](docs/troubleshooting.md) |
+| **Fix issues** (git-lfs? MCP tokens? Read this!) | [Troubleshooting](docs/troubleshooting.md) & [FAQ](#-frequently-asked-questions-faq) |
 
 ---
 
@@ -74,6 +75,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ### Getting Started
 - [🚀 Quick Start](#-quick-start) - Install in 3 steps
+- [📋 Prerequisites](#-prerequisites) - **NEW!** What you need (spoiler: just Node.js!)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
 - [📰 Latest Release](#-latest-release) - What's new
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
@@ -103,6 +105,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 ### Additional Resources
 - [🔗 Useful Links](#-useful-links) - Voice typing & AI tools
 - [🔄 Updating](#-updating) - Keep AgentVibes current
+- [❓ FAQ](#-frequently-asked-questions-faq) - **NEW!** Common questions answered (git-lfs, MCP tokens, installation)
 - [🍎 macOS Testing](docs/macos-testing.md) - Automated testing on macOS with GitHub Actions
 - [🙏 Credits](#-credits) - Acknowledgments
 - [🤝 Contributing](#-contributing) - Show support
@@ -178,6 +181,51 @@ npx agentvibes install
 ```
 
 **[→ View Complete Quick Start Guide](docs/quick-start.md)** - Full installation options, provider setup, and activation steps
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 📋 Prerequisites
+
+### For Users (Installing & Running AgentVibes)
+
+**✅ Required:**
+- **Node.js** ≥16.0 (`node --version`)
+- That's it! No git required, no git-lfs required, no repo cloning needed.
+
+**❌ NOT Required:**
+- ❌ Git or git-lfs (you're installing via npm, not cloning)
+- ❌ Repository cloning (npm handles everything)
+- ❌ Build tools (pre-built package ready to use)
+
+**📦 Installation Methods:**
+
+| Method | Command | Use Case |
+|--------|---------|----------|
+| **✅ RECOMMENDED: NPM** | `npx agentvibes install` | Users wanting to use AgentVibes |
+| **⚠️ Developer Clone** | `git clone ...` | **Only for contributing code** |
+
+**💡 Why npm installation?**
+- Zero git operations - npm downloads pre-built package
+- No large file downloads - audio generated on-demand
+- Instant setup - works in seconds
+- No git-lfs, no cloning, no build steps
+
+### For Developers (Contributing to AgentVibes)
+
+**Only if contributing code to the project:**
+- Node.js 16+
+- Git (no git-lfs needed - repo has no large files)
+- Familiarity with `npm link` for local development
+
+**Developer installation:**
+```bash
+git clone https://github.com/paulpreibisch/AgentVibes.git
+cd AgentVibes
+npm install
+npm link
+```
 
 [↑ Back to top](#-table-of-contents)
 
@@ -591,9 +639,33 @@ AgentVibes supports **custom personalities** and **custom voices**.
 
 **Common Issues:**
 
+**❌ Error: "git-lfs is not installed"**
+
+**AgentVibes does NOT require git-lfs.** This error suggests:
+
+1. **Wrong installation method** - Use npm, not git clone:
+   ```bash
+   # ✅ CORRECT - Use this:
+   npx agentvibes install
+
+   # ❌ WRONG - Don't clone unless contributing:
+   git clone https://github.com/paulpreibisch/AgentVibes.git
+   ```
+
+2. **Different project** - You may be in a BMAD-METHOD or other repo that uses git-lfs
+
+3. **Global git config** - Your git may have lfs enabled globally:
+   ```bash
+   git config --global --list | grep lfs
+   ```
+
+**Solution:** Use `npx agentvibes install` - no git operations needed!
+
+---
+
 **No Audio Playing?**
-2. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
-3. Test: `/agent-vibes:sample Aria`
+1. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
+2. Test: `/agent-vibes:sample Aria`
 
 **Commands Not Found?**
 ```bash
@@ -625,6 +697,86 @@ npm update -g agentvibes && agentvibes update --yes
 **Check Version:** `/agent-vibes:version`
 
 **[→ View Complete Update Guide](docs/updating.md)** - All update methods, version checking, what gets updated, and troubleshooting
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+### Installation & Setup
+
+**Q: Does AgentVibes require git-lfs?**
+**A:** **NO.** AgentVibes has zero git-lfs requirement. Use `npx agentvibes install` - no git operations needed.
+
+**Q: Do I need to clone the GitHub repository?**
+**A:** **NO** (unless you're contributing code). Normal users should use `npx agentvibes install`. Repository cloning is only for developers who want to contribute to the project.
+
+**Q: Why is the GitHub repo so large?**
+**A:** The repo includes demo files and development dependencies (node_modules). The actual npm package you download is **< 50MB** and optimized for users.
+
+**Q: What's the difference between npm install and git clone?**
+**A:**
+- `npx agentvibes install` → **For users** - Downloads pre-built package, zero git operations, instant setup
+- `git clone ...` → **For developers only** - Full source code, development setup, contributing code
+
+**Q: I saw an error about git-lfs, is something wrong?**
+**A:** You're likely:
+1. Using wrong installation method (use `npx` not `git clone`)
+2. In a different project directory that uses git-lfs
+3. Have global git config with lfs enabled
+
+AgentVibes itself does NOT use or require git-lfs.
+
+### Features & Usage
+
+**Q: Does MCP consume tokens from my context window?**
+**A:** **YES.** Every MCP tool schema adds to the context window. AgentVibes MCP is designed to be minimal (~1500-2000 tokens), but if you're concerned about token usage, you can use slash commands instead of MCP.
+
+**Q: What's the difference between using MCP vs slash commands?**
+**A:**
+- **MCP**: Natural language ("Switch to Aria voice"), uses ~1500-2000 context tokens
+- **Slash commands**: Explicit commands (`/agent-vibes:switch Aria`), zero token overhead
+
+Both do the exact same thing - MCP is more convenient, slash commands are more token-efficient.
+
+**Q: Is AgentVibes just a bash script?**
+**A:** No. AgentVibes includes:
+- Multi-provider TTS abstraction (Piper, macOS Say, ElevenLabs)
+- Voice management system with 50+ voices
+- Personality & sentiment system
+- Language learning mode with bilingual playback
+- Audio effects processing (reverb, EQ, compression)
+- MCP server for natural language control
+- BMAD integration for multi-agent voice switching
+- Remote audio optimization for SSH/RDP sessions
+
+**Q: Can I use AgentVibes without BMAD?**
+**A:** **YES.** AgentVibes works standalone. BMAD integration is optional - only activates if you install BMAD separately.
+
+**Q: What are the audio dependencies?**
+**A:**
+- **Required**: Node.js 16+, Python 3.10+ (for Piper TTS)
+- **Optional**: sox (audio effects), ffmpeg (background music, padding)
+- All TTS generation works without optional dependencies - they just enhance the experience
+
+### Troubleshooting
+
+**Q: Why isn't Claude speaking?**
+**A:** Common causes:
+1. Hook not installed - Run `npx agentvibes install --yes`
+2. Audio player missing - Install `sox` and `ffmpeg`
+3. TTS protocol not enabled in settings
+4. Test with `/agent-vibes:sample Aria`
+
+**Q: Can I use this on Windows?**
+**A:** Yes, but requires WSL (Windows Subsystem for Linux). See [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md).
+
+**Q: How do I reduce token usage?**
+**A:**
+1. Use slash commands instead of MCP (zero context token overhead)
+2. Set verbosity to LOW (`/agent-vibes:verbosity low`)
+3. Disable BMAD integration if not using it
 
 [↑ Back to top](#-table-of-contents)
 
