@@ -2728,7 +2728,7 @@ async function install(options = {}) {
 
     // Set default voice based on user selection or provider defaults
     const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
-    let defaultVoice = config.defaultVoice;
+    let defaultVoice = userConfig.defaultVoice;
 
     // Fallback to defaults if voice wasn't selected
     if (!defaultVoice) {
