@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install BATS
+        run: sudo npm install -g bats
+
       - name: Run tests with coverage
         run: npm test
         continue-on-error: true  # Don't fail the workflow if tests fail
