@@ -1,0 +1,4 @@
+agent,piper,mac,intro
+analyst,en_US-kristin-medium,Samantha,"Hi! I'm Mary."
+no-voice-agent,,,"I have no voice configured."
+invalid-voice,invalid-voice-name,FakeVoice,"My voices don't exist."

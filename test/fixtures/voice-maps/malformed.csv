@@ -1,0 +1,6 @@
+agent,piper,mac,intro
+analyst,en_US-kristin-medium,Samantha,"Valid entry"
+broken-line-missing-fields,en_US-ryan-high
+another-agent,,,
+"weird""quotes",en_US-amy-medium,Karen,"This has ""nested"" quotes"
+,en_US-joe-medium,Tom,"No agent name"

@@ -4,6 +4,7 @@
 # Generated from agent YAML tts sections by manifest-generator.js
 
 load ../helpers/test-helper
+load ../helpers/bmad-assertions
 
 setup() {
   setup_test_env
@@ -198,23 +199,4 @@ EOF
   # Note: Output might be suppressed in background mode, so we check the script ran
 }
 
-# Helper functions for output assertions
-assert_output_contains() {
-  local expected="$1"
-  if [[ "$output" != *"$expected"* ]]; then
-    echo "Expected output to contain: $expected"
-    echo "Actual output: $output"
-    return 1
-  fi
-}
-
-assert_output_equals_clean() {
-  local expected="$1"
-  local clean_output=$(echo "$output" | grep -v "warning:" | tr -d '[:space:]')
-  if [[ "$clean_output" != "$expected" ]]; then
-    echo "Expected (clean): $expected"
-    echo "Actual (clean): $clean_output"
-    echo "Actual (raw): $output"
-    return 1
-  fi
-}
+# Helper functions now loaded from ../helpers/bmad-assertions.bash
