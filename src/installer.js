@@ -1779,7 +1779,7 @@ async function checkAndInstallPiper(targetDir, options) {
     const { execSync } = await import('node:child_process');
 
     try {
-      execSync('command -v piper', { stdio: 'ignore' });
+      execSync('command -v piper', { stdio: 'ignore' }); // NOSONAR - Safe: fixed command, no user input
       console.log(chalk.green('✅ Piper TTS is already installed\n'));
       return;
     } catch {
@@ -2300,7 +2300,7 @@ async function handleBmadIntegration(targetDir) {
 async function showRecentChanges(sourceDir) {
   try {
     const { execSync } = await import('node:child_process');
-    const gitLog = execSync(
+    const gitLog = execSync( // NOSONAR - Safe: fixed command with controlled cwd, no user input
       'git log --oneline --no-decorate -5',
       { cwd: sourceDir, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
     ).trim();
