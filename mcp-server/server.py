@@ -54,6 +54,18 @@ import mcp.server.stdio
 class AgentVibesServer:
     """MCP Server for AgentVibes TTS functionality"""
 
+    # Script name constants (addresses SonarCloud S1192)
+    VOICE_MANAGER_SCRIPT = "voice-manager.sh"
+    PERSONALITY_MANAGER_SCRIPT = "personality-manager.sh"
+    LANGUAGE_MANAGER_SCRIPT = "language-manager.sh"
+    BACKGROUND_MUSIC_MANAGER_SCRIPT = "background-music-manager.sh"
+    EFFECTS_MANAGER_SCRIPT = "effects-manager.sh"
+
+    # Path constants (addresses SonarCloud S1192)
+    CLAUDE_DIR_NAME = ".claude"
+    MUTE_FILE_NAME = ".agentvibes-muted"
+    SEPARATOR = "━" * 39
+
     def __init__(self):
         """Initialize the AgentVibes MCP server"""
         # Find the .claude directory (project-local or global)
@@ -67,7 +79,7 @@ class AgentVibesServer:
         # Get the AgentVibes root directory (parent of mcp-server)
         script_dir = Path(__file__).resolve().parent  # mcp-server/
         agentvibes_root = script_dir.parent  # AgentVibes/
-        claude_dir = agentvibes_root / ".claude"
+        claude_dir = agentvibes_root / self.CLAUDE_DIR_NAME
 
         # ALWAYS use package .claude for hooks (even in NPX cache)
         # The package ALWAYS has .claude/ with all the hooks
@@ -75,7 +87,7 @@ class AgentVibesServer:
             return claude_dir
 
         # Fallback to global ~/.claude (should never happen in properly installed package)
-        return Path.home() / ".claude"
+        return Path.home() / self.CLAUDE_DIR_NAME
 
     async def text_to_speech(
         self,
@@ -105,13 +117,13 @@ class AgentVibesServer:
             if personality:
                 original_personality = await self._get_personality()
                 await self._run_script(
-                    "personality-manager.sh", ["set", personality]
+                    self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
                 )
 
             # Temporarily set language if specified
             if language:
                 original_language = await self._get_language()
-                await self._run_script("language-manager.sh", ["set", language])
+                await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
 
             # Call the TTS script via bash explicitly
             play_tts = self.hooks_dir / "play-tts.sh"
@@ -127,7 +139,7 @@ class AgentVibesServer:
             # 2. Otherwise → Use global ~/.claude/ (Claude Desktop, Warp, etc.)
             # Note: Hooks are ALWAYS from package .claude/ (self.claude_dir)
             cwd = Path.cwd()
-            if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
+            if (cwd / self.CLAUDE_DIR_NAME).is_dir() and cwd != self.agentvibes_root:
                 # Real Claude Code project with .claude directory
                 env["CLAUDE_PROJECT_DIR"] = str(cwd)
             # else: Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
@@ -177,11 +189,11 @@ class AgentVibesServer:
             # Restore original settings
             if original_personality:
                 await self._run_script(
-                    "personality-manager.sh", ["set", original_personality]
+                    self.PERSONALITY_MANAGER_SCRIPT, ["set", original_personality]
                 )
             if original_language:
                 await self._run_script(
-                    "language-manager.sh", ["set", original_language]
+                    self.LANGUAGE_MANAGER_SCRIPT, ["set", original_language]
                 )
 
     async def list_voices(self) -> str:
@@ -196,17 +208,17 @@ class AgentVibesServer:
         current_voice = await self._get_current_voice()
 
         # voice-manager.sh list-simple is now provider-aware
-        result = await self._run_script("voice-manager.sh", ["list-simple"])
+        result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["list-simple"])
         if result:
             voices = result.strip().split("\n")
             voices = [v for v in voices if v]  # Filter empty strings
 
             if not voices:
                 return (
-                    "📦 No voices available\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "For Piper: Download voices using /agent-vibes:provider download <voice-name>\n"
-                    "Example: en_US-lessac-medium, en_GB-alba-medium"
+                    f"📦 No voices available\n"
+                    f"{self.SEPARATOR}\n"
+                    f"For Piper: Download voices using /agent-vibes:provider download <voice-name>\n"
+                    f"Example: en_US-lessac-medium, en_GB-alba-medium"
                 )
 
             # Determine provider label and alternative provider
@@ -221,11 +233,11 @@ class AgentVibesServer:
                 alternative_provider = None
 
             output = f"🎤 Available {provider_label} Voices:\n"
-            output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            output += f"{self.SEPARATOR}\n"
             for voice in voices:
                 marker = " ✓ (current)" if voice == current_voice else ""
                 output += f"  • {voice}{marker}\n"
-            output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            output += f"{self.SEPARATOR}\n"
 
             # Add provider switch hint
             if alternative_provider:
@@ -245,7 +257,7 @@ class AgentVibesServer:
             Success or error message
         """
         result = await self._run_script(
-            "voice-manager.sh", ["switch", voice_name, "--silent"]
+            self.VOICE_MANAGER_SCRIPT, ["switch", voice_name, "--silent"]
         )
         if result and "✅" in result:
             return f"✅ Voice switched to: {voice_name}"
@@ -258,7 +270,7 @@ class AgentVibesServer:
         Returns:
             Formatted list of personalities with descriptions
         """
-        result = await self._run_script("personality-manager.sh", ["list"])
+        result = await self._run_script(self.PERSONALITY_MANAGER_SCRIPT, ["list"])
         return result if result else "❌ Failed to list personalities"
 
     async def set_personality(self, personality: str) -> str:
@@ -272,7 +284,7 @@ class AgentVibesServer:
             Success or error message
         """
         result = await self._run_script(
-            "personality-manager.sh", ["set", personality]
+            self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
         )
         if result and "🎭" in result:
             return result
@@ -291,12 +303,12 @@ class AgentVibesServer:
         provider = await self._get_provider()
 
         output = "🎤 Current AgentVibes Configuration\n"
-        output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        output += f"{self.SEPARATOR}\n"
         output += f"Provider: {provider}\n"
         output += f"Voice: {voice}\n"
         output += f"Personality: {personality}\n"
         output += f"Language: {language}\n"
-        output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        output += f"{self.SEPARATOR}\n"
         return output
 
     async def set_language(self, language: str) -> str:
@@ -309,7 +321,7 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script("language-manager.sh", ["set", language])
+        result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
         if result and "✓" in result:
             return result
         return f"❌ Failed to set language: {result}"
@@ -324,7 +336,7 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script("voice-manager.sh", ["replay", str(n)])
+        result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["replay", str(n)])
         if result and "🔊" in result:
             return result
         return f"❌ Failed to replay audio: {result}"
@@ -489,7 +501,7 @@ class AgentVibesServer:
         Returns:
             Success message confirming mute is active
         """
-        mute_file = Path.home() / ".agentvibes-muted"
+        mute_file = Path.home() / self.MUTE_FILE_NAME
         try:
             mute_file.touch()
             return "🔇 AgentVibes TTS muted. All voice output is now silenced.\n\n💡 To unmute, use: unmute()"
@@ -503,8 +515,8 @@ class AgentVibesServer:
         Returns:
             Success message confirming TTS is restored
         """
-        global_mute = Path.home() / ".agentvibes-muted"
-        project_mute = Path.cwd() / ".claude" / "agentvibes-muted"
+        global_mute = Path.home() / self.MUTE_FILE_NAME
+        project_mute = Path.cwd() / self.CLAUDE_DIR_NAME / "agentvibes-muted"
 
         removed = []
         try:
@@ -529,8 +541,8 @@ class AgentVibesServer:
         Returns:
             Current mute status
         """
-        global_mute = Path.home() / ".agentvibes-muted"
-        project_mute = Path.cwd() / ".claude" / "agentvibes-muted"
+        global_mute = Path.home() / self.MUTE_FILE_NAME
+        project_mute = Path.cwd() / self.CLAUDE_DIR_NAME / "agentvibes-muted"
 
         if global_mute.exists() or project_mute.exists():
             return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
@@ -544,7 +556,7 @@ class AgentVibesServer:
         Returns:
             Formatted list of all pre-packaged background music files
         """
-        result = await self._run_script("background-music-manager.sh", ["list"])
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["list"])
         return result if result else "❌ Failed to list background music"
 
     async def set_background_music(self, track_name: str, agent_name: Optional[str] = None) -> str:
@@ -561,7 +573,7 @@ class AgentVibesServer:
         import re
 
         # Get list of available tracks for fuzzy matching
-        list_result = await self._run_script("background-music-manager.sh", ["list"])
+        list_result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["list"])
         if not list_result or "❌" in list_result:
             return "❌ Failed to list background music tracks"
 
@@ -597,13 +609,13 @@ class AgentVibesServer:
         # Determine which command to use based on agent_name
         if agent_name and agent_name.lower() == "all":
             # Set for all agents
-            result = await self._run_script("background-music-manager.sh", ["set-all", matched_track])
+            result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-all", matched_track])
         elif agent_name:
             # Set for specific agent
-            result = await self._run_script("background-music-manager.sh", ["set-agent", agent_name, matched_track])
+            result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-agent", agent_name, matched_track])
         else:
             # Set as default
-            result = await self._run_script("background-music-manager.sh", ["set-default", matched_track])
+            result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-default", matched_track])
 
         if result and "✅" in result:
             if matched_track.lower() != track_name.lower():
@@ -622,7 +634,7 @@ class AgentVibesServer:
             Success or error message
         """
         command = "on" if enabled else "off"
-        result = await self._run_script("background-music-manager.sh", [command])
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, [command])
         return result if result else f"❌ Failed to {'enable' if enabled else 'disable'} background music"
 
     async def set_background_music_volume(self, volume: float) -> str:
@@ -635,7 +647,7 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script("background-music-manager.sh", ["volume", str(volume)])
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["volume", str(volume)])
         return result if result else "❌ Failed to set background music volume"
 
     async def get_background_music_status(self) -> str:
@@ -645,7 +657,7 @@ class AgentVibesServer:
         Returns:
             Status information
         """
-        result = await self._run_script("background-music-manager.sh", ["status"])
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["status"])
         return result if result else "❌ Failed to get background music status"
 
     async def set_reverb(self, level: str, agent: str = "default", apply_all: bool = False) -> str:
@@ -663,7 +675,7 @@ class AgentVibesServer:
         args = ["set-reverb", level, agent]
         if apply_all:
             args.append("--all")
-        result = await self._run_script("effects-manager.sh", args)
+        result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, args)
         return result if result else f"✅ Set reverb to {level}"
 
     async def get_reverb(self, agent: str = "default") -> str:
@@ -676,7 +688,7 @@ class AgentVibesServer:
         Returns:
             Current reverb level
         """
-        result = await self._run_script("effects-manager.sh", ["get-reverb", agent])
+        result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["get-reverb", agent])
         if result:
             return f"Current reverb level for {agent}: {result.strip()}"
         return f"❌ Failed to get reverb for {agent}"
@@ -688,7 +700,7 @@ class AgentVibesServer:
         Returns:
             Effects configuration
         """
-        result = await self._run_script("effects-manager.sh", ["list"])
+        result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["list"])
         return result if result else "❌ Failed to list audio effects"
 
     # Helper methods
@@ -749,7 +761,7 @@ class AgentVibesServer:
 
     async def _get_current_voice(self) -> str:
         """Get the currently active voice"""
-        result = await self._run_script("voice-manager.sh", ["get"])
+        result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["get"])
         return result.strip() if result else "Unknown"
 
     async def _get_personality(self) -> str:
@@ -757,7 +769,7 @@ class AgentVibesServer:
         personality_file = self.claude_dir / "tts-personality.txt"
         if not personality_file.exists():
             # Try global
-            personality_file = Path.home() / ".claude" / "tts-personality.txt"
+            personality_file = Path.home() / self.CLAUDE_DIR_NAME / "tts-personality.txt"
 
         try:
             if personality_file.exists():
@@ -770,14 +782,14 @@ class AgentVibesServer:
 
     async def _get_language(self) -> str:
         """Get the current language setting"""
-        result = await self._run_script("language-manager.sh", ["code"])
+        result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["code"])
         return result.strip() if result else "english"
 
     async def _get_provider(self) -> str:
         """Get the active TTS provider"""
         provider_file = self.claude_dir / "tts-provider.txt"
         if not provider_file.exists():
-            provider_file = Path.home() / ".claude" / "tts-provider.txt"
+            provider_file = Path.home() / self.CLAUDE_DIR_NAME / "tts-provider.txt"
 
         try:
             if provider_file.exists():
