@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.3
 
 ---
 
@@ -111,7 +111,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.0 - Installer UX Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.2)** 🎉
+**[v2.17.0 - Installer UX Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.3)** 🎉
 
 AgentVibes v2.17.0 delivers a complete installer user experience transformation with intelligent system dependency checking, paginated configuration flow, and comprehensive inline help.
 
