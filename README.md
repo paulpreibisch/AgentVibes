@@ -111,17 +111,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.0 - Installer UX Revolution](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.3)** 🎉
+**[v2.17.3 - Voice Selection & Quality Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.3)** 🎤
 
-AgentVibes v2.17.0 delivers a complete installer user experience transformation with intelligent system dependency checking, paginated configuration flow, and comprehensive inline help.
+AgentVibes v2.17.3 adds interactive voice selection during installation, allowing users to choose their preferred TTS voice with clear descriptions and provider-aware options.
 
 **Key Highlights:**
-- 🔧 **System Dependency Checker** - Validates Node, Python, bash, sox, ffmpeg, curl, etc.
-- 📄 **Paginated Configuration** - Beautiful headers with Agent Vibes branding on every page
-- 💡 **Inline Help & Commands** - TTS explanations and examples throughout installer
-- 🎵 **New Music Track** - Salsa v2 background music now available
-- 🎨 **Professional UI** - Consistent sunshine yellow styling and dynamic page numbering
-- ✅ **Quality Assurance** - 140 tests passing, SonarCloud integration
+- 🎤 **Interactive Voice Selection** - Choose your default voice during installation
+- 🎯 **Provider-Aware Options** - 6 popular voices for Piper TTS and macOS Say
+- 📝 **Voice Descriptions** - Clear gender, accent, and quality information
+- 🔊 **Improved Default** - Changed from lessac to ryan-high for better quality
+- ✅ **All Tests Passing** - 182 tests, macOS-15 runner support, CI improvements
+- 🐛 **Bug Fixes** - Fixed installation error, removed -8dB default gain
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
