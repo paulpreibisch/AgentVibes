@@ -1340,6 +1340,103 @@ async function copyCommandFiles(targetDir, spinner) {
 }
 
 /**
+ * Check if a file should be included as a hook file
+ * @param {string} file - Filename to check
+ * @param {Object} stat - File stats object
+ * @returns {boolean} True if file should be included
+ */
+function shouldIncludeHookFile(file, stat) {
+  return stat.isFile() &&
+         (file.endsWith('.sh') || file === 'hooks.json') &&
+         !file.includes('prepare-release') &&
+         !file.startsWith('.');
+}
+
+/**
+ * Filter hook files from directory
+ * @param {string} srcHooksDir - Source hooks directory
+ * @param {Array} allFiles - All files in directory
+ * @returns {Promise<Array>} Filtered hook files
+ */
+async function filterHookFiles(srcHooksDir, allFiles) {
+  const hookFiles = [];
+
+  for (const file of allFiles) {
+    const srcPath = path.join(srcHooksDir, file);
+    try {
+      const stat = await fs.stat(srcPath);
+      if (shouldIncludeHookFile(file, stat)) {
+        hookFiles.push(file);
+      }
+    } catch (err) {
+      console.log(chalk.yellow(`   ⚠ Could not check ${file}: ${err.message}`));
+    }
+  }
+
+  return hookFiles;
+}
+
+/**
+ * Copy a single hook file and set permissions
+ * @param {string} srcPath - Source file path
+ * @param {string} destPath - Destination file path
+ * @param {string} filename - Name of the file
+ * @returns {Promise<Object>} Result object with success/error info
+ */
+async function copyHookFile(srcPath, destPath, filename) {
+  try {
+    await fs.copyFile(srcPath, destPath);
+
+    if (filename.endsWith('.sh')) {
+      await fs.chmod(destPath, 0o750);
+      return { success: true, name: filename, executable: true };
+    }
+
+    return { success: true, name: filename, executable: false };
+  } catch (err) {
+    return { success: false, name: filename, error: err.message };
+  }
+}
+
+/**
+ * Build boxen content for hook installation results
+ * @param {Array} installedFiles - Successfully installed files
+ * @param {Array} failedFiles - Failed files
+ * @returns {string} Boxen formatted content
+ */
+function buildHookInstallationBoxen(installedFiles, failedFiles) {
+  let content = chalk.bold(`${installedFiles.length} TTS Hook Scripts Installed\n\n`);
+  content += chalk.gray('Hook scripts automatically run at key moments during your\n');
+  content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
+
+  installedFiles.forEach(file => {
+    content += chalk.green(`✓ ${file.name}`);
+    if (file.executable) {
+      content += chalk.gray(' (executable)');
+    }
+    content += '\n';
+  });
+
+  if (failedFiles.length > 0) {
+    content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
+    content += chalk.bold.yellow(`${failedFiles.length} Failed\n\n`);
+    failedFiles.forEach(file => {
+      content += chalk.yellow(`⚠ ${file.name}\n`);
+      content += chalk.dim(`  ${file.error}\n`);
+    });
+  }
+
+  return boxen(content.trim(), {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: 'green',
+    title: chalk.bold('🔧 TTS Scripts'),
+    titleAlignment: 'center'
+  });
+}
+
+/**
  * Copy hook files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -1354,48 +1451,26 @@ async function copyHookFiles(targetDir, spinner) {
     await fs.mkdir(hooksDir, { recursive: true });
 
     const allHookFiles = await fs.readdir(srcHooksDir);
-    const hookFiles = [];
-
-    for (const file of allHookFiles) {
-      const srcPath = path.join(srcHooksDir, file);
-      try {
-        const stat = await fs.stat(srcPath);
-
-        if (stat.isFile() &&
-            (file.endsWith('.sh') || file === 'hooks.json') &&
-            !file.includes('prepare-release') &&
-            !file.startsWith('.')) {
-          hookFiles.push(file);
-        }
-      } catch (err) {
-        console.log(chalk.yellow(`   ⚠ Could not check ${file}: ${err.message}`));
-        // Continue with other files
-      }
-    }
+    const hookFiles = await filterHookFiles(srcHooksDir, allHookFiles);
 
     spinner.start(`Installing ${hookFiles.length} TTS scripts...`);
-    let successCount = 0;
-    let installedFiles = [];
-    let failedFiles = [];
+
+    const installedFiles = [];
+    const failedFiles = [];
 
     for (const file of hookFiles) {
       const srcPath = path.join(srcHooksDir, file);
       const destPath = path.join(hooksDir, file);
-      try {
-        await fs.copyFile(srcPath, destPath);
+      const result = await copyHookFile(srcPath, destPath, file);
 
-        if (file.endsWith('.sh')) {
-          // Security: Use more restrictive permissions (owner: rwx, group: r-x, others: ---)
-          await fs.chmod(destPath, 0o750);
-          installedFiles.push({ name: file, executable: true });
-        } else {
-          installedFiles.push({ name: file, executable: false });
-        }
-        successCount++;
-      } catch (err) {
-        failedFiles.push({ name: file, error: err.message });
+      if (result.success) {
+        installedFiles.push({ name: result.name, executable: result.executable });
+      } else {
+        failedFiles.push({ name: result.name, error: result.error });
       }
     }
+
+    const successCount = installedFiles.length;
 
     if (successCount === hookFiles.length) {
       spinner.succeed(chalk.green('Installed TTS scripts!\n'));
@@ -1403,38 +1478,9 @@ async function copyHookFiles(targetDir, spinner) {
       spinner.warn(chalk.yellow(`Installed ${successCount}/${hookFiles.length} scripts (some failed)\n`));
     }
 
-    // Create boxen content (don't print yet - will be shown in pagination)
-    let boxenContent = null;
-    if (installedFiles.length > 0) {
-      let content = chalk.bold(`${installedFiles.length} TTS Hook Scripts Installed\n\n`);
-      content += chalk.gray('Hook scripts automatically run at key moments during your\n');
-      content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
-      installedFiles.forEach(file => {
-        content += chalk.green(`✓ ${file.name}`);
-        if (file.executable) {
-          content += chalk.gray(' (executable)');
-        }
-        content += '\n';
-      });
-
-      if (failedFiles.length > 0) {
-        content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
-        content += chalk.bold.yellow(`${failedFiles.length} Failed\n\n`);
-        failedFiles.forEach(file => {
-          content += chalk.yellow(`⚠ ${file.name}\n`);
-          content += chalk.dim(`  ${file.error}\n`);
-        });
-      }
-
-      boxenContent = boxen(content.trim(), {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'green',
-        title: chalk.bold('🔧 TTS Scripts'),
-        titleAlignment: 'center'
-      });
-    }
+    const boxenContent = installedFiles.length > 0
+      ? buildHookInstallationBoxen(installedFiles, failedFiles)
+      : null;
 
     return { count: successCount, boxen: boxenContent };
   } catch (err) {
