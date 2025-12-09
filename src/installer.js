@@ -2275,36 +2275,31 @@ frame-expert,en_GB-alan-medium
  * @param {Object} spinner - Ora spinner instance
  * @returns {Promise<boolean>} True if migration was performed
  */
-async function detectAndMigrateOldConfig(targetDir, spinner) {
-  const oldConfigPaths = [
-    path.join(targetDir, '.claude', 'config', 'agentvibes.json'),
-    path.join(targetDir, '.claude', 'config', 'bmad-voices.md'),
-    path.join(targetDir, '.claude', 'config', 'bmad-voices-enabled.flag'),
-    path.join(targetDir, '.claude', 'plugins', 'bmad-voices-enabled.flag'),
-    path.join(targetDir, '.claude', 'plugins', 'bmad-party-mode-disabled.flag'),
-  ];
-
-  // Check if any old config exists
-  let hasOldConfig = false;
-  for (const oldPath of oldConfigPaths) {
+/**
+ * Check if any old config files exist
+ * @param {string[]} paths - Array of paths to check
+ * @returns {Promise<boolean>} True if any old config exists
+ */
+async function hasOldConfigFiles(paths) {
+  for (const oldPath of paths) {
     try {
       await fs.access(oldPath);
-      hasOldConfig = true;
-      break;
+      return true;
     } catch {
       // File doesn't exist, continue
     }
   }
+  return false;
+}
 
-  if (!hasOldConfig) {
-    return false; // No migration needed
-  }
-
-  spinner.info(chalk.yellow('🔄 Old configuration detected - migrating to .agentvibes/'));
-
-  // Run migration script
-  const migrationScript = path.join(targetDir, '.claude', 'hooks', 'migrate-to-agentvibes.sh');
-
+/**
+ * Execute migration script
+ * @param {string} migrationScript - Path to migration script
+ * @param {string} targetDir - Target directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<boolean>} True if migration succeeded
+ */
+async function executeMigrationScript(migrationScript, targetDir, spinner) {
   try {
     await fs.access(migrationScript);
 
@@ -2327,6 +2322,27 @@ async function detectAndMigrateOldConfig(targetDir, spinner) {
     console.log('');
     return false;
   }
+}
+
+async function detectAndMigrateOldConfig(targetDir, spinner) {
+  const oldConfigPaths = [
+    path.join(targetDir, '.claude', 'config', 'agentvibes.json'),
+    path.join(targetDir, '.claude', 'config', 'bmad-voices.md'),
+    path.join(targetDir, '.claude', 'config', 'bmad-voices-enabled.flag'),
+    path.join(targetDir, '.claude', 'plugins', 'bmad-voices-enabled.flag'),
+    path.join(targetDir, '.claude', 'plugins', 'bmad-party-mode-disabled.flag'),
+  ];
+
+  // Check if any old config exists
+  if (!await hasOldConfigFiles(oldConfigPaths)) {
+    return false; // No migration needed
+  }
+
+  spinner.info(chalk.yellow('🔄 Old configuration detected - migrating to .agentvibes/'));
+
+  // Run migration script
+  const migrationScript = path.join(targetDir, '.claude', 'hooks', 'migrate-to-agentvibes.sh');
+  return await executeMigrationScript(migrationScript, targetDir, spinner);
 }
 
 /**
