@@ -208,6 +208,7 @@ async function collectConfiguration(options = {}) {
   const config = {
     provider: null,
     piperPath: null,
+    defaultVoice: null,
     reverb: 'light',
     backgroundMusic: {
       enabled: true,
@@ -219,13 +220,14 @@ async function collectConfiguration(options = {}) {
   if (options.yes) {
     // Non-interactive mode - use defaults
     config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
+    config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
     return config;
   }
 
   let currentPage = 0;
-  const sectionPages = 4; // System Dependencies, Provider, Audio Settings, Verbosity
+  const sectionPages = 5; // System Dependencies, Provider, Voice Selection, Audio Settings, Verbosity
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -240,7 +242,8 @@ async function collectConfiguration(options = {}) {
     // Show header
     const pageTitle = currentPage === 0 ? 'System Dependencies' :
                       currentPage === 1 ? 'TTS Provider Configuration' :
-                      currentPage === 2 ? 'Audio Settings' :
+                      currentPage === 2 ? 'Voice Selection' :
+                      currentPage === 3 ? 'Audio Settings' :
                       'Verbosity Settings';
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
@@ -453,7 +456,86 @@ async function collectConfiguration(options = {}) {
       }
 
     } else if (currentPage === 2) {
-      // Page 3: Audio Settings (Reverb + Background Music)
+      // Page 3: Voice Selection
+      console.log(boxen(
+        chalk.white('Choose a default voice for your AgentVibes.\n\n') +
+        chalk.gray('This will be used when no specific voice is configured.\n') +
+        chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
+        {
+          padding: 1,
+          margin: 1,
+          borderStyle: 'round',
+          borderColor: 'gray',
+          title: chalk.bold('🎤 Default Voice'),
+          titleAlignment: 'center'
+        }
+      ));
+
+      if (config.provider === 'piper') {
+        // Piper voices - popular selections
+        const piperVoices = [
+          { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)'), value: 'en_US-ryan-high' },
+          { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)'), value: 'en_US-amy-medium' },
+          { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)'), value: 'en_US-joe-medium' },
+          { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)'), value: 'en_US-lessac-medium' },
+          { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)'), value: 'en_GB-alan-medium' },
+          { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)'), value: 'en_GB-southern_english_female-medium' },
+          new inquirer.Separator(),
+          { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
+          { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
+        ];
+
+        const { selectedVoice } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedVoice',
+          message: chalk.yellow('Select your default Piper voice:'),
+          choices: piperVoices,
+          default: 'en_US-ryan-high',
+          pageSize: 12
+        }]);
+
+        if (selectedVoice === '__back__') {
+          return null;
+        }
+
+        if (selectedVoice !== '__skip__') {
+          config.defaultVoice = selectedVoice;
+        }
+
+      } else if (config.provider === 'macos') {
+        // macOS Say voices - popular selections
+        const macOSVoices = [
+          { name: chalk.cyan('Samantha') + chalk.gray(' (Female, American)'), value: 'Samantha' },
+          { name: chalk.cyan('Alex') + chalk.gray(' (Male, American)'), value: 'Alex' },
+          { name: chalk.magenta('Flo') + chalk.gray(' (Female, American, Expressive)'), value: 'Flo' },
+          { name: chalk.cyan('Tom') + chalk.gray(' (Male, American)'), value: 'Tom' },
+          { name: chalk.magenta('Karen') + chalk.gray(' (Female, Australian)'), value: 'Karen' },
+          { name: chalk.cyan('Daniel') + chalk.gray(' (Male, British)'), value: 'Daniel' },
+          new inquirer.Separator(),
+          { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
+          { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
+        ];
+
+        const { selectedVoice } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedVoice',
+          message: chalk.yellow('Select your default macOS voice:'),
+          choices: macOSVoices,
+          default: 'Samantha',
+          pageSize: 12
+        }]);
+
+        if (selectedVoice === '__back__') {
+          return null;
+        }
+
+        if (selectedVoice !== '__skip__') {
+          config.defaultVoice = selectedVoice;
+        }
+      }
+
+    } else if (currentPage === 3) {
+      // Page 4: Audio Settings (Reverb + Background Music)
       console.log(boxen(
         chalk.white('Configure audio effects and background music for your Agents.\n\n') +
         chalk.yellow('Reverb:\n') +
@@ -541,8 +623,8 @@ async function collectConfiguration(options = {}) {
         config.backgroundMusic.track = selectedTrack;
       }
 
-    } else if (currentPage === 3) {
-      // Page 4: Verbosity Settings
+    } else if (currentPage === 4) {
+      // Page 5: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -2644,17 +2726,21 @@ async function install(options = {}) {
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
 
-    // Set default voice based on provider to prevent fallback to mismatched global voice
+    // Set default voice based on user selection or provider defaults
     const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
-    let defaultVoice;
-    switch (selectedProvider) {
-      case 'piper':
-        defaultVoice = 'en_US-lessac-medium';
-        break;
-      case 'macos':
-      default:
-        defaultVoice = 'Samantha';
-        break;
+    let defaultVoice = config.defaultVoice;
+
+    // Fallback to defaults if voice wasn't selected
+    if (!defaultVoice) {
+      switch (selectedProvider) {
+        case 'piper':
+          defaultVoice = 'en_US-ryan-high';
+          break;
+        case 'macos':
+        default:
+          defaultVoice = 'Samantha';
+          break;
+      }
     }
     await fs.writeFile(voiceConfigPath, defaultVoice);
 
