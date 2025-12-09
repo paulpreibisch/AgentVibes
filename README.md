@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.4
 
 ---
 
@@ -114,17 +114,18 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.3 - Voice Selection & Quality Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.3)** 🎤
+**[v2.17.4 - Code Quality & Maintainability](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.4)** ⚙️
 
-AgentVibes v2.17.3 adds interactive voice selection during installation, allowing users to choose their preferred TTS voice with clear descriptions and provider-aware options.
+AgentVibes v2.17.4 focuses on code quality and maintainability with extensive SonarCloud-driven refactoring across the entire codebase, reducing cognitive complexity in critical files by up to 90%.
 
 **Key Highlights:**
-- 🎤 **Interactive Voice Selection** - Choose your default voice during installation
-- 🎯 **Provider-Aware Options** - 6 popular voices for Piper TTS and macOS Say
-- 📝 **Voice Descriptions** - Clear gender, accent, and quality information
-- 🔊 **Improved Default** - Changed from lessac to ryan-high for better quality
-- ✅ **All Tests Passing** - 182 tests, macOS-15 runner support, CI improvements
-- 🐛 **Bug Fixes** - Fixed installation error, removed -8dB default gain
+- ⚙️ **Major Code Refactoring** - Cognitive complexity reduced by up to 90% across critical files
+- 🧪 **Comprehensive Testing** - 377 new party mode tests added, 225 total tests passing
+- 📚 **Improved Documentation** - New Prerequisites and FAQ sections clarify installation
+- 🎭 **Conversational Agent Intros** - BMAD party mode now uses "Hi! I'm John, your Product Manager" format
+- 🔊 **Better Audio Balance** - Background music reduced 15% for clearer TTS voice
+- 🏗️ **installer.js** - Complexity: 84 → ~8 (90% reduction)
+- 📦 **dependency-checker.js** - Complexity: 43 → ~5, 23 → ~8 (88% & 65% reductions)
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
