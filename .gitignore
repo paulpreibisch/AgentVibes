@@ -110,3 +110,4 @@ scripts/audio-tunnel.config
 # Journal files (may contain sensitive conversation logs)
 .claude/journal/
 agentvibes.org/.claude/journal/
+coverage/
