@@ -323,9 +323,22 @@ sync_intros_from_manifest() {
 
         # Only update if intro is the exact generic placeholder
         if [[ "$intro" == "$generic_intro" ]]; then
-            # Look up displayName from manifest
-            local display_name=$(grep "^\"*${agent}\"*," "$manifest_file" | cut -d',' -f2 | sed 's/^"//;s/"$//')
-            if [[ -n "$display_name" ]]; then
+            # Look up displayName and title from manifest using awk for proper CSV parsing
+            # CSV format: name,displayName,title,icon,role,...
+            local manifest_data=$(grep "^\"*${agent}\"*," "$manifest_file" | awk -F'","' '{
+                gsub(/^"/, "", $2);
+                gsub(/"$/, "", $3);
+                print $2 "|" $3
+            }')
+
+            local display_name=$(echo "$manifest_data" | cut -d'|' -f1)
+            local title=$(echo "$manifest_data" | cut -d'|' -f2)
+
+            if [[ -n "$display_name" ]] && [[ -n "$title" ]]; then
+                # Generate intro like PR 987: "Hi! I'm [Name], your [Title]."
+                intro="Hi! I'm ${display_name}, your ${title}."
+            elif [[ -n "$display_name" ]]; then
+                # Fallback if title missing
                 intro="${display_name} here"
             fi
         fi
@@ -375,7 +388,17 @@ get_agent_intro() {
     if [[ -n "$bmad_voice_map" ]]; then
         # Read from BMAD's standard _cfg directory
         # CSV format: agent,voice,intro
-        local intro=$(grep "^$agent_id," "$bmad_voice_map" | cut -d',' -f3 | sed 's/^"//;s/"$//')
+        # Use awk to properly handle quoted CSV fields (intro may contain commas)
+        local intro=$(grep "^$agent_id," "$bmad_voice_map" | awk -F',' '{
+            # Extract field 3 onwards (intro may span multiple comma-separated parts)
+            intro = $3;
+            for (i = 4; i <= NF; i++) {
+                intro = intro "," $i;
+            }
+            gsub(/^"/, "", intro);
+            gsub(/"$/, "", intro);
+            print intro;
+        }')
 
         # If intro is empty or generic, fall back to agent display name from manifest
         if [[ -z "$intro" ]] || [[ "$intro" == "Hello! Ready to help with the discussion." ]]; then
