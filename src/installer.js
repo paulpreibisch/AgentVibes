@@ -200,6 +200,108 @@ async function showPaginatedContent(pages, options = {}) {
 }
 
 /**
+ * Get page title by page number
+ * @param {number} pageNum - Page number (0-4)
+ * @returns {string} Page title
+ */
+function getPageTitle(pageNum) {
+  const titles = {
+    0: 'System Dependencies',
+    1: 'TTS Provider Configuration',
+    2: 'Voice Selection',
+    3: 'Audio Settings',
+    4: 'Verbosity Settings'
+  };
+  return titles[pageNum] || 'Configuration';
+}
+
+/**
+ * Handle Page 0: System Dependencies display
+ * @returns {Promise<void>}
+ */
+async function handleSystemDependenciesPage() {
+  const { checkDependencies, getInstallCommands } = await import('./utils/dependency-checker.js');
+  const depResults = checkDependencies();
+
+  let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
+  depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
+
+  // Satisfied dependencies
+  if (depResults.core.node?.isCompatible) {
+    depContent += chalk.green(`✓ Node.js ${depResults.core.node.version}\n`);
+  }
+  if (depResults.core.python?.isCompatible) {
+    depContent += chalk.green(`✓ Python ${depResults.core.python.version}\n`);
+  }
+  if (depResults.core.bash?.isModern) {
+    depContent += chalk.green(`✓ Bash ${depResults.core.bash.version}\n`);
+  }
+  if (depResults.optional.curl) {
+    depContent += chalk.green('✓ curl\n');
+  }
+  if (depResults.optional.sox) {
+    depContent += chalk.green('✓ sox\n');
+  }
+  if (depResults.optional.ffmpeg) {
+    depContent += chalk.green('✓ ffmpeg\n');
+  }
+  if (depResults.optional.bc) {
+    depContent += chalk.green('✓ bc\n');
+  }
+  if (depResults.optional.flock) {
+    depContent += chalk.green('✓ flock\n');
+  }
+  if (depResults.optional.pipx) {
+    depContent += chalk.green('✓ pipx\n');
+  }
+  if (depResults.optional.audioPlayer) {
+    depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
+  }
+
+  // Missing dependencies
+  if (Object.keys(depResults.missing).length > 0) {
+    depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+    depContent += chalk.yellow.bold('Missing (Optional):\n\n');
+
+    if (depResults.missing.curl) depContent += chalk.yellow('⚠ curl - needed for downloads\n');
+    if (depResults.missing.sox) depContent += chalk.yellow('⚠ sox - audio effects\n');
+    if (depResults.missing.ffmpeg) depContent += chalk.yellow('⚠ ffmpeg - background music\n');
+    if (depResults.missing.bc) depContent += chalk.yellow('⚠ bc - audio calculations\n');
+    if (depResults.missing.flock) depContent += chalk.yellow('⚠ flock - TTS queue locking\n');
+    if (depResults.missing.pipx) depContent += chalk.yellow('⚠ pipx - Piper TTS installation\n');
+    if (depResults.missing.audioPlayer) depContent += chalk.yellow('⚠ audio player - playback\n');
+
+    depContent += '\n' + chalk.gray('TTS will still work without optional tools');
+
+    // Add install commands
+    const os = await import('os');
+    const platform = os.platform();
+    const installCmds = getInstallCommands(depResults.missing, platform);
+
+    if (installCmds.length > 0) {
+      depContent += '\n\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+      depContent += chalk.cyan.bold('To Install Missing Tools:\n\n');
+
+      installCmds.forEach(({ label, command }) => {
+        depContent += chalk.cyan(`${label}:\n`);
+        depContent += chalk.white(`  ${command}\n\n`);
+      });
+    }
+  }
+
+  const depsBoxen = boxen(depContent.trim(), {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
+    title: chalk.bold('🔧 System Dependencies'),
+    titleAlignment: 'center'
+  });
+
+  console.log(depsBoxen);
+}
+
+/**
  * Collect all configuration answers through paginated question flow
  * @param {Object} options - Installation options (yes, pageOffset, totalPages)
  * @returns {Promise<Object>} Configuration object with all answers
@@ -240,97 +342,13 @@ async function collectConfiguration(options = {}) {
     console.clear();
 
     // Show header
-    const pageTitle = currentPage === 0 ? 'System Dependencies' :
-                      currentPage === 1 ? 'TTS Provider Configuration' :
-                      currentPage === 2 ? 'Voice Selection' :
-                      currentPage === 3 ? 'Audio Settings' :
-                      'Verbosity Settings';
+    const pageTitle = getPageTitle(currentPage);
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
     console.log('');
 
     if (currentPage === 0) {
-      // Page 1: System Dependencies Check
-      const { checkDependencies } = await import('./utils/dependency-checker.js');
-      const depResults = checkDependencies();
-
-      let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
-      depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
-
-      // Satisfied dependencies
-      if (depResults.core.node?.isCompatible) {
-        depContent += chalk.green(`✓ Node.js ${depResults.core.node.version}\n`);
-      }
-      if (depResults.core.python?.isCompatible) {
-        depContent += chalk.green(`✓ Python ${depResults.core.python.version}\n`);
-      }
-      if (depResults.core.bash?.isModern) {
-        depContent += chalk.green(`✓ Bash ${depResults.core.bash.version}\n`);
-      }
-      if (depResults.optional.curl) {
-        depContent += chalk.green('✓ curl\n');
-      }
-      if (depResults.optional.sox) {
-        depContent += chalk.green('✓ sox\n');
-      }
-      if (depResults.optional.ffmpeg) {
-        depContent += chalk.green('✓ ffmpeg\n');
-      }
-      if (depResults.optional.bc) {
-        depContent += chalk.green('✓ bc\n');
-      }
-      if (depResults.optional.flock) {
-        depContent += chalk.green('✓ flock\n');
-      }
-      if (depResults.optional.pipx) {
-        depContent += chalk.green('✓ pipx\n');
-      }
-      if (depResults.optional.audioPlayer) {
-        depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
-      }
-
-      // Missing dependencies
-      if (Object.keys(depResults.missing).length > 0) {
-        depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
-        depContent += chalk.yellow.bold('Missing (Optional):\n\n');
-
-        if (depResults.missing.curl) depContent += chalk.yellow('⚠ curl - needed for downloads\n');
-        if (depResults.missing.sox) depContent += chalk.yellow('⚠ sox - audio effects\n');
-        if (depResults.missing.ffmpeg) depContent += chalk.yellow('⚠ ffmpeg - background music\n');
-        if (depResults.missing.bc) depContent += chalk.yellow('⚠ bc - audio calculations\n');
-        if (depResults.missing.flock) depContent += chalk.yellow('⚠ flock - TTS queue locking\n');
-        if (depResults.missing.pipx) depContent += chalk.yellow('⚠ pipx - Piper TTS installation\n');
-        if (depResults.missing.audioPlayer) depContent += chalk.yellow('⚠ audio player - playback\n');
-
-        depContent += '\n' + chalk.gray('TTS will still work without optional tools');
-
-        // Add install commands
-        const os = await import('os');
-        const { getInstallCommands } = await import('./utils/dependency-checker.js');
-        const platform = os.platform();
-        const installCmds = getInstallCommands(depResults.missing, platform);
-
-        if (installCmds.length > 0) {
-          depContent += '\n\n' + chalk.gray('─'.repeat(50)) + '\n\n';
-          depContent += chalk.cyan.bold('To Install Missing Tools:\n\n');
-
-          installCmds.forEach(({ label, command }) => {
-            depContent += chalk.cyan(`${label}:\n`);
-            depContent += chalk.white(`  ${command}\n\n`);
-          });
-        }
-      }
-
-      const depsBoxen = boxen(depContent.trim(), {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
-        title: chalk.bold('🔧 System Dependencies'),
-        titleAlignment: 'center'
-      });
-
-      console.log(depsBoxen);
+      await handleSystemDependenciesPage();
     } else if (currentPage === 1) {
       // Page 2: TTS Provider & Voice Storage
 
