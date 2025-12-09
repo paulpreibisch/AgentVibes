@@ -117,9 +117,56 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
  * @param {Object} options - Options for pagination (yes, continueLabel, pageOffset, totalPages, showPreviousOnFirst)
  * @returns {Promise<void>}
  */
+/**
+ * Build navigation choices for paginated content
+ * @param {number} currentPage - Current page index
+ * @param {number} totalPages - Total number of pages
+ * @param {string} continueLabel - Label for continue button
+ * @param {boolean} showPreviousOnFirst - Show previous on first page
+ * @returns {Array} Navigation choices
+ */
+function buildNavigationChoices(currentPage, totalPages, continueLabel, showPreviousOnFirst) {
+  const choices = [];
+  const isLastPage = currentPage >= totalPages - 1;
+
+  if (!isLastPage) {
+    choices.push({ name: chalk.green('Next →'), value: 'next' });
+  } else {
+    choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
+  }
+
+  if (currentPage > 0 || showPreviousOnFirst) {
+    choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+  }
+
+  return choices;
+}
+
+/**
+ * Handle navigation action in paginated content
+ * @param {string} action - Navigation action (prev, next, continue)
+ * @param {number} currentPage - Current page index
+ * @param {boolean} showPreviousOnFirst - Show previous on first page
+ * @returns {Object} Navigation result {newPage, shouldExit, shouldReturn}
+ */
+function handleNavigationAction(action, currentPage, showPreviousOnFirst) {
+  if (action === 'prev') {
+    if (currentPage > 0) {
+      return { newPage: currentPage - 1, shouldExit: false, shouldReturn: false };
+    }
+    if (showPreviousOnFirst) {
+      return { newPage: currentPage, shouldExit: false, shouldReturn: true };
+    }
+  } else if (action === 'next') {
+    return { newPage: currentPage + 1, shouldExit: false, shouldReturn: false };
+  }
+
+  // Continue action - exit loop
+  return { newPage: currentPage, shouldExit: true, shouldReturn: false };
+}
+
 async function showPaginatedContent(pages, options = {}) {
   if (options.yes || pages.length === 0) {
-    // In non-interactive mode or no pages, just display all content
     pages.forEach(page => console.log(page.content));
     return;
   }
@@ -131,7 +178,6 @@ async function showPaginatedContent(pages, options = {}) {
   let currentPage = 0;
 
   while (currentPage >= 0 && currentPage < pages.length) {
-    // Clear screen and show current page with header/footer
     console.clear();
 
     const { header, footer } = createPageHeaderFooter(
@@ -145,35 +191,12 @@ async function showPaginatedContent(pages, options = {}) {
     console.log('');
     console.log(pages[currentPage].content);
 
-    // Build navigation message with Previous/Next on same line
-    let navMessage = '';
-    if (currentPage > 0 && currentPage < pages.length - 1) {
-      navMessage = `${chalk.cyan('←')} Previous  |  Next ${chalk.cyan('→')}  |  ${continueLabel}`;
-    } else if (currentPage > 0) {
-      navMessage = `${chalk.cyan('←')} Previous  |  ${continueLabel}`;
-    } else if (currentPage < pages.length - 1) {
-      navMessage = `Next ${chalk.cyan('→')}  |  ${continueLabel}`;
-    } else {
-      navMessage = continueLabel;
-    }
-
-    // Build navigation choices with colors
-    const choices = [];
-    if (currentPage < pages.length - 1) {
-      choices.push({ name: chalk.green('Next →'), value: 'next' });
-    } else {
-      // Only show "Start Installation" on the last page
-      choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
-    }
-    if (currentPage > 0 || showPreviousOnFirst) {
-      choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
-    }
+    const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst);
 
     console.log('');
     console.log(footer);
     console.log('');
 
-    // Show navigation prompt
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
@@ -182,20 +205,18 @@ async function showPaginatedContent(pages, options = {}) {
       default: currentPage < pages.length - 1 ? 'next' : 'continue'
     }]);
 
-    if (action === 'prev') {
-      if (currentPage > 0) {
-        currentPage--;
-      } else if (showPreviousOnFirst) {
-        // User clicked Previous on first page - signal to caller
-        return 'prev';
-      }
-    } else if (action === 'next') {
-      currentPage++;
-    } else {
-      // Continue - exit loop
+    const navResult = handleNavigationAction(action, currentPage, showPreviousOnFirst);
+
+    if (navResult.shouldReturn) {
+      return 'prev';
+    }
+
+    if (navResult.shouldExit) {
       console.clear();
       break;
     }
+
+    currentPage = navResult.newPage;
   }
 }
 
