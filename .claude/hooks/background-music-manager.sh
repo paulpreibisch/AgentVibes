@@ -28,7 +28,7 @@ ENABLED_FILE="$CONFIG_DIR/background-music-enabled.txt"
 VOLUME_FILE="$CONFIG_DIR/background-music-volume.txt"
 
 # Defaults
-DEFAULT_VOLUME="0.40"
+DEFAULT_VOLUME="0.34"
 
 # Ensure config directory exists
 mkdir -p "$CONFIG_DIR"
