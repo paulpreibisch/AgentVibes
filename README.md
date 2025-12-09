@@ -115,7 +115,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 ## 📰 Latest Release
 
 **[v2.17.4 - Code Quality & Maintainability](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.4)** ⚙️
-
+AgentVibes v2.17.4 focuses on code quality and maintainability with extensive SonarCloud-driven refactoring across the entire codebase. This release reduces cognitive complexity in critical files by up to 90%, making the codebase more maintainable and easier to understand. Major refactoring includes the installer (complexity reduced from 84 to ~8), dependency checker (43 to ~5), and MCP installer (34 to ~8), with helper functions extracted and responsibilities separated. Additionally, this release includes comprehensive party mode testing with 377 new tests, conversational BMAD agent intros, improved documentation, and audio quality enhancements. **Key Highlights:** - ⚙️ **Major Code Refactoring** - Cognitive complexity reduced by up to 90% across critical files - 🧪 **Comprehensive Testing** - 377 new party mode tests added, 225 total tests passing - 📚 **Improved Documentation** - New Prerequisites and FAQ sections clarify installation - 🎭 **Conversational Agent Intros** - BMAD party mode now uses "Hi! I'm John, your Product Manager" format - 🔊 **Better Audio Balance** - Background music reduced 15% for clearer TTS voice
 AgentVibes v2.17.4 focuses on code quality and maintainability with extensive SonarCloud-driven refactoring across the entire codebase, reducing cognitive complexity in critical files by up to 90%.
 
 **Key Highlights:**
