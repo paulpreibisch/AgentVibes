@@ -1,3 +1,77 @@
+# AgentVibes Release Notes
+
+## 📦 v2.17.3
+
+### 🤖 AI Summary
+
+This patch release adds interactive voice selection during installation, giving users the ability to choose their preferred TTS voice based on their provider (Piper or macOS Say). The installer now presents popular voice options with clear descriptions, making it easier for new users to customize their AgentVibes experience from the start.
+
+### ✨ Features
+- **Interactive Voice Selection**: New installation step allowing users to choose their default voice
+  - Provider-aware voice lists (6 popular options for each provider)
+  - Gender and accent descriptions for each voice
+  - Skip option for users who want to configure later
+  - Back navigation to change provider if needed
+
+### 🐛 Bug Fixes
+- Fixed ReferenceError where `config.defaultVoice` should have been `userConfig.defaultVoice`
+  - This was causing installation to fail after voice selection
+  - Hotfixed immediately after feature deployment
+
+### 🎤 Voice Options Added
+
+**Piper TTS Voices:**
+- en_US-ryan-high (Male, American, High Quality) - New default
+- en_US-amy-medium (Female, American, Clear)
+- en_US-joe-medium (Male, American, Warm)
+- en_US-lessac-medium (Female, American, Professional)
+- en_GB-alan-medium (Male, British, Refined)
+- en_GB-southern_english_female-medium (Female, British)
+
+**macOS Say Voices:**
+- Samantha (Female, American) - Default
+- Alex (Male, American)
+- Flo (Female, American, Expressive)
+- Tom (Male, American)
+- Karen (Female, Australian)
+- Daniel (Male, British)
+
+### 🔧 Technical Changes
+- Added `defaultVoice` field to installer config object
+- Increased installer page count from 4 to 5 pages
+- Updated default Piper voice from `en_US-lessac-medium` to `en_US-ryan-high`
+- Voice selection integrated into configuration flow (page 3)
+- Non-interactive mode (`--yes`) automatically selects appropriate defaults
+
+### 📝 User Impact
+
+**For New Users:**
+- Better first-time experience with voice customization
+- Clear descriptions help make informed voice choices
+- Preview what each provider offers before committing
+
+**For Existing Users:**
+- No breaking changes - existing voice configurations remain unchanged
+- Can re-run `npx agentvibes install` to select a new default voice if desired
+
+### 🚀 Installation
+
+```bash
+npx agentvibes@2.17.3 install
+```
+
+### 📚 Documentation
+- Installation flow updated with new voice selection step
+- Voice descriptions added for clarity
+
+---
+
+**Previous Release:** v2.17.2
+**Release Date:** December 8, 2024
+**Commits:** 2 (1 feature, 1 bugfix)
+
+---
+
 # Release v2.14.19 - BMAD TTS Injection Improvements
 
 **Release Date:** 2025-12-05
