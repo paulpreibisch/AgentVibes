@@ -117,9 +117,56 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
  * @param {Object} options - Options for pagination (yes, continueLabel, pageOffset, totalPages, showPreviousOnFirst)
  * @returns {Promise<void>}
  */
+/**
+ * Build navigation choices for paginated content
+ * @param {number} currentPage - Current page index
+ * @param {number} totalPages - Total number of pages
+ * @param {string} continueLabel - Label for continue button
+ * @param {boolean} showPreviousOnFirst - Show previous on first page
+ * @returns {Array} Navigation choices
+ */
+function buildNavigationChoices(currentPage, totalPages, continueLabel, showPreviousOnFirst) {
+  const choices = [];
+  const isLastPage = currentPage >= totalPages - 1;
+
+  if (!isLastPage) {
+    choices.push({ name: chalk.green('Next →'), value: 'next' });
+  } else {
+    choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
+  }
+
+  if (currentPage > 0 || showPreviousOnFirst) {
+    choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+  }
+
+  return choices;
+}
+
+/**
+ * Handle navigation action in paginated content
+ * @param {string} action - Navigation action (prev, next, continue)
+ * @param {number} currentPage - Current page index
+ * @param {boolean} showPreviousOnFirst - Show previous on first page
+ * @returns {Object} Navigation result {newPage, shouldExit, shouldReturn}
+ */
+function handleNavigationAction(action, currentPage, showPreviousOnFirst) {
+  if (action === 'prev') {
+    if (currentPage > 0) {
+      return { newPage: currentPage - 1, shouldExit: false, shouldReturn: false };
+    }
+    if (showPreviousOnFirst) {
+      return { newPage: currentPage, shouldExit: false, shouldReturn: true };
+    }
+  } else if (action === 'next') {
+    return { newPage: currentPage + 1, shouldExit: false, shouldReturn: false };
+  }
+
+  // Continue action - exit loop
+  return { newPage: currentPage, shouldExit: true, shouldReturn: false };
+}
+
 async function showPaginatedContent(pages, options = {}) {
   if (options.yes || pages.length === 0) {
-    // In non-interactive mode or no pages, just display all content
     pages.forEach(page => console.log(page.content));
     return;
   }
@@ -131,7 +178,6 @@ async function showPaginatedContent(pages, options = {}) {
   let currentPage = 0;
 
   while (currentPage >= 0 && currentPage < pages.length) {
-    // Clear screen and show current page with header/footer
     console.clear();
 
     const { header, footer } = createPageHeaderFooter(
@@ -145,35 +191,12 @@ async function showPaginatedContent(pages, options = {}) {
     console.log('');
     console.log(pages[currentPage].content);
 
-    // Build navigation message with Previous/Next on same line
-    let navMessage = '';
-    if (currentPage > 0 && currentPage < pages.length - 1) {
-      navMessage = `${chalk.cyan('←')} Previous  |  Next ${chalk.cyan('→')}  |  ${continueLabel}`;
-    } else if (currentPage > 0) {
-      navMessage = `${chalk.cyan('←')} Previous  |  ${continueLabel}`;
-    } else if (currentPage < pages.length - 1) {
-      navMessage = `Next ${chalk.cyan('→')}  |  ${continueLabel}`;
-    } else {
-      navMessage = continueLabel;
-    }
-
-    // Build navigation choices with colors
-    const choices = [];
-    if (currentPage < pages.length - 1) {
-      choices.push({ name: chalk.green('Next →'), value: 'next' });
-    } else {
-      // Only show "Start Installation" on the last page
-      choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
-    }
-    if (currentPage > 0 || showPreviousOnFirst) {
-      choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
-    }
+    const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst);
 
     console.log('');
     console.log(footer);
     console.log('');
 
-    // Show navigation prompt
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
@@ -182,21 +205,121 @@ async function showPaginatedContent(pages, options = {}) {
       default: currentPage < pages.length - 1 ? 'next' : 'continue'
     }]);
 
-    if (action === 'prev') {
-      if (currentPage > 0) {
-        currentPage--;
-      } else if (showPreviousOnFirst) {
-        // User clicked Previous on first page - signal to caller
-        return 'prev';
-      }
-    } else if (action === 'next') {
-      currentPage++;
-    } else {
-      // Continue - exit loop
+    const navResult = handleNavigationAction(action, currentPage, showPreviousOnFirst);
+
+    if (navResult.shouldReturn) {
+      return 'prev';
+    }
+
+    if (navResult.shouldExit) {
       console.clear();
       break;
     }
+
+    currentPage = navResult.newPage;
   }
+}
+
+/**
+ * Get page title by page number
+ * @param {number} pageNum - Page number (0-4)
+ * @returns {string} Page title
+ */
+function getPageTitle(pageNum) {
+  const titles = {
+    0: 'System Dependencies',
+    1: 'TTS Provider Configuration',
+    2: 'Voice Selection',
+    3: 'Audio Settings',
+    4: 'Verbosity Settings'
+  };
+  return titles[pageNum] || 'Configuration';
+}
+
+/**
+ * Handle Page 0: System Dependencies display
+ * @returns {Promise<void>}
+ */
+async function handleSystemDependenciesPage() {
+  const { checkDependencies, getInstallCommands } = await import('./utils/dependency-checker.js');
+  const depResults = checkDependencies();
+
+  let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
+  depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
+
+  // Satisfied dependencies
+  if (depResults.core.node?.isCompatible) {
+    depContent += chalk.green(`✓ Node.js ${depResults.core.node.version}\n`);
+  }
+  if (depResults.core.python?.isCompatible) {
+    depContent += chalk.green(`✓ Python ${depResults.core.python.version}\n`);
+  }
+  if (depResults.core.bash?.isModern) {
+    depContent += chalk.green(`✓ Bash ${depResults.core.bash.version}\n`);
+  }
+  if (depResults.optional.curl) {
+    depContent += chalk.green('✓ curl\n');
+  }
+  if (depResults.optional.sox) {
+    depContent += chalk.green('✓ sox\n');
+  }
+  if (depResults.optional.ffmpeg) {
+    depContent += chalk.green('✓ ffmpeg\n');
+  }
+  if (depResults.optional.bc) {
+    depContent += chalk.green('✓ bc\n');
+  }
+  if (depResults.optional.flock) {
+    depContent += chalk.green('✓ flock\n');
+  }
+  if (depResults.optional.pipx) {
+    depContent += chalk.green('✓ pipx\n');
+  }
+  if (depResults.optional.audioPlayer) {
+    depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
+  }
+
+  // Missing dependencies
+  if (Object.keys(depResults.missing).length > 0) {
+    depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+    depContent += chalk.yellow.bold('Missing (Optional):\n\n');
+
+    if (depResults.missing.curl) depContent += chalk.yellow('⚠ curl - needed for downloads\n');
+    if (depResults.missing.sox) depContent += chalk.yellow('⚠ sox - audio effects\n');
+    if (depResults.missing.ffmpeg) depContent += chalk.yellow('⚠ ffmpeg - background music\n');
+    if (depResults.missing.bc) depContent += chalk.yellow('⚠ bc - audio calculations\n');
+    if (depResults.missing.flock) depContent += chalk.yellow('⚠ flock - TTS queue locking\n');
+    if (depResults.missing.pipx) depContent += chalk.yellow('⚠ pipx - Piper TTS installation\n');
+    if (depResults.missing.audioPlayer) depContent += chalk.yellow('⚠ audio player - playback\n');
+
+    depContent += '\n' + chalk.gray('TTS will still work without optional tools');
+
+    // Add install commands
+    const os = await import('os');
+    const platform = os.platform();
+    const installCmds = getInstallCommands(depResults.missing, platform);
+
+    if (installCmds.length > 0) {
+      depContent += '\n\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+      depContent += chalk.cyan.bold('To Install Missing Tools:\n\n');
+
+      installCmds.forEach(({ label, command }) => {
+        depContent += chalk.cyan(`${label}:\n`);
+        depContent += chalk.white(`  ${command}\n\n`);
+      });
+    }
+  }
+
+  const depsBoxen = boxen(depContent.trim(), {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
+    title: chalk.bold('🔧 System Dependencies'),
+    titleAlignment: 'center'
+  });
+
+  console.log(depsBoxen);
 }
 
 /**
@@ -240,97 +363,13 @@ async function collectConfiguration(options = {}) {
     console.clear();
 
     // Show header
-    const pageTitle = currentPage === 0 ? 'System Dependencies' :
-                      currentPage === 1 ? 'TTS Provider Configuration' :
-                      currentPage === 2 ? 'Voice Selection' :
-                      currentPage === 3 ? 'Audio Settings' :
-                      'Verbosity Settings';
+    const pageTitle = getPageTitle(currentPage);
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
     console.log('');
 
     if (currentPage === 0) {
-      // Page 1: System Dependencies Check
-      const { checkDependencies } = await import('./utils/dependency-checker.js');
-      const depResults = checkDependencies();
-
-      let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
-      depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
-
-      // Satisfied dependencies
-      if (depResults.core.node?.isCompatible) {
-        depContent += chalk.green(`✓ Node.js ${depResults.core.node.version}\n`);
-      }
-      if (depResults.core.python?.isCompatible) {
-        depContent += chalk.green(`✓ Python ${depResults.core.python.version}\n`);
-      }
-      if (depResults.core.bash?.isModern) {
-        depContent += chalk.green(`✓ Bash ${depResults.core.bash.version}\n`);
-      }
-      if (depResults.optional.curl) {
-        depContent += chalk.green('✓ curl\n');
-      }
-      if (depResults.optional.sox) {
-        depContent += chalk.green('✓ sox\n');
-      }
-      if (depResults.optional.ffmpeg) {
-        depContent += chalk.green('✓ ffmpeg\n');
-      }
-      if (depResults.optional.bc) {
-        depContent += chalk.green('✓ bc\n');
-      }
-      if (depResults.optional.flock) {
-        depContent += chalk.green('✓ flock\n');
-      }
-      if (depResults.optional.pipx) {
-        depContent += chalk.green('✓ pipx\n');
-      }
-      if (depResults.optional.audioPlayer) {
-        depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
-      }
-
-      // Missing dependencies
-      if (Object.keys(depResults.missing).length > 0) {
-        depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
-        depContent += chalk.yellow.bold('Missing (Optional):\n\n');
-
-        if (depResults.missing.curl) depContent += chalk.yellow('⚠ curl - needed for downloads\n');
-        if (depResults.missing.sox) depContent += chalk.yellow('⚠ sox - audio effects\n');
-        if (depResults.missing.ffmpeg) depContent += chalk.yellow('⚠ ffmpeg - background music\n');
-        if (depResults.missing.bc) depContent += chalk.yellow('⚠ bc - audio calculations\n');
-        if (depResults.missing.flock) depContent += chalk.yellow('⚠ flock - TTS queue locking\n');
-        if (depResults.missing.pipx) depContent += chalk.yellow('⚠ pipx - Piper TTS installation\n');
-        if (depResults.missing.audioPlayer) depContent += chalk.yellow('⚠ audio player - playback\n');
-
-        depContent += '\n' + chalk.gray('TTS will still work without optional tools');
-
-        // Add install commands
-        const os = await import('os');
-        const { getInstallCommands } = await import('./utils/dependency-checker.js');
-        const platform = os.platform();
-        const installCmds = getInstallCommands(depResults.missing, platform);
-
-        if (installCmds.length > 0) {
-          depContent += '\n\n' + chalk.gray('─'.repeat(50)) + '\n\n';
-          depContent += chalk.cyan.bold('To Install Missing Tools:\n\n');
-
-          installCmds.forEach(({ label, command }) => {
-            depContent += chalk.cyan(`${label}:\n`);
-            depContent += chalk.white(`  ${command}\n\n`);
-          });
-        }
-      }
-
-      const depsBoxen = boxen(depContent.trim(), {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
-        title: chalk.bold('🔧 System Dependencies'),
-        titleAlignment: 'center'
-      });
-
-      console.log(depsBoxen);
+      await handleSystemDependenciesPage();
     } else if (currentPage === 1) {
       // Page 2: TTS Provider & Voice Storage
 
@@ -1301,6 +1340,103 @@ async function copyCommandFiles(targetDir, spinner) {
 }
 
 /**
+ * Check if a file should be included as a hook file
+ * @param {string} file - Filename to check
+ * @param {Object} stat - File stats object
+ * @returns {boolean} True if file should be included
+ */
+function shouldIncludeHookFile(file, stat) {
+  return stat.isFile() &&
+         (file.endsWith('.sh') || file === 'hooks.json') &&
+         !file.includes('prepare-release') &&
+         !file.startsWith('.');
+}
+
+/**
+ * Filter hook files from directory
+ * @param {string} srcHooksDir - Source hooks directory
+ * @param {Array} allFiles - All files in directory
+ * @returns {Promise<Array>} Filtered hook files
+ */
+async function filterHookFiles(srcHooksDir, allFiles) {
+  const hookFiles = [];
+
+  for (const file of allFiles) {
+    const srcPath = path.join(srcHooksDir, file);
+    try {
+      const stat = await fs.stat(srcPath);
+      if (shouldIncludeHookFile(file, stat)) {
+        hookFiles.push(file);
+      }
+    } catch (err) {
+      console.log(chalk.yellow(`   ⚠ Could not check ${file}: ${err.message}`));
+    }
+  }
+
+  return hookFiles;
+}
+
+/**
+ * Copy a single hook file and set permissions
+ * @param {string} srcPath - Source file path
+ * @param {string} destPath - Destination file path
+ * @param {string} filename - Name of the file
+ * @returns {Promise<Object>} Result object with success/error info
+ */
+async function copyHookFile(srcPath, destPath, filename) {
+  try {
+    await fs.copyFile(srcPath, destPath);
+
+    if (filename.endsWith('.sh')) {
+      await fs.chmod(destPath, 0o750);
+      return { success: true, name: filename, executable: true };
+    }
+
+    return { success: true, name: filename, executable: false };
+  } catch (err) {
+    return { success: false, name: filename, error: err.message };
+  }
+}
+
+/**
+ * Build boxen content for hook installation results
+ * @param {Array} installedFiles - Successfully installed files
+ * @param {Array} failedFiles - Failed files
+ * @returns {string} Boxen formatted content
+ */
+function buildHookInstallationBoxen(installedFiles, failedFiles) {
+  let content = chalk.bold(`${installedFiles.length} TTS Hook Scripts Installed\n\n`);
+  content += chalk.gray('Hook scripts automatically run at key moments during your\n');
+  content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
+
+  installedFiles.forEach(file => {
+    content += chalk.green(`✓ ${file.name}`);
+    if (file.executable) {
+      content += chalk.gray(' (executable)');
+    }
+    content += '\n';
+  });
+
+  if (failedFiles.length > 0) {
+    content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
+    content += chalk.bold.yellow(`${failedFiles.length} Failed\n\n`);
+    failedFiles.forEach(file => {
+      content += chalk.yellow(`⚠ ${file.name}\n`);
+      content += chalk.dim(`  ${file.error}\n`);
+    });
+  }
+
+  return boxen(content.trim(), {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: 'green',
+    title: chalk.bold('🔧 TTS Scripts'),
+    titleAlignment: 'center'
+  });
+}
+
+/**
  * Copy hook files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -1315,48 +1451,26 @@ async function copyHookFiles(targetDir, spinner) {
     await fs.mkdir(hooksDir, { recursive: true });
 
     const allHookFiles = await fs.readdir(srcHooksDir);
-    const hookFiles = [];
-
-    for (const file of allHookFiles) {
-      const srcPath = path.join(srcHooksDir, file);
-      try {
-        const stat = await fs.stat(srcPath);
-
-        if (stat.isFile() &&
-            (file.endsWith('.sh') || file === 'hooks.json') &&
-            !file.includes('prepare-release') &&
-            !file.startsWith('.')) {
-          hookFiles.push(file);
-        }
-      } catch (err) {
-        console.log(chalk.yellow(`   ⚠ Could not check ${file}: ${err.message}`));
-        // Continue with other files
-      }
-    }
+    const hookFiles = await filterHookFiles(srcHooksDir, allHookFiles);
 
     spinner.start(`Installing ${hookFiles.length} TTS scripts...`);
-    let successCount = 0;
-    let installedFiles = [];
-    let failedFiles = [];
+
+    const installedFiles = [];
+    const failedFiles = [];
 
     for (const file of hookFiles) {
       const srcPath = path.join(srcHooksDir, file);
       const destPath = path.join(hooksDir, file);
-      try {
-        await fs.copyFile(srcPath, destPath);
+      const result = await copyHookFile(srcPath, destPath, file);
 
-        if (file.endsWith('.sh')) {
-          // Security: Use more restrictive permissions (owner: rwx, group: r-x, others: ---)
-          await fs.chmod(destPath, 0o750);
-          installedFiles.push({ name: file, executable: true });
-        } else {
-          installedFiles.push({ name: file, executable: false });
-        }
-        successCount++;
-      } catch (err) {
-        failedFiles.push({ name: file, error: err.message });
+      if (result.success) {
+        installedFiles.push({ name: result.name, executable: result.executable });
+      } else {
+        failedFiles.push({ name: result.name, error: result.error });
       }
     }
+
+    const successCount = installedFiles.length;
 
     if (successCount === hookFiles.length) {
       spinner.succeed(chalk.green('Installed TTS scripts!\n'));
@@ -1364,38 +1478,9 @@ async function copyHookFiles(targetDir, spinner) {
       spinner.warn(chalk.yellow(`Installed ${successCount}/${hookFiles.length} scripts (some failed)\n`));
     }
 
-    // Create boxen content (don't print yet - will be shown in pagination)
-    let boxenContent = null;
-    if (installedFiles.length > 0) {
-      let content = chalk.bold(`${installedFiles.length} TTS Hook Scripts Installed\n\n`);
-      content += chalk.gray('Hook scripts automatically run at key moments during your\n');
-      content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
-      installedFiles.forEach(file => {
-        content += chalk.green(`✓ ${file.name}`);
-        if (file.executable) {
-          content += chalk.gray(' (executable)');
-        }
-        content += '\n';
-      });
-
-      if (failedFiles.length > 0) {
-        content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
-        content += chalk.bold.yellow(`${failedFiles.length} Failed\n\n`);
-        failedFiles.forEach(file => {
-          content += chalk.yellow(`⚠ ${file.name}\n`);
-          content += chalk.dim(`  ${file.error}\n`);
-        });
-      }
-
-      boxenContent = boxen(content.trim(), {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'green',
-        title: chalk.bold('🔧 TTS Scripts'),
-        titleAlignment: 'center'
-      });
-    }
+    const boxenContent = installedFiles.length > 0
+      ? buildHookInstallationBoxen(installedFiles, failedFiles)
+      : null;
 
     return { count: successCount, boxen: boxenContent };
   } catch (err) {
@@ -2190,36 +2275,31 @@ frame-expert,en_GB-alan-medium
  * @param {Object} spinner - Ora spinner instance
  * @returns {Promise<boolean>} True if migration was performed
  */
-async function detectAndMigrateOldConfig(targetDir, spinner) {
-  const oldConfigPaths = [
-    path.join(targetDir, '.claude', 'config', 'agentvibes.json'),
-    path.join(targetDir, '.claude', 'config', 'bmad-voices.md'),
-    path.join(targetDir, '.claude', 'config', 'bmad-voices-enabled.flag'),
-    path.join(targetDir, '.claude', 'plugins', 'bmad-voices-enabled.flag'),
-    path.join(targetDir, '.claude', 'plugins', 'bmad-party-mode-disabled.flag'),
-  ];
-
-  // Check if any old config exists
-  let hasOldConfig = false;
-  for (const oldPath of oldConfigPaths) {
+/**
+ * Check if any old config files exist
+ * @param {string[]} paths - Array of paths to check
+ * @returns {Promise<boolean>} True if any old config exists
+ */
+async function hasOldConfigFiles(paths) {
+  for (const oldPath of paths) {
     try {
       await fs.access(oldPath);
-      hasOldConfig = true;
-      break;
+      return true;
     } catch {
       // File doesn't exist, continue
     }
   }
+  return false;
+}
 
-  if (!hasOldConfig) {
-    return false; // No migration needed
-  }
-
-  spinner.info(chalk.yellow('🔄 Old configuration detected - migrating to .agentvibes/'));
-
-  // Run migration script
-  const migrationScript = path.join(targetDir, '.claude', 'hooks', 'migrate-to-agentvibes.sh');
-
+/**
+ * Execute migration script
+ * @param {string} migrationScript - Path to migration script
+ * @param {string} targetDir - Target directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<boolean>} True if migration succeeded
+ */
+async function executeMigrationScript(migrationScript, targetDir, spinner) {
   try {
     await fs.access(migrationScript);
 
@@ -2242,6 +2322,27 @@ async function detectAndMigrateOldConfig(targetDir, spinner) {
     console.log('');
     return false;
   }
+}
+
+async function detectAndMigrateOldConfig(targetDir, spinner) {
+  const oldConfigPaths = [
+    path.join(targetDir, '.claude', 'config', 'agentvibes.json'),
+    path.join(targetDir, '.claude', 'config', 'bmad-voices.md'),
+    path.join(targetDir, '.claude', 'config', 'bmad-voices-enabled.flag'),
+    path.join(targetDir, '.claude', 'plugins', 'bmad-voices-enabled.flag'),
+    path.join(targetDir, '.claude', 'plugins', 'bmad-party-mode-disabled.flag'),
+  ];
+
+  // Check if any old config exists
+  if (!await hasOldConfigFiles(oldConfigPaths)) {
+    return false; // No migration needed
+  }
+
+  spinner.info(chalk.yellow('🔄 Old configuration detected - migrating to .agentvibes/'));
+
+  // Run migration script
+  const migrationScript = path.join(targetDir, '.claude', 'hooks', 'migrate-to-agentvibes.sh');
+  return await executeMigrationScript(migrationScript, targetDir, spinner);
 }
 
 /**
@@ -2387,6 +2488,114 @@ async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
 }
 
 /**
+ * Create a silent spinner for update operations
+ * @returns {Object} Mock spinner object
+ */
+function createSilentSpinner() {
+  return { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} };
+}
+
+/**
+ * Update command files
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of commands updated
+ */
+async function updateCommandFiles(targetDir, spinner) {
+  spinner.text = 'Updating commands...';
+  const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
+  const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
+  const commandFiles = await fs.readdir(srcCommandsDir);
+
+  for (const file of commandFiles) {
+    const srcPath = path.join(srcCommandsDir, file);
+    const destPath = path.join(commandsDir, file);
+    await fs.copyFile(srcPath, destPath);
+  }
+
+  return commandFiles.length;
+}
+
+/**
+ * Perform all update operations
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<Object>} Update results
+ */
+async function performUpdateOperations(targetDir, spinner) {
+  const silentSpinner = createSilentSpinner();
+
+  // Update commands
+  const commandCount = await updateCommandFiles(targetDir, spinner);
+  console.log(chalk.green(`\n✓ Updated ${commandCount} commands`));
+
+  // Update hooks
+  spinner.text = 'Updating TTS scripts...';
+  const hookResult = await copyHookFiles(targetDir, silentSpinner);
+  console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
+
+  // Update personalities
+  spinner.text = 'Updating personality templates...';
+  const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+  const personalityResult = await updatePersonalityFiles(targetDir, srcPersonalitiesDir);
+  console.log(chalk.green(`✓ Updated ${personalityResult.updated} personalities, added ${personalityResult.new} new`));
+
+  // Update plugin files
+  const pluginFileCount = await copyPluginFiles(targetDir, silentSpinner);
+  if (pluginFileCount > 0) {
+    console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
+  }
+
+  // Update BMAD config files
+  const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, silentSpinner);
+  if (bmadConfigFileCount > 0) {
+    console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
+  }
+
+  // Update background music files
+  const backgroundMusicUpdateResult = await copyBackgroundMusicFiles(targetDir, silentSpinner);
+  if (backgroundMusicUpdateResult.count > 0) {
+    console.log(chalk.green(`✓ Installed ${backgroundMusicUpdateResult.count} background music track${backgroundMusicUpdateResult.count === 1 ? '' : 's'}`));
+  }
+
+  // Update config files
+  const configFileCount = await copyConfigFiles(targetDir, silentSpinner);
+  if (configFileCount > 0) {
+    console.log(chalk.green(`✓ Installed ${configFileCount} config file${configFileCount === 1 ? '' : 's'}`));
+  }
+
+  // Update settings.json
+  spinner.text = 'Updating AgentVibes hook configuration...';
+  await configureSessionStartHook(targetDir, silentSpinner);
+
+  // Detect and migrate old configuration
+  spinner.text = 'Checking for old configuration...';
+  await detectAndMigrateOldConfig(targetDir, spinner);
+
+  return {
+    commandCount,
+    hookCount: hookResult.count,
+    personalityResult,
+    pluginFileCount
+  };
+}
+
+/**
+ * Display update summary
+ * @param {Object} results - Update results
+ */
+function displayUpdateSummary(results) {
+  console.log(chalk.cyan('📦 Update Summary:'));
+  console.log(chalk.white(`   • ${results.commandCount} commands updated`));
+  console.log(chalk.white(`   • ${results.hookCount} TTS scripts updated`));
+  console.log(chalk.white(`   • ${results.personalityResult.new + results.personalityResult.updated} personality templates (${results.personalityResult.new} new, ${results.personalityResult.updated} updated)`));
+  if (results.pluginFileCount > 0) {
+    console.log(chalk.white(`   • ${results.pluginFileCount} BMAD plugin files updated`));
+  }
+  console.log('');
+}
+
+/**
  * Update AgentVibes files in target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} options - Update options
@@ -2395,76 +2604,13 @@ async function updateAgentVibes(targetDir, options) {
   const spinner = ora('Updating AgentVibes...').start();
 
   try {
-    const claudeDir = path.join(targetDir, '.claude');
-    const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
-
-    // Update commands
-    spinner.text = 'Updating commands...';
-    const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
-    const commandFiles = await fs.readdir(srcCommandsDir);
-
-    for (const file of commandFiles) {
-      const srcPath = path.join(srcCommandsDir, file);
-      const destPath = path.join(commandsDir, file);
-      await fs.copyFile(srcPath, destPath);
-    }
-    console.log(chalk.green(`\n✓ Updated ${commandFiles.length} commands`));
-
-    // Update hooks
-    spinner.text = 'Updating TTS scripts...';
-    const hookResult = await copyHookFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
-
-    // Update personalities
-    spinner.text = 'Updating personality templates...';
-    const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
-    const personalityResult = await updatePersonalityFiles(targetDir, srcPersonalitiesDir);
-    console.log(chalk.green(`✓ Updated ${personalityResult.updated} personalities, added ${personalityResult.new} new`));
-
-    // Output styles removed - deprecated in favor of SessionStart hook system
-
-    // Update plugin files
-    const pluginFileCount = await copyPluginFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (pluginFileCount > 0) {
-      console.log(chalk.green(`✓ Updated ${pluginFileCount} BMAD plugin files`));
-    }
-
-    // Update BMAD config files
-    const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (bmadConfigFileCount > 0) {
-      console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
-    }
-
-    // Update background music files
-    const backgroundMusicUpdateResult = await copyBackgroundMusicFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (backgroundMusicUpdateResult.count > 0) {
-      console.log(chalk.green(`✓ Installed ${backgroundMusicUpdateResult.count} background music track${backgroundMusicUpdateResult.count === 1 ? '' : 's'}`));
-    }
-
-    // Update config files
-    const configFileCount = await copyConfigFiles(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-    if (configFileCount > 0) {
-      console.log(chalk.green(`✓ Installed ${configFileCount} config file${configFileCount === 1 ? '' : 's'}`));
-    }
-
-    // Update settings.json
-    spinner.text = 'Updating AgentVibes hook configuration...';
-    await configureSessionStartHook(targetDir, { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} });
-
-    // Detect and migrate old configuration
-    spinner.text = 'Checking for old configuration...';
-    await detectAndMigrateOldConfig(targetDir, spinner);
+    // Perform all update operations
+    const updateResults = await performUpdateOperations(targetDir, spinner);
 
     spinner.succeed(chalk.green.bold('\n✨ Update complete!\n'));
 
-    console.log(chalk.cyan('📦 Update Summary:'));
-    console.log(chalk.white(`   • ${commandFiles.length} commands updated`));
-    console.log(chalk.white(`   • ${hookResult.count} TTS scripts updated`));
-    console.log(chalk.white(`   • ${personalityResult.new + personalityResult.updated} personality templates (${personalityResult.new} new, ${personalityResult.updated} updated)`));
-    if (pluginFileCount > 0) {
-      console.log(chalk.white(`   • ${pluginFileCount} BMAD plugin files updated`));
-    }
-    console.log('');
+    // Display summary
+    displayUpdateSummary(updateResults);
 
     // Show recent changes
     await showRecentChanges(path.join(__dirname, '..'));
