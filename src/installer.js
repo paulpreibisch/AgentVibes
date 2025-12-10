@@ -92,9 +92,9 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
   const github = chalk.gray('https://github.com/paulpreibisch/AgentVibes');
 
   const header = boxen(
-    `${agentText} ${vibesText} ${chalk.yellow(`v${VERSION}`)} ${chalk.white('Installer')} • ${pageNum}\n\n` +
-    `${chalk.cyan(pageTitle)}\n\n` +
-    `${website} • ${github}`,
+    `${agentText} ${vibesText} ${chalk.gray(`v${VERSION}`)} ${chalk.gray('Installer')} • ${pageNum}\n` +
+    `${website} • ${github}\n\n` +
+    `${chalk.cyan(pageTitle)}`,
     {
       padding: { top: 0, bottom: 0, left: 2, right: 2 },
       borderStyle: 'round',
@@ -123,20 +123,31 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
  * @param {number} totalPages - Total number of pages
  * @param {string} continueLabel - Label for continue button
  * @param {boolean} showPreviousOnFirst - Show previous on first page
+ * @param {Array} pages - Array of page objects with titles
  * @returns {Array} Navigation choices
  */
-function buildNavigationChoices(currentPage, totalPages, continueLabel, showPreviousOnFirst) {
+function buildNavigationChoices(currentPage, totalPages, continueLabel, showPreviousOnFirst, pages = null) {
   const choices = [];
   const isLastPage = currentPage >= totalPages - 1;
 
   if (!isLastPage) {
-    choices.push({ name: chalk.green('Next →'), value: 'next' });
+    let nextLabel = chalk.green('Next →');
+    if (pages && pages[currentPage + 1]) {
+      nextLabel += chalk.gray(` (${pages[currentPage + 1].title})`);
+    }
+    choices.push({ name: nextLabel, value: 'next' });
   } else {
     choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
   }
 
   if (currentPage > 0 || showPreviousOnFirst) {
-    choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+    let prevLabel = chalk.gray('← Previous');
+    if (pages && currentPage > 0 && pages[currentPage - 1]) {
+      prevLabel += chalk.gray(` (${pages[currentPage - 1].title})`);
+    } else if (showPreviousOnFirst && currentPage === 0) {
+      prevLabel = chalk.gray('← Back to Configuration');
+    }
+    choices.push({ name: prevLabel, value: 'prev' });
   }
 
   return choices;
@@ -188,14 +199,9 @@ async function showPaginatedContent(pages, options = {}) {
     );
 
     console.log(header);
-    console.log('');
     console.log(pages[currentPage].content);
 
-    const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst);
-
-    console.log('');
-    console.log(footer);
-    console.log('');
+    const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst, pages);
 
     const { action } = await inquirer.prompt([{
       type: 'list',
@@ -227,13 +233,31 @@ async function showPaginatedContent(pages, options = {}) {
  */
 function getPageTitle(pageNum) {
   const titles = {
-    0: 'System Dependencies',
-    1: 'TTS Provider Configuration',
-    2: 'Voice Selection',
-    3: 'Audio Settings',
-    4: 'Verbosity Settings'
+    0: '🔧 System Dependencies',
+    1: '🎙️ TTS Provider Configuration',
+    2: '🎤 Voice Selection',
+    3: '💧 Audio Effects',
+    4: '🎵 Background Music',
+    5: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
+}
+
+/**
+ * Get short page name with icon for navigation preview
+ * @param {number} pageNum - Page number (0-5)
+ * @returns {string} Short page name with icon
+ */
+function getPageShortName(pageNum) {
+  const shortNames = {
+    0: '🔧 System Dependencies',
+    1: '🎙️ TTS Provider',
+    2: '🎤 Default Voice',
+    3: '💧 Audio Effects',
+    4: '🎵 Background Music',
+    5: '🔊 TTS Verbosity'
+  };
+  return shortNames[pageNum] || 'Configuration';
 }
 
 /**
@@ -312,11 +336,10 @@ async function handleSystemDependenciesPage() {
 
   const depsBoxen = boxen(depContent.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
-    title: chalk.bold('🔧 System Dependencies'),
-    titleAlignment: 'center'
+    width: 80
   });
 
   console.log(depsBoxen);
@@ -350,7 +373,7 @@ async function collectConfiguration(options = {}) {
   }
 
   let currentPage = 0;
-  const sectionPages = 5; // System Dependencies, Provider, Voice Selection, Audio Settings, Verbosity
+  const sectionPages = 6; // System Dependencies, Provider, Voice Selection, Audio Effects, Background Music, Verbosity
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -366,7 +389,6 @@ async function collectConfiguration(options = {}) {
     const pageTitle = getPageTitle(currentPage);
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
-    console.log('');
 
     if (currentPage === 0) {
       await handleSystemDependenciesPage();
@@ -376,7 +398,7 @@ async function collectConfiguration(options = {}) {
       // On non-macOS platforms, only Piper is available - auto-select it
       if (process.platform !== 'darwin') {
         console.log(boxen(
-          chalk.gray('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
           chalk.white('Your TTS Provider:\n\n') +
           chalk.green('🆓 Piper TTS (Free, Offline)\n') +
           chalk.gray('   • 50+ Hugging Face AI voices\n') +
@@ -385,11 +407,10 @@ async function collectConfiguration(options = {}) {
           chalk.dim('(Automatically selected - only option for Linux/WSL)'),
           {
             padding: 1,
-            margin: 1,
+            margin: { top: 0, bottom: 1, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'gray',
-            title: chalk.bold('☺ TTS Provider'),
-            titleAlignment: 'center'
+            width: 80
           }
         ));
 
@@ -399,7 +420,7 @@ async function collectConfiguration(options = {}) {
       } else {
         // macOS - show choice between macOS Say and Piper
         console.log(boxen(
-          chalk.gray('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
           chalk.white('Choose your Text-to-Speech provider.\n\n') +
           chalk.yellow('🍎 macOS Say\n') +
           chalk.gray('   • Built-in to macOS\n') +
@@ -411,11 +432,10 @@ async function collectConfiguration(options = {}) {
           chalk.gray('   • Human-like speech quality'),
           {
             padding: 1,
-            margin: 1,
+            margin: { top: 0, bottom: 1, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'gray',
-            title: chalk.bold('☺ TTS Provider'),
-            titleAlignment: 'center'
+            width: 80
           }
         ));
 
@@ -467,11 +487,10 @@ async function collectConfiguration(options = {}) {
             chalk.white('across all your projects, or locally per project.'),
             {
               padding: 1,
-              margin: { top: 1, bottom: 1, left: 1, right: 1 },
+              margin: { top: 0, bottom: 1, left: 0, right: 0 },
               borderStyle: 'round',
               borderColor: 'gray',
-              title: chalk.bold('📁 Voice Storage'),
-              titleAlignment: 'center'
+              width: 80
             }
           ));
 
@@ -496,102 +515,122 @@ async function collectConfiguration(options = {}) {
 
     } else if (currentPage === 2) {
       // Page 3: Voice Selection
-      console.log(boxen(
-        chalk.white('Choose a default voice for your AgentVibes.\n\n') +
-        chalk.gray('This will be used when no specific voice is configured.\n') +
-        chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'gray',
-          title: chalk.bold('🎤 Default Voice'),
-          titleAlignment: 'center'
+
+      // Only show selection if voice not yet configured
+      if (!config.defaultVoice) {
+        console.log(boxen(
+          chalk.white('Choose a default voice for your AgentVibes.\n\n') +
+          chalk.gray('This will be used when no specific voice is configured.\n') +
+          chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 1, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'gray',
+            width: 80
+          }
+        ));
+
+        if (config.provider === 'piper') {
+          // Piper voices - popular selections
+          const piperVoices = [
+            { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)'), value: 'en_US-ryan-high' },
+            { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)'), value: 'en_US-amy-medium' },
+            { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)'), value: 'en_US-joe-medium' },
+            { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)'), value: 'en_US-lessac-medium' },
+            { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)'), value: 'en_GB-alan-medium' },
+            { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)'), value: 'en_GB-southern_english_female-medium' },
+            new inquirer.Separator(),
+            { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
+            { name: chalk.gray('← Back to Provider Selection'), value: '__back__' }
+          ];
+
+          const { selectedVoice } = await inquirer.prompt([{
+            type: 'list',
+            name: 'selectedVoice',
+            message: chalk.yellow('Select your default Piper voice:'),
+            choices: piperVoices,
+            default: 'en_US-ryan-high',
+            pageSize: 12
+          }]);
+
+          if (selectedVoice === '__back__') {
+            return null;
+          }
+
+          if (selectedVoice !== '__skip__') {
+            config.defaultVoice = selectedVoice;
+            // Auto-advance to next page after selection
+            console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+            currentPage++; // Skip to next page immediately
+            continue; // Skip navigation and go to next iteration
+          }
+
+        } else if (config.provider === 'macos') {
+          // macOS Say voices - popular selections
+          const macOSVoices = [
+            { name: chalk.cyan('Samantha') + chalk.gray(' (Female, American)'), value: 'Samantha' },
+            { name: chalk.cyan('Alex') + chalk.gray(' (Male, American)'), value: 'Alex' },
+            { name: chalk.magenta('Flo') + chalk.gray(' (Female, American, Expressive)'), value: 'Flo' },
+            { name: chalk.cyan('Tom') + chalk.gray(' (Male, American)'), value: 'Tom' },
+            { name: chalk.magenta('Karen') + chalk.gray(' (Female, Australian)'), value: 'Karen' },
+            { name: chalk.cyan('Daniel') + chalk.gray(' (Male, British)'), value: 'Daniel' },
+            new inquirer.Separator(),
+            { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
+            { name: chalk.gray('← Back to Provider Selection'), value: '__back__' }
+          ];
+
+          const { selectedVoice } = await inquirer.prompt([{
+            type: 'list',
+            name: 'selectedVoice',
+            message: chalk.yellow('Select your default macOS voice:'),
+            choices: macOSVoices,
+            default: 'Samantha',
+            pageSize: 12
+          }]);
+
+          if (selectedVoice === '__back__') {
+            return null;
+          }
+
+          if (selectedVoice !== '__skip__') {
+            config.defaultVoice = selectedVoice;
+            // Auto-advance to next page after selection
+            console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+            currentPage++; // Skip to next page immediately
+            continue; // Skip navigation and go to next iteration
+          }
         }
-      ));
-
-      if (config.provider === 'piper') {
-        // Piper voices - popular selections
-        const piperVoices = [
-          { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)'), value: 'en_US-ryan-high' },
-          { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)'), value: 'en_US-amy-medium' },
-          { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)'), value: 'en_US-joe-medium' },
-          { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)'), value: 'en_US-lessac-medium' },
-          { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)'), value: 'en_GB-alan-medium' },
-          { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)'), value: 'en_GB-southern_english_female-medium' },
-          new inquirer.Separator(),
-          { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
-          { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
-        ];
-
-        const { selectedVoice } = await inquirer.prompt([{
-          type: 'list',
-          name: 'selectedVoice',
-          message: chalk.yellow('Select your default Piper voice:'),
-          choices: piperVoices,
-          default: 'en_US-ryan-high',
-          pageSize: 12
-        }]);
-
-        if (selectedVoice === '__back__') {
-          return null;
-        }
-
-        if (selectedVoice !== '__skip__') {
-          config.defaultVoice = selectedVoice;
-        }
-
-      } else if (config.provider === 'macos') {
-        // macOS Say voices - popular selections
-        const macOSVoices = [
-          { name: chalk.cyan('Samantha') + chalk.gray(' (Female, American)'), value: 'Samantha' },
-          { name: chalk.cyan('Alex') + chalk.gray(' (Male, American)'), value: 'Alex' },
-          { name: chalk.magenta('Flo') + chalk.gray(' (Female, American, Expressive)'), value: 'Flo' },
-          { name: chalk.cyan('Tom') + chalk.gray(' (Male, American)'), value: 'Tom' },
-          { name: chalk.magenta('Karen') + chalk.gray(' (Female, Australian)'), value: 'Karen' },
-          { name: chalk.cyan('Daniel') + chalk.gray(' (Male, British)'), value: 'Daniel' },
-          new inquirer.Separator(),
-          { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
-          { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
-        ];
-
-        const { selectedVoice } = await inquirer.prompt([{
-          type: 'list',
-          name: 'selectedVoice',
-          message: chalk.yellow('Select your default macOS voice:'),
-          choices: macOSVoices,
-          default: 'Samantha',
-          pageSize: 12
-        }]);
-
-        if (selectedVoice === '__back__') {
-          return null;
-        }
-
-        if (selectedVoice !== '__skip__') {
-          config.defaultVoice = selectedVoice;
-        }
+      } else {
+        // Voice already selected - show confirmation
+        console.log(boxen(
+          chalk.green('✓ Default voice configured\n\n') +
+          chalk.white(`Voice: ${config.defaultVoice}\n\n`) +
+          chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 1, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'green',
+            width: 80
+          }
+        ));
       }
 
     } else if (currentPage === 3) {
-      // Page 4: Audio Settings (Reverb + Background Music)
+      // Page 4: Audio Effects (Reverb)
       console.log(boxen(
-        chalk.white('Configure audio effects and background music for your Agents.\n\n') +
+        chalk.white('Configure audio effects for your TTS voices.\n\n') +
         chalk.yellow('Reverb:\n') +
         chalk.gray('   • 💧 Reverb adds room ambiance to TTS audio, making voices sound more natural\n') +
-        chalk.gray('   • Change anytime: ') + chalk.cyan('/agent-vibes:effects reverb off/light/medium/heavy/cathedral\n\n') +
-        chalk.yellow('Background Music:\n') +
-        chalk.gray('   • Optional ambient music during TTS\n') +
-        chalk.gray('   • 16 genre choices from Flamenco to City Pop\n') +
-        chalk.gray('   • Toggle: ') + chalk.cyan('/agent-vibes:background-music on/off\n') +
-        chalk.gray('   • Change track: ') + chalk.cyan('/agent-vibes:background-music set chillwave'),
+        chalk.gray('   • Simulates different acoustic environments from small rooms to cathedrals\n') +
+        chalk.gray('   • Change anytime: ') + chalk.cyan('/agent-vibes:effects reverb off/light/medium/heavy/cathedral'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 0, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
-          title: chalk.bold('☺ Audio Effects'),
-          titleAlignment: 'center'
+          width: 80
         }
       ));
 
@@ -610,12 +649,26 @@ async function collectConfiguration(options = {}) {
       }]);
 
       config.reverb = reverbLevel;
+      console.log(chalk.green(`\n✓ Reverb level set: ${reverbLevel}\n`));
+      currentPage++; // Auto-advance to next page
+      continue; // Skip navigation and go to next iteration
 
-      // Add spacing before next question
-      console.log('');
-
-      // Background music
-      console.log(chalk.gray('🎵 Background music plays ambient tracks during TTS for a more engaging experience.'));
+    } else if (currentPage === 4) {
+      // Page 5: Background Music
+      console.log(boxen(
+        chalk.white('Add ambient background music to your TTS sessions.\n\n') +
+        chalk.gray('   • Optional ambient music plays during TTS for a more engaging experience\n') +
+        chalk.gray('   • 16 genre choices from Flamenco to City Pop\n') +
+        chalk.gray('   • Toggle: ') + chalk.cyan('/agent-vibes:background-music on/off\n') +
+        chalk.gray('   • Change track: ') + chalk.cyan('/agent-vibes:background-music set chillwave'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 1, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'gray',
+          width: 80
+        }
+      ));
 
       const { enableMusic } = await inquirer.prompt([{
         type: 'confirm',
@@ -660,10 +713,16 @@ async function collectConfiguration(options = {}) {
         }]);
 
         config.backgroundMusic.track = selectedTrack;
+        console.log(chalk.green(`\n✓ Background music configured\n`));
+      } else {
+        console.log(chalk.green(`\n✓ Background music disabled\n`));
       }
 
-    } else if (currentPage === 4) {
-      // Page 5: Verbosity Settings
+      currentPage++; // Auto-advance to next page
+      continue; // Skip navigation and go to next iteration
+
+    } else if (currentPage === 5) {
+      // Page 6: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -678,11 +737,10 @@ async function collectConfiguration(options = {}) {
         chalk.gray('Change anytime: ') + chalk.cyan('/agent-vibes:verbosity <level>'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 0, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
-          title: chalk.bold('☺ TTS Verbosity'),
-          titleAlignment: 'center'
+          width: 80
         }
       ));
 
@@ -701,29 +759,29 @@ async function collectConfiguration(options = {}) {
       }]);
 
       config.verbosity = verbosity;
+      console.log(chalk.green(`\n✓ Verbosity set: ${verbosity}\n`));
+
+      // Last config page - show completion message and auto-exit
+      console.log(chalk.cyan.bold('✓ Configuration complete!\n'));
+      break; // Exit the loop to proceed with installation
     }
 
-    // Add spacing before navigation
-    console.log('');
-
-    // Show footer before navigation
-    console.log('');
-    console.log(footer);
-    console.log('');
 
     // Navigation
     const navChoices = [];
     if (currentPage < totalPages - 1) {
-      navChoices.push({ name: chalk.green('Next →'), value: 'next' });
+      const nextPageName = getPageShortName(currentPage + 1);
+      navChoices.push({ name: chalk.green('Next → ') + chalk.gray(`(${nextPageName})`), value: 'next' });
     } else {
       navChoices.push({ name: chalk.cyan('✓ Continue to Installation'), value: 'continue' });
     }
 
     // Always show Previous button (on first page it goes back to welcome)
     if (currentPage === 0) {
-      navChoices.push({ name: chalk.magentaBright('← Back to Welcome'), value: 'back' });
+      navChoices.push({ name: chalk.gray('← Back to Welcome'), value: 'back' });
     } else {
-      navChoices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+      const prevPageName = getPageShortName(currentPage - 1);
+      navChoices.push({ name: chalk.gray(`← Previous (${prevPageName})`), value: 'prev' });
     }
 
     const { action } = await inquirer.prompt([{
@@ -1300,20 +1358,37 @@ async function copyCommandFiles(targetDir, spinner) {
 
     // Create boxen content (don't print yet - will be shown in pagination)
     let content = chalk.bold(`${installedCommands.length} Slash Commands Installed\n\n`);
+    content += chalk.gray('Installed in: ') + chalk.cyan('.claude/commands/\n\n');
     content += chalk.gray('Slash commands are shortcuts you type in chat to trigger actions.\n');
     content += chalk.gray('Type them with a forward slash like: /agent-vibes:list\n\n');
+    content += chalk.cyan('Use ') + chalk.magenta('/agent-vibes:hide') + chalk.cyan(' to hide and ') + chalk.magenta('/agent-vibes:show') + chalk.cyan(' to show\n\n');
 
-    installedCommands.forEach(file => {
-      // Remove .md extension and format command name
-      const commandName = file.replace('.md', '');
+    // Format commands in two columns
+    const commandNames = installedCommands.map(file => file.replace('.md', ''));
+    const mid = Math.ceil(commandNames.length / 2);
+    const leftColumn = commandNames.slice(0, mid);
+    const rightColumn = commandNames.slice(mid);
 
-      // Highlight show and hide commands in cyan
-      if (commandName === 'agent-vibes:show' || commandName === 'agent-vibes:hide') {
-        content += chalk.green('✓ ') + chalk.cyan(`/${commandName}\n`);
-      } else {
-        content += chalk.green(`✓ `) + chalk.yellow(`/${commandName}\n`);
+    for (let i = 0; i < leftColumn.length; i++) {
+      const leftCmd = leftColumn[i];
+      const rightCmd = rightColumn[i];
+
+      // Format left column
+      let line = chalk.green('✓ ') + chalk.yellow(`/${leftCmd}`);
+
+      // Pad to align right column (40 chars for command + checkmark)
+      const leftLength = leftCmd.length + 4; // 4 = "✓ /" + command
+      const padding = ' '.repeat(Math.max(0, 40 - leftLength));
+
+      line += padding;
+
+      // Format right column if it exists
+      if (rightCmd) {
+        line += chalk.green('✓ ') + chalk.yellow(`/${rightCmd}`);
       }
-    });
+
+      content += line + '\n';
+    }
 
     // Add failures if any
     if (failedCommands.length > 0) {
@@ -1326,11 +1401,10 @@ async function copyCommandFiles(targetDir, spinner) {
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 1, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: successCount === commandFiles.length ? 'cyan' : 'yellow',
-      title: chalk.bold('📋 Slash Commands'),
-      titleAlignment: 'center'
+      width: 80
     });
 
     return { count: successCount, boxen: boxenContent };
@@ -1410,13 +1484,25 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
   content += chalk.gray('Hook scripts automatically run at key moments during your\n');
   content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
 
-  installedFiles.forEach(file => {
-    content += chalk.green(`✓ ${file.name}`);
-    if (file.executable) {
-      content += chalk.gray(' (executable)');
+  // Format files in two columns
+  const mid = Math.ceil(installedFiles.length / 2);
+  for (let i = 0; i < mid; i++) {
+    const left = installedFiles[i];
+    const right = installedFiles[i + mid];
+
+    // Format left column
+    let line = chalk.green(`✓ ${left.name}`);
+    const leftLen = left.name.length + 2; // "✓ " + name
+    const padding = ' '.repeat(Math.max(0, 40 - leftLen));
+    line += padding;
+
+    // Format right column if it exists
+    if (right) {
+      line += chalk.green(`✓ ${right.name}`);
     }
-    content += '\n';
-  });
+
+    content += line + '\n';
+  }
 
   if (failedFiles.length > 0) {
     content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
@@ -1429,11 +1515,10 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
 
   return boxen(content.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
-    title: chalk.bold('🔧 TTS Scripts'),
-    titleAlignment: 'center'
+    width: 80
   });
 }
 
@@ -1558,19 +1643,36 @@ async function copyPersonalityFiles(targetDir, spinner) {
       'zen': '🧘'
     };
 
-    installedPersonalities.forEach(file => {
+    // Display personalities in two columns
+    const personalities = installedPersonalities.map(file => {
       const name = file.replace('.md', '');
       const emoji = personalityEmojis[name] || '✨';
-      content += chalk.green(`✓ ${emoji} ${name}\n`);
+      return { emoji, name };
     });
+
+    const mid = Math.ceil(personalities.length / 2);
+    for (let i = 0; i < mid; i++) {
+      const left = personalities[i];
+      const right = personalities[i + mid];
+
+      let line = chalk.green('✓ ') + left.emoji + ' ' + chalk.yellow(left.name);
+      const leftLen = left.name.length + 4; // "✓ " + emoji + " " + name
+      const padding = ' '.repeat(Math.max(0, 35 - leftLen));
+      line += padding;
+
+      if (right) {
+        line += chalk.green('✓ ') + right.emoji + ' ' + chalk.yellow(right.name);
+      }
+
+      content += line + '\n';
+    }
 
     boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 1, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'magenta',
-      title: chalk.bold('🎭 Personalities'),
-      titleAlignment: 'center'
+      width: 80
     });
   }
 
@@ -1709,18 +1811,52 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
 
     content += chalk.gray('─'.repeat(70)) + '\n\n';
 
-    musicFiles.forEach(track => {
-      content += chalk.green(`✓ ${track.name}`) + chalk.gray(` (${track.size})\n`);
-      content += chalk.dim(`  ${track.path}\n`);
-    });
+    // Display tracks with emojis in two columns
+    content += chalk.cyan('Available Tracks:\n\n');
+
+    const tracks = [
+      { emoji: '🎻', name: 'Soft Flamenco' },
+      { emoji: '🎺', name: 'Bachata' },
+      { emoji: '💃', name: 'Salsa' },
+      { emoji: '🎸', name: 'Cumbia' },
+      { emoji: '🌸', name: 'Bossa Nova' },
+      { emoji: '🏙️ ', name: 'Japanese City Pop' },
+      { emoji: '🌊', name: 'Chillwave' },
+      { emoji: '🎹', name: 'Dreamy House' },
+      { emoji: '🌙', name: 'Dark Chill Step' },
+      { emoji: '🕉️ ', name: 'Goa Trance' },
+      { emoji: '🎼', name: 'Harpsichord' },
+      { emoji: '🎻', name: 'Celtic Harp' },
+      { emoji: '🌺', name: 'Hawaiian Slack Key' },
+      { emoji: '🏜️ ', name: 'Arabic Oud' },
+      { emoji: '🪘', name: 'Gnawa Ambient' },
+      { emoji: '🥁', name: 'Tabla Dream Pop' }
+    ];
+
+    const mid = Math.ceil(tracks.length / 2);
+    for (let i = 0; i < mid; i++) {
+      const left = tracks[i];
+      const right = tracks[i + mid];
+
+      let line = '  ' + left.emoji + ' ' + chalk.yellow(left.name);
+      // Calculate padding based on actual character count (emojis with extra space already included)
+      const leftLen = left.name.length + 3 + (left.emoji.length > 2 ? 1 : 0); // "  " + emoji + " " + name
+      const padding = ' '.repeat(Math.max(0, 35 - leftLen));
+      line += padding;
+
+      if (right) {
+        line += right.emoji + ' ' + chalk.yellow(right.name);
+      }
+
+      content += line + '\n';
+    }
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 1, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'green',
-      title: chalk.bold('🎵 Background Music'),
-      titleAlignment: 'center'
+      width: 80
     });
 
     return { count: musicFiles.length, boxen: boxenContent };
@@ -2631,7 +2767,7 @@ async function install(options = {}) {
   const currentDir = process.env.INIT_CWD || process.cwd();
 
   // Global pagination constants (used throughout install flow)
-  const configPages = 4; // System Dependencies + Provider + Audio + Verbosity
+  const configPages = 6; // System Dependencies + Provider + Voice + Audio Effects + Background Music + Verbosity
   const configOffset = 0;
 
   // Loop to allow going back to welcome screen
@@ -2700,10 +2836,12 @@ async function install(options = {}) {
   configContent += chalk.cyan('🎤 TTS Provider:\n');
   configContent += chalk.white(`   ${providerLabels[selectedProvider]}\n`);
   if (selectedProvider === 'piper' && piperVoicesPath) {
-    configContent += chalk.gray(`   Voice storage: ${piperVoicesPath}\n`);
+    // Shorten the path if it's too long for display
+    const displayPath = piperVoicesPath.replace(process.env.HOME, '~');
+    configContent += chalk.gray(`   Storage: ${displayPath}\n`);
   }
   configContent += '\n';
-  configContent += chalk.cyan('🎛️  Audio Settings:\n');
+  configContent += chalk.cyan('🎛️  Audio Settings: \n');
   configContent += chalk.white(`   Reverb: ${reverbLabels[userConfig.reverb]}\n`);
   configContent += chalk.white(`   Background Music: ${userConfig.backgroundMusic.enabled ? 'Enabled' : 'Disabled'}\n`);
   if (userConfig.backgroundMusic.enabled) {
@@ -2727,7 +2865,7 @@ async function install(options = {}) {
       'agent_vibes_tabla_dream_pop_v1_loop.mp3': 'Tabla Dream Pop'
     };
     const trackName = trackChoices[userConfig.backgroundMusic.track] || userConfig.backgroundMusic.track;
-    configContent += chalk.gray(`   Default track: ${trackName}\n`);
+    configContent += chalk.gray(`   Track: ${trackName}\n`);
   }
   configContent += '\n';
   configContent += chalk.cyan('🔊 Verbosity:\n');
@@ -2735,11 +2873,10 @@ async function install(options = {}) {
 
   const configBoxen = boxen(configContent.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
-    title: chalk.bold('⚙️  Configuration Summary'),
-    titleAlignment: 'center'
+    width: 80
   });
   preInstallPages.push({
     title: 'Configuration Summary',
@@ -2749,7 +2886,7 @@ async function install(options = {}) {
   // Show pre-install info pages with pagination
   if (!options.yes) {
     console.log(chalk.cyan('\n📖 Installation Preview\n'));
-    const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
+    const preInstallOffset = 6; // After 6 config pages (System Dependencies + Provider + Voice + Audio Effects + Background Music + Verbosity)
     // For pre-install, estimate post-install pages (will be exact in post-install)
     const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
     const estimatedTotal = configPages + preInstallPages.length + estimatedPostInstall;
@@ -3139,27 +3276,26 @@ async function install(options = {}) {
       }
     }
 
-    // Success message as final page (no boxen)
+    // Success message as final page
+    const thankYouBox = boxen(
+      chalk.green.bold('Thank you for installing AgentVibes!\n\n') +
+      chalk.white('Consider giving us a ⭐ on GitHub:\n') +
+      chalk.cyan('https://github.com/paulpreibisch/AgentVibes'),
+      {
+        padding: 1,
+        margin: { top: 0, bottom: 1, left: 0, right: 0 },
+        borderStyle: 'round',
+        borderColor: 'green',
+        textAlignment: 'center',
+        width: 80
+      }
+    );
+
     const successContent =
       chalk.green.bold('✨ Installation Complete! ✨\n\n') +
       chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
       chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n') +
-      chalk.white('🎤 Available Commands:\n\n') +
-      chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
-      chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
-      chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
-      chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
-      chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
-      chalk.cyan('  /agent-vibes:add <name> <id>') + chalk.gray(' .... Add custom voice\n') +
-      chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n') +
-      chalk.cyan('  /agent-vibes:get') + chalk.gray(' ................. Get active voice\n') +
-      chalk.cyan('  /agent-vibes:sample <name>') + chalk.gray(' ...... Test a voice\n') +
-      chalk.cyan('  /agent-vibes:personality') + chalk.gray(' ......... Set personality\n') +
-      chalk.cyan('  /agent-vibes:sentiment') + chalk.gray(' ........... Set sentiment\n') +
-      chalk.cyan('  /agent-vibes:set-pretext') + chalk.gray(' ......... Set TTS prefix\n\n') +
-      chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n') +
-      chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes\n') +
-      chalk.gray('📖 Docs: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes/blob/master/README.md');
+      thankYouBox;
 
     pages.push({ title: 'Installation Complete', content: successContent });
 

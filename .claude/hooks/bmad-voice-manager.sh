@@ -321,8 +321,8 @@ sync_intros_from_manifest() {
         # Remove quotes from intro
         intro=$(echo "$intro" | sed 's/^"//;s/"$//')
 
-        # Only update if intro is the exact generic placeholder
-        if [[ "$intro" == "$generic_intro" ]]; then
+        # Only update if intro is the exact generic placeholder or empty
+        if [[ "$intro" == "$generic_intro" ]] || [[ -z "$intro" ]]; then
             # Look up displayName and title from manifest using awk for proper CSV parsing
             # CSV format: name,displayName,title,icon,role,...
             local manifest_data=$(grep "^\"*${agent}\"*," "$manifest_file" | awk -F'","' '{
@@ -400,8 +400,8 @@ get_agent_intro() {
             print intro;
         }')
 
-        # If intro is empty or generic, fall back to agent display name from manifest
-        if [[ -z "$intro" ]] || [[ "$intro" == "Hello! Ready to help with the discussion." ]]; then
+        # If intro is empty or generic, generate from manifest
+        if [[ -z "$intro" ]] || [[ "$intro" == "Hello! Ready to help with the discussion." ]] || [[ "$intro" == '""' ]]; then
             # Try to get display name from agent-manifest.csv
             local manifest_file=""
             if [[ -f ".bmad/_cfg/agent-manifest.csv" ]]; then
