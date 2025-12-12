@@ -206,7 +206,7 @@ async function showPaginatedContent(pages, options = {}) {
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: chalk.cyan(`📄 ${pages[currentPage].title}`),
+      message: '', // Hide the "Use arrow keys" message
       choices,
       default: currentPage < pages.length - 1 ? 'next' : 'continue'
     }]);
@@ -233,12 +233,13 @@ async function showPaginatedContent(pages, options = {}) {
  */
 function getPageTitle(pageNum) {
   const titles = {
-    0: '🔧 System Dependencies',
-    1: '🎙️ TTS Provider Configuration',
-    2: '🎤 Voice Selection',
-    3: '💧 Audio Effects',
-    4: '🎵 Background Music',
-    5: '🔊 Verbosity Settings'
+    0: '⚡ Mode Selection',
+    1: '🔧 System Dependencies',
+    2: '🎙️ TTS Provider Configuration',
+    3: '🎤 Voice Selection',
+    4: '💧 Audio Effects',
+    5: '🎵 Background Music',
+    6: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -250,12 +251,13 @@ function getPageTitle(pageNum) {
  */
 function getPageShortName(pageNum) {
   const shortNames = {
-    0: '🔧 System Dependencies',
-    1: '🎙️ TTS Provider',
-    2: '🎤 Default Voice',
-    3: '💧 Audio Effects',
-    4: '🎵 Background Music',
-    5: '🔊 TTS Verbosity'
+    0: '⚡ Mode',
+    1: '🔧 Dependencies',
+    2: '🎙️ Provider',
+    3: '🎤 Voice',
+    4: '💧 Effects',
+    5: '🎵 Music',
+    6: '🔊 Verbosity'
   };
   return shortNames[pageNum] || 'Configuration';
 }
@@ -352,6 +354,7 @@ async function handleSystemDependenciesPage() {
  */
 async function collectConfiguration(options = {}) {
   const config = {
+    mode: 'full', // NEW: lite or full
     provider: null,
     piperPath: null,
     defaultVoice: null,
@@ -364,7 +367,8 @@ async function collectConfiguration(options = {}) {
   };
 
   if (options.yes) {
-    // Non-interactive mode - use defaults
+    // Non-interactive mode - use defaults (full mode)
+    config.mode = 'full';
     config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
     config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
     const homeDir = process.env.HOME || process.env.USERPROFILE;
@@ -373,7 +377,7 @@ async function collectConfiguration(options = {}) {
   }
 
   let currentPage = 0;
-  const sectionPages = 6; // System Dependencies, Provider, Voice Selection, Audio Effects, Background Music, Verbosity
+  const sectionPages = 7; // Mode Selection, System Dependencies, Provider, Voice Selection, Audio Effects, Background Music, Verbosity
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -391,9 +395,69 @@ async function collectConfiguration(options = {}) {
     console.log(header);
 
     if (currentPage === 0) {
-      await handleSystemDependenciesPage();
+      // Page 1: Mode Selection
+      console.log(boxen(
+        chalk.white.bold('Choose Your AgentVibes Mode\n\n') +
+        chalk.green.bold('🟢 FULL MODE (Recommended)\n') +
+        chalk.gray('   • Rich, expressive TTS with personality\n') +
+        chalk.gray('   • Acknowledgment + completion messages\n') +
+        chalk.gray('   • Language learning & audio effects\n') +
+        chalk.gray('   • Background music & 50+ voices\n') +
+        chalk.gray('   • Perfect for immersive AI experience\n') +
+        chalk.dim('   • ~500 tokens overhead per session\n\n') +
+        chalk.blue.bold('🔵 LITE MODE (Advanced)\n') +
+        chalk.gray('   • Minimal overhead for power users\n') +
+        chalk.gray('   • Completion messages only (no acknowledgment)\n') +
+        chalk.gray('   • Smart verbosity (scales with response)\n') +
+        chalk.gray('   • Silent operation, no file saving\n') +
+        chalk.gray('   • Perfect for parallel Claude sessions\n') +
+        chalk.dim('   • ~50 tokens overhead per session\n\n') +
+        chalk.yellow('💡 You can switch modes anytime with /agent-vibes:mode'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 1, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'cyan',
+          width: 80
+        }
+      ));
+
+      const { mode } = await inquirer.prompt([{
+        type: 'list',
+        name: 'mode',
+        message: chalk.yellow('Select AgentVibes mode:'),
+        choices: [
+          {
+            name: chalk.green('🟢 Full Mode (Recommended) - All features, rich experience'),
+            value: 'full'
+          },
+          {
+            name: chalk.blue('🔵 Lite Mode (Advanced) - Minimal overhead, ~50 tokens'),
+            value: 'lite'
+          }
+        ],
+        default: 'full'
+      }]);
+
+      config.mode = mode;
+
+      // If lite mode, disable features that don't apply
+      if (mode === 'lite') {
+        config.reverb = 'off';
+        config.backgroundMusic.enabled = false;
+        config.verbosity = 'low'; // Lite mode handles verbosity automatically
+      }
+
+      // Auto-advance to next page
+      console.log(chalk.green(`\n✓ Mode selected: ${mode === 'lite' ? 'Lite Mode' : 'Full Mode'}\n`));
+      currentPage++;
+      continue; // Skip navigation menu and go directly to next page
+
     } else if (currentPage === 1) {
-      // Page 2: TTS Provider & Voice Storage
+      await handleSystemDependenciesPage();
+      currentPage++;
+    } else if (currentPage === 2) {
+      // Page 3: TTS Provider & Voice Storage
 
       // On non-macOS platforms, only Piper is available - auto-select it
       if (process.platform !== 'darwin') {
@@ -513,8 +577,17 @@ async function collectConfiguration(options = {}) {
         }
       }
 
-    } else if (currentPage === 2) {
-      // Page 3: Voice Selection
+    } else if (currentPage === 3) {
+      // Page 4: Voice Selection
+
+      // Debug: Check provider status
+      if (!config.provider) {
+        console.log(chalk.red('\n✗ DEBUG: Provider is not set!'));
+        console.log(chalk.yellow(`config.provider = ${config.provider}`));
+        console.log(chalk.yellow('This should not happen. Going back to provider selection.\n'));
+        currentPage = 2;
+        continue;
+      }
 
       // Only show selection if voice not yet configured
       if (!config.defaultVoice) {
@@ -564,6 +637,11 @@ async function collectConfiguration(options = {}) {
             console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
             currentPage++; // Skip to next page immediately
             continue; // Skip navigation and go to next iteration
+          } else {
+            // User skipped - advance anyway
+            console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+            currentPage++;
+            continue;
           }
 
         } else if (config.provider === 'macos') {
@@ -599,7 +677,17 @@ async function collectConfiguration(options = {}) {
             console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
             currentPage++; // Skip to next page immediately
             continue; // Skip navigation and go to next iteration
+          } else {
+            // User skipped - advance anyway
+            console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+            currentPage++;
+            continue;
           }
+        } else {
+          // Provider not configured or unknown - go back to provider page
+          console.log(chalk.red('\n✗ Error: Provider not configured properly.\n'));
+          console.log(chalk.yellow('Please go back and select a provider first.\n'));
+          // Don't auto-advance - let user navigate back
         }
       } else {
         // Voice already selected - show confirmation
@@ -617,8 +705,8 @@ async function collectConfiguration(options = {}) {
         ));
       }
 
-    } else if (currentPage === 3) {
-      // Page 4: Audio Effects (Reverb)
+    } else if (currentPage === 4) {
+      // Page 5: Audio Effects (Reverb)
       console.log(boxen(
         chalk.white('Configure audio effects for your TTS voices.\n\n') +
         chalk.yellow('Reverb:\n') +
@@ -653,8 +741,8 @@ async function collectConfiguration(options = {}) {
       currentPage++; // Auto-advance to next page
       continue; // Skip navigation and go to next iteration
 
-    } else if (currentPage === 4) {
-      // Page 5: Background Music
+    } else if (currentPage === 5) {
+      // Page 6: Background Music
       console.log(boxen(
         chalk.white('Add ambient background music to your TTS sessions.\n\n') +
         chalk.gray('   • Optional ambient music plays during TTS for a more engaging experience\n') +
@@ -721,8 +809,8 @@ async function collectConfiguration(options = {}) {
       currentPage++; // Auto-advance to next page
       continue; // Skip navigation and go to next iteration
 
-    } else if (currentPage === 5) {
-      // Page 6: Verbosity Settings
+    } else if (currentPage === 6) {
+      // Page 7: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -819,44 +907,32 @@ program
 
 // Beautiful ASCII art
 function showWelcome() {
+  console.clear();
   console.log('');
 
-  // Generate separate ASCII art for "Agent" and "Vibes"
-  const agentText = figlet.textSync('Agent', {
-    font: 'ANSI Shadow',
-    horizontalLayout: 'default',
-  });
+  // Use standard header (same format as configuration pages)
+  const agentText = chalk.cyan('Agent');
+  const vibesText = chalk.magentaBright('Vibes');
+  const website = chalk.gray('https://agentvibes.org');
+  const github = chalk.gray('https://github.com/paulpreibisch/AgentVibes');
 
-  const vibesText = figlet.textSync('Vibes', {
-    font: 'ANSI Shadow',
-    horizontalLayout: 'default',
-  });
-
-  // Split into lines and combine with different colors
-  const agentLines = agentText.split('\n');
-  const vibesLines = vibesText.split('\n');
-  const maxLines = Math.max(agentLines.length, vibesLines.length);
-
-  for (let i = 0; i < maxLines; i++) {
-    const agentLine = agentLines[i] || '';
-    const vibesLine = vibesLines[i] || '';
-    console.log(chalk.cyan(agentLine) + chalk.magenta(vibesLine));
-  }
-
-  console.log(
-    boxen(
-      chalk.white.bold('🎤 Now your AI Agents can finally talk back! TTS Voice for Claude Code\n\n') +
-      chalk.gray('Add professional text-to-speech narration to your AI coding sessions\n\n') +
-      chalk.cyan('📦 https://github.com/paulpreibisch/AgentVibes'),
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'cyan',
-        backgroundColor: '#1a1a1a',
-      }
-    )
+  const header = boxen(
+    `${agentText} ${vibesText} ${chalk.gray(`v${VERSION}`)} ${chalk.gray('Installer')}\n` +
+    `${website} • ${github}\n\n` +
+    chalk.white('AgentVibes enhances the developer experience by adding Text-to-Speech\n') +
+    chalk.white('for Claude Code with optional Background Music, Special Effects, and Personalities!\n\n') +
+    chalk.cyan('📖 README: ') + chalk.blue('https://github.com/paulpreibisch/AgentVibes/blob/main/README.md'),
+    {
+      padding: { top: 0, bottom: 0, left: 2, right: 2 },
+      borderStyle: 'round',
+      borderColor: 'cyan',
+      width: 80,
+      textAlignment: 'left'
+    }
   );
+
+  console.log(header);
+  console.log('');
 }
 
 /**
@@ -864,25 +940,10 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.17.4 - Code Quality & Maintainability\n\n') +
-    chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.17.4 focuses on code quality and maintainability with extensive\n') +
-    chalk.cyan('SonarCloud-driven refactoring across the entire codebase. This release reduces\n') +
-    chalk.cyan('cognitive complexity in critical files by up to 90%, making the codebase more\n') +
-    chalk.cyan('maintainable and easier to understand.\n\n') +
-    chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   ⚙️  Major Code Refactoring - Cognitive complexity reduced by up to 90% across critical files\n') +
-    chalk.gray('   🧪 Comprehensive Testing - 377 new party mode tests added, 225 total tests passing\n') +
-    chalk.gray('   📚 Improved Documentation - New Prerequisites and FAQ sections clarify installation\n') +
-    chalk.gray('   🎭 Conversational Agent Intros - BMAD party mode now uses "Hi! I\'m John, your Product Manager"\n') +
-    chalk.gray('   🔊 Better Audio Balance - Background music reduced 15% for clearer TTS voice\n') +
-    chalk.gray('   🏗️  installer.js: 84 → ~8 complexity (90% reduction)\n') +
-    chalk.gray('   📦 dependency-checker.js: 43 → ~5, 23 → ~8 (88% & 65% reductions)\n\n') +
-    chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
-    chalk.gray('🌐 Website: https://agentvibes.org\n') +
-    chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
-    chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-    chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License');
+  return chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
+    chalk.white('AgentVibes v2.17.4 focuses on code quality and maintainability with extensive\n') +
+    chalk.white('SonarCloud-driven refactoring across the entire codebase, reducing cognitive\n') +
+    chalk.white('complexity in critical files by up to 90%.\n');
 }
 
 /**
@@ -1750,6 +1811,52 @@ async function copyBmadConfigFiles(targetDir, spinner) {
 }
 
 /**
+ * Copy AgentVibes hooks directory for lite mode support
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<number>} Number of files copied
+ */
+async function copyAgentVibesHooks(targetDir, spinner) {
+  const srcHooksDir = path.join(__dirname, '..', '.agentvibes', 'hooks');
+  const destHooksDir = path.join(targetDir, '.agentvibes', 'hooks');
+
+  try {
+    // Check if source directory exists
+    await fs.access(srcHooksDir);
+  } catch (error) {
+    // Source directory doesn't exist, skip silently
+    return 0;
+  }
+
+  await fs.mkdir(destHooksDir, { recursive: true });
+
+  let fileCount = 0;
+
+  try {
+    const hookFiles = await fs.readdir(srcHooksDir);
+
+    for (const file of hookFiles) {
+      if (file.endsWith('.sh')) {
+        const srcPath = path.join(srcHooksDir, file);
+        const destPath = path.join(destHooksDir, file);
+
+        await fs.copyFile(srcPath, destPath);
+        await fs.chmod(destPath, 0o755);
+        fileCount++;
+      }
+    }
+
+    if (fileCount > 0) {
+      console.log(chalk.gray(`   ✓ Installed ${fileCount} AgentVibes hook script(s)`));
+    }
+  } catch (error) {
+    console.log(chalk.yellow(`   ⚠ Could not copy AgentVibes hooks: ${error.message}`));
+  }
+
+  return fileCount;
+}
+
+/**
  * Copy background music files to target directory
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -1945,17 +2052,34 @@ async function configureSessionStartHook(targetDir, spinner) {
       existingSettings.hooks = {};
     }
 
+    let updated = false;
+
     if (!existingSettings.hooks.SessionStart) {
       existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
+      updated = true;
+    }
 
-      if (!existingSettings.$schema) {
-        existingSettings.$schema = templateSettings.$schema;
-      }
+    // Add PostToolUse hook for lite mode support
+    if (!existingSettings.hooks.PostToolUse && templateSettings.hooks.PostToolUse) {
+      existingSettings.hooks.PostToolUse = templateSettings.hooks.PostToolUse;
+      updated = true;
+    }
 
+    // Add Stop hook for lite mode support
+    if (!existingSettings.hooks.Stop && templateSettings.hooks.Stop) {
+      existingSettings.hooks.Stop = templateSettings.hooks.Stop;
+      updated = true;
+    }
+
+    if (!existingSettings.$schema) {
+      existingSettings.$schema = templateSettings.$schema;
+    }
+
+    if (updated) {
       await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
-      spinner.succeed(chalk.green('SessionStart hook configured!\n'));
+      spinner.succeed(chalk.green('Hooks configured (SessionStart + PostToolUse + Stop)!\n'));
     } else {
-      spinner.info(chalk.yellow('SessionStart hook already configured\n'));
+      spinner.info(chalk.yellow('Hooks already configured\n'));
     }
   } catch (error) {
     spinner.fail(chalk.red('Failed to configure hook: ' + error.message + '\n'));
@@ -2329,16 +2453,16 @@ async function createDefaultBmadVoiceAssignments(bmadPath) {
   // Note: BMAD installer also generates this file - these are fallback defaults
   // if AgentVibes is installed without BMAD or before BMAD
   const defaultVoices = `agent,voice,intro
-bmad-master,en_US-lessac-medium,"Greetings! The BMad Master is here to orchestrate and guide you through any workflow."
-analyst,en_US-kristin-medium,"Hi there! I'm Mary, your Business Analyst. I'll help uncover the real requirements."
-architect,en_GB-alan-medium,"Hello! Winston here, your Architect. I'll ensure we build something scalable and pragmatic."
-dev,en_US-joe-medium,"Hey! Amelia here, your Developer. Ready to turn specs into working code."
-pm,en_US-ryan-high,"Hey team! John here, your Product Manager. Let's make sure we're building the right thing."
-sm,en_US-amy-medium,"Hi everyone! Bob here, your Scrum Master. I'll keep us focused and moving forward."
-tea,en_US-kusal-medium,"Hello! Murat here, your Test Architect. Quality is my obsession."
-tech-writer,jenny,"Hi! I'm Paige, your Technical Writer. I'll make sure everything is documented clearly."
-ux-designer,kristin,"Hey! Sally here, your UX Designer. The user experience is my top priority."
-frame-expert,en_GB-alan-medium,"Hello! Saif here, your Visual Design Expert. I'll help visualize your ideas."
+bmad-master,en_US-lessac-medium,"BMad Master here, ready to orchestrate our session."
+analyst,en_US-kristin-medium,"Mary here, your Business Analyst."
+architect,en_GB-alan-medium,"Winston here, your System Architect."
+dev,en_US-joe-medium,"Amelia here, your Developer."
+pm,en_US-ryan-high,"John here, your Product Manager."
+sm,en_US-amy-medium,"Bob here, your Scrum Master."
+tea,en_US-kusal-medium,"Murat here, your Test Architect."
+tech-writer,jenny,"Paige here, your Technical Writer."
+ux-designer,kristin,"Sally here, your UX Designer."
+frame-expert,en_GB-alan-medium,"Saif here, your Visual Design Expert."
 `;
 
   try {
@@ -2362,17 +2486,17 @@ async function createDefaultBmadVoiceAssignmentsProactive(targetDir) {
     path.join(targetDir, 'bmad'),
   ];
 
-  const defaultVoices = `agent,voice
-bmad-master,en_US-ryan-high
-analyst,en_US-kristin-medium
-architect,en_GB-alan-medium
-dev,en_US-joe-medium
-pm,en_US-lessac-medium
-sm,en_US-amy-medium
-tea,en_US-kusal-medium
-tech-writer,jenny
-ux-designer,kristin
-frame-expert,en_GB-alan-medium
+  const defaultVoices = `agent,voice,intro
+bmad-master,en_US-ryan-high,"BMad Master here, ready to orchestrate our session."
+analyst,en_US-kristin-medium,"Mary here, your Business Analyst."
+architect,en_GB-alan-medium,"Winston here, your System Architect."
+dev,en_US-joe-medium,"Amelia here, your Developer."
+pm,en_US-lessac-medium,"John here, your Product Manager."
+sm,en_US-amy-medium,"Bob here, your Scrum Master."
+tea,en_US-kusal-medium,"Murat here, your Test Architect."
+tech-writer,jenny,"Paige here, your Technical Writer."
+ux-designer,kristin,"Sally here, your UX Designer."
+frame-expert,en_GB-alan-medium,"Saif here, your Visual Design Expert."
 `;
 
   for (const bmadPath of bmadPaths) {
@@ -2689,6 +2813,12 @@ async function performUpdateOperations(targetDir, spinner) {
     console.log(chalk.green(`✓ Updated ${bmadConfigFileCount} BMAD config files`));
   }
 
+  // Update AgentVibes hooks (for lite mode)
+  const agentvibesHooksCount = await copyAgentVibesHooks(targetDir, silentSpinner);
+  if (agentvibesHooksCount > 0) {
+    console.log(chalk.green(`✓ Updated ${agentvibesHooksCount} AgentVibes hook${agentvibesHooksCount === 1 ? '' : 's'}`));
+  }
+
   // Update background music files
   const backgroundMusicUpdateResult = await copyBackgroundMusicFiles(targetDir, silentSpinner);
   if (backgroundMusicUpdateResult.count > 0) {
@@ -2767,7 +2897,7 @@ async function install(options = {}) {
   const currentDir = process.env.INIT_CWD || process.cwd();
 
   // Global pagination constants (used throughout install flow)
-  const configPages = 6; // System Dependencies + Provider + Voice + Audio Effects + Background Music + Verbosity
+  const configPages = 7; // Mode Selection + System Dependencies + Provider + Voice + Audio Effects + Background Music + Verbosity
   const configOffset = 0;
 
   // Loop to allow going back to welcome screen
@@ -2775,14 +2905,16 @@ async function install(options = {}) {
   while (!userConfig) {
     showWelcome();
 
-    // Show release notes and recent changes after welcome banner
+    // Show what's new
     console.log(getReleaseInfoBoxen());
     console.log('');
+
+    // Show recent changes
     await showRecentChanges(path.join(__dirname, '..'));
 
+    // Show installation details (version already in header)
     console.log(chalk.cyan('\n📍 Installation Details:'));
     console.log(chalk.gray(`   Install location: ${currentDir}/.claude/`));
-    console.log(chalk.yellow(`   Package version: ${VERSION}`));
 
     // Prompt to continue (gives user time to read welcome banner)
     if (!options.yes) {
@@ -2833,6 +2965,13 @@ async function install(options = {}) {
   };
 
   let configContent = chalk.bold('Your Configuration\n\n');
+  configContent += chalk.cyan('⚡ Mode:\n');
+  if (userConfig.mode === 'lite') {
+    configContent += chalk.blue(`   Lite Mode (minimal overhead)\n`);
+  } else {
+    configContent += chalk.green(`   Full Mode (all features)\n`);
+  }
+  configContent += '\n';
   configContent += chalk.cyan('🎤 TTS Provider:\n');
   configContent += chalk.white(`   ${providerLabels[selectedProvider]}\n`);
   if (selectedProvider === 'piper' && piperVoicesPath) {
@@ -2993,6 +3132,7 @@ async function install(options = {}) {
     const personalityResult = await copyPersonalityFiles(targetDir, spinner);
     const pluginFileCount = await copyPluginFiles(targetDir, spinner);
     const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
+    const agentvibesHooksCount = await copyAgentVibesHooks(targetDir, spinner);
     const backgroundMusicResult = await copyBackgroundMusicFiles(targetDir, spinner);
     const configFileCount = await copyConfigFiles(targetDir, spinner);
 
@@ -3309,6 +3449,31 @@ async function install(options = {}) {
       pageOffset: postInstallOffset,
       totalPages: actualTotalPages
     });
+
+    // Apply selected mode (lite or full)
+    // Note: The wrapper hooks in .claude/hooks/ automatically delegate to .agentvibes/
+    // So we just need to set the mode file
+    if (userConfig.mode === 'lite') {
+      spinner.start('Configuring lite mode...');
+      try {
+        const modeFile = path.join(targetDir, '.agentvibes', 'config', 'mode.txt');
+        await fs.mkdir(path.dirname(modeFile), { recursive: true });
+        await fs.writeFile(modeFile, 'lite');
+        spinner.succeed('Lite mode configured');
+      } catch (error) {
+        spinner.warn(`Could not configure lite mode: ${error.message}`);
+        console.log(chalk.yellow('   You can switch to lite mode later with: /agent-vibes:mode lite'));
+      }
+    } else {
+      // Full mode - explicitly set it
+      try {
+        const modeFile = path.join(targetDir, '.agentvibes', 'config', 'mode.txt');
+        await fs.mkdir(path.dirname(modeFile), { recursive: true });
+        await fs.writeFile(modeFile, 'full');
+      } catch (error) {
+        // Silent failure - full is the default anyway
+      }
+    }
 
     // Final message after pagination
     console.log(chalk.green.bold('\n✅ AgentVibes is Ready!\n'));
