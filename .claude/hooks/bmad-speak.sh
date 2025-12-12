@@ -28,6 +28,13 @@ DIALOGUE="$2"
 DIALOGUE="${DIALOGUE//\\!/!}"
 DIALOGUE="${DIALOGUE//\\\$/\$}"
 
+# WORKAROUND: If BMAD party mode passes generic intro, fetch the real one from CSV
+# This handles BMAD-METHOD versions that haven't merged PR 987 yet
+if [[ "$DIALOGUE" == "Hello! Ready to help with the discussion." ]]; then
+  # Will fetch proper intro from CSV later in the script
+  DIALOGUE=""
+fi
+
 # Check if party mode is enabled
 if [[ -f "$PROJECT_ROOT/.agentvibes/bmad/bmad-party-mode-disabled.flag" ]]; then
   exit 0
@@ -53,8 +60,9 @@ map_to_agent_id() {
   # CSV format: name,displayName,title,icon,role,...
   local direct_match=$(grep -i "^\"*${name_or_id}\"*," "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv" | head -1)
   if [[ -n "$direct_match" ]]; then
-    # Already an agent ID, pass through
-    echo "$name_or_id"
+    # Extract the actual agent ID (lowercase) from column 1
+    local agent=$(echo "$direct_match" | awk -F',' '{print $1}' | tr -d '"')
+    echo "$agent"
     return
   fi
 
@@ -95,9 +103,20 @@ if [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
 fi
 
 # Prepend intro text if configured (e.g., "John, Product Manager here. [dialogue]")
-FULL_TEXT="$DIALOGUE"
-if [[ -n "$AGENT_INTRO" ]]; then
+if [[ -z "$DIALOGUE" ]]; then
+  # If no dialogue text (intro-only mode), use just the intro
+  FULL_TEXT="$AGENT_INTRO"
+elif [[ -n "$AGENT_INTRO" ]]; then
+  # Prepend intro to dialogue
   FULL_TEXT="${AGENT_INTRO}. ${DIALOGUE}"
+else
+  # No intro, just dialogue
+  FULL_TEXT="$DIALOGUE"
+fi
+
+# Safety check: Don't speak if we have no text at all
+if [[ -z "$FULL_TEXT" ]]; then
+  exit 0
 fi
 
 # Speak with agent's voice using queue system (non-blocking for Claude)
