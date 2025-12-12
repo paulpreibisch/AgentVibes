@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - feature/user-feedback-improvements
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
