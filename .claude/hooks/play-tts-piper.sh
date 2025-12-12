@@ -320,15 +320,15 @@ fi
 
 # @function add_silence_padding
 # @intent Add silence to prevent WSL audio cutoff
-# @why WSL audio subsystem cuts off first ~200ms AND last ~200ms
+# @why WSL audio subsystem cuts off first ~200ms AND last ~500ms
 # @param Uses global: $TEMP_FILE
 # @returns Updates $TEMP_FILE to padded version
 # @sideeffects Modifies audio file
 # AI NOTE: Use ffmpeg if available, otherwise skip padding (degraded experience)
 if command -v ffmpeg &> /dev/null; then
   PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
-  # Add 200ms of silence at the beginning AND end to prevent WSL cutoff
-  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 \
+  # Add 200ms silence at start, 500ms at end (WSL cuts more at end)
+  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.5 \
     -filter_complex "[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]" \
     -map "[out]" -y "$PADDED_FILE" 2>/dev/null
 

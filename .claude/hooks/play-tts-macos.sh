@@ -216,10 +216,10 @@ fi
 
 # @function convert_and_pad_audio
 # @intent Convert AIFF to WAV and add silence padding to prevent cutoff
-# @why WSL audio subsystem cuts off first ~200ms AND last ~200ms
+# @why WSL audio subsystem cuts off first ~200ms AND last ~500ms
 if command -v ffmpeg &> /dev/null; then
-  # Add 200ms of silence at the beginning AND end, then convert to WAV
-  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 \
+  # Add 200ms silence at start, 500ms at end (WSL cuts more at end), then convert to WAV
+  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.5 \
     -filter_complex "[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]" \
     -map "[out]" -y "$FINAL_FILE" 2>/dev/null
 
