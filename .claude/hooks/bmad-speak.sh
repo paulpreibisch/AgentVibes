@@ -28,10 +28,15 @@ DIALOGUE="$2"
 DIALOGUE="${DIALOGUE//\\!/!}"
 DIALOGUE="${DIALOGUE//\\\$/\$}"
 
-# WORKAROUND: If BMAD party mode passes generic intro, fetch the real one from CSV
+# WORKAROUND: If BMAD party mode passes generic intro, clear it to use agent's custom intro
 # This handles BMAD-METHOD versions that haven't merged PR 987 yet
 if [[ "$DIALOGUE" == "Hello! Ready to help with the discussion." ]]; then
-  # Will fetch proper intro from CSV later in the script
+  # Clear generic dialogue - will use agent's custom intro from voice map
+  DIALOGUE=""
+fi
+
+# Additional generic intro patterns to clear (allows agent-specific intros to be used)
+if [[ "$DIALOGUE" =~ ^(Hello|Hi|Hey)[!\.]?\ (Ready|Here|Available) ]]; then
   DIALOGUE=""
 fi
 
@@ -66,9 +71,8 @@ map_to_agent_id() {
     return
   fi
 
-  # Otherwise map display name to agent ID (for party mode)
-  # Extract 'name' (column 1) where displayName (column 2) contains the name
-  # displayName format in CSV: "John", "Mary", "Winston", etc. (first word before any parentheses)
+  # Try to match displayName (column 2) - handles "Winston", "Mary", etc.
+  # This handles both "John" and "John (Product Manager)"
   local agent_id=$(awk -F',' -v name="$name_or_id" '
     BEGIN { IGNORECASE=1 }
     NR > 1 {
@@ -77,7 +81,6 @@ map_to_agent_id() {
       gsub(/^"|"$/, "", display)  # Remove surrounding quotes
 
       # Check if display name starts with the search name (case-insensitive)
-      # This handles both "John" and "John (Product Manager)"
       if (tolower(display) ~ "^" tolower(name) "($| |\\()") {
         # Extract agent ID (column 1)
         agent = $1
@@ -87,6 +90,28 @@ map_to_agent_id() {
       }
     }
   ' "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv")
+
+  # If still not found, try matching against title (column 3)
+  # Handles "Architect" -> "architect", "Product Manager" -> "pm", etc.
+  if [[ -z "$agent_id" ]]; then
+    agent_id=$(awk -F',' -v name="$name_or_id" '
+      BEGIN { IGNORECASE=1 }
+      NR > 1 {
+        # Extract title (column 3)
+        title = $3
+        gsub(/^"|"$/, "", title)  # Remove surrounding quotes
+
+        # Check if title matches (exact or starts with)
+        if (tolower(title) == tolower(name) || tolower(title) ~ "^" tolower(name) " ") {
+          # Extract agent ID (column 1)
+          agent = $1
+          gsub(/^"|"$/, "", agent)
+          print agent
+          exit
+        }
+      }
+    ' "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv")
+  fi
 
   echo "$agent_id"
 }
