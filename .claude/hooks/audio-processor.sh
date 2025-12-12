@@ -226,12 +226,12 @@ mix_background() {
         fi
     fi
 
-    # Extend total duration by 2 seconds for background music fade out
+    # Extend total duration by 0.3 seconds for background music fade out (reduced from 2s to prevent overlap)
     local total_duration
     if command -v bc &> /dev/null; then
-        total_duration=$(echo "$duration + 2" | bc -l)
+        total_duration=$(echo "$duration + 0.3" | bc -l)
     else
-        total_duration=$(awk "BEGIN {print $duration + 2}")
+        total_duration=$(awk "BEGIN {print $duration + 0.3}")
     fi
 
     # Calculate new position after this clip (including fade out time)
@@ -247,7 +247,7 @@ mix_background() {
     fi
 
     # Mix: Seek to position in background, apply volume and fades
-    # Background fades in at start (0.3s), continues under speech, then fades out over 2s after speech ends
+    # Background fades in at start (0.3s), continues under speech, then fades out over 0.3s after speech ends
     # -ss before -i seeks efficiently without decoding
     local bg_fade_out_start
     if command -v bc &> /dev/null; then
@@ -271,7 +271,7 @@ mix_background() {
     fi
 
     # Add 2 seconds of background music intro before voice starts
-    # Background: fades in (0.3s), plays solo (2s), then voice joins, fades out at end (2s)
+    # Background: fades in (0.3s), plays solo (2s), then voice joins, fades out at end (0.3s)
     # Voice: delayed by 2000ms (2s), no fade-in (full volume from first word)
     local voice_delay_ms="2000"  # adelay takes milliseconds
     local voice_delay_sec="2.0"
@@ -283,7 +283,7 @@ mix_background() {
     fi
 
     ffmpeg -y -i "$voice" -ss "$start_pos" -stream_loop -1 -i "$background" \
-        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_adjusted}:d=2[bg];[0:a]adelay=${voice_delay_ms}|${voice_delay_ms}[v];[v][bg]amix=inputs=2:duration=longest[out]" \
+        -filter_complex "[1:a]volume=${volume},afade=t=in:st=0:d=0.3,afade=t=out:st=${bg_fade_out_adjusted}:d=0.3[bg];[0:a]adelay=${voice_delay_ms}|${voice_delay_ms}[v];[v][bg]amix=inputs=2:duration=longest[out]" \
         -map "[out]" $audio_settings -t "$total_duration" "$output" 2>/dev/null || {
         echo "Warning: Background mixing failed, using voice only" >&2
         cp "$voice" "$output"
