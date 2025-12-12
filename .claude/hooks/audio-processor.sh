@@ -226,12 +226,13 @@ mix_background() {
         fi
     fi
 
-    # Extend total duration by 0.3 seconds for background music fade out (reduced from 2s to prevent overlap)
+    # Extend total duration to include voice delay + fade out
+    # Voice delay is 2s, fade out is 0.3s
     local total_duration
     if command -v bc &> /dev/null; then
-        total_duration=$(echo "$duration + 0.3" | bc -l)
+        total_duration=$(echo "$duration + 2.3" | bc -l)
     else
-        total_duration=$(awk "BEGIN {print $duration + 0.3}")
+        total_duration=$(awk "BEGIN {print $duration + 2.3}")
     fi
 
     # Calculate new position after this clip (including fade out time)
