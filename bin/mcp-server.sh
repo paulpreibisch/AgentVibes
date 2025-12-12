@@ -86,16 +86,16 @@ else
     echo "✅ Python MCP package already installed" >&2
 fi
 
-# Check provider (Piper vs ElevenLabs)
+# Check provider (Piper is the only supported provider)
 PROVIDER_FILE="$PACKAGE_ROOT/.claude/tts-provider.txt"
-PROVIDER="elevenlabs"  # Default
+PROVIDER="piper"  # Default
 
 if [ -f "$PROVIDER_FILE" ]; then
     PROVIDER=$(cat "$PROVIDER_FILE" | tr -d '[:space:]')
 fi
 
-# If using Piper, ensure it's installed
-if [ "$PROVIDER" = "piper" ]; then
+# Ensure Piper is installed
+if [ "$PROVIDER" = "piper" ] || [ "$PROVIDER" = "piper-tts" ]; then
     if ! command -v piper &> /dev/null; then
         # Piper not found, try to auto-install
 
@@ -181,20 +181,10 @@ if [ "$PROVIDER" = "piper" ]; then
             fi
         fi
     fi
-elif [ "$PROVIDER" = "elevenlabs" ]; then
-    # Check for ElevenLabs API key
-    if [ -z "$ELEVENLABS_API_KEY" ]; then
-        echo "⚠️  ElevenLabs selected but ELEVENLABS_API_KEY not set" >&2
-        echo "" >&2
-        echo "📖 Set your API key:" >&2
-        echo "   export ELEVENLABS_API_KEY='your-key-here'" >&2
-        echo "" >&2
-        echo "💡 Or switch to Piper TTS (free):" >&2
-        echo "   echo 'piper' > $PACKAGE_ROOT/.claude/tts-provider.txt" >&2
-        echo "" >&2
-    else
-        echo "✅ ElevenLabs API key configured" >&2
-    fi
+else
+    echo "⚠️  Unknown TTS provider: $PROVIDER" >&2
+    echo "   Defaulting to Piper TTS (the only supported provider)" >&2
+    echo "   Update $PROVIDER_FILE if needed" >&2
 fi
 
 # All checks passed, run the MCP server

@@ -111,3 +111,7 @@ scripts/audio-tunnel.config
 .claude/journal/
 agentvibes.org/.claude/journal/
 coverage/
+
+# BMAD Method documentation examples (internal reference only)
+BMAD-METHOD-PARTY-MODE-EXAMPLE.md
+BMAD-VIDEO-PROMPTS.md

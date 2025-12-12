@@ -6,6 +6,14 @@
 >
 > Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
 
+---
+
+**🚀 Just want simple TTS?** [→ Simple 30-Second Setup (README-SIMPLE.md)](README-SIMPLE.md) - No complexity, just voice announcements.
+
+**🎯 Want full features?** Continue reading below for personalities, language learning, BMAD integration, and more.
+
+---
+
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)

@@ -549,6 +549,143 @@ class AgentVibesServer:
         else:
             return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
 
+    async def get_mode(self) -> str:
+        """
+        Get current AgentVibes mode (lite or full).
+
+        Returns:
+            Current mode with description
+        """
+        agentvibes_dir = self.agentvibes_root / ".agentvibes"
+        mode_file = agentvibes_dir / "config" / "mode.txt"
+
+        current_mode = "full"  # Default
+        if mode_file.exists():
+            try:
+                current_mode = mode_file.read_text().strip()
+            except Exception:
+                pass
+
+        if current_mode == "lite":
+            return (
+                "🔵 LITE MODE (Active)\n"
+                "━" * 40 + "\n"
+                "  • Minimal tokens (~50 vs ~500)\n"
+                "  • No acknowledgment TTS\n"
+                "  • Smart completion TTS only\n"
+                "  • No .wav files\n"
+                "  • Silent operation\n"
+                "  • Perfect for parallel sessions\n\n"
+                "💡 Switch to full mode: set_mode(mode='full')"
+            )
+        else:
+            return (
+                "🟢 FULL MODE (Active)\n"
+                "━" * 40 + "\n"
+                "  • Full protocol (~500 tokens)\n"
+                "  • Acknowledgment + completion TTS\n"
+                "  • Personalities & learning\n"
+                "  • Audio effects & background music\n"
+                "  • All features enabled\n\n"
+                "💡 Switch to lite mode: set_mode(mode='lite')"
+            )
+
+    async def set_mode(self, mode: str) -> str:
+        """
+        Switch between lite and full mode.
+
+        Args:
+            mode: 'lite' or 'full'
+
+        Returns:
+            Success message with instructions
+        """
+        if mode not in ["lite", "full"]:
+            return "❌ Invalid mode. Use 'lite' or 'full'"
+
+        # Find switch-mode.sh script
+        agentvibes_dir = self.agentvibes_root / ".agentvibes"
+        switch_script = agentvibes_dir / "hooks" / "switch-mode.sh"
+
+        if not switch_script.exists():
+            return (
+                "❌ Mode switcher not found!\n\n"
+                "The lite mode feature may not be installed.\n"
+                f"Expected: {switch_script}"
+            )
+
+        try:
+            # Run switch-mode.sh with the mode argument
+            result = subprocess.run(
+                ["bash", str(switch_script), mode],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False
+            )
+
+            if result.returncode == 0:
+                mode_label = "LITE MODE" if mode == "lite" else "FULL MODE"
+                return (
+                    f"✅ Switched to {mode_label}\n\n"
+                    f"{result.stdout}\n\n"
+                    "⚠️  IMPORTANT: Restart your Claude session for changes to take effect!"
+                )
+            else:
+                return (
+                    f"❌ Failed to switch to {mode} mode\n\n"
+                    f"Error: {result.stderr}"
+                )
+        except subprocess.TimeoutExpired:
+            return "❌ Mode switch timed out"
+        except Exception as e:
+            return f"❌ Error switching mode: {str(e)}"
+
+    async def help(self) -> str:
+        """
+        Show AgentVibes status, settings, and helpful commands.
+        Runs diagnostics and suggests fixes if issues detected.
+
+        Returns:
+            User-friendly help and status information
+        """
+        # Find help.sh script
+        agentvibes_dir = self.agentvibes_root / ".agentvibes"
+        help_script = agentvibes_dir / "hooks" / "help.sh"
+
+        if not help_script.exists():
+            # Fallback if help script not found
+            return (
+                "═══════════════════════════════════════════\n"
+                "  AgentVibes Help\n"
+                "═══════════════════════════════════════════\n\n"
+                "Available MCP Tools:\n"
+                "  get_mode()                  - Show current mode\n"
+                "  set_mode(mode='lite'|'full') - Switch modes\n"
+                "  text_to_speech(text='...')  - Speak text\n"
+                "  list_voices()               - See available voices\n"
+                "  mute() / unmute()           - Control TTS\n\n"
+                "Documentation:\n"
+                "  https://agentvibes.org\n"
+                "  https://github.com/paulpreibisch/AgentVibes\n"
+            )
+
+        try:
+            # Run help.sh script
+            result = subprocess.run(
+                ["bash", str(help_script)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False
+            )
+
+            return result.stdout if result.stdout else "✅ Help command complete"
+        except subprocess.TimeoutExpired:
+            return "❌ Help command timed out"
+        except Exception as e:
+            return f"❌ Error running help: {str(e)}"
+
     async def list_background_music(self) -> str:
         """
         List all available background music tracks.
@@ -818,40 +955,25 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="text_to_speech",
-            description="""Convert text to speech using AgentVibes TTS.
-
-Supports both macOS TTS and Piper (free, offline) providers.
-Can use different voices, personalities, and languages.
-
-Perfect for:
-- Speaking acknowledgments and confirmations
-- Adding voice to Claude responses
-- Multi-language communication
-- Personality-driven interactions
-
-Examples:
-- text_to_speech(text="Hello, I'm ready to help!")
-- text_to_speech(text="Task completed!", personality="flirty")
-- text_to_speech(text="Hola, ¿cómo estás?", language="spanish")
-""",
+            description="Speak text via TTS. Supports voices, personalities, and languages. Ex: text_to_speech(text='Done!', personality='flirty')",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "text": {
                         "type": "string",
-                        "description": "Text to convert to speech (max 500 characters)",
+                        "description": "Text to speak (max 500 chars)",
                     },
                     "voice": {
                         "type": "string",
-                        "description": "Voice name (optional). Use list_voices to see options.",
+                        "description": "Voice name (see list_voices)",
                     },
                     "personality": {
                         "type": "string",
-                        "description": "Personality style (optional). Examples: flirty, sarcastic, pirate, robot, zen",
+                        "description": "Style: flirty, sarcastic, pirate, robot, zen",
                     },
                     "language": {
                         "type": "string",
-                        "description": "Language to speak in (optional). Examples: spanish, french, german, italian",
+                        "description": "Language: spanish, french, german, italian",
                     },
                 },
                 "required": ["text"],
@@ -946,13 +1068,13 @@ Examples:
         ),
         Tool(
             name="set_learn_mode",
-            description="Enable or disable language learning mode. When ON, TTS speaks in both your main language and target language for bilingual learning.",
+            description="Enable/disable language learning (speaks in both main and target language).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "enabled": {
                         "type": "boolean",
-                        "description": "True to enable learning mode, False to disable"
+                        "description": "True to enable, False to disable"
                     }
                 },
                 "required": ["enabled"],
@@ -960,17 +1082,17 @@ Examples:
         ),
         Tool(
             name="set_speed",
-            description="Set speech speed for main or target voice. Works with both Piper and macOS providers. Use this to make voices faster or slower.",
+            description="Set speech speed. Ex: set_speed(speed='2x') or set_speed(speed='fast')",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "speed": {
                         "type": "string",
-                        "description": "Speed value: '0.5x' or 'slow/slower' (half speed, slower), '1x' or 'normal' (normal speed), '2x' or 'fast' (double speed, faster), '3x' or 'faster' (triple speed, very fast)"
+                        "description": "Speed: 0.5x/slow, 1x/normal, 2x/fast, 3x/faster"
                     },
                     "target": {
                         "type": "boolean",
-                        "description": "If true, sets target language speed (for learning mode); if false or omitted, sets main voice speed",
+                        "description": "True for target language (learning mode), false for main voice",
                         "default": False
                     }
                 },
@@ -984,13 +1106,13 @@ Examples:
         ),
         Tool(
             name="download_extra_voices",
-            description="Download extra high-quality custom Piper voices from HuggingFace. Includes: Kristin (US female), Jenny (UK female with Irish accent), and Tracy/16Speakers (multi-speaker). Perfect for adding variety to your TTS voices.",
+            description="Download extra Piper voices from HuggingFace (Kristin, Jenny, Tracy/16Speakers).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "auto_yes": {
                         "type": "boolean",
-                        "description": "Skip confirmation prompt and download automatically (default: False)",
+                        "description": "Skip confirmation (default: False)",
                         "default": False
                     }
                 },
@@ -998,30 +1120,18 @@ Examples:
         ),
         Tool(
             name="get_verbosity",
-            description="Get current AgentVibes verbosity level (low/medium/high). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken).",
+            description="Get current verbosity level (low/medium/high).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="set_verbosity",
-            description="""Set AgentVibes verbosity level to control how much Claude speaks while working.
-
-Verbosity Levels:
-- LOW: Only acknowledgments (start) and completions (end). Minimal interruption.
-- MEDIUM: + Major decisions and key findings. Balanced transparency.
-- HIGH: All reasoning, decisions, and findings. Maximum transparency.
-
-Perfect for:
-- LOW: Quiet work sessions, minimal distraction
-- MEDIUM: Understanding major decisions without full narration
-- HIGH: Full transparency, learning mode, debugging complex tasks
-
-Note: Changes take effect on next Claude Code session restart.""",
+            description="Set verbosity (low=minimal, medium=balanced, high=full transparency). Changes take effect on next session restart.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "level": {
                         "type": "string",
-                        "description": "Verbosity level to set",
+                        "description": "Verbosity level",
                         "enum": ["low", "medium", "high"]
                     }
                 },
@@ -1030,12 +1140,12 @@ Note: Changes take effect on next Claude Code session restart.""",
         ),
         Tool(
             name="mute",
-            description="Mute all AgentVibes TTS output. Creates a persistent mute flag that silences all voice output until unmuted. Persists across sessions.",
+            description="Mute all TTS output (persists across sessions).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="unmute",
-            description="Unmute AgentVibes TTS output. Removes the mute flag and restores voice output.",
+            description="Unmute TTS output and restore voice.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
@@ -1044,34 +1154,48 @@ Note: Changes take effect on next Claude Code session restart.""",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
+            name="get_mode",
+            description="Get current AgentVibes mode (lite or full). Lite mode has minimal overhead (~50 tokens), full mode has all features.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_mode",
+            description="Switch between lite mode (minimal overhead) and full mode (all features). Requires session restart to take effect.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "description": "Mode: 'lite' (minimal overhead, ~50 tokens) or 'full' (all features, ~500 tokens)",
+                        "enum": ["lite", "full"]
+                    }
+                },
+                "required": ["mode"],
+            },
+        ),
+        Tool(
+            name="help",
+            description="Show AgentVibes status, current settings, and available commands. Runs diagnostics and suggests fixes if issues detected.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
             name="list_background_music",
-            description="List all available pre-packaged background music tracks. Shows all audio files that can be used as background music for TTS.",
+            description="List available background music tracks.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="set_background_music",
-            description="""Set background music track for a specific agent, all agents, or as default. Supports smart fuzzy matching.
-
-Perfect for:
-- "change background music to flamenco" - Sets for all agents
-- "set John's background music to celtic harp" - Agent-specific
-- "use chillwave as default background" - Default for new agents
-
-Fuzzy matching examples:
-- "flamenco" matches "agentvibes_soft_flamenco_loop.mp3"
-- "celtic" matches "agent_vibes_celtic_harp_v1_loop.mp3"
-- "bossa" matches "agent_vibes_bossa_nova_v2_loop.mp3"
-""",
+            description="Set background music track (supports fuzzy matching). Ex: set_background_music(track_name='flamenco', agent_name='John')",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "track_name": {
                         "type": "string",
-                        "description": "Track filename or partial name for fuzzy matching (e.g., 'celtic', 'flamenco', 'bossa nova')",
+                        "description": "Track name (fuzzy matching): celtic, flamenco, bossa",
                     },
                     "agent_name": {
                         "type": "string",
-                        "description": "Agent name to configure (optional). Use 'all' for all agents, omit for default",
+                        "description": "Agent name (use 'all' for all agents, omit for default)",
                     },
                 },
                 "required": ["track_name"],
@@ -1079,13 +1203,13 @@ Fuzzy matching examples:
         ),
         Tool(
             name="enable_background_music",
-            description="Enable or disable background music globally. When enabled, TTS audio will be mixed with background music at configured volume (default 30%).",
+            description="Enable/disable background music globally.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "enabled": {
                         "type": "boolean",
-                        "description": "True to enable background music, False to disable",
+                        "description": "True to enable, False to disable",
                     }
                 },
                 "required": ["enabled"],
@@ -1093,13 +1217,13 @@ Fuzzy matching examples:
         ),
         Tool(
             name="set_background_music_volume",
-            description="Set the volume level for background music (0.0-1.0). Recommended: 0.20-0.40 for subtle background ambiance.",
+            description="Set background music volume (0.0-1.0, recommended: 0.20-0.40).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "volume": {
                         "type": "number",
-                        "description": "Volume level (0.0 = silent, 0.30 = default, 1.0 = full volume)",
+                        "description": "Volume: 0.0=silent, 0.30=default, 1.0=full",
                         "minimum": 0.0,
                         "maximum": 1.0,
                     }
@@ -1109,21 +1233,12 @@ Fuzzy matching examples:
         ),
         Tool(
             name="get_background_music_status",
-            description="Get current background music configuration including enabled status, volume, default track, and number of available tracks.",
+            description="Get background music config (enabled, volume, track).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="set_reverb",
-            description="""Set reverb level for TTS audio. Can apply globally (default agent), to a specific agent, or to all agents.
-
-Reverb adds room/space ambiance to the voice, making it sound like it's in a small room, conference room, or large hall.
-
-Examples:
-- set_reverb(level="medium") - Set reverb for default agent
-- set_reverb(level="cathedral", agent="Winston") - Set cathedral reverb for Winston
-- set_reverb(level="light", apply_all=True) - Set light reverb for all agents
-- set_reverb(level="off") - Turn off reverb for default agent
-""",
+            description="Set reverb level (adds room ambiance). Ex: set_reverb(level='cathedral', agent='Winston')",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1134,11 +1249,11 @@ Examples:
                     },
                     "agent": {
                         "type": "string",
-                        "description": "Agent name (optional, defaults to 'default'). Examples: Winston, John, Mary, Amelia",
+                        "description": "Agent name (default: 'default')",
                     },
                     "apply_all": {
                         "type": "boolean",
-                        "description": "Apply to all agents (optional, default: false)",
+                        "description": "Apply to all agents (default: false)",
                     }
                 },
                 "required": ["level"],
@@ -1146,20 +1261,20 @@ Examples:
         ),
         Tool(
             name="get_reverb",
-            description="Get current reverb level for a specific agent or default",
+            description="Get current reverb level for agent.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "agent": {
                         "type": "string",
-                        "description": "Agent name (optional, defaults to 'default')",
+                        "description": "Agent name (default: 'default')",
                     }
                 },
             },
         ),
         Tool(
             name="list_audio_effects",
-            description="List current audio effects configuration for all agents, including reverb levels and other effects",
+            description="List audio effects config for all agents.",
             inputSchema={"type": "object", "properties": {}},
         ),
     ]
@@ -1213,6 +1328,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.unmute()
         elif name == "is_muted":
             result = await agent_vibes.is_muted()
+        elif name == "get_mode":
+            result = await agent_vibes.get_mode()
+        elif name == "set_mode":
+            result = await agent_vibes.set_mode(arguments["mode"])
+        elif name == "help":
+            result = await agent_vibes.help()
         elif name == "list_background_music":
             result = await agent_vibes.list_background_music()
         elif name == "set_background_music":
