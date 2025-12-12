@@ -167,8 +167,14 @@ mkdir -p "$AUDIO_DIR"
 
 # Generate unique filename
 TIMESTAMP=$(date +%s)
-TEMP_FILE="$AUDIO_DIR/tts-${TIMESTAMP}.aiff"
-FINAL_FILE="$AUDIO_DIR/tts-padded-${TIMESTAMP}.wav"
+# In lite mode, use /tmp and clean up after playing
+if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]]; then
+  TEMP_FILE="/tmp/agentvibes-lite-${TIMESTAMP}-$$.aiff"
+  FINAL_FILE="/tmp/agentvibes-lite-padded-${TIMESTAMP}-$$.wav"
+else
+  TEMP_FILE="$AUDIO_DIR/tts-${TIMESTAMP}.aiff"
+  FINAL_FILE="$AUDIO_DIR/tts-padded-${TIMESTAMP}.wav"
+fi
 
 # @function get_speech_rate
 # @intent Determine speech rate for synthesis
@@ -256,6 +262,7 @@ DURATION=${DURATION:-2}  # Default to 2 seconds if detection fails
 
 # Play audio in background (skip if in test mode or no-playback mode)
 # AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+PLAYER_PID=""
 if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
   # Check if we're in an SSH session with PulseAudio tunnel available
   if [[ -n "$SSH_CONNECTION" ]] && [[ -n "$PULSE_SERVER" ]]; then
@@ -276,9 +283,25 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
   fi
 fi
 
-# Wait for audio to finish, then release lock
-(sleep $DURATION; rm -f "$LOCK_FILE") &
-disown
-
-echo "🎵 Saved to: $TEMP_FILE"
+# Wait for audio to finish, then release lock and clean up temp file in lite mode
+if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]]; then
+  if [[ -n "$PLAYER_PID" ]]; then
+    # Use actual process wait for accurate completion detection
+    (wait $PLAYER_PID 2>/dev/null; rm -f "$LOCK_FILE" "$TEMP_FILE") &
+  else
+    # Fallback to sleep timer if no player PID (test/no-playback mode)
+    (sleep $DURATION; rm -f "$LOCK_FILE" "$TEMP_FILE") &
+  fi
+  disown
+else
+  if [[ -n "$PLAYER_PID" ]]; then
+    # Use actual process wait for accurate completion detection
+    (wait $PLAYER_PID 2>/dev/null; rm -f "$LOCK_FILE") &
+  else
+    # Fallback to sleep timer if no player PID (test/no-playback mode)
+    (sleep $DURATION; rm -f "$LOCK_FILE") &
+  fi
+  disown
+  echo "🎵 Saved to: $TEMP_FILE"
+fi
 echo "🎤 Voice used: $VOICE_NAME (macOS Say)"
