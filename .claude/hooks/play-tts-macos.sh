@@ -215,12 +215,12 @@ if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
 fi
 
 # @function convert_and_pad_audio
-# @intent Convert AIFF to WAV and add silence padding for consistency
-# @why Maintains consistent audio format across providers
+# @intent Convert AIFF to WAV and add silence padding to prevent cutoff
+# @why WSL audio subsystem cuts off first ~200ms AND last ~200ms
 if command -v ffmpeg &> /dev/null; then
-  # Add 200ms of silence at the beginning and convert to WAV
-  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
-    -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
+  # Add 200ms of silence at the beginning AND end, then convert to WAV
+  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 \
+    -filter_complex "[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]" \
     -map "[out]" -y "$FINAL_FILE" 2>/dev/null
 
   if [[ -f "$FINAL_FILE" ]]; then

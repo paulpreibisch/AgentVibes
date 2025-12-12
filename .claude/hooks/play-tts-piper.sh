@@ -319,17 +319,17 @@ if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &> /dev/
 fi
 
 # @function add_silence_padding
-# @intent Add silence to prevent WSL audio static
-# @why WSL audio subsystem cuts off first ~200ms
+# @intent Add silence to prevent WSL audio cutoff
+# @why WSL audio subsystem cuts off first ~200ms AND last ~200ms
 # @param Uses global: $TEMP_FILE
 # @returns Updates $TEMP_FILE to padded version
 # @sideeffects Modifies audio file
 # AI NOTE: Use ffmpeg if available, otherwise skip padding (degraded experience)
 if command -v ffmpeg &> /dev/null; then
   PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
-  # Add 200ms of silence at the beginning
-  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
-    -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
+  # Add 200ms of silence at the beginning AND end to prevent WSL cutoff
+  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 \
+    -filter_complex "[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]" \
     -map "[out]" -y "$PADDED_FILE" 2>/dev/null
 
   if [[ -f "$PADDED_FILE" ]]; then
