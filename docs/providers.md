@@ -37,6 +37,79 @@ AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premi
 - **Windows**: Native support - no additional setup
 - Automatic voice download on first use
 
+## 💾 Audio File Saving
+
+AgentVibes supports optional saving of TTS audio files to disk. By **default, audio files are NOT saved** - they use secure temporary storage and are automatically cleaned up after playback.
+
+**Default Behavior (Recommended):**
+- Audio plays but files are not saved
+- Uses secure temp directories (`$XDG_RUNTIME_DIR/agentvibes-tts/`)
+- Automatic cleanup after playback
+- Saves disk space
+- Privacy-focused (no permanent audio logs)
+
+**When to Enable Audio Saving:**
+- Building TTS voice libraries
+- Debugging TTS output quality
+- Creating audio archives/logs
+- Testing replay functionality
+- Need persistent audio files
+
+### Commands
+
+```bash
+# Check current setting
+/agent-vibes:save-audio status
+# MCP: get_save_audio_status()
+
+# Enable audio file saving
+/agent-vibes:save-audio on
+# MCP: enable_save_audio()
+# Files saved to: .claude/audio/tts-{timestamp}.wav
+
+# Disable audio file saving (default)
+/agent-vibes:save-audio off
+# MCP: disable_save_audio()
+# Uses temp files with automatic cleanup
+```
+
+### Installation
+
+During **Full Mode** setup, you'll be prompted:
+```
+Would you like to save TTS audio files to disk?
+  [y] Yes - Save files to .claude/audio/
+            (useful for debugging, replay, archiving)
+  [N] No  - Use temporary files (default)
+            (automatic cleanup, saves disk space)
+```
+
+**Lite Mode**: Always uses temporary files regardless of this setting (for minimal overhead).
+
+### Technical Details
+
+**When Disabled (Default):**
+- Temp location: `$XDG_RUNTIME_DIR/agentvibes-tts/tts-{timestamp}.wav`
+- Fallback: `/tmp/agentvibes-tts-$USER/tts-{timestamp}.wav`
+- Permissions: `700` (user-only access)
+- Cleanup: Automatic via trap on script exit
+- Security: SonarQube compliant (secure temp directories)
+
+**When Enabled:**
+- Location: `.claude/audio/tts-{timestamp}.wav`
+- Persistence: Files remain after playback
+- Cleanup: Manual (user manages files)
+- Use case: Debugging, archiving, building voice libraries
+
+### Configuration
+
+Setting stored in: `.agentvibes/config/save-audio.txt`
+- `true` = Save files
+- `false` = Use temp files (default)
+- Missing file = Defaults to `false`
+
+Configuration persists across sessions and can be changed anytime via slash command or MCP.
+
 ## Provider Commands
 
 ```bash

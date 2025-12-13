@@ -549,6 +549,66 @@ class AgentVibesServer:
         else:
             return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
 
+    async def get_save_audio_status(self) -> str:
+        """
+        Get current save-audio setting.
+
+        Returns:
+            Current save-audio status with description
+        """
+        agentvibes_dir = self.agentvibes_root / ".agentvibes"
+        save_audio_file = agentvibes_dir / "config" / "save-audio.txt"
+
+        save_audio = "false"  # Default
+        if save_audio_file.exists():
+            try:
+                save_audio = save_audio_file.read_text().strip()
+            except Exception:
+                pass
+
+        if save_audio == "true":
+            return (
+                "💾 SAVE AUDIO: ON\n"
+                "━" * 40 + "\n"
+                "  • Audio files saved to .claude/audio/\n"
+                "  • Files persist after playback\n"
+                "  • Useful for: debugging, archiving, replay\n\n"
+                "💡 To disable, use: disable_save_audio()"
+            )
+        else:
+            return (
+                "🗑️  SAVE AUDIO: OFF (Default)\n"
+                "━" * 40 + "\n"
+                "  • Audio uses temporary files\n"
+                "  • Files cleaned up after playback\n"
+                "  • Saves disk space\n\n"
+                "💡 To enable, use: enable_save_audio()"
+            )
+
+    async def enable_save_audio(self) -> str:
+        """
+        Enable audio file saving to disk.
+
+        Returns:
+            Success message confirming audio saving is enabled
+        """
+        result = await self._run_script("save-audio-manager.sh", ["on"])
+        if "ENABLED" in result:
+            return "💾 Audio file saving ENABLED\n\n" + result
+        return f"❌ Failed to enable save-audio: {result}"
+
+    async def disable_save_audio(self) -> str:
+        """
+        Disable audio file saving (use temporary files).
+
+        Returns:
+            Success message confirming audio saving is disabled
+        """
+        result = await self._run_script("save-audio-manager.sh", ["off"])
+        if "DISABLED" in result:
+            return "🗑️  Audio file saving DISABLED\n\n" + result
+        return f"❌ Failed to disable save-audio: {result}"
+
     async def get_mode(self) -> str:
         """
         Get current AgentVibes mode (lite or full).
@@ -1154,6 +1214,21 @@ async def list_tools() -> list[Tool]:
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
+            name="get_save_audio_status",
+            description="Check if audio file saving is enabled or disabled. Returns current save-audio setting.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="enable_save_audio",
+            description="Enable saving TTS audio files to .claude/audio/ directory (useful for debugging, archiving, replay). Files persist after playback.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="disable_save_audio",
+            description="Disable saving TTS audio files (default). Uses temporary files that are automatically cleaned up after playback. Saves disk space.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
             name="get_mode",
             description="Get current AgentVibes mode (lite or full). Lite mode has minimal overhead (~50 tokens), full mode has all features.",
             inputSchema={"type": "object", "properties": {}},
@@ -1328,6 +1403,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.unmute()
         elif name == "is_muted":
             result = await agent_vibes.is_muted()
+        elif name == "get_save_audio_status":
+            result = await agent_vibes.get_save_audio_status()
+        elif name == "enable_save_audio":
+            result = await agent_vibes.enable_save_audio()
+        elif name == "disable_save_audio":
+            result = await agent_vibes.disable_save_audio()
         elif name == "get_mode":
             result = await agent_vibes.get_mode()
         elif name == "set_mode":

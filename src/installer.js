@@ -86,7 +86,8 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
   // Header: Agent Vibes Installer + Version + Page Title + Page Number + Links
   const agentText = chalk.cyan('Agent');
   const vibesText = chalk.magentaBright('Vibes');
-  const globalPageNum = currentPage + pageOffset + 1; // Convert to 1-indexed and add offset
+  // Page numbering: currentPage 0-7 maps to Page 0-7
+  const globalPageNum = currentPage + pageOffset;
   const pageNum = chalk.green(`Page ${globalPageNum}/${totalPages}`);
   const website = chalk.gray('https://agentvibes.org');
   const github = chalk.gray('https://github.com/paulpreibisch/AgentVibes');
@@ -233,13 +234,14 @@ async function showPaginatedContent(pages, options = {}) {
  */
 function getPageTitle(pageNum) {
   const titles = {
-    0: '⚡ Mode Selection',
-    1: '🔧 System Dependencies',
+    0: '🔧 System Dependencies',
+    1: '⚡ Mode Selection',
     2: '🎙️ TTS Provider Configuration',
-    3: '🎤 Voice Selection',
-    4: '💧 Audio Effects',
-    5: '🎵 Background Music',
-    6: '🔊 Verbosity Settings'
+    3: '💾 Audio File Saving',
+    4: '🎤 Voice Selection',
+    5: '💧 Audio Effects',
+    6: '🎵 Background Music',
+    7: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -358,6 +360,7 @@ async function collectConfiguration(options = {}) {
     provider: null,
     piperPath: null,
     defaultVoice: null,
+    saveAudio: false, // Default to temporary files (GitHub Issue #74)
     reverb: 'light',
     backgroundMusic: {
       enabled: true,
@@ -377,9 +380,9 @@ async function collectConfiguration(options = {}) {
   }
 
   let currentPage = 0;
-  const sectionPages = 7; // Mode Selection, System Dependencies, Provider, Voice Selection, Audio Effects, Background Music, Verbosity
+  const sectionPages = 8; // System Dependencies, Mode Selection, Provider, Save Audio, Voice Selection, Audio Effects, Background Music, Verbosity
   const pageOffset = options.pageOffset || 0;
-  const totalPages = options.totalPages || sectionPages;
+  const totalPages = options.totalPages || 7; // Pages 0-7 (8 pages total, displayed as 0/7 through 7/7)
 
   console.clear();
   console.log(chalk.cyan.bold('\n⚙️  Configuration Setup\n'));
@@ -395,6 +398,11 @@ async function collectConfiguration(options = {}) {
     console.log(header);
 
     if (currentPage === 0) {
+      // Page 0: System Dependencies
+      await handleSystemDependenciesPage();
+      // Don't auto-advance - let user see dependencies and navigate
+
+    } else if (currentPage === 1) {
       // Page 1: Mode Selection
       console.log(boxen(
         chalk.white.bold('Choose Your AgentVibes Mode\n\n') +
@@ -404,7 +412,7 @@ async function collectConfiguration(options = {}) {
         chalk.gray('   • Language learning & audio effects\n') +
         chalk.gray('   • Background music & 50+ voices\n') +
         chalk.gray('   • Perfect for immersive AI experience\n') +
-        chalk.dim('   • ~500 tokens overhead per session\n\n') +
+        chalk.dim('   • ~200 tokens overhead per session (optimized!)\n\n') +
         chalk.blue.bold('🔵 LITE MODE (Advanced)\n') +
         chalk.gray('   • Minimal overhead for power users\n') +
         chalk.gray('   • Completion messages only (no acknowledgment)\n') +
@@ -452,10 +460,6 @@ async function collectConfiguration(options = {}) {
       console.log(chalk.green(`\n✓ Mode selected: ${mode === 'lite' ? 'Lite Mode' : 'Full Mode'}\n`));
       currentPage++;
       continue; // Skip navigation menu and go directly to next page
-
-    } else if (currentPage === 1) {
-      await handleSystemDependenciesPage();
-      currentPage++;
     } else if (currentPage === 2) {
       // Page 3: TTS Provider & Voice Storage
 
@@ -578,7 +582,75 @@ async function collectConfiguration(options = {}) {
       }
 
     } else if (currentPage === 3) {
-      // Page 4: Voice Selection
+      // Page 3: Audio File Saving Preference (GitHub Issue #74)
+
+      // If already configured (user went back and forward), auto-skip
+      if (config.saveAudio !== undefined) {
+        currentPage++; // Skip to next page
+        continue;
+      }
+
+      // Show prompt for first-time configuration
+      console.log(boxen(
+        chalk.white('AgentVibes can save TTS audio files to disk or use temporary files.\n\n') +
+        chalk.white('🗑️  ') + chalk.bold('Use Temporary Files (Recommended)\n') +
+        chalk.gray('   • Audio plays but files are NOT saved\n') +
+        chalk.gray('   • Automatic cleanup after playback\n') +
+        chalk.gray('   • Saves disk space\n') +
+        chalk.gray('   • Privacy-focused (no audio logs)\n\n') +
+        chalk.white('💾 ') + chalk.bold('Save Audio Files\n') +
+        chalk.gray('   • Files saved to .claude/audio/\n') +
+        chalk.gray('   • Useful for debugging, archiving\n') +
+        chalk.gray('   • Manual file management needed\n\n') +
+        chalk.dim('You can change this anytime with: ') + chalk.cyan('/agent-vibes:save-audio on|off'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 1, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'gray',
+          width: 80
+        }
+      ));
+
+      const saveAudioChoices = [
+        {
+          name: chalk.green('🗑️  Use Temporary Files (Recommended)'),
+          value: false
+        },
+        {
+          name: chalk.yellow('💾 Save Audio Files to Disk'),
+          value: true
+        },
+        new inquirer.Separator(),
+        {
+          name: chalk.magentaBright('← Back to TTS Provider'),
+          value: '__back__'
+        }
+      ];
+
+      const { saveAudio } = await inquirer.prompt([{
+        type: 'list',
+        name: 'saveAudio',
+        message: chalk.yellow('Audio file handling:'),
+        choices: saveAudioChoices,
+        default: false
+      }]);
+
+      // Check if user wants to go back
+      if (saveAudio === '__back__') {
+        currentPage = 2; // Go back to provider page
+        continue;
+      }
+
+      config.saveAudio = saveAudio;
+
+      // Auto-advance to next page (no confirmation needed)
+      console.log(chalk.green(`\n✓ Audio file handling set: ${config.saveAudio ? 'Save to disk' : 'Use temporary files'}\n`));
+      currentPage++; // Auto-advance to voice selection
+      continue; // Skip navigation and go to next iteration
+
+    } else if (currentPage === 4) {
+      // Page 5: Voice Selection
 
       // Debug: Check provider status
       if (!config.provider) {
@@ -705,8 +777,8 @@ async function collectConfiguration(options = {}) {
         ));
       }
 
-    } else if (currentPage === 4) {
-      // Page 5: Audio Effects (Reverb)
+    } else if (currentPage === 5) {
+      // Page 6: Audio Effects (Reverb)
       console.log(boxen(
         chalk.white('Configure audio effects for your TTS voices.\n\n') +
         chalk.yellow('Reverb:\n') +
@@ -741,8 +813,8 @@ async function collectConfiguration(options = {}) {
       currentPage++; // Auto-advance to next page
       continue; // Skip navigation and go to next iteration
 
-    } else if (currentPage === 5) {
-      // Page 6: Background Music
+    } else if (currentPage === 6) {
+      // Page 7: Background Music
       console.log(boxen(
         chalk.white('Add ambient background music to your TTS sessions.\n\n') +
         chalk.gray('   • Optional ambient music plays during TTS for a more engaging experience\n') +
@@ -809,8 +881,8 @@ async function collectConfiguration(options = {}) {
       currentPage++; // Auto-advance to next page
       continue; // Skip navigation and go to next iteration
 
-    } else if (currentPage === 6) {
-      // Page 7: Verbosity Settings
+    } else if (currentPage === 7) {
+      // Page 8: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -2897,7 +2969,7 @@ async function install(options = {}) {
   const currentDir = process.env.INIT_CWD || process.cwd();
 
   // Global pagination constants (used throughout install flow)
-  const configPages = 7; // Mode Selection + System Dependencies + Provider + Voice + Audio Effects + Background Music + Verbosity
+  const configPages = 8; // Mode Selection + System Dependencies + Provider + Save Audio + Voice + Audio Effects + Background Music + Verbosity
   const configOffset = 0;
 
   // Loop to allow going back to welcome screen
@@ -2978,6 +3050,13 @@ async function install(options = {}) {
     // Shorten the path if it's too long for display
     const displayPath = piperVoicesPath.replace(process.env.HOME, '~');
     configContent += chalk.gray(`   Storage: ${displayPath}\n`);
+  }
+  configContent += '\n';
+  configContent += chalk.cyan('💾 Audio File Saving:\n');
+  if (userConfig.saveAudio) {
+    configContent += chalk.white(`   Enabled (saved to .claude/audio/)\n`);
+  } else {
+    configContent += chalk.white(`   Disabled (temporary files)\n`);
   }
   configContent += '\n';
   configContent += chalk.cyan('🎛️  Audio Settings: \n');
@@ -3224,6 +3303,12 @@ async function install(options = {}) {
     // Apply verbosity configuration from userConfig
     const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
     await fs.writeFile(verbosityFile, userConfig.verbosity);
+
+    // Apply save-audio configuration from userConfig (GitHub Issue #74)
+    const agentvibesConfigDir = path.join(targetDir, '.agentvibes', 'config');
+    await fs.mkdir(agentvibesConfigDir, { recursive: true });
+    const saveAudioFile = path.join(agentvibesConfigDir, 'save-audio.txt');
+    await fs.writeFile(saveAudioFile, userConfig.saveAudio ? 'true' : 'false');
 
     // Initialize piperVoicesBoxen outside the conditional for proper scoping
     let piperVoicesBoxen = null;

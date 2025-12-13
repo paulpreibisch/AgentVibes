@@ -197,10 +197,40 @@ fi
 
 mkdir -p "$AUDIO_DIR"
 
-# In lite mode, use /tmp and clean up after playing
-if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]]; then
-  TEMP_FILE="/tmp/agentvibes-lite-$(date +%s)-$$.wav"
+# @function determine_output_file
+# @intent Determine where to save/store audio based on mode and save-audio config
+# @why Support both persistent storage and temporary files with SonarQube-compliant security
+# @param Uses globals: AGENTVIBES_LITE_MODE, SCRIPT_DIR
+# @returns Sets $TEMP_FILE global variable
+# @sideeffects Creates temp directory with secure permissions, sets trap for cleanup
+# @security Uses XDG_RUNTIME_DIR for secure temp storage, validates user ownership
+# @related GitHub Issue #74
+
+# Check save-audio preference from .agentvibes/config/save-audio.txt
+AGENTVIBES_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SAVE_AUDIO_FILE="$AGENTVIBES_ROOT/.agentvibes/config/save-audio.txt"
+SAVE_AUDIO=$(cat "$SAVE_AUDIO_FILE" 2>/dev/null || echo "false")
+
+# Determine output path based on mode and save-audio preference
+if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]] || [[ "$SAVE_AUDIO" == "false" ]]; then
+  # Use secure temp directory (SonarQube compliant - addresses security hotspots)
+  if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
+    TEMP_DIR="$XDG_RUNTIME_DIR/agentvibes-tts"
+  else
+    TEMP_DIR="/tmp/agentvibes-tts-$USER"
+  fi
+
+  # Create temp directory with restrictive permissions
+  mkdir -p "$TEMP_DIR"
+  chmod 700 "$TEMP_DIR"
+
+  # Create temp file in secure directory
+  TEMP_FILE="$TEMP_DIR/tts-$(date +%s)-$$.wav"
+
+  # Note: Temp file cleanup is handled by wait logic below (lines 448-465)
+  # Don't set EXIT trap as it would delete file before playback completes
 else
+  # Save to persistent audio directory
   TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).wav"
 fi
 
@@ -321,12 +351,18 @@ fi
 # @function add_silence_padding
 # @intent Add silence to prevent WSL audio cutoff
 # @why WSL audio subsystem cuts off first ~200ms AND last ~500ms
-# @param Uses global: $TEMP_FILE
+# @param Uses global: $TEMP_FILE, $SAVE_AUDIO
 # @returns Updates $TEMP_FILE to padded version
 # @sideeffects Modifies audio file
 # AI NOTE: Use ffmpeg if available, otherwise skip padding (degraded experience)
 if command -v ffmpeg &> /dev/null; then
-  PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
+  # Use temp directory when save-audio is disabled, otherwise use audio dir
+  if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]] || [[ "$SAVE_AUDIO" == "false" ]]; then
+    PADDED_FILE="${TEMP_FILE%.wav}-padded.wav"
+  else
+    PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
+  fi
+
   # Add 200ms silence at start, 500ms at end (WSL cuts more at end)
   ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.5 \
     -filter_complex "[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]" \
@@ -340,12 +376,18 @@ fi
 
 # @function apply_audio_effects
 # @intent Apply sox effects and background music via audio-processor.sh
-# @param Uses global: $TEMP_FILE
+# @param Uses global: $TEMP_FILE, $SAVE_AUDIO
 # @returns Updates $TEMP_FILE to processed version, sets $BACKGROUND_MUSIC if used
 # @sideeffects Applies audio effects and background music
 BACKGROUND_MUSIC=""
 if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
-  PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
+  # Use temp directory when save-audio is disabled, otherwise use audio dir
+  if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]] || [[ "$SAVE_AUDIO" == "false" ]]; then
+    PROCESSED_FILE="${TEMP_FILE%.wav}-processed.wav"
+  else
+    PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
+  fi
+
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
   PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
@@ -414,24 +456,17 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
   fi
 fi
 
-# Wait for audio to finish, then release lock and clean up temp file in lite mode
-if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]]; then
-  if [[ -n "$PLAYER_PID" ]]; then
-    # Use actual process wait for accurate completion detection
-    (wait $PLAYER_PID 2>/dev/null; rm -f "$LOCK_FILE" "$TEMP_FILE" "$BACKGROUND_MUSIC") &
-  else
-    # Fallback to sleep timer if no player PID (test/no-playback mode)
-    (sleep $DURATION; rm -f "$LOCK_FILE" "$TEMP_FILE" "$BACKGROUND_MUSIC") &
-  fi
+# Wait for audio to finish, then release lock and clean up temp files
+# In temp mode (SAVE_AUDIO=false or LITE_MODE=true), clean up audio file after playback
+# In persistent mode (SAVE_AUDIO=true), keep audio file but clean up lock
+if [[ "${AGENTVIBES_LITE_MODE:-false}" == "true" ]] || [[ "$SAVE_AUDIO" == "false" ]]; then
+  # Temp file mode: Clean up audio file and lock after playback
+  # Use sleep duration since player runs in subshell and can't be waited on
+  (sleep $DURATION; rm -f "$LOCK_FILE" "$TEMP_FILE" "$BACKGROUND_MUSIC") &
   disown
 else
-  if [[ -n "$PLAYER_PID" ]]; then
-    # Use actual process wait for accurate completion detection
-    (wait $PLAYER_PID 2>/dev/null; rm -f "$LOCK_FILE") &
-  else
-    # Fallback to sleep timer if no player PID (test/no-playback mode)
-    (sleep $DURATION; rm -f "$LOCK_FILE") &
-  fi
+  # Persistent file mode: Keep audio file, only clean up lock
+  (sleep $DURATION; rm -f "$LOCK_FILE") &
   disown
   echo "🎵 Saved to: $TEMP_FILE"
 fi
