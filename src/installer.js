@@ -2853,6 +2853,27 @@ async function install(options = {}) {
     content: configBoxen
   });
 
+  // Add welcome message prompt as the last page before "Start Installation"
+  if (!options.yes) {
+    const welcomeContent = boxen(
+      chalk.white('Before we begin installation, would you like to hear a\n') +
+      chalk.white('welcome message from Paul, creator of AgentVibes?\n\n') +
+      chalk.gray('This is a quick audio introduction to AgentVibes and its features.'),
+      {
+        padding: 1,
+        margin: { top: 0, bottom: 1, left: 0, right: 0 },
+        borderStyle: 'round',
+        borderColor: 'cyan',
+        width: 80
+      }
+    );
+
+    preInstallPages.push({
+      title: '🎵 Welcome Message',
+      content: welcomeContent
+    });
+  }
+
   // Show pre-install info pages with pagination
   if (!options.yes) {
     console.log(chalk.cyan('\n📖 Installation Preview\n'));
@@ -2876,17 +2897,8 @@ async function install(options = {}) {
     }
   }
 
-  // Ask if user wants to hear welcome message
+  // Ask if user wants to hear welcome message (after they pressed "Start Installation")
   if (!options.yes) {
-    // Show header for this confirmation screen
-    console.clear();
-    const currentPageNum = 3 + preInstallPages.length;
-    const { header } = createPageHeaderFooter('Installation Confirmation', 0, 15, currentPageNum);
-    console.log(header);
-    console.log('');
-
-    console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
-
     const { playWelcome } = await inquirer.prompt([
       {
         type: 'confirm',
@@ -2899,27 +2911,13 @@ async function install(options = {}) {
     if (playWelcome) {
       const spinner = ora('Playing welcome message...').start();
       await playWelcomeDemo(targetDir, spinner, options);
-      spinner.succeed(chalk.green('Welcome message complete!'));
+      spinner.succeed(chalk.green('Welcome message complete!\n'));
+    } else {
+      console.log(chalk.gray('Skipping welcome message...\n'));
     }
   }
 
-  // Final confirmation after previewing
-  if (!options.yes) {
-    const { confirm } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirm',
-        message: chalk.yellow(`\n✅ Ready to install AgentVibes with ${providerLabels[selectedProvider]}?`),
-        default: true,
-      },
-    ]);
-
-    if (!confirm) {
-      console.log(chalk.red('\n❌ Installation cancelled.\n'));
-      process.exit(0);
-    }
-  }
-
+  // User already confirmed by pressing "Start Installation", so no need for another confirmation
   console.log('');
   const spinner = ora('Checking installation directory...').start();
 
