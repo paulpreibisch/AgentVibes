@@ -2849,25 +2849,15 @@ async function install(options = {}) {
     width: 80
   });
 
-  // Add welcome message prompt to config summary page
-  let configSummaryContent = configBoxen;
-  if (!options.yes) {
-    configSummaryContent += '\n' + chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n\n');
-    configSummaryContent += chalk.yellow('? 🎵 Listen to Welcome Message? (y/N)');
-  }
+  // Don't add Configuration Summary to preInstallPages yet - we'll handle it specially
 
-  preInstallPages.push({
-    title: 'Configuration Summary',
-    content: configSummaryContent
-  });
-
-  // Show pre-install pages up to (and including) Configuration Summary
-  if (!options.yes) {
+  // Show pre-install pages up to (but NOT including) Configuration Summary
+  if (!options.yes && preInstallPages.length > 0) {
     console.log(chalk.cyan('\n📖 Installation Preview\n'));
     const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
     // For pre-install, estimate post-install pages (will be exact in post-install)
     const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
-    const estimatedTotal = configPages + preInstallPages.length + estimatedPostInstall;
+    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall; // +1 for Config Summary
 
     const result = await showPaginatedContent(preInstallPages, {
       ...options,
@@ -2884,7 +2874,22 @@ async function install(options = {}) {
     }
   }
 
-  // After Configuration Summary page, ask both prompts on the same screen
+  // Handle Configuration Summary page specially with welcome message prompt
+  if (!options.yes) {
+    // Show Configuration Summary page
+    console.clear();
+    const currentPageNum = 4 + preInstallPages.length; // After config pages + pre-install pages
+    const estimatedPostInstall = 7;
+    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall;
+    const { header } = createPageHeaderFooter('Configuration Summary', currentPageNum, estimatedTotal, 0);
+
+    console.log(header);
+    console.log(configBoxen);
+    console.log('');
+    console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
+  }
+
+  // Ask welcome message question BEFORE showing navigation
   if (!options.yes) {
     // Ask if user wants to hear welcome message
     const { playWelcome } = await inquirer.prompt([
@@ -2904,7 +2909,7 @@ async function install(options = {}) {
       console.log(''); // Spacing after completion
     }
 
-    // Ask to start installation
+    // Now show navigation menu (Continue to installation)
     const { startInstall } = await inquirer.prompt([
       {
         type: 'confirm',
