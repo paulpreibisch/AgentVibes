@@ -370,7 +370,6 @@ async function collectConfiguration(options = {}) {
     const pageTitle = getPageTitle(currentPage);
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
-    console.log('');
 
     if (currentPage === 0) {
       await handleSystemDependenciesPage();
@@ -729,14 +728,6 @@ async function collectConfiguration(options = {}) {
       continue;
     }
 
-    // Add spacing before navigation
-    console.log('');
-
-    // Show footer before navigation
-    console.log('');
-    console.log(footer);
-    console.log('');
-
     // Navigation
     const navChoices = [];
     if (currentPage < totalPages - 1) {
@@ -755,7 +746,7 @@ async function collectConfiguration(options = {}) {
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: ' ',
+      message: '',
       choices: navChoices,
       default: 'next'
     }]);
