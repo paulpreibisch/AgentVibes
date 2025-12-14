@@ -2860,39 +2860,17 @@ async function install(options = {}) {
     content: configSummaryContent
   });
 
-  // Add "Start Installation" confirmation page
-  if (!options.yes) {
-    const startContent = boxen(
-      chalk.white.bold('Ready to Install AgentVibes!\n\n') +
-      chalk.gray('Press "Continue" to begin the installation process.\n') +
-      chalk.gray('AgentVibes will be installed to: ') + chalk.cyan('.claude/\n\n') +
-      chalk.gray('You can cancel anytime by pressing Ctrl+C.'),
-      {
-        padding: 1,
-        margin: { top: 0, bottom: 1, left: 0, right: 0 },
-        borderStyle: 'round',
-        borderColor: 'green',
-        width: 80
-      }
-    );
-
-    preInstallPages.push({
-      title: '✅ Start Installation',
-      content: startContent
-    });
-  }
-
-  // Show pre-install info pages with pagination
+  // Show pre-install pages up to (and including) Configuration Summary
   if (!options.yes) {
     console.log(chalk.cyan('\n📖 Installation Preview\n'));
     const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
     // For pre-install, estimate post-install pages (will be exact in post-install)
     const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
-    const estimatedTotal = configPages + preInstallPages.length + estimatedPostInstall;
+    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall; // +1 for Start Installation page
 
     const result = await showPaginatedContent(preInstallPages, {
       ...options,
-      continueLabel: '✓ Continue',
+      continueLabel: '✓ Next',
       pageOffset: preInstallOffset,
       totalPages: estimatedTotal,
       showPreviousOnFirst: true
@@ -2905,7 +2883,7 @@ async function install(options = {}) {
     }
   }
 
-  // Ask if user wants to hear welcome message (right after they press Continue from Start Installation page)
+  // Ask if user wants to hear welcome message (after Configuration Summary, before Start Installation)
   if (!options.yes) {
     console.log(''); // Add spacing
     const { playWelcome } = await inquirer.prompt([
@@ -2924,6 +2902,40 @@ async function install(options = {}) {
       await playWelcomeDemo(targetDir, spinner, options);
       spinner.succeed(chalk.green('Welcome message complete!\n'));
     }
+  }
+
+  // Show "Start Installation" confirmation page
+  if (!options.yes) {
+    const startContent = boxen(
+      chalk.white.bold('Ready to Install AgentVibes!\n\n') +
+      chalk.gray('Press "Continue" to begin the installation process.\n') +
+      chalk.gray('AgentVibes will be installed to: ') + chalk.cyan('.claude/\n\n') +
+      chalk.gray('You can cancel anytime by pressing Ctrl+C.'),
+      {
+        padding: 1,
+        margin: { top: 0, bottom: 1, left: 0, right: 0 },
+        borderStyle: 'round',
+        borderColor: 'green',
+        width: 80
+      }
+    );
+
+    const startInstallPages = [{
+      title: '✅ Start Installation',
+      content: startContent
+    }];
+
+    const currentPageNum = preInstallOffset + preInstallPages.length;
+    const estimatedPostInstall = 7;
+    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall;
+
+    await showPaginatedContent(startInstallPages, {
+      ...options,
+      continueLabel: '✓ Continue',
+      pageOffset: currentPageNum,
+      totalPages: estimatedTotal,
+      showPreviousOnFirst: false
+    });
   }
 
   // User already confirmed by pressing "Start Installation", so no need for another confirmation
