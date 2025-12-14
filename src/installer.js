@@ -1299,20 +1299,37 @@ async function copyCommandFiles(targetDir, spinner) {
 
     // Create boxen content (don't print yet - will be shown in pagination)
     let content = chalk.bold(`${installedCommands.length} Slash Commands Installed\n\n`);
+    content += chalk.gray('Installed in: ') + chalk.cyan('.claude/commands/\n\n');
     content += chalk.gray('Slash commands are shortcuts you type in chat to trigger actions.\n');
     content += chalk.gray('Type them with a forward slash like: /agent-vibes:list\n\n');
+    content += chalk.cyan('Use ') + chalk.magenta('/agent-vibes:hide') + chalk.cyan(' to hide and ') + chalk.magenta('/agent-vibes:show') + chalk.cyan(' to show\n\n');
 
-    installedCommands.forEach(file => {
-      // Remove .md extension and format command name
-      const commandName = file.replace('.md', '');
+    // Format commands in two columns
+    const commandNames = installedCommands.map(file => file.replace('.md', ''));
+    const mid = Math.ceil(commandNames.length / 2);
+    const leftColumn = commandNames.slice(0, mid);
+    const rightColumn = commandNames.slice(mid);
 
-      // Highlight show and hide commands in cyan
-      if (commandName === 'agent-vibes:show' || commandName === 'agent-vibes:hide') {
-        content += chalk.green('✓ ') + chalk.cyan(`/${commandName}\n`);
-      } else {
-        content += chalk.green(`✓ `) + chalk.yellow(`/${commandName}\n`);
+    for (let i = 0; i < leftColumn.length; i++) {
+      const leftCmd = leftColumn[i];
+      const rightCmd = rightColumn[i];
+
+      // Format left column
+      let line = chalk.green('✓ ') + chalk.yellow(`/${leftCmd}`);
+
+      // Pad to align right column (40 chars for command + checkmark)
+      const leftLength = leftCmd.length + 4; // 4 = "✓ /" + command
+      const padding = ' '.repeat(Math.max(0, 40 - leftLength));
+
+      line += padding;
+
+      // Format right column if it exists
+      if (rightCmd) {
+        line += chalk.green('✓ ') + chalk.yellow(`/${rightCmd}`);
       }
-    });
+
+      content += line + '\n';
+    }
 
     // Add failures if any
     if (failedCommands.length > 0) {
@@ -1325,11 +1342,10 @@ async function copyCommandFiles(targetDir, spinner) {
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 1, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: successCount === commandFiles.length ? 'cyan' : 'yellow',
-      title: chalk.bold('📋 Slash Commands'),
-      titleAlignment: 'center'
+      width: 80
     });
 
     return { count: successCount, boxen: boxenContent };
@@ -1409,13 +1425,25 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
   content += chalk.gray('Hook scripts automatically run at key moments during your\n');
   content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
 
-  installedFiles.forEach(file => {
-    content += chalk.green(`✓ ${file.name}`);
-    if (file.executable) {
-      content += chalk.gray(' (executable)');
+  // Format files in two columns
+  const mid = Math.ceil(installedFiles.length / 2);
+  for (let i = 0; i < mid; i++) {
+    const left = installedFiles[i];
+    const right = installedFiles[i + mid];
+
+    // Format left column
+    let line = chalk.green(`✓ ${left.name}`);
+    const leftLen = left.name.length + 2; // "✓ " + name
+    const padding = ' '.repeat(Math.max(0, 40 - leftLen));
+    line += padding;
+
+    // Format right column if it exists
+    if (right) {
+      line += chalk.green(`✓ ${right.name}`);
     }
-    content += '\n';
-  });
+
+    content += line + '\n';
+  }
 
   if (failedFiles.length > 0) {
     content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
@@ -1428,11 +1456,10 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
 
   return boxen(content.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
-    title: chalk.bold('🔧 TTS Scripts'),
-    titleAlignment: 'center'
+    width: 80
   });
 }
 
@@ -1557,19 +1584,36 @@ async function copyPersonalityFiles(targetDir, spinner) {
       'zen': '🧘'
     };
 
-    installedPersonalities.forEach(file => {
+    // Display personalities in two columns
+    const personalities = installedPersonalities.map(file => {
       const name = file.replace('.md', '');
       const emoji = personalityEmojis[name] || '✨';
-      content += chalk.green(`✓ ${emoji} ${name}\n`);
+      return { emoji, name };
     });
+
+    const mid = Math.ceil(personalities.length / 2);
+    for (let i = 0; i < mid; i++) {
+      const left = personalities[i];
+      const right = personalities[i + mid];
+
+      let line = chalk.green('✓ ') + left.emoji + ' ' + chalk.yellow(left.name);
+      const leftLen = left.name.length + 4; // "✓ " + emoji + " " + name
+      const padding = ' '.repeat(Math.max(0, 35 - leftLen));
+      line += padding;
+
+      if (right) {
+        line += chalk.green('✓ ') + right.emoji + ' ' + chalk.yellow(right.name);
+      }
+
+      content += line + '\n';
+    }
 
     boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 1, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'magenta',
-      title: chalk.bold('🎭 Personalities'),
-      titleAlignment: 'center'
+      width: 80
     });
   }
 
@@ -1708,18 +1752,55 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
 
     content += chalk.gray('─'.repeat(70)) + '\n\n';
 
-    musicFiles.forEach(track => {
-      content += chalk.green(`✓ ${track.name}`) + chalk.gray(` (${track.size})\n`);
-      content += chalk.dim(`  ${track.path}\n`);
-    });
+    // Display tracks with emojis in two columns
+    const trackEmojis = {
+      'agentvibes_soft_flamenco_loop.mp3': '🎸',
+      'agentvibes_chillwave_loop.mp3': '🌊',
+      'agentvibes_lofi_hiphop_loop.mp3': '🎧',
+      'agentvibes_ambient_space_loop.mp3': '🌌',
+      'agentvibes_jazz_cafe_loop.mp3': '☕',
+      'agentvibes_synthwave_loop.mp3': '🌃',
+      'agentvibes_bossa_nova_loop.mp3': '🎺',
+      'agentvibes_downtempo_loop.mp3': '🎹',
+      'agentvibes_city_pop_loop.mp3': '🏙️',
+      'agentvibes_vaporwave_loop.mp3': '💿',
+      'agentvibes_trip_hop_loop.mp3': '🎵',
+      'agentvibes_soul_loop.mp3': '🎤',
+      'agentvibes_funk_loop.mp3': '🕺',
+      'agentvibes_reggae_loop.mp3': '🌴',
+      'agentvibes_blues_loop.mp3': '🎸',
+      'agentvibes_classical_loop.mp3': '🎻'
+    };
+
+    const tracks = musicFiles.map(track => ({
+      name: track.name.replace('agentvibes_', '').replace('_loop.mp3', '').replace(/_/g, ' '),
+      emoji: trackEmojis[track.name] || '🎵',
+      size: track.size
+    }));
+
+    const mid = Math.ceil(tracks.length / 2);
+    for (let i = 0; i < mid; i++) {
+      const left = tracks[i];
+      const right = tracks[i + mid];
+
+      let line = chalk.green('✓ ') + left.emoji + ' ' + chalk.yellow(left.name);
+      const leftLen = left.name.length + 4; // "✓ " + emoji + " " + name
+      const padding = ' '.repeat(Math.max(0, 35 - leftLen));
+      line += padding;
+
+      if (right) {
+        line += chalk.green('✓ ') + right.emoji + ' ' + chalk.yellow(right.name);
+      }
+
+      content += line + '\n';
+    }
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 1, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'green',
-      title: chalk.bold('🎵 Background Music'),
-      titleAlignment: 'center'
+      width: 80
     });
 
     return { count: musicFiles.length, boxen: boxenContent };
@@ -2734,11 +2815,10 @@ async function install(options = {}) {
 
   const configBoxen = boxen(configContent.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
-    title: chalk.bold('⚙️  Configuration Summary'),
-    titleAlignment: 'center'
+    width: 80
   });
   preInstallPages.push({
     title: 'Configuration Summary',
