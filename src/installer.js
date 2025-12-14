@@ -2848,29 +2848,37 @@ async function install(options = {}) {
     borderColor: 'green',
     width: 80
   });
+
+  // Add welcome message prompt to config summary page
+  let configSummaryContent = configBoxen;
+  if (!options.yes) {
+    configSummaryContent += '\n' + chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n');
+  }
+
   preInstallPages.push({
     title: 'Configuration Summary',
-    content: configBoxen
+    content: configSummaryContent
   });
 
-  // Add welcome message prompt as the last page before "Start Installation"
+  // Add "Start Installation" confirmation page
   if (!options.yes) {
-    const welcomeContent = boxen(
-      chalk.white('Before we begin installation, would you like to hear a\n') +
-      chalk.white('welcome message from Paul, creator of AgentVibes?\n\n') +
-      chalk.gray('This is a quick audio introduction to AgentVibes and its features.'),
+    const startContent = boxen(
+      chalk.white.bold('Ready to Install AgentVibes!\n\n') +
+      chalk.gray('Press "Continue" to begin the installation process.\n') +
+      chalk.gray('AgentVibes will be installed to: ') + chalk.cyan('.claude/\n\n') +
+      chalk.gray('You can cancel anytime by pressing Ctrl+C.'),
       {
         padding: 1,
         margin: { top: 0, bottom: 1, left: 0, right: 0 },
         borderStyle: 'round',
-        borderColor: 'cyan',
+        borderColor: 'green',
         width: 80
       }
     );
 
     preInstallPages.push({
-      title: '🎵 Welcome Message',
-      content: welcomeContent
+      title: '✅ Start Installation',
+      content: startContent
     });
   }
 
@@ -2884,7 +2892,7 @@ async function install(options = {}) {
 
     const result = await showPaginatedContent(preInstallPages, {
       ...options,
-      continueLabel: '✓ Start Installation',
+      continueLabel: '✓ Continue',
       pageOffset: preInstallOffset,
       totalPages: estimatedTotal,
       showPreviousOnFirst: true
@@ -2897,8 +2905,9 @@ async function install(options = {}) {
     }
   }
 
-  // Ask if user wants to hear welcome message (after they pressed "Start Installation")
+  // Ask if user wants to hear welcome message (right after they press Continue from Start Installation page)
   if (!options.yes) {
+    console.log(''); // Add spacing
     const { playWelcome } = await inquirer.prompt([
       {
         type: 'confirm',
@@ -2908,12 +2917,12 @@ async function install(options = {}) {
       },
     ]);
 
+    console.log(''); // Add spacing after response
+
     if (playWelcome) {
       const spinner = ora('Playing welcome message...').start();
       await playWelcomeDemo(targetDir, spinner, options);
       spinner.succeed(chalk.green('Welcome message complete!\n'));
-    } else {
-      console.log(chalk.gray('Skipping welcome message...\n'));
     }
   }
 
