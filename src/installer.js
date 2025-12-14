@@ -723,6 +723,11 @@ async function collectConfiguration(options = {}) {
       }]);
 
       config.verbosity = verbosity;
+
+      // Auto-advance - verbosity is the last page, so we're done
+      console.log(chalk.green('\n✓ Verbosity level set\n'));
+      currentPage++;
+      continue;
     }
 
     // Add spacing before navigation
