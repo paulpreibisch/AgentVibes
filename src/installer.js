@@ -318,7 +318,7 @@ async function handleSystemDependenciesPage() {
 
   const depsBoxen = boxen(depContent.trim(), {
     padding: 1,
-    margin: { top: 0, bottom: 1, left: 0, right: 0 },
+    margin: { top: 0, bottom: 0, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
     width: 80
@@ -390,7 +390,7 @@ async function collectConfiguration(options = {}) {
           chalk.dim('(Automatically selected - only option for Linux/WSL)'),
           {
             padding: 1,
-            margin: { top: 0, bottom: 1, left: 0, right: 0 },
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'gray',
             width: 80
@@ -415,7 +415,7 @@ async function collectConfiguration(options = {}) {
           chalk.gray('   • Human-like speech quality'),
           {
             padding: 1,
-            margin: { top: 0, bottom: 1, left: 0, right: 0 },
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'gray',
             width: 80
@@ -470,7 +470,7 @@ async function collectConfiguration(options = {}) {
             chalk.white('across all your projects, or locally per project.'),
             {
               padding: 1,
-              margin: { top: 0, bottom: 1, left: 0, right: 0 },
+              margin: { top: 0, bottom: 0, left: 0, right: 0 },
               borderStyle: 'round',
               borderColor: 'gray',
               width: 80
@@ -504,7 +504,7 @@ async function collectConfiguration(options = {}) {
         chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
         {
           padding: 1,
-          margin: { top: 0, bottom: 1, left: 0, right: 0 },
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
           width: 80
@@ -606,7 +606,7 @@ async function collectConfiguration(options = {}) {
         chalk.gray('   • Change track: ') + chalk.cyan('/agent-vibes:background-music set chillwave'),
         {
           padding: 1,
-          margin: { top: 0, bottom: 1, left: 0, right: 0 },
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
           width: 80
@@ -701,7 +701,7 @@ async function collectConfiguration(options = {}) {
         chalk.gray('Change anytime: ') + chalk.cyan('/agent-vibes:verbosity <level>'),
         {
           padding: 1,
-          margin: { top: 0, bottom: 1, left: 0, right: 0 },
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
           width: 80
@@ -1370,7 +1370,7 @@ async function copyCommandFiles(targetDir, spinner) {
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: { top: 0, bottom: 1, left: 0, right: 0 },
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: successCount === commandFiles.length ? 'cyan' : 'yellow',
       width: 80
@@ -1484,7 +1484,7 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
 
   return boxen(content.trim(), {
     padding: 1,
-    margin: { top: 0, bottom: 1, left: 0, right: 0 },
+    margin: { top: 0, bottom: 0, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
     width: 80
@@ -1638,7 +1638,7 @@ async function copyPersonalityFiles(targetDir, spinner) {
 
     boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: { top: 0, bottom: 1, left: 0, right: 0 },
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'magenta',
       width: 80
@@ -1825,7 +1825,7 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: { top: 0, bottom: 1, left: 0, right: 0 },
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'green',
       width: 80
@@ -2843,7 +2843,7 @@ async function install(options = {}) {
 
   const configBoxen = boxen(configContent.trim(), {
     padding: 1,
-    margin: { top: 0, bottom: 1, left: 0, right: 0 },
+    margin: { top: 0, bottom: 0, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
     width: 80
