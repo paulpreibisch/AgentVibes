@@ -2852,7 +2852,8 @@ async function install(options = {}) {
   // Add welcome message prompt to config summary page
   let configSummaryContent = configBoxen;
   if (!options.yes) {
-    configSummaryContent += '\n' + chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n');
+    configSummaryContent += '\n' + chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n\n');
+    configSummaryContent += chalk.yellow('? 🎵 Listen to Welcome Message? (y/N)');
   }
 
   preInstallPages.push({
