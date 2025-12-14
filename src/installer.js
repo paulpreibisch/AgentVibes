@@ -200,7 +200,6 @@ async function showPaginatedContent(pages, options = {}) {
 
     console.log(header);
     console.log(pages[currentPage].content);
-
     const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst, pages);
 
     const { action } = await inquirer.prompt([{
