@@ -2866,7 +2866,7 @@ async function install(options = {}) {
     const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
     // For pre-install, estimate post-install pages (will be exact in post-install)
     const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
-    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall; // +1 for Start Installation page
+    const estimatedTotal = configPages + preInstallPages.length + estimatedPostInstall;
 
     const result = await showPaginatedContent(preInstallPages, {
       ...options,
@@ -2883,9 +2883,9 @@ async function install(options = {}) {
     }
   }
 
-  // Ask if user wants to hear welcome message (after Configuration Summary, before Start Installation)
+  // After Configuration Summary page, ask both prompts on the same screen
   if (!options.yes) {
-    console.log(''); // Add spacing
+    // Ask if user wants to hear welcome message
     const { playWelcome } = await inquirer.prompt([
       {
         type: 'confirm',
@@ -2895,47 +2895,28 @@ async function install(options = {}) {
       },
     ]);
 
-    console.log(''); // Add spacing after response
-
     if (playWelcome) {
+      console.log(''); // Spacing before spinner
       const spinner = ora('Playing welcome message...').start();
       await playWelcomeDemo(targetDir, spinner, options);
-      spinner.succeed(chalk.green('Welcome message complete!\n'));
+      spinner.succeed(chalk.green('Welcome message complete!'));
+      console.log(''); // Spacing after completion
     }
-  }
 
-  // Show "Start Installation" confirmation page
-  if (!options.yes) {
-    const startContent = boxen(
-      chalk.white.bold('Ready to Install AgentVibes!\n\n') +
-      chalk.gray('Press "Continue" to begin the installation process.\n') +
-      chalk.gray('AgentVibes will be installed to: ') + chalk.cyan('.claude/\n\n') +
-      chalk.gray('You can cancel anytime by pressing Ctrl+C.'),
+    // Ask to start installation
+    const { startInstall } = await inquirer.prompt([
       {
-        padding: 1,
-        margin: { top: 0, bottom: 1, left: 0, right: 0 },
-        borderStyle: 'round',
-        borderColor: 'green',
-        width: 80
-      }
-    );
+        type: 'confirm',
+        name: 'startInstall',
+        message: chalk.yellow('✅ Start Installation?'),
+        default: true,
+      },
+    ]);
 
-    const startInstallPages = [{
-      title: '✅ Start Installation',
-      content: startContent
-    }];
-
-    const currentPageNum = preInstallOffset + preInstallPages.length;
-    const estimatedPostInstall = 7;
-    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall;
-
-    await showPaginatedContent(startInstallPages, {
-      ...options,
-      continueLabel: '✓ Continue',
-      pageOffset: currentPageNum,
-      totalPages: estimatedTotal,
-      showPreviousOnFirst: false
-    });
+    if (!startInstall) {
+      console.log(chalk.red('\n❌ Installation cancelled.\n'));
+      process.exit(0);
+    }
   }
 
   // User already confirmed by pressing "Start Installation", so no need for another confirmation
