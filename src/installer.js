@@ -540,6 +540,15 @@ async function collectConfiguration(options = {}) {
 
         if (selectedVoice !== '__skip__') {
           config.defaultVoice = selectedVoice;
+          // Auto-advance to next page after selection
+          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          currentPage++; // Skip to next page immediately
+          continue; // Skip navigation and go to next iteration
+        } else {
+          // User skipped - advance anyway
+          console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+          currentPage++;
+          continue;
         }
 
       } else if (config.provider === 'macos') {
@@ -571,6 +580,15 @@ async function collectConfiguration(options = {}) {
 
         if (selectedVoice !== '__skip__') {
           config.defaultVoice = selectedVoice;
+          // Auto-advance to next page after selection
+          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          currentPage++; // Skip to next page immediately
+          continue; // Skip navigation and go to next iteration
+        } else {
+          // User skipped - advance anyway
+          console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+          currentPage++;
+          continue;
         }
       }
 
@@ -661,6 +679,11 @@ async function collectConfiguration(options = {}) {
 
         config.backgroundMusic.track = selectedTrack;
       }
+
+      // Auto-advance to next page after audio settings
+      console.log(chalk.green('\n✓ Audio settings configured\n'));
+      currentPage++;
+      continue;
 
     } else if (currentPage === 4) {
       // Page 5: Verbosity Settings
