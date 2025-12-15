@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.4
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.5
 
 ---
 
@@ -114,18 +114,15 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.4 - Code Quality & Maintainability](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.4)** ⚙️
-AgentVibes v2.17.4 focuses on code quality and maintainability with extensive SonarCloud-driven refactoring across the entire codebase. This release reduces cognitive complexity in critical files by up to 90%, making the codebase more maintainable and easier to understand. Major refactoring includes the installer (complexity reduced from 84 to ~8), dependency checker (43 to ~5), and MCP installer (34 to ~8), with helper functions extracted and responsibilities separated. Additionally, this release includes comprehensive party mode testing with 377 new tests, conversational BMAD agent intros, improved documentation, and audio quality enhancements. **Key Highlights:** - ⚙️ **Major Code Refactoring** - Cognitive complexity reduced by up to 90% across critical files - 🧪 **Comprehensive Testing** - 377 new party mode tests added, 225 total tests passing - 📚 **Improved Documentation** - New Prerequisites and FAQ sections clarify installation - 🎭 **Conversational Agent Intros** - BMAD party mode now uses "Hi! I'm John, your Product Manager" format - 🔊 **Better Audio Balance** - Background music reduced 15% for clearer TTS voice
-AgentVibes v2.17.4 focuses on code quality and maintainability with extensive SonarCloud-driven refactoring across the entire codebase, reducing cognitive complexity in critical files by up to 90%.
+**[v2.17.5 - Installer UX Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.5)** ✨
+
+AgentVibes v2.17.5 improves the installation experience with a complete installer UX overhaul. This release introduces intelligent page navigation with previews, beautiful two-column layouts for all summary screens, and optimized vertical spacing throughout.
 
 **Key Highlights:**
-- ⚙️ **Major Code Refactoring** - Cognitive complexity reduced by up to 90% across critical files
-- 🧪 **Comprehensive Testing** - 377 new party mode tests added, 225 total tests passing
-- 📚 **Improved Documentation** - New Prerequisites and FAQ sections clarify installation
-- 🎭 **Conversational Agent Intros** - BMAD party mode now uses "Hi! I'm John, your Product Manager" format
-- 🔊 **Better Audio Balance** - Background music reduced 15% for clearer TTS voice
-- 🏗️ **installer.js** - Complexity: 84 → ~8 (90% reduction)
-- 📦 **dependency-checker.js** - Complexity: 43 → ~5, 23 → ~8 (88% & 65% reductions)
+- 📱 **Page Navigation Previews** - See next/previous page titles in navigation menu (e.g., "Next → (Voice Selection)")
+- 🎨 **Beautiful Two-Column Layouts** - Slash commands, hooks, personalities, and music displayed in organized columns
+- ✨ **Emoji Page Titles** - Each configuration page has descriptive icons (🔧 System Dependencies, 🎤 Voice Selection, etc.)
+- 📏 **Optimized Spacing** - Eliminated excessive vertical spacing for cleaner, more compact display
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

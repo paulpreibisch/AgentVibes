@@ -823,20 +823,17 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.17.4 - Code Quality & Maintainability\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v2.17.5 - Installer UX Improvements\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.17.4 focuses on code quality and maintainability with extensive\n') +
-    chalk.cyan('SonarCloud-driven refactoring across the entire codebase. This release reduces\n') +
-    chalk.cyan('cognitive complexity in critical files by up to 90%, making the codebase more\n') +
-    chalk.cyan('maintainable and easier to understand.\n\n') +
+    chalk.cyan('AgentVibes v2.17.5 improves the installation experience with a complete installer\n') +
+    chalk.cyan('UX overhaul. This release introduces intelligent page navigation with previews,\n') +
+    chalk.cyan('beautiful two-column layouts for all summary screens, and optimized vertical\n') +
+    chalk.cyan('spacing throughout.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   ⚙️  Major Code Refactoring - Cognitive complexity reduced by up to 90% across critical files\n') +
-    chalk.gray('   🧪 Comprehensive Testing - 377 new party mode tests added, 225 total tests passing\n') +
-    chalk.gray('   📚 Improved Documentation - New Prerequisites and FAQ sections clarify installation\n') +
-    chalk.gray('   🎭 Conversational Agent Intros - BMAD party mode now uses "Hi! I\'m John, your Product Manager"\n') +
-    chalk.gray('   🔊 Better Audio Balance - Background music reduced 15% for clearer TTS voice\n') +
-    chalk.gray('   🏗️  installer.js: 84 → ~8 complexity (90% reduction)\n') +
-    chalk.gray('   📦 dependency-checker.js: 43 → ~5, 23 → ~8 (88% & 65% reductions)\n\n') +
+    chalk.gray('   📱 Page Navigation Previews - See next/previous page titles in navigation menu\n') +
+    chalk.gray('   🎨 Beautiful Two-Column Layouts - Commands, hooks, personalities displayed in organized columns\n') +
+    chalk.gray('   ✨ Emoji Page Titles - Descriptive icons for each configuration page\n') +
+    chalk.gray('   📏 Optimized Spacing - Eliminated excessive vertical spacing for cleaner display\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +

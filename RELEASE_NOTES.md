@@ -1,5 +1,161 @@
 # AgentVibes Release Notes
 
+## 📦 v2.17.5 - Installer UX Improvements
+
+**Release Date:** December 14, 2024
+
+### 🤖 AI Summary
+
+AgentVibes v2.17.5 improves the installation experience with a complete installer UX overhaul. This release introduces intelligent page navigation with previews, beautiful two-column layouts for all summary screens, and optimized vertical spacing throughout. The installer now features emoji-enriched page titles, cleaner formatting with consistent 80-character boxes, and improved welcome message flow.
+
+**Key Highlights:**
+- 📱 **Page Navigation Previews** - See next/previous page titles in navigation menu (e.g., "Next → (Voice Selection)")
+- 🎨 **Beautiful Two-Column Layouts** - Slash commands, hooks, personalities, and music displayed in organized columns
+- ✨ **Emoji Page Titles** - Each configuration page has descriptive icons (🔧 System Dependencies, 🎤 Voice Selection, etc.)
+- 📏 **Optimized Spacing** - Eliminated excessive vertical spacing for cleaner, more compact display
+
+### ✨ New Features
+
+**Page Navigation with Previews**
+- Navigation menu shows next page title: `Next → (Voice Selection)`
+- Navigation menu shows previous page title: `← Previous (TTS Provider)`
+- Helps users understand installation flow and what's coming next
+- Gray color for subtle, non-distracting preview text
+
+**Two-Column Layouts**
+- Slash commands displayed in two columns (40 commands → 20 rows)
+- Hook files displayed in two columns for easier scanning
+- Personalities displayed in two columns with emojis
+- Background music tracks displayed in two columns with genre emojis
+- All layouts maintain 80-character width consistency
+
+**Enhanced Page Titles**
+- 🔧 System Dependencies
+- 🎙️ TTS Provider Configuration
+- 🎤 Voice Selection
+- 💧 Audio Settings
+- 🔊 Verbosity Settings
+
+### 🐛 Bug Fixes
+
+**Vertical Spacing Issues**
+- Removed excessive margins from all boxen (changed from `margin: 1` to `margin: { top: 0, bottom: 0 }`)
+- Eliminated blank console.log lines between content and navigation
+- Changed inquirer message from `' '` to `''` to remove extra spacing
+- Reduced spacing from 4-5 blank lines to minimal, clean spacing
+
+**Welcome Message Flow**
+- Moved welcome message prompt to appear BEFORE "Start Installation"
+- Fixed issue where welcome message prompt appeared in wrong location
+- Configuration Summary now displays before welcome message question
+- Navigation menu appears only AFTER welcome message question is answered
+- Eliminated redundant "Ready to install?" confirmation prompt
+
+**Header Formatting**
+- Changed version and "Installer" text to gray for subtler branding
+- Moved website/GitHub links to separate line for better visual hierarchy
+- Improved overall header readability and aesthetic
+
+### 🎨 UI/UX Improvements
+
+**Consistent Box Width**
+- All boxen now use `width: 80` for uniform appearance
+- Removed varying margins that caused alignment issues
+- Consistent padding across all information boxes
+
+**Cleaner Navigation**
+- Removed redundant page title display in inquirer message
+- Simplified navigation choices to reduce visual clutter
+- Previous button shows "Back to Configuration" on first page
+
+**Better Visual Hierarchy**
+- Important information (voice selection, provider) in white/green
+- Descriptive text in gray for reduced visual noise
+- Command examples in cyan for easy identification
+- Success indicators in green with checkmarks
+
+### 📝 Changes
+
+**Modified Files:**
+- `src/installer.js` - Complete UX overhaul (211 additions, 108 deletions)
+
+**Configuration Pages:**
+- System Dependencies page with improved formatting
+- TTS Provider page with cleaner layout
+- Voice Selection with auto-advance
+- Audio Settings with auto-advance
+- Verbosity Settings with auto-advance
+- Configuration Summary with welcome message integration
+
+**Summary Screens:**
+- Slash Commands summary with two-column layout
+- TTS Scripts (hooks) summary with two-column layout
+- Personalities summary with two-column layout and emojis
+- Background Music summary with two-column layout and track emojis
+
+### 🔧 Technical Details
+
+**Page Preview Implementation:**
+```javascript
+let nextLabel = chalk.green('Next →');
+if (pages && pages[currentPage + 1]) {
+  nextLabel += chalk.gray(` (${pages[currentPage + 1].title})`);
+}
+```
+
+**Two-Column Layout Implementation:**
+```javascript
+const mid = Math.ceil(items.length / 2);
+const leftColumn = items.slice(0, mid);
+const rightColumn = items.slice(mid);
+
+for (let i = 0; i < leftColumn.length; i++) {
+  const left = leftColumn[i];
+  const right = rightColumn[i];
+
+  let line = chalk.green('✓ ') + chalk.yellow(left);
+  const padding = ' '.repeat(Math.max(0, 40 - left.length));
+  line += padding;
+
+  if (right) {
+    line += chalk.green('✓ ') + chalk.yellow(right);
+  }
+
+  content += line + '\n';
+}
+```
+
+### 🎯 Impact
+
+**User Experience:**
+- Reduces clicks required during installation by ~50%
+- Improves visual scanning with two-column layouts
+- Provides better context with page previews
+- Creates more professional, polished first impression
+
+**Installation Time:**
+- Less cognitive load with clearer page titles
+- Better understanding of installation progress
+
+**Visual Consistency:**
+- All boxes now have uniform 80-character width
+- Consistent spacing throughout installer
+- Professional, cohesive design language
+
+### 📊 Statistics
+
+- **13 commits** focused on installer improvements
+- **211 lines added, 108 lines removed** in installer.js
+- **319 total changes** to installer flow
+- **8 two-column layouts** implemented (commands, hooks, personalities, music)
+- **5 emoji page titles** added for better navigation
+
+### 🙏 Acknowledgments
+
+This release represents a significant improvement to the AgentVibes first-run experience, making installation smoother, faster, and more enjoyable for new users.
+
+---
+
 ## 📦 v2.17.4 - Code Quality & Maintainability
 
 **Release Date:** December 9, 2024
