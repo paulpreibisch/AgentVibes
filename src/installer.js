@@ -92,9 +92,9 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
   const github = chalk.gray('https://github.com/paulpreibisch/AgentVibes');
 
   const header = boxen(
-    `${agentText} ${vibesText} ${chalk.yellow(`v${VERSION}`)} ${chalk.white('Installer')} • ${pageNum}\n\n` +
-    `${chalk.cyan(pageTitle)}\n\n` +
-    `${website} • ${github}`,
+    `${agentText} ${vibesText} ${chalk.gray(`v${VERSION}`)} ${chalk.gray('Installer')} • ${pageNum}\n` +
+    `${website} • ${github}\n\n` +
+    `${chalk.cyan(pageTitle)}`,
     {
       padding: { top: 0, bottom: 0, left: 2, right: 2 },
       borderStyle: 'round',
@@ -123,20 +123,31 @@ function createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset =
  * @param {number} totalPages - Total number of pages
  * @param {string} continueLabel - Label for continue button
  * @param {boolean} showPreviousOnFirst - Show previous on first page
+ * @param {Array} pages - Array of page objects with titles
  * @returns {Array} Navigation choices
  */
-function buildNavigationChoices(currentPage, totalPages, continueLabel, showPreviousOnFirst) {
+function buildNavigationChoices(currentPage, totalPages, continueLabel, showPreviousOnFirst, pages = null) {
   const choices = [];
   const isLastPage = currentPage >= totalPages - 1;
 
   if (!isLastPage) {
-    choices.push({ name: chalk.green('Next →'), value: 'next' });
+    let nextLabel = chalk.green('Next →');
+    if (pages && pages[currentPage + 1]) {
+      nextLabel += chalk.gray(` (${pages[currentPage + 1].title})`);
+    }
+    choices.push({ name: nextLabel, value: 'next' });
   } else {
     choices.push({ name: chalk.cyan(`✓ ${continueLabel.replace('✓ ', '')}`), value: 'continue' });
   }
 
   if (currentPage > 0 || showPreviousOnFirst) {
-    choices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+    let prevLabel = chalk.gray('← Previous');
+    if (pages && currentPage > 0 && pages[currentPage - 1]) {
+      prevLabel += chalk.gray(` (${pages[currentPage - 1].title})`);
+    } else if (showPreviousOnFirst && currentPage === 0) {
+      prevLabel = chalk.gray('← Back to Configuration');
+    }
+    choices.push({ name: prevLabel, value: 'prev' });
   }
 
   return choices;
@@ -188,19 +199,13 @@ async function showPaginatedContent(pages, options = {}) {
     );
 
     console.log(header);
-    console.log('');
     console.log(pages[currentPage].content);
-
-    const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst);
-
-    console.log('');
-    console.log(footer);
-    console.log('');
+    const choices = buildNavigationChoices(currentPage, pages.length, continueLabel, showPreviousOnFirst, pages);
 
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: chalk.cyan(`📄 ${pages[currentPage].title}`),
+      message: '', // Hide the "Use arrow keys" message
       choices,
       default: currentPage < pages.length - 1 ? 'next' : 'continue'
     }]);
@@ -227,11 +232,11 @@ async function showPaginatedContent(pages, options = {}) {
  */
 function getPageTitle(pageNum) {
   const titles = {
-    0: 'System Dependencies',
-    1: 'TTS Provider Configuration',
-    2: 'Voice Selection',
-    3: 'Audio Settings',
-    4: 'Verbosity Settings'
+    0: '🔧 System Dependencies',
+    1: '🎙️ TTS Provider Configuration',
+    2: '🎤 Voice Selection',
+    3: '💧 Audio Settings',
+    4: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -312,11 +317,10 @@ async function handleSystemDependenciesPage() {
 
   const depsBoxen = boxen(depContent.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 0, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: Object.keys(depResults.missing).length > 0 ? 'yellow' : 'green',
-    title: chalk.bold('🔧 System Dependencies'),
-    titleAlignment: 'center'
+    width: 80
   });
 
   console.log(depsBoxen);
@@ -366,7 +370,6 @@ async function collectConfiguration(options = {}) {
     const pageTitle = getPageTitle(currentPage);
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
-    console.log('');
 
     if (currentPage === 0) {
       await handleSystemDependenciesPage();
@@ -376,7 +379,7 @@ async function collectConfiguration(options = {}) {
       // On non-macOS platforms, only Piper is available - auto-select it
       if (process.platform !== 'darwin') {
         console.log(boxen(
-          chalk.gray('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
           chalk.white('Your TTS Provider:\n\n') +
           chalk.green('🆓 Piper TTS (Free, Offline)\n') +
           chalk.gray('   • 50+ Hugging Face AI voices\n') +
@@ -385,11 +388,10 @@ async function collectConfiguration(options = {}) {
           chalk.dim('(Automatically selected - only option for Linux/WSL)'),
           {
             padding: 1,
-            margin: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'gray',
-            title: chalk.bold('☺ TTS Provider'),
-            titleAlignment: 'center'
+            width: 80
           }
         ));
 
@@ -399,7 +401,7 @@ async function collectConfiguration(options = {}) {
       } else {
         // macOS - show choice between macOS Say and Piper
         console.log(boxen(
-          chalk.gray('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
           chalk.white('Choose your Text-to-Speech provider.\n\n') +
           chalk.yellow('🍎 macOS Say\n') +
           chalk.gray('   • Built-in to macOS\n') +
@@ -411,11 +413,10 @@ async function collectConfiguration(options = {}) {
           chalk.gray('   • Human-like speech quality'),
           {
             padding: 1,
-            margin: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'gray',
-            title: chalk.bold('☺ TTS Provider'),
-            titleAlignment: 'center'
+            width: 80
           }
         ));
 
@@ -467,11 +468,10 @@ async function collectConfiguration(options = {}) {
             chalk.white('across all your projects, or locally per project.'),
             {
               padding: 1,
-              margin: { top: 1, bottom: 1, left: 1, right: 1 },
+              margin: { top: 0, bottom: 0, left: 0, right: 0 },
               borderStyle: 'round',
               borderColor: 'gray',
-              title: chalk.bold('📁 Voice Storage'),
-              titleAlignment: 'center'
+              width: 80
             }
           ));
 
@@ -502,11 +502,10 @@ async function collectConfiguration(options = {}) {
         chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
-          title: chalk.bold('🎤 Default Voice'),
-          titleAlignment: 'center'
+          width: 80
         }
       ));
 
@@ -539,6 +538,15 @@ async function collectConfiguration(options = {}) {
 
         if (selectedVoice !== '__skip__') {
           config.defaultVoice = selectedVoice;
+          // Auto-advance to next page after selection
+          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          currentPage++; // Skip to next page immediately
+          continue; // Skip navigation and go to next iteration
+        } else {
+          // User skipped - advance anyway
+          console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+          currentPage++;
+          continue;
         }
 
       } else if (config.provider === 'macos') {
@@ -570,6 +578,15 @@ async function collectConfiguration(options = {}) {
 
         if (selectedVoice !== '__skip__') {
           config.defaultVoice = selectedVoice;
+          // Auto-advance to next page after selection
+          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          currentPage++; // Skip to next page immediately
+          continue; // Skip navigation and go to next iteration
+        } else {
+          // User skipped - advance anyway
+          console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+          currentPage++;
+          continue;
         }
       }
 
@@ -587,11 +604,10 @@ async function collectConfiguration(options = {}) {
         chalk.gray('   • Change track: ') + chalk.cyan('/agent-vibes:background-music set chillwave'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
-          title: chalk.bold('☺ Audio Effects'),
-          titleAlignment: 'center'
+          width: 80
         }
       ));
 
@@ -662,6 +678,11 @@ async function collectConfiguration(options = {}) {
         config.backgroundMusic.track = selectedTrack;
       }
 
+      // Auto-advance to next page after audio settings
+      console.log(chalk.green('\n✓ Audio settings configured\n'));
+      currentPage++;
+      continue;
+
     } else if (currentPage === 4) {
       // Page 5: Verbosity Settings
       console.log(boxen(
@@ -678,11 +699,10 @@ async function collectConfiguration(options = {}) {
         chalk.gray('Change anytime: ') + chalk.cyan('/agent-vibes:verbosity <level>'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'gray',
-          title: chalk.bold('☺ TTS Verbosity'),
-          titleAlignment: 'center'
+          width: 80
         }
       ));
 
@@ -701,15 +721,12 @@ async function collectConfiguration(options = {}) {
       }]);
 
       config.verbosity = verbosity;
+
+      // Auto-advance - verbosity is the last page, so we're done
+      console.log(chalk.green('\n✓ Verbosity level set\n'));
+      currentPage++;
+      continue;
     }
-
-    // Add spacing before navigation
-    console.log('');
-
-    // Show footer before navigation
-    console.log('');
-    console.log(footer);
-    console.log('');
 
     // Navigation
     const navChoices = [];
@@ -729,7 +746,7 @@ async function collectConfiguration(options = {}) {
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: ' ',
+      message: '',
       choices: navChoices,
       default: 'next'
     }]);
@@ -1300,20 +1317,37 @@ async function copyCommandFiles(targetDir, spinner) {
 
     // Create boxen content (don't print yet - will be shown in pagination)
     let content = chalk.bold(`${installedCommands.length} Slash Commands Installed\n\n`);
+    content += chalk.gray('Installed in: ') + chalk.cyan('.claude/commands/\n\n');
     content += chalk.gray('Slash commands are shortcuts you type in chat to trigger actions.\n');
     content += chalk.gray('Type them with a forward slash like: /agent-vibes:list\n\n');
+    content += chalk.cyan('Use ') + chalk.magenta('/agent-vibes:hide') + chalk.cyan(' to hide and ') + chalk.magenta('/agent-vibes:show') + chalk.cyan(' to show\n\n');
 
-    installedCommands.forEach(file => {
-      // Remove .md extension and format command name
-      const commandName = file.replace('.md', '');
+    // Format commands in two columns
+    const commandNames = installedCommands.map(file => file.replace('.md', ''));
+    const mid = Math.ceil(commandNames.length / 2);
+    const leftColumn = commandNames.slice(0, mid);
+    const rightColumn = commandNames.slice(mid);
 
-      // Highlight show and hide commands in cyan
-      if (commandName === 'agent-vibes:show' || commandName === 'agent-vibes:hide') {
-        content += chalk.green('✓ ') + chalk.cyan(`/${commandName}\n`);
-      } else {
-        content += chalk.green(`✓ `) + chalk.yellow(`/${commandName}\n`);
+    for (let i = 0; i < leftColumn.length; i++) {
+      const leftCmd = leftColumn[i];
+      const rightCmd = rightColumn[i];
+
+      // Format left column
+      let line = chalk.green('✓ ') + chalk.yellow(`/${leftCmd}`);
+
+      // Pad to align right column (40 chars for command + checkmark)
+      const leftLength = leftCmd.length + 4; // 4 = "✓ /" + command
+      const padding = ' '.repeat(Math.max(0, 40 - leftLength));
+
+      line += padding;
+
+      // Format right column if it exists
+      if (rightCmd) {
+        line += chalk.green('✓ ') + chalk.yellow(`/${rightCmd}`);
       }
-    });
+
+      content += line + '\n';
+    }
 
     // Add failures if any
     if (failedCommands.length > 0) {
@@ -1326,11 +1360,10 @@ async function copyCommandFiles(targetDir, spinner) {
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: successCount === commandFiles.length ? 'cyan' : 'yellow',
-      title: chalk.bold('📋 Slash Commands'),
-      titleAlignment: 'center'
+      width: 80
     });
 
     return { count: successCount, boxen: boxenContent };
@@ -1410,13 +1443,25 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
   content += chalk.gray('Hook scripts automatically run at key moments during your\n');
   content += chalk.gray('Claude Code sessions to provide TTS feedback and manage audio.\n\n');
 
-  installedFiles.forEach(file => {
-    content += chalk.green(`✓ ${file.name}`);
-    if (file.executable) {
-      content += chalk.gray(' (executable)');
+  // Format files in two columns
+  const mid = Math.ceil(installedFiles.length / 2);
+  for (let i = 0; i < mid; i++) {
+    const left = installedFiles[i];
+    const right = installedFiles[i + mid];
+
+    // Format left column
+    let line = chalk.green(`✓ ${left.name}`);
+    const leftLen = left.name.length + 2; // "✓ " + name
+    const padding = ' '.repeat(Math.max(0, 40 - leftLen));
+    line += padding;
+
+    // Format right column if it exists
+    if (right) {
+      line += chalk.green(`✓ ${right.name}`);
     }
-    content += '\n';
-  });
+
+    content += line + '\n';
+  }
 
   if (failedFiles.length > 0) {
     content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
@@ -1429,11 +1474,10 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
 
   return boxen(content.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 0, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
-    title: chalk.bold('🔧 TTS Scripts'),
-    titleAlignment: 'center'
+    width: 80
   });
 }
 
@@ -1558,19 +1602,36 @@ async function copyPersonalityFiles(targetDir, spinner) {
       'zen': '🧘'
     };
 
-    installedPersonalities.forEach(file => {
+    // Display personalities in two columns
+    const personalities = installedPersonalities.map(file => {
       const name = file.replace('.md', '');
       const emoji = personalityEmojis[name] || '✨';
-      content += chalk.green(`✓ ${emoji} ${name}\n`);
+      return { emoji, name };
     });
+
+    const mid = Math.ceil(personalities.length / 2);
+    for (let i = 0; i < mid; i++) {
+      const left = personalities[i];
+      const right = personalities[i + mid];
+
+      let line = chalk.green('✓ ') + left.emoji + ' ' + chalk.yellow(left.name);
+      const leftLen = left.name.length + 4; // "✓ " + emoji + " " + name
+      const padding = ' '.repeat(Math.max(0, 35 - leftLen));
+      line += padding;
+
+      if (right) {
+        line += chalk.green('✓ ') + right.emoji + ' ' + chalk.yellow(right.name);
+      }
+
+      content += line + '\n';
+    }
 
     boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'magenta',
-      title: chalk.bold('🎭 Personalities'),
-      titleAlignment: 'center'
+      width: 80
     });
   }
 
@@ -1709,18 +1770,55 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
 
     content += chalk.gray('─'.repeat(70)) + '\n\n';
 
-    musicFiles.forEach(track => {
-      content += chalk.green(`✓ ${track.name}`) + chalk.gray(` (${track.size})\n`);
-      content += chalk.dim(`  ${track.path}\n`);
-    });
+    // Display tracks with emojis in two columns
+    const trackEmojis = {
+      'agentvibes_soft_flamenco_loop.mp3': '🎸',
+      'agentvibes_chillwave_loop.mp3': '🌊',
+      'agentvibes_lofi_hiphop_loop.mp3': '🎧',
+      'agentvibes_ambient_space_loop.mp3': '🌌',
+      'agentvibes_jazz_cafe_loop.mp3': '☕',
+      'agentvibes_synthwave_loop.mp3': '🌃',
+      'agentvibes_bossa_nova_loop.mp3': '🎺',
+      'agentvibes_downtempo_loop.mp3': '🎹',
+      'agentvibes_city_pop_loop.mp3': '🏙️',
+      'agentvibes_vaporwave_loop.mp3': '💿',
+      'agentvibes_trip_hop_loop.mp3': '🎵',
+      'agentvibes_soul_loop.mp3': '🎤',
+      'agentvibes_funk_loop.mp3': '🕺',
+      'agentvibes_reggae_loop.mp3': '🌴',
+      'agentvibes_blues_loop.mp3': '🎸',
+      'agentvibes_classical_loop.mp3': '🎻'
+    };
+
+    const tracks = musicFiles.map(track => ({
+      name: track.name.replace('agentvibes_', '').replace('_loop.mp3', '').replace(/_/g, ' '),
+      emoji: trackEmojis[track.name] || '🎵',
+      size: track.size
+    }));
+
+    const mid = Math.ceil(tracks.length / 2);
+    for (let i = 0; i < mid; i++) {
+      const left = tracks[i];
+      const right = tracks[i + mid];
+
+      let line = chalk.green('✓ ') + left.emoji + ' ' + chalk.yellow(left.name);
+      const leftLen = left.name.length + 4; // "✓ " + emoji + " " + name
+      const padding = ' '.repeat(Math.max(0, 35 - leftLen));
+      line += padding;
+
+      if (right) {
+        line += chalk.green('✓ ') + right.emoji + ' ' + chalk.yellow(right.name);
+      }
+
+      content += line + '\n';
+    }
 
     const boxenContent = boxen(content.trim(), {
       padding: 1,
-      margin: 1,
+      margin: { top: 0, bottom: 0, left: 0, right: 0 },
       borderStyle: 'round',
       borderColor: 'green',
-      title: chalk.bold('🎵 Background Music'),
-      titleAlignment: 'center'
+      width: 80
     });
 
     return { count: musicFiles.length, boxen: boxenContent };
@@ -2735,28 +2833,25 @@ async function install(options = {}) {
 
   const configBoxen = boxen(configContent.trim(), {
     padding: 1,
-    margin: 1,
+    margin: { top: 0, bottom: 0, left: 0, right: 0 },
     borderStyle: 'round',
     borderColor: 'green',
-    title: chalk.bold('⚙️  Configuration Summary'),
-    titleAlignment: 'center'
-  });
-  preInstallPages.push({
-    title: 'Configuration Summary',
-    content: configBoxen
+    width: 80
   });
 
-  // Show pre-install info pages with pagination
-  if (!options.yes) {
+  // Don't add Configuration Summary to preInstallPages yet - we'll handle it specially
+
+  // Show pre-install pages up to (but NOT including) Configuration Summary
+  if (!options.yes && preInstallPages.length > 0) {
     console.log(chalk.cyan('\n📖 Installation Preview\n'));
     const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
     // For pre-install, estimate post-install pages (will be exact in post-install)
     const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
-    const estimatedTotal = configPages + preInstallPages.length + estimatedPostInstall;
+    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall; // +1 for Config Summary
 
     const result = await showPaginatedContent(preInstallPages, {
       ...options,
-      continueLabel: '✓ Start Installation',
+      continueLabel: '✓ Next',
       pageOffset: preInstallOffset,
       totalPages: estimatedTotal,
       showPreviousOnFirst: true
@@ -2769,17 +2864,24 @@ async function install(options = {}) {
     }
   }
 
-  // Ask if user wants to hear welcome message
+  // Handle Configuration Summary page specially with welcome message prompt
   if (!options.yes) {
-    // Show header for this confirmation screen
+    // Show Configuration Summary page
     console.clear();
-    const currentPageNum = 3 + preInstallPages.length;
-    const { header } = createPageHeaderFooter('Installation Confirmation', 0, 15, currentPageNum);
+    const currentPageNum = 4 + preInstallPages.length; // After config pages + pre-install pages
+    const estimatedPostInstall = 7;
+    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall;
+    const { header } = createPageHeaderFooter('Configuration Summary', currentPageNum, estimatedTotal, 0);
+
     console.log(header);
+    console.log(configBoxen);
     console.log('');
-
     console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
+  }
 
+  // Ask welcome message question BEFORE showing navigation
+  if (!options.yes) {
+    // Ask if user wants to hear welcome message
     const { playWelcome } = await inquirer.prompt([
       {
         type: 'confirm',
@@ -2790,29 +2892,30 @@ async function install(options = {}) {
     ]);
 
     if (playWelcome) {
+      console.log(''); // Spacing before spinner
       const spinner = ora('Playing welcome message...').start();
       await playWelcomeDemo(targetDir, spinner, options);
       spinner.succeed(chalk.green('Welcome message complete!'));
+      console.log(''); // Spacing after completion
     }
-  }
 
-  // Final confirmation after previewing
-  if (!options.yes) {
-    const { confirm } = await inquirer.prompt([
+    // Now show navigation menu (Continue to installation)
+    const { startInstall } = await inquirer.prompt([
       {
         type: 'confirm',
-        name: 'confirm',
-        message: chalk.yellow(`\n✅ Ready to install AgentVibes with ${providerLabels[selectedProvider]}?`),
+        name: 'startInstall',
+        message: chalk.yellow('✅ Start Installation?'),
         default: true,
       },
     ]);
 
-    if (!confirm) {
+    if (!startInstall) {
       console.log(chalk.red('\n❌ Installation cancelled.\n'));
       process.exit(0);
     }
   }
 
+  // User already confirmed by pressing "Start Installation", so no need for another confirmation
   console.log('');
   const spinner = ora('Checking installation directory...').start();
 
