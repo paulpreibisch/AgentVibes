@@ -59,26 +59,7 @@ AgentVibes supports two TTS providers - pick the one that fits your needs:
 - ✅ 18 languages supported
 - ✅ Privacy-focused local processing
 
-**To use:** Just install AgentVibes and you're done! The installer will set Piper as default if no Piper TTS key is detected.
-
-### **Option B: Piper TTS (Premium AI Voices)** 🎤
-
-**Best for production and variety.** Requires API key but offers 150+ premium voices.
-
-- ✅ 150+ professional AI voices
-- ✅ 30+ languages with multilingual v2
-- ✅ Studio-quality audio with emotional range
-- ✅ Character voices and unique personalities
-
-**Setup steps:**
-
-1. Sign up at [piper.io](https://piper.io/) (free tier: 10,000 chars/month)
-2. Copy your API key from the dashboard
-3. Add it to your environment:
-
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-source ~/.bashrc
+Option B: if on a Mac, you can ise Mac Say
 ```
 
 **Switch providers anytime:** `/agent-vibes:provider switch`
