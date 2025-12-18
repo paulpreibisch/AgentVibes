@@ -2444,9 +2444,10 @@ async function detectAndMigrateOldConfig(targetDir, spinner) {
 /**
  * Handle BMAD integration (detection and TTS injection)
  * @param {string} targetDir - Target installation directory
+ * @param {Object} options - Installation options (e.g., yes flag for non-interactive)
  * @returns {Promise<Object>} BMAD detection result
  */
-async function handleBmadIntegration(targetDir) {
+async function handleBmadIntegration(targetDir, options = {}) {
   const bmadDetection = await detectBMAD(targetDir);
   const bmadDetected = bmadDetection.installed;
 
@@ -2484,6 +2485,55 @@ async function handleBmadIntegration(targetDir) {
 
   // Create default voice assignments if they don't exist
   await createDefaultBmadVoiceAssignmentsProactive(targetDir);
+
+  // Prompt user to inject TTS into BMAD agents (or auto-inject with --yes flag)
+  let enableTtsInjection = options.yes; // Auto-enable with --yes flag
+
+  if (!options.yes) {
+    console.log(''); // Add spacing
+    console.log(chalk.cyan.bold('🎤 AgentVibes TTS Integration for BMAD Agents\n'));
+    console.log(chalk.white('AgentVibes can inject Text-to-Speech into your BMAD agents'));
+    console.log(chalk.white('so each agent speaks with their own unique voice!\n'));
+    console.log(chalk.gray('What this does:'));
+    console.log(chalk.gray('  • Modifies agent activation instructions to include TTS'));
+    console.log(chalk.gray('  • Each agent gets a unique voice (e.g., Mary, John, Winston)'));
+    console.log(chalk.gray('  • Agents will speak when activated and during responses'));
+    console.log(chalk.gray('  • Creates backups before making any changes\n'));
+    console.log(chalk.cyan('Agents that will get unique voices:'));
+    console.log(chalk.gray('  • Mary (analyst) → Female voice'));
+    console.log(chalk.gray('  • John (pm) → Male voice'));
+    console.log(chalk.gray('  • Winston (architect) → British voice'));
+    console.log(chalk.gray('  • And 6+ more agents...\n'));
+    console.log(chalk.yellow('You can disable this later with:'));
+    console.log(chalk.gray('  .claude/hooks/bmad-tts-injector.sh disable\n'));
+
+    const { enableTts } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'enableTts',
+      message: chalk.yellow('Enable TTS for BMAD agents?'),
+      default: true
+    }]);
+
+    enableTtsInjection = enableTts;
+  }
+
+  if (enableTtsInjection) {
+    const injectorScript = path.join(claudeDir, 'hooks', 'bmad-tts-injector.sh');
+    try {
+      // Run bmad-tts-injector.sh enable
+      execSync(`bash "${injectorScript}" enable`, {
+        cwd: targetDir,
+        stdio: 'inherit'
+      });
+      console.log(chalk.green('✅ TTS injection completed successfully'));
+    } catch (error) {
+      console.log(chalk.yellow('⚠️  TTS injection encountered issues'));
+      console.log(chalk.gray('   You can retry manually with: .claude/hooks/bmad-tts-injector.sh enable'));
+    }
+  } else {
+    console.log(chalk.gray('   Skipped TTS injection. You can enable it later with:'));
+    console.log(chalk.gray('   .claude/hooks/bmad-tts-injector.sh enable'));
+  }
 
   console.log(chalk.green('✅ BMAD agents will use agent-specific voices via bmad-speak.sh hook'));
 
@@ -3185,7 +3235,7 @@ async function install(options = {}) {
     await createDefaultBmadVoiceAssignmentsProactive(targetDir);
 
     // Handle BMAD integration
-    const bmadDetection = await handleBmadIntegration(targetDir);
+    const bmadDetection = await handleBmadIntegration(targetDir, options);
     const bmadDetected = bmadDetection.installed;
 
     if (bmadDetected) {
