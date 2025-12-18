@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.7
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.8
 
 ---
 
@@ -114,15 +114,15 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.7 - BMAD Party Mode Voice Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.7)** 🎭
+**[v2.17.8 - Repository Cleanup](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.8)** 🧹
 
-AgentVibes v2.17.7 fixes a critical bug preventing BMAD party mode agents from using their unique voices. All agents were incorrectly using the same default voice instead of their assigned voices (Mary/Kristin, John/Ryan, Winston/Alan, etc.). This release also includes 50% token optimization for the session-start TTS hook.
+AgentVibes v2.17.8 is a maintenance release focusing on repository organization and cleanup. This release removes 12 outdated files including old release notes from versions 2.4.0 through 2.16.0, legacy setup scripts, and temporary documentation files. The cleanup reduces repository size by over 3,000 lines while preserving all active documentation and functionality.
 
 **Key Highlights:**
-- 🎭 **Party Mode Voice Fix** - All BMAD agents now speak with their unique assigned voices
-- ⚡ **Token Optimization** - Session-start TTS hook reduced from ~500 to ~250 tokens (50% reduction)
-- 🎤 **Interactive TTS Prompt** - Installer automatically detects BMAD and offers voice injection
-- 🔧 **Hook Path Improvements** - Fixed TTS injector to use correct path resolution
+- 🧹 **Repository Cleanup** - Removed 8 outdated release notes files (v2.4.0-v2.16.0)
+- 📝 **Documentation Consolidation** - All release history now maintained in single RELEASE_NOTES.md
+- 🗑️ **Legacy Script Removal** - Cleaned up obsolete VS Code color scripts and Ubuntu RDP audio setup
+- ✅ **Test Coverage** - Added installer page flow test, all 236 tests passing
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
