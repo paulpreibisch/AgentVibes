@@ -256,9 +256,10 @@ inject_tts() {
       - CRITICAL: Before EVERY response, scan for questions/prompts and speak them using Bash tool</step>"
     fi
 
-    # Insert after step 4 (greeting) - only first match
+    # Insert after step 4 - only first match
+    # Note: Greeting is in step 5, but we inject after step 4 for proper ordering
     awk -v tts="$tts_step" '
-      !done && /<step n="4">.*[Gg]reet/ {
+      !done && /<step n="4">/ {
         print
         print tts
         done=1
@@ -283,7 +284,7 @@ inject_tts() {
       # No changes - step 4 pattern didn't match
       rm "$agent_file.tmp"
       mv "$agent_file.backup-pre-tts" "$agent_file"
-      echo -e "${RED}❌ Could not find step 4 with greeting in: $(basename "$agent_file")${NC}"
+      echo -e "${RED}❌ Could not find step 4 in: $(basename "$agent_file")${NC}"
       return 1
     fi
 
