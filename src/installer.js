@@ -823,17 +823,17 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.17.7 - BMAD Party Mode Voice Fix\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v2.17.8 - Repository Cleanup\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.17.7 fixes a critical bug preventing BMAD party mode agents from\n') +
-    chalk.cyan('using their unique voices. All agents were incorrectly using the same default voice\n') +
-    chalk.cyan('instead of their assigned voices (Mary/Kristin, John/Ryan, Winston/Alan, etc.).\n') +
-    chalk.cyan('This release also includes 50% token optimization for session-start hook.\n\n') +
+    chalk.cyan('AgentVibes v2.17.8 is a maintenance release focusing on repository organization\n') +
+    chalk.cyan('and cleanup. This release removes 12 outdated files including old release notes\n') +
+    chalk.cyan('from versions 2.4.0 through 2.16.0, legacy setup scripts, and temporary documentation.\n') +
+    chalk.cyan('The cleanup reduces repository size by over 3,000 lines while preserving all functionality.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🎭 Party Mode Voice Fix - All BMAD agents now speak with unique assigned voices\n') +
-    chalk.gray('   ⚡ Token Optimization - Session-start TTS hook reduced from ~500 to ~250 tokens\n') +
-    chalk.gray('   🎤 Interactive TTS Prompt - Installer detects BMAD and offers voice injection\n') +
-    chalk.gray('   🔧 Hook Path Improvements - Fixed TTS injector path resolution\n\n') +
+    chalk.gray('   🧹 Repository Cleanup - Removed 8 outdated release notes files (v2.4.0-v2.16.0)\n') +
+    chalk.gray('   📝 Documentation Consolidation - All release history in single RELEASE_NOTES.md\n') +
+    chalk.gray('   🗑️ Legacy Script Removal - Cleaned up obsolete VS Code color and RDP audio scripts\n') +
+    chalk.gray('   ✅ Test Coverage - Added installer page flow test, all 236 tests passing\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +

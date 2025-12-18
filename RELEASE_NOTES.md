@@ -1,5 +1,94 @@
 # AgentVibes Release Notes
 
+## 📦 v2.17.8 - Repository Cleanup
+
+**Release Date:** December 18, 2024
+
+### 🤖 AI Summary
+
+AgentVibes v2.17.8 is a maintenance release focusing on repository organization and cleanup. This release removes 12 outdated files including old release notes from versions 2.4.0 through 2.16.0, legacy setup scripts, and temporary documentation files. The cleanup reduces repository size by over 3,000 lines while preserving all active documentation and functionality.
+
+**Key Highlights:**
+- 🧹 **Repository Cleanup** - Removed 8 outdated release notes files (v2.4.0-v2.16.0)
+- 📝 **Documentation Consolidation** - All release history now maintained in single RELEASE_NOTES.md
+- 🗑️ **Legacy Script Removal** - Cleaned up obsolete VS Code color scripts and Ubuntu RDP audio setup
+- ✅ **Test Coverage** - Added installer page flow test, all 236 tests passing
+
+### 🗑️ Files Removed
+
+**Release Notes (8 files):**
+- `RELEASE_NOTES_v2.5.0.md`
+- `RELEASE_NOTES_v2.4.0_DRAFT.md`
+- `RELEASE_NOTES_v2.4.1_DRAFT.md`
+- `RELEASE_NOTES_v2.15.0.md`
+- `RELEASE_NOTES_v2.16.0.md`
+- `docs/releases/RELEASE_NOTES.md` (duplicate)
+- `docs/releases/RELEASE_NOTES_v2.0.17_DRAFT.md`
+- `docs/releases/RELEASE_NOTES_V2.md`
+
+**Setup Scripts (entire `scripts/setup/` directory):**
+- `scripts/setup/fixcolors` - VS Code workspace color configurator
+- `scripts/setup/fix-vscode-colors.sh` - VS Code settings.json color configurator
+- `scripts/setup/setup-ubuntu-rdp-audio.sh` - Ubuntu RDP audio configuration
+
+**Other Files:**
+- `fixcolors` (root duplicate)
+- `docker-volumes-report.md` (temporary documentation)
+- `scripts/CHANGELOG-2025-10-16.md` (old changelog)
+
+### ✨ New Features
+
+**Test Coverage:**
+- Added `test/installer-page-flow.test.js` - Validates installer pagination and navigation flow
+
+### 📝 Changes
+
+**Modified Files:**
+- `test/installer-page-flow.test.js` - New test file (+191 lines)
+
+**Net Change:**
+- 12 files deleted
+- 1 file added
+- Total: -3,125 lines
+
+### 🎯 Impact
+
+**Repository Organization:**
+- ✅ Single source of truth for release notes (`RELEASE_NOTES.md`)
+- ✅ Cleaner repository structure
+- ✅ Faster git operations (fewer files to track)
+- ✅ Reduced confusion from outdated documentation
+
+**User Experience:**
+- No impact - all functionality preserved
+- No breaking changes
+- All tests passing (236/236)
+
+### 📊 Statistics
+
+- **1 commit** since v2.17.7
+- **12 files removed, 1 file added**
+- **3,316 lines deleted, 191 lines added**
+- **236 tests passing** (213 bats + 23 Node.js)
+
+### 🚀 Installation
+
+```bash
+# New installation
+npx agentvibes@2.17.8 install
+
+# Update existing installation
+npx agentvibes@2.17.8 update
+```
+
+### 📚 Links
+
+- **NPM**: https://www.npmjs.com/package/agentvibes
+- **GitHub**: https://github.com/paulpreibisch/AgentVibes
+- **Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.17.7...v2.17.8
+
+---
+
 ## 📦 v2.17.7 - BMAD Party Mode Voice Fix
 
 **Release Date:** December 18, 2024
