@@ -247,12 +247,12 @@ inject_tts() {
     if [[ -n "$agent_voice" ]]; then
       tts_step="  <step n=\"4.5\" tts=\"agentvibes\">🎤 AGENTVIBES TTS INJECTION:
       - Create context: echo \"${agent_id}\" > .bmad-agent-context (Bash tool)
-      - Speak greeting: .claude/hooks/play-tts.sh \"Hello! I'm ready to help you.\" \"${agent_voice}\" (Bash tool)
+      - Speak greeting: bash .claude/hooks/play-tts.sh \"Hello! I'm ready to help you.\" \"${agent_voice}\" (Bash tool)
       - CRITICAL: Before EVERY response, scan for questions/prompts and speak them using Bash tool</step>"
     else
       tts_step="  <step n=\"4.5\" tts=\"agentvibes\">🎤 AGENTVIBES TTS INJECTION:
       - Create context: echo \"${agent_id}\" > .bmad-agent-context (Bash tool)
-      - Speak greeting: .claude/hooks/play-tts.sh \"Hello! I'm ready to help you.\" (Bash tool)
+      - Speak greeting: bash .claude/hooks/play-tts.sh \"Hello! I'm ready to help you.\" (Bash tool)
       - CRITICAL: Before EVERY response, scan for questions/prompts and speak them using Bash tool</step>"
     fi
 
@@ -294,12 +294,12 @@ inject_tts() {
     if [[ -n "$agent_voice" ]]; then
       activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS
   - STEP 3.5a: Use Bash tool to create context file: echo \"${agent_id}\" > .bmad-agent-context
-  - STEP 3.5b: Use Bash tool to speak: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\" \"${agent_voice}\"
+  - STEP 3.5b: Use Bash tool to speak: bash .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\" \"${agent_voice}\"
   - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
     else
       activation_injection="  - # AGENTVIBES-TTS-INJECTION: STEP 3.5 - Announce activation with TTS
   - STEP 3.5a: Use Bash tool to create context file: echo \"${agent_id}\" > .bmad-agent-context
-  - STEP 3.5b: Use Bash tool to speak: .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\"
+  - STEP 3.5b: Use Bash tool to speak: bash .claude/hooks/play-tts.sh \"Agent ${agent_id} activated and ready\"
   - AGENTVIBES-TTS-INJECTION: Before every response, scan for questions and speak them using Bash tool"
     fi
 
