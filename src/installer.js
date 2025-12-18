@@ -823,17 +823,17 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.17.5 - Installer UX Improvements\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v2.17.7 - BMAD Party Mode Voice Fix\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.17.5 improves the installation experience with a complete installer\n') +
-    chalk.cyan('UX overhaul. This release introduces intelligent page navigation with previews,\n') +
-    chalk.cyan('beautiful two-column layouts for all summary screens, and optimized vertical\n') +
-    chalk.cyan('spacing throughout.\n\n') +
+    chalk.cyan('AgentVibes v2.17.7 fixes a critical bug preventing BMAD party mode agents from\n') +
+    chalk.cyan('using their unique voices. All agents were incorrectly using the same default voice\n') +
+    chalk.cyan('instead of their assigned voices (Mary/Kristin, John/Ryan, Winston/Alan, etc.).\n') +
+    chalk.cyan('This release also includes 50% token optimization for session-start hook.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   📱 Page Navigation Previews - See next/previous page titles in navigation menu\n') +
-    chalk.gray('   🎨 Beautiful Two-Column Layouts - Commands, hooks, personalities displayed in organized columns\n') +
-    chalk.gray('   ✨ Emoji Page Titles - Descriptive icons for each configuration page\n') +
-    chalk.gray('   📏 Optimized Spacing - Eliminated excessive vertical spacing for cleaner display\n\n') +
+    chalk.gray('   🎭 Party Mode Voice Fix - All BMAD agents now speak with unique assigned voices\n') +
+    chalk.gray('   ⚡ Token Optimization - Session-start TTS hook reduced from ~500 to ~250 tokens\n') +
+    chalk.gray('   🎤 Interactive TTS Prompt - Installer detects BMAD and offers voice injection\n') +
+    chalk.gray('   🔧 Hook Path Improvements - Fixed TTS injector path resolution\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +

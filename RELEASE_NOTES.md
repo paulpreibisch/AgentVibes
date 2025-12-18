@@ -1,5 +1,142 @@
 # AgentVibes Release Notes
 
+## 📦 v2.17.7 - BMAD Party Mode Voice Fix
+
+**Release Date:** December 18, 2024
+
+### 🤖 AI Summary
+
+AgentVibes v2.17.7 fixes a critical bug preventing BMAD party mode agents from using their unique voices. Due to a working directory issue, all agents were incorrectly using the same default voice instead of their assigned voices (Mary/Kristin, John/Ryan, Winston/Alan, etc.). This release also includes token optimization for the session-start TTS hook (50% reduction), an interactive BMAD TTS injection prompt during installation, and several improvements to hook path handling.
+
+**Key Highlights:**
+- 🎭 **Party Mode Voice Fix** - All BMAD agents now speak with their unique assigned voices
+- ⚡ **Token Optimization** - Session-start TTS hook reduced from ~500 to ~250 tokens (Issue #80 Phase 1)
+- 🎤 **Interactive TTS Prompt** - Installer automatically detects BMAD and offers voice injection
+- 🔧 **Hook Path Improvements** - Fixed TTS injector to use `bash .claude/hooks/` for correct path resolution
+
+### 🐛 Bug Fixes
+
+**CRITICAL: Party Mode Voice Assignment (Working Directory Bug)**
+- **Root Cause**: `bmad-voice-manager.sh` uses relative paths (`.bmad/_cfg/agent-voice-map.csv`) that depend on current working directory
+- **Impact**: When party mode runs from a different directory (e.g., AgentVibes repo), it reads the wrong CSV file
+- **Result**: All agents used the same voice instead of their unique assigned voices
+- **Solution**: Run `bmad-voice-manager.sh` with PROJECT_ROOT as working directory
+- **Files**: `.claude/hooks/bmad-speak.sh`, `.claude/hooks/bmad-speak-enhanced.sh`
+- **Before**: `$SCRIPT_DIR/bmad-voice-manager.sh get-voice "$AGENT_ID"`
+- **After**: `cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID"`
+
+**Voice Assignments Now Working:**
+- pm (John) → `en_US-ryan-high`
+- analyst (Mary) → `en_US-kristin-medium`
+- architect (Winston) → `en_GB-alan-medium`
+- dev (Amelia) → `en_US-amy-medium`
+- sm (Bob) → `en_US-joe-medium`
+- tea (Murat) → `en_US-kusal-medium`
+- tech-writer (Paige) → `en_US-kristin-medium` (jenny)
+- ux-designer (Sally) → `en_US-kristin-medium` (kristin)
+
+**TTS Injection Pattern Fix**
+- **Issue**: TTS injector failed to inject into BMAD v6 compiled agent files
+- **Root Cause**: Pattern searched for step 4 with "greet" regex, but compiler puts greeting in step 5
+- **Solution**: Simplified pattern from `/<step n="4">.*[Gg]reet/` to `/<step n="4">/`
+- **Impact**: Agent voice assignments now work correctly in party mode
+- **File**: `.claude/hooks/bmad-tts-injector.sh`
+
+**Hook Path Resolution Fix**
+- **Issue**: TTS injector injected `.claude/hooks/play-tts.sh` which Claude Code resolves as `~/.claude/hooks/` (global) instead of project-local
+- **Solution**: Changed all references to `bash .claude/hooks/play-tts.sh` for correct path resolution
+- **Impact**: BMAD agents now use project-local hooks correctly
+- **File**: `.claude/hooks/bmad-tts-injector.sh`
+- **Instances**: 4 path references updated
+
+### ⚡ Performance Improvements
+
+**Session-Start TTS Hook Token Optimization (Issue #80 Phase 1)**
+- Reduced token count from ~500 to ~250 tokens (50% reduction)
+- Streamlined TTS protocol instructions while maintaining all core functionality
+- Added strict mode (`set -euo pipefail`) for improved reliability
+- **File**: `.claude/hooks/session-start-tts.sh`
+- **Impact**: Faster session start, reduced Claude Code context usage
+
+### ✨ New Features
+
+**Interactive BMAD TTS Injection Prompt**
+- Installer automatically detects BMAD installation
+- Shows interactive prompt explaining TTS injection benefits
+- Lists agents that will get unique voices (Mary, John, Winston, etc.)
+- Explains what injection does and how to disable later
+- Auto-enables with `--yes` flag for non-interactive installs
+- Runs `bmad-tts-injector.sh enable` if user agrees
+- **File**: `src/installer.js`
+- **User Experience**:
+  - Interactive mode: Detailed explanation + yes/no prompt (default: yes)
+  - Non-interactive (`--yes`): Automatically enables TTS injection
+  - Clear instructions for disabling later if needed
+
+### 📝 Changes
+
+**Modified Files:**
+- `.claude/hooks/bmad-speak.sh` - Fixed voice lookup working directory
+- `.claude/hooks/bmad-speak-enhanced.sh` - Fixed voice lookup working directory
+- `.claude/hooks/bmad-tts-injector.sh` - Fixed injection pattern + hook paths
+- `.claude/hooks/session-start-tts.sh` - Token optimization
+- `src/installer.js` - Added interactive BMAD TTS injection prompt
+
+### 🔧 Technical Details
+
+**Voice Manager Working Directory Fix:**
+```bash
+# Before (broken - wrong directory):
+AGENT_VOICE=$("$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID")
+
+# After (fixed - correct directory):
+AGENT_VOICE=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID")
+```
+
+**Installation Workflow:**
+1. User installs BMAD (with PR 987 compiler that preserves TTS data)
+2. User installs AgentVibes
+3. Installer detects BMAD and prompts for TTS injection
+4. If accepted, all agents get unique voices automatically
+
+### 🎯 Impact
+
+**BMAD Party Mode Users:**
+- **Before**: All agents spoke with the same voice (confusing, hard to distinguish speakers)
+- **After**: Each agent has a unique voice (Mary/Kristin, John/Ryan, Winston/Alan, etc.)
+- **Migration**: Run `npx agentvibes install` to get updated hooks
+- **Testing**: npm linked installations will need reinstall to pick up hook changes
+
+**Performance:**
+- Session start now uses 50% fewer tokens
+- Faster initialization for Claude Code sessions
+- Reduced context window usage
+
+### 📊 Statistics
+
+- **6 commits** since v2.17.6
+- **6 files modified**: hooks (4), installer (1), README (1)
+- **Critical bug fix** affecting all BMAD party mode users
+- **236 tests passing** (213 bats + 23 Node.js)
+
+### 🚀 Installation
+
+```bash
+# New installation
+npx agentvibes@2.17.7 install
+
+# Update existing installation
+npx agentvibes@2.17.7 update
+```
+
+### 📚 Links
+
+- **NPM**: https://www.npmjs.com/package/agentvibes
+- **GitHub**: https://github.com/paulpreibisch/AgentVibes
+- **Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v2.17.6...v2.17.7
+
+---
+
 ## 📦 v2.17.5 - Installer UX Improvements
 
 **Release Date:** December 14, 2024
