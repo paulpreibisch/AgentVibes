@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.7
 
 ---
 
@@ -114,15 +114,15 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.5 - Installer UX Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.5)** ✨
+**[v2.17.7 - BMAD Party Mode Voice Fix](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.7)** 🎭
 
-AgentVibes v2.17.5 improves the installation experience with a complete installer UX overhaul. This release introduces intelligent page navigation with previews, beautiful two-column layouts for all summary screens, and optimized vertical spacing throughout.
+AgentVibes v2.17.7 fixes a critical bug preventing BMAD party mode agents from using their unique voices. All agents were incorrectly using the same default voice instead of their assigned voices (Mary/Kristin, John/Ryan, Winston/Alan, etc.). This release also includes 50% token optimization for the session-start TTS hook.
 
 **Key Highlights:**
-- 📱 **Page Navigation Previews** - See next/previous page titles in navigation menu (e.g., "Next → (Voice Selection)")
-- 🎨 **Beautiful Two-Column Layouts** - Slash commands, hooks, personalities, and music displayed in organized columns
-- ✨ **Emoji Page Titles** - Each configuration page has descriptive icons (🔧 System Dependencies, 🎤 Voice Selection, etc.)
-- 📏 **Optimized Spacing** - Eliminated excessive vertical spacing for cleaner, more compact display
+- 🎭 **Party Mode Voice Fix** - All BMAD agents now speak with their unique assigned voices
+- ⚡ **Token Optimization** - Session-start TTS hook reduced from ~500 to ~250 tokens (50% reduction)
+- 🎤 **Interactive TTS Prompt** - Installer automatically detects BMAD and offers voice injection
+- 🔧 **Hook Path Improvements** - Fixed TTS injector to use correct path resolution
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
