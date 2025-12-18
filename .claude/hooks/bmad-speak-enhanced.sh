@@ -110,8 +110,8 @@ AGENT_FOR_EFFECTS="${DISPLAY_NAME:-$AGENT_NAME_OR_ID}"
 AGENT_VOICE=""
 AGENT_INTRO=""
 if [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
-    AGENT_VOICE=$("$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null || echo "")
-    AGENT_INTRO=$("$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null || echo "")
+    AGENT_VOICE=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null || echo "")
+    AGENT_INTRO=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null || echo "")
 fi
 
 # Prepend intro text if configured
