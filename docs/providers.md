@@ -1,25 +1,6 @@
 # Multi-Provider Support
 
-AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premium Piper TTS AI voices or free offline Piper TTS!
-
-## 🎤 Piper TTS (Premium AI Voices)
-
-**Features:**
-- 150+ professional AI voices
-- 30+ languages with multilingual v2 model
-- Studio-quality audio with emotional range
-- Character voices, accents, and unique personalities
-- Voices include: Aria, Archer, Cowboy Bob, Pirate Marshal, Grandpa Spuds, Jessica Anne Bogart, and more!
-
-**Requirements:**
-- Piper TTS API key (get free tier at [piper.io](https://piper.io))
-- Internet connection for API calls
-
-**Pricing (2025):**
-- Free: 10,000 chars/month (light use)
-- Starter: $5/month - 30,000 chars
-- Creator: $22/month - 100,000 chars
-- Pro: $99/month - 500,000 chars
+AgentVibes supports multiple TTS providers - choose between free offline Piper TTS or native macOS voices!
 
 ## 🆓 Piper TTS (Free, Offline)
 
@@ -36,6 +17,21 @@ AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premi
 - **Linux/WSL**: Python pipx (auto-installed)
 - **Windows**: Native support - no additional setup
 - Automatic voice download on first use
+
+## 🍎 macOS Say (Built-in, Free)
+
+**Features:**
+- 70+ built-in system voices
+- 40+ languages supported
+- Zero installation required
+- Native macOS integration
+- Instant availability
+- High-quality system voices
+
+**Requirements:**
+- macOS only (Darwin)
+- Pre-installed with every Mac
+- No setup needed
 
 ## Provider Commands
 
@@ -68,48 +64,43 @@ The installer asks which provider you prefer and sets it up automatically.
 /agent-vibes:provider switch
 # Select: piper
 
-# Switch to Piper TTS (premium)
+# Switch to macOS Say (macOS only)
 /agent-vibes:provider switch
-# Select: piper
+# Select: macos
 ```
-
-**Automatic Fallback:**
-If Piper TTS API key is missing, AgentVibes automatically falls back to Piper TTS.
 
 ## Provider Comparison
 
-| Feature | Piper TTS | Piper TTS |
+| Feature | Piper TTS | macOS Say |
 |---------|-----------|-----------|
-| **Voices** | 150+ premium AI | 50+ neural voices |
-| **Cost** | $0-99/month | Free forever |
-| **Quality** | Studio-grade | High-quality neural |
-| **Languages** | 30+ with multilingual v2 | 18 languages |
-| **Offline** | ❌ Requires internet | ✅ Works offline |
-| **API Key** | ✅ Required | ❌ Not needed |
-| **Emotional Range** | ✅ Advanced | ⚠️ Limited |
-| **Character Voices** | ✅ Extensive library | ⚠️ Standard voices |
-| **Platform Support** | All platforms | Windows, macOS, Linux, WSL |
-| **Best For** | Production, demos, variety | Development, privacy, Windows users |
+| **Voices** | 50+ neural voices | 70+ built-in voices |
+| **Cost** | Free forever | Free (built-in) |
+| **Quality** | High-quality neural | Natural, system native |
+| **Languages** | 18 languages | 40+ languages |
+| **Offline** | ✅ Works offline | ✅ Works offline |
+| **API Key** | ❌ Not needed | ❌ Not needed |
+| **Platform Support** | Windows, macOS, Linux, WSL | macOS only |
+| **Installation** | Auto-installed | Pre-installed |
+| **Best For** | Cross-platform, development | macOS users, system integration |
 
 ## Which Provider Should I Choose?
 
 **Choose Piper TTS if:**
-- You want premium studio-quality voices
-- You need extensive character voice variety
-- You're creating demos or production content
-- You want advanced emotional range
-- You have a budget for API costs
-
-**Choose Piper TTS if:**
-- You want completely free TTS (works on ALL platforms!)
+- You want free, high-quality neural voices
 - You prefer offline/local processing
-- You're on macOS, Windows, WSL, or Linux
+- You're on Windows, Linux, or WSL
 - You value privacy and data control
-- You're in development/testing phase
-- You don't want to manage API keys or billing
-- **macOS users**: Piper now works via precompiled binaries!
+- You need cross-platform consistency
+- **Works on ALL platforms with precompiled binaries!**
 
-**Pro Tip:** Use Piper for development and Piper TTS for production/demos!
+**Choose macOS Say if:**
+- You're on macOS
+- You want instant setup (no installation)
+- You prefer native system voices
+- You want maximum language variety (40+ languages)
+- You value system integration
+
+**Pro Tip:** macOS users can use either provider - Piper for consistency across platforms, or macOS Say for native system integration!
 
 ---
 
