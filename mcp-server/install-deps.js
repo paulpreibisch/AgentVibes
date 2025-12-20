@@ -69,8 +69,20 @@ function installMcp(pythonCmd) {
     console.log('✅ Python mcp package installed successfully!\n');
     return true;
   } catch (error) {
+    // Check if this is a PEP 668 externally-managed environment error (macOS, some Linux distros)
+    const errorOutput = error.stderr?.toString() || error.message || '';
+    if (errorOutput.includes('externally-managed-environment') || errorOutput.includes('PEP 668')) {
+      console.log('ℹ️  Python environment is externally managed (PEP 668)');
+      console.log('   This is normal on macOS and some Linux distributions');
+      console.log('   MCP will work when installed in a virtual environment');
+      console.log('   See mcp-server/README.md for setup instructions\n');
+      return 'skipped'; // Special return value
+    }
+
     console.error('❌ Failed to install mcp package');
-    console.error('   Please install manually: pip install --user mcp\n');
+    console.error('⚠️  Manual installation required:');
+    console.error('   Please install manually: pip install --user mcp');
+    console.error('   Run: pip install mcp\n');
     return false;
   }
 }
@@ -96,11 +108,14 @@ function main() {
   }
 
   // Install mcp package
-  const success = installMcp(pythonCmd);
+  const result = installMcp(pythonCmd);
 
-  if (success) {
+  if (result === true) {
     console.log('🎉 AgentVibes MCP Server setup complete!');
     console.log('   See mcp-server/README.md for Claude Desktop configuration\n');
+  } else if (result === 'skipped') {
+    console.log('✅ AgentVibes MCP Server is ready for virtual environment setup');
+    console.log('   Create a venv and install: python3 -m venv venv && source venv/bin/activate && pip install mcp\n');
   } else {
     console.log('⚠️  Manual installation required:');
     console.log('   Run: pip install mcp\n');
