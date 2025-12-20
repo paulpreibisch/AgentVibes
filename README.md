@@ -740,7 +740,7 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 
 **Q: Is AgentVibes just a bash script?**
 **A:** No. AgentVibes includes:
-- Multi-provider TTS abstraction (Piper, macOS Say, ElevenLabs)
+- Multi-provider TTS abstraction (Piper TTS, macOS Say)
 - Voice management system with 50+ voices
 - Personality & sentiment system
 - Language learning mode with bilingual playback

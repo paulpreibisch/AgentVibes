@@ -1,6 +1,6 @@
 # How AgentVibes Works Under the Hood: A Technical Deep Dive
 
-Two months ago, I wanted to add voice and personality to my Claude coding agents so they would speak acknowledgments and completions—making my development workflow more engaging and keeping me in flow state. Fast forward to today, and we've built an amazing working system that not only speaks with over 150 voices, but does so with distinct personalities ranging from zen masters to sarcastic companions that add a bit of sass to your coding sessions.
+In early 2025, I wanted to add voice and personality to my Claude coding agents so they would speak acknowledgments and completions—making my development workflow more engaging and keeping me in a 'flow state'. Fast forward to today, and we've built an amazing working system that not only speaks with over 50+ high-quality natural voices, but does so with distinct personalities ranging from zen masters to sarcastic companions that add a bit of sass to your coding sessions.
 
 In this article, we're going to take a deep dive to show you how AgentVibes works under the hood—the architecture, the design patterns, and the clever implementations that make it all possible. And best of all, **this is an open source project that is completely free** and will completely transform your coding experience with AI assistants.
 
@@ -10,30 +10,27 @@ Claude Code is an amazing AI coding assistant, but it's entirely text-based. You
 
 That's exactly what AgentVibes does. It transforms Claude Code from a silent text assistant into a voice-enabled AI companion with character and charm.
 
-## Architecture Overview: The Four Core Systems
+## Architecture Overview: The Three Core Systems
 
-AgentVibes is built on four interconnected systems:
+AgentVibes is built on three interconnected systems:
 
-1. **Output Style System** - The AI's instructions for when to speak
-2. **Hook System** - The bash scripts that generate and play audio
-3. **Provider System** - The TTS engines (Piper TTS or Piper)
-4. **MCP Server** - Natural language control interface
+1. **Hook System** - The bash scripts that generate and play audio
+2. **Provider System** - The TTS engines (Piper TTS or macOS Say)
+3. **MCP Server** - Natural language control interface
 
 Let's explore each one.
 
 ---
 
-## System 1: The Output Style - Teaching Claude When to Speak
+## System 1: The Hook System - Where the Magic Happens
 
-### What is an Output Style?
+### The Startup Hook Protocol
 
-In Claude Code, an "output style" is essentially a set of instructions that tells the AI assistant *how* to format and present its responses. Think of it as a personality overlay that changes Claude's behavior without changing its core capabilities.
+AgentVibes uses Claude Code's **startup hook** feature to inject TTS instructions at the beginning of every session. The startup hook (`.claude/hooks/startup.sh`) executes when Claude Code starts and returns a system reminder with the TTS protocol.
 
-AgentVibes provides an output style called "Agent Vibes" (located at `.claude/output-styles/agent-vibes.md`). This markdown file contains detailed instructions that become part of Claude's system prompt when activated.
+### The Two-Point TTS Protocol
 
-### The Two-Point Protocol
-
-The core genius of the AgentVibes output style is its **Two-Point TTS Protocol**:
+The core genius of the AgentVibes startup hook is its **Two-Point TTS Protocol**:
 
 **1. ACKNOWLEDGMENT** (Start of task)
 When Claude receives a user command, it:
@@ -48,17 +45,21 @@ After completing the task, Claude:
 - Generates a unique completion message
 - Executes the TTS script again
 
-Here's the critical part from `.claude/output-styles/agent-vibes.md`:
+Here's how the startup hook injects these instructions:
 
-```
-### 1. ACKNOWLEDGMENT (Start of task)
-After receiving a user command:
-1. Check sentiment FIRST: `SENTIMENT=$(cat .claude/tts-sentiment.txt 2>/dev/null)`
-2. If no sentiment, check personality: `PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null)`
-3. Use sentiment if set, otherwise use personality
-4. **Generate UNIQUE acknowledgment** - Use AI to create a fresh response in that style
-5. Execute TTS: `.claude/hooks/play-tts.sh "[message]" "[VoiceName]"`
-6. Proceed with work
+```bash
+# .claude/hooks/startup.sh
+cat <<'EOF'
+**CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
+
+1. **Acknowledgment** - Start of task: `Bash: .claude/hooks/play-tts.sh "[action]"`
+2. **Completion** - End of task: `Bash: .claude/hooks/play-tts.sh "[result + key details]"`
+
+Example:
+[Bash: .claude/hooks/play-tts.sh "Checking git status"]
+[work...]
+[Bash: .claude/hooks/play-tts.sh "Repository is clean, no changes"]
+EOF
 ```
 
 ### Why This Matters
@@ -73,42 +74,44 @@ The AI doesn't just blindly execute—it *communicates* like a helpful assistant
 
 ### Settings Priority System
 
-AgentVibes has a sophisticated three-tier priority system for how Claude should speak:
+AgentVibes has a sophisticated priority system for how Claude should speak:
 
-**Priority 0: Language** (`.claude/tts-language.txt`)
-- Controls which language TTS speaks
-- Examples: "english", "spanish", "french"
-- When set to non-English, ALL TTS is in that language
+**Verbosity Level** (Startup hook parameter)
+- Controls how detailed TTS messages are
+- `low` = action + result only
+- `medium` = + key decisions
+- `high` = + full reasoning and trade-offs
 
-**Priority 1: Sentiment** (`.claude/tts-sentiment.txt`)
+**Personality** (`.claude/tts-personality.txt`)
+- Changes BOTH voice AND speaking style
+- Examples: "sarcastic" = en_US-amy-medium voice + dry wit
+- Each personality has an assigned voice per provider
+
+**Sentiment** (`.claude/tts-sentiment.txt`)
 - Applies personality style WITHOUT changing voice
 - Examples: "sarcastic", "flirty", "professional"
 - Keeps your current voice but changes speaking style
 
-**Priority 2: Personality** (`.claude/tts-personality.txt`)
-- Changes BOTH voice AND speaking style
-- Examples: "sarcastic" = Jessica Anne Bogart voice + dry wit
-- Each personality has an assigned voice
+**Language** (`.claude/tts-language.txt`)
+- Controls which language TTS speaks
+- Examples: "english", "spanish", "french"
+- Used for language learning mode and translation
 
-The output style checks these in order—if language is set, speak in that language. If sentiment is set, use that style. Otherwise fall back to personality.
+The startup hook checks these settings and provides them to Claude as part of the TTS protocol instructions.
 
 ---
 
-## System 2: The Hook System - Where the Magic Happens
-
-The hook system is a collection of bash scripts in `.claude/hooks/` that do the actual work of generating and playing audio. Let's trace the journey of a TTS request.
-
 ### The Entry Point: play-tts.sh
 
-When Claude's output style executes `.claude/hooks/play-tts.sh "Hello world" "Aria"`, here's what happens:
+When Claude executes `.claude/hooks/play-tts.sh "Hello world"`, here's what happens:
 
 **File: `.claude/hooks/play-tts.sh`** (the router)
 
 ```bash
 TEXT="$1"          # "Hello world"
-VOICE_OVERRIDE="$2"  # "Aria" (optional)
+VOICE_OVERRIDE="$2"  # Optional voice override
 
-# Get active provider (piper or piper)
+# Get active provider (piper or macos)
 ACTIVE_PROVIDER=$(get_active_provider)
 
 # Route to provider-specific implementation
@@ -116,8 +119,8 @@ case "$ACTIVE_PROVIDER" in
   piper)
     exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
-  piper)
-    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
+  macos)
+    exec "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
 esac
 ```
@@ -129,19 +132,17 @@ This script is a **provider router**. It doesn't generate audio itself—it dele
 Each provider has its own script that handles the specifics:
 
 **For Piper TTS** (`.claude/hooks/play-tts-piper.sh`):
-1. Resolves voice name to voice ID (looks up "Aria" → actual voice ID)
-2. Detects current language setting (for multilingual support)
-3. Makes API call to Piper TTS with text, voice, and language
-4. Saves audio to temp file
-5. Plays audio using system player (paplay/aplay/mpg123)
-6. Handles SSH detection and audio optimization
-
-**For Piper** (`.claude/hooks/play-tts-piper.sh`):
 1. Resolves voice name to Piper model (e.g., "en_US-lessac-medium")
 2. Downloads voice model if not cached
-3. Runs local Piper TTS engine (no API call)
+3. Runs local Piper TTS engine (no internet required)
 4. Saves audio to temp file
-5. Plays audio using system player
+5. Plays audio using system player (paplay/aplay/mpv)
+
+**For macOS Say** (`.claude/hooks/play-tts-macos.sh`):
+1. Validates voice exists on system
+2. Uses macOS `say` command to generate audio
+3. Saves audio to temp file
+4. Plays audio using `afplay` (macOS built-in)
 
 ### The Personality Manager
 
@@ -185,8 +186,8 @@ Each personality is defined in a markdown file like `.claude/personalities/sarca
 ---
 name: sarcastic
 description: Dry wit and cutting observations
-piper_voice: Jessica Anne Bogart
 piper_voice: en_US-amy-medium
+macos_voice: Samantha
 ---
 
 ## AI Instructions
@@ -210,7 +211,7 @@ The AI reads this file and uses the "AI Instructions" section to generate unique
 
 ### Provider Manager
 
-The provider manager (`provider-manager.sh`) handles switching between Piper TTS and Piper:
+The provider manager (`provider-manager.sh`) handles switching between Piper TTS and macOS Say:
 
 ```bash
 # Get active provider
@@ -235,57 +236,15 @@ switch_provider() {
 }
 ```
 
-This allows seamless switching between paid (Piper TTS) and free (Piper) TTS without changing any other configuration.
+This allows seamless switching between the two providers without changing any other configuration.
 
 ---
 
-## System 3: The Provider System - Two Engines, One Interface
+## System 2: The Provider System - Two Engines, One Interface
 
 AgentVibes supports two TTS providers with the same interface:
 
 ### Piper TTS Provider
-
-**Architecture:** Cloud-based API
-
-**How it works:**
-1. Accepts text, voice name, and language code
-2. Makes HTTPS POST request to Piper TTS API
-3. Receives MP3 audio stream
-4. Detects if running over SSH (checks `$SSH_CONNECTION`)
-5. If SSH detected, converts to OGG format (prevents audio corruption)
-6. Plays audio using local audio player
-
-**Code snippet from `.claude/hooks/play-tts-piper.sh`:**
-
-```bash
-# Make API request
-RESPONSE=$(curl -s -X POST \
-  "https://api.piper.io/v1/text-to-speech/${VOICE_ID}" \
-  -H "xi-api-key: ${API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"text\": \"$TEXT\",
-    \"model_id\": \"eleven_multilingual_v2\",
-    \"language_code\": \"$LANGUAGE_CODE\",
-    \"voice_settings\": {
-      \"stability\": 0.5,
-      \"similarity_boost\": 0.75
-    }
-  }" \
-  --output "$AUDIO_FILE")
-
-# SSH audio optimization
-if [[ -n "$SSH_CONNECTION" ]]; then
-  # Convert MP3 to OGG to prevent corruption over SSH
-  ffmpeg -i "$AUDIO_FILE" -c:a libopus -b:a 128k "$OGG_FILE"
-  AUDIO_FILE="$OGG_FILE"
-fi
-
-# Play audio
-paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE"
-```
-
-### Piper Provider
 
 **Architecture:** Local neural TTS
 
@@ -303,8 +262,8 @@ paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE"
 VOICE_PATH="$HOME/.local/share/piper/voices/${VOICE}.onnx"
 
 if [[ ! -f "$VOICE_PATH" ]]; then
-  # Download voice model
-  "$SCRIPT_DIR/piper-download-voices.sh" "$VOICE"
+  # Download voice model automatically
+  "$SCRIPT_DIR/piper-voice-manager.sh" download "$VOICE"
 fi
 
 # Generate speech locally
@@ -313,39 +272,67 @@ echo "$TEXT" | piper \
   --output_file "$AUDIO_FILE"
 
 # Play audio
-paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE"
+paplay "$AUDIO_FILE" 2>/dev/null || aplay "$AUDIO_FILE" || mpv "$AUDIO_FILE"
+```
+
+### macOS Say Provider
+
+**Architecture:** Native macOS TTS
+
+**How it works:**
+1. Accepts text and voice name
+2. Validates voice exists using `say -v ?`
+3. Uses macOS built-in `say` command
+4. Generates AIFF audio file
+5. Plays audio using `afplay` (macOS built-in)
+
+**Code snippet from `.claude/hooks/play-tts-macos.sh`:**
+
+```bash
+# Validate voice exists
+if ! say -v ? | grep -q "^${VOICE}"; then
+  echo "❌ Voice not found: $VOICE"
+  exit 1
+fi
+
+# Generate speech using macOS say command
+say -v "$VOICE" -o "$AUDIO_FILE" "$TEXT"
+
+# Play audio
+afplay "$AUDIO_FILE"
 ```
 
 ### Why Two Providers?
 
 **Piper TTS:**
-- ✅ Superior voice quality
-- ✅ 150+ voices with distinct characters
-- ✅ Perfect multilingual support (29 languages)
-- ❌ Requires API key and paid plan
-- ❌ Needs internet connection
-- ❌ API costs per character
-
-**Piper:**
+- ✅ High-quality neural voices
+- ✅ 50+ voices across 18 languages
 - ✅ Completely free
 - ✅ Works offline
+- ✅ Cross-platform (Windows, macOS, Linux, WSL)
 - ✅ No API key needed
-- ✅ 50+ voices
-- ❌ Moderate voice quality
-- ❌ Basic multilingual support
 - ❌ Requires local installation
 
-By supporting both, AgentVibes lets users choose based on their priorities: quality vs. cost.
+**macOS Say:**
+- ✅ Completely free
+- ✅ Works offline
+- ✅ 70+ built-in voices
+- ✅ 40+ languages
+- ✅ Zero installation (built into macOS)
+- ✅ Native system integration
+- ❌ macOS only
+
+By supporting both, AgentVibes provides flexibility: cross-platform consistency with Piper or native integration with macOS Say.
 
 ---
 
-## System 4: The MCP Server - Natural Language Control
+## System 3: The MCP Server - Natural Language Control
 
 The Model Context Protocol (MCP) server is AgentVibes' newest feature. It exposes all AgentVibes functionality through a standardized protocol that AI assistants can use.
 
 ### What is MCP?
 
-MCP is a protocol that allows AI assistants to discover and use external tools. Think of it like REST API for AI assistants—instead of manually typing commands like `/agent-vibes:switch Aria`, you can just say "Switch to Aria voice" and the AI figures out the right tool to call.
+MCP is a protocol that allows AI assistants to discover and use external tools. Think of it like REST API for AI assistants—instead of manually typing commands like `/agent-vibes:switch en_GB-alan-medium`, you can just say "Switch to en_GB-alan-medium voice" and the AI figures out the right tool to call.
 
 ### The MCP Server Architecture
 
@@ -428,14 +415,14 @@ async def list_tools() -> list[Tool]:
 
 ### MCP in Action
 
-When you say "Switch to Aria voice" in Claude Desktop with AgentVibes MCP installed:
+When you say "Switch to en_GB-alan-medium voice" in Claude Desktop with AgentVibes MCP installed:
 
 1. Claude receives your natural language request
 2. Claude sees the `switch_voice` tool is available
-3. Claude calls: `switch_voice(voice_name="Aria")`
-4. MCP server executes: `bash .claude/hooks/voice-manager.sh switch Aria`
-5. Voice manager saves "Aria" to `.claude/tts-voice.txt`
-6. MCP server returns: "✅ Switched to Aria voice"
+3. Claude calls: `switch_voice(voice_name="en_GB-alan-medium")`
+4. MCP server executes: `bash .claude/hooks/voice-manager.sh switch en_GB-alan-medium`
+5. Voice manager saves "en_GB-alan-medium" to `.claude/tts-voice.txt`
+6. MCP server returns: "✅ Switched to en_GB-alan-medium voice"
 7. Claude responds to you with confirmation
 
 You never had to know the slash command syntax or where files are stored!
@@ -469,23 +456,25 @@ Let's trace a complete request to see how all systems work together.
 
 **Scenario:** You ask Claude Code to "Check git status" with the sarcastic personality active.
 
-### Step 1: Output Style Triggers Acknowledgment
+### Step 1: Startup Hook Protocol Triggers Acknowledgment
 
-Claude's output style instructions kick in:
+Claude follows the startup hook TTS protocol:
 
 ```
-1. Check personality setting:
+1. Receive user request: "Check git status"
+
+2. Check personality setting:
    - Reads .claude/tts-personality.txt → "sarcastic"
 
-2. Read personality configuration:
+3. Read personality configuration:
    - Reads .claude/personalities/sarcastic.md
    - Extracts AI instructions: "Use dry wit, cutting observations..."
 
-3. Generate unique acknowledgment:
+4. Generate unique acknowledgment:
    - AI creates: "Oh, the excitement. Let me check that git status for you."
 
-4. Execute TTS:
-   - Calls: .claude/hooks/play-tts.sh "Oh, the excitement. Let me check that git status for you."
+5. Execute TTS:
+   - Calls: Bash .claude/hooks/play-tts.sh "Oh, the excitement. Let me check that git status for you."
 ```
 
 ### Step 2: TTS Router Determines Provider
@@ -496,53 +485,47 @@ Claude's output style instructions kick in:
 # Read active provider
 ACTIVE_PROVIDER=$(cat .claude/tts-provider.txt) → "piper"
 
-# Route to Piper TTS implementation
+# Route to Piper implementation
 exec .claude/hooks/play-tts-piper.sh "$TEXT" "$VOICE"
 ```
 
-### Step 3: Piper TTS Provider Generates Audio
+### Step 3: Piper Provider Generates Audio
 
 `play-tts-piper.sh` does the heavy lifting:
 
 ```bash
 # 1. Resolve voice
-VOICE_NAME="Jessica Anne Bogart"  # from sarcastic.md
-VOICE_ID=$(lookup_voice_id "$VOICE_NAME") → "abc123xyz789"
+VOICE_NAME="en_US-amy-medium"  # from sarcastic.md
+VOICE_PATH="$HOME/.local/share/piper/voices/${VOICE_NAME}.onnx"
 
-# 2. Detect language
-LANGUAGE_CODE=$(cat .claude/tts-language.txt) → "en"
-
-# 3. Call Piper TTS API
-curl -X POST "https://api.piper.io/v1/text-to-speech/$VOICE_ID" \
-  -H "xi-api-key: $API_KEY" \
-  -d '{"text": "Oh, the excitement. Let me check that git status for you."}' \
-  --output /tmp/tts_12345.mp3
-
-# 4. Check if over SSH
-if [[ -n "$SSH_CONNECTION" ]]; then
-  # Convert MP3 to OGG to prevent corruption
-  ffmpeg -i /tmp/tts_12345.mp3 /tmp/tts_12345.ogg
-  AUDIO_FILE=/tmp/tts_12345.ogg
+# 2. Check if voice model exists, download if needed
+if [[ ! -f "$VOICE_PATH" ]]; then
+  "$SCRIPT_DIR/piper-voice-manager.sh" download "$VOICE_NAME"
 fi
 
-# 5. Play audio
-paplay /tmp/tts_12345.ogg
+# 3. Generate speech locally using Piper
+echo "$TEXT" | piper \
+  --model "$VOICE_PATH" \
+  --output_file /tmp/tts_12345.wav
+
+# 4. Play audio
+paplay /tmp/tts_12345.wav
 ```
 
 ### Step 4: Claude Proceeds With Task
 
 Claude runs the git status command while audio plays in parallel (non-blocking).
 
-### Step 5: Output Style Triggers Completion
+### Step 5: Startup Hook Protocol Triggers Completion
 
 After task completes:
 
 ```
-1. Generate completion message:
+1. Generate completion message (still using sarcastic personality):
    - AI creates: "Riveting. Your repository is clean. Try not to get too excited."
 
 2. Execute TTS:
-   - Calls: .claude/hooks/play-tts.sh "Riveting. Your repository is clean. Try not to get too excited."
+   - Calls: Bash .claude/hooks/play-tts.sh "Riveting. Your repository is clean. Try not to get too excited."
 
 3. Same flow as Step 2-3 repeats
 ```
@@ -580,7 +563,6 @@ The installer:
    - Commands → `.claude/commands/agent-vibes/`
    - Hooks → `.claude/hooks/`
    - Personalities → `.claude/personalities/`
-   - Output styles → `.claude/output-styles/`
 4. Makes all bash scripts executable (`chmod +x`)
 5. Creates default configuration files
 
@@ -596,9 +578,10 @@ The installer:
 │       ├── personality.md              # /agent-vibes:personality
 │       └── ... (50+ command files)
 ├── hooks/
+│   ├── startup.sh                      # Injects TTS protocol on session start
 │   ├── play-tts.sh                     # Main TTS router
-│   ├── play-tts-piper.sh         # Piper TTS implementation
 │   ├── play-tts-piper.sh               # Piper implementation
+│   ├── play-tts-macos.sh               # macOS Say implementation
 │   ├── personality-manager.sh          # Personality system
 │   ├── voice-manager.sh                # Voice switching
 │   ├── provider-manager.sh             # Provider switching
@@ -610,9 +593,7 @@ The installer:
 │   ├── sarcastic.md
 │   ├── zen.md
 │   └── ... (19 personality files)
-├── output-styles/
-│   └── agent-vibes.md                  # Output style instructions
-├── tts-voice.txt                       # Current voice (e.g., "Aria")
+├── tts-voice.txt                       # Current voice (e.g., "en_GB-alan-medium")
 ├── tts-personality.txt                 # Current personality (e.g., "sarcastic")
 ├── tts-provider.txt                    # Current provider (e.g., "piper")
 └── tts-language.txt                    # Current language (e.g., "english")
@@ -651,7 +632,7 @@ AgentVibes uses simple text files for configuration. This makes it easy to under
 
 | File | Purpose | Example Value |
 |------|---------|---------------|
-| `tts-voice.txt` | Current voice name | `Aria` |
+| `tts-voice.txt` | Current voice name | `en_GB-alan-medium` |
 | `tts-personality.txt` | Current personality | `pirate` |
 | `tts-sentiment.txt` | Current sentiment (optional) | `sarcastic` |
 | `tts-provider.txt` | Active TTS provider | `piper` |
@@ -698,25 +679,24 @@ The output style is modified to call TTS twice:
 
 The translation happens via API (if using Piper TTS multilingual voices) or by using language-specific Piper voices.
 
-### SSH Audio Optimization
+### Remote Audio Setup
 
-AgentVibes automatically detects SSH sessions and optimizes audio:
+AgentVibes works great over SSH! Since both providers (Piper and macOS Say) generate audio locally, you just need to set up audio forwarding:
 
+**For Linux/WSL over SSH:**
 ```bash
-# Detect SSH
-if [[ -n "$SSH_CONNECTION" ]]; then
-  IS_SSH=true
-fi
-
-if [[ "$IS_SSH" == "true" ]]; then
-  # Convert MP3 to OGG with Opus codec
-  # This prevents audio corruption over SSH tunnels
-  ffmpeg -i "$MP3_FILE" -c:a libopus -b:a 128k "$OGG_FILE"
-  AUDIO_FILE="$OGG_FILE"
-fi
+# Forward PulseAudio over SSH
+ssh -R 24713:localhost:4713 user@remote-host
+# Now audio plays on your local machine!
 ```
 
-Why? MP3 streaming over SSH can have corruption. OGG/Opus format is more robust for network transmission.
+**For macOS over SSH:**
+```bash
+# Audio plays directly on the macOS system
+# No additional configuration needed
+```
+
+See the [remote audio setup guide](remote-audio-setup.md) for detailed instructions.
 
 ### BMAD Plugin Integration
 
@@ -724,13 +704,13 @@ AgentVibes can integrate with the BMAD METHOD (a multi-agent framework). When a 
 
 **How it works:**
 
-1. BMAD agent activates (e.g., `/BMad:agents:pm` for project manager)
+1. BMAD agent activates (e.g., `/bmad:bmm:agents:pm` for project manager)
 2. BMAD writes agent ID to `.bmad-agent-context` file
-3. AgentVibes output style checks this file
-4. If BMAD plugin is enabled, looks up voice in `.agentvibes/bmad/bmad-voices.md`
+3. AgentVibes startup hook checks this file
+4. If BMAD party mode is enabled, looks up voice in `.agentvibes/bmad/bmad-voices.csv`
 5. Automatically switches to that voice
 
-This creates the illusion of multiple distinct AI personalities in conversations.
+This creates the illusion of multiple distinct AI personalities in multi-agent conversations.
 
 ---
 
@@ -763,13 +743,13 @@ Files are kept for the duration of the session, allowing the `/agent-vibes:repla
 ### Provider Performance
 
 **Piper TTS:**
-- API latency: ~500-1000ms
-- Audio quality: Excellent (256kbps MP3)
-- Bandwidth: ~2KB per second of audio
-
-**Piper:**
 - Generation latency: ~200-500ms (local)
 - Audio quality: Good (22kHz WAV)
+- Bandwidth: None (offline)
+
+**macOS Say:**
+- Generation latency: ~100-300ms (native)
+- Audio quality: Good (AIFF/AAC)
 - Bandwidth: None (offline)
 
 ### Text Length Limits
@@ -784,9 +764,9 @@ fi
 ```
 
 This prevents:
-- Excessive API costs (Piper TTS charges per character)
 - Slow generation (long audio takes time to produce)
 - User confusion (very long TTS messages are hard to follow)
+- Audio playback issues with extremely long text
 
 ---
 
@@ -794,25 +774,25 @@ This prevents:
 
 AgentVibes has multiple layers of error handling:
 
-### API Failure Handling
+### TTS Generation Failure Handling
 
 ```bash
-# Try Piper TTS API
-RESPONSE=$(curl -s -X POST "$API_ENDPOINT" ...)
+# Try to generate audio
+echo "$TEXT" | piper --model "$VOICE_PATH" --output_file "$AUDIO_FILE"
 
 if [[ $? -ne 0 ]] || [[ ! -f "$AUDIO_FILE" ]]; then
-  echo "⚠️  TTS request failed (API error or network issue)"
+  echo "⚠️  TTS generation failed"
   exit 1
 fi
 ```
 
-If the API fails, error is logged but doesn't crash Claude Code—the task continues without audio.
+If TTS generation fails, error is logged but doesn't crash Claude Code—the task continues without audio.
 
 ### Missing Configuration Graceful Degradation
 
 ```bash
 # If no voice configured, use default
-VOICE=$(cat .claude/tts-voice.txt 2>/dev/null || echo "Aria")
+VOICE=$(cat .claude/tts-voice.txt 2>/dev/null || echo "en_GB-alan-medium")
 
 # If no personality configured, use normal
 PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null || echo "normal")
@@ -861,13 +841,13 @@ Test files validate:
 AgentVibes demonstrates several important software engineering principles:
 
 **1. Separation of Concerns**
-- Output style (when to speak) is separate from hooks (how to speak)
-- Provider abstraction (Piper TTS vs Piper) is separate from voice management
+- Startup hook (when to speak) is separate from hooks (how to speak)
+- Provider abstraction (Piper vs macOS Say) is separate from voice management
 - MCP server is separate from core functionality
 
 **2. Provider Pattern**
 - Multiple TTS engines behind a single interface
-- Easy to add new providers (OpenAI TTS, Google TTS, etc.)
+- Easy to add new providers (ElevenLabs, OpenAI TTS, Google TTS, etc.)
 
 **3. Configuration as Data**
 - Simple text files instead of complex databases
@@ -895,7 +875,7 @@ Now that you understand how AgentVibes works under the hood, you might want to:
 
 - **Create custom personalities** - Edit `.claude/personalities/*.md` files
 - **Extend the MCP server** - Add new tools in `mcp-server/server.py`
-- **Build custom output styles** - Create your own instructions in `.claude/output-styles/`
+- **Customize the startup hook** - Modify `.claude/hooks/startup.sh` for different TTS behaviors
 - **Contribute to the project** - Submit PRs on [GitHub](https://github.com/paulpreibisch/AgentVibes)
 
 Happy coding, and may your AI assistant always speak with personality! 🎤✨

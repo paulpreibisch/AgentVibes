@@ -1,5 +1,95 @@
 # AgentVibes Release Notes
 
+## 📦 v2.17.9 - Documentation Accuracy Update
+
+**Release Date:** December 20, 2024
+
+### 🤖 AI Summary
+
+AgentVibes v2.17.9 is a documentation accuracy release that removes all outdated ElevenLabs references and updates documentation to reflect the current architecture. This release corrects the voice library documentation (removing fake piper.io URLs), updates provider documentation to accurately describe Piper TTS and macOS Say (removing references to the no-longer-supported ElevenLabs provider), and completely rewrites the technical deep dive to reflect the current startup hook architecture instead of the deprecated output styles system.
+
+**Key Highlights:**
+- 📚 **Voice Library Accuracy** - Replaced fake voice URLs with actual Piper TTS voice names and accurate language support (18+ languages)
+- 🔧 **Provider Documentation** - Removed ElevenLabs section, added macOS Say provider details, corrected feature comparison tables
+- 🏗️ **Architecture Update** - Technical deep dive rewritten: "Output Style System" → "Startup Hook Protocol", updated from 4 to 3 core systems
+- ✅ **Code Example Accuracy** - All code snippets now match current implementation (Piper TTS local generation, macOS Say integration)
+
+### 📝 Documentation Updates
+
+**docs/voice-library.md:**
+- Removed fake "piper.io/voice-library" URLs (formatted like old ElevenLabs links)
+- Updated from "30+ languages" to accurate "18+ languages"
+- Replaced character voice list with actual Piper voice names (en_US-lessac-medium, en_GB-alan-medium, etc.)
+- Added commands to preview and list voices
+
+**docs/providers.md:**
+- Removed entire "Piper TTS (Premium AI Voices)" section with ElevenLabs references
+- Added "macOS Say (Built-in, Free)" provider section
+- Updated provider comparison table: Piper TTS vs macOS Say (was incorrectly "Piper TTS vs Piper TTS")
+- Removed outdated pricing information ($0-99/month)
+- Removed API key requirements
+- Updated recommendations for cross-platform vs macOS-specific use cases
+
+**docs/technical-deep-dive.md** (Major Rewrite):
+- Architecture: Changed from "4 Core Systems" to "3 Core Systems" (removed Output Style System)
+- System 1: "Output Style System" → "Startup Hook Protocol"
+  - Explained how `.claude/hooks/startup.sh` injects TTS instructions
+  - Removed references to `.claude/output-styles/agent-vibes.md`
+  - Added actual startup hook code examples
+- Provider Implementation:
+  - Removed fake ElevenLabs API curl examples
+  - Removed SSH audio conversion (MP3→OGG, only needed for API streaming)
+  - Added macOS Say provider implementation with actual code
+  - Updated Piper implementation to show local voice generation
+- Data Flow: Updated all examples to use startup hook instead of output style
+- Installation: Removed `output-styles/` from directory structure, added `startup.sh`
+- Performance: Updated latency numbers (removed API latency, added local generation times)
+- Error Handling: "API Failure Handling" → "TTS Generation Failure Handling"
+- Updated voice references from "150+ voices" to "50+ neural voices"
+- Changed default voice from "Aria" to "en_GB-alan-medium"
+
+**README.md:**
+- Updated FAQ: "Piper, macOS Say, ElevenLabs" → "Piper TTS, macOS Say"
+
+### 🔧 Changes by File
+
+| File | Lines Changed | Description |
+|------|---------------|-------------|
+| docs/voice-library.md | -45 / +42 | Voice names and language accuracy |
+| docs/providers.md | -89 / +43 | Provider comparison and features |
+| docs/technical-deep-dive.md | -267 / +236 | Architecture and implementation |
+| README.md | -1 / +1 | Provider list in FAQ |
+
+**Net Change:** -236 insertions, +267 deletions (overall documentation improvement and accuracy)
+
+### 🎯 User Impact
+
+**What This Means for Users:**
+- ✅ **Accurate Documentation** - All docs now correctly reflect the current free, open-source architecture
+- ✅ **Clear Provider Info** - No confusion about paid vs free providers (both are free!)
+- ✅ **Updated Examples** - All code snippets and examples match actual implementation
+- ✅ **Correct Voice Lists** - Voice library shows actual Piper voice names you can use
+
+**No Breaking Changes:** This is purely a documentation update - no code or functionality changed.
+
+### 📋 Full Changes
+
+```
+b3daa23c docs: Remove outdated ElevenLabs references and update documentation
+```
+
+**Files Modified:**
+- README.md
+- docs/voice-library.md
+- docs/providers.md
+- docs/technical-deep-dive.md
+
+### 🧪 Testing
+
+✅ All 236 tests passing (213 BATS unit tests + 23 Node.js tests)
+
+---
+
 ## 📦 v2.17.8 - Repository Cleanup
 
 **Release Date:** December 18, 2024
