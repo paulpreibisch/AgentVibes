@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.8
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.17.9
 
 ---
 
@@ -114,14 +114,15 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.17.8 - Repository Cleanup](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.8)** 🧹
-AgentVibes v2.17.8 is a maintenance release focusing on repository organization and cleanup. This release removes 12 outdated files including old release notes from versions 2.4.0 through 2.16.0, legacy setup scripts, and temporary documentation files. The cleanup reduces repository size by over 3,000 lines while preserving all active documentation and functionality. **Key Highlights:** - 🧹 **Repository Cleanup** - Removed 8 outdated release notes files (v2.4.0-v2.16.0) - 📝 **Documentation Consolidation** - All release history now maintained in single RELEASE_NOTES.md - 🗑️ **Legacy Script Removal** - Cleaned up obsolete VS Code color scripts and Ubuntu RDP audio setup - ✅ **Test Coverage** - Added installer page flow test, all 236 tests passing
-AgentVibes v2.17.8 is a maintenance release focusing on repository organization and cleanup. This release removes 12 outdated files including old release notes from versions 2.4.0 through 2.16.0, legacy setup scripts, and temporary documentation files. The cleanup reduces repository size by over 3,000 lines while preserving all active documentation and functionality.
+**[v2.17.9 - Documentation Accuracy Update](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.17.9)** 📚
+
+AgentVibes v2.17.9 removes all outdated ElevenLabs references and updates documentation to reflect the current architecture. This release corrects voice library documentation (removing fake piper.io URLs), updates provider docs to accurately describe Piper TTS and macOS Say (removing references to the no-longer-supported ElevenLabs provider), and completely rewrites the technical deep dive to reflect the current startup hook architecture instead of the deprecated output styles system.
 
 **Key Highlights:**
-- 🧹 **Repository Cleanup** - Removed 8 outdated release notes files (v2.4.0-v2.16.0)
-- 📝 **Documentation Consolidation** - All release history now maintained in single RELEASE_NOTES.md
-- 🗑️ **Legacy Script Removal** - Cleaned up obsolete VS Code color scripts and Ubuntu RDP audio setup
+- 📚 **Voice Library Accuracy** - Replaced fake voice URLs with actual Piper TTS voice names and accurate language support (18+ languages)
+- 🔧 **Provider Documentation** - Removed ElevenLabs section, added macOS Say provider details, corrected feature comparison tables
+- 🏗️ **Architecture Update** - Technical deep dive rewritten: "Output Style System" → "Startup Hook Protocol", updated from 4 to 3 core systems
+- ✅ **Code Example Accuracy** - All code snippets now match current implementation (Piper TTS local generation, macOS Say integration)
 - ✅ **Test Coverage** - Added installer page flow test, all 236 tests passing
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
