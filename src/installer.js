@@ -823,17 +823,17 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.17.9 - Documentation Accuracy Update\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v2.18.0 - Uninstall Command & CI Improvements\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.17.9 removes all outdated ElevenLabs references and updates\n') +
-    chalk.cyan('documentation to reflect the current architecture. This release corrects voice library\n') +
-    chalk.cyan('documentation, updates provider docs to accurately describe Piper TTS and macOS Say,\n') +
-    chalk.cyan('and rewrites the technical deep dive to reflect the startup hook architecture.\n\n') +
+    chalk.cyan('AgentVibes v2.18.0 introduces a comprehensive uninstall command that makes it easy\n') +
+    chalk.cyan('to cleanly remove AgentVibes from your projects. The new agentvibes uninstall command\n') +
+    chalk.cyan('provides interactive confirmation, flexible removal options (project-level, global, or\n') +
+    chalk.cyan('complete including Piper TTS), and clear documentation.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   📚 Voice Library Accuracy - Replaced fake URLs with actual Piper voice names\n') +
-    chalk.gray('   🔧 Provider Documentation - Removed ElevenLabs, added macOS Say provider details\n') +
-    chalk.gray('   🏗️ Architecture Update - "Output Style System" → "Startup Hook Protocol"\n') +
-    chalk.gray('   ✅ Code Example Accuracy - All snippets now match current implementation\n\n') +
+    chalk.gray('   🗑️ Comprehensive Uninstall Command - Interactive confirmation and preview\n') +
+    chalk.gray('   🎛️ Flexible Removal Options - --yes, --global, and --with-piper flags\n') +
+    chalk.gray('   📚 Complete Documentation - New uninstall section in README with examples\n') +
+    chalk.gray('   🧪 Improved CI Reliability - Increased test timeout for slower CI systems\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
