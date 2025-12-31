@@ -105,6 +105,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 ### Additional Resources
 - [🔗 Useful Links](#-useful-links) - Voice typing & AI tools
 - [🔄 Updating](#-updating) - Keep AgentVibes current
+- [🗑️ Uninstalling](#️-uninstalling) - Remove AgentVibes cleanly
 - [❓ FAQ](#-frequently-asked-questions-faq) - **NEW!** Common questions answered (git-lfs, MCP tokens, installation)
 - [🍎 macOS Testing](docs/macos-testing.md) - Automated testing on macOS with GitHub Actions
 - [🙏 Credits](#-credits) - Acknowledgments
@@ -696,6 +697,61 @@ npm update -g agentvibes && agentvibes update --yes
 **Check Version:** `/agent-vibes:version`
 
 **[→ View Complete Update Guide](docs/updating.md)** - All update methods, version checking, what gets updated, and troubleshooting
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🗑️ Uninstalling
+
+**Quick Uninstall (Project Only):**
+```bash
+npx agentvibes uninstall
+```
+
+**Uninstall Options:**
+```bash
+# Interactive uninstall (confirms before removing)
+npx agentvibes uninstall
+
+# Auto-confirm (skip confirmation prompt)
+npx agentvibes uninstall --yes
+
+# Also remove global configuration
+npx agentvibes uninstall --global
+
+# Complete uninstall including Piper TTS
+npx agentvibes uninstall --global --with-piper
+```
+
+**What Gets Removed:**
+
+**Project-level (default):**
+- `.claude/commands/agent-vibes/` - Slash commands
+- `.claude/hooks/` - TTS scripts
+- `.claude/personalities/` - Personality templates
+- `.claude/output-styles/` - Output styles
+- `.claude/audio/` - Audio cache
+- `.claude/tts-*.txt` - TTS configuration files
+- `.agentvibes/` - BMAD integration files
+
+**Global (with `--global` flag):**
+- `~/.claude/` - Global configuration
+- `~/.agentvibes/` - Global cache
+
+**Piper TTS (with `--with-piper` flag):**
+- `~/piper/` - Piper TTS installation
+
+**To Reinstall:**
+```bash
+npx agentvibes install
+```
+
+**💡 Tips:**
+- Default uninstall only removes project-level files
+- Use `--global` if you want to completely reset AgentVibes
+- Use `--with-piper` if you also want to remove the Piper TTS engine
+- Run `npx agentvibes status` to check installation status
 
 [↑ Back to top](#-table-of-contents)
 

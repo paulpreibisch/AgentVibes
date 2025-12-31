@@ -3452,6 +3452,200 @@ program
   });
 
 program
+  .command('uninstall')
+  .description('Uninstall AgentVibes from current project')
+  .option('-d, --directory <path>', 'Installation directory (default: current directory)')
+  .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
+  .option('--global', 'Also remove global configuration (~/.claude/, ~/.agentvibes/)')
+  .option('--with-piper', 'Also remove Piper TTS installation (~/piper/)')
+  .action(async (options) => {
+    const currentDir = process.env.INIT_CWD || process.cwd();
+    const targetDir = options.directory || currentDir;
+
+    showWelcome();
+
+    console.log(chalk.cyan('📍 Uninstall Details:'));
+    console.log(chalk.gray(`   Target directory: ${targetDir}`));
+    console.log(chalk.gray(`   Package version: ${VERSION}\n`));
+
+    // Check if installed
+    const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
+    let isInstalled = false;
+    try {
+      await fs.access(commandsDir);
+      isInstalled = true;
+    } catch {}
+
+    if (!isInstalled) {
+      console.log(chalk.yellow('⚠️  AgentVibes is not installed in this directory.'));
+      console.log(chalk.gray(`   Directory checked: ${targetDir}/.claude/`));
+      console.log(chalk.gray('   Nothing to uninstall.\n'));
+      process.exit(0);
+    }
+
+    // Show what will be removed
+    console.log(chalk.cyan('📦 What will be removed:\n'));
+
+    const itemsToRemove = [];
+
+    // Project-level items
+    console.log(chalk.white.bold('  Project Files:'));
+    itemsToRemove.push({ path: '.claude/commands/agent-vibes/', desc: 'AgentVibes slash commands' });
+    itemsToRemove.push({ path: '.claude/hooks/', desc: 'TTS scripts' });
+    itemsToRemove.push({ path: '.claude/personalities/', desc: 'Personality templates' });
+    itemsToRemove.push({ path: '.claude/output-styles/', desc: 'Output style templates' });
+    itemsToRemove.push({ path: '.claude/audio/', desc: 'Audio cache' });
+    itemsToRemove.push({ path: '.claude/tts-*.txt', desc: 'TTS configuration files' });
+    itemsToRemove.push({ path: '.claude/*.json', desc: 'AgentVibes settings' });
+    itemsToRemove.push({ path: '.agentvibes/', desc: 'BMAD integration files' });
+
+    for (const item of itemsToRemove) {
+      console.log(chalk.gray(`   • ${item.path}`));
+    }
+
+    // Global items
+    if (options.global) {
+      console.log(chalk.white.bold('\n  Global Files:'));
+      console.log(chalk.gray('   • ~/.claude/ (global configuration)'));
+      console.log(chalk.gray('   • ~/.agentvibes/ (global cache)'));
+    }
+
+    // Piper TTS
+    if (options.withPiper) {
+      console.log(chalk.white.bold('\n  TTS Engine:'));
+      console.log(chalk.gray('   • ~/piper/ (Piper TTS installation)'));
+    }
+
+    console.log('');
+
+    // Confirmation
+    if (!options.yes) {
+      const { confirm } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: chalk.yellow('Are you sure you want to uninstall AgentVibes?'),
+          default: false,
+        },
+      ]);
+
+      if (!confirm) {
+        console.log(chalk.green('\n✓ Uninstall cancelled. AgentVibes remains installed.\n'));
+        process.exit(0);
+      }
+    } else {
+      console.log(chalk.gray('✓ Auto-confirmed (--yes flag)\n'));
+    }
+
+    const spinner = ora('Uninstalling AgentVibes...').start();
+
+    try {
+      let removedCount = 0;
+
+      // Remove project-level files
+      const projectPaths = [
+        path.join(targetDir, '.claude', 'commands', 'agent-vibes'),
+        path.join(targetDir, '.claude', 'hooks'),
+        path.join(targetDir, '.claude', 'personalities'),
+        path.join(targetDir, '.claude', 'output-styles'),
+        path.join(targetDir, '.claude', 'audio'),
+        path.join(targetDir, '.agentvibes'),
+      ];
+
+      for (const dirPath of projectPaths) {
+        try {
+          await fs.rm(dirPath, { recursive: true, force: true });
+          removedCount++;
+        } catch (err) {
+          // Ignore if directory doesn't exist
+        }
+      }
+
+      // Remove TTS config files
+      const configPatterns = [
+        'tts-voice.txt',
+        'tts-provider.txt',
+        'tts-personality.txt',
+        'tts-verbosity.txt',
+        'tts-translate.txt',
+        'tts-target-voice.txt',
+        'tts-target-language.txt',
+        'tts-language.txt',
+        'personalities.json',
+        'github-star-reminder.txt',
+        'piper-voices-dir.txt',
+        'verbosity.txt',
+      ];
+
+      for (const pattern of configPatterns) {
+        const filePath = path.join(targetDir, '.claude', pattern);
+        try {
+          await fs.unlink(filePath);
+        } catch (err) {
+          // Ignore if file doesn't exist
+        }
+      }
+
+      // Remove global files if requested
+      if (options.global) {
+        const homedir = process.env.HOME || process.env.USERPROFILE;
+        const globalPaths = [
+          path.join(homedir, '.claude'),
+          path.join(homedir, '.agentvibes'),
+        ];
+
+        for (const dirPath of globalPaths) {
+          try {
+            await fs.rm(dirPath, { recursive: true, force: true });
+            removedCount++;
+          } catch (err) {
+            // Ignore if directory doesn't exist
+          }
+        }
+      }
+
+      // Remove Piper TTS if requested
+      if (options.withPiper) {
+        const homedir = process.env.HOME || process.env.USERPROFILE;
+        const piperPath = path.join(homedir, 'piper');
+
+        try {
+          await fs.rm(piperPath, { recursive: true, force: true });
+          removedCount++;
+        } catch (err) {
+          // Ignore if directory doesn't exist
+        }
+      }
+
+      spinner.succeed(chalk.green('Successfully uninstalled AgentVibes!\n'));
+
+      // Show summary
+      console.log(
+        boxen(
+          chalk.green.bold('✓ Uninstall Complete\n\n') +
+          chalk.gray('AgentVibes has been removed from this project.\n') +
+          (options.global ? chalk.gray('Global configuration has been removed.\n') : '') +
+          (options.withPiper ? chalk.gray('Piper TTS has been removed.\n') : '') +
+          chalk.gray('\nTo reinstall: ') + chalk.cyan('npx agentvibes install\n') +
+          chalk.gray('\nWe\'d love to know why you uninstalled!\n') +
+          chalk.gray('Share feedback: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes/issues'),
+          {
+            padding: 1,
+            margin: 1,
+            borderStyle: 'round',
+            borderColor: 'green',
+          }
+        )
+      );
+
+    } catch (err) {
+      spinner.fail(chalk.red('Failed to uninstall AgentVibes'));
+      console.error(chalk.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  });
+
+program
   .command('status')
   .description('Show installation status')
   .action(async () => {
