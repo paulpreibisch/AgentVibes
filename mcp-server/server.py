@@ -43,12 +43,27 @@ use or other dealings in the software.
 import asyncio
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
 from mcp.server import Server
 from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 import mcp.server.stdio
+
+
+
+def to_git_bash_path(path_str: str) -> str:
+    """Convert Windows path to Git Bash format (C:/Users -> /c/Users).
+
+    Git Bash on Windows expects Unix-style paths with drive letter prefix.
+    This function converts Windows paths for subprocess calls to bash.
+    On non-Windows platforms, returns the path unchanged.
+    """
+    if sys.platform == "win32" and len(path_str) >= 2 and path_str[1] == ':':
+        drive_letter = path_str[0].lower()
+        return f"/{drive_letter}{path_str[2:].replace(chr(92), '/')}"
+    return path_str
 
 
 class AgentVibesServer:
@@ -127,7 +142,7 @@ class AgentVibesServer:
 
             # Call the TTS script via bash explicitly
             play_tts = self.hooks_dir / "play-tts.sh"
-            args = ["bash", str(play_tts), text]
+            args = ["bash", to_git_bash_path(str(play_tts)), text]
             if voice:
                 args.append(voice)
 
@@ -711,7 +726,7 @@ class AgentVibesServer:
             return f"Script not found: {script_path}"
 
         # Explicitly call bash to run the script
-        cmd = ["bash", str(script_path)] + args
+        cmd = ["bash", to_git_bash_path(str(script_path))] + args
 
         # Set environment and ensure PATH includes .local/bin
         env = os.environ.copy()
