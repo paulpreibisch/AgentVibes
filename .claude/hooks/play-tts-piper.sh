@@ -364,6 +364,15 @@ fi
 # @sideeffects Plays audio with lock mechanism for sequential playback
 LOCK_FILE="/tmp/agentvibes-audio.lock"
 
+# Auto-remove stale locks (older than 30 seconds - no TTS should take this long)
+# This prevents permanent blocking when background cleanup process is killed
+if [ -f "$LOCK_FILE" ]; then
+  LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$LOCK_FILE" 2>/dev/null || stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0) ))
+  if [ "$LOCK_AGE" -gt 30 ]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
+
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
