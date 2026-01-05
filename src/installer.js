@@ -857,15 +857,15 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
   let audioPlayer = null;
 
   try {
-    execSync('which paplay 2>/dev/null', { stdio: 'pipe' }); // NOSONAR - Safe: checking system PATH for audio player
+    execFileSync('which', ['paplay'], { stdio: 'pipe' });
     audioPlayer = 'paplay';
   } catch {
     try {
-      execSync('which afplay 2>/dev/null', { stdio: 'pipe' }); // NOSONAR - Safe: checking system PATH for audio player
+      execFileSync('which', ['afplay'], { stdio: 'pipe' });
       audioPlayer = 'afplay';
     } catch {
       try {
-        execSync('which mpv 2>/dev/null', { stdio: 'pipe' }); // NOSONAR - Safe: checking system PATH for audio player
+        execFileSync('which', ['mpv'], { stdio: 'pipe' });
         audioPlayer = 'mpv';
       } catch {}
     }
