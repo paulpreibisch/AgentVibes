@@ -888,17 +888,18 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.18.0 - Uninstall Command & CI Improvements\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v2.19.0-alpha.0 - Termux SSH TTS Provider (Alpha)\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.18.0 introduces a comprehensive uninstall command that makes it easy\n') +
-    chalk.cyan('to cleanly remove AgentVibes from your projects. The new agentvibes uninstall command\n') +
-    chalk.cyan('provides interactive confirmation, flexible removal options (project-level, global, or\n') +
-    chalk.cyan('complete including Piper TTS), and clear documentation.\n\n') +
+    chalk.cyan('AgentVibes v2.19.0-alpha.0 introduces the termux-ssh TTS provider, enabling Android\n') +
+    chalk.cyan('device audio output when working on remote servers. This alpha release adds SSH-based\n') +
+    chalk.cyan('TTS routing to Android devices via Termux, comprehensive Tailscale VPN setup documentation,\n') +
+    chalk.cyan('and full MCP server integration. Perfect for developers who want to hear AgentVibes TTS\n') +
+    chalk.cyan('on their phone while working on cloud servers, VPS instances, or remote workstations.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🗑️ Comprehensive Uninstall Command - Interactive confirmation and preview\n') +
-    chalk.gray('   🎛️ Flexible Removal Options - --yes, --global, and --with-piper flags\n') +
-    chalk.gray('   📚 Complete Documentation - New uninstall section in README with examples\n') +
-    chalk.gray('   🧪 Improved CI Reliability - Increased test timeout for slower CI systems\n\n') +
+    chalk.gray('   📱 Termux SSH Provider - Route TTS to Android devices via SSH with native Android TTS\n') +
+    chalk.gray('   🌐 Tailscale Integration - Comprehensive guide for internet-wide device access\n') +
+    chalk.gray('   🔧 Installer Support - Interactive SSH host configuration with validation\n') +
+    chalk.gray('   🎯 MCP Server Ready - Full compatibility with all MCP commands and workflows\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
