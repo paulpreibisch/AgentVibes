@@ -2623,6 +2623,15 @@ async function handleBmadIntegration(targetDir, options = {}) {
  */
 async function showRecentChanges(sourceDir) {
   try {
+    // Check if sourceDir actually has a .git directory
+    const gitDir = path.join(sourceDir, '.git');
+    const gitDirExists = await fs.access(gitDir).then(() => true).catch(() => false);
+
+    if (!gitDirExists) {
+      // No .git directory - skip git log to avoid showing parent repo's commits
+      throw new Error('No .git directory in package - using release notes');
+    }
+
     const { execSync } = await import('node:child_process');
     const gitLog = execSync( // NOSONAR - Safe: fixed command with controlled cwd, no user input
       'git log --oneline --no-decorate -5',

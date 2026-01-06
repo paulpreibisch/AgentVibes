@@ -4,14 +4,19 @@
 
 The `termux-ssh` provider allows AgentVibes to send TTS audio output to your Android device when you're connected from Termux via SSH. Instead of playing audio locally on your server/desktop, text is sent to your phone via SSH and spoken using Android's native TTS engine (`termux-tts-speak`).
 
+**Use Case:** You're working on a remote server (VPS, cloud instance, home server) and want to hear AgentVibes TTS on your Android phone instead of the server's speakers.
+
 ### Why This Provider?
 
 - **Solves PulseAudio issues**: PulseAudio tunneling doesn't work reliably on Android/Termux
 - **Uses native Android TTS**: High-quality voices from Google TTS or other installed engines
 - **Near-instant**: Only sends text, not audio files
+- **Works from anywhere**: With Tailscale, access your Android from any network
 - **No configuration overhead**: Works with standard SSH setup
 
 ## Prerequisites
+
+> **💡 Tip:** Install Tailscale first (see [Advanced Configuration](#using-tailscale-for-internet-wide-access-recommended)) for the best experience. It allows you to access your Android device from anywhere, not just your local WiFi.
 
 ### On Android Device (Termux)
 
@@ -44,13 +49,22 @@ The `termux-ssh` provider allows AgentVibes to send TTS audio output to your And
    ```
 
 5. **Get your device IP address**:
-   ```bash
-   # On same Wi-Fi network
-   ifconfig wlan0 | grep "inet addr"
 
-   # Or use Tailscale/ZeroTier for internet-wide access
-   # Example: 100.115.27.58 (Tailscale IP)
+   **Option A: Tailscale IP (Recommended)**
+   ```bash
+   # After installing Tailscale (see Advanced Configuration)
+   tailscale ip -4
+   # Example: 100.100.100.100
    ```
+
+   **Option B: Local WiFi IP (Same Network Only)**
+   ```bash
+   # Only works when both devices are on the same WiFi
+   ifconfig wlan0 | grep "inet addr"
+   # Example: 192.168.1.100
+   ```
+
+   > ⚠️ **Local WiFi IPs only work on the same network.** Use Tailscale for reliable access from anywhere.
 
 ### On Server/Desktop
 
@@ -78,8 +92,8 @@ The `termux-ssh` provider allows AgentVibes to send TTS audio output to your And
    **Example**:
    ```ssh-config
    Host android
-       HostName 100.115.27.58     # Tailscale IP
-       User u0_a484                # From 'whoami' in Termux
+       HostName 100.100.100.100    # Tailscale IP
+       User u0_a123                # From 'whoami' in Termux
        Port 8022
        IdentityFile ~/.ssh/id_ed25519
        ServerAliveInterval 60
@@ -205,13 +219,113 @@ Host android
 
 ## Advanced Configuration
 
-### Using Tailscale for Internet-Wide Access
+### Using Tailscale for Internet-Wide Access (Recommended)
 
-Tailscale creates a secure VPN so you can access your Android device from anywhere:
+#### Why Use Tailscale?
 
-1. Install Tailscale on Android and server
-2. Use Tailscale IP (100.x.x.x) in SSH config
-3. Access your device from any network
+**The Problem:**
+- Your Android device and server are on different networks (home WiFi, mobile data, office)
+- SSH requires both devices on the same local network OR a public IP with port forwarding
+- Port forwarding is complex, insecure, and often blocked by carriers/ISPs
+- Public WiFi networks block SSH connections
+
+**The Solution: Tailscale**
+
+Tailscale creates a secure, private VPN network between your devices that works from anywhere:
+- ✅ Access your Android from any network (home, office, coffee shop, mobile data)
+- ✅ No port forwarding or firewall configuration needed
+- ✅ Encrypted point-to-point connections
+- ✅ Works behind NAT, firewalls, and on mobile data
+- ✅ Free for personal use (up to 100 devices)
+- ✅ Each device gets a stable private IP (100.x.x.x)
+
+#### Step 1: Install Tailscale on Android
+
+1. **Download Tailscale from Play Store:**
+   - Search for "Tailscale" in Google Play Store
+   - Install the official Tailscale app
+   - OR download APK from: https://tailscale.com/download/android
+
+2. **Connect to Tailscale:**
+   - Open Tailscale app
+   - Tap "Sign in with Google" (or another provider)
+   - Grant VPN permissions when prompted
+   - Toggle the connection ON
+
+3. **Get your Android's Tailscale IP:**
+   ```bash
+   # In Termux, run:
+   tailscale ip -4
+   # Example output: 100.100.100.100
+   ```
+
+   **OR** check in the Tailscale app:
+   - Open Tailscale app
+   - Your IP is shown under your device name (e.g., "100.100.100.100")
+
+#### Step 2: Install Tailscale on Server/Desktop
+
+**On Ubuntu/Debian:**
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+```
+
+**On macOS:**
+```bash
+brew install tailscale
+sudo tailscale up
+```
+
+**On Windows:**
+- Download installer from https://tailscale.com/download/windows
+- Run installer and sign in
+
+**Get your server's Tailscale IP:**
+```bash
+tailscale ip -4
+# Example output: 100.100.100.101
+```
+
+#### Step 3: Configure SSH with Tailscale IP
+
+Update your `~/.ssh/config` to use the Tailscale IP instead of local WiFi IP:
+
+```ssh-config
+Host android
+    HostName 100.100.100.100    # ← Use Tailscale IP (from Step 1)
+    User u0_a123                # ← Your Termux username (run 'whoami' in Termux)
+    Port 8022
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+```
+
+**Why this works everywhere:**
+- Tailscale IPs (100.x.x.x) are stable and work on ANY network
+- No need to change config when switching WiFi networks
+- Works even when Android is on mobile data
+
+#### Step 4: Test Connection
+
+```bash
+# Test from your server/desktop
+ssh android "echo 'Connected via Tailscale!'"
+
+# If successful, you're ready for AgentVibes
+```
+
+#### Benefits Summary
+
+| Without Tailscale | With Tailscale |
+|------------------|----------------|
+| Only works on same WiFi | Works from anywhere |
+| Need to update IP when network changes | Stable IP that never changes |
+| Port forwarding required | No configuration needed |
+| Insecure over internet | End-to-end encrypted |
+| Doesn't work on mobile data | Works on mobile data |
+
+**Recommendation:** Always use Tailscale for the best experience. It makes your Android device accessible from anywhere while keeping connections secure and private.
 
 ### Multiple Android Devices
 
@@ -219,13 +333,13 @@ Configure different host aliases:
 
 ```ssh-config
 Host android-phone
-    HostName 100.115.27.58
-    User u0_a484
+    HostName 100.100.100.100
+    User u0_a123
     Port 8022
 
 Host android-tablet
-    HostName 100.115.27.59
-    User u0_a485
+    HostName 100.100.100.101
+    User u0_a456
     Port 8022
 ```
 
