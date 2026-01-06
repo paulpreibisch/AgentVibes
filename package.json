@@ -58,6 +58,7 @@
     ".bmad/",
     ".mcp.json",
     "README.md",
+    "RELEASE_NOTES.md",
     "LICENSE",
     "CLAUDE.md"
   ],
