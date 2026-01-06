@@ -421,7 +421,7 @@ async function collectConfiguration(options = {}) {
       });
 
       providerChoices.push({
-        name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Remote Server audio to Android'),
+        name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
         value: 'termux-ssh'
       });
 
@@ -1195,7 +1195,7 @@ async function promptProviderSelection(options) {
 
   // Termux SSH (all platforms)
   choices.push({
-    name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only use if project is on a Remote Server and you want Audio pushed to your Android Device via Termux SSH'),
+    name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
     value: 'termux-ssh',
   });
 
