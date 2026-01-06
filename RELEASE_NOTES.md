@@ -1,5 +1,113 @@
 # AgentVibes Release Notes
 
+## 📦 v2.19.0-alpha.0 - Termux SSH TTS Provider (Alpha)
+
+**Release Date:** January 6, 2026
+
+### 🤖 AI Summary
+
+AgentVibes v2.19.0-alpha.0 introduces the termux-ssh TTS provider, enabling Android device audio output when working on remote servers. This alpha release adds SSH-based TTS routing to Android devices via Termux, comprehensive Tailscale VPN setup documentation, and full MCP server integration. Perfect for developers who want to hear AgentVibes TTS on their phone while working on cloud servers, VPS instances, or remote workstations.
+
+**Key Highlights:**
+- 📱 **Termux SSH Provider** - Route TTS to Android devices via SSH with native Android TTS engine
+- 🌐 **Tailscale Integration** - Comprehensive guide for internet-wide device access without port forwarding
+- 🔧 **Installer Support** - Interactive SSH host configuration with validation
+- 🎯 **MCP Server Ready** - Full compatibility with all MCP commands and workflows
+
+### ✨ New Features
+
+**Termux SSH TTS Provider (`.claude/hooks/play-tts-termux-ssh.sh`):**
+- New TTS provider for Android via SSH connection
+- Routes text to `termux-tts-speak` on remote Android device
+- Configuration priority: env var → project → global
+- Secure quote escaping for safe text transmission
+- 196 lines of fully documented code
+
+**Installer Updates (`src/installer.js`):**
+- Added termux-ssh to provider selection menu
+- Interactive SSH host alias configuration with validation
+- Saves host alias to `.claude/termux-ssh-host.txt`
+- Clear use case description: "Only choose if your project is on a remote server and you want audio sent to your Android device"
+- Documentation link to TERMUX_SETUP.md
+
+**TTS Router Updates (`.claude/hooks/play-tts.sh`):**
+- Added termux-ssh provider routing in two locations
+- Full integration with existing provider detection
+- Supports mixed-provider mode (Piper + Termux)
+
+**MCP Server Integration (`mcp-server/server.py`):**
+- Added termux-ssh to provider validation
+- Provider name mapping: "Termux SSH"
+- JSON schema enum includes termux-ssh
+- Full compatibility with all slash commands
+
+### 📝 Documentation
+
+**New File: `.claude/docs/TERMUX_SETUP.md`**
+- 409 lines of comprehensive setup documentation
+- Prerequisites for Android (Termux, termux-api, openssh)
+- Prerequisites for server/desktop (SSH config)
+- **Tailscale Integration Guide:**
+  - Why Tailscale solves cross-network access
+  - Step-by-step installation (Android + Server)
+  - Benefits comparison table
+  - Example configurations with sanitized IPs
+- Multiple device configuration
+- Custom TTS voices
+- Security considerations
+- Troubleshooting section
+- Architecture diagram
+
+### 🐛 Bug Fixes & Improvements
+
+**Git Log Bug Fix (`src/installer.js`):**
+- Check for .git directory before running git log
+- Prevents showing parent repository commits
+- Falls back to RELEASE_NOTES.md for npm installs
+
+**Documentation IP Sanitization:**
+- All example IPs changed to clearly fake: 100.100.100.x
+- Removed potentially sensitive information
+
+### 🔧 Technical Details
+
+**Files Changed:**
+- `.claude/hooks/play-tts-termux-ssh.sh`: New provider implementation (+196 lines)
+- `.claude/hooks/play-tts.sh`: Added termux-ssh routing (+6 lines)
+- `.claude/docs/TERMUX_SETUP.md`: Complete setup guide (+409 lines)
+- `src/installer.js`: Provider selection + SSH config + git fix (+100 lines)
+- `mcp-server/server.py`: Provider validation updates (+8 lines)
+- `package.json`: Version bump + docs folder inclusion
+- `sonar-project.properties`: Version sync
+
+**Branch:** termux (not yet published to npm)
+
+**Install from GitHub:**
+```bash
+npm install paulpreibisch/AgentVibes#termux
+```
+
+### 📊 Impact
+
+**User Experience:**
+- Work on remote servers while hearing TTS on Android phone
+- No PulseAudio configuration complexity
+- Uses familiar SSH workflow
+- Works from anywhere with Tailscale
+
+**Developer Experience:**
+- Simple SSH host alias configuration
+- Tailscale eliminates network complexity
+- Native Android TTS voices
+- Full MCP integration for all workflows
+
+**Testing Status:**
+- ⚠️ Alpha release - install from GitHub branch for testing
+- Not yet published to npm registry
+- Awaiting user validation before stable release
+
+---
+
 ## 📦 v2.18.0 - Uninstall Command & CI Improvements
 
 **Release Date:** December 30, 2025
