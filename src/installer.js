@@ -629,6 +629,30 @@ async function collectConfiguration(options = {}) {
           currentPage++;
           continue;
         }
+
+      } else if (config.provider === 'termux-ssh') {
+        // Termux SSH - voices are managed on Android device
+        console.log(boxen(
+          chalk.white('Android TTS voices are managed on your Android device.\n\n') +
+          chalk.gray('To configure voices:\n') +
+          chalk.gray('   1. Open Android ') + chalk.cyan('Settings → Accessibility → Text-to-Speech\n') +
+          chalk.gray('   2. Install voice engines from Play Store (e.g., Google TTS)\n') +
+          chalk.gray('   3. Select your preferred engine and voice\n\n') +
+          chalk.yellow('AgentVibes will use your Android\'s selected TTS voice automatically.'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'blue',
+            width: 80
+          }
+        ));
+
+        console.log(chalk.green('\n✓ Android TTS will use device-configured voice\n'));
+
+        // Auto-advance to next page
+        currentPage++;
+        continue;
       }
 
     } else if (currentPage === 3) {
