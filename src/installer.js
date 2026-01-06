@@ -392,9 +392,10 @@ async function collectConfiguration(options = {}) {
         chalk.gray('   • 50+ Hugging Face AI voices\n') +
         chalk.gray('   • Human-like speech quality\n\n') +
         chalk.blue('📱 Termux SSH\n') +
-        chalk.gray('   • Use Android device as speaker\n') +
-        chalk.gray('   • Requires SSH setup\n') +
-        chalk.gray('   • Native Android TTS'),
+        chalk.gray('   • Only use if project is on a Remote Server\n') +
+        chalk.gray('   • Pushes audio to your Android Device via SSH\n') +
+        chalk.gray('   • Native Android TTS\n') +
+        chalk.gray('   • See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
         {
           padding: 1,
           margin: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -420,7 +421,7 @@ async function collectConfiguration(options = {}) {
       });
 
       providerChoices.push({
-        name: chalk.blue('📱 Termux SSH (Android)'),
+        name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Remote Server audio to Android'),
         value: 'termux-ssh'
       });
 
@@ -491,12 +492,14 @@ async function collectConfiguration(options = {}) {
         console.log('\n' + boxen(
           chalk.white('Termux SSH requires an SSH host alias configured in ~/.ssh/config\n') +
           chalk.white('Example: "android" pointing to your Android device\n\n') +
-          chalk.gray('See documentation: .claude/docs/TERMUX_SETUP.md'),
+          chalk.cyan('📖 Documentation:\n') +
+          chalk.gray('   github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md\n') +
+          chalk.gray('   After install: .claude/docs/TERMUX_SETUP.md'),
           {
             padding: 1,
             margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
-            borderColor: 'gray',
+            borderColor: 'blue',
             width: 80
           }
         ));
@@ -1192,7 +1195,7 @@ async function promptProviderSelection(options) {
 
   // Termux SSH (all platforms)
   choices.push({
-    name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Use your Android device as TTS speaker via SSH'),
+    name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only use if project is on a Remote Server and you want Audio pushed to your Android Device via Termux SSH'),
     value: 'termux-ssh',
   });
 
