@@ -657,6 +657,14 @@ async function collectConfiguration(options = {}) {
 
     } else if (currentPage === 3) {
       // Page 4: Audio Settings (Reverb + Background Music)
+      // Skip for termux-ssh - audio effects/background music don't work with SSH text-only TTS
+      if (config.provider === 'termux-ssh') {
+        console.log(chalk.yellow('⊘ Audio effects and background music are not available for Termux SSH provider'));
+        console.log(chalk.gray('   (Audio plays on Android device, not locally)\n'));
+        currentPage++;
+        continue;
+      }
+
       console.log(boxen(
         chalk.white('Configure audio effects and background music for your Agents.\n\n') +
         chalk.yellow('Reverb:\n') +
@@ -3041,11 +3049,15 @@ async function install(options = {}) {
     console.log(header);
     console.log(configBoxen);
     console.log('');
-    console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
+    // Don't show welcome message text for termux-ssh (it won't work)
+    if (userConfig.provider !== 'termux-ssh') {
+      console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
+    }
   }
 
   // Ask welcome message question BEFORE showing navigation
-  if (!options.yes) {
+  // Skip for termux-ssh - welcome audio plays locally, not on Android device
+  if (!options.yes && userConfig.provider !== 'termux-ssh') {
     // Ask if user wants to hear welcome message
     const { playWelcome } = await inquirer.prompt([
       {
@@ -3063,6 +3075,9 @@ async function install(options = {}) {
       spinner.succeed(chalk.green('Welcome message complete!'));
       console.log(''); // Spacing after completion
     }
+  } else if (!options.yes && userConfig.provider === 'termux-ssh') {
+    console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux SSH)\n'));
+  }
 
     // Now show navigation menu (Continue to installation)
     const { startInstall } = await inquirer.prompt([
