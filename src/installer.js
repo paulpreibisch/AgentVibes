@@ -335,6 +335,7 @@ async function collectConfiguration(options = {}) {
   const config = {
     provider: null,
     piperPath: null,
+    sshHost: null,
     defaultVoice: null,
     reverb: 'light',
     backgroundMusic: {
@@ -376,82 +377,73 @@ async function collectConfiguration(options = {}) {
     } else if (currentPage === 1) {
       // Page 2: TTS Provider & Voice Storage
 
-      // On non-macOS platforms, only Piper is available - auto-select it
-      if (process.platform !== 'darwin') {
-        console.log(boxen(
-          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
-          chalk.white('Your TTS Provider:\n\n') +
-          chalk.green('🆓 Piper TTS (Free, Offline)\n') +
-          chalk.gray('   • 50+ Hugging Face AI voices\n') +
-          chalk.gray('   • Human-like speech quality\n') +
-          chalk.gray('   • No API key required\n\n') +
-          chalk.dim('(Automatically selected - only option for Linux/WSL)'),
-          {
-            padding: 1,
-            margin: { top: 0, bottom: 0, left: 0, right: 0 },
-            borderStyle: 'round',
-            borderColor: 'gray',
-            width: 80
-          }
-        ));
+      // Show provider selection with all available options
+      const isMacOS = process.platform === 'darwin';
 
-        config.provider = 'piper';
-
-        // No confirmation needed - just auto-continue
-      } else {
-        // macOS - show choice between macOS Say and Piper
-        console.log(boxen(
-          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
-          chalk.white('Choose your Text-to-Speech provider.\n\n') +
-          chalk.yellow('🍎 macOS Say\n') +
-          chalk.gray('   • Built-in to macOS\n') +
-          chalk.gray('   • Zero setup required\n') +
-          chalk.gray('   • 40+ system voices\n\n') +
-          chalk.green('🆓 Piper TTS\n') +
-          chalk.gray('   • Free & offline\n') +
-          chalk.gray('   • 50+ Hugging Face AI voices\n') +
-          chalk.gray('   • Human-like speech quality'),
-          {
-            padding: 1,
-            margin: { top: 0, bottom: 0, left: 0, right: 0 },
-            borderStyle: 'round',
-            borderColor: 'gray',
-            width: 80
-          }
-        ));
-
-        // Provider selection
-        const providerChoices = [
-          {
-            name: chalk.yellow('🍎 macOS Say (Recommended)'),
-            value: 'macos'
-          },
-          {
-            name: chalk.green('🆓 Piper TTS (Free, Offline)'),
-            value: 'piper'
-          },
-          new inquirer.Separator(),
-          {
-            name: chalk.magentaBright('← Back to Welcome'),
-            value: '__back__'
-          }
-        ];
-
-        const { provider } = await inquirer.prompt([{
-          type: 'list',
-          name: 'provider',
-          message: chalk.yellow('Select TTS provider:'),
-          choices: providerChoices,
-          default: config.provider || 'macos'
-        }]);
-
-        // Check if user wants to go back
-        if (provider === '__back__') {
-          return null;
+      console.log(boxen(
+        chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+        chalk.white('Choose your Text-to-Speech provider.\n\n') +
+        (isMacOS ? chalk.yellow('🍎 macOS Say\n') +
+        chalk.gray('   • Built-in to macOS\n') +
+        chalk.gray('   • Zero setup required\n') +
+        chalk.gray('   • 40+ system voices\n\n') : '') +
+        chalk.green('🆓 Piper TTS\n') +
+        chalk.gray('   • Free & offline\n') +
+        chalk.gray('   • 50+ Hugging Face AI voices\n') +
+        chalk.gray('   • Human-like speech quality\n\n') +
+        chalk.blue('📱 Termux SSH\n') +
+        chalk.gray('   • Use Android device as speaker\n') +
+        chalk.gray('   • Requires SSH setup\n') +
+        chalk.gray('   • Native Android TTS'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'gray',
+          width: 80
         }
+      ));
 
-        config.provider = provider;
+      // Provider selection
+      const providerChoices = [];
+
+      if (isMacOS) {
+        providerChoices.push({
+          name: chalk.yellow('🍎 macOS Say (Recommended)'),
+          value: 'macos'
+        });
       }
+
+      providerChoices.push({
+        name: chalk.green('🆓 Piper TTS (Free, Offline)'),
+        value: 'piper'
+      });
+
+      providerChoices.push({
+        name: chalk.blue('📱 Termux SSH (Android)'),
+        value: 'termux-ssh'
+      });
+
+      providerChoices.push(new inquirer.Separator());
+      providerChoices.push({
+        name: chalk.magentaBright('← Back to Welcome'),
+        value: '__back__'
+      });
+
+      const { provider } = await inquirer.prompt([{
+        type: 'list',
+        name: 'provider',
+        message: chalk.yellow('Select TTS provider:'),
+        choices: providerChoices,
+        default: config.provider || (isMacOS ? 'macos' : 'piper')
+      }]);
+
+      // Check if user wants to go back
+      if (provider === '__back__') {
+        return null;
+      }
+
+      config.provider = provider;
 
       // If Piper selected, ask for voice storage location
       if (config.provider === 'piper') {
@@ -491,6 +483,52 @@ async function collectConfiguration(options = {}) {
           config.piperPath = piperPath;
         } else {
           config.piperPath = defaultPiperPath;
+        }
+      }
+
+      // If Termux SSH selected, ask for SSH host alias
+      if (config.provider === 'termux-ssh') {
+        console.log('\n' + boxen(
+          chalk.white('Termux SSH requires an SSH host alias configured in ~/.ssh/config\n') +
+          chalk.white('Example: "android" pointing to your Android device\n\n') +
+          chalk.gray('See documentation: .claude/docs/TERMUX_SETUP.md'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'gray',
+            width: 80
+          }
+        ));
+
+        const { configureNow } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'configureNow',
+          message: chalk.yellow('Configure SSH host alias now?'),
+          default: false
+        }]);
+
+        if (configureNow) {
+          const { sshHost } = await inquirer.prompt([{
+            type: 'input',
+            name: 'sshHost',
+            message: chalk.yellow('Enter your SSH host alias (e.g., "android"):'),
+            validate: (input) => {
+              if (!input || input.trim() === '') {
+                return 'Please provide a valid SSH host alias';
+              }
+              // Security: Basic validation - no spaces, no special chars that could cause issues
+              if (!/^[a-zA-Z0-9_-]+$/.test(input.trim())) {
+                return 'SSH host alias should only contain letters, numbers, dashes, and underscores';
+              }
+              return true;
+            }
+          }]);
+
+          config.sshHost = sshHost.trim();
+        } else {
+          console.log(chalk.yellow('\n⚠️  SSH host not configured - you can set it later:'));
+          console.log(chalk.gray('   echo "your-host-alias" > ~/.claude/termux-ssh-host.txt\n'));
         }
       }
 
@@ -1116,9 +1154,9 @@ Without the \`.bmad-agent-context\` file:
 // ============================================================================
 
 /**
- * Prompt user to select TTS provider (Piper or macOS Say)
+ * Prompt user to select TTS provider (Piper, macOS Say, or Termux SSH)
  * @param {Object} options - Installation options
- * @returns {Promise<string>} Selected provider ('piper' or 'macos')
+ * @returns {Promise<string>} Selected provider ('piper', 'macos', or 'termux-ssh')
  */
 async function promptProviderSelection(options) {
   const isMacOS = process.platform === 'darwin';
@@ -1133,41 +1171,30 @@ async function promptProviderSelection(options) {
     return 'piper';
   }
 
-  // Auto-select if only one provider available
-  if (!isMacOS) {
-    // On Linux/WSL, only Piper is available - auto-select it
-    console.log(boxen(
-      chalk.bold('🎤 TTS Provider\n\n') +
-      chalk.green('✓ Piper TTS (Free, Offline)\n') +
-      chalk.gray('  50+ Hugging Face AI voices\n') +
-      chalk.gray('  Human-like speech quality\n') +
-      chalk.gray('  No API key required'),
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'green',
-        title: chalk.bold('TTS Provider Auto-detected'),
-        titleAlignment: 'center'
-      }
-    ));
-    console.log('');
-    return 'piper';
-  }
-
-  // On macOS, both providers available - prompt user
+  // Always show all providers - let user choose
   console.log(chalk.cyan('🎭 Choose Your TTS Provider:\n'));
 
-  const choices = [
-    {
+  const choices = [];
+
+  // macOS Say (only on macOS)
+  if (isMacOS) {
+    choices.push({
       name: chalk.yellow('🍎 macOS Say (Recommended)') + chalk.gray(' - Built-in, zero setup required'),
       value: 'macos',
-    },
-    {
-      name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
-      value: 'piper',
-    }
-  ];
+    });
+  }
+
+  // Piper TTS (all platforms)
+  choices.push({
+    name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
+    value: 'piper',
+  });
+
+  // Termux SSH (all platforms)
+  choices.push({
+    name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Use your Android device as TTS speaker via SSH'),
+    value: 'termux-ssh',
+  });
 
   const { provider } = await inquirer.prompt([
     {
@@ -1175,7 +1202,7 @@ async function promptProviderSelection(options) {
       name: 'provider',
       message: 'Which TTS provider would you like to use?',
       choices,
-      default: 'macos',
+      default: isMacOS ? 'macos' : 'piper',
     },
   ]);
 
@@ -1271,6 +1298,53 @@ async function handlePiperConfiguration() {
   return piperPath;
 }
 
+/**
+ * Handle Termux SSH configuration (SSH host alias setup)
+ * @returns {Promise<string|null>} SSH host alias or null if user skips
+ */
+async function handleTermuxSshConfiguration() {
+  console.log(chalk.cyan('\n📱 Termux SSH Configuration:\n'));
+  console.log(chalk.gray('   Termux SSH requires an SSH host alias configured in ~/.ssh/config'));
+  console.log(chalk.gray('   Example: "android" pointing to your Android device\n'));
+  console.log(chalk.gray('   See documentation: .claude/docs/TERMUX_SETUP.md\n'));
+
+  const { configureNow } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'configureNow',
+      message: 'Do you want to configure the SSH host alias now?',
+      default: false,
+    },
+  ]);
+
+  if (!configureNow) {
+    console.log(chalk.yellow('⚠️  SSH host not configured - you can set it later:'));
+    console.log(chalk.gray('   echo "your-host-alias" > ~/.claude/termux-ssh-host.txt\n'));
+    return null;
+  }
+
+  const { sshHost } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'sshHost',
+      message: 'Enter your SSH host alias (e.g., "android"):',
+      validate: (input) => {
+        if (!input || input.trim() === '') {
+          return 'Please provide a valid SSH host alias';
+        }
+        // Basic validation: no spaces, no special chars that could cause issues
+        if (!/^[a-zA-Z0-9_-]+$/.test(input.trim())) {
+          return 'SSH host alias should only contain letters, numbers, dashes, and underscores';
+        }
+        return true;
+      },
+    },
+  ]);
+
+  const sshHostTrimmed = sshHost.trim();
+  console.log(chalk.green(`✓ SSH host alias set to: ${sshHostTrimmed}`));
+  return sshHostTrimmed;
+}
 
 /**
  * Copy command files to target directory
@@ -2827,7 +2901,7 @@ async function install(options = {}) {
   const preInstallPages = [];
 
   // Page 1: Configuration Summary
-  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say' };
+  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say', 'termux-ssh': 'Termux SSH (Android)' };
   const reverbLabels = {
     off: 'Off',
     light: 'Light',
@@ -2846,6 +2920,13 @@ async function install(options = {}) {
   configContent += chalk.white(`   ${providerLabels[selectedProvider]}\n`);
   if (selectedProvider === 'piper' && piperVoicesPath) {
     configContent += chalk.gray(`   Voice storage: ${piperVoicesPath}\n`);
+  }
+  if (selectedProvider === 'termux-ssh') {
+    if (userConfig.sshHost) {
+      configContent += chalk.gray(`   SSH host: ${userConfig.sshHost}\n`);
+    } else {
+      configContent += chalk.yellow(`   SSH host: Not configured (set later)\n`);
+    }
   }
   configContent += '\n';
   configContent += chalk.cyan('🎛️  Audio Settings:\n');
@@ -3023,6 +3104,11 @@ async function install(options = {}) {
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
 
+    if (selectedProvider === 'termux-ssh' && userConfig.sshHost) {
+      const sshHostConfigPath = path.join(claudeDir, 'termux-ssh-host.txt');
+      await fs.writeFile(sshHostConfigPath, userConfig.sshHost);
+    }
+
     // Set default voice based on user selection or provider defaults
     const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
     let defaultVoice = userConfig.defaultVoice;
@@ -3034,6 +3120,12 @@ async function install(options = {}) {
           defaultVoice = 'en_US-ryan-high';
           break;
         case 'macos':
+          defaultVoice = 'Samantha';
+          break;
+        case 'termux-ssh':
+          // Android TTS voices are managed in Android settings, not here
+          defaultVoice = 'android-system-default';
+          break;
         default:
           defaultVoice = 'Samantha';
           break;
