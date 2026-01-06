@@ -228,6 +228,9 @@ class AgentVibesServer:
             elif "macOS" in provider:
                 provider_label = "macOS TTS"
                 alternative_provider = "Piper"
+            elif "Termux" in provider or "Android" in provider:
+                provider_label = "Termux SSH (Android)"
+                alternative_provider = "Piper"
             else:
                 provider_label = "TTS"
                 alternative_provider = None
@@ -343,22 +346,27 @@ class AgentVibesServer:
 
     async def set_provider(self, provider: str) -> str:
         """
-        Switch TTS provider between Piper and macOS.
+        Switch TTS provider between Piper, macOS, and Termux SSH.
 
         Args:
-            provider: Provider name ("piper" or "macos")
+            provider: Provider name ("piper", "macos", or "termux-ssh")
 
         Returns:
             Success or error message
         """
         provider = provider.lower()
-        if provider not in ["piper", "macos"]:
-            return f"❌ Invalid provider: {provider}. Choose 'piper' or 'macos'"
+        if provider not in ["piper", "macos", "termux-ssh"]:
+            return f"❌ Invalid provider: {provider}. Choose 'piper', 'macos', or 'termux-ssh'"
 
         result = await self._run_script("provider-manager.sh", ["switch", provider])
         if result and "✓" in result:
             # Automatically speak confirmation in the new provider's voice
-            provider_name = "macOS" if provider == "macos" else "Piper"
+            if provider == "macos":
+                provider_name = "macOS"
+            elif provider == "termux-ssh":
+                provider_name = "Termux SSH"
+            else:
+                provider_name = "Piper"
             confirmation_text = f"Successfully switched to {provider_name} provider"
 
             try:
@@ -798,6 +806,8 @@ class AgentVibesServer:
                     return "macOS TTS"
                 elif provider == "piper":
                     return "Piper TTS (Free, Offline)"
+                elif provider == "termux-ssh":
+                    return "Termux SSH (Android)"
                 return provider
         except (PermissionError, UnicodeDecodeError, OSError) as e:
             # Log error but don't crash - return default
@@ -931,14 +941,14 @@ Examples:
         ),
         Tool(
             name="set_provider",
-            description="Switch between macOS TTS and Piper (free, offline) TTS providers",
+            description="Switch between TTS providers: macOS TTS, Piper (free, offline), or Termux SSH (Android)",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "provider": {
                         "type": "string",
-                        "description": "Provider name: 'piper' or 'macos'",
-                        "enum": ["piper", "macos"]
+                        "description": "Provider name: 'piper', 'macos', or 'termux-ssh'",
+                        "enum": ["piper", "macos", "termux-ssh"]
                     }
                 },
                 "required": ["provider"],
