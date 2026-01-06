@@ -48,6 +48,7 @@
     ".claude/output-styles/",
     ".claude/audio/tracks/",
     ".claude/config/",
+    ".claude/docs/",
     ".claude/language-voices.yaml",
     ".claude/settings.json",
     ".claude/activation-instructions",
