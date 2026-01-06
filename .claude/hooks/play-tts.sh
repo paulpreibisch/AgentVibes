@@ -148,6 +148,9 @@ speak_text() {
     macos)
       "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
       ;;
+    termux-ssh)
+      "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
+      ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
       return 1
@@ -263,6 +266,9 @@ case "$ACTIVE_PROVIDER" in
     ;;
   macos)
     exec "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  termux-ssh)
+    exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER"
