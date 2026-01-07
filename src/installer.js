@@ -3079,20 +3079,19 @@ async function install(options = {}) {
     console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux SSH)\n'));
   }
 
-    // Now show navigation menu (Continue to installation)
-    const { startInstall } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'startInstall',
-        message: chalk.yellow('✅ Start Installation?'),
-        default: true,
-      },
-    ]);
+  // Now show navigation menu (Continue to installation)
+  const { startInstall } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'startInstall',
+      message: chalk.yellow('✅ Start Installation?'),
+      default: true,
+    },
+  ]);
 
-    if (!startInstall) {
-      console.log(chalk.red('\n❌ Installation cancelled.\n'));
-      process.exit(0);
-    }
+  if (!startInstall) {
+    console.log(chalk.red('\n❌ Installation cancelled.\n'));
+    process.exit(0);
   }
 
   // User already confirmed by pressing "Start Installation", so no need for another confirmation

@@ -237,6 +237,70 @@ def test_play_tts_mute_check():
         return False
 
 
+def test_set_provider():
+    """Test set_provider MCP functionality"""
+    print("\nTesting set_provider MCP functionality...")
+    try:
+        from server import AgentVibesServer
+        import asyncio
+        from pathlib import Path
+
+        server = AgentVibesServer()
+
+        # Test provider switching for all three providers
+        async def run_tests():
+            # Test 1: Switch to piper
+            result = await server.set_provider("piper")
+            assert "✓" in result or "switched" in result.lower(), f"Expected success switching to piper, got: {result}"
+            print("✅ Test 1: Successfully switched to piper")
+
+            # Test 2: Switch to macos
+            result = await server.set_provider("macos")
+            assert "✓" in result or "switched" in result.lower(), f"Expected success switching to macos, got: {result}"
+            print("✅ Test 2: Successfully switched to macos")
+
+            # Test 3: Switch to termux-ssh
+            result = await server.set_provider("termux-ssh")
+            assert "✓" in result or "switched" in result.lower(), f"Expected success switching to termux-ssh, got: {result}"
+            print("✅ Test 3: Successfully switched to termux-ssh")
+
+            # Test 4: Invalid provider should fail
+            result = await server.set_provider("invalid-provider")
+            assert "❌" in result or "Invalid" in result or "Error" in result, f"Expected error for invalid provider, got: {result}"
+            print("✅ Test 4: Correctly rejected invalid provider")
+
+            # Test 5: Case insensitivity
+            result = await server.set_provider("PIPER")
+            assert "✓" in result or "switched" in result.lower(), f"Expected success with uppercase PIPER, got: {result}"
+            print("✅ Test 5: Case-insensitive provider switching works")
+
+            # Test 6: Verify provider file was written
+            provider_file = server.claude_dir / "tts-provider.txt"
+            if not provider_file.exists():
+                provider_file = Path.home() / ".claude" / "tts-provider.txt"
+
+            if provider_file.exists():
+                provider_content = provider_file.read_text().strip()
+                assert provider_content == "piper", f"Expected provider file to contain 'piper', got: {provider_content}"
+                print("✅ Test 6: Provider file correctly written")
+            else:
+                print("⚠️  Test 6: Provider file not found (may be in project dir)")
+
+        asyncio.run(run_tests())
+
+        print("✅ All set_provider tests passed")
+        return True
+
+    except AssertionError as e:
+        print(f"❌ Assertion failed: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ set_provider test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Run all tests"""
     print("=" * 60)
@@ -249,6 +313,7 @@ def main():
         ("Helper Methods", test_helper_methods),
         ("Mute/Unmute Functionality", test_mute_unmute),
         ("play-tts.sh Mute Detection", test_play_tts_mute_check),
+        ("set_provider MCP Function", test_set_provider),
     ]
 
     results = []
