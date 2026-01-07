@@ -370,10 +370,16 @@ class AgentVibesServer:
             confirmation_text = f"Successfully switched to {provider_name} provider"
 
             try:
-                # Speak the confirmation (ignoring the TTS result details)
-                await self.text_to_speech(confirmation_text)
+                # Speak the confirmation with 5 second timeout to prevent hanging
+                await asyncio.wait_for(
+                    self.text_to_speech(confirmation_text),
+                    timeout=5.0
+                )
                 # Return the provider switch result plus TTS confirmation
                 return f"{result}\n🔊 Spoken confirmation: {confirmation_text}"
+            except asyncio.TimeoutError:
+                # Timeout - provider may need setup (e.g., Piper not installed)
+                return f"{result}\n⚠️ Provider switched (TTS confirmation timed out - provider may need setup)"
             except Exception as e:
                 # If TTS fails, still return success for the provider switch
                 return f"{result}\n⚠️ Provider switched but TTS confirmation failed: {e}"
