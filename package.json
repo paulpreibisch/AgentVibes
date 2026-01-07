@@ -34,6 +34,7 @@
   "files": [
     "bin/",
     "src/",
+    "templates/",
     "mcp-server/*.py",
     "mcp-server/*.js",
     "mcp-server/*.md",
