@@ -8,12 +8,14 @@ argument-hint: [patch|minor|major]
 Prepares a new AgentVibes release with AI-generated release notes.
 
 This command:
-1. Analyzes all changes since the last release
-2. Generates an intelligent summary using Claude AI
-3. Creates/updates RELEASE_NOTES.md
-4. Bumps the version
-5. Commits everything
-6. Ready for you to push
+1. **Runs full test suite** - MUST pass before proceeding ✅
+2. **Validates Sonar quality gates** - MUST pass before proceeding ✅
+3. Analyzes all changes since the last release
+4. Generates an intelligent summary using Claude AI
+5. Creates/updates RELEASE_NOTES.md
+6. Bumps the version
+7. Commits everything
+8. Ready for you to push
 
 ## Usage
 
@@ -61,5 +63,36 @@ all 27 tests pass consistently across different environments.
 ```
 
 ## Implementation
+
+When executing this command, Claude MUST follow these steps in order:
+
+1. **Run Test Suite** (MANDATORY FIRST STEP):
+   - Execute `npm test` (which runs syntax validation, BATS tests, and coverage tests)
+   - If ANY tests fail, STOP immediately and report the failures
+   - Do NOT proceed with any release operations if tests fail
+   - Example output: "🧪 Running tests... ✅ All 213 BATS tests passed, ✅ All 38 Node tests passed"
+
+2. **Validate Sonar Quality Gates** (MANDATORY SECOND STEP):
+   - Check all bash scripts for `set -euo pipefail` (strict mode)
+   - Verify no hardcoded credentials in code
+   - Validate proper variable quoting in bash scripts
+   - Check for input validation and error handling
+   - Review any new or modified files for security issues
+   - If ANY quality gate fails, STOP immediately and report the issues
+   - Example output: "🛡️ Validating quality gates... ✅ All Sonar requirements met"
+   - **Note**: Document any known minor issues (like missing strict mode in legacy scripts) if they existed before this release
+
+3. **Analyze Changes**: Git log since last tag, examine diffs
+4. **Generate RELEASE_NOTES.md**: AI-generated summary with categorized changes
+5. **Bump package.json**: Use npm version (patch/minor/major)
+6. **Commit changes**: RELEASE_NOTES.md and package.json
+7. **Ready for push**: User must manually push to master
+
+### Critical Points
+
+- **ALWAYS run tests first** - Never proceed if tests fail
+- **ALWAYS validate Sonar quality gates** - Never proceed if quality checks fail
+- **Extract content from RELEASE_NOTES.md** - Don't make up new content
+- **Document any security exceptions** - If known issues exist from before this release, document them
 
 !bash .claude/hooks/prepare-release.sh $ARGUMENTS

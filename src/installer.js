@@ -494,7 +494,12 @@ async function collectConfiguration(options = {}) {
           chalk.white('Example: "android" pointing to your Android device\n\n') +
           chalk.cyan('📖 Documentation:\n') +
           chalk.gray('   github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md\n') +
-          chalk.gray('   After install: .claude/docs/TERMUX_SETUP.md'),
+          chalk.gray('   After install: .claude/docs/TERMUX_SETUP.md\n\n') +
+          chalk.cyan('🔗 Required Components:\n') +
+          chalk.gray('   • Tailscale VPN: ') + chalk.blue('https://tailscale.com/download/android\n') +
+          chalk.gray('   • F-Droid Store: ') + chalk.blue('https://f-droid.org\n') +
+          chalk.gray('   • Termux App: ') + chalk.blue('https://f-droid.org/packages/com.termux\n') +
+          chalk.gray('   • Termux:API: ') + chalk.blue('https://f-droid.org/packages/com.termux.api'),
           {
             padding: 1,
             margin: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -1343,6 +1348,11 @@ async function handleTermuxSshConfiguration() {
   console.log(chalk.gray('   Termux SSH requires an SSH host alias configured in ~/.ssh/config'));
   console.log(chalk.gray('   Example: "android" pointing to your Android device\n'));
   console.log(chalk.gray('   See documentation: .claude/docs/TERMUX_SETUP.md\n'));
+  console.log(chalk.cyan('   🔗 Required Components:\n'));
+  console.log(chalk.gray('   • Tailscale VPN: ') + chalk.blue('https://tailscale.com/download/android'));
+  console.log(chalk.gray('   • F-Droid Store: ') + chalk.blue('https://f-droid.org'));
+  console.log(chalk.gray('   • Termux App: ') + chalk.blue('https://f-droid.org/packages/com.termux'));
+  console.log(chalk.gray('   • Termux:API: ') + chalk.blue('https://f-droid.org/packages/com.termux.api\n'));
 
   const { configureNow } = await inquirer.prompt([
     {
