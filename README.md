@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.18.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.0.0
 
 ---
 
@@ -115,15 +115,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v2.18.0 - Uninstall Command & CI Improvements](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.18.0)** 🗑️
+**[v3.0.0 - Cross-Platform Remote Audio: Termux SSH Provider](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.0.0)** 📱
 
-AgentVibes v2.18.0 introduces a comprehensive uninstall command that makes it easy to cleanly remove AgentVibes from your projects. The new `agentvibes uninstall` command provides interactive confirmation, flexible removal options (project-level, global, or complete including Piper TTS), and clear documentation. This release also improves CI test reliability by adjusting timeouts for slower build environments, ensuring more consistent test results across different systems.
+AgentVibes v3.0.0 introduces the termux-ssh TTS provider, enabling **true mobile-first interactive conversations with Claude Code**. Route TTS audio to your Android device via SSH—whether coding locally on your laptop or on remote servers—and have hands-free, voice-driven conversations with Claude using just your phone. This major release includes comprehensive Tailscale VPN setup documentation for internet-wide access, full MCP server integration, and transforms how developers interact with AI assistants. Perfect for developers who want to experience AI conversations naturally through their mobile device while their hands stay on the keyboard.
 
 **Key Highlights:**
-- 🗑️ **Comprehensive Uninstall Command** - New `agentvibes uninstall` with interactive confirmation and preview of what will be removed
-- 🎛️ **Flexible Removal Options** - Support for `--yes` (auto-confirm), `--global` (remove global config), and `--with-piper` (remove TTS engine) flags
-- 📚 **Complete Documentation** - New uninstall section in README with examples, options, and what gets removed at each level
-- 🧪 **Improved CI Reliability** - Increased party-mode TTS test timeout from 10s to 15s for slower CI systems
+- 📱 **Mobile-First AI Conversations** - Have fully interactive, hands-free conversations with Claude Code using just your Android device
+- 💻 **Local + Remote Development** - Works for both local coding (laptop → phone audio) and remote server development
+- 🌐 **Tailscale Integration** - Comprehensive guide for internet-wide device access without port forwarding or firewall configuration
+- 🎥 **Demo Video** - Watch it in action: [Mobile-First AI Conversations](https://youtu.be/ngLiA_KQtTA?si=wTwS4CJidIxWqLIP)
+- 🎯 **Full MCP Compatibility** - Complete integration with all MCP commands and workflows
+- 🛡️ **Quality Gates Integration** - Automated security validation in release process
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

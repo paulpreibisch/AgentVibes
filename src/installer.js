@@ -901,18 +901,19 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v2.19.0-alpha.0 - Termux SSH TTS Provider (Alpha)\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.0.0 - Cross-Platform Remote Audio\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v2.19.0-alpha.0 introduces the termux-ssh TTS provider, enabling Android\n') +
-    chalk.cyan('device audio output when working on remote servers. This alpha release adds SSH-based\n') +
-    chalk.cyan('TTS routing to Android devices via Termux, comprehensive Tailscale VPN setup documentation,\n') +
-    chalk.cyan('and full MCP server integration. Perfect for developers who want to hear AgentVibes TTS\n') +
-    chalk.cyan('on their phone while working on cloud servers, VPS instances, or remote workstations.\n\n') +
+    chalk.cyan('AgentVibes v3.0.0 introduces the termux-ssh TTS provider, enabling true mobile-first\n') +
+    chalk.cyan('interactive conversations with Claude Code. Route TTS audio to your Android device via\n') +
+    chalk.cyan('SSH—whether coding locally on your laptop or on remote servers—and have hands-free,\n') +
+    chalk.cyan('voice-driven conversations with Claude using just your phone. Transforms how developers\n') +
+    chalk.cyan('interact with AI assistants.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   📱 Termux SSH Provider - Route TTS to Android devices via SSH with native Android TTS\n') +
-    chalk.gray('   🌐 Tailscale Integration - Comprehensive guide for internet-wide device access\n') +
-    chalk.gray('   🔧 Installer Support - Interactive SSH host configuration with validation\n') +
-    chalk.gray('   🎯 MCP Server Ready - Full compatibility with all MCP commands and workflows\n\n') +
+    chalk.gray('   📱 Mobile-First AI Conversations - Fully interactive conversations with Claude Code\n') +
+    chalk.gray('   💻 Local + Remote Development - Works for local coding and remote server development\n') +
+    chalk.gray('   🌐 Tailscale Integration - Internet-wide access without port forwarding\n') +
+    chalk.gray('   🎥 Demo Video - Watch it in action: https://youtu.be/ngLiA_KQtTA\n') +
+    chalk.gray('   🎯 Full MCP Compatibility - Complete integration with all MCP workflows\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
