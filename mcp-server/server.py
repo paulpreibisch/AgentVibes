@@ -349,20 +349,22 @@ class AgentVibesServer:
         Switch TTS provider between Piper, macOS, and Termux SSH.
 
         Args:
-            provider: Provider name ("piper", "macos", or "termux-ssh")
+            provider: Provider name ("piper", "macos", "termux", or "termux-ssh")
 
         Returns:
             Success or error message
         """
         provider = provider.lower()
-        if provider not in ["piper", "macos", "termux-ssh"]:
-            return f"❌ Invalid provider: {provider}. Choose 'piper', 'macos', or 'termux-ssh'"
+        if provider not in ["piper", "macos", "termux", "termux-ssh"]:
+            return f"❌ Invalid provider: {provider}. Choose 'piper', 'macos', 'termux', or 'termux-ssh'"
 
         result = await self._run_script("provider-manager.sh", ["switch", provider])
         if result and "✓" in result:
             # Automatically speak confirmation in the new provider's voice
             if provider == "macos":
                 provider_name = "macOS"
+            elif provider == "termux":
+                provider_name = "Termux"
             elif provider == "termux-ssh":
                 provider_name = "Termux SSH"
             else:
@@ -812,8 +814,10 @@ class AgentVibesServer:
                     return "macOS TTS"
                 elif provider == "piper":
                     return "Piper TTS (Free, Offline)"
+                elif provider == "termux":
+                    return "Termux (Local Android)"
                 elif provider == "termux-ssh":
-                    return "Termux SSH (Android)"
+                    return "Termux SSH (Remote Android)"
                 return provider
         except (PermissionError, UnicodeDecodeError, OSError) as e:
             # Log error but don't crash - return default
@@ -947,14 +951,14 @@ Examples:
         ),
         Tool(
             name="set_provider",
-            description="Switch between TTS providers: macOS TTS, Piper (free, offline), or Termux SSH (Android)",
+            description="Switch between TTS providers: macOS TTS, Piper (free, offline), Termux (local Android), or Termux SSH (remote Android)",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "provider": {
                         "type": "string",
-                        "description": "Provider name: 'piper', 'macos', or 'termux-ssh'",
-                        "enum": ["piper", "macos", "termux-ssh"]
+                        "description": "Provider name: 'piper', 'macos', 'termux', or 'termux-ssh'",
+                        "enum": ["piper", "macos", "termux", "termux-ssh"]
                     }
                 },
                 "required": ["provider"],

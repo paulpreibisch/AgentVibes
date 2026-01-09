@@ -408,6 +408,9 @@ async function collectConfiguration(options = {}) {
       // Provider selection
       const providerChoices = [];
 
+      // Detect if running in Termux environment
+      const isTermux = process.env.PREFIX && process.env.PREFIX.includes('/com.termux/');
+
       if (isMacOS) {
         providerChoices.push({
           name: chalk.yellow('🍎 macOS Say (Recommended)'),
@@ -420,8 +423,16 @@ async function collectConfiguration(options = {}) {
         value: 'piper'
       });
 
+      // Add Termux local option if running on Android
+      if (isTermux) {
+        providerChoices.push({
+          name: chalk.blue('📱 Termux (Local Android)') + chalk.gray(' - Recommended - Uses native Android TTS locally'),
+          value: 'termux'
+        });
+      }
+
       providerChoices.push({
-        name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
+        name: chalk.blue('📱 Termux SSH (Remote Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
         value: 'termux-ssh'
       });
 
@@ -635,8 +646,8 @@ async function collectConfiguration(options = {}) {
           continue;
         }
 
-      } else if (config.provider === 'termux-ssh') {
-        // Termux SSH - voices are managed on Android device
+      } else if (config.provider === 'termux-ssh' || config.provider === 'termux') {
+        // Termux SSH or local Termux - voices are managed on Android device
         console.log(boxen(
           chalk.white('Android TTS voices are managed on your Android device.\n\n') +
           chalk.gray('To configure voices:\n') +
@@ -662,10 +673,10 @@ async function collectConfiguration(options = {}) {
 
     } else if (currentPage === 3) {
       // Page 4: Audio Settings (Reverb + Background Music)
-      // Skip for termux-ssh - audio effects/background music don't work with SSH text-only TTS
-      if (config.provider === 'termux-ssh') {
-        console.log(chalk.yellow('⊘ Audio effects and background music are not available for Termux SSH provider'));
-        console.log(chalk.gray('   (Audio plays on Android device, not locally)\n'));
+      // Skip for termux providers - audio effects/background music don't work with Android TTS
+      if (config.provider === 'termux-ssh' || config.provider === 'termux') {
+        console.log(chalk.yellow('⊘ Audio effects and background music are not available for Termux providers'));
+        console.log(chalk.gray('   (Audio plays on Android device using native TTS)\n'));
         currentPage++;
         continue;
       }
@@ -1202,9 +1213,14 @@ Without the \`.bmad-agent-context\` file:
  */
 async function promptProviderSelection(options) {
   const isMacOS = process.platform === 'darwin';
+  const isTermux = process.env.PREFIX && process.env.PREFIX.includes('/com.termux/');
 
   if (options.yes) {
     // Free-first approach: Always use free providers with --yes flag
+    if (isTermux) {
+      console.log(chalk.green('✓ Using Termux (local Android TTS, zero setup)\n'));
+      return 'termux';
+    }
     if (isMacOS) {
       console.log(chalk.green('✓ Using macOS Say (built-in, zero setup)\n'));
       return 'macos';
@@ -1232,11 +1248,27 @@ async function promptProviderSelection(options) {
     value: 'piper',
   });
 
+  // Termux local (only show on Android)
+  if (isTermux) {
+    choices.push({
+      name: chalk.blue('📱 Termux (Local Android)') + chalk.gray(' - Recommended - Native Android TTS when running Claude Code locally in Termux'),
+      value: 'termux',
+    });
+  }
+
   // Termux SSH (all platforms)
   choices.push({
-    name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
+    name: chalk.blue('📱 Termux SSH (Remote Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
     value: 'termux-ssh',
   });
+
+  // Set smart default based on platform
+  let defaultProvider = 'piper';
+  if (isTermux) {
+    defaultProvider = 'termux';
+  } else if (isMacOS) {
+    defaultProvider = 'macos';
+  }
 
   const { provider } = await inquirer.prompt([
     {
@@ -1244,7 +1276,7 @@ async function promptProviderSelection(options) {
       name: 'provider',
       message: 'Which TTS provider would you like to use?',
       choices,
-      default: isMacOS ? 'macos' : 'piper',
+      default: defaultProvider,
     },
   ]);
 
@@ -2957,7 +2989,7 @@ async function install(options = {}) {
   const preInstallPages = [];
 
   // Page 1: Configuration Summary
-  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say', 'termux-ssh': 'Termux SSH (Android)' };
+  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say', termux: 'Termux (Local Android)', 'termux-ssh': 'Termux SSH (Remote Android)' };
   const reverbLabels = {
     off: 'Off',
     light: 'Light',
@@ -3060,15 +3092,15 @@ async function install(options = {}) {
     console.log(header);
     console.log(configBoxen);
     console.log('');
-    // Don't show welcome message text for termux-ssh (it won't work)
-    if (userConfig.provider !== 'termux-ssh') {
+    // Don't show welcome message text for termux providers (it won't work well)
+    if (userConfig.provider !== 'termux-ssh' && userConfig.provider !== 'termux') {
       console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
     }
   }
 
   // Ask welcome message question BEFORE showing navigation
-  // Skip for termux-ssh - welcome audio plays locally, not on Android device
-  if (!options.yes && userConfig.provider !== 'termux-ssh') {
+  // Skip for termux providers - welcome audio plays locally, not on Android device
+  if (!options.yes && userConfig.provider !== 'termux-ssh' && userConfig.provider !== 'termux') {
     // Ask if user wants to hear welcome message
     const { playWelcome } = await inquirer.prompt([
       {
@@ -3086,8 +3118,8 @@ async function install(options = {}) {
       spinner.succeed(chalk.green('Welcome message complete!'));
       console.log(''); // Spacing after completion
     }
-  } else if (!options.yes && userConfig.provider === 'termux-ssh') {
-    console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux SSH)\n'));
+  } else if (!options.yes && (userConfig.provider === 'termux-ssh' || userConfig.provider === 'termux')) {
+    console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux providers)\n'));
   }
 
   // Now show navigation menu (Continue to installation)
@@ -3184,6 +3216,7 @@ async function install(options = {}) {
         case 'macos':
           defaultVoice = 'Samantha';
           break;
+        case 'termux':
         case 'termux-ssh':
           // Android TTS voices are managed in Android settings, not here
           defaultVoice = 'android-system-default';
