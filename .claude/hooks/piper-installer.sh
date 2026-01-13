@@ -58,6 +58,23 @@ echo ""
 PLATFORM="$(uname -s)"
 ARCH="$(uname -m)"
 
+# Check if running on Termux/Android first
+if [[ -d "/data/data/com.termux" ]]; then
+  echo "📱 Detected Termux/Android"
+  echo ""
+  echo "   Termux requires a special installation process using proot-distro."
+  echo "   Running Termux-specific installer..."
+  echo ""
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$SCRIPT_DIR/termux-installer.sh" ]]; then
+    exec "$SCRIPT_DIR/termux-installer.sh" "$@"
+  else
+    echo "❌ Error: termux-installer.sh not found"
+    echo "   Please download it from the AgentVibes repository"
+    exit 1
+  fi
+fi
+
 # Check if running on macOS, WSL, or Linux
 if [[ "$PLATFORM" == "Darwin" ]]; then
   IS_MACOS=true

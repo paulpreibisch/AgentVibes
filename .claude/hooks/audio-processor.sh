@@ -306,13 +306,15 @@ main() {
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
     # Temporary files (using explicit paths to avoid unbound variable issues)
+    # Use Termux-compatible temp directory
+    local TEMP_DIR="${TMPDIR:-/data/data/com.termux/files/usr/tmp}"
     local temp_effects
     local temp_final
-    temp_effects="/tmp/agentvibes-effects-$$.wav"
-    temp_final="/tmp/agentvibes-final-$$.wav"
+    temp_effects="$TEMP_DIR/agentvibes-effects-$$.wav"
+    temp_final="$TEMP_DIR/agentvibes-final-$$.wav"
 
     # Clean up on exit using explicit paths
-    trap 'rm -f /tmp/agentvibes-effects-'"$$"'.wav /tmp/agentvibes-final-'"$$"'.wav' EXIT
+    trap 'rm -f "'"$TEMP_DIR"'/agentvibes-effects-'"$$"'.wav" "'"$TEMP_DIR"'/agentvibes-final-'"$$"'.wav"' EXIT
 
     # Step 1: Apply sox effects
     if [[ -n "$sox_effects" ]]; then
