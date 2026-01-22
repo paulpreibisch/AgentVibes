@@ -306,8 +306,15 @@ main() {
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
     # Temporary files (using explicit paths to avoid unbound variable issues)
-    # Use Termux-compatible temp directory
-    local TEMP_DIR="${TMPDIR:-/data/data/com.termux/files/usr/tmp}"
+    # Use Termux-compatible temp directory if on Termux, otherwise standard /tmp
+    local TEMP_DIR
+    if [[ -d "/data/data/com.termux" ]]; then
+        # On Termux
+        TEMP_DIR="${TMPDIR:-${PREFIX}/tmp}"
+    else
+        # Standard Linux/macOS
+        TEMP_DIR="${TMPDIR:-/tmp}"
+    fi
     local temp_effects
     local temp_final
     temp_effects="$TEMP_DIR/agentvibes-effects-$$.wav"
