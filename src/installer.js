@@ -72,6 +72,27 @@ const packageJson = JSON.parse(
 const VERSION = packageJson.version;
 
 /**
+ * Detect if running on Android/Termux environment
+ * @returns {boolean} True if running on Termux/Android
+ */
+function isTermux() {
+  return fsSync.existsSync('/data/data/com.termux');
+}
+
+/**
+ * Detect if running on Android/Termux and display message
+ * @returns {boolean} True if running on Termux/Android
+ */
+function detectAndNotifyTermux() {
+  if (isTermux()) {
+    console.log(chalk.green('\n📱 Android environment detected!'));
+    console.log(chalk.cyan('   Installing specialized libraries for Termux...\n'));
+    return true;
+  }
+  return false;
+}
+
+/**
  * Create header and footer for installer pages
  * @param {string} pageTitle - Title of current page
  * @param {number} currentPage - Current page number (0-indexed, relative to section)
@@ -345,10 +366,23 @@ async function collectConfiguration(options = {}) {
     verbosity: 'high'
   };
 
+  // Detect Android/Termux environment
+  const isAndroid = isTermux();
+  if (isAndroid) {
+    detectAndNotifyTermux();
+  }
+
   if (options.yes) {
     // Non-interactive mode - use defaults
-    config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
-    config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
+    // On Termux, always use piper (via proot-distro)
+    if (isAndroid) {
+      config.provider = 'piper';
+      config.defaultVoice = 'en_US-lessac-medium';
+      config.isTermux = true;
+    } else {
+      config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
+      config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
+    }
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
     return config;
@@ -2101,7 +2135,14 @@ async function checkAndInstallPiper(targetDir, options) {
       }
 
       if (installPiper) {
-        console.log(chalk.cyan('\n📦 Installing Piper TTS...\n'));
+        // Check if we're on Termux/Android
+        if (isTermux()) {
+          console.log(chalk.green('\n📱 Android environment detected!'));
+          console.log(chalk.cyan('📦 Installing Piper TTS with Termux-specific setup...\n'));
+          console.log(chalk.gray('   This will install proot-distro and set up Piper in a Debian environment.\n'));
+        } else {
+          console.log(chalk.cyan('\n📦 Installing Piper TTS...\n'));
+        }
         const piperInstallerPath = path.join(targetDir, '.claude', 'hooks', 'piper-installer.sh');
 
         try {
@@ -2114,13 +2155,19 @@ async function checkAndInstallPiper(targetDir, options) {
           console.log(chalk.yellow('\n⚠️  Piper installation failed or was cancelled'));
           console.log(chalk.gray('   You can install it later by running:'));
           console.log(chalk.cyan(`   ${piperInstallerPath}`));
-          console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+          if (isTermux()) {
+            console.log(chalk.gray('   On Termux, this will use proot-distro for installation.\n'));
+          } else {
+            console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+          }
         }
       } else {
         console.log(chalk.yellow('\n⚠️  Skipping Piper installation'));
         console.log(chalk.gray('   You can install it later by running:'));
         console.log(chalk.cyan(`   ${targetDir}/.claude/hooks/piper-installer.sh`));
-        console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+        if (!isTermux()) {
+          console.log(chalk.gray('   Or manually: pipx install piper-tts\n'));
+        }
       }
     }
   } catch (error) {

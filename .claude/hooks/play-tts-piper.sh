@@ -400,6 +400,10 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
     # macOS: Use afplay (native macOS audio player)
     afplay "$TEMP_FILE" >/dev/null 2>&1 &
     PLAYER_PID=$!
+  elif [[ -n "${TERMUX_VERSION:-}" ]] || [[ -d "/data/data/com.termux" ]]; then
+    # Android/Termux: Use termux-media-player
+    termux-media-player play "$TEMP_FILE" >/dev/null 2>&1 &
+    PLAYER_PID=$!
   else
     # Linux/WSL: Prefer paplay (PulseAudio) for best WSL audio quality
     (paplay "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
