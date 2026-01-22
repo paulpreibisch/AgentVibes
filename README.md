@@ -22,6 +22,7 @@
 | **Install AgentVibes** (just `npx`, no git!) | [Quick Start Guide](docs/quick-start.md) |
 | **Understand what I need** (spoiler: just Node.js!) | [Prerequisites](#-prerequisites) |
 | **Set up on Windows (Claude Desktop)** | [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) |
+| **Run Claude Code on Android** | [Android/Termux Setup](#-android--termux) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
 | **Learn Spanish while coding** | [Language Learning Mode](docs/language-learning-mode.md) |
@@ -318,6 +319,85 @@ Then follow Linux requirements above inside WSL.
 - AgentVibes uses bash scripts extensively
 - Audio routing from WSL to Windows requires PulseAudio configuration
 - See [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) for detailed audio setup
+
+#### 🤖 Android / Termux
+
+**Running Claude Code on Your Android Using Termux**
+
+AgentVibes fully supports Android devices through the [Termux app](https://termux.dev/). This enables you to run Claude Code with professional TTS voices directly on your Android phone or tablet!
+
+**Quick Setup:**
+
+```bash
+# 1. Install Termux from F-Droid (NOT Google Play - it's outdated)
+# Download: https://f-droid.org/en/packages/com.termux/
+
+# 2. Install Node.js in Termux
+pkg update && pkg upgrade
+pkg install nodejs-lts
+
+# 3. Install AgentVibes (auto-detects Android and runs Termux installer)
+npx agentvibes install
+```
+
+**What Gets Installed?**
+
+The Termux installer automatically sets up:
+- **proot-distro** with Debian (for glibc compatibility)
+- **Piper TTS** via proot wrapper (Android uses bionic libc, not glibc)
+- **termux-media-player** for audio playback (`paplay` doesn't work on Android)
+- **Audio dependencies**: ffmpeg, sox, bc for processing
+- **termux-api** for Android-specific audio routing
+
+**Why Termux Instead of Standard Installation?**
+
+Android's architecture requires special handling:
+- ❌ Standard pip/pipx fails (missing wheels for bionic libc)
+- ❌ Linux binaries require glibc (Android uses bionic)
+- ❌ `/tmp` directory is not accessible on Android
+- ❌ Standard audio tools like `paplay` don't exist
+
+✅ Termux installer solves all these issues with proot-distro and Android-native audio playback!
+
+**Requirements:**
+- [Termux app](https://f-droid.org/en/packages/com.termux/) (from F-Droid, NOT Google Play)
+- [Termux:API](https://f-droid.org/en/packages/com.termux.api/) (for audio playback)
+- Android 7.0+ (recommended: Android 10+)
+- ~500MB free storage (for Piper TTS + voice models)
+
+**Audio Playback:**
+- Uses `termux-media-player` instead of `paplay`
+- Audio automatically routes through Android's media system
+- Supports all Piper TTS voices (50+ languages)
+
+**Verifying Your Setup:**
+
+```bash
+# Check Termux environment
+echo $PREFIX               # Should show /data/data/com.termux/files/usr
+
+# Check Node.js
+node --version             # Should be ≥16.0
+
+# Check if Piper is installed
+which piper                # Should return /data/data/com.termux/files/usr/bin/piper
+
+# Test audio playback
+termux-media-player play /path/to/audio.wav
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| "piper: not found" | Run `npx agentvibes install` - auto-detects Termux |
+| No audio playback | Install Termux:API from F-Droid |
+| Permission denied | Run `termux-setup-storage` to grant storage access |
+| Slow installation | Use WiFi, not mobile data (~300MB download) |
+
+**Why F-Droid and Not Google Play?**
+
+Google Play's Termux version is outdated and unsupported. Always use the [F-Droid version](https://f-droid.org/en/packages/com.termux/) for the latest security updates and compatibility.
 
 ### TTS Provider Requirements
 
