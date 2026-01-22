@@ -1,5 +1,145 @@
 # AgentVibes Release Notes
 
+## 📦 v3.1.0 - Android Native Support: Run Claude Code on Your Phone
+
+**Release Date:** January 22, 2026
+
+### 🎯 Why v3.1.0?
+
+This minor release brings **native Android support** to AgentVibes, enabling developers to run Claude Code with professional TTS voices directly on Android devices via Termux. No SSH required, no remote server needed—just install Termux on your Android phone or tablet and get the full AgentVibes experience locally. This complements the v3.0.0 termux-ssh provider by offering a **complete mobile development solution**: use native Termux for local Android development, or use termux-ssh when connecting to remote servers.
+
+### 🤖 AI Summary
+
+AgentVibes v3.1.0 introduces native Android/Termux support, enabling developers to run Claude Code with professional TTS voices directly on their Android devices. Through automatic detection and a specialized installer, AgentVibes now runs Piper TTS via proot-distro with Debian (solving Android's glibc compatibility issues), uses termux-media-player for audio playback, and includes comprehensive Android-specific documentation. Perfect for developers who want to code on-the-go with their Android phone or tablet using the full power of Claude Code and AgentVibes.
+
+**Key Highlights:**
+- 🤖 **Native Android Support** - Run Claude Code with TTS directly on Android devices via Termux
+- 📦 **Automatic Termux Detection** - AgentVibes auto-detects Android and runs specialized installation
+- 🎯 **Proot-Distro Integration** - Solves glibc compatibility with proot Debian environment
+- 🔊 **Android Audio Playback** - Uses termux-media-player for native Android audio routing
+- 📚 **Comprehensive Documentation** - Complete Android setup guide with troubleshooting and F-Droid instructions
+- ✅ **Full Test Coverage** - All 213 BATS + 38 Node tests passing with Android compatibility
+
+### ✨ New Features
+
+**Termux Installer (`.claude/hooks/termux-installer.sh`):**
+- New 224-line installer specifically for Android/Termux environments
+- Automatically installs proot-distro with Debian (for glibc compatibility)
+- Downloads and configures Piper TTS binary in proot environment
+- Creates `/usr/bin/piper` wrapper that routes through proot
+- Installs audio dependencies: ffmpeg, sox, bc, termux-api
+- Interactive voice selection with 50+ language options
+- Validates Termux environment before proceeding
+
+**Termux Detection (`src/installer.js`):**
+- New `isTermux()` function checks for `/data/data/com.termux` directory
+- New `detectAndNotifyTermux()` displays Android detection messages
+- Auto-configures piper provider with Termux-compatible voice
+- Shows Termux-specific installation instructions
+- Piper installer automatically redirects to termux-installer.sh on Android
+
+**Audio Processor Updates (`.claude/hooks/audio-processor.sh`):**
+- Detects Termux environment for temp directory selection
+- Uses `${PREFIX}/tmp` on Termux, `/tmp` on standard systems
+- Ensures audio effects work correctly on Android
+- Cross-platform compatibility maintained
+
+**Piper Installer Updates (`.claude/hooks/piper-installer.sh`):**
+- Auto-detects Termux and redirects to specialized installer
+- Shows clear message when routing to Termux-specific setup
+
+**Android Audio Playback (`.claude/hooks/play-tts-piper.sh`):**
+- Detects Android/Termux environment
+- Uses `termux-media-player` instead of `paplay` on Android
+- Audio routes through Android's native media system
+
+### 📚 Documentation
+
+**New Android Setup Section (`README.md`):**
+- Added "🤖 Android / Termux" section to System Requirements
+- Complete 3-step installation guide for Android devices
+- Explanation of why Termux needs special handling (bionic vs glibc)
+- Requirements: Termux app from F-Droid, Termux:API, Android 7.0+
+- Audio playback architecture explanation
+- Setup verification commands
+- Troubleshooting table for common issues
+- Clear explanation of why F-Droid version is required (not Google Play)
+- Updated Quick Links table with direct link to Android setup
+
+### 🐛 Bug Fixes
+
+- **Test #90 Fix** - Added termux-ssh provider to test cleanup list for "no providers found" edge case
+- **Temp Directory Detection** - Fixed audio-processor.sh defaulting to Termux paths on non-Termux systems
+- **Sonar Compliance** - Added `set -euo pipefail` strict mode to termux-installer.sh for security
+
+### 🔒 Security & Quality
+
+- ✅ All Sonar quality gates validated
+- ✅ Strict mode (`set -euo pipefail`) on all new bash scripts
+- ✅ No hardcoded credentials
+- ✅ Proper variable quoting and input validation
+- ✅ Cross-platform temp directory handling
+- ✅ All 213 BATS + 38 Node tests passing
+
+### 📊 Changes Summary
+
+- **Files Modified:** 7
+- **Lines Added:** +391
+- **Lines Removed:** -8
+- **New Files:** 1 (termux-installer.sh)
+- **Commits:** 8 (5 fixes, 1 feature, 1 docs, 1 merge)
+
+### 🎯 User Impact
+
+**For Android Users:**
+- Can now run Claude Code directly on Android phones/tablets
+- Full TTS support with 50+ voices and languages
+- No remote server required for basic usage
+- Works offline after initial voice downloads
+
+**For Developers:**
+- Complete mobile development solution (native + SSH)
+- Native Termux for local Android development
+- Termux-SSH provider for remote server connections
+- Seamless integration with existing AgentVibes workflows
+
+**For Existing Users:**
+- Zero breaking changes
+- All existing features work exactly the same
+- New Android support is opt-in via Termux installation
+
+### 🚀 Migration Notes
+
+No migration required! This is a fully backward-compatible minor release.
+
+**To Try Android Support:**
+1. Install [Termux from F-Droid](https://f-droid.org/en/packages/com.termux/)
+2. Install [Termux:API](https://f-droid.org/en/packages/com.termux.api/)
+3. In Termux: `pkg install nodejs-lts`
+4. Run: `npx agentvibes install`
+
+AgentVibes will auto-detect Termux and run the specialized installer.
+
+### 📦 Full Changelog
+
+**Feature Commits:**
+- `e9d4cf95` feat: Add Android/Termux support for Piper TTS
+
+**Bug Fix Commits:**
+- `aa4d3cdd` fix: Add termux-ssh provider to test #90 cleanup list
+- `c1b00c6d` fix: Use termux-media-player for audio playback on Android
+- `f96ab89a` fix: Properly detect Termux environment for temp directory
+- `e2efeb06` fix: Add strict mode to termux-installer.sh for Sonar compliance
+
+**Documentation Commits:**
+- `701a9412` docs: Add comprehensive Android/Termux setup section to README
+
+**Merge Commits:**
+- `a5d3f546` Merge feature/android-termux into master
+- `95f04e70` Merge origin/master into feature/pulseaudio-reverse-tunnel
+
+---
+
 ## 📦 v3.0.0 - Cross-Platform Remote Audio: Termux SSH Provider
 
 **Release Date:** January 8, 2026
@@ -48,252 +188,3 @@ See the termux-ssh provider in action—fully interactive, hands-free conversati
 - Supports mixed-provider mode (Piper + Termux)
 
 **MCP Server Integration (`mcp-server/server.py`):**
-- Added termux-ssh to provider validation
-- Provider name mapping: "Termux SSH"
-- JSON schema enum includes termux-ssh
-- Full compatibility with all slash commands
-
-### 📝 Documentation
-
-**New File: `.claude/docs/TERMUX_SETUP.md`**
-- 409 lines of comprehensive setup documentation
-- Prerequisites for Android (Termux, termux-api, openssh)
-- Prerequisites for server/desktop (SSH config)
-- **Tailscale Integration Guide:**
-  - Why Tailscale solves cross-network access
-  - Step-by-step installation (Android + Server)
-  - Benefits comparison table
-  - Example configurations with sanitized IPs
-- Multiple device configuration
-- Custom TTS voices
-- Security considerations
-- Troubleshooting section
-- Architecture diagram
-
-### 🐛 Bug Fixes & Improvements
-
-**Git Log Bug Fix (`src/installer.js`):**
-- Check for .git directory before running git log
-- Prevents showing parent repository commits
-- Falls back to RELEASE_NOTES.md for npm installs
-
-**Provider Timeout Fix:**
-- Added timeout to set_provider TTS confirmation to prevent hanging
-- Improves user experience when switching providers
-
-**NPM Package Improvements:**
-- Include templates/ directory in npm package for welcome audio
-- Include RELEASE_NOTES.md in npm package
-- Include .claude/docs/ directory for setup guides
-- Syntax validation added to test suite
-
-**Documentation IP Sanitization:**
-- All example IPs changed to clearly fake: 100.100.100.x
-- Removed potentially sensitive information from examples
-
-**Audio Effects Handling:**
-- Skip audio effects for termux-ssh provider (mobile devices)
-- Skip welcome message for termux-ssh to reduce initial setup noise
-- Optimize mobile experience with appropriate defaults
-
-**Release Process Quality Gates:**
-- Integrated Sonar quality gate validation into /release command
-- Automated test suite execution before all releases
-- Security validation for bash scripts and JavaScript code
-
-### 🔧 Technical Details
-
-**Files Changed:**
-- `.claude/hooks/play-tts-termux-ssh.sh`: New provider implementation (+196 lines)
-- `.claude/hooks/play-tts.sh`: Added termux-ssh routing (+6 lines)
-- `.claude/docs/TERMUX_SETUP.md`: Complete setup guide (+409 lines)
-- `src/installer.js`: Provider selection + SSH config + git fix (+100 lines)
-- `mcp-server/server.py`: Provider validation updates (+8 lines)
-- `package.json`: Version bump + docs folder inclusion
-- `sonar-project.properties`: Version sync
-
-**Installation:**
-```bash
-npx agentvibes@latest install
-```
-
-### 📊 Impact
-
-**User Experience:**
-- Work on remote servers while hearing TTS on Android phone
-- No PulseAudio or complex audio forwarding configuration
-- Uses familiar SSH workflow
-- Works from anywhere in the world with Tailscale VPN
-- True location-independent development experience
-
-**Developer Experience:**
-- Simple SSH host alias configuration via installer
-- Tailscale eliminates network complexity, NAT traversal, and port forwarding
-- Native Android TTS voices with language support
-- Full MCP integration for all workflows
-- Seamless provider switching between local (Piper/macOS) and remote (termux-ssh)
-
-**Use Cases:**
-- 🎙️ **Interactive Mobile Conversations** - Have true back-and-forth conversations with Claude Code using just your Android phone (no computer speakers needed)
-- 💻 **Local Development with Mobile Audio** - Code on your laptop/desktop but hear and interact with Claude via your phone
-- ☁️ **Remote Server Development** - Work on cloud servers, VPS, or corporate servers with audio delivered to your mobile device anywhere in the world
-- 🚶 **Mobile-First Workflow** - Walk around while conversing with Claude, freed from your workstation
-- 🎧 **Private Conversations** - Use phone earbuds for private AI interactions in shared workspaces
-- ♿ **Enhanced Accessibility** - Hands-free voice interaction with AI while maintaining visual focus on code
-- 📱 **Distributed Teams** - Team members can hear Claude updates on their phones regardless of location or network
-
----
-
-## 📦 v2.18.0 - Uninstall Command & CI Improvements
-
-**Release Date:** December 30, 2025
-
-### 🤖 AI Summary
-
-AgentVibes v2.18.0 introduces a comprehensive uninstall command that makes it easy to cleanly remove AgentVibes from your projects. The new `agentvibes uninstall` command provides interactive confirmation, flexible removal options (project-level, global, or complete including Piper TTS), and clear documentation. This release also improves CI test reliability by adjusting timeouts for slower build environments, ensuring more consistent test results across different systems.
-
-**Key Highlights:**
-- 🗑️ **Comprehensive Uninstall Command** - New `agentvibes uninstall` with interactive confirmation and preview of what will be removed
-- 🎛️ **Flexible Removal Options** - Support for `--yes` (auto-confirm), `--global` (remove global config), and `--with-piper` (remove TTS engine) flags
-- 📚 **Complete Documentation** - New uninstall section in README with examples, options, and what gets removed at each level
-- 🧪 **Improved CI Reliability** - Increased party-mode TTS test timeout from 10s to 15s for slower CI systems
-
-### ✨ New Features
-
-**Uninstall Command (`src/installer.js`):**
-- Added `agentvibes uninstall` command with ~194 lines of new functionality
-- Interactive confirmation prompt (skippable with `--yes` flag)
-- Preview display showing exactly what will be removed before uninstalling
-- Project-level uninstall (default): Removes `.claude/`, `.agentvibes/` directories
-- Global uninstall (with `--global`): Also removes `~/.claude/`, `~/.agentvibes/`
-- Complete uninstall (with `--with-piper`): Also removes `~/piper/` TTS engine
-- Safety check: Verifies installation exists before proceeding
-- Colored output with spinner, progress indicators, and feedback prompts
-- Helpful messaging with reinstall instructions and feedback link
-
-### 📝 Documentation
-
-**README.md:**
-- Added new "🗑️ Uninstalling" section to Table of Contents
-- Complete uninstall documentation with:
-  - Quick uninstall command: `npx agentvibes uninstall`
-  - All command options with descriptions
-  - Clear breakdown of what gets removed at each level (project/global/Piper)
-  - Tips and best practices
-  - Reinstall instructions
-
-### 🐛 Bug Fixes & Improvements
-
-**Test Reliability (`test/unit/party-mode-tts.bats`):**
-- Increased timeout for party mode multi-agent TTS test from 10s to 15s
-- Accommodates slower CI systems while still catching real performance issues
-- Updated test comment to explain the timeout adjustment
-
-### 🔧 Technical Details
-
-**Files Changed:**
-- `README.md`: Added uninstall documentation section (+56 lines)
-- `src/installer.js`: Implemented uninstall command (+194 lines)
-- `test/unit/party-mode-tts.bats`: Adjusted timeout for CI compatibility (+2 lines, -2 lines)
-
-**Command Usage:**
-```bash
-# Interactive uninstall (confirms before removing)
-npx agentvibes uninstall
-
-# Auto-confirm (skip confirmation prompt)
-npx agentvibes uninstall --yes
-
-# Also remove global configuration
-npx agentvibes uninstall --global
-
-# Complete uninstall including Piper TTS
-npx agentvibes uninstall --global --with-piper
-```
-
-### 📊 Impact
-
-**User Experience:**
-- Users can now cleanly uninstall AgentVibes at their preferred scope
-- Clear visibility into what will be removed before taking action
-- Safety confirmation prevents accidental uninstalls
-- Easy reinstallation path with `npx agentvibes install`
-
-**Developer Experience:**
-- More reliable CI builds with adjusted test timeouts
-- Better test failure signal-to-noise ratio
-- Clearer test comments explaining timeout rationale
-
----
-
-## 📦 v2.17.9 - Documentation Accuracy Update
-
-**Release Date:** December 20, 2024
-
-### 🤖 AI Summary
-
-AgentVibes v2.17.9 is a documentation accuracy release that removes all outdated ElevenLabs references and updates documentation to reflect the current architecture. This release corrects the voice library documentation (removing fake piper.io URLs), updates provider documentation to accurately describe Piper TTS and macOS Say (removing references to the no-longer-supported ElevenLabs provider), and completely rewrites the technical deep dive to reflect the current startup hook architecture instead of the deprecated output styles system.
-
-**Key Highlights:**
-- 📚 **Voice Library Accuracy** - Replaced fake voice URLs with actual Piper TTS voice names and accurate language support (18+ languages)
-- 🔧 **Provider Documentation** - Removed ElevenLabs section, added macOS Say provider details, corrected feature comparison tables
-- 🏗️ **Architecture Update** - Technical deep dive rewritten: "Output Style System" → "Startup Hook Protocol", updated from 4 to 3 core systems
-- ✅ **Code Example Accuracy** - All code snippets now match current implementation (Piper TTS local generation, macOS Say integration)
-
-### 📝 Documentation Updates
-
-**docs/voice-library.md:**
-- Removed fake "piper.io/voice-library" URLs (formatted like old ElevenLabs links)
-- Updated from "30+ languages" to accurate "18+ languages"
-- Replaced character voice list with actual Piper voice names (en_US-lessac-medium, en_GB-alan-medium, etc.)
-- Added commands to preview and list voices
-
-**docs/providers.md:**
-- Removed entire "Piper TTS (Premium AI Voices)" section with ElevenLabs references
-- Added "macOS Say (Built-in, Free)" provider section
-- Updated provider comparison table: Piper TTS vs macOS Say (was incorrectly "Piper TTS vs Piper TTS")
-- Removed outdated pricing information ($0-99/month)
-- Removed API key requirements
-- Updated recommendations for cross-platform vs macOS-specific use cases
-
-**docs/technical-deep-dive.md** (Major Rewrite):
-- Architecture: Changed from "4 Core Systems" to "3 Core Systems" (removed Output Style System)
-- System 1: "Output Style System" → "Startup Hook Protocol"
-  - Explained how `.claude/hooks/startup.sh` injects TTS instructions
-  - Removed references to `.claude/output-styles/agent-vibes.md`
-  - Added actual startup hook code examples
-- Provider Implementation:
-  - Removed fake ElevenLabs API curl examples
-  - Removed SSH audio conversion (MP3→OGG, only needed for API streaming)
-  - Added macOS Say provider implementation with actual code
-  - Updated Piper implementation to show local voice generation
-- Data Flow: Updated all examples to use startup hook instead of output style
-- Installation: Removed `output-styles/` from directory structure, added `startup.sh`
-- Performance: Updated latency numbers (removed API latency, added local generation times)
-- Error Handling: "API Failure Handling" → "TTS Generation Failure Handling"
-- Updated voice references from "150+ voices" to "50+ neural voices"
-- Changed default voice from "Aria" to "en_GB-alan-medium"
-
-### 🐛 Bug Fixes
-
-**macOS Installation (src/installer.js):**
-- Fixed Python installation on macOS to handle PEP 668 externally-managed environments
-- Added `--break-system-packages` flag for Python dependencies when virtual environments aren't available
-- Prevents installation failures on macOS systems with externally-managed Python
-- Maintains compatibility with standard Python environments
-
-### 🔧 Technical Details
-
-**Files Changed:**
-- `docs/voice-library.md`: Voice name and language accuracy
-- `docs/providers.md`: Provider documentation overhaul
-- `docs/technical-deep-dive.md`: Complete architecture rewrite
-- `src/installer.js`: macOS Python dependency handling
-
-### 📊 Impact
-
-This release ensures that all documentation accurately reflects the current AgentVibes architecture. No functionality was changed, but users will find:
-- Accurate voice names and language support
-- Correct provider information for making informed choices
-- Technical documentation matching the actual codebase
-- Better macOS installation reliability

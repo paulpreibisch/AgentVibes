@@ -935,19 +935,20 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.0.0 - Cross-Platform Remote Audio\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.1.0 - Android Native Support\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.0.0 introduces the termux-ssh TTS provider, enabling true mobile-first\n') +
-    chalk.cyan('interactive conversations with Claude Code. Route TTS audio to your Android device via\n') +
-    chalk.cyan('SSH—whether coding locally on your laptop or on remote servers—and have hands-free,\n') +
-    chalk.cyan('voice-driven conversations with Claude using just your phone. Transforms how developers\n') +
-    chalk.cyan('interact with AI assistants.\n\n') +
+    chalk.cyan('AgentVibes v3.1.0 introduces native Android/Termux support, enabling developers to run\n') +
+    chalk.cyan('Claude Code with professional TTS voices directly on their Android devices. Through\n') +
+    chalk.cyan('automatic detection and a specialized installer, AgentVibes now runs Piper TTS via\n') +
+    chalk.cyan('proot-distro with Debian, uses termux-media-player for audio playback, and includes\n') +
+    chalk.cyan('comprehensive Android-specific documentation. Perfect for developers who want to code\n') +
+    chalk.cyan('on-the-go with their Android phone or tablet.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   📱 Mobile-First AI Conversations - Fully interactive conversations with Claude Code\n') +
-    chalk.gray('   💻 Local + Remote Development - Works for local coding and remote server development\n') +
-    chalk.gray('   🌐 Tailscale Integration - Internet-wide access without port forwarding\n') +
-    chalk.gray('   🎥 Demo Video - Watch it in action: https://youtu.be/ngLiA_KQtTA\n') +
-    chalk.gray('   🎯 Full MCP Compatibility - Complete integration with all MCP workflows\n\n') +
+    chalk.gray('   🤖 Native Android Support - Run Claude Code with TTS directly on Android devices\n') +
+    chalk.gray('   📦 Automatic Termux Detection - AgentVibes auto-detects Android environments\n') +
+    chalk.gray('   🎯 Proot-Distro Integration - Solves glibc compatibility issues on Android\n') +
+    chalk.gray('   🔊 Android Audio Playback - Uses termux-media-player for native audio routing\n') +
+    chalk.gray('   📚 Comprehensive Documentation - Complete Android setup guide with troubleshooting\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
