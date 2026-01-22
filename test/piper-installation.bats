@@ -26,13 +26,18 @@ setup() {
   # Copy necessary files for installation
   cp -r "$BATS_TEST_DIRNAME/../.claude" "$TEST_PROJECT_DIR/"
 
-  # Expected voice models
+  # Expected voice models (must match COMMON_VOICES in piper-download-voices.sh)
   export EXPECTED_VOICES=(
     "en_US-lessac-medium"
     "en_US-amy-medium"
-    "en_US-joe-medium"
     "en_US-ryan-high"
-    "en_US-libritts-high"
+    "en_US-hfc_female-medium"
+    "en_US-danny-low"
+    "en_US-bryce-medium"
+    "en_US-kathleen-low"
+    "en_US-kusal-medium"
+    "en_US-kristin-medium"
+    "en_US-libritts_r-high"
     "16Speakers"
   )
 }
