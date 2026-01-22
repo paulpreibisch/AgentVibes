@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.0.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.1.0
 
 ---
 
@@ -116,17 +116,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.0.0 - Cross-Platform Remote Audio: Termux SSH Provider](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.0.0)** 📱
+**[v3.1.0 - Android Native Support: Run Claude Code on Your Phone](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.1.0)** 🤖
 
-AgentVibes v3.0.0 introduces the termux-ssh TTS provider, enabling **true mobile-first interactive conversations with Claude Code**. Route TTS audio to your Android device via SSH—whether coding locally on your laptop or on remote servers—and have hands-free, voice-driven conversations with Claude using just your phone. This major release includes comprehensive Tailscale VPN setup documentation for internet-wide access, full MCP server integration, and transforms how developers interact with AI assistants. Perfect for developers who want to experience AI conversations naturally through their mobile device while their hands stay on the keyboard.
+AgentVibes v3.1.0 introduces native Android/Termux support, enabling developers to run Claude Code with professional TTS voices directly on their Android devices. Through automatic detection and a specialized installer, AgentVibes now runs Piper TTS via proot-distro with Debian (solving Android's glibc compatibility issues), uses termux-media-player for audio playback, and includes comprehensive Android-specific documentation. Perfect for developers who want to code on-the-go with their Android phone or tablet using the full power of Claude Code and AgentVibes.
 
 **Key Highlights:**
-- 📱 **Mobile-First AI Conversations** - Have fully interactive, hands-free conversations with Claude Code using just your Android device
-- 💻 **Local + Remote Development** - Works for both local coding (laptop → phone audio) and remote server development
-- 🌐 **Tailscale Integration** - Comprehensive guide for internet-wide device access without port forwarding or firewall configuration
-- 🎥 **Demo Video** - Watch it in action: [Mobile-First AI Conversations](https://youtu.be/ngLiA_KQtTA?si=wTwS4CJidIxWqLIP)
-- 🎯 **Full MCP Compatibility** - Complete integration with all MCP commands and workflows
-- 🛡️ **Quality Gates Integration** - Automated security validation in release process
+- 🤖 **Native Android Support** - Run Claude Code with TTS directly on Android devices via Termux
+- 📦 **Automatic Termux Detection** - AgentVibes auto-detects Android and runs specialized installation
+- 🎯 **Proot-Distro Integration** - Solves glibc compatibility with proot Debian environment
+- 🔊 **Android Audio Playback** - Uses termux-media-player for native Android audio routing
+- 📚 **Comprehensive Documentation** - Complete Android setup guide with troubleshooting and F-Droid instructions
+- ✅ **Full Test Coverage** - All 213 BATS + 38 Node tests passing with Android compatibility
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
