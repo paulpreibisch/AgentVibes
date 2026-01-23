@@ -3965,6 +3965,7 @@ program
     program.outputHelp();
   });
 
+/* c8 ignore start - CLI entry point, tested via subprocess */
 // Only run CLI if this file is being executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   program.parse(process.argv);
@@ -3975,6 +3976,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     program.outputHelp();
   }
 }
+/* c8 ignore stop */
 
 // Export functions for testing
 export { isTermux, detectAndNotifyTermux };
