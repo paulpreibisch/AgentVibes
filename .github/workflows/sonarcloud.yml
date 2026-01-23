@@ -38,6 +38,19 @@ jobs:
         env:
           AGENTVIBES_TEST_MODE: true
 
+      - name: Verify coverage file exists
+        run: |
+          echo "Checking for coverage file..."
+          if [ -f coverage/lcov.info ]; then
+            echo "✅ coverage/lcov.info exists"
+            echo "File size: $(wc -l < coverage/lcov.info) lines"
+            echo "First 20 lines:"
+            head -20 coverage/lcov.info
+          else
+            echo "❌ coverage/lcov.info NOT FOUND"
+            ls -la coverage/ || echo "coverage/ directory does not exist"
+          fi
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@ba3875ecf642b2129de2b589510c81a8b53dbf4e # master as of 2025-12-08
         env:
