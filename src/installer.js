@@ -3965,10 +3965,16 @@ program
     program.outputHelp();
   });
 
-program.parse(process.argv);
+// Only run CLI if this file is being executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  program.parse(process.argv);
 
-// Show help if no command provided
-if (process.argv.slice(2).length === 0) {
-  showWelcome();
-  program.outputHelp();
+  // Show help if no command provided
+  if (process.argv.slice(2).length === 0) {
+    showWelcome();
+    program.outputHelp();
+  }
 }
+
+// Export functions for testing
+export { isTermux, detectAndNotifyTermux };
