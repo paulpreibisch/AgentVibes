@@ -32,9 +32,17 @@ jobs:
       - name: Install BATS
         run: sudo npm install -g bats
 
-      - name: Run tests with coverage
-        run: npm test
+      - name: Install sox for audio tests
+        run: sudo apt-get update && sudo apt-get install -y sox
+
+      - name: Run BATS tests
+        run: npm run test:syntax && AGENTVIBES_TEST_MODE=true bats test/unit/*.bats
         continue-on-error: true  # Don't fail the workflow if tests fail
+        env:
+          AGENTVIBES_TEST_MODE: true
+
+      - name: Generate coverage report
+        run: npm run test:coverage
         env:
           AGENTVIBES_TEST_MODE: true
 
