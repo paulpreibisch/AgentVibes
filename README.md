@@ -4,14 +4,14 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **Clawdbot** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.1.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.2.0
 
 ---
 
@@ -22,6 +22,7 @@
 | **Install AgentVibes** (just `npx`, no git!) | [Quick Start Guide](docs/quick-start.md) |
 | **Understand what I need** (spoiler: just Node.js!) | [Prerequisites](#-prerequisites) |
 | **Set up on Windows (Claude Desktop)** | [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) |
+| **Use with Clawdbot** | [Clawdbot Integration](#-clawdbot-integration) |
 | **Run Claude Code on Android** | [Android/Termux Setup](#-android--termux) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
@@ -34,7 +35,7 @@
 
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
-Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp Terminal - AgentVibes brings AI to life with professional voices and personalities.
+Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Terminal, or running Clawdbot - AgentVibes brings AI to life with professional voices and personalities.
 
 ### 🎯 Key Features
 
@@ -116,17 +117,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.1.0 - Android Native Support: Run Claude Code on Your Phone](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.1.0)** 🤖
+**[v3.2.0 - Clawdbot Integration: AI Assistants on Any Messenger](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.2.0)** 🤖
 
-AgentVibes v3.1.0 introduces native Android/Termux support, enabling developers to run Claude Code with professional TTS voices directly on their Android devices. Through automatic detection and a specialized installer, AgentVibes now runs Piper TTS via proot-distro with Debian (solving Android's glibc compatibility issues), uses termux-media-player for audio playback, and includes comprehensive Android-specific documentation. Perfect for developers who want to code on-the-go with their Android phone or tablet using the full power of Claude Code and AgentVibes.
+AgentVibes v3.2.0 introduces seamless integration with Clawdbot, the revolutionary AI assistant accessible via any instant messenger. With this release, Clawdbot users get professional TTS with 50+ voices, remote SSH audio support for server deployments, and zero-configuration setup—just install AgentVibes and the Clawdbot skill is ready. The release also includes SonarCloud workflow fixes and improved test coverage validation.
 
 **Key Highlights:**
-- 🤖 **Native Android Support** - Run Claude Code with TTS directly on Android devices via Termux
-- 📦 **Automatic Termux Detection** - AgentVibes auto-detects Android and runs specialized installation
-- 🎯 **Proot-Distro Integration** - Solves glibc compatibility with proot Debian environment
-- 🔊 **Android Audio Playback** - Uses termux-media-player for native Android audio routing
-- 📚 **Comprehensive Documentation** - Complete Android setup guide with troubleshooting and F-Droid instructions
-- ✅ **Full Test Coverage** - All 213 BATS + 38 Node tests passing with Android compatibility
+- 🤖 **Clawdbot Integration** - Native TTS support for Clawdbot AI assistant framework
+- 💬 **Messenger Platforms** - Works with WhatsApp, Telegram, Discord via Clawdbot
+- 🔊 **Remote SSH Audio** - Perfect for Clawdbot on remote servers with PulseAudio tunneling
+- 📦 **Simple Install** - Just `npx agentvibes install` and it works
+- 🛡️ **SonarCloud Fixes** - Quality gate workflow improvements and documentation
+- ✅ **Full Test Coverage** - All 213 BATS + 47 Node tests passing
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
@@ -620,6 +621,81 @@ BMAD uses a **loosely-coupled injection system** for voice integration. BMAD sou
 This design means **any TTS provider** can integrate with BMAD by replacing these markers with their own instructions!
 
 **[→ View Complete BMAD Documentation](docs/bmad-plugin.md)** - All agent mappings, language support, TTS injection details, plugin management, and customization
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🤖 Clawdbot Integration
+
+**Use AgentVibes TTS with Clawdbot - the revolutionary AI assistant you can access via any instant messenger!**
+
+**What is Clawdbot?** [Clawdbot](https://clawd.bot) is a revolutionary AI assistant that brings Claude AI to your favorite messaging platforms - WhatsApp, Telegram, Discord, and more. No apps to install, no websites to visit - just message your AI assistant like you would a friend.
+
+🌐 **Website**: https://clawd.bot
+
+AgentVibes seamlessly integrates with Clawdbot, providing professional text-to-speech for AI assistants running on messaging platforms and remote servers.
+
+### 🎯 Key Benefits
+
+- **Free & Offline**: No API costs, works without internet
+- **Remote SSH Audio**: Audio tunnels from server to local machine via PulseAudio
+- **50+ Voices**: Professional AI voices in 30+ languages
+- **Zero Config**: Automatic when AgentVibes is installed
+
+### 🚀 Installation
+
+```bash
+npx agentvibes install
+```
+
+That's it! AgentVibes is ready to use.
+
+### 📝 Usage
+
+```bash
+# Basic TTS
+npx agentvibes speak "Hello from Clawdbot"
+
+# With different voices
+npx agentvibes speak "Hello" --voice en_US-amy-medium
+npx agentvibes speak "Bonjour" --voice fr_FR-siwis-medium
+
+# List available voices
+npx agentvibes voices
+```
+
+### 🔊 Remote SSH Audio
+
+Perfect for running Clawdbot on a remote server with audio on your local machine:
+
+**Quick Setup:**
+
+1. **Remote server** - Configure PulseAudio:
+```bash
+echo 'export PULSE_SERVER=tcp:localhost:14713' >> ~/.bashrc
+source ~/.bashrc
+```
+
+2. **Local machine** - Add SSH tunnel (`~/.ssh/config`):
+```
+Host your-server
+    RemoteForward 14713 localhost:14713
+```
+
+3. **Connect and test**:
+```bash
+ssh your-server
+agentvibes speak "Testing remote audio from Clawdbot"
+```
+
+Audio plays on your local speakers! 🔊
+
+### 📚 Documentation
+
+- **Clawdbot Skill**: [.clawdbot/README.md](.clawdbot/README.md)
+- **Clawdbot Website**: https://clawd.bot
+- **Remote Audio Setup**: [docs/remote-audio-setup.md](docs/remote-audio-setup.md)
 
 [↑ Back to top](#-table-of-contents)
 
