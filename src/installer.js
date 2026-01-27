@@ -935,20 +935,18 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.1.0 - Android Native Support\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.2.0 - Clawdbot Integration\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.1.0 introduces native Android/Termux support, enabling developers to run\n') +
-    chalk.cyan('Claude Code with professional TTS voices directly on their Android devices. Through\n') +
-    chalk.cyan('automatic detection and a specialized installer, AgentVibes now runs Piper TTS via\n') +
-    chalk.cyan('proot-distro with Debian, uses termux-media-player for audio playback, and includes\n') +
-    chalk.cyan('comprehensive Android-specific documentation. Perfect for developers who want to code\n') +
-    chalk.cyan('on-the-go with their Android phone or tablet.\n\n') +
+    chalk.cyan('AgentVibes v3.2.0 introduces seamless integration with Clawdbot, the revolutionary AI\n') +
+    chalk.cyan('assistant accessible via any instant messenger. With this release, Clawdbot users get\n') +
+    chalk.cyan('professional TTS with 50+ voices, remote SSH audio support for server deployments, and\n') +
+    chalk.cyan('zero-configuration setup—just install AgentVibes and the Clawdbot skill is ready.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🤖 Native Android Support - Run Claude Code with TTS directly on Android devices\n') +
-    chalk.gray('   📦 Automatic Termux Detection - AgentVibes auto-detects Android environments\n') +
-    chalk.gray('   🎯 Proot-Distro Integration - Solves glibc compatibility issues on Android\n') +
-    chalk.gray('   🔊 Android Audio Playback - Uses termux-media-player for native audio routing\n') +
-    chalk.gray('   📚 Comprehensive Documentation - Complete Android setup guide with troubleshooting\n\n') +
+    chalk.gray('   🤖 Clawdbot Integration - Native TTS support for Clawdbot AI assistant framework\n') +
+    chalk.gray('   💬 Messenger Platforms - Works with WhatsApp, Telegram, Discord via Clawdbot\n') +
+    chalk.gray('   🔊 Remote SSH Audio - Perfect for Clawdbot on remote servers with PulseAudio\n') +
+    chalk.gray('   📦 Simple Install - Just `npx agentvibes install` and it works\n') +
+    chalk.gray('   🛡️ SonarCloud Fixes - Quality gate workflow improvements and documentation\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
