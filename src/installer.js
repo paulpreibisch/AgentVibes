@@ -61,6 +61,7 @@ import {
   assignVoice,
   resetBmadVoices,
 } from './commands/bmad-voices.js';
+import { runPersonaDetection } from './cli/detect-persona.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3936,6 +3937,14 @@ program
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
     await resetBmadVoices(options);
+  });
+
+// Persona Detection Command
+program
+  .command('detect-persona [directory]')
+  .description('Detect persona from IDENTITY.md and show voice settings')
+  .action(async (directory) => {
+    await runPersonaDetection(directory);
   });
 
 // BMAD PR Testing Command
