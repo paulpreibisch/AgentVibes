@@ -698,10 +698,22 @@ async function collectConfiguration(options = {}) {
       // Page 4: Audio Settings (Reverb + Background Music)
       // Skip for termux-ssh - audio effects/background music don't work with SSH text-only TTS
       if (config.provider === 'termux-ssh') {
-        console.log(chalk.yellow('⊘ Audio effects and background music are not available for Termux SSH provider'));
-        console.log(chalk.gray('   (Audio plays on Android device, not locally)\n'));
-        currentPage++;
-        continue;
+        console.log(boxen(
+          chalk.white('SSH-Remote TTS sends text to your Android for local generation.\n\n') +
+          chalk.green('✅ Full feature support:\n') +
+          chalk.gray('   • AgentVibes generates audio locally on Android\n') +
+          chalk.gray('   • All reverb and background music effects work\n') +
+          chalk.gray('   • Low bandwidth (text only, not audio files)\n\n') +
+          chalk.cyan('Configure audio effects below - they will apply on your Android device!'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'green',
+            width: 80
+          }
+        ));
+        console.log('');
       }
 
       console.log(boxen(
