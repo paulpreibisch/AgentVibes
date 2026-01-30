@@ -425,11 +425,17 @@ async function collectConfiguration(options = {}) {
         chalk.gray('   • Free & offline\n') +
         chalk.gray('   • 50+ Hugging Face AI voices\n') +
         chalk.gray('   • Human-like speech quality\n\n') +
-        chalk.blue('📱 Termux SSH\n') +
-        chalk.gray('   • Only use if project is on a Remote Server\n') +
-        chalk.gray('   • Pushes audio to your Android Device via SSH\n') +
-        chalk.gray('   • Native Android TTS\n') +
-        chalk.gray('   • See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
+        chalk.blue('📱 SSH-Remote: Android Local Gen\n') +
+        chalk.gray('   • Send TEXT to Android via SSH\n') +
+        chalk.gray('   • AgentVibes generates audio locally on Android\n') +
+        chalk.gray('   • Requires: AgentVibes installed in Termux\n') +
+        chalk.gray('   • Full effects, low bandwidth\n') +
+        chalk.gray('   • See: .claude/docs/TERMUX_SETUP.md\n\n') +
+        chalk.blue('🔊 SSH-Remote: Server Gen + PulseAudio\n') +
+        chalk.gray('   • Server generates audio with Piper\n') +
+        chalk.gray('   • Send AUDIO via SSH tunnel to PulseAudio\n') +
+        chalk.gray('   • No Android AgentVibes needed\n') +
+        chalk.gray('   • See: docs/remote-audio-setup.md'),
         {
           padding: 1,
           margin: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -455,8 +461,13 @@ async function collectConfiguration(options = {}) {
       });
 
       providerChoices.push({
-        name: chalk.blue('📱 Termux SSH (Android)') + chalk.gray(' - Only choose if your project is on a remote server and you want audio sent to your Android device. See: github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md'),
+        name: chalk.blue('📱 SSH-Remote: Android Local Gen') + chalk.gray(' - Text → Android → AgentVibes generates locally (requires AgentVibes in Termux). Full effects, low bandwidth.'),
         value: 'termux-ssh'
+      });
+      
+      providerChoices.push({
+        name: chalk.blue('🔊 SSH-Remote: Server Gen + PulseAudio') + chalk.gray(' - Server generates audio → PulseAudio tunnel. No Android AgentVibes needed.'),
+        value: 'ssh-pulseaudio'
       });
 
       providerChoices.push(new inquirer.Separator());
@@ -522,7 +533,7 @@ async function collectConfiguration(options = {}) {
       }
 
       // If Termux SSH selected, ask for SSH host alias
-      if (config.provider === 'termux-ssh') {
+      if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
         console.log('\n' + boxen(
           chalk.white('Termux SSH requires an SSH host alias configured in ~/.ssh/config\n') +
           chalk.white('Example: "android" pointing to your Android device\n\n') +
@@ -669,7 +680,7 @@ async function collectConfiguration(options = {}) {
           continue;
         }
 
-      } else if (config.provider === 'termux-ssh') {
+      } else if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
         // Termux SSH - voices are managed on Android device
         console.log(boxen(
           chalk.white('Android TTS voices are managed on your Android device.\n\n') +
@@ -699,17 +710,41 @@ async function collectConfiguration(options = {}) {
       // Skip for termux-ssh - audio effects/background music don't work with SSH text-only TTS
       if (config.provider === 'termux-ssh') {
         console.log(boxen(
-          chalk.white('SSH-Remote TTS sends text to your Android for local generation.\n\n') +
+          chalk.white('SSH-Remote: Android Local Generation\n\n') +
           chalk.green('✅ Full feature support:\n') +
+          chalk.gray('   • Sends TEXT to Android (low bandwidth)\n') +
           chalk.gray('   • AgentVibes generates audio locally on Android\n') +
-          chalk.gray('   • All reverb and background music effects work\n') +
-          chalk.gray('   • Low bandwidth (text only, not audio files)\n\n') +
+          chalk.gray('   • All reverb and background music effects work\n\n') +
+          chalk.yellow('⚠️  Requires:\n') +
+          chalk.gray('   • AgentVibes installed in Termux on Android\n') +
+          chalk.gray('   • SSH access to Android device\n\n') +
           chalk.cyan('Configure audio effects below - they will apply on your Android device!'),
           {
             padding: 1,
             margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
             borderColor: 'green',
+            width: 80
+          }
+        ));
+        console.log('');
+      } else if (config.provider === 'ssh-pulseaudio') {
+        console.log(boxen(
+          chalk.white('SSH-Remote: Server Generation + PulseAudio\n\n') +
+          chalk.green('✅ Full feature support:\n') +
+          chalk.gray('   • Server generates audio with Piper\n') +
+          chalk.gray('   • Sends AUDIO via SSH tunnel to PulseAudio\n') +
+          chalk.gray('   • All reverb and background music effects work\n\n') +
+          chalk.yellow('⚠️  Requires:\n') +
+          chalk.gray('   • PulseAudio on remote machine\n') +
+          chalk.gray('   • SSH tunnel configured (port 14713)\n') +
+          chalk.gray('   • See: docs/remote-audio-setup.md\n\n') +
+          chalk.cyan('Configure audio effects below - they will apply on the server!'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'blue',
             width: 80
           }
         ));
@@ -3144,7 +3179,7 @@ async function install(options = {}) {
       spinner.succeed(chalk.green('Welcome message complete!'));
       console.log(''); // Spacing after completion
     }
-  } else if (!options.yes && userConfig.provider === 'termux-ssh') {
+  } else if (!options.yes && userConfig.provider === 'termux-ssh' || userConfig.provider === 'ssh-pulseaudio') {
     console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux SSH)\n'));
   }
 
