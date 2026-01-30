@@ -11,8 +11,15 @@
 
 set -euo pipefail
 
-TEXT="$1"
+TEXT="${1:-}"
 VOICE="${2:-en_US-lessac-medium}"
+
+# Validate required input
+if [[ -z "$TEXT" ]]; then
+  echo "❌ No text provided" >&2
+  echo "Usage: $0 <text> [voice]" >&2
+  exit 1
+fi
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,22 +35,48 @@ if [[ -z "$SSH_HOST" ]]; then
   exit 1
 fi
 
-# Sanitize text for SSH transmission (escape single quotes)
-SANITIZED_TEXT="${TEXT//\'/\'\\\'\'}"
+# SECURITY: Validate SSH_HOST to prevent option injection
+# Must be a valid hostname, IP address, or SSH config alias (alphanumeric, dots, hyphens, underscores)
+if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+  echo "❌ Invalid SSH host format: $SSH_HOST" >&2
+  echo "💡 Host must be alphanumeric (may contain dots, hyphens, underscores)" >&2
+  exit 1
+fi
+
+# SECURITY: Reject hosts starting with hyphen (SSH option injection)
+if [[ "$SSH_HOST" == -* ]]; then
+  echo "❌ Invalid SSH host: cannot start with hyphen" >&2
+  exit 1
+fi
+
+# SECURITY: Validate VOICE to prevent injection (alphanumeric, hyphens, underscores only)
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "❌ Invalid voice format: $VOICE" >&2
+  exit 1
+fi
+
+# SECURITY: Encode text as base64 to prevent command injection
+# The receiver will decode this safely
+ENCODED_TEXT=$(printf '%s' "$TEXT" | base64 -w 0)
 
 # Send text to remote for local AgentVibes playback
 echo "📱 Sending to $SSH_HOST for local playback..." >&2
 
-# Use agentvibes-play receiver if available, fallback to direct play-tts
+# Determine which receiver script exists and send encoded text
+# SECURITY: Base64-encoded text is safe to pass as argument (no shell metacharacters)
+# The receiver auto-detects and decodes base64 input
 if ssh "$SSH_HOST" "test -f ~/.termux/agentvibes-play.sh" 2>/dev/null; then
-  ssh "$SSH_HOST" "bash ~/.termux/agentvibes-play.sh '$SANITIZED_TEXT' '$VOICE'" &
+  ssh "$SSH_HOST" "bash ~/.termux/agentvibes-play.sh '$ENCODED_TEXT' '$VOICE'" &
+  SSH_PID=$!
 elif ssh "$SSH_HOST" "test -f ~/.agentvibes/play-remote.sh" 2>/dev/null; then
-  ssh "$SSH_HOST" "bash ~/.agentvibes/play-remote.sh '$SANITIZED_TEXT' '$VOICE'" &
+  ssh "$SSH_HOST" "bash ~/.agentvibes/play-remote.sh '$ENCODED_TEXT' '$VOICE'" &
+  SSH_PID=$!
 else
   echo "⚠️  Receiver script not found on $SSH_HOST" >&2
   echo "💡 Install: agentvibes install --ssh-receiver" >&2
   exit 1
 fi
 
-echo "✓ Sent to $SSH_HOST (playing remotely)" >&2
+# Log the background PID for debugging (non-blocking)
+echo "✓ Sent to $SSH_HOST (PID: $SSH_PID, playing remotely)" >&2
 exit 0

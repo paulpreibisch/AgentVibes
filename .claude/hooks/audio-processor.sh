@@ -83,7 +83,7 @@ get_agent_config() {
     local agent="$1"
 
     if [[ ! -f "$CONFIG_FILE" ]]; then
-        echo "default|reverb 50 50 90|agentvibes_soft_flamenco_loop.mp3|0.10"
+        echo "default|gain -8||0.0"
         return
     fi
 
@@ -100,7 +100,7 @@ get_agent_config() {
     if [[ -n "$config" ]]; then
         echo "$config"
     else
-        echo "default|reverb 50 50 90|agentvibes_soft_flamenco_loop.mp3|0.10"
+        echo "default|gain -8||0.0"
     fi
 }
 
@@ -305,23 +305,40 @@ main() {
     # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
-    # Temporary files (using explicit paths to avoid unbound variable issues)
-    # Use Termux-compatible temp directory if on Termux, otherwise standard /tmp
+    # SECURITY: Use secure temp directory per CLAUDE.md guidelines
+    # Prefer XDG_RUNTIME_DIR (user-owned, restricted permissions)
+    # Fall back to user-specific directory in /tmp
     local TEMP_DIR
     if [[ -d "/data/data/com.termux" ]]; then
-        # On Termux
-        TEMP_DIR="${TMPDIR:-${PREFIX}/tmp}"
+        # On Termux - use Termux temp
+        TEMP_DIR="${TMPDIR:-${PREFIX:-/data/data/com.termux/files/usr}/tmp}/agentvibes-audio-$$"
+    elif [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
+        # Preferred: XDG_RUNTIME_DIR (user-owned, 700 permissions)
+        TEMP_DIR="$XDG_RUNTIME_DIR/agentvibes-audio"
     else
-        # Standard Linux/macOS
-        TEMP_DIR="${TMPDIR:-/tmp}"
+        # Fallback: user-specific directory in /tmp
+        TEMP_DIR="/tmp/agentvibes-audio-${USER:-$(id -un)}"
     fi
+
+    # Create temp directory with restrictive permissions
+    mkdir -p "$TEMP_DIR"
+    chmod 700 "$TEMP_DIR"
+
+    # SECURITY: Verify ownership of temp directory
+    if [[ "$(stat -c '%u' "$TEMP_DIR" 2>/dev/null || stat -f '%u' "$TEMP_DIR" 2>/dev/null)" != "$(id -u)" ]]; then
+        echo "Error: Temp directory not owned by current user: $TEMP_DIR" >&2
+        exit 1
+    fi
+
+    # SECURITY: Use mktemp for unpredictable filenames
     local temp_effects
     local temp_final
-    temp_effects="$TEMP_DIR/agentvibes-effects-$$.wav"
-    temp_final="$TEMP_DIR/agentvibes-final-$$.wav"
+    temp_effects=$(mktemp "$TEMP_DIR/effects-XXXXXX.wav")
+    temp_final=$(mktemp "$TEMP_DIR/final-XXXXXX.wav")
 
-    # Clean up on exit using explicit paths
-    trap 'rm -f "'"$TEMP_DIR"'/agentvibes-effects-'"$$"'.wav" "'"$TEMP_DIR"'/agentvibes-final-'"$$"'.wav"' EXIT
+    # Clean up on exit - use double quotes to capture paths at definition time
+    # (local variables won't exist at trap execution time outside function scope)
+    trap "rm -f '$temp_effects' '$temp_final'" EXIT
 
     # Step 1: Apply sox effects
     if [[ -n "$sox_effects" ]]; then
