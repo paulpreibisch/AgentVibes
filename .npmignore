@@ -67,3 +67,7 @@ docs/huggingface-setup-guide.md
 # Sensitive/internal directories (not for public npm)
 agentvibes.org/
 agentvibes/
+
+# Backup files
+*.backup
+src/*.backup
