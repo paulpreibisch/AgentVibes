@@ -83,7 +83,7 @@ get_agent_config() {
     local agent="$1"
 
     if [[ ! -f "$CONFIG_FILE" ]]; then
-        echo "default|gain -8||0.0"
+        echo "default|reverb 50 50 90|agentvibes_soft_flamenco_loop.mp3|0.10"
         return
     fi
 
@@ -100,7 +100,7 @@ get_agent_config() {
     if [[ -n "$config" ]]; then
         echo "$config"
     else
-        echo "default|gain -8||0.0"
+        echo "default|reverb 50 50 90|agentvibes_soft_flamenco_loop.mp3|0.10"
     fi
 }
 
