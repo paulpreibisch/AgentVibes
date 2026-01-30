@@ -47,14 +47,19 @@ fi
 
 echo "✓ AgentVibes installed"
 
-# Create install directory
+# SECURITY: Create install directory with restrictive permissions
 mkdir -p "$INSTALL_DIR"
+chmod 700 "$INSTALL_DIR"
 
 # Download or copy receiver script
 RECEIVER_SCRIPT="$INSTALL_DIR/agentvibes-play.sh"
 
 echo ""
 echo "📥 Installing receiver script to: $RECEIVER_SCRIPT"
+
+# SECURITY NOTE: We download from GitHub over HTTPS
+# For additional security, verify the script manually before first use
+echo "⚠️  Security: Review the script at $RECEIVER_SCRIPT before use" >&2
 
 # Try to download from GitHub (main branch)
 if command -v curl >/dev/null 2>&1; then
@@ -63,17 +68,26 @@ if command -v curl >/dev/null 2>&1; then
         echo "✓ Downloaded from GitHub"
     else
         echo "⚠️  GitHub download failed, using embedded template"
-        # Fallback: embed the script
+        # Fallback: embed the script with security fixes
         cat > "$RECEIVER_SCRIPT" << 'RECEIVER_EOF'
 #!/usr/bin/env bash
 # AgentVibes SSH-TTS Receiver (embedded template)
 set -euo pipefail
-TEXT="$1"
+TEXT="${1:-}"
 VOICE="${2:-en_US-ryan-high}"
 [[ -z "$TEXT" ]] && { echo "❌ No text" >&2; exit 1; }
+# SECURITY: Decode base64 if input appears to be encoded
+if [[ "$TEXT" =~ ^[A-Za-z0-9+/]+=*$ ]] && [[ ${#TEXT} -gt 20 ]]; then
+    DECODED=$(printf '%s' "$TEXT" | base64 -d 2>/dev/null) || DECODED=""
+    [[ -n "$DECODED" ]] && TEXT="$DECODED"
+fi
+# SECURITY: Validate voice format
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "❌ Invalid voice format" >&2; exit 1
+fi
 export AGENTVIBES_NO_REMINDERS=1
 if command -v agentvibes >/dev/null 2>&1; then
-    AGENTVIBES_ROOT="$(dirname $(dirname $(which agentvibes)))/lib/node_modules/agentvibes"
+    AGENTVIBES_ROOT="$(dirname "$(dirname "$(which agentvibes)")")/lib/node_modules/agentvibes"
 elif [[ -d ~/.npm-global/lib/node_modules/agentvibes ]]; then
     AGENTVIBES_ROOT="$HOME/.npm-global/lib/node_modules/agentvibes"
 elif [[ -d /data/data/com.termux/files/usr/lib/node_modules/agentvibes ]]; then
@@ -89,7 +103,38 @@ RECEIVER_EOF
     fi
 else
     echo "⚠️  curl not found, using embedded template"
-    # Same fallback as above
+    # Fallback: embed the script with security fixes
+    cat > "$RECEIVER_SCRIPT" << 'RECEIVER_EOF'
+#!/usr/bin/env bash
+# AgentVibes SSH-TTS Receiver (embedded template)
+set -euo pipefail
+TEXT="${1:-}"
+VOICE="${2:-en_US-ryan-high}"
+[[ -z "$TEXT" ]] && { echo "❌ No text" >&2; exit 1; }
+# SECURITY: Decode base64 if input appears to be encoded
+if [[ "$TEXT" =~ ^[A-Za-z0-9+/]+=*$ ]] && [[ ${#TEXT} -gt 20 ]]; then
+    DECODED=$(printf '%s' "$TEXT" | base64 -d 2>/dev/null) || DECODED=""
+    [[ -n "$DECODED" ]] && TEXT="$DECODED"
+fi
+# SECURITY: Validate voice format
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "❌ Invalid voice format" >&2; exit 1
+fi
+export AGENTVIBES_NO_REMINDERS=1
+if command -v agentvibes >/dev/null 2>&1; then
+    AGENTVIBES_ROOT="$(dirname "$(dirname "$(which agentvibes)")")/lib/node_modules/agentvibes"
+elif [[ -d ~/.npm-global/lib/node_modules/agentvibes ]]; then
+    AGENTVIBES_ROOT="$HOME/.npm-global/lib/node_modules/agentvibes"
+elif [[ -d /data/data/com.termux/files/usr/lib/node_modules/agentvibes ]]; then
+    AGENTVIBES_ROOT="/data/data/com.termux/files/usr/lib/node_modules/agentvibes"
+else
+    echo "❌ AgentVibes not found" >&2; exit 1
+fi
+PLAY_TTS="$AGENTVIBES_ROOT/.claude/hooks/play-tts.sh"
+[[ ! -f "$PLAY_TTS" ]] && { echo "❌ play-tts.sh missing" >&2; exit 1; }
+echo "🎵 Playing via AgentVibes..." >&2
+bash "$PLAY_TTS" "$TEXT" "$VOICE"
+RECEIVER_EOF
 fi
 
 # Make executable
