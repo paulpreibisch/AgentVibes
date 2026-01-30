@@ -11,7 +11,7 @@
 # BACKGROUND_FILE: path to ambient audio (relative to .claude/audio/tracks/)
 # BACKGROUND_VOLUME: 0.0-1.0 (0.20-0.40 recommended)
 #
-# Example: John|reverb 30 50 80|my-track.mp3|0.25
+# Example: John|reverb 30 50 80|my-track.mp3|0.10
 
 # BMAD Agents - each with unique audio personality
 
@@ -19,28 +19,28 @@
 John|gain -1 equalizer 3000 1q +2|agentvibes_soft_flamenco_loop.mp3|0.30
 
 # Architect Winston - deep, authoritative
-Winston|reverb 40 50 90 gain -2|agentvibes_soft_flamenco_loop.mp3|0.25
+Winston|reverb 40 50 90 gain -2|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # Developer Amelia - clean, precise
-Amelia|compand 0.3,1 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.25
+Amelia|compand 0.3,1 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # Business Analyst Mary - warm, analytical
-Mary|equalizer 200 1q +3 equalizer 2500 1q -2|agentvibes_soft_flamenco_loop.mp3|0.25
+Mary|equalizer 200 1q +3 equalizer 2500 1q -2|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # Scrum Master Bob - refined, organized
-Bob|reverb 30 40 70 compand 0.2,0.5 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.25
+Bob|reverb 30 40 70 compand 0.2,0.5 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # Test Architect Murat - crisp, analytical
-Murat|equalizer 4000 1q +3 compand 0.1,0.3 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.25
+Murat|equalizer 4000 1q +3 compand 0.1,0.3 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # UX Designer Sally - warm, empathetic
-Sally|reverb 25 40 70 equalizer 300 1q +2|agentvibes_soft_flamenco_loop.mp3|0.25
+Sally|reverb 25 40 70 equalizer 300 1q +2|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # Tech Writer Paige - clear, patient
 Paige|compand 0.2,0.5 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.20
 
 # Frame Expert Saif - structured, detail-oriented
-Saif|equalizer 2000 1q +2|agentvibes_soft_flamenco_loop.mp3|0.25
+Saif|equalizer 2000 1q +2|agentvibes_soft_flamenco_loop.mp3|0.10
 
 # BMad Master - wise orchestrator
 BMad Master|reverb 50 60 100 pitch -100|agentvibes_soft_flamenco_loop.mp3|0.30
