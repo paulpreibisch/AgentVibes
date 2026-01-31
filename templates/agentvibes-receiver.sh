@@ -24,10 +24,12 @@ fi
 
 TEXT="${1:-}"
 VOICE="${2:-en_US-ryan-high}"
+MUSIC="${3:-}"
+REVERB="${4:-}"
 
 if [[ -z "$TEXT" ]]; then
     echo "❌ No text provided" >&2
-    echo "Usage: $0 [--] <text> [voice]" >&2
+    echo "Usage: $0 [--] <text> [voice] [music] [reverb]" >&2
     exit 1
 fi
 
@@ -112,10 +114,40 @@ if [[ ! -f "$PLAY_TTS" ]]; then
     exit 1
 fi
 
+# Configure audio effects and background music if provided
+# CRITICAL: Write to AGENTVIBES package config, not HOME config
+# The audio-processor reads from package config, not ~/.claude/config
+if [[ -n "$MUSIC" ]] || [[ -n "$REVERB" ]]; then
+    CONFIG_DIR="$AGENTVIBES_ROOT/.claude/config"
+    mkdir -p "$CONFIG_DIR"
+    
+    # Enable background music
+    echo "true" > "$CONFIG_DIR/background-music-enabled.txt"
+    
+    # Clear position cache for fresh start
+    rm -f "$CONFIG_DIR/background-music-position.txt"
+    
+    # Set background music track if provided
+    if [[ -n "$MUSIC" ]]; then
+        echo "$MUSIC" > "$CONFIG_DIR/background-music.txt"
+    fi
+    
+    # Set audio effects config (default agent name is always "default")
+    if [[ -n "$MUSIC" ]] && [[ -n "$REVERB" ]]; then
+        echo "default|${REVERB}|${MUSIC}|0.10" > "$CONFIG_DIR/audio-effects.cfg"
+    elif [[ -n "$REVERB" ]]; then
+        echo "default|${REVERB}||0.0" > "$CONFIG_DIR/audio-effects.cfg"
+    elif [[ -n "$MUSIC" ]]; then
+        echo "default||${MUSIC}|0.10" > "$CONFIG_DIR/audio-effects.cfg"
+    fi
+fi
+
 # Log for debugging (optional, comment out in production)
 if [[ "${AGENTVIBES_DEBUG:-0}" == "1" ]]; then
     echo "[DEBUG] AgentVibes root: $AGENTVIBES_ROOT" >&2
     echo "[DEBUG] Voice: $VOICE" >&2
+    echo "[DEBUG] Music: ${MUSIC:-none}" >&2
+    echo "[DEBUG] Reverb: ${REVERB:-none}" >&2
     echo "[DEBUG] Text length: ${#TEXT}" >&2
 fi
 
