@@ -13,11 +13,12 @@ set -euo pipefail
 
 TEXT="${1:-}"
 VOICE="${2:-en_US-lessac-medium}"
+AGENT_NAME="${3:-default}"
 
 # Validate required input
 if [[ -z "$TEXT" ]]; then
   echo "❌ No text provided" >&2
-  echo "Usage: $0 <text> [voice]" >&2
+  echo "Usage: $0 <text> [voice] [agent_name]" >&2
   exit 1
 fi
 
@@ -55,21 +56,28 @@ if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
   exit 1
 fi
 
-# SECURITY: Encode text as base64 to prevent command injection
-# The receiver will decode this safely
+# SECURITY: Validate AGENT_NAME to prevent injection (alphanumeric, hyphens, underscores, spaces only)
+if [[ ! "$AGENT_NAME" =~ ^[a-zA-Z0-9_\ -]+$ ]]; then
+  echo "❌ Invalid agent name format: $AGENT_NAME" >&2
+  exit 1
+fi
+
+# SECURITY: Encode text and agent name as base64 to prevent command injection
+# The receiver will decode these safely
 ENCODED_TEXT=$(printf '%s' "$TEXT" | base64 -w 0)
+ENCODED_AGENT=$(printf '%s' "$AGENT_NAME" | base64 -w 0)
 
 # Send text to remote for local AgentVibes playback
 echo "📱 Sending to $SSH_HOST for local playback..." >&2
 
-# Determine which receiver script exists and send encoded text
-# SECURITY: Base64-encoded text is safe to pass as argument (no shell metacharacters)
+# Determine which receiver script exists and send encoded text, voice, and agent name
+# SECURITY: Base64-encoded values are safe to pass as arguments (no shell metacharacters)
 # The receiver auto-detects and decodes base64 input
 if ssh "$SSH_HOST" "test -f ~/.termux/agentvibes-play.sh" 2>/dev/null; then
-  ssh "$SSH_HOST" "bash ~/.termux/agentvibes-play.sh '$ENCODED_TEXT' '$VOICE'" &
+  ssh "$SSH_HOST" "bash ~/.termux/agentvibes-play.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'" &
   SSH_PID=$!
 elif ssh "$SSH_HOST" "test -f ~/.agentvibes/play-remote.sh" 2>/dev/null; then
-  ssh "$SSH_HOST" "bash ~/.agentvibes/play-remote.sh '$ENCODED_TEXT' '$VOICE'" &
+  ssh "$SSH_HOST" "bash ~/.agentvibes/play-remote.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'" &
   SSH_PID=$!
 else
   echo "⚠️  Receiver script not found on $SSH_HOST" >&2

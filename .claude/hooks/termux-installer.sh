@@ -206,6 +206,43 @@ if [[ ! -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
 fi
 
 echo ""
+
+# Step 7: Install Clawdbot SSH receiver
+echo -e "${BLUE}[7/7] Installing Clawdbot SSH receiver...${NC}"
+
+TERMUX_DIR="$HOME/.termux"
+mkdir -p "$TERMUX_DIR"
+
+# Create wrapper script at ~/.termux/agentvibes-play.sh
+# This calls the main receiver in AgentVibes hooks
+cat > "$TERMUX_DIR/agentvibes-play.sh" << 'EOF'
+#!/usr/bin/env bash
+# AgentVibes Clawdbot Receiver Wrapper
+# Installed by AgentVibes Termux installer
+# Forwards to main receiver script in AgentVibes
+
+# Find AgentVibes installation
+if [[ -f "$HOME/agentvibes/.claude/hooks/clawdbot-receiver.sh" ]]; then
+  exec bash "$HOME/agentvibes/.claude/hooks/clawdbot-receiver.sh" "$@"
+elif [[ -f "$HOME/AgentVibes-dev/.claude/hooks/clawdbot-receiver.sh" ]]; then
+  exec bash "$HOME/AgentVibes-dev/.claude/hooks/clawdbot-receiver.sh" "$@"
+else
+  echo "❌ AgentVibes clawdbot-receiver.sh not found" >&2
+  exit 1
+fi
+EOF
+
+chmod +x "$TERMUX_DIR/agentvibes-play.sh"
+echo -e "  ${GREEN}✓${NC} Clawdbot receiver installed at ~/.termux/agentvibes-play.sh"
+
+# Also create fallback at ~/.agentvibes/play-remote.sh
+AGENTVIBES_DIR="$HOME/.agentvibes"
+mkdir -p "$AGENTVIBES_DIR"
+ln -sf "$TERMUX_DIR/agentvibes-play.sh" "$AGENTVIBES_DIR/play-remote.sh" 2>/dev/null || \
+  cp "$TERMUX_DIR/agentvibes-play.sh" "$AGENTVIBES_DIR/play-remote.sh"
+echo -e "  ${GREEN}✓${NC} Fallback link created at ~/.agentvibes/play-remote.sh"
+
+echo ""
 echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}  Installation Complete!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
