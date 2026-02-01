@@ -2,6 +2,7 @@
 .claude/journal/
 .claude/audio/*
 !.claude/audio/tracks/
+!.claude/audio/tracks/*.mp3
 .claude/config/
 .claude/settings.local.json
 .claude/tts-*.txt
