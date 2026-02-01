@@ -75,3 +75,8 @@ agentvibes/
 # Backup files
 *.backup
 src/*.backup
+
+# BMAD workflows (separate package, not part of AgentVibes core)
+.bmad/
+.claude/commands/bmad/
+.claude/commands/BMad/
