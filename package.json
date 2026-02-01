@@ -35,7 +35,9 @@
   "files": [
     "bin/",
     "src/",
-    "templates/",
+    "templates/*.sh",
+    "templates/*.md",
+    "templates/audio/*.mp3",
     "mcp-server/*.py",
     "mcp-server/*.js",
     "mcp-server/*.md",
