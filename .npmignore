@@ -51,6 +51,9 @@ RELEASE_PROCESS.md
 # NOTE: RELEASE_NOTES.md is intentionally NOT ignored - it's used by the installer
 # to display release information when git is unavailable (e.g., when running via npx)
 
+# Large demo/template audio files (too large for npm)
+templates/audio/*.wav
+
 # Voice model files (too large for npm, downloaded separately via piper-download-voices.sh)
 mcp-server/voices/*.onnx
 mcp-server/voices/*.onnx.json
