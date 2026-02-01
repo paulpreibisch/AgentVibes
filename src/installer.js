@@ -93,6 +93,71 @@ function detectAndNotifyTermux() {
 }
 
 /**
+ * Detect environment type for smart installation defaults
+ * @returns {string} - 'DESKTOP', 'PHONE', or 'VOICELESS'
+ */
+function detectEnvironment() {
+  // Check if Termux/Android
+  if (isTermux()) {
+    return 'PHONE';
+  }
+
+  // Check for audio devices
+  const hasAudio = checkAudioDevices();
+
+  // Check if in SSH session
+  const isSSH = process.env.SSH_CONNECTION || process.env.SSH_CLIENT || process.env.SSH_TTY;
+
+  // Voiceless: No audio OR in SSH session
+  if (!hasAudio || isSSH) {
+    return 'VOICELESS';
+  }
+
+  // Desktop: Has audio, not SSH, not Termux
+  return 'DESKTOP';
+}
+
+/**
+ * Check if system has audio output devices
+ * @returns {boolean} - True if audio devices found
+ */
+function checkAudioDevices() {
+  try {
+    // Linux: check with aplay or paplay
+    if (process.platform === 'linux') {
+      try {
+        // Try aplay first (ALSA)
+        execSync('aplay -l 2>/dev/null', { encoding: 'utf8', stdio: 'pipe' });
+        return true;
+      } catch (e) {
+        // Try paplay (PulseAudio)
+        try {
+          execSync('paplay --version 2>/dev/null', { encoding: 'utf8', stdio: 'pipe' });
+          return true;
+        } catch (e2) {
+          return false;
+        }
+      }
+    }
+
+    // macOS: always has audio
+    if (process.platform === 'darwin') {
+      return true;
+    }
+
+    // Windows: assume has audio
+    if (process.platform === 'win32') {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    // If detection fails, assume no audio (safe default)
+    return false;
+  }
+}
+
+/**
  * Create header and footer for installer pages
  * @param {string} pageTitle - Title of current page
  * @param {number} currentPage - Current page number (0-indexed, relative to section)
@@ -366,10 +431,18 @@ async function collectConfiguration(options = {}) {
     verbosity: 'high'
   };
 
-  // Detect Android/Termux environment
+  // Detect environment type
+  const environment = detectEnvironment();
   const isAndroid = isTermux();
+
   if (isAndroid) {
     detectAndNotifyTermux();
+  } else if (environment === 'VOICELESS') {
+    console.log(chalk.cyan('\n🔇 Voiceless environment detected!'));
+    console.log(chalk.gray('   No audio output available on this server.\n'));
+  } else if (environment === 'DESKTOP') {
+    console.log(chalk.green('\n🔊 Audio output detected!'));
+    console.log(chalk.gray('   Your system has speakers/audio devices.\n'));
   }
 
   if (options.yes) {
@@ -411,64 +484,114 @@ async function collectConfiguration(options = {}) {
     } else if (currentPage === 1) {
       // Page 2: TTS Provider & Voice Storage
 
-      // Show provider selection with all available options
+      // Show provider selection with context-aware messaging
       const isMacOS = process.platform === 'darwin';
 
-      console.log(boxen(
-        chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
-        chalk.white('Choose your Text-to-Speech provider.\n\n') +
-        (isMacOS ? chalk.yellow('🍎 macOS Say\n') +
-        chalk.gray('   • Built-in to macOS\n') +
-        chalk.gray('   • Zero setup required\n') +
-        chalk.gray('   • 40+ system voices\n\n') : '') +
-        chalk.green('🆓 Piper TTS\n') +
-        chalk.gray('   • Free & offline\n') +
-        chalk.gray('   • 50+ Hugging Face AI voices\n') +
-        chalk.gray('   • Human-like speech quality\n\n') +
-        chalk.blue('📱 SSH-Remote: Android Local Gen\n') +
-        chalk.gray('   • Send TEXT to Android via SSH\n') +
-        chalk.gray('   • AgentVibes generates audio locally on Android\n') +
-        chalk.gray('   • Requires: AgentVibes installed in Termux\n') +
-        chalk.gray('   • Full effects, low bandwidth\n') +
-        chalk.gray('   • See: .claude/docs/TERMUX_SETUP.md\n\n') +
-        chalk.blue('🔊 SSH-Remote: Server Gen + PulseAudio\n') +
-        chalk.gray('   • Server generates audio with Piper\n') +
-        chalk.gray('   • Send AUDIO via SSH tunnel to PulseAudio\n') +
-        chalk.gray('   • No Android AgentVibes needed\n') +
-        chalk.gray('   • See: docs/remote-audio-setup.md'),
-        {
-          padding: 1,
-          margin: { top: 0, bottom: 0, left: 0, right: 0 },
-          borderStyle: 'round',
-          borderColor: 'gray',
-          width: 80
-        }
-      ));
-
-      // Provider selection
-      const providerChoices = [];
-
-      if (isMacOS) {
-        providerChoices.push({
-          name: chalk.yellow('🍎 macOS Say (Recommended)'),
-          value: 'macos'
-        });
+      // Voiceless Server: Special prompt about audio routing
+      if (environment === 'VOICELESS') {
+        console.log(boxen(
+          chalk.cyan.bold('Where would you like to hear TTS announcements?\n\n') +
+          chalk.white('1️⃣  ') + chalk.green('My phone/tablet via SSH') + chalk.yellow(' (Recommended)\n') +
+          chalk.gray('    ✓ Secure, works anywhere with Tailscale\n') +
+          chalk.gray('    ✓ Full voice effects and features on receiver\n') +
+          chalk.gray('    ✓ Low bandwidth (text only)\n\n') +
+          chalk.white('2️⃣  ') + chalk.blue('Another computer via PulseAudio\n') +
+          chalk.gray('    ✓ Low latency on local network\n') +
+          chalk.gray('    ✗ Requires PulseAudio on both devices\n\n') +
+          chalk.white('3️⃣  ') + chalk.gray('No audio (silent mode)'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'cyan',
+            width: 80
+          }
+        ));
+      }
+      // Phone/Termux: Ask how they'll use AgentVibes
+      else if (environment === 'PHONE') {
+        console.log(boxen(
+          chalk.cyan.bold('How will you use AgentVibes on this device?\n\n') +
+          chalk.white('1️⃣  ') + chalk.green('Receive TTS from remote server') + chalk.yellow(' (Receiver mode)\n') +
+          chalk.gray('    ✓ Perfect for Clawdbot phone setup\n') +
+          chalk.gray('    ✓ Plays audio sent from your server\n\n') +
+          chalk.white('2️⃣  ') + chalk.blue('Local TTS playback only\n') +
+          chalk.gray('    ✓ Use AgentVibes directly on this device\n') +
+          chalk.gray('    ✗ Not for remote server routing'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'green',
+            width: 80
+          }
+        ));
+      }
+      // Desktop: Standard provider selection
+      else {
+        console.log(boxen(
+          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Choose your Text-to-Speech provider.\n\n') +
+          (isMacOS ? chalk.yellow('🍎 macOS Say\n') +
+          chalk.gray('   • Built-in to macOS\n') +
+          chalk.gray('   • Zero setup required\n') +
+          chalk.gray('   • 40+ system voices\n\n') : '') +
+          chalk.green('🆓 Piper TTS\n') +
+          chalk.gray('   • Free & offline\n') +
+          chalk.gray('   • 50+ Hugging Face AI voices\n') +
+          chalk.gray('   • Human-like speech quality'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'gray',
+            width: 80
+          }
+        ));
       }
 
-      providerChoices.push({
-        name: chalk.green('🆓 Piper TTS (Free, Offline)'),
-        value: 'piper'
-      });
+      // Provider selection - Context-aware based on environment
+      const providerChoices = [];
 
-      providerChoices.push({
-        name: chalk.blue('📱 SSH-Remote: Android Local Gen') + chalk.gray(' - Text → Android → AgentVibes generates locally (requires AgentVibes in Termux). Full effects, low bandwidth.'),
-        value: 'termux-ssh'
-      });
-      
-      providerChoices.push({
-        name: chalk.blue('🔊 SSH-Remote: Server Gen + PulseAudio') + chalk.gray(' - Server generates audio → PulseAudio tunnel. No Android AgentVibes needed.'),
-        value: 'ssh-pulseaudio'
-      });
+      // VOICELESS SERVER: Prioritize remote audio options
+      if (environment === 'VOICELESS') {
+        providerChoices.push({
+          name: chalk.green('📱 My phone/tablet via SSH') + chalk.yellow(' (Recommended)'),
+          value: 'termux-ssh'
+        });
+        providerChoices.push({
+          name: chalk.blue('🔊 Another computer via PulseAudio'),
+          value: 'ssh-pulseaudio'
+        });
+        providerChoices.push({
+          name: chalk.gray('🔇 No audio (silent mode)'),
+          value: 'silent'
+        });
+      }
+      // PHONE/TERMUX: Receiver mode or local playback
+      else if (environment === 'PHONE') {
+        providerChoices.push({
+          name: chalk.green('🎵 Receiver mode') + chalk.gray(' - Receive TTS from remote server'),
+          value: 'piper-receiver'
+        });
+        providerChoices.push({
+          name: chalk.blue('🎤 Local playback only') + chalk.gray(' - Use AgentVibes on this device'),
+          value: 'piper'
+        });
+      }
+      // DESKTOP: Standard provider options
+      else {
+        if (isMacOS) {
+          providerChoices.push({
+            name: chalk.yellow('🍎 macOS Say (Recommended)'),
+            value: 'macos'
+          });
+        }
+        providerChoices.push({
+          name: chalk.green('🆓 Piper TTS (Free, Offline)'),
+          value: 'piper'
+        });
+      }
 
       providerChoices.push(new inquirer.Separator());
       providerChoices.push({
@@ -491,8 +614,21 @@ async function collectConfiguration(options = {}) {
 
       config.provider = provider;
 
+      // Handle special receiver mode for Termux
+      if (config.provider === 'piper-receiver') {
+        config.provider = 'piper';
+        config.isReceiver = true;
+      }
+
+      // Handle silent mode (voiceless servers that don't want audio)
+      if (config.provider === 'silent') {
+        // Silent mode uses piper but won't actually play audio
+        config.provider = 'piper';
+        config.isSilent = true;
+      }
+
       // If Piper selected, ask for voice storage location
-      if (config.provider === 'piper') {
+      if (config.provider === 'piper' || config.isReceiver) {
         const homeDir = process.env.HOME || process.env.USERPROFILE;
         const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
 
@@ -532,24 +668,39 @@ async function collectConfiguration(options = {}) {
         }
       }
 
-      // If Termux SSH selected, ask for SSH host alias
+      // If Termux SSH selected, show setup guide
       if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
         console.log('\n' + boxen(
-          chalk.white('Termux SSH requires an SSH host alias configured in ~/.ssh/config\n') +
-          chalk.white('Example: "android" pointing to your Android device\n\n') +
-          chalk.cyan('📖 Documentation:\n') +
-          chalk.gray('   github.com/paulpreibisch/AgentVibes/blob/master/.claude/docs/TERMUX_SETUP.md\n') +
-          chalk.gray('   After install: .claude/docs/TERMUX_SETUP.md\n\n') +
-          chalk.cyan('🔗 Required Components:\n') +
-          chalk.gray('   • Tailscale VPN: ') + chalk.blue('https://tailscale.com/download/android\n') +
-          chalk.gray('   • F-Droid Store: ') + chalk.blue('https://f-droid.org\n') +
-          chalk.gray('   • Termux App: ') + chalk.blue('https://f-droid.org/packages/com.termux\n') +
-          chalk.gray('   • Termux:API: ') + chalk.blue('https://f-droid.org/packages/com.termux.api'),
+          chalk.cyan.bold('📱 AgentVibes Receiver Setup\n\n') +
+          chalk.white('What is Receiver Mode?\n') +
+          chalk.gray('This voiceless server has no speakers. Receiver mode lets you\n') +
+          chalk.gray('hear TTS audio on a different device (phone/tablet) with speakers.\n\n') +
+          chalk.white('How it Works:\n') +
+          chalk.gray('1. This server sends TEXT via SSH to your device\n') +
+          chalk.gray('2. Your device generates audio locally with AgentVibes\n') +
+          chalk.gray('3. You hear high-quality TTS with full voice effects\n\n') +
+          chalk.white('Benefits:\n') +
+          chalk.green('✓ Low bandwidth (text only, not audio files)\n') +
+          chalk.green('✓ Full AgentVibes features on your device\n') +
+          chalk.green('✓ Secure (SSH encrypted)\n') +
+          chalk.green('✓ Works anywhere with Tailscale\n\n') +
+          chalk.gray('─'.repeat(60) + '\n\n') +
+          chalk.white('Quick Setup (5 minutes):\n\n') +
+          chalk.gray('☐ 1. Install AgentVibes on target device\n') +
+          chalk.white('     npm install -g agentvibes\n\n') +
+          chalk.gray('☐ 2. Configure SSH access\n') +
+          chalk.white('     • Copy SSH key: ssh-copy-id user@device\n') +
+          chalk.white('     • OR: Use Tailscale for zero-config networking\n\n') +
+          chalk.gray('☐ 3. Set receiver hostname\n') +
+          chalk.white('     echo "your-device-name" > ~/.claude/ssh-remote-host.txt\n\n') +
+          chalk.gray('☐ 4. Test the connection\n') +
+          chalk.white('     agentvibes tts "Hello from server!"\n\n') +
+          chalk.cyan('📖 Full guide: ') + chalk.blue('https://github.com/paulpreibisch/AgentVibes/blob/main/docs/SSH_REMOTE_SETUP.md'),
           {
             padding: 1,
             margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
-            borderColor: 'blue',
+            borderColor: 'cyan',
             width: 80
           }
         ));
@@ -565,7 +716,7 @@ async function collectConfiguration(options = {}) {
           const { sshHost } = await inquirer.prompt([{
             type: 'input',
             name: 'sshHost',
-            message: chalk.yellow('Enter your SSH host alias (e.g., "android"):'),
+            message: chalk.yellow('Enter your SSH host alias (e.g., "android", "phone"):'),
             validate: (input) => {
               if (!input || input.trim() === '') {
                 return 'Please provide a valid SSH host alias';
@@ -581,7 +732,7 @@ async function collectConfiguration(options = {}) {
           config.sshHost = sshHost.trim();
         } else {
           console.log(chalk.yellow('\n⚠️  SSH host not configured - you can set it later:'));
-          console.log(chalk.gray('   echo "your-host-alias" > ~/.claude/termux-ssh-host.txt\n'));
+          console.log(chalk.gray('   echo "your-host-alias" > ~/.claude/ssh-remote-host.txt\n'));
         }
       }
 
@@ -3264,6 +3415,102 @@ async function install(options = {}) {
       await fs.writeFile(sshHostConfigPath, userConfig.sshHost);
     }
 
+    // Set up receiver script if in receiver mode (Termux)
+    if (userConfig.isReceiver) {
+      spinner.start('Setting up receiver script...');
+
+      const receiverDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
+      await fs.mkdir(receiverDir, { recursive: true, mode: 0o700 });
+
+      const receiverScriptPath = path.join(receiverDir, 'receiver.sh');
+      const templatePath = path.join(__dirname, '..', 'templates', 'agentvibes-receiver.sh');
+
+      try {
+        const templateContent = await fs.readFile(templatePath, 'utf8');
+        await fs.writeFile(receiverScriptPath, templateContent, { mode: 0o755 });
+        spinner.succeed(chalk.green('Receiver script installed!'));
+        console.log(chalk.gray(`   Location: ${receiverScriptPath}\n`));
+      } catch (error) {
+        spinner.warn(chalk.yellow('Could not install receiver script'));
+        console.log(chalk.gray(`   Error: ${error.message}\n`));
+      }
+    }
+
+    // Save setup guide for SSH-remote installations
+    if (selectedProvider === 'termux-ssh' || selectedProvider === 'ssh-pulseaudio') {
+      spinner.start('Saving setup guide...');
+
+      const agentvibesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
+      await fs.mkdir(agentvibesDir, { recursive: true, mode: 0o700 });
+
+      const setupGuidePath = path.join(agentvibesDir, 'setup-guide.txt');
+      const setupGuideContent = `AgentVibes SSH-Remote Setup Guide
+=================================
+
+What is Receiver Mode?
+----------------------
+This voiceless server has no speakers. Receiver mode lets you hear TTS
+audio on a different device (phone/tablet) with speakers.
+
+How it Works:
+1. This server sends TEXT via SSH to your device
+2. Your device generates audio locally with AgentVibes
+3. You hear high-quality TTS with full voice effects
+
+Benefits:
+✓ Low bandwidth (text only, not audio files)
+✓ Full AgentVibes features on your device
+✓ Secure (SSH encrypted)
+✓ Works anywhere with Tailscale
+
+Quick Setup (5 minutes):
+
+☐ Step 1: Install AgentVibes on target device
+   npm install -g agentvibes
+
+   The installer will auto-detect and configure receiver mode.
+
+☐ Step 2: Setup SSH/Tailscale (pick one)
+
+   Option A - Tailscale (easiest):
+   1. Install Tailscale on both devices
+   2. They'll auto-discover each other
+   3. Use device name in SSH config
+
+   Option B - Manual SSH:
+   1. Copy your SSH key:
+      ssh-copy-id user@your-device-ip
+   2. Add to ~/.ssh/config:
+      Host phone
+          HostName your-device-ip
+          User your-username
+          Port 8022
+
+☐ Step 3: Configure connection
+   echo "${userConfig.sshHost || 'phone'}" > ~/.claude/ssh-remote-host.txt
+
+☐ Step 4: Test it!
+   agentvibes tts "Hello from server!"
+
+Full Documentation:
+https://github.com/paulpreibisch/AgentVibes/blob/main/docs/SSH_REMOTE_SETUP.md
+
+Troubleshooting:
+- Check SSH connection: ssh ${userConfig.sshHost || 'phone'} echo "Connected!"
+- Verify AgentVibes on receiver: ssh ${userConfig.sshHost || 'phone'} which agentvibes
+- Test receiver script: ssh ${userConfig.sshHost || 'phone'} ~/.agentvibes/receiver.sh "Test"
+`;
+
+      try {
+        await fs.writeFile(setupGuidePath, setupGuideContent);
+        spinner.succeed(chalk.green('Setup guide saved!'));
+        console.log(chalk.gray(`   Location: ${setupGuidePath}\n`));
+      } catch (error) {
+        spinner.warn(chalk.yellow('Could not save setup guide'));
+        console.log(chalk.gray(`   Error: ${error.message}\n`));
+      }
+    }
+
     // Set default voice based on user selection or provider defaults
     const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
     let defaultVoice = userConfig.defaultVoice;
@@ -3536,25 +3783,52 @@ async function install(options = {}) {
       }
     }
 
-    // Success message as final page (no boxen)
-    const successContent =
-      chalk.green.bold('✨ Installation Complete! ✨\n\n') +
-      chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
-      chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n') +
+    // Success message as final page (no boxen) - Customize based on setup type
+    let successContent = chalk.green.bold('✨ Installation Complete! ✨\n\n');
+
+    // Receiver mode success message (Termux/Phone)
+    if (userConfig.isReceiver) {
+      successContent +=
+        chalk.green('✓ Receiver mode configured!\n') +
+        chalk.green('✓ Receiver script: ~/.agentvibes/receiver.sh\n') +
+        chalk.green('✓ Provider: piper (local playback)\n\n') +
+        chalk.cyan('📋 Next: On your server, set this device as target:\n') +
+        chalk.white('    echo "phone" > ~/.claude/ssh-remote-host.txt\n\n') +
+        chalk.gray('(Use your SSH hostname or Tailscale name)\n\n');
+    }
+    // SSH-Remote success message (Voiceless server)
+    else if (selectedProvider === 'termux-ssh' || selectedProvider === 'ssh-pulseaudio') {
+      successContent +=
+        chalk.green('✓ Provider configured: ssh-remote\n\n') +
+        chalk.cyan('📋 Setup Instructions Saved:\n') +
+        chalk.white('   ~/.agentvibes/setup-guide.txt\n\n') +
+        chalk.cyan('Quick Start:\n') +
+        chalk.white('1. Install AgentVibes on target device\n') +
+        chalk.white('2. Configure SSH/Tailscale access\n') +
+        chalk.white('3. Test: agentvibes tts "Hello!"\n\n');
+    }
+    // Standard installation success message
+    else {
+      successContent +=
+        chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
+        chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n');
+    }
+
+    // Common commands section for all installations
+    successContent +=
       chalk.white('🎤 Available Commands:\n\n') +
       chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
       chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
       chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
       chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
       chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
-      chalk.cyan('  /agent-vibes:add <name> <id>') + chalk.gray(' .... Add custom voice\n') +
-      chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n') +
-      chalk.cyan('  /agent-vibes:get') + chalk.gray(' ................. Get active voice\n') +
-      chalk.cyan('  /agent-vibes:sample <name>') + chalk.gray(' ...... Test a voice\n') +
-      chalk.cyan('  /agent-vibes:personality') + chalk.gray(' ......... Set personality\n') +
-      chalk.cyan('  /agent-vibes:sentiment') + chalk.gray(' ........... Set sentiment\n') +
-      chalk.cyan('  /agent-vibes:set-pretext') + chalk.gray(' ......... Set TTS prefix\n\n') +
-      chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n') +
+      chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n\n');
+
+    if (!userConfig.isReceiver) {
+      successContent += chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n');
+    }
+
+    successContent +=
       chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes\n') +
       chalk.gray('📖 Docs: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes/blob/master/README.md');
 
