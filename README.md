@@ -4,14 +4,14 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **Clawdbot** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **OpenClaw** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.2.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.3.0-alpha.5
 
 ---
 
@@ -22,7 +22,7 @@
 | **Install AgentVibes** (just `npx`, no git!) | [Quick Start Guide](docs/quick-start.md) |
 | **Understand what I need** (spoiler: just Node.js!) | [Prerequisites](#-prerequisites) |
 | **Set up on Windows (Claude Desktop)** | [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) |
-| **Use with Clawdbot** | [Clawdbot Integration](#-clawdbot-integration) |
+| **Use with OpenClaw** | [OpenClaw Integration](#-openclaw-integration) |
 | **Run Claude Code on Android** | [Android/Termux Setup](#-android--termux) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
@@ -35,7 +35,7 @@
 
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
-Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Terminal, or running Clawdbot - AgentVibes brings AI to life with professional voices and personalities.
+Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Terminal, or running OpenClaw - AgentVibes brings AI to life with professional voices and personalities.
 
 ### 🎯 Key Features
 
@@ -101,6 +101,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [💡 Common Workflows](#-common-workflows) - Quick examples
 - [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
 - [🔊 Remote Audio Setup](#-remote-audio-setup) - Play TTS from remote servers
+- [🔐 Security Hardening Guide](docs/security-hardening-guide.md) - **Required for production**: SSH, Fail2Ban, Tailscale, UFW, AIDE
 - [🔬 Technical Deep Dive](docs/technical-deep-dive.md) - How AgentVibes works under the hood
 - [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
 
@@ -117,17 +118,26 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.2.0 - Clawdbot Integration: AI Assistants on Any Messenger](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.2.0)** 🤖
+**[v3.3.0-alpha.5 - Remote Audio Revolution: Voiceless Servers → Phone & Mobile Playback](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.3.0-alpha.5)** 📱🔊
 
-AgentVibes v3.2.0 introduces seamless integration with Clawdbot, the revolutionary AI assistant accessible via any instant messenger. With this release, Clawdbot users get professional TTS with 50+ voices, remote SSH audio support for server deployments, and zero-configuration setup—just install AgentVibes and the Clawdbot skill is ready. The release also includes SonarCloud workflow fixes and improved test coverage validation.
+AgentVibes v3.3.0-alpha.5 brings breakthrough remote audio capabilities, turning your messaging apps into voice-enabled AI assistants! **Use Case:** Install [OpenClaw](https://openclaw.ai/) on a remote server, message it via Telegram or WhatsApp from anywhere, and AgentVibes (running in Termux on your phone) plays the TTS responses through your phone speakers—making it work like Siri, but powered by AgentVibes! This release enables voiceless servers to play audio remotely on phones, mobile devices, or any machine via SSH/PulseAudio tunneling. Also includes audio tracks directory structure fix and comprehensive OpenClaw skill documentation.
 
 **Key Highlights:**
-- 🤖 **Clawdbot Integration** - Native TTS support for Clawdbot AI assistant framework
-- 💬 **Messenger Platforms** - Works with WhatsApp, Telegram, Discord via Clawdbot
-- 🔊 **Remote SSH Audio** - Perfect for Clawdbot on remote servers with PulseAudio tunneling
-- 📦 **Simple Install** - Just `npx agentvibes install` and it works
-- 🛡️ **SonarCloud Fixes** - Quality gate workflow improvements and documentation
-- ✅ **Full Test Coverage** - All 213 BATS + 47 Node tests passing
+- 📱 **Voiceless Server Support** - Generate TTS on servers without audio hardware, play on remote devices
+- 🔊 **Phone/Mobile Playback** - Audio tunnels from cloud servers to your phone or local machine via SSH
+- 🌐 **PulseAudio SSH Tunneling** - Automatic audio routing through SSH reverse forwarding (port 14713)
+- 🤖 **Enhanced OpenClaw Integration** - Complete skill documentation with 50+ voices and remote audio setup
+- 🎵 **Audio Tracks Fix** - Corrected directory structure (backgrounds → tracks) with proper .npmignore entries
+- 📦 **Package Size Optimization** - 8.3 MB unpacked, 172 files, optimized for npm distribution
+- 🛡️ **Security & Quality** - Removed sensitive data from git history, SonarCloud compliance
+
+**Perfect For:**
+- Running AgentVibes/OpenClaw on AWS, GCP, Azure, DigitalOcean
+- VS Code Remote SSH development with TTS feedback
+- Android/Termux with audio playback on phone speakers
+- Any headless server → local audio scenario
+
+💡 **Alpha Testing:** This is a pre-release version. Report issues at [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
@@ -626,15 +636,17 @@ This design means **any TTS provider** can integrate with BMAD by replacing thes
 
 ---
 
-## 🤖 Clawdbot Integration
+## 🤖 OpenClaw Integration
 
-**Use AgentVibes TTS with Clawdbot - the revolutionary AI assistant you can access via any instant messenger!**
+**Use AgentVibes TTS with OpenClaw - the revolutionary AI assistant you can access via any instant messenger!**
 
-**What is Clawdbot?** [Clawdbot](https://clawd.bot) is a revolutionary AI assistant that brings Claude AI to your favorite messaging platforms - WhatsApp, Telegram, Discord, and more. No apps to install, no websites to visit - just message your AI assistant like you would a friend.
+**What is OpenClaw?** [OpenClaw](https://openclaw.ai/) is a revolutionary AI assistant that brings Claude AI to your favorite messaging platforms - WhatsApp, Telegram, Discord, and more. No apps to install, no websites to visit - just message your AI assistant like you would a friend.
 
-🌐 **Website**: https://clawd.bot
+🌐 **Website**: https://openclaw.ai/
 
-AgentVibes seamlessly integrates with Clawdbot, providing professional text-to-speech for AI assistants running on messaging platforms and remote servers.
+AgentVibes seamlessly integrates with OpenClaw, providing professional text-to-speech for AI assistants running on messaging platforms and remote servers.
+
+⚠️ **Security Notice**: Running OpenClaw on a remote server with SSH access exposes your infrastructure to security risks. See our **[Security Hardening Guide](docs/security-hardening-guide.md)** for comprehensive setup instructions covering SSH hardening, Fail2Ban, Tailscale VPN, UFW firewall, and intrusion detection.
 
 ### 🎯 Key Benefits
 
@@ -645,17 +657,115 @@ AgentVibes seamlessly integrates with Clawdbot, providing professional text-to-s
 
 ### 🚀 Installation
 
+AgentVibes includes a ready-to-use OpenClaw skill that enables TTS on messaging platforms. The setup involves two components:
+
+#### Component 1: OpenClaw Server (Remote)
+
+Install AgentVibes on your OpenClaw server:
+
+```bash
+# On your remote server where OpenClaw is running
+npx agentvibes install
+```
+
+The OpenClaw skill is **automatically included** in the AgentVibes npm package at `.clawdbot/skill/SKILL.md`.
+
+**How to activate the skill in OpenClaw:**
+
+1. **Locate the skill** - After installing AgentVibes, the skill is at:
+   ```
+   node_modules/agentvibes/.clawdbot/skill/SKILL.md
+   ```
+
+2. **Link to OpenClaw skills directory** (if OpenClaw uses skills):
+   ```bash
+   # Example - adjust path based on your OpenClaw installation
+   ln -s $(npm root -g)/agentvibes/.clawdbot/skill/SKILL.md ~/.openclaw/skills/agentvibes.md
+   ```
+
+3. **OpenClaw auto-detection** - Many OpenClaw setups automatically detect AgentVibes when it's installed. Check your OpenClaw logs for:
+   ```
+   ✓ AgentVibes skill detected and loaded
+   ```
+
+#### Component 2: AgentVibes Receiver (Local/Phone) ⚠️ REQUIRED
+
+**CRITICAL: You MUST install AgentVibes on your phone (or local machine) to receive and play audio!**
+
+Without this, audio cannot be heard - the server generates TTS but needs a receiver to play it.
+
+**Install on Android Phone (Termux):**
+
+1. **Install Termux from F-Droid** (NOT Google Play):
+   - Download: https://f-droid.org/en/packages/com.termux/
+
+2. **Install Node.js in Termux:**
+   ```bash
+   pkg update && pkg upgrade
+   pkg install nodejs-lts
+   ```
+
+3. **Install AgentVibes in Termux:**
+   ```bash
+   npx agentvibes install
+   ```
+
+4. **Install Termux:API** (for audio playback):
+   - Download: https://f-droid.org/en/packages/com.termux.api/
+   - Then in Termux: `pkg install termux-api`
+
+**Install on Local Mac/Linux:**
+
 ```bash
 npx agentvibes install
 ```
 
-That's it! AgentVibes is ready to use.
+**Why is this needed?**
+- The **server generates TTS** but has no speakers (headless)
+- AgentVibes on your **phone acts as the audio receiver** via SSH tunnel
+- Audio tunnels from server → SSH → phone → speakers 🔊
+
+Without AgentVibes installed on the receiving device, you'll generate audio but hear nothing!
+
+#### How It Works: Server → SSH Tunnel → Local Playback
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. User messages OpenClaw via Telegram/WhatsApp       │
+│     "Tell me about the weather"                         │
+└─────────────────────────────────────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────────────┐
+│  2. OpenClaw (Server) processes request with Claude    │
+│     AgentVibes skill generates TTS audio               │
+└─────────────────────────────────────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────────────┐
+│  3. Audio tunnels through SSH → PulseAudio (port 14713)│
+│     Server: PULSE_SERVER=tcp:localhost:14713           │
+└─────────────────────────────────────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────────────┐
+│  4. Local AgentVibes receives and plays audio          │
+│     Phone speakers, laptop speakers, etc.              │
+│     🔊 "The weather is sunny and 72 degrees"            │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Architecture:**
+- **Server (OpenClaw)**: Generates TTS, sends via PulseAudio
+- **SSH Tunnel**: RemoteForward port 14713 (encrypted transport)
+- **Local (Termux/Desktop)**: AgentVibes receives audio, plays on speakers
+
+This creates a **Siri-like experience** - message from anywhere, hear responses on your phone! 📱🎤
 
 ### 📝 Usage
 
+#### Basic TTS Commands
+
 ```bash
 # Basic TTS
-npx agentvibes speak "Hello from Clawdbot"
+npx agentvibes speak "Hello from OpenClaw"
 
 # With different voices
 npx agentvibes speak "Hello" --voice en_US-amy-medium
@@ -665,9 +775,99 @@ npx agentvibes speak "Bonjour" --voice fr_FR-siwis-medium
 npx agentvibes voices
 ```
 
+#### Advanced: Direct Hook Usage with Voice Override
+
+For programmatic control, use the TTS hook directly:
+
+```bash
+# Basic: Use default voice
+bash ~/.claude/hooks/play-tts.sh "Hello from OpenClaw"
+
+# Advanced: Override voice per message
+bash ~/.claude/hooks/play-tts.sh "Welcome message" "en_US-amy-medium"
+bash ~/.claude/hooks/play-tts.sh "Bonjour!" "fr_FR-siwis-medium"
+bash ~/.claude/hooks/play-tts.sh "British greeting" "en_GB-alan-medium"
+```
+
+**Parameters:**
+- `$1` - **TEXT** (required): Message to speak
+- `$2` - **VOICE** (optional): Voice name to override default
+
+#### Audio Effects Configuration for OpenClaw
+
+**File**: `.claude/config/audio-effects.cfg`
+
+Customize audio effects, background music, and voice processing per agent or use default settings:
+
+**Format:**
+```
+AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME
+```
+
+**Example Configuration:**
+
+```bash
+# Default - subtle background music
+default||agentvibes_soft_flamenco_loop.mp3|0.30
+
+# Custom agent with reverb + background
+MyAgent|reverb 40 50 90 gain -2|agentvibes_soft_flamenco_loop.mp3|0.20
+
+# Agent with pitch shift and EQ
+Assistant|pitch -100 equalizer 3000 1q +2|agentvibes_dark_chill_step_loop.mp3|0.15
+```
+
+**Available SOX Effects:**
+
+| Effect | Syntax | Example | Description |
+|--------|--------|---------|-------------|
+| **Reverb** | `reverb <reverberance> <HF-damping> <room-scale>` | `reverb 40 50 90` | Adds room ambiance (light: 30 40 70, heavy: 50 60 100) |
+| **Pitch** | `pitch <cents>` | `pitch -100` | Shift pitch (100 cents = 1 semitone, negative = lower) |
+| **Equalizer** | `equalizer <freq> <width>q <gain-dB>` | `equalizer 3000 1q +2` | Boost/cut frequencies (bass: 200Hz, treble: 4000Hz) |
+| **Gain** | `gain <dB>` | `gain -2` | Adjust volume (negative = quieter, positive = louder) |
+| **Compand** | `compand <attack,decay> <threshold:in,out>` | `compand 0.3,1 6:-70,-60,-20` | Dynamic range compression (makes quiet parts louder) |
+
+**Background Music Tracks:**
+
+Built-in tracks available in `.claude/audio/tracks/`:
+- `agentvibes_soft_flamenco_loop.mp3` - Warm, rhythmic flamenco
+- `agentvibes_dark_chill_step_loop.mp3` - Modern chill electronic
+- (50+ additional tracks available)
+
+**Background Volume:**
+- `0.10` - Very subtle (10%)
+- `0.20` - Subtle (20%)
+- `0.30` - Moderate (30%, recommended default)
+- `0.40` - Noticeable (40%, party mode)
+
+**Example: OpenClaw Custom Configuration**
+
+Create `.claude/config/audio-effects.cfg` on your OpenClaw server:
+
+```bash
+# OpenClaw assistant - warm voice with subtle reverb
+OpenClaw|reverb 30 40 70 gain -1|agentvibes_soft_flamenco_loop.mp3|0.25
+
+# Help desk agent - clear, bright voice
+HelpDesk|equalizer 4000 1q +3 compand 0.2,0.5 6:-70,-60,-20|agentvibes_dark_chill_step_loop.mp3|0.15
+
+# Default fallback
+default||agentvibes_soft_flamenco_loop.mp3|0.30
+```
+
+**How AgentVibes Applies Effects:**
+
+1. **Generate TTS** - Create base audio with Piper TTS
+2. **Apply SOX effects** - Process audio (reverb, EQ, pitch, etc.)
+3. **Mix background** - Blend background music at specified volume
+4. **Tunnel via SSH** - Send processed audio to local receiver
+5. **Play on device** - Output to phone/laptop speakers
+
+This allows **per-message customization** or **consistent agent branding** with unique audio signatures!
+
 ### 🔊 Remote SSH Audio
 
-Perfect for running Clawdbot on a remote server with audio on your local machine:
+Perfect for running OpenClaw on a remote server with audio on your local machine:
 
 **Quick Setup:**
 
@@ -686,16 +886,17 @@ Host your-server
 3. **Connect and test**:
 ```bash
 ssh your-server
-agentvibes speak "Testing remote audio from Clawdbot"
+agentvibes speak "Testing remote audio from OpenClaw"
 ```
 
 Audio plays on your local speakers! 🔊
 
 ### 📚 Documentation
 
-- **Clawdbot Skill**: [.clawdbot/README.md](.clawdbot/README.md)
-- **Clawdbot Website**: https://clawd.bot
+- **OpenClaw Skill**: [.clawdbot/README.md](.clawdbot/README.md)
+- **OpenClaw Website**: https://openclaw.ai/
 - **Remote Audio Setup**: [docs/remote-audio-setup.md](docs/remote-audio-setup.md)
+- **Security Hardening**: [docs/security-hardening-guide.md](docs/security-hardening-guide.md) ⚠️
 
 [↑ Back to top](#-table-of-contents)
 
