@@ -20,6 +20,14 @@ yarn-error.log*
 !.claude/audio/backgrounds/README.md
 !.claude/audio/backgrounds/dreamy-house.mp3
 !.claude/audio/backgrounds/agent-vibes-dark-chill-step.mp3
+
+# TTS cache files (NEVER commit these - they can be 5GB+)
+.claude/audio/tts-*.mp3
+.claude/audio/tts-*.wav
+.claude/audio/tts-padded-*.mp3
+.claude/audio/tts-padded-*.wav
+.claude/audio/bmad-party-mode-recordings/
+
 .claude/journal/
 .claude/tts-*.txt
 # Config files (but keep audio-effects sample template)

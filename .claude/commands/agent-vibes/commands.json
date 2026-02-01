@@ -132,6 +132,10 @@
     {
       "name": "bmad",
       "description": "BMAD voice integration and agent voice assignment"
+    },
+    {
+      "name": "cleanup",
+      "description": "Clean up TTS cache files to free up disk space"
     }
   ]
 }
