@@ -86,9 +86,19 @@ echo "🎤 Voice: $VOICE | Agent: $DECODED_AGENT" >&2
 # Try to create lock directory - will fail if already exists
 waited=0
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-  # Lock exists, wait
-  if [[ $waited -ge 30 ]]; then
-    echo "⏱️  Timeout waiting for TTS lock after ${LOCK_TIMEOUT}s" >&2
+  # Lock exists, check if it's stale (>120 seconds old)
+  if [[ -d "$LOCK_DIR" ]]; then
+    LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK_DIR" 2>/dev/null || date +%s) ))
+    if [[ $LOCK_AGE -gt 120 ]]; then
+      echo "⚠️  Removing stale lock (${LOCK_AGE}s old)" >&2
+      rm -rf "$LOCK_DIR"
+      continue
+    fi
+  fi
+  
+  # Wait for lock
+  if [[ $waited -ge 15 ]]; then
+    echo "⏱️  Timeout waiting for TTS lock after 30s" >&2
     exit 1
   fi
   sleep 2
@@ -117,20 +127,15 @@ if [[ -z "$AUDIO_FILE" ]]; then
 fi
 
 # Wait for audio to finish playing
-if [[ -n "$AUDIO_FILE" ]] && [[ -f "$AUDIO_FILE" ]]; then
-  # Get audio duration using ffprobe
-  DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_FILE" 2>/dev/null || echo "5")
-  # Round up and add 1 second buffer
-  WAIT_TIME=$(echo "$DURATION + 1.5" | bc 2>/dev/null || echo "6")
-  echo "  ⏱️  Waiting ${WAIT_TIME}s for audio to complete..." >&2
-  sleep "$WAIT_TIME"
-else
-  # Fallback: estimate based on text length (rough: 150 words/minute)
-  TEXT_LENGTH=${#DECODED_TEXT}
-  WAIT_TIME=$(echo "scale=1; $TEXT_LENGTH / 20 + 2" | bc 2>/dev/null || echo "5")
-  echo "  ⏱️  Waiting ~${WAIT_TIME}s for audio..." >&2
-  sleep "$WAIT_TIME"
+# Estimate based on text length: ~10 chars/second speech + 2s buffer
+TEXT_LENGTH=${#DECODED_TEXT}
+WAIT_TIME=$(( (TEXT_LENGTH / 10) + 2 ))
+# Cap at 30 seconds max
+if [[ $WAIT_TIME -gt 30 ]]; then
+  WAIT_TIME=30
 fi
+echo "  ⏱️  Waiting ${WAIT_TIME}s for audio..." >&2
+sleep "$WAIT_TIME"
 
 # Lock will be automatically removed by trap
 
