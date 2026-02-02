@@ -4,7 +4,7 @@
 #
 # AgentVibes Clawdbot Receiver - SSH-Remote TTS with Agent Support and Intro Messages
 # Receives base64-encoded text, voice, agent name, and optional intro from remote Clawdbot instances
-# Uses TTS queue to prevent audio overlap when multiple messages arrive quickly
+# Uses file locking to prevent audio overlap when multiple messages arrive quickly
 #
 # Usage (called via SSH from remote):
 #   clawdbot-receiver.sh <base64_text> <voice> <base64_agent_name> [base64_intro]
@@ -30,6 +30,10 @@ ENCODED_TEXT="${1:-}"
 VOICE="${2:-en_US-lessac-medium}"
 ENCODED_AGENT="${3:-}"
 ENCODED_INTRO="${4:-}"
+
+# Lock file to prevent simultaneous audio playback
+LOCK_FILE="/tmp/agentvibes-tts.lock"
+LOCK_TIMEOUT=30  # seconds
 
 # Validate inputs
 if [[ -z "$ENCODED_TEXT" ]]; then
@@ -76,19 +80,37 @@ else
   exit 1
 fi
 
-echo "🎤 Voice: $VOICE | Music: $(echo -n "$DECODED_AGENT" | base64 -w 0) | Vol: 30% | Effects: default" >&2
+echo "🎤 Voice: $VOICE | Agent: $DECODED_AGENT" >&2
 
-# Use TTS queue if available (prevents audio overlap)
+# Wait for lock with timeout
+waited=0
+while [[ -f "$LOCK_FILE" ]] && [[ $waited -lt $LOCK_TIMEOUT ]]; do
+  sleep 0.5
+  waited=$((waited + 1))
+done
+
+# Create lock file
+echo "$$" > "$LOCK_FILE"
+
+# Ensure lock is removed on exit
+trap "rm -f '$LOCK_FILE'" EXIT
+
+# Play TTS
 cd "$AGENTVIBES_ROOT"
-if [[ -f ".claude/hooks/tts-queue.sh" ]]; then
-  # Queue the TTS request for sequential playback
-  bash .claude/hooks/tts-queue.sh add "$DECODED_TEXT" "$VOICE" "$DECODED_AGENT" 2>&1
-else
-  # Fallback to direct playback (may overlap)
-  bash .claude/hooks/play-tts-enhanced.sh "$DECODED_TEXT" "$DECODED_AGENT" "$VOICE" 2>&1 || {
-    echo "⚠️  Enhanced TTS failed, using standard TTS" >&2
-    bash .claude/hooks/play-tts.sh "$DECODED_TEXT" "$VOICE" 2>&1
-  }
-fi
+bash .claude/hooks/play-tts-enhanced.sh "$DECODED_TEXT" "$DECODED_AGENT" "$VOICE" 2>&1 || {
+  echo "⚠️  Enhanced TTS failed, using standard TTS" >&2
+  bash .claude/hooks/play-tts.sh "$DECODED_TEXT" "$VOICE" 2>&1
+}
+
+# Wait for all background audio players to finish
+# This ensures the lock isn't released until audio playback completes
+sleep 0.5  # Give audio player time to start
+while pgrep -f "mpv.*$AGENTVIBES_ROOT" >/dev/null 2>&1 || \
+      pgrep -f "aplay.*$AGENTVIBES_ROOT" >/dev/null 2>&1 || \
+      pgrep -f "paplay.*$AGENTVIBES_ROOT" >/dev/null 2>&1; do
+  sleep 0.5
+done
+
+# Lock will be automatically removed by trap
 
 exit 0
