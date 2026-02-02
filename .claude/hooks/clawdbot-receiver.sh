@@ -95,21 +95,36 @@ echo "$$" > "$LOCK_FILE"
 # Ensure lock is removed on exit
 trap "rm -f '$LOCK_FILE'" EXIT
 
-# Play TTS
+# Play TTS and get the output file path
 cd "$AGENTVIBES_ROOT"
-bash .claude/hooks/play-tts-enhanced.sh "$DECODED_TEXT" "$DECODED_AGENT" "$VOICE" 2>&1 || {
+TTS_OUTPUT=$(bash .claude/hooks/play-tts-enhanced.sh "$DECODED_TEXT" "$DECODED_AGENT" "$VOICE" 2>&1 || {
   echo "⚠️  Enhanced TTS failed, using standard TTS" >&2
   bash .claude/hooks/play-tts.sh "$DECODED_TEXT" "$VOICE" 2>&1
-}
+})
 
-# Wait for all background audio players to finish
-# This ensures the lock isn't released until audio playback completes
-sleep 0.5  # Give audio player time to start
-while pgrep -f "mpv.*$AGENTVIBES_ROOT" >/dev/null 2>&1 || \
-      pgrep -f "aplay.*$AGENTVIBES_ROOT" >/dev/null 2>&1 || \
-      pgrep -f "paplay.*$AGENTVIBES_ROOT" >/dev/null 2>&1; do
-  sleep 0.5
-done
+echo "$TTS_OUTPUT" >&2
+
+# Extract the audio file path from output
+AUDIO_FILE=$(echo "$TTS_OUTPUT" | grep "Enhanced audio:" | sed 's/.*Enhanced audio: //' | tr -d '\r\n')
+if [[ -z "$AUDIO_FILE" ]]; then
+  AUDIO_FILE=$(echo "$TTS_OUTPUT" | grep "Saved to:" | sed 's/.*Saved to: //' | tr -d '\r\n')
+fi
+
+# Wait for audio to finish playing
+if [[ -n "$AUDIO_FILE" ]] && [[ -f "$AUDIO_FILE" ]]; then
+  # Get audio duration using ffprobe
+  DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$AUDIO_FILE" 2>/dev/null || echo "5")
+  # Round up and add 1 second buffer
+  WAIT_TIME=$(echo "$DURATION + 1.5" | bc 2>/dev/null || echo "6")
+  echo "  ⏱️  Waiting ${WAIT_TIME}s for audio to complete..." >&2
+  sleep "$WAIT_TIME"
+else
+  # Fallback: estimate based on text length (rough: 150 words/minute)
+  TEXT_LENGTH=${#DECODED_TEXT}
+  WAIT_TIME=$(echo "scale=1; $TEXT_LENGTH / 20 + 2" | bc 2>/dev/null || echo "5")
+  echo "  ⏱️  Waiting ~${WAIT_TIME}s for audio..." >&2
+  sleep "$WAIT_TIME"
+fi
 
 # Lock will be automatically removed by trap
 
