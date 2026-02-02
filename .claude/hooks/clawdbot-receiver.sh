@@ -31,9 +31,9 @@ VOICE="${2:-en_US-lessac-medium}"
 ENCODED_AGENT="${3:-}"
 ENCODED_INTRO="${4:-}"
 
-# Lock file to prevent simultaneous audio playback
-LOCK_FILE="/tmp/agentvibes-tts.lock"
-LOCK_TIMEOUT=30  # seconds
+# Lock directory to prevent simultaneous audio playback (mkdir is atomic)
+LOCK_DIR="/tmp/agentvibes-tts.lock"
+LOCK_TIMEOUT=60  # seconds (30 iterations * 2 seconds each)
 
 # Validate inputs
 if [[ -z "$ENCODED_TEXT" ]]; then
@@ -82,18 +82,24 @@ fi
 
 echo "🎤 Voice: $VOICE | Agent: $DECODED_AGENT" >&2
 
-# Wait for lock with timeout
+# Acquire lock atomically using mkdir (atomic operation)
+# Try to create lock directory - will fail if already exists
 waited=0
-while [[ -f "$LOCK_FILE" ]] && [[ $waited -lt $LOCK_TIMEOUT ]]; do
-  sleep 0.5
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  # Lock exists, wait
+  if [[ $waited -ge 30 ]]; then
+    echo "⏱️  Timeout waiting for TTS lock after ${LOCK_TIMEOUT}s" >&2
+    exit 1
+  fi
+  sleep 2
   waited=$((waited + 1))
 done
 
-# Create lock file
-echo "$$" > "$LOCK_FILE"
+# Lock acquired! Store our PID
+echo "$$" > "$LOCK_DIR/pid"
 
-# Ensure lock is removed on exit
-trap "rm -f '$LOCK_FILE'" EXIT
+# Ensure lock directory is removed on exit
+trap "rm -rf '$LOCK_DIR'" EXIT
 
 # Play TTS and get the output file path
 cd "$AGENTVIBES_ROOT"
