@@ -4,7 +4,7 @@
 #
 # AgentVibes Clawdbot Receiver - SSH-Remote TTS with Agent Support and Intro Messages
 # Receives base64-encoded text, voice, agent name, and optional intro from remote Clawdbot instances
-# Calls AgentVibes play-tts-enhanced.sh to apply agent-specific audio effects
+# Uses TTS queue to prevent audio overlap when multiple messages arrive quickly
 #
 # Usage (called via SSH from remote):
 #   clawdbot-receiver.sh <base64_text> <voice> <base64_agent_name> [base64_intro]
@@ -78,12 +78,17 @@ fi
 
 echo "🎤 Voice: $VOICE | Music: $(echo -n "$DECODED_AGENT" | base64 -w 0) | Vol: 30% | Effects: default" >&2
 
-# Call AgentVibes play-tts-enhanced.sh with agent name for audio-effects.cfg lookup
-cd "$AGENTVIBES_ROOT" && \
+# Use TTS queue if available (prevents audio overlap)
+cd "$AGENTVIBES_ROOT"
+if [[ -f ".claude/hooks/tts-queue.sh" ]]; then
+  # Queue the TTS request for sequential playback
+  bash .claude/hooks/tts-queue.sh add "$DECODED_TEXT" "$VOICE" "$DECODED_AGENT" 2>&1
+else
+  # Fallback to direct playback (may overlap)
   bash .claude/hooks/play-tts-enhanced.sh "$DECODED_TEXT" "$DECODED_AGENT" "$VOICE" 2>&1 || {
-  # Fallback to standard play-tts if enhanced fails
-  echo "⚠️  Enhanced TTS failed, using standard TTS" >&2
-  bash .claude/hooks/play-tts.sh "$DECODED_TEXT" "$VOICE" 2>&1
-}
+    echo "⚠️  Enhanced TTS failed, using standard TTS" >&2
+    bash .claude/hooks/play-tts.sh "$DECODED_TEXT" "$VOICE" 2>&1
+  }
+fi
 
 exit 0
