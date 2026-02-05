@@ -135,7 +135,11 @@
     },
     {
       "name": "cleanup",
-      "description": "Clean up TTS cache files to free up disk space"
+      "description": "Clean up TTS cache files to free up disk space (interactive)"
+    },
+    {
+      "name": "clean",
+      "description": "Clean all TTS audio cache files (non-interactive)"
     }
   ]
 }
