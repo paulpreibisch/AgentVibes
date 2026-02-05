@@ -453,11 +453,9 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
 fi
 
 # Display with file count and auto-clean indicator
-# Use shorter filename (just tts-timestamp)
-TEMP_FILENAME=$(basename "$TEMP_FILE" | sed 's/tts-processed-/tts-/')
 # Get auto-clean threshold for display
 AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
-echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILENAME 📦 $FILE_COUNT ${CACHE_COLOR}$SIZE_HUMAN${NC} ${GOLD}🧹[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
+echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${WHITE}📦${NC} ${YELLOW}$FILE_COUNT${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
 
 # Auto-cleanup check - delete oldest files if over size threshold
 THRESHOLD_MB=$(get_auto_clean_threshold)
