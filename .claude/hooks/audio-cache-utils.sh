@@ -140,21 +140,22 @@ get_auto_clean_threshold() {
   echo "50"
 }
 
-# Delete oldest TTS files to stay under threshold
-# Args: $1 = audio_dir, $2 = threshold (files to keep)
+# Delete oldest TTS files to stay under size threshold (in MB)
+# Args: $1 = audio_dir, $2 = threshold (size in MB)
 # Returns: Number of files deleted
 auto_clean_old_files() {
   local audio_dir="${1:-$(get_audio_dir)}"
-  local threshold="${2:-50}"
+  local threshold_mb="${2:-15}"
+  local threshold_bytes=$((threshold_mb * 1048576))
 
   if [[ ! -d "$audio_dir" ]]; then
     echo "0"
     return
   fi
 
-  local current_count=$(count_tts_files "$audio_dir")
+  local current_size=$(calculate_tts_size_bytes "$audio_dir")
 
-  if [[ $current_count -le $threshold ]]; then
+  if [[ $current_size -le $threshold_bytes ]]; then
     echo "0"
     return
   fi
@@ -167,22 +168,32 @@ auto_clean_old_files() {
     return 0
   fi
 
-  local to_delete=$((current_count - threshold))
+  local files_deleted=0
+  local current_size_bytes=$current_size
 
-  # Find oldest files by modification time and delete them
-  find "$audio_dir" -maxdepth 1 -type f \( \
-    -name "tts-*.wav" -o \
-    -name "tts-*.mp3" -o \
-    -name "tts-*.aiff" -o \
-    -name "tts-padded-*.mp3" -o \
-    -name "tts-padded-*.wav" \
-  \) -printf '%T+ %p\n' 2>/dev/null | \
-  sort | \
-  head -n "$to_delete" | \
-  cut -d' ' -f2- | \
-  xargs -r rm -f 2>/dev/null || true
+  # Delete oldest files until under threshold
+  while [[ $current_size_bytes -gt $threshold_bytes ]]; do
+    # Find the oldest file
+    local oldest_file=$(find "$audio_dir" -maxdepth 1 -type f \( \
+      -name "tts-*.wav" -o \
+      -name "tts-*.mp3" -o \
+      -name "tts-*.aiff" -o \
+      -name "tts-padded-*.mp3" -o \
+      -name "tts-padded-*.wav" \
+    \) -printf '%T+ %p\n' 2>/dev/null | sort | head -1 | cut -d' ' -f2-)
 
-  echo "$to_delete"
+    if [[ -z "$oldest_file" ]]; then
+      break
+    fi
+
+    # Get file size and delete it
+    local file_size=$(stat -c%s "$oldest_file" 2>/dev/null || stat -f%z "$oldest_file" 2>/dev/null || echo "0")
+    rm -f "$oldest_file" 2>/dev/null || true
+    current_size_bytes=$((current_size_bytes - file_size))
+    files_deleted=$((files_deleted + 1))
+  done
+
+  echo "$files_deleted"
 }
 
 # Clean all TTS audio files and report stats

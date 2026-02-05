@@ -314,18 +314,19 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
   CACHE_COLOR=$YELLOW
 fi
 
-# Display with file count and size in dynamic color brackets
+# Display with file count and auto-clean indicator
+# Use shorter filename (just tts-timestamp)
+TEMP_FILENAME=$(basename "$TEMP_FILE" | sed 's/tts-processed-/tts-/')
 # Get auto-clean threshold for display
 AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
-AUTO_CLEAN_THRESHOLD_SIZE="15mb"  # Display value (could be dynamically set)
-echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} - ${LIGHT_PURPLE}🧹 AutoClean On ($AUTO_CLEAN_THRESHOLD_SIZE)${NC}"
+echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILENAME 📦 $FILE_COUNT ${CACHE_COLOR}$SIZE_HUMAN${NC} ${GOLD}🧹[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
 
-# Auto-cleanup check - delete oldest files if over threshold
-THRESHOLD=$(get_auto_clean_threshold)
-if [[ $FILE_COUNT -gt $THRESHOLD ]]; then
-  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$THRESHOLD")
+# Auto-cleanup check - delete oldest files if over size threshold
+THRESHOLD_MB=$(get_auto_clean_threshold)
+if [[ $SIZE_BYTES -gt $((THRESHOLD_MB * 1048576)) ]]; then
+  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$THRESHOLD_MB")
   if [[ $DELETED -gt 0 ]]; then
-    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files (threshold: $THRESHOLD)${NC}"
+    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED files${NC}"
   fi
 fi
 
