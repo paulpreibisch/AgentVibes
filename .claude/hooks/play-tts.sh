@@ -46,6 +46,7 @@ export LC_ALL=C
 # Get script directory (needed for mute file check)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+export PROJECT_ROOT  # Export for child scripts
 
 # Check if muted (persists across sessions)
 # Project settings always override global settings:

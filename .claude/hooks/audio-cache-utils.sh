@@ -69,7 +69,7 @@ calculate_tts_size_bytes() {
   local stat_cmd=""
 
   # Detect stat command format (BSD vs GNU)
-  if stat -c%s /dev/null 2>/dev/null; then
+  if stat -c%s /dev/null >/dev/null 2>&1; then
     stat_cmd="stat -c%s"
   else
     stat_cmd="stat -f%z"
@@ -157,6 +157,14 @@ auto_clean_old_files() {
   if [[ $current_count -le $threshold ]]; then
     echo "0"
     return
+  fi
+
+  # SAFETY CHECK: Skip cleanup if any TTS files have active write locks
+  # Check for .lock files that indicate in-progress TTS generation
+  local lock_count=$(find "$audio_dir" -maxdepth 1 -name "tts-*.lock" -type f 2>/dev/null | wc -l)
+  if [[ $lock_count -gt 0 ]]; then
+    # Active TTS generation in progress, skip cleanup to avoid race condition
+    return 0
   fi
 
   local to_delete=$((current_count - threshold))

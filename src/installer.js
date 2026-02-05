@@ -71,6 +71,13 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
+// Validate Node.js executable is available (CLAUDE.md - early validation)
+if (!process.execPath) {
+  console.error('❌ Error: Node.js executable path not found');
+  console.error('   Please ensure Node.js is properly installed and in your PATH');
+  process.exit(1);
+}
+
 /**
  * Detect if running on Android/Termux environment
  * @returns {boolean} True if running on Termux/Android
@@ -321,8 +328,9 @@ function getPageTitle(pageNum) {
     0: '🔧 System Dependencies',
     1: '🎙️ TTS Provider Configuration',
     2: '🎤 Voice Selection',
-    3: '💧 Audio Settings',
-    4: '🔊 Verbosity Settings'
+    3: '😎 Personality Selection',
+    4: '💧 Audio Settings',
+    5: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -423,6 +431,7 @@ async function collectConfiguration(options = {}) {
     piperPath: null,
     sshHost: null,
     defaultVoice: null,
+    personality: 'none',
     reverb: 'light',
     backgroundMusic: {
       enabled: true,
@@ -462,7 +471,7 @@ async function collectConfiguration(options = {}) {
   }
 
   let currentPage = 0;
-  const sectionPages = 5; // System Dependencies, Provider, Voice Selection, Audio Settings, Verbosity
+  const sectionPages = 6; // System Dependencies, Provider, Voice Selection, Personality Selection, Audio Settings, Verbosity
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -857,7 +866,107 @@ async function collectConfiguration(options = {}) {
       }
 
     } else if (currentPage === 3) {
-      // Page 4: Audio Settings (Reverb + Background Music)
+      // Page 4: Personality Selection
+      console.log(boxen(
+        chalk.white('Give your Agent a personality!\n\n') +
+        chalk.gray('Personalities add character and style to TTS responses.\n') +
+        chalk.gray('Examples: sarcastic, pirate, zen, professional, etc.\n\n') +
+        chalk.yellow('Default: ') + chalk.cyan('none') + chalk.gray(' (professional, no character)\n\n') +
+        chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:personality <style>'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'gray',
+          width: 80
+        }
+      ));
+
+      // Build personality choices from .claude/personalities directory
+      const personalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
+      let personalityChoices = [];
+
+      try {
+        const personalityFiles = await fs.readdir(personalitiesDir);
+        const personalities = [];
+
+        for (const file of personalityFiles) {
+          if (file.endsWith('.md')) {
+            const personalityName = file.replace('.md', '');
+            const filePath = path.join(personalitiesDir, file);
+            const content = await fs.readFile(filePath, 'utf-8');
+
+            // Extract description from frontmatter
+            const descMatch = content.match(/^description:\s*(.+)$/m);
+            const description = descMatch ? descMatch[1].trim() : '';
+
+            personalities.push({
+              name: personalityName,
+              description: description
+            });
+          }
+        }
+
+        // Sort alphabetically
+        personalities.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Add "none" as first option (default)
+        personalityChoices.push(
+          { name: chalk.green('none') + chalk.gray(' (Professional, no personality) - Recommended'), value: 'none' },
+          new inquirer.Separator(chalk.gray('─'.repeat(60)))
+        );
+
+        // Add all other personalities
+        for (const p of personalities) {
+          if (p.name !== 'normal') { // Skip 'normal' as it's similar to 'none'
+            personalityChoices.push({
+              name: chalk.cyan(p.name) + chalk.gray(` - ${p.description}`),
+              value: p.name
+            });
+          }
+        }
+
+        personalityChoices.push(
+          new inquirer.Separator(),
+          { name: chalk.magentaBright('← Back to Voice Selection'), value: '__back__' }
+        );
+
+      } catch (error) {
+        // Fallback if personalities directory not found
+        personalityChoices = [
+          { name: chalk.green('none') + chalk.gray(' (Professional, no personality)'), value: 'none' },
+          { name: chalk.magentaBright('← Back to Voice Selection'), value: '__back__' }
+        ];
+      }
+
+      const { selectedPersonality } = await inquirer.prompt([{
+        type: 'list',
+        name: 'selectedPersonality',
+        message: chalk.yellow('Select your default personality:'),
+        choices: personalityChoices,
+        default: 'none',
+        pageSize: 15
+      }]);
+
+      if (selectedPersonality === '__back__') {
+        currentPage--; // Go back to voice selection
+        continue;
+      }
+
+      config.personality = selectedPersonality;
+
+      if (selectedPersonality === 'none') {
+        console.log(chalk.green('\n✓ No personality - professional mode\n'));
+      } else {
+        console.log(chalk.green(`\n✓ Personality selected: ${selectedPersonality}\n`));
+      }
+
+      // Auto-advance to next page
+      currentPage++;
+      continue;
+
+    } else if (currentPage === 4) {
+      // Page 5: Audio Settings (Reverb + Background Music)
       // Skip for termux-ssh - audio effects/background music don't work with SSH text-only TTS
       if (config.provider === 'termux-ssh') {
         console.log(boxen(
@@ -993,8 +1102,8 @@ async function collectConfiguration(options = {}) {
       currentPage++;
       continue;
 
-    } else if (currentPage === 4) {
-      // Page 5: Verbosity Settings
+    } else if (currentPage === 5) {
+      // Page 6: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -2314,6 +2423,47 @@ async function checkAndInstallPiper(targetDir, options) {
     try {
       execSync('command -v piper', { stdio: 'ignore' }); // NOSONAR - Safe: fixed command, no user input
       console.log(chalk.green('✅ Piper TTS is already installed\n'));
+
+      // Check if voices are installed
+      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
+      let hasVoices = false;
+
+      try {
+        if (fsSync.existsSync(piperVoicesDir)) {
+          const files = fsSync.readdirSync(piperVoicesDir);
+          const voiceFiles = files.filter(f => f.endsWith('.onnx'));
+          hasVoices = voiceFiles.length > 0;
+
+          if (hasVoices) {
+            console.log(chalk.green(`   Found ${voiceFiles.length} voice model(s)\n`));
+            return;
+          }
+        }
+      } catch {
+        // Ignore errors, fall through to download voices
+      }
+
+      // Piper installed but no voices - download them
+      console.log(chalk.yellow('   No voice models found - downloading recommended voices...\n'));
+      const piperDownloadPath = path.join(targetDir, '.claude', 'hooks', 'piper-download-voices.sh');
+
+      try {
+        if (fsSync.existsSync(piperDownloadPath)) {
+          execScript(`${piperDownloadPath} --yes`, {
+            stdio: 'inherit',
+            env: process.env
+          });
+          console.log(chalk.green('\n✅ Voice models downloaded successfully!\n'));
+        } else {
+          console.log(chalk.yellow('   Voice download script not found. You can download voices later with:'));
+          console.log(chalk.cyan('   ~/.claude/hooks/piper-download-voices.sh\n'));
+        }
+      } catch (error) {
+        console.log(chalk.yellow('\n⚠️  Voice download failed'));
+        console.log(chalk.gray('   You can download voices later by running:'));
+        console.log(chalk.cyan(`   ${piperDownloadPath}\n`));
+      }
+
       return;
     } catch {
       console.log(chalk.yellow('⚠️  Piper TTS binary not detected\n'));
@@ -3256,6 +3406,10 @@ async function install(options = {}) {
     configContent += chalk.gray(`   Default track: ${trackName}\n`);
   }
   configContent += '\n';
+  configContent += chalk.cyan('😎 Personality:\n');
+  const personalityDisplay = userConfig.personality === 'none' ? 'None (Professional)' : userConfig.personality.charAt(0).toUpperCase() + userConfig.personality.slice(1);
+  configContent += chalk.white(`   ${personalityDisplay}\n`);
+  configContent += '\n';
   configContent += chalk.cyan('🔊 Verbosity:\n');
   configContent += chalk.white(`   ${verbosityLabels[userConfig.verbosity]}\n`);
 
@@ -3591,6 +3745,12 @@ Troubleshooting:
     // Apply verbosity configuration from userConfig
     const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
     await fs.writeFile(verbosityFile, userConfig.verbosity);
+
+    // Apply personality configuration from userConfig
+    if (userConfig.personality && userConfig.personality !== 'none') {
+      const personalityFile = path.join(claudeDir, 'tts-personality.txt');
+      await fs.writeFile(personalityFile, userConfig.personality);
+    }
 
     // Initialize piperVoicesBoxen outside the conditional for proper scoping
     let piperVoicesBoxen = null;
