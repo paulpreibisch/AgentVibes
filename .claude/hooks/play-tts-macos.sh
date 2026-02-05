@@ -50,6 +50,9 @@ VOICE_OVERRIDE="$2"  # Optional: voice name (e.g., "Samantha", "Daniel")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Source audio cache utilities
+source "$SCRIPT_DIR/audio-cache-utils.sh"
+
 # Default voice for macOS
 DEFAULT_VOICE="Samantha"
 
@@ -280,5 +283,60 @@ fi
 (sleep $DURATION; rm -f "$LOCK_FILE") &
 disown
 
-echo "🎵 Saved to: $TEMP_FILE"
-echo "🎤 Voice used: $VOICE_NAME (macOS Say)"
+# Get audio cache stats
+AUDIO_DIR_PATH=$(get_audio_dir)
+FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
+SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH" | tail -1)  # Get last line only
+SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
+
+# Color codes
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+ORANGE='\033[0;33m'
+WHITE='\033[1;37m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+GOLD='\033[0;33m'
+NC='\033[0m'
+
+# Dynamic color coding based on cache size
+# Green: < 500MB (small)
+# Yellow: 500MB - 3GB (lots)
+# Red: > 3GB (extreme)
+CACHE_COLOR=$GREEN
+if [[ $SIZE_BYTES -gt 3221225472 ]]; then  # > 3GB
+  CACHE_COLOR=$RED
+elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
+  CACHE_COLOR=$YELLOW
+fi
+
+# Display with file count and size in dynamic color brackets, "Saved to" in blue, path with disk icon
+echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC}"
+
+# Auto-cleanup check - delete oldest files if over threshold
+THRESHOLD=$(get_auto_clean_threshold)
+if [[ $FILE_COUNT -gt $THRESHOLD ]]; then
+  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$THRESHOLD")
+  if [[ $DELETED -gt 0 ]]; then
+    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files (threshold: $THRESHOLD)${NC}"
+  fi
+fi
+
+echo -e "${CYAN}🎤 Voice used:${NC} ${WHITE}$VOICE_NAME (macOS Say)${NC}"
+
+# Show personality if configured
+PERSONALITY=$(cat "$PROJECT_ROOT/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
+if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
+  echo -e "${GOLD}💫 Personality:${NC} ${WHITE}$PERSONALITY${NC}"
+fi
+
+# Check audio folder size and warn if getting large
+if [[ -d "$AUDIO_DIR_PATH" ]]; then
+  AUDIO_SIZE=$(du -sm "$AUDIO_DIR_PATH" 2>/dev/null | cut -f1)
+  if [[ -n "$AUDIO_SIZE" ]] && [[ "$AUDIO_SIZE" -gt 100 ]]; then
+    echo -e "\033[0;31m⚠️  Audio cache is ${AUDIO_SIZE}MB - Run: /agent-vibes:cleanup\033[0m"
+  fi
+fi
