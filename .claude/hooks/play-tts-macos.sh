@@ -314,7 +314,9 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
 fi
 
 # Display with file count and size in dynamic color brackets, "Saved to" in blue, path with disk icon
-echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} auto-clean set to 15mb"
+# Extract just the filename to save space
+TEMP_FILENAME=$(basename "$TEMP_FILE")
+echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILENAME ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} auto-clean set to 15mb"
 
 # Auto-cleanup check - delete oldest files if over threshold
 THRESHOLD=$(get_auto_clean_threshold)
