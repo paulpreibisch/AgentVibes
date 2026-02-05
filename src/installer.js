@@ -1242,18 +1242,18 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.2.0 - Clawdbot Integration\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.3.0 - Remote Audio Revolution\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.2.0 introduces seamless integration with Clawdbot, the revolutionary AI\n') +
-    chalk.cyan('assistant accessible via any instant messenger. With this release, Clawdbot users get\n') +
-    chalk.cyan('professional TTS with 50+ voices, remote SSH audio support for server deployments, and\n') +
-    chalk.cyan('zero-configuration setup—just install AgentVibes and the Clawdbot skill is ready.\n\n') +
+    chalk.cyan('AgentVibes v3.3.0 unleashes the platform across remote servers, mobile devices, and OpenClaw\n') +
+    chalk.cyan('deployments. Stream TTS from voiceless servers to your phone via SSH-PulseAudio tunneling,\n') +
+    chalk.cyan('run native Piper on Android/Termux, and manage audio with intelligent size-based auto-cleanup.\n') +
+    chalk.cyan('Perfect for turning any server into a voice-enabled AI assistant.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🤖 Clawdbot Integration - Native TTS support for Clawdbot AI assistant framework\n') +
-    chalk.gray('   💬 Messenger Platforms - Works with WhatsApp, Telegram, Discord via Clawdbot\n') +
-    chalk.gray('   🔊 Remote SSH Audio - Perfect for Clawdbot on remote servers with PulseAudio\n') +
-    chalk.gray('   📦 Simple Install - Just `npx agentvibes install` and it works\n') +
-    chalk.gray('   🛡️ SonarCloud Fixes - Quality gate workflow improvements and documentation\n\n') +
+    chalk.gray('   📱 AgentVibes Receiver - Stream audio from voiceless servers to phones/laptops\n') +
+    chalk.gray('   🌐 Voiceless Server Support - Generate TTS on cloud servers (AWS, GCP, Azure)\n') +
+    chalk.gray('   🎤 Voice Management Skill - 50+ voices, multi-provider support for OpenClaw\n') +
+    chalk.gray('   🛡️ Smart Auto-Cleanup - Size-based cache management prevents disk bloat\n') +
+    chalk.gray('   🎨 Enhanced Display - Color-coded output with real-time cache metrics\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +

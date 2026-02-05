@@ -1,432 +1,241 @@
 ---
 name: agentvibes
-description: Text-to-speech using AgentVibes with PulseAudio/SSH tunnel support for remote servers. Use when you need to generate speech audio that plays on a local machine from a remote server, or when free/offline TTS is preferred over cloud APIs. Provides Piper TTS (50+ voices, multilingual, 100% free) with automatic audio tunneling through SSH.
+description: 🎤 AgentVibes Voice Management - Manage your text-to-speech voices across multiple providers (Piper TTS, Piper, macOS Say). Switch voices, preview audio, manage providers, add custom voices, and control TTS output.
 ---
 
-# AgentVibes TTS for Clawdbot
+# 🎤 AgentVibes Voice Management
 
-Generate text-to-speech audio using AgentVibes with full support for remote SSH sessions and PulseAudio tunneling.
+Manage your text-to-speech voices across multiple providers (Piper TTS, Piper, macOS Say).
 
-## Quick Start
+---
 
-### Basic TTS
+## Available Commands
 
-```bash
-# Simple TTS with default voice
-npx agentvibes speak "Your text here"
+### Voice Control
 
-# With a specific voice
-npx agentvibes speak "Hello" --voice en_US-amy-medium
-```
+#### /agent-vibes:mute
+Mute all TTS output (persists across sessions)
 
-### Choose Your Voice
+- Creates a mute flag that silences all voice output
+- Shows 🔇 indicator when TTS would have played
 
 ```bash
-# List all 50+ available voices
-npx agentvibes voices
-
-# Set your default voice
-npx agentvibes voice set en_US-amy-medium
+/agent-vibes:mute
 ```
 
-### Popular Voice Options
+#### /agent-vibes:unmute
+Unmute TTS output
 
-- **Female voices:** `en_US-amy-medium`, `en_GB-jenny_dioco-medium`, `fr_FR-siwis-medium`
-- **Male voices:** `en_US-lessac-medium` (default), `en_GB-alan-medium`, `en_US-ryan-high`
-- **Other languages:** `es_ES-davefx-medium` (Spanish), `fr_FR-siwis-medium` (French), `de_DE-thorsten-medium` (German)
-
-## Features
-
-### Core Features
-- **Free & Offline**: Uses Piper TTS (no API keys required)
-- **50+ Voices**: Professional AI voices in 30+ languages
-- **Remote SSH Support**: Audio automatically tunnels to your local machine via PulseAudio
-- **Zero Latency**: Local generation, instant playback
-- **Integrated**: Works seamlessly with Clawdbot messaging
-
-### Advanced Features (All Available!)
-- **🎵 Background Music**: 50+ pre-made tracks (jazz, lofi, flamenco, cumbia, bossa nova, etc.)
-- **🎚️ Voice Effects**: Reverb (light, medium, heavy, cathedral)
-- **🎭 Personalities**: 19+ styles (pirate, sarcastic, zen, flirty, robot, therapist, etc.)
-- **🌍 Multi-language**: Auto-translation and language learning modes
-- **⚡ Customization**: Speed control, sentiment, verbosity levels
-
-## Installation
+- Removes mute flag and restores voice output
 
 ```bash
-npx agentvibes install
+/agent-vibes:unmute
 ```
 
-That's it! AgentVibes is ready to use.
-
-For remote SSH audio, see: https://github.com/paulpreibisch/AgentVibes/blob/master/docs/remote-audio-setup.md
-
-## Usage Examples
-
-### Basic TTS
+#### /agent-vibes:list [first|last] [N]
+List all available voices, with optional filtering
 
 ```bash
-agentvibes speak "Hello from Clawdbot"
+/agent-vibes:list                    # Show all voices
+/agent-vibes:list first 5            # Show first 5 voices
+/agent-vibes:list last 3             # Show last 3 voices
 ```
 
-### Voice Selection
-
-AgentVibes provides 50+ professional AI voices. Users can select voices in multiple ways:
-
-#### Method 1: One-Time Voice (Per Message)
+#### /agent-vibes:preview [first|last] [N]
+Preview voices by playing audio samples
 
 ```bash
-# Use specific voice for this message only
-bash ~/.claude/hooks/play-tts.sh "Hello world" "en_US-amy-medium"
-
-# Different voices:
-bash ~/.claude/hooks/play-tts.sh "Hello" "en_US-lessac-medium"  # Default male (US)
-bash ~/.claude/hooks/play-tts.sh "Hello" "en_US-amy-medium"     # Female (US)
-bash ~/.claude/hooks/play-tts.sh "Hello" "en_US-ryan-high"      # High quality male (US)
-bash ~/.claude/hooks/play-tts.sh "Good day" "en_GB-alan-medium" # British male
-bash ~/.claude/hooks/play-tts.sh "Bonjour" "fr_FR-siwis-medium" # French female
-bash ~/.claude/hooks/play-tts.sh "Hola" "es_ES-davefx-medium"   # Spanish male
+/agent-vibes:preview                 # Preview first 3 voices
+/agent-vibes:preview 5               # Preview first 5 voices
+/agent-vibes:preview last 5          # Preview last 5 voices
 ```
 
-#### Method 2: Set Default Voice (Persistent)
+#### /agent-vibes:switch <voice_name>
+Switch to a different default voice
 
 ```bash
-# List all available voices with preview samples
-bash ~/.claude/hooks/voice-manager.sh list
-
-# Set your preferred voice as default
-bash ~/.claude/hooks/voice-manager.sh set en_US-amy-medium
-
-# Now all messages use this voice
-bash ~/.claude/hooks/play-tts.sh "This uses Amy's voice"
-
-# Check current default voice
-bash ~/.claude/hooks/voice-manager.sh show
+/agent-vibes:switch en_US-amy-medium
+/agent-vibes:switch en_GB-alan-medium
+/agent-vibes:switch fr_FR-siwis-medium
 ```
 
-#### Method 3: Preview Before Choosing
+#### /agent-vibes:get
+Display the currently selected voice
 
 ```bash
-# Preview a voice before committing
-bash ~/.claude/hooks/voice-manager.sh preview en_US-ryan-high
-
-# Preview multiple voices to compare
-bash ~/.claude/hooks/voice-manager.sh preview en_GB-alan-medium
-bash ~/.claude/hooks/voice-manager.sh preview en_US-lessac-medium
-
-# Set your favorite after testing
-bash ~/.claude/hooks/voice-manager.sh set en_GB-alan-medium
+/agent-vibes:get
 ```
 
-### Voice Categories
-
-**🇺🇸 English (US) - Most Popular:**
-- `en_US-lessac-medium` - Clear male voice (default)
-- `en_US-amy-medium` - Friendly female voice
-- `en_US-ryan-high` - High quality male voice
-- `en_US-libritts-high` - Multiple speakers available
-
-**🇬🇧 English (UK):**
-- `en_GB-alan-medium` - British male
-- `en_GB-jenny_dioco-medium` - British female
-
-**🌍 Other Languages:**
-- `es_ES-davefx-medium` - Spanish (Spain) male
-- `es_MX-claude-high` - Spanish (Mexico) male
-- `fr_FR-siwis-medium` - French female
-- `fr_FR-gilles-low` - French male
-- `de_DE-thorsten-medium` - German male
-- `de_DE-eva_k-x_low` - German female
-- `it_IT-riccardo-x_low` - Italian male
-- `pt_BR-faber-medium` - Portuguese (Brazilian) male
-- `ja_JP-ayanami-medium` - Japanese female
-- `zh_CN-huayan-x_low` - Chinese female
-- `ko_KR-kss-medium` - Korean female
-
-See full list: https://rhasspy.github.io/piper-samples/
-
-### Advanced Features
-
-AgentVibes provides powerful audio customization through hook scripts:
-
-#### 🎵 Background Music
+#### /agent-vibes:add <name> <voice_id>
+Add a new custom voice from your Piper TTS account
 
 ```bash
-# Enable background music
-bash ~/.claude/hooks/background-music-manager.sh on
-
-# List available tracks
-bash ~/.claude/hooks/background-music-manager.sh list
-
-# Set specific track (flamenco, jazz, lofi, etc.)
-bash ~/.claude/hooks/background-music-manager.sh set-default agentvibes_soft_flamenco_loop.mp3
-
-# Adjust volume (0.0-1.0)
-bash ~/.claude/hooks/background-music-manager.sh volume 0.3
-
-# Disable background music
-bash ~/.claude/hooks/background-music-manager.sh off
+/agent-vibes:add "My Voice" abc123xyz456
 ```
 
-#### 🎚️ Voice Effects (Reverb)
+See [Getting Voice IDs](#getting-voice-ids-piper-tts) section below.
+
+#### /agent-vibes:replay [N]
+Replay recently played TTS audio
 
 ```bash
-# Add reverb effects
-bash ~/.claude/hooks/effects-manager.sh set-reverb light      # Small room
-bash ~/.claude/hooks/effects-manager.sh set-reverb medium     # Conference room
-bash ~/.claude/hooks/effects-manager.sh set-reverb heavy      # Large hall
-bash ~/.claude/hooks/effects-manager.sh set-reverb cathedral  # Epic space
-
-# Turn off reverb
-bash ~/.claude/hooks/effects-manager.sh set-reverb off
-
-# Check current effects
-bash ~/.claude/hooks/effects-manager.sh list
+/agent-vibes:replay                  # Replay last audio
+/agent-vibes:replay 1                # Replay most recent
+/agent-vibes:replay 2                # Replay second-to-last
+/agent-vibes:replay 3                # Replay third-to-last
 ```
 
-#### 🎭 Personalities
+Keeps last 10 audio files in history.
 
-Add personality and emotion to the voice:
+#### /agent-vibes:set-pretext <word>
+Set a prefix word/phrase for all TTS messages
 
 ```bash
-# Set personality (sarcastic is hilarious!)
-bash ~/.claude/hooks/personality-manager.sh set sarcastic
-bash ~/.claude/hooks/personality-manager.sh set flirty
-bash ~/.claude/hooks/personality-manager.sh set zen
-bash ~/.claude/hooks/personality-manager.sh set robot
-
-# List all personalities
-bash ~/.claude/hooks/personality-manager.sh list
-
-# Remove personality
-bash ~/.claude/hooks/personality-manager.sh unset
+/agent-vibes:set-pretext AgentVibes  # All TTS starts with "AgentVibes:"
+/agent-vibes:set-pretext "Project Alpha" # Custom phrase
+/agent-vibes:set-pretext ""          # Clear pretext
 ```
 
-Available personalities: sarcastic (highly recommended!), flirty, pirate, robot, zen, valley-girl, noir-detective, wizard, shakespearean, drill-sergeant, therapist, game-show-host, conspiracy-theorist, stoner, dry-humor, enthusiastic, professional, drunk, and more!
+Saved locally in `.agentvibes/config/agentvibes.json`
 
-#### 🗣️ Voice & Speed Control
+---
+
+## Provider Management
+
+#### /agent-vibes:provider list
+Show all available TTS providers
 
 ```bash
-# List all 50+ available voices
-bash ~/.claude/hooks/voice-manager.sh list
-
-# Preview a voice before selecting
-bash ~/.claude/hooks/voice-manager.sh preview en_US-amy-medium
-
-# Set default voice (persists across messages)
-bash ~/.claude/hooks/voice-manager.sh set en_US-amy-medium
-
-# Check current voice
-bash ~/.claude/hooks/voice-manager.sh show
-
-# Use specific voice for one message only
-bash ~/.claude/hooks/play-tts.sh "Hello" "en_GB-alan-medium"
-
-# Adjust speech speed (0.5-2.0)
-bash ~/.claude/hooks/speed-manager.sh set 1.2  # 20% faster
-bash ~/.claude/hooks/speed-manager.sh set 0.8  # 20% slower
-bash ~/.claude/hooks/speed-manager.sh show     # Check current speed
+/agent-vibes:provider list
 ```
 
-**Popular Voice Choices:**
-- Female: `en_US-amy-medium`, `en_GB-jenny_dioco-medium`, `fr_FR-siwis-medium`
-- Male: `en_US-lessac-medium`, `en_GB-alan-medium`, `en_US-ryan-high`
-- High Quality: `en_US-ryan-high`, `es_MX-claude-high`
-
-#### 🗣️ Verbosity Control
-
-Control how much detail gets spoken via TTS:
+#### /agent-vibes:provider switch <name>
+Switch between providers
 
 ```bash
-# Set verbosity level
-bash ~/.claude/hooks/verbosity-manager.sh set high      # Maximum transparency (recommended for Clawdbot)
-bash ~/.claude/hooks/verbosity-manager.sh set medium    # Balanced (major decisions only)
-bash ~/.claude/hooks/verbosity-manager.sh set low       # Minimal (acknowledgments only)
-
-# Check current level
-bash ~/.claude/hooks/verbosity-manager.sh get
-
-# Get info about levels
-bash ~/.claude/hooks/verbosity-manager.sh info
+/agent-vibes:provider switch piper    # Piper TTS - Free, offline, 50+ voices
+/agent-vibes:provider switch macos    # macOS Say - Native macOS voices (Mac only)
 ```
 
-**Verbosity Levels:**
-- **HIGH** - All reasoning spoken (full transparency) - *Recommended for Clawdbot*
-- **MEDIUM** - Major decisions and findings only
-- **LOW** - Just acknowledgments and completions
-
-**For Clawdbot:** Set to HIGH for full verbosity in all responses.
-
-#### 🌍 Language & Translation
+#### /agent-vibes:provider info <name>
+Get details about a specific provider
 
 ```bash
-# Set target language
-bash ~/.claude/hooks/language-manager.sh set-language es  # Spanish
-bash ~/.claude/hooks/language-manager.sh set-language fr  # French
-
-# Enable auto-translation
-bash ~/.claude/hooks/translate-manager.sh on
-
-# Disable translation
-bash ~/.claude/hooks/translate-manager.sh off
+/agent-vibes:provider info piper
+/agent-vibes:provider info macos
 ```
 
-### Complete Example with Effects
+---
+
+## Providers
+
+| Provider | Platform | Cost | Voices | Quality |
+|----------|----------|------|--------|---------|
+| **Piper TTS** | All platforms (Linux, macOS, WSL) | Free | 50+ in 30+ languages | ⭐⭐⭐⭐ |
+| **macOS Say** | macOS only | Free (built-in) | 100+ system voices | ⭐⭐⭐⭐ |
+
+**On macOS**, the native `say` provider is automatically detected and recommended!
+
+---
+
+## Getting Voice IDs (Piper TTS)
+
+To add your own custom Piper TTS voices:
+
+1. Go to https://piper.io/app/voice-library
+2. Select or create a voice
+3. Copy the voice ID (15-30 character alphanumeric string)
+4. Use `/agent-vibes:add` to add it:
 
 ```bash
-# Setup: Flamenco music + cathedral reverb + sarcastic personality
-bash ~/.claude/hooks/background-music-manager.sh set-default agentvibes_soft_flamenco_loop.mp3
-bash ~/.claude/hooks/effects-manager.sh set-reverb cathedral
-bash ~/.claude/hooks/personality-manager.sh set sarcastic
-
-# Speak with all effects applied
-bash ~/.claude/hooks/play-tts.sh "Oh great, another user who needs help. How wonderful."
+/agent-vibes:add "My Custom Voice" xyz789abc123def456
 ```
 
-### Programmatic Use
+---
 
+## Default Voices
+
+### Piper TTS (Free & Offline)
+
+**English (US):**
+- en_US-lessac-medium (default male voice)
+- en_US-amy-medium (friendly female)
+- en_US-ryan-high (high quality male)
+- en_US-libritts-high (multiple speakers)
+
+**English (UK):**
+- en_GB-alan-medium (British male)
+- en_GB-jenny_dioco-medium (British female)
+
+**Romance Languages:**
+- es_ES-davefx-medium (Spanish - Spain)
+- es_MX-claude-high (Spanish - Mexico)
+- fr_FR-siwis-medium (French female)
+- fr_FR-gilles-low (French male)
+- it_IT-riccardo-x_low (Italian male)
+- pt_BR-faber-medium (Portuguese - Brazilian)
+
+**Germanic Languages:**
+- de_DE-thorsten-medium (German male)
+- de_DE-eva_k-x_low (German female)
+
+**Asian Languages:**
+- ja_JP-ayanami-medium (Japanese female)
+- zh_CN-huayan-x_low (Chinese female)
+- ko_KR-kss-medium (Korean female)
+
+### macOS Say (100+ Built-in)
+- Samantha
+- Alex
+- Daniel
+- Victoria
+- Karen
+- Moira
+- And 100+ more system voices
+
+---
+
+## Quick Examples
+
+### Switch to a different voice
 ```bash
-# Capture audio file path
-OUTPUT=$(agentvibes speak "Test")
-AUDIO_FILE=$(echo "$OUTPUT" | grep "Saved to:" | cut -d: -f2- | xargs)
-echo "Audio: $AUDIO_FILE"
+/agent-vibes:switch en_US-lessac-medium    # Clear male voice
+/agent-vibes:switch en_US-ryan-high        # High quality male
+/agent-vibes:switch en_GB-alan-medium      # British male
 ```
 
-## Voice Library
-
-Common voices:
-- **English (US)**: `en_US-lessac-medium` (default male), `en_US-amy-medium` (female)
-- **English (UK)**: `en_GB-alan-medium` (male), `en_GB-jenny_dioco-medium` (female)
-- **Spanish**: `es_ES-davefx-medium` (male), `es_MX-claude-high` (female HQ)
-- **French**: `fr_FR-siwis-medium` (female), `fr_FR-gilles-low` (male)
-- **German**: `de_DE-thorsten-medium` (male), `de_DE-eva_k-x_low` (female)
-
-See full voice library: `agentvibes list-voices`
-
-Or browse online: https://rhasspy.github.io/piper-samples/
-
-## Remote SSH Audio
-
-When running Clawdbot on a remote server, audio can play on your local machine through SSH tunneling.
-
-**Quick setup:**
-
-1. Configure PulseAudio on remote server:
+### Preview before choosing
 ```bash
-mkdir -p ~/.config/pulse
-cat > ~/.config/pulse/default.pa << 'EOF'
-.include /etc/pulse/default.pa
-load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1;192.168.0.0/16
-EOF
-
-echo 'export PULSE_SERVER=tcp:localhost:14713' >> ~/.bashrc
-source ~/.bashrc
+/agent-vibes:preview 5                     # Preview first 5 voices
+/agent-vibes:preview last 3                # Preview last 3 voices
 ```
 
-2. Configure SSH tunnel on local machine (`~/.ssh/config`):
-```
-Host your-server
-    RemoteForward 14713 localhost:14713
-```
-
-3. Connect and test:
+### Add your custom Piper voice
 ```bash
-ssh your-server
-agentvibes speak "Testing remote audio"
+/agent-vibes:add "My Voice" abc123xyz456
+/agent-vibes:switch My Voice
 ```
 
-Full guide: https://github.com/paulpreibisch/AgentVibes/blob/master/docs/remote-audio-setup.md
-
-## Troubleshooting
-
-### No audio output
-
-Check PulseAudio:
+### Switch providers
 ```bash
-pactl info
+/agent-vibes:provider switch macos    # Use native macOS voices
+/agent-vibes:provider switch piper    # Switch back to Piper
 ```
 
-Should show: `Server String: tcp:localhost:14713`
-
-### AgentVibes command not found
-
-Make sure AgentVibes is installed:
+### Mute/Unmute
 ```bash
-npx agentvibes install
+/agent-vibes:mute                     # Silent mode
+/agent-vibes:unmute                   # Restore voice
 ```
 
-Or globally:
-```bash
-npm install -g agentvibes
-```
+---
 
-### Audio plays on server instead of local
+## Tips & Tricks
 
-Verify environment variable:
-```bash
-echo $PULSE_SERVER
-```
+- **Preview first**: Always use `/agent-vibes:preview` before switching to a new voice
+- **Provider switching**: Some voices are only available on specific providers
+- **Voice history**: Use `/agent-vibes:replay` to hear the last 10 TTS messages
+- **Custom pretext**: Set a pretext to brand all your responses (e.g., "AgentVibes:")
+- **Mute for focus**: Use `/agent-vibes:mute` during intensive work sessions
 
-Should be: `tcp:localhost:14713`
-
-## Quick Reference - Common Commands
-
-### Voice Selection
-```bash
-bash ~/.claude/hooks/voice-manager.sh list                    # List all voices
-bash ~/.claude/hooks/voice-manager.sh preview en_US-amy-medium # Preview voice
-bash ~/.claude/hooks/voice-manager.sh set en_US-amy-medium     # Set default
-bash ~/.claude/hooks/play-tts.sh "Hi" "en_US-amy-medium"       # One-time use
-```
-
-### Background Music
-```bash
-bash ~/.claude/hooks/background-music-manager.sh on            # Enable
-bash ~/.claude/hooks/background-music-manager.sh list          # List tracks
-bash ~/.claude/hooks/background-music-manager.sh set-default agentvibes_soft_flamenco_loop.mp3
-bash ~/.claude/hooks/background-music-manager.sh volume 0.3    # Set volume
-bash ~/.claude/hooks/background-music-manager.sh off           # Disable
-```
-
-### Voice Effects
-```bash
-bash ~/.claude/hooks/effects-manager.sh set-reverb medium      # Add reverb
-bash ~/.claude/hooks/effects-manager.sh set-reverb off         # Remove
-bash ~/.claude/hooks/effects-manager.sh list                   # Show effects
-```
-
-### Personality
-```bash
-bash ~/.claude/hooks/personality-manager.sh list               # List all
-bash ~/.claude/hooks/personality-manager.sh set sarcastic      # Set personality
-bash ~/.claude/hooks/personality-manager.sh unset              # Remove
-```
-
-### Speed Control
-```bash
-bash ~/.claude/hooks/speed-manager.sh set 1.2                  # 20% faster
-bash ~/.claude/hooks/speed-manager.sh set 0.8                  # 20% slower
-bash ~/.claude/hooks/speed-manager.sh show                     # Current speed
-```
-
-### Verbosity Control
-```bash
-bash ~/.claude/hooks/verbosity-manager.sh set high             # Full detail (recommended)
-bash ~/.claude/hooks/verbosity-manager.sh set medium           # Balanced
-bash ~/.claude/hooks/verbosity-manager.sh set low              # Minimal
-bash ~/.claude/hooks/verbosity-manager.sh get                  # Check current
-```
-
-## Technical Details
-
-- **Audio Format**: WAV (16-bit, 22.05kHz mono)
-- **Storage**: `~/.claude/audio/tts-processed-*.wav`
-- **Engine**: Piper TTS (VITS neural TTS from Hugging Face)
-- **Latency**: <1 second for typical sentences
-
-## Documentation
-
-- **AgentVibes Home**: https://agentvibes.org
-- **GitHub**: https://github.com/paulpreibisch/AgentVibes
-- **Piper TTS**: https://github.com/rhasspy/piper
-- **Voice Models**: https://huggingface.co/rhasspy/piper-voices
+Enjoy your TTS experience! 🎵

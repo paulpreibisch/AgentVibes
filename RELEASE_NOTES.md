@@ -1,5 +1,313 @@
 # AgentVibes Release Notes
 
+## 📦 v3.3.0 - Remote TTS, Smart Installer, OpenClaw Receiver & Cache Management
+
+**Release Date:** February 5, 2026
+
+### 🎯 Why v3.3.0?
+
+v3.3.0 transforms AgentVibes into a **universal TTS platform** for any environment:
+
+- **SSH-Remote Provider** - Generate TTS on servers, receive audio on your phone/computer
+- **Termux/Android Support** - Native Piper TTS on mobile devices
+- **OpenClaw Integration** - Turn voiceless servers into Siri-like conversational AI
+- **AgentVibes Receiver** - Receive and play audio from remote servers on your device
+- **Smart Installer** - Auto-detects your environment (voiceless, GUI, Termux, SSH)
+- **Intelligent Cache Management** - Real-time tracking and auto-cleanup prevents disk bloat
+
+#### 🌐 Real-World Use Case: OpenClaw + AgentVibes Receiver
+
+You deploy OpenClaw on a voiceless Mac mini (or remote server) where users message you via WhatsApp, Telegram, or Discord. With v3.3.0:
+
+**Before AgentVibes Receiver:**
+- User messages: "Tell me a joke"
+- Mac mini processes request
+- Text response appears in chat
+- 😞 No audio - silent experience
+
+**After AgentVibes Receiver:**
+1. **Install AgentVibes** on your Mac mini (or remote server)
+2. **Install AgentVibes Receiver** on your phone/iPad/laptop
+3. **Connect via Tailscale** (one-time setup)
+4. **User messages:** "Tell me a joke"
+5. **Mac mini generates TTS** with your configured voice
+6. **Audio streams to your device** via SSH tunnel
+7. **Your speakers play:** 🔊 "Why did the AI go to school? To improve its learning model!"
+8. **User in WhatsApp also hears** the audio playing (Siri-like experience)
+
+Result: OpenClaw transforms from **silent text AI** → **Conversational AI with voice**
+
+Perfect for:
+- 🖥️ Mac mini with OpenClaw
+- 🖥️ Remote servers (AWS, DigitalOcean, Linode)
+- 🏗️ Container deployments (Docker)
+- 🔧 WSL (Windows Subsystem for Linux)
+- 📱 Any voiceless environment needing audio
+
+### 🤖 AI Summary
+
+AgentVibes v3.3.0 unleashes the platform across new frontiers: remote servers via SSH-PulseAudio tunneling, Android/Termux environments with native Piper support, and OpenClaw (formerly Clawdbot) multi-agent orchestration. The redesigned smart installer detects your environment (voiceless, GUI, SSH, Termux) and shows only relevant options, plus optional BMAD personality injection for advanced users. Every TTS output now displays real-time cache metrics (file count/size with dynamic colors) plus intelligent size-based auto-cleanup that deletes oldest files when the cache exceeds threshold. The release includes comprehensive TTS queue management to prevent audio overlap, audio effects support across all providers, and full MCP tool integration for programmatic control. This release transforms AgentVibes into a universal TTS platform.
+
+**Key Highlights:**
+- 🌍 **SSH-Remote TTS** - Remote device playback via PulseAudio tunneling (servers, containers, WSL)
+- 📱 **Android/Termux Support** - Native Piper TTS on Android with termux-media-player integration
+- 🤖 **OpenClaw Receiver** (formerly Clawdbot) - AgentVibes Receiver for receiving TTS from voiceless servers
+- 🧠 **Smart Installer** - Voiceless environment detection + personality injection for BMAD
+- 📊 **Real-Time Cache Tracking** - File count and size on every output with dynamic colors
+- 🧹 **Intelligent Auto-Cleanup** - Size-based threshold (15MB default) prevents storage bloat
+- 🎵 **Queue Management** - Prevents TTS audio overlap via centralized queue system
+- ⚙️ **Audio Effects** - Full support across SSH-remote, Termux-ssh, and local providers
+- 📁 **Uninstall Command** - Comprehensive cleanup with full documentation
+- ✅ **96 Commits** - Massive feature expansion with 213 BATS tests passing
+
+### ✨ New Features
+
+#### 🌍 Remote SSH TTS Support
+
+**SSH-Remote Provider:**
+- Play TTS on remote servers via SSH + PulseAudio tunneling
+- Zero-dependency for audio output (uses PulseAudio network tunnel)
+- Perfect for deployed Claude Code on servers, containers, WSL
+- Auto-configuration of PulseAudio TCP module
+- Fallback to local playback if SSH unavailable
+- Full compatibility with all voice selection and audio effects
+
+**SSH-PulseAudio Integration:**
+- Automatic SSH connection detection and setup
+- Secure TCP tunnel for audio stream transmission
+- Support for both interactive and batch TTS operations
+- Persistent audio configuration per SSH session
+
+#### 📱 Android/Termux Support
+
+**Termux-SSH Provider:**
+- Native Piper TTS on Android via Termux environment
+- Uses termux-media-player for audio playback
+- Full voice selection and effects support
+- Automatic temp directory detection
+- Integration with Tailscale for secure remote access
+- Comprehensive setup guide with QR codes
+
+**Android Installation:**
+- Self-contained Termux installer script
+- One-command setup: `curl https://agentvibes.org/install-android | bash`
+- Automatic dependency detection and installation
+- Piper voice download management
+
+#### 🎙️ OpenClaw Integration & AgentVibes Receiver
+
+**What is AgentVibes Receiver?**
+
+AgentVibes Receiver is a **lightweight audio client** that receives and plays TTS audio from remote servers where OpenClaw is installed. It runs on your phone, tablet, or personal computer and connects to voiceless servers via SSH tunnel.
+
+**The Problem It Solves:**
+- OpenClaw running on Mac mini/remote server has no audio output
+- Users message via WhatsApp/Telegram/Discord - get text responses only
+- 😞 No voice = Less engaging AI experience
+
+**AgentVibes Receiver Solution:**
+1. **Lightweight client** runs on your device (phone/tablet/laptop)
+2. **SSH tunnel** securely connects to your voiceless server
+3. **Audio streams** from server to your device via PulseAudio
+4. **Auto-plays** on your speakers when OpenClaw responds
+5. **Siri-like experience** - Text + Voice in one flow
+
+**How It Works:**
+
+```
+┌──────────────────────────────┐
+│ Your Mac mini / Server       │
+│ (OpenClaw + AgentVibes)      │
+│ ├─ No audio output           │
+│ ├─ Generates TTS             │
+│ └─ Sends via SSH tunnel      │
+└──────────────────────────────┘
+            ↓ SSH Tunnel (encrypted)
+┌──────────────────────────────┐
+│ Your Phone / Laptop          │
+│ (AgentVibes Receiver)        │
+│ ├─ Receives audio stream     │
+│ ├─ Plays on speakers         │
+│ └─ You hear OpenClaw speak   │
+└──────────────────────────────┘
+```
+
+**Example Flow:**
+```
+WhatsApp: "Tell me a joke"
+        ↓
+Mac mini: Processes with Claude
+        ↓
+Generates TTS: "Why did the AI... [audio file]"
+        ↓ SSH tunnel
+Your Phone: Plays audio 🔊
+        ↓
+You hear: "Why did the AI go to school?"
+```
+
+**AgentVibes Receiver Features:**
+- **One-Time Setup** - Pair with server via SSH key
+- **Automatic Connection** - Reconnects if interrupted
+- **Real-Time Streaming** - Low latency audio playback
+- **SSH Encryption** - Secure tunnel for audio
+- **Tailscale Support** - Easy VPN for remote servers
+- **Multiple Servers** - Connect to different OpenClaw instances
+- **Voice Control** - Full voice selection on the server side
+- **Cache Metrics** - Monitor audio generation and cleanup
+
+**OpenClaw Skill Integration:**
+- Installed automatically with AgentVibes on OpenClaw server
+- Full feature access:
+  - Voice selection (50+ voices)
+  - Personality/sentiment (sarcastic, flirty, etc.)
+  - Audio effects (reverb, echo, pitch)
+  - Speech speed (0.5x - 3.0x)
+  - Language translation (speak in different languages)
+  - Real-time cache tracking
+  - Automatic cleanup of old audio files
+
+#### 🧠 Smart Installer Enhancements
+
+**Voiceless Environment Detection:**
+- Auto-detects if GUI audio is unavailable (headless servers, containers)
+- Offers SSH-remote TTS as alternative for voiceless environments
+- Prevents installation of unnecessary audio dependencies
+
+**Personality Injection (BMAD):**
+- Interactive prompt during install for BMAD users
+- Optional TTS personality configuration
+- Sentiment/personality selection built into setup flow
+- Skipped for non-BMAD environments
+
+**Provider Auto-Selection:**
+- Intelligent detection of available providers:
+  - macOS Say (macOS systems)
+  - Piper TTS (all systems)
+  - SSH-remote (if SSH available)
+  - Termux-ssh (Android/Termux)
+- Shows only relevant providers in installation
+
+**Better UX:**
+- Clear descriptions of each provider
+- Setup URLs for complex providers (Tailscale)
+- Comprehensive help text for each option
+- Git log integration for recent changes
+
+#### 📊 Real-Time TTS Cache Tracking & Intelligent Auto-Cleanup
+
+**Why Cache Management Matters:**
+- TTS audio files accumulate quickly
+- Server deployments can run out of disk space silently
+- Users have no visibility into cache size or cleanup status
+- Manual cleanup is inconvenient and error-prone
+
+**Cache Display on Every Output:**
+Every time you generate TTS, you see real-time cache metrics:
+```
+💾 Saved to: /home/user/.claude/audio/tts-1770274925.wav 📦 28 20.9MB 🧹[15mb]
+```
+
+What you see:
+- 💾 **Full path** - Clickable file for replay or sharing
+- 📦 **28** - File count in cache
+- **20.9MB** - Total cache size (color-coded):
+  - 🟢 Green: <500MB
+  - 🟡 Yellow: 500MB-3GB
+  - 🔴 Red: >3GB
+- 🧹 **[15mb]** - Auto-cleanup threshold
+
+**Intelligent Size-Based Auto-Cleanup:**
+- Deletes oldest files when cache exceeds threshold (default: 15MB)
+- Silent operation (no blocking prompts)
+- Write-lock protection prevents conflicts with TTS generation
+- Respects active TTS (won't delete while generating)
+
+**Configuration:**
+```bash
+# Per-project threshold override
+echo "50" > .claude/tts-auto-clean-threshold.txt  # 50MB limit
+
+# Or disable cleanup
+echo "0" > .claude/tts-auto-clean-threshold.txt   # Disable
+```
+
+**Manual Cleanup:**
+```bash
+# Non-interactive cleanup
+/agent-vibes:clean
+
+# Or programmatically via MCP
+await agent_vibes.clean_audio_cache()
+```
+
+#### 🎵 TTS Queue Management
+
+**Overlap Prevention:**
+- Centralized queue system for TTS operations
+- Prevents simultaneous audio playback
+- Critical for Clawdbot multi-agent scenarios
+- Atomic queue operations ensure consistency
+
+**Queue Integration:**
+- Automatic in OpenClaw Receiver
+- Optional in standalone environments
+- Fallback to sequential playback
+
+#### ⚙️ Audio Effects Across All Providers
+
+**Effects Support:**
+- Reverb, echo, pitch, EQ available
+- SSH-remote provider: Full effects support
+- Termux-ssh provider: Full effects support
+- All local providers: Unchanged effects behavior
+
+**Configuration:**
+- Per-session override via environment variables
+- Project-local settings via config files
+- Persistent across TTS operations
+
+#### 📁 Comprehensive Uninstall Command
+
+**`/agent-vibes:uninstall` Skill:**
+- Complete removal of AgentVibes and dependencies
+- Interactive prompts for user confirmation
+- Option to preserve configuration
+- Detailed removal logs
+- Full documentation included
+
+### 🐛 Bug Fixes
+
+- **TTS Overlap** - Fixed audio overlapping via queue management
+- **Termux Audio** - Proper detection and use of termux-media-player
+- **SSH Detection** - Improved SSH environment detection logic
+- **Race Conditions** - Write-lock mechanism prevents cleanup conflicts
+- **Temp Directory** - Proper Termux temp directory handling
+- **Color Codes** - Fixed GOLD color (256-color \033[38;5;226m)
+- **Stat Compatibility** - BSD/GNU stat detection with proper output suppression
+- **Syntax Validation** - Fixed installer.js syntax errors
+- **Coverage Testing** - Proper coverage file generation for CI/CD
+
+### 🔒 Security & Quality
+
+- **No Hardcoded Credentials** - All secure operations use environment variables
+- **SSH Safety** - Secure PulseAudio tunnel authentication
+- **Atomic Operations** - Queue and receiver use atomic file operations
+- **Input Validation** - All external inputs validated
+- **Pre-existing Limitations** - TTS scripts lack `set -euo pipefail` (pre-existing)
+- **Sonar Compliance** - Security hotspots resolved, quality gates passing
+- **Test Coverage** - 213 BATS tests + 47 Node unit tests
+
+### ✅ Testing & Validation
+
+- **213 BATS Tests** - Core functionality validation
+- **47 Node Tests** - JavaScript/installer validation
+- **Cross-Platform** - Piper, macOS, SSH-remote, Termux-ssh
+- **Environment Tests** - Voiceless, GUI, SSH, Termux detection
+- **Audio Effects** - All providers tested
+- **Backwards Compatible** - No breaking changes to existing code
+
+---
+
 ## 📦 v3.2.0 - Clawdbot Integration: AI Assistants on Any Messenger
 
 **Release Date:** January 27, 2026

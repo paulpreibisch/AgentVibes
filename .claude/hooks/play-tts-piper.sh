@@ -421,11 +421,8 @@ fi
 (sleep $DURATION; rm -f "$LOCK_FILE" "$WRITE_LOCK_FILE") &
 disown
 
-# Get audio cache stats
+# Get audio cache path
 AUDIO_DIR_PATH=$(get_audio_dir)
-FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
-SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
-SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
 
 # Color codes
 BLUE='\033[0;34m'
@@ -441,6 +438,22 @@ CYAN='\033[0;36m'
 GOLD='\033[38;5;226m'
 NC='\033[0m'
 
+# CRITICAL: Run auto-cleanup FIRST (before calculating size)
+# This ensures we display the POST-cleanup size, not pre-cleanup size
+AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
+INITIAL_SIZE=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
+if [[ $INITIAL_SIZE -gt $((AUTO_CLEAN_THRESHOLD * 1048576)) ]]; then
+  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$AUTO_CLEAN_THRESHOLD")
+  if [[ $DELETED -gt 0 ]]; then
+    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files${NC}"
+  fi
+fi
+
+# NOW calculate cache stats after cleanup
+FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
+SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
+SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
+
 # Dynamic color coding based on cache size
 # Green: < 500MB (small)
 # Yellow: 500MB - 3GB (lots)
@@ -452,31 +465,20 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
   CACHE_COLOR=$YELLOW
 fi
 
-# Display with file count and auto-clean indicator
-# Get auto-clean threshold for display
-AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
-echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${WHITE}📦${NC} ${YELLOW}$FILE_COUNT${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
-
-# Auto-cleanup check - delete oldest files if over size threshold
-THRESHOLD_MB=$(get_auto_clean_threshold)
-if [[ $SIZE_BYTES -gt $((THRESHOLD_MB * 1048576)) ]]; then
-  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$THRESHOLD_MB")
-  if [[ $DELETED -gt 0 ]]; then
-    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED files${NC}"
-  fi
-fi
+# Display with file count (now showing accurate post-cleanup size)
+echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
 
 if [[ -n "$BACKGROUND_MUSIC" ]]; then
   # Extract just the filename to save space
   MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
-  echo -e "${PURPLE}🎶 Background music:${NC} $MUSIC_FILENAME"
+  echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
 fi
-echo -e "${CYAN}🎤 Voice used:${NC} ${WHITE}$VOICE_MODEL (Piper TTS)${NC}"
+echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
 
 # Show personality if configured
 PERSONALITY=$(cat "$PROJECT_ROOT/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
 if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
-  echo -e "${GOLD}💫 Personality:${NC} ${WHITE}$PERSONALITY${NC}"
+  echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
 fi
 
 # Check audio folder size and warn if getting large
@@ -505,8 +507,8 @@ fi
 # Background music status indicator
 if [[ -z "$BACKGROUND_MUSIC" ]]; then
   if [[ -f "$BACKGROUND_ENABLED_FILE" ]] && grep -q "true" "$BACKGROUND_ENABLED_FILE" 2>/dev/null; then
-    echo "🎵 Background music: Enabled but not playing (check config)"
+    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Enabled but not playing (check config)${NC}"
   else
-    echo "🎵 Background music: Disabled"
+    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Disabled${NC}"
   fi
 fi
