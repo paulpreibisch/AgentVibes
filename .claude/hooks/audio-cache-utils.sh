@@ -172,12 +172,12 @@ auto_clean_old_files() {
   local current_size_bytes=$current_size
 
   # Delete oldest files until under threshold
+  # IMPORTANT: Only delete auto-generated TTS files, NOT project assets like welcome-multivoice-final.wav
   while [[ $current_size_bytes -gt $threshold_bytes ]]; do
-    # Find the oldest file
+    # Find the oldest file (only tts-processed-* and tts-padded-* files, not other project assets)
     local oldest_file=$(find "$audio_dir" -maxdepth 1 -type f \( \
-      -name "tts-*.wav" -o \
-      -name "tts-*.mp3" -o \
-      -name "tts-*.aiff" -o \
+      -name "tts-processed-*.wav" -o \
+      -name "tts-processed-*.mp3" -o \
       -name "tts-padded-*.mp3" -o \
       -name "tts-padded-*.wav" \
     \) -printf '%T+ %p\n' 2>/dev/null | sort | head -1 | cut -d' ' -f2-)
@@ -219,11 +219,10 @@ clean_all_tts_files() {
     return
   fi
 
-  # Delete all TTS files (maxdepth 1 prevents recurse)
+  # Delete auto-generated TTS files only (preserve project assets like welcome-multivoice-final.wav)
   find "$audio_dir" -maxdepth 1 -type f \( \
-    -name "tts-*.wav" -o \
-    -name "tts-*.mp3" -o \
-    -name "tts-*.aiff" -o \
+    -name "tts-processed-*.wav" -o \
+    -name "tts-processed-*.mp3" -o \
     -name "tts-padded-*.mp3" -o \
     -name "tts-padded-*.wav" \
   \) -delete 2>/dev/null || true
