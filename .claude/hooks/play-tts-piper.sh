@@ -452,7 +452,9 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
 fi
 
 # Display with file count and size in dynamic color brackets, "Saved to" in blue, path with disk icon
-echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} auto-clean set to 15mb"
+# Extract just the filename to save space
+TEMP_FILENAME=$(basename "$TEMP_FILE")
+echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILENAME ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} auto-clean set to 15mb"
 
 # Auto-cleanup check - delete oldest files if over threshold
 THRESHOLD=$(get_auto_clean_threshold)
@@ -464,7 +466,9 @@ if [[ $FILE_COUNT -gt $THRESHOLD ]]; then
 fi
 
 if [[ -n "$BACKGROUND_MUSIC" ]]; then
-  echo -e "${PURPLE}🎶 Background music:${NC} $BACKGROUND_MUSIC"
+  # Extract just the filename to save space
+  MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
+  echo -e "${PURPLE}🎶 Background music:${NC} $MUSIC_FILENAME"
 fi
 echo -e "${CYAN}🎤 Voice used:${NC} ${WHITE}$VOICE_MODEL (Piper TTS)${NC}"
 
