@@ -22,6 +22,41 @@ VOICE="${AGENTVIBES_VOICE:-en_US-kristin-medium}"
 MUSIC="${AGENTVIBES_MUSIC:-agentvibes_soft_flamenco_loop.mp3}"
 MUSIC_VOLUME="${AGENTVIBES_MUSIC_VOLUME:-0.10}"
 
+# Step -1: SSH Setup Validation
+echo "🔐 SSH Configuration Check"
+echo "────────────────────────────────────────"
+echo "Remote device (SSH_HOST): $SSH_HOST"
+echo ""
+
+if ssh -o BatchMode=yes -o ConnectTimeout=3 "$SSH_HOST" "echo 'OK'" 2>&1 | grep -q "OK"; then
+    echo "✓ SSH connection to '$SSH_HOST' is working!"
+    echo ""
+else
+    echo "❌ Cannot connect to '$SSH_HOST' via SSH"
+    echo ""
+    echo "📋 To set up SSH to your remote device:"
+    echo ""
+    echo "1️⃣  Generate SSH key (if you don't have one):"
+    echo "   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ''"
+    echo ""
+    echo "2️⃣  Copy key to remote device:"
+    echo "   ssh-copy-id -i ~/.ssh/id_ed25519.pub user@remote-ip"
+    echo "   (or manually copy ~/.ssh/id_ed25519.pub to ~/.ssh/authorized_keys on remote)"
+    echo ""
+    echo "3️⃣  Test SSH connection:"
+    echo "   ssh $SSH_HOST 'echo Connected'"
+    echo ""
+    echo "4️⃣  Add to ~/.ssh/config (optional but recommended):"
+    echo "   Host $SSH_HOST"
+    echo "       HostName your-device-ip"
+    echo "       User your-username"
+    echo "       Port 22"
+    echo ""
+    echo "5️⃣  Once SSH works, run this script again"
+    echo ""
+    exit 1
+fi
+
 # SECURITY: Validate all inputs to prevent injection attacks
 # SSH_HOST: alphanumeric, dots, hyphens, underscores only (no leading hyphen)
 if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
@@ -59,6 +94,20 @@ if [[ ! -d "$WORKSPACE" ]]; then
     echo "❌ Workspace not found: $WORKSPACE"
     echo "💡 Create it first: mkdir -p $WORKSPACE"
     exit 1
+fi
+
+# Step 0: Auto-install AgentVibes on server if needed
+echo "🔍 Checking for AgentVibes installation..."
+if ! command -v agentvibes >/dev/null 2>&1; then
+    echo "📦 AgentVibes not found, installing globally..."
+    npm install -g agentvibes || {
+        echo "❌ Failed to install AgentVibes with npm" >&2
+        echo "💡 Install manually: npx agentvibes --help (or npm install -g agentvibes)" >&2
+        exit 1
+    }
+    echo "✓ AgentVibes installed successfully"
+else
+    echo "✓ AgentVibes already installed"
 fi
 
 # Step 1: Create directories with restrictive permissions
@@ -189,7 +238,17 @@ fi
 export AGENTVIBES_NO_REMINDERS=1
 export AGENTVIBES_RDP_MODE=false
 
-# Find AgentVibes
+# Step 1: Check if AgentVibes is installed, auto-install if needed
+if ! command -v agentvibes >/dev/null 2>&1; then
+    echo "📦 AgentVibes not found, attempting auto-install..." >&2
+    if ! npm install -g agentvibes 2>/dev/null; then
+        echo "❌ AgentVibes not installed and auto-install failed" >&2
+        echo "💡 Install manually: npm install -g agentvibes" >&2
+        exit 1
+    fi
+fi
+
+# Step 2: Find AgentVibes
 if command -v agentvibes >/dev/null 2>&1; then
     AGENTVIBES_ROOT="$(dirname "$(dirname "$(which agentvibes)")")/lib/node_modules/agentvibes"
 elif [[ -d ~/.npm-global/lib/node_modules/agentvibes ]]; then
@@ -197,7 +256,7 @@ elif [[ -d ~/.npm-global/lib/node_modules/agentvibes ]]; then
 elif [[ -d /data/data/com.termux/files/usr/lib/node_modules/agentvibes ]]; then
     AGENTVIBES_ROOT="/data/data/com.termux/files/usr/lib/node_modules/agentvibes"
 else
-    echo "❌ AgentVibes not found" >&2
+    echo "❌ AgentVibes not found after install attempt" >&2
     exit 1
 fi
 
@@ -261,3 +320,6 @@ echo "   1. Send a message to Clawdbot"
 echo "   2. It will automatically speak via AgentVibes!"
 echo ""
 echo "📚 Docs: $WORKSPACE/agentvibes-clawdbot-skill/SKILL.md"
+echo ""
+echo "⭐ Love AgentVibes? Star the repo!"
+echo "   https://github.com/paulpreibisch/AgentVibes"
