@@ -25,11 +25,43 @@ Automatically integrates AgentVibes with Clawdbot for local TTS generation on re
 - Workspace directory (e.g., `~/clawd`)
 
 ### On Remote Device (Android/Linux/macOS)
-- AgentVibes installed (`npm install -g agentvibes`)
 - SSH server running (`sshd`)
+- Node.js installed (for auto-install of AgentVibes)
 - Tailscale (optional but recommended)
 
+**Note:** AgentVibes is automatically installed on both server and remote device during setup.
+
 ## Installation
+
+### Prerequisites First: SSH Setup ⚠️
+
+**Before running the skill setup, you MUST set up SSH to your remote device:**
+
+1. **Generate SSH key** (if you don't have one):
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ''
+```
+
+2. **Copy key to remote device**:
+```bash
+ssh-copy-id -i ~/.ssh/id_ed25519.pub user@remote-ip
+```
+
+3. **Test SSH connection** (without password):
+```bash
+ssh android "echo Connected"
+# Should print: Connected
+```
+
+4. **Add to ~/.ssh/config** (optional but recommended):
+```
+Host android
+    HostName your-device-ip
+    User your-username
+    Port 22
+```
+
+Once SSH works, proceed to installation.
 
 ### Quick Setup
 
@@ -41,23 +73,25 @@ npx agentvibes install-clawdbot-skill
 
 ### Manual Setup
 
-1. **Install the skill:**
+1. **Run the setup script** (AgentVibes auto-installs on both server and remote device):
 ```bash
 cd ~/.npm-global/lib/node_modules/agentvibes
-bash skills/clawdbot/install.sh
-```
 
-2. **Configure for your workspace:**
-```bash
 # Set your Clawdbot workspace
 export CLAWDBOT_WORKSPACE=~/clawd
 
-# Set SSH remote host
+# Set SSH remote host (optional, defaults to 'android')
 export AGENTVIBES_SSH_HOST=android
 
-# Run setup
+# Run setup - AgentVibes will be auto-installed if needed
 bash skills/clawdbot/setup.sh
 ```
+
+The setup script will:
+- ✅ Install AgentVibes on the server (if not present)
+- ✅ Create TTS hooks and scripts
+- ✅ SSH to your remote device and auto-install AgentVibes there
+- ✅ Configure all necessary files and permissions
 
 ## What Gets Installed
 
@@ -299,9 +333,16 @@ AGENTVIBES_MUSIC=agent_vibes_bachata_v1_loop.mp3 \
 bash skills/clawdbot/setup.sh
 ```
 
+## Support the Project
+
+⭐ **Love AgentVibes?** Star the repository to support the project:
+👉 https://github.com/paulpreibisch/AgentVibes
+
+Your star helps other developers discover this project!
+
 ## Contributing
 
-Found a bug or have a suggestion? Open an issue:  
+Found a bug or have a suggestion? Open an issue:
 https://github.com/paulpreibisch/AgentVibes/issues
 
 ## License
