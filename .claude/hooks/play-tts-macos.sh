@@ -293,6 +293,7 @@ SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 PURPLE='\033[0;35m'
+LIGHT_PURPLE='\033[1;35m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
@@ -313,10 +314,11 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
   CACHE_COLOR=$YELLOW
 fi
 
-# Display with file count and size in dynamic color brackets, "Saved to" in blue, path with disk icon
-# Extract just the filename to save space
-TEMP_FILENAME=$(basename "$TEMP_FILE")
-echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILENAME ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} auto-clean set to 15mb"
+# Display with file count and size in dynamic color brackets
+# Get auto-clean threshold for display
+AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
+AUTO_CLEAN_THRESHOLD_SIZE="15mb"  # Display value (could be dynamically set)
+echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} - ${LIGHT_PURPLE}🧹 AutoClean On ($AUTO_CLEAN_THRESHOLD_SIZE)${NC}"
 
 # Auto-cleanup check - delete oldest files if over threshold
 THRESHOLD=$(get_auto_clean_threshold)
