@@ -124,10 +124,10 @@ curl -sSL https://raw.githubusercontent.com/paulpreibisch/AgentVibes/main/script
 Add to `~/.ssh/config`:
 ```
 Host android
-    HostName 100.115.27.58
-    User u0_a484
-    Port 52847
-    IdentityFile ~/.ssh/android_key
+    HostName 100.x.x.x  # Your Tailscale IP
+    User your-username
+    Port 8022
+    IdentityFile ~/.ssh/id_ed25519
 ```
 
 ## New Commands
