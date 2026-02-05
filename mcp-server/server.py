@@ -717,6 +717,20 @@ class AgentVibesServer:
         result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["list"])
         return result if result else "❌ Failed to list audio effects"
 
+    async def clean_audio_cache(self) -> str:
+        """
+        Clean all TTS audio cache files and report space freed.
+
+        Non-interactive cleanup suitable for MCP tool usage. Deletes all
+        TTS-generated audio files (wav, mp3, aiff) while preserving
+        background music tracks.
+
+        Returns:
+            Cleanup results with file count and space freed
+        """
+        result = await self._run_script("clean-audio-cache.sh", [])
+        return result if result else "❌ Failed to clean audio cache"
+
     # Helper methods
     async def _run_script(self, script_name: str, args: list[str]) -> str:
         """Run a bash script and return output"""
@@ -1178,6 +1192,11 @@ Examples:
             description="List current audio effects configuration for all agents, including reverb levels and other effects",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="clean_audio_cache",
+            description="Clean all TTS audio cache files and report space freed. Non-interactive cleanup that removes all wav/mp3/aiff files while preserving background music tracks.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -1253,6 +1272,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.get_reverb(agent)
         elif name == "list_audio_effects":
             result = await agent_vibes.list_audio_effects()
+        elif name == "clean_audio_cache":
+            result = await agent_vibes.clean_audio_cache()
         else:
             result = f"Unknown tool: {name}"
 
