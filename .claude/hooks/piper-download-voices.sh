@@ -40,6 +40,9 @@
 # @related piper-voice-manager.sh, piper-installer.sh
 #
 
+# REQUIRED: Bash strict mode for security and reliability (CLAUDE.md)
+set -euo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/piper-voice-manager.sh"
 
@@ -60,9 +63,8 @@ COMMON_VOICES=(
   "en_US-kathleen-low"       # Clear female (13MB) - BMAD: Paige (tech-writer)
   "en_US-kusal-medium"       # Male voice (13MB) - BMAD: Saif (frame-expert)
   "en_US-kristin-medium"     # Female voice (13MB) - BMAD: Sally (ux-designer)
-  "en_US-libritts_r-high"    # Premium male (57MB) - BMAD: BMad Master
+  "en_US-libritts_r-medium"  # Premium male (57MB) - BMAD: BMad Master (NOTE: Changed from -high to -medium, -high doesn't exist)
   "en_US-libritts-high"      # Premium quality (57MB)
-  "16Speakers"               # Multi-speaker: 12 US + 4 UK voices (77MB) - REQUIRED for BMAD agents
 )
 
 echo "🎙️  Piper Voice Model Downloader"
@@ -74,15 +76,15 @@ echo ""
 
 # Check if piper is installed
 if ! command -v piper &> /dev/null; then
-  echo "❌ Error: Piper TTS not installed"
-  echo "Install with: pipx install piper-tts"
+  echo "❌ Error: Piper TTS not installed" >&2
+  echo "Install with: pipx install piper-tts" >&2
   exit 1
 fi
 
 # Get storage directory
 VOICE_DIR=$(get_voice_storage_dir)
 
-echo "📂 Storage location: $VOICE_DIR"
+echo "📂 Storage location: \"$VOICE_DIR\""
 echo ""
 
 # Count already downloaded
@@ -100,8 +102,8 @@ for voice in "${COMMON_VOICES[@]}"; do
 done
 
 echo "📊 Status:"
-echo "   Already downloaded: $ALREADY_DOWNLOADED voice(s)"
-echo "   Need to download: ${#NEED_DOWNLOAD[@]} voice(s)"
+echo "   Already downloaded: \"$ALREADY_DOWNLOADED\" voice(s)"
+echo "   Need to download: \"${#NEED_DOWNLOAD[@]}\" voice(s)"
 echo ""
 
 # Show already downloaded voices
@@ -129,8 +131,14 @@ if [[ "$AUTO_YES" == "false" ]]; then
   read -p "Download ${#NEED_DOWNLOAD[@]} voice model(s)? [Y/n]: " -n 1 -r
   echo
 
-  if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
-    echo "❌ Download cancelled"
+  # Validate input is Y, y, N, n, or empty (default to Y)
+  if [[ ! $REPLY =~ ^[YyNn]?$ ]]; then
+    echo "❌ Invalid input. Please enter Y or N." >&2
+    exit 1
+  fi
+
+  if [[ $REPLY =~ ^[Nn]$ ]]; then
+    echo "❌ Download cancelled" >&2
     exit 0
   fi
 else
@@ -148,8 +156,8 @@ for voice in "${NEED_DOWNLOAD[@]}"; do
 
   if download_voice "$voice"; then
     ((DOWNLOADED++))
-    local voice_path="$VOICE_DIR/${voice}.onnx"
-    local file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
+    voice_path="$VOICE_DIR/${voice}.onnx"
+    file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
     echo "   ✓ Downloaded: $voice"
     echo "   📁 Path: $voice_path"
     echo "   📦 Size: $file_size"
@@ -165,8 +173,8 @@ echo "📊 Download Summary:"
 echo ""
 echo "Installed voices:"
 for voice in "${ALREADY_DOWNLOADED_LIST[@]}"; do
-  local voice_path="$VOICE_DIR/${voice}.onnx"
-  local file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
+  voice_path="$VOICE_DIR/${voice}.onnx"
+  file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
   echo "   ✓ $voice ($file_size)"
   echo "     $voice_path"
 done
@@ -175,9 +183,9 @@ if [[ $DOWNLOADED -gt 0 ]]; then
   echo ""
   echo "Just downloaded:"
   for voice in "${NEED_DOWNLOAD[@]}"; do
-    local voice_path="$VOICE_DIR/${voice}.onnx"
+    voice_path="$VOICE_DIR/${voice}.onnx"
     if [[ -f "$voice_path" ]]; then
-      local file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
+      file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
       echo "   ✓ $voice ($file_size)"
       echo "     $voice_path"
     fi
@@ -188,7 +196,7 @@ if [[ $FAILED -gt 0 ]]; then
   echo ""
   echo "Failed downloads:"
   for voice in "${NEED_DOWNLOAD[@]}"; do
-    local voice_path="$VOICE_DIR/${voice}.onnx"
+    voice_path="$VOICE_DIR/${voice}.onnx"
     if [[ ! -f "$voice_path" ]]; then
       echo "   ✗ $voice"
     fi
@@ -207,6 +215,11 @@ if [[ $DOWNLOADED -gt 0 ]]; then
   echo "  /agent-vibes:preview"
 fi
 
-# Always exit successfully even if some downloads failed
-# (individual failures are tracked in FAILED counter)
+# Exit with error code if any downloads failed (Unix convention)
+if [[ $FAILED -gt 0 ]]; then
+  echo "" >&2
+  echo "⚠️  Warning: $FAILED download(s) failed. Some voices may not be available." >&2
+  exit 1
+fi
+
 exit 0

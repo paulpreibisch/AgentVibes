@@ -286,7 +286,7 @@ disown
 # Get audio cache stats
 AUDIO_DIR_PATH=$(get_audio_dir)
 FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
-SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH" | tail -1)  # Get last line only
+SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
 SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
 
 # Color codes
@@ -299,7 +299,7 @@ ORANGE='\033[0;33m'
 WHITE='\033[1;37m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
-GOLD='\033[0;33m'
+GOLD='\033[38;5;226m'
 NC='\033[0m'
 
 # Dynamic color coding based on cache size
@@ -314,7 +314,7 @@ elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
 fi
 
 # Display with file count and size in dynamic color brackets, "Saved to" in blue, path with disk icon
-echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC}"
+echo -e "${BLUE}💾 Saved to:${NC} $TEMP_FILE ${CACHE_COLOR}[$FILE_COUNT files, $SIZE_HUMAN]${NC} auto-clean set to 15mb"
 
 # Auto-cleanup check - delete oldest files if over threshold
 THRESHOLD=$(get_auto_clean_threshold)
