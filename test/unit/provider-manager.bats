@@ -50,6 +50,8 @@ teardown() {
   mv "$hooks_dir/play-tts-macos.sh" "$hooks_dir/play-tts-macos.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-enhanced.sh" "$hooks_dir/play-tts-enhanced.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-termux-ssh.sh" "$hooks_dir/play-tts-termux-ssh.sh.bak" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-soprano.sh" "$hooks_dir/play-tts-soprano.sh.bak" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-ssh-remote.sh" "$hooks_dir/play-tts-ssh-remote.sh.bak" 2>/dev/null || true
 
   run "$PROVIDER_MANAGER" list
 
@@ -61,6 +63,8 @@ teardown() {
   mv "$hooks_dir/play-tts-macos.sh.bak" "$hooks_dir/play-tts-macos.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-enhanced.sh.bak" "$hooks_dir/play-tts-enhanced.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-termux-ssh.sh.bak" "$hooks_dir/play-tts-termux-ssh.sh" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-soprano.sh.bak" "$hooks_dir/play-tts-soprano.sh" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-ssh-remote.sh.bak" "$hooks_dir/play-tts-ssh-remote.sh" 2>/dev/null || true
 }
 
 # ============================================================================

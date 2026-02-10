@@ -190,9 +190,26 @@ migrate_voice_to_provider() {
   # Default voices by provider
   local piper_default="en_US-lessac-medium"
   local macos_default="Samantha"
+  local soprano_default="soprano-default"  # Single voice — no selection needed
+
+  # Soprano has a single voice, so migration is straightforward
+  if [[ "$target_provider" == "soprano" ]]; then
+    echo "$soprano_default"
+    return 0
+  fi
 
   # If no current voice, return default for target provider
   if [[ -z "$current_voice" ]]; then
+    case "$target_provider" in
+      piper) echo "$piper_default" ;;
+      macos) echo "$macos_default" ;;
+      *) echo "$piper_default" ;;
+    esac
+    return 0
+  fi
+
+  # If migrating FROM Soprano, return default for target provider
+  if [[ "$current_voice" == "soprano-default" ]]; then
     case "$target_provider" in
       piper) echo "$piper_default" ;;
       macos) echo "$macos_default" ;;

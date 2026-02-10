@@ -146,6 +146,9 @@ speak_text() {
     piper)
       "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice"
       ;;
+    soprano)
+      "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
+      ;;
     macos)
       "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
       ;;
@@ -264,6 +267,9 @@ fi
 case "$ACTIVE_PROVIDER" in
   piper)
     exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  soprano)
+    exec "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   macos)
     exec "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
