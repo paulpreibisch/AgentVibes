@@ -100,6 +100,85 @@ function detectAndNotifyTermux() {
 }
 
 /**
+ * Check if PulseAudio tunnel is active
+ * @returns {boolean} True if PULSE_SERVER points to a TCP connection
+ */
+function hasPulseAudioTunnel() {
+  return process.env.PULSE_SERVER &&
+         process.env.PULSE_SERVER.toLowerCase().startsWith('tcp:');
+}
+
+/**
+ * Detect system capabilities for smart provider recommendations
+ * @returns {Promise<Object>} System info including GPU, memory, platform
+ */
+async function detectSystemCapabilities() {
+  const isMacOS = process.platform === 'darwin';
+  const isAndroid = isTermux();
+  let hasGPU = false;
+  let totalRAM = 0;
+
+  try {
+    // Detect NVIDIA GPU
+    try {
+      execSync('nvidia-smi --query-gpu=name --format=csv,noheader', {
+        stdio: 'pipe',
+        timeout: 5000  // 5 second timeout
+      });
+      hasGPU = true;
+    } catch (e) {
+      // No NVIDIA GPU or timeout
+    }
+
+    // Detect total RAM (in MB)
+    if (isMacOS) {
+      const output = execSync('sysctl hw.memsize', {
+        encoding: 'utf8',
+        timeout: 3000  // 3 second timeout
+      });
+      const parts = output.split(':');
+      if (parts.length < 2) {
+        throw new Error('Unexpected sysctl output format');
+      }
+      const bytes = parseInt(parts[1].trim(), 10);
+      if (isNaN(bytes)) {
+        throw new Error('Failed to parse memory size');
+      }
+      totalRAM = Math.floor(bytes / (1024 * 1024));
+    } else {
+      const output = execSync('cat /proc/meminfo | grep MemTotal', {
+        encoding: 'utf8',
+        timeout: 3000  // 3 second timeout
+      });
+      const parts = output.split(':');
+      if (parts.length < 2) {
+        throw new Error('Unexpected meminfo output format');
+      }
+      const memParts = parts[1].trim().split(' ');
+      if (memParts.length < 1) {
+        throw new Error('Unexpected meminfo value format');
+      }
+      const kb = parseInt(memParts[0], 10);
+      if (isNaN(kb)) {
+        throw new Error('Failed to parse memory size');
+      }
+      totalRAM = Math.floor(kb / 1024);
+    }
+  } catch (e) {
+    // Fallback: assume 4GB if detection fails
+    totalRAM = 4096;
+  }
+
+  return {
+    hasGPU,
+    lowMemory: totalRAM < 4096,
+    totalRAM,
+    isMacOS,
+    isAndroid
+  };
+}
+
+/**
  * Detect environment type for smart installation defaults
  * @returns {string} - 'DESKTOP', 'PHONE', or 'VOICELESS'
  */
@@ -109,18 +188,24 @@ function detectEnvironment() {
     return 'PHONE';
   }
 
-  // Check for audio devices
+  // Check for audio devices (local hardware)
   const hasAudio = checkAudioDevices();
+
+  // Check if PulseAudio tunnel is active (e.g., tcp:hostname:port)
+  // This provides working audio over SSH connections
+  const hasTunnel = hasPulseAudioTunnel();
 
   // Check if in SSH session
   const isSSH = process.env.SSH_CONNECTION || process.env.SSH_CLIENT || process.env.SSH_TTY;
 
-  // Voiceless: No audio OR in SSH session
-  if (!hasAudio || isSSH) {
+  // Voiceless: No audio devices AND no PulseAudio tunnel
+  // (SSH status doesn't matter - what matters is whether audio works)
+  if (!hasAudio && !hasTunnel) {
     return 'VOICELESS';
   }
 
-  // Desktop: Has audio, not SSH, not Termux
+  // Desktop: Has working audio (local devices OR PulseAudio tunnel)
+  // This includes SSH sessions with PulseAudio tunnels
   return 'DESKTOP';
 }
 
@@ -475,6 +560,9 @@ async function collectConfiguration(options = {}) {
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
+  // Cache system capabilities to avoid duplicate detection
+  let systemInfoCache = null;
+
   console.clear();
   console.log(chalk.cyan.bold('\n⚙️  Configuration Setup\n'));
   console.log(chalk.white('Please configure your AgentVibes installation.\n'));
@@ -536,24 +624,76 @@ async function collectConfiguration(options = {}) {
           }
         ));
       }
-      // Desktop: Standard provider selection
+      // Desktop: Smart provider selection with system detection
       else {
+        // Detect system capabilities for smart recommendations (cached to avoid duplicate calls)
+        if (!systemInfoCache) {
+          systemInfoCache = await detectSystemCapabilities();
+        }
+        const systemInfo = systemInfoCache;
+
+        // Detect audio method (local devices vs PulseAudio tunnel)
+        const hasLocalAudio = checkAudioDevices();
+        const hasTunnel = hasPulseAudioTunnel();
+
+        // Context-aware header message
+        let audioHeader = '';
+        let audioSubtext = '';
+        if (hasLocalAudio && hasTunnel) {
+          audioHeader = chalk.green.bold('🔊 Audio Output Detected!\n\n');
+          audioSubtext = chalk.white('Local speakers + PulseAudio tunnel detected. Choose your TTS engine:\n\n');
+        } else if (hasTunnel) {
+          audioHeader = chalk.blue.bold('🌐 PulseAudio Tunnel Detected!\n\n');
+          audioSubtext = chalk.white('Audio will play through your PulseAudio tunnel. Choose your TTS engine:\n\n');
+        } else {
+          audioHeader = chalk.green.bold('🔊 Audio Output Detected!\n\n');
+          audioSubtext = chalk.white('Your system has speakers. Choose your TTS engine:\n\n');
+        }
+
+        // Build recommendation message
+        let recommendation = '';
+        if (systemInfo.hasGPU && !systemInfo.isMacOS) {
+          recommendation = chalk.yellow('💡 Recommendation: Soprano\n') +
+                          chalk.gray('   Your GPU will run Soprano 2000x faster than CPU!\n') +
+                          chalk.gray('   Perfect for high-volume TTS or real-time applications.\n\n');
+        } else if (systemInfo.lowMemory && !systemInfo.isMacOS) {
+          const ramGB = systemInfo.totalRAM / 1024;
+          const ramDisplay = ramGB < 1
+            ? `${systemInfo.totalRAM}MB`
+            : `${Math.floor(ramGB)}GB`;
+          recommendation = chalk.yellow('💡 Recommendation: Soprano\n') +
+                          chalk.gray(`   Your system has limited RAM (${ramDisplay}).\n`) +
+                          chalk.gray('   Soprano uses <1GB vs Piper\'s 2-3GB.\n\n');
+        } else if (systemInfo.isMacOS) {
+          recommendation = chalk.yellow('💡 Recommendation: macOS Say\n') +
+                          chalk.gray('   Built-in, zero setup, 100+ voices included.\n') +
+                          chalk.gray('   Best choice for macOS users.\n\n');
+        } else {
+          recommendation = chalk.yellow('💡 Recommendation: Piper\n') +
+                          chalk.gray('   Most versatile: 50+ voices, 18+ languages.\n') +
+                          chalk.gray('   Great for multi-language projects and variety.\n\n');
+        }
+
         console.log(boxen(
-          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
-          chalk.white('Choose your Text-to-Speech provider.\n\n') +
-          (isMacOS ? chalk.yellow('🍎 macOS Say\n') +
-          chalk.gray('   • Built-in to macOS\n') +
-          chalk.gray('   • Zero setup required\n') +
-          chalk.gray('   • 40+ system voices\n\n') : '') +
+          audioHeader +
+          audioSubtext +
+          recommendation +
+          chalk.white('Available Providers:\n\n') +
+          (systemInfo.isMacOS ? chalk.yellow('🍎 macOS Say\n') +
+          chalk.gray('   • Built-in, zero setup, 100+ voices\n\n') : '') +
+          chalk.magenta('⚡ Soprano TTS\n') +
+          chalk.gray('   • Ultra-fast: 20x CPU, 2000x GPU\n') +
+          chalk.gray('   • 1 premium English voice\n') +
+          chalk.gray('   • <1GB memory footprint\n\n') +
           chalk.green('🆓 Piper TTS\n') +
+          chalk.gray('   • 50+ voices, 18+ languages\n') +
           chalk.gray('   • Free & offline\n') +
-          chalk.gray('   • 50+ Hugging Face AI voices\n') +
           chalk.gray('   • Human-like speech quality'),
           {
             padding: 1,
             margin: { top: 0, bottom: 0, left: 0, right: 0 },
             borderStyle: 'round',
-            borderColor: 'gray',
+            borderColor: 'green',
             width: 80
           }
         ));
@@ -565,41 +705,98 @@ async function collectConfiguration(options = {}) {
       // VOICELESS SERVER: Prioritize remote audio options
       if (environment === 'VOICELESS') {
         providerChoices.push({
-          name: chalk.green('📱 My phone/tablet via SSH') + chalk.yellow(' (Recommended)'),
-          value: 'termux-ssh'
+          name: chalk.green('📱 AgentVibes Receiver (Text → SSH → Device)') + chalk.yellow(' (Recommended)'),
+          value: 'termux-ssh',
+          short: 'SSH-Remote'
         });
         providerChoices.push({
-          name: chalk.blue('🔊 Another computer via PulseAudio'),
-          value: 'ssh-pulseaudio'
+          name: chalk.blue('🔊 PulseAudio Tunnel (Audio → TCP → Speakers)'),
+          value: 'ssh-pulseaudio',
+          short: 'PulseAudio'
         });
         providerChoices.push({
-          name: chalk.gray('🔇 No audio (silent mode)'),
-          value: 'silent'
+          name: chalk.gray('🔇 Silent Mode (No TTS)'),
+          value: 'silent',
+          short: 'Silent'
         });
       }
       // PHONE/TERMUX: Receiver mode or local playback
       else if (environment === 'PHONE') {
         providerChoices.push({
-          name: chalk.green('🎵 Receiver mode') + chalk.gray(' - Receive TTS from remote server'),
-          value: 'piper-receiver'
+          name: chalk.green('📱 Receiver Mode (Remote Server → This Phone)') + chalk.yellow(' (Recommended)'),
+          value: 'piper-receiver',
+          short: 'Receiver'
         });
         providerChoices.push({
-          name: chalk.blue('🎤 Local playback only') + chalk.gray(' - Use AgentVibes on this device'),
-          value: 'piper'
+          name: chalk.blue('🔊 Local Playback (This Device Only)'),
+          value: 'piper',
+          short: 'Local'
         });
       }
-      // DESKTOP: Standard provider options
+      // DESKTOP: Smart provider ordering
       else {
-        if (isMacOS) {
+        // Reuse cached system info from earlier detection
+        const systemInfo = systemInfoCache || await detectSystemCapabilities();
+
+        // Smart ordering based on system capabilities
+        if (systemInfo.hasGPU && !systemInfo.isMacOS) {
+          // GPU detected: Soprano first
           providerChoices.push({
-            name: chalk.yellow('🍎 macOS Say (Recommended)'),
-            value: 'macos'
+            name: chalk.magenta('⚡ Soprano TTS') + chalk.yellow(' (Recommended for your GPU)') +
+                  chalk.gray(' - 2000x real-time'),
+            value: 'soprano',
+            short: 'Soprano'
+          });
+          providerChoices.push({
+            name: chalk.green('🆓 Piper TTS') + chalk.gray(' - 50+ voices, 18+ languages'),
+            value: 'piper',
+            short: 'Piper'
+          });
+        } else if (systemInfo.lowMemory && !systemInfo.isMacOS) {
+          // Low memory: Soprano first
+          providerChoices.push({
+            name: chalk.magenta('⚡ Soprano TTS') + chalk.yellow(' (Best for low memory)') +
+                  chalk.gray(' - <1GB'),
+            value: 'soprano',
+            short: 'Soprano'
+          });
+          providerChoices.push({
+            name: chalk.green('🆓 Piper TTS') + chalk.gray(' - 50+ voices (uses 2-3GB RAM)'),
+            value: 'piper',
+            short: 'Piper'
+          });
+        } else if (systemInfo.isMacOS) {
+          // macOS: System voice first
+          providerChoices.push({
+            name: chalk.yellow('🍎 macOS Say') + chalk.yellow(' (Recommended)') +
+                  chalk.gray(' - Zero setup, 100+ built-in voices'),
+            value: 'macos',
+            short: 'macOS Say'
+          });
+          providerChoices.push({
+            name: chalk.magenta('⚡ Soprano TTS') + chalk.gray(' - Ultra-fast, 1 premium voice'),
+            value: 'soprano',
+            short: 'Soprano'
+          });
+          providerChoices.push({
+            name: chalk.green('🆓 Piper TTS') + chalk.gray(' - 50+ voices, 18+ languages'),
+            value: 'piper',
+            short: 'Piper'
+          });
+        } else {
+          // Standard: Piper first (most versatile)
+          providerChoices.push({
+            name: chalk.green('🆓 Piper TTS') + chalk.yellow(' (Recommended)') +
+                  chalk.gray(' - 50+ voices, versatile'),
+            value: 'piper',
+            short: 'Piper'
+          });
+          providerChoices.push({
+            name: chalk.magenta('⚡ Soprano TTS') + chalk.gray(' - Ultra-fast, 1 premium voice'),
+            value: 'soprano',
+            short: 'Soprano'
           });
         }
-        providerChoices.push({
-          name: chalk.green('🆓 Piper TTS (Free, Offline)'),
-          value: 'piper'
-        });
       }
 
       providerChoices.push(new inquirer.Separator());
@@ -677,8 +874,8 @@ async function collectConfiguration(options = {}) {
         }
       }
 
-      // If Termux SSH selected, show setup guide
-      if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
+      // If SSH-Remote selected, show setup guide (NOT PulseAudio!)
+      if (config.provider === 'termux-ssh' || config.provider === 'ssh-remote') {
         console.log('\n' + boxen(
           chalk.cyan.bold('📱 AgentVibes Receiver Setup\n\n') +
           chalk.white('What is Receiver Mode?\n') +
@@ -745,12 +942,63 @@ async function collectConfiguration(options = {}) {
         }
       }
 
+      // If PulseAudio selected, show different setup (BUG FIX!)
+      if (config.provider === 'ssh-pulseaudio' || config.provider === 'pulseaudio') {
+        console.log('\n' + boxen(
+          chalk.blue.bold('🔊 PulseAudio Tunnel Setup\n\n') +
+          chalk.white('What is PulseAudio Tunnel?\n') +
+          chalk.gray('Server generates audio and streams it via TCP to your speakers.\n\n') +
+          chalk.white('How it Works:\n') +
+          chalk.gray('1. Server: Generates TTS audio (Piper/Soprano/macOS Say)\n') +
+          chalk.gray('2. Server: Streams AUDIO via TCP tunnel (port 14713)\n') +
+          chalk.gray('3. Your device: PulseAudio receives and plays audio\n\n') +
+          chalk.white('Requirements:\n') +
+          chalk.yellow('⚠️  PulseAudio must be installed on BOTH devices\n') +
+          chalk.yellow('⚠️  SSH tunnel or network route to port 14713\n\n') +
+          chalk.white('Manual Setup Required:\n') +
+          chalk.gray('On Server:\n') +
+          chalk.white('  export PULSE_SERVER=tcp:localhost:14713\n') +
+          chalk.white('  (Add to ~/.bashrc for persistence)\n\n') +
+          chalk.gray('On Your Local Machine:\n') +
+          chalk.white('  ssh -R 14713:localhost:4713 your-server\n\n') +
+          chalk.cyan('📖 Full guide: ') + chalk.blue('docs/remote-audio-setup.md\n\n') +
+          chalk.yellow('💡 Tip: ') + chalk.gray('PulseAudio works best on local networks.\n') +
+          chalk.gray('   For mobile/remote, consider SSH-Remote instead.'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'blue',
+            width: 80
+          }
+        ));
+        console.log('');
+      }
+
     } else if (currentPage === 2) {
       // Page 3: Voice Selection
+      // Provider-aware voice selection introduction
+      let voiceIntroMessage = '';
+      if (config.provider === 'soprano') {
+        voiceIntroMessage = chalk.white('Soprano Voice Configuration\n\n') +
+                           chalk.gray('Soprano has a single premium neural voice.\n') +
+                           chalk.gray('Voice details and specifications shown below.');
+      } else if (config.provider === 'piper') {
+        voiceIntroMessage = chalk.white('Choose a default voice for your AgentVibes.\n\n') +
+                           chalk.gray('Piper offers 50+ voices in 18+ languages.\n') +
+                           chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>');
+      } else if (config.provider === 'macos') {
+        voiceIntroMessage = chalk.white('Choose a default voice for your AgentVibes.\n\n') +
+                           chalk.gray('macOS includes 100+ built-in voices.\n') +
+                           chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>');
+      } else {
+        voiceIntroMessage = chalk.white('Choose a default voice for your AgentVibes.\n\n') +
+                           chalk.gray('This will be used when no specific voice is configured.\n') +
+                           chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>');
+      }
+
       console.log(boxen(
-        chalk.white('Choose a default voice for your AgentVibes.\n\n') +
-        chalk.gray('This will be used when no specific voice is configured.\n') +
-        chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>'),
+        voiceIntroMessage,
         {
           padding: 1,
           margin: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -839,6 +1087,36 @@ async function collectConfiguration(options = {}) {
           currentPage++;
           continue;
         }
+
+      } else if (config.provider === 'soprano') {
+        // Soprano TTS - single voice model
+        console.log(boxen(
+          chalk.magenta.bold('⚡ Soprano TTS Voice\n\n') +
+          chalk.white('Soprano is a single-speaker neural TTS model.\n\n') +
+          chalk.cyan('Voice Details:\n') +
+          chalk.gray('   • Model: ') + chalk.white('Soprano-1.1-80M\n') +
+          chalk.gray('   • Language: ') + chalk.white('English (en_US)\n') +
+          chalk.gray('   • Gender: ') + chalk.white('Female\n') +
+          chalk.gray('   • Quality: ') + chalk.white('Premium neural voice\n') +
+          chalk.gray('   • Speed: ') + chalk.white('20x CPU, 2000x GPU (if available)\n\n') +
+          chalk.yellow('💡 ') + chalk.white('Only one voice available - automatically selected.\n') +
+          chalk.gray('   For multiple voices, consider switching to Piper (50+ voices).'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'magenta',
+            width: 80
+          }
+        ));
+
+        // Auto-set the single Soprano voice
+        config.defaultVoice = 'soprano-default';
+        console.log(chalk.green('\n✓ Voice: Soprano-1.1-80M (auto-selected)\n'));
+
+        // Auto-advance to next page
+        currentPage++;
+        continue;
 
       } else if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
         // Termux SSH - voices are managed on Android device
@@ -1570,6 +1848,12 @@ async function promptProviderSelection(options) {
   choices.push({
     name: chalk.green('🆓 Piper TTS (Free, Offline)') + chalk.gray(' - 50+ Hugging Face AI voices, human-like speech'),
     value: 'piper',
+  });
+
+  // Soprano TTS (all platforms)
+  choices.push({
+    name: chalk.magenta('⚡ Soprano TTS (Ultra-Fast)') + chalk.gray(' - 1 premium voice, 20x faster, <1GB memory'),
+    value: 'soprano',
   });
 
   // Termux SSH (all platforms)
@@ -3351,7 +3635,14 @@ async function install(options = {}) {
   const preInstallPages = [];
 
   // Page 1: Configuration Summary
-  const providerLabels = { piper: 'Piper TTS', macos: 'macOS Say', 'termux-ssh': 'Termux SSH (Android)' };
+  const providerLabels = {
+    piper: 'Piper TTS',
+    macos: 'macOS Say',
+    soprano: 'Soprano TTS',
+    'termux-ssh': 'Termux SSH (Android)',
+    'ssh-pulseaudio': 'PulseAudio Tunnel',
+    pulseaudio: 'PulseAudio Tunnel'
+  };
   const reverbLabels = {
     off: 'Off',
     light: 'Light',
