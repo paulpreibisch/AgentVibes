@@ -39,9 +39,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ### 🎯 Key Features
 
+**⚡ NEW IN v3.4.0:**
+- 🎤 **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks [@nathanchase](https://github.com/nathanchase)!)
+- 🛡️ **Security Hardening** - 9.5/10 score with comprehensive validation and timeouts
+- 🌐 **Environment Intelligence** - PulseAudio tunnel auto-detection for SSH scenarios
+- 🎯 **Smart Recommendations** - GPU/RAM-based provider suggestions in installer
+
 **✨ NEW IN v3.3.0:**
-- 📱 **AgentVibes Receiver - NEW!** - Stream TTS from voiceless servers to your phone, laptop, or local machine via encrypted SSH tunnel
-- 🌐 **Voiceless Server Support - NEW!** - Generate TTS on cloud servers (AWS, GCP, Azure) and play on any device with speakers
+- 📱 **AgentVibes Receiver** - Stream TTS from voiceless servers to your phone, laptop, or local machine via encrypted SSH tunnel
+- 🌐 **Voiceless Server Support** - Generate TTS on cloud servers (AWS, GCP, Azure) and play on any device with speakers
 
 **⚡ Core Features:**
 - ⚡ **One-Command Install** - Get started in 30 seconds (`npx agentvibes install`)
