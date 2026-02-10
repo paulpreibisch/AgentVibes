@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.3.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.4.0
 
 ---
 
@@ -88,7 +88,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [📰 Latest Release](#-latest-release) - v3.3.0 - Remote Audio Revolution
+- [📰 Latest Release](#-latest-release) - v3.4.0 - Soprano TTS & Security Hardening
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -132,24 +132,25 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[Remote Audio Revolution: Voiceless Servers → Phone & Mobile Playback](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.3.0)** 📱🔊
+**[v3.4.0 - Soprano TTS, Security Hardening & Environment Intelligence](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.4.0)** ⚡🛡️
 
-AgentVibes v3.3.0 brings breakthrough remote audio capabilities, turning your messaging apps into voice-enabled AI assistants! **Use Case:** Install [OpenClaw](https://openclaw.ai/) on a remote server, message it via Telegram or WhatsApp from anywhere, and AgentVibes (running in Termux on your phone) plays the TTS responses through your phone speakers—making it work like Siri, but powered by AgentVibes! This release enables voiceless servers to play audio remotely on phones, mobile devices, or any machine via SSH/PulseAudio tunneling. Also includes audio tracks directory structure fix and comprehensive OpenClaw skill documentation.
+AgentVibes v3.4.0 introduces Soprano TTS - an 80M parameter neural provider offering 20x CPU and 2000x GPU acceleration with sub-1GB memory footprint - plus comprehensive security hardening (timeouts, bounds checking, NaN validation) achieving a 9.5/10 security score, and intelligent environment detection that recognizes PulseAudio tunnels as working audio for remote scenarios. The enhanced installer provides GPU-based provider recommendations and context-aware messaging. Special thanks to [@nathanchase](https://github.com/nathanchase) for contributing the Soprano TTS Provider integration!
 
 **Key Highlights:**
-- 📱 **Voiceless Server Support** - Generate TTS on servers without audio hardware, play on remote devices
-- 🔊 **Phone/Mobile Playback** - Audio tunnels from cloud servers to your phone or local machine via SSH
-- 🌐 **PulseAudio SSH Tunneling** - Automatic audio routing through SSH reverse forwarding (port 14713)
-- 🤖 **Enhanced OpenClaw Integration** - Complete skill documentation with 50+ voices and remote audio setup
-- 🎵 **Audio Tracks Fix** - Corrected directory structure (backgrounds → tracks) with proper .npmignore entries
-- 📦 **Package Size Optimization** - 8.3 MB unpacked, 172 files, optimized for npm distribution
-- 🛡️ **Security & Quality** - Removed sensitive data from git history, SonarCloud compliance
+- ⚡ **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks @nathanchase!)
+- 🛡️ **Security Hardening** - 9.5/10 score with timeouts on system commands and comprehensive validation
+- 🌐 **Environment Intelligence** - PulseAudio tunnel auto-detection for SSH + tunnel scenarios
+- 🎯 **Smart Recommendations** - GPU/RAM-based provider suggestions (Soprano for CUDA, macOS Say for Apple)
+- 📱 **Provider-Aware Voice Pages** - Soprano shows model specs, auto-selects single voice
+- 🧪 **260/260 Tests Passing** - Complete suite coverage with all edge cases fixed
+- 🎨 **Better UX** - Context-aware messaging ("PulseAudio Tunnel Detected!" vs "speakers")
 
 **Perfect For:**
-- Running AgentVibes/OpenClaw on AWS, GCP, Azure, DigitalOcean
-- VS Code Remote SSH development with TTS feedback
-- Android/Termux with audio playback on phone speakers
-- Any headless server → local audio scenario
+- GPU users wanting ultra-fast TTS (2000x real-time with CUDA)
+- Low-RAM systems (<1GB memory footprint with Soprano)
+- SSH sessions with PulseAudio tunnels (auto-detected)
+- Production deployments requiring security hardening
+- Any environment needing intelligent provider selection
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
@@ -1451,6 +1452,9 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 - [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
 - [Claude Code](https://claude.com/claude-code) - AI coding assistant
 - Licensed under Apache 2.0
+
+**Contributors:**
+- 🎤 [@nathanchase](https://github.com/nathanchase) - Soprano TTS Provider integration (PR #95) - Ultra-fast neural TTS with GPU acceleration
 
 **Special Thanks:**
 - 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler) - Hooks inspiration

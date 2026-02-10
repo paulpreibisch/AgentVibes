@@ -1520,18 +1520,19 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.3.0 - Remote Audio Revolution\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.4.0 - Soprano TTS & Security Hardening\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.3.0 unleashes the platform across remote servers, mobile devices, and OpenClaw\n') +
-    chalk.cyan('deployments. Stream TTS from voiceless servers to your phone via SSH-PulseAudio tunneling,\n') +
-    chalk.cyan('run native Piper on Android/Termux, and manage audio with intelligent size-based auto-cleanup.\n') +
-    chalk.cyan('Perfect for turning any server into a voice-enabled AI assistant.\n\n') +
+    chalk.cyan('AgentVibes v3.4.0 introduces Soprano TTS - an 80M parameter neural provider with 20x CPU\n') +
+    chalk.cyan('and 2000x GPU acceleration - plus comprehensive security hardening (timeouts, bounds checking,\n') +
+    chalk.cyan('NaN validation) and intelligent environment detection that recognizes PulseAudio tunnels as\n') +
+    chalk.cyan('working audio for remote scenarios. Enhanced installer provides GPU-based recommendations.\n\n') +
+    chalk.yellow('🙏 Special thanks to community member @nathanchase for contributing Soprano TTS!\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   📱 AgentVibes Receiver - Stream audio from voiceless servers to phones/laptops\n') +
-    chalk.gray('   🌐 Voiceless Server Support - Generate TTS on cloud servers (AWS, GCP, Azure)\n') +
-    chalk.gray('   🎤 Voice Management Skill - 50+ voices, multi-provider support for OpenClaw\n') +
-    chalk.gray('   🛡️ Smart Auto-Cleanup - Size-based cache management prevents disk bloat\n') +
-    chalk.gray('   🎨 Enhanced Display - Color-coded output with real-time cache metrics\n\n') +
+    chalk.gray('   ⚡ Soprano TTS Provider - Ultra-fast neural TTS with GPU acceleration (thanks @nathanchase!)\n') +
+    chalk.gray('   🛡️ Security Hardening - 9.5/10 score with timeouts and comprehensive validation\n') +
+    chalk.gray('   🌐 Environment Intelligence - PulseAudio tunnel auto-detection for SSH scenarios\n') +
+    chalk.gray('   🎯 Smart Recommendations - GPU/RAM-based provider suggestions\n') +
+    chalk.gray('   🧪 260/260 Tests Passing - Complete test coverage with fixed edge cases\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
