@@ -1,5 +1,44 @@
 # AgentVibes Release Notes
 
+## 🛡️ v3.5.8 - Provider Validation Security & UX Improvements
+
+**Release Date:** February 12, 2026
+
+### 🎯 Summary
+
+Critical security and reliability update for provider detection. Fixes command injection vulnerabilities in validation code, prevents HOME directory injection attacks, and improves UX with explicit provider detection messaging. Soprano TTS installed via pipx is now correctly detected (previously showed "not installed" due to ES module import error). All 8 critical code review issues resolved with comprehensive security hardening and enhanced error reporting.
+
+### ✨ Key Improvements
+
+- **🔐 Security Fixes:** Fixed command injection vulnerability (template strings → array form), prevented HOME injection attacks, added path traversal protection
+- **✅ Provider Detection:** Soprano via pipx now correctly detected; added checkedLocations tracking for transparency
+- **💬 Better Messaging:** Explicit "Detected and selected!" confirmation; detailed error messages showing what was checked
+- **🧪 Test Coverage:** Enhanced tests verify actual detection values, not just types
+- **🐛 Debugging:** Added [DEBUG] logging for troubleshooting provider issues
+
+### 🔴 Critical Fixes
+
+1. **Command Injection Prevention** - All execSync calls now use array form (security: CLAUDE.md)
+2. **HOME Directory Injection** - Switched to os.homedir() instead of process.env.HOME
+3. **Path Traversal Protection** - Added path.resolve() validation for pipx venv directories
+
+### 🟡 Medium Fixes
+
+4. **Pipx Logic Improved** - Tracks checked locations even on success (transparency)
+5. **Silent Failures Eliminated** - Added [DEBUG] error logging for diagnostics
+6. **Test Quality Enhanced** - Verify message content, not just types
+7. **Documentation** - Added JSDoc comments explaining security-critical imports
+8. **Error Differentiation** - Better distinction between different failure types
+
+### 📊 Technical Impact
+
+- Soprano detection now works reliably for both pip and pipx installations
+- Reduced false negatives in provider validation
+- Enhanced security posture aligned with CLAUDE.md security mandates
+- Improved debuggability with explicit error messages
+
+---
+
 ## 🔧 v3.5.7 - CLI Fix: npx Command Output & Startup Hooks
 
 **Release Date:** February 12, 2026

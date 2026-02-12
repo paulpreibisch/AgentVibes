@@ -1680,20 +1680,17 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.5.5 - Native Windows Support: Soprano, Piper & SAPI\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.5.8 - Provider Validation Security & UX Improvements\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.5.5 brings native Windows support with three TTS providers (Soprano neural,\n') +
-    chalk.cyan('Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects\n') +
-    chalk.cyan('via ffmpeg, and verbosity control. Includes 8 Windows hook scripts, beautiful PowerShell\n') +
-    chalk.cyan('installer with figlet banner, and 46 new Windows-specific unit tests.\n\n') +
-    chalk.yellow('🙏 Thanks to @nathanchase (Soprano), @alexeyv (Windows SAPI), @bmadcode (BMAD Method)!\n\n') +
+    chalk.cyan('Critical security and reliability update for provider detection. Fixes command injection\n') +
+    chalk.cyan('vulnerabilities, prevents HOME directory injection attacks, and improves UX with explicit\n') +
+    chalk.cyan('provider detection messaging. Soprano TTS installed via pipx now correctly detected.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🖥️ Native Windows TTS - Soprano, Piper, and Windows SAPI providers. No WSL needed!\n') +
-    chalk.gray('   🎵 Background Music - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more)\n') +
-    chalk.gray('   🎛️ Reverb & Effects - 5 reverb levels via ffmpeg aecho filter\n') +
-    chalk.gray('   🔊 Verbosity Control - High, Medium, or Low transparency levels\n') +
-    chalk.gray('   🎨 Beautiful Installer - Figlet banner, directory explanations, provider detection\n') +
-    chalk.gray('   🧪 93/93 Tests Passing - 46 Windows + 47 cross-platform\n\n') +
+    chalk.gray('   🔐 Security Fixes - Fixed command injection, HOME injection prevention, path traversal\n') +
+    chalk.gray('   ✅ Provider Detection - Soprano via pipx now correctly detected\n') +
+    chalk.gray('   💬 Better Messaging - Explicit detection confirmation, detailed error messages\n') +
+    chalk.gray('   🧪 Enhanced Tests - Verification of actual detection values\n') +
+    chalk.gray('   🐛 Debug Support - Added logging for troubleshooting\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
