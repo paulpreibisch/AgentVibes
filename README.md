@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.4
 
 ---
 
@@ -40,7 +40,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ### 🎯 Key Features
 
-**🪟 NEW IN v3.5.2 — Native Windows Support:**
+**🪟 NEW IN v3.5.4 — Native Windows Support:**
 - 🖥️ **Windows Native TTS** - Three providers: Soprano (neural), Piper (offline), Windows SAPI (zero setup). No WSL required!
 - 🎵 **Background Music** - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more) mixed under voice
 - 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg (Light, Medium, Heavy, Cathedral)
@@ -97,7 +97,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [📰 Latest Release](#-latest-release) - v3.5.2 - Native Windows Support with Soprano, Piper & SAPI
+- [📰 Latest Release](#-latest-release) - v3.5.4 - Native Windows Support with Soprano, Piper & SAPI
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -141,9 +141,9 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.5.2 - Native Windows Support: Soprano, Piper & SAPI Providers](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.2)** 🪟🎤
+**[v3.5.4 - Native Windows Support: Soprano, Piper & SAPI Providers](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.4)** 🪟🎤
 
-AgentVibes v3.5.2 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
+AgentVibes v3.5.4 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
 
 Install via `npx agentvibes install` or the standalone PowerShell installer (`.\setup-windows.ps1`). No WSL required!
 
