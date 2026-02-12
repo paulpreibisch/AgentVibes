@@ -1,5 +1,13 @@
 # AgentVibes Release Notes
 
+## 🔧 v3.5.6 - Bug Fix: Bash Hook Parameter Handling
+
+**Release Date:** February 11, 2026
+
+Fixes critical regression in v3.5.5 where bash hooks failed with unbound variable errors when called with optional parameters under strict mode. Affects `play-tts.sh` and `provider-manager.sh`.
+
+---
+
 ## 📦 v3.5.5 - Native Windows Support: Soprano, Piper & SAPI Providers
 
 **Release Date:** February 12, 2026
