@@ -87,6 +87,14 @@ function isTermux() {
 }
 
 /**
+ * Detect if running on native Windows (not WSL)
+ * @returns {boolean} True if running on native Windows
+ */
+function isNativeWindows() {
+  return process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+}
+
+/**
  * Detect if running on Android/Termux and display message
  * @returns {boolean} True if running on Termux/Android
  */
@@ -546,6 +554,9 @@ async function collectConfiguration(options = {}) {
       config.provider = 'piper';
       config.defaultVoice = 'en_US-lessac-medium';
       config.isTermux = true;
+    } else if (isNativeWindows()) {
+      config.provider = 'windows-piper';
+      config.defaultVoice = 'en_US-ryan-high';
     } else {
       config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
       config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
@@ -623,6 +634,31 @@ async function collectConfiguration(options = {}) {
             width: 80
           }
         ));
+      }
+      // Windows: Simple provider info
+      else if (isNativeWindows()) {
+        const providerInfoContent =
+          chalk.white('Text-to-Speech (TTS) converts Claude\'s text responses into spoken audio.\n\n') +
+          chalk.white('Choose your Text-to-Speech provider.\n\n') +
+          chalk.green('🎵 Windows Piper TTS (Recommended)\n') +
+          chalk.gray('   • High quality neural voices\n') +
+          chalk.gray('   • 50+ Hugging Face AI voices\n') +
+          chalk.gray('   • Free & offline\n\n') +
+          chalk.magenta('⚡ Soprano TTS\n') +
+          chalk.gray('   • Ultra-fast: 20x CPU, 2000x GPU\n') +
+          chalk.gray('   • 1 premium English voice\n') +
+          chalk.gray('   • <1GB memory footprint\n\n') +
+          chalk.blue('🔊 Windows SAPI (Built-in)\n') +
+          chalk.gray('   • Zero setup required\n') +
+          chalk.gray('   • Uses Windows built-in voices\n') +
+          chalk.gray('   • Basic quality');
+        console.log(boxen(providerInfoContent, {
+          padding: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'cyan',
+          width: 80
+        }));
       }
       // Desktop: Smart provider selection with system detection
       else {
@@ -733,6 +769,21 @@ async function collectConfiguration(options = {}) {
           short: 'Local'
         });
       }
+      // WINDOWS: Native Windows providers
+      else if (isNativeWindows()) {
+        providerChoices.push({
+          name: chalk.green('🎵 Windows Piper TTS (Recommended)') + chalk.gray(' - High quality neural voices'),
+          value: 'windows-piper'
+        });
+        providerChoices.push({
+          name: chalk.magenta('⚡ Soprano TTS') + chalk.gray(' - Ultra-fast neural, 1 premium voice'),
+          value: 'soprano'
+        });
+        providerChoices.push({
+          name: chalk.blue('🔊 Windows SAPI (Built-in)') + chalk.gray(' - Basic quality, zero setup'),
+          value: 'windows-sapi'
+        });
+      }
       // DESKTOP: Smart provider ordering
       else {
         // Reuse cached system info from earlier detection
@@ -810,7 +861,7 @@ async function collectConfiguration(options = {}) {
         name: 'provider',
         message: chalk.yellow('Select TTS provider:'),
         choices: providerChoices,
-        default: config.provider || (isMacOS ? 'macos' : 'piper')
+        default: config.provider || (isNativeWindows() ? 'windows-piper' : (isMacOS ? 'macos' : 'piper'))
       }]);
 
       // Check if user wants to go back
@@ -834,7 +885,7 @@ async function collectConfiguration(options = {}) {
       }
 
       // If Piper selected, ask for voice storage location
-      if (config.provider === 'piper' || config.isReceiver) {
+      if (config.provider === 'piper' || config.provider === 'windows-piper' || config.isReceiver) {
         const homeDir = process.env.HOME || process.env.USERPROFILE;
         const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
 
@@ -1117,6 +1168,37 @@ async function collectConfiguration(options = {}) {
         // Auto-advance to next page
         currentPage++;
         continue;
+
+      } else if (config.provider === 'windows-sapi') {
+        const sapiVoices = [
+          { name: chalk.cyan('Microsoft David Desktop') + chalk.gray(' (Male, American)'), value: 'Microsoft David Desktop' },
+          { name: chalk.magenta('Microsoft Zira Desktop') + chalk.gray(' (Female, American)'), value: 'Microsoft Zira Desktop' },
+          { name: chalk.cyan('Microsoft Mark Desktop') + chalk.gray(' (Male, American)'), value: 'Microsoft Mark Desktop' },
+          new inquirer.Separator(),
+          { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
+          { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
+        ];
+        const { selectedVoice } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedVoice',
+          message: chalk.yellow('Select your default Windows SAPI voice:'),
+          choices: sapiVoices,
+          default: 'Microsoft David Desktop',
+          pageSize: 10
+        }]);
+        if (selectedVoice === '__back__') {
+          return null;
+        }
+        if (selectedVoice !== '__skip__') {
+          config.defaultVoice = selectedVoice;
+          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          currentPage++;
+          continue;
+        } else {
+          console.log(chalk.yellow('\n⊘ Voice selection skipped\n'));
+          currentPage++;
+          continue;
+        }
 
       } else if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
         // Termux SSH - voices are managed on Android device
@@ -1552,7 +1634,27 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
     return;
   }
 
-  // Check if we have audio player (prefer paplay for WSL)
+  // Use pre-generated welcome demo audio
+  const welcomeDemoAudio = path.join(__dirname, '..', 'templates', 'audio', 'welcome-demo.wav');
+
+  if (!fsSync.existsSync(welcomeDemoAudio)) {
+    console.log(chalk.gray('\n   (Welcome demo skipped - audio file not found)'));
+    return;
+  }
+
+  // Windows: Use PowerShell SoundPlayer for audio playback (check BEFORE Unix which)
+  if (isNativeWindows()) {
+    // Escape single quotes to prevent PowerShell injection (double them per PS escaping rules)
+    const safeAudioPath = welcomeDemoAudio.replace(/'/g, "''");
+    const audioProcess = spawn('powershell', [
+      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+      `(New-Object System.Media.SoundPlayer '${safeAudioPath}').PlaySync()`
+    ], { detached: true, stdio: 'ignore' });
+    audioProcess.unref();
+    return;
+  }
+
+  // Unix: Check if we have audio player (prefer paplay for WSL)
   let audioPlayer = null;
 
   try {
@@ -1572,14 +1674,6 @@ async function playWelcomeDemo(targetDir, spinner, options = {}) {
 
   if (!audioPlayer) {
     console.log(chalk.gray('\n   (Welcome demo skipped - requires paplay, afplay, or mpv)'));
-    return;
-  }
-
-  // Use pre-generated welcome demo audio
-  const welcomeDemoAudio = path.join(__dirname, '..', 'templates', 'audio', 'welcome-demo.wav');
-
-  if (!fsSync.existsSync(welcomeDemoAudio)) {
-    console.log(chalk.gray('\n   (Welcome demo skipped - audio file not found)'));
     return;
   }
 
@@ -2123,6 +2217,13 @@ async function copyCommandFiles(targetDir, spinner) {
  * @returns {boolean} True if file should be included
  */
 function shouldIncludeHookFile(file, stat) {
+  if (isNativeWindows()) {
+    // Include .ps1 scripts, .py helpers, and hooks.json; exclude dotfiles and prepare-release
+    return stat.isFile() &&
+           (file.endsWith('.ps1') || file.endsWith('.py') || file === 'hooks.json') &&
+           !file.includes('prepare-release') &&
+           !file.startsWith('.');
+  }
   return stat.isFile() &&
          (file.endsWith('.sh') || file === 'hooks.json') &&
          !file.includes('prepare-release') &&
@@ -2232,8 +2333,9 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
  */
 async function copyHookFiles(targetDir, spinner) {
   spinner.start('Installing TTS helper scripts...');
-  const srcHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
-  const hooksDir = path.join(targetDir, '.claude', 'hooks');
+  const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
+  const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
+  const hooksDir = path.join(targetDir, '.claude', hooksSubdir);
 
   try {
     await fs.mkdir(hooksDir, { recursive: true });
@@ -2651,7 +2753,16 @@ async function configureSessionStartHook(targetDir, spinner) {
     }
 
     if (!existingSettings.hooks.SessionStart) {
-      existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
+      if (isNativeWindows()) {
+        existingSettings.hooks.SessionStart = [{
+          hooks: [{
+            type: 'command',
+            command: 'powershell -NoProfile -ExecutionPolicy Bypass -File "$CLAUDE_PROJECT_DIR\\.claude\\hooks-windows\\session-start-tts.ps1"'
+          }]
+        }];
+      } else {
+        existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
+      }
 
       if (!existingSettings.$schema) {
         existingSettings.$schema = templateSettings.$schema;
@@ -2805,6 +2916,132 @@ async function checkAndInstallPiper(targetDir, options) {
   } catch (error) {
     console.log(chalk.yellow('⚠️  Unable to auto-detect Piper installation'));
     console.log(chalk.gray('   Install manually if needed: pipx install piper-tts\n'));
+  }
+}
+
+/**
+ * Download a file from a URL, following redirects
+ * @param {string} url - URL to download from
+ * @param {string} destPath - Destination file path
+ * @returns {Promise<void>}
+ */
+async function downloadFile(url, destPath) {
+  const https = await import('https');
+  const MAX_REDIRECTS = 5;
+  return new Promise((resolve, reject) => {
+    const request = (reqUrl, redirectCount) => {
+      if (redirectCount > MAX_REDIRECTS) {
+        reject(new Error('Too many redirects'));
+        return;
+      }
+      // Only follow HTTPS redirects (prevent downgrade to HTTP or file://)
+      if (redirectCount > 0 && !reqUrl.startsWith('https://')) {
+        reject(new Error(`Refused non-HTTPS redirect to: ${reqUrl}`));
+        return;
+      }
+      const req = https.default.get(reqUrl, { timeout: 60000 }, (response) => {
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          request(response.headers.location, redirectCount + 1);
+          return;
+        }
+        if (response.statusCode !== 200) {
+          reject(new Error(`Download failed: HTTP ${response.statusCode}`));
+          return;
+        }
+        const fileStream = fsSync.createWriteStream(destPath);
+        response.pipe(fileStream);
+        fileStream.on('finish', () => { fileStream.close(); resolve(); });
+        fileStream.on('error', (err) => {
+          fileStream.close();
+          // Clean up partial file on error
+          try { fsSync.unlinkSync(destPath); } catch {}
+          reject(err);
+        });
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('Download timed out')); });
+    };
+    request(url, 0);
+  });
+}
+
+/**
+ * Check and install Piper TTS on Windows
+ * Downloads piper_windows_amd64.zip from GitHub, extracts via PowerShell,
+ * and downloads default voice from HuggingFace
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} options - Installation options
+ */
+async function checkAndInstallPiperWindows(targetDir, options) {
+  const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+  if (!localAppData) {
+    console.log(chalk.red('Could not determine LOCALAPPDATA directory.\n'));
+    return;
+  }
+  const piperDir = path.join(localAppData, 'Programs', 'Piper');
+  const piperExe = path.join(piperDir, 'piper.exe');
+  const spinner = ora();
+
+  if (fsSync.existsSync(piperExe)) {
+    console.log(chalk.green('✓ Piper TTS is already installed at ' + piperDir + '\n'));
+    return;
+  }
+
+  spinner.start('Downloading Piper TTS for Windows...');
+  try {
+    await fs.mkdir(piperDir, { recursive: true });
+    const zipPath = path.join(piperDir, 'piper_windows_amd64.zip');
+    const piperUrl = 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip';
+    await downloadFile(piperUrl, zipPath);
+    spinner.text = 'Extracting Piper...';
+    const { execSync: execSyncLocal } = await import('child_process');
+    // Escape single quotes to prevent PowerShell injection
+    const safeZipPath = zipPath.replace(/'/g, "''");
+    const safePiperDir = piperDir.replace(/'/g, "''");
+    execSyncLocal(`powershell -NoProfile -Command "Expand-Archive -Path '${safeZipPath}' -DestinationPath '${safePiperDir}' -Force"`, { stdio: 'pipe' });
+    // Move files from nested piper/ subdirectory to piperDir
+    const nestedDir = path.join(piperDir, 'piper');
+    if (fsSync.existsSync(nestedDir)) {
+      const files = await fs.readdir(nestedDir);
+      for (const file of files) {
+        const src = path.join(nestedDir, file);
+        const dest = path.join(piperDir, file);
+        if (!fsSync.existsSync(dest)) {
+          await fs.rename(src, dest);
+        }
+      }
+      await fs.rm(nestedDir, { recursive: true, force: true });
+    }
+    await fs.unlink(zipPath).catch(() => {});
+    spinner.succeed(chalk.green('Piper TTS installed!\n'));
+  } catch (error) {
+    spinner.fail(chalk.red('Failed to install Piper: ' + error.message));
+    console.log(chalk.yellow('You can install Piper manually from: https://github.com/rhasspy/piper/releases\n'));
+    return;
+  }
+
+  // Download default voice
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  if (!homeDir) {
+    console.log(chalk.yellow('Could not determine home directory, skipping voice download.\n'));
+    return;
+  }
+  const voicesDir = path.join(homeDir, '.claude', 'piper-voices');
+  const voiceName = 'en_US-ryan-high';
+  const modelFile = path.join(voicesDir, voiceName + '.onnx');
+  if (!fsSync.existsSync(modelFile)) {
+    spinner.start('Downloading default voice (en_US-ryan-high)...');
+    try {
+      await fs.mkdir(voicesDir, { recursive: true });
+      const modelUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/${voiceName}.onnx`;
+      const configUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/${voiceName}.onnx.json`;
+      await downloadFile(modelUrl, modelFile);
+      await downloadFile(configUrl, modelFile + '.json');
+      spinner.succeed(chalk.green('Default voice downloaded!\n'));
+    } catch (error) {
+      spinner.fail(chalk.red('Failed to download voice: ' + error.message));
+      console.log(chalk.yellow('You can download voices manually later.\n'));
+    }
   }
 }
 
@@ -3642,7 +3879,9 @@ async function install(options = {}) {
     soprano: 'Soprano TTS',
     'termux-ssh': 'Termux SSH (Android)',
     'ssh-pulseaudio': 'PulseAudio Tunnel',
-    pulseaudio: 'PulseAudio Tunnel'
+    pulseaudio: 'PulseAudio Tunnel',
+    'windows-piper': 'Windows Piper TTS',
+    'windows-sapi': 'Windows SAPI'
   };
   const reverbLabels = {
     off: 'Off',
@@ -3803,7 +4042,7 @@ async function install(options = {}) {
     // Create .claude directory structure
     const claudeDir = path.join(targetDir, '.claude');
     const commandsDir = path.join(claudeDir, 'commands');
-    const hooksDir = path.join(claudeDir, 'hooks');
+    const hooksDir = path.join(claudeDir, isNativeWindows() ? 'hooks-windows' : 'hooks');
 
     let exists = false;
     try {
@@ -3970,6 +4209,15 @@ Troubleshooting:
         case 'macos':
           defaultVoice = 'Samantha';
           break;
+        case 'windows-piper':
+          defaultVoice = 'en_US-ryan-high';
+          break;
+        case 'windows-sapi':
+          defaultVoice = 'Microsoft David Desktop';
+          break;
+        case 'soprano':
+          defaultVoice = 'soprano-default';
+          break;
         case 'termux-ssh':
           // Android TTS voices are managed in Android settings, not here
           defaultVoice = 'android-system-default';
@@ -4005,6 +4253,15 @@ Troubleshooting:
     // Auto-install Piper if selected
     if (selectedProvider === 'piper') {
       await checkAndInstallPiper(targetDir, options);
+    } else if (selectedProvider === 'windows-piper') {
+      await checkAndInstallPiperWindows(targetDir, options);
+    } else if (selectedProvider === 'soprano') {
+      console.log(chalk.magenta('⚡ Soprano TTS selected'));
+      console.log(chalk.gray('   Install: pip install soprano-tts'));
+      console.log(chalk.gray('   GPU:     pip install soprano-tts[lmdeploy]'));
+      console.log(chalk.gray('   Start:   soprano-webui\n'));
+    } else if (selectedProvider === 'windows-sapi') {
+      console.log(chalk.green('✓ Windows SAPI provider selected - no additional setup needed\n'));
     }
 
     // Apply background music configuration from userConfig
@@ -4519,6 +4776,7 @@ program
       const projectPaths = [
         path.join(targetDir, '.claude', 'commands', 'agent-vibes'),
         path.join(targetDir, '.claude', 'hooks'),
+        path.join(targetDir, '.claude', 'hooks-windows'),
         path.join(targetDir, '.claude', 'personalities'),
         path.join(targetDir, '.claude', 'output-styles'),
         path.join(targetDir, '.claude', 'audio'),
@@ -4738,7 +4996,10 @@ program
 
 /* c8 ignore start - CLI entry point, tested via subprocess */
 // Only run CLI if this file is being executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+const __entryFile = fileURLToPath(import.meta.url);
+let __argvFile;
+try { __argvFile = fsSync.realpathSync(process.argv[1]); } catch { __argvFile = path.resolve(process.argv[1]); }
+if (__entryFile === __argvFile) {
   program.parse(process.argv);
 
   // Show help if no command provided
@@ -4750,4 +5011,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 /* c8 ignore stop */
 
 // Export functions for testing
-export { isTermux, detectAndNotifyTermux };
+export { isTermux, isNativeWindows, detectAndNotifyTermux };

@@ -23,7 +23,8 @@
 | **Run Claude Code on Android** | [Android/Termux Setup](#-android--termux) |
 | **Secure OpenClaw on Remote Server** | [Security Hardening Guide](docs/security-hardening-guide.md) ⚠️ |
 | **Understand what I need** | [Prerequisites](#-prerequisites) |
-| **Set up on Windows (Claude Desktop)** | [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) |
+| **Set up on Windows (Native)** | [Windows Native Setup](WINDOWS-SETUP.md) |
+| **Set up on Windows (Claude Desktop/WSL)** | [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md) |
 | **Use with OpenClaw** | [OpenClaw Integration](#-openclaw-integration) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
@@ -206,6 +207,7 @@ npx agentvibes install
 ### 2️⃣ Choose Provider (Auto-Detected)
 - **macOS**: Native `say` provider (100+ voices) ✨
 - **Linux/WSL**: Piper TTS (50+ free voices) 🎙️
+- **Windows Native**: Soprano, Piper, or SAPI 🪟
 - **Android**: Termux with auto-setup 📱
 
 ### 3️⃣ Use in Claude Code
@@ -366,9 +368,29 @@ brew install sox ffmpeg pipx
 - **afplay**: Built-in macOS audio player
 - **say**: Built-in macOS text-to-speech (alternative to Piper)
 
-#### 🪟 Windows (WSL Required)
+#### 🪟 Windows
 
-AgentVibes requires WSL (Windows Subsystem for Linux) on Windows. Follow the [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) for complete installation.
+**Option A: Native Windows (Recommended)**
+
+AgentVibes now supports native Windows with PowerShell-based TTS scripts. No WSL required!
+
+```powershell
+# Run from PowerShell in your project directory
+.\setup-windows.ps1
+```
+
+**Providers available natively:**
+- **Soprano** - Ultra-fast neural TTS (best quality, requires `pip install soprano-tts`)
+- **Windows Piper** - High quality offline neural voices (auto-downloaded)
+- **Windows SAPI** - Built-in Windows voices (zero setup)
+
+**Requirements:** Node.js 16+, PowerShell 5.1+, ffmpeg (optional, for background music)
+
+See [Windows Native Setup Guide](WINDOWS-SETUP.md) for full instructions.
+
+**Option B: WSL (Legacy)**
+
+For Claude Desktop or WSL-based workflows, follow the [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md).
 
 ```powershell
 # Install WSL from PowerShell (Administrator)
@@ -376,11 +398,6 @@ wsl --install -d Ubuntu
 ```
 
 Then follow Linux requirements above inside WSL.
-
-**Why WSL?**
-- AgentVibes uses bash scripts extensively
-- Audio routing from WSL to Windows requires PulseAudio configuration
-- See [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md) for detailed audio setup
 
 #### 🤖 Android / Termux
 
@@ -518,7 +535,9 @@ which afplay      # Should return /usr/bin/afplay
 | Provider | Platform | Cost | Quality | Setup |
 |----------|----------|------|---------|-------|
 | **macOS Say** | macOS only | Free (built-in) | ⭐⭐⭐⭐ | Zero config |
-| **Piper** | Linux/WSL | Free | ⭐⭐⭐⭐ | Auto-downloads |
+| **Piper** | Linux/WSL/Windows | Free | ⭐⭐⭐⭐ | Auto-downloads |
+| **Soprano** | Linux/WSL/Windows | Free | ⭐⭐⭐⭐⭐ | `pip install soprano-tts` |
+| **Windows SAPI** | Windows | Free (built-in) | ⭐⭐⭐ | Zero config |
 
 On macOS, the native `say` provider is automatically detected and recommended!
 
@@ -1404,7 +1423,7 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 4. Test with `/agent-vibes:sample Aria`
 
 **Q: Can I use this on Windows?**
-**A:** Yes, but requires WSL (Windows Subsystem for Linux). See [Windows Setup Guide](mcp-server/WINDOWS_SETUP.md).
+**A:** Yes! AgentVibes supports **native Windows** with PowerShell scripts (Soprano, Piper, SAPI providers). See [Windows Native Setup](WINDOWS-SETUP.md). WSL is also supported for legacy workflows - see [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md).
 
 **Q: How do I reduce token usage?**
 **A:**

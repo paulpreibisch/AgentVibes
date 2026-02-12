@@ -42,6 +42,7 @@ use or other dealings in the software.
 
 import asyncio
 import os
+import platform
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -68,9 +69,20 @@ class AgentVibesServer:
 
     def __init__(self):
         """Initialize the AgentVibes MCP server"""
+        # Detect native Windows (not WSL)
+        self.is_windows = platform.system() == "Windows" and not os.environ.get("WSL_DISTRO_NAME")
+
+        # Script name constants — Windows uses .ps1, Unix uses .sh
+        if self.is_windows:
+            self.VOICE_MANAGER_SCRIPT = "voice-manager-windows.ps1"
+            self.PERSONALITY_MANAGER_SCRIPT = "personality-manager.ps1"
+            self.LANGUAGE_MANAGER_SCRIPT = "language-manager.ps1"
+            self.BACKGROUND_MUSIC_MANAGER_SCRIPT = "background-music-manager.ps1"
+            self.EFFECTS_MANAGER_SCRIPT = "effects-manager.ps1"
+
         # Find the .claude directory (project-local or global)
         self.claude_dir = self._find_claude_dir()
-        self.hooks_dir = self.claude_dir / "hooks"
+        self.hooks_dir = self.claude_dir / ("hooks-windows" if self.is_windows else "hooks")
         # Store AgentVibes root directory for environment variable
         self.agentvibes_root = self.claude_dir.parent
 
@@ -125,33 +137,19 @@ class AgentVibesServer:
                 original_language = await self._get_language()
                 await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
 
-            # Call the TTS script via bash explicitly
-            play_tts = self.hooks_dir / "play-tts.sh"
-            args = ["bash", str(play_tts), text]
-            if voice:
-                args.append(voice)
-
-            # Set environment and ensure PATH includes .local/bin
-            env = os.environ.copy()
-
-            # Determine where to save settings based on context:
-            # 1. If cwd has .claude/ → Use cwd (real Claude Code project)
-            # 2. Otherwise → Use global ~/.claude/ (Claude Desktop, Warp, etc.)
-            # Note: Hooks are ALWAYS from package .claude/ (self.claude_dir)
-            cwd = Path.cwd()
-            if (cwd / self.CLAUDE_DIR_NAME).is_dir() and cwd != self.agentvibes_root:
-                # Real Claude Code project with .claude directory
-                env["CLAUDE_PROJECT_DIR"] = str(cwd)
-            # else: Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
-            # This handles: Claude Desktop (NPX), Warp, and any non-project context
-            # Add common locations for piper to PATH
-            home_dir = Path.home()
-            local_bin = str(home_dir / ".local" / "bin")
-            if "PATH" in env:
-                if local_bin not in env["PATH"]:
-                    env["PATH"] = f"{local_bin}:{env['PATH']}"
+            # Call the TTS script via appropriate shell
+            tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
+            play_tts = self.hooks_dir / tts_script
+            if self.is_windows:
+                args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text]
+                if voice:
+                    args.extend(["-VoiceOverride", voice])
             else:
-                env["PATH"] = local_bin
+                args = ["bash", str(play_tts), text]
+                if voice:
+                    args.append(voice)
+
+            env = self._build_script_env()
 
             result = await asyncio.create_subprocess_exec(
                 *args,
@@ -355,18 +353,25 @@ class AgentVibesServer:
             Success or error message
         """
         provider = provider.lower()
-        if provider not in ["piper", "macos", "termux-ssh"]:
-            return f"❌ Invalid provider: {provider}. Choose 'piper', 'macos', or 'termux-ssh'"
+        if self.is_windows:
+            valid_providers = ["windows-piper", "windows-sapi", "soprano"]
+        else:
+            valid_providers = ["piper", "macos", "termux-ssh", "soprano"]
+        if provider not in valid_providers:
+            return f"❌ Invalid provider: {provider}. Choose from: {', '.join(valid_providers)}"
 
         result = await self._run_script("provider-manager.sh", ["switch", provider])
-        if result and "✓" in result:
+        if result and ("✓" in result or "[OK]" in result):
             # Automatically speak confirmation in the new provider's voice
-            if provider == "macos":
-                provider_name = "macOS"
-            elif provider == "termux-ssh":
-                provider_name = "Termux SSH"
-            else:
-                provider_name = "Piper"
+            provider_names = {
+                "macos": "macOS",
+                "termux-ssh": "Termux SSH",
+                "piper": "Piper",
+                "windows-piper": "Windows Piper",
+                "windows-sapi": "Windows SAPI",
+                "soprano": "Soprano",
+            }
+            provider_name = provider_names.get(provider, provider.title())
             confirmation_text = f"Successfully switched to {provider_name} provider"
 
             try:
@@ -508,6 +513,17 @@ class AgentVibesServer:
             return f"{result}\n\n⚠️  Restart Claude Code for changes to take effect"
         return f"❌ Failed to set verbosity: {result}"
 
+    def _get_mute_files(self) -> list:
+        """Get all mute file paths for current platform"""
+        files = [
+            Path.home() / self.MUTE_FILE_NAME,
+            Path.cwd() / self.CLAUDE_DIR_NAME / "agentvibes-muted",
+        ]
+        # Windows PowerShell scripts check tts-muted.txt in .claude dir
+        if self.is_windows:
+            files.append(Path.home() / self.CLAUDE_DIR_NAME / "tts-muted.txt")
+        return files
+
     async def mute(self) -> str:
         """
         Mute all TTS output. Creates a persistent mute flag.
@@ -515,9 +531,14 @@ class AgentVibesServer:
         Returns:
             Success message confirming mute is active
         """
-        mute_file = Path.home() / self.MUTE_FILE_NAME
         try:
+            mute_file = Path.home() / self.MUTE_FILE_NAME
             mute_file.touch()
+            # On Windows, also write tts-muted.txt for PowerShell script compatibility
+            if self.is_windows:
+                win_mute = Path.home() / self.CLAUDE_DIR_NAME / "tts-muted.txt"
+                win_mute.parent.mkdir(parents=True, exist_ok=True)
+                win_mute.write_text("true")
             return "🔇 AgentVibes TTS muted. All voice output is now silenced.\n\n💡 To unmute, use: unmute()"
         except Exception as e:
             return f"❌ Failed to mute: {e}"
@@ -529,17 +550,19 @@ class AgentVibesServer:
         Returns:
             Success message confirming TTS is restored
         """
-        global_mute = Path.home() / self.MUTE_FILE_NAME
-        project_mute = Path.cwd() / self.CLAUDE_DIR_NAME / "agentvibes-muted"
-
         removed = []
         try:
-            if global_mute.exists():
-                global_mute.unlink()
-                removed.append("global")
-            if project_mute.exists():
-                project_mute.unlink()
-                removed.append("project")
+            for mute_file in self._get_mute_files():
+                if mute_file.exists():
+                    # tts-muted.txt uses content "true"/"false", others use file existence
+                    if mute_file.name == "tts-muted.txt":
+                        content = mute_file.read_text().strip()
+                        if content == "true":
+                            mute_file.write_text("false")
+                            removed.append(str(mute_file.name))
+                    else:
+                        mute_file.unlink()
+                        removed.append(str(mute_file.name))
 
             if removed:
                 return f"🔊 AgentVibes TTS unmuted. Voice output is now restored.\n   (Removed: {', '.join(removed)} mute flag)"
@@ -555,13 +578,16 @@ class AgentVibesServer:
         Returns:
             Current mute status
         """
-        global_mute = Path.home() / self.MUTE_FILE_NAME
-        project_mute = Path.cwd() / self.CLAUDE_DIR_NAME / "agentvibes-muted"
-
-        if global_mute.exists() or project_mute.exists():
-            return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
-        else:
-            return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
+        for mute_file in self._get_mute_files():
+            if mute_file.exists():
+                # tts-muted.txt uses content "true"/"false"
+                if mute_file.name == "tts-muted.txt":
+                    content = mute_file.read_text().strip()
+                    if content == "true":
+                        return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
+                else:
+                    return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
+        return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
 
     async def list_background_music(self) -> str:
         """
@@ -732,16 +758,8 @@ class AgentVibesServer:
         return result if result else "❌ Failed to clean audio cache"
 
     # Helper methods
-    async def _run_script(self, script_name: str, args: list[str]) -> str:
-        """Run a bash script and return output"""
-        script_path = self.hooks_dir / script_name
-        if not script_path.exists():
-            return f"Script not found: {script_path}"
-
-        # Explicitly call bash to run the script
-        cmd = ["bash", str(script_path)] + args
-
-        # Set environment and ensure PATH includes .local/bin
+    def _build_script_env(self) -> dict:
+        """Build environment dict for script execution (shared by all script runners)"""
         env = os.environ.copy()
 
         # Determine where to save settings based on context:
@@ -750,18 +768,39 @@ class AgentVibesServer:
         # Note: Hooks are ALWAYS from package .claude/ (self.claude_dir)
         cwd = Path.cwd()
         if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
-            # Real Claude Code project with .claude directory
             env["CLAUDE_PROJECT_DIR"] = str(cwd)
-        # else: Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
-        # This handles: Claude Desktop (NPX), Warp, and any non-project context
-        # Add common locations for piper to PATH
-        home_dir = Path.home()
-        local_bin = str(home_dir / ".local" / "bin")
-        if "PATH" in env:
-            if local_bin not in env["PATH"]:
-                env["PATH"] = f"{local_bin}:{env['PATH']}"
+
+        # Add common locations for piper to PATH (Unix only)
+        if not self.is_windows:
+            home_dir = Path.home()
+            local_bin = str(home_dir / ".local" / "bin")
+            if "PATH" in env:
+                if local_bin not in env["PATH"]:
+                    env["PATH"] = f"{local_bin}:{env['PATH']}"
+            else:
+                env["PATH"] = local_bin
+
+        return env
+
+    async def _run_script(self, script_name: str, args: list[str]) -> str:
+        """Run a script and return output (bash on Unix, PowerShell on Windows)"""
+        # Auto-resolve .sh → .ps1 on Windows (class constants handle special cases)
+        if self.is_windows and script_name.endswith('.sh'):
+            script_name = script_name[:-3] + '.ps1'
+        script_path = self.hooks_dir / script_name
+        if not script_path.exists():
+            return f"Script not found: {script_path}"
+
+        # Build command — PowerShell on Windows, bash on Unix
+        if self.is_windows:
+            cmd = [
+                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(script_path)
+            ] + args
         else:
-            env["PATH"] = local_bin
+            cmd = ["bash", str(script_path)] + args
+
+        env = self._build_script_env()
 
         try:
             result = await asyncio.create_subprocess_exec(
@@ -819,21 +858,27 @@ class AgentVibesServer:
         if not provider_file.exists():
             provider_file = Path.home() / self.CLAUDE_DIR_NAME / "tts-provider.txt"
 
+        provider_labels = {
+            "macos": "macOS TTS",
+            "piper": "Piper TTS (Free, Offline)",
+            "termux-ssh": "Termux SSH (Android)",
+            "windows-piper": "Windows Piper TTS (Free, Offline)",
+            "windows-sapi": "Windows SAPI (Built-in)",
+            "soprano": "Soprano TTS (Ultra-fast Neural)",
+        }
         try:
             if provider_file.exists():
                 provider = provider_file.read_text().strip()
-                if provider == "macos":
-                    return "macOS TTS"
-                elif provider == "piper":
-                    return "Piper TTS (Free, Offline)"
-                elif provider == "termux-ssh":
-                    return "Termux SSH (Android)"
-                return provider
+                # Strip BOM from PowerShell-written files
+                provider = provider.lstrip('\ufeff')
+                return provider_labels.get(provider, provider)
         except (PermissionError, UnicodeDecodeError, OSError) as e:
             # Log error but don't crash - return default
             import sys
             print(f"Warning: Could not read provider file: {e}", file=sys.stderr)
-        # Default to Piper (free, offline)
+        # Default based on platform
+        if self.is_windows:
+            return "Windows SAPI (Built-in)"
         return "Piper TTS (Free, Offline)"
 
 
@@ -961,14 +1006,25 @@ Examples:
         ),
         Tool(
             name="set_provider",
-            description="Switch between TTS providers: macOS TTS, Piper (free, offline), or Termux SSH (Android)",
+            description="Switch between TTS providers" + (
+                ": Windows Piper, Windows SAPI, or Soprano" if agent_vibes.is_windows
+                else ": macOS TTS, Piper (free, offline), Soprano, or Termux SSH (Android)"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "provider": {
                         "type": "string",
-                        "description": "Provider name: 'piper', 'macos', or 'termux-ssh'",
-                        "enum": ["piper", "macos", "termux-ssh"]
+                        "description": (
+                            "Provider name: 'windows-piper', 'windows-sapi', or 'soprano'"
+                            if agent_vibes.is_windows
+                            else "Provider name: 'piper', 'macos', 'soprano', or 'termux-ssh'"
+                        ),
+                        "enum": (
+                            ["windows-piper", "windows-sapi", "soprano"]
+                            if agent_vibes.is_windows
+                            else ["piper", "macos", "soprano", "termux-ssh"]
+                        ),
                     }
                 },
                 "required": ["provider"],

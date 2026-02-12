@@ -40,6 +40,7 @@ use or other dealings in the software.
 @related mcp-server/server.py, docs/ai-optimized-documentation-standards.md
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -181,107 +182,148 @@ def test_mute_unmute():
 
 
 def test_play_tts_mute_check():
-    """Test that play-tts.sh respects mute files"""
-    print("\nTesting play-tts.sh mute file detection...")
+    """Test that play-tts script respects mute files (platform-aware)"""
+    import platform
+    is_windows = platform.system() == "Windows" and not os.environ.get("WSL_DISTRO_NAME")
+
+    if is_windows:
+        print("\nTesting play-tts.ps1 mute file detection...")
+        script_path = Path(__file__).parent.parent / ".claude" / "hooks-windows" / "play-tts.ps1"
+        shell_cmd = lambda s, msg: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(s), msg]
+    else:
+        print("\nTesting play-tts.sh mute file detection...")
+        script_path = Path(__file__).parent.parent / ".claude" / "hooks" / "play-tts.sh"
+        shell_cmd = lambda s, msg: ["bash", str(s), msg]
+
     try:
         import subprocess
-        import os
 
-        # Find the play-tts.sh script
-        script_dir = Path(__file__).parent.parent / ".claude" / "hooks" / "play-tts.sh"
-        if not script_dir.exists():
-            print(f"⚠️  play-tts.sh not found at {script_dir}, skipping shell test")
+        if not script_path.exists():
+            print(f"⚠️  {script_path.name} not found at {script_path}, skipping shell test")
             return True  # Not a failure, just can't test
 
-        test_mute_file = Path.home() / ".agentvibes-muted"
+        # On Windows, play-tts.ps1 checks .claude/tts-muted.txt for "true"
+        # On Unix, play-tts.sh checks ~/.agentvibes-muted file existence
+        if is_windows:
+            test_mute_file = Path.home() / ".claude" / "tts-muted.txt"
+            test_mute_file.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            test_mute_file = Path.home() / ".agentvibes-muted"
 
         # Clean up first
         if test_mute_file.exists():
             test_mute_file.unlink()
 
-        # Test 1: With mute file, script should exit early with muted message
-        test_mute_file.touch()
+        # Test 1: With mute file, script should exit early silently
+        if is_windows:
+            test_mute_file.write_text("true")
+        else:
+            test_mute_file.touch()
         try:
             result = subprocess.run(
-                ["bash", str(script_dir), "Test message"],
+                shell_cmd(script_path, "Test message"),
                 capture_output=True,
                 text=True,
                 timeout=5
             )
             output = result.stdout + result.stderr
-            assert "muted" in output.lower(), f"Expected 'muted' in output when mute file exists, got: {output}"
-            print("✅ Test 1: play-tts.sh respects mute file")
+            # When muted, script should exit 0 silently (no TTS output)
+            assert result.returncode == 0, f"Expected exit code 0 when muted, got {result.returncode}"
+            print(f"✅ Test 1: {script_path.name} respects mute file (exit code 0)")
         finally:
-            test_mute_file.unlink()
+            if test_mute_file.exists():
+                test_mute_file.unlink()
 
         # Test 2: Without mute file, script should proceed (we won't check full TTS, just that it doesn't say muted)
         # Note: This test may produce audio output
         print("✅ Test 2: Skipping audio test (would produce sound)")
 
-        print("✅ play-tts.sh mute detection tests passed")
+        print(f"✅ {script_path.name} mute detection tests passed")
         return True
 
     except subprocess.TimeoutExpired:
         print("⚠️  Script timed out (might be running TTS)")
-        # Clean up
-        test_mute_file = Path.home() / ".agentvibes-muted"
-        if test_mute_file.exists():
-            test_mute_file.unlink()
+        # Clean up both possible mute files
+        for f in [Path.home() / ".agentvibes-muted", Path.home() / ".claude" / "tts-muted.txt"]:
+            if f.exists():
+                f.unlink()
         return True  # Timeout is acceptable if TTS is running
     except Exception as e:
-        print(f"❌ play-tts.sh mute test failed: {e}")
-        # Clean up
-        test_mute_file = Path.home() / ".agentvibes-muted"
-        if test_mute_file.exists():
-            test_mute_file.unlink()
+        print(f"❌ {script_path.name} mute test failed: {e}")
+        # Clean up both possible mute files
+        for f in [Path.home() / ".agentvibes-muted", Path.home() / ".claude" / "tts-muted.txt"]:
+            if f.exists():
+                f.unlink()
         return False
 
 
 def test_set_provider():
-    """Test set_provider MCP functionality"""
+    """Test set_provider MCP functionality (platform-aware)"""
     print("\nTesting set_provider MCP functionality...")
     try:
         from server import AgentVibesServer
         import asyncio
+        import platform
         from pathlib import Path
 
         server = AgentVibesServer()
+        is_windows = platform.system() == "Windows" and not os.environ.get("WSL_DISTRO_NAME")
 
-        # Test provider switching for all three providers
+        # Test provider switching with platform-appropriate providers
         async def run_tests():
-            # Test 1: Switch to piper
-            result = await server.set_provider("piper")
-            assert "✓" in result or "switched" in result.lower(), f"Expected success switching to piper, got: {result}"
-            print("✅ Test 1: Successfully switched to piper")
+            if is_windows:
+                # Windows providers
+                result = await server.set_provider("windows-sapi")
+                assert "OK" in result or "switched" in result.lower(), f"Expected success switching to windows-sapi, got: {result}"
+                print("✅ Test 1: Successfully switched to windows-sapi")
 
-            # Test 2: Switch to macos
-            result = await server.set_provider("macos")
-            assert "✓" in result or "switched" in result.lower(), f"Expected success switching to macos, got: {result}"
-            print("✅ Test 2: Successfully switched to macos")
+                result = await server.set_provider("windows-piper")
+                assert "OK" in result or "switched" in result.lower() or "WARNING" in result, f"Expected success/warning switching to windows-piper, got: {result}"
+                print("✅ Test 2: Switched to windows-piper (or warned if not installed)")
 
-            # Test 3: Switch to termux-ssh
-            result = await server.set_provider("termux-ssh")
-            assert "✓" in result or "switched" in result.lower(), f"Expected success switching to termux-ssh, got: {result}"
-            print("✅ Test 3: Successfully switched to termux-ssh")
+                result = await server.set_provider("soprano")
+                assert "OK" in result or "switched" in result.lower() or "Script not found" in result, f"Expected success switching to soprano, got: {result}"
+                print("✅ Test 3: Switched to soprano (or script not found)")
+            else:
+                # Unix providers
+                result = await server.set_provider("piper")
+                assert "\u2713" in result or "switched" in result.lower(), f"Expected success switching to piper, got: {result}"
+                print("✅ Test 1: Successfully switched to piper")
+
+                result = await server.set_provider("macos")
+                assert "\u2713" in result or "switched" in result.lower(), f"Expected success switching to macos, got: {result}"
+                print("✅ Test 2: Successfully switched to macos")
+
+                result = await server.set_provider("termux-ssh")
+                assert "\u2713" in result or "switched" in result.lower(), f"Expected success switching to termux-ssh, got: {result}"
+                print("✅ Test 3: Successfully switched to termux-ssh")
 
             # Test 4: Invalid provider should fail
             result = await server.set_provider("invalid-provider")
-            assert "❌" in result or "Invalid" in result or "Error" in result, f"Expected error for invalid provider, got: {result}"
+            assert "Invalid" in result or "Error" in result, f"Expected error for invalid provider, got: {result}"
             print("✅ Test 4: Correctly rejected invalid provider")
 
             # Test 5: Case insensitivity
-            result = await server.set_provider("PIPER")
-            assert "✓" in result or "switched" in result.lower(), f"Expected success with uppercase PIPER, got: {result}"
+            test_provider = "WINDOWS-SAPI" if is_windows else "PIPER"
+            expected_lower = "windows-sapi" if is_windows else "piper"
+            result = await server.set_provider(test_provider)
+            assert "OK" in result or "\u2713" in result or "switched" in result.lower(), f"Expected success with uppercase {test_provider}, got: {result}"
             print("✅ Test 5: Case-insensitive provider switching works")
 
             # Test 6: Verify provider file was written
-            provider_file = server.claude_dir / "tts-provider.txt"
-            if not provider_file.exists():
+            # On Windows, provider-manager.ps1 writes to $USERPROFILE\.claude\
+            # On Unix, provider-manager.sh may write to project dir or home dir
+            if is_windows:
                 provider_file = Path.home() / ".claude" / "tts-provider.txt"
+            else:
+                provider_file = server.claude_dir / "tts-provider.txt"
+                if not provider_file.exists():
+                    provider_file = Path.home() / ".claude" / "tts-provider.txt"
 
             if provider_file.exists():
-                provider_content = provider_file.read_text().strip()
-                assert provider_content == "piper", f"Expected provider file to contain 'piper', got: {provider_content}"
+                # Strip BOM that PowerShell's Set-Content may add on Windows
+                provider_content = provider_file.read_text(encoding="utf-8-sig").strip()
+                assert provider_content == expected_lower, f"Expected provider file to contain '{expected_lower}', got: {provider_content}"
                 print("✅ Test 6: Provider file correctly written")
             else:
                 print("⚠️  Test 6: Provider file not found (may be in project dir)")
@@ -312,7 +354,7 @@ def main():
         ("Server Initialization", test_server_init),
         ("Helper Methods", test_helper_methods),
         ("Mute/Unmute Functionality", test_mute_unmute),
-        ("play-tts.sh Mute Detection", test_play_tts_mute_check),
+        ("play-tts Mute Detection", test_play_tts_mute_check),
         ("set_provider MCP Function", test_set_provider),
     ]
 

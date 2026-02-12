@@ -234,9 +234,9 @@ export function getInstallCommands(missing, platform) {
     return getLinuxCommands(missing);
   } else if (platform === 'win32') {
     return [{
-      label: 'Windows (WSL Required)',
-      command: 'wsl --install -d Ubuntu',
-      note: 'Then install dependencies inside WSL using Ubuntu commands above'
+      label: 'Windows (Native)',
+      command: 'npx agentvibes install',
+      note: 'Windows Piper and SAPI providers are supported natively'
     }];
   }
 
@@ -284,50 +284,52 @@ export function checkDependencies(options = {}) {
     }
   }
 
-  // Optional tools
-  results.optional.sox = commandExists('sox');
-  if (!results.optional.sox) {
-    results.missing.sox = true;
-  }
+  // Optional tools (Unix-only — Windows uses native providers)
+  if (!isWindows) {
+    results.optional.sox = commandExists('sox');
+    if (!results.optional.sox) {
+      results.missing.sox = true;
+    }
 
-  results.optional.ffmpeg = commandExists('ffmpeg');
-  if (!results.optional.ffmpeg) {
-    results.missing.ffmpeg = true;
-  }
+    results.optional.ffmpeg = commandExists('ffmpeg');
+    if (!results.optional.ffmpeg) {
+      results.missing.ffmpeg = true;
+    }
 
-  results.optional.pipx = commandExists('pipx');
-  if (!results.optional.pipx) {
-    results.missing.pipx = true;
-  }
+    results.optional.pipx = commandExists('pipx');
+    if (!results.optional.pipx) {
+      results.missing.pipx = true;
+    }
 
-  // Check for flock (used for TTS queue file locking)
-  results.optional.flock = commandExists('flock');
-  if (!results.optional.flock) {
-    results.missing.flock = true;
-    results.warnings.push('flock command not found (required for TTS queue file locking)');
-  }
+    // Check for flock (used for TTS queue file locking)
+    results.optional.flock = commandExists('flock');
+    if (!results.optional.flock) {
+      results.missing.flock = true;
+      results.warnings.push('flock command not found (required for TTS queue file locking)');
+    }
 
-  // Check for curl (used for downloading Piper TTS and voices)
-  results.optional.curl = commandExists('curl');
-  if (!results.optional.curl) {
-    results.missing.curl = true;
-    results.warnings.push('curl command not found (required for downloading Piper TTS)');
-  }
+    // Check for curl (used for downloading Piper TTS and voices)
+    results.optional.curl = commandExists('curl');
+    if (!results.optional.curl) {
+      results.missing.curl = true;
+      results.warnings.push('curl command not found (required for downloading Piper TTS)');
+    }
 
-  // Check for bc (used for audio processing calculations)
-  results.optional.bc = commandExists('bc');
-  if (!results.optional.bc) {
-    results.missing.bc = true;
-    results.warnings.push('bc command not found (used for audio processing calculations)');
-  }
+    // Check for bc (used for audio processing calculations)
+    results.optional.bc = commandExists('bc');
+    if (!results.optional.bc) {
+      results.missing.bc = true;
+      results.warnings.push('bc command not found (used for audio processing calculations)');
+    }
 
-  // Audio player check (Linux/WSL only)
-  if (isLinux || process.env.WSL_DISTRO_NAME) {
-    const audioCheck = checkAudioPlayers();
-    results.optional.audioPlayer = audioCheck.hasAny;
-    if (!audioCheck.hasAny) {
-      results.missing.audioPlayer = true;
-      results.warnings.push('No audio player found (paplay, aplay, mpg123, or mpv)');
+    // Audio player check (Linux/WSL only)
+    if (isLinux || process.env.WSL_DISTRO_NAME) {
+      const audioCheck = checkAudioPlayers();
+      results.optional.audioPlayer = audioCheck.hasAny;
+      if (!audioCheck.hasAny) {
+        results.missing.audioPlayer = true;
+        results.warnings.push('No audio player found (paplay, aplay, mpg123, or mpv)');
+      }
     }
   }
 
