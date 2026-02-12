@@ -77,17 +77,28 @@ if (Test-Path $BgEnabledFile) {
     $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
 }
 
-# Check ffmpeg availability for background music mixing
+# Check if reverb is enabled (allowlist validation)
+$ReverbLevel = "off"
+$ReverbFile = "$ConfigDir\reverb-level.txt"
+if (Test-Path $ReverbFile) {
+    $reverbVal = (Get-Content $ReverbFile -Raw).Trim()
+    if ($reverbVal -in @("off", "light", "medium", "heavy", "cathedral")) {
+        $ReverbLevel = $reverbVal
+    }
+}
+$HasReverb = $ReverbLevel -ne "off"
+
+# Check ffmpeg availability for background music mixing or reverb
 $HasFfmpeg = $false
-if ($BgEnabled) {
+if ($BgEnabled -or $HasReverb) {
     try {
         $null = Get-Command ffmpeg -ErrorAction Stop
         $HasFfmpeg = $true
     } catch {}
 }
 
-# If background music enabled and ffmpeg available, tell provider to skip playback
-if ($BgEnabled -and $HasFfmpeg) {
+# If background music or reverb enabled and ffmpeg available, tell provider to skip playback
+if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     $env:AGENTVIBES_NO_PLAY = "1"
 }
 
@@ -108,8 +119,8 @@ catch {
     exit 1
 }
 
-# Mix with background music if enabled
-if ($BgEnabled -and $HasFfmpeg) {
+# Apply reverb and/or mix with background music
+if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     $env:AGENTVIBES_NO_PLAY = $null
 
     # Find the most recent TTS wav file
@@ -118,70 +129,109 @@ if ($BgEnabled -and $HasFfmpeg) {
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
     if ($RecentWav -and $RecentWav.Length -gt 0) {
-        # Get background track - default to bachata, or read from config
-        $TracksDir = "$ClaudeDir\audio\tracks"
-        $DefaultTrack = "agent_vibes_bachata_v1_loop.mp3"
-        $DefaultTrackFile = "$ConfigDir\background-music-default.txt"
-        if (Test-Path $DefaultTrackFile) {
-            $configTrack = (Get-Content $DefaultTrackFile -Raw).Trim()
-            if ($configTrack) { $DefaultTrack = $configTrack }
-        }
-        $BgTrackPath = Join-Path $TracksDir $DefaultTrack
+        $voicePath = $RecentWav.FullName
 
-        # Get volume (default 0.25)
-        $BgVolume = "0.25"
-        $VolumeFile = "$ConfigDir\background-music-volume.txt"
-        if (Test-Path $VolumeFile) {
-            $vol = (Get-Content $VolumeFile -Raw).Trim()
-            if ($vol -match '^\d+\.?\d*$') { $BgVolume = $vol }
-        }
-
-        if (Test-Path $BgTrackPath) {
-            $MixedFile = $RecentWav.FullName -replace '\.wav$', '-mixed.wav'
-
-            try {
-                # Use ffmpeg to mix: 2s music intro -> voice over music -> 2s music outro
-                $voicePath = $RecentWav.FullName
-
-                # Get voice duration to calculate total length
-                $probArgs = "-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 `"$voicePath`""
-                $durationProc = Start-Process -FilePath "ffprobe" -ArgumentList $probArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL" -RedirectStandardOutput "$env:TEMP\agentvibes-duration.txt"
-                $voiceDuration = 5  # default fallback
-                if (Test-Path "$env:TEMP\agentvibes-duration.txt") {
-                    $durStr = (Get-Content "$env:TEMP\agentvibes-duration.txt" -Raw).Trim()
-                    if ($durStr -match '^\d+\.?\d*$') { $voiceDuration = [double]$durStr }
-                    Remove-Item "$env:TEMP\agentvibes-duration.txt" -Force -ErrorAction SilentlyContinue
+        # Apply reverb if configured
+        if ($HasReverb) {
+            $reverbFilter = switch ($ReverbLevel) {
+                "light"     { "aecho=0.8:0.88:60:0.4" }
+                "medium"    { "aecho=0.8:0.88:60|120:0.4|0.3" }
+                "heavy"     { "aecho=0.8:0.88:60|120|180:0.4|0.3|0.2" }
+                "cathedral" { "aecho=0.8:0.88:100|200|300|400:0.3|0.25|0.2|0.15" }
+                default     { "" }
+            }
+            if ($reverbFilter) {
+                $reverbedFile = "$AudioDir\tts-reverbed.wav"
+                $reverbArgs = "-y -i `"$voicePath`" -af `"$reverbFilter`" `"$reverbedFile`""
+                $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $reverbArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL"
+                if ($proc.ExitCode -eq 0 -and (Test-Path $reverbedFile)) {
+                    $voicePath = $reverbedFile
                 }
-                $totalDuration = $voiceDuration + 4  # 2s intro + voice + 2s outro
-                $fadeOutStart = $totalDuration - 2
+            }
+        }
 
-                # Filter: music fades in 0.5s, voice delayed 2s, music fades out last 2s
-                $filter = "[0:a]volume=${BgVolume},afade=t=in:d=0.5,afade=t=out:st=${fadeOutStart}:d=2[bg];[1:a]adelay=2000|2000,apad=pad_dur=2[voice];[bg][voice]amix=inputs=2:duration=longest:dropout_transition=2[out]"
+        # Mix with background music if enabled
+        if ($BgEnabled) {
+            # Get background track - default to bachata, or read from config
+            $TracksDir = "$ClaudeDir\audio\tracks"
+            $DefaultTrack = "agent_vibes_bachata_v1_loop.mp3"
+            $DefaultTrackFile = "$ConfigDir\background-music-default.txt"
+            if (Test-Path $DefaultTrackFile) {
+                $configTrack = (Get-Content $DefaultTrackFile -Raw).Trim()
+                # Validate: filename only, no path separators or traversal
+                if ($configTrack -and $configTrack -match '^[a-zA-Z0-9_\-\.]+$') {
+                    $DefaultTrack = $configTrack
+                }
+            }
+            $BgTrackPath = Join-Path $TracksDir $DefaultTrack
+            # Path containment: verify resolved path stays within tracks directory
+            $ResolvedBgTrack = [System.IO.Path]::GetFullPath($BgTrackPath)
+            $ResolvedTracksDir = [System.IO.Path]::GetFullPath($TracksDir)
+            if (-not $ResolvedBgTrack.StartsWith($ResolvedTracksDir + [System.IO.Path]::DirectorySeparatorChar)) {
+                $BgTrackPath = Join-Path $TracksDir "agent_vibes_bachata_v1_loop.mp3"
+            }
 
-                # Run ffmpeg - use Start-Process to avoid stderr issues with $ErrorActionPreference
-                $ffmpegArgs = "-y -stream_loop -1 -i `"$BgTrackPath`" -i `"$voicePath`" -filter_complex `"$filter`" -map `"[out]`" -t $totalDuration `"$MixedFile`""
-                $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $ffmpegArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL"
+            # Get volume (default 0.25)
+            $BgVolume = "0.25"
+            $VolumeFile = "$ConfigDir\background-music-volume.txt"
+            if (Test-Path $VolumeFile) {
+                $vol = (Get-Content $VolumeFile -Raw).Trim()
+                if ($vol -match '^\d+\.?\d*$') { $BgVolume = $vol }
+            }
 
-                if ($proc.ExitCode -eq 0 -and (Test-Path $MixedFile) -and (Get-Item $MixedFile).Length -gt 0) {
-                    # Play the mixed audio
-                    $player = $null
-                    try {
-                        $player = New-Object System.Media.SoundPlayer $MixedFile
-                        $player.PlaySync()
-                    } catch {
-                        Write-Host "[WARNING] Mixed playback failed, playing voice only" -ForegroundColor Yellow
-                        $player2 = $null
-                        try {
-                            $player2 = New-Object System.Media.SoundPlayer $voicePath
-                            $player2.PlaySync()
-                        } finally {
-                            if ($player2) { $player2.Dispose() }
-                        }
-                    } finally {
-                        if ($player) { $player.Dispose() }
+            if (Test-Path $BgTrackPath) {
+                $MixedFile = $RecentWav.FullName -replace '\.wav$', '-mixed.wav'
+
+                try {
+                    # Get voice duration to calculate total length
+                    $probArgs = "-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 `"$voicePath`""
+                    $durationProc = Start-Process -FilePath "ffprobe" -ArgumentList $probArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL" -RedirectStandardOutput "$env:TEMP\agentvibes-duration.txt"
+                    $voiceDuration = 5  # default fallback
+                    if (Test-Path "$env:TEMP\agentvibes-duration.txt") {
+                        $durStr = (Get-Content "$env:TEMP\agentvibes-duration.txt" -Raw).Trim()
+                        if ($durStr -match '^\d+\.?\d*$') { $voiceDuration = [double]$durStr }
+                        Remove-Item "$env:TEMP\agentvibes-duration.txt" -Force -ErrorAction SilentlyContinue
                     }
-                } else {
-                    # Mixing failed, play voice only
+                    $totalDuration = $voiceDuration + 4  # 2s intro + voice + 2s outro
+                    $fadeOutStart = $totalDuration - 2
+
+                    # Filter: music fades in 0.5s, voice delayed 2s, music fades out last 2s
+                    $filter = "[0:a]volume=${BgVolume},afade=t=in:d=0.5,afade=t=out:st=${fadeOutStart}:d=2[bg];[1:a]adelay=2000|2000,apad=pad_dur=2[voice];[bg][voice]amix=inputs=2:duration=longest:dropout_transition=2[out]"
+
+                    # Run ffmpeg - use Start-Process to avoid stderr issues with $ErrorActionPreference
+                    $ffmpegArgs = "-y -stream_loop -1 -i `"$BgTrackPath`" -i `"$voicePath`" -filter_complex `"$filter`" -map `"[out]`" -t $totalDuration `"$MixedFile`""
+                    $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $ffmpegArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL"
+
+                    if ($proc.ExitCode -eq 0 -and (Test-Path $MixedFile) -and (Get-Item $MixedFile).Length -gt 0) {
+                        # Play the mixed audio
+                        $player = $null
+                        try {
+                            $player = New-Object System.Media.SoundPlayer $MixedFile
+                            $player.PlaySync()
+                        } catch {
+                            Write-Host "[WARNING] Mixed playback failed, playing voice only" -ForegroundColor Yellow
+                            $player2 = $null
+                            try {
+                                $player2 = New-Object System.Media.SoundPlayer $voicePath
+                                $player2.PlaySync()
+                            } finally {
+                                if ($player2) { $player2.Dispose() }
+                            }
+                        } finally {
+                            if ($player) { $player.Dispose() }
+                        }
+                    } else {
+                        # Mixing failed, play voice only
+                        $player = $null
+                        try {
+                            $player = New-Object System.Media.SoundPlayer $voicePath
+                            $player.PlaySync()
+                        } finally {
+                            if ($player) { $player.Dispose() }
+                        }
+                    }
+                } catch {
+                    # ffmpeg failed, play voice only
                     $player = $null
                     try {
                         $player = New-Object System.Media.SoundPlayer $voicePath
@@ -190,21 +240,21 @@ if ($BgEnabled -and $HasFfmpeg) {
                         if ($player) { $player.Dispose() }
                     }
                 }
-            } catch {
-                # ffmpeg failed, play voice only
+            } else {
+                # No background track found, play voice only
                 $player = $null
                 try {
-                    $player = New-Object System.Media.SoundPlayer $RecentWav.FullName
+                    $player = New-Object System.Media.SoundPlayer $voicePath
                     $player.PlaySync()
                 } finally {
                     if ($player) { $player.Dispose() }
                 }
             }
         } else {
-            # No background track found, play voice only
+            # No background music, play the (possibly reverbed) voice
             $player = $null
             try {
-                $player = New-Object System.Media.SoundPlayer $RecentWav.FullName
+                $player = New-Object System.Media.SoundPlayer $voicePath
                 $player.PlaySync()
             } finally {
                 if ($player) { $player.Dispose() }
