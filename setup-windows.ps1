@@ -407,15 +407,47 @@ if ($Provider -eq "soprano") {
         Write-Info "Start it with: soprano-tts --share"
         Write-Info "Or run it in WSL and forward port 7860"
     } else {
-        Write-Warn "Soprano not detected"
+        Write-Warn "Soprano TTS not detected"
         Write-Host ""
-        Write-Host "    To install Soprano:" -ForegroundColor White
-        Write-Host "      pip install soprano-tts" -ForegroundColor Cyan
-        Write-Host ""
-        Write-Host "    Or use Soprano in WSL with port forwarding:" -ForegroundColor White
-        Write-Host "      ssh -L 7860:localhost:7860 your-wsl-host" -ForegroundColor Cyan
-        Write-Host ""
-        Write-Info "AgentVibes will work once Soprano is accessible on port 7860"
+
+        # Offer to install Soprano
+        $installChoice = Read-Host "Would you like to install Soprano now? (y/n, default: y)"
+
+        if ($installChoice -eq "" -or $installChoice -eq "y" -or $installChoice -eq "Y") {
+            Write-Info "Installing Soprano TTS..."
+            Write-Host ""
+
+            try {
+                & pip install soprano-tts 2>&1 | Tee-Object -Variable pipOutput | Write-Host
+
+                # Re-check if installation succeeded
+                $SopranoInstalled = $false
+                try {
+                    $pipResult = & pip show soprano-tts 2>$null
+                    if ($pipResult) { $SopranoInstalled = $true }
+                } catch {}
+
+                if ($SopranoInstalled) {
+                    Write-Ok "Soprano TTS installed successfully!"
+                    Write-Info "Start it with: soprano-tts --share"
+                } else {
+                    Write-Error "Installation may have failed. Please check the output above."
+                    Write-Info "You can try installing manually: pip install soprano-tts"
+                }
+            } catch {
+                Write-Error "Installation failed: $_"
+                Write-Info "Please install manually: pip install soprano-tts"
+            }
+        } else {
+            Write-Host ""
+            Write-Host "    To install Soprano manually:" -ForegroundColor White
+            Write-Host "      pip install soprano-tts" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "    Or use Soprano in WSL with port forwarding:" -ForegroundColor White
+            Write-Host "      ssh -L 7860:localhost:7860 your-wsl-host" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Info "AgentVibes will work once Soprano is accessible on port 7860"
+        }
     }
 }
 
