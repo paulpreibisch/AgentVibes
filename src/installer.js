@@ -941,6 +941,10 @@ async function collectConfiguration(options = {}) {
         } else if (action === 'skip') {
           console.log(chalk.yellow(`\n⚠️  No problem! You can set it up anytime with:\n   ${getProviderInstallCommand(provider)}\n`));
         }
+      } else {
+        // Provider detected and ready to use
+        const displayName = getProviderDisplayName(provider);
+        console.log(chalk.green(`\n✓ ${displayName} Detected and selected!\n`));
       }
 
       config.provider = provider;
