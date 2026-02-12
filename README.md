@@ -255,7 +255,8 @@ macOS ships with bash 3.2 (from 2007). After this, everything works perfectly!
 
 | Method | Command | Use Case |
 |--------|---------|----------|
-| **✅ RECOMMENDED: NPX (via npm)** | `npx agentvibes install` | **Users** - Just want to use AgentVibes |
+| **✅ RECOMMENDED: NPX (via npm)** | `npx agentvibes install` | **All platforms** - Just want to use AgentVibes |
+| **🪟 Windows PowerShell** | `.\setup-windows.ps1` | **Windows** - Standalone installer (no Node.js needed) |
 | **⚠️ Git Clone** | `git clone ...` | **Developers Only** - Contributing code |
 
 **Why npx?** Zero git operations, no build steps, just 30 seconds to voice!
@@ -372,10 +373,13 @@ brew install sox ffmpeg pipx
 
 **Option A: Native Windows (Recommended)**
 
-AgentVibes now supports native Windows with PowerShell-based TTS scripts. No WSL required!
+AgentVibes now supports native Windows with three TTS providers. No WSL required!
 
 ```powershell
-# Run from PowerShell in your project directory
+# Interactive Node.js installer (recommended)
+npx agentvibes install
+
+# Or use the standalone PowerShell installer
 .\setup-windows.ps1
 ```
 
@@ -384,7 +388,7 @@ AgentVibes now supports native Windows with PowerShell-based TTS scripts. No WSL
 - **Windows Piper** - High quality offline neural voices (auto-downloaded)
 - **Windows SAPI** - Built-in Windows voices (zero setup)
 
-**Requirements:** Node.js 16+, PowerShell 5.1+, ffmpeg (optional, for background music)
+**Requirements:** Node.js 16+, PowerShell 5.1+, ffmpeg (optional, for background music & reverb)
 
 See [Windows Native Setup Guide](WINDOWS-SETUP.md) for full instructions.
 
