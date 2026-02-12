@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.7
 
 ---
 
@@ -40,12 +40,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ### 🎯 Key Features
 
-**🔧 NEW IN v3.5.6 — Critical Bug Fix:**
-- ✅ **Bash Hook Fixes** - Optional parameters now work correctly with strict mode (`set -u`)
-- ✅ **TTS Works on First Use** - No more unbound variable errors on fresh install
-- ✅ **All Platforms** - Linux, macOS, WSL, and Windows SAPI fixed
-
-**🪟 IN v3.5.5 — Native Windows Support:**
+**🪟 NEW IN v3.5.5 — Native Windows Support:**
 - 🖥️ **Windows Native TTS** - Soprano, Piper, and Windows SAPI providers. No WSL required!
 - 🎵 **Background Music** - 16 genre tracks mixed under voice
 - 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg
@@ -102,7 +97,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [📰 Latest Release](#-latest-release) - v3.5.6 - Critical Bug Fix: Bash Hook Parameter Handling
+- [📰 Latest Release](#-latest-release) - v3.5.7 Maintenance + v3.5.5 Native Windows Support
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -146,9 +141,9 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.5.6 - Bug Fix: Bash Hook Parameter Handling](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.6)** 🔧
+**[v3.5.7 - Maintenance Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.7)** 🔧
 
-Fixes regression in v3.5.5 where bash hooks failed with unbound variable errors on first use. Install via `npx agentvibes install` or the standalone PowerShell installer (`.\setup-windows.ps1`). No WSL required!
+Quick fix for CLI output handling. [See v3.5.5 below](#-windows-support) for the major release with Native Windows support, background music, and audio effects!
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 

@@ -1,5 +1,36 @@
 # AgentVibes Release Notes
 
+## 🔧 v3.5.7 - CLI Fix: npx Command Output & Startup Hooks
+
+**Release Date:** February 12, 2026
+
+Fixes critical bug where `npx agent-vibes install` and other commands produced no output, making CLI unusable. Root cause: bin/agent-vibes used dynamic import without passing arguments to installer.js on local execution. Also removed broken hook configurations (pre_compact.py, notification.ts) that didn't exist and caused startup errors in Claude Code settings.
+
+### 🎯 What's Fixed
+
+- **npx agent-vibes now works** - `npx agent-vibes install`, `npx agent-vibes --help`, all commands produce proper output
+- **Startup hook errors gone** - Removed non-existent hook references from settings.json (pre_compact.py, notification.ts)
+- **CLI execution proper** - Both npx and local execution now use execFileSync with proper argument passing
+
+### 🚀 Technical Details
+
+**Before v3.5.7:**
+```javascript
+// bin/agent-vibes (local execution path)
+import('../src/installer.js');  // ❌ No args, doesn't await
+```
+
+**After v3.5.7:**
+```javascript
+// bin/agent-vibes (all execution paths)
+execFileSync('node', [installerPath, ...arguments_], {
+  stdio: 'inherit',
+  cwd: isNpxExecution ? path.dirname(__dirname) : process.cwd(),
+});  // ✅ Passes args, proper I/O
+```
+
+---
+
 ## 🔧 v3.5.6 - Bug Fix: Bash Hook Parameter Handling
 
 **Release Date:** February 11, 2026
