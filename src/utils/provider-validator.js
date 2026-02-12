@@ -44,18 +44,18 @@ export async function validateSopranoInstallation() {
   const checkedLocations = [];
 
   // Check for pipx installation first (common for CLI tools)
+  // Use home directory to find pipx venv (more reliable than pipx list which can error)
   try {
-    const result = execSync('pipx list 2>/dev/null', {
-      encoding: 'utf8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    if (result && result.includes('soprano-tts')) {
+    const homeDir = process.env.HOME || require('os').homedir();
+    const piperVenvPath = require('path').join(homeDir, '.local', 'share', 'pipx', 'venvs', 'soprano-tts');
+
+    if (require('fs').existsSync(piperVenvPath)) {
       return { installed: true, message: 'Soprano TTS detected (via pipx)' };
     }
   } catch (error) {
-    checkedLocations.push('pipx');
+    // If home directory check fails, fall through to Python checks
   }
+  checkedLocations.push('pipx');
 
   // Comprehensive Python version detection
   const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
@@ -116,19 +116,18 @@ export async function validatePiperInstallation() {
     checkedLocations.push('PATH (piper binary)');
   }
 
-  // Check for pipx installation with error suppression
+  // Check for pipx installation (use venv directory check - more reliable than pipx list)
   try {
-    const result = execSync('pipx list 2>/dev/null', {
-      encoding: 'utf8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    if (result && result.includes('piper-tts')) {
+    const homeDir = process.env.HOME || require('os').homedir();
+    const piperVenvPath = require('path').join(homeDir, '.local', 'share', 'pipx', 'venvs', 'piper-tts');
+
+    if (require('fs').existsSync(piperVenvPath)) {
       return { installed: true, message: 'Piper TTS detected (via pipx)' };
     }
   } catch (error) {
-    checkedLocations.push('pipx');
+    // If home directory check fails, fall through to Python pip checks
   }
+  checkedLocations.push('pipx');
 
   // Check if Python + piper-tts package installed with error suppression
   try {
