@@ -38,50 +38,58 @@ export async function validateProvider(providerName) {
 /**
  * Validate Soprano TTS installation
  * Checks multiple Python versions since Soprano might be in non-default Python
- * @returns {Promise<{installed: boolean, message: string, pythonVersion?: string}>}
+ * @returns {Promise<{installed: boolean, message: string, pythonVersion?: string, checkedCount?: number}>}
  */
 export async function validateSopranoInstallation() {
   // Comprehensive Python version detection
   const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
+  let checkedCount = 0;
 
   for (const pythonCmd of pythonCommands) {
     try {
       // Use array form instead of template string for safety (security best practice)
+      // Suppress all output including errors to provide clean UX
       const result = execSync(pythonCmd, ['-m', 'pip', 'show', 'soprano-tts'], {
         encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'ignore'] // 'ignore' ensures no error output
       });
 
       if (result && result.trim()) {
         return {
           installed: true,
           message: `Soprano TTS detected via ${pythonCmd}`,
-          pythonVersion: pythonCmd
+          pythonVersion: pythonCmd,
+          checkedCount: checkedCount + 1
         };
       }
     } catch (error) {
-      // Log error for debugging but continue to next Python version
-      // Silent continue is intentional - we're checking multiple fallbacks
-      continue;
+      // Silently continue to next Python version
+      // Errors are expected when Python isn't in PATH or doesn't have the package
+      checkedCount++;
     }
   }
 
   return {
     installed: false,
-    message: 'Soprano TTS package not found in any Python installation',
-    error: 'SOPRANO_NOT_FOUND'
+    message: 'Soprano TTS is not available on your system',
+    error: 'SOPRANO_NOT_FOUND',
+    checkedCount
   };
 }
 
 /**
  * Validate Piper TTS installation
  * Checks if Piper is available via pipx or direct installation
+ * Suppresses all error output for clean UX
  * @returns {Promise<{installed: boolean, message: string}>}
  */
 export async function validatePiperInstallation() {
   // Check for piper binary
   try {
-    execSync('which', ['piper'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('which', ['piper'], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+    });
     return { installed: true, message: 'Piper TTS detected (binary)' };
   } catch (error) {
     // Continue to next check
@@ -89,7 +97,10 @@ export async function validatePiperInstallation() {
 
   // Check for pipx installation
   try {
-    const result = execSync('pipx', ['list'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    const result = execSync('pipx', ['list'], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+    });
     if (result && result.includes('piper-tts')) {
       return { installed: true, message: 'Piper TTS detected (via pipx)' };
     }
@@ -101,7 +112,7 @@ export async function validatePiperInstallation() {
   try {
     const result = execSync('python3', ['-m', 'pip', 'show', 'piper-tts'], {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
     });
     if (result && result.trim()) {
       return { installed: true, message: 'Piper TTS detected (Python package)' };
@@ -112,7 +123,7 @@ export async function validatePiperInstallation() {
 
   return {
     installed: false,
-    message: 'Piper TTS binary or Python package not found',
+    message: 'Piper TTS is not available on your system',
     error: 'PIPER_NOT_FOUND'
   };
 }
@@ -131,7 +142,10 @@ export async function validateMacOSProvider() {
   }
 
   try {
-    execSync('which', ['say'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('which', ['say'], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+    });
     return { installed: true, message: 'macOS Say detected' };
   } catch (error) {
     // say command not found
@@ -139,7 +153,7 @@ export async function validateMacOSProvider() {
 
   return {
     installed: false,
-    message: 'macOS Say command not found',
+    message: 'macOS Say is not available on your system',
     error: 'MACOS_SAY_NOT_FOUND'
   };
 }

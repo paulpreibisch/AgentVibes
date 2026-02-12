@@ -110,7 +110,8 @@ test('Provider Validator - Piper Installation Detection', async (t) => {
     if (result.installed) {
       assert.match(result.message, /[Pp]iper/);
     } else {
-      assert.match(result.message, /piper|package/);
+      // Message should indicate Piper is not available
+      assert.ok(result.message.includes('not available') || result.message.includes('piper'));
     }
   });
 });
