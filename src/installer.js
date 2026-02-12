@@ -862,92 +862,102 @@ async function collectConfiguration(options = {}) {
         value: '__back__'
       });
 
-      const { provider } = await inquirer.prompt([{
-        type: 'list',
-        name: 'provider',
-        message: chalk.yellow('Select TTS provider:'),
-        choices: providerChoices,
-        default: config.provider || (isNativeWindows() ? 'windows-piper' : (isMacOS ? 'macos' : 'piper'))
-      }]);
-
-      // Check if user wants to go back
-      if (provider === '__back__') {
-        return null;
-      }
-
-      // Validate provider installation before accepting selection
-      console.log(chalk.gray(`\n   Checking for ${getProviderDisplayName(provider)}...`));
-      const validation = await validateProvider(provider);
-
-      if (!validation.installed) {
-        const displayName = getProviderDisplayName(provider);
-        console.log(chalk.yellow(`\n⚠️  ${validation.message}`));
-
-        const { action } = await inquirer.prompt([{
+      // Provider selection loop - allows user to try different providers without going back
+      let providerSelected = false;
+      while (!providerSelected) {
+        const { provider } = await inquirer.prompt([{
           type: 'list',
-          name: 'action',
-          message: 'What would you like to do?',
-          choices: [
-            { name: chalk.green('Install now (recommended)'), value: 'install' },
-            { name: 'Choose a different provider', value: 'back' },
-            { name: 'I\'ll install it myself later', value: 'skip' }
-          ]
+          name: 'provider',
+          message: chalk.yellow('Select TTS provider:'),
+          choices: providerChoices,
+          default: config.provider || (isNativeWindows() ? 'windows-piper' : (isMacOS ? 'macos' : 'piper'))
         }]);
 
-        if (action === 'install') {
-          console.log(chalk.cyan(`\n📦 Installing ${displayName}...\n`));
-
-          // Use smart installation with fallbacks
-          const installResult = await attemptProviderInstallation(provider);
-
-          if (installResult.success && installResult.verified) {
-            // Installation succeeded AND verified
-            console.log(chalk.green(`\n✓ ${displayName} installed and verified!\n`));
-            console.log(chalk.gray(`   Method: ${installResult.command}`));
-            console.log(chalk.green(`   Status: Ready to use\n`));
-          } else if (installResult.success) {
-            // Installation command ran but verification failed
-            console.log(chalk.yellow(`\n⚠️  Installation command completed, but verification failed\n`));
-            console.log(chalk.gray(`   The installation may have been blocked by system protection (PEP 668).\n`));
-            console.log(chalk.cyan(`   Try one of these solutions:\n`));
-            console.log(chalk.gray(`   1. Use pipx (avoids system protection):\n      pipx install soprano-tts\n`));
-            console.log(chalk.gray(`   2. Create a virtual environment:\n      python3 -m venv ~/my-env\n      ~/my-env/bin/pip install soprano-tts\n`));
-
-            // Pause before returning to provider selection
-            await inquirer.prompt([{
-              type: 'confirm',
-              name: 'continue',
-              message: 'Press Enter to go back to provider selection',
-              default: true
-            }]);
-
-            return null; // Go back to provider selection
-          } else {
-            console.log(chalk.red(`\n❌ ${installResult.message}\n`));
-
-            // Pause before returning to provider selection
-            await inquirer.prompt([{
-              type: 'confirm',
-              name: 'continue',
-              message: 'Press Enter to go back to provider selection',
-              default: true
-            }]);
-
-            return null; // Go back to provider selection
-          }
-        } else if (action === 'back') {
-          // Go back to provider selection
+        // Check if user wants to go back to previous page
+        if (provider === '__back__') {
           return null;
-        } else if (action === 'skip') {
-          console.log(chalk.yellow(`\n⚠️  No problem! You can set it up anytime with:\n   ${getProviderInstallCommand(provider)}\n`));
         }
-      } else {
-        // Provider detected and ready to use
-        const displayName = getProviderDisplayName(provider);
-        console.log(chalk.green(`\n✓ ${displayName} Detected and selected!\n`));
-      }
 
-      config.provider = provider;
+        // Validate provider installation before accepting selection
+        console.log(chalk.gray(`\n   Checking for ${getProviderDisplayName(provider)}...`));
+        const validation = await validateProvider(provider);
+
+        if (!validation.installed) {
+          const displayName = getProviderDisplayName(provider);
+          console.log(chalk.yellow(`\n⚠️  ${validation.message}`));
+
+          const { action } = await inquirer.prompt([{
+            type: 'list',
+            name: 'action',
+            message: 'What would you like to do?',
+            choices: [
+              { name: chalk.green('Install now (recommended)'), value: 'install' },
+              { name: 'Choose a different provider', value: 'back' },
+              { name: 'I\'ll install it myself later', value: 'skip' }
+            ]
+          }]);
+
+          if (action === 'install') {
+            console.log(chalk.cyan(`\n📦 Installing ${displayName}...\n`));
+
+            // Use smart installation with fallbacks
+            const installResult = await attemptProviderInstallation(provider);
+
+            if (installResult.success && installResult.verified) {
+              // Installation succeeded AND verified
+              console.log(chalk.green(`\n✓ ${displayName} installed and verified!\n`));
+              console.log(chalk.gray(`   Method: ${installResult.command}`));
+              console.log(chalk.green(`   Status: Ready to use\n`));
+              config.provider = provider;
+              providerSelected = true; // Exit provider selection loop
+            } else if (installResult.success) {
+              // Installation command ran but verification failed
+              console.log(chalk.yellow(`\n⚠️  Installation command completed, but verification failed\n`));
+              console.log(chalk.gray(`   The installation may have been blocked by system protection (PEP 668).\n`));
+              console.log(chalk.cyan(`   Try one of these solutions:\n`));
+              console.log(chalk.gray(`   1. Use pipx (avoids system protection):\n      pipx install soprano-tts\n`));
+              console.log(chalk.gray(`   2. Create a virtual environment:\n      python3 -m venv ~/my-env\n      ~/my-env/bin/pip install soprano-tts\n`));
+
+              // Pause before returning to provider selection
+              await inquirer.prompt([{
+                type: 'confirm',
+                name: 'continue',
+                message: 'Press Enter to try a different provider',
+                default: true
+              }]);
+
+              // Loop back to provider selection
+              continue;
+            } else {
+              console.log(chalk.red(`\n❌ ${installResult.message}\n`));
+
+              // Pause before returning to provider selection
+              await inquirer.prompt([{
+                type: 'confirm',
+                name: 'continue',
+                message: 'Press Enter to try a different provider',
+                default: true
+              }]);
+
+              // Loop back to provider selection
+              continue;
+            }
+          } else if (action === 'back') {
+            // Loop back to provider selection to choose a different one
+            continue;
+          } else if (action === 'skip') {
+            console.log(chalk.yellow(`\n⚠️  No problem! You can set it up anytime with:\n   ${getProviderInstallCommand(provider)}\n`));
+            config.provider = provider;
+            providerSelected = true; // Exit provider selection loop
+          }
+        } else {
+          // Provider detected and ready to use
+          const displayName = getProviderDisplayName(provider);
+          console.log(chalk.green(`\n✓ ${displayName} Detected and selected!\n`));
+          config.provider = provider;
+          providerSelected = true; // Exit provider selection loop
+        }
+      }
 
       // Handle special receiver mode for Termux
       if (config.provider === 'piper-receiver') {
