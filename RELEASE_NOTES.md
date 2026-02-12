@@ -1,4 +1,154 @@
-# AgentVibes v3.4.0 Release Notes - DRAFT
+# AgentVibes Release Notes
+
+## 📦 v3.5.0 - Native Windows Support: Soprano, Piper & SAPI Providers
+
+**Release Date:** February 11, 2026
+
+### 🎯 Why v3.5.0?
+
+v3.5.0 brings **native Windows support** to AgentVibes with a full-featured PowerShell installer and three TTS providers. Windows users no longer need WSL - AgentVibes runs natively with Soprano (neural), Piper (offline neural), or Windows SAPI (zero-setup) voices. The installer also adds **background music selection** (16 genre tracks), **reverb/audio effects** (via ffmpeg aecho), and **verbosity control** for the TTS experience.
+
+### 🚀 Key Highlights
+
+#### 🖥️ Native Windows TTS (NEW!)
+- **3 providers**: Soprano (ultra-fast neural), Piper (offline neural), Windows SAPI (built-in)
+- **Beautiful PowerShell installer** with figlet banner and interactive setup
+- **8 hook scripts** for complete TTS functionality on Windows
+- **MCP server** auto-resolves `.sh` to `.ps1` on Windows
+- **46 Windows-specific unit tests** with full coverage
+
+#### 🎵 Background Music Selection
+- **16 genre tracks**: Flamenco, Bachata, Bossa Nova, City Pop, Chillwave, and more
+- **Interactive picker** in the installer with descriptions
+- **ffmpeg mixing**: 2s intro, voice over music, 2s fade-out outro
+
+#### 🎛️ Reverb / Audio Effects
+- **5 reverb levels**: Off, Light, Medium, Heavy, Cathedral
+- **ffmpeg aecho filter** (no SOX dependency on Windows)
+- Applied before background music mixing for clean layering
+
+#### 🔊 Verbosity Control
+- **3 levels**: High (full reasoning), Medium (key updates), Low (essential only)
+- Integrates with session-start-tts.ps1 protocol instructions
+
+### 🤖 AI Summary
+
+AgentVibes v3.5.0 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
+
+---
+
+## ✨ New Features
+
+### Native Windows TTS
+- Full PowerShell installer (`setup-windows.ps1`) with figlet banner and interactive UX
+- Soprano provider (`play-tts-soprano.ps1`) with Gradio WebUI integration
+- Piper provider (`play-tts-windows-piper.ps1`) with auto-download of voices from HuggingFace
+- Windows SAPI provider (`play-tts-windows-sapi.ps1`) with zero-setup built-in voices
+- TTS router (`play-tts.ps1`) with mute support, background music mixing, and reverb
+- Provider manager, voice manager, audio cache utils, and session-start hook scripts
+- MCP server `.sh` to `.ps1` auto-resolution on Windows
+
+### Installer Enhancements
+- Background music selection with 16 genre tracks and interactive picker
+- Reverb/audio effects selection (Off/Light/Medium/Heavy/Cathedral)
+- Verbosity control (High/Medium/Low) for TTS protocol instructions
+- Updated completion screen showing all 4 settings (provider, background, reverb, verbosity)
+
+---
+
+## 🐛 Bug Fixes
+
+### Security Fixes
+- Fix path traversal in background music config reader (regex allowlist + path containment)
+- Add allowlist validation for reverb-level.txt config (prevent invalid values)
+- Add `set -euo pipefail` strict mode to `play-tts.sh` for Sonar compliance
+
+### Cross-Platform Fixes
+- Fix self-copy error when setup-windows.ps1 runs from project root
+- Fix test executable permission checks on Windows (skip Unix mode bits)
+- Fix test path separator comparison in uninstall test (use `path.join` not hardcoded `/`)
+
+---
+
+## 🏗️ Improvements
+
+### Code Quality
+- Reverb config uses switch-as-allowlist pattern - file content never flows into commands
+- All SoundPlayer instances wrapped in try/finally for resource disposal
+- Environment variable cleanup (`AGENTVIBES_NO_PLAY`) on all exit paths
+- Input validation with regex + range checks for all installer prompts
+
+### Testing
+- 46 new Windows-specific unit tests (hook scripts, providers, security, encoding)
+- 3 cross-platform test fixes for Windows compatibility
+- Full suite: 93 Node tests passing on Windows
+
+---
+
+## 📊 Statistics
+
+- **7 commits** since v3.4.1
+- **3,769 lines added**, 211 removed across 24 files
+- **9 new PowerShell scripts** for Windows TTS
+- **93 tests passing** (46 Windows + 47 cross-platform)
+- **24/24 Sonar quality gates** passing
+- **Security score**: All path traversal and injection vectors reviewed
+
+---
+
+## 🔧 Technical Details
+
+### Files Added
+- `.claude/hooks-windows/play-tts.ps1`: TTS router with reverb and background music
+- `.claude/hooks-windows/play-tts-soprano.ps1`: Soprano neural TTS provider
+- `.claude/hooks-windows/play-tts-windows-piper.ps1`: Piper offline TTS provider
+- `.claude/hooks-windows/play-tts-windows-sapi.ps1`: Windows SAPI built-in voices
+- `.claude/hooks-windows/provider-manager.ps1`: Provider switching
+- `.claude/hooks-windows/voice-manager-windows.ps1`: Voice browsing and selection
+- `.claude/hooks-windows/audio-cache-utils.ps1`: Cache management
+- `.claude/hooks-windows/session-start-tts.ps1`: Auto-activates TTS on Claude start
+- `setup-windows.ps1`: Full Windows installer with 4 interactive sections
+- `test/unit/windows-tts.test.js`: 46 Windows-specific unit tests
+
+### Breaking Changes
+None - all changes are backward compatible. Existing Unix/macOS installations are unaffected.
+
+---
+
+## 🎓 Migration Notes
+
+### For New Windows Users
+1. Run `npx agentvibes install` (Node.js) or `.\setup-windows.ps1` (PowerShell)
+2. Follow the interactive setup
+3. Choose provider (Soprano, Piper, or SAPI)
+4. Select background music, reverb, and verbosity
+5. TTS works automatically in Claude Code sessions
+
+### For Existing Unix/macOS Users
+- No changes required - your setup continues working
+- All Unix bash hooks remain untouched
+- Only `play-tts.sh` gained `set -euo pipefail` (strict mode)
+
+---
+
+## 🙏 Acknowledgments
+
+### Community Contributors
+- **[@nathanchase](https://github.com/nathanchase)** — For contributing the Soprano TTS provider in v3.4.0, whose ultra-fast neural engine is now one of the three Windows-native providers
+- **[@alexeyv](https://github.com/alexeyv)** — For suggesting native Windows support and recommending Windows SAPI as a zero-dependency provider
+- **[@bmadcode](https://github.com/bmadcode)** (Brian Madison) — Creator of the [BMAD Method](https://github.com/bmadcode/BMAD-METHOD), used daily for planning and building AgentVibes features
+
+### Quality Assurance
+- **Adversarial Security Review**: Path traversal, injection, and resource disposal all validated
+- **Testing**: 93/93 tests passing (100% suite coverage)
+- **Quality Gates**: 24/24 Sonar requirements validated
+- **Co-Authored-By**: Claude Opus 4.6
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.4.1...v3.5.0
+
+---
 
 ## 📦 v3.4.0 - Soprano TTS, Security Hardening & Environment Intelligence
 

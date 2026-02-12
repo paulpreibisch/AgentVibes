@@ -96,6 +96,9 @@ sonar
 # Windows NTFS metadata
 *:Zone.Identifier
 
+# Windows NUL device artifacts (created by >NUL redirects in PowerShell)
+nul
+
 # Backup and temp files
 *.backup-*
 *.new
