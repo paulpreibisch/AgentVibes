@@ -1,6 +1,6 @@
 # AgentVibes Release Notes
 
-## 📦 v3.5.1 - Native Windows Support: Soprano, Piper & SAPI Providers
+## 📦 v3.5.2 - Native Windows Support: Soprano, Piper & SAPI Providers
 
 **Release Date:** February 12, 2026
 
@@ -146,7 +146,7 @@ None - all changes are backward compatible. Existing Unix/macOS installations ar
 
 ---
 
-**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.4.1...v3.5.1
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.4.1...v3.5.2
 
 ---
 
