@@ -40,6 +40,8 @@
 # @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
 #
 
+set -euo pipefail
+
 # Fix locale warnings
 export LC_ALL=C
 
