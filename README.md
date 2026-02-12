@@ -45,7 +45,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 - 🎵 **Background Music** - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more) mixed under voice
 - 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg (Light, Medium, Heavy, Cathedral)
 - 🔊 **Verbosity Control** - Choose how much Claude speaks: High, Medium, or Low
-- 🎨 **Beautiful Installer** - PowerShell installer with figlet banner, or use `npx agentvibes install`
+- 🎨 **Beautiful Installer** - `npx agentvibes install` (Node.js) or `.\setup-windows.ps1` (no Node.js required)
 
 **⚡ v3.4.0 Highlights:**
 - 🎤 **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks [@nathanchase](https://github.com/nathanchase)!)
