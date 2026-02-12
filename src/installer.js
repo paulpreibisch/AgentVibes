@@ -61,6 +61,11 @@ import {
   assignVoice,
   resetBmadVoices,
 } from './commands/bmad-voices.js';
+import {
+  validateProvider,
+  getProviderInstallCommand,
+  getProviderDisplayName,
+} from './utils/provider-validator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -867,6 +872,46 @@ async function collectConfiguration(options = {}) {
       // Check if user wants to go back
       if (provider === '__back__') {
         return null;
+      }
+
+      // Validate provider installation before accepting selection
+      const validation = await validateProvider(provider);
+
+      if (!validation.installed) {
+        const displayName = getProviderDisplayName(provider);
+        console.log(chalk.yellow(`\n⚠️  ${displayName} provider not detected`));
+        console.log(chalk.gray(`   Checking: ${validation.message}...\n`));
+
+        const { action } = await inquirer.prompt([{
+          type: 'list',
+          name: 'action',
+          message: 'What would you like to do?',
+          choices: [
+            { name: chalk.green('Install now (recommended)'), value: 'install' },
+            { name: 'Choose different provider', value: 'back' },
+            { name: 'Skip - I\'ll install manually', value: 'skip' }
+          ]
+        }]);
+
+        if (action === 'install') {
+          const installCmd = getProviderInstallCommand(provider);
+          if (installCmd) {
+            console.log(chalk.cyan(`\n📦 Installing ${displayName}...`));
+            console.log(chalk.gray(`   Running: ${installCmd}\n`));
+
+            try {
+              execSync(installCmd, { stdio: 'inherit' });
+              console.log(chalk.green(`\n✓ ${displayName} installed successfully!\n`));
+            } catch (error) {
+              console.log(chalk.red(`\n❌ Installation failed. Please install manually:\n   ${installCmd}\n`));
+            }
+          }
+        } else if (action === 'back') {
+          // Go back to provider selection
+          return null;
+        } else if (action === 'skip') {
+          console.log(chalk.yellow(`⚠️  You can install ${displayName} later with:\n   ${getProviderInstallCommand(provider)}\n`));
+        }
       }
 
       config.provider = provider;
