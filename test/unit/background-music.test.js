@@ -152,16 +152,22 @@ test('Background music manager script exists', () => {
   const scriptPath = join(PROJECT_ROOT, '.claude/hooks/background-music-manager.sh');
   assert.ok(existsSync(scriptPath), 'background-music-manager.sh should exist');
 
-  const stats = statSync(scriptPath);
-  assert.ok(stats.mode & 0o111, 'Script should be executable');
+  // Windows doesn't use Unix permission bits; skip executable check there
+  if (process.platform !== 'win32') {
+    const stats = statSync(scriptPath);
+    assert.ok(stats.mode & 0o111, 'Script should be executable');
+  }
 });
 
 test('Audio processor script exists', () => {
   const scriptPath = join(PROJECT_ROOT, '.claude/hooks/audio-processor.sh');
   assert.ok(existsSync(scriptPath), 'audio-processor.sh should exist');
 
-  const stats = statSync(scriptPath);
-  assert.ok(stats.mode & 0o111, 'Script should be executable');
+  // Windows doesn't use Unix permission bits; skip executable check there
+  if (process.platform !== 'win32') {
+    const stats = statSync(scriptPath);
+    assert.ok(stats.mode & 0o111, 'Script should be executable');
+  }
 });
 
 test('Background music README exists', () => {

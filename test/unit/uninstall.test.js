@@ -467,9 +467,10 @@ describe('Uninstall Command', () => {
 
       await handler.removeProjectFiles();
 
-      // Verify paths in removedPaths are correct
+      // Verify paths in removedPaths are correct (normalize separators for cross-platform)
+      const expected = path.join('.claude', 'commands', 'agent-vibes');
       assert.ok(
-        handler.removedPaths.some(p => p.includes('.claude/commands/agent-vibes')),
+        handler.removedPaths.some(p => p.includes(expected)),
         'Should include correct project path'
       );
     });
