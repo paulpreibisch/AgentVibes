@@ -28,6 +28,10 @@ test('Provider Validator - validateProvider', async (t) => {
     const result = await validatePiperInstallation();
     assert.strictEqual(typeof result.installed, 'boolean');
     assert.strictEqual(typeof result.message, 'string');
+    // Verify message contains information about what was checked
+    if (!result.installed) {
+      assert.match(result.message, /checked/i, 'Error message should mention what was checked');
+    }
   });
 
   await t.test('should validate macos provider', async () => {
