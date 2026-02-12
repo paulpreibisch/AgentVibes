@@ -78,7 +78,7 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
 fi
 
 TEXT="$1"
-VOICE_OVERRIDE="$2"  # Optional: voice name or ID
+VOICE_OVERRIDE="${2:-}"  # Optional: voice name or ID
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then

@@ -51,7 +51,7 @@ get_provider_config_path() {
   local provider_file
 
   # Check project-local first
-  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
     provider_file="$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
   else
     # Search up directory tree for .claude/
@@ -134,7 +134,7 @@ set_active_provider() {
 
   # Reset voice when switching providers to avoid incompatible voices
   local voice_file
-  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
     voice_file="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
   else
     voice_file="$HOME/.claude/tts-voice.txt"
