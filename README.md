@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.4.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.0
 
 ---
 
@@ -139,7 +139,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.4.0 - Soprano TTS, Security Hardening & Environment Intelligence](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.4.1)** ⚡🛡️
+**[v3.4.0 - Soprano TTS, Security Hardening & Environment Intelligence](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.0)** ⚡🛡️
 
 AgentVibes v3.4.0 introduces Soprano TTS - an 80M parameter neural provider offering 20x CPU and 2000x GPU acceleration with sub-1GB memory footprint - plus comprehensive security hardening (timeouts, bounds checking, NaN validation) achieving a 9.5/10 security score, and intelligent environment detection that recognizes PulseAudio tunnels as working audio for remote scenarios. The enhanced installer provides GPU-based provider recommendations and context-aware messaging. Special thanks to [@nathanchase](https://github.com/nathanchase) for contributing the Soprano TTS Provider integration!
 
