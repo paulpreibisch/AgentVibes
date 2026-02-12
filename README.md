@@ -53,7 +53,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 - 🌐 **Environment Intelligence** - PulseAudio tunnel auto-detection for SSH scenarios
 
 **⚡ Core Features:**
-- ⚡ **One-Command Install** - Get started in 30 seconds (`npx agentvibes install`)
+- ⚡ **One-Command Install** - Get started in 30 seconds (`npx agentvibes install` or `.\setup-windows.ps1` without Node.js)
 - 🎭 **Multi-Provider Support** - Soprano (neural), Piper TTS (50+ free voices), macOS Say (100+ built-in), or Windows SAPI
 - 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎙️ **Verbosity Control** - Choose how much Claude speaks (LOW, MEDIUM, HIGH)

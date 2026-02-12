@@ -123,6 +123,26 @@ Write-BoxLine "   https://agentvibes.org" "DarkCyan"
 Write-BoxBottom
 Write-Host ""
 
+# ── What's New ──────────────────────────────────────────────
+
+Write-Host "  WHAT'S NEW in v$Version" -ForegroundColor Green
+Write-Host ""
+Write-Host "    Native Windows support with three TTS providers (Soprano neural," -ForegroundColor Cyan
+Write-Host "    Piper offline, Windows SAPI), background music from 16 genre tracks," -ForegroundColor Cyan
+Write-Host "    reverb effects via ffmpeg, and verbosity control." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "    Thanks to @nathanchase (Soprano), @alexeyv (Windows SAPI)," -ForegroundColor Yellow
+Write-Host "    @bmadcode (BMAD Method)!" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "    KEY HIGHLIGHTS:" -ForegroundColor Green
+Write-Host "      [*] Native Windows TTS - Soprano, Piper, SAPI. No WSL needed!" -ForegroundColor Gray
+Write-Host "      [*] Background Music - 16 genre tracks (Bachata, Flamenco, etc.)" -ForegroundColor Gray
+Write-Host "      [*] Reverb & Effects - 5 reverb levels via ffmpeg aecho filter" -ForegroundColor Gray
+Write-Host "      [*] Verbosity Control - High, Medium, or Low transparency" -ForegroundColor Gray
+Write-Host "      [*] Beautiful Installer - Figlet banner, provider detection" -ForegroundColor Gray
+Write-Host "      [*] 93/93 Tests Passing - 46 Windows + 47 cross-platform" -ForegroundColor Gray
+Write-Host ""
+
 # ── Node.js Detection ──────────────────────────────────────
 
 try {
