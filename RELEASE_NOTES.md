@@ -1,12 +1,12 @@
 # AgentVibes Release Notes
 
-## 📦 v3.5.4 - Native Windows Support: Soprano, Piper & SAPI Providers
+## 📦 v3.5.5 - Native Windows Support: Soprano, Piper & SAPI Providers
 
 **Release Date:** February 12, 2026
 
-### 🎯 Why v3.5.4?
+### 🎯 Why v3.5.5?
 
-v3.5.4 brings **native Windows support** to AgentVibes with a full-featured PowerShell installer and three TTS providers. Windows users no longer need WSL - AgentVibes runs natively with Soprano (neural), Piper (offline neural), or Windows SAPI (zero-setup) voices. The installer also adds **background music selection** (16 genre tracks), **reverb/audio effects** (via ffmpeg aecho), and **verbosity control** for the TTS experience.
+v3.5.5 brings **native Windows support** to AgentVibes with a full-featured PowerShell installer and three TTS providers. Windows users no longer need WSL - AgentVibes runs natively with Soprano (neural), Piper (offline neural), or Windows SAPI (zero-setup) voices. The installer also adds **background music selection** (16 genre tracks), **reverb/audio effects** (via ffmpeg aecho), and **verbosity control** for the TTS experience.
 
 ### 🚀 Key Highlights
 
@@ -33,7 +33,7 @@ v3.5.4 brings **native Windows support** to AgentVibes with a full-featured Powe
 
 ### 🤖 AI Summary
 
-AgentVibes v3.5.4 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
+AgentVibes v3.5.5 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
 
 ---
 
@@ -149,7 +149,7 @@ None - all changes are backward compatible. Existing Unix/macOS installations ar
 
 ---
 
-**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.4.1...v3.5.4
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.4.1...v3.5.5
 
 ---
 
