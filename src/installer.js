@@ -881,11 +881,7 @@ async function collectConfiguration(options = {}) {
 
       if (!validation.installed) {
         const displayName = getProviderDisplayName(provider);
-        console.log(chalk.yellow(`\n⚠️  ${displayName} is not available on your system`));
-
-        if (validation.checkedCount) {
-          console.log(chalk.gray(`   (Checked ${validation.checkedCount} Python installations)`));
-        }
+        console.log(chalk.yellow(`\n⚠️  ${validation.message}`));
 
         const { action } = await inquirer.prompt([{
           type: 'list',
