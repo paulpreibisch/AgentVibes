@@ -40,12 +40,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ### 🎯 Key Features
 
-**🪟 NEW IN v3.5.5 — Native Windows Support:**
-- 🖥️ **Windows Native TTS** - Three providers: Soprano (neural), Piper (offline), Windows SAPI (zero setup). No WSL required!
-- 🎵 **Background Music** - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more) mixed under voice
-- 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg (Light, Medium, Heavy, Cathedral)
-- 🔊 **Verbosity Control** - Choose how much Claude speaks: High, Medium, or Low
-- 🎨 **Beautiful Installer** - `npx agentvibes install` (Node.js) or `.\setup-windows.ps1` (no Node.js required)
+**🔧 NEW IN v3.5.6 — Critical Bug Fix:**
+- ✅ **Bash Hook Fixes** - Optional parameters now work correctly with strict mode (`set -u`)
+- ✅ **TTS Works on First Use** - No more unbound variable errors on fresh install
+- ✅ **All Platforms** - Linux, macOS, WSL, and Windows SAPI fixed
+
+**🪟 IN v3.5.5 — Native Windows Support:**
+- 🖥️ **Windows Native TTS** - Soprano, Piper, and Windows SAPI providers. No WSL required!
+- 🎵 **Background Music** - 16 genre tracks mixed under voice
+- 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg
+- 🔊 **Verbosity Control** - High, Medium, or Low settings
+- 🎨 **Beautiful Installer** - `npx agentvibes install` or `.\setup-windows.ps1`
 
 **⚡ v3.4.0 Highlights:**
 - 🎤 **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks [@nathanchase](https://github.com/nathanchase)!)
