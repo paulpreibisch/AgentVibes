@@ -133,6 +133,9 @@ None - all changes are backward compatible. Existing Unix/macOS installations ar
 
 ## 🙏 Acknowledgments
 
+### Project Lead
+- **[@paulpreibisch](https://github.com/paulpreibisch)** (Paul Preibisch) — Creator and maintainer of AgentVibes
+
 ### Community Contributors
 - **[@nathanchase](https://github.com/nathanchase)** — For contributing the Soprano TTS provider in v3.4.0, whose ultra-fast neural engine is now one of the three Windows-native providers
 - **[@alexeyv](https://github.com/alexeyv)** — For suggesting native Windows support and recommending Windows SAPI as a zero-dependency provider
