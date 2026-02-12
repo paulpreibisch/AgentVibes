@@ -1468,6 +1468,9 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 
 **Powered by:**
 - [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
+- [Soprano TTS](https://github.com/suno-ai/bark) - Ultra-fast neural TTS
+- **Windows SAPI** - Native Windows text-to-speech
+- **macOS Say** - Native macOS text-to-speech
 - [Claude Code](https://claude.com/claude-code) - AI coding assistant
 - Licensed under Apache 2.0
 
