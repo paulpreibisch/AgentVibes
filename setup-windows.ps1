@@ -103,8 +103,15 @@ foreach ($script in $HookScripts) {
     $DestFile = Join-Path $HooksDir $script
 
     if (Test-Path $SourceFile) {
-        Copy-Item -Path $SourceFile -Destination $DestFile -Force
-        Write-Host "   [OK] Copied: $script" -ForegroundColor Green
+        # Skip if source and destination are the same file (running from project root)
+        $resolvedSrc = (Resolve-Path $SourceFile).Path
+        $resolvedDst = if (Test-Path $DestFile) { (Resolve-Path $DestFile).Path } else { "" }
+        if ($resolvedSrc -eq $resolvedDst) {
+            Write-Host "   [OK] Already in place: $script" -ForegroundColor Green
+        } else {
+            Copy-Item -Path $SourceFile -Destination $DestFile -Force
+            Write-Host "   [OK] Copied: $script" -ForegroundColor Green
+        }
         $CopiedCount++
     }
     else {
