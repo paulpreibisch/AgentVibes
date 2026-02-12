@@ -4,14 +4,14 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **OpenClaw** - **Piper TTS (Free!)** or **macOS Say (Built-in!)**
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.1
 
 ---
 
@@ -40,19 +40,21 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ### 🎯 Key Features
 
-**⚡ NEW IN v3.4.0:**
+**🪟 NEW IN v3.5.1 — Native Windows Support:**
+- 🖥️ **Windows Native TTS** - Three providers: Soprano (neural), Piper (offline), Windows SAPI (zero setup). No WSL required!
+- 🎵 **Background Music** - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more) mixed under voice
+- 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg (Light, Medium, Heavy, Cathedral)
+- 🔊 **Verbosity Control** - Choose how much Claude speaks: High, Medium, or Low
+- 🎨 **Beautiful Installer** - PowerShell installer with figlet banner, or use `npx agentvibes install`
+
+**⚡ v3.4.0 Highlights:**
 - 🎤 **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks [@nathanchase](https://github.com/nathanchase)!)
 - 🛡️ **Security Hardening** - 9.5/10 score with comprehensive validation and timeouts
 - 🌐 **Environment Intelligence** - PulseAudio tunnel auto-detection for SSH scenarios
-- 🎯 **Smart Recommendations** - GPU/RAM-based provider suggestions in installer
-
-**✨ NEW IN v3.3.0:**
-- 📱 **AgentVibes Receiver** - Stream TTS from voiceless servers to your phone, laptop, or local machine via encrypted SSH tunnel
-- 🌐 **Voiceless Server Support** - Generate TTS on cloud servers (AWS, GCP, Azure) and play on any device with speakers
 
 **⚡ Core Features:**
 - ⚡ **One-Command Install** - Get started in 30 seconds (`npx agentvibes install`)
-- 🎭 **Multi-Provider Support** - Choose Piper TTS (50+ free voices, offline) or macOS Say (100+ built-in)
+- 🎭 **Multi-Provider Support** - Soprano (neural), Piper TTS (50+ free voices), macOS Say (100+ built-in), or Windows SAPI
 - 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎙️ **Verbosity Control** - Choose how much Claude speaks (LOW, MEDIUM, HIGH)
 - 🎙️ **AgentVibes MCP** - Natural language control ("Switch to Aria voice") for Claude Code, Desktop & Warp
@@ -95,7 +97,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [📰 Latest Release](#-latest-release) - v3.4.0 - Soprano TTS & Security Hardening
+- [📰 Latest Release](#-latest-release) - v3.5.1 - Native Windows Support with Soprano, Piper & SAPI
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -139,25 +141,24 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.4.0 - Soprano TTS, Security Hardening & Environment Intelligence](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.0)** ⚡🛡️
+**[v3.5.1 - Native Windows Support: Soprano, Piper & SAPI Providers](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.1)** 🪟🎤
 
-AgentVibes v3.4.0 introduces Soprano TTS - an 80M parameter neural provider offering 20x CPU and 2000x GPU acceleration with sub-1GB memory footprint - plus comprehensive security hardening (timeouts, bounds checking, NaN validation) achieving a 9.5/10 security score, and intelligent environment detection that recognizes PulseAudio tunnels as working audio for remote scenarios. The enhanced installer provides GPU-based provider recommendations and context-aware messaging. Special thanks to [@nathanchase](https://github.com/nathanchase) for contributing the Soprano TTS Provider integration!
+AgentVibes v3.5.1 brings **native Windows support** — no WSL required! Choose from three TTS providers (Soprano neural, Piper offline, Windows SAPI built-in), with background music selection from 16 genre tracks, reverb effects, and verbosity control. Install via `npx agentvibes install` or the standalone PowerShell installer (`.\setup-windows.ps1`). Includes 46 Windows-specific tests and comprehensive security hardening.
 
 **Key Highlights:**
-- ⚡ **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks @nathanchase!)
-- 🛡️ **Security Hardening** - 9.5/10 score with timeouts on system commands and comprehensive validation
-- 🌐 **Environment Intelligence** - PulseAudio tunnel auto-detection for SSH + tunnel scenarios
-- 🎯 **Smart Recommendations** - GPU/RAM-based provider suggestions (Soprano for CUDA, macOS Say for Apple)
-- 📱 **Provider-Aware Voice Pages** - Soprano shows model specs, auto-selects single voice
-- 🧪 **260/260 Tests Passing** - Complete suite coverage with all edge cases fixed
-- 🎨 **Better UX** - Context-aware messaging ("PulseAudio Tunnel Detected!" vs "speakers")
+- 🖥️ **Native Windows TTS** - Three providers: Soprano, Piper, and Windows SAPI. No WSL needed!
+- 🎵 **Background Music** - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more)
+- 🎛️ **Reverb & Effects** - 5 reverb levels via ffmpeg aecho filter
+- 🔊 **Verbosity Control** - High (full reasoning), Medium (key updates), Low (essential only)
+- 🎨 **Beautiful Installer** - Figlet banner, directory explanations, provider detection
+- 🧪 **93/93 Tests Passing** - 46 Windows + 47 cross-platform
+- 🛡️ **Security Hardened** - Path traversal prevention, input sanitization, resource disposal
 
 **Perfect For:**
-- GPU users wanting ultra-fast TTS (2000x real-time with CUDA)
-- Low-RAM systems (<1GB memory footprint with Soprano)
-- SSH sessions with PulseAudio tunnels (auto-detected)
-- Production deployments requiring security hardening
-- Any environment needing intelligent provider selection
+- Windows developers wanting native TTS without WSL
+- Teams needing zero-setup voice (Windows SAPI works out of the box)
+- Users wanting background music and reverb effects
+- Anyone installing via `npx agentvibes install` on Windows
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
