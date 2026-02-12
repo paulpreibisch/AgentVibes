@@ -1602,9 +1602,9 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.5.4 - Native Windows Support: Soprano, Piper & SAPI\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.5.5 - Native Windows Support: Soprano, Piper & SAPI\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.5.4 brings native Windows support with three TTS providers (Soprano neural,\n') +
+    chalk.cyan('AgentVibes v3.5.5 brings native Windows support with three TTS providers (Soprano neural,\n') +
     chalk.cyan('Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects\n') +
     chalk.cyan('via ffmpeg, and verbosity control. Includes 8 Windows hook scripts, beautiful PowerShell\n') +
     chalk.cyan('installer with figlet banner, and 46 new Windows-specific unit tests.\n\n') +
