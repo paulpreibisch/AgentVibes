@@ -41,9 +41,24 @@ export async function validateProvider(providerName) {
  * @returns {Promise<{installed: boolean, message: string, pythonVersion?: string, checkedCount?: number}>}
  */
 export async function validateSopranoInstallation() {
+  const checkedLocations = [];
+
+  // Check for pipx installation first (common for CLI tools)
+  try {
+    const result = execSync('pipx list 2>/dev/null', {
+      encoding: 'utf8',
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    if (result && result.includes('soprano-tts')) {
+      return { installed: true, message: 'Soprano TTS detected (via pipx)' };
+    }
+  } catch (error) {
+    checkedLocations.push('pipx');
+  }
+
   // Comprehensive Python version detection
   const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
-  const checkedVersions = [];
 
   for (const pythonCmd of pythonCommands) {
     try {
@@ -60,21 +75,23 @@ export async function validateSopranoInstallation() {
           installed: true,
           message: `Soprano TTS detected via ${pythonCmd}`,
           pythonVersion: pythonCmd,
-          checkedCount: checkedVersions.length + 1
+          checkedCount: checkedLocations.length + pythonCommands.indexOf(pythonCmd) + 1
         };
       }
     } catch (error) {
       // Silently continue to next Python version
       // Errors are expected when Python isn't in PATH or doesn't have the package
-      checkedVersions.push(pythonCmd);
     }
   }
 
+  // Build list of Python versions checked
+  checkedLocations.push(...pythonCommands);
+
   return {
     installed: false,
-    message: `Soprano TTS is not installed on your system (checked: ${checkedVersions.join(', ')})`,
+    message: `Soprano TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
     error: 'SOPRANO_NOT_FOUND',
-    checkedCount: checkedVersions.length
+    checkedCount: checkedLocations.length
   };
 }
 
