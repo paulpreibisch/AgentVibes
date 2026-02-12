@@ -142,7 +142,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 ## 📰 Latest Release
 
 **[v3.5.1 - Native Windows Support: Soprano, Piper & SAPI Providers](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.1)** 🪟🎤
-
+AgentVibes v3.5.0 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
 AgentVibes v3.5.1 brings **native Windows support** — no WSL required! Choose from three TTS providers (Soprano neural, Piper offline, Windows SAPI built-in), with background music selection from 16 genre tracks, reverb effects, and verbosity control. Install via `npx agentvibes install` or the standalone PowerShell installer (`.\setup-windows.ps1`). Includes 46 Windows-specific tests and comprehensive security hardening.
 
 **Key Highlights:**
