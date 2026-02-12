@@ -5,9 +5,9 @@
 
 import { execSync } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
-import path from 'node:path';
-import fs from 'node:fs';
-import os from 'node:os';
+import path from 'node:path'; // For safe path operations and traversal prevention
+import fs from 'node:fs'; // For checking file/directory existence
+import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
 
 /**
  * Validate a TTS provider's installation status
@@ -47,16 +47,27 @@ export async function validateSopranoInstallation() {
   const checkedLocations = [];
 
   // Check for pipx installation first (common for CLI tools)
-  // Use home directory to find pipx venv (more reliable than pipx list which can error)
+  // Use os.homedir() (not env var) to prevent HOME injection attacks
   try {
-    const homeDir = process.env.HOME || os.homedir();
+    const homeDir = os.homedir();
     const sopranoVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'soprano-tts');
 
+    // Validate path is within home directory (prevent path traversal)
+    const resolvedPath = path.resolve(sopranoVenvPath);
+    const resolvedHome = path.resolve(homeDir);
+    if (!resolvedPath.startsWith(resolvedHome)) {
+      throw new Error('Path traversal detected');
+    }
+
     if (fs.existsSync(sopranoVenvPath)) {
-      return { installed: true, message: 'Soprano TTS detected (via pipx)' };
+      checkedLocations.push('pipx'); // Always track what was checked
+      return { installed: true, message: 'Soprano TTS detected (via pipx)', checkedLocations };
     }
   } catch (error) {
     // If home directory check fails, fall through to Python checks
+    if (error.code !== 'ENOENT') {
+      console.error('[DEBUG] Pipx check error:', error.message);
+    }
   }
   checkedLocations.push('pipx');
 
@@ -65,25 +76,24 @@ export async function validateSopranoInstallation() {
 
   for (const pythonCmd of pythonCommands) {
     try {
-      // Use shell redirection to suppress all error output for clean UX
-      // 2>/dev/null redirects stderr to dev/null at shell level
-      const result = execSync(`${pythonCmd} -m pip show soprano-tts 2>/dev/null`, {
+      // Use array form to prevent command injection (security: CLAUDE.md)
+      const result = execSync(pythonCmd, ['-m', 'pip', 'show', 'soprano-tts'], {
         encoding: 'utf8',
-        shell: true,
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 10000
       });
 
       if (result && result.trim()) {
+        checkedLocations.push(pythonCmd); // Track which Python found it
         return {
           installed: true,
           message: `Soprano TTS detected via ${pythonCmd}`,
           pythonVersion: pythonCmd,
-          checkedCount: checkedLocations.length + pythonCommands.indexOf(pythonCmd) + 1
+          checkedCount: checkedLocations.length + pythonCommands.indexOf(pythonCmd)
         };
       }
     } catch (error) {
-      // Silently continue to next Python version
-      // Errors are expected when Python isn't in PATH or doesn't have the package
+      // Continue to next Python version - errors expected when Python not in PATH or package missing
     }
   }
 
@@ -121,26 +131,37 @@ export async function validatePiperInstallation() {
 
   // Check for pipx installation (use venv directory check - more reliable than pipx list)
   try {
-    const homeDir = process.env.HOME || os.homedir();
+    const homeDir = os.homedir(); // Use os.homedir() not env var (security: prevent HOME injection)
     const piperVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'piper-tts');
 
+    // Validate path is within home directory (prevent path traversal)
+    const resolvedPath = path.resolve(piperVenvPath);
+    const resolvedHome = path.resolve(homeDir);
+    if (!resolvedPath.startsWith(resolvedHome)) {
+      throw new Error('Path traversal detected');
+    }
+
     if (fs.existsSync(piperVenvPath)) {
-      return { installed: true, message: 'Piper TTS detected (via pipx)' };
+      checkedLocations.push('pipx'); // Always track
+      return { installed: true, message: 'Piper TTS detected (via pipx)', checkedLocations };
     }
   } catch (error) {
-    // If home directory check fails, fall through to Python pip checks
+    if (error.code !== 'ENOENT') {
+      console.error('[DEBUG] Pipx check error:', error.message);
+    }
   }
   checkedLocations.push('pipx');
 
-  // Check if Python + piper-tts package installed with error suppression
+  // Check if Python + piper-tts package installed using array form (security: prevent injection)
   try {
-    const result = execSync('python3 -m pip show piper-tts 2>/dev/null', {
+    const result = execSync('python3', ['-m', 'pip', 'show', 'piper-tts'], {
       encoding: 'utf8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 10000
     });
     if (result && result.trim()) {
-      return { installed: true, message: 'Piper TTS detected (Python package)' };
+      checkedLocations.push('python3 pip'); // Track what found it
+      return { installed: true, message: 'Piper TTS detected (Python package)', checkedLocations };
     }
   } catch (error) {
     checkedLocations.push('python3 pip');
