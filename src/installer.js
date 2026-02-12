@@ -1602,19 +1602,20 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.4.0 - Soprano TTS & Security Hardening\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v3.5.2 - Native Windows Support: Soprano, Piper & SAPI\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('AgentVibes v3.4.0 introduces Soprano TTS - an 80M parameter neural provider with 20x CPU\n') +
-    chalk.cyan('and 2000x GPU acceleration - plus comprehensive security hardening (timeouts, bounds checking,\n') +
-    chalk.cyan('NaN validation) and intelligent environment detection that recognizes PulseAudio tunnels as\n') +
-    chalk.cyan('working audio for remote scenarios. Enhanced installer provides GPU-based recommendations.\n\n') +
-    chalk.yellow('🙏 Special thanks to community member @nathanchase for contributing Soprano TTS!\n\n') +
+    chalk.cyan('AgentVibes v3.5.2 brings native Windows support with three TTS providers (Soprano neural,\n') +
+    chalk.cyan('Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects\n') +
+    chalk.cyan('via ffmpeg, and verbosity control. Includes 8 Windows hook scripts, beautiful PowerShell\n') +
+    chalk.cyan('installer with figlet banner, and 46 new Windows-specific unit tests.\n\n') +
+    chalk.yellow('🙏 Thanks to @nathanchase (Soprano), @alexeyv (Windows SAPI), @bmadcode (BMAD Method)!\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   ⚡ Soprano TTS Provider - Ultra-fast neural TTS with GPU acceleration (thanks @nathanchase!)\n') +
-    chalk.gray('   🛡️ Security Hardening - 9.5/10 score with timeouts and comprehensive validation\n') +
-    chalk.gray('   🌐 Environment Intelligence - PulseAudio tunnel auto-detection for SSH scenarios\n') +
-    chalk.gray('   🎯 Smart Recommendations - GPU/RAM-based provider suggestions\n') +
-    chalk.gray('   🧪 260/260 Tests Passing - Complete test coverage with fixed edge cases\n\n') +
+    chalk.gray('   🖥️ Native Windows TTS - Soprano, Piper, and Windows SAPI providers. No WSL needed!\n') +
+    chalk.gray('   🎵 Background Music - 16 genre tracks (Bachata, Flamenco, Bossa Nova, City Pop, and more)\n') +
+    chalk.gray('   🎛️ Reverb & Effects - 5 reverb levels via ffmpeg aecho filter\n') +
+    chalk.gray('   🔊 Verbosity Control - High, Medium, or Low transparency levels\n') +
+    chalk.gray('   🎨 Beautiful Installer - Figlet banner, directory explanations, provider detection\n') +
+    chalk.gray('   🧪 93/93 Tests Passing - 46 Windows + 47 cross-platform\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
