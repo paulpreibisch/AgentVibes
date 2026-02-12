@@ -134,6 +134,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [🗑️ Uninstalling](#️-uninstalling) - Remove AgentVibes cleanly
 - [❓ FAQ](#-frequently-asked-questions-faq) - **NEW!** Common questions answered (git-lfs, MCP tokens, installation)
 - [🍎 macOS Testing](docs/macos-testing.md) - Automated testing on macOS with GitHub Actions
+- [🤗 Hugging Face Voice Models](docs/hugging-face-models.md) - Technical details on AI voice models
 - [🙏 Credits](#-credits) - Acknowledgments
 - [🤝 Contributing](#-contributing) - Show support
 
