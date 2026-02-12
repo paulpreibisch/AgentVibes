@@ -5,6 +5,9 @@
 
 import { execSync } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 
 /**
  * Validate a TTS provider's installation status
@@ -46,10 +49,10 @@ export async function validateSopranoInstallation() {
   // Check for pipx installation first (common for CLI tools)
   // Use home directory to find pipx venv (more reliable than pipx list which can error)
   try {
-    const homeDir = process.env.HOME || require('os').homedir();
-    const piperVenvPath = require('path').join(homeDir, '.local', 'share', 'pipx', 'venvs', 'soprano-tts');
+    const homeDir = process.env.HOME || os.homedir();
+    const sopranoVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'soprano-tts');
 
-    if (require('fs').existsSync(piperVenvPath)) {
+    if (fs.existsSync(sopranoVenvPath)) {
       return { installed: true, message: 'Soprano TTS detected (via pipx)' };
     }
   } catch (error) {
@@ -118,10 +121,10 @@ export async function validatePiperInstallation() {
 
   // Check for pipx installation (use venv directory check - more reliable than pipx list)
   try {
-    const homeDir = process.env.HOME || require('os').homedir();
-    const piperVenvPath = require('path').join(homeDir, '.local', 'share', 'pipx', 'venvs', 'piper-tts');
+    const homeDir = process.env.HOME || os.homedir();
+    const piperVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'piper-tts');
 
-    if (require('fs').existsSync(piperVenvPath)) {
+    if (fs.existsSync(piperVenvPath)) {
       return { installed: true, message: 'Piper TTS detected (via pipx)' };
     }
   } catch (error) {
