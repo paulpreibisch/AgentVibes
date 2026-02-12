@@ -6,6 +6,7 @@ import {
   validateSopranoInstallation,
   validatePiperInstallation,
   testProviderRuntime,
+  attemptProviderInstallation,
   getProviderInstallCommand,
   getProviderDisplayName,
 } from '../../src/utils/provider-validator.js';
@@ -137,6 +138,42 @@ test('Provider Validator - Runtime Testing', async (t) => {
     if (!result.working && process.platform !== 'darwin') {
       // Expected - macOS only available on macOS
       assert.ok(result.error);
+    }
+  });
+});
+
+test('Provider Validator - attemptProviderInstallation', async (t) => {
+  await t.test('should reject unknown provider', async () => {
+    const result = await attemptProviderInstallation('unknown-provider');
+    assert.strictEqual(result.success, false);
+    assert.match(result.message, /Unknown provider/);
+  });
+
+  await t.test('should return consistent message structure for soprano', async () => {
+    const result = await attemptProviderInstallation('soprano');
+    assert.strictEqual(typeof result.success, 'boolean');
+    assert.strictEqual(typeof result.message, 'string');
+  });
+
+  await t.test('should return consistent message structure for piper', async () => {
+    const result = await attemptProviderInstallation('piper');
+    assert.strictEqual(typeof result.success, 'boolean');
+    assert.strictEqual(typeof result.message, 'string');
+  });
+
+  await t.test('should include command in result when successful', async () => {
+    const result = await attemptProviderInstallation('piper');
+    if (result.success) {
+      assert.strictEqual(typeof result.command, 'string');
+      assert.match(result.command, /piper-tts/);
+    }
+  });
+
+  await t.test('should not suggest --break-system-packages', async () => {
+    const result = await attemptProviderInstallation('soprano');
+    assert.ok(!result.message.includes('--break-system-packages'));
+    if (result.command) {
+      assert.ok(!result.command.includes('--break-system-packages'));
     }
   });
 });

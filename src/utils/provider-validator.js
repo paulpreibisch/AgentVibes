@@ -43,15 +43,16 @@ export async function validateProvider(providerName) {
 export async function validateSopranoInstallation() {
   // Comprehensive Python version detection
   const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
-  let checkedCount = 0;
+  const checkedVersions = [];
 
   for (const pythonCmd of pythonCommands) {
     try {
-      // Use array form instead of template string for safety (security best practice)
-      // Suppress all output including errors to provide clean UX
-      const result = execSync(pythonCmd, ['-m', 'pip', 'show', 'soprano-tts'], {
+      // Use shell redirection to suppress all error output for clean UX
+      // 2>/dev/null redirects stderr to dev/null at shell level
+      const result = execSync(`${pythonCmd} -m pip show soprano-tts 2>/dev/null`, {
         encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'ignore'] // 'ignore' ensures no error output
+        shell: true,
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
       if (result && result.trim()) {
@@ -59,21 +60,21 @@ export async function validateSopranoInstallation() {
           installed: true,
           message: `Soprano TTS detected via ${pythonCmd}`,
           pythonVersion: pythonCmd,
-          checkedCount: checkedCount + 1
+          checkedCount: checkedVersions.length + 1
         };
       }
     } catch (error) {
       // Silently continue to next Python version
       // Errors are expected when Python isn't in PATH or doesn't have the package
-      checkedCount++;
+      checkedVersions.push(pythonCmd);
     }
   }
 
   return {
     installed: false,
-    message: 'Soprano TTS is not available on your system',
+    message: `Soprano TTS is not installed on your system (checked: ${checkedVersions.join(', ')})`,
     error: 'SOPRANO_NOT_FOUND',
-    checkedCount
+    checkedCount: checkedVersions.length
   };
 }
 
@@ -84,46 +85,51 @@ export async function validateSopranoInstallation() {
  * @returns {Promise<{installed: boolean, message: string}>}
  */
 export async function validatePiperInstallation() {
-  // Check for piper binary
+  const checkedLocations = [];
+
+  // Check for piper binary with error suppression
   try {
-    execSync('which', ['piper'], {
+    execSync('which piper 2>/dev/null', {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
     });
-    return { installed: true, message: 'Piper TTS detected (binary)' };
+    return { installed: true, message: 'Piper TTS detected (binary in PATH)' };
   } catch (error) {
-    // Continue to next check
+    checkedLocations.push('PATH (piper binary)');
   }
 
-  // Check for pipx installation
+  // Check for pipx installation with error suppression
   try {
-    const result = execSync('pipx', ['list'], {
+    const result = execSync('pipx list 2>/dev/null', {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
     });
     if (result && result.includes('piper-tts')) {
       return { installed: true, message: 'Piper TTS detected (via pipx)' };
     }
   } catch (error) {
-    // pipx not available or not in PATH
+    checkedLocations.push('pipx');
   }
 
-  // Check if Python + piper-tts package installed
+  // Check if Python + piper-tts package installed with error suppression
   try {
-    const result = execSync('python3', ['-m', 'pip', 'show', 'piper-tts'], {
+    const result = execSync('python3 -m pip show piper-tts 2>/dev/null', {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
     });
     if (result && result.trim()) {
       return { installed: true, message: 'Piper TTS detected (Python package)' };
     }
   } catch (error) {
-    // Not installed via pip
+    checkedLocations.push('python3 pip');
   }
 
   return {
     installed: false,
-    message: 'Piper TTS is not available on your system',
+    message: `Piper TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
     error: 'PIPER_NOT_FOUND'
   };
 }
@@ -136,15 +142,16 @@ export async function validateMacOSProvider() {
   if (process.platform !== 'darwin') {
     return {
       installed: false,
-      message: 'macOS Say only available on macOS',
+      message: 'macOS Say is only available on macOS (this is not a Mac)',
       error: 'NOT_MACOS'
     };
   }
 
   try {
-    execSync('which', ['say'], {
+    execSync('which say 2>/dev/null', {
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'] // Suppress errors
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
     });
     return { installed: true, message: 'macOS Say detected' };
   } catch (error) {
@@ -153,7 +160,7 @@ export async function validateMacOSProvider() {
 
   return {
     installed: false,
-    message: 'macOS Say is not available on your system',
+    message: 'macOS Say is not installed on your system (checked: /usr/bin/say)',
     error: 'MACOS_SAY_NOT_FOUND'
   };
 }
@@ -272,6 +279,123 @@ export function getProviderInstallCommand(providerName) {
   };
 
   return commands[providerName] || '';
+}
+
+/**
+ * Attempt to install a provider with fallback strategies
+ * Handles PEP 668 protection by trying multiple installation methods
+ * @param {string} providerName - Provider name (soprano, piper)
+ * @returns {object} {success: boolean, message: string, command?: string, verified?: boolean}
+ */
+export async function attemptProviderInstallation(providerName) {
+  // Whitelist approach - only allow known providers (MEDIUM #1 fix)
+  const providers = {
+    soprano: 'soprano-tts',
+    piper: 'piper-tts'
+  };
+
+  const pkgName = providers[providerName];
+  if (!pkgName) {
+    return { success: false, message: `Unknown provider: ${providerName}` };
+  }
+
+  // Strategy 1: Try regular pip install (using array form for security - CRITICAL #1 fix)
+  try {
+    // Show installation in progress
+    console.log(`   Attempting: pip install ${pkgName}...`);
+    execSync('pip', ['install', pkgName], {
+      stdio: 'inherit',
+      timeout: 60000 // HIGH #1 fix - 60 second timeout
+    });
+
+    // Verify installation actually worked (proves it's installed)
+    const validation = await validateProvider(providerName);
+    if (validation.installed) {
+      return {
+        success: true,
+        message: `Successfully installed via pip`,
+        command: `pip install ${pkgName}`,
+        verified: true
+      };
+    }
+
+    return { success: true, message: `Successfully installed via pip`, command: `pip install ${pkgName}` };
+  } catch (error) {
+    // Strategy 1 failed - continue to Strategy 2
+    // Don't check specific error messages - just try next strategy (MEDIUM #3 fix)
+  }
+
+  // Strategy 2: Try pipx install (recommended for PEP 668 protection)
+  try {
+    console.log(`   Attempting: pipx install ${pkgName}...`);
+    execSync('pipx', ['install', pkgName], {
+      stdio: 'inherit',
+      timeout: 60000 // HIGH #1 fix - 60 second timeout
+    });
+
+    // Verify installation actually worked (proves it's installed)
+    const validation = await validateProvider(providerName);
+    if (validation.installed) {
+      return {
+        success: true,
+        message: `Successfully installed via pipx`,
+        command: `pipx install ${pkgName}`,
+        verified: true
+      };
+    }
+
+    return { success: true, message: `Successfully installed via pipx`, command: `pipx install ${pkgName}` };
+  } catch (error) {
+    // Both strategies failed
+  }
+
+  // Both strategies failed - consistent error message (MEDIUM #2 fix)
+  return { success: false, message: `Installation failed. Please install manually:\n   pip install ${pkgName}\n   or\n   pipx install ${pkgName}` };
+}
+
+/**
+ * Get package installation information (location and version)
+ * @param {string} pkgName - Package name to check
+ * @returns {object|null} {location, version} or null if not found
+ */
+function getPackageInfo(pkgName) {
+  try {
+    // Small delay to ensure package is registered in pip
+    // (sometimes pip needs a moment to update its cache)
+    const output = execSync('pip', ['show', pkgName], {
+      encoding: 'utf8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe'] // Capture both stdout and stderr
+    });
+
+    // Parse pip show output
+    const info = {};
+    const lines = output.split('\n');
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) continue;
+
+      const key = line.substring(0, colonIndex).trim();
+      const value = line.substring(colonIndex + 1).trim();
+
+      if (key === 'Location') {
+        info.location = value;
+      } else if (key === 'Version') {
+        info.version = value;
+      } else if (key === 'Name') {
+        info.name = value;
+      }
+    }
+
+    // Return info if we found at least version or location
+    return (info.version || info.location) ? info : null;
+  } catch (error) {
+    // Silently fail - package info is optional, not critical
+    return null;
+  }
 }
 
 /**
