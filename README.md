@@ -145,7 +145,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 Critical security update: Fixed command injection vulnerabilities, HOME directory injection prevention, and path traversal protection. Soprano TTS installed via pipx now correctly detected. Enhanced provider detection messaging and debug logging.
 
-**Foundation Release:** [v3.5.5 - Native Windows Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.5) brings Windows support (Soprano, Piper, SAPI), background music (16 genre tracks), reverb/audio effects, and verbosity control. [See release notes](RELEASE_NOTES.md) for complete v3.5.5-3.5.8 history.
+**Foundation Release:** [v3.5.5 - Native Windows Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.8) brings Windows support (Soprano, Piper, SAPI), background music (16 genre tracks), reverb/audio effects, and verbosity control. [See release notes](RELEASE_NOTES.md) for complete v3.5.5-3.5.8 history.
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
