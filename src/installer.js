@@ -875,12 +875,16 @@ async function collectConfiguration(options = {}) {
       }
 
       // Validate provider installation before accepting selection
+      console.log(chalk.gray(`\n   Checking for ${getProviderDisplayName(provider)}...`));
       const validation = await validateProvider(provider);
 
       if (!validation.installed) {
         const displayName = getProviderDisplayName(provider);
-        console.log(chalk.yellow(`\n⚠️  ${displayName} provider not detected`));
-        console.log(chalk.gray(`   Checking: ${validation.message}...\n`));
+        console.log(chalk.yellow(`\n⚠️  ${displayName} is not available on your system`));
+
+        if (validation.checkedCount) {
+          console.log(chalk.gray(`   (Checked ${validation.checkedCount} Python installations)`));
+        }
 
         const { action } = await inquirer.prompt([{
           type: 'list',
@@ -888,8 +892,8 @@ async function collectConfiguration(options = {}) {
           message: 'What would you like to do?',
           choices: [
             { name: chalk.green('Install now (recommended)'), value: 'install' },
-            { name: 'Choose different provider', value: 'back' },
-            { name: 'Skip - I\'ll install manually', value: 'skip' }
+            { name: 'Choose a different provider', value: 'back' },
+            { name: 'I\'ll install it myself later', value: 'skip' }
           ]
         }]);
 
@@ -920,7 +924,7 @@ async function collectConfiguration(options = {}) {
           // Go back to provider selection
           return null;
         } else if (action === 'skip') {
-          console.log(chalk.yellow(`⚠️  You can install ${displayName} later with:\n   ${getProviderInstallCommand(provider)}\n`));
+          console.log(chalk.yellow(`\n⚠️  No problem! You can set it up anytime with:\n   ${getProviderInstallCommand(provider)}\n`));
         }
       }
 
