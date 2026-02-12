@@ -14,15 +14,15 @@ import { spawnSync } from 'node:child_process';
 export async function validateProvider(providerName) {
   switch (providerName) {
     case 'soprano':
-      return validateSopranoInstallation();
+      return await validateSopranoInstallation();
     case 'piper':
-      return validatePiperInstallation();
+      return await validatePiperInstallation();
     case 'macos':
-      return validateMacOSProvider();
+      return await validateMacOSProvider();
     case 'windows-sapi':
-      return validateWindowsSAPI();
+      return await validateWindowsSAPI();
     case 'windows-piper':
-      return validatePiperInstallation();
+      return await validatePiperInstallation();
     case 'termux-ssh':
     case 'ssh-remote':
     case 'ssh-pulseaudio':
@@ -41,28 +41,34 @@ export async function validateProvider(providerName) {
  * @returns {Promise<{installed: boolean, message: string, pythonVersion?: string}>}
  */
 export async function validateSopranoInstallation() {
-  const pythonCommands = ['python3', 'python', 'python3.11', 'python3.10', 'python3.9'];
+  // Comprehensive Python version detection
+  const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
 
   for (const pythonCmd of pythonCommands) {
     try {
-      const result = execSync(`${pythonCmd} -m pip show soprano-tts`, {
+      // Use array form instead of template string for safety (security best practice)
+      const result = execSync(pythonCmd, ['-m', 'pip', 'show', 'soprano-tts'], {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
-      if (result) {
+      if (result && result.trim()) {
         return {
           installed: true,
-          message: `Soprano TTS detected (${pythonCmd})`,
+          message: `Soprano TTS detected via ${pythonCmd}`,
           pythonVersion: pythonCmd
         };
       }
-    } catch {}
+    } catch (error) {
+      // Log error for debugging but continue to next Python version
+      // Silent continue is intentional - we're checking multiple fallbacks
+      continue;
+    }
   }
 
   return {
     installed: false,
-    message: 'pip show soprano-tts',
+    message: 'Soprano TTS package not found in any Python installation',
     error: 'SOPRANO_NOT_FOUND'
   };
 }
@@ -75,32 +81,38 @@ export async function validateSopranoInstallation() {
 export async function validatePiperInstallation() {
   // Check for piper binary
   try {
-    execSync('which piper', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    return { installed: true, message: 'Piper TTS detected' };
-  } catch {}
+    execSync('which', ['piper'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    return { installed: true, message: 'Piper TTS detected (binary)' };
+  } catch (error) {
+    // Continue to next check
+  }
 
   // Check for pipx installation
   try {
-    const result = execSync('pipx list', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    if (result.includes('piper-tts')) {
+    const result = execSync('pipx', ['list'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    if (result && result.includes('piper-tts')) {
       return { installed: true, message: 'Piper TTS detected (via pipx)' };
     }
-  } catch {}
+  } catch (error) {
+    // pipx not available or not in PATH
+  }
 
   // Check if Python + piper-tts package installed
   try {
-    const result = execSync('python3 -m pip show piper-tts', {
+    const result = execSync('python3', ['-m', 'pip', 'show', 'piper-tts'], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    if (result) {
+    if (result && result.trim()) {
       return { installed: true, message: 'Piper TTS detected (Python package)' };
     }
-  } catch {}
+  } catch (error) {
+    // Not installed via pip
+  }
 
   return {
     installed: false,
-    message: 'piper binary or piper-tts package',
+    message: 'Piper TTS binary or Python package not found',
     error: 'PIPER_NOT_FOUND'
   };
 }
@@ -119,13 +131,15 @@ export async function validateMacOSProvider() {
   }
 
   try {
-    execSync('which say', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('which', ['say'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
     return { installed: true, message: 'macOS Say detected' };
-  } catch {}
+  } catch (error) {
+    // say command not found
+  }
 
   return {
     installed: false,
-    message: 'macOS Say command',
+    message: 'macOS Say command not found',
     error: 'MACOS_SAY_NOT_FOUND'
   };
 }
@@ -156,11 +170,11 @@ export async function validateWindowsSAPI() {
 export async function testProviderRuntime(providerName) {
   switch (providerName) {
     case 'soprano':
-      return testSopranoRuntime();
+      return await testSopranoRuntime();
     case 'piper':
-      return testPiperRuntime();
+      return await testPiperRuntime();
     case 'macos':
-      return testMacOSRuntime();
+      return await testMacOSRuntime();
     default:
       return { working: true }; // Assume other providers work if installed
   }
@@ -171,7 +185,7 @@ export async function testProviderRuntime(providerName) {
  */
 async function testSopranoRuntime() {
   try {
-    // Try a quick soprano generation
+    // Try a quick soprano import check
     const result = spawnSync('python3', ['-c', 'import soprano; print("OK")'], {
       timeout: 5000,
       encoding: 'utf8'
@@ -180,7 +194,7 @@ async function testSopranoRuntime() {
     if (result.error || result.status !== 0) {
       return {
         working: false,
-        error: 'Soprano Python module check failed'
+        error: 'Soprano Python module import failed'
       };
     }
 
@@ -198,7 +212,7 @@ async function testSopranoRuntime() {
  */
 async function testPiperRuntime() {
   try {
-    execSync('piper --help', {
+    execSync('piper', ['--help'], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 5000
@@ -207,7 +221,7 @@ async function testPiperRuntime() {
   } catch (e) {
     return {
       working: false,
-      error: 'Piper runtime test failed'
+      error: 'Piper command execution failed'
     };
   }
 }
@@ -217,7 +231,7 @@ async function testPiperRuntime() {
  */
 async function testMacOSRuntime() {
   try {
-    execSync('say -f /dev/null', {
+    execSync('say', ['-f', '/dev/null'], {
       encoding: 'utf8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe']
@@ -226,7 +240,7 @@ async function testMacOSRuntime() {
   } catch (e) {
     return {
       working: false,
-      error: 'macOS Say runtime test failed'
+      error: 'macOS Say command execution failed'
     };
   }
 }

@@ -5,6 +5,7 @@ import {
   validateProvider,
   validateSopranoInstallation,
   validatePiperInstallation,
+  testProviderRuntime,
   getProviderInstallCommand,
   getProviderDisplayName,
 } from '../../src/utils/provider-validator.js';
@@ -110,6 +111,31 @@ test('Provider Validator - Piper Installation Detection', async (t) => {
       assert.match(result.message, /[Pp]iper/);
     } else {
       assert.match(result.message, /piper|package/);
+    }
+  });
+});
+
+test('Provider Validator - Runtime Testing', async (t) => {
+  await t.test('should return working status for piper runtime', async () => {
+    const result = await testProviderRuntime('piper');
+    assert.strictEqual(typeof result.working, 'boolean');
+    if (!result.working) {
+      assert.strictEqual(typeof result.error, 'string');
+    }
+  });
+
+  await t.test('should handle unknown provider in runtime test', async () => {
+    const result = await testProviderRuntime('unknown-provider');
+    assert.strictEqual(result.working, true);
+    assert.strictEqual(result.error, undefined);
+  });
+
+  await t.test('should return working status for macos runtime', async () => {
+    const result = await testProviderRuntime('macos');
+    assert.strictEqual(typeof result.working, 'boolean');
+    if (!result.working && process.platform !== 'darwin') {
+      // Expected - macOS only available on macOS
+      assert.ok(result.error);
     }
   });
 });
