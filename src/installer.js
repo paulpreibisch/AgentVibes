@@ -65,6 +65,7 @@ import {
   validateProvider,
   getProviderInstallCommand,
   getProviderDisplayName,
+  attemptProviderInstallation,
 } from './utils/provider-validator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -898,27 +899,45 @@ async function collectConfiguration(options = {}) {
         }]);
 
         if (action === 'install') {
-          const installCmd = getProviderInstallCommand(provider);
-          if (installCmd) {
-            console.log(chalk.cyan(`\n📦 Installing ${displayName}...`));
-            console.log(chalk.gray(`   Running: ${installCmd}\n`));
+          console.log(chalk.cyan(`\n📦 Installing ${displayName}...\n`));
 
-            try {
-              execSync(installCmd, { stdio: 'inherit' });
+          // Use smart installation with fallbacks
+          const installResult = await attemptProviderInstallation(provider);
 
-              // Re-validate after installation attempt
-              const revalidation = await validateProvider(provider);
-              if (revalidation.installed) {
-                console.log(chalk.green(`\n✓ ${displayName} installed and verified successfully!\n`));
-              } else {
-                console.log(chalk.red(`\n❌ Installation completed but verification failed: ${revalidation.message}\n`));
-                console.log(chalk.yellow(`   Please try installing manually:\n   ${installCmd}\n`));
-                return null; // Go back to provider selection
-              }
-            } catch (error) {
-              console.log(chalk.red(`\n❌ Installation failed. Please install manually:\n   ${installCmd}\n`));
-              return null; // Go back to provider selection
-            }
+          if (installResult.success && installResult.verified) {
+            // Installation succeeded AND verified
+            console.log(chalk.green(`\n✓ ${displayName} installed and verified!\n`));
+            console.log(chalk.gray(`   Method: ${installResult.command}`));
+            console.log(chalk.green(`   Status: Ready to use\n`));
+          } else if (installResult.success) {
+            // Installation command ran but verification failed
+            console.log(chalk.yellow(`\n⚠️  Installation command completed, but verification failed\n`));
+            console.log(chalk.gray(`   The installation may have been blocked by system protection (PEP 668).\n`));
+            console.log(chalk.cyan(`   Try one of these solutions:\n`));
+            console.log(chalk.gray(`   1. Use pipx (avoids system protection):\n      pipx install soprano-tts\n`));
+            console.log(chalk.gray(`   2. Create a virtual environment:\n      python3 -m venv ~/my-env\n      ~/my-env/bin/pip install soprano-tts\n`));
+
+            // Pause before returning to provider selection
+            await inquirer.prompt([{
+              type: 'confirm',
+              name: 'continue',
+              message: 'Press Enter to go back to provider selection',
+              default: true
+            }]);
+
+            return null; // Go back to provider selection
+          } else {
+            console.log(chalk.red(`\n❌ ${installResult.message}\n`));
+
+            // Pause before returning to provider selection
+            await inquirer.prompt([{
+              type: 'confirm',
+              name: 'continue',
+              message: 'Press Enter to go back to provider selection',
+              default: true
+            }]);
+
+            return null; // Go back to provider selection
           }
         } else if (action === 'back') {
           // Go back to provider selection
