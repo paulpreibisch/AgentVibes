@@ -901,9 +901,19 @@ async function collectConfiguration(options = {}) {
 
             try {
               execSync(installCmd, { stdio: 'inherit' });
-              console.log(chalk.green(`\n✓ ${displayName} installed successfully!\n`));
+
+              // Re-validate after installation attempt
+              const revalidation = await validateProvider(provider);
+              if (revalidation.installed) {
+                console.log(chalk.green(`\n✓ ${displayName} installed and verified successfully!\n`));
+              } else {
+                console.log(chalk.red(`\n❌ Installation completed but verification failed: ${revalidation.message}\n`));
+                console.log(chalk.yellow(`   Please try installing manually:\n   ${installCmd}\n`));
+                return null; // Go back to provider selection
+              }
             } catch (error) {
               console.log(chalk.red(`\n❌ Installation failed. Please install manually:\n   ${installCmd}\n`));
+              return null; // Go back to provider selection
             }
           }
         } else if (action === 'back') {
