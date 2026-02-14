@@ -46,8 +46,43 @@ export async function validateProvider(providerName) {
 export async function validateSopranoInstallation() {
   const checkedLocations = [];
 
-  // Check for pipx installation first (common for CLI tools)
+  // Check for soprano command in PATH first (most reliable for pipx installations)
+  try {
+    execSync('which soprano 2>/dev/null', {
+      encoding: 'utf8',
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return { installed: true, message: 'Soprano TTS detected (binary in PATH)' };
+  } catch (error) {
+    checkedLocations.push('PATH (soprano binary)');
+  }
+
+  // Check for pipx bin directory directly
   // Use os.homedir() (not env var) to prevent HOME injection attacks
+  try {
+    const homeDir = os.homedir();
+    const sopranoExePath = path.join(homeDir, '.local', 'bin', 'soprano');
+
+    // Validate path is within home directory (prevent path traversal)
+    const resolvedPath = path.resolve(sopranoExePath);
+    const resolvedHome = path.resolve(homeDir);
+    if (!resolvedPath.startsWith(resolvedHome)) {
+      throw new Error('Path traversal detected');
+    }
+
+    if (fs.existsSync(sopranoExePath)) {
+      checkedLocations.push('~/.local/bin');
+      return { installed: true, message: 'Soprano TTS detected (via pipx bin)', checkedLocations };
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('[DEBUG] Pipx bin check error:', error.message);
+    }
+  }
+  checkedLocations.push('~/.local/bin');
+
+  // Check for pipx venv installation directory
   try {
     const homeDir = os.homedir();
     const sopranoVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'soprano-tts');
@@ -60,16 +95,16 @@ export async function validateSopranoInstallation() {
     }
 
     if (fs.existsSync(sopranoVenvPath)) {
-      checkedLocations.push('pipx'); // Always track what was checked
+      checkedLocations.push('pipx venv');
       return { installed: true, message: 'Soprano TTS detected (via pipx)', checkedLocations };
     }
   } catch (error) {
     // If home directory check fails, fall through to Python checks
     if (error.code !== 'ENOENT') {
-      console.error('[DEBUG] Pipx check error:', error.message);
+      console.error('[DEBUG] Pipx venv check error:', error.message);
     }
   }
-  checkedLocations.push('pipx');
+  checkedLocations.push('pipx venv');
 
   // Comprehensive Python version detection
   const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
