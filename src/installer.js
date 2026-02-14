@@ -48,6 +48,7 @@ import fsSync from 'node:fs';
 import { execSync, execFileSync, spawn } from 'node:child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import search from '@inquirer/search';
 import figlet from 'figlet';
 import { detectBMAD } from './bmad-detector.js';
 import boxen from 'boxen';
@@ -76,6 +77,31 @@ const packageJson = JSON.parse(
   await fs.readFile(path.join(__dirname, '..', 'package.json'), 'utf8')
 );
 const VERSION = packageJson.version;
+
+// Personality emoji mapping for quick visual recognition
+const personalityEmojis = {
+  'angry': '😠',
+  'annoying': '😤',
+  'crass': '🤬',
+  'dramatic': '🎭',
+  'dry-humor': '😐',
+  'flirty': '😘',
+  'funny': '😂',
+  'grandpa': '👴',
+  'millennial': '🙄',
+  'moody': '😒',
+  'none': '😊',
+  'normal': '😊',
+  'pirate': '🏴‍☠️',
+  'poetic': '📜',
+  'professional': '👔',
+  'rapper': '🎤',
+  'robot': '🤖',
+  'sarcastic': '😏',
+  'sassy': '💁',
+  'surfer-dude': '🏄',
+  'zen': '🧘'
+};
 
 // Validate Node.js executable is available (CLAUDE.md - early validation)
 if (!process.execPath) {
@@ -520,6 +546,159 @@ async function handleSystemDependenciesPage() {
 }
 
 /**
+ * Validate and copy custom music track to .claude/audio/tracks directory
+ * @param {string} userFilePath - Path provided by user
+ * @param {string} tracksDir - Target directory for audio tracks
+ * @returns {Promise<string|null>} Filename if successful, null if cancelled
+ */
+async function handleCustomMusicTrack(userFilePath, tracksDir) {
+  try {
+    // Validate file exists and resolve path securely
+    const resolvedPath = path.resolve(userFilePath.trim());
+
+    if (!fsSync.existsSync(resolvedPath)) {
+      console.error(chalk.red('✗ File not found. Please check the path.'));
+      return null;
+    }
+
+    // Validate file extension (whitelist approach per CLAUDE.md)
+    const ext = path.extname(resolvedPath).toLowerCase();
+    const supportedFormats = ['.mp3', '.wav', '.ogg', '.m4a'];
+    if (!supportedFormats.includes(ext)) {
+      console.error(chalk.red('✗ Unsupported format. Use: .mp3, .wav, .ogg, or .m4a'));
+      return null;
+    }
+
+    // Verify file is within expected directory (prevent path traversal)
+    if (!resolvedPath.startsWith(path.resolve(process.env.HOME || process.env.USERPROFILE))) {
+      console.error(chalk.red('✗ File must be in your home directory or subdirectories.'));
+      return null;
+    }
+
+    // Get original filename and sanitize it
+    let originalFilename = path.basename(resolvedPath);
+    const sanitizedFilename = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    // Create tracks directory if needed
+    await fs.mkdir(tracksDir, { recursive: true });
+
+    // Copy file to tracks directory
+    const destPath = path.join(tracksDir, sanitizedFilename);
+    await fs.copyFile(resolvedPath, destPath);
+
+    return sanitizedFilename;
+  } catch (err) {
+    console.error(chalk.red(`✗ Error: ${err.message}`));
+    return null;
+  }
+}
+
+/**
+ * Load custom tracks from global registry
+ * @returns {Promise<Array>} Array of custom track objects {name, filename}
+ */
+async function loadCustomTracks() {
+  try {
+    const registryPath = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes', 'custom-tracks.json');
+    if (fsSync.existsSync(registryPath)) {
+      const content = await fs.readFile(registryPath, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    // Silently fail - registry may not exist yet
+  }
+  return [];
+}
+
+/**
+ * Save custom tracks to global registry
+ * @param {Array} tracks - Array of custom track objects
+ */
+async function saveCustomTracks(tracks) {
+  try {
+    const registryDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
+    await fs.mkdir(registryDir, { recursive: true });
+    const registryPath = path.join(registryDir, 'custom-tracks.json');
+    await fs.writeFile(registryPath, JSON.stringify(tracks, null, 2));
+  } catch (err) {
+    // Silently fail - non-critical
+  }
+}
+
+/**
+ * Preview audio track using available audio player
+ * @param {string} trackName - Name of the track file to preview
+ * @param {string} tracksDir - Directory containing audio tracks
+ * @returns {Promise<boolean>} True if preview was attempted, false if no audio tools available
+ */
+async function previewAudioTrack(trackName, tracksDir) {
+  const trackPath = path.join(tracksDir, trackName);
+
+  // Verify track exists
+  if (!fsSync.existsSync(trackPath)) {
+    console.log(chalk.yellow('⚠️  Track file not found'));
+    return false;
+  }
+
+  // Try available audio players in order of preference
+  const audioPlayers = ['ffplay', 'play', 'mpv'];
+  let playerAvailable = false;
+
+  for (const player of audioPlayers) {
+    try {
+      execSync(`which ${player}`, { stdio: 'ignore' });
+      playerAvailable = true;
+
+      console.log(chalk.cyan('▶  Playing preview (10 seconds)...'));
+
+      // Build appropriate command for each player
+      let playerArgs = [];
+      if (player === 'ffplay') {
+        playerArgs = ['-nodisp', '-autoexit', '-t', '10', '-volume', '30', trackPath];
+      } else if (player === 'play') {
+        playerArgs = [trackPath, 'trim', '0', '10'];
+      } else if (player === 'mpv') {
+        playerArgs = ['--no-video', '--duration=10', '--volume=30', trackPath];
+      }
+
+      // Spawn player process with safety timeout
+      const audioProcess = spawn(player, playerArgs, {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        timeout: 12000 // 12 second timeout for safety
+      });
+
+      // Handle process completion
+      return new Promise((resolve) => {
+        const timeoutHandle = setTimeout(() => {
+          if (audioProcess && !audioProcess.killed) {
+            audioProcess.kill('SIGTERM');
+          }
+          resolve(true);
+        }, 11000); // 11 second timeout
+
+        audioProcess.on('close', () => {
+          clearTimeout(timeoutHandle);
+          resolve(true);
+        });
+
+        audioProcess.on('error', () => {
+          clearTimeout(timeoutHandle);
+          resolve(true);
+        });
+      });
+    } catch (err) {
+      // This player not available, try next
+      continue;
+    }
+  }
+
+  if (!playerAvailable) {
+    console.log(chalk.yellow('⚠️  Audio preview requires ffplay, sox (play), or mpv'));
+  }
+  return false;
+}
+
+/**
  * Collect all configuration answers through paginated question flow
  * @param {Object} options - Installation options (yes, pageOffset, totalPages)
  * @returns {Promise<Object>} Configuration object with all answers
@@ -530,6 +709,7 @@ async function collectConfiguration(options = {}) {
     piperPath: null,
     sshHost: null,
     defaultVoice: null,
+    pretext: '',
     personality: 'none',
     reverb: 'light',
     backgroundMusic: {
@@ -1314,7 +1494,37 @@ async function collectConfiguration(options = {}) {
       }
 
     } else if (currentPage === 3) {
-      // Page 4: Personality Selection
+      // Page 4: Pretext and Personality Selection
+      console.log(boxen(
+        chalk.white('Customize your Agent\'s introduction!\n\n') +
+        chalk.gray('Add optional intro text that prefixes all TTS messages.\n') +
+        chalk.gray('Examples: "FireBot: ", "Agent: ", "🤖 Assistant: "\n\n') +
+        chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:set-pretext <text>'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'gray',
+          width: 80
+        }
+      ));
+
+      // Pretext input
+      const { pretext } = await inquirer.prompt([{
+        type: 'input',
+        name: 'pretext',
+        message: chalk.yellow('Enter intro text (optional, press Enter to skip):'),
+        default: config.pretext || ''
+      }]);
+
+      config.pretext = pretext.trim();
+      if (config.pretext) {
+        console.log(chalk.green(`✓ Intro text set: "${config.pretext}"\n`));
+      } else {
+        console.log(chalk.gray('→ No intro text (messages will speak normally)\n'));
+      }
+
+      // Page 5: Personality Selection
       console.log(boxen(
         chalk.white('Give your Agent a personality!\n\n') +
         chalk.gray('Personalities add character and style to TTS responses.\n') +
@@ -1359,16 +1569,18 @@ async function collectConfiguration(options = {}) {
         personalities.sort((a, b) => a.name.localeCompare(b.name));
 
         // Add "none" as first option (default)
+        const noneEmoji = personalityEmojis['none'] || '✨';
         personalityChoices.push(
-          { name: chalk.green('none') + chalk.gray(' (Professional, no personality) - Recommended'), value: 'none' },
+          { name: noneEmoji + ' ' + chalk.green('none') + chalk.gray(' (Professional, no personality) - Recommended'), value: 'none' },
           new inquirer.Separator(chalk.gray('─'.repeat(60)))
         );
 
         // Add all other personalities
         for (const p of personalities) {
           if (p.name !== 'normal') { // Skip 'normal' as it's similar to 'none'
+            const emoji = personalityEmojis[p.name] || '✨';
             personalityChoices.push({
-              name: chalk.cyan(p.name) + chalk.gray(` - ${p.description}`),
+              name: emoji + ' ' + chalk.cyan(p.name) + chalk.gray(` - ${p.description}`),
               value: p.name
             });
           }
@@ -1387,14 +1599,23 @@ async function collectConfiguration(options = {}) {
         ];
       }
 
-      const { selectedPersonality } = await inquirer.prompt([{
-        type: 'list',
-        name: 'selectedPersonality',
-        message: chalk.yellow('Select your default personality:'),
-        choices: personalityChoices,
-        default: 'none',
+      // Use search prompt for keyboard navigation (type to filter)
+      const selectedPersonality = await search({
+        message: chalk.yellow('Select your default personality (type to search):'),
+        source: async (input) => {
+          // Filter personalityChoices based on input
+          if (!input) {
+            return personalityChoices;
+          }
+          return personalityChoices.filter(choice => {
+            // Check if choice is a Separator, if so skip it
+            if (!choice.value) return false;
+            return choice.value.toLowerCase().includes(input.toLowerCase()) ||
+                   (choice.name && choice.name.toLowerCase().includes(input.toLowerCase()));
+          });
+        },
         pageSize: 15
-      }]);
+      });
 
       if (selectedPersonality === '__back__') {
         currentPage--; // Go back to voice selection
@@ -1514,6 +1735,13 @@ async function collectConfiguration(options = {}) {
         console.log('');
         console.log(chalk.gray('🎼 Choose your default background music genre (you can change this anytime).'));
 
+        // Load custom tracks from registry
+        const customTracks = await loadCustomTracks();
+        const customTrackChoices = customTracks.map(track => ({
+          name: `📁 ${track.name}`,
+          value: track.filename
+        }));
+
         const trackChoices = [
           { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
           { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
@@ -1533,20 +1761,85 @@ async function collectConfiguration(options = {}) {
           { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
         ];
 
+        // Add custom tracks separator and options if any exist
+        if (customTrackChoices.length > 0) {
+          trackChoices.push(
+            new inquirer.Separator(chalk.gray('─'.repeat(50))),
+            ...customTrackChoices
+          );
+        }
+
+        // Add custom track option
+        trackChoices.push(
+          new inquirer.Separator(chalk.gray('─'.repeat(50))),
+          { name: '➕ Add Custom Track...', value: '__custom__' }
+        );
+
         const { selectedTrack } = await inquirer.prompt([{
           type: 'list',
           name: 'selectedTrack',
           message: chalk.yellow('Choose default background music track:'),
           choices: trackChoices,
           default: config.backgroundMusic.track || 'agentvibes_soft_flamenco_loop.mp3',
-          pageSize: 16
+          pageSize: 18
         }]);
 
-        config.backgroundMusic.track = selectedTrack;
+        // Handle custom track selection
+        if (selectedTrack === '__custom__') {
+          const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+          const { customTrackPath } = await inquirer.prompt([{
+            type: 'input',
+            name: 'customTrackPath',
+            message: chalk.yellow('Enter the full path to your audio file:'),
+            validate: (input) => {
+              const resolvedPath = path.resolve(input.trim());
+              if (!fsSync.existsSync(resolvedPath)) return 'File not found';
+              const ext = path.extname(resolvedPath).toLowerCase();
+              if (!['.mp3', '.wav', '.ogg', '.m4a'].includes(ext))
+                return 'Unsupported format (use .mp3, .wav, .ogg, or .m4a)';
+              return true;
+            }
+          }]);
+
+          const copiedFilename = await handleCustomMusicTrack(customTrackPath, tracksDir);
+          if (copiedFilename) {
+            config.backgroundMusic.track = copiedFilename;
+            console.log(chalk.green(`✓ Custom track added: ${copiedFilename}`));
+
+            // Update registry with new custom track
+            const trackName = path.basename(customTrackPath, path.extname(customTrackPath));
+            const allCustomTracks = await loadCustomTracks();
+            if (!allCustomTracks.some(t => t.filename === copiedFilename)) {
+              allCustomTracks.push({ name: trackName, filename: copiedFilename });
+              await saveCustomTracks(allCustomTracks);
+            }
+          } else {
+            // Fall back to default if custom track fails
+            config.backgroundMusic.track = 'agentvibes_soft_flamenco_loop.mp3';
+            console.log(chalk.yellow('⚠️  Using default track'));
+          }
+        } else {
+          config.backgroundMusic.track = selectedTrack;
+        }
+
+        // Offer preview of selected track
+        const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+        const { previewTrack } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'previewTrack',
+          message: chalk.cyan('Preview this track before continuing?'),
+          default: false
+        }]);
+
+        if (previewTrack) {
+          console.log('');
+          await previewAudioTrack(config.backgroundMusic.track, tracksDir);
+          console.log('');
+        }
       }
 
       // Auto-advance to next page after audio settings
-      console.log(chalk.green('\n✓ Audio settings configured\n'));
+      console.log(chalk.green('✓ Audio settings configured\n'));
       currentPage++;
       continue;
 
@@ -2508,30 +2801,6 @@ async function copyPersonalityFiles(targetDir, spinner) {
     let content = chalk.bold(`${installedPersonalities.length} Personality Templates Installed\n\n`);
     content += chalk.gray('Personalities change how Claude speaks - adding humor, emotion, or style.\n');
     content += chalk.gray('Change with: ') + chalk.yellow('/agent-vibes:personality <name>') + chalk.gray(' or say "change personality to sassy"\n\n');
-
-    // Map personalities to emojis
-    const personalityEmojis = {
-      'angry': '😠',
-      'annoying': '😤',
-      'crass': '🤬',
-      'dramatic': '🎭',
-      'dry-humor': '😐',
-      'flirty': '😘',
-      'funny': '😂',
-      'grandpa': '👴',
-      'millennial': '🙄',
-      'moody': '😒',
-      'normal': '😊',
-      'pirate': '🏴‍☠️',
-      'poetic': '📜',
-      'professional': '👔',
-      'rapper': '🎤',
-      'robot': '🤖',
-      'sarcastic': '😏',
-      'sassy': '💁',
-      'surfer-dude': '🏄',
-      'zen': '🧘'
-    };
 
     // Display personalities in two columns
     const personalities = installedPersonalities.map(file => {
@@ -4385,6 +4654,14 @@ Troubleshooting:
     if (userConfig.personality && userConfig.personality !== 'none') {
       const personalityFile = path.join(claudeDir, 'tts-personality.txt');
       await fs.writeFile(personalityFile, userConfig.personality);
+    }
+
+    // Apply pretext configuration from userConfig
+    if (userConfig.pretext && userConfig.pretext.trim()) {
+      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
+      const configDir = path.join(claudeDir, 'config');
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(pretextFile, userConfig.pretext.trim());
     }
 
     // Initialize piperVoicesBoxen outside the conditional for proper scoping

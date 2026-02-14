@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.9
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.10-alpha.0
 
 ---
 
@@ -97,7 +97,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [📰 Latest Release](#-latest-release) - v3.5.9 Security & UX + v3.5.5 Native Windows Support
+- [📰 Latest Release](#-latest-release) - v3.5.10-alpha.0 (Alpha) with Soprano Detection Fixes + v3.5.5 Native Windows Support
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -142,9 +142,16 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.5.9 - Security & Provider Validation](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.9)** 🛡️
+**[v3.5.10-alpha.0 - Soprano Detection Fixes & Features](https://github.com/paulpreibisch/AgentVibes/releases/tag/master)** (Alpha) 🛡️
 
-Critical security update: Fixed command injection vulnerabilities, HOME directory injection prevention, and path traversal protection. Soprano TTS installed via pipx now correctly detected. Enhanced provider detection messaging and debug logging.
+Critical fixes and new features:
+- Fixed Soprano TTS detection when installed via pipx
+- Fixed command injection vulnerabilities in provider validation
+- Eliminated code duplication between Soprano and Piper validators
+- Added custom music tracks support with preview functionality
+- Added personality emoji mapping for better visual recognition
+- Added pretext configuration for custom agent introductions
+- HOME directory injection prevention and path traversal protection maintained
 
 **Foundation Release:** [v3.5.5 - Native Windows Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.9) brings Windows support (Soprano, Piper, SAPI), background music (16 genre tracks), reverb/audio effects, and verbosity control. [See release notes](RELEASE_NOTES.md) for complete v3.5.5-3.5.9 history.
 
