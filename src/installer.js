@@ -719,6 +719,22 @@ async function collectConfiguration(options = {}) {
     verbosity: 'high'
   };
 
+  // Load existing pretext from file if it exists (Story 1.2: File Persistence)
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const claudeDir = path.join(homeDir, '.claude');
+  const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
+  try {
+    if (fsSync.existsSync(pretextFile)) {
+      const existingPretext = fsSync.readFileSync(pretextFile, 'utf-8').trim();
+      if (existingPretext) {
+        config.pretext = existingPretext;
+      }
+    }
+  } catch (err) {
+    // Gracefully handle read errors (file permissions, encoding issues, etc.)
+    // Pretext will remain empty string if file can't be read
+  }
+
   // Detect environment type
   const environment = detectEnvironment();
   const isAndroid = isTermux();
@@ -1509,19 +1525,51 @@ async function collectConfiguration(options = {}) {
         }
       ));
 
-      // Pretext input
-      const { pretext } = await inquirer.prompt([{
-        type: 'input',
-        name: 'pretext',
-        message: chalk.yellow('Enter intro text (optional, press Enter to skip):'),
-        default: config.pretext || ''
-      }]);
+      // Pretext input with validation
+      let pretextValid = false;
+      let pretext = config.pretext || '';
 
-      config.pretext = pretext.trim();
-      if (config.pretext) {
-        console.log(chalk.green(`✓ Intro text set: "${config.pretext}"\n`));
-      } else {
-        console.log(chalk.gray('→ No intro text (messages will speak normally)\n'));
+      while (!pretextValid) {
+        const { pretextInput } = await inquirer.prompt([{
+          type: 'input',
+          name: 'pretextInput',
+          message: chalk.yellow('Enter intro text (optional, max 50 chars):'),
+          default: pretext,
+          // Live character count display in prompt
+          prefix: `${chalk.cyan('[Intro Text]')}`,
+          validate: (input) => {
+            // Trim first for consistent length checking
+            const trimmed = input.trim();
+            // Check for newlines
+            if (input.includes('\n') || input.includes('\r')) {
+              return chalk.red('Error: Newlines not allowed');
+            }
+            // Check length after trimming for consistency with display
+            if (trimmed.length > 50) {
+              return chalk.red(`Too long: ${trimmed.length}/50 characters`);
+            }
+            return true;
+          },
+          filter: (input) => {
+            // Trim and treat whitespace-only as empty
+            const trimmed = input.trim();
+            return trimmed;
+          }
+        }]);
+
+        pretext = pretextInput;
+
+        // Display preview
+        if (pretext) {
+          console.log(chalk.yellow(`\nCharacter count: ${pretext.length}/50`));
+          console.log(chalk.cyan(`Preview: "${pretext}" This is how it will sound\n`));
+          console.log(chalk.green(`✓ Intro text set: "${pretext}"\n`));
+        } else {
+          console.log(chalk.gray('→ No intro text (messages will speak normally)\n'));
+        }
+
+        config.pretext = pretext;
+        pretextValid = true;
       }
 
       // Page 5: Personality Selection
@@ -4656,12 +4704,21 @@ Troubleshooting:
       await fs.writeFile(personalityFile, userConfig.personality);
     }
 
-    // Apply pretext configuration from userConfig
+    // Apply pretext configuration from userConfig (already trimmed by filter)
+    // Story 1.2: File Persistence - Save to .claude/config/tts-pretext.txt
     if (userConfig.pretext && userConfig.pretext.trim()) {
       const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
       const configDir = path.join(claudeDir, 'config');
       await fs.mkdir(configDir, { recursive: true });
-      await fs.writeFile(pretextFile, userConfig.pretext.trim());
+      await fs.writeFile(pretextFile, userConfig.pretext, { mode: 0o600 });
+    } else {
+      // Clear pretext if user chose not to set it
+      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
+      try {
+        await fs.unlink(pretextFile);
+      } catch (err) {
+        // File doesn't exist or can't be deleted - that's fine
+      }
     }
 
     // Initialize piperVoicesBoxen outside the conditional for proper scoping
@@ -5330,6 +5387,73 @@ program
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
   .action(async (options) => {
     await resetBmadVoices(options);
+  });
+
+// Story 1.4: Config Command - Post-install configuration
+program
+  .command('config <setting>')
+  .description('Configure AgentVibes settings after installation')
+  .usage('intro-text [--no-default]')
+  .action(async (setting, options) => {
+    if (setting === 'intro-text' || setting === 'pretext') {
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const claudeDir = path.join(homeDir, '.claude');
+      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
+
+      // Read current pretext if it exists
+      let currentPretext = '';
+      try {
+        if (fsSync.existsSync(pretextFile)) {
+          currentPretext = fsSync.readFileSync(pretextFile, 'utf-8').trim();
+        }
+      } catch (err) {
+        // Ignore read errors
+      }
+
+      // Prompt for new intro text
+      const { newPretext } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'newPretext',
+          message: chalk.yellow('Enter new intro text (max 50 chars):'),
+          default: currentPretext || '(none)',
+          validate: (input) => {
+            if (input === '(none)') return true;
+            if (input.length > 50) return 'Max 50 characters';
+            if (input.includes('\n') || input.includes('\r')) return 'No newlines allowed';
+            return true;
+          }
+        }
+      ]);
+
+      // Handle the response
+      if (newPretext === '(none)' || newPretext === '') {
+        // Remove pretext
+        try {
+          await fs.unlink(pretextFile);
+          console.log(chalk.green('✓ Intro text cleared\n'));
+        } catch (err) {
+          // File doesn't exist - that's fine
+          console.log(chalk.green('✓ No intro text configured\n'));
+        }
+      } else {
+        // Save new pretext
+        try {
+          const configDir = path.join(claudeDir, 'config');
+          await fs.mkdir(configDir, { recursive: true });
+          await fs.writeFile(pretextFile, newPretext, { mode: 0o600 });
+          console.log(chalk.green(`✓ Intro text updated: "${newPretext}"\n`));
+          console.log(chalk.cyan('Preview: ') + chalk.gray(`"${newPretext}" This is a sample response\n`));
+        } catch (err) {
+          console.log(chalk.red(`❌ Error saving intro text: ${err.message}\n`));
+          process.exit(1);
+        }
+      }
+    } else {
+      console.log(chalk.red(`❌ Unknown setting: ${setting}`));
+      console.log(chalk.gray('Available settings: intro-text\n'));
+      process.exit(1);
+    }
   });
 
 // BMAD PR Testing Command
