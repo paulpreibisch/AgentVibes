@@ -10,9 +10,49 @@ import fs from 'node:fs'; // For checking file/directory existence
 import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
 
 /**
+ * Helper: Check if command exists in PATH
+ * @param {string} command - Command name to check
+ * @returns {boolean} True if command exists in PATH
+ */
+function commandExistsInPath(command) {
+  try {
+    execSync(`which "${command}" 2>/dev/null`, {
+      encoding: 'utf8',
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Helper: Check if file/directory exists and is within home directory
+ * @param {string} targetPath - Full path to check
+ * @returns {boolean} True if path exists and is safe
+ */
+function isSafePathExists(targetPath) {
+  try {
+    const homeDir = os.homedir();
+    const resolvedPath = path.resolve(targetPath);
+    const resolvedHome = path.resolve(homeDir);
+
+    // Validate path is within home directory (prevent path traversal)
+    if (!resolvedPath.startsWith(resolvedHome)) {
+      return false;
+    }
+
+    return fs.existsSync(targetPath);
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * Validate a TTS provider's installation status
  * @param {string} providerName - Provider name (soprano, piper, macos, windows-sapi, etc.)
- * @returns {Promise<{installed: boolean, message: string, pythonVersion?: string, error?: string}>}
+ * @returns {Promise<{installed: boolean, message: string, checkedLocations?: string[], error?: string}>}
  */
 export async function validateProvider(providerName) {
   switch (providerName) {
@@ -39,92 +79,54 @@ export async function validateProvider(providerName) {
 }
 
 /**
- * Validate Soprano TTS installation
- * Checks multiple Python versions since Soprano might be in non-default Python
- * @returns {Promise<{installed: boolean, message: string, pythonVersion?: string, checkedCount?: number}>}
+ * Helper: Check if pipx provider is installed (Soprano, Piper)
+ * @param {string} providerName - Provider name (soprano or piper)
+ * @param {string} packageName - Package name (soprano-tts or piper-tts)
+ * @returns {Promise<{installed: boolean, message: string, checkedLocations: string[]}>}
  */
-export async function validateSopranoInstallation() {
+async function validatePipxProvider(providerName, packageName) {
   const checkedLocations = [];
+  const binName = providerName === 'soprano' ? 'soprano' : 'piper';
+  const venvName = providerName === 'soprano' ? 'soprano-tts' : 'piper-tts';
 
-  // Check for soprano command in PATH first (most reliable for pipx installations)
-  try {
-    execSync('which soprano 2>/dev/null', {
-      encoding: 'utf8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return { installed: true, message: 'Soprano TTS detected (binary in PATH)' };
-  } catch (error) {
-    checkedLocations.push('PATH (soprano binary)');
+  // Check for binary in PATH first (most reliable for pipx installations)
+  if (commandExistsInPath(binName)) {
+    return { installed: true, message: `${providerName} TTS detected (binary in PATH)`, checkedLocations: ['PATH'] };
   }
+  checkedLocations.push('PATH');
 
   // Check for pipx bin directory directly
-  // Use os.homedir() (not env var) to prevent HOME injection attacks
-  try {
-    const homeDir = os.homedir();
-    const sopranoExePath = path.join(homeDir, '.local', 'bin', 'soprano');
-
-    // Validate path is within home directory (prevent path traversal)
-    const resolvedPath = path.resolve(sopranoExePath);
-    const resolvedHome = path.resolve(homeDir);
-    if (!resolvedPath.startsWith(resolvedHome)) {
-      throw new Error('Path traversal detected');
-    }
-
-    if (fs.existsSync(sopranoExePath)) {
-      checkedLocations.push('~/.local/bin');
-      return { installed: true, message: 'Soprano TTS detected (via pipx bin)', checkedLocations };
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      console.error('[DEBUG] Pipx bin check error:', error.message);
-    }
+  const homeDir = os.homedir();
+  const binPath = path.join(homeDir, '.local', 'bin', binName);
+  if (isSafePathExists(binPath)) {
+    return { installed: true, message: `${providerName} TTS detected (via pipx bin)`, checkedLocations: ['~/.local/bin'] };
   }
   checkedLocations.push('~/.local/bin');
 
   // Check for pipx venv installation directory
-  try {
-    const homeDir = os.homedir();
-    const sopranoVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'soprano-tts');
-
-    // Validate path is within home directory (prevent path traversal)
-    const resolvedPath = path.resolve(sopranoVenvPath);
-    const resolvedHome = path.resolve(homeDir);
-    if (!resolvedPath.startsWith(resolvedHome)) {
-      throw new Error('Path traversal detected');
-    }
-
-    if (fs.existsSync(sopranoVenvPath)) {
-      checkedLocations.push('pipx venv');
-      return { installed: true, message: 'Soprano TTS detected (via pipx)', checkedLocations };
-    }
-  } catch (error) {
-    // If home directory check fails, fall through to Python checks
-    if (error.code !== 'ENOENT') {
-      console.error('[DEBUG] Pipx venv check error:', error.message);
-    }
+  const venvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', venvName);
+  if (isSafePathExists(venvPath)) {
+    return { installed: true, message: `${providerName} TTS detected (via pipx venv)`, checkedLocations: ['pipx venv'] };
   }
   checkedLocations.push('pipx venv');
 
-  // Comprehensive Python version detection
+  // Check Python package installations (comprehensive version detection)
   const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
 
   for (const pythonCmd of pythonCommands) {
     try {
-      // Use array form to prevent command injection (security: CLAUDE.md)
-      const result = execSync(pythonCmd, ['-m', 'pip', 'show', 'soprano-tts'], {
+      // Use spawnSync with array args (security: correct API usage per CLAUDE.md)
+      const result = spawnSync(pythonCmd, ['-m', 'pip', 'show', packageName], {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 10000
       });
 
-      if (result && result.trim()) {
-        checkedLocations.push(pythonCmd); // Track which Python found it
+      if (result.status === 0 && result.stdout && result.stdout.trim()) {
         return {
           installed: true,
-          message: `Soprano TTS detected via ${pythonCmd}`,
-          pythonVersion: pythonCmd,
-          checkedCount: checkedLocations.length + pythonCommands.indexOf(pythonCmd)
+          message: `${providerName} TTS detected (Python package via ${pythonCmd})`,
+          checkedLocations: [...checkedLocations, pythonCmd]
         };
       }
     } catch (error) {
@@ -132,81 +134,32 @@ export async function validateSopranoInstallation() {
     }
   }
 
-  // Build list of Python versions checked
   checkedLocations.push(...pythonCommands);
 
   return {
     installed: false,
-    message: `Soprano TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
-    error: 'SOPRANO_NOT_FOUND',
-    checkedCount: checkedLocations.length
+    message: `${providerName} TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
+    error: `${providerName.toUpperCase()}_NOT_FOUND`,
+    checkedLocations
   };
 }
 
 /**
+ * Validate Soprano TTS installation
+ * Checks multiple locations: PATH, pipx bin, pipx venv, Python packages
+ * @returns {Promise<{installed: boolean, message: string, checkedLocations?: string[], error?: string}>}
+ */
+export async function validateSopranoInstallation() {
+  return await validatePipxProvider('soprano', 'soprano-tts');
+}
+
+/**
  * Validate Piper TTS installation
- * Checks if Piper is available via pipx or direct installation
- * Suppresses all error output for clean UX
- * @returns {Promise<{installed: boolean, message: string}>}
+ * Checks multiple locations: PATH, pipx bin, pipx venv, Python packages
+ * @returns {Promise<{installed: boolean, message: string, checkedLocations?: string[], error?: string}>}
  */
 export async function validatePiperInstallation() {
-  const checkedLocations = [];
-
-  // Check for piper binary with error suppression
-  try {
-    execSync('which piper 2>/dev/null', {
-      encoding: 'utf8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return { installed: true, message: 'Piper TTS detected (binary in PATH)' };
-  } catch (error) {
-    checkedLocations.push('PATH (piper binary)');
-  }
-
-  // Check for pipx installation (use venv directory check - more reliable than pipx list)
-  try {
-    const homeDir = os.homedir(); // Use os.homedir() not env var (security: prevent HOME injection)
-    const piperVenvPath = path.join(homeDir, '.local', 'share', 'pipx', 'venvs', 'piper-tts');
-
-    // Validate path is within home directory (prevent path traversal)
-    const resolvedPath = path.resolve(piperVenvPath);
-    const resolvedHome = path.resolve(homeDir);
-    if (!resolvedPath.startsWith(resolvedHome)) {
-      throw new Error('Path traversal detected');
-    }
-
-    if (fs.existsSync(piperVenvPath)) {
-      checkedLocations.push('pipx'); // Always track
-      return { installed: true, message: 'Piper TTS detected (via pipx)', checkedLocations };
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      console.error('[DEBUG] Pipx check error:', error.message);
-    }
-  }
-  checkedLocations.push('pipx');
-
-  // Check if Python + piper-tts package installed using array form (security: prevent injection)
-  try {
-    const result = execSync('python3', ['-m', 'pip', 'show', 'piper-tts'], {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 10000
-    });
-    if (result && result.trim()) {
-      checkedLocations.push('python3 pip'); // Track what found it
-      return { installed: true, message: 'Piper TTS detected (Python package)', checkedLocations };
-    }
-  } catch (error) {
-    checkedLocations.push('python3 pip');
-  }
-
-  return {
-    installed: false,
-    message: `Piper TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
-    error: 'PIPER_NOT_FOUND'
-  };
+  return await validatePipxProvider('piper', 'piper-tts');
 }
 
 /**
@@ -308,11 +261,17 @@ async function testSopranoRuntime() {
  */
 async function testPiperRuntime() {
   try {
-    execSync('piper', ['--help'], {
+    const result = spawnSync('piper', ['--help'], {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 5000
     });
+    if (result.error || result.status !== 0) {
+      return {
+        working: false,
+        error: 'Piper command execution failed'
+      };
+    }
     return { working: true };
   } catch (e) {
     return {
@@ -327,11 +286,17 @@ async function testPiperRuntime() {
  */
 async function testMacOSRuntime() {
   try {
-    execSync('say', ['-f', '/dev/null'], {
+    const result = spawnSync('say', ['-f', '/dev/null'], {
       encoding: 'utf8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
+    if (result.error || result.status !== 0) {
+      return {
+        working: false,
+        error: 'macOS Say command execution failed'
+      };
+    }
     return { working: true };
   } catch (e) {
     return {
@@ -374,52 +339,59 @@ export async function attemptProviderInstallation(providerName) {
     return { success: false, message: `Unknown provider: ${providerName}` };
   }
 
-  // Strategy 1: Try regular pip install (using array form for security - CRITICAL #1 fix)
+  // Strategy 1: Try regular pip install (using spawnSync for correct API usage)
   try {
     // Show installation in progress
     console.log(`   Attempting: pip install ${pkgName}...`);
-    execSync('pip', ['install', pkgName], {
+    const result = spawnSync('pip', ['install', pkgName], {
       stdio: 'inherit',
-      timeout: 60000 // HIGH #1 fix - 60 second timeout
+      timeout: 60000
     });
 
-    // Verify installation actually worked (proves it's installed)
-    const validation = await validateProvider(providerName);
-    if (validation.installed) {
-      return {
-        success: true,
-        message: `Successfully installed via pip`,
-        command: `pip install ${pkgName}`,
-        verified: true
-      };
-    }
+    if (result.error || result.status !== 0) {
+      // Strategy 1 failed - continue to Strategy 2
+    } else {
+      // Verify installation actually worked (proves it's installed)
+      const validation = await validateProvider(providerName);
+      if (validation.installed) {
+        return {
+          success: true,
+          message: `Successfully installed via pip`,
+          command: `pip install ${pkgName}`,
+          verified: true
+        };
+      }
 
-    return { success: true, message: `Successfully installed via pip`, command: `pip install ${pkgName}` };
+      return { success: true, message: `Successfully installed via pip`, command: `pip install ${pkgName}` };
+    }
   } catch (error) {
     // Strategy 1 failed - continue to Strategy 2
-    // Don't check specific error messages - just try next strategy (MEDIUM #3 fix)
   }
 
   // Strategy 2: Try pipx install (recommended for PEP 668 protection)
   try {
     console.log(`   Attempting: pipx install ${pkgName}...`);
-    execSync('pipx', ['install', pkgName], {
+    const result = spawnSync('pipx', ['install', pkgName], {
       stdio: 'inherit',
-      timeout: 60000 // HIGH #1 fix - 60 second timeout
+      timeout: 60000
     });
 
-    // Verify installation actually worked (proves it's installed)
-    const validation = await validateProvider(providerName);
-    if (validation.installed) {
-      return {
-        success: true,
-        message: `Successfully installed via pipx`,
-        command: `pipx install ${pkgName}`,
-        verified: true
-      };
-    }
+    if (result.error || result.status !== 0) {
+      // Both strategies failed
+    } else {
+      // Verify installation actually worked (proves it's installed)
+      const validation = await validateProvider(providerName);
+      if (validation.installed) {
+        return {
+          success: true,
+          message: `Successfully installed via pipx`,
+          command: `pipx install ${pkgName}`,
+          verified: true
+        };
+      }
 
-    return { success: true, message: `Successfully installed via pipx`, command: `pipx install ${pkgName}` };
+      return { success: true, message: `Successfully installed via pipx`, command: `pipx install ${pkgName}` };
+    }
   } catch (error) {
     // Both strategies failed
   }
@@ -435,13 +407,18 @@ export async function attemptProviderInstallation(providerName) {
  */
 function getPackageInfo(pkgName) {
   try {
-    // Small delay to ensure package is registered in pip
-    // (sometimes pip needs a moment to update its cache)
-    const output = execSync('pip', ['show', pkgName], {
+    // Use spawnSync with array args (security: correct API usage per CLAUDE.md)
+    const result = spawnSync('pip', ['show', pkgName], {
       encoding: 'utf8',
       timeout: 10000,
-      stdio: ['pipe', 'pipe', 'pipe'] // Capture both stdout and stderr
+      stdio: ['pipe', 'pipe', 'pipe']
     });
+
+    if (result.error || result.status !== 0) {
+      return null;
+    }
+
+    const output = result.stdout;
 
     // Parse pip show output
     const info = {};
