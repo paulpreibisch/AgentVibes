@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.9
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.5.10-alpha.0
 
 ---
 
@@ -142,11 +142,11 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.5.9 - Security & Provider Validation](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.9)** 🛡️
+**[v3.5.9 - Security & Provider Validation](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.10-alpha.0)** 🛡️
 
 Critical security update: Fixed command injection vulnerabilities, HOME directory injection prevention, and path traversal protection. Soprano TTS installed via pipx now correctly detected. Enhanced provider detection messaging and debug logging.
 
-**Foundation Release:** [v3.5.5 - Native Windows Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.9) brings Windows support (Soprano, Piper, SAPI), background music (16 genre tracks), reverb/audio effects, and verbosity control. [See release notes](RELEASE_NOTES.md) for complete v3.5.5-3.5.9 history.
+**Foundation Release:** [v3.5.5 - Native Windows Support](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.5.10-alpha.0) brings Windows support (Soprano, Piper, SAPI), background music (16 genre tracks), reverb/audio effects, and verbosity control. [See release notes](RELEASE_NOTES.md) for complete v3.5.5-3.5.9 history.
 
 💡 **Tip:** If `npx agentvibes` shows an older version or missing commands, clear your npm cache: `npm cache clean --force && npx agentvibes@latest --help`
 
