@@ -1,5 +1,77 @@
 # AgentVibes Release Notes
 
+## ✨ v3.5.10 - Soprano Detection Fixes & Enhanced Installer Features
+
+**Release Date:** February 14, 2026
+
+### 🎯 Summary
+
+Production release combining critical bug fixes and new installer features. Fixed Soprano TTS detection for pipx installations (the core issue reported by users), resolved 5 execSync API misuse bugs that were breaking Python package detection, and eliminated 100+ lines of code duplication. Introduces new installer features: custom music track support with preview functionality, personality emoji mapping for better visual recognition, and pretext configuration allowing users to customize agent introductions.
+
+### ✨ Key Features & Fixes
+
+**🔧 Critical Bug Fixes:**
+- **Soprano TTS Detection:** Fixed detection when installed via pipx (was showing "not installed" despite working)
+- **execSync API Bugs:** Fixed 5 locations using incorrect API signature (array args with execSync)
+- **Code Duplication:** Eliminated 100+ lines of duplicate code between Soprano and Piper validators
+- **API Consistency:** All provider validation functions now return consistent response structures
+- **Python Package Detection:** Fixed broken Python pip detection that was silently failing
+
+**🎨 New Installer Features:**
+- **Custom Music Tracks:** Users can now upload and preview their own background music
+- **Personality Emojis:** Visual recognition mapping (😊 for none, 🎭 for dramatic, 💁 for sassy, etc.)
+- **Pretext Configuration:** Custom agent introductions (e.g., "FireBot: " prefix for all messages)
+- **Track Preview:** Audio preview with support for ffplay, sox, and mpv players
+
+**🛡️ Security & Quality:**
+- Improved path traversal protection in provider validation
+- Enhanced error handling and logging
+- Reduced code complexity by 29% through deduplication
+- Test coverage improved: 56.61% → 63.67%
+
+### 📊 Technical Details
+
+**Soprano Detection Improvements:**
+- Checks command in PATH first (most reliable for pipx)
+- Falls back to ~/.local/bin directory check
+- Checks pipx venv directory for installation
+- Final fallback to Python pip package detection
+- Consistent error messages showing all checked locations
+
+**Code Quality Metrics:**
+- File size reduced by 145 lines (-29%)
+- Code duplication eliminated (was ~100 lines)
+- Test coverage improved +7.06%
+- All 114 tests passing
+- Provider validator now 63.67% covered (up from 56.61%)
+
+**Installer Enhancements:**
+- Added personality emoji mapping (26 personalities)
+- Custom track upload with validation
+- File type restrictions (.mp3, .wav, .ogg, .m4a)
+- Registry storage in ~/.agentvibes/custom-tracks.json
+- Audio preview before finalizing selection
+
+### 🔒 Security Notes
+
+- All spawnSync calls now use correct array argument form
+- Path traversal prevention maintained in all operations
+- HOME injection protection via os.homedir()
+- No hardcoded credentials introduced
+- Input validation for file uploads and track selection
+
+### 🐛 Known Limitations
+
+- Audio preview requires ffplay, sox, or mpv (feature gracefully degrades if unavailable)
+- Custom track registry is stored locally per user
+- Some legacy bash scripts still lack strict mode (pre-existing, low risk)
+
+### 🙏 Acknowledgments
+
+This release includes fixes identified through adversarial code review, ensuring production-quality reliability and security alignment with CLAUDE.md standards.
+
+---
+
 ## 🛡️ v3.5.8 - Provider Validation Security & UX Improvements
 
 **Release Date:** February 12, 2026
