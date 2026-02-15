@@ -149,6 +149,68 @@ function hasPulseAudioTunnel() {
 }
 
 /**
+ * Story 2.3: Detect terminal emoji support
+ * Checks $TERM, locale, and platform to determine emoji capability
+ * @returns {boolean} True if terminal supports emoji
+ */
+function supportsEmoji() {
+  // Check TERM environment variable
+  const term = process.env.TERM || '';
+  const lang = process.env.LANG || '';
+  const lcAll = process.env.LC_ALL || '';
+
+  // Explicitly unsupported terminals
+  const unsupportedTerminals = ['dumb', 'emacs', 'ansi'];
+  if (unsupportedTerminals.includes(term.toLowerCase())) {
+    return false;
+  }
+
+  // Check for UTF-8 locale (required for emoji)
+  const isUtf8 = lang.includes('utf8') || lang.includes('UTF-8') ||
+                 lcAll.includes('utf8') || lcAll.includes('UTF-8');
+
+  // Modern terminals (check common ones)
+  const modernTerminals = [
+    'xterm-256color', 'screen-256color', 'tmux-256color',
+    'iterm2', 'iterm', 'vscode', 'alacritty', 'kitty',
+    'wezterm', 'windows-terminal', 'conemu'
+  ];
+
+  const isModernTerminal = modernTerminals.some(t => term.toLowerCase().includes(t));
+
+  // Windows Terminal always supports emoji
+  const isWindowsTerminal = process.platform === 'win32' &&
+                            (process.env.WT_SESSION || process.env.WT_PROFILE_ID);
+
+  // macOS Terminal and iTerm2
+  const isMacOS = process.platform === 'darwin';
+
+  // Linux with proper UTF-8
+  const isLinuxWithUtf8 = process.platform === 'linux' && isUtf8;
+
+  // Default to true for: modern terms, Windows Terminal, macOS, Linux with UTF-8
+  // Default to false for: dumb terminals, unknown environments without UTF-8
+  return isModernTerminal || isWindowsTerminal || isMacOS || isLinuxWithUtf8 || (term && isUtf8);
+}
+
+/**
+ * Story 2.4: Get personality display with emoji or text fallback
+ * Returns emoji if supported, otherwise returns text label like "[personality]"
+ * @param {string} personality - Personality name
+ * @returns {string} Either emoji or "[personality-name]" fallback
+ */
+function getPersonalityIcon(personality) {
+  const emoji = personalityEmojis[personality] || '✨';
+
+  if (supportsEmoji()) {
+    return emoji;
+  }
+
+  // Text fallback for unsupported terminals: [personality-name]
+  return `[${personality}]`;
+}
+
+/**
  * Detect system capabilities for smart provider recommendations
  * @returns {Promise<Object>} System info including GPU, memory, platform
  */
@@ -1617,18 +1679,19 @@ async function collectConfiguration(options = {}) {
         personalities.sort((a, b) => a.name.localeCompare(b.name));
 
         // Add "none" as first option (default)
-        const noneEmoji = personalityEmojis['none'] || '✨';
+        // Story 2.3 & 2.4: Use icon that adapts to terminal support
+        const noneIcon = getPersonalityIcon('none');
         personalityChoices.push(
-          { name: noneEmoji + ' ' + chalk.green('none') + chalk.gray(' (Professional, no personality) - Recommended'), value: 'none' },
+          { name: noneIcon + ' ' + chalk.green('none') + chalk.gray(' (Professional, no personality) - Recommended'), value: 'none' },
           new inquirer.Separator(chalk.gray('─'.repeat(60)))
         );
 
         // Add all other personalities
         for (const p of personalities) {
           if (p.name !== 'normal') { // Skip 'normal' as it's similar to 'none'
-            const emoji = personalityEmojis[p.name] || '✨';
+            const icon = getPersonalityIcon(p.name);
             personalityChoices.push({
-              name: emoji + ' ' + chalk.cyan(p.name) + chalk.gray(` - ${p.description}`),
+              name: icon + ' ' + chalk.cyan(p.name) + chalk.gray(` - ${p.description}`),
               value: p.name
             });
           }
@@ -1647,9 +1710,15 @@ async function collectConfiguration(options = {}) {
         ];
       }
 
+      // Story 2.3 & 2.4: Show emoji support status in help text
+      const emojiSupport = supportsEmoji();
+      const emojiNote = emojiSupport
+        ? chalk.gray('(Emoji icons shown for visual recognition)')
+        : chalk.gray('(Text labels shown - emoji not supported in this terminal)');
+
       // Use search prompt for keyboard navigation (type to filter)
       const selectedPersonality = await search({
-        message: chalk.yellow('Select your default personality (type to search):'),
+        message: chalk.yellow('Select your default personality (type to search):') + ' ' + emojiNote,
         source: async (input) => {
           // Filter personalityChoices based on input
           if (!input) {
