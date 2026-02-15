@@ -1,156 +1,170 @@
 # AgentVibes Development Guidelines
 
+**Version:** 3.0
+**Updated:** 2026-02-15
+**Status:** Active (Using BMAD Methodology)
+
 ## Overview
+
 AgentVibes is a Text-to-Speech system for AI assistants with personality support.
-This document defines coding standards and quality requirements for all contributions.
 
-## CRITICAL: PR and Commit Workflow
+### Project Uses BMAD Methodology
 
-**NEVER push to a PR or commit changes without explicit user approval.**
+This project follows **BMAD (BMM - Business Model Methodology)** for all story development:
+- Use `/sprint-planning` to initialize sprint tracking
+- Use `/dev-story` for each story implementation (NOT manual commits)
+- `/dev-story` handles: implementation → testing → code review → auto-fixes → status updates
+- All stories tracked in `docs/implementation-artifacts/sprint-status.yaml`
+- Status updates: `ready-for-dev` → `in-progress` → `complete`
 
-When working on PRs or making changes to external repositories:
-1. **Always describe the changes first** - Explain what you plan to modify
-2. **Wait for user to test locally** - Do not push until user confirms testing is complete
-3. **Ask before pushing** - Get explicit "yes, push it" or similar confirmation
-4. **If user says "let me know before adding to PR"** - This means STOP and WAIT for approval
+**Required Reading:** See `BMAD-STORY-DEVELOPMENT.md` for complete workflow.
 
-This rule applies to:
-- All commits to any repository
-- All pushes to remote branches
-- All PR updates
-- Any changes to BMAD-METHOD or other external projects
+## Critical Rules
 
-## Sonar Quality Gates (REQUIRED)
+### ✅ MANDATORY: Use BMAD Workflow
+1. **Initialize sprint:** Run `/sprint-planning` once per sprint
+2. **Develop each story:** Run `/dev-story` (NOT manual coding)
+3. **Never skip workflow steps** - Workflow enforces quality gates
+4. **Update sprint-status.yaml** automatically via `/dev-story`
+5. **Code review included** - Built into `/dev-story` workflow
 
-All code MUST pass SonarCloud quality gates before merging. The following checks are mandatory:
+### ✅ Git Workflow (ONLY Outside BMAD)
+For changes outside story development:
+1. Describe changes before acting
+2. Get explicit user approval before commits/pushes
+3. Test locally before pushing
+4. Exception: Changes made by `/dev-story` auto-commit
 
-### Security Hotspots
-1. **No hardcoded credentials** - API keys, passwords, tokens must NEVER be in code
-2. **Validate all external input** - User input, environment variables, file content
-3. **Use secure temp directories** - Prefer `$XDG_RUNTIME_DIR` with fallback to user-specific `/tmp`
-4. **Verify file ownership** - Before processing files from directories that could be influenced externally
-5. **Prevent path traversal** - Always validate paths are within expected directories
+## Security Requirements (SonarCloud Compliance)
 
-### Shell Script Security (Bash)
+### Core Security Rules (NO EXCEPTIONS)
+1. **No hardcoded credentials** - Never commit API keys, passwords, tokens
+2. **Validate all external input** - User input, files, environment variables
+3. **Secure temp directories** - Use `$XDG_RUNTIME_DIR` or user-specific `/tmp`
+4. **Verify file ownership** - Check before processing external files (uid check)
+5. **Prevent path traversal** - Validate paths stay within expected directories (use `path.resolve()`)
+6. **Never log sensitive data** - Mask credentials in logs
+
+### Bash/Shell Security
 ```bash
-# REQUIRED: Always use strict mode
-set -euo pipefail
+set -euo pipefail  # REQUIRED: Always use strict mode
 
-# REQUIRED: Use secure temp directories
-if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
-  TEMP_DIR="$XDG_RUNTIME_DIR/agentvibes-FEATURE"
-else
-  TEMP_DIR="/tmp/agentvibes-FEATURE-$USER"
-fi
+# Secure temp with proper permissions
+TEMP_DIR="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-$RANDOM"
+mkdir -p "$TEMP_DIR"; chmod 700 "$TEMP_DIR"
 
-# REQUIRED: Set restrictive permissions on directories
-mkdir -p "$TEMP_DIR"
-chmod 700 "$TEMP_DIR"
+# Verify file ownership before processing
+[[ $(stat -c '%u' "$file" 2>/dev/null || stat -f '%u' "$file" 2>/dev/null) == $(id -u) ]] || exit 1
 
-# REQUIRED: Verify ownership before processing external files
-if [[ "$(stat -c '%u' "$DIR" 2>/dev/null || stat -f '%u' "$DIR" 2>/dev/null)" != "$(id -u)" ]]; then
-  echo "Error: Directory not owned by current user" >&2
-  exit 1
-fi
+trap 'rm -f "$TEMP_FILE"' EXIT  # Clean up: use single quotes for deferred expansion
 
-# REQUIRED: Use single quotes in trap to defer variable expansion
-trap 'rm -f "$PID_FILE"' EXIT
+# Validate input
+[[ "$VALUE" =~ ^[0-9]+$ ]] || exit 1  # Only allow numbers
 
-# REQUIRED: Validate numeric input
-if [[ "$VALUE" =~ ^[0-9]+$ ]]; then
-  # Safe to use
-fi
-
-# REQUIRED: Quote all variables
-echo "$VARIABLE"  # Good
-echo $VARIABLE    # Bad - word splitting/globbing risk
+echo "$VARIABLE"  # GOOD: Quoted
+echo $VARIABLE    # BAD: Vulnerable to word splitting
 ```
 
 ### JavaScript/Node.js Security
 ```javascript
-// REQUIRED: Use path.resolve() for path operations
+// Path safety: ALWAYS use path.resolve()
 const safePath = path.resolve(userInput);
-
-// REQUIRED: Validate paths are within expected directory
-function isPathSafe(targetPath, basePath) {
-  const resolved = path.resolve(targetPath);
-  const baseResolved = path.resolve(basePath);
-  // Check for exact match OR starts with base + separator
-  return resolved === baseResolved || resolved.startsWith(baseResolved + path.sep);
+function isPathSafe(target, base) {
+  const r = path.resolve(target), b = path.resolve(base);
+  return r === b || r.startsWith(b + path.sep);
 }
 
-// REQUIRED: Never log sensitive data
-console.log('API Key: ***************...');  // Good - masked
-console.log(`API Key: ${apiKey}`);           // Bad - exposes credential
+// Never log credentials - ALWAYS mask
+console.log('Key: ' + apiKey.substring(0, 3) + '...');  // Good
+console.log(`Key: ${apiKey}`);                           // BAD
 
-// REQUIRED: Use try-finally for resource cleanup
-let process;
+// Resource cleanup with try-finally
+let proc;
 try {
-  process = spawn(...);
-  // ... use process
+  proc = spawn(...);
 } finally {
-  if (process && !process.killed) {
-    process.kill();
-  }
+  if (proc && !proc.killed) proc.kill();
 }
 ```
 
 ### Python Security
 ```python
-# REQUIRED: Use try-finally for resource cleanup
+# Resource cleanup
 process = None
 try:
     process = subprocess.Popen(...)
-    # ... use process
 finally:
     if process and process.poll() is None:
         process.kill()
 
-# REQUIRED: Handle file operation errors gracefully
+# Graceful error handling
 try:
-    content = file_path.read_text()
+    content = path.read_text()
 except (PermissionError, UnicodeDecodeError, OSError) as e:
-    print(f"Warning: Could not read file: {e}", file=sys.stderr)
+    print(f"Warning: {e}", file=sys.stderr)
     return default_value
 ```
 
 ## Code Quality Standards
 
-### Reliability
-1. **Always handle errors** - No silent failures
-2. **Use defensive programming** - Check preconditions
-3. **Clean up resources** - Files, processes, connections
-4. **Avoid race conditions** - Use file locking where needed
-
-### Maintainability
-1. **Add comments for security-critical code** - Explain why, not what
-2. **Keep functions focused** - Single responsibility
-3. **Use meaningful variable names** - Self-documenting code
+- ✅ **Error handling:** No silent failures - always handle errors explicitly
+- ✅ **Defensive programming:** Check preconditions and validate inputs
+- ✅ **Resource cleanup:** Always clean up files, processes, connections
+- ✅ **Race conditions:** Use file locking for shared resources
+- ✅ **Comments:** Security-critical code only (explain WHY, not WHAT)
+- ✅ **Single responsibility:** Keep functions focused and testable
 
 ## Testing Requirements
 
-### Before Committing
-1. Run existing test suite: `npm test`
-2. Add tests for new security-critical code
-3. Manual testing of affected features
+- Run `npm test` before committing (REQUIRED)
+- Write tests for: input validation, path handling, edge cases
+- Code review via `/dev-story` includes test validation
+- Target: 80%+ code coverage for new features
 
-### Test Coverage
-- All input validation must have tests
-- All path handling must have tests
-- Edge cases must be covered
-
-## Pre-Release Checklist
+## Definition of Done (Checked by /dev-story)
 
 - [ ] All tests pass (`npm test`)
-- [ ] No new Sonar security hotspots
-- [ ] Credentials are masked in logs
-- [ ] File operations validate paths
+- [ ] No Sonar security hotspots
+- [ ] Code follows project patterns (project-context.md)
+- [ ] Credentials masked in logs
+- [ ] Paths validated (no traversal)
+- [ ] File operations safe (ownership checked)
 - [ ] Shell scripts use strict mode
-- [ ] Resources are properly cleaned up
-- [ ] Error handling is comprehensive
+- [ ] Resources properly cleaned up
+- [ ] Acceptance criteria satisfied
+
+## Story Development Workflow (REQUIRED)
+
+### For Each Sprint:
+1. Run `/sprint-planning` to initialize sprint-status.yaml
+2. For each story, run `/dev-story` (handles everything)
+3. Check progress anytime with `/sprint-status`
+
+### What /dev-story Does:
+- Finds next ready-for-dev story
+- Loads story file with acceptance criteria
+- Implements tasks with code + tests
+- **Runs adversarial code review** (finds 3-10 issues)
+- **Auto-fixes HIGH and MEDIUM severity issues**
+- Validates against project-context.md
+- Updates sprint-status.yaml automatically
+- Marks story complete when all ACs satisfied
+
+**Never bypass the workflow** - it enforces all quality gates.
+
+## Important Files
+
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | Development standards (this file) |
+| `BMAD-STORY-DEVELOPMENT.md` | How to use BMAD methodology |
+| `project-context.md` | Project-specific patterns (if exists) |
+| `docs/epics.md` | All epics and stories |
+| `docs/implementation-artifacts/sprint-status.yaml` | Sprint progress tracking |
+| `_bmad/core/tasks/workflow.xml` | BMAD execution engine (read-only) |
 
 ## References
 
-- [SonarCloud Security Rules](https://rules.sonarsource.com/javascript/type/Security_Hotspot)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Bash Security Best Practices](https://github.com/anordal/shellharden/blob/master/how_to_do_things_safely_in_bash.md)
+- **BMAD Methodology:** See `/sprint-planning`, `/dev-story`, `/sprint-status` workflows
+- **Security Standards:** [SonarCloud Rules](https://rules.sonarsource.com/javascript/type/Security_Hotspot), [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- **Bash Best Practices:** [Shellharden](https://github.com/anordal/shellharden/blob/master/how_to_do_things_safely_in_bash.md)
