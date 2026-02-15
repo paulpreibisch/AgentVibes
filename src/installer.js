@@ -188,21 +188,29 @@ function supportsEmoji() {
   // Linux with proper UTF-8
   const isLinuxWithUtf8 = process.platform === 'linux' && isUtf8;
 
-  // Default to true for: modern terms, Windows Terminal, macOS, Linux with UTF-8
-  // Default to false for: dumb terminals, unknown environments without UTF-8
-  return isModernTerminal || isWindowsTerminal || isMacOS || isLinuxWithUtf8 || (term && isUtf8);
+  // Unknown terminal with UTF-8: Only enable emoji if TERM is not explicitly unsupported AND has UTF-8
+  // This prevents false positives like "vt100" with UTF-8 reporting emoji support
+  const unknownTerminalWithUtf8 = term &&
+                                 !unsupportedTerminals.includes(term.toLowerCase()) &&
+                                 isUtf8;
+
+  // Default to true for: modern terms, Windows Terminal, macOS, Linux with UTF-8, or unknown term with UTF-8
+  // Default to false for: dumb/emacs/ansi terminals or environments without UTF-8
+  return isModernTerminal || isWindowsTerminal || isMacOS || isLinuxWithUtf8 || unknownTerminalWithUtf8;
 }
 
 /**
  * Story 2.4: Get personality display with emoji or text fallback
  * Returns emoji if supported, otherwise returns text label like "[personality]"
  * @param {string} personality - Personality name
+ * @param {boolean} emojiSupported - Pre-computed emoji support (avoids redundant env var reads)
  * @returns {string} Either emoji or "[personality-name]" fallback
  */
-function getPersonalityIcon(personality) {
+function getPersonalityIcon(personality, emojiSupported) {
   const emoji = personalityEmojis[personality] || '✨';
 
-  if (supportsEmoji()) {
+  // Use provided emojiSupported to avoid recalculating for every personality (performance)
+  if (emojiSupported) {
     return emoji;
   }
 
@@ -1678,9 +1686,11 @@ async function collectConfiguration(options = {}) {
         // Sort alphabetically
         personalities.sort((a, b) => a.name.localeCompare(b.name));
 
+        // Story 2.3 & 2.4: Check emoji support once, pass to all personality icons (performance fix)
+        const emojiSupported = supportsEmoji();
+
         // Add "none" as first option (default)
-        // Story 2.3 & 2.4: Use icon that adapts to terminal support
-        const noneIcon = getPersonalityIcon('none');
+        const noneIcon = getPersonalityIcon('none', emojiSupported);
         personalityChoices.push(
           { name: noneIcon + ' ' + chalk.green('none') + chalk.gray(' (Professional, no personality) - Recommended'), value: 'none' },
           new inquirer.Separator(chalk.gray('─'.repeat(60)))
@@ -1689,7 +1699,7 @@ async function collectConfiguration(options = {}) {
         // Add all other personalities
         for (const p of personalities) {
           if (p.name !== 'normal') { // Skip 'normal' as it's similar to 'none'
-            const icon = getPersonalityIcon(p.name);
+            const icon = getPersonalityIcon(p.name, emojiSupported);
             personalityChoices.push({
               name: icon + ' ' + chalk.cyan(p.name) + chalk.gray(` - ${p.description}`),
               value: p.name
@@ -1710,9 +1720,8 @@ async function collectConfiguration(options = {}) {
         ];
       }
 
-      // Story 2.3 & 2.4: Show emoji support status in help text
-      const emojiSupport = supportsEmoji();
-      const emojiNote = emojiSupport
+      // Story 2.3 & 2.4: Show emoji support status in help text (reuse emojiSupported from above)
+      const emojiNote = emojiSupported
         ? chalk.gray('(Emoji icons shown for visual recognition)')
         : chalk.gray('(Text labels shown - emoji not supported in this terminal)');
 

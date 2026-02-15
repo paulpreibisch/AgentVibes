@@ -57,7 +57,13 @@ function supportsEmoji() {
   // Linux with UTF-8
   const isLinuxWithUtf8 = process.platform === 'linux' && isUtf8;
 
-  return isModernTerminal || isWindowsTerminal || isMacOS || isLinuxWithUtf8 || (term && isUtf8);
+  // Unknown terminal with UTF-8: Only enable emoji if TERM is not explicitly unsupported AND has UTF-8
+  // This prevents false positives like "vt100" with UTF-8 reporting emoji support
+  const unknownTerminalWithUtf8 = term &&
+                                 !unsupportedTerminals.includes(term.toLowerCase()) &&
+                                 isUtf8;
+
+  return isModernTerminal || isWindowsTerminal || isMacOS || isLinuxWithUtf8 || unknownTerminalWithUtf8;
 }
 
 /**
