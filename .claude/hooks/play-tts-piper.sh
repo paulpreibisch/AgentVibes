@@ -38,11 +38,13 @@
 # Fix locale warnings
 export LC_ALL=C
 
-TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"  # Optional: voice model name
+TEXT="$1"
+VOICE_OVERRIDE="$2"  # Optional: voice model name
 
 # Source voice manager and language manager
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Use readlink -f to handle symlinks correctly
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 source "$SCRIPT_DIR/piper-voice-manager.sh"
 source "$SCRIPT_DIR/language-manager.sh"
 source "$SCRIPT_DIR/audio-cache-utils.sh"
@@ -74,7 +76,7 @@ else
   # 2. Script location (for direct slash command usage)
   # 3. Global ~/.claude (fallback)
 
-  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
     # MCP context: Use the project directory where MCP was invoked
     VOICE_FILE="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
   elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
@@ -128,42 +130,6 @@ if [[ -z "$TEXT" ]]; then
   exit 1
 fi
 
-# @function read_and_prepend_pretext
-# @intent Load pretext from file and prepend to TEXT if it exists
-# @why Add personality/branding to TTS output
-# @param Uses global: $TEXT, $CLAUDE_PROJECT_DIR, $SCRIPT_DIR, $HOME
-# @returns Updates $TEXT global variable
-# @sideeffects None
-# REQUIRED: Validate file ownership before reading (CLAUDE.md security)
-PRETEXT_FILE=""
-
-# Priority order for pretext file:
-# 1. CLAUDE_PROJECT_DIR env var (project-specific)
-# 2. Script location (direct usage)
-# 3. Global ~/.claude (fallback)
-
-if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/config/tts-pretext.txt" ]]; then
-  PRETEXT_FILE="$CLAUDE_PROJECT_DIR/.claude/config/tts-pretext.txt"
-elif [[ -f "$SCRIPT_DIR/../config/tts-pretext.txt" ]]; then
-  PRETEXT_FILE="$SCRIPT_DIR/../config/tts-pretext.txt"
-elif [[ -f "$HOME/.claude/config/tts-pretext.txt" ]]; then
-  PRETEXT_FILE="$HOME/.claude/config/tts-pretext.txt"
-fi
-
-if [[ -n "$PRETEXT_FILE" ]] && [[ -f "$PRETEXT_FILE" ]]; then
-  # Verify file ownership before reading (CLAUDE.md - prevent TOCTOU)
-  if [[ "$(stat -c '%u' "$PRETEXT_FILE" 2>/dev/null || stat -f '%u' "$PRETEXT_FILE" 2>/dev/null || echo 'unknown')" == "$(id -u)" ]] || [[ "$?" == "0" ]]; then
-    # Verify file size is reasonable (prevent DoS via huge file)
-    file_size=$(stat -c '%s' "$PRETEXT_FILE" 2>/dev/null || stat -f '%z' "$PRETEXT_FILE" 2>/dev/null || echo 0)
-    if [[ "$file_size" -lt 1000 ]]; then
-      PRETEXT=$(cat "$PRETEXT_FILE" 2>/dev/null | tr -d '\n\r')
-      if [[ -n "$PRETEXT" ]]; then
-        TEXT="${PRETEXT} ${TEXT}"
-      fi
-    fi
-  fi
-fi
-
 # Check if Piper is installed
 if ! command -v piper &> /dev/null; then
   echo "❌ Error: Piper TTS not installed"
@@ -214,12 +180,11 @@ fi
 # @intent Find appropriate directory for audio file storage
 # @why Supports project-local and global storage
 # @returns Sets $AUDIO_DIR global variable
-if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
   AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
 else
   # Fallback: try to find .claude directory in current path
   CURRENT_DIR="$PWD"
-  AUDIO_DIR=""
   while [[ "$CURRENT_DIR" != "/" ]]; do
     if [[ -d "$CURRENT_DIR/.claude" ]]; then
       AUDIO_DIR="$CURRENT_DIR/.claude/audio"
@@ -400,12 +365,7 @@ fi
 # @why Support multiple audio players and prevent overlapping audio in learning mode
 # @param Uses global: $TEMP_FILE, $CURRENT_LANGUAGE
 # @sideeffects Plays audio with lock mechanism for sequential playback
-# REQUIRED: Use secure temp directory with user isolation (CLAUDE.md)
-if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
-  LOCK_FILE="$XDG_RUNTIME_DIR/agentvibes-audio.lock"
-else
-  LOCK_FILE="/tmp/agentvibes-audio-$USER.lock"
-fi
+LOCK_FILE="/tmp/agentvibes-audio.lock"
 
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do

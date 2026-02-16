@@ -47,10 +47,12 @@
 # Fix locale warnings
 export LC_ALL=C
 
-TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"  # Ignored — Soprano has a single voice, kept for provider contract
+TEXT="$1"
+VOICE_OVERRIDE="$2"  # Ignored — Soprano has a single voice, kept for provider contract
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Use readlink -f to handle symlinks correctly
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 source "$SCRIPT_DIR/audio-cache-utils.sh"
 
 SOPRANO_PORT="${SOPRANO_PORT:-7860}"
@@ -63,42 +65,6 @@ SOPRANO_DEVICE="${SOPRANO_DEVICE:-auto}"
 if [[ -z "$TEXT" ]]; then
   echo "Usage: $0 \"text to speak\" [voice_override]"
   exit 1
-fi
-
-# @function read_and_prepend_pretext
-# @intent Load pretext from file and prepend to TEXT if it exists
-# @why Add personality/branding to TTS output
-# @param Uses global: $TEXT, $CLAUDE_PROJECT_DIR, $SCRIPT_DIR, $HOME
-# @returns Updates $TEXT global variable
-# @sideeffects None
-# REQUIRED: Validate file ownership before reading (CLAUDE.md security)
-PRETEXT_FILE=""
-
-# Priority order for pretext file:
-# 1. CLAUDE_PROJECT_DIR env var (project-specific)
-# 2. Script location (direct usage)
-# 3. Global ~/.claude (fallback)
-
-if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/config/tts-pretext.txt" ]]; then
-  PRETEXT_FILE="$CLAUDE_PROJECT_DIR/.claude/config/tts-pretext.txt"
-elif [[ -f "$SCRIPT_DIR/../config/tts-pretext.txt" ]]; then
-  PRETEXT_FILE="$SCRIPT_DIR/../config/tts-pretext.txt"
-elif [[ -f "$HOME/.claude/config/tts-pretext.txt" ]]; then
-  PRETEXT_FILE="$HOME/.claude/config/tts-pretext.txt"
-fi
-
-if [[ -n "$PRETEXT_FILE" ]] && [[ -f "$PRETEXT_FILE" ]]; then
-  # Verify file ownership before reading (CLAUDE.md - prevent TOCTOU)
-  if [[ "$(stat -c '%u' "$PRETEXT_FILE" 2>/dev/null || stat -f '%u' "$PRETEXT_FILE" 2>/dev/null || echo 'unknown')" == "$(id -u)" ]] || [[ "$?" == "0" ]]; then
-    # Verify file size is reasonable (prevent DoS via huge file)
-    file_size=$(stat -c '%s' "$PRETEXT_FILE" 2>/dev/null || stat -f '%z' "$PRETEXT_FILE" 2>/dev/null || echo 0)
-    if [[ "$file_size" -lt 1000 ]]; then
-      PRETEXT=$(cat "$PRETEXT_FILE" 2>/dev/null | tr -d '\n\r')
-      if [[ -n "$PRETEXT" ]]; then
-        TEXT="${PRETEXT} ${TEXT}"
-      fi
-    fi
-  fi
 fi
 
 # @function check_webui_server
@@ -139,11 +105,10 @@ fi
 # @intent Find appropriate directory for audio file storage
 # @why Supports project-local and global storage
 # @returns Sets $AUDIO_DIR global variable
-if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
   AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
 else
   CURRENT_DIR="$PWD"
-  AUDIO_DIR=""
   while [[ "$CURRENT_DIR" != "/" ]]; do
     if [[ -d "$CURRENT_DIR/.claude" ]]; then
       AUDIO_DIR="$CURRENT_DIR/.claude/audio"
@@ -249,12 +214,7 @@ fi
 # @function play_audio
 # @intent Play generated audio using available player with sequential playback
 # @why Support multiple audio players and prevent overlapping audio
-# REQUIRED: Use secure temp directory with user isolation (CLAUDE.md)
-if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
-  LOCK_FILE="$XDG_RUNTIME_DIR/agentvibes-audio.lock"
-else
-  LOCK_FILE="/tmp/agentvibes-audio-$USER.lock"
-fi
+LOCK_FILE="/tmp/agentvibes-audio.lock"
 
 for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
