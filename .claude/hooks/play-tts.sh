@@ -39,15 +39,41 @@
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
 # @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
 #
+# **CRITICAL: This script MUST ALWAYS be called with `run_in_background: true` in Bash tool**
+# Do NOT wait for TTS playback to complete. Run in background so other tasks continue immediately.
+# Example: Bash (background): .claude/hooks/play-tts.sh "Acknowledging task start"
+#
 
 set -euo pipefail
 
 # Fix locale warnings
 export LC_ALL=C
 
-# Get script directory (needed for mute file check)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Get script directory - handle symlinks correctly with readlink -f
+# This resolves: symlinks, relative paths, and working directory changes
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+
+# Find PROJECT_ROOT by searching up the directory tree for .claude/hooks
+# This handles non-standard installations and directory structures
+PROJECT_ROOT="$SCRIPT_DIR"
+while [[ "$PROJECT_ROOT" != "/" ]]; do
+  if [[ -d "$PROJECT_ROOT/.claude/hooks" ]]; then
+    # Found the .claude/hooks directory - PROJECT_ROOT is 2 levels up from hooks
+    PROJECT_ROOT="$(dirname "$(dirname "$PROJECT_ROOT")")"
+    break
+  fi
+  PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
+
+# Verify PROJECT_ROOT is valid
+if [[ ! -d "$PROJECT_ROOT/.claude/hooks" ]]; then
+  echo "❌ ERROR: Could not find AgentVibes .claude/hooks directory" >&2
+  echo "   Script path: $SCRIPT_PATH" >&2
+  echo "   Searched up from: $SCRIPT_DIR" >&2
+  exit 1
+fi
+
 export PROJECT_ROOT  # Export for child scripts
 
 # Check if muted (persists across sessions)
