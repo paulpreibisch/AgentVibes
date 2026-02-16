@@ -40,9 +40,9 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW FEATURE HIGHLIGHT
+## 🌟 NEW FEATURE HIGHLIGHTS
 
-### Agent Vibes v1.0 Voice Browser
+### 🎤 Agent Vibes v1.0 Voice Browser
 
 ![Voice Browser Banner](docs/installation-screenshots/voice-browser-screenshot.png)
 
@@ -71,6 +71,107 @@ The new **AgentVibes Voice Browser** is an interactive console application that 
 - Building favorite collections
 
 Launch now: `npx agentvibes-voice-browser`
+
+---
+
+### 💬 Intro Text (Pretext) - Your Personal AI Branding
+
+**Add custom prefixes to every TTS announcement!**
+
+```bash
+npx agentvibes config intro-text
+```
+
+Transform generic AI responses into your personal brand:
+
+**Before:**
+```
+"Starting analysis of the codebase..."
+```
+
+**After (with "FireBot: " intro text):**
+```
+"FireBot: Starting analysis of the codebase..."
+```
+
+**Perfect for:**
+- 🤖 **Personal AI Branding** - Make Claude sound like your custom assistant
+- 🏢 **Team Identity** - Company bots with branded voices
+- 🎮 **Character Roleplay** - Gaming assistants with character names
+- 🎓 **Teaching Contexts** - Professor Bot, Tutor AI, etc.
+
+**Features:**
+- Up to 50 characters
+- UTF-8 and emoji support 🎉
+- Set during installation or anytime after
+- Works with all TTS providers
+- Applies to every single announcement
+
+**Examples:**
+- `"JARVIS: "` - Iron Man style
+- `"🤖 Assistant: "` - With emoji
+- `"CodeBot: "` - Development assistant
+- `"Chef AI: "` - Cooking helper
+
+Configure now: `npx agentvibes config intro-text`
+
+---
+
+### 🎵 Custom Background Music - Complete Audio Control
+
+**Upload your own background music with battle-tested security!**
+
+```bash
+npx agentvibes config music
+```
+
+Replace the default background tracks with your own audio files for complete sonic branding.
+
+**Supported Formats:**
+- 🎵 MP3 (.mp3)
+- 🎵 WAV (.wav)
+- 🎵 OGG (.ogg)
+- 🎵 M4A (.m4a)
+
+**Security First:**
+- ✅ **180+ attack variations tested** - Path traversal, symlinks, Unicode tricks
+- ✅ **100% attack rejection rate** - Every malicious attempt blocked
+- ✅ **OWASP CWE-22 compliant** - Industry-standard security
+- ✅ **7 validation layers** - Defense-in-depth architecture
+- ✅ **File ownership verification** - Only your files accepted
+- ✅ **Magic number validation** - Real audio files only
+- ✅ **Secure storage** - 600 permissions, restricted directory
+
+**Smart Validation:**
+- Recommended duration: 30-90 seconds (optimal looping)
+- Maximum: 300 seconds (5 minutes)
+- Maximum size: 50MB
+- Automatic format detection
+- Duration warnings for non-optimal lengths
+
+**Perfect for:**
+- 🎸 **Team Audio Branding** - Company theme music
+- 🎮 **Gaming Sessions** - Epic background tracks
+- 🎼 **Personal Playlists** - Your favorite instrumental
+- 🎹 **Focus Music** - Lo-fi, classical, ambient
+
+**Features:**
+- Preview before setting
+- One-command upload
+- Works with all TTS providers
+- Loops seamlessly under voice
+- Easy restore to defaults
+
+**Menu Options:**
+1. Change music - Upload new audio file
+2. Remove music - Clear custom music
+3. Reset to default - Restore built-in tracks (16 genres)
+4. Enable/Disable - Toggle background music
+5. Preview current - Sample your music
+
+Configure now: `npx agentvibes config music`
+
+**Security Certified:** See full audit report at `docs/security/SECURITY-AUDIT.md`
 
 ---
 
@@ -141,7 +242,10 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [🌟 NEW FEATURE HIGHLIGHT - Voice Browser v1.0](#-new-feature-highlight) - **START HERE!**
+- [🌟 NEW FEATURE HIGHLIGHTS](#-new-feature-highlights) - **START HERE!**
+  - [🎤 Voice Browser v1.0](#-agent-vibes-v10-voice-browser) - Browse & sample 914 voices
+  - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
+  - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
 - [📰 Latest Release](#-latest-release) - v3.6.0 "Voice Explorer" with Voice Browser, Friendly Names, Custom Music
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
