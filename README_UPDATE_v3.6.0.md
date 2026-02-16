@@ -4,6 +4,50 @@ This document contains the sections to update in README.md for the v3.6.0 releas
 
 ---
 
+## Add New Feature Highlight Banner (After Title, Around Line 30)
+
+Add this prominent feature highlight section right after the main title/badges:
+
+```markdown
+---
+
+## 🌟 NEW FEATURE HIGHLIGHT
+
+### Agent Vibes v1.0 Voice Browser
+
+![Voice Browser Banner](docs/installation-screenshots/voice-browser-screenshot.png)
+
+**🎤 Browse, Sample & Install 914 Voices in Real-Time**
+
+```bash
+npx agentvibes-voice-browser
+```
+
+The new **AgentVibes Voice Browser** is an interactive console application that lets you:
+
+- 🎧 **Hear Before You Choose** - Real-time audio sampling with one keypress
+- ⭐ **Mark Your Favorites** - Build your personal voice collection
+- 🔍 **Smart Search** - Filter by name, personality, accent, or gender
+- 📦 **One-Click Install** - Press 'I' to instantly switch to any voice
+- 🎨 **Beautiful Interface** - Stunning terminal UI powered by blessed.js
+
+**914 Total Voices:**
+- 904 High-Quality Piper TTS Speakers (libritts-high model)
+- 10 Hand-Curated Personality Voices
+
+**Perfect for:**
+- Finding your ideal AI voice
+- Exploring voice characteristics
+- Quick voice switching
+- Building favorite collections
+
+Launch now: `npx agentvibes-voice-browser`
+
+---
+```
+
+---
+
 ## Replace "Latest Release" Section
 
 Replace the existing "## 📰 Latest Release" section (around line 143-165) with:
@@ -368,6 +412,7 @@ Add these new entries to the Table of Contents (around line 93):
 
 ```markdown
 ### New Features (v3.6.0)
+- [🌟 NEW FEATURE HIGHLIGHT - Voice Browser v1.0](#-new-feature-highlight) - **START HERE!**
 - [🎤 AgentVibes Voice Browser](#-agentvibes-voice-browser) - Browse and sample 914 voices interactively
 - [🏷️ Friendly Voice Names](#-voice-library) - Memorable names instead of technical IDs
 - [💬 Intro Text Feature](#-commands-reference) - Custom prefixes for TTS output
