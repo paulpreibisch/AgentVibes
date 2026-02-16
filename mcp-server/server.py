@@ -112,10 +112,22 @@ class AgentVibesServer:
         Returns:
             Resolved Piper voice ID, or original voice_name if not found
         """
+        import re
+
         metadata_path = self.agentvibes_root / ".agentvibes" / "config" / "voice-metadata.json"
 
-        if not metadata_path.exists():
+        # SECURITY: Verify file exists and is not a symlink
+        if not metadata_path.exists() or metadata_path.is_symlink():
             return voice_name
+
+        # SECURITY: Verify file ownership matches current user (Unix only)
+        try:
+            if hasattr(os, 'getuid'):
+                stat_info = metadata_path.stat()
+                if stat_info.st_uid != os.getuid():
+                    return voice_name
+        except (OSError, AttributeError):
+            pass
 
         try:
             with open(metadata_path, 'r') as f:
@@ -124,16 +136,24 @@ class AgentVibesServer:
             voices = metadata.get('voices', {})
             voice_lower = voice_name.lower()
 
+            resolved_id = None
+
             # Check if it's a friendly name key
             if voice_lower in voices:
-                return voices[voice_lower]['id']
+                resolved_id = voices[voice_lower].get('id')
 
             # Check if it matches a displayName
-            for friendly_name, voice_data in voices.items():
-                if voice_data.get('displayName', '').lower() == voice_lower:
-                    return voice_data['id']
+            if not resolved_id:
+                for friendly_name, voice_data in voices.items():
+                    if voice_data.get('displayName', '').lower() == voice_lower:
+                        resolved_id = voice_data.get('id')
+                        break
 
-        except (json.JSONDecodeError, KeyError, IOError):
+            # SECURITY: Validate resolved ID matches safe pattern
+            if resolved_id and re.match(r'^[a-zA-Z0-9_-]+$', resolved_id):
+                return resolved_id
+
+        except (json.JSONDecodeError, KeyError, IOError, TypeError):
             pass
 
         return voice_name
