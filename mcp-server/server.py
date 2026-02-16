@@ -41,6 +41,7 @@ use or other dealings in the software.
 """
 
 import asyncio
+import json
 import os
 import platform
 import subprocess
@@ -100,6 +101,42 @@ class AgentVibesServer:
 
         # Fallback to global ~/.claude (should never happen in properly installed package)
         return Path.home() / self.CLAUDE_DIR_NAME
+
+    def _resolve_friendly_name(self, voice_name: str) -> str:
+        """
+        Resolve friendly name to Piper voice ID using voice-metadata.json.
+
+        Args:
+            voice_name: Friendly name (e.g., "ryan") or Piper ID
+
+        Returns:
+            Resolved Piper voice ID, or original voice_name if not found
+        """
+        metadata_path = self.agentvibes_root / ".agentvibes" / "config" / "voice-metadata.json"
+
+        if not metadata_path.exists():
+            return voice_name
+
+        try:
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+
+            voices = metadata.get('voices', {})
+            voice_lower = voice_name.lower()
+
+            # Check if it's a friendly name key
+            if voice_lower in voices:
+                return voices[voice_lower]['id']
+
+            # Check if it matches a displayName
+            for friendly_name, voice_data in voices.items():
+                if voice_data.get('displayName', '').lower() == voice_lower:
+                    return voice_data['id']
+
+        except (json.JSONDecodeError, KeyError, IOError):
+            pass
+
+        return voice_name
 
     async def text_to_speech(
         self,
@@ -249,18 +286,25 @@ class AgentVibesServer:
 
     async def set_voice(self, voice_name: str) -> str:
         """
-        Switch to a different voice.
+        Switch to a different voice (supports friendly names like "ryan" or "katherine").
 
         Args:
-            voice_name: Name of the voice to switch to
+            voice_name: Friendly name (e.g., "ryan") or Piper voice ID
 
         Returns:
             Success or error message
         """
+        # Resolve friendly name to Piper ID
+        original_name = voice_name
+        resolved_name = self._resolve_friendly_name(voice_name)
+
         result = await self._run_script(
-            self.VOICE_MANAGER_SCRIPT, ["switch", voice_name, "--silent"]
+            self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name, "--silent"]
         )
+
         if result and "✅" in result:
+            if original_name.lower() != resolved_name.lower():
+                return f"✅ Voice switched to: {original_name} ({resolved_name})"
             return f"✅ Voice switched to: {voice_name}"
         return f"❌ Failed to switch voice: {result}"
 
