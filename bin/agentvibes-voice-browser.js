@@ -240,15 +240,14 @@ class AgentVibesVoiceBrowser {
   setupUI() {
     this.screen = blessed.screen({ smartCSR: true, title: 'AgentVibes Voice Browser' });
 
-    // Calculate unique models
-    const uniqueModels = new Set(this.tableData.map(row => row.model)).size;
-    const totalVoices = this.tableData.length;
+    // Calculate unique models and store as instance variable
+    this.uniqueModels = new Set(this.tableData.map(row => row.model)).size;
 
     const title = blessed.box({
       top: 0,
       height: 3,
       width: '100%',
-      content: `{center}{bold}{cyan-fg}Agent{/cyan-fg} {magenta-fg}Vibes{/magenta-fg} {gray-fg}v1.0{/gray-fg} {yellow-fg}Voice Browser{/yellow-fg} - ${totalVoices} Voices, ${uniqueModels} Models{/bold}{/center}\n{center}{cyan-fg}[1-4]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[F/X]{/cyan-fg}Favorites {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}Fav {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[Q]{/cyan-fg}Quit{/center}`,
+      content: `{center}{bold}{cyan-fg}Agent{/cyan-fg} {magenta-fg}Vibes{/magenta-fg} {gray-fg}v1.0{/gray-fg} {yellow-fg}Voice Browser{/yellow-fg}{/bold}{/center}\n{center}{gray-fg}github.com/paulpreibisch/agentvibes{/gray-fg} {white-fg}www.agentvibes.org{/white-fg}{/center}\n{center}{cyan-fg}[1-4]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[F/X]{/cyan-fg}Favorites {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}Fav {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[Q]{/cyan-fg}Quit{/center}`,
       tags: true,
       style: { fg: 'white' }
     });
@@ -266,32 +265,38 @@ class AgentVibesVoiceBrowser {
       top: 4,
       left: 0,
       width: '70%',
-      height: '100%-7',
+      height: '100%-8',
       keys: true,
       vi: true,
       mouse: false,
       tags: true,
       style: {
         selected: { bg: 'blue', fg: 'white', bold: true },
-        item: { fg: 'white' }
+        item: { fg: 'white' },
+        border: { fg: 'cyan' },
+        label: { fg: 'gray' }
       },
       border: { type: 'line', fg: 'cyan' },
-      label: ` Voices (${this.filteredData.length}) - Sort: ${this.sortColumn} ${this.sortAsc ? '↑' : '↓'} `
+      label: ` Voices (${this.filteredData.length}) - Model (${this.uniqueModels}) - Sort: ${this.sortColumn} ${this.sortAsc ? '↑' : '↓'} `
     });
 
     this.infoPanel = blessed.box({
       top: 3,
       left: '70%',
       width: '30%',
-      height: '100%-6',
+      height: '100%-7',
       tags: true,
       border: { type: 'line', fg: 'cyan' },
       label: ' Voice Info ',
-      scrollable: true
+      scrollable: true,
+      style: {
+        border: { fg: 'cyan' },
+        label: { fg: 'gray' }
+      }
     });
 
     this.statusBar = blessed.box({
-      bottom: 2,
+      bottom: 3,
       height: 1,
       width: '100%',
       content: 'Ready',
@@ -301,9 +306,9 @@ class AgentVibesVoiceBrowser {
 
     this.helpBar = blessed.box({
       bottom: 0,
-      height: 2,
+      height: 3,
       width: '100%',
-      content: '{cyan-fg}[1-4]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[F/X]{/cyan-fg}Favorites {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}Toggle★ {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[E]{/cyan-fg}Export',
+      content: '{cyan-fg}[1-4]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[F/X]{/cyan-fg}Favorites {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}Toggle★ {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[E]{/cyan-fg}Export\n{center}{gray-fg}Please consider giving us a GitHub star ⭐ {/gray-fg}{yellow-fg}github.com/paulpreibisch/agentvibes{/yellow-fg}{/center}',
       tags: true,
       style: { bg: 'black' }
     });
@@ -485,24 +490,87 @@ class AgentVibesVoiceBrowser {
     // Use voice-specific sample text
     const sampleText = row.sampleText || this.sampleText;
 
+    // Sanitize sampleText to prevent command injection
+    const safeSampleText = sampleText.replace(/[`$\\!"]/g, '\\$&');
+
     // Generate unique filename based on sample text hash to support different samples
     const textHash = sampleText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '');
 
     let outputFile;
     if (row.type === 'curated') {
-      outputFile = path.join(CONFIG.CURATED_DIR, `${row.model}_${textHash}.wav`);
-      const modelPath = path.join(CONFIG.PIPER_VOICES_DIR, `${row.model}.onnx`);
+      // Validate model name to prevent path traversal
+      const safeModel = path.basename(row.model);
+      if (safeModel !== row.model || /[^a-zA-Z0-9_-]/.test(safeModel)) {
+        this.statusBar.setContent(`{red-fg}✗ Invalid model name{/red-fg}`);
+        this.screen.render();
+        return;
+      }
+
+      outputFile = path.join(CONFIG.CURATED_DIR, `${safeModel}_${textHash}.wav`);
+
+      // Verify output path stays within intended directory
+      const resolvedOutput = path.resolve(outputFile);
+      const resolvedDir = path.resolve(CONFIG.CURATED_DIR);
+      if (!resolvedOutput.startsWith(resolvedDir + path.sep)) {
+        this.statusBar.setContent(`{red-fg}✗ Invalid output path{/red-fg}`);
+        this.screen.render();
+        return;
+      }
+
+      const modelPath = path.join(CONFIG.PIPER_VOICES_DIR, `${safeModel}.onnx`);
       try {
         await fs.access(outputFile);
       } catch {
-        await execAsync(`echo "${sampleText}" | ${CONFIG.PIPER_PATH} --model "${modelPath}" --output_file "${outputFile}" 2>/dev/null`);
+        // Use spawn instead of execAsync to prevent command injection
+        const piperProcess = spawn(CONFIG.PIPER_PATH, [
+          '--model', modelPath,
+          '--output_file', outputFile
+        ], { stdio: ['pipe', 'ignore', 'ignore'] });
+
+        piperProcess.stdin.write(safeSampleText);
+        piperProcess.stdin.end();
+
+        await new Promise((resolve, reject) => {
+          piperProcess.on('close', code => code === 0 ? resolve() : reject(new Error(`Piper exit ${code}`)));
+          piperProcess.on('error', reject);
+        });
       }
     } else {
+      // Validate speaker ID is numeric
+      if (!Number.isInteger(row.id) || row.id < 0) {
+        this.statusBar.setContent(`{red-fg}✗ Invalid speaker ID{/red-fg}`);
+        this.screen.render();
+        return;
+      }
+
       outputFile = path.join(CONFIG.OUTPUT_DIR, `speaker_${row.id}_${textHash}.wav`);
+
+      // Verify output path stays within intended directory
+      const resolvedOutput = path.resolve(outputFile);
+      const resolvedDir = path.resolve(CONFIG.OUTPUT_DIR);
+      if (!resolvedOutput.startsWith(resolvedDir + path.sep)) {
+        this.statusBar.setContent(`{red-fg}✗ Invalid output path{/red-fg}`);
+        this.screen.render();
+        return;
+      }
+
       try {
         await fs.access(outputFile);
       } catch {
-        await execAsync(`echo "${sampleText}" | ${CONFIG.PIPER_PATH} --model "${CONFIG.MODEL_PATH}" --speaker ${row.id} --output_file "${outputFile}" 2>/dev/null`);
+        // Use spawn instead of execAsync to prevent command injection
+        const piperProcess = spawn(CONFIG.PIPER_PATH, [
+          '--model', CONFIG.MODEL_PATH,
+          '--speaker', row.id.toString(),
+          '--output_file', outputFile
+        ], { stdio: ['pipe', 'ignore', 'ignore'] });
+
+        piperProcess.stdin.write(safeSampleText);
+        piperProcess.stdin.end();
+
+        await new Promise((resolve, reject) => {
+          piperProcess.on('close', code => code === 0 ? resolve() : reject(new Error(`Piper exit ${code}`)));
+          piperProcess.on('error', reject);
+        });
       }
     }
 
@@ -515,11 +583,25 @@ class AgentVibesVoiceBrowser {
     for (const player of players) {
       try {
         await execAsync(`which ${player.cmd} 2>/dev/null`);
-        this.currentAudioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });
-        this.currentAudioProcess.on('close', () => {
+
+        // SECURITY: Store process immediately to prevent leak
+        const audioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });
+        this.currentAudioProcess = audioProcess;
+
+        audioProcess.on('close', () => {
+          if (this.currentAudioProcess === audioProcess) {
+            this.currentAudioProcess = null;
+          }
           this.statusBar.setContent(`{green-fg}✓ Played ${row.name}{/green-fg}`);
           this.screen.render();
         });
+
+        audioProcess.on('error', (err) => {
+          if (this.currentAudioProcess === audioProcess) {
+            this.currentAudioProcess = null;
+          }
+        });
+
         break;
       } catch (error) {
         continue;
@@ -555,15 +637,25 @@ class AgentVibesVoiceBrowser {
         voiceId = `libritts-speaker-${row.id}`;
       }
 
+      // SECURITY: Validate voiceId to prevent JSON injection
+      if (!/^[a-zA-Z0-9_-]+$/.test(voiceId)) {
+        this.statusBar.setContent(`{red-fg}✗ Invalid voice ID format{/red-fg}`);
+        this.screen.render();
+        return;
+      }
+
       // Update config
       config.defaultVoice = voiceId;
       config.ttsProvider = 'piper';
 
-      // Ensure config directory exists
-      await fs.mkdir(path.dirname(CONFIG.AGENTVIBES_CONFIG), { recursive: true });
+      // Ensure config directory exists with secure permissions
+      const configDir = path.dirname(CONFIG.AGENTVIBES_CONFIG);
+      await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
 
-      // Write config
-      await fs.writeFile(CONFIG.AGENTVIBES_CONFIG, JSON.stringify(config, null, 2));
+      // SECURITY: Atomic write to prevent race condition
+      const tempFile = CONFIG.AGENTVIBES_CONFIG + '.tmp.' + Date.now();
+      await fs.writeFile(tempFile, JSON.stringify(config, null, 2), { mode: 0o600 });
+      await fs.rename(tempFile, CONFIG.AGENTVIBES_CONFIG);
 
       this.statusBar.setContent(`{green-fg}✓ Installed: ${row.name} → AgentVibes default voice{/green-fg}`);
       this.screen.render();

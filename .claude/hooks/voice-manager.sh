@@ -253,7 +253,8 @@ case "$1" in
       VOICE_DIR=$(get_voice_storage_dir)
 
       # Friendly name resolution: Check if voice-metadata.json exists
-      METADATA_FILE="$SCRIPT_DIR/../../.agentvibes/config/voice-metadata.json"
+      # SECURITY: Use realpath to prevent symlink attacks
+      METADATA_FILE="$(realpath "$SCRIPT_DIR/../../.agentvibes/config/voice-metadata.json" 2>/dev/null || echo "")"
       if [[ -f "$METADATA_FILE" ]] && command -v jq >/dev/null 2>&1; then
         # Try to resolve friendly name to Piper ID
         RESOLVED_VOICE=$(jq -r --arg name "$(to_lower "$VOICE_NAME")" '
@@ -263,8 +264,13 @@ case "$1" in
         ' "$METADATA_FILE" 2>/dev/null | head -1)
 
         if [[ -n "$RESOLVED_VOICE" ]]; then
-          echo "🔍 Resolved friendly name '$VOICE_NAME' → '$RESOLVED_VOICE'"
-          VOICE_NAME="$RESOLVED_VOICE"
+          # SECURITY: Validate resolved voice matches safe pattern (alphanumeric, dash, underscore only)
+          if [[ "$RESOLVED_VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "🔍 Resolved friendly name '$VOICE_NAME' → '$RESOLVED_VOICE'"
+            VOICE_NAME="$RESOLVED_VOICE"
+          else
+            echo "⚠️  Warning: Invalid voice ID in metadata, ignoring resolution"
+          fi
         fi
       fi
 
