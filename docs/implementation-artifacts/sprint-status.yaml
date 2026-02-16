@@ -70,13 +70,18 @@ development_status:
   story_4_5:
     id: AVI-S4.5
     title: Music File Input and Selection
-    status: ready-for-dev
+    status: complete
     story_points: 2
     acceptance_criteria_count: 10
     description: |
       Interactive prompt during installer for audio file path.
       Support absolute/relative paths, tab-completion, validation feedback.
       Progress indicator while validating, retry logic (max 3 attempts).
+    completion_date: 2026-02-15
+    notes: |
+      Implemented secure music file input with full validation chain.
+      Added Soprano auto-start detection and helper.
+      Integrated into installer background music section.
     dependencies:
       - AVI-S4.1
       - AVI-S4.2
@@ -86,7 +91,7 @@ development_status:
   story_4_6:
     id: AVI-S4.6
     title: Post-Install Music Configuration Command
-    status: ready-for-dev
+    status: complete
     story_points: 2
     acceptance_criteria_count: 9
     description: |
@@ -94,20 +99,33 @@ development_status:
       Menu options: Change, Remove, Reset to default.
       Display current setting, changes take effect immediately.
       Backup of previous setting maintained.
+    completion_date: 2026-02-15
+    notes: |
+      Implemented agentvibes config music command with full menu.
+      Reuses promptForCustomMusic() for secure file selection.
+      Supports Change, Remove, Reset, and Enable/Disable actions.
     dependencies:
       - AVI-S4.5
 
   story_4_7:
     id: AVI-S4.7
     title: TTS Integration - Background Music Mixing
-    status: ready-for-dev
+    status: complete
     story_points: 3
-    acceptance_criteria_count: 10
+    acceptance_criteria_count: 11
     description: |
       Integrate custom music with TTS voice output.
       Load from .claude/audio/custom-music/, graceful fallback to default.
       Works with all TTS providers and personality types.
       Loop if shorter than TTS output, no audio artifacts.
+      Audio length validation and user guidance added.
+    completion_date: 2026-02-16
+    notes: |
+      Implemented complete custom music integration with TTS system.
+      Added audio duration validation (30-90s recommended, 300s max).
+      Modified audio-processor.sh to prioritize custom music over defaults.
+      Users receive warnings for non-ideal durations with recommendations.
+      All security requirements met (ownership verification, secure paths).
     dependencies:
       - AVI-S4.4
 
@@ -147,13 +165,13 @@ epic_summary:
 
 statistics:
   total_stories: 8
-  completed_stories: 4
-  ready_for_dev: 4
-  total_story_points: 16
-  completed_points: 12
+  completed_stories: 7
+  ready_for_dev: 1
+  total_story_points: 23
+  completed_points: 19
   ready_for_dev_points: 4
-  completion_percentage: 75.0
-  next_milestone: "Implement Story 4.5 - Music File Input Selection"
+  completion_percentage: 82.6
+  next_milestone: "Story 4.8 - Comprehensive Security Testing (CRITICAL)"
 
 validation_checklist:
   security_requirements:
