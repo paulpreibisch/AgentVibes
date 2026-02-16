@@ -252,6 +252,22 @@ case "$1" in
       source "$SCRIPT_DIR/piper-voice-manager.sh"
       VOICE_DIR=$(get_voice_storage_dir)
 
+      # Friendly name resolution: Check if voice-metadata.json exists
+      METADATA_FILE="$SCRIPT_DIR/../../.agentvibes/config/voice-metadata.json"
+      if [[ -f "$METADATA_FILE" ]] && command -v jq >/dev/null 2>&1; then
+        # Try to resolve friendly name to Piper ID
+        RESOLVED_VOICE=$(jq -r --arg name "$(to_lower "$VOICE_NAME")" '
+          .voices | to_entries[] |
+          select(.key == $name or (.value.displayName | ascii_downcase) == $name) |
+          .value.id
+        ' "$METADATA_FILE" 2>/dev/null | head -1)
+
+        if [[ -n "$RESOLVED_VOICE" ]]; then
+          echo "🔍 Resolved friendly name '$VOICE_NAME' → '$RESOLVED_VOICE'"
+          VOICE_NAME="$RESOLVED_VOICE"
+        fi
+      fi
+
       # Check if voice file exists (case-insensitive)
       FOUND=""
       shopt -s nullglob
@@ -299,8 +315,8 @@ case "$1" in
               fi
 
               echo ""
-              echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
-              echo "   /output-style Agent Vibes"
+              echo "💡 Tip: TTS is automatic via post-response hook"
+              echo "   To mute: /agent-vibes:mute | To unmute: /agent-vibes:unmute"
             fi
             exit 0
           else
@@ -362,8 +378,8 @@ case "$1" in
       fi
 
       echo ""
-      echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
-      echo "   /output-style Agent Vibes"
+      echo "💡 Tip: TTS is automatic via post-response hook"
+      echo "   To mute: /agent-vibes:mute | To unmute: /agent-vibes:unmute"
     fi
     ;;
 
