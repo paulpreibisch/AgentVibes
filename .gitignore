@@ -122,3 +122,39 @@ scripts/audio-tunnel.config
 .claude/journal/
 agentvibes.org/.claude/journal/
 coverage/
+
+# BMAD project artifacts and planning docs (separate workflow)
+_bmad/
+docs/epics.md
+docs/stories.md
+docs/analysis/
+docs/implementation-artifacts/
+docs/planning-artifacts/
+docs/requirements/
+docs/excalidraw-diagrams/
+
+# Release guides and installer docs (temporary, for releases only)
+RELEASE_GUIDE_*.md
+RELEASE_NOTES_v*.md
+RELEASE_PACKAGE_SUMMARY.md
+INSTALLER-ENHANCEMENT-*.md
+INSTALLER-ENHANCEMENT-COMPLETION-REPORT.md
+INSTALLER-ENHANCEMENT-INDEX.md
+INSTALLER-ENHANCEMENT-SUMMARY.md
+
+# Installation screenshots (generated during testing)
+docs/installation-screenshots/
+
+# Voice sample generation scripts (user-specific)
+scripts/generate-*.sh
+scripts/regenerate-*.sh
+
+# Local project state files
+.agentvibes-unmuted
+.claude/hooks/post-response.sh
+.claude/story-workflow.sh
+bin/ensure-soprano-running.sh
+docs/personality-preview-phrases.md
+
+# Test infrastructure (not part of core package)
+test/installer/
