@@ -41,6 +41,25 @@ const FOOTER_TEXT =
 // Default effects — single source of truth (used by _getEffects, _setEffects, refreshDisplay)
 const EFFECTS_DEFAULTS = Object.freeze({ reverb: false, reverbAmount: 0.3, pitch: 0 });
 
+// Default background music config
+const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' });
+
+// Human-readable track display names
+const TRACK_NAMES = Object.freeze({
+  'agentvibes_soft_flamenco_loop.mp3':      'Soft Flamenco',
+  'agent_vibes_bossa_nova_v2_loop.mp3':     'Bossa Nova',
+  'agent_vibes_chillwave_v2_loop.mp3':      'Chillwave',
+  'agent_vibes_ganawa_ambient_v2_loop.mp3': 'Gnawa Ambient',
+});
+
+// Built-in track list for the picker
+const BUILT_IN_TRACKS = [
+  { label: 'Soft Flamenco',  file: 'agentvibes_soft_flamenco_loop.mp3' },
+  { label: 'Bossa Nova',     file: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+  { label: 'Chillwave',      file: 'agent_vibes_chillwave_v2_loop.mp3' },
+  { label: 'Gnawa Ambient',  file: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
+];
+
 // ---------------------------------------------------------------------------
 // Exported format helpers (pure functions — used by tests and UI)
 
@@ -63,6 +82,23 @@ export function formatPitchState(pitch) {
   const s = pitch ?? 0;
   const sign = s >= 0 ? '+' : '';
   return `${sign}${s} semitones`;
+}
+
+/**
+ * @param {boolean} enabled
+ * @returns {string}
+ */
+export function formatMusicState(enabled) {
+  return enabled ? 'Enabled' : 'Disabled';
+}
+
+/**
+ * @param {string} track - filename (e.g. 'agentvibes_soft_flamenco_loop.mp3')
+ * @returns {string}
+ */
+export function formatTrackName(track) {
+  if (!track) return 'None';
+  return TRACK_NAMES[track] ?? track.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -255,13 +291,80 @@ export function createSettingsTab(screen, services) {
   adjustPitchBtn.left = 40;
 
   // -------------------------------------------------------------------------
-  // Groups 3-5 placeholder note
+  // Section header: ── Background Music ──
 
   blessed.text({
     parent: box,
-    top: 16,
+    top: 17,
+    left: 2,
+    content: `{#7986cb-fg}── Background Music ${'─'.repeat(48)}{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Music row: label + value + [Toggle] button
+
+  blessed.text({
+    parent: box,
+    top: 19,
     left: 4,
-    content: `{#455a64-fg}(Groups 3-5: Music, Personality, Intro Text — added in stories 7.3-7.5){/#455a64-fg}`,
+    content: 'Music:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const musicValue = blessed.text({
+    parent: box,
+    top: 19,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const musicToggleBtn = _createButton(box, screen, '[Toggle]', COLORS, () => {
+    const music = _getMusic(configService);
+    _setMusic(configService, { enabled: !music.enabled });
+    refreshDisplay();
+  });
+  musicToggleBtn.top = 19;
+  musicToggleBtn.left = 40;
+
+  // -------------------------------------------------------------------------
+  // Track row: label + value + [Change] button
+
+  blessed.text({
+    parent: box,
+    top: 21,
+    left: 4,
+    content: 'Track:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const trackValue = blessed.text({
+    parent: box,
+    top: 21,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const trackChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
+    _openTrackPicker(screen, configService, (file) => {
+      _setMusic(configService, { track: file });
+      refreshDisplay();
+    });
+  });
+  trackChangeBtn.top = 21;
+  trackChangeBtn.left = 40;
+
+  // -------------------------------------------------------------------------
+  // Groups 4-5 placeholder note
+
+  blessed.text({
+    parent: box,
+    top: 24,
+    left: 4,
+    content: `{#455a64-fg}(Groups 4-5: Personality, Intro Text — added in stories 7.4-7.5){/#455a64-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -269,7 +372,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Display state
 
-  const _buttons = [switchBtn, changeBtn, toggleBtn, adjustReverbBtn, adjustPitchBtn];
+  const _buttons = [switchBtn, changeBtn, toggleBtn, adjustReverbBtn, adjustPitchBtn, musicToggleBtn, trackChangeBtn];
 
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
@@ -281,6 +384,11 @@ export function createSettingsTab(screen, services) {
     const effects = configService.getConfig().effects ?? EFFECTS_DEFAULTS;
     reverbValue.setContent(formatReverbState(effects.reverb, effects.reverbAmount));
     pitchValue.setContent(formatPitchState(effects.pitch));
+
+    // Group 3: Background Music
+    const music = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
+    musicValue.setContent(formatMusicState(music.enabled));
+    trackValue.setContent(formatTrackName(music.track));
 
     screen.render();
   }
@@ -539,6 +647,64 @@ function _openPitchPicker(screen, configService, onSelect) {
     list.destroy();
     screen.render();
     onSelect(semitones);
+  });
+
+  list.key(['escape', 'q'], () => {
+    list.destroy();
+    screen.render();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Private: Background music config read/write helpers
+
+function _getMusic(configService) {
+  return configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
+}
+
+function _setMusic(configService, partial) {
+  const current = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
+  const merged = { ...current, ...partial };
+  configService.set('backgroundMusic', merged);
+}
+
+// ---------------------------------------------------------------------------
+// Private: Inline track picker
+
+function _openTrackPicker(screen, configService, onSelect) {
+  const currentTrack = (configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track);
+  const items = BUILT_IN_TRACKS.map(t => (t.file === currentTrack ? `● ${t.label}` : `  ${t.label}`));
+  const currentIdx = BUILT_IN_TRACKS.findIndex(t => t.file === currentTrack);
+
+  const list = blessed.list({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 44,
+    height: BUILT_IN_TRACKS.length + 4,
+    border: { type: 'line' },
+    label: ' Select Track ',
+    items,
+    keys: true,
+    vi: false,
+    mouse: true,
+    style: {
+      border: { fg: COLORS.btnFocus },
+      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      item: { fg: '#e3f2fd' },
+    },
+  });
+
+  if (currentIdx >= 0) list.select(currentIdx);
+  list.focus();
+  screen.render();
+
+  list.key(['enter', 'space'], () => {
+    const selected = BUILT_IN_TRACKS[list.selected];
+    if (!selected) return;
+    list.destroy();
+    screen.render();
+    onSelect(selected.file);
   });
 
   list.key(['escape', 'q'], () => {
