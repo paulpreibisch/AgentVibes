@@ -1,11 +1,11 @@
 /**
- * AgentVibes TUI Console — Settings Tab (Group 1: Provider & Voice)
- * Story 7.1: Provider & Voice Settings Group
+ * AgentVibes TUI Console — Settings Tab
+ * Stories 7.1 (Provider & Voice) + 7.2 (Audio Effects)
  *
  * Implements the Tab Component Contract:
  *   createSettingsTab(screen, services) → { box, show, hide, onFocus, onBlur, getFooterText, getFooterColor }
  *
- * Renders Group 1 only. Groups 2-5 added in stories 7.2-7.5.
+ * Groups 1-2 implemented. Groups 3-5 added in stories 7.3-7.5.
  * Button-level focus navigation (↑↓←→) implemented in story 7.6.
  */
 
@@ -37,6 +37,9 @@ const COLORS = {
 
 const FOOTER_TEXT =
   '[↑↓] Next Button  [Enter] Activate  [Space] Preview  [S/V/M/A/H/R] Switch Tab  [Q] Quit';
+
+// Default effects — single source of truth (used by _getEffects, _setEffects, refreshDisplay)
+const EFFECTS_DEFAULTS = Object.freeze({ reverb: false, reverbAmount: 0.3, pitch: 0 });
 
 // ---------------------------------------------------------------------------
 // Exported format helpers (pure functions — used by tests and UI)
@@ -124,7 +127,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Provider row: label + value + [Switch] button
 
-  const providerLabel = blessed.text({
+  blessed.text({
     parent: box,
     top: 3,
     left: 4,
@@ -275,7 +278,7 @@ export function createSettingsTab(screen, services) {
     voiceValue.setContent(activeVoice);
 
     // Group 2: Audio Effects
-    const effects = configService.getConfig().effects ?? { reverb: false, reverbAmount: 0.3, pitch: 0 };
+    const effects = configService.getConfig().effects ?? EFFECTS_DEFAULTS;
     reverbValue.setContent(formatReverbState(effects.reverb, effects.reverbAmount));
     pitchValue.setContent(formatPitchState(effects.pitch));
 
@@ -439,11 +442,11 @@ function _showNotice(parent, screen, message) {
 // Private: Effects config read/write helpers
 
 function _getEffects(configService) {
-  return configService.getConfig().effects ?? { reverb: false, reverbAmount: 0.3, pitch: 0 };
+  return configService.getConfig().effects ?? EFFECTS_DEFAULTS;
 }
 
 function _setEffects(configService, partial) {
-  const current = configService.getConfig().effects ?? { reverb: false, reverbAmount: 0.3, pitch: 0 };
+  const current = configService.getConfig().effects ?? EFFECTS_DEFAULTS;
   const merged = { ...current, ...partial };
   configService.set('effects', merged);
 }
@@ -481,6 +484,7 @@ function _openReverbPicker(screen, configService, onSelect) {
 
   list.key(['enter', 'space'], () => {
     const pct = parseInt(opts[list.selected], 10);
+    if (isNaN(pct)) return;
     const amount = pct / 100;
     list.destroy();
     screen.render();
@@ -531,6 +535,7 @@ function _openPitchPicker(screen, configService, onSelect) {
   list.key(['enter', 'space'], () => {
     const raw = pitchOpts[list.selected];
     const semitones = parseInt(raw, 10);
+    if (isNaN(semitones)) return;
     list.destroy();
     screen.render();
     onSelect(semitones);
