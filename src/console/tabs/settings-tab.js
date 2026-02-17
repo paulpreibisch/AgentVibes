@@ -39,6 +39,30 @@ const FOOTER_TEXT =
   '[↑↓] Next Button  [Enter] Activate  [Space] Preview  [S/V/M/A/H/R] Switch Tab  [Q] Quit';
 
 // ---------------------------------------------------------------------------
+// Exported format helpers (pure functions — used by tests and UI)
+
+/**
+ * @param {boolean} reverb
+ * @param {number} reverbAmount - 0.0 to 1.0
+ * @returns {string}
+ */
+export function formatReverbState(reverb, reverbAmount) {
+  if (!reverb) return 'Disabled';
+  const pct = Math.round((reverbAmount ?? 0.3) * 100);
+  return `Enabled (${pct}%)`;
+}
+
+/**
+ * @param {number} pitch - integer semitones, −12 to +12
+ * @returns {string}
+ */
+export function formatPitchState(pitch) {
+  const s = pitch ?? 0;
+  const sign = s >= 0 ? '+' : '';
+  return `${sign}${s} semitones`;
+}
+
+// ---------------------------------------------------------------------------
 // Test stub — returned in AGENTVIBES_TEST_MODE to avoid blessed widgets
 
 function createTestStub() {
@@ -152,13 +176,89 @@ export function createSettingsTab(screen, services) {
   changeBtn.left = 40;
 
   // -------------------------------------------------------------------------
-  // Groups 2-5 placeholder note
+  // Section header: ── Audio Effects ──
 
   blessed.text({
     parent: box,
-    top: 8,
+    top: 9,
+    left: 2,
+    content: `{#7986cb-fg}── Audio Effects ${'─'.repeat(50)}{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Reverb row: label + value + [Toggle] + [Adjust] buttons
+
+  blessed.text({
+    parent: box,
+    top: 11,
     left: 4,
-    content: `{#455a64-fg}(Groups 2-5: Audio Effects, Music, Personality, Intro Text — added in stories 7.2-7.5){/#455a64-fg}`,
+    content: 'Reverb:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const reverbValue = blessed.text({
+    parent: box,
+    top: 11,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const toggleBtn = _createButton(box, screen, '[Toggle]', COLORS, () => {
+    const effects = _getEffects(configService);
+    _setEffects(configService, { reverb: !effects.reverb });
+    refreshDisplay();
+  });
+  toggleBtn.top = 11;
+  toggleBtn.left = 40;
+
+  const adjustReverbBtn = _createButton(box, screen, '[Adjust]', COLORS, () => {
+    _openReverbPicker(screen, configService, (amount) => {
+      _setEffects(configService, { reverbAmount: amount });
+      refreshDisplay();
+    });
+  });
+  adjustReverbBtn.top = 11;
+  adjustReverbBtn.left = 52;
+
+  // -------------------------------------------------------------------------
+  // Pitch row: label + value + [Adjust] button
+
+  blessed.text({
+    parent: box,
+    top: 13,
+    left: 4,
+    content: 'Pitch:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const pitchValue = blessed.text({
+    parent: box,
+    top: 13,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const adjustPitchBtn = _createButton(box, screen, '[Adjust]', COLORS, () => {
+    _openPitchPicker(screen, configService, (semitones) => {
+      _setEffects(configService, { pitch: semitones });
+      refreshDisplay();
+    });
+  });
+  adjustPitchBtn.top = 13;
+  adjustPitchBtn.left = 40;
+
+  // -------------------------------------------------------------------------
+  // Groups 3-5 placeholder note
+
+  blessed.text({
+    parent: box,
+    top: 16,
+    left: 4,
+    content: `{#455a64-fg}(Groups 3-5: Music, Personality, Intro Text — added in stories 7.3-7.5){/#455a64-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -166,13 +266,19 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Display state
 
-  const _buttons = [switchBtn, changeBtn];
+  const _buttons = [switchBtn, changeBtn, toggleBtn, adjustReverbBtn, adjustPitchBtn];
 
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
     const activeVoice = providerService.getActiveVoiceId();
     providerValue.setContent(activeProvider);
     voiceValue.setContent(activeVoice);
+
+    // Group 2: Audio Effects
+    const effects = configService.getConfig().effects ?? { reverb: false, reverbAmount: 0.3, pitch: 0 };
+    reverbValue.setContent(formatReverbState(effects.reverb, effects.reverbAmount));
+    pitchValue.setContent(formatPitchState(effects.pitch));
+
     screen.render();
   }
 
@@ -327,4 +433,111 @@ function _showNotice(parent, screen, message) {
     notice.destroy();
     screen.render();
   }, 2000);
+}
+
+// ---------------------------------------------------------------------------
+// Private: Effects config read/write helpers
+
+function _getEffects(configService) {
+  return configService.getConfig().effects ?? { reverb: false, reverbAmount: 0.3, pitch: 0 };
+}
+
+function _setEffects(configService, partial) {
+  const current = configService.getConfig().effects ?? { reverb: false, reverbAmount: 0.3, pitch: 0 };
+  const merged = { ...current, ...partial };
+  configService.set('effects', merged);
+}
+
+// ---------------------------------------------------------------------------
+// Private: Inline reverb amount picker
+
+function _openReverbPicker(screen, configService, onSelect) {
+  const opts = ['0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'];
+  const currentAmt = (configService.getConfig().effects?.reverbAmount ?? 0.3);
+  const currentIdx = Math.min(10, Math.round(currentAmt * 10));
+
+  const list = blessed.list({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 28,
+    height: Math.min(opts.length + 4, 20),
+    border: { type: 'line' },
+    label: ' Reverb Amount ',
+    items: opts,
+    keys: true,
+    vi: true,
+    mouse: true,
+    style: {
+      border: { fg: COLORS.btnFocus },
+      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      item: { fg: '#e3f2fd' },
+    },
+  });
+
+  list.select(currentIdx);
+  list.focus();
+  screen.render();
+
+  list.key(['enter', 'space'], () => {
+    const pct = parseInt(opts[list.selected], 10);
+    const amount = pct / 100;
+    list.destroy();
+    screen.render();
+    onSelect(amount);
+  });
+
+  list.key(['escape', 'q'], () => {
+    list.destroy();
+    screen.render();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Private: Inline pitch semitone picker
+
+function _openPitchPicker(screen, configService, onSelect) {
+  const pitchOpts = [];
+  for (let i = -12; i <= 12; i++) {
+    pitchOpts.push(i >= 0 ? `+${i}` : `${i}`);
+  }
+
+  const currentPitch = (configService.getConfig().effects?.pitch ?? 0);
+  const currentIdx = currentPitch + 12;  // -12 → 0, 0 → 12, +12 → 24
+
+  const list = blessed.list({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 24,
+    height: 20,
+    border: { type: 'line' },
+    label: ' Pitch (semitones) ',
+    items: pitchOpts,
+    keys: true,
+    vi: true,
+    mouse: true,
+    style: {
+      border: { fg: COLORS.btnFocus },
+      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      item: { fg: '#e3f2fd' },
+    },
+  });
+
+  list.select(currentIdx);
+  list.focus();
+  screen.render();
+
+  list.key(['enter', 'space'], () => {
+    const raw = pitchOpts[list.selected];
+    const semitones = parseInt(raw, 10);
+    list.destroy();
+    screen.render();
+    onSelect(semitones);
+  });
+
+  list.key(['escape', 'q'], () => {
+    list.destroy();
+    screen.render();
+  });
 }
