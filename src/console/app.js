@@ -15,6 +15,7 @@ import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
 import { createVoicesTab } from './tabs/voices-tab.js';
+import { createMusicTab } from './tabs/music-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -278,6 +279,13 @@ export class AgentVibesConsole {
       voicesPlaceholder.destroy();
     }
     this.tabs['voices'] = createVoicesTab(this.screen, services);
+
+    // Destroy music placeholder and mount real music tab
+    const musicPlaceholder = this.tabs['music'];
+    if (musicPlaceholder && typeof musicPlaceholder.destroy === 'function') {
+      musicPlaceholder.destroy();
+    }
+    this.tabs['music'] = createMusicTab(this.screen, services);
   }
 
   // ---------------------------------------------------------------------------
