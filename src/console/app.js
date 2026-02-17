@@ -16,6 +16,7 @@ import { createModalOverlay } from './modals/modal-overlay.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
 import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
+import { createAgentsTab } from './tabs/agents-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -286,6 +287,13 @@ export class AgentVibesConsole {
       musicPlaceholder.destroy();
     }
     this.tabs['music'] = createMusicTab(this.screen, services);
+
+    // Destroy agents placeholder and mount real agents tab
+    const agentsPlaceholder = this.tabs['agents'];
+    if (agentsPlaceholder && typeof agentsPlaceholder.destroy === 'function') {
+      agentsPlaceholder.destroy();
+    }
+    this.tabs['agents'] = createAgentsTab(this.screen, services);
   }
 
   // ---------------------------------------------------------------------------
