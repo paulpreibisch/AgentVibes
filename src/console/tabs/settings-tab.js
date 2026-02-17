@@ -44,6 +44,9 @@ const EFFECTS_DEFAULTS = Object.freeze({ reverb: false, reverbAmount: 0.3, pitch
 // Default background music config
 const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' });
 
+// Verbosity display labels
+const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low' });
+
 // Human-readable track display names
 const TRACK_NAMES = Object.freeze({
   'agentvibes_soft_flamenco_loop.mp3':      'Soft Flamenco',
@@ -99,6 +102,22 @@ export function formatMusicState(enabled) {
 export function formatTrackName(track) {
   if (!track) return 'None';
   return TRACK_NAMES[track] ?? track.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+}
+
+/**
+ * @param {string} verbosity - 'high' | 'medium' | 'low'
+ * @returns {string}
+ */
+export function formatVerbosity(verbosity) {
+  return VERBOSITY_LABELS[verbosity] ?? 'High';
+}
+
+/**
+ * @param {string} personality
+ * @returns {string}
+ */
+export function formatPersonality(personality) {
+  return personality ?? 'none';
 }
 
 // ---------------------------------------------------------------------------
@@ -358,13 +377,75 @@ export function createSettingsTab(screen, services) {
   trackChangeBtn.left = 40;
 
   // -------------------------------------------------------------------------
-  // Groups 4-5 placeholder note
+  // Section header: ── Personality & Verbosity ──
 
   blessed.text({
     parent: box,
-    top: 24,
+    top: 25,
+    left: 2,
+    content: `{#7986cb-fg}── Personality & Verbosity ${'─'.repeat(40)}{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Verbosity row: label + value + [Change] button
+
+  blessed.text({
+    parent: box,
+    top: 27,
     left: 4,
-    content: `{#455a64-fg}(Groups 4-5: Personality, Intro Text — added in stories 7.4-7.5){/#455a64-fg}`,
+    content: 'Verbosity:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const verbosityValue = blessed.text({
+    parent: box,
+    top: 27,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const verbosityChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
+    _openVerbosityPicker(screen, configService, () => refreshDisplay());
+  });
+  verbosityChangeBtn.top = 27;
+  verbosityChangeBtn.left = 40;
+
+  // -------------------------------------------------------------------------
+  // Personality row: label + value + [Change] button (stub for story 7-7)
+
+  blessed.text({
+    parent: box,
+    top: 29,
+    left: 4,
+    content: 'Personality:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const personalityValue = blessed.text({
+    parent: box,
+    top: 29,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const personalityChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
+    _showNotice(box, screen, 'Personality Selector coming in story 7-7');
+  });
+  personalityChangeBtn.top = 29;
+  personalityChangeBtn.left = 40;
+
+  // -------------------------------------------------------------------------
+  // Group 5 placeholder note
+
+  blessed.text({
+    parent: box,
+    top: 32,
+    left: 4,
+    content: `{#455a64-fg}(Group 5: Intro Text — added in story 7.5){/#455a64-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -372,7 +453,12 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Display state
 
-  const _buttons = [switchBtn, changeBtn, toggleBtn, adjustReverbBtn, adjustPitchBtn, musicToggleBtn, trackChangeBtn];
+  const _buttons = [
+    switchBtn, changeBtn,
+    toggleBtn, adjustReverbBtn, adjustPitchBtn,
+    musicToggleBtn, trackChangeBtn,
+    verbosityChangeBtn, personalityChangeBtn,
+  ];
 
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
@@ -389,6 +475,11 @@ export function createSettingsTab(screen, services) {
     const music = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
     musicValue.setContent(formatMusicState(music.enabled));
     trackValue.setContent(formatTrackName(music.track));
+
+    // Group 4: Personality & Verbosity
+    const cfg = configService.getConfig();
+    verbosityValue.setContent(formatVerbosity(cfg.verbosity));
+    personalityValue.setContent(formatPersonality(cfg.personality));
 
     screen.render();
   }
@@ -705,6 +796,52 @@ function _openTrackPicker(screen, configService, onSelect) {
     list.destroy();
     screen.render();
     onSelect(selected.file);
+  });
+
+  list.key(['escape', 'q'], () => {
+    list.destroy();
+    screen.render();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Private: Inline verbosity picker
+
+function _openVerbosityPicker(screen, configService, onDone) {
+  const levels = ['High', 'Medium', 'Low'];
+  const current = configService.getConfig().verbosity ?? 'high';
+  const currentIdx = Math.max(0, levels.findIndex(l => l.toLowerCase() === current));
+
+  const list = blessed.list({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 28,
+    height: levels.length + 4,
+    border: { type: 'line' },
+    label: ' Verbosity Level ',
+    items: levels.map((l, i) => (i === currentIdx ? `● ${l}` : `  ${l}`)),
+    keys: true,
+    vi: false,
+    mouse: true,
+    style: {
+      border: { fg: COLORS.btnFocus },
+      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      item: { fg: '#e3f2fd' },
+    },
+  });
+
+  list.select(currentIdx);
+  list.focus();
+  screen.render();
+
+  list.key(['enter', 'space'], () => {
+    const selected = levels[list.selected];
+    if (!selected) return;
+    list.destroy();
+    screen.render();
+    configService.set('verbosity', selected.toLowerCase());
+    onDone();
   });
 
   list.key(['escape', 'q'], () => {
