@@ -120,6 +120,15 @@ export function formatPersonality(personality) {
   return personality ?? 'none';
 }
 
+/**
+ * @param {string} pretext - intro text (max 50 chars from installer)
+ * @returns {string}
+ */
+export function formatIntroText(pretext) {
+  if (!pretext) return '(none)';
+  return pretext.length > 30 ? pretext.slice(0, 30) + '…' : pretext;
+}
+
 // ---------------------------------------------------------------------------
 // Test stub — returned in AGENTVIBES_TEST_MODE to avoid blessed widgets
 
@@ -439,16 +448,42 @@ export function createSettingsTab(screen, services) {
   personalityChangeBtn.left = 40;
 
   // -------------------------------------------------------------------------
-  // Group 5 placeholder note
+  // Section header: ── Intro Text ──
 
   blessed.text({
     parent: box,
-    top: 32,
-    left: 4,
-    content: `{#455a64-fg}(Group 5: Intro Text — added in story 7.5){/#455a64-fg}`,
+    top: 33,
+    left: 2,
+    content: `{#7986cb-fg}── Intro Text ${'─'.repeat(54)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
+
+  // -------------------------------------------------------------------------
+  // Intro Text row: label + value + [Clear] button
+
+  blessed.text({
+    parent: box,
+    top: 35,
+    left: 4,
+    content: 'Intro Text:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const introTextValue = blessed.text({
+    parent: box,
+    top: 35,
+    left: 20,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const introClearBtn = _createButton(box, screen, '[Clear]', COLORS, () => {
+    configService.set('pretext', '');
+    refreshDisplay();
+  });
+  introClearBtn.top = 35;
+  introClearBtn.left = 40;
 
   // -------------------------------------------------------------------------
   // Display state
@@ -458,6 +493,7 @@ export function createSettingsTab(screen, services) {
     toggleBtn, adjustReverbBtn, adjustPitchBtn,
     musicToggleBtn, trackChangeBtn,
     verbosityChangeBtn, personalityChangeBtn,
+    introClearBtn,
   ];
 
   function refreshDisplay() {
@@ -480,6 +516,9 @@ export function createSettingsTab(screen, services) {
     const cfg = configService.getConfig();
     verbosityValue.setContent(formatVerbosity(cfg.verbosity));
     personalityValue.setContent(formatPersonality(cfg.personality));
+
+    // Group 5: Intro Text
+    introTextValue.setContent(formatIntroText(cfg.pretext));
 
     screen.render();
   }
