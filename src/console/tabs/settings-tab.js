@@ -47,6 +47,14 @@ const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_f
 // Verbosity display labels
 const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low' });
 
+// Known personalities (matches .claude/personalities/ directory)
+const PERSONALITIES = Object.freeze([
+  'none', 'angry', 'annoying', 'crass', 'dramatic', 'dry-humor',
+  'flirty', 'funny', 'grandpa', 'millennial', 'moody', 'normal',
+  'pirate', 'poetic', 'professional', 'rapper', 'robot', 'sarcastic',
+  'sassy', 'surfer-dude', 'zen',
+]);
+
 // Human-readable track display names
 const TRACK_NAMES = Object.freeze({
   'agentvibes_soft_flamenco_loop.mp3':      'Soft Flamenco',
@@ -236,8 +244,8 @@ export function createSettingsTab(screen, services) {
   });
 
   const changeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
-    // Voice Selector Modal implemented in story 7-8
-    _showNotice(box, screen, 'Voice Selector coming in story 7-8');
+    // Full voice browser available via CLI: /agent-vibes:switch or /audio-browser
+    _showNotice(box, screen, 'Use /agent-vibes:switch or /audio-browser to change voice');
   });
   changeBtn.top = 5;
   changeBtn.left = 40;
@@ -442,7 +450,10 @@ export function createSettingsTab(screen, services) {
   });
 
   const personalityChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
-    _showNotice(box, screen, 'Personality Selector coming in story 7-7');
+    _openPersonalityPicker(screen, configService, (name) => {
+      configService.set('personality', name);
+      refreshDisplay();
+    });
   });
   personalityChangeBtn.top = 29;
   personalityChangeBtn.left = 40;
@@ -897,6 +908,50 @@ function _openVerbosityPicker(screen, configService, onDone) {
     screen.render();
     configService.set('verbosity', selected.toLowerCase());
     onDone();
+  });
+
+  list.key(['escape', 'q'], () => {
+    list.destroy();
+    screen.render();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Private: Inline personality picker
+
+function _openPersonalityPicker(screen, configService, onSelect) {
+  const current = configService.getConfig().personality ?? 'none';
+  const currentIdx = Math.max(0, PERSONALITIES.indexOf(current));
+
+  const list = blessed.list({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 32,
+    height: Math.min(PERSONALITIES.length + 4, 22),
+    border: { type: 'line' },
+    label: ' Select Personality ',
+    items: PERSONALITIES.map((p, i) => (i === currentIdx ? `● ${p}` : `  ${p}`)),
+    keys: true,
+    vi: true,
+    mouse: true,
+    style: {
+      border: { fg: COLORS.btnFocus },
+      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      item: { fg: '#e3f2fd' },
+    },
+  });
+
+  list.select(currentIdx);
+  list.focus();
+  screen.render();
+
+  list.key(['enter', 'space'], () => {
+    const selected = PERSONALITIES[list.selected];
+    if (!selected) return;
+    list.destroy();
+    screen.render();
+    onSelect(selected);
   });
 
   list.key(['escape', 'q'], () => {
