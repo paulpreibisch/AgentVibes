@@ -45,7 +45,7 @@ const EFFECTS_DEFAULTS = Object.freeze({ reverb: false, reverbAmount: 0.3, pitch
 const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' });
 
 // Verbosity display labels
-const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low' });
+const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', minimal: 'Minimal', custom: 'Custom' });
 
 // Known personalities (matches .claude/personalities/ directory)
 const PERSONALITIES = Object.freeze([
@@ -874,7 +874,7 @@ function _openTrackPicker(screen, configService, onSelect) {
 // Private: Inline verbosity picker
 
 function _openVerbosityPicker(screen, configService, onDone) {
-  const levels = ['High', 'Medium', 'Low'];
+  const levels = ['Minimal', 'Low', 'Medium', 'High', 'Custom'];
   const current = configService.getConfig().verbosity ?? 'high';
   const currentIdx = Math.max(0, levels.findIndex(l => l.toLowerCase() === current));
 
