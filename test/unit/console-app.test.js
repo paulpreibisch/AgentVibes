@@ -221,3 +221,37 @@ describe('AgentVibesConsole - startTab Options', () => {
     assert.strictEqual(instance.startTab, 'settings');
   });
 });
+
+describe('AgentVibesConsole - Settings Tab Wiring (Story 7.1)', () => {
+  test('_updateContextFooter uses FOOTER_CONFIG fallback for placeholder tabs', async () => {
+    // Verifies the duck-typing dispatch: placeholder tabs (no .getFooterColor) fall through to FOOTER_CONFIG
+    const { AgentVibesConsole } = await import('../../src/console/app.js');
+    const instance = new AgentVibesConsole({ _testMode: true });
+    await instance.init();
+    instance.contextFooterBox = { style: { bg: '' }, setContent: () => {} };
+    // 'voices' is a placeholder tab — should fall through to FOOTER_CONFIG
+    instance._updateContextFooter('voices');
+    assert.strictEqual(instance.contextFooterBox.style.bg, '#00bcd4',
+      'placeholder tab must use FOOTER_CONFIG color, not tab component getter');
+  });
+
+  test('_updateContextFooter uses tab.getFooterColor() when tab has Tab Component Contract', async () => {
+    // Verifies real tab components (with getFooterColor) take precedence over FOOTER_CONFIG
+    const { AgentVibesConsole } = await import('../../src/console/app.js');
+    const instance = new AgentVibesConsole({ _testMode: true });
+    await instance.init();
+    // Inject a mock tab component into tabs (simulates _createRealTabs wiring)
+    instance.tabs['settings'] = {
+      getFooterColor: () => '#2196f3',
+      getFooterText: () => '[↑↓] test footer',
+    };
+    let capturedColor = '';
+    instance.contextFooterBox = {
+      style: { bg: '' },
+      setContent: () => {},
+    };
+    instance._updateContextFooter('settings');
+    assert.strictEqual(instance.contextFooterBox.style.bg, '#2196f3',
+      'real tab component must have getFooterColor() used over FOOTER_CONFIG');
+  });
+});

@@ -13,6 +13,9 @@ import { setupNavigation } from './navigation.js';
 import { createPlaceholderTab, TAB_DISPLAY_LABELS } from './tabs/placeholder-tab.js';
 import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
+import { createSettingsTab } from './tabs/settings-tab.js';
+import { ConfigService } from '../services/config-service.js';
+import { ProviderService } from '../services/provider-service.js';
 
 // Brand colours — consistent with UX design plan and architecture.md
 const COLORS = {
@@ -65,6 +68,7 @@ export class AgentVibesConsole {
     this._createFooter();
     this._registerHandlers();
     this._createPlaceholderTabs();
+    this._createRealTabs();
     this._initNavigation();
     this._createModalOverlay();
     // Force-activate the start tab: switchTab() no-ops when _activeTab is already
@@ -209,9 +213,17 @@ export class AgentVibesConsole {
   // Private: Update context footer color + text for the given tab
 
   _updateContextFooter(tabId) {
-    const config = FOOTER_CONFIG[tabId] ?? { color: DEFAULT_FOOTER_COLOR, text: '' };
-    this.contextFooterBox.style.bg = config.color;
-    this.contextFooterBox.setContent(config.text);
+    // Real tab components (Tab Component Contract) provide their own footer getters.
+    // Placeholder tabs fall back to FOOTER_CONFIG.
+    const tab = this.tabs[tabId];
+    if (tab && typeof tab.getFooterColor === 'function') {
+      this.contextFooterBox.style.bg = tab.getFooterColor();
+      this.contextFooterBox.setContent(tab.getFooterText());
+    } else {
+      const config = FOOTER_CONFIG[tabId] ?? { color: DEFAULT_FOOTER_COLOR, text: '' };
+      this.contextFooterBox.style.bg = config.color;
+      this.contextFooterBox.setContent(config.text);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -245,6 +257,21 @@ export class AgentVibesConsole {
   }
 
   // ---------------------------------------------------------------------------
+  // Private: Replace placeholder tabs with real implementations (story 7.1+)
+
+  _createRealTabs() {
+    // Destroy the settings placeholder (real tab mounts directly to screen, not contentArea)
+    const placeholder = this.tabs['settings'];
+    if (placeholder && typeof placeholder.destroy === 'function') {
+      placeholder.destroy();
+    }
+
+    const configService = new ConfigService();
+    const providerService = new ProviderService(configService);
+    this.tabs['settings'] = createSettingsTab(this.screen, { configService, providerService });
+  }
+
+  // ---------------------------------------------------------------------------
   // Private: Initialise navigation service and wire key handlers (story 6.2)
 
   _initNavigation() {
@@ -258,9 +285,21 @@ export class AgentVibesConsole {
       // Update context footer color + shortcuts (story 6.3)
       this._updateContextFooter(tabId);
 
-      // Show active tab, hide all others
-      for (const [id, box] of Object.entries(this.tabs)) {
-        box.hidden = (id !== tabId);
+      // Show active tab, hide all others.
+      // Real tab components (Tab Component Contract) expose show/hide/onFocus/onBlur.
+      // Placeholder tabs are plain blessed boxes with a .hidden property.
+      for (const [id, tab] of Object.entries(this.tabs)) {
+        if (typeof tab.show === 'function') {
+          if (id === tabId) {
+            tab.show();
+            tab.onFocus();
+          } else {
+            tab.hide();
+            tab.onBlur();
+          }
+        } else {
+          tab.hidden = (id !== tabId);
+        }
       }
 
       this.screen.render();

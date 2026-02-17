@@ -219,6 +219,37 @@ describe('ConfigService — set()', () => {
   });
 });
 
+describe('ConfigService — getVersion()', () => {
+  let ConfigService;
+  before(async () => {
+    const mod = await import('../../src/services/config-service.js');
+    ConfigService = mod.ConfigService;
+  });
+
+  test('returns version from config when set', () => {
+    const homeDir = makeTmpDir('version-home');
+    try {
+      const cfgDir = path.join(homeDir, '.agentvibes');
+      fs.mkdirSync(cfgDir, { recursive: true });
+      fs.writeFileSync(path.join(cfgDir, 'config.json'), JSON.stringify({ version: '2.5' }));
+      const svc = new ConfigService({ homeDir, projectRoot: '/tmp/fake' });
+      assert.strictEqual(svc.getVersion(), '2.5');
+    } finally {
+      cleanDir(homeDir);
+    }
+  });
+
+  test('defaults to "1.0" when version not in config', () => {
+    const homeDir = makeTmpDir('version-default-home');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot: '/tmp/fake' });
+      assert.strictEqual(svc.getVersion(), '1.0');
+    } finally {
+      cleanDir(homeDir);
+    }
+  });
+});
+
 describe('ConfigService — setGlobal()', () => {
   let ConfigService;
   before(async () => {

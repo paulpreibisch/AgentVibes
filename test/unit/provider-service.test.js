@@ -95,4 +95,12 @@ describe('ProviderService', () => {
       assert.ok(KNOWN.has(p), `unknown provider returned: ${p}`);
     }
   });
+
+  test('getInstalledProviders() caches result on repeated calls (same array reference)', () => {
+    const mockConfig = { getConfig: () => ({}) };
+    const svc = new ProviderService(mockConfig);
+    const first = svc.getInstalledProviders();
+    const second = svc.getInstalledProviders();
+    assert.strictEqual(first, second, 'should return the same cached array reference');
+  });
 });

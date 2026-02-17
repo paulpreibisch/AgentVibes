@@ -6,7 +6,7 @@
  * through ConfigService. Gracefully degrades when detection fails.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 export class ProviderService {
   /**
@@ -14,6 +14,7 @@ export class ProviderService {
    */
   constructor(configService) {
     this._config = configService;
+    this._installedProviders = null; // cached after first detection
   }
 
   // ---------------------------------------------------------------------------
@@ -43,6 +44,8 @@ export class ProviderService {
    * @returns {string[]}
    */
   getInstalledProviders() {
+    if (this._installedProviders) return this._installedProviders;
+
     const providers = [];
 
     if (this._isAvailable('piper')) providers.push('piper');
@@ -56,6 +59,7 @@ export class ProviderService {
     // Graceful degradation: always return at least piper
     if (providers.length === 0) providers.push('piper');
 
+    this._installedProviders = providers;
     return providers;
   }
 
@@ -90,7 +94,7 @@ export class ProviderService {
    */
   _isAvailable(binary) {
     try {
-      execSync(`which ${binary}`, { stdio: 'ignore', timeout: 2000 });
+      execFileSync('which', [binary], { stdio: 'ignore', timeout: 2000 });
       return true;
     } catch {
       return false;
