@@ -486,7 +486,7 @@ export function createSettingsTab(screen, services) {
   introClearBtn.left = 40;
 
   // -------------------------------------------------------------------------
-  // Display state
+  // Display state + button-level focus navigation (story 7.6)
 
   const _buttons = [
     switchBtn, changeBtn,
@@ -495,6 +495,24 @@ export function createSettingsTab(screen, services) {
     verbosityChangeBtn, personalityChangeBtn,
     introClearBtn,
   ];
+
+  let _currentIdx = 0;
+
+  // Sync _currentIdx on focus — keeps mouse clicks in sync with keyboard nav
+  for (const [i, btn] of _buttons.entries()) {
+    btn.on('focus', () => { _currentIdx = i; });
+  }
+
+  // ↓ / Tab → next button;  ↑ / Shift-Tab → previous button
+  function _navigateButton(delta) {
+    _currentIdx = (_currentIdx + delta + _buttons.length) % _buttons.length;
+    _buttons[_currentIdx].focus();
+  }
+
+  for (const btn of _buttons) {
+    btn.key(['down', 'tab'], () => _navigateButton(1));
+    btn.key(['up', 'S-tab'], () => _navigateButton(-1));
+  }
 
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
@@ -541,10 +559,8 @@ export function createSettingsTab(screen, services) {
     },
 
     onFocus() {
-      // Focus the first button (Provider [Switch]) when tab becomes active
-      if (_buttons.length > 0) {
-        _buttons[0].focus();
-      }
+      // Restore focus to last used button (or first button on initial activation)
+      _buttons[_currentIdx].focus();
       screen.render();
     },
 
