@@ -1,235 +1,117 @@
----
-sprint: 3
-epic_id: AVI-E04
-epic_name: Custom Background Music System
-feature_id: AVI-04-CUSTOM-MUSIC
-priority: Medium
-story_points_total: 16
-duration: 2 weeks
-focus: Custom Background Music (File Operations + Security)
-outcome: Audio branding + team deployment capability
-created_date: 2026-02-15
-version: 1.0
+# generated: 2026-02-16
+# project: AgentVibes
+# project_key: AVI
+# tracking_system: file-system
+# story_location: docs/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - SM creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review workflow
+
+generated: "2026-02-16"
+project: AgentVibes
+project_key: AVI
+tracking_system: file-system
+story_location: docs/implementation-artifacts
+
+# NOTE: Previous Epics 1-5 (Installer Enhancement) and Epic 4 (Custom Background Music)
+# are complete and tracked in git history. Epic 4 (Sprint 3) was 100% done as of 2026-02-16.
 
 development_status:
 
-  # COMPLETED STORIES
-  story_4_1:
-    id: AVI-S4.1
-    title: Path Validation and Security Hardening
-    status: complete
-    story_points: 4
-    acceptance_criteria_count: 10
-    description: |
-      Validate file paths securely to prevent path traversal attacks.
-      Use path.resolve() for all operations, verify paths within home directory,
-      reject symlinks/relative paths, verify file ownership.
-    completion_date: 2026-02-14
-    notes: Security-critical foundation for custom music feature
+  # ─────────────────────────────────────────────
+  # SPRINT 4 — TUI Console Foundation + Core UI
+  # ─────────────────────────────────────────────
 
-  story_4_2:
-    id: AVI-S4.2
-    title: Audio Format Detection (Magic Number Validation)
-    status: complete
-    story_points: 3
-    acceptance_criteria_count: 10
-    description: |
-      Validate audio file format by checking file headers (magic numbers).
-      Support .mp3, .wav, .ogg, .m4a. Verify extension matches actual content.
-      Reject unsupported formats with clear error messages.
-    completion_date: 2026-02-14
-    notes: Validates file integrity and format compliance
+  # Epic 6: Core TUI Console Framework
+  epic-6: done
+  6-1-blessed-js-app-scaffold-and-screen-setup: done
+  6-2-tab-bar-and-global-keyboard-navigation: done
+  6-3-color-coded-context-footer-system: done
+  6-4-modal-overlay-component: done
+  6-5-command-routing-and-entry-points: done
+  epic-6-retrospective: optional
 
-  story_4_3:
-    id: AVI-S4.3
-    title: File Ownership Verification
-    status: complete
-    story_points: 2
-    acceptance_criteria_count: 7
-    description: |
-      Verify file ownership before processing.
-      Check UID matches current user, cross-platform compatible.
-      Reject files not owned by current user (security check).
-    completion_date: 2026-02-14
-    notes: Prevents malicious files planted by other users
+  # Epic 7: Settings Tab
+  epic-7: in-progress
+  7-1-provider-and-voice-settings-group: in-progress
+  7-2-audio-effects-settings-group: backlog
+  7-3-background-music-settings-group: backlog
+  7-4-personality-and-verbosity-settings-group: backlog
+  7-5-intro-text-settings-group: backlog
+  7-6-button-level-focus-navigation-system: backlog
+  7-7-personality-selector-modal: backlog
+  7-8-voice-selector-modal: backlog
+  7-9-music-selector-modal: backlog
+  epic-7-retrospective: optional
 
-  story_4_4:
-    id: AVI-S4.4
-    title: File Copy and Secure Storage
-    status: complete
-    story_points: 3
-    acceptance_criteria_count: 11
-    description: |
-      Copy validated music files to secure storage at .claude/audio/custom-music/.
-      Directory permissions 700, file permissions 600.
-      Verify integrity with checksums, backup previous music, atomic operations.
-    completion_date: 2026-02-14
-    notes: Implements secure storage with backup and integrity verification
+  # Epic 8: Voices Tab
+  epic-8: backlog
+  8-1-voice-table-with-sort-search-and-filter: backlog
+  8-2-voice-info-panel-and-preview: backlog
+  8-3-favorites-management-voices: backlog
+  8-4-voice-install-feature: backlog
+  epic-8-retrospective: optional
 
-  # READY FOR DEVELOPMENT STORIES
-  story_4_5:
-    id: AVI-S4.5
-    title: Music File Input and Selection
-    status: complete
-    story_points: 2
-    acceptance_criteria_count: 10
-    description: |
-      Interactive prompt during installer for audio file path.
-      Support absolute/relative paths, tab-completion, validation feedback.
-      Progress indicator while validating, retry logic (max 3 attempts).
-    completion_date: 2026-02-15
-    notes: |
-      Implemented secure music file input with full validation chain.
-      Added Soprano auto-start detection and helper.
-      Integrated into installer background music section.
-    dependencies:
-      - AVI-S4.1
-      - AVI-S4.2
-      - AVI-S4.3
-      - AVI-S4.4
+  # Epic 12: Installer Wizard (5-Screen Flow)
+  epic-12: backlog
+  12-1-installer-screen-1-welcome-and-purpose: backlog
+  12-2-installer-screen-2-auto-dependency-check: backlog
+  12-3-installer-screen-3-provider-selection: backlog
+  12-4-installer-screen-4-voice-config-and-intro-text: backlog
+  12-5-installer-screen-5-install-and-live-tts-greeting: backlog
+  epic-12-retrospective: optional
 
-  story_4_6:
-    id: AVI-S4.6
-    title: Post-Install Music Configuration Command
-    status: complete
-    story_points: 2
-    acceptance_criteria_count: 9
-    description: |
-      Command: agentvibes config music
-      Menu options: Change, Remove, Reset to default.
-      Display current setting, changes take effect immediately.
-      Backup of previous setting maintained.
-    completion_date: 2026-02-15
-    notes: |
-      Implemented agentvibes config music command with full menu.
-      Reuses promptForCustomMusic() for secure file selection.
-      Supports Change, Remove, Reset, and Enable/Disable actions.
-    dependencies:
-      - AVI-S4.5
+  # ─────────────────────────────────────────────
+  # SPRINT 5 — Feature Completion
+  # ─────────────────────────────────────────────
 
-  story_4_7:
-    id: AVI-S4.7
-    title: TTS Integration - Background Music Mixing
-    status: complete
-    story_points: 3
-    acceptance_criteria_count: 11
-    description: |
-      Integrate custom music with TTS voice output.
-      Load from .claude/audio/custom-music/, graceful fallback to default.
-      Works with all TTS providers and personality types.
-      Loop if shorter than TTS output, no audio artifacts.
-      Audio length validation and user guidance added.
-    completion_date: 2026-02-16
-    notes: |
-      Implemented complete custom music integration with TTS system.
-      Added audio duration validation (30-90s recommended, 300s max).
-      Modified audio-processor.sh to prioritize custom music over defaults.
-      Users receive warnings for non-ideal durations with recommendations.
-      All security requirements met (ownership verification, secure paths).
-    dependencies:
-      - AVI-S4.4
+  # Epic 9: Music Tab
+  epic-9: backlog
+  9-1-built-in-track-library-with-preview-and-select: backlog
+  9-2-custom-track-upload-and-management: backlog
+  9-3-music-enable-disable-and-favorites: backlog
+  epic-9-retrospective: optional
 
-  story_4_8:
-    id: AVI-S4.8
-    title: Comprehensive Security Testing (100+ Traversal Attempts)
-    status: complete
-    story_points: 4
-    acceptance_criteria_count: 13
-    description: |
-      Comprehensive security testing covering 100+ path traversal attempt variations.
-      Test: ../, symlinks, hard links, absolute paths, env var expansion, null bytes.
-      All attempts correctly rejected with clear error messages.
-      Security review by external reviewer recommended.
-    completion_date: 2026-02-16
-    notes: |
-      Implemented comprehensive security testing with 180+ attack variations:
-      - Created 3 test files with 107 individual tests
-      - Tested path traversal (100 variations), symlink/hardlink attacks (25 variations),
-        and edge cases (65+ variations)
-      - All tests passed (100% rejection rate for malicious paths)
-      - Created detailed security audit report in docs/security/SECURITY-AUDIT.md
-      - Verified OWASP compliance and no information disclosure
-      - System certified secure for production use
-    critical: true
-    dependencies:
-      - AVI-S4.1
+  # Epic 10: Verbosity System Enhancement
+  epic-10: backlog
+  10-1-minimal-and-low-verbosity-levels: backlog
+  10-2-custom-verbosity-mode: backlog
+  10-3-migration-logic-and-notice-ui: backlog
+  10-4-verbosityservice-class-and-hook-integration: backlog
+  epic-10-retrospective: optional
 
-epic_summary:
-  epic_id: AVI-E04
-  epic_name: Custom Background Music System
-  epic_description: |
-    Enable users to upload and use personal audio files as background music.
-    Includes secure file validation, format checking, and integration with existing music system.
-  business_value: |
-    - Ultimate audio personalization for power users
-    - Team branding through custom music
-    - Differentiator from other TTS systems
-    - High perceived value (audio + intro text = complete SoundBrand)
-  risks:
-    - risk_1: Path traversal vulnerability (Medium probability)
-      mitigation: path.resolve() + ownership verification + security review
-    - risk_2: Large file handling (Low probability)
-      mitigation: 50MB size limit + file validation
-    - risk_3: Audio format detection (Low probability)
-      mitigation: Magic number checking + error handling
+  # Epic 11: Agents Tab (BMAD Voice Management)
+  epic-11: backlog
+  11-1-global-voice-storage-and-migration: backlog
+  11-2-agents-tab-ui: backlog
+  11-3-multi-provider-support-and-single-voice-warning: backlog
+  11-4-party-mode-toggle-and-provider-switching-prompt: backlog
+  11-5-bmad-detection-and-optional-install-setup: backlog
+  epic-11-retrospective: optional
 
-statistics:
-  total_stories: 8
-  completed_stories: 8
-  ready_for_dev: 0
-  total_story_points: 23
-  completed_points: 23
-  ready_for_dev_points: 0
-  completion_percentage: 100.0
-  next_milestone: "Epic 4 COMPLETE - All stories finished"
-
-validation_checklist:
-  security_requirements:
-    - path_traversal_prevention: complete
-    - file_ownership_verification: complete
-    - secure_storage: complete
-    - format_validation: complete
-    - comprehensive_testing: complete
-  acceptance_criteria:
-    - all_stories_have_ac: true
-    - all_stories_have_points: true
-    - all_stories_have_dependencies: true
-  readiness:
-    - documentation_complete: true
-    - dependencies_mapped: true
-    - acceptance_criteria_clear: true
-    - ready_to_start_sprint: true
-
-notes: |
-  ✅ EPIC COMPLETE: Sprint 3 Epic 4 - Custom Background Music System
-
-  All 8 stories have been implemented and tested successfully:
-
-  Security Foundation (Stories 4.1-4.4):
-  - Path validation with defense-in-depth
-  - Audio format detection via magic numbers
-  - File ownership verification (UID checks)
-  - Secure storage with backup and integrity checks
-
-  User Interface (Stories 4.5-4.6):
-  - Interactive music file input during installation
-  - Post-install configuration command
-
-  Integration (Story 4.7):
-  - TTS integration with custom music
-  - Audio duration validation and user guidance
-  - Seamless fallback to default music
-
-  Security Validation (Story 4.8):
-  - 180+ attack variations tested
-  - 100% attack rejection rate
-  - OWASP compliance verified
-  - Security audit report published
-
-  The feature is production-ready and certified secure.
-
-references:
-  epics_doc: /home/fire/claude/AgentVibes/docs/epics.md
-  stories_doc: /home/fire/claude/AgentVibes/docs/stories.md
-  prd_doc: /home/fire/claude/AgentVibes/docs/prd.md
-  claude_guidelines: /home/fire/claude/AgentVibes/CLAUDE.md
+  # Epic 13: Help & Readme Tabs
+  epic-13: backlog
+  13-1-help-tab-keyboard-shortcuts-reference: backlog
+  13-2-readme-tab-markdown-viewer: backlog
+  epic-13-retrospective: optional
