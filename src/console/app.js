@@ -17,6 +17,7 @@ import { createSettingsTab } from './tabs/settings-tab.js';
 import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
 import { createAgentsTab } from './tabs/agents-tab.js';
+import { createInstallTab } from './tabs/install-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -294,6 +295,13 @@ export class AgentVibesConsole {
       agentsPlaceholder.destroy();
     }
     this.tabs['agents'] = createAgentsTab(this.screen, services);
+
+    // Destroy install placeholder and mount real install wizard
+    const installPlaceholder = this.tabs['install'];
+    if (installPlaceholder && typeof installPlaceholder.destroy === 'function') {
+      installPlaceholder.destroy();
+    }
+    this.tabs['install'] = createInstallTab(this.screen, services);
   }
 
   // ---------------------------------------------------------------------------
