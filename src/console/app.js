@@ -18,6 +18,8 @@ import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
 import { createAgentsTab } from './tabs/agents-tab.js';
 import { createInstallTab } from './tabs/install-tab.js';
+import { createHelpTab } from './tabs/help-tab.js';
+import { createReadmeTab } from './tabs/readme-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -302,6 +304,19 @@ export class AgentVibesConsole {
       installPlaceholder.destroy();
     }
     this.tabs['install'] = createInstallTab(this.screen, services);
+
+    // Destroy help/readme placeholders and mount real tabs
+    const helpPlaceholder = this.tabs['help'];
+    if (helpPlaceholder && typeof helpPlaceholder.destroy === 'function') {
+      helpPlaceholder.destroy();
+    }
+    this.tabs['help'] = createHelpTab(this.screen, services);
+
+    const readmePlaceholder = this.tabs['readme'];
+    if (readmePlaceholder && typeof readmePlaceholder.destroy === 'function') {
+      readmePlaceholder.destroy();
+    }
+    this.tabs['readme'] = createReadmeTab(this.screen, services);
   }
 
   // ---------------------------------------------------------------------------
