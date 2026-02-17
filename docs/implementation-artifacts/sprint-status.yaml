@@ -53,24 +53,24 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: Settings Tab
-  epic-7: in-progress
-  7-1-provider-and-voice-settings-group: in-progress
-  7-2-audio-effects-settings-group: backlog
-  7-3-background-music-settings-group: backlog
-  7-4-personality-and-verbosity-settings-group: backlog
-  7-5-intro-text-settings-group: backlog
-  7-6-button-level-focus-navigation-system: backlog
-  7-7-personality-selector-modal: backlog
-  7-8-voice-selector-modal: backlog
-  7-9-music-selector-modal: backlog
+  epic-7: done
+  7-1-provider-and-voice-settings-group: done
+  7-2-audio-effects-settings-group: done
+  7-3-background-music-settings-group: done
+  7-4-personality-and-verbosity-settings-group: done
+  7-5-intro-text-settings-group: done
+  7-6-button-level-focus-navigation-system: done
+  7-7-personality-selector-modal: done
+  7-8-voice-selector-modal: done
+  7-9-music-selector-modal: done
   epic-7-retrospective: optional
 
   # Epic 8: Voices Tab
-  epic-8: backlog
-  8-1-voice-table-with-sort-search-and-filter: backlog
-  8-2-voice-info-panel-and-preview: backlog
-  8-3-favorites-management-voices: backlog
-  8-4-voice-install-feature: backlog
+  epic-8: done
+  8-1-voice-table-with-sort-search-and-filter: done
+  8-2-voice-info-panel-and-preview: done
+  8-3-favorites-management-voices: done
+  8-4-voice-install-feature: done
   epic-8-retrospective: optional
 
   # Epic 12: Installer Wizard (5-Screen Flow)
