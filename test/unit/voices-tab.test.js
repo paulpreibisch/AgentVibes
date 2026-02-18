@@ -1,6 +1,6 @@
 /**
  * Epic 8: Voices Tab
- * Tests for voices-tab.js exports: parseVoiceId, formatVoiceInfo, createVoicesTab contract
+ * Tests for voices-tab.js exports: parseVoiceId, formatVoiceInfo, inferGender, formatVoiceName, createVoicesTab contract
  */
 
 process.env.AGENTVIBES_TEST_MODE = 'true';
@@ -110,5 +110,74 @@ describe('createVoicesTab — Tab Component Contract', () => {
       providerService: { getActiveVoiceId: () => 'en_US-amy-medium', setActiveVoice: () => {} },
     });
     assert.strictEqual(tab.getFooterColor(), '#00695c');
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('inferGender', () => {
+  let inferGender;
+  before(async () => {
+    const mod = await import('../../src/console/tabs/voices-tab.js');
+    inferGender = mod.inferGender;
+  });
+
+  test('exported as named function', () => {
+    assert.strictEqual(typeof inferGender, 'function');
+  });
+
+  test('detects female from _female in voice ID', () => {
+    assert.strictEqual(inferGender('en_GB-southern_english_female-low'), 'Female');
+  });
+
+  test('detects female for amy (lookup)', () => {
+    assert.strictEqual(inferGender('en_US-amy-medium'), 'Female');
+  });
+
+  test('detects male for alan (lookup)', () => {
+    assert.strictEqual(inferGender('en_GB-alan-medium'), 'Male');
+  });
+
+  test('detects male for ryan (lookup)', () => {
+    assert.strictEqual(inferGender('en_US-ryan-high'), 'Male');
+  });
+
+  test('returns — for unknown voice', () => {
+    assert.strictEqual(inferGender('xx_XX-unknown-medium'), '—');
+  });
+
+  test('uses dataset param when provided', () => {
+    assert.strictEqual(inferGender('en_US-amy-medium', 'amy'), 'Female');
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('formatVoiceName', () => {
+  let formatVoiceName;
+  before(async () => {
+    const mod = await import('../../src/console/tabs/voices-tab.js');
+    formatVoiceName = mod.formatVoiceName;
+  });
+
+  test('exported as named function', () => {
+    assert.strictEqual(typeof formatVoiceName, 'function');
+  });
+
+  test('title-cases simple dataset name', () => {
+    assert.strictEqual(formatVoiceName('en_US-amy-medium', 'amy'), 'Amy');
+  });
+
+  test('title-cases multi-word dataset', () => {
+    assert.strictEqual(formatVoiceName('en_GB-southern_english_female-low', 'southern_english_female'), 'Southern English Female');
+  });
+
+  test('uses display name override for ljspeech', () => {
+    assert.strictEqual(formatVoiceName('en_US-ljspeech-high', 'ljspeech'), 'LJ Speech');
+  });
+
+  test('falls back to parsing voice ID when no dataset', () => {
+    const result = formatVoiceName('en_US-alan-medium');
+    assert.ok(result.toLowerCase().includes('alan'));
   });
 });

@@ -43,6 +43,67 @@ const COLORS = {
 const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter/Space] Preview  [Tab] Buttons  [F] Favorite  [/] Search  [Q] Quit';
 const PIPER_VOICES_DIR = path.join(os.homedir(), '.local', 'share', 'piper', 'voices');
 
+// Column widths for the multi-column voice list
+const COL_NAME_W   = 26;
+const COL_GENDER_W = 10;
+
+// ---------------------------------------------------------------------------
+// Pure helpers — exported for testability
+
+// Well-known piper dataset → gender
+const GENDER_MAP = {
+  amy: 'Female', kristin: 'Female', jenny: 'Female', cori: 'Female',
+  aria: 'Female', glados: 'Female', litvyak: 'Female', hfc_female: 'Female',
+  ljspeech: 'Female',
+  alan: 'Male', joe: 'Male', john: 'Male', ryan: 'Male', lessac: 'Male',
+  kusal: 'Male', hfc_male: 'Male', danny: 'Male', arctic: 'Male',
+  l2arctic: 'Male', libritts: 'Male', libritts_r: 'Male',
+};
+
+// Well-known piper dataset → nice display name
+const DISPLAY_NAMES = {
+  ljspeech:    'LJ Speech',
+  libritts:    'LibriTTS',
+  libritts_r:  'LibriTTS',
+  l2arctic:    'L2-Arctic',
+  hfc_male:    'HFC Male',
+  hfc_female:  'HFC Female',
+};
+
+/**
+ * Infer voice gender from voice ID and/or dataset name.
+ * Returns 'Female', 'Male', or '—'.
+ *
+ * @param {string} voiceId  e.g. 'en_GB-southern_english_female-low'
+ * @param {string} [dataset] e.g. 'southern_english_female'
+ * @returns {string}
+ */
+export function inferGender(voiceId, dataset) {
+  const id = voiceId.toLowerCase();
+  const ds = (dataset ?? '').toLowerCase();
+  // Explicit in name
+  if (id.includes('_female') || ds.includes('female')) return 'Female';
+  if (id.includes('_male')   || ds.includes('male'))   return 'Male';
+  // Lookup by dataset or name segment
+  const key = ds || (id.split('-')[1] ?? '');
+  return GENDER_MAP[key] ?? '—';
+}
+
+/**
+ * Format a piper dataset name into a human-readable voice display name.
+ *
+ * @param {string} voiceId
+ * @param {string} [dataset] from the .onnx.json file
+ * @returns {string}
+ */
+export function formatVoiceName(voiceId, dataset) {
+  const raw = dataset ?? voiceId.split('-')[1] ?? voiceId;
+  if (DISPLAY_NAMES[raw]) return DISPLAY_NAMES[raw];
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 const SAMPLE_PHRASES = [
   "Hello! I'm ready to assist you with your tasks today.",
   "Code review complete. I found several areas that could be improved.",
@@ -143,6 +204,36 @@ function _toggleFavorite(configService, voiceId) {
 }
 
 // ---------------------------------------------------------------------------
+// Voice metadata cache (lives for the process lifetime)
+
+const _metaCache = new Map();
+
+/**
+ * Load metadata from the .onnx.json file for a voice.
+ * Caches results so the file is only read once per voice.
+ *
+ * @param {string} voiceId
+ * @returns {{ displayName: string, gender: string, provider: string }}
+ */
+function _getVoiceMeta(voiceId) {
+  if (_metaCache.has(voiceId)) return _metaCache.get(voiceId);
+  let dataset = null;
+  try {
+    const jsonPath = path.join(PIPER_VOICES_DIR, voiceId + '.onnx.json');
+    const raw = fs.readFileSync(jsonPath, 'utf8');
+    const data = JSON.parse(raw);
+    dataset = data.dataset ?? null;
+  } catch {}
+  const result = {
+    displayName: formatVoiceName(voiceId, dataset),
+    gender: inferGender(voiceId, dataset),
+    provider: 'Piper',
+  };
+  _metaCache.set(voiceId, result);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * Create the Voices tab component.
@@ -209,6 +300,18 @@ export function createVoicesTab(screen, services) {
       bg: '#1a237e',
       focus: { bg: '#283593' },
     },
+  });
+
+  // -------------------------------------------------------------------------
+  // Column header row (sits between search and voice list border)
+
+  blessed.text({
+    parent: box,
+    top: 4,
+    left: 6,
+    content: `{#00897b-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#00897b-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
   });
 
   // -------------------------------------------------------------------------
@@ -481,7 +584,11 @@ export function createVoicesTab(screen, services) {
       const isPrev   = v === _playingVoiceId;
       const star = isFav  ? '★' : ' ';
       const dot  = isPrev ? '♪' : (isActive ? '●' : ' ');
-      return ` ${star}${dot} ${v}`;
+      const { displayName, gender, provider } = _getVoiceMeta(v);
+      const name = displayName.length > COL_NAME_W
+        ? displayName.slice(0, COL_NAME_W - 1) + '…'
+        : displayName.padEnd(COL_NAME_W);
+      return ` ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}`;
     });
   }
 
@@ -496,7 +603,7 @@ export function createVoicesTab(screen, services) {
 
     // Update info panel for currently selected item
     const sel = filtered[voiceList.selected] ?? active ?? '';
-    infoLine.setContent(`  ${formatVoiceInfo(sel)}`);
+    infoLine.setContent(`  ${formatVoiceInfo(sel)}  |  ID: ${sel}`);
 
     screen.render();
   }
@@ -549,7 +656,7 @@ export function createVoicesTab(screen, services) {
   voiceList.on('select item', () => {
     const voices = _getFilteredVoices();
     const sel = voices[voiceList.selected] ?? '';
-    infoLine.setContent(`  ${formatVoiceInfo(sel)}`);
+    infoLine.setContent(`  ${formatVoiceInfo(sel)}  |  ID: ${sel}`);
     screen.render();
   });
 
