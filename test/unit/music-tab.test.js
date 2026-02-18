@@ -1,6 +1,6 @@
 /**
  * Epic 9: Music Tab
- * Tests for music-tab.js exports: formatTrackDisplay, getBuiltInTracks, createMusicTab contract
+ * Tests for music-tab.js exports: formatTrackLabel, getBuiltInTracks, formatMusicStatus, createMusicTab contract
  */
 
 process.env.AGENTVIBES_TEST_MODE = 'true';
@@ -21,9 +21,9 @@ describe('getBuiltInTracks', () => {
     assert.strictEqual(typeof getBuiltInTracks, 'function');
   });
 
-  test('returns array of 12 built-in tracks', () => {
+  test('returns array of 16 built-in tracks', () => {
     const tracks = getBuiltInTracks();
-    assert.strictEqual(tracks.length, 12);
+    assert.strictEqual(tracks.length, 16);
   });
 
   test('each track has id and label', () => {
@@ -102,5 +102,35 @@ describe('createMusicTab — Tab Component Contract', () => {
       providerService: { getActiveVoiceId: () => '', setActiveVoice: () => {} },
     });
     assert.strictEqual(tab.getFooterColor(), '#ff9800');
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('formatTrackLabel', () => {
+  let formatTrackLabel;
+  before(async () => {
+    const mod = await import('../../src/console/tabs/music-tab.js');
+    formatTrackLabel = mod.formatTrackLabel;
+  });
+
+  test('exported as named function', () => {
+    assert.strictEqual(typeof formatTrackLabel, 'function');
+  });
+
+  test('strips agent_vibes_ prefix and _loop/_v2 suffixes', () => {
+    assert.strictEqual(formatTrackLabel('agent_vibes_arabic_v2_loop.mp3'), 'Arabic');
+  });
+
+  test('strips agentvibes_ prefix', () => {
+    assert.strictEqual(formatTrackLabel('agentvibes_soft_flamenco_loop.mp3'), 'Soft Flamenco');
+  });
+
+  test('handles file with no prefix', () => {
+    assert.strictEqual(formatTrackLabel('dreamy_house_loop.mp3'), 'Dreamy House');
+  });
+
+  test('title-cases multi-word labels', () => {
+    assert.strictEqual(formatTrackLabel('agent_vibes_bossa_nova_v2_loop.mp3'), 'Bossa Nova');
   });
 });

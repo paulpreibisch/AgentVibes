@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { spawn } from 'node:child_process';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -39,8 +40,16 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter] Switch Voice  [F] Favorite  [/] Search  [S/V/M/A/R] Tab  [Q] Quit';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter/Space] Preview  [Tab] Buttons  [F] Favorite  [/] Search  [Q] Quit';
 const PIPER_VOICES_DIR = path.join(os.homedir(), '.local', 'share', 'piper', 'voices');
+
+const SAMPLE_PHRASES = [
+  "Hello! I'm ready to assist you with your tasks today.",
+  "Code review complete. I found several areas that could be improved.",
+  "Welcome to AgentVibes. I'll help you get things done efficiently.",
+  "Task finished successfully. What shall we work on next?",
+  "I've analyzed the code and have some suggestions for you.",
+];
 
 // ---------------------------------------------------------------------------
 // Exported pure helpers (testable without blessed)
@@ -246,6 +255,116 @@ export function createVoicesTab(screen, services) {
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
+  const previewLine = blessed.text({
+    parent: box,
+    top: '70%',
+    left: 2,
+    tags: true,
+    content: '',
+    style: { fg: COLORS.activeFg, bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Playback state
+
+  let _playingProcess = null;
+  let _playingVoiceId = null;
+
+  function _killPlayingProcess() {
+    if (_playingProcess && !_playingProcess.killed) {
+      try { _playingProcess.kill('SIGTERM'); } catch {}
+    }
+    _playingProcess = null;
+  }
+
+  /**
+   * Preview a voice by synthesizing a sample phrase with piper.
+   * Second call with the same voice stops playback (toggle).
+   */
+  function _previewVoice(voiceId) {
+    // Toggle: second press stops
+    if (_playingVoiceId === voiceId) {
+      _killPlayingProcess();
+      _playingVoiceId = null;
+      previewLine.setContent('');
+      screen.render();
+      return;
+    }
+
+    // Kill any current preview
+    _killPlayingProcess();
+
+    // Validate model path stays within PIPER_VOICES_DIR
+    const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+    const safeBase = path.resolve(PIPER_VOICES_DIR);
+    if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) {
+      return;
+    }
+
+    const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
+    const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+
+    // Synthesize via piper using stdin (no shell injection)
+    const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+      stdio: ['pipe', 'ignore', 'ignore'],
+    });
+    piper.stdin.write(phrase);
+    piper.stdin.end();
+
+    _playingProcess = piper;
+    _playingVoiceId = voiceId;
+
+    previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Synthesizing: ${voiceId}…{/${COLORS.activeFg}-fg}`);
+    screen.render();
+
+    piper.on('exit', (code) => {
+      if (_playingVoiceId !== voiceId) {
+        // Stopped by user before synthesis finished
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
+
+      if (code !== 0) {
+        _playingVoiceId = null;
+        _playingProcess = null;
+        previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Preview failed (piper error){/${COLORS.activeFg}-fg}`);
+        screen.render();
+        return;
+      }
+
+      // Play the synthesized wav
+      const cmd = `play "${tempWav}" 2>/dev/null || aplay "${tempWav}" 2>/dev/null`;
+      const playProc = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: false });
+      _playingProcess = playProc;
+
+      previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing: ${voiceId}  (press Enter/Space again to stop){/${COLORS.activeFg}-fg}`);
+      screen.render();
+
+      playProc.on('exit', () => {
+        if (_playingVoiceId === voiceId) {
+          _playingVoiceId = null;
+          _playingProcess = null;
+          previewLine.setContent('');
+          screen.render();
+        }
+        try { fs.unlinkSync(tempWav); } catch {}
+      });
+
+      playProc.on('error', () => {
+        _playingVoiceId = null;
+        _playingProcess = null;
+        previewLine.setContent('');
+        try { fs.unlinkSync(tempWav); } catch {}
+      });
+    });
+
+    piper.on('error', () => {
+      _playingVoiceId = null;
+      _playingProcess = null;
+      previewLine.setContent('');
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Buttons
 
@@ -339,10 +458,11 @@ export function createVoicesTab(screen, services) {
 
   function _buildListItems(voices, active, favorites) {
     return voices.map(v => {
-      const isFav = favorites.includes(v);
+      const isFav    = favorites.includes(v);
       const isActive = v === active;
-      const star = isFav ? '★' : ' ';
-      const dot = isActive ? '●' : ' ';
+      const isPrev   = v === _playingVoiceId;
+      const star = isFav  ? '★' : ' ';
+      const dot  = isPrev ? '♪' : (isActive ? '●' : ' ');
       return ` ${star}${dot} ${v}`;
     });
   }
@@ -397,12 +517,12 @@ export function createVoicesTab(screen, services) {
     }
   });
 
-  // Enter in voiceList switches voice
-  voiceList.key(['enter'], () => {
+  // Enter / Space → preview voice (toggle: second press stops playback)
+  voiceList.key(['enter', 'space'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
-      providerService.setActiveVoice(selected);
+      _previewVoice(selected);
       refreshDisplay();
     }
   });
@@ -428,6 +548,9 @@ export function createVoicesTab(screen, services) {
     },
 
     hide() {
+      _killPlayingProcess();
+      _playingVoiceId = null;
+      previewLine.setContent('');
       box.hide();
       screen.render();
     },
@@ -437,7 +560,10 @@ export function createVoicesTab(screen, services) {
       screen.render();
     },
 
-    onBlur() {},
+    onBlur() {
+      _killPlayingProcess();
+      _playingVoiceId = null;
+    },
 
     getFooterText() {
       return FOOTER_TEXT;

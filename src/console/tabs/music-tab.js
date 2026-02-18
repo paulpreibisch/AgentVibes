@@ -5,9 +5,13 @@
  * Implements the Tab Component Contract:
  *   createMusicTab(screen, services) → { box, show, hide, onFocus, onBlur, getFooterText, getFooterColor }
  *
- * Features: 12 built-in tracks, custom tracks from config, favorites (★), active track (▶),
- *           toggle music on/off, favorites filter, upload help.
+ * Features: dynamic track library from .claude/audio/tracks/, favorites (★), active track (▶),
+ *           toggle music on/off, favorites filter, preview playback on Enter/Space (toggle).
  */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -34,37 +38,63 @@ const COLORS = {
   footerBg:   '#ff9800',  // Orange — Music tab footer
   noticeFg:   '#90a4ae',
   dimFg:      '#455a64',
+  playingFg:  '#00e5ff',  // Cyan — currently previewing track indicator
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter] Set Active  [M] Toggle Music  [*] Favorite  [F] Fav Filter  [Q] Quit';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter/Space] Preview  [Tab] Buttons  [M] Toggle  [*] Favorite  [F] Filter  [Q] Quit';
 
 // ---------------------------------------------------------------------------
-// Track catalog
+// Static catalog — correct real filenames; Soft Flamenco kept first for compat.
+// At runtime the UI scans .claude/audio/tracks/ dynamically so new tracks appear.
 
 const BUILT_IN_TRACK_CATALOG = Object.freeze([
-  { id: 'agentvibes_soft_flamenco_loop.mp3',    label: 'Soft Flamenco Loop' },
-  { id: 'agentvibes_jazz_ambient_chill.mp3',    label: 'Jazz Ambient Chill' },
-  { id: 'agentvibes_classical_piano_gentle.mp3',label: 'Classical Piano Gentle' },
-  { id: 'agentvibes_lofi_beats_coding.mp3',     label: 'Lo-Fi Beats Coding' },
-  { id: 'agentvibes_electronic_focus.mp3',      label: 'Electronic Focus' },
-  { id: 'agentvibes_blues_smooth_guitar.mp3',   label: 'Blues Smooth Guitar' },
-  { id: 'agentvibes_acoustic_folk_calm.mp3',    label: 'Acoustic Folk Calm' },
-  { id: 'agentvibes_cinematic_epic.mp3',        label: 'Cinematic Epic' },
-  { id: 'agentvibes_nature_sounds_rain.mp3',    label: 'Nature Sounds Rain' },
-  { id: 'agentvibes_white_noise_deep.mp3',      label: 'White Noise Deep' },
-  { id: 'agentvibes_binaural_waves_alpha.mp3',  label: 'Binaural Waves Alpha' },
-  { id: 'agentvibes_orchestral_peaceful.mp3',   label: 'Orchestral Peaceful' },
+  { id: 'agentvibes_soft_flamenco_loop.mp3',                 label: 'Soft Flamenco' },
+  { id: 'agent_vibes_arabic_v2_loop.mp3',                    label: 'Arabic' },
+  { id: 'agent_vibes_bachata_v1_loop.mp3',                   label: 'Bachata' },
+  { id: 'agent_vibes_bossa_nova_v2_loop.mp3',                label: 'Bossa Nova' },
+  { id: 'agent_vibes_celtic_harp_v1_loop.mp3',               label: 'Celtic Harp' },
+  { id: 'agent_vibes_chillwave_v2_loop.mp3',                 label: 'Chillwave' },
+  { id: 'agent_vibes_cumbia_v1_loop.mp3',                    label: 'Cumbia' },
+  { id: 'agent_vibes_dark_chill_step_loop.mp3',              label: 'Dark Chill Step' },
+  { id: 'agent_vibes_ganawa_ambient_v2_loop.mp3',            label: 'Ganawa Ambient' },
+  { id: 'agent_vibes_goa_trance_v2_loop.mp3',                label: 'Goa Trance' },
+  { id: 'agent_vibes_harpsichord_v2_loop.mp3',               label: 'Harpsichord' },
+  { id: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3', label: 'Hawaiian Slack Key Guitar' },
+  { id: 'agent_vibes_japanese_city_pop_v1_loop.mp3',         label: 'Japanese City Pop' },
+  { id: 'agent_vibes_salsa_v2_loop.mp3',                     label: 'Salsa' },
+  { id: 'agent_vibes_tabla_dream_pop_v1_loop.mp3',           label: 'Tabla Dream Pop' },
+  { id: 'dreamy_house_loop.mp3',                             label: 'Dreamy House' },
 ]);
 
 // ---------------------------------------------------------------------------
 // Exported pure helpers (testable without blessed)
 
 /**
- * Return the built-in track catalog.
+ * Return the built-in track catalog (static, predictable for tests).
  * @returns {{ id: string, label: string }[]}
  */
 export function getBuiltInTracks() {
   return [...BUILT_IN_TRACK_CATALOG];
+}
+
+/**
+ * Generate a pretty label from a track filename.
+ * Strips agent_vibes_/agentvibes_ prefix, _loop/_vN suffixes, then title-cases.
+ *
+ * @param {string} filename
+ * @returns {string}
+ */
+export function formatTrackLabel(filename) {
+  const label = filename
+    .replace(/\.mp3$/i, '')
+    .replace(/^agent_vibes_/i, '')
+    .replace(/^agentvibes_/i, '')
+    .replace(/_loop$/i, '')
+    .replace(/_v\d+$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim();
+  return label || filename;
 }
 
 /**
@@ -92,11 +122,38 @@ function createTestStub() {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers (used inside createMusicTab)
 
 /**
- * Get music config object from configService.
- * @param {object} configService
- * @returns {{ enabled: boolean, track: string }}
+ * Resolve the tracks directory for the running project.
+ * @returns {string}
+ */
+function _getTracksDir() {
+  return path.join(process.cwd(), '.claude', 'audio', 'tracks');
+}
+
+/**
+ * Scan .claude/audio/tracks/ for .mp3 files.
+ * Falls back to the static catalog if the directory is absent.
+ *
+ * @returns {{ id: string, label: string, isBuiltIn: boolean }[]}
+ */
+function _scanTracks() {
+  const tracksDir = _getTracksDir();
+  try {
+    const files = fs.readdirSync(tracksDir);
+    return files
+      .filter(f => /\.mp3$/i.test(f))
+      .sort()
+      .map(f => ({ id: f, label: formatTrackLabel(f), isBuiltIn: true }));
+  } catch {
+    // Directory not found or unreadable — use the static catalog
+    return BUILT_IN_TRACK_CATALOG.map(t => ({ ...t, isBuiltIn: true }));
+  }
+}
+
+/**
+ * Get music config from configService.
  */
 function _getMusic(configService) {
   const cfg = configService.getConfig();
@@ -108,9 +165,7 @@ function _getMusic(configService) {
 }
 
 /**
- * Update music config.
- * @param {object} configService
- * @param {Partial<{ enabled: boolean, track: string }>} update
+ * Update music config (merge, never overwrite).
  */
 function _setMusic(configService, update) {
   const current = _getMusic(configService);
@@ -119,8 +174,6 @@ function _setMusic(configService, update) {
 
 /**
  * Get favorites array from config.musicFavorites.
- * @param {object} configService
- * @returns {string[]}
  */
 function _getFavorites(configService) {
   const favs = configService.getConfig().musicFavorites;
@@ -128,9 +181,7 @@ function _getFavorites(configService) {
 }
 
 /**
- * Toggle a track in music favorites.
- * @param {object} configService
- * @param {string} trackId
+ * Toggle a track in the favorites list.
  */
 function _toggleFavorite(configService, trackId) {
   const favs = _getFavorites(configService);
@@ -145,8 +196,6 @@ function _toggleFavorite(configService, trackId) {
 
 /**
  * Get custom tracks from config.
- * @param {object} configService
- * @returns {string[]}
  */
 function _getCustomTracks(configService) {
   const custom = configService.getConfig().customTracks;
@@ -239,6 +288,15 @@ export function createMusicTab(screen, services) {
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
+  const previewLine = blessed.text({
+    parent: box,
+    top: '74%',
+    left: 2,
+    tags: true,
+    content: '',
+    style: { fg: COLORS.playingFg, bg: COLORS.contentBg },
+  });
+
   // -------------------------------------------------------------------------
   // Buttons
 
@@ -325,19 +383,88 @@ export function createMusicTab(screen, services) {
   uploadBtn.left = 55;
 
   // -------------------------------------------------------------------------
-  // State
+  // Playback state
+
+  let _playingProcess = null;
+  let _playingTrackId = null;
+
+  function _killPlayingProcess() {
+    if (_playingProcess && !_playingProcess.killed) {
+      try { _playingProcess.kill('SIGTERM'); } catch {}
+    }
+    _playingProcess = null;
+  }
+
+  /**
+   * Preview a track by spawning an audio player.
+   * Second call with the same trackId stops playback (toggle).
+   */
+  function _playTrack(trackId) {
+    const tracksDir = _getTracksDir();
+    const trackPath = path.resolve(tracksDir, trackId);
+
+    // Guard: path must stay inside tracksDir
+    const safeBase = path.resolve(tracksDir);
+    if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) {
+      return;
+    }
+
+    // Toggle: second press on the same track → stop
+    if (_playingTrackId === trackId) {
+      _killPlayingProcess();
+      _playingTrackId = null;
+      previewLine.setContent('');
+      screen.render();
+      return;
+    }
+
+    // Kill any previously playing track
+    _killPlayingProcess();
+
+    // Spawn: try ffplay (ffmpeg), then play (sox), then mpg123
+    const cmd = [
+      `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}"`,
+      `play "${trackPath}"`,
+      `mpg123 -q "${trackPath}"`,
+    ].join(' 2>/dev/null || ') + ' 2>/dev/null';
+
+    _playingProcess = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: false });
+    _playingTrackId = trackId;
+
+    const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
+    previewLine.setContent(`{${COLORS.playingFg}-fg}♪ Previewing: ${label}  (press Enter/Space again to stop){/${COLORS.playingFg}-fg}`);
+    screen.render();
+
+    _playingProcess.on('exit', () => {
+      if (_playingTrackId === trackId) {
+        _playingTrackId = null;
+        _playingProcess = null;
+        previewLine.setContent('');
+        screen.render();
+      }
+    });
+
+    _playingProcess.on('error', () => {
+      _playingTrackId = null;
+      _playingProcess = null;
+      previewLine.setContent('');
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Display state
 
   let _showFavoritesOnly = false;
-  let _allTracks = [];  // { id, label, isBuiltIn }
+  let _allTracks = [];
 
   function _buildAllTracks() {
-    const builtIn = BUILT_IN_TRACK_CATALOG.map(t => ({ ...t, isBuiltIn: true }));
-    const custom = _getCustomTracks(configService).map(id => ({
-      id,
-      label: id.replace(/\.[^.]+$/, '').replace(/_/g, ' '),
-      isBuiltIn: false,
-    }));
-    return [...builtIn, ...custom];
+    const scanned = _scanTracks();
+    const scannedIds = new Set(scanned.map(t => t.id));
+    // Append custom tracks not already present from disk scan
+    const custom = _getCustomTracks(configService)
+      .filter(id => !scannedIds.has(id))
+      .map(id => ({ id, label: formatTrackLabel(id), isBuiltIn: false }));
+    return [...scanned, ...custom];
   }
 
   function _getVisibleTracks() {
@@ -354,10 +481,11 @@ export function createMusicTab(screen, services) {
 
   function _buildListItems(tracks, activeTrackId, favorites) {
     return tracks.map(t => {
-      const isFav = favorites.includes(t.id);
-      const isActive = t.id === activeTrackId;
-      const star = isFav ? '★' : ' ';
-      const dot  = isActive ? '▶' : ' ';
+      const isFav     = favorites.includes(t.id);
+      const isActive  = t.id === activeTrackId;
+      const isPrev    = t.id === _playingTrackId;
+      const star = isFav  ? '★' : ' ';
+      const dot  = isPrev ? '♪' : (isActive ? '▶' : ' ');
       const tag  = t.isBuiltIn ? '' : ' [custom]';
       return ` ${star}${dot} ${t.label}${tag}`;
     });
@@ -370,9 +498,8 @@ export function createMusicTab(screen, services) {
     const visible = _getVisibleTracks();
     const items = _buildListItems(visible, activeTrackId, favorites);
 
-    const activeLabel = BUILT_IN_TRACK_CATALOG.find(t => t.id === activeTrackId)?.label
-      ?? activeTrackId?.replace(/\.[^.]+$/, '').replace(/_/g, ' ')
-      ?? 'None';
+    const activeTrack = _allTracks.find(t => t.id === activeTrackId);
+    const activeLabel = (activeTrack?.label ?? formatTrackLabel(activeTrackId ?? '')) || 'None';
 
     trackList.setItems(items.length > 0 ? items : [' (no tracks match filter)']);
     statusLine.setContent(
@@ -385,16 +512,25 @@ export function createMusicTab(screen, services) {
   // -------------------------------------------------------------------------
   // Key bindings on trackList
 
-  // [Enter] → set active track
+  // [Enter] → preview/stop track (toggle)
   trackList.key(['enter'], () => {
     const trackId = _getSelectedTrackId();
     if (trackId) {
-      _setMusic(configService, { track: trackId });
+      _playTrack(trackId);
       refreshDisplay();
     }
   });
 
-  // [m/M] → toggle music
+  // [Space] → same as Enter: preview/stop track (toggle)
+  trackList.key(['space'], () => {
+    const trackId = _getSelectedTrackId();
+    if (trackId) {
+      _playTrack(trackId);
+      refreshDisplay();
+    }
+  });
+
+  // [m/M] → toggle music enabled in config
   trackList.key(['m', 'M'], () => {
     const { enabled } = _getMusic(configService);
     _setMusic(configService, { enabled: !enabled });
@@ -416,10 +552,11 @@ export function createMusicTab(screen, services) {
     refreshDisplay();
   });
 
-  // Update status on selection change
+  // Refresh status text on cursor movement
   trackList.on('select item', () => {
     const { enabled, track: activeTrackId } = _getMusic(configService);
-    const activeLabel = BUILT_IN_TRACK_CATALOG.find(t => t.id === activeTrackId)?.label ?? activeTrackId ?? 'None';
+    const activeTrack = _allTracks.find(t => t.id === activeTrackId);
+    const activeLabel = (activeTrack?.label ?? formatTrackLabel(activeTrackId ?? '')) || 'None';
     statusLine.setContent(
       `  Music: ${formatMusicStatus(enabled)}  |  Active Track: ${activeLabel}  |  Filter: ${_showFavoritesOnly ? 'Favorites' : 'All'}`
     );
@@ -439,6 +576,10 @@ export function createMusicTab(screen, services) {
     },
 
     hide() {
+      // Stop any preview when leaving the tab
+      _killPlayingProcess();
+      _playingTrackId = null;
+      previewLine.setContent('');
       box.hide();
       screen.render();
     },
@@ -448,7 +589,11 @@ export function createMusicTab(screen, services) {
       screen.render();
     },
 
-    onBlur() {},
+    onBlur() {
+      // Stop preview when focus leaves Music tab
+      _killPlayingProcess();
+      _playingTrackId = null;
+    },
 
     getFooterText() {
       return FOOTER_TEXT;
