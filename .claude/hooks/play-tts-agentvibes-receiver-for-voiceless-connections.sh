@@ -29,11 +29,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Get SSH host from config
-# Checks agentvibes-receiver-host.txt first, falls back to legacy ssh-remote-host.txt
 SSH_HOST=$(cat "$PROJECT_ROOT/.claude/agentvibes-receiver-host.txt" 2>/dev/null || \
-           cat "$HOME/.claude/agentvibes-receiver-host.txt" 2>/dev/null || \
-           cat "$PROJECT_ROOT/.claude/ssh-remote-host.txt" 2>/dev/null || \
-           cat "$HOME/.claude/ssh-remote-host.txt" 2>/dev/null || echo "")
+           cat "$HOME/.claude/agentvibes-receiver-host.txt" 2>/dev/null || echo "")
 
 if [[ -z "$SSH_HOST" ]]; then
   echo "❌ AgentVibes Receiver host not configured" >&2
