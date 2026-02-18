@@ -11,6 +11,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
@@ -388,12 +389,20 @@ export function createMusicTab(screen, services) {
   let _playingProcess = null;
   let _playingTrackId = null;
 
+  // Kill the entire process group so child audio processes (ffplay, play, mpg123) all die
   function _killPlayingProcess() {
-    if (_playingProcess && !_playingProcess.killed) {
-      try { _playingProcess.kill('SIGTERM'); } catch {}
+    if (_playingProcess) {
+      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      _playingProcess = null;
     }
-    _playingProcess = null;
   }
+
+  // Extended PATH for audio players (ffplay, play, mpg123)
+  const _spawnEnv = {
+    ...process.env,
+    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+      .filter(Boolean).join(':'),
+  };
 
   /**
    * Preview a track by spawning an audio player.
@@ -420,6 +429,7 @@ export function createMusicTab(screen, services) {
 
     // Kill any previously playing track
     _killPlayingProcess();
+    _playingTrackId = null;
 
     // Spawn: try ffplay (ffmpeg), then play (sox), then mpg123
     const cmd = [
@@ -428,7 +438,7 @@ export function createMusicTab(screen, services) {
       `mpg123 -q "${trackPath}"`,
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
-    _playingProcess = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: false });
+    _playingProcess = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: true, env: _spawnEnv });
     _playingTrackId = trackId;
 
     const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);

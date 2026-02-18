@@ -270,15 +270,23 @@ export function createVoicesTab(screen, services) {
   let _playingProcess = null;
   let _playingVoiceId = null;
 
+  // Kill the entire process group so child audio players (piper, aplay, play) all die
   function _killPlayingProcess() {
-    if (_playingProcess && !_playingProcess.killed) {
-      try { _playingProcess.kill('SIGTERM'); } catch {}
+    if (_playingProcess) {
+      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      _playingProcess = null;
     }
-    _playingProcess = null;
   }
 
+  // Extended PATH so piper (installed via pipx to ~/.local/bin) is found
+  const _spawnEnv = {
+    ...process.env,
+    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+      .filter(Boolean).join(':'),
+  };
+
   /**
-   * Preview a voice by synthesizing a sample phrase with piper.
+   * Preview a voice by synthesizing a sample phrase with piper, then playing the wav.
    * Second call with the same voice stops playback (toggle).
    */
   function _previewVoice(voiceId) {
@@ -291,8 +299,9 @@ export function createVoicesTab(screen, services) {
       return;
     }
 
-    // Kill any current preview
+    // Kill any current preview first
     _killPlayingProcess();
+    _playingVoiceId = null;
 
     // Validate model path stays within PIPER_VOICES_DIR
     const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
@@ -304,11 +313,13 @@ export function createVoicesTab(screen, services) {
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
     const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
-    // Synthesize via piper using stdin (no shell injection)
+    // Synthesize: spawn piper in its own process group; pass text via stdin with newline
     const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
       stdio: ['pipe', 'ignore', 'ignore'],
+      detached: true,
+      env: _spawnEnv,
     });
-    piper.stdin.write(phrase);
+    piper.stdin.write(phrase + '\n');
     piper.stdin.end();
 
     _playingProcess = piper;
@@ -319,7 +330,7 @@ export function createVoicesTab(screen, services) {
 
     piper.on('exit', (code) => {
       if (_playingVoiceId !== voiceId) {
-        // Stopped by user before synthesis finished
+        // User stopped before synthesis finished
         try { fs.unlinkSync(tempWav); } catch {}
         return;
       }
@@ -327,17 +338,22 @@ export function createVoicesTab(screen, services) {
       if (code !== 0) {
         _playingVoiceId = null;
         _playingProcess = null;
-        previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Preview failed (piper error){/${COLORS.activeFg}-fg}`);
+        previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Preview failed (piper error — is piper installed?){/${COLORS.activeFg}-fg}`);
         screen.render();
+        setTimeout(() => { previewLine.setContent(''); screen.render(); }, 4000);
         return;
       }
 
-      // Play the synthesized wav
-      const cmd = `play "${tempWav}" 2>/dev/null || aplay "${tempWav}" 2>/dev/null`;
-      const playProc = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: false });
+      // Play the synthesized wav in its own process group so we can kill it
+      const cmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
+      const playProc = spawn('sh', ['-c', cmd], {
+        stdio: 'ignore',
+        detached: true,
+        env: _spawnEnv,
+      });
       _playingProcess = playProc;
 
-      previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing: ${voiceId}  (press Enter/Space again to stop){/${COLORS.activeFg}-fg}`);
+      previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing: ${voiceId}  (Enter/Space to stop){/${COLORS.activeFg}-fg}`);
       screen.render();
 
       playProc.on('exit', () => {
@@ -361,7 +377,9 @@ export function createVoicesTab(screen, services) {
     piper.on('error', () => {
       _playingVoiceId = null;
       _playingProcess = null;
-      previewLine.setContent('');
+      previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Cannot find piper — install with: pipx install piper-tts{/${COLORS.activeFg}-fg}`);
+      screen.render();
+      setTimeout(() => { previewLine.setContent(''); screen.render(); }, 4000);
     });
   }
 
