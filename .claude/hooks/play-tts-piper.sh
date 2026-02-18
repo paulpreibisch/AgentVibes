@@ -363,7 +363,15 @@ fi
 # @why Support multiple audio players and prevent overlapping audio in learning mode
 # @param Uses global: $TEMP_FILE, $CURRENT_LANGUAGE
 # @sideeffects Plays audio with lock mechanism for sequential playback
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+# Use a group-shared lock directory if available (no sticky bit = any tts-users member can clear stale locks)
+# Falls back to /tmp for systems without /run/agentvibes set up
+if [[ -d "/run/agentvibes" ]] && [[ -w "/run/agentvibes" ]]; then
+  LOCK_FILE="/run/agentvibes/audio.lock"
+elif [[ -d "/tmp/agentvibes-locks" ]] && [[ -w "/tmp/agentvibes-locks" ]]; then
+  LOCK_FILE="/tmp/agentvibes-locks/audio.lock"
+else
+  LOCK_FILE="/tmp/agentvibes-audio.lock"
+fi
 
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do
@@ -373,10 +381,20 @@ for i in {1..4}; do
   sleep 0.5
 done
 
-# If still locked after 2 seconds, skip this TTS to prevent blocking Claude
+# Auto-heal: if lock is stale (>10s old) and no audio process is running, remove it
+# This handles crashes, killed processes, or cross-user lock conflicts
 if [ -f "$LOCK_FILE" ]; then
-  echo "⏭️  Skipping TTS (previous audio still playing)" >&2
-  exit 0
+  LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0) ))
+  pgrep -x piper > /dev/null 2>&1; PIPER_RUNNING=$?
+  pgrep -x aplay > /dev/null 2>&1; APLAY_RUNNING=$?
+  pgrep -x paplay > /dev/null 2>&1; PAPLAY_RUNNING=$?
+  if [ "$LOCK_AGE" -gt 10 ] && [ "$PIPER_RUNNING" -ne 0 ] && [ "$APLAY_RUNNING" -ne 0 ] && [ "$PAPLAY_RUNNING" -ne 0 ]; then
+    echo "🔧 Auto-healed stale TTS lock (age: ${LOCK_AGE}s)" >&2
+    rm -f "$LOCK_FILE"
+  else
+    echo "⏭️  Skipping TTS (previous audio still playing)" >&2
+    exit 0
+  fi
 fi
 
 # Track last target language audio for replay command
@@ -412,7 +430,7 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
     PLAYER_PID=$!
   else
     # Linux/WSL: Prefer paplay (PulseAudio) for best WSL audio quality
-    (paplay "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
+    (paplay --latency-msec=300 "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
     PLAYER_PID=$!
   fi
 fi
