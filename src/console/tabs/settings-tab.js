@@ -533,7 +533,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 1,
     left: 2,
-    content: `{#7986cb-fg}🎤  Provider & Voice ${'─'.repeat(50)}{/#7986cb-fg}`,
+    width: '100%-6',
+    content: `{#7986cb-fg}🎤  Provider & Voice ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -553,7 +554,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 3,
     left: 22,
-    width: 16,    // truncate before [Switch] at left:40
+    width: 26,    // truncate before [Switch] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -567,7 +569,7 @@ export function createSettingsTab(screen, services) {
     });
   });
   switchBtn.top = 3;
-  switchBtn.left = 40;
+  switchBtn.left = 52;
 
   // -------------------------------------------------------------------------
   // Voice row: label + value + [Change] button (stub for story 7-8)
@@ -584,7 +586,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 5,
     left: 22,
-    width: 16,    // truncate before [Change] at left:40
+    width: 26,    // truncate before [Change] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -597,7 +600,7 @@ export function createSettingsTab(screen, services) {
     });
   });
   changeBtn.top = 5;
-  changeBtn.left = 40;
+  changeBtn.left = 52;
 
   const playBtn = _createButton(box, screen, '▶ Play', COLORS, () => {
     if (_samplePlaying) {
@@ -660,7 +663,7 @@ export function createSettingsTab(screen, services) {
     }
   });
   playBtn.top = 5;
-  playBtn.left = 52;
+  playBtn.left = 64;
 
   // -------------------------------------------------------------------------
   // Section header: ── Audio Effects ──
@@ -669,7 +672,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 9,
     left: 2,
-    content: `{#7986cb-fg}⚡  Audio Effects ${'─'.repeat(52)}{/#7986cb-fg}`,
+    width: '100%-6',
+    content: `{#7986cb-fg}⚡  Audio Effects ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -689,7 +693,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 11,
     left: 22,
-    width: 16,    // truncate before [Change] at left:40
+    width: 26,    // truncate before [Change] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -701,11 +706,11 @@ export function createSettingsTab(screen, services) {
     });
   });
   reverbChangeBtn.top = 11;
-  reverbChangeBtn.left = 40;
+  reverbChangeBtn.left = 52;
 
   const reverbTestBtn = _createButton(box, screen, 'Test', COLORS, () => _runTest(false));
   reverbTestBtn.top = 11;
-  reverbTestBtn.left = 52;
+  reverbTestBtn.left = 64;
 
   // -------------------------------------------------------------------------
   // Section header: ── Background Music ──
@@ -714,7 +719,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 13,
     left: 2,
-    content: `{#7986cb-fg}🎸  Background Music ${'─'.repeat(48)}{/#7986cb-fg}`,
+    width: '100%-6',
+    content: `{#7986cb-fg}🎸  Background Music ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -734,7 +740,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 15,
     left: 22,
-    width: 16,    // truncate before [Change] at left:40
+    width: 26,    // truncate before [Change] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -745,7 +752,7 @@ export function createSettingsTab(screen, services) {
     });
   });
   trackChangeBtn.top = 15;
-  trackChangeBtn.left = 40;
+  trackChangeBtn.left = 52;
 
   const musicToggleBtn = _createButton(box, screen, 'Disabled', COLORS, () => {
     const music = _getMusic(configService);
@@ -753,11 +760,11 @@ export function createSettingsTab(screen, services) {
     refreshDisplay();
   });
   musicToggleBtn.top = 15;
-  musicToggleBtn.left = 52;
+  musicToggleBtn.left = 64;
 
   const musicTestBtn = _createButton(box, screen, 'Test', COLORS, _runMusicTest);
   musicTestBtn.top = 15;
-  musicTestBtn.left = 66;
+  musicTestBtn.left = 78;
 
   // -------------------------------------------------------------------------
   // Section header: ── Personality & Verbosity ──
@@ -766,7 +773,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 19,
     left: 2,
-    content: `{#7986cb-fg}🌈  Personality & Verbosity ${'─'.repeat(40)}{/#7986cb-fg}`,
+    width: '100%-6',
+    content: `{#7986cb-fg}🌈  Personality & Verbosity ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -786,7 +794,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 21,
     left: 22,
-    width: 16,    // truncate before [Change] at left:40
+    width: 26,    // truncate before [Change] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -795,7 +804,7 @@ export function createSettingsTab(screen, services) {
     _openVerbosityPicker(screen, configService, () => refreshDisplay());
   });
   verbosityChangeBtn.top = 21;
-  verbosityChangeBtn.left = 40;
+  verbosityChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
   // Personality row: label + value + [Change] button
@@ -812,7 +821,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 23,
     left: 22,
-    width: 16,    // truncate before [Change] at left:40
+    width: 26,    // truncate before [Change] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -824,7 +834,7 @@ export function createSettingsTab(screen, services) {
     });
   });
   personalityChangeBtn.top = 23;
-  personalityChangeBtn.left = 40;
+  personalityChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
   // Section header: ── Intro Text ──
@@ -833,7 +843,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 27,
     left: 2,
-    content: `{#7986cb-fg}✍️  Intro Text ${'─'.repeat(54)}{/#7986cb-fg}`,
+    width: '100%-6',
+    content: `{#7986cb-fg}✍️  Intro Text ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -853,7 +864,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 29,
     left: 22,
-    width: 16,    // truncate before [Edit] at left:40
+    width: 26,    // truncate before [Edit] at left:40
+    wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -862,14 +874,14 @@ export function createSettingsTab(screen, services) {
     _openIntroTextEditor(screen, configService, () => { refreshDisplay(); });
   });
   introEditBtn.top = 29;
-  introEditBtn.left = 40;
+  introEditBtn.left = 52;
 
   const introClearBtn = _createButton(box, screen, 'Clear', COLORS, () => {
     configService.set('pretext', '');
     refreshDisplay();
   });
   introClearBtn.top = 29;
-  introClearBtn.left = 50;
+  introClearBtn.left = 64;
 
   // -------------------------------------------------------------------------
   // Section header: 🚀 Full Preview (top-anchored, just below intro text)
@@ -878,7 +890,8 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 33,
     left: 2,
-    content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(52)}{/#7986cb-fg}`,
+    width: '100%-6',
+    content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
