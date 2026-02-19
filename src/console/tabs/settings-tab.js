@@ -71,18 +71,18 @@ const PERSONALITIES = Object.freeze([
 
 // Human-readable track display names
 const TRACK_NAMES = Object.freeze({
-  'agentvibes_soft_flamenco_loop.mp3':      'Soft Flamenco',
-  'agent_vibes_bossa_nova_v2_loop.mp3':     'Bossa Nova',
-  'agent_vibes_chillwave_v2_loop.mp3':      'Chillwave',
-  'agent_vibes_ganawa_ambient_v2_loop.mp3': 'Gnawa Ambient',
+  'agentvibes_soft_flamenco_loop.mp3':      '🎸 Soft Flamenco',
+  'agent_vibes_bossa_nova_v2_loop.mp3':     '🎷 Bossa Nova',
+  'agent_vibes_chillwave_v2_loop.mp3':      '🌊 Chillwave',
+  'agent_vibes_ganawa_ambient_v2_loop.mp3': '🪘 Gnawa Ambient',
 });
 
 // Built-in track list for the picker
 const BUILT_IN_TRACKS = [
-  { label: 'Soft Flamenco',  file: 'agentvibes_soft_flamenco_loop.mp3' },
-  { label: 'Bossa Nova',     file: 'agent_vibes_bossa_nova_v2_loop.mp3' },
-  { label: 'Chillwave',      file: 'agent_vibes_chillwave_v2_loop.mp3' },
-  { label: 'Gnawa Ambient',  file: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
+  { label: '🎸 Soft Flamenco',  file: 'agentvibes_soft_flamenco_loop.mp3' },
+  { label: '🎷 Bossa Nova',     file: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+  { label: '🌊 Chillwave',      file: 'agent_vibes_chillwave_v2_loop.mp3' },
+  { label: '🪘 Gnawa Ambient',  file: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,10 @@ export function formatMusicState(enabled) {
  */
 export function formatTrackName(track) {
   if (!track) return 'None';
-  return TRACK_NAMES[track] ?? track.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+  if (TRACK_NAMES[track]) return TRACK_NAMES[track];
+  // Custom track: strip extension, underscores→spaces, title-case each word
+  return track.replace(/\.[^.]+$/, '').replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
 }
 
 /**
@@ -1021,7 +1024,7 @@ export function createSettingsTab(screen, services) {
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
     const activeVoice = providerService.getActiveVoiceId();
-    providerValue.setContent(activeProvider);
+    providerValue.setContent(_ALL_PROVIDERS.find(p => p.id === activeProvider)?.name ?? activeProvider);
     // Single-voice providers: show the provider name instead of voice ID
     voiceValue.setContent(activeProvider === 'soprano' ? 'Soprano' : activeVoice);
 
@@ -1181,7 +1184,7 @@ function _openProviderPicker(screen, providerService, onSelect) {
     top: 'center',
     left: 'center',
     width: 70,
-    height: 20,
+    height: 24,
     border: { type: 'line' },
     tags: true,
     label: _modalTitle('Select Provider'),
@@ -1215,7 +1218,7 @@ function _openProviderPicker(screen, providerService, onSelect) {
   let focusIdx = 0;
 
   _ALL_PROVIDERS.forEach((prov, i) => {
-    const rowTop      = 2 + i;
+    const rowTop      = 2 + (i * 2);   // 2 rows per provider: name row + description row
     const isSupported = prov.platforms.includes(platform);
     const isInstalled = installed.has(prov.id);
     const isCurrent   = prov.id === current;
@@ -1225,7 +1228,12 @@ function _openProviderPicker(screen, providerService, onSelect) {
       const forOs = prov.platforms.map(p => osMap[p] ?? p).join('/');
       blessed.text({
         parent: modal, top: rowTop, left: 1, width: 66, tags: true,
-        content: `{#546e7a-fg}✗  ${prov.name.padEnd(14)} ${prov.desc.padEnd(28)}  only on: ${forOs}{/#546e7a-fg}`,
+        content: `{#546e7a-fg}✗  ${prov.name}  — only on: ${forOs}{/#546e7a-fg}`,
+        style: { bg: COLORS.contentBg },
+      });
+      blessed.text({
+        parent: modal, top: rowTop + 1, left: 5, width: 62, tags: true,
+        content: `{#455a64-fg}${prov.desc}{/#455a64-fg}`,
         style: { bg: COLORS.contentBg },
       });
       return;
@@ -1236,9 +1244,10 @@ function _openProviderPicker(screen, providerService, onSelect) {
     const active = isCurrent   ? ' {yellow-fg}[active]{/yellow-fg}' : '';
     const status = isInstalled ? '{green-fg}Installed{/green-fg}' : '{#ef9a9a-fg}Not found{/#ef9a9a-fg}';
 
-    blessed.text({ parent: modal, top: rowTop, left: 1,  width: 20, tags: true, content: `${icon}  ${name}${active}`, style: { bg: COLORS.contentBg } });
-    blessed.text({ parent: modal, top: rowTop, left: 20, width: 24, tags: true, content: `{#90a4ae-fg}${prov.desc}{/#90a4ae-fg}`, style: { bg: COLORS.contentBg } });
-    blessed.text({ parent: modal, top: rowTop, left: 44, width: 12, tags: true, content: status, style: { bg: COLORS.contentBg } });
+    blessed.text({ parent: modal, top: rowTop,     left: 1,  width: 30, tags: true, content: `${icon}  ${name}${active}`, style: { bg: COLORS.contentBg } });
+    blessed.text({ parent: modal, top: rowTop,     left: 44, width: 12, tags: true, content: status,                      style: { bg: COLORS.contentBg } });
+    blessed.text({ parent: modal, top: rowTop + 1, left: 5,  width: 60, tags: true,
+      content: `{#90a4ae-fg}${prov.desc}{/#90a4ae-fg}`, style: { bg: COLORS.contentBg } });
 
     const btn = _createButton(modal, screen, isInstalled ? 'Select' : 'Install', COLORS, () => {
       if (isInstalled) {
@@ -1255,25 +1264,25 @@ function _openProviderPicker(screen, providerService, onSelect) {
     actionBtns.push(btn);
   });
 
-  // Separator + instructions panel
-  blessed.text({ parent: modal, top: 6, left: 0, content: ' ' + '─'.repeat(66), style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg } });
+  // Separator + instructions panel (shifted down 4 rows due to 2-row provider layout)
+  blessed.text({ parent: modal, top: 10, left: 0, content: ' ' + '─'.repeat(66), style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg } });
 
   const instrTitle = blessed.text({
-    parent: modal, top: 7, left: 1, width: 66, tags: true,
+    parent: modal, top: 11, left: 1, width: 66, tags: true,
     content: '{#7986cb-fg}Install instructions — click Install beside a provider:{/#7986cb-fg}',
     style: { bg: COLORS.contentBg },
   });
   const instrContent = blessed.text({
-    parent: modal, top: 8, left: 3, width: 64, height: 5, tags: true,
+    parent: modal, top: 12, left: 3, width: 64, height: 5, tags: true,
     content: '{#546e7a-fg}(click Install beside a provider to see commands){/#546e7a-fg}',
     style: { bg: COLORS.contentBg },
   });
 
   // Bottom separator + Cancel
-  blessed.text({ parent: modal, top: 14, left: 0, content: ' ' + '─'.repeat(66), style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg } });
+  blessed.text({ parent: modal, top: 18, left: 0, content: ' ' + '─'.repeat(66), style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg } });
 
   const cancelBtn = _createButton(modal, screen, 'Cancel', COLORS, _close);
-  cancelBtn.top = 15; cancelBtn.left = 'center';
+  cancelBtn.top = 19; cancelBtn.left = 'center';
   actionBtns.push(cancelBtn);
 
   // Keyboard navigation
