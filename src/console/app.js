@@ -123,55 +123,96 @@ export class AgentVibesConsole {
   _createHeader() {
     const cwd = process.cwd();
 
-    const header = blessed.box({
+    this.headerBox = blessed.box({
       top: 0,
       left: 0,
       width: '100%',
       height: 3,
-      content: `{bold}AgentVibes v4.0 TUI Console{/bold}  │  ⭐ github.com/preibisch/agentvibes  │  📁 ${cwd}`,
       tags: true,
-      style: {
-        fg: COLORS.textWhite,
-        bg: COLORS.headerBg,
-      },
-      padding: { left: 1 },
+      wrap: false,
+      scrollable: false,
+      valign: 'middle',
+      padding: { left: 2 },
+      style: { fg: COLORS.textWhite, bg: COLORS.headerBg },
     });
-
-    this.screen.append(header);
+    // Append FIRST so this.screen is set, then setContent so tags parse correctly.
+    // Use {bright-cyan-fg}/{bright-magenta-fg} — standard ANSI 36/35 are too dark
+    // against the navy background; bright variants (96/95) are clearly visible.
+    this.screen.append(this.headerBox);
+    this.headerBox.setContent(
+      `{bright-cyan-fg}Agent{/bright-cyan-fg}{#ffc0cb-fg}Vibes{/#ffc0cb-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}4.0{/#ffd700-fg}  \u2502  \uD83D\uDCC1 working folder: ${cwd}`
+    );
   }
 
   // ---------------------------------------------------------------------------
-  // Private: Tab bar (row 3) — populated with real tabs in story 6.2
+  // Private: Tab bar (row 3) — individual child boxes, no tag parsing.
+  // Each tab is a separate blessed.box. Active tab highlighted via style update.
 
   _createTabBar() {
-    // tags: true enables {#color-bg}/{bold} inline tags for active tab highlight
     this.tabBarBox = blessed.box({
       top: 3,
       left: 0,
       width: '100%',
       height: 1,
-      content: ' [ Loading tabs... ]',
-      tags: true,
-      style: {
-        fg: COLORS.textDim,
-        bg: COLORS.tabBarBg,
-      },
+      style: { bg: COLORS.tabBarBg },
     });
-
+    // Attach to screen FIRST so tabBarBox.screen is set before children are
+    // created. Child boxes inherit screen from parent via blessed's insert().
+    // If children are created before the parent is attached, el.screen = null
+    // and they render at position (0,0) — the header row area.
     this.screen.append(this.tabBarBox);
+
+    // One box per tab — positioned sequentially. No tag parsing, no wrapping.
+    this._tabItems = {};
+    let xOffset = 1;
+    for (const id of TAB_ORDER) {
+      const label = TAB_DISPLAY_LABELS[id];
+      const text = ` [${label[0]}] ${label} `;
+      const el = blessed.box({
+        parent: this.tabBarBox,
+        top: 0,
+        left: xOffset,
+        width: text.length,
+        height: 1,
+        content: text,
+        tags: false,
+        style: { fg: COLORS.focusCyan, bg: COLORS.tabBarBg },
+      });
+      this._tabItems[id] = el;
+      xOffset += text.length + 1; // 1-space gap between tabs
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: Update tab bar — set active item style, reset all others.
+
+  _updateTabBar(activeTabId) {
+    if (!this._tabItems) return; // guard: not initialized in test mode
+    for (const [id, el] of Object.entries(this._tabItems)) {
+      if (id === activeTabId) {
+        el.style.fg = 'white';
+        el.style.bg = COLORS.activeTab;
+        el.style.bold = true;
+      } else {
+        el.style.fg = COLORS.focusCyan;
+        el.style.bg = COLORS.tabBarBg;
+        el.style.bold = false;
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
   // Private: Render tab bar content string for given active tab
+  // (kept as a pure helper for unit tests; real rendering uses _updateTabBar)
 
   _renderTabBarContent(activeTabId) {
     return TAB_ORDER.map(id => {
       const label = TAB_DISPLAY_LABELS[id];
       if (id === activeTabId) {
-        return `{#3949ab-bg}{bold}{white-fg} [${label[0]}] ${label} {/white-fg}{/bold}{/#3949ab-bg}`;
+        return `{bold}{white-fg}[${label[0]}] ${label}{/white-fg}{/bold}`;
       }
-      return `{#82b1ff-fg} [${label[0]}] ${label} {/#82b1ff-fg}`;
-    }).join('');
+      return `{#82b1ff-fg}[${label[0]}] ${label}{/#82b1ff-fg}`;
+    }).join('  ');
   }
 
   // ---------------------------------------------------------------------------
@@ -327,29 +368,73 @@ export class AgentVibesConsole {
 
     // On every tab switch: update tab bar, context footer, and show/hide tab boxes
     this.navigationService.onSwitch(tabId => {
-      // Update tab bar highlighting
-      this.tabBarBox.setContent(this._renderTabBarContent(tabId));
+      const activeTab = this.tabs[tabId];
 
-      // Update context footer color + shortcuts (story 6.3)
-      this._updateContextFooter(tabId);
+      // Render-suppression tab switch:
+      //   All show/hide calls and UI updates happen inside this window so zero
+      //   intermediate frames are sent to the terminal. A single clean render
+      //   fires at the end, when exactly one tab is visible.
+      const _origRender = this.screen.render.bind(this.screen);
+      this.screen.render = () => {};
 
-      // Show active tab, hide all others.
-      // Real tab components (Tab Component Contract) expose show/hide/onFocus/onBlur.
-      // Placeholder tabs are plain blessed boxes with a .hidden property.
-      for (const [id, tab] of Object.entries(this.tabs)) {
-        if (typeof tab.show === 'function') {
-          if (id === tabId) {
-            tab.show();
-            tab.onFocus();
-          } else {
-            tab.hide();
-            tab.onBlur();
+      try {
+        // Nuclear clear: wipe from the tab bar row (3) through the content area.
+        // blessed's render loop never resets the `lines` buffer before rendering
+        // (see: blessed/lib/widgets/screen.js line 733, commented-out clear).
+        // Without this, stale cell content from the previous tab persists in
+        // `lines` and bleeds through whenever cells aren't fully overwritten.
+        this.screen.clearRegion(0, this.screen.cols, 2, this.screen.rows - 2);
+
+        // Force-invalidate olines from the header's last row (2) through the
+        // content area. Row 2 (header bottom) and row 3 (tab bar) accumulate
+        // ghost rendering artifacts — draw() skips them when lines==olines even
+        // though the terminal still shows stale chars from earlier renders.
+        // Setting attr=-1 is impossible for any real cell, so draw() is forced
+        // to physically rewrite every cell on the next render call.
+        for (let r = 2; r < this.screen.rows - 2; r++) {
+          const orow = this.screen.olines[r];
+          if (!orow) continue;
+          for (let c = 0; c < this.screen.cols; c++) {
+            if (orow[c]) orow[c][0] = -1; // impossible attr — forces draw() rewrite
           }
-        } else {
-          tab.hidden = (id !== tabId);
+          orow.dirty = true;
         }
+
+        // Update tab bar and footer inside suppression — no intermediate render.
+        this._updateTabBar(tabId);
+        this._updateContextFooter(tabId);
+
+        // Hide all inactive tabs via their proper hide() method so side-effects
+        // (e.g. voice preview kill, previewLine clear) run correctly.
+        for (const [id, tab] of Object.entries(this.tabs)) {
+          if (id !== tabId) {
+            if (typeof tab.hide === 'function') tab.hide();
+            else tab.hidden = true;
+            if (typeof tab.onBlur === 'function') tab.onBlur();
+          }
+        }
+
+        // Show the active tab via show() so refreshDisplay() populates labels.
+        if (activeTab) {
+          if (typeof activeTab.show === 'function') {
+            activeTab.show();
+            // setFront() moves the box to the end of screen.children so it
+            // paints last (on top) — belt-and-suspenders against any z-order issue.
+            if (activeTab.box && typeof activeTab.box.setFront === 'function') {
+              activeTab.box.setFront();
+            }
+          } else {
+            activeTab.hidden = false;
+          }
+        }
+      } finally {
+        // Always restore render even if something throws.
+        this.screen.render = _origRender;
       }
 
+      if (activeTab && typeof activeTab.onFocus === 'function') {
+        activeTab.onFocus();
+      }
       this.screen.render();
     });
 

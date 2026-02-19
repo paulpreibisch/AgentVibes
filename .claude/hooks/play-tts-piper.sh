@@ -42,9 +42,7 @@ TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice model name
 
 # Source voice manager and language manager
-# Use readlink -f to handle symlinks correctly
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/piper-voice-manager.sh"
 source "$SCRIPT_DIR/language-manager.sh"
 source "$SCRIPT_DIR/audio-cache-utils.sh"
@@ -431,8 +429,14 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
     termux-media-player play "$TEMP_FILE" >/dev/null 2>&1 &
     PLAYER_PID=$!
   else
-    # Linux/WSL: Prefer paplay (PulseAudio) for best WSL audio quality
-    (paplay --latency-msec=300 "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
+    # Linux/WSL: Use aplay directly on WSLg (PulseAudio drain timeout is unreliable).
+    # Fall back to paplay/mpv on standard Linux without WSLg.
+    if [[ -S "/mnt/wslg/PulseServer" ]]; then
+      # WSLg detected: aplay bypasses PulseAudio and plays directly via ALSA
+      (aplay "$TEMP_FILE" || mpv "$TEMP_FILE") >/dev/null 2>&1 &
+    else
+      (paplay --latency-msec=300 "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
+    fi
     PLAYER_PID=$!
   fi
 fi

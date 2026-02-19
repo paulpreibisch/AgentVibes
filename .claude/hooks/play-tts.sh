@@ -127,6 +127,60 @@ TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 TEXT="${TEXT//\\\\/\\}"      # Remove \\ (escaped backslash)
 
+# @function read_pretext_from_json
+# @intent Read pretext string from agentvibes.json config
+# @security Validates file ownership before reading (prevents symlink attacks)
+# @param $1 path to agentvibes.json
+read_pretext_from_json() {
+  local config_file="$1"
+  [[ -f "$config_file" ]] || return 0
+  # SECURITY: Only read files owned by the current user
+  local file_uid
+  file_uid=$(stat -c '%u' "$config_file" 2>/dev/null || stat -f '%u' "$config_file" 2>/dev/null || echo "")
+  [[ "$file_uid" == "$(id -u)" ]] || return 0
+  if command -v jq &>/dev/null; then
+    jq -r '.pretext // empty' "$config_file" 2>/dev/null || true
+  else
+    # Fallback: grep extraction when jq unavailable
+    grep -o '"pretext"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null \
+      | sed 's/.*"pretext"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | head -1 || true
+  fi
+}
+
+# Apply pretext to TEXT if configured
+# Priority: project .agentvibes/config/agentvibes.json > .claude/config/tts-pretext.txt > global ~/.agentvibes/config/agentvibes.json
+# AI agents can bypass by manually prepending their own text (text already starts with pretext value)
+PRETEXT=""
+
+# 1. Project-level JSON config (written by /agent-vibes:set-pretext)
+PRETEXT=$(read_pretext_from_json "$PROJECT_ROOT/.agentvibes/config/agentvibes.json")
+
+# 2. Project plain-text file (simpler alternative, also used by tests)
+if [[ -z "$PRETEXT" ]]; then
+  PRETEXT_TXT="$PROJECT_ROOT/.claude/config/tts-pretext.txt"
+  if [[ -f "$PRETEXT_TXT" ]]; then
+    TXT_UID=$(stat -c '%u' "$PRETEXT_TXT" 2>/dev/null || stat -f '%u' "$PRETEXT_TXT" 2>/dev/null || echo "")
+    if [[ "$TXT_UID" == "$(id -u)" ]]; then
+      PRETEXT=$(tr -d '\n\r' < "$PRETEXT_TXT")
+    fi
+  fi
+fi
+
+# 3. Global user config fallback
+if [[ -z "$PRETEXT" ]]; then
+  PRETEXT=$(read_pretext_from_json "$HOME/.agentvibes/config/agentvibes.json")
+fi
+
+# Prepend pretext to TEXT if found and not already present
+if [[ -n "$PRETEXT" ]]; then
+  # SECURITY: Strip newlines and cap length to prevent TTS injection via config file
+  PRETEXT=$(printf '%s' "$PRETEXT" | tr -d '\n\r' | cut -c1-50)
+  # Don't double-prepend if the message already starts with the pretext
+  if [[ "$TEXT" != "$PRETEXT"* ]]; then
+    TEXT="${PRETEXT}: ${TEXT}"
+  fi
+fi
+
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
 
