@@ -22,79 +22,38 @@ describe('formatReverbState', () => {
     assert.strictEqual(typeof formatReverbState, 'function');
   });
 
-  test('returns "Disabled" when reverb is false', () => {
-    assert.strictEqual(formatReverbState(false, 0.3), 'Disabled');
+  test('returns "Off" for preset "off"', () => {
+    assert.strictEqual(formatReverbState('off'), 'Off');
   });
 
-  test('returns "Disabled" when reverb is false regardless of amount', () => {
-    assert.strictEqual(formatReverbState(false, 1.0), 'Disabled');
+  test('returns "Light (Small room)" for preset "light"', () => {
+    assert.strictEqual(formatReverbState('light'), 'Light (Small room)');
   });
 
-  test('returns "Enabled (30%)" when reverb true, amount 0.3', () => {
-    assert.strictEqual(formatReverbState(true, 0.3), 'Enabled (30%)');
+  test('returns "Medium (Conference room)" for preset "medium"', () => {
+    assert.strictEqual(formatReverbState('medium'), 'Medium (Conference room)');
   });
 
-  test('returns "Enabled (100%)" when reverb true, amount 1.0', () => {
-    assert.strictEqual(formatReverbState(true, 1.0), 'Enabled (100%)');
+  test('returns "Heavy (Large hall)" for preset "heavy"', () => {
+    assert.strictEqual(formatReverbState('heavy'), 'Heavy (Large hall)');
   });
 
-  test('returns "Enabled (0%)" when reverb true, amount 0.0', () => {
-    assert.strictEqual(formatReverbState(true, 0.0), 'Enabled (0%)');
+  test('returns "Cathedral (Epic space)" for preset "cathedral"', () => {
+    assert.strictEqual(formatReverbState('cathedral'), 'Cathedral (Epic space)');
   });
 
-  test('returns "Enabled (50%)" when reverb true, amount 0.5', () => {
-    assert.strictEqual(formatReverbState(true, 0.5), 'Enabled (50%)');
+  test('defaults to "Light (Small room)" for unknown preset', () => {
+    assert.strictEqual(formatReverbState('unknown'), 'Light (Small room)');
   });
 
-  test('rounds to nearest percent', () => {
-    // 0.333... → 33%
-    assert.strictEqual(formatReverbState(true, 1/3), 'Enabled (33%)');
+  test('defaults to "Light (Small room)" when preset is undefined', () => {
+    assert.strictEqual(formatReverbState(undefined), 'Light (Small room)');
   });
 
-  test('defaults reverbAmount to 30% when undefined', () => {
-    assert.strictEqual(formatReverbState(true, undefined), 'Enabled (30%)');
-  });
-});
-
-// ---------------------------------------------------------------------------
-
-describe('formatPitchState', () => {
-  let formatPitchState;
-  before(async () => {
-    const mod = await import('../../src/console/tabs/settings-tab.js');
-    formatPitchState = mod.formatPitchState;
-  });
-
-  test('exported as named function', () => {
-    assert.strictEqual(typeof formatPitchState, 'function');
-  });
-
-  test('returns "+0 semitones" for pitch 0', () => {
-    assert.strictEqual(formatPitchState(0), '+0 semitones');
-  });
-
-  test('returns "+5 semitones" for positive pitch 5', () => {
-    assert.strictEqual(formatPitchState(5), '+5 semitones');
-  });
-
-  test('returns "-3 semitones" for negative pitch -3', () => {
-    assert.strictEqual(formatPitchState(-3), '-3 semitones');
-  });
-
-  test('returns "+12 semitones" for maximum pitch 12', () => {
-    assert.strictEqual(formatPitchState(12), '+12 semitones');
-  });
-
-  test('returns "-12 semitones" for minimum pitch -12', () => {
-    assert.strictEqual(formatPitchState(-12), '-12 semitones');
-  });
-
-  test('returns "+1 semitones" for pitch 1', () => {
-    assert.strictEqual(formatPitchState(1), '+1 semitones');
-  });
-
-  test('defaults to +0 semitones when pitch is undefined', () => {
-    assert.strictEqual(formatPitchState(undefined), '+0 semitones');
+  test('returns distinct label for each of the 5 presets', () => {
+    const results = ['off', 'light', 'medium', 'heavy', 'cathedral'].map(p => formatReverbState(p));
+    const unique = new Set(results);
+    assert.strictEqual(unique.size, 5);
   });
 });
 

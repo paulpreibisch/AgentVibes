@@ -68,6 +68,8 @@ import {
   getProviderDisplayName,
   attemptProviderInstallation,
 } from './utils/provider-validator.js';
+import { promptForCustomMusic } from './installer/music-file-input.js';
+import { createPreviewListPrompt } from './utils/preview-list-prompt.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -219,14 +221,171 @@ function getPersonalityIcon(personality, emojiSupported) {
 }
 
 /**
+ * Check if Piper TTS is installed
+ * @returns {boolean} True if piper command exists
+ */
+function isPiperInstalled() {
+  try {
+    execSync('which piper', {
+      stdio: 'pipe',
+      timeout: 3000
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Check if Soprano TTS is installed
+ * @returns {boolean} True if soprano-tts or soprano-webui command exists
+ */
+function isSopranoInstalled() {
+  try {
+    execSync('which soprano-tts || which soprano-webui', {
+      stdio: 'pipe',
+      timeout: 3000
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Play voice sample for preview during voice selection
+ * @param {string} voiceName - Name of the voice (e.g., 'en_US-lessac-medium', 'soprano-default')
+ * @param {string} provider - TTS provider ('piper' or 'soprano')
+ * @returns {Promise<boolean>} True if sample played successfully
+ */
+async function playVoiceSample(voiceName, provider) {
+  try {
+    const samplesDir = path.join(__dirname, '..', '.claude', 'audio', 'voice-samples', provider);
+
+    // Try friendly name first (e.g., "ryan.wav")
+    let sampleFile = path.join(samplesDir, `${voiceName}.wav`);
+
+    // If not found and looks like a Piper ID, try that too
+    if (!fsSync.existsSync(sampleFile) && voiceName.includes('-')) {
+      sampleFile = path.join(samplesDir, `${voiceName}.wav`);
+    }
+
+    // Check if pre-recorded sample exists
+    if (fsSync.existsSync(sampleFile)) {
+      console.log(chalk.cyan('  🔊 Playing voice sample...'));
+
+      // Play using sox/aplay - use spawn for non-blocking playback
+      try {
+        // Try play first, fall back to aplay
+        const player = spawn('sh', ['-c', `play "${sampleFile}" 2>/dev/null || aplay "${sampleFile}" 2>/dev/null`], {
+          detached: false,
+          stdio: 'ignore'
+        });
+
+        // Return the process so it can be killed
+        return player;
+      } catch (e) {
+        // Fallback: generate on-the-fly if provider is available
+      }
+    }
+
+    // Generate sample on-the-fly if provider is running
+    if (provider === 'piper' && isPiperInstalled()) {
+      const text = `Hi, I'm ${voiceName.split('-')[1] || 'Piper'}`;
+      execSync(`echo "${text}" | piper --model ${voiceName} --output_raw | aplay -r 22050 -f S16_LE -c 1 2>/dev/null`, {
+        stdio: 'pipe',
+        timeout: 5000
+      });
+      return true;
+    } else if (provider === 'soprano' && await isSopranoRunning()) {
+      // Generate via Soprano API
+      const text = "Hi, I'm Soprano";
+      const response = await fetch('http://localhost:7860/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: 'soprano-default' }),
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (response.ok) {
+        const audio = await response.arrayBuffer();
+        // Save temporarily and play
+        const tempFile = `/tmp/soprano-sample-${Date.now()}.wav`;
+        fsSync.writeFileSync(tempFile, Buffer.from(audio));
+        execSync(`play "${tempFile}" 2>/dev/null || aplay "${tempFile}" 2>/dev/null`, {
+          stdio: 'pipe',
+          timeout: 5000
+        });
+        fsSync.unlinkSync(tempFile);
+        return true;
+      }
+    }
+
+    return false;
+  } catch (e) {
+    console.log(chalk.gray('  (Preview not available)'));
+    return false;
+  }
+}
+
+/**
+ * Check if Soprano server is running on port 7860
+ * @returns {Promise<boolean>} True if server responds to health check
+ */
+async function isSopranoRunning() {
+  try {
+    const response = await fetch('http://localhost:7860/health', {
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Start Soprano TTS server in background
+ * @returns {Promise<boolean>} True if successfully started
+ */
+async function startSopranoServer() {
+  try {
+    console.log(chalk.gray('🚀 Starting Soprano TTS server...'));
+
+    // Start soprano-webui in background
+    const sopranoProcess = spawn('soprano-webui', ['--port', '7860'], {
+      detached: true,
+      stdio: 'ignore'
+    });
+
+    sopranoProcess.unref(); // Allow parent to exit independently
+
+    // Wait up to 10 seconds for server to be ready
+    for (let i = 0; i < 20; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      if (await isSopranoRunning()) {
+        console.log(chalk.green('✓ Soprano TTS server started successfully\n'));
+        return true;
+      }
+    }
+
+    console.log(chalk.yellow('⚠️  Soprano server started but not responding yet\n'));
+    return false;
+  } catch (e) {
+    console.log(chalk.yellow('⚠️  Failed to start Soprano server:', e.message, '\n'));
+    return false;
+  }
+}
+
+/**
  * Detect system capabilities for smart provider recommendations
- * @returns {Promise<Object>} System info including GPU, memory, platform
+ * @returns {Promise<Object>} System info including GPU, memory, platform, Soprano availability
  */
 async function detectSystemCapabilities() {
   const isMacOS = process.platform === 'darwin';
   const isAndroid = isTermux();
   let hasGPU = false;
   let totalRAM = 0;
+  let sopranoAvailable = false;
 
   try {
     // Detect NVIDIA GPU
@@ -279,12 +438,24 @@ async function detectSystemCapabilities() {
     totalRAM = 4096;
   }
 
+  // Detect and auto-start Soprano if installed
+  if (isSopranoInstalled()) {
+    const isRunning = await isSopranoRunning();
+    if (isRunning) {
+      sopranoAvailable = true;
+    } else {
+      // Soprano installed but not running - try to start it
+      sopranoAvailable = await startSopranoServer();
+    }
+  }
+
   return {
     hasGPU,
     lowMemory: totalRAM < 4096,
     totalRAM,
     isMacOS,
-    isAndroid
+    isAndroid,
+    sopranoAvailable
   };
 }
 
@@ -493,7 +664,8 @@ async function showPaginatedContent(pages, options = {}) {
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: '', // Hide the "Use arrow keys" message
+      message: chalk.cyan('💡 Try these AgentVibes commands in Claude Code terminal'),
+      prefix: '',
       choices,
       default: currentPage < pages.length - 1 ? 'next' : 'continue'
     }]);
@@ -521,11 +693,12 @@ async function showPaginatedContent(pages, options = {}) {
 function getPageTitle(pageNum) {
   const titles = {
     0: '🔧 System Dependencies',
-    1: '🎙️ TTS Provider Configuration',
+    1: '🔌 TTS Provider Configuration',
     2: '🎤 Voice Selection',
     3: '😎 Personality Selection',
-    4: '💧 Audio Settings',
-    5: '🔊 Verbosity Settings'
+    4: '🎛️ Reverb Settings',
+    5: '🎵 Background Music',
+    6: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -538,8 +711,8 @@ async function handleSystemDependenciesPage() {
   const { checkDependencies, getInstallCommands } = await import('./utils/dependency-checker.js');
   const depResults = checkDependencies();
 
-  let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
-  depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
+  let depContent = chalk.gray('System dependencies detected and already installed.\n');
+  depContent += chalk.gray('These tools enable AgentVibes features and functionality.\n\n');
 
   // Satisfied dependencies
   if (depResults.core.node?.isCompatible) {
@@ -571,6 +744,39 @@ async function handleSystemDependenciesPage() {
   }
   if (depResults.optional.audioPlayer) {
     depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
+  }
+
+  // Check TTS providers
+  const piperInstalled = isPiperInstalled();
+  const sopranoInstalled = isSopranoInstalled();
+
+  if (piperInstalled || sopranoInstalled) {
+    depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+    depContent += chalk.cyan.bold('TTS Providers Already Installed:\n\n');
+
+    if (piperInstalled) {
+      try {
+        const piperPath = execSync('which piper 2>/dev/null', { encoding: 'utf8' }).trim();
+        depContent += chalk.green('✓ Piper TTS (offline voice synthesis)\n');
+        depContent += chalk.gray(`  ${piperPath}\n`);
+      } catch (e) {
+        depContent += chalk.green('✓ Piper TTS (offline voice synthesis)\n');
+      }
+    }
+    if (sopranoInstalled) {
+      try {
+        let sopranoPath = '';
+        try {
+          sopranoPath = execSync('which soprano-tts 2>/dev/null', { encoding: 'utf8' }).trim();
+        } catch (e) {
+          sopranoPath = execSync('which soprano-webui 2>/dev/null', { encoding: 'utf8' }).trim();
+        }
+        depContent += chalk.green('✓ Soprano TTS (premium quality)\n');
+        depContent += chalk.gray(`  ${sopranoPath}\n`);
+      } catch (e) {
+        depContent += chalk.green('✓ Soprano TTS (premium quality)\n');
+      }
+    }
   }
 
   // Missing dependencies
@@ -613,6 +819,12 @@ async function handleSystemDependenciesPage() {
   });
 
   console.log(depsBoxen);
+
+  // Return status for navigation message
+  return {
+    allMet: Object.keys(depResults.missing).length === 0,
+    missingCount: Object.keys(depResults.missing).length
+  };
 }
 
 /**
@@ -695,6 +907,9 @@ async function saveCustomTracks(tracks) {
   }
 }
 
+// Track currently playing audio preview to prevent overlaps
+let currentAudioPreview = null;
+
 /**
  * Preview audio track using available audio player
  * @param {string} trackName - Name of the track file to preview
@@ -702,6 +917,12 @@ async function saveCustomTracks(tracks) {
  * @returns {Promise<boolean>} True if preview was attempted, false if no audio tools available
  */
 async function previewAudioTrack(trackName, tracksDir) {
+  // Stop any currently playing preview
+  if (currentAudioPreview && !currentAudioPreview.killed) {
+    currentAudioPreview.kill('SIGTERM');
+    currentAudioPreview = null;
+  }
+
   const trackPath = path.join(tracksDir, trackName);
 
   // Verify track exists
@@ -737,22 +958,34 @@ async function previewAudioTrack(trackName, tracksDir) {
         timeout: 12000 // 12 second timeout for safety
       });
 
+      // Store reference to current preview
+      currentAudioPreview = audioProcess;
+
       // Handle process completion
       return new Promise((resolve) => {
         const timeoutHandle = setTimeout(() => {
           if (audioProcess && !audioProcess.killed) {
             audioProcess.kill('SIGTERM');
           }
+          if (currentAudioPreview === audioProcess) {
+            currentAudioPreview = null;
+          }
           resolve(true);
         }, 11000); // 11 second timeout
 
         audioProcess.on('close', () => {
           clearTimeout(timeoutHandle);
+          if (currentAudioPreview === audioProcess) {
+            currentAudioPreview = null;
+          }
           resolve(true);
         });
 
         audioProcess.on('error', () => {
           clearTimeout(timeoutHandle);
+          if (currentAudioPreview === audioProcess) {
+            currentAudioPreview = null;
+          }
           resolve(true);
         });
       });
@@ -839,7 +1072,7 @@ async function collectConfiguration(options = {}) {
   }
 
   let currentPage = 0;
-  const sectionPages = 6; // System Dependencies, Provider, Voice Selection, Personality Selection, Audio Settings, Verbosity
+  const sectionPages = 7; // System Dependencies, Provider, Voice Selection, Personality Selection, Reverb, Background Music, Verbosity
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -859,8 +1092,10 @@ async function collectConfiguration(options = {}) {
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
 
+    let pageStatus = null; // Track page completion status for navigation message
+
     if (currentPage === 0) {
-      await handleSystemDependenciesPage();
+      pageStatus = await handleSystemDependenciesPage();
     } else if (currentPage === 1) {
       // Page 2: TTS Provider & Voice Storage
 
@@ -1146,6 +1381,57 @@ async function collectConfiguration(options = {}) {
 
         // Validate provider installation before accepting selection
         console.log(chalk.gray(`\n   Checking for ${getProviderDisplayName(provider)}...`));
+
+        // Special handling for Soprano - check if running, auto-start if installed
+        if (provider === 'soprano') {
+          const sopranoInstalled = isSopranoInstalled();
+          const sopranoRunning = await isSopranoRunning();
+
+          if (sopranoInstalled && !sopranoRunning) {
+            // Soprano installed but not running - offer to start it
+            console.log(chalk.yellow('\n⚠️  Soprano TTS is installed but server is not running'));
+
+            const { startAction } = await inquirer.prompt([{
+              type: 'list',
+              name: 'startAction',
+              message: 'What would you like to do?',
+              choices: [
+                { name: chalk.green('Start Soprano server now (recommended)'), value: 'start' },
+                { name: 'I\'ll start it myself', value: 'manual' },
+                { name: 'Choose a different provider', value: 'back' }
+              ]
+            }]);
+
+            if (startAction === 'start') {
+              const started = await startSopranoServer();
+              if (started) {
+                config.provider = provider;
+                providerSelected = true;
+                continue;
+              } else {
+                console.log(chalk.yellow('\n⚠️  Failed to start Soprano automatically'));
+                console.log(chalk.cyan('   Try starting manually:'));
+                console.log(chalk.gray('   $ soprano-webui --port 7860\n'));
+                continue;
+              }
+            } else if (startAction === 'manual') {
+              console.log(chalk.cyan('\n📝 To start Soprano manually, run:'));
+              console.log(chalk.gray('   $ soprano-webui --port 7860\n'));
+              continue;
+            } else {
+              // User chose to go back
+              continue;
+            }
+          } else if (sopranoInstalled && sopranoRunning) {
+            // Soprano installed and running - all good!
+            console.log(chalk.green('\n✓ Soprano TTS detected and running!\n'));
+            config.provider = provider;
+            providerSelected = true;
+            continue;
+          }
+          // If not installed, fall through to normal validation below
+        }
+
         const validation = await validateProvider(provider);
 
         if (!validation.installed) {
@@ -1222,6 +1508,9 @@ async function collectConfiguration(options = {}) {
           console.log(chalk.green(`\n✓ ${displayName} Detected and selected!\n`));
           config.provider = provider;
           providerSelected = true; // Exit provider selection loop
+
+          // Auto-advance flag for navigation
+          config._autoAdvance = true;
         }
       }
 
@@ -1414,36 +1703,105 @@ async function collectConfiguration(options = {}) {
       ));
 
       if (config.provider === 'piper') {
-        // Piper voices - popular selections
-        const piperVoices = [
-          { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)'), value: 'en_US-ryan-high' },
-          { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)'), value: 'en_US-amy-medium' },
-          { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)'), value: 'en_US-joe-medium' },
-          { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)'), value: 'en_US-lessac-medium' },
-          { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)'), value: 'en_GB-alan-medium' },
-          { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)'), value: 'en_GB-southern_english_female-medium' },
+        // Check if Piper is installed for voice previews
+        const piperAvailable = isPiperInstalled();
+
+        // Load voice metadata for friendly names
+        let voiceMetadata;
+        try {
+          const metadataPath = path.join(__dirname, '..', '.agentvibes', 'config', 'voice-metadata.json');
+          voiceMetadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8'));
+        } catch (e) {
+          voiceMetadata = null;
+        }
+
+        // Build voice choices
+        const previewHint = piperAvailable ? ' ' + chalk.gray('[SPACE to preview]') : '';
+        let piperVoices;
+
+        if (voiceMetadata && voiceMetadata.installerVoices) {
+          // Use voice metadata system - all 10 voices with friendly names
+          piperVoices = voiceMetadata.installerVoices.map(friendlyName => {
+            const voice = voiceMetadata.voices[friendlyName];
+            const isMale = voice.gender === 'male';
+            const color = isMale ? chalk.cyan : chalk.hex('#FF69B4'); // Lighter pink for females
+
+            return {
+              name: color(voice.displayName) + chalk.gray(` (${voice.gender}, ${voice.accent}, ${voice.quality})`) + previewHint,
+              value: friendlyName  // Store friendly name
+            };
+          });
+        } else {
+          // Fallback to old hardcoded list
+          piperVoices = [
+            { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)') + previewHint, value: 'en_US-ryan-high' },
+            { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)') + previewHint, value: 'en_US-amy-medium' },
+            { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)') + previewHint, value: 'en_US-joe-medium' },
+            { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)') + previewHint, value: 'en_US-lessac-medium' },
+            { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)') + previewHint, value: 'en_GB-alan-medium' },
+            { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)') + previewHint, value: 'en_GB-southern_english_female-medium' }
+          ];
+        }
+
+        piperVoices.push(
           new inquirer.Separator(),
           { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
           { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
-        ];
+        );
 
-        const { selectedVoice } = await inquirer.prompt([{
-          type: 'list',
-          name: 'selectedVoice',
-          message: chalk.yellow('Select your default Piper voice:'),
-          choices: piperVoices,
-          default: 'en_US-ryan-high',
-          pageSize: 12
-        }]);
+        let selectedVoice;
+        if (piperAvailable) {
+          const result = await createPreviewListPrompt(inquirer, {
+            name: 'selectedVoice',
+            message: chalk.yellow('Select your default Piper voice:'),
+            choices: piperVoices,
+            default: 'en_US-ryan-high',
+            pageSize: 12,
+            onPreview: async (voiceName) => {
+              await playVoiceSample(voiceName, 'piper');
+            }
+          });
+          selectedVoice = result.selectedVoice;
+        } else {
+          const result = await inquirer.prompt([{
+            type: 'list',
+            name: 'selectedVoice',
+            message: chalk.yellow('Select your default Piper voice:'),
+            choices: piperVoices,
+            default: 'en_US-ryan-high',
+            pageSize: 12
+          }]);
+          selectedVoice = result.selectedVoice;
+        }
 
         if (selectedVoice === '__back__') {
           return null;
         }
 
         if (selectedVoice !== '__skip__') {
-          config.defaultVoice = selectedVoice;
+          // Convert friendly name to Piper ID if using metadata
+          if (voiceMetadata && voiceMetadata.voices[selectedVoice]) {
+            config.defaultVoice = voiceMetadata.voices[selectedVoice].id;
+            console.log(chalk.green(`\n✓ Voice selected: ${voiceMetadata.voices[selectedVoice].displayName} (${config.defaultVoice})\n`));
+          } else {
+            config.defaultVoice = selectedVoice;
+            console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          }
+
+          // Show hint about voice browser
+          console.log(boxen(
+            chalk.cyan('💡 Want to explore 914+ voices?\n\n') +
+            chalk.white('Run: ') + chalk.yellow('npx agentvibes-voice-browser') + chalk.gray('\n\nBrowse all LibriTTS voices with preview, search, and install.'),
+            {
+              padding: { top: 0, bottom: 0, left: 1, right: 1 },
+              margin: { top: 0, bottom: 1, left: 0, right: 0 },
+              borderStyle: 'round',
+              borderColor: 'cyan',
+              dimBorder: true
+            }
+          ));
+
           // Auto-advance to next page after selection
-          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
           currentPage++; // Skip to next page immediately
           continue; // Skip navigation and go to next iteration
         } else {
@@ -1481,9 +1839,29 @@ async function collectConfiguration(options = {}) {
         }
 
         if (selectedVoice !== '__skip__') {
-          config.defaultVoice = selectedVoice;
+          // Convert friendly name to Piper ID if using metadata
+          if (voiceMetadata && voiceMetadata.voices[selectedVoice]) {
+            config.defaultVoice = voiceMetadata.voices[selectedVoice].id;
+            console.log(chalk.green(`\n✓ Voice selected: ${voiceMetadata.voices[selectedVoice].displayName} (${config.defaultVoice})\n`));
+          } else {
+            config.defaultVoice = selectedVoice;
+            console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          }
+
+          // Show hint about voice browser
+          console.log(boxen(
+            chalk.cyan('💡 Want to explore 914+ voices?\n\n') +
+            chalk.white('Run: ') + chalk.yellow('npx agentvibes-voice-browser') + chalk.gray('\n\nBrowse all LibriTTS voices with preview, search, and install.'),
+            {
+              padding: { top: 0, bottom: 0, left: 1, right: 1 },
+              margin: { top: 0, bottom: 1, left: 0, right: 0 },
+              borderStyle: 'round',
+              borderColor: 'cyan',
+              dimBorder: true
+            }
+          ));
+
           // Auto-advance to next page after selection
-          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
           currentPage++; // Skip to next page immediately
           continue; // Skip navigation and go to next iteration
         } else {
@@ -1662,6 +2040,9 @@ async function collectConfiguration(options = {}) {
       const personalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
       let personalityChoices = [];
 
+      // Story 2.3 & 2.4: Check emoji support once, pass to all personality icons (performance fix)
+      const emojiSupported = supportsEmoji();
+
       try {
         const personalityFiles = await fs.readdir(personalitiesDir);
         const personalities = [];
@@ -1685,9 +2066,6 @@ async function collectConfiguration(options = {}) {
 
         // Sort alphabetically
         personalities.sort((a, b) => a.name.localeCompare(b.name));
-
-        // Story 2.3 & 2.4: Check emoji support once, pass to all personality icons (performance fix)
-        const emojiSupported = supportsEmoji();
 
         // Add "none" as first option (default)
         const noneIcon = getPersonalityIcon('none', emojiSupported);
@@ -1834,15 +2212,45 @@ async function collectConfiguration(options = {}) {
           { name: 'Light (Small room) - Recommended', value: 'light' },
           { name: 'Medium (Conference room)', value: 'medium' },
           { name: 'Heavy (Large hall)', value: 'heavy' },
-          { name: 'Cathedral (Epic space)', value: 'cathedral' }
+          { name: 'Cathedral (Epic space)', value: 'cathedral' },
+          new inquirer.Separator(),
+          { name: chalk.magentaBright('← Previous'), value: '__back__' }
         ],
         default: config.reverb || 'light'
       }]);
 
+      if (reverbLevel === '__back__') {
+        currentPage--;
+        continue;
+      }
+
       config.reverb = reverbLevel;
 
-      // Add spacing before next question
-      console.log('');
+      console.log(chalk.green('\n✓ Reverb level set\n'));
+      currentPage++;
+      continue;
+
+    } else if (currentPage === 5) {
+      // Page 6: Background Music Settings
+
+      // Skip for termux-ssh - background music doesn't work with SSH text-only TTS
+      if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
+        console.log(boxen(
+          chalk.white('SSH-Remote: Audio Effects Apply on Android\n\n') +
+          chalk.green('✅ Background music works:\n') +
+          chalk.gray('   • Music plays on Android device\n') +
+          chalk.gray('   • All settings configured below will apply\n\n') +
+          chalk.cyan('Configure background music below!'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'green',
+            width: 80
+          }
+        ));
+        console.log('');
+      }
 
       // Background music
       console.log(chalk.gray('🎵 Background music plays ambient tracks during TTS for a more engaging experience.'));
@@ -1864,27 +2272,26 @@ async function collectConfiguration(options = {}) {
         // Load custom tracks from registry
         const customTracks = await loadCustomTracks();
         const customTrackChoices = customTracks.map(track => ({
-          name: `📁 ${track.name}`,
+          name: `📁 ${track.name} ` + chalk.gray('[SPACE to preview]'),
           value: track.filename
         }));
 
         const trackChoices = [
-          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
-          { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
-          { name: '💃 Salsa (Latin - Upbeat brass & percussion)', value: 'agent_vibes_salsa_v2_loop.mp3' },
-          { name: '🎸 Cumbia (Latin - Accordion & drums)', value: 'agent_vibes_cumbia_v1_loop.mp3' },
-          { name: '🌸 Bossa Nova (Brazilian jazz)', value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
-          { name: '🏙️  Japanese City Pop (80s synth)', value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
-          { name: '🌊 Chillwave (Electronic ambient)', value: 'agent_vibes_chillwave_v2_loop.mp3' },
-          { name: '🎹 Dreamy House (Electronic dance)', value: 'dreamy_house_loop.mp3' },
-          { name: '🌙 Dark Chill Step (Electronic bass)', value: 'agent_vibes_dark_chill_step_loop.mp3' },
-          { name: '🕉️  Goa Trance (Psychedelic electronic)', value: 'agent_vibes_goa_trance_v2_loop.mp3' },
-          { name: '🎼 Harpsichord (Baroque classical)', value: 'agent_vibes_harpsichord_v2_loop.mp3' },
-          { name: '🎻 Celtic Harp (Irish traditional)', value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
-          { name: '🌺 Hawaiian Slack Key Guitar', value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
-          { name: '🏜️  Arabic Oud (Middle Eastern)', value: 'agent_vibes_arabic_v2_loop.mp3' },
-          { name: '🪘 Gnawa Ambient (North African)', value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
-          { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
+          { name: '🎻 Soft Flamenco (Spanish guitar) ' + chalk.gray('[SPACE to preview]'), value: 'agentvibes_soft_flamenco_loop.mp3' },
+          { name: '🎺 Bachata (Latin - Romantic guitar & bongos) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_bachata_v1_loop.mp3' },
+          { name: '💃 Salsa (Latin - Upbeat brass & percussion) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_salsa_v2_loop.mp3' },
+          { name: '🎸 Cumbia (Latin - Accordion & drums) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_cumbia_v1_loop.mp3' },
+          { name: '🌸 Bossa Nova (Brazilian jazz) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+          { name: '🏙️  Japanese City Pop (80s synth) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
+          { name: '🌊 Chillwave (Electronic ambient) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_chillwave_v2_loop.mp3' },
+          { name: '🌙 Dark Chill Step (Electronic bass) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_dark_chill_step_loop.mp3' },
+          { name: '🕉️  Goa Trance (Psychedelic electronic) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_goa_trance_v2_loop.mp3' },
+          { name: '🎼 Harpsichord (Baroque classical) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_harpsichord_v2_loop.mp3' },
+          { name: '🎻 Celtic Harp (Irish traditional) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
+          { name: '🌺 Hawaiian Slack Key Guitar ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
+          { name: '🏜️  Arabic Oud (Middle Eastern) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_arabic_v2_loop.mp3' },
+          { name: '🪘 Gnawa Ambient (North African) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
+          { name: '🥁 Tabla Dream Pop (Indian percussion) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
         ];
 
         // Add custom tracks separator and options if any exist
@@ -1901,76 +2308,60 @@ async function collectConfiguration(options = {}) {
           { name: '➕ Add Custom Track...', value: '__custom__' }
         );
 
-        const { selectedTrack } = await inquirer.prompt([{
-          type: 'list',
+        // Interactive track selection - Enter=Select, Spacebar=Preview
+        const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+
+        const result = await createPreviewListPrompt(inquirer, {
           name: 'selectedTrack',
-          message: chalk.yellow('Choose default background music track:'),
+          message: chalk.yellow('Choose background music:'),
           choices: trackChoices,
           default: config.backgroundMusic.track || 'agentvibes_soft_flamenco_loop.mp3',
-          pageSize: 18
-        }]);
+          pageSize: 18,
+          loop: false,
+          onPreview: async (trackFile) => {
+            console.log(chalk.cyan('\n  🔊 Playing preview...\n'));
+            await previewAudioTrack(trackFile, tracksDir);
+          }
+        });
+        const selectedTrack = result.selectedTrack;
 
         // Handle custom track selection
         if (selectedTrack === '__custom__') {
-          const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
-          const { customTrackPath } = await inquirer.prompt([{
-            type: 'input',
-            name: 'customTrackPath',
-            message: chalk.yellow('Enter the full path to your audio file:'),
-            validate: (input) => {
-              const resolvedPath = path.resolve(input.trim());
-              if (!fsSync.existsSync(resolvedPath)) return 'File not found';
-              const ext = path.extname(resolvedPath).toLowerCase();
-              if (!['.mp3', '.wav', '.ogg', '.m4a'].includes(ext))
-                return 'Unsupported format (use .mp3, .wav, .ogg, or .m4a)';
-              return true;
-            }
-          }]);
+          console.log('');
+          const result = await promptForCustomMusic(claudeDir);
 
-          const copiedFilename = await handleCustomMusicTrack(customTrackPath, tracksDir);
-          if (copiedFilename) {
-            config.backgroundMusic.track = copiedFilename;
-            console.log(chalk.green(`✓ Custom track added: ${copiedFilename}`));
+          if (result.success && result.filename) {
+            config.backgroundMusic.track = result.filename;
 
-            // Update registry with new custom track
-            const trackName = path.basename(customTrackPath, path.extname(customTrackPath));
+            // Update registry
             const allCustomTracks = await loadCustomTracks();
-            if (!allCustomTracks.some(t => t.filename === copiedFilename)) {
-              allCustomTracks.push({ name: trackName, filename: copiedFilename });
+            if (!allCustomTracks.some(t => t.filename === result.filename)) {
+              const trackName = path.basename(result.filename, path.extname(result.filename));
+              allCustomTracks.push({ name: trackName, filename: result.filename });
               await saveCustomTracks(allCustomTracks);
             }
           } else {
-            // Fall back to default if custom track fails
+            // Fallback to default
             config.backgroundMusic.track = 'agentvibes_soft_flamenco_loop.mp3';
+            if (result.error) {
+              console.log(chalk.yellow(`⚠️  ${result.error}`));
+            }
             console.log(chalk.yellow('⚠️  Using default track'));
           }
         } else {
           config.backgroundMusic.track = selectedTrack;
         }
 
-        // Offer preview of selected track
-        const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
-        const { previewTrack } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'previewTrack',
-          message: chalk.cyan('Preview this track before continuing?'),
-          default: false
-        }]);
-
-        if (previewTrack) {
-          console.log('');
-          await previewAudioTrack(config.backgroundMusic.track, tracksDir);
-          console.log('');
-        }
+        console.log(chalk.green(`\n✓ Selected: ${config.backgroundMusic.track}\n`));
       }
 
       // Auto-advance to next page after audio settings
-      console.log(chalk.green('✓ Audio settings configured\n'));
+      console.log(chalk.green('✓ Background music configured\n'));
       currentPage++;
       continue;
 
-    } else if (currentPage === 5) {
-      // Page 6: Verbosity Settings
+    } else if (currentPage === 6) {
+      // Page 7: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -2001,23 +2392,39 @@ async function collectConfiguration(options = {}) {
         choices: [
           { name: '🔊 High - Maximum transparency', value: 'high' },
           { name: '🔉 Medium - Balanced', value: 'medium' },
-          { name: '🔈 Low - Minimal', value: 'low' }
+          { name: '🔈 Low - Minimal', value: 'low' },
+          new inquirer.Separator(),
+          { name: chalk.magentaBright('← Previous'), value: '__back__' }
         ],
         default: config.verbosity || 'high'
       }]);
 
+      if (verbosity === '__back__') {
+        currentPage--;
+        continue;
+      }
+
       config.verbosity = verbosity;
 
-      // Auto-advance - verbosity is the last page, so we're done
+      // Show confirmation and auto-advance to next page
       console.log(chalk.green('\n✓ Verbosity level set\n'));
       currentPage++;
       continue;
     }
 
-    // Navigation
+    // Auto-advance if provider was just detected (skip navigation prompt)
+    if (config._autoAdvance) {
+      delete config._autoAdvance;
+      await new Promise(resolve => setTimeout(resolve, 800)); // Brief pause
+      currentPage++;
+      continue;
+    }
+
+    // Navigation with page titles
     const navChoices = [];
     if (currentPage < totalPages - 1) {
-      navChoices.push({ name: chalk.green('Next →'), value: 'next' });
+      const nextPageTitle = getPageTitle(currentPage + 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      navChoices.push({ name: chalk.green('Next →') + chalk.gray(` (${nextPageTitle})`), value: 'next' });
     } else {
       navChoices.push({ name: chalk.cyan('✓ Continue to Installation'), value: 'continue' });
     }
@@ -2026,13 +2433,23 @@ async function collectConfiguration(options = {}) {
     if (currentPage === 0) {
       navChoices.push({ name: chalk.magentaBright('← Back to Welcome'), value: 'back' });
     } else {
-      navChoices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+      const prevPageTitle = getPageTitle(currentPage - 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      navChoices.push({ name: chalk.magentaBright('← Previous') + chalk.gray(` (${prevPageTitle})`), value: 'prev' });
+    }
+
+    // Set navigation message based on page status
+    let navMessage = '';
+    if (currentPage === 0 && pageStatus) {
+      navMessage = pageStatus.allMet
+        ? chalk.green('✓') + chalk.cyan(' All system dependencies met')
+        : chalk.yellow('⚠') + chalk.cyan(` ${pageStatus.missingCount} optional tool${pageStatus.missingCount > 1 ? 's' : ''} missing`);
     }
 
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: '',
+      message: navMessage,
+      prefix: '',
       choices: navChoices,
       default: 'next'
     }]);
@@ -5527,9 +5944,168 @@ program
           process.exit(1);
         }
       }
+    } else if (setting === 'music') {
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const claudeDir = path.join(homeDir, '.claude');
+      const musicTracksDir = path.join(claudeDir, 'audio', 'custom-music', 'tracks');
+      const musicConfigFile = path.join(claudeDir, 'config', 'background-music.txt');
+      const musicEnabledFile = path.join(claudeDir, 'config', 'background-music-enabled.txt');
+
+      console.log(boxen(
+        chalk.cyan.bold('🎵 Background Music Configuration\n\n') +
+        chalk.white('Manage your custom background music settings.'),
+        { padding: 1, borderColor: 'cyan', borderStyle: 'round' }
+      ));
+
+      // Read current music setting
+      let currentMusic = null;
+      let musicEnabled = false;
+
+      try {
+        if (fsSync.existsSync(musicEnabledFile)) {
+          const enabled = fsSync.readFileSync(musicEnabledFile, 'utf-8').trim();
+          musicEnabled = enabled === 'true' || enabled === '1';
+        }
+        if (fsSync.existsSync(musicConfigFile)) {
+          currentMusic = fsSync.readFileSync(musicConfigFile, 'utf-8').trim();
+        }
+      } catch (err) {
+        // Ignore read errors
+      }
+
+      // Display current setting
+      console.log(chalk.gray('\nCurrent Settings:'));
+      console.log(chalk.gray('  Background Music: ') + (musicEnabled ? chalk.green('Enabled') : chalk.yellow('Disabled')));
+
+      if (currentMusic && musicEnabled) {
+        const isCustom = currentMusic.startsWith('custom-') || !currentMusic.includes('agentvibes_');
+        if (isCustom) {
+          console.log(chalk.gray('  Track: ') + chalk.cyan(currentMusic) + chalk.yellow(' (Custom)'));
+        } else {
+          console.log(chalk.gray('  Track: ') + chalk.white(currentMusic) + chalk.gray(' (Default)'));
+        }
+      } else if (!musicEnabled) {
+        console.log(chalk.gray('  Track: ') + chalk.gray('(None - music disabled)'));
+      }
+      console.log('');
+
+      // Show menu
+      const { action } = await inquirer.prompt([{
+        type: 'list',
+        name: 'action',
+        message: chalk.yellow('What would you like to do?'),
+        choices: [
+          { name: '🎵 Change custom music file', value: 'change' },
+          { name: '🗑️  Remove custom music (use defaults)', value: 'remove' },
+          { name: '🔄 Reset to factory defaults', value: 'reset' },
+          { name: musicEnabled ? '🔇 Disable background music' : '🔊 Enable background music', value: 'toggle' },
+          new inquirer.Separator(),
+          { name: '← Back', value: 'back' }
+        ]
+      }]);
+
+      if (action === 'change') {
+        // Change music - reuse promptForCustomMusic from Story 4.5
+        console.log('');
+        const result = await promptForCustomMusic(claudeDir);
+
+        if (result.success && result.filename) {
+          // Update config to point to custom music
+          const configDir = path.join(claudeDir, 'config');
+          await fs.mkdir(configDir, { recursive: true });
+          await fs.writeFile(musicConfigFile, result.filename, { mode: 0o600 });
+
+          // Ensure music is enabled
+          await fs.writeFile(musicEnabledFile, 'true', { mode: 0o644 });
+
+          console.log(chalk.green(`\n✓ Background music updated to: ${result.filename}`));
+          console.log(chalk.gray('  Changes take effect immediately\n'));
+        } else if (result.error) {
+          console.log(chalk.yellow(`\n⚠️  ${result.error}`));
+          console.log(chalk.gray('  Keeping previous setting\n'));
+        } else {
+          console.log(chalk.gray('\n  No changes made\n'));
+        }
+
+      } else if (action === 'remove') {
+        // Remove custom music - keep defaults
+        const customMusicFiles = fsSync.existsSync(musicTracksDir) ?
+          fsSync.readdirSync(musicTracksDir) : [];
+
+        if (customMusicFiles.length === 0) {
+          console.log(chalk.yellow('\n⚠️  No custom music files found\n'));
+        } else {
+          const { confirm } = await inquirer.prompt([{
+            type: 'confirm',
+            name: 'confirm',
+            message: 'Remove all custom music files?',
+            default: false
+          }]);
+
+          if (confirm) {
+            try {
+              // Remove custom music files
+              for (const file of customMusicFiles) {
+                await fs.unlink(path.join(musicTracksDir, file));
+              }
+
+              // Reset to default music
+              await fs.writeFile(musicConfigFile, 'agentvibes_soft_flamenco_loop.mp3', { mode: 0o600 });
+
+              console.log(chalk.green('\n✓ Custom music removed, reverted to defaults\n'));
+            } catch (err) {
+              console.log(chalk.red(`\n❌ Error removing custom music: ${err.message}\n`));
+            }
+          } else {
+            console.log(chalk.gray('\n  Cancelled\n'));
+          }
+        }
+
+      } else if (action === 'reset') {
+        // Reset to factory defaults
+        const { confirm } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirm',
+          message: 'Reset all music settings to factory defaults?',
+          default: false
+        }]);
+
+        if (confirm) {
+          try {
+            // Reset to default track
+            await fs.writeFile(musicConfigFile, 'agentvibes_soft_flamenco_loop.mp3', { mode: 0o600 });
+
+            // Enable music
+            await fs.writeFile(musicEnabledFile, 'true', { mode: 0o644 });
+
+            console.log(chalk.green('\n✓ Reset to factory defaults'));
+            console.log(chalk.gray('  Track: Soft Flamenco (Spanish guitar)'));
+            console.log(chalk.gray('  Status: Enabled\n'));
+          } catch (err) {
+            console.log(chalk.red(`\n❌ Error resetting settings: ${err.message}\n`));
+          }
+        } else {
+          console.log(chalk.gray('\n  Cancelled\n'));
+        }
+
+      } else if (action === 'toggle') {
+        // Toggle music on/off
+        try {
+          const newState = !musicEnabled;
+          await fs.writeFile(musicEnabledFile, newState ? 'true' : 'false', { mode: 0o644 });
+
+          console.log(chalk.green(`\n✓ Background music ${newState ? 'enabled' : 'disabled'}\n`));
+        } catch (err) {
+          console.log(chalk.red(`\n❌ Error toggling music: ${err.message}\n`));
+        }
+
+      } else if (action === 'back') {
+        console.log(chalk.gray('\n  No changes made\n'));
+      }
+
     } else {
       console.log(chalk.red(`❌ Unknown setting: ${setting}`));
-      console.log(chalk.gray('Available settings: intro-text\n'));
+      console.log(chalk.gray('Available settings: intro-text, music\n'));
       process.exit(1);
     }
   });

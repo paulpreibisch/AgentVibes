@@ -25,6 +25,11 @@ export class ConfigService {
     this._homeDir = path.resolve(opts.homeDir ?? os.homedir());
   }
 
+  /** Returns the resolved project root path. */
+  getProjectRoot() {
+    return this._projectRoot;
+  }
+
   // ---------------------------------------------------------------------------
   // Detection (story 6.5)
 

@@ -48,9 +48,7 @@ fi
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Optional: voice name (e.g., "Samantha", "Daniel")
 
-# Use readlink -f to handle symlinks correctly
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source audio cache utilities
 source "$SCRIPT_DIR/audio-cache-utils.sh"

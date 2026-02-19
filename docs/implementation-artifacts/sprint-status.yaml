@@ -74,12 +74,12 @@ development_status:
   epic-8-retrospective: optional
 
   # Epic 12: Installer Wizard (5-Screen Flow)
-  epic-12: backlog
-  12-1-installer-screen-1-welcome-and-purpose: backlog
-  12-2-installer-screen-2-auto-dependency-check: backlog
-  12-3-installer-screen-3-provider-selection: backlog
-  12-4-installer-screen-4-voice-config-and-intro-text: backlog
-  12-5-installer-screen-5-install-and-live-tts-greeting: backlog
+  epic-12: done
+  12-1-installer-screen-1-welcome-and-purpose: done
+  12-2-installer-screen-2-auto-dependency-check: done
+  12-3-installer-screen-3-provider-selection: done
+  12-4-installer-screen-4-voice-config-and-intro-text: done
+  12-5-installer-screen-5-install-and-live-tts-greeting: done
   epic-12-retrospective: optional
 
   # ─────────────────────────────────────────────
@@ -87,31 +87,31 @@ development_status:
   # ─────────────────────────────────────────────
 
   # Epic 9: Music Tab
-  epic-9: backlog
-  9-1-built-in-track-library-with-preview-and-select: backlog
-  9-2-custom-track-upload-and-management: backlog
-  9-3-music-enable-disable-and-favorites: backlog
+  epic-9: done
+  9-1-built-in-track-library-with-preview-and-select: done
+  9-2-custom-track-upload-and-management: done
+  9-3-music-enable-disable-and-favorites: done
   epic-9-retrospective: optional
 
   # Epic 10: Verbosity System Enhancement
-  epic-10: backlog
-  10-1-minimal-and-low-verbosity-levels: backlog
-  10-2-custom-verbosity-mode: backlog
-  10-3-migration-logic-and-notice-ui: backlog
-  10-4-verbosityservice-class-and-hook-integration: backlog
+  epic-10: done
+  10-1-minimal-and-low-verbosity-levels: done
+  10-2-custom-verbosity-mode: done
+  10-3-migration-logic-and-notice-ui: done
+  10-4-verbosityservice-class-and-hook-integration: done
   epic-10-retrospective: optional
 
   # Epic 11: Agents Tab (BMAD Voice Management)
-  epic-11: backlog
-  11-1-global-voice-storage-and-migration: backlog
-  11-2-agents-tab-ui: backlog
-  11-3-multi-provider-support-and-single-voice-warning: backlog
-  11-4-party-mode-toggle-and-provider-switching-prompt: backlog
-  11-5-bmad-detection-and-optional-install-setup: backlog
+  epic-11: done
+  11-1-global-voice-storage-and-migration: done
+  11-2-agents-tab-ui: done
+  11-3-multi-provider-support-and-single-voice-warning: done
+  11-4-party-mode-toggle-and-provider-switching-prompt: done
+  11-5-bmad-detection-and-optional-install-setup: done
   epic-11-retrospective: optional
 
   # Epic 13: Help & Readme Tabs
-  epic-13: backlog
-  13-1-help-tab-keyboard-shortcuts-reference: backlog
-  13-2-readme-tab-markdown-viewer: backlog
+  epic-13: done
+  13-1-help-tab-keyboard-shortcuts-reference: done
+  13-2-readme-tab-markdown-viewer: done
   epic-13-retrospective: optional

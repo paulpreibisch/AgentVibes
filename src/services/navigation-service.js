@@ -62,6 +62,15 @@ export class NavigationService {
   }
 
   /**
+   * Cycle to the previous tab in TAB_ORDER, wrapping from first back to last.
+   */
+  cycleTabPrev() {
+    const idx = TAB_ORDER.indexOf(this._activeTab);
+    const prevIdx = (idx - 1 + TAB_ORDER.length) % TAB_ORDER.length;
+    this.switchTab(TAB_ORDER[prevIdx]);
+  }
+
+  /**
    * Register a callback fired whenever the active tab changes.
    * @param {(tabId: string) => void} callback
    */
@@ -90,6 +99,7 @@ export class NavigationService {
   closeModal() {
     this._modalOpen = false;
   }
+
 
   // ---------------------------------------------------------------------------
   // Focus stack (story 7.6 will use this for button-level focus)

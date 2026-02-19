@@ -9,6 +9,17 @@
  * Button-level focus navigation (↑↓←→) implemented in story 7.6.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  PIPER_VOICES_DIR, COL_NAME_W, COL_GENDER_W, SAMPLE_PHRASES,
+  parseVoiceId, scanInstalledVoices, getVoiceMeta, getFavorites, toggleFavorite,
+} from './voices-tab.js';
+import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite } from './music-tab.js';
+import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
+
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
 // Lazy-load blessed only in non-test mode (avoids screen requirement in tests)
@@ -21,12 +32,15 @@ if (!IS_TEST) {
 // ---------------------------------------------------------------------------
 // Brand colours (matches architecture.md + UX design plan)
 
+// Modal label helper — wraps text in BRAND_PINK for consistent modal titles
+const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
+
 const COLORS = {
   contentBg:   '#0a0e1a',  // Near-black content background
   sectionHdr:  '#7986cb',  // Light blue — section dividers
   labelFg:     '#e3f2fd',  // Light blue text — labels
   valueFg:     '#ffd700',  // Yellow — current values
-  btnDefault:  '#3949ab',  // Blue — default button bg
+  btnDefault:  BRAND_BLUE, // Indigo blue — default button bg
   btnFocus:    '#00e5ff',  // Cyan — focused button bg
   btnFocusFg:  '#000000',  // Black — focused button text
   btnPress:    '#ff00ff',  // Magenta — pressed button bg
@@ -39,7 +53,7 @@ const FOOTER_TEXT =
   '[↑↓] Next Button  [Enter] Activate  [Space] Preview  [S/V/M/A/H/R] Switch Tab  [Q] Quit';
 
 // Default effects — single source of truth (used by _getEffects, _setEffects, refreshDisplay)
-const EFFECTS_DEFAULTS = Object.freeze({ reverb: false, reverbAmount: 0.3, pitch: 0 });
+const EFFECTS_DEFAULTS = Object.freeze({ reverbPreset: 'light' });
 
 // Default background music config
 const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' });
@@ -75,24 +89,12 @@ const BUILT_IN_TRACKS = [
 // Exported format helpers (pure functions — used by tests and UI)
 
 /**
- * @param {boolean} reverb
- * @param {number} reverbAmount - 0.0 to 1.0
+ * @param {string} preset - 'off' | 'light' | 'medium' | 'heavy' | 'cathedral'
  * @returns {string}
  */
-export function formatReverbState(reverb, reverbAmount) {
-  if (!reverb) return 'Disabled';
-  const pct = Math.round((reverbAmount ?? 0.3) * 100);
-  return `Enabled (${pct}%)`;
-}
-
-/**
- * @param {number} pitch - integer semitones, −12 to +12
- * @returns {string}
- */
-export function formatPitchState(pitch) {
-  const s = pitch ?? 0;
-  const sign = s >= 0 ? '+' : '';
-  return `${sign}${s} semitones`;
+export function formatReverbState(preset) {
+  const LABELS = { off: 'Off', light: 'Light (Small room)', medium: 'Medium (Conference room)', heavy: 'Heavy (Large hall)', cathedral: 'Cathedral (Epic space)' };
+  return LABELS[preset] ?? LABELS.light;
 }
 
 /**
@@ -167,7 +169,347 @@ function createTestStub() {
 export function createSettingsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService } = services;
+  const { configService, providerService, navigationService } = services;
+
+  // Playback state for the voice sample button
+  let _sampleProcess = null;
+  let _samplePlaying = false;
+
+  const _sampleEnv = {
+    ...process.env,
+    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+      .filter(Boolean).join(':'),
+  };
+
+  const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+  const SPINNER_PROCESSING_BG = '#00838f';  // teal — distinct from blue default and cyan focus
+
+  // Single-button spinner (▶ Play, music Test)
+  let _spinnerTimer = null;
+  let _spinnerIdx   = 0;
+  let _spinnerBtn   = null;
+
+  function _startSpinner(btn, label) {
+    _spinnerBtn = btn;
+    _spinnerIdx = 0;
+    btn.style.bg = SPINNER_PROCESSING_BG;
+    btn.setContent(`${SPINNER_FRAMES[0]} ${label}`);
+    screen.render();
+    _spinnerTimer = setInterval(() => {
+      _spinnerIdx = (_spinnerIdx + 1) % SPINNER_FRAMES.length;
+      btn.setContent(`${SPINNER_FRAMES[_spinnerIdx]} ${label}`);
+      screen.render();
+    }, 100);
+  }
+
+  function _stopSpinner() {
+    if (_spinnerTimer) { clearInterval(_spinnerTimer); _spinnerTimer = null; }
+    if (_spinnerBtn)   { _spinnerBtn.style.bg = COLORS.btnDefault; _spinnerBtn = null; }
+  }
+
+  // Multi-button spinner for _testBtns (reverb Test + Full Preview — each keeps its own label)
+  let _testSpinnerTimer = null;
+  let _testSpinnerIdx   = 0;
+  // Populated alongside _testBtns so we know each button's rest label
+  const _testBtnLabels  = new Map();
+
+  function _startTestSpinner() {
+    _testSpinnerIdx = 0;
+    for (const b of _testBtns) {
+      b.style.bg = SPINNER_PROCESSING_BG;
+      b.setContent(`${SPINNER_FRAMES[0]} ${_testBtnLabels.get(b) ?? 'Test'}`);
+    }
+    screen.render();
+    _testSpinnerTimer = setInterval(() => {
+      _testSpinnerIdx = (_testSpinnerIdx + 1) % SPINNER_FRAMES.length;
+      for (const b of _testBtns) {
+        b.setContent(`${SPINNER_FRAMES[_testSpinnerIdx]} ${_testBtnLabels.get(b) ?? 'Test'}`);
+      }
+      screen.render();
+    }, 100);
+  }
+
+  function _stopTestSpinner() {
+    if (_testSpinnerTimer) { clearInterval(_testSpinnerTimer); _testSpinnerTimer = null; }
+    for (const b of _testBtns) { b.style.bg = COLORS.btnDefault; }
+  }
+
+  function _killSample() {
+    _stopSpinner();
+    if (_sampleProcess) {
+      try { process.kill(-_sampleProcess.pid, 'SIGTERM'); } catch {}
+      _sampleProcess = null;
+    }
+    _samplePlaying = false;
+  }
+
+  // Test button state (shared for reverb [Test])
+  let _testActive   = false;
+  let _testMusicProc = null;
+  let _testVoiceProc = null;
+  let _testTimeout  = null;
+  const _testBtns   = [];  // populated after button creation
+
+  // Music-only test state (background music [Test] — no voice synthesis)
+  let _musicTestActive = false;
+  let _musicTestProc   = null;
+
+  const _testEnv = {
+    ...process.env,
+    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+      .filter(Boolean).join(':'),
+  };
+
+  function _killTest() {
+    _stopTestSpinner();
+    if (_testTimeout)   { clearTimeout(_testTimeout); _testTimeout = null; }
+    if (_testMusicProc) { try { process.kill(-_testMusicProc.pid, 'SIGTERM'); } catch {} _testMusicProc = null; }
+    if (_testVoiceProc) { try { process.kill(-_testVoiceProc.pid, 'SIGTERM'); } catch {} _testVoiceProc = null; }
+    _testActive = false;
+  }
+
+  function _setTestBtnsLabel(label) {
+    for (const b of _testBtns) { b.setContent(label); }
+    screen.render();
+  }
+
+  let _starPhraseIdx = -1;  // cycles so the same phrase is never repeated back-to-back
+
+  const _STAR_PHRASES = [
+    "Hey, we'd love it if you gave Agent Vibes a GitHub star. It really helps us out.",
+    "Are you loving Agent Vibes? Please consider giving us a GitHub star. It means a lot.",
+    "Hey dude, did you give us a GitHub star yet? It would really help us out.",
+    "By the way, we love GitHub stars. It really helps our efforts. Go ahead and star us!",
+    "If Agent Vibes is making your day better, a GitHub star is the best way to say thanks.",
+    "Quick favour — if you're enjoying this, drop us a star on GitHub. We appreciate every single one.",
+    "Hey, stars on GitHub keep us motivated to keep building. Consider leaving one for us!",
+    "Psst — your GitHub star helps keep Agent Vibes free and open source. Just saying.",
+    "We put a lot of love into Agent Vibes. A star on GitHub would make our day.",
+    "Enjoying the vibes? Head over to GitHub and give us a star. It genuinely helps.",
+  ];
+
+  function _buildPreviewPhrase() {
+    const cfg        = configService.getConfig();
+    const provider   = providerService.getActiveProvider();
+    const voice      = provider === 'soprano' ? 'Soprano' : (providerService.getActiveVoiceId() ?? 'unknown');
+    const pretext    = (cfg.pretext ?? '').trim();
+
+    const effects    = cfg.effects ?? {};
+    const reverbOn   = effects.reverb !== false;
+    const reverbDesc = reverbOn ? `on, set to ${effects.reverbPreset ?? 'light'}` : 'off';
+
+    const music      = cfg.backgroundMusic ?? {};
+    const musicOn    = music.enabled !== false;
+    const trackLabel = formatTrackName(music.track ?? '');
+    const musicDesc  = musicOn ? `on, playing ${trackLabel}` : 'off';
+
+    const personality = (cfg.personality ?? '').trim();
+    const persDesc    = personality ? `set to ${personality}` : 'off';
+
+    _starPhraseIdx = (_starPhraseIdx + 1) % _STAR_PHRASES.length;
+    const starPhrase  = _STAR_PHRASES[_starPhraseIdx];
+
+    const parts = [];
+    if (pretext) parts.push(pretext + '.');
+    parts.push(`I am ${voice}.`);
+    parts.push(`I have reverb ${reverbDesc}.`);
+    parts.push(`My background music track is ${musicDesc}.`);
+    parts.push('We hope you are enjoying Agent Vibes.');
+    parts.push(`My personality is ${persDesc}.`);
+    parts.push(starPhrase);
+    return parts.join(' ');
+  }
+
+  // withMusic=true → Full Preview (voice + reverb + background track)
+  // withMusic=false → Reverb Test (voice + reverb only, no background music)
+  function _runTest(withMusic = true) {
+    if (_testActive) { _killTest(); _setTestBtnsLabel('Test'); return; }
+
+    _testActive = true;
+    _startTestSpinner();
+
+    // Prefer the settings-tab key (backgroundMusic) over the music-tab key (music)
+    const musicCfg = configService.getConfig().backgroundMusic
+      ?? configService.getConfig().music
+      ?? {};
+    const trackId   = musicCfg.track ?? 'agentvibes_soft_flamenco_loop.mp3';
+    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+    const trackPath = path.resolve(tracksDir, trackId);
+    const safeMusic = path.resolve(tracksDir);
+
+    // Start background music loop (Full Preview only — not reverb Test)
+    if (withMusic) {
+      const trackExists = (trackPath.startsWith(safeMusic + path.sep) || trackPath === safeMusic)
+        && (() => { try { fs.accessSync(trackPath); return true; } catch { return false; } })();
+      if (trackExists) {
+        const musicCmd = [
+          `ffplay -nodisp -loop 0 -loglevel quiet "${trackPath}"`,
+          `play "${trackPath}" repeat 9999`,
+          `mpg123 -q --loop -1 "${trackPath}"`,
+        ].join(' 2>/dev/null || ') + ' 2>/dev/null';
+        _testMusicProc = spawn('sh', ['-c', musicCmd], {
+          stdio: 'ignore', detached: true, env: _testEnv,
+        });
+        _testMusicProc.unref();
+      }
+    }
+
+    // Lead-in before voice synthesis.
+    // Soprano CLI loads the model fresh each call (~10s) so needs no artificial
+    // delay — the music will be well underway by the time synthesis finishes.
+    const provider   = providerService.getActiveProvider();
+    const leadInMs   = provider === 'soprano' ? 0 : 2000;
+    _testTimeout = setTimeout(() => {
+      _testTimeout = null;
+      if (!_testActive) return;
+
+      const provider  = providerService.getActiveProvider();  // re-read (may have changed)
+      const tempWav   = path.join(os.tmpdir(), `agentvibes-test-${Date.now()}.wav`);
+      const ttsInput  = _buildPreviewPhrase();
+
+      let synthProc;
+      if (provider === 'soprano') {
+        synthProc = spawn('soprano', ['--output', tempWav, ttsInput], {
+          stdio: 'ignore', detached: true, env: _testEnv,
+        });
+      } else {
+        const voiceId = providerService.getActiveVoiceId();
+        if (!voiceId) { _killTest(); _setTestBtnsLabel('Test'); return; }
+        const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+        const safePiper = path.resolve(PIPER_VOICES_DIR);
+        if (!voicePath.startsWith(safePiper + path.sep) && voicePath !== safePiper) {
+          _killTest(); _setTestBtnsLabel('Test'); return;
+        }
+        synthProc = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+          stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _testEnv,
+        });
+        synthProc.stdin.write(ttsInput + '\n');
+        synthProc.stdin.end();
+      }
+      synthProc.unref();
+      _testVoiceProc = synthProc;
+
+      synthProc.on('exit', (code) => {
+        if (!_testActive || code !== 0) {
+          _killTest(); _setTestBtnsLabel('Test');
+          try { fs.unlinkSync(tempWav); } catch {}
+          return;
+        }
+
+        // Apply sox reverb based on current preset
+        const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
+        const presetResult = spawnSync('bash', [effectsScript, 'get-reverb', 'default'], {
+          encoding: 'utf8', timeout: 3000, env: _testEnv,
+        });
+        const preset = (presetResult.stdout || '').trim();
+
+        const SOX_REVERB = {
+          light:    'reverb 20 50 50',
+          medium:   'reverb 40 50 70',
+          heavy:    'reverb 70 50 100',
+          cathedral: 'reverb 90 30 100',
+        };
+        const soxFx = SOX_REVERB[preset];
+
+        let wavToPlay = tempWav;
+        let processedWav = null;
+
+        if (soxFx) {
+          processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
+          spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
+            stdio: 'ignore', env: _testEnv,
+          });
+          // Use processed wav if sox succeeded
+          try {
+            fs.accessSync(processedWav);
+            wavToPlay = processedWav;
+          } catch {
+            processedWav = null;
+          }
+        }
+
+        _stopTestSpinner();
+        _setTestBtnsLabel('■ Stop');
+        const playCmd = `aplay "${wavToPlay}" 2>/dev/null || play "${wavToPlay}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${wavToPlay}" 2>/dev/null`;
+        const playProc = spawn('sh', ['-c', playCmd], {
+          stdio: 'ignore', detached: true, env: _testEnv,
+        });
+        _testVoiceProc = playProc;
+        playProc.on('exit', () => {
+          _killTest(); _setTestBtnsLabel('Test');
+          try { fs.unlinkSync(tempWav); } catch {}
+          if (processedWav) { try { fs.unlinkSync(processedWav); } catch {} }
+        });
+        playProc.on('error', () => {
+          _killTest(); _setTestBtnsLabel('Test');
+          try { fs.unlinkSync(tempWav); } catch {}
+          if (processedWav) { try { fs.unlinkSync(processedWav); } catch {} }
+        });
+      });
+
+      synthProc.on('error', () => {
+        _killTest(); _setTestBtnsLabel('Test');
+      });
+    }, leadInMs);
+  }
+
+  function _killMusicTest() {
+    if (_musicTestProc) {
+      try { process.kill(-_musicTestProc.pid, 'SIGTERM'); } catch {}
+      _musicTestProc = null;
+    }
+    _musicTestActive = false;
+  }
+
+  function _runMusicTest() {
+    if (_musicTestActive) {
+      _killMusicTest();
+      musicTestBtn.setContent('Test');
+      screen.render();
+      return;
+    }
+
+    const musicCfg = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
+    const trackId  = musicCfg.track ?? MUSIC_DEFAULTS.track;
+    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+    const trackPath = path.resolve(tracksDir, trackId);
+    const safeBase  = path.resolve(tracksDir);
+    if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
+
+    _musicTestActive = true;
+    _startSpinner(musicTestBtn, 'Test');
+
+    // Play up to 10 seconds of the track (music-only, no voice)
+    const cmd = [
+      `ffplay -nodisp -t 10 -loglevel quiet "${trackPath}"`,
+      `play "${trackPath}" trim 0 10`,
+      `mpg123 -q "${trackPath}"`,
+    ].join(' 2>/dev/null || ') + ' 2>/dev/null';
+
+    _musicTestProc = spawn('sh', ['-c', cmd], {
+      stdio: 'ignore', detached: true, env: _testEnv,
+    });
+    _musicTestProc.unref();
+    _stopSpinner();
+    musicTestBtn.setContent('■ Stop');
+    screen.render();
+
+    _musicTestProc.on('exit', () => {
+      if (_musicTestActive) {
+        _killMusicTest();
+        musicTestBtn.setContent('Test');
+        screen.render();
+      }
+    });
+    _musicTestProc.on('error', () => {
+      _killMusicTest();
+      musicTestBtn.setContent('Test');
+      screen.render();
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Container box — fills content area, hidden until activated
@@ -191,7 +533,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 1,
     left: 2,
-    content: `{#7986cb-fg}── Provider & Voice ${'─'.repeat(50)}{/#7986cb-fg}`,
+    content: `{#7986cb-fg}🎤  Provider & Voice ${'─'.repeat(50)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -202,7 +544,7 @@ export function createSettingsTab(screen, services) {
   blessed.text({
     parent: box,
     top: 3,
-    left: 4,
+    left: 6,
     content: 'Provider:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -210,15 +552,18 @@ export function createSettingsTab(screen, services) {
   const providerValue = blessed.text({
     parent: box,
     top: 3,
-    left: 20,
+    left: 22,
+    width: 16,    // truncate before [Switch] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const switchBtn = _createButton(box, screen, '[Switch]', COLORS, () => {
+  const switchBtn = _createButton(box, screen, 'Switch', COLORS, () => {
     _openProviderPicker(screen, providerService, (selected) => {
       providerService.setActiveProvider(selected);
       refreshDisplay();
+      _buttons[_currentIdx].focus();
+      screen.render();
     });
   });
   switchBtn.top = 3;
@@ -230,7 +575,7 @@ export function createSettingsTab(screen, services) {
   blessed.text({
     parent: box,
     top: 5,
-    left: 4,
+    left: 6,
     content: 'Current Voice:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -238,17 +583,84 @@ export function createSettingsTab(screen, services) {
   const voiceValue = blessed.text({
     parent: box,
     top: 5,
-    left: 20,
+    left: 22,
+    width: 16,    // truncate before [Change] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const changeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
-    // Full voice browser available via CLI: /agent-vibes:switch or /audio-browser
-    _showNotice(box, screen, 'Use /agent-vibes:switch or /audio-browser to change voice');
+  const changeBtn = _createButton(box, screen, 'Change', COLORS, () => {
+    _openVoiceBrowserModal(screen, providerService, configService, navigationService, () => {
+      refreshDisplay();
+      _buttons[_currentIdx].focus();
+      screen.render();
+    });
   });
   changeBtn.top = 5;
   changeBtn.left = 40;
+
+  const playBtn = _createButton(box, screen, '▶ Play', COLORS, () => {
+    if (_samplePlaying) {
+      _killSample();
+      playBtn.setContent('▶ Play');
+      screen.render();
+      return;
+    }
+
+    const provider = providerService.getActiveProvider();
+    const phrase   = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+    const tempWav  = path.join(os.tmpdir(), `agentvibes-sample-${Date.now()}.wav`);
+
+    _samplePlaying = true;
+    _startSpinner(playBtn, '▶ Play');
+
+    const _onSynthDone = (code) => {
+      _stopSpinner();
+      if (!_samplePlaying) { try { fs.unlinkSync(tempWav); } catch {} return; }
+      if (code !== 0) {
+        _killSample(); playBtn.setContent('▶ Play'); screen.render();
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
+      playBtn.setContent('■ Stop');
+      screen.render();
+      const playCmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
+      const playProc = spawn('sh', ['-c', playCmd], { stdio: 'ignore', detached: true, env: _sampleEnv });
+      _sampleProcess = playProc;
+      const _done = () => { _killSample(); playBtn.setContent('▶ Play'); screen.render(); try { fs.unlinkSync(tempWav); } catch {} };
+      playProc.on('exit', _done);
+      playProc.on('error', _done);
+    };
+
+    if (provider === 'soprano') {
+      // Soprano: soprano --output <wav> "<text>"
+      const soprano = spawn('soprano', ['--output', tempWav, phrase], {
+        stdio: 'ignore', detached: true, env: _sampleEnv,
+      });
+      _sampleProcess = soprano;
+      soprano.on('exit', _onSynthDone);
+      soprano.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); });
+    } else {
+      // Piper (default): pipe text via stdin
+      const voiceId   = providerService.getActiveVoiceId();
+      if (!voiceId) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
+      const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+      const safeBase  = path.resolve(PIPER_VOICES_DIR);
+      if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) {
+        _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return;
+      }
+      const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+        stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _sampleEnv,
+      });
+      piper.stdin.write(phrase + '\n');
+      piper.stdin.end();
+      _sampleProcess = piper;
+      piper.on('exit', _onSynthDone);
+      piper.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); });
+    }
+  });
+  playBtn.top = 5;
+  playBtn.left = 52;
 
   // -------------------------------------------------------------------------
   // Section header: ── Audio Effects ──
@@ -257,7 +669,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 9,
     left: 2,
-    content: `{#7986cb-fg}── Audio Effects ${'─'.repeat(50)}{/#7986cb-fg}`,
+    content: `{#7986cb-fg}⚡  Audio Effects ${'─'.repeat(52)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -268,7 +680,7 @@ export function createSettingsTab(screen, services) {
   blessed.text({
     parent: box,
     top: 11,
-    left: 4,
+    left: 6,
     content: 'Reverb:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -276,131 +688,85 @@ export function createSettingsTab(screen, services) {
   const reverbValue = blessed.text({
     parent: box,
     top: 11,
-    left: 20,
+    left: 22,
+    width: 16,    // truncate before [Change] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const toggleBtn = _createButton(box, screen, '[Toggle]', COLORS, () => {
-    const effects = _getEffects(configService);
-    _setEffects(configService, { reverb: !effects.reverb });
-    refreshDisplay();
-  });
-  toggleBtn.top = 11;
-  toggleBtn.left = 40;
-
-  const adjustReverbBtn = _createButton(box, screen, '[Adjust]', COLORS, () => {
-    _openReverbPicker(screen, configService, (amount) => {
-      _setEffects(configService, { reverbAmount: amount });
+  const reverbChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
+    _openReverbPicker(screen, configService, (preset) => {
+      _setEffects(configService, { reverbPreset: preset });
       refreshDisplay();
     });
   });
-  adjustReverbBtn.top = 11;
-  adjustReverbBtn.left = 52;
+  reverbChangeBtn.top = 11;
+  reverbChangeBtn.left = 40;
 
-  // -------------------------------------------------------------------------
-  // Pitch row: label + value + [Adjust] button
-
-  blessed.text({
-    parent: box,
-    top: 13,
-    left: 4,
-    content: 'Pitch:',
-    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-  });
-
-  const pitchValue = blessed.text({
-    parent: box,
-    top: 13,
-    left: 20,
-    content: '',  // populated by refreshDisplay()
-    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
-  });
-
-  const adjustPitchBtn = _createButton(box, screen, '[Adjust]', COLORS, () => {
-    _openPitchPicker(screen, configService, (semitones) => {
-      _setEffects(configService, { pitch: semitones });
-      refreshDisplay();
-    });
-  });
-  adjustPitchBtn.top = 13;
-  adjustPitchBtn.left = 40;
+  const reverbTestBtn = _createButton(box, screen, 'Test', COLORS, () => _runTest(false));
+  reverbTestBtn.top = 11;
+  reverbTestBtn.left = 52;
 
   // -------------------------------------------------------------------------
   // Section header: ── Background Music ──
 
   blessed.text({
     parent: box,
-    top: 17,
+    top: 13,
     left: 2,
-    content: `{#7986cb-fg}── Background Music ${'─'.repeat(48)}{/#7986cb-fg}`,
+    content: `{#7986cb-fg}🎸  Background Music ${'─'.repeat(48)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
 
   // -------------------------------------------------------------------------
-  // Music row: label + value + [Toggle] button
+  // Music row (single): Track value + [Change] + [Enabled/Disabled] + [Test]
 
   blessed.text({
     parent: box,
-    top: 19,
-    left: 4,
-    content: 'Music:',
-    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-  });
-
-  const musicValue = blessed.text({
-    parent: box,
-    top: 19,
-    left: 20,
-    content: '',  // populated by refreshDisplay()
-    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
-  });
-
-  const musicToggleBtn = _createButton(box, screen, '[Toggle]', COLORS, () => {
-    const music = _getMusic(configService);
-    _setMusic(configService, { enabled: !music.enabled });
-    refreshDisplay();
-  });
-  musicToggleBtn.top = 19;
-  musicToggleBtn.left = 40;
-
-  // -------------------------------------------------------------------------
-  // Track row: label + value + [Change] button
-
-  blessed.text({
-    parent: box,
-    top: 21,
-    left: 4,
+    top: 15,
+    left: 6,
     content: 'Track:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const trackValue = blessed.text({
     parent: box,
-    top: 21,
-    left: 20,
+    top: 15,
+    left: 14,
+    width: 24,    // truncate before [Change] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const trackChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
-    _openTrackPicker(screen, configService, (file) => {
-      _setMusic(configService, { track: file });
+  const trackChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
+    _openMusicBrowserModal(screen, configService, navigationService, () => {
       refreshDisplay();
     });
   });
-  trackChangeBtn.top = 21;
+  trackChangeBtn.top = 15;
   trackChangeBtn.left = 40;
+
+  const musicToggleBtn = _createButton(box, screen, 'Disabled', COLORS, () => {
+    const music = _getMusic(configService);
+    _setMusic(configService, { enabled: !music.enabled });
+    refreshDisplay();
+  });
+  musicToggleBtn.top = 15;
+  musicToggleBtn.left = 52;
+
+  const musicTestBtn = _createButton(box, screen, 'Test', COLORS, _runMusicTest);
+  musicTestBtn.top = 15;
+  musicTestBtn.left = 66;
 
   // -------------------------------------------------------------------------
   // Section header: ── Personality & Verbosity ──
 
   blessed.text({
     parent: box,
-    top: 25,
+    top: 19,
     left: 2,
-    content: `{#7986cb-fg}── Personality & Verbosity ${'─'.repeat(40)}{/#7986cb-fg}`,
+    content: `{#7986cb-fg}🌈  Personality & Verbosity ${'─'.repeat(40)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -410,52 +776,54 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 27,
-    left: 4,
+    top: 21,
+    left: 6,
     content: 'Verbosity:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const verbosityValue = blessed.text({
     parent: box,
-    top: 27,
-    left: 20,
+    top: 21,
+    left: 22,
+    width: 16,    // truncate before [Change] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const verbosityChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
+  const verbosityChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
     _openVerbosityPicker(screen, configService, () => refreshDisplay());
   });
-  verbosityChangeBtn.top = 27;
+  verbosityChangeBtn.top = 21;
   verbosityChangeBtn.left = 40;
 
   // -------------------------------------------------------------------------
-  // Personality row: label + value + [Change] button (stub for story 7-7)
+  // Personality row: label + value + [Change] button
 
   blessed.text({
     parent: box,
-    top: 29,
-    left: 4,
+    top: 23,
+    left: 6,
     content: 'Personality:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const personalityValue = blessed.text({
     parent: box,
-    top: 29,
-    left: 20,
+    top: 23,
+    left: 22,
+    width: 16,    // truncate before [Change] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const personalityChangeBtn = _createButton(box, screen, '[Change]', COLORS, () => {
+  const personalityChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
     _openPersonalityPicker(screen, configService, (name) => {
       configService.set('personality', name);
       refreshDisplay();
     });
   });
-  personalityChangeBtn.top = 29;
+  personalityChangeBtn.top = 23;
   personalityChangeBtn.left = 40;
 
   // -------------------------------------------------------------------------
@@ -463,49 +831,92 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 33,
+    top: 27,
     left: 2,
-    content: `{#7986cb-fg}── Intro Text ${'─'.repeat(54)}{/#7986cb-fg}`,
+    content: `{#7986cb-fg}✍️  Intro Text ${'─'.repeat(54)}{/#7986cb-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
 
   // -------------------------------------------------------------------------
-  // Intro Text row: label + value + [Clear] button
+  // Intro Text row: label + value + [Edit] + [Clear] buttons
 
   blessed.text({
     parent: box,
-    top: 35,
-    left: 4,
+    top: 29,
+    left: 6,
     content: 'Intro Text:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const introTextValue = blessed.text({
     parent: box,
-    top: 35,
-    left: 20,
+    top: 29,
+    left: 22,
+    width: 16,    // truncate before [Edit] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  const introClearBtn = _createButton(box, screen, '[Clear]', COLORS, () => {
+  const introEditBtn = _createButton(box, screen, 'Edit', COLORS, () => {
+    _openIntroTextEditor(screen, configService, () => { refreshDisplay(); });
+  });
+  introEditBtn.top = 29;
+  introEditBtn.left = 40;
+
+  const introClearBtn = _createButton(box, screen, 'Clear', COLORS, () => {
     configService.set('pretext', '');
     refreshDisplay();
   });
-  introClearBtn.top = 35;
-  introClearBtn.left = 40;
+  introClearBtn.top = 29;
+  introClearBtn.left = 50;
+
+  // -------------------------------------------------------------------------
+  // Section header: 🚀 Full Preview (top-anchored, just below intro text)
+
+  blessed.text({
+    parent: box,
+    top: 33,
+    left: 2,
+    content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(52)}{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // Full Preview button — voice + reverb + background track combined
+  const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
+  fullPreviewBtn.top = 35;
+  fullPreviewBtn.left = 6;
+
+  // -------------------------------------------------------------------------
+  // Hint bar — keyboard shortcuts at the bottom of the settings area
+
+  blessed.text({
+    parent: box,
+    bottom: 0,
+    left: 2,
+    right: 2,
+    tags: true,
+    content: '{#455a64-fg}[↑↓] Group  [←→] Sibling  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit{/#455a64-fg}',
+    style: { bg: COLORS.contentBg },
+  });
 
   // -------------------------------------------------------------------------
   // Display state + button-level focus navigation (story 7.6)
 
   const _buttons = [
-    switchBtn, changeBtn,
-    toggleBtn, adjustReverbBtn, adjustPitchBtn,
-    musicToggleBtn, trackChangeBtn,
+    switchBtn, changeBtn, playBtn,
+    reverbChangeBtn, reverbTestBtn,
+    trackChangeBtn, musicToggleBtn, musicTestBtn,
     verbosityChangeBtn, personalityChangeBtn,
-    introClearBtn,
+    introEditBtn, introClearBtn,
+    fullPreviewBtn,
   ];
+
+  // Register test buttons for label sync (reverb + full preview share state)
+  _testBtns.push(reverbTestBtn, fullPreviewBtn);
+  _testBtnLabels.set(reverbTestBtn, 'Test');
+  _testBtnLabels.set(fullPreviewBtn, '▶ Full Preview');
 
   let _currentIdx = 0;
 
@@ -514,32 +925,77 @@ export function createSettingsTab(screen, services) {
     btn.on('focus', () => { _currentIdx = i; });
   }
 
-  // ↓ / Tab → next button;  ↑ / Shift-Tab → previous button
-  function _navigateButton(delta) {
-    _currentIdx = (_currentIdx + delta + _buttons.length) % _buttons.length;
-    _buttons[_currentIdx].focus();
+  // Shared focus helper — suppresses intermediate renders, force-invalidates olines.
+  // Prevents the olines desync artifact where setContent() updates lines[] but
+  // olines[] stays stale, causing draw() to skip repainting those cells.
+  function _focusButton(btn) {
+    const _orig = screen.render.bind(screen);
+    screen.render = () => {};
+    btn.focus();
+    screen.render = _orig;
+
+    screen.clearRegion(0, screen.cols, 4, screen.rows - 2);
+    for (let r = 4; r < screen.rows - 2; r++) {
+      const orow = screen.olines[r];
+      if (!orow) continue;
+      for (let c = 0; c < screen.cols; c++) {
+        if (orow[c]) orow[c][0] = -1;
+      }
+      orow.dirty = true;
+    }
+    screen.render();
+  }
+
+  // ↓ / ↑ → navigate between row groups (skips siblings; use ←/→ for those)
+  function _navigateRow(delta) {
+    const focused = _buttons[_currentIdx];
+    let rowIdx = _rows.findIndex(row => row.includes(focused));
+    if (rowIdx === -1) rowIdx = 0;
+    rowIdx = (rowIdx + delta + _rows.length) % _rows.length;
+    const btn = _rows[rowIdx][0];
+    _currentIdx = _buttons.indexOf(btn);
+    _focusButton(btn);
   }
 
   for (const btn of _buttons) {
-    btn.key(['down', 'tab'], () => _navigateButton(1));
-    btn.key(['up', 'S-tab'], () => _navigateButton(-1));
+    btn.key(['down'], () => _navigateRow(1));
+    btn.key(['up'],   () => _navigateRow(-1));
+  }
+
+  // ← / → within a row — intercepts before tab-switch navigation fires
+  const _rows = [
+    [switchBtn],
+    [changeBtn, playBtn],
+    [reverbChangeBtn, reverbTestBtn],
+    [trackChangeBtn, musicToggleBtn, musicTestBtn],
+    [verbosityChangeBtn],
+    [personalityChangeBtn],
+    [introEditBtn, introClearBtn],
+    [fullPreviewBtn],
+  ];
+
+  for (const row of _rows) {
+    for (let i = 0; i < row.length; i++) {
+      if (i < row.length - 1) row[i].key(['right'], () => _focusButton(row[i + 1]));
+      if (i > 0)              row[i].key(['left'],  () => _focusButton(row[i - 1]));
+    }
   }
 
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
     const activeVoice = providerService.getActiveVoiceId();
     providerValue.setContent(activeProvider);
-    voiceValue.setContent(activeVoice);
+    // Single-voice providers: show the provider name instead of voice ID
+    voiceValue.setContent(activeProvider === 'soprano' ? 'Soprano' : activeVoice);
 
     // Group 2: Audio Effects
     const effects = configService.getConfig().effects ?? EFFECTS_DEFAULTS;
-    reverbValue.setContent(formatReverbState(effects.reverb, effects.reverbAmount));
-    pitchValue.setContent(formatPitchState(effects.pitch));
+    reverbValue.setContent(formatReverbState(effects.reverbPreset ?? 'light'));
 
     // Group 3: Background Music
     const music = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
-    musicValue.setContent(formatMusicState(music.enabled));
     trackValue.setContent(formatTrackName(music.track));
+    musicToggleBtn.setContent(music.enabled ? 'Enabled' : 'Disabled');
 
     // Group 4: Personality & Verbosity
     const cfg = configService.getConfig();
@@ -565,6 +1021,12 @@ export function createSettingsTab(screen, services) {
     },
 
     hide() {
+      _killSample();
+      playBtn.setContent('▶ Play');
+      _killTest();
+      _setTestBtnsLabel('Test');
+      _killMusicTest();
+      musicTestBtn.setContent('Test');
       box.hide();
       screen.render();
     },
@@ -576,7 +1038,12 @@ export function createSettingsTab(screen, services) {
     },
 
     onBlur() {
-      // No-op: NavigationService handles focus restoration
+      _killSample();
+      playBtn.setContent('▶ Play');
+      _killTest();
+      _setTestBtnsLabel('Test');
+      _killMusicTest();
+      musicTestBtn.setContent('Test');
     },
 
     getFooterText() {
@@ -641,45 +1108,152 @@ function _createButton(parent, screen, label, COLORS, onClick) {
 }
 
 // ---------------------------------------------------------------------------
-// Private: Inline provider picker (blessed list widget)
+// Private: Provider picker modal — all providers, install status, instructions
+
+const _ALL_PROVIDERS = [
+  { id: 'piper',        name: 'Piper TTS',    platforms: ['linux', 'darwin', 'win32'], desc: 'High-quality local neural TTS' },
+  { id: 'soprano',      name: 'Soprano',      platforms: ['linux', 'darwin'],          desc: 'Ultra-fast neural TTS (single voice)' },
+  { id: 'windows-sapi', name: 'Windows SAPI', platforms: ['win32'],                   desc: 'Windows built-in text-to-speech' },
+  { id: 'macos',        name: 'Mac Say',      platforms: ['darwin'],                  desc: 'macOS built-in text-to-speech' },
+];
+
+const _INSTALL_CMDS = {
+  piper:          ['pip install piper-tts', 'OR:   pipx install piper-tts', '', 'Voices are downloaded separately:', 'Run: agentvibes install  (then choose Piper)'],
+  soprano:        ['pip install soprano-tts', 'OR:   pipx install soprano-tts', '', 'Keep model loaded for fast synthesis:', 'soprano-webui'],
+  'windows-sapi': ['Built-in on Windows — no install required.', 'Only works in a native Windows shell,', 'not inside WSL. Use piper or soprano in WSL.'],
+  macos:          ['Built-in on macOS — no install required.', 'The say command ships with every Mac.'],
+};
+
+function _detectEnvLabel() {
+  if (process.platform === 'win32') return { label: 'Windows', platform: 'win32' };
+  if (process.platform === 'darwin') return { label: 'macOS', platform: 'darwin' };
+  try {
+    const v = fs.readFileSync('/proc/version', 'utf8');
+    if (v.toLowerCase().includes('microsoft')) return { label: 'WSL (Linux/Microsoft)', platform: 'linux' };
+  } catch {}
+  return { label: 'Linux', platform: 'linux' };
+}
 
 function _openProviderPicker(screen, providerService, onSelect) {
-  const providers = providerService.getInstalledProviders();
-  const current = providerService.getActiveProvider();
+  const { label: envLabel, platform } = _detectEnvLabel();
+  const installed = new Set(providerService.getInstalledProviders());
+  const current   = providerService.getActiveProvider();
 
-  const list = blessed.list({
+  const modal = blessed.box({
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 32,
-    height: providers.length + 4,
+    width: 70,
+    height: 20,
     border: { type: 'line' },
-    label: ' Select Provider ',
-    items: providers.map(p => (p === current ? `● ${p}` : `  ${p}`)),
-    keys: true,
-    vi: false,
-    mouse: true,
-    style: {
-      border: { fg: COLORS.btnFocus },
-      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
-      item: { fg: '#e3f2fd' },
-    },
+    tags: true,
+    label: _modalTitle('Select Provider'),
+    style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
   });
 
-  list.focus();
+  function _close() {
+    modal.destroy();
+    try {
+      for (let r = 0; r < screen.height; r++)
+        for (let c = 0; c < screen.width; c++)
+          if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
+    } catch {}
+    screen.render();
+  }
+
+  // Environment header
+  blessed.text({
+    parent: modal, top: 0, left: 1, tags: true,
+    content: `{#00e5ff-fg}🖥  Environment:{/#00e5ff-fg} {bold}${envLabel}{/bold}`,
+    style: { bg: COLORS.contentBg },
+  });
+  blessed.text({
+    parent: modal, top: 1, left: 0,
+    content: ' ' + '─'.repeat(66),
+    style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg },
+  });
+
+  // Provider rows (top 2–5)
+  const actionBtns = [];
+  let focusIdx = 0;
+
+  _ALL_PROVIDERS.forEach((prov, i) => {
+    const rowTop      = 2 + i;
+    const isSupported = prov.platforms.includes(platform);
+    const isInstalled = installed.has(prov.id);
+    const isCurrent   = prov.id === current;
+
+    if (!isSupported) {
+      const osMap = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
+      const forOs = prov.platforms.map(p => osMap[p] ?? p).join('/');
+      blessed.text({
+        parent: modal, top: rowTop, left: 1, width: 66, tags: true,
+        content: `{#546e7a-fg}✗  ${prov.name.padEnd(14)} ${prov.desc.padEnd(28)}  only on: ${forOs}{/#546e7a-fg}`,
+        style: { bg: COLORS.contentBg },
+      });
+      return;
+    }
+
+    const icon   = isInstalled ? '{green-fg}✓{/green-fg}' : '{#ef9a9a-fg}✗{/#ef9a9a-fg}';
+    const name   = isInstalled ? `{bold}${prov.name}{/bold}` : prov.name;
+    const active = isCurrent   ? ' {yellow-fg}[active]{/yellow-fg}' : '';
+    const status = isInstalled ? '{green-fg}Installed{/green-fg}' : '{#ef9a9a-fg}Not found{/#ef9a9a-fg}';
+
+    blessed.text({ parent: modal, top: rowTop, left: 1,  width: 20, tags: true, content: `${icon}  ${name}${active}`, style: { bg: COLORS.contentBg } });
+    blessed.text({ parent: modal, top: rowTop, left: 20, width: 24, tags: true, content: `{#90a4ae-fg}${prov.desc}{/#90a4ae-fg}`, style: { bg: COLORS.contentBg } });
+    blessed.text({ parent: modal, top: rowTop, left: 44, width: 12, tags: true, content: status, style: { bg: COLORS.contentBg } });
+
+    const btn = _createButton(modal, screen, isInstalled ? 'Select' : 'Install', COLORS, () => {
+      if (isInstalled) {
+        _close(); onSelect(prov.id);
+      } else {
+        const lines = _INSTALL_CMDS[prov.id] ?? ['No instructions available.'];
+        instrTitle.setContent(`{#7986cb-fg}Install — ${prov.name}:{/#7986cb-fg}`);
+        instrContent.setContent(lines.map(l => l ? `{#00e5ff-fg}${l}{/#00e5ff-fg}` : '').join('\n'));
+        screen.render();
+      }
+    });
+    btn.top = rowTop; btn.left = 57;
+    if (isCurrent) focusIdx = actionBtns.length;
+    actionBtns.push(btn);
+  });
+
+  // Separator + instructions panel
+  blessed.text({ parent: modal, top: 6, left: 0, content: ' ' + '─'.repeat(66), style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg } });
+
+  const instrTitle = blessed.text({
+    parent: modal, top: 7, left: 1, width: 66, tags: true,
+    content: '{#7986cb-fg}Install instructions — click Install beside a provider:{/#7986cb-fg}',
+    style: { bg: COLORS.contentBg },
+  });
+  const instrContent = blessed.text({
+    parent: modal, top: 8, left: 3, width: 64, height: 5, tags: true,
+    content: '{#546e7a-fg}(click Install beside a provider to see commands){/#546e7a-fg}',
+    style: { bg: COLORS.contentBg },
+  });
+
+  // Bottom separator + Cancel
+  blessed.text({ parent: modal, top: 14, left: 0, content: ' ' + '─'.repeat(66), style: { fg: COLORS.sectionHdr, bg: COLORS.contentBg } });
+
+  const cancelBtn = _createButton(modal, screen, 'Cancel', COLORS, _close);
+  cancelBtn.top = 15; cancelBtn.left = 'center';
+  actionBtns.push(cancelBtn);
+
+  // Keyboard navigation
+  for (let i = 0; i < actionBtns.length; i++) {
+    actionBtns[i].key(['down', 'tab'], () => {
+      const cur = actionBtns.findIndex(b => b === screen.focused);
+      actionBtns[(cur + 1) % actionBtns.length].focus();
+    });
+    actionBtns[i].key(['up', 'S-tab'], () => {
+      const cur = actionBtns.findIndex(b => b === screen.focused);
+      actionBtns[(cur - 1 + actionBtns.length) % actionBtns.length].focus();
+    });
+  }
+  modal.key(['escape', 'q'], _close);
+
+  (actionBtns[focusIdx] ?? actionBtns[0])?.focus();
   screen.render();
-
-  list.key(['enter', 'space'], () => {
-    const selected = providers[list.selected];
-    list.destroy();
-    screen.render();
-    if (selected) onSelect(selected);
-  });
-
-  list.key(['escape', 'q'], () => {
-    list.destroy();
-    screen.render();
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -717,24 +1291,32 @@ function _setEffects(configService, partial) {
 }
 
 // ---------------------------------------------------------------------------
-// Private: Inline reverb amount picker
+// Private: Inline reverb preset picker
 
 function _openReverbPicker(screen, configService, onSelect) {
-  const opts = ['0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'];
-  const currentAmt = (configService.getConfig().effects?.reverbAmount ?? 0.3);
-  const currentIdx = Math.min(10, Math.round(currentAmt * 10));
+  const PRESETS = [
+    { label: 'Off (Dry, no reverb)',        value: 'off' },
+    { label: 'Light (Small room)',           value: 'light' },
+    { label: 'Medium (Conference room)',     value: 'medium' },
+    { label: 'Heavy (Large hall)',           value: 'heavy' },
+    { label: 'Cathedral (Epic space)',       value: 'cathedral' },
+  ];
+
+  const currentPreset = configService.getConfig().effects?.reverbPreset ?? 'light';
+  const currentIdx = Math.max(0, PRESETS.findIndex(p => p.value === currentPreset));
 
   const list = blessed.list({
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 28,
-    height: Math.min(opts.length + 4, 20),
+    width: 40,
+    height: PRESETS.length + 4,
     border: { type: 'line' },
-    label: ' Reverb Amount ',
-    items: opts,
+    tags: true,
+    label: _modalTitle('Select Reverb Preset'),
+    items: PRESETS.map((p, i) => (i === currentIdx ? `● ${p.label}` : `  ${p.label}`)),
     keys: true,
-    vi: true,
+    vi: false,
     mouse: true,
     style: {
       border: { fg: COLORS.btnFocus },
@@ -748,62 +1330,20 @@ function _openReverbPicker(screen, configService, onSelect) {
   screen.render();
 
   list.key(['enter', 'space'], () => {
-    const pct = parseInt(opts[list.selected], 10);
-    if (isNaN(pct)) return;
-    const amount = pct / 100;
+    const selected = PRESETS[list.selected];
+    if (!selected) return;
     list.destroy();
     screen.render();
-    onSelect(amount);
-  });
 
-  list.key(['escape', 'q'], () => {
-    list.destroy();
-    screen.render();
-  });
-}
+    // Apply to audio config via effects-manager.sh
+    const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
+    spawnSync('bash', [effectsScript, 'set-reverb', selected.value, 'default'], {
+      stdio: 'ignore',
+      timeout: 5000,
+      env: { ...process.env },
+    });
 
-// ---------------------------------------------------------------------------
-// Private: Inline pitch semitone picker
-
-function _openPitchPicker(screen, configService, onSelect) {
-  const pitchOpts = [];
-  for (let i = -12; i <= 12; i++) {
-    pitchOpts.push(i >= 0 ? `+${i}` : `${i}`);
-  }
-
-  const currentPitch = (configService.getConfig().effects?.pitch ?? 0);
-  const currentIdx = currentPitch + 12;  // -12 → 0, 0 → 12, +12 → 24
-
-  const list = blessed.list({
-    parent: screen,
-    top: 'center',
-    left: 'center',
-    width: 24,
-    height: 20,
-    border: { type: 'line' },
-    label: ' Pitch (semitones) ',
-    items: pitchOpts,
-    keys: true,
-    vi: true,
-    mouse: true,
-    style: {
-      border: { fg: COLORS.btnFocus },
-      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
-      item: { fg: '#e3f2fd' },
-    },
-  });
-
-  list.select(currentIdx);
-  list.focus();
-  screen.render();
-
-  list.key(['enter', 'space'], () => {
-    const raw = pitchOpts[list.selected];
-    const semitones = parseInt(raw, 10);
-    if (isNaN(semitones)) return;
-    list.destroy();
-    screen.render();
-    onSelect(semitones);
+    onSelect(selected.value);
   });
 
   list.key(['escape', 'q'], () => {
@@ -829,22 +1369,39 @@ function _setMusic(configService, partial) {
 // Private: Inline track picker
 
 function _openTrackPicker(screen, configService, onSelect) {
-  const currentTrack = (configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track);
-  const items = BUILT_IN_TRACKS.map(t => (t.file === currentTrack ? `● ${t.label}` : `  ${t.label}`));
-  const currentIdx = BUILT_IN_TRACKS.findIndex(t => t.file === currentTrack);
+  // Scan .claude/audio/tracks/ dynamically; fall back to BUILT_IN_TRACKS if missing.
+  const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+  let tracks;
+  try {
+    const files = fs.readdirSync(tracksDir);
+    tracks = files
+      .filter(f => /\.mp3$/i.test(f))
+      .sort()
+      .map(f => ({ file: f, label: formatTrackLabel(f) }));
+  } catch {
+    tracks = BUILT_IN_TRACKS;
+  }
 
+  const currentTrack = (configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track);
+  const items = tracks.map(t => (t.file === currentTrack ? `● ${t.label}` : `  ${t.label}`));
+  const currentIdx = tracks.findIndex(t => t.file === currentTrack);
+
+  const listHeight = Math.min(tracks.length + 4, Math.floor(screen.rows * 0.7));
   const list = blessed.list({
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 44,
-    height: BUILT_IN_TRACKS.length + 4,
+    width: 50,
+    height: listHeight,
     border: { type: 'line' },
-    label: ' Select Track ',
+    tags: true,
+    label: _modalTitle('Select Track'),
     items,
     keys: true,
     vi: false,
     mouse: true,
+    scrollable: true,
+    scrollbar: { ch: '│', track: { bg: '#1e2a3a' }, style: { fg: COLORS.btnFocus } },
     style: {
       border: { fg: COLORS.btnFocus },
       selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
@@ -857,7 +1414,7 @@ function _openTrackPicker(screen, configService, onSelect) {
   screen.render();
 
   list.key(['enter', 'space'], () => {
-    const selected = BUILT_IN_TRACKS[list.selected];
+    const selected = tracks[list.selected];
     if (!selected) return;
     list.destroy();
     screen.render();
@@ -868,6 +1425,279 @@ function _openTrackPicker(screen, configService, onSelect) {
     list.destroy();
     screen.render();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Private: Full music browser modal — rich track selection with favorites + preview
+
+function _openMusicBrowserModal(screen, configService, navigationService, onDone) {
+  let _allTracks = [];
+  let _showFavoritesOnly = false;
+  let _previewProcess = null;
+  let _previewTrackId = null;
+  let _closed = false;
+
+  // Block global Tab-to-cycle-tab while modal is open
+  navigationService?.openModal();
+
+  const _modalEnv = {
+    ...process.env,
+    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+      .filter(Boolean).join(':'),
+  };
+
+  function _killPreview() {
+    if (_previewProcess) {
+      try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
+      _previewProcess = null;
+    }
+    _previewTrackId = null;
+  }
+
+  function _closeModal() {
+    if (_closed) return;
+    _closed = true;
+    navigationService?.closeModal();
+    _killPreview();
+    modal.destroy();
+
+    // Force-invalidate olines so draw() rewrites every cell the modal covered
+    screen.clearRegion(0, screen.cols, 2, screen.rows - 2);
+    for (let r = 2; r < screen.rows - 2; r++) {
+      const orow = screen.olines[r];
+      if (!orow) continue;
+      for (let c = 0; c < screen.cols; c++) {
+        if (orow[c]) orow[c][0] = -1;
+      }
+      orow.dirty = true;
+    }
+
+    screen.render();
+    onDone();
+  }
+
+  // ---- Modal overlay ----
+  const modal = blessed.box({
+    parent: screen,
+    top: '5%',
+    left: '3%',
+    width: '94%',
+    height: '90%',
+    border: { type: 'line' },
+    tags: true,
+    label: _modalTitle('🎵 Select Music Track'),
+    style: {
+      fg: COLORS.labelFg,
+      bg: COLORS.contentBg,
+      border: { fg: COLORS.btnFocus },
+      label: { fg: COLORS.btnFocus },
+    },
+  });
+  modal.setFront();
+
+  // ---- Track list ----
+  const modalTrackList = blessed.list({
+    parent: modal,
+    top: 1,
+    left: 2,
+    right: 2,
+    bottom: 6,
+    keys: true,
+    vi: true,
+    mouse: true,
+    border: { type: 'line' },
+    scrollbar: { ch: '│', style: { fg: COLORS.borderFg } },
+    style: {
+      fg: COLORS.labelFg,
+      bg: COLORS.contentBg,
+      border: { fg: COLORS.borderFg },
+      selected: { bg: '#1a237e', fg: '#00e5ff', bold: true },
+      item: { fg: COLORS.labelFg },
+    },
+  });
+
+  // ---- Preview status line ----
+  const modalPreviewLine = blessed.text({
+    parent: modal,
+    bottom: 5,
+    left: 2,
+    right: 2,
+    tags: true,
+    content: '',
+    style: { fg: '#00e5ff', bg: COLORS.contentBg },
+  });
+
+  // ---- File location hint ----
+  blessed.text({
+    parent: modal,
+    bottom: 4,
+    left: 2,
+    right: 2,
+    tags: true,
+    content: `{#455a64-fg}Add MP3 files to: .claude/audio/tracks/  •  Supports ffplay / mpg123 / play{/#455a64-fg}`,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // ---- Key hint bar ----
+  blessed.text({
+    parent: modal,
+    bottom: 3,
+    left: 2,
+    right: 2,
+    content: '{#455a64-fg}[\u2191\u2193] Navigate  [Enter] Select  [Space] Preview  [F] Favorite  [/] Favorites only  [Esc] Cancel{/#455a64-fg}',
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // ---- Buttons ----
+  const selectTrackBtn = _createButton(modal, screen, 'Select Track', COLORS, () => {
+    const visible = _getVisibleTracks();
+    const selected = visible[modalTrackList.selected];
+    if (selected) {
+      try {
+        const current = configService.getConfig().backgroundMusic ?? {};
+        configService.set('backgroundMusic', { ...current, track: selected.id });
+      } catch {}
+      _closeModal();
+    }
+  });
+  selectTrackBtn.bottom = 1;
+  selectTrackBtn.left = 4;
+
+  const cancelModalBtn = _createButton(modal, screen, 'Cancel', COLORS, _closeModal);
+  cancelModalBtn.bottom = 1;
+  cancelModalBtn.left = 22;
+
+  // ---- Helper functions ----
+
+  function _getVisibleTracks() {
+    if (!_showFavoritesOnly) return _allTracks;
+    const favs = getMusicFavorites(configService);
+    return _allTracks.filter(t => favs.includes(t.id));
+  }
+
+  function _buildListItems(tracks) {
+    const currentTrack = configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track;
+    const favs = getMusicFavorites(configService);
+    return tracks.map(t => {
+      const isActive = t.id === currentTrack;
+      const isFav    = favs.includes(t.id);
+      const isPrev   = t.id === _previewTrackId;
+      const activeMark = isPrev ? '\u266A' : (isActive ? '\u25B6' : ' ');
+      const favMark    = isFav ? '\u2605' : ' ';
+      return ` ${activeMark} ${favMark} ${t.label}`;
+    });
+  }
+
+  function _refreshList() {
+    if (_closed) return;
+    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+    const scanned = scanTracks();
+    _allTracks = scanned;
+    const visible = _getVisibleTracks();
+    const items = _buildListItems(visible);
+    modalTrackList.setItems(items.length > 0 ? items : [' (no tracks found)']);
+    screen.render();
+  }
+
+  function _previewTrack(trackId) {
+    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+    const trackPath = path.resolve(tracksDir, trackId);
+    const safeBase  = path.resolve(tracksDir);
+    if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
+
+    // Toggle: second press on same track → stop
+    if (_previewTrackId === trackId) {
+      _killPreview();
+      if (!_closed) { modalPreviewLine.setContent(''); screen.render(); }
+      _refreshList();
+      return;
+    }
+
+    _killPreview();
+
+    const cmd = `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}" 2>/dev/null || play "${trackPath}" 2>/dev/null || mpg123 -q "${trackPath}" 2>/dev/null`;
+    _previewProcess = spawn('sh', ['-c', cmd], {
+      stdio: 'ignore', detached: true, env: _modalEnv,
+    });
+    _previewProcess.unref();
+    _previewTrackId = trackId;
+
+    const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
+    if (!_closed) {
+      modalPreviewLine.setContent(`{#00e5ff-fg}\u266A Previewing: ${label}  (Space to stop){/#00e5ff-fg}`);
+      screen.render();
+    }
+
+    _previewProcess.on('exit', () => {
+      if (_previewTrackId === trackId) {
+        _previewTrackId = null;
+        _previewProcess = null;
+        if (!_closed) { modalPreviewLine.setContent(''); _refreshList(); }
+      }
+    });
+
+    _previewProcess.on('error', () => {
+      _previewTrackId = null;
+      _previewProcess = null;
+      if (!_closed) { modalPreviewLine.setContent(''); screen.render(); }
+    });
+  }
+
+  // ---- Key bindings ----
+
+  modalTrackList.key(['enter'], () => {
+    const visible = _getVisibleTracks();
+    const sel = visible[modalTrackList.selected];
+    if (sel) {
+      try {
+        const current = configService.getConfig().backgroundMusic ?? {};
+        configService.set('backgroundMusic', { ...current, track: sel.id });
+      } catch {}
+      _closeModal();
+    }
+  });
+
+  modalTrackList.key(['space'], () => {
+    const visible = _getVisibleTracks();
+    const sel = visible[modalTrackList.selected];
+    if (sel) { _previewTrack(sel.id); }
+  });
+
+  modalTrackList.key(['f', 'F'], () => {
+    const visible = _getVisibleTracks();
+    const sel = visible[modalTrackList.selected];
+    if (sel) {
+      toggleMusicFavorite(configService, sel.id);
+      _refreshList();
+    }
+  });
+
+  modalTrackList.key(['/'], () => {
+    _showFavoritesOnly = !_showFavoritesOnly;
+    _refreshList();
+  });
+
+  modalTrackList.key(['escape', 'q'], _closeModal);
+
+  // Tab: list → [Select Track] → [Cancel] → list
+  modalTrackList.key(['tab'], () => { selectTrackBtn.focus(); screen.render(); });
+  selectTrackBtn.key(['tab'], () => { cancelModalBtn.focus(); screen.render(); });
+  cancelModalBtn.key(['tab'], () => { modalTrackList.focus(); screen.render(); });
+  selectTrackBtn.key(['escape'], _closeModal);
+  cancelModalBtn.key(['escape'], _closeModal);
+
+  // ---- Initial load ----
+  _refreshList();
+
+  // Scroll to active track on open
+  const currentTrack = configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track;
+  const activeIdx = _getVisibleTracks().findIndex(t => t.id === currentTrack);
+  if (activeIdx >= 0) modalTrackList.select(activeIdx);
+
+  modalTrackList.focus();
+  screen.render();
 }
 
 // ---------------------------------------------------------------------------
@@ -885,7 +1715,8 @@ function _openVerbosityPicker(screen, configService, onDone) {
     width: 28,
     height: levels.length + 4,
     border: { type: 'line' },
-    label: ' Verbosity Level ',
+    tags: true,
+    label: _modalTitle('Verbosity Level'),
     items: levels.map((l, i) => (i === currentIdx ? `● ${l}` : `  ${l}`)),
     keys: true,
     vi: false,
@@ -917,6 +1748,507 @@ function _openVerbosityPicker(screen, configService, onDone) {
 }
 
 // ---------------------------------------------------------------------------
+// Private: Inline intro text editor
+
+function _openIntroTextEditor(screen, configService, onDone) {
+  const current = configService.getConfig().pretext ?? '';
+  let _closed = false;
+
+  const modal = blessed.box({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 62,
+    height: 11,
+    border: { type: 'line' },
+    tags: true,
+    label: _modalTitle('Edit Intro Text'),
+    style: {
+      fg: COLORS.labelFg,
+      bg: COLORS.contentBg,
+      border: { fg: COLORS.btnFocus },
+    },
+  });
+
+  blessed.text({
+    parent: modal,
+    top: 1,
+    left: 2,
+    content: 'Enter intro text (max 50 chars, prepended before TTS):',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const inputBox = blessed.textbox({
+    parent: modal,
+    top: 3,
+    left: 2,
+    right: 2,
+    height: 3,
+    border: { type: 'line' },
+    inputOnFocus: true,
+    style: {
+      fg: COLORS.valueFg,
+      bg: '#0d1b35',
+      border: { fg: COLORS.borderFg },
+      focus: { border: { fg: COLORS.btnFocus } },
+    },
+  });
+  inputBox.setValue(current);
+
+  blessed.text({
+    parent: modal,
+    bottom: 1,
+    left: 2,
+    content: '{#455a64-fg}[Enter] Save  [Esc] Cancel{/#455a64-fg}',
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  function _close() {
+    if (_closed) return;
+    _closed = true;
+    modal.destroy();
+    screen.clearRegion(0, screen.cols, 2, screen.rows - 2);
+    for (let r = 2; r < screen.rows - 2; r++) {
+      const orow = screen.olines[r];
+      if (!orow) continue;
+      for (let c = 0; c < screen.cols; c++) { if (orow[c]) orow[c][0] = -1; }
+      orow.dirty = true;
+    }
+    screen.render();
+  }
+
+  inputBox.key(['enter'], () => {
+    const value = inputBox.getValue().replace(/\n/g, ' ').trim().slice(0, 50);
+    try { configService.set('pretext', value); } catch {}
+    _close();
+    onDone();
+  });
+
+  inputBox.key(['escape'], () => {
+    _close();
+  });
+
+  modal.setFront();
+  inputBox.focus();
+  screen.render();
+}
+
+// ---------------------------------------------------------------------------
+// Private: Full voice browser modal — replicates the Voices tab UX
+
+function _openVoiceBrowserModal(screen, providerService, configService, navigationService, onDone) {
+  let _allVoices = [];
+  let _filterText = '';
+  let _playingProcess = null;
+  let _playingVoiceId = null;
+  let _closed = false;
+
+  // Block global Tab-to-cycle-tab while modal is open
+  navigationService?.openModal();
+
+  const _spawnEnv = {
+    ...process.env,
+    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+      .filter(Boolean).join(':'),
+  };
+
+  function _killPreview() {
+    if (_playingProcess) {
+      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      _playingProcess = null;
+    }
+    _playingVoiceId = null;
+  }
+
+  function _closeModal() {
+    if (_closed) return;
+    _closed = true;
+    navigationService?.closeModal();
+    _killPreview();
+    modal.destroy();
+
+    // Force-invalidate olines so draw() rewrites every cell the modal covered.
+    // modal.destroy() removes the widget from lines[] but leaves olines[] stale,
+    // so draw() skips repainting cells where lines==olines — terminal retains
+    // modal content. Setting attr=-1 is impossible for any real cell, so draw()
+    // is forced to physically rewrite each cell on the next render.
+    screen.clearRegion(0, screen.cols, 2, screen.rows - 2);
+    for (let r = 2; r < screen.rows - 2; r++) {
+      const orow = screen.olines[r];
+      if (!orow) continue;
+      for (let c = 0; c < screen.cols; c++) {
+        if (orow[c]) orow[c][0] = -1;
+      }
+      orow.dirty = true;
+    }
+
+    screen.render();
+    onDone();
+  }
+
+  // ---- Modal overlay ----
+  const modal = blessed.box({
+    parent: screen,
+    top: '8%',
+    left: '4%',
+    width: '92%',
+    height: '84%',
+    border: { type: 'line' },
+    tags: true,
+    label: _modalTitle('Change Voice'),
+    style: {
+      fg: COLORS.labelFg,
+      bg: COLORS.contentBg,
+      border: { fg: COLORS.btnFocus },
+      label: { fg: COLORS.btnFocus },
+    },
+  });
+  modal.setFront();
+
+  // ---- Search ----
+  blessed.text({
+    parent: modal,
+    top: 1,
+    left: 2,
+    content: 'Search:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const modalSearch = blessed.textbox({
+    parent: modal,
+    top: 1,
+    left: 11,
+    width: 40,
+    height: 1,
+    inputOnFocus: true,
+    keys: true,
+    style: {
+      fg: COLORS.valueFg,
+      bg: '#1a237e',
+      focus: { bg: '#283593' },
+    },
+  });
+
+  // ---- Column header ----
+  blessed.text({
+    parent: modal,
+    top: 2,
+    left: 6,
+    content: `{#7986cb-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // ---- Voice list ----
+  const modalVoiceList = blessed.list({
+    parent: modal,
+    top: 3,
+    left: 2,
+    right: 2,
+    bottom: 6,
+    keys: true,
+    vi: true,
+    mouse: true,
+    border: { type: 'line' },
+    scrollbar: { ch: '│', style: { fg: COLORS.borderFg } },
+    style: {
+      fg: COLORS.labelFg,
+      bg: COLORS.contentBg,
+      border: { fg: COLORS.borderFg },
+      selected: { bg: '#1a237e', fg: '#00e5ff', bold: true },
+      item: { fg: COLORS.labelFg },
+    },
+  });
+
+  // ---- Info panel ----
+  blessed.text({
+    parent: modal,
+    bottom: 5,
+    left: 2,
+    content: `{#7986cb-fg}── Voice Info ${'─'.repeat(50)}{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  const modalInfoLine = blessed.text({
+    parent: modal,
+    bottom: 4,
+    left: 2,
+    right: 2,
+    tags: true,
+    content: '',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const modalPreviewLine = blessed.text({
+    parent: modal,
+    bottom: 3,
+    left: 2,
+    right: 2,
+    tags: true,
+    content: '',
+    style: { fg: '#00e5ff', bg: COLORS.contentBg },
+  });
+
+  // ---- Key hint bar ----
+  blessed.text({
+    parent: modal,
+    bottom: 2,
+    left: 2,
+    right: 2,
+    content: '{#455a64-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [F] Favorite  [/] Search  [Esc] Cancel{/#455a64-fg}',
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // ---- Buttons ----
+  const selectBtn = _createButton(modal, screen, 'Select Voice', COLORS, () => {
+    const voices = _getFiltered();
+    const selected = voices[modalVoiceList.selected];
+    if (selected) {
+      providerService.setActiveVoice(selected);
+      _closeModal();
+    }
+  });
+  selectBtn.bottom = 1;
+  selectBtn.left = 4;
+
+  const favBtn = _createButton(modal, screen, '★ Fav', COLORS, () => {
+    const filtered = _getFiltered();
+    const sel = filtered[modalVoiceList.selected];
+    if (sel) { toggleFavorite(configService, sel); _refreshList(); }
+  });
+  favBtn.bottom = 1;
+  favBtn.left = 22;
+
+  const cancelBtn = _createButton(modal, screen, 'Cancel', COLORS, _closeModal);
+  cancelBtn.bottom = 1;
+  cancelBtn.left = 33;
+
+  // ---- Helper functions ----
+
+  function _getFiltered() {
+    if (!_filterText) return _allVoices;
+    const f = _filterText.toLowerCase();
+    return _allVoices.filter(v => v.toLowerCase().includes(f));
+  }
+
+  function _buildItems(voices) {
+    const active = providerService.getActiveVoiceId();
+    const favs = getFavorites(configService);
+    return voices.map(v => {
+      const isFav   = favs.includes(v);
+      const isActive = v === active;
+      const isPrev  = v === _playingVoiceId;
+      const star = isFav  ? '★' : ' ';
+      const dot  = isPrev ? '♪' : (isActive ? '●' : ' ');
+      const { displayName, gender, provider } = getVoiceMeta(v);
+      const name = displayName.length > COL_NAME_W
+        ? displayName.slice(0, COL_NAME_W - 1) + '…'
+        : displayName.padEnd(COL_NAME_W);
+      return ` ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}`;
+    });
+  }
+
+  function _formatInfo(voiceId) {
+    const { lang, name, quality } = parseVoiceId(voiceId);
+    const Y = COLORS.valueFg;
+    if (lang === 'unknown') {
+      return `{${Y}-fg}Voice:{/${Y}-fg} ${voiceId}  {${Y}-fg}Provider:{/${Y}-fg} Piper`;
+    }
+    return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
+           `{${Y}-fg}Language:{/${Y}-fg} ${lang}  ` +
+           `{${Y}-fg}Quality:{/${Y}-fg} ${quality}  ` +
+           `{${Y}-fg}Provider:{/${Y}-fg} Piper  ` +
+           `{${Y}-fg}ID:{/${Y}-fg} ${voiceId}`;
+  }
+
+  function _refreshList() {
+    if (_closed) return;
+    _allVoices = scanInstalledVoices();
+    const filtered = _getFiltered();
+    const items = _buildItems(filtered);
+    modalVoiceList.setItems(items.length > 0 ? items : [' (no voices found — install piper first)']);
+    const active = providerService.getActiveVoiceId();
+    const sel = filtered[modalVoiceList.selected] ?? active ?? '';
+    if (sel) modalInfoLine.setContent(`  ${_formatInfo(sel)}`);
+    screen.render();
+  }
+
+  function _previewVoice(voiceId) {
+    if (_playingVoiceId === voiceId) {
+      _killPreview();
+      if (!_closed) { modalPreviewLine.setContent(''); screen.render(); }
+      return;
+    }
+    _killPreview();
+
+    // Path traversal guard
+    const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+    const safeBase  = path.resolve(PIPER_VOICES_DIR);
+    if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
+
+    const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
+    const phrase  = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+
+    const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+      stdio: ['pipe', 'ignore', 'ignore'],
+      detached: true,
+      env: _spawnEnv,
+    });
+    piper.stdin.write(phrase + '\n');
+    piper.stdin.end();
+
+    _playingProcess = piper;
+    _playingVoiceId = voiceId;
+    if (!_closed) {
+      modalPreviewLine.setContent(`{#00e5ff-fg}♪ Synthesizing: ${voiceId}…{/#00e5ff-fg}`);
+      screen.render();
+    }
+
+    piper.on('exit', (code) => {
+      if (_playingVoiceId !== voiceId) {
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
+      if (code !== 0) {
+        _playingVoiceId = null;
+        _playingProcess = null;
+        if (!_closed) {
+          modalPreviewLine.setContent('{#00e5ff-fg}♪ Preview failed (piper error — is piper installed?){/#00e5ff-fg}');
+          screen.render();
+          setTimeout(() => { if (!_closed) { modalPreviewLine.setContent(''); screen.render(); } }, 4000);
+        }
+        return;
+      }
+
+      const cmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
+      const playProc = spawn('sh', ['-c', cmd], {
+        stdio: 'ignore',
+        detached: true,
+        env: _spawnEnv,
+      });
+      _playingProcess = playProc;
+
+      if (!_closed) {
+        modalPreviewLine.setContent(`{#00e5ff-fg}♪ Playing: ${voiceId}  (Space to stop){/#00e5ff-fg}`);
+        screen.render();
+      }
+
+      playProc.on('exit', () => {
+        if (_playingVoiceId === voiceId) {
+          _playingVoiceId = null;
+          _playingProcess = null;
+          if (!_closed) { modalPreviewLine.setContent(''); screen.render(); }
+        }
+        try { fs.unlinkSync(tempWav); } catch {}
+      });
+
+      playProc.on('error', () => {
+        _playingVoiceId = null;
+        _playingProcess = null;
+        if (!_closed) { modalPreviewLine.setContent(''); screen.render(); }
+        try { fs.unlinkSync(tempWav); } catch {}
+      });
+    });
+
+    piper.on('error', () => {
+      _playingVoiceId = null;
+      _playingProcess = null;
+      if (!_closed) {
+        modalPreviewLine.setContent('{#00e5ff-fg}♪ Cannot find piper — install with: pipx install piper-tts{/#00e5ff-fg}');
+        screen.render();
+        setTimeout(() => { if (!_closed) { modalPreviewLine.setContent(''); screen.render(); } }, 4000);
+      }
+    });
+  }
+
+  // ---- Key bindings ----
+
+  // Search: update filter on keypress
+  modalSearch.on('keypress', () => {
+    setTimeout(() => {
+      _filterText = modalSearch.getValue().trim();
+      _refreshList();
+    }, 0);
+  });
+
+  // Escape in search → back to list (not close)
+  modalSearch.key(['escape'], () => {
+    modalVoiceList.focus();
+    screen.render();
+  });
+
+  // Tab out of search → select button
+  modalSearch.key(['tab'], () => { selectBtn.focus(); screen.render(); });
+
+  // / in list → open search
+  modalVoiceList.key(['/'], () => {
+    modalSearch.clearValue();
+    modalSearch.focus();
+    screen.render();
+  });
+
+  // f → toggle favorite
+  modalVoiceList.key(['f'], () => {
+    const filtered = _getFiltered();
+    const sel = filtered[modalVoiceList.selected];
+    if (sel) { toggleFavorite(configService, sel); _refreshList(); }
+  });
+
+  // Enter → select voice (set active + close modal)
+  modalVoiceList.key(['enter'], () => {
+    const filtered = _getFiltered();
+    const sel = filtered[modalVoiceList.selected];
+    if (sel) {
+      providerService.setActiveVoice(sel);
+      _closeModal();
+    }
+  });
+
+  // Space → preview voice (toggle)
+  modalVoiceList.key(['space'], () => {
+    const filtered = _getFiltered();
+    const sel = filtered[modalVoiceList.selected];
+    if (sel) { _previewVoice(sel); _refreshList(); }
+  });
+
+  // Update info panel on selection change
+  modalVoiceList.on('select item', () => {
+    const filtered = _getFiltered();
+    const sel = filtered[modalVoiceList.selected] ?? '';
+    if (sel && !_closed) {
+      modalInfoLine.setContent(`  ${_formatInfo(sel)}`);
+      screen.render();
+    }
+  });
+
+  // Tab navigation: list → [Select] → [★ Fav] → [Cancel] → list
+  modalVoiceList.key(['tab'], () => { selectBtn.focus(); screen.render(); });
+  selectBtn.key(['tab'], () => { favBtn.focus(); screen.render(); });
+  favBtn.key(['tab'], () => { cancelBtn.focus(); screen.render(); });
+  cancelBtn.key(['tab'], () => { modalVoiceList.focus(); screen.render(); });
+
+  // Escape / q closes modal
+  modalVoiceList.key(['escape', 'q'], _closeModal);
+  selectBtn.key(['escape'], _closeModal);
+  favBtn.key(['escape'], _closeModal);
+  cancelBtn.key(['escape'], _closeModal);
+
+  // ---- Initial load ----
+  _refreshList();
+
+  // Scroll to active voice on open
+  const activeVoiceId = providerService.getActiveVoiceId();
+  const activeIdx = _getFiltered().indexOf(activeVoiceId);
+  if (activeIdx >= 0) modalVoiceList.select(activeIdx);
+
+  modalVoiceList.focus();
+  screen.render();
+}
+
+// ---------------------------------------------------------------------------
 // Private: Inline personality picker
 
 function _openPersonalityPicker(screen, configService, onSelect) {
@@ -930,7 +2262,8 @@ function _openPersonalityPicker(screen, configService, onSelect) {
     width: 32,
     height: Math.min(PERSONALITIES.length + 4, 22),
     border: { type: 'line' },
-    label: ' Select Personality ',
+    tags: true,
+    label: _modalTitle('Select Personality'),
     items: PERSONALITIES.map((p, i) => (i === currentIdx ? `● ${p}` : `  ${p}`)),
     keys: true,
     vi: true,

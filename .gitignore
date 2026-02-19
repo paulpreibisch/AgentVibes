@@ -89,6 +89,13 @@ personalities
 # Local utility scripts
 fixcolors
 sonar
+scripts/fix-wsl-audio.sh
+scripts/fix-audio-tunnel.sh
+scripts/fix-audio-tunnel-complete.sh
+scripts/check-audio-tunnel.sh
+scripts/check_audio_tunnel.sh
+scripts/health-check-tunnel.sh
+scripts/audio-tunnel.config
 
 # Test state files
 .test-bmad-config

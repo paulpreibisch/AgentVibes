@@ -130,42 +130,6 @@ apply_sox_effects() {
 # Position tracking file for continuous playback
 POSITION_FILE="$SCRIPT_DIR/../config/background-music-position.txt"
 
-# @function get_custom_music_path
-# @intent Story 4.7: Check for custom music uploaded by user
-# @returns Path to custom music file if exists, empty string otherwise
-# @context Custom music stored at .claude/audio/custom-music/tracks/
-get_custom_music_path() {
-    local custom_music_dir="$SCRIPT_DIR/../audio/custom-music/tracks"
-
-    # Check if custom music directory exists
-    if [[ ! -d "$custom_music_dir" ]]; then
-        echo ""
-        return
-    fi
-
-    # Look for any audio file in custom music directory
-    # Files uploaded through Stories 4.1-4.6 are stored here
-    # SECURITY: Use -maxdepth 1 to prevent directory traversal
-    # DETERMINISTIC: Sort by modification time (newest first) for consistent behavior
-    local custom_file
-    custom_file=$(find "$custom_music_dir" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" -o -name "*.ogg" -o -name "*.m4a" \) -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
-
-    if [[ -n "$custom_file" ]] && [[ -f "$custom_file" ]]; then
-        # SECURITY: Verify file ownership matches current user
-        local file_uid
-        file_uid=$(stat -c '%u' "$custom_file" 2>/dev/null || stat -f '%u' "$custom_file" 2>/dev/null)
-        local current_uid
-        current_uid=$(id -u)
-
-        if [[ "$file_uid" == "$current_uid" ]]; then
-            echo "$custom_file"
-            return
-        fi
-    fi
-
-    echo ""
-}
-
 # @function get_background_position
 # @intent Get saved position for a background track
 # @param $1 Background file path
@@ -385,29 +349,14 @@ main() {
     fi
 
     # Step 2: Mix background if configured AND enabled
-    # Story 4.7: Check for custom music first, then fallback to default
     local background_path=""
-    local custom_music_path
-    custom_music_path=$(get_custom_music_path)
-
-    if [[ -n "$custom_music_path" ]]; then
-        # Story 4.7: Custom music uploaded by user takes priority
-        background_path="$custom_music_path"
-        echo "  → Using custom background music" >&2
-    elif [[ -n "$background_file" ]]; then
-        # Fall back to default background music from audio-effects.cfg
+    if [[ -n "$background_file" ]]; then
         background_path="$BACKGROUNDS_DIR/$background_file"
     fi
 
     local used_background=""
     if is_background_music_enabled && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
-        local bg_display_name
-        if [[ "$background_path" == "$custom_music_path" ]]; then
-            bg_display_name="custom music"
-        else
-            bg_display_name="$background_file"
-        fi
-        echo "  → Mixing background: $bg_display_name at ${bg_volume} volume" >&2
+        echo "  → Mixing background: $background_file at ${bg_volume} volume" >&2
         mix_background "$temp_effects" "$background_path" "$bg_volume" "$temp_final"
         used_background="$background_path"  # Return full path instead of just filename
     else

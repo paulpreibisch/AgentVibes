@@ -8,11 +8,14 @@
  */
 
 import blessed from 'blessed';
+import path from 'node:path';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { NavigationService, TAB_ORDER } from '../services/navigation-service.js';
 import { setupNavigation } from './navigation.js';
 import { createPlaceholderTab, TAB_DISPLAY_LABELS } from './tabs/placeholder-tab.js';
 import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
+import { BRAND_PINK } from './brand-colors.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
 import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
@@ -140,8 +143,34 @@ export class AgentVibesConsole {
     // against the navy background; bright variants (96/95) are clearly visible.
     this.screen.append(this.headerBox);
     this.headerBox.setContent(
-      `{bright-cyan-fg}Agent{/bright-cyan-fg}{#ffc0cb-fg}Vibes{/#ffc0cb-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}4.0{/#ffd700-fg}  \u2502  \uD83D\uDCC1 working folder: ${cwd}`
+      `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}4.0{/#ffd700-fg}  \u2502  \uD83D\uDCC1 working folder: ${cwd}`
     );
+
+    // Right-aligned git remote URL + branch (best-effort — silent if not in a git repo)
+    try {
+      const branchResult = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
+        { encoding: 'utf8', timeout: 2000, cwd });
+      const remoteResult = spawnSync('git', ['remote', 'get-url', 'origin'],
+        { encoding: 'utf8', timeout: 2000, cwd });
+      if (branchResult.status === 0 && remoteResult.status === 0) {
+        const branch = branchResult.stdout.trim();
+        // Normalise SSH (git@github.com:user/repo.git) → HTTPS, strip .git suffix
+        const repoUrl = remoteResult.stdout.trim()
+          .replace(/^git@([^:]+):/, 'https://$1/')
+          .replace(/\.git$/, '');
+        // Strip protocol for compact display: https://github.com/… → github.com/…
+        const displayUrl = repoUrl.replace(/^https?:\/\//, '');
+        blessed.text({
+          parent: this.headerBox,
+          top: 1,
+          right: 2,
+          shrink: true,
+          tags: true,
+          content: `{#00e5ff-fg}${displayUrl}{/#00e5ff-fg}  {#90a4ae-fg}\u2502{/#90a4ae-fg}  {#90a4ae-fg}\u2387{/#90a4ae-fg} {bright-white-fg}${branch}{/bright-white-fg}`,
+          style: { bg: COLORS.headerBg },
+        });
+      }
+    } catch {}
   }
 
   // ---------------------------------------------------------------------------
@@ -277,12 +306,35 @@ export class AgentVibesConsole {
   // Private: GitHub star footer (row N — fixed bottom)
 
   _createFooter() {
+    // Detect installed providers inline (same logic as ProviderService)
+    const _has = (bin) => {
+      try { execFileSync('which', [bin], { stdio: 'ignore', timeout: 2000 }); return true; }
+      catch { return false; }
+    };
+    const detected = {
+      piper:   _has('piper'),
+      soprano: _has('soprano'),
+      sapi:    process.platform === 'win32',
+      macos:   process.platform === 'darwin' && _has('say'),
+    };
+
+    // Build provider status badges:  ● Name  (green if detected, grey if not)
+    const on  = (label) => `{green-fg}●{/green-fg} ${label}`;
+    const off = (label) => `{#546e7a-fg}● ${label}{/#546e7a-fg}`;
+    const badges = [
+      detected.piper   ? on('Piper')        : off('Piper'),
+      detected.soprano ? on('Soprano')      : off('Soprano'),
+      detected.sapi    ? on('Windows SAPI') : off('Windows SAPI'),
+      detected.macos   ? on('Mac Say')      : off('Mac Say'),
+    ].join('  ');
+
     const footer = blessed.box({
       bottom: 0,
       left: 0,
       width: '100%',
       height: 1,
-      content: '  ⭐  Love AgentVibes? Star us on GitHub → github.com/preibisch/agentvibes  ',
+      tags: true,
+      content: `  ${badges}  {right}⭐ github.com/preibisch/agentvibes  {/right}`,
       style: {
         fg: COLORS.textWhite,
         bg: COLORS.headerBg,
@@ -315,7 +367,7 @@ export class AgentVibesConsole {
 
     const configService = new ConfigService();
     const providerService = new ProviderService(configService);
-    const services = { configService, providerService };
+    const services = { configService, providerService, navigationService: this.navigationService };
     this.tabs['settings'] = createSettingsTab(this.screen, services);
 
     // Destroy voices placeholder and mount real voices tab

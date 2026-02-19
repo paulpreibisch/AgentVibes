@@ -27,7 +27,7 @@
   "type": "module",
   "main": "src/installer.js",
   "bin": {
-    "agentvibes": "bin/agent-vibes",
+    "agentvibes": "bin/agentvibes.js",
     "agent-vibes": "bin/agent-vibes",
     "agentvibes-mcp-server": "bin/mcp-server.js",
     "agentvibes-voice-browser": "bin/agentvibes-voice-browser.js",
@@ -78,6 +78,7 @@
     "install-local": "node src/installer.js install",
     "postinstall": "node mcp-server/install-deps.js",
     "install-mcp-deps": "node mcp-server/install-deps.js",
+    "voice-browser": "node bin/agentvibes-voice-browser.js",
     "test": "npm run test:syntax && AGENTVIBES_TEST_MODE=true bats test/unit/*.bats && npm run test:coverage",
     "test:syntax": "node -c src/installer.js && node -c mcp-server/install-deps.js",
     "test:bats": "AGENTVIBES_TEST_MODE=true bats test/unit/*.bats",

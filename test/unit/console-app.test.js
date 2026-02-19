@@ -165,13 +165,13 @@ describe('AgentVibesConsole - Navigation (Story 6.2)', () => {
       'Active tab must have {bold} tag (AC#2 active tab highlight)');
   });
 
-  test('_renderTabBarContent marks active tab with #3949ab background (AC#2)', async () => {
+  test('_renderTabBarContent marks active tab with white-fg tag (AC#2)', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
     const content = instance._renderTabBarContent('music');
-    assert.ok(content.includes('#3949ab'),
-      'Active tab must use #3949ab background color (AC#2)');
+    assert.ok(content.includes('{white-fg}') && content.includes('Music'),
+      'Active tab must use {white-fg} highlight tag (AC#2)');
   });
 });
 

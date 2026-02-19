@@ -40,12 +40,12 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter/Space] Preview  [Tab] Buttons  [F] Favorite  [/] Search  [Q] Quit';
-const PIPER_VOICES_DIR = path.join(os.homedir(), '.local', 'share', 'piper', 'voices');
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Tab] Buttons  [F] Favorite  [/] Search  [Q] Quit';
+export const PIPER_VOICES_DIR = path.join(os.homedir(), '.local', 'share', 'piper', 'voices');
 
 // Column widths for the multi-column voice list
-const COL_NAME_W   = 26;
-const COL_GENDER_W = 10;
+export const COL_NAME_W   = 26;
+export const COL_GENDER_W = 10;
 
 // ---------------------------------------------------------------------------
 // Pure helpers — exported for testability
@@ -104,7 +104,7 @@ export function formatVoiceName(voiceId, dataset) {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-const SAMPLE_PHRASES = [
+export const SAMPLE_PHRASES = [
   "Hello! I'm ready to assist you with your tasks today.",
   "Code review complete. I found several areas that could be improved.",
   "Welcome to AgentVibes. I'll help you get things done efficiently.",
@@ -165,7 +165,7 @@ function createTestStub() {
  *
  * @returns {string[]}
  */
-function _scanInstalledVoices() {
+export function scanInstalledVoices() {
   try {
     const files = fs.readdirSync(PIPER_VOICES_DIR);
     return files
@@ -182,7 +182,7 @@ function _scanInstalledVoices() {
  * @param {object} configService
  * @returns {string[]}
  */
-function _getFavorites(configService) {
+export function getFavorites(configService) {
   const favs = configService.getConfig().favorites;
   return Array.isArray(favs) ? favs : [];
 }
@@ -192,7 +192,7 @@ function _getFavorites(configService) {
  * @param {object} configService
  * @param {string} voiceId
  */
-function _toggleFavorite(configService, voiceId) {
+export function toggleFavorite(configService, voiceId) {
   const favs = _getFavorites(configService);
   const idx = favs.indexOf(voiceId);
   if (idx >= 0) {
@@ -215,7 +215,7 @@ const _metaCache = new Map();
  * @param {string} voiceId
  * @returns {{ displayName: string, gender: string, provider: string }}
  */
-function _getVoiceMeta(voiceId) {
+export function getVoiceMeta(voiceId) {
   if (_metaCache.has(voiceId)) return _metaCache.get(voiceId);
   let dataset = null;
   try {
@@ -543,7 +543,7 @@ export function createVoicesTab(screen, services) {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
-      _toggleFavorite(configService, selected);
+      toggleFavorite(configService, selected);
       refreshDisplay();
     }
   });
@@ -584,7 +584,7 @@ export function createVoicesTab(screen, services) {
       const isPrev   = v === _playingVoiceId;
       const star = isFav  ? '★' : ' ';
       const dot  = isPrev ? '♪' : (isActive ? '●' : ' ');
-      const { displayName, gender, provider } = _getVoiceMeta(v);
+      const { displayName, gender, provider } = getVoiceMeta(v);
       const name = displayName.length > COL_NAME_W
         ? displayName.slice(0, COL_NAME_W - 1) + '…'
         : displayName.padEnd(COL_NAME_W);
@@ -592,10 +592,24 @@ export function createVoicesTab(screen, services) {
     });
   }
 
+  // Build a tagged info string with yellow labels for the info panel
+  function _formatInfoTagged(voiceId) {
+    const { lang, name, quality } = parseVoiceId(voiceId);
+    const Y = COLORS.valueFg;  // #ffd700 yellow
+    if (lang === 'unknown') {
+      return `{${Y}-fg}Voice:{/${Y}-fg} ${voiceId}  {${Y}-fg}Provider:{/${Y}-fg} Piper`;
+    }
+    return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
+           `{${Y}-fg}Language:{/${Y}-fg} ${lang}  ` +
+           `{${Y}-fg}Quality:{/${Y}-fg} ${quality}  ` +
+           `{${Y}-fg}Provider:{/${Y}-fg} Piper  ` +
+           `{${Y}-fg}ID:{/${Y}-fg} ${voiceId}`;
+  }
+
   function refreshDisplay() {
-    _allVoices = _scanInstalledVoices();
+    _allVoices = scanInstalledVoices();
     const active = providerService.getActiveVoiceId();
-    const favorites = _getFavorites(configService);
+    const favorites = getFavorites(configService);
     const filtered = _getFilteredVoices();
     const items = _buildListItems(filtered, active, favorites);
 
@@ -603,7 +617,7 @@ export function createVoicesTab(screen, services) {
 
     // Update info panel for currently selected item
     const sel = filtered[voiceList.selected] ?? active ?? '';
-    infoLine.setContent(`  ${formatVoiceInfo(sel)}  |  ID: ${sel}`);
+    infoLine.setContent(`  ${_formatInfoTagged(sel)}`);
 
     screen.render();
   }
@@ -637,13 +651,13 @@ export function createVoicesTab(screen, services) {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
-      _toggleFavorite(configService, selected);
+      toggleFavorite(configService, selected);
       refreshDisplay();
     }
   });
 
-  // Enter / Space → preview voice (toggle: second press stops playback)
-  voiceList.key(['enter', 'space'], () => {
+  // Space → preview voice (toggle: second press stops playback)
+  voiceList.key(['space'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -656,7 +670,7 @@ export function createVoicesTab(screen, services) {
   voiceList.on('select item', () => {
     const voices = _getFilteredVoices();
     const sel = voices[voiceList.selected] ?? '';
-    infoLine.setContent(`  ${formatVoiceInfo(sel)}  |  ID: ${sel}`);
+    infoLine.setContent(`  ${_formatInfoTagged(sel)}`);
     screen.render();
   });
 

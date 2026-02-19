@@ -83,6 +83,12 @@ get_default_voice() {
     macos)
       echo "Samantha"  # macOS default
       ;;
+    soprano)
+      echo "soprano-default"  # Soprano is single-voice
+      ;;
+    windows-sapi)
+      echo "Microsoft David Desktop"  # Windows SAPI default
+      ;;
     *)
       echo "en_US-lessac-medium"  # Default to Piper
       ;;
@@ -166,12 +172,38 @@ case "$1" in
         fi
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "soprano" ]]; then
+      echo "🎤 Soprano TTS"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "  ▶ soprano-default (current) — single voice, no selection"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    elif [[ "$ACTIVE_PROVIDER" == "windows-sapi" ]]; then
+      echo "🎤 Available Windows SAPI Voices:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      if command -v powershell.exe &>/dev/null; then
+        while IFS= read -r voice_name; do
+          [[ -z "$voice_name" ]] && continue
+          if [[ "$voice_name" == "$CURRENT_VOICE" ]]; then
+            echo "  ▶ $voice_name (current)"
+          else
+            echo "    $voice_name"
+          fi
+        done < <(powershell.exe -NoProfile -Command \
+          "Add-Type -AssemblyName System.Speech; \
+           (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | \
+           ForEach-Object { \$_.VoiceInfo.Name }" 2>/dev/null | tr -d '\r')
+      else
+        echo "  (powershell.exe not available)"
+      fi
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     else
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
       echo "Available providers:"
-      echo "  - piper (Free, Offline)"
-      echo "  - macos (Built-in, macOS only)"
+      echo "  - piper        (Free, Offline)"
+      echo "  - macos        (Built-in, macOS only)"
+      echo "  - soprano      (Gradio TTS, single voice)"
+      echo "  - windows-sapi (Windows built-in TTS)"
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
     fi
@@ -252,28 +284,6 @@ case "$1" in
       source "$SCRIPT_DIR/piper-voice-manager.sh"
       VOICE_DIR=$(get_voice_storage_dir)
 
-      # Friendly name resolution: Check if voice-metadata.json exists
-      # SECURITY: Use realpath to prevent symlink attacks
-      METADATA_FILE="$(realpath "$SCRIPT_DIR/../../.agentvibes/config/voice-metadata.json" 2>/dev/null || echo "")"
-      if [[ -f "$METADATA_FILE" ]] && command -v jq >/dev/null 2>&1; then
-        # Try to resolve friendly name to Piper ID
-        RESOLVED_VOICE=$(jq -r --arg name "$(to_lower "$VOICE_NAME")" '
-          .voices | to_entries[] |
-          select(.key == $name or (.value.displayName | ascii_downcase) == $name) |
-          .value.id
-        ' "$METADATA_FILE" 2>/dev/null | head -1)
-
-        if [[ -n "$RESOLVED_VOICE" ]]; then
-          # SECURITY: Validate resolved voice matches safe pattern (alphanumeric, dash, underscore only)
-          if [[ "$RESOLVED_VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-            echo "🔍 Resolved friendly name '$VOICE_NAME' → '$RESOLVED_VOICE'"
-            VOICE_NAME="$RESOLVED_VOICE"
-          else
-            echo "⚠️  Warning: Invalid voice ID in metadata, ignoring resolution"
-          fi
-        fi
-      fi
-
       # Check if voice file exists (case-insensitive)
       FOUND=""
       shopt -s nullglob
@@ -321,8 +331,8 @@ case "$1" in
               fi
 
               echo ""
-              echo "💡 Tip: TTS is automatic via post-response hook"
-              echo "   To mute: /agent-vibes:mute | To unmute: /agent-vibes:unmute"
+              echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
+              echo "   /output-style Agent Vibes"
             fi
             exit 0
           else
@@ -359,12 +369,45 @@ case "$1" in
         echo "Download extra voices with: /agent-vibes:provider download"
         exit 1
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "soprano" ]]; then
+      # Soprano is single-voice — switching not supported
+      echo "ℹ️  Soprano TTS has a single built-in voice — no voice switching needed."
+      echo "   Current voice: soprano-default"
+      exit 0
+    elif [[ "$ACTIVE_PROVIDER" == "windows-sapi" ]]; then
+      # Windows SAPI voice lookup via PowerShell
+      if ! command -v powershell.exe &>/dev/null; then
+        echo "❌ powershell.exe not available — required for Windows SAPI voice management"
+        exit 1
+      fi
+
+      FOUND=""
+      while IFS= read -r voice_name; do
+        [[ -z "$voice_name" ]] && continue
+        voice_name_clean=$(echo "$voice_name" | tr -d '\r')
+        if [[ "$(to_lower "$voice_name_clean")" == "$(to_lower "$VOICE_NAME")" ]]; then
+          FOUND="$voice_name_clean"
+          break
+        fi
+      done < <(powershell.exe -NoProfile -Command \
+        "Add-Type -AssemblyName System.Speech; \
+         (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | \
+         ForEach-Object { \$_.VoiceInfo.Name }" 2>/dev/null)
+
+      if [[ -z "$FOUND" ]]; then
+        echo "❌ Windows SAPI voice not found: $VOICE_NAME"
+        echo ""
+        echo "Available voices: /agent-vibes:list"
+        exit 1
+      fi
     else
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
       echo "Available providers:"
-      echo "  - piper (Free, Offline)"
-      echo "  - macos (Built-in, macOS only)"
+      echo "  - piper        (Free, Offline)"
+      echo "  - macos        (Built-in, macOS only)"
+      echo "  - soprano      (Gradio TTS, single voice)"
+      echo "  - windows-sapi (Windows built-in TTS)"
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
       exit 1
@@ -384,14 +427,15 @@ case "$1" in
       fi
 
       echo ""
-      echo "💡 Tip: TTS is automatic via post-response hook"
-      echo "   To mute: /agent-vibes:mute | To unmute: /agent-vibes:unmute"
+      echo "💡 Tip: To hear automatic TTS narration, enable the Agent Vibes output style:"
+      echo "   /output-style Agent Vibes"
     fi
     ;;
 
   get)
-    if [ -f "$VOICE_FILE" ]; then
-      cat "$VOICE_FILE"
+    CURRENT=$(cat "$VOICE_FILE" 2>/dev/null)
+    if [[ -n "$CURRENT" ]]; then
+      echo "$CURRENT"
     else
       get_default_voice
     fi
@@ -409,13 +453,13 @@ case "$1" in
 
     if [ -f "$PROVIDER_FILE" ]; then
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
-      if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
-        echo "Provider: Piper TTS (Free, Offline)"
-      elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
-        echo "Provider: macOS Say (Built-in, Free)"
-      else
-        echo "Provider: $ACTIVE_PROVIDER"
-      fi
+      case "$ACTIVE_PROVIDER" in
+        piper)        echo "Provider: Piper TTS (Free, Offline)" ;;
+        macos)        echo "Provider: macOS Say (Built-in, Free)" ;;
+        soprano)      echo "Provider: Soprano TTS (Gradio, Single Voice)" ;;
+        windows-sapi) echo "Provider: Windows SAPI (Built-in TTS)" ;;
+        *)            echo "Provider: $ACTIVE_PROVIDER" ;;
+      esac
     else
       # Default to Piper if no provider file
       echo "Provider: Piper TTS (Free, Offline)"
@@ -478,6 +522,17 @@ case "$1" in
         say -v ? 2>/dev/null | awk '{print $1}' | sort
       else
         echo "(macOS voices only available on macOS)"
+      fi
+    elif [[ "$ACTIVE_PROVIDER" == "soprano" ]]; then
+      echo "soprano-default"
+    elif [[ "$ACTIVE_PROVIDER" == "windows-sapi" ]]; then
+      if command -v powershell.exe &>/dev/null; then
+        powershell.exe -NoProfile -Command \
+          "Add-Type -AssemblyName System.Speech; \
+           (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | \
+           ForEach-Object { \$_.VoiceInfo.Name }" 2>/dev/null | tr -d '\r' | sort
+      else
+        echo "(powershell.exe not available)"
       fi
     else
       echo "(Unknown provider: $ACTIVE_PROVIDER)"

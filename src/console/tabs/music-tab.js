@@ -139,7 +139,7 @@ function _getTracksDir() {
  *
  * @returns {{ id: string, label: string, isBuiltIn: boolean }[]}
  */
-function _scanTracks() {
+export function scanTracks() {
   const tracksDir = _getTracksDir();
   try {
     const files = fs.readdirSync(tracksDir);
@@ -176,7 +176,7 @@ function _setMusic(configService, update) {
 /**
  * Get favorites array from config.musicFavorites.
  */
-function _getFavorites(configService) {
+export function getMusicFavorites(configService) {
   const favs = configService.getConfig().musicFavorites;
   return Array.isArray(favs) ? favs : [];
 }
@@ -184,8 +184,8 @@ function _getFavorites(configService) {
 /**
  * Toggle a track in the favorites list.
  */
-function _toggleFavorite(configService, trackId) {
-  const favs = _getFavorites(configService);
+export function toggleMusicFavorite(configService, trackId) {
+  const favs = getMusicFavorites(configService);
   const idx = favs.indexOf(trackId);
   if (idx >= 0) {
     favs.splice(idx, 1);
@@ -361,7 +361,7 @@ export function createMusicTab(screen, services) {
   const favoriteBtn = _createBtn('[★ Favorite]', () => {
     const trackId = _getSelectedTrackId();
     if (trackId) {
-      _toggleFavorite(configService, trackId);
+      toggleMusicFavorite(configService, trackId);
       refreshDisplay();
     }
   });
@@ -468,7 +468,7 @@ export function createMusicTab(screen, services) {
   let _allTracks = [];
 
   function _buildAllTracks() {
-    const scanned = _scanTracks();
+    const scanned = scanTracks();
     const scannedIds = new Set(scanned.map(t => t.id));
     // Append custom tracks not already present from disk scan
     const custom = _getCustomTracks(configService)
@@ -479,7 +479,7 @@ export function createMusicTab(screen, services) {
 
   function _getVisibleTracks() {
     if (!_showFavoritesOnly) return _allTracks;
-    const favs = _getFavorites(configService);
+    const favs = getMusicFavorites(configService);
     return _allTracks.filter(t => favs.includes(t.id));
   }
 
@@ -504,7 +504,7 @@ export function createMusicTab(screen, services) {
   function refreshDisplay() {
     _allTracks = _buildAllTracks();
     const { enabled, track: activeTrackId } = _getMusic(configService);
-    const favorites = _getFavorites(configService);
+    const favorites = getMusicFavorites(configService);
     const visible = _getVisibleTracks();
     const items = _buildListItems(visible, activeTrackId, favorites);
 
@@ -551,7 +551,7 @@ export function createMusicTab(screen, services) {
   trackList.key(['*'], () => {
     const trackId = _getSelectedTrackId();
     if (trackId) {
-      _toggleFavorite(configService, trackId);
+      toggleMusicFavorite(configService, trackId);
       refreshDisplay();
     }
   });

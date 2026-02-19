@@ -22,8 +22,12 @@ const KEY_TO_TAB = {
  *
  * Handlers registered:
  *   S/V/M/A/R/H/I → switchTab (blocked when modal is open)
- *   T/t           → cycleTab  (blocked when modal is open)
- *   Escape        → closeModal (only when modal is open)
+ *   Tab / T/t      → cycleTab forward (blocked when modal is open)
+ *   Shift+Tab      → cycleTab backward (blocked when modal is open)
+ *   Escape         → closeModal (only when modal is open)
+ *
+ * Arrow keys (left/right) are intentionally NOT used for tab cycling —
+ * individual tabs use left/right for in-element navigation (e.g. row siblings).
  *
  * NOTE: Q / Ctrl+C are already registered in app.js (_registerHandlers).
  * Do NOT re-register them here — that would stack duplicate quit handlers.
@@ -41,10 +45,16 @@ export function setupNavigation(screen, navigationService) {
     });
   }
 
-  // Tab cycling — T key
-  screen.key(['t', 'T'], () => {
+  // Tab / T → cycle to next tab; Shift+Tab → cycle to previous tab
+  screen.key(['tab', 't', 'T'], () => {
     if (!navigationService.isModalOpen()) {
       navigationService.cycleTab();
+    }
+  });
+
+  screen.key(['S-tab'], () => {
+    if (!navigationService.isModalOpen()) {
+      navigationService.cycleTabPrev();
     }
   });
 

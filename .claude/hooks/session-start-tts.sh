@@ -43,13 +43,11 @@ cat <<'EOF'
 1. **Acknowledgment** - Start of task: `Bash: .claude/hooks/play-tts.sh "[action]"`
 2. **Completion** - End of task: `Bash: .claude/hooks/play-tts.sh "[result + key details]"`
 
-**IMPORTANT: ALWAYS run TTS commands with `run_in_background: true` so they never block your work. Never wait for TTS to finish before continuing.**
-
 **Example:**
 ```
-[Bash (background): .claude/hooks/play-tts.sh "Checking git status"]
+[Bash: .claude/hooks/play-tts.sh "Checking git status"]
 [work...]
-[Bash (background): .claude/hooks/play-tts.sh "Repository is clean, no changes"]
+[Bash: .claude/hooks/play-tts.sh "Repository is clean, no changes"]
 ```
 
 EOF

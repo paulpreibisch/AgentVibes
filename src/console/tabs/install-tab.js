@@ -200,20 +200,22 @@ export function createInstallTab(screen, services) {
 
   function _renderScreen2() {
     _deps = _checkDependencies();
-    const ok  = c => `{${COLORS.successFg}-fg}✅ Installed{/${COLORS.successFg}-fg}`;
-    const bad = c => `{${COLORS.errorFg}-fg}❌ Not found{/${COLORS.errorFg}-fg}`;
+    const ok  = () => `{${COLORS.successFg}-fg}✅  Installed{/${COLORS.successFg}-fg}`;
+    const bad = () => `{${COLORS.errorFg}-fg}❌  Not found{/${COLORS.errorFg}-fg}`;
 
     contentBox.setContent([
-      `{bold}{#3f51b5-fg}── Dependency Check ${'─'.repeat(47)}{/#3f51b5-fg}{/bold}`,
+      `{bold}{#3f51b5-fg}🔍  Dependency Check ${'─'.repeat(47)}{/#3f51b5-fg}{/bold}`,
       '',
-      `  Node.js   ${_deps.node    ? ok() : bad()}`,
-      `  npm       ${_deps.npm     ? ok() : bad()}`,
-      `  Piper     ${_deps.piper   ? ok() : bad()}`,
-      `  Soprano   ${_deps.soprano ? ok() : bad()}`,
+      `  ${'Dependency'.padEnd(12)}  Status`,
+      `  ${'──────────'.padEnd(12)}  ──────────────`,
+      `  ${'Node.js'.padEnd(12)}  ${_deps.node    ? ok() : bad()}`,
+      `  ${'npm'.padEnd(12)}  ${_deps.npm     ? ok() : bad()}`,
+      `  ${'Piper TTS'.padEnd(12)}  ${_deps.piper   ? ok() : bad()}`,
+      `  ${'Soprano TTS'.padEnd(12)}  ${_deps.soprano ? ok() : bad()}`,
       '',
       _deps.piper || _deps.soprano
-        ? `  {${COLORS.successFg}-fg}✅ Provider detected — press [Enter] to continue{/${COLORS.successFg}-fg}`
-        : `  {${COLORS.errorFg}-fg}⚠ No TTS provider detected. Install Piper or Soprano first.{/${COLORS.errorFg}-fg}`,
+        ? `  {${COLORS.successFg}-fg}✅  TTS provider detected — press Enter to continue{/${COLORS.successFg}-fg}`
+        : `  {${COLORS.errorFg}-fg}⚠   No TTS provider found. Install Piper or Soprano first.{/${COLORS.errorFg}-fg}`,
     ].join('\n'));
     hintLine.setContent('  Screen 2/5: Dependencies');
     screen.render();
@@ -266,24 +268,19 @@ export function createInstallTab(screen, services) {
   function _renderScreen5() {
     const greeting = formatGreeting(_introText, getIntroDefault(process.cwd()));
     contentBox.setContent([
-      `{bold}{#3f51b5-fg}── Installation Complete ${'─'.repeat(43)}{/#3f51b5-fg}{/bold}`,
+      `{bold}{#3f51b5-fg}✅  Configuration Saved ${'─'.repeat(45)}{/#3f51b5-fg}{/bold}`,
       '',
-      `  {${COLORS.successFg}-fg}✅ AgentVibes is configured!{/${COLORS.successFg}-fg}`,
+      `  {${COLORS.successFg}-fg}✅  AgentVibes is configured and ready!{/${COLORS.successFg}-fg}`,
       '',
-      `  Provider:    ${_selectedProvider ?? 'piper'}`,
-      `  Intro text:  ${_introText || '(disabled)'}`,
+      `  ${'Provider:'.padEnd(14)}  ${_selectedProvider ?? 'piper'}`,
+      `  ${'Intro text:'.padEnd(14)}  ${_introText || '(none)'}`,
       '',
-      '  TTS Greeting:',
-      `  "${greeting}"`,
+      '  TTS will announce:',
+      `  {${COLORS.valueFg}-fg}"${greeting}"{/${COLORS.valueFg}-fg}`,
       '',
-      `  {${COLORS.valueFg}-fg}[Enter] Finish  |  [C] Open Console  |  ⭐ Star on GitHub!{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}Press Enter to finish  •  C to open console  •  ⭐ Star us on GitHub!{/${COLORS.noticeFg}-fg}`,
     ].join('\n'));
     hintLine.setContent('  Screen 5/5: Complete');
-
-    // Save configuration
-    configService.set('provider', _selectedProvider ?? 'piper');
-    if (_introText) configService.set('introText', _introText);
-
     screen.render();
   }
 
@@ -301,7 +298,15 @@ export function createInstallTab(screen, services) {
   // Navigation
 
   box.key(['enter'], () => {
-    if (_screen < 5) {
+    if (_screen === 4) {
+      // Save configuration before advancing to the complete screen
+      try {
+        configService.set('provider', _selectedProvider ?? 'piper');
+        if (_introText) configService.set('pretext', _introText);
+      } catch {}
+      _screen = 5;
+      _showCurrentScreen();
+    } else if (_screen < 5) {
       _screen++;
       _showCurrentScreen();
     } else {

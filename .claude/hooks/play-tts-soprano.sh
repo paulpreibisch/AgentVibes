@@ -50,9 +50,7 @@ export LC_ALL=C
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Ignored — Soprano has a single voice, kept for provider contract
 
-# Use readlink -f to handle symlinks correctly
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/audio-cache-utils.sh"
 
 SOPRANO_PORT="${SOPRANO_PORT:-7860}"

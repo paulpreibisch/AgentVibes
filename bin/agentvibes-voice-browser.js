@@ -8,7 +8,7 @@
 
 import blessed from 'blessed';
 import chalk from 'chalk';
-import { exec, spawn } from 'child_process';
+import { exec, spawn, spawnSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
@@ -58,11 +58,18 @@ class AgentVibesVoiceBrowser {
     this.searchTerm = '';
     this.favorites = new Set();
     this.favoritesOnly = false; // Filter to show only favorites
+    this.providerFilter = null; // Filter by provider (null = all)
     this.sampleText = CONFIG.SAMPLE_TEXT;
     this.playing = false;
     this.currentAudioProcess = null;
     this.voiceAssignments = null;
     this.voiceMetadata = null;
+    this.currentTab = 'voices'; // 'voices' or 'music'
+    this.musicTracks = [];
+    this.currentMusicSelection = null;
+    this.musicEnabled = false;
+    this.currentlyPlayingTrack = null; // Track which music track is currently playing
+    this.musicFavorites = new Set(); // Favorite music tracks
   }
 
   async init() {
@@ -84,6 +91,7 @@ class AgentVibesVoiceBrowser {
 
     await this.loadProgress();
     await this.loadVoiceData();
+    await this.loadMusicData();
     this.prepareTable();
     this.setupUI();
   }
@@ -92,6 +100,7 @@ class AgentVibesVoiceBrowser {
     try {
       const data = JSON.parse(await fs.readFile(CONFIG.PROGRESS_FILE, 'utf8'));
       this.favorites = new Set(data.favorites || []);
+      this.musicFavorites = new Set(data.musicFavorites || []);
       this.sampleText = data.sampleText || CONFIG.SAMPLE_TEXT;
       this.sortColumn = data.sortColumn || 'id';
       this.sortAsc = data.sortAsc !== undefined ? data.sortAsc : true;
@@ -103,13 +112,167 @@ class AgentVibesVoiceBrowser {
   async saveProgress() {
     await fs.writeFile(CONFIG.PROGRESS_FILE, JSON.stringify({
       favorites: Array.from(this.favorites),
+      musicFavorites: Array.from(this.musicFavorites),
       sampleText: this.sampleText,
       sortColumn: this.sortColumn,
       sortAsc: this.sortAsc
     }, null, 2));
   }
 
+  async detectProviders() {
+    const providers = [];
+
+    // Check for macOS Say
+    if (process.platform === 'darwin') {
+      try {
+        const result = spawnSync('which', ['say'], { encoding: 'utf8', timeout: 1000 });
+        if (result.status === 0) {
+          providers.push('macos');
+        }
+      } catch {
+        // Silently skip if check fails
+      }
+    }
+
+    // Check for Windows SAPI (not available in WSL)
+    if (process.platform === 'win32') {
+      providers.push('windows-sapi');
+    }
+
+    // Check for Soprano TTS
+    try {
+      // Try to start Soprano if available
+      const ensureScript = path.join(__dirname, 'ensure-soprano-running.sh');
+      if (fsSync.existsSync(ensureScript)) {
+        try {
+          spawnSync('bash', [ensureScript], { encoding: 'utf8', timeout: 5000 });
+        } catch {
+          // Failed to start, skip silently
+        }
+      }
+
+      // Check if Soprano server is responding
+      const curlResult = spawnSync('curl', ['-s', '-m', '1', 'http://127.0.0.1:7860/openapi.json'], { encoding: 'utf8', timeout: 2000 });
+      if (curlResult.status === 0 && curlResult.stdout && curlResult.stdout.includes('Soprano')) {
+        providers.push('soprano');
+      }
+    } catch {
+      // Silently skip if detection fails
+    }
+
+    return providers;
+  }
+
+  async loadMusicData() {
+    // Load background music tracks
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    let tracksDir = path.join(homeDir, '.claude', 'audio', 'tracks');
+
+    // If running from project directory, also check project's .claude/audio/tracks
+    if (!fsSync.existsSync(tracksDir)) {
+      const projectTracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+      if (fsSync.existsSync(projectTracksDir)) {
+        tracksDir = projectTracksDir;
+      }
+    }
+
+    try {
+      const files = await fs.readdir(tracksDir);
+      this.musicTracks = files
+        .filter(f => f.endsWith('.mp3') && !f.startsWith('.'))
+        .map(file => ({
+          file,
+          name: file.replace(/^agent_vibes_|^agentvibes_|_v\d+|_loop\.mp3$/g, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          path: path.join(tracksDir, file)
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Load current music selection
+      const musicConfigFile = path.join(homeDir, '.claude', 'config', 'background-music.txt');
+      try {
+        this.currentMusicSelection = (await fs.readFile(musicConfigFile, 'utf8')).trim();
+      } catch {
+        this.currentMusicSelection = null;
+      }
+
+      // Load music enabled status
+      const musicEnabledFile = path.join(homeDir, '.claude', 'config', 'background-music-enabled.txt');
+      try {
+        const enabled = (await fs.readFile(musicEnabledFile, 'utf8')).trim();
+        this.musicEnabled = enabled === 'true';
+      } catch {
+        this.musicEnabled = false;
+      }
+    } catch (error) {
+      this.musicTracks = [];
+    }
+  }
+
+  async loadMacOSVoices() {
+    try {
+      const { stdout } = await execAsync('say -v ? 2>/dev/null');
+      const voices = [];
+      const lines = stdout.trim().split('\n');
+
+      for (const line of lines) {
+        const match = line.match(/^(\S+)\s+(\S+)\s+#\s*(.+)/);
+        if (match) {
+          const [, name, lang, description] = match;
+          voices.push({
+            name,
+            language: lang,
+            description: description || '',
+            provider: 'macos'
+          });
+        }
+      }
+      return voices;
+    } catch {
+      return [];
+    }
+  }
+
+  async loadWindowsSAPIVoices() {
+    try {
+      const psScript = 'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object { $_.VoiceInfo | Select-Object Name, Gender, Culture | ConvertTo-Json -Compress }';
+      const { stdout } = await execAsync(`powershell -Command "${psScript}"`, { timeout: 5000 });
+      const voices = [];
+      const lines = stdout.trim().split('\n').filter(l => l.trim());
+
+      for (const line of lines) {
+        try {
+          const voice = JSON.parse(line);
+          voices.push({
+            name: voice.Name,
+            gender: voice.Gender?.toLowerCase() || 'unknown',
+            language: voice.Culture || 'en-US',
+            provider: 'windows-sapi'
+          });
+        } catch {}
+      }
+      return voices;
+    } catch {
+      return [];
+    }
+  }
+
+  async loadSopranoVoices() {
+    // Soprano TTS currently has only one voice
+    // It uses OpenAI API format but ignores the voice parameter
+    return [
+      {
+        name: 'Soprano',
+        language: 'en-US',
+        provider: 'soprano',
+        description: 'Neural TTS voice'
+      }
+    ];
+  }
+
   async loadVoiceData() {
+    // Detect available providers
+    this.availableProviders = await this.detectProviders();
+
     // Load voice assignments (for LibriTTS speakers)
     const assignmentsPath = path.join(__dirname, '..', 'voice-assignments.json');
     if (fsSync.existsSync(assignmentsPath)) {
@@ -149,10 +312,30 @@ class AgentVibesVoiceBrowser {
         }
       }
     }
+
+    // Load voices from other providers
+    this.otherProviderVoices = {
+      macos: [],
+      'windows-sapi': [],
+      soprano: []
+    };
+
+    if (this.availableProviders.includes('macos')) {
+      this.otherProviderVoices.macos = await this.loadMacOSVoices();
+    }
+
+    if (this.availableProviders.includes('windows-sapi')) {
+      this.otherProviderVoices['windows-sapi'] = await this.loadWindowsSAPIVoices();
+    }
+
+    if (this.availableProviders.includes('soprano')) {
+      this.otherProviderVoices.soprano = await this.loadSopranoVoices();
+    }
   }
 
   prepareTable() {
     this.tableData = [];
+    let nextId = 0;
 
     // Add LibriTTS speakers
     for (let id = 0; id < CONFIG.TOTAL_SPEAKERS; id++) {
@@ -163,13 +346,16 @@ class AgentVibesVoiceBrowser {
         const sampleText = template.replace('{NAME}', assignment.voice_name);
 
         this.tableData.push({
-          id,
+          id: nextId++,
+          originalId: id,
           gender: assignment.gender,
           name: assignment.voice_name,
           model: 'LibriTTS',
           type: 'libritts',
+          provider: 'Piper',
           piperVoiceId: `speaker-${id}`,
-          sampleText: sampleText
+          sampleText: sampleText,
+          language: 'en_US'
         });
       }
     }
@@ -180,15 +366,73 @@ class AgentVibesVoiceBrowser {
       const template = SAMPLE_TEMPLATES[Math.floor(Math.random() * SAMPLE_TEMPLATES.length)];
       const sampleText = template.replace('{NAME}', curated.voice_name);
 
+      // Extract language from model file (e.g., en_US-amy-medium -> en_US)
+      const langMatch = curated.model_file.match(/^([a-z]{2}_[A-Z]{2})/);
+      const language = langMatch ? langMatch[1] : 'en_US';
+
       this.tableData.push({
-        id: parseInt(id),
+        id: nextId++,
+        originalId: parseInt(id),
         gender: curated.gender,
         name: curated.voice_name,
         model: curated.model_file,
         type: 'curated',
+        provider: 'Piper',
         piperVoiceId: curated.model_file,
         friendlyName: curated.friendly_name,
-        sampleText: sampleText
+        sampleText: sampleText,
+        language: language
+      });
+    }
+
+    // Add macOS voices
+    for (const voice of this.otherProviderVoices.macos || []) {
+      const template = SAMPLE_TEMPLATES[Math.floor(Math.random() * SAMPLE_TEMPLATES.length)];
+      const sampleText = template.replace('{NAME}', voice.name);
+
+      this.tableData.push({
+        id: nextId++,
+        gender: 'unknown',
+        name: voice.name,
+        model: 'macOS Say',
+        type: 'macos',
+        provider: 'macOS',
+        sampleText: sampleText,
+        language: voice.language || 'en_US'
+      });
+    }
+
+    // Add Windows SAPI voices
+    for (const voice of this.otherProviderVoices['windows-sapi'] || []) {
+      const template = SAMPLE_TEMPLATES[Math.floor(Math.random() * SAMPLE_TEMPLATES.length)];
+      const sampleText = template.replace('{NAME}', voice.name);
+
+      this.tableData.push({
+        id: nextId++,
+        gender: voice.gender || 'unknown',
+        name: voice.name,
+        model: 'Windows SAPI',
+        type: 'windows-sapi',
+        provider: 'Windows',
+        sampleText: sampleText,
+        language: voice.language || 'en-US'
+      });
+    }
+
+    // Add Soprano voices
+    for (const voice of this.otherProviderVoices.soprano || []) {
+      const template = SAMPLE_TEMPLATES[Math.floor(Math.random() * SAMPLE_TEMPLATES.length)];
+      const sampleText = template.replace('{NAME}', voice.name);
+
+      this.tableData.push({
+        id: nextId++,
+        gender: 'unknown',
+        name: voice.name,
+        model: 'Soprano',
+        type: 'soprano',
+        provider: 'Soprano',
+        sampleText: sampleText,
+        language: voice.language || 'en-US'
       });
     }
 
@@ -201,6 +445,11 @@ class AgentVibesVoiceBrowser {
       ? this.tableData.filter(row => this.favorites.has(row.id))
       : [...this.tableData];
 
+    // Apply provider filter
+    if (this.providerFilter) {
+      data = data.filter(row => row.provider === this.providerFilter);
+    }
+
     // Apply search filter
     if (this.searchTerm) {
       const term = this.searchTerm.toLowerCase();
@@ -208,7 +457,9 @@ class AgentVibesVoiceBrowser {
         row.id.toString().includes(term) ||
         row.gender.includes(term) ||
         row.name.toLowerCase().includes(term) ||
-        row.model.toLowerCase().includes(term)
+        row.model.toLowerCase().includes(term) ||
+        row.language.toLowerCase().includes(term) ||
+        row.provider.toLowerCase().includes(term)
       );
     }
 
@@ -227,14 +478,16 @@ class AgentVibesVoiceBrowser {
   }
 
   formatRow(row) {
-    const fav = this.favorites.has(row.id) ? '⭐' : '  ';
-    const genderIcon = row.gender === 'male' ? '♂' : '♀';
-    const genderColor = row.gender === 'male' ? 'blue-fg' : 'magenta-fg';
+    const fav = this.favorites.has(row.id) ? '*' : ' ';
+    const genderIcon = row.gender === 'male' ? '♂' : (row.gender === 'female' ? '♀' : '-');
+    const genderColor = row.gender === 'male' ? 'blue-fg' : (row.gender === 'female' ? 'magenta-fg' : 'gray-fg');
     const gender = `{${genderColor}}${genderIcon}{/${genderColor}}`;
     const id = String(row.id).padStart(4);
-    const name = row.name.padEnd(15);
-    const model = row.model.substring(0, 25).padEnd(25);
-    return `${fav} ${id} ${gender} ${name} ${model}`;
+    const name = row.name.substring(0, 13).padEnd(13);
+    const provider = row.provider.substring(0, 8).padEnd(8);
+    const lang = row.language.substring(0, 6).padEnd(6);
+    const model = row.model.substring(0, 15).padEnd(15);
+    return `${fav} ${id} ${gender} ${name} ${provider} ${lang} ${model}`;
   }
 
   setupUI() {
@@ -245,30 +498,67 @@ class AgentVibesVoiceBrowser {
 
     const title = blessed.box({
       top: 0,
-      height: 3,
+      height: 1,
       width: '100%',
-      content: `{center}{bold}{cyan-fg}Agent{/cyan-fg} {magenta-fg}Vibes{/magenta-fg} {gray-fg}v1.0{/gray-fg} {yellow-fg}Voice Browser{/yellow-fg}{/bold}{/center}\n{center}{gray-fg}github.com/paulpreibisch/agentvibes{/gray-fg} {white-fg}www.agentvibes.org{/white-fg}{/center}\n{center}{cyan-fg}[1-4]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[F/X]{/cyan-fg}Favorites {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}Fav {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[Q]{/cyan-fg}Quit{/center}`,
+      content: `{center}{bold}{cyan-fg}Agent{/cyan-fg} {magenta-fg}Vibes{/magenta-fg} {gray-fg}v1.0{/gray-fg} {yellow-fg}Voice Browser{/yellow-fg}{/bold}{/center}`,
       tags: true,
       style: { fg: 'white' }
     });
 
-    const tableHeader = blessed.box({
-      top: 3,
+    const headerBar = blessed.box({
+      top: 1,
+      height: 4,
+      width: '100%',
+      content: `{center}{gray-fg}github.com/paulpreibisch/agentvibes{/gray-fg} {white-fg}www.agentvibes.org{/white-fg}{/center}\n{center}{red-fg}[T]{/red-fg}Tabs {cyan-fg}[1-6]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[P]{/cyan-fg}Prompt {cyan-fg}[L]{/cyan-fg}Filter {cyan-fg}[F/X]{/cyan-fg}Fav {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}★ {cyan-fg}[I]{/cyan-fg}Install{/center}`,
+      tags: true,
+      padding: 0,
+      border: { type: 'line', fg: 'gray' },
+      style: {
+        bg: 'black',
+        fg: 'white',
+        border: { bg: 'black' }
+      }
+    });
+
+    // Tab bar
+    this.tabBar = blessed.box({
+      top: 5,
+      height: 1,
+      width: '100%',
+      tags: true,
+      mouse: true,
+      clickable: true,
+      style: { fg: 'white', bg: 'black' }
+    });
+
+    // Voices Tab Content
+    this.voicesContainer = blessed.box({
+      top: 6,
+      left: 0,
+      width: '100%',
+      height: '100%-11',
+      hidden: false
+    });
+
+    this.tableHeader = blessed.box({
+      top: 0,
       left: 0,
       height: 1,
       width: '70%',
-      content: `   ID   G  Name            Model                    `,
-      style: { fg: 'cyan', bold: true }
+      content: `   ID   G  Name          Provider Lang   Model          `,
+      style: { fg: 'cyan', bold: true },
+      mouse: true,
+      clickable: true
     });
 
     this.list = blessed.list({
-      top: 4,
+      top: 1,
       left: 0,
       width: '70%',
-      height: '100%-8',
+      height: '100%-1',
       keys: true,
       vi: true,
-      mouse: false,
+      mouse: true,
       tags: true,
       style: {
         selected: { bg: 'blue', fg: 'white', bold: true },
@@ -281,22 +571,77 @@ class AgentVibesVoiceBrowser {
     });
 
     this.infoPanel = blessed.box({
-      top: 3,
+      top: 0,
       left: '70%',
       width: '30%',
-      height: '100%-7',
+      height: '100%',
       tags: true,
       border: { type: 'line', fg: 'cyan' },
       label: ' Voice Info ',
       scrollable: true,
+      alwaysScroll: true,
+      mouse: true,
+      keys: true,
+      vi: true,
       style: {
         border: { fg: 'cyan' },
         label: { fg: 'gray' }
       }
     });
 
+    this.voicesContainer.append(this.tableHeader);
+    this.voicesContainer.append(this.list);
+    this.voicesContainer.append(this.infoPanel);
+
+    // Music Tab Content
+    this.musicContainer = blessed.box({
+      top: 6,
+      left: 0,
+      width: '100%',
+      height: '100%-11',
+      hidden: true
+    });
+
+    this.musicList = blessed.list({
+      top: 0,
+      left: 0,
+      width: '70%',
+      height: '100%',
+      keys: true,
+      vi: true,
+      mouse: true,
+      tags: true,
+      style: {
+        selected: { bg: 'blue', fg: 'white', bold: true },
+        item: { fg: 'white' },
+        border: { fg: 'cyan' },
+        label: { fg: 'gray' }
+      },
+      border: { type: 'line', fg: 'cyan' },
+      label: ` Background Music (${this.musicTracks.length} tracks) `
+    });
+
+    this.musicInfo = blessed.box({
+      top: 0,
+      left: '70%',
+      width: '30%',
+      height: '100%',
+      tags: true,
+      border: { type: 'line', fg: 'cyan' },
+      label: ' Track Info ',
+      content: '',
+      padding: 1,
+      style: {
+        border: { fg: 'cyan' },
+        label: { fg: 'gray' }
+      }
+    });
+
+    this.musicContainer.append(this.musicList);
+    this.musicContainer.append(this.musicInfo);
+
     this.statusBar = blessed.box({
-      bottom: 3,
+      bottom: 4,
       height: 1,
       width: '100%',
       content: 'Ready',
@@ -305,20 +650,40 @@ class AgentVibesVoiceBrowser {
     });
 
     this.helpBar = blessed.box({
-      bottom: 0,
+      bottom: 1,
       height: 3,
       width: '100%',
-      content: '{cyan-fg}[1-4]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[F/X]{/cyan-fg}Favorites {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}Toggle★ {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[E]{/cyan-fg}Export\n{center}{gray-fg}Please consider giving us a GitHub star ⭐ {/gray-fg}{yellow-fg}github.com/paulpreibisch/agentvibes{/yellow-fg}{/center}',
+      content: '{cyan-fg}[1-6]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[P]{/cyan-fg}Prompt {cyan-fg}[L]{/cyan-fg}Filter {cyan-fg}[F/X]{/cyan-fg}Fav {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[R]{/cyan-fg}Reverb {cyan-fg}[*]{/cyan-fg}★ {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[Nav]{/cyan-fg}Keys',
       tags: true,
-      style: { bg: 'black' }
+      padding: 0,
+      border: { type: 'line', fg: 'gray' },
+      style: {
+        bg: 'black',
+        fg: 'white',
+        border: { bg: 'black' }
+      }
+    });
+
+    this.githubMessage = blessed.box({
+      bottom: 0,
+      height: 1,
+      width: '100%',
+      content: '{center}{gray-fg}Please consider giving us a GitHub star *{/gray-fg} {yellow-fg}github.com/paulpreibisch/agentvibes{/yellow-fg}{/center}',
+      tags: true,
+      style: { fg: 'white' }
     });
 
     this.screen.append(title);
-    this.screen.append(tableHeader);
-    this.screen.append(this.list);
-    this.screen.append(this.infoPanel);
+    this.screen.append(headerBar);
+    this.screen.append(this.tabBar);
+    this.screen.append(this.voicesContainer);
+    this.screen.append(this.musicContainer);
     this.screen.append(this.statusBar);
     this.screen.append(this.helpBar);
+    this.screen.append(this.githubMessage);
+
+    this.updateTabBar();
+    this.updateMusicList();
 
     this.updateList();
     this.list.focus();
@@ -331,8 +696,8 @@ class AgentVibesVoiceBrowser {
     this.list.setItems(items);
     this.list.select(Math.min(this.currentRow, items.length - 1));
 
-    const modeLabel = this.favoritesOnly ? ' ⭐ Favorites ' : ' Voices ';
-    this.list.setLabel(`${modeLabel}(${this.filteredData.length}) - Sort: ${this.sortColumn} ${this.sortAsc ? '↑' : '↓'} `);
+    const modeLabel = this.favoritesOnly ? ' * Favorites ' : ' Voices ';
+    this.list.setLabel(`${modeLabel}(${this.filteredData.length}) - Model (${this.uniqueModels}) - Sort: ${this.sortColumn} ${this.sortAsc ? '↑' : '↓'} `);
     this.updateInfo();
   }
 
@@ -343,7 +708,7 @@ class AgentVibesVoiceBrowser {
     const row = this.filteredData[idx];
     let info = `{bold}${row.type === 'curated' ? row.name : 'Speaker ' + row.id}{/bold}\n`;
     info += `{gray-fg}${'─'.repeat(20)}{/gray-fg}\n\n`;
-    if (this.favorites.has(row.id)) info += '{yellow-fg}⭐ Favorite{/yellow-fg}\n\n';
+    if (this.favorites.has(row.id)) info += '{yellow-fg}* Favorite{/yellow-fg}\n\n';
     info += `{cyan-fg}ID:{/cyan-fg} ${row.id}\n`;
 
     // Color gender value: blue for male, pink for female
@@ -351,6 +716,8 @@ class AgentVibesVoiceBrowser {
     info += `{cyan-fg}Gender:{/cyan-fg} {${genderColor}}${row.gender}{/${genderColor}}\n`;
 
     info += `{cyan-fg}Voice:{/cyan-fg} ${row.name}\n`;
+    info += `{cyan-fg}Provider:{/cyan-fg} {green-fg}${row.provider}{/green-fg}\n`;
+    info += `{cyan-fg}Language:{/cyan-fg} ${row.language}\n`;
 
     // Color model in yellow
     info += `{cyan-fg}Model:{/cyan-fg} {yellow-fg}${row.model}{/yellow-fg}\n`;
@@ -365,25 +732,176 @@ class AgentVibesVoiceBrowser {
 
     info += `\n{cyan-fg}Position:{/cyan-fg} ${idx + 1}/${this.filteredData.length}\n`;
     info += `{cyan-fg}Favorites:{/cyan-fg} ${this.favorites.size}\n\n`;
-    info += `{green-fg}Press [I] to install this voice{/green-fg}`;
+    info += `{green-fg}[I]{/green-fg} Install voice  {cyan-fg}[P]{/cyan-fg} Copy prompt`;
 
     this.infoPanel.setContent(info);
     this.screen.render();
   }
 
+  updateTabBar() {
+    const voicesTab = this.currentTab === 'voices'
+      ? '{black-bg}{magenta-fg}[V]{/magenta-fg} {cyan-fg}Voices{/cyan-fg}{/black-bg}'
+      : '{gray-fg}[V] Voices{/gray-fg}';
+    const musicTab = this.currentTab === 'music'
+      ? '{black-bg}{red-fg}[B]{/red-fg} {cyan-fg}🎶 Background Music{/cyan-fg}{/black-bg}'
+      : '{gray-fg}[B] 🎶 Background Music{/gray-fg}';
+
+    this.tabBar.setContent(`  ${voicesTab}  │  ${musicTab}`);
+    this.screen.render();
+  }
+
+  switchTab(tab) {
+    this.currentTab = tab;
+
+    if (tab === 'voices') {
+      this.voicesContainer.show();
+      this.musicContainer.hide();
+      this.list.focus();
+    } else {
+      this.voicesContainer.hide();
+      this.musicContainer.show();
+      this.musicList.focus();
+    }
+
+    this.updateTabBar();
+    this.screen.render();
+  }
+
+  updateMusicList() {
+    const items = this.musicTracks.map(track => {
+      const isCurrent = track.file === this.currentMusicSelection;
+      const isFavorite = this.musicFavorites.has(track.file);
+      const isEnabled = this.musicEnabled ? '🔊' : '🔇';
+      const marker = isCurrent ? `{cyan-fg}▶{/cyan-fg}` : ' ';
+      const favMarker = isFavorite ? '*' : ' ';
+      return `${marker}${favMarker} ${track.name}  ${isCurrent ? isEnabled : ''}`;
+    });
+
+    this.musicList.setItems(items);
+
+    // Update music info
+    this.updateMusicInfo();
+  }
+
+  updateMusicInfo() {
+    const enabledText = this.musicEnabled ? '{green-fg}Enabled{/green-fg}' : '{red-fg}Disabled{/red-fg}';
+    const currentTrack = this.currentMusicSelection
+      ? this.musicTracks.find(t => t.file === this.currentMusicSelection)?.name || 'None'
+      : 'None';
+
+    let content = '{cyan-fg}{bold}Background Music{/bold}{/cyan-fg}\n\n';
+    content += `Status: ${enabledText}\n\n`;
+    content += `Current Track:\n{yellow-fg}${currentTrack}{/yellow-fg}\n\n`;
+    content += '{gray-fg}Controls:{/gray-fg}\n';
+    content += '{cyan-fg}Space{/cyan-fg} - Preview track\n';
+    content += '{cyan-fg}Enter{/cyan-fg} - Select track\n';
+    content += '{cyan-fg}F/*{/cyan-fg} - Favorite\n';
+    content += '{cyan-fg}M{/cyan-fg} - Toggle on/off\n';
+    content += '{cyan-fg}R{/cyan-fg} - Toggle reverb\n';
+    content += '{cyan-fg}T{/cyan-fg} - Switch tabs\n\n';
+    content += `{gray-fg}Total Tracks: {/gray-fg}{white-fg}${this.musicTracks.length}{/white-fg}`;
+
+    this.musicInfo.setContent(content);
+  }
+
   setupKeys() {
     this.screen.key(['q', 'Q', 'C-c'], () => this.exit());
+
+    // Tab switching
+    this.screen.key(['t', 'T'], () => {
+      const newTab = this.currentTab === 'voices' ? 'music' : 'voices';
+      this.switchTab(newTab);
+    });
+
+    // Tab bar click handling
+    this.tabBar.on('click', (data) => {
+      const x = data.x;
+      // "[V] Voices" is at position 2-12 (approx)
+      // "[B] 🎶 Background Music" starts around position 15+
+      if (x < 15) {
+        // Clicked on Voices tab
+        if (this.currentTab !== 'voices') {
+          this.switchTab('voices');
+        }
+      } else {
+        // Clicked on Background Music tab
+        if (this.currentTab !== 'music') {
+          this.switchTab('music');
+        }
+      }
+    });
 
     // Listen to selection changes (blessed handles arrow keys automatically)
     this.list.on('select', () => {
       this.updateInfo();
     });
 
+    // Double-click to play voice
+    let lastClickTime = 0;
+    this.list.on('click', async () => {
+      const now = Date.now();
+      if (now - lastClickTime < 400) {
+        // Double-click detected
+        const row = this.filteredData[this.list.selected];
+        if (row) await this.playSample(row);
+        lastClickTime = 0; // Reset to prevent triple-click
+      } else {
+        lastClickTime = now;
+      }
+    });
+
+    // Double-click column header to sort
+    let lastHeaderClickTime = 0;
+    let lastHeaderClickX = 0;
+    this.tableHeader.on('click', (data) => {
+      const now = Date.now();
+      const x = data.x;
+
+      if (now - lastHeaderClickTime < 400 && Math.abs(x - lastHeaderClickX) < 3) {
+        // Double-click detected on same column
+        let newSortColumn = this.sortColumn;
+
+        // Map x position to column (accounting for border offset)
+        // "   ID   G  Name          Provider Lang   Model          "
+        if (x < 8) {
+          newSortColumn = 'id';
+        } else if (x < 11) {
+          newSortColumn = 'gender';
+        } else if (x < 25) {
+          newSortColumn = 'name';
+        } else if (x < 34) {
+          newSortColumn = 'provider';
+        } else if (x < 41) {
+          newSortColumn = 'language';
+        } else {
+          newSortColumn = 'model';
+        }
+
+        // Toggle sort direction if same column, otherwise ascending
+        if (newSortColumn === this.sortColumn) {
+          this.sortAsc = !this.sortAsc;
+        } else {
+          this.sortColumn = newSortColumn;
+          this.sortAsc = true;
+        }
+
+        this.applyFilter();
+        this.updateList();
+
+        lastHeaderClickTime = 0; // Reset to prevent triple-click
+      } else {
+        lastHeaderClickTime = now;
+        lastHeaderClickX = x;
+      }
+    });
+
     // Sorting
     this.screen.key(['1'], () => { this.sortColumn = 'id'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
     this.screen.key(['2'], () => { this.sortColumn = 'gender'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
     this.screen.key(['3'], () => { this.sortColumn = 'name'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
-    this.screen.key(['4'], () => { this.sortColumn = 'model'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
+    this.screen.key(['4'], () => { this.sortColumn = 'provider'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
+    this.screen.key(['5'], () => { this.sortColumn = 'language'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
+    this.screen.key(['6'], () => { this.sortColumn = 'model'; this.sortAsc = !this.sortAsc; this.applyFilter(); this.updateList(); });
 
     // Search
     this.screen.key(['/'], () => this.showSearch());
@@ -392,6 +910,13 @@ class AgentVibesVoiceBrowser {
     this.list.key(['space'], async () => {
       const row = this.filteredData[this.list.selected];
       if (row) await this.playSample(row);
+    });
+
+    // Reverb toggle (on voices tab)
+    this.list.key(['r', 'R'], async () => {
+      if (this.currentTab === 'voices') {
+        await this.toggleReverb();
+      }
     });
 
     // Favorite
@@ -403,7 +928,7 @@ class AgentVibesVoiceBrowser {
           this.statusBar.setContent('{yellow-fg}Removed from favorites{/yellow-fg}');
         } else {
           this.favorites.add(row.id);
-          this.statusBar.setContent('{yellow-fg}Added to favorites ⭐{/yellow-fg}');
+          this.statusBar.setContent('{yellow-fg}Added to favorites *{/yellow-fg}');
         }
         await this.saveProgress();
         this.updateList();
@@ -420,7 +945,7 @@ class AgentVibesVoiceBrowser {
       this.updateList();
 
       if (this.favoritesOnly) {
-        this.statusBar.setContent(`{yellow-fg}⭐ Showing ${this.filteredData.length} favorites - Press [F] or [X] to show all{/yellow-fg}`);
+        this.statusBar.setContent(`{yellow-fg}* Showing ${this.filteredData.length} favorites - Press [F] or [X] to show all{/yellow-fg}`);
       } else {
         this.statusBar.setContent(`{cyan-fg}Showing all voices - Press [F] to filter favorites{/cyan-fg}`);
       }
@@ -440,6 +965,458 @@ class AgentVibesVoiceBrowser {
 
     // Export
     this.screen.key(['e', 'E'], () => this.exportFavorites());
+
+    // Navigation: Page Down
+    this.list.key(['pagedown'], () => {
+      const pageSize = Math.floor(this.list.height / 2);
+      const newIndex = Math.min(this.list.selected + pageSize, this.filteredData.length - 1);
+      this.list.select(newIndex);
+      this.screen.render();
+    });
+
+    // Navigation: Page Up
+    this.list.key(['pageup'], () => {
+      const pageSize = Math.floor(this.list.height / 2);
+      const newIndex = Math.max(this.list.selected - pageSize, 0);
+      this.list.select(newIndex);
+      this.screen.render();
+    });
+
+    // Navigation: Home (go to top)
+    this.list.key(['home'], () => {
+      this.list.select(0);
+      this.screen.render();
+    });
+
+    // Navigation: End (go to bottom)
+    this.list.key(['end'], () => {
+      if (this.filteredData.length > 0) {
+        this.list.select(this.filteredData.length - 1);
+        this.screen.render();
+      }
+    });
+
+    // Provider filter toggle
+    this.screen.key(['l', 'L'], () => this.showProviderFilter());
+
+    // Voice prompt — copy-pasteable AgentVibes instructions
+    this.list.key(['p', 'P'], () => this.showVoicePrompt());
+
+    // Music tab controls
+    this.musicList.key(['space'], async () => {
+      if (this.currentTab !== 'music') return;
+      const selected = this.musicList.selected;
+      if (selected >= 0 && selected < this.musicTracks.length) {
+        const selectedTrack = this.musicTracks[selected];
+
+        // If this track is already playing, stop it
+        if (this.currentlyPlayingTrack && this.currentlyPlayingTrack.file === selectedTrack.file) {
+          this.stopMusic();
+        } else {
+          // Otherwise, play the new track
+          await this.previewMusic(selectedTrack);
+        }
+      }
+    });
+
+    this.musicList.key(['enter'], async () => {
+      if (this.currentTab !== 'music') return;
+      const selected = this.musicList.selected;
+      if (selected >= 0 && selected < this.musicTracks.length) {
+        await this.selectMusic(this.musicTracks[selected]);
+      }
+    });
+
+    this.musicList.key(['m', 'M'], async () => {
+      if (this.currentTab !== 'music') return;
+      await this.toggleMusic();
+    });
+
+    this.musicList.key(['r', 'R'], async () => {
+      if (this.currentTab !== 'music') return;
+      await this.toggleReverb();
+    });
+
+    // Favorite music track
+    this.musicList.key(['f', 'F', '*', '8'], async () => {
+      if (this.currentTab !== 'music') return;
+      const selected = this.musicList.selected;
+      if (selected >= 0 && selected < this.musicTracks.length) {
+        const track = this.musicTracks[selected];
+        if (this.musicFavorites.has(track.file)) {
+          this.musicFavorites.delete(track.file);
+          this.statusBar.setContent('{yellow-fg}Removed from favorites{/yellow-fg}');
+        } else {
+          this.musicFavorites.add(track.file);
+          this.statusBar.setContent('{yellow-fg}Added to favorites *{/yellow-fg}');
+        }
+        await this.saveProgress();
+        this.updateMusicList();
+        this.screen.render();
+      }
+    });
+  }
+
+  showVoicePrompt() {
+    const row = this.filteredData[this.list.selected];
+    if (!row) return;
+
+    // Build copy-pasteable AgentVibes instructions per voice type
+    let lines = [];
+    let subtitle = '';
+
+    switch (row.type) {
+      case 'curated': {
+        const switchName = row.friendlyName || row.piperVoiceId || row.model;
+        subtitle = `Piper curated voice`;
+        lines = [
+          `# Switch to: ${row.name}`,
+          ``,
+          `# If piper is already your active provider:`,
+          `/agent-vibes:switch ${switchName}`,
+          ``,
+          `# If switching from another provider first:`,
+          `/agent-vibes:provider switch piper`,
+          `/agent-vibes:switch ${switchName}`,
+        ];
+        break;
+      }
+      case 'libritts': {
+        const speakerId = row.originalId;
+        const safeName = row.name.replace(/\s+/g, '_');
+        const modelFile = path.basename(CONFIG.MODEL_PATH, '.onnx');
+        subtitle = `LibriTTS multi-speaker — speaker ID ${speakerId}`;
+        lines = [
+          `# Use LibriTTS Speaker ${speakerId}: ${row.name}`,
+          ``,
+          `# Step 1 — Download the model (skip if already downloaded):`,
+          `bash .claude/hooks/piper-voice-manager.sh download ${modelFile}`,
+          ``,
+          `# Step 2 — Register speaker in piper-multispeaker-registry.sh:`,
+          `# Add this line to the MULTISPEAKER_VOICES array:`,
+          `  "${safeName}:${modelFile}:${speakerId}:LibriTTS Speaker"`,
+          ``,
+          `# Step 3 — Switch AgentVibes to this voice:`,
+          `/agent-vibes:switch ${safeName}`,
+        ];
+        break;
+      }
+      case 'macos': {
+        subtitle = `macOS built-in voice`;
+        lines = [
+          `# Switch to macOS voice: ${row.name}`,
+          ``,
+          `# Step 1 — Switch provider to macOS:`,
+          `/agent-vibes:provider switch macos`,
+          ``,
+          `# Step 2 — Switch to this voice:`,
+          `/agent-vibes:switch ${row.name}`,
+        ];
+        break;
+      }
+      case 'windows-sapi': {
+        subtitle = `Windows SAPI built-in voice`;
+        lines = [
+          `# Switch to Windows SAPI voice: ${row.name}`,
+          ``,
+          `# Step 1 — Switch provider to Windows SAPI:`,
+          `/agent-vibes:provider switch windows-sapi`,
+          ``,
+          `# Step 2 — Switch to this voice:`,
+          `/agent-vibes:switch ${row.name}`,
+        ];
+        break;
+      }
+      case 'soprano': {
+        subtitle = `Soprano neural TTS — single voice`;
+        lines = [
+          `# Switch to Soprano TTS`,
+          ``,
+          `/agent-vibes:provider switch soprano`,
+          ``,
+          `# Soprano has one built-in voice — no voice selection needed.`,
+        ];
+        break;
+      }
+      default: {
+        subtitle = row.provider;
+        lines = [
+          `# Switch to: ${row.name}`,
+          `/agent-vibes:switch ${row.name}`,
+        ];
+      }
+    }
+
+    const promptText = lines.join('\n');
+    const contentHeight = lines.length + 8;
+    const boxHeight = Math.min(contentHeight, Math.floor(this.screen.height * 0.8));
+
+    const modal = blessed.box({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: 72,
+      height: boxHeight,
+      border: { type: 'line', fg: 'green' },
+      label: ` [P] Prompt — ${row.name} `,
+      tags: true,
+      scrollable: true,
+      alwaysScroll: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      padding: 1,
+      style: {
+        border: { fg: 'green' },
+        bg: 'black',
+        fg: 'white'
+      }
+    });
+
+    let content = `{yellow-fg}{bold}${row.name}{/bold}{/yellow-fg}  {gray-fg}${subtitle}{/gray-fg}\n\n`;
+    content += `{gray-fg}Copy and paste these commands into your terminal or Claude session:{/gray-fg}\n\n`;
+    content += `{green-fg}${lines.join('\n')}{/green-fg}\n\n`;
+    content += `{gray-fg}─────────────────────────────────────────────────────────────{/gray-fg}\n`;
+    content += `{gray-fg}[Esc/Q] Close  [↑↓] Scroll{/gray-fg}`;
+
+    modal.setContent(content);
+
+    // Try to copy to clipboard (best-effort, silent on failure)
+    const clipboardCmds = [
+      ['xclip', ['-selection', 'clipboard']],
+      ['xsel', ['--clipboard', '--input']],
+      ['pbcopy', []]
+    ];
+    for (const [cmd, args] of clipboardCmds) {
+      try {
+        const proc = spawnSync('which', [cmd], { encoding: 'utf8', timeout: 500 });
+        if (proc.status === 0) {
+          const cp = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'ignore'] });
+          cp.stdin.write(promptText);
+          cp.stdin.end();
+          // Update status bar to let user know
+          this.statusBar.setContent(`{green-fg}✓ Prompt copied to clipboard via ${cmd}{/green-fg}`);
+          break;
+        }
+      } catch {
+        // Silently skip
+      }
+    }
+
+    modal.key(['escape', 'q', 'Q'], () => {
+      this.screen.remove(modal);
+      this.list.focus();
+      this.screen.render();
+    });
+
+    modal.focus();
+    this.screen.render();
+  }
+
+  showProviderFilter() {
+    // Get unique providers from tableData
+    const providers = [...new Set(this.tableData.map(row => row.provider))].sort();
+
+    const menu = blessed.list({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: 40,
+      height: Math.min(providers.length + 4, 15),
+      border: { type: 'line', fg: 'cyan' },
+      label: ' Filter by Provider ',
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        selected: { bg: 'cyan', fg: 'black' },
+        border: { fg: 'cyan' }
+      }
+    });
+
+    const items = ['All Providers', ...providers];
+    menu.setItems(items);
+
+    // Select current filter
+    if (this.providerFilter) {
+      const index = items.indexOf(this.providerFilter);
+      if (index >= 0) menu.select(index);
+    }
+
+    menu.on('select', (item, index) => {
+      if (index === 0) {
+        // All Providers
+        this.providerFilter = null;
+        this.statusBar.setContent(`{cyan-fg}Showing all providers - Press [P] to filter{/cyan-fg}`);
+      } else {
+        // Specific provider
+        this.providerFilter = item.getText();
+        this.statusBar.setContent(`{cyan-fg}Showing ${this.providerFilter} only - Press [P] to change{/cyan-fg}`);
+      }
+
+      this.applyFilter();
+      this.updateList();
+      this.screen.remove(menu);
+      this.list.focus();
+      this.screen.render();
+    });
+
+    menu.key(['escape'], () => {
+      this.screen.remove(menu);
+      this.list.focus();
+      this.screen.render();
+    });
+
+    menu.focus();
+    this.screen.render();
+  }
+
+  stopMusic() {
+    // Kill existing audio process if any
+    if (this.currentAudioProcess) {
+      try {
+        this.currentAudioProcess.kill('SIGKILL');
+        this.currentAudioProcess = null;
+        this.currentlyPlayingTrack = null;
+      } catch (error) {}
+    }
+
+    this.statusBar.setContent(`{yellow-fg}⏹ Stopped playback{/yellow-fg}`);
+    this.screen.render();
+  }
+
+  async previewMusic(track) {
+    // Kill existing audio process if any
+    if (this.currentAudioProcess) {
+      try {
+        this.currentAudioProcess.kill('SIGKILL');
+        this.currentAudioProcess = null;
+      } catch (error) {}
+    }
+
+    const trackPath = track.path;
+    this.currentlyPlayingTrack = track;
+
+    this.statusBar.setContent(`{cyan-fg}▶ Playing: ${track.name}...{/cyan-fg}`);
+    this.screen.render();
+
+    // Try different audio players
+    const players = [
+      { cmd: 'ffplay', args: ['-nodisp', '-autoexit', '-t', '15', trackPath] },
+      { cmd: 'mpg123', args: ['-q', '--loop', '1', trackPath] },
+      { cmd: 'afplay', args: [trackPath] }
+    ];
+
+    for (const player of players) {
+      try {
+        await execAsync(`which ${player.cmd} 2>/dev/null`);
+
+        const audioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });
+        this.currentAudioProcess = audioProcess;
+
+        audioProcess.on('close', () => {
+          if (this.currentAudioProcess === audioProcess) {
+            this.currentAudioProcess = null;
+            this.currentlyPlayingTrack = null;
+          }
+          this.statusBar.setContent(`{green-fg}✓ Playback complete{/green-fg}`);
+          this.screen.render();
+        });
+
+        audioProcess.on('error', (err) => {
+          if (this.currentAudioProcess === audioProcess) {
+            this.currentAudioProcess = null;
+            this.currentlyPlayingTrack = null;
+          }
+          this.statusBar.setContent(`{red-fg}✗ Error playing track{/red-fg}`);
+          this.screen.render();
+        });
+
+        break;
+      } catch (error) {
+        continue;
+      }
+    }
+  }
+
+  async selectMusic(track) {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const configDir = path.join(homeDir, '.claude', 'config');
+    const musicConfigFile = path.join(configDir, 'background-music.txt');
+
+    try {
+      // Ensure config directory exists
+      await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
+
+      await fs.writeFile(musicConfigFile, track.file, { mode: 0o600 });
+      this.currentMusicSelection = track.file;
+      this.updateMusicList();
+      this.statusBar.setContent(`{green-fg}✓ Selected: ${track.name}{/green-fg}`);
+      this.screen.render();
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error selecting track: ${error.message}{/red-fg}`);
+      this.screen.render();
+    }
+  }
+
+  async toggleMusic() {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const configDir = path.join(homeDir, '.claude', 'config');
+    const musicEnabledFile = path.join(configDir, 'background-music-enabled.txt');
+
+    try {
+      // Ensure config directory exists
+      await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
+
+      this.musicEnabled = !this.musicEnabled;
+      await fs.writeFile(musicEnabledFile, this.musicEnabled ? 'true' : 'false', { mode: 0o600 });
+      this.updateMusicList();
+      this.updateMusicInfo();
+
+      const status = this.musicEnabled ? 'Enabled' : 'Disabled';
+      this.statusBar.setContent(`{green-fg}✓ Background Music ${status}{/green-fg}`);
+      this.screen.render();
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error toggling music: ${error.message}{/red-fg}`);
+      this.screen.render();
+    }
+  }
+
+  async toggleReverb() {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const configDir = path.join(homeDir, '.claude', 'config');
+    const audioEffectsPath = path.join(configDir, 'audio-effects.cfg');
+
+    try {
+      // Ensure config directory exists
+      await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
+
+      // Read current reverb setting
+      let content = '';
+      try {
+        content = await fs.readFile(audioEffectsPath, 'utf8');
+      } catch {
+        content = 'REVERB_ENABLED=false\nREVERB_LEVEL=medium\n';
+      }
+
+      // Toggle reverb
+      const currentEnabled = content.includes('REVERB_ENABLED=true');
+      const newEnabled = !currentEnabled;
+
+      content = content.replace(
+        /REVERB_ENABLED=(true|false)/,
+        `REVERB_ENABLED=${newEnabled}`
+      );
+
+      await fs.writeFile(audioEffectsPath, content, { mode: 0o600 });
+
+      const status = newEnabled ? 'Enabled' : 'Disabled';
+      this.statusBar.setContent(`{green-fg}✓ Reverb ${status}{/green-fg}`);
+      this.screen.render();
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error toggling reverb: ${error.message}{/red-fg}`);
+      this.screen.render();
+    }
   }
 
   showSearch() {
@@ -490,6 +1467,141 @@ class AgentVibesVoiceBrowser {
     // Use voice-specific sample text
     const sampleText = row.sampleText || this.sampleText;
 
+    // Handle different providers
+    switch (row.type) {
+      case 'macos':
+        return await this.playMacOSVoice(row, sampleText);
+      case 'windows-sapi':
+        return await this.playWindowsSAPIVoice(row, sampleText);
+      case 'soprano':
+        return await this.playSopranoVoice(row, sampleText);
+      default:
+        return await this.playPiperVoice(row, sampleText);
+    }
+  }
+
+  async playMacOSVoice(row, sampleText) {
+    try {
+      const process = spawn('say', ['-v', row.name, sampleText], { stdio: 'ignore' });
+      this.currentAudioProcess = process;
+
+      process.on('close', () => {
+        if (this.currentAudioProcess === process) {
+          this.currentAudioProcess = null;
+        }
+        this.statusBar.setContent(`{green-fg}✓ Played ${row.name}{/green-fg}`);
+        this.screen.render();
+      });
+
+      process.on('error', (err) => {
+        if (this.currentAudioProcess === process) {
+          this.currentAudioProcess = null;
+        }
+        this.statusBar.setContent(`{red-fg}✗ Error playing voice{/red-fg}`);
+        this.screen.render();
+      });
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error: ${error.message}{/red-fg}`);
+      this.screen.render();
+    }
+  }
+
+  async playWindowsSAPIVoice(row, sampleText) {
+    try {
+      const psScript = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.SelectVoice('${row.name}'); $synth.Speak('${sampleText.replace(/'/g, "''")}')`;
+      const process = spawn('powershell', ['-Command', psScript], { stdio: 'ignore' });
+      this.currentAudioProcess = process;
+
+      process.on('close', () => {
+        if (this.currentAudioProcess === process) {
+          this.currentAudioProcess = null;
+        }
+        this.statusBar.setContent(`{green-fg}✓ Played ${row.name}{/green-fg}`);
+        this.screen.render();
+      });
+
+      process.on('error', (err) => {
+        if (this.currentAudioProcess === process) {
+          this.currentAudioProcess = null;
+        }
+        this.statusBar.setContent(`{red-fg}✗ Error playing voice{/red-fg}`);
+        this.screen.render();
+      });
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error: ${error.message}{/red-fg}`);
+      this.screen.render();
+    }
+  }
+
+  async playSopranoVoice(row, sampleText) {
+    try {
+      // Soprano uses OpenAI API format
+      const outputFile = path.join(CONFIG.OUTPUT_DIR, `soprano_${row.name.toLowerCase()}_${Date.now()}.wav`);
+
+      // Create JSON payload file to avoid shell escaping issues
+      const payloadFile = path.join(CONFIG.OUTPUT_DIR, `soprano_payload_${Date.now()}.json`);
+      const payload = {
+        input: sampleText,
+        model: 'tts-1',
+        voice: row.name.toLowerCase() // API expects lowercase voice names
+      };
+      await fs.writeFile(payloadFile, JSON.stringify(payload));
+
+      // Call Soprano API to generate audio (OpenAI format)
+      const curlCmd = `curl -s -m 10 -X POST http://127.0.0.1:7860/v1/audio/speech -H "Content-Type: application/json" -d @${payloadFile} -o ${outputFile}`;
+      await execAsync(curlCmd);
+
+      // Clean up payload file
+      try {
+        await fs.unlink(payloadFile);
+      } catch {}
+
+      // Play the generated audio
+      const players = [
+        { cmd: 'aplay', args: [outputFile] },
+        { cmd: 'paplay', args: [outputFile] },
+        { cmd: 'ffplay', args: ['-nodisp', '-autoexit', outputFile] }
+      ];
+
+      for (const player of players) {
+        try {
+          await execAsync(`which ${player.cmd} 2>/dev/null`);
+
+          const audioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });
+          this.currentAudioProcess = audioProcess;
+
+          audioProcess.on('close', async () => {
+            if (this.currentAudioProcess === audioProcess) {
+              this.currentAudioProcess = null;
+            }
+            // Clean up temp file
+            try {
+              await fs.unlink(outputFile);
+            } catch {}
+            this.statusBar.setContent(`{green-fg}✓ Played ${row.name}{/green-fg}`);
+            this.screen.render();
+          });
+
+          audioProcess.on('error', (err) => {
+            if (this.currentAudioProcess === audioProcess) {
+              this.currentAudioProcess = null;
+            }
+            this.statusBar.setContent(`{red-fg}✗ Error playing voice{/red-fg}`);
+            this.screen.render();
+          });
+
+          break;
+        } catch (error) {
+          continue;
+        }
+      }
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error with Soprano: ${error.message}{/red-fg}`);
+      this.screen.render();
+    }
+  }
+
+  async playPiperVoice(row, sampleText) {
     // Sanitize sampleText to prevent command injection
     const safeSampleText = sampleText.replace(/[`$\\!"]/g, '\\$&');
 

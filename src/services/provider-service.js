@@ -7,6 +7,9 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 export class ProviderService {
   /**
@@ -30,11 +33,35 @@ export class ProviderService {
   }
 
   /**
-   * Sets the active TTS provider in config.
+   * Sets the active TTS provider in config AND syncs to .claude/tts-provider.txt
+   * so the shell hooks (play-tts.sh → provider-manager.sh) pick up the change.
    * @param {string} provider
    */
   setActiveProvider(provider) {
     this._config.set('provider', provider);
+    this._syncProviderFile(provider);
+  }
+
+  /**
+   * Write provider to .claude/tts-provider.txt so shell hooks stay in sync.
+   * Writes to projectRoot/.claude/tts-provider.txt if .claude/ exists there,
+   * otherwise falls back to ~/.claude/tts-provider.txt.
+   * @param {string} provider
+   */
+  _syncProviderFile(provider) {
+    try {
+      const projectClaudeDir = path.resolve(this._config.getProjectRoot(), '.claude');
+      const targetDir = fs.existsSync(projectClaudeDir)
+        ? projectClaudeDir
+        : path.resolve(os.homedir(), '.claude');
+      const targetFile = path.resolve(targetDir, 'tts-provider.txt');
+      // Verify resolved path stays within targetDir (path traversal guard)
+      if (!targetFile.startsWith(targetDir + path.sep) && targetFile !== targetDir) return;
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.writeFileSync(targetFile, provider, 'utf8');
+    } catch {
+      // Non-fatal — config.json is the authoritative source
+    }
   }
 
   /**
