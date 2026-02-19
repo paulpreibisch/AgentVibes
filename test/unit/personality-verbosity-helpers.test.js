@@ -55,20 +55,20 @@ describe('formatPersonality', () => {
     assert.strictEqual(typeof formatPersonality, 'function');
   });
 
-  test('returns "None" for personality "none"', () => {
-    assert.strictEqual(formatPersonality('none'), 'None');
+  test('returns emoji + "None" for personality "none"', () => {
+    assert.strictEqual(formatPersonality('none'), '😊 None');
   });
 
-  test('title-cases "sarcastic" to "Sarcastic"', () => {
-    assert.strictEqual(formatPersonality('sarcastic'), 'Sarcastic');
+  test('returns emoji + title-cased name for "sarcastic"', () => {
+    assert.strictEqual(formatPersonality('sarcastic'), '😏 Sarcastic');
   });
 
-  test('defaults to "None" for undefined', () => {
-    assert.strictEqual(formatPersonality(undefined), 'None');
+  test('defaults to emoji + "None" for undefined', () => {
+    assert.strictEqual(formatPersonality(undefined), '😊 None');
   });
 
-  test('title-cases "funny" to "Funny"', () => {
-    assert.strictEqual(formatPersonality('funny'), 'Funny');
+  test('returns emoji + title-cased name for "funny"', () => {
+    assert.strictEqual(formatPersonality('funny'), '😂 Funny');
   });
 });
 

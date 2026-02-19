@@ -48,12 +48,12 @@ describe('formatTrackName', () => {
     assert.strictEqual(typeof formatTrackName, 'function');
   });
 
-  test('returns "🎸 Soft Flamenco" for flamenco filename', () => {
-    assert.strictEqual(formatTrackName('agentvibes_soft_flamenco_loop.mp3'), '🎸 Soft Flamenco');
+  test('returns "🎻 Soft Flamenco" for flamenco filename', () => {
+    assert.strictEqual(formatTrackName('agentvibes_soft_flamenco_loop.mp3'), '🎻 Soft Flamenco');
   });
 
-  test('returns "🎷 Bossa Nova" for bossa nova filename', () => {
-    assert.strictEqual(formatTrackName('agent_vibes_bossa_nova_v2_loop.mp3'), '🎷 Bossa Nova');
+  test('returns "🌸 Bossa Nova" for bossa nova filename', () => {
+    assert.strictEqual(formatTrackName('agent_vibes_bossa_nova_v2_loop.mp3'), '🌸 Bossa Nova');
   });
 
   test('returns "🌊 Chillwave" for chillwave filename', () => {
@@ -64,8 +64,8 @@ describe('formatTrackName', () => {
     assert.strictEqual(formatTrackName('agent_vibes_ganawa_ambient_v2_loop.mp3'), '🪘 Gnawa Ambient');
   });
 
-  test('title-cases unknown track name', () => {
-    assert.strictEqual(formatTrackName('my_custom_track.mp3'), 'My Custom Track');
+  test('title-cases unknown track, strips agent_vibes_ prefix and _loop suffix', () => {
+    assert.strictEqual(formatTrackName('agent_vibes_my_custom_track_v2_loop.mp3'), 'My Custom Track');
   });
 
   test('returns "None" for undefined track', () => {

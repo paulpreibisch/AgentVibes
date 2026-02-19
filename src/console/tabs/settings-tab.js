@@ -61,6 +61,31 @@ const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_f
 // Verbosity display labels
 const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', minimal: 'Minimal', custom: 'Custom' });
 
+// Personality emojis — mirrors installer.js personalityEmojis (src/installer.js:84)
+const PERSONALITY_EMOJIS = Object.freeze({
+  angry:        '😠',
+  annoying:     '😤',
+  crass:        '🤬',
+  dramatic:     '🎭',
+  'dry-humor':  '😐',
+  flirty:       '😘',
+  funny:        '😂',
+  grandpa:      '👴',
+  millennial:   '🙄',
+  moody:        '😒',
+  none:         '😊',
+  normal:       '😊',
+  pirate:       '🏴‍☠️',
+  poetic:       '📜',
+  professional: '👔',
+  rapper:       '🎤',
+  robot:        '🤖',
+  sarcastic:    '😏',
+  sassy:        '💁',
+  'surfer-dude':'🏄',
+  zen:          '🧘',
+});
+
 // Known personalities (matches .claude/personalities/ directory)
 const PERSONALITIES = Object.freeze([
   'none', 'angry', 'annoying', 'crass', 'dramatic', 'dry-humor',
@@ -69,18 +94,29 @@ const PERSONALITIES = Object.freeze([
   'sassy', 'surfer-dude', 'zen',
 ]);
 
-// Human-readable track display names
+// Human-readable track display names — matches installer track picker (src/installer.js:2280)
 const TRACK_NAMES = Object.freeze({
-  'agentvibes_soft_flamenco_loop.mp3':      '🎸 Soft Flamenco',
-  'agent_vibes_bossa_nova_v2_loop.mp3':     '🎷 Bossa Nova',
-  'agent_vibes_chillwave_v2_loop.mp3':      '🌊 Chillwave',
-  'agent_vibes_ganawa_ambient_v2_loop.mp3': '🪘 Gnawa Ambient',
+  'agentvibes_soft_flamenco_loop.mp3':                 '🎻 Soft Flamenco',
+  'agent_vibes_bachata_v1_loop.mp3':                   '🎺 Bachata',
+  'agent_vibes_salsa_v2_loop.mp3':                     '💃 Salsa',
+  'agent_vibes_cumbia_v1_loop.mp3':                    '🎸 Cumbia',
+  'agent_vibes_bossa_nova_v2_loop.mp3':                '🌸 Bossa Nova',
+  'agent_vibes_japanese_city_pop_v1_loop.mp3':         '🏙️ Japanese City Pop',
+  'agent_vibes_chillwave_v2_loop.mp3':                 '🌊 Chillwave',
+  'agent_vibes_dark_chill_step_loop.mp3':              '🌙 Dark Chill Step',
+  'agent_vibes_goa_trance_v2_loop.mp3':                '🕉️ Goa Trance',
+  'agent_vibes_harpsichord_v2_loop.mp3':               '🎼 Harpsichord',
+  'agent_vibes_celtic_harp_v1_loop.mp3':               '🎻 Celtic Harp',
+  'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3': '🌺 Hawaiian Slack Key Guitar',
+  'agent_vibes_arabic_v2_loop.mp3':                    '🏜️ Arabic Oud',
+  'agent_vibes_ganawa_ambient_v2_loop.mp3':            '🪘 Gnawa Ambient',
+  'agent_vibes_tabla_dream_pop_v1_loop.mp3':           '🥁 Tabla Dream Pop',
 });
 
-// Built-in track list for the picker
+// Built-in track list for the picker (fallback when tracks dir is missing)
 const BUILT_IN_TRACKS = [
-  { label: '🎸 Soft Flamenco',  file: 'agentvibes_soft_flamenco_loop.mp3' },
-  { label: '🎷 Bossa Nova',     file: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+  { label: '🎻 Soft Flamenco',  file: 'agentvibes_soft_flamenco_loop.mp3' },
+  { label: '🌸 Bossa Nova',     file: 'agent_vibes_bossa_nova_v2_loop.mp3' },
   { label: '🌊 Chillwave',      file: 'agent_vibes_chillwave_v2_loop.mp3' },
   { label: '🪘 Gnawa Ambient',  file: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
 ];
@@ -112,8 +148,13 @@ export function formatMusicState(enabled) {
 export function formatTrackName(track) {
   if (!track) return 'None';
   if (TRACK_NAMES[track]) return TRACK_NAMES[track];
-  // Custom track: strip extension, underscores→spaces, title-case each word
-  return track.replace(/\.[^.]+$/, '').replace(/_/g, ' ')
+  // Custom/unknown track: strip extension, agentvibes_/agent_vibes_ prefix,
+  // _v1/_v2/_loop/_v1_loop/_v2_loop suffixes, then title-case each word
+  return track
+    .replace(/\.[^.]+$/, '')
+    .replace(/^agentvibes_|^agent_vibes_/, '')
+    .replace(/_v\d+_loop$|_loop$|_v\d+$/, '')
+    .replace(/_/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
@@ -130,8 +171,10 @@ export function formatVerbosity(verbosity) {
  * @returns {string}
  */
 export function formatPersonality(personality) {
-  if (!personality || personality === 'none') return 'None';
-  return personality.charAt(0).toUpperCase() + personality.slice(1);
+  const name  = personality || 'none';
+  const emoji = PERSONALITY_EMOJIS[name] ?? '✨';
+  const label = name === 'none' ? 'None' : name.charAt(0).toUpperCase() + name.slice(1);
+  return `${emoji} ${label}`;
 }
 
 /**
@@ -2325,12 +2368,17 @@ function _openPersonalityPicker(screen, configService, onSelect) {
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 32,
+    width: 44,
     height: Math.min(PERSONALITIES.length + 4, 22),
     border: { type: 'line' },
     tags: true,
     label: _modalTitle('Select Personality'),
-    items: PERSONALITIES.map((p, i) => (i === currentIdx ? `● ${p}` : `  ${p}`)),
+    items: PERSONALITIES.map((p, i) => {
+      const emoji = PERSONALITY_EMOJIS[p] ?? '✨';
+      const label = p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1);
+      const mark  = i === currentIdx ? '✅' : '   ';
+      return `${mark} ${emoji} ${label}`;
+    }),
     keys: true,
     vi: true,
     mouse: true,
