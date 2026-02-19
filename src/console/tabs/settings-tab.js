@@ -130,7 +130,8 @@ export function formatVerbosity(verbosity) {
  * @returns {string}
  */
 export function formatPersonality(personality) {
-  return personality ?? 'none';
+  if (!personality || personality === 'none') return 'None';
+  return personality.charAt(0).toUpperCase() + personality.slice(1);
 }
 
 /**
@@ -936,32 +937,51 @@ export function createSettingsTab(screen, services) {
 
   let _currentIdx = 0;
 
-  // Map each button to its row label widget for focus-highlight
+  // Map each button to its row label + value widgets for focus-highlight
   const _buttonToLabel = new Map([
-    [switchBtn,          providerLabel],
-    [changeBtn,          voiceLabel],
-    [playBtn,            voiceLabel],
-    [reverbChangeBtn,    reverbLabel],
-    [reverbTestBtn,      reverbLabel],
-    [trackChangeBtn,     trackLabel],
-    [musicToggleBtn,     trackLabel],
-    [musicTestBtn,       trackLabel],
-    [verbosityChangeBtn, verbosityLabel],
+    [switchBtn,            providerLabel],
+    [changeBtn,            voiceLabel],
+    [playBtn,              voiceLabel],
+    [reverbChangeBtn,      reverbLabel],
+    [reverbTestBtn,        reverbLabel],
+    [trackChangeBtn,       trackLabel],
+    [musicToggleBtn,       trackLabel],
+    [musicTestBtn,         trackLabel],
+    [verbosityChangeBtn,   verbosityLabel],
     [personalityChangeBtn, personalityLabel],
-    [introEditBtn,       introTextLabel],
-    [introClearBtn,      introTextLabel],
+    [introEditBtn,         introTextLabel],
+    [introClearBtn,        introTextLabel],
   ]);
 
-  // Sync _currentIdx + highlight row label on focus; restore on blur
+  const _buttonToValue = new Map([
+    [switchBtn,            providerValue],
+    [changeBtn,            voiceValue],
+    [playBtn,              voiceValue],
+    [reverbChangeBtn,      reverbValue],
+    [reverbTestBtn,        reverbValue],
+    [trackChangeBtn,       trackValue],
+    [musicToggleBtn,       trackValue],
+    [musicTestBtn,         trackValue],
+    [verbosityChangeBtn,   verbosityValue],
+    [personalityChangeBtn, personalityValue],
+    [introEditBtn,         introTextValue],
+    [introClearBtn,        introTextValue],
+  ]);
+
+  // Sync _currentIdx; highlight label (cyan) + value (bright blue + underline) on focus
   for (const [i, btn] of _buttons.entries()) {
     btn.on('focus', () => {
       _currentIdx = i;
       const lbl = _buttonToLabel.get(btn);
       if (lbl) lbl.style.fg = COLORS.btnFocus;
+      const val = _buttonToValue.get(btn);
+      if (val) { val.style.fg = COLORS.btnFocus; val.style.underline = true; }
     });
     btn.on('blur', () => {
       const lbl = _buttonToLabel.get(btn);
       if (lbl) lbl.style.fg = COLORS.labelFg;
+      const val = _buttonToValue.get(btn);
+      if (val) { val.style.fg = COLORS.valueFg; val.style.underline = false; }
     });
   }
 
@@ -1423,7 +1443,7 @@ function _openTrackPicker(screen, configService, onSelect) {
     tracks = files
       .filter(f => /\.mp3$/i.test(f))
       .sort()
-      .map(f => ({ file: f, label: formatTrackLabel(f) }));
+      .map(f => ({ file: f, label: formatTrackName(f) }));
   } catch {
     tracks = BUILT_IN_TRACKS;
   }
@@ -1632,7 +1652,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
       const isPrev   = t.id === _previewTrackId;
       const activeMark = isPrev ? '\u266A' : (isActive ? '\u25B6' : ' ');
       const favMark    = isFav ? '\u2605' : ' ';
-      return ` ${activeMark} ${favMark} ${t.label}`;
+      return ` ${activeMark} ${favMark} ${formatTrackName(t.id) || t.label}`;
     });
   }
 

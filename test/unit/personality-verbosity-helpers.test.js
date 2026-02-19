@@ -55,20 +55,20 @@ describe('formatPersonality', () => {
     assert.strictEqual(typeof formatPersonality, 'function');
   });
 
-  test('returns "none" for personality "none"', () => {
-    assert.strictEqual(formatPersonality('none'), 'none');
+  test('returns "None" for personality "none"', () => {
+    assert.strictEqual(formatPersonality('none'), 'None');
   });
 
-  test('returns "sarcastic" for personality "sarcastic"', () => {
-    assert.strictEqual(formatPersonality('sarcastic'), 'sarcastic');
+  test('title-cases "sarcastic" to "Sarcastic"', () => {
+    assert.strictEqual(formatPersonality('sarcastic'), 'Sarcastic');
   });
 
-  test('defaults to "none" for undefined', () => {
-    assert.strictEqual(formatPersonality(undefined), 'none');
+  test('defaults to "None" for undefined', () => {
+    assert.strictEqual(formatPersonality(undefined), 'None');
   });
 
-  test('returns "funny" for personality "funny"', () => {
-    assert.strictEqual(formatPersonality('funny'), 'funny');
+  test('title-cases "funny" to "Funny"', () => {
+    assert.strictEqual(formatPersonality('funny'), 'Funny');
   });
 });
 
