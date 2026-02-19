@@ -541,7 +541,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Provider row: label + value + [Switch] button
 
-  blessed.text({
+  const providerLabel = blessed.text({
     parent: box,
     top: 3,
     left: 6,
@@ -572,7 +572,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Voice row: label + value + [Change] button (stub for story 7-8)
 
-  blessed.text({
+  const voiceLabel = blessed.text({
     parent: box,
     top: 5,
     left: 6,
@@ -677,7 +677,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Reverb row: label + value + [Toggle] + [Adjust] buttons
 
-  blessed.text({
+  const reverbLabel = blessed.text({
     parent: box,
     top: 11,
     left: 6,
@@ -722,7 +722,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Music row (single): Track value + [Change] + [Enabled/Disabled] + [Test]
 
-  blessed.text({
+  const trackLabel = blessed.text({
     parent: box,
     top: 15,
     left: 6,
@@ -733,8 +733,8 @@ export function createSettingsTab(screen, services) {
   const trackValue = blessed.text({
     parent: box,
     top: 15,
-    left: 14,
-    width: 24,    // truncate before [Change] at left:40
+    left: 22,
+    width: 16,    // truncate before [Change] at left:40
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -774,7 +774,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Verbosity row: label + value + [Change] button
 
-  blessed.text({
+  const verbosityLabel = blessed.text({
     parent: box,
     top: 21,
     left: 6,
@@ -800,7 +800,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Personality row: label + value + [Change] button
 
-  blessed.text({
+  const personalityLabel = blessed.text({
     parent: box,
     top: 23,
     left: 6,
@@ -841,7 +841,7 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Intro Text row: label + value + [Edit] + [Clear] buttons
 
-  blessed.text({
+  const introTextLabel = blessed.text({
     parent: box,
     top: 29,
     left: 6,
@@ -920,9 +920,33 @@ export function createSettingsTab(screen, services) {
 
   let _currentIdx = 0;
 
-  // Sync _currentIdx on focus — keeps mouse clicks in sync with keyboard nav
+  // Map each button to its row label widget for focus-highlight
+  const _buttonToLabel = new Map([
+    [switchBtn,          providerLabel],
+    [changeBtn,          voiceLabel],
+    [playBtn,            voiceLabel],
+    [reverbChangeBtn,    reverbLabel],
+    [reverbTestBtn,      reverbLabel],
+    [trackChangeBtn,     trackLabel],
+    [musicToggleBtn,     trackLabel],
+    [musicTestBtn,       trackLabel],
+    [verbosityChangeBtn, verbosityLabel],
+    [personalityChangeBtn, personalityLabel],
+    [introEditBtn,       introTextLabel],
+    [introClearBtn,      introTextLabel],
+  ]);
+
+  // Sync _currentIdx + highlight row label on focus; restore on blur
   for (const [i, btn] of _buttons.entries()) {
-    btn.on('focus', () => { _currentIdx = i; });
+    btn.on('focus', () => {
+      _currentIdx = i;
+      const lbl = _buttonToLabel.get(btn);
+      if (lbl) lbl.style.fg = COLORS.btnFocus;
+    });
+    btn.on('blur', () => {
+      const lbl = _buttonToLabel.get(btn);
+      if (lbl) lbl.style.fg = COLORS.labelFg;
+    });
   }
 
   // Shared focus helper — suppresses intermediate renders, force-invalidates olines.

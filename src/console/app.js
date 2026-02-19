@@ -131,20 +131,34 @@ export class AgentVibesConsole {
       left: 0,
       width: '100%',
       height: 3,
-      tags: true,
+      tags: false,
       wrap: false,
       scrollable: false,
-      valign: 'middle',
-      padding: { left: 2 },
       style: { fg: COLORS.textWhite, bg: COLORS.headerBg },
     });
-    // Append FIRST so this.screen is set, then setContent so tags parse correctly.
-    // Use {bright-cyan-fg}/{bright-magenta-fg} — standard ANSI 36/35 are too dark
-    // against the navy background; bright variants (96/95) are clearly visible.
     this.screen.append(this.headerBox);
-    this.headerBox.setContent(
-      `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}4.0{/#ffd700-fg}  \u2502  \uD83D\uDCC1 working folder: ${cwd}`
-    );
+
+    // Row 0: main title — explicit child avoids valign:middle redraw artifacts
+    blessed.text({
+      parent: this.headerBox,
+      top: 0,
+      left: 2,
+      shrink: true,
+      tags: true,
+      content: `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}4.0{/#ffd700-fg}  \u2502  \uD83D\uDCC1 ${cwd}`,
+      style: { bg: COLORS.headerBg },
+    });
+
+    // Row 1: subtitle
+    blessed.text({
+      parent: this.headerBox,
+      top: 1,
+      left: 2,
+      shrink: true,
+      tags: true,
+      content: `{#546e7a-fg}Agent Vibes Customization Tool{/#546e7a-fg}`,
+      style: { bg: COLORS.headerBg },
+    });
 
     // Right-aligned git remote URL + branch (best-effort — silent if not in a git repo)
     try {
@@ -162,7 +176,7 @@ export class AgentVibesConsole {
         const displayUrl = repoUrl.replace(/^https?:\/\//, '');
         blessed.text({
           parent: this.headerBox,
-          top: 1,
+          top: 0,
           right: 2,
           shrink: true,
           tags: true,
