@@ -273,20 +273,21 @@ export function createInstallTab(screen, services) {
     if (providers.length === 0) providers.push('piper');  // fallback
     if (!_selectedProvider) _selectedProvider = providers[0];
 
+    // Pad items to 78 visible chars so they overwrite any stale cells from Screen 2.
     const items = providers.map(p =>
       p === _selectedProvider
-        ? `{bold}{${COLORS.valueFg}-fg} ● ${p}{/${COLORS.valueFg}-fg}{/bold}`
-        : `   ${p}`
+        ? `{bold}{${COLORS.valueFg}-fg} ● ${p.padEnd(74)}{/${COLORS.valueFg}-fg}{/bold}`
+        : `   ${p.padEnd(75)}`
     );
 
     contentBox.setContent(_c([
       _HDR('🎤', 'Provider Selection'),
       '',
-      `  {${COLORS.noticeFg}-fg}Available TTS providers:{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${'Available TTS providers:'.padEnd(76)}{/${COLORS.noticeFg}-fg}`,
       '',
       ...items.map(i => `  ${i}`),
       '',
-      `  {${COLORS.valueFg}-fg}[↑↓] Navigate  [Enter] Select & Continue{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.valueFg}-fg}${'[↑↓] Navigate  [Enter] Select & Continue'.padEnd(76)}{/${COLORS.valueFg}-fg}`,
     ]));
     hintLine.setContent('  Screen 3/5: Provider  |  [←] Back  |  [↑↓] Choose  |  [Enter] Select');
     screen.render();
