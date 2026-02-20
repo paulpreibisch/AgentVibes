@@ -668,6 +668,7 @@ export function createSettingsTab(screen, services) {
     top: 1,
     left: 0,
     right: 0,
+    wrap: false,
     content: `${'─'.repeat(R)}┼${'─'.repeat(200)}`,
     style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
   });
@@ -1108,6 +1109,7 @@ export function createSettingsTab(screen, services) {
     top: 8,
     left: R,
     right: 0,
+    wrap: false,
     content: `├${'─'.repeat(200)}`,
     style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
   });
@@ -1275,6 +1277,7 @@ export function createSettingsTab(screen, services) {
     top: 12,
     left: R,
     right: 0,
+    wrap: false,
     content: `├${'─'.repeat(200)}`,
     style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
   });
