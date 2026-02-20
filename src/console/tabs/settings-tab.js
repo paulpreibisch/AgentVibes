@@ -645,6 +645,20 @@ export function createSettingsTab(screen, services) {
     borderStyle: { fg: COLORS.borderFg },
   });
 
+  // Right column starts here — Audio Destination, Full Preview, and Config
+  // Storage widgets are positioned at left: R + offset in the right column.
+  const R = 62;
+
+  // Vertical column divider between left and right columns
+  blessed.box({
+    parent: box,
+    top: 0,
+    left: R - 1,
+    width: 1,
+    height: '100%',
+    style: { bg: COLORS.borderFg },
+  });
+
   // -------------------------------------------------------------------------
   // Section header: ── Provider & Voice ──
 
@@ -1046,12 +1060,12 @@ export function createSettingsTab(screen, services) {
   introClearBtn.left = 64;
 
   // -------------------------------------------------------------------------
-  // Section header: 🚀 Full Preview (top-anchored, just below audio destination)
+  // Section header: 🚀 Full Preview — RIGHT COLUMN row 8
 
   blessed.text({
     parent: box,
-    top: 39,
-    left: 2,
+    top: 8,
+    left: R + 2,
     width: '100%-6',
     content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
@@ -1060,16 +1074,16 @@ export function createSettingsTab(screen, services) {
 
   // Full Preview button — voice + reverb + background track combined
   const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
-  fullPreviewBtn.top = 41;
-  fullPreviewBtn.left = 52;
+  fullPreviewBtn.top = 10;
+  fullPreviewBtn.left = R + 4;
 
   // -------------------------------------------------------------------------
-  // Section header: 📡 Audio Destination
+  // Section header: 📡 Audio Destination — RIGHT COLUMN row 1
 
   blessed.text({
     parent: box,
-    top: 31,
-    left: 2,
+    top: 1,
+    left: R + 2,
     width: '100%-6',
     content: `{#7986cb-fg}📡  Audio Destination ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
@@ -1081,17 +1095,17 @@ export function createSettingsTab(screen, services) {
 
   const audioDstLabel = blessed.text({
     parent: box,
-    top: 33,
-    left: 6,
+    top: 3,
+    left: R + 4,
     content: 'Destination:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const audioDstValue = blessed.text({
     parent: box,
-    top: 33,
-    left: 22,
-    width: 26,
+    top: 3,
+    left: R + 18,
+    width: 20,
     wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1127,8 +1141,8 @@ export function createSettingsTab(screen, services) {
     }
     refreshDisplay();
   }, { bg: COLORS.btnChange });
-  audioDstChangeBtn.top = 33;
-  audioDstChangeBtn.left = 52;
+  audioDstChangeBtn.top = 3;
+  audioDstChangeBtn.left = R + 40;
 
   // -------------------------------------------------------------------------
   // SSH Alias row: label + value + [Edit] + [stream mode toggle] buttons
@@ -1136,8 +1150,8 @@ export function createSettingsTab(screen, services) {
 
   const audioSshLabel = blessed.text({
     parent: box,
-    top: 34,
-    left: 6,
+    top: 4,
+    left: R + 4,
     hidden: true,
     content: 'SSH Alias:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1145,9 +1159,9 @@ export function createSettingsTab(screen, services) {
 
   const audioSshValue = blessed.text({
     parent: box,
-    top: 34,
-    left: 22,
-    width: 26,
+    top: 4,
+    left: R + 18,
+    width: 20,
     wrap: false,
     hidden: true,
     content: '',  // populated by refreshDisplay()
@@ -1175,41 +1189,42 @@ export function createSettingsTab(screen, services) {
       });
     screen.render();
   }, { bg: COLORS.btnEdit });
-  audioSshEditBtn.top = 34;
-  audioSshEditBtn.left = 52;
+  audioSshEditBtn.top = 4;
+  audioSshEditBtn.left = R + 40;
   audioSshEditBtn.hide();
 
-  // Stream mode toggle: "Text Only" (recommended) or "Pulse Audio"
-  // Text Only = send TTS text to remote AgentVibes Receiver which speaks locally (no audio data transfer)
-  // Pulse Audio = stream audio file over SSH/PulseAudio tunnel
-  const audioStreamModeBtn = _createButton(box, screen, 'Text Only', COLORS, () => {
+  // Stream mode toggle — row 5, its own row for readability.
+  // Streaming Text Only = send TTS text to remote AgentVibes Receiver which speaks locally (no audio data transfer)
+  // Streaming Pulse Audio = stream audio file over SSH/PulseAudio tunnel
+  const audioStreamModeBtn = _createButton(box, screen, 'Streaming Text Only ✓', COLORS, () => {
     const current = configService.getConfig().audio_stream_mode ?? 'text';
     configService.set('audio_stream_mode', current === 'text' ? 'pulse' : 'text');
     refreshDisplay();
   }, { bg: '#2e7d32' });  // green = recommended
-  audioStreamModeBtn.top = 34;
-  audioStreamModeBtn.left = 64;
+  audioStreamModeBtn.top = 5;
+  audioStreamModeBtn.left = R + 40;
   audioStreamModeBtn.hide();
 
-  // Explanation note
+  // Explanation note — right column row 6
   blessed.text({
     parent: box,
-    top: 36,
-    left: 6,
+    top: 6,
+    left: R + 4,
     width: '100%-10',
     wrap: false,
     tags: true,
-    content: `{#546e7a-fg}Remote: sends TTS over SSH tunnel. Text Only = remote machine speaks (no audio transfer). Pulse Audio = streams audio.{/#546e7a-fg}`,
+    content: `{#546e7a-fg}Remote: sends TTS over SSH. Text Only = remote speaks (no audio transfer). Pulse = streams audio.{/#546e7a-fg}`,
     style: { bg: COLORS.contentBg },
   });
 
   // -------------------------------------------------------------------------
   // Section header: 💾 Config Storage
 
+  // Section header: 💾 Config Storage — RIGHT COLUMN row 12
   blessed.text({
     parent: box,
-    top: 44,
-    left: 2,
+    top: 12,
+    left: R + 2,
     width: '100%-6',
     content: `{#7986cb-fg}💾  Config Storage ${'─'.repeat(120)}{/#7986cb-fg}`,
     tags: true,
@@ -1219,17 +1234,17 @@ export function createSettingsTab(screen, services) {
   // Info row 1: global config path
   blessed.text({
     parent: box,
-    top: 46,
-    left: 6,
+    top: 14,
+    left: R + 4,
     content: 'Global:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const configGlobalValue = blessed.text({
     parent: box,
-    top: 46,
-    left: 22,
-    width: '100%-26',
+    top: 14,
+    left: R + 13,
+    width: '100%-78',
     wrap: false,
     content: '',  // populated by refreshConfigDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1238,23 +1253,23 @@ export function createSettingsTab(screen, services) {
   // Info row 2: local config path (or "None")
   blessed.text({
     parent: box,
-    top: 47,
-    left: 6,
+    top: 15,
+    left: R + 4,
     content: 'Local:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const configLocalValue = blessed.text({
     parent: box,
-    top: 47,
-    left: 22,
-    width: '100%-26',
+    top: 15,
+    left: R + 13,
+    width: '100%-78',
     wrap: false,
     content: '',  // populated by refreshConfigDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  // Action buttons row — aligned with the standard button column (left:52)
+  // Action buttons row — right column, row 17
   const saveGloballyBtn = _createButton(box, screen, 'Save Globally', COLORS, () => {
     const data = configService.getConfig();
     const path = configService.getGlobalConfigPath();
@@ -1263,8 +1278,8 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
     });
   }, { bg: '#7b1fa2' });   // purple
-  saveGloballyBtn.top = 50;
-  saveGloballyBtn.left = 52;
+  saveGloballyBtn.top = 17;
+  saveGloballyBtn.left = R + 4;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
     const data = configService.getConfig();
@@ -1274,8 +1289,8 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
     });
   }, { bg: '#2e7d32' });   // green
-  saveLocallyBtn.top = 50;
-  saveLocallyBtn.left = 70;   // 52+15(btn)+3(gap)
+  saveLocallyBtn.top = 17;
+  saveLocallyBtn.left = R + 21;   // R+4 + 15(btn) + 2(gap)
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
     // Restore global config to snapshot taken at tab open
@@ -1292,8 +1307,8 @@ export function createSettingsTab(screen, services) {
     refreshConfigDisplay();
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
-  cancelChangesBtn.top = 50;
-  cancelChangesBtn.left = 87;  // 70+14(btn)+3(gap)
+  cancelChangesBtn.top = 17;
+  cancelChangesBtn.left = R + 37;   // R+21 + 14(btn) + 2(gap)
 
   // -------------------------------------------------------------------------
   // Hint bar — keyboard shortcuts at the bottom of the settings area
@@ -1347,7 +1362,7 @@ export function createSettingsTab(screen, services) {
     [introClearBtn,        introTextLabel],
     [audioDstChangeBtn,    audioDstLabel],
     [audioSshEditBtn,      audioSshLabel],
-    [audioStreamModeBtn,   audioSshLabel],
+    [audioStreamModeBtn,   audioDstLabel],
   ]);
 
   const _buttonToValue = new Map([
@@ -1366,7 +1381,7 @@ export function createSettingsTab(screen, services) {
     [introClearBtn,        introTextValue],
     [audioDstChangeBtn,    audioDstValue],
     [audioSshEditBtn,      audioSshValue],
-    [audioStreamModeBtn,   audioSshValue],
+    [audioStreamModeBtn,   audioDstValue],
   ]);
 
   // Sync _currentIdx; highlight label (cyan) + value (bright blue + underline) on focus
@@ -1439,7 +1454,8 @@ export function createSettingsTab(screen, services) {
     [personalityChangeBtn],
     [introEditBtn, introClearBtn],
     [audioDstChangeBtn],
-    [audioSshEditBtn, audioStreamModeBtn],
+    [audioSshEditBtn],
+    [audioStreamModeBtn],
     [fullPreviewBtn],
     [saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
   ];
@@ -1491,7 +1507,7 @@ export function createSettingsTab(screen, services) {
       audioStreamModeBtn.show();
       audioSshValue.setContent(audioAlias || '(none)');
       const streamMode = cfg.audio_stream_mode ?? 'text';
-      audioStreamModeBtn.setContent(streamMode === 'pulse' ? 'Pulse Audio' : 'Text Only ✓');
+      audioStreamModeBtn.setContent(streamMode === 'pulse' ? 'Streaming Pulse Audio' : 'Streaming Text Only ✓');
       audioStreamModeBtn.style.bg = streamMode === 'text' ? '#2e7d32' : COLORS.btnChange;
     } else {
       audioSshLabel.hide();
