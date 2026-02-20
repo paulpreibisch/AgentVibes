@@ -189,6 +189,7 @@ export function createInstallTab(screen, services) {
     parent: box,
     bottom: 2,
     left: 2,
+    right: 2,   // explicit right bound — prevents blessed auto-shrink which leaves stale chars
     tags: true,
     content: '',
     style: { fg: COLORS.noticeFg, bg: COLORS.contentBg },
@@ -200,7 +201,7 @@ export function createInstallTab(screen, services) {
   // Screen renderers
 
   const _HDR = (emoji, label) =>
-    `{${COLORS.sectionHdr}-fg}${emoji}  ${label} ${'─'.repeat(60)}{/${COLORS.sectionHdr}-fg}`;
+    `{${COLORS.sectionHdr}-fg}${emoji}  ${label} ${'─'.repeat(100)}{/${COLORS.sectionHdr}-fg}`;
 
   function _renderScreen1() {
     contentBox.setContent(_c([
@@ -251,7 +252,7 @@ export function createInstallTab(screen, services) {
       _HDR('🔍', 'Dependency Check'),
       '',
       `  {${COLORS.noticeFg}-fg}${'Dependency'.padEnd(14)}Status{/${COLORS.noticeFg}-fg}`,
-      `  {${COLORS.noticeFg}-fg}${'──────────'.padEnd(14)}──────────────{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${'─'.repeat(78)}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.labelFg}-fg}${'Node.js'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.node    ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'npm'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.npm     ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Piper TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.piper   ? ok() : bad()}`,
