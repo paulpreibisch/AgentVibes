@@ -933,7 +933,7 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 21,
+    top: 19,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}🌈  Personality & Verbosity ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -946,7 +946,7 @@ export function createSettingsTab(screen, services) {
 
   const verbosityLabel = blessed.text({
     parent: box,
-    top: 23,
+    top: 21,
     left: 6,
     content: 'Verbosity:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -954,7 +954,7 @@ export function createSettingsTab(screen, services) {
 
   const verbosityValue = blessed.text({
     parent: box,
-    top: 23,
+    top: 21,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -965,7 +965,7 @@ export function createSettingsTab(screen, services) {
   const verbosityChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
     _openVerbosityPicker(screen, configService, () => refreshDisplay());
   }, { bg: COLORS.btnChange });
-  verbosityChangeBtn.top = 23;
+  verbosityChangeBtn.top = 21;
   verbosityChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
@@ -973,7 +973,7 @@ export function createSettingsTab(screen, services) {
 
   const personalityLabel = blessed.text({
     parent: box,
-    top: 25,
+    top: 23,
     left: 6,
     content: 'Personality:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -981,7 +981,7 @@ export function createSettingsTab(screen, services) {
 
   const personalityValue = blessed.text({
     parent: box,
-    top: 25,
+    top: 23,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -995,7 +995,7 @@ export function createSettingsTab(screen, services) {
       refreshDisplay();
     });
   }, { bg: COLORS.btnChange });
-  personalityChangeBtn.top = 25;
+  personalityChangeBtn.top = 23;
   personalityChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
@@ -1003,7 +1003,7 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 29,
+    top: 26,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}✍️  Intro Text ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1016,7 +1016,7 @@ export function createSettingsTab(screen, services) {
 
   const introTextLabel = blessed.text({
     parent: box,
-    top: 31,
+    top: 28,
     left: 6,
     content: 'Intro Text:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1024,7 +1024,7 @@ export function createSettingsTab(screen, services) {
 
   const introTextValue = blessed.text({
     parent: box,
-    top: 31,
+    top: 28,
     left: 22,
     width: 26,    // truncate before [Edit] at left:40
     wrap: false,
@@ -1035,14 +1035,14 @@ export function createSettingsTab(screen, services) {
   const introEditBtn = _createButton(box, screen, 'Edit', COLORS, () => {
     _openIntroTextEditor(screen, configService, () => { refreshDisplay(); });
   }, { bg: COLORS.btnEdit });
-  introEditBtn.top = 31;
+  introEditBtn.top = 28;
   introEditBtn.left = 52;
 
   const introClearBtn = _createButton(box, screen, 'Clear', COLORS, () => {
     configService.set('pretext', '');
     refreshDisplay();
   }, { bg: '#c62828' });
-  introClearBtn.top = 31;
+  introClearBtn.top = 28;
   introClearBtn.left = 64;
 
   // -------------------------------------------------------------------------
@@ -1050,7 +1050,7 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 43,
+    top: 39,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1060,7 +1060,7 @@ export function createSettingsTab(screen, services) {
 
   // Full Preview button — voice + reverb + background track combined
   const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
-  fullPreviewBtn.top = 45;
+  fullPreviewBtn.top = 41;
   fullPreviewBtn.left = 52;
 
   // -------------------------------------------------------------------------
@@ -1068,7 +1068,7 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 35,
+    top: 31,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}📡  Audio Destination ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1081,7 +1081,7 @@ export function createSettingsTab(screen, services) {
 
   const audioDstLabel = blessed.text({
     parent: box,
-    top: 37,
+    top: 33,
     left: 6,
     content: 'Destination:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1089,7 +1089,7 @@ export function createSettingsTab(screen, services) {
 
   const audioDstValue = blessed.text({
     parent: box,
-    top: 37,
+    top: 33,
     left: 22,
     width: 26,
     wrap: false,
@@ -1127,7 +1127,7 @@ export function createSettingsTab(screen, services) {
     }
     refreshDisplay();
   }, { bg: COLORS.btnChange });
-  audioDstChangeBtn.top = 37;
+  audioDstChangeBtn.top = 33;
   audioDstChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
@@ -1136,7 +1136,7 @@ export function createSettingsTab(screen, services) {
 
   const audioSshLabel = blessed.text({
     parent: box,
-    top: 38,
+    top: 34,
     left: 6,
     hidden: true,
     content: 'SSH Alias:',
@@ -1145,7 +1145,7 @@ export function createSettingsTab(screen, services) {
 
   const audioSshValue = blessed.text({
     parent: box,
-    top: 38,
+    top: 34,
     left: 22,
     width: 26,
     wrap: false,
@@ -1175,7 +1175,7 @@ export function createSettingsTab(screen, services) {
       });
     screen.render();
   }, { bg: COLORS.btnEdit });
-  audioSshEditBtn.top = 38;
+  audioSshEditBtn.top = 34;
   audioSshEditBtn.left = 52;
   audioSshEditBtn.hide();
 
@@ -1187,14 +1187,14 @@ export function createSettingsTab(screen, services) {
     configService.set('audio_stream_mode', current === 'text' ? 'pulse' : 'text');
     refreshDisplay();
   }, { bg: '#2e7d32' });  // green = recommended
-  audioStreamModeBtn.top = 38;
+  audioStreamModeBtn.top = 34;
   audioStreamModeBtn.left = 64;
   audioStreamModeBtn.hide();
 
   // Explanation note
   blessed.text({
     parent: box,
-    top: 40,
+    top: 36,
     left: 6,
     width: '100%-10',
     wrap: false,
@@ -1208,7 +1208,7 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 50,
+    top: 44,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}💾  Config Storage ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1219,7 +1219,7 @@ export function createSettingsTab(screen, services) {
   // Info row 1: global config path
   blessed.text({
     parent: box,
-    top: 52,
+    top: 46,
     left: 6,
     content: 'Global:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1227,7 +1227,7 @@ export function createSettingsTab(screen, services) {
 
   const configGlobalValue = blessed.text({
     parent: box,
-    top: 52,
+    top: 46,
     left: 22,
     width: '100%-26',
     wrap: false,
@@ -1238,7 +1238,7 @@ export function createSettingsTab(screen, services) {
   // Info row 2: local config path (or "None")
   blessed.text({
     parent: box,
-    top: 53,
+    top: 47,
     left: 6,
     content: 'Local:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1246,7 +1246,7 @@ export function createSettingsTab(screen, services) {
 
   const configLocalValue = blessed.text({
     parent: box,
-    top: 53,
+    top: 47,
     left: 22,
     width: '100%-26',
     wrap: false,
@@ -1263,7 +1263,7 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
     });
   }, { bg: '#7b1fa2' });   // purple
-  saveGloballyBtn.top = 56;
+  saveGloballyBtn.top = 50;
   saveGloballyBtn.left = 52;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
@@ -1274,7 +1274,7 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
     });
   }, { bg: '#2e7d32' });   // green
-  saveLocallyBtn.top = 56;
+  saveLocallyBtn.top = 50;
   saveLocallyBtn.left = 70;   // 52+15(btn)+3(gap)
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
@@ -1292,7 +1292,7 @@ export function createSettingsTab(screen, services) {
     refreshConfigDisplay();
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
-  cancelChangesBtn.top = 56;
+  cancelChangesBtn.top = 50;
   cancelChangesBtn.left = 87;  // 70+14(btn)+3(gap)
 
   // -------------------------------------------------------------------------
