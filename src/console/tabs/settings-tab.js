@@ -1046,11 +1046,11 @@ export function createSettingsTab(screen, services) {
   introClearBtn.left = 64;
 
   // -------------------------------------------------------------------------
-  // Section header: 🚀 Full Preview (top-anchored, just below intro text)
+  // Section header: 🚀 Full Preview (top-anchored, just below audio destination)
 
   blessed.text({
     parent: box,
-    top: 35,
+    top: 43,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1060,7 +1060,7 @@ export function createSettingsTab(screen, services) {
 
   // Full Preview button — voice + reverb + background track combined
   const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
-  fullPreviewBtn.top = 37;
+  fullPreviewBtn.top = 45;
   fullPreviewBtn.left = 52;
 
   // -------------------------------------------------------------------------
@@ -1068,7 +1068,7 @@ export function createSettingsTab(screen, services) {
 
   blessed.text({
     parent: box,
-    top: 40,
+    top: 35,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}📡  Audio Destination ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1081,7 +1081,7 @@ export function createSettingsTab(screen, services) {
 
   const audioDstLabel = blessed.text({
     parent: box,
-    top: 42,
+    top: 37,
     left: 6,
     content: 'Destination:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1089,7 +1089,7 @@ export function createSettingsTab(screen, services) {
 
   const audioDstValue = blessed.text({
     parent: box,
-    top: 42,
+    top: 37,
     left: 22,
     width: 26,
     wrap: false,
@@ -1127,26 +1127,29 @@ export function createSettingsTab(screen, services) {
     }
     refreshDisplay();
   }, { bg: COLORS.btnChange });
-  audioDstChangeBtn.top = 42;
+  audioDstChangeBtn.top = 37;
   audioDstChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
-  // SSH Alias row: label + value + [Edit] button
+  // SSH Alias row: label + value + [Edit] + [stream mode toggle] buttons
+  // Hidden when destination is Local — shown/hidden by refreshDisplay()
 
   const audioSshLabel = blessed.text({
     parent: box,
-    top: 43,
+    top: 38,
     left: 6,
+    hidden: true,
     content: 'SSH Alias:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const audioSshValue = blessed.text({
     parent: box,
-    top: 43,
+    top: 38,
     left: 22,
     width: 26,
     wrap: false,
+    hidden: true,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
@@ -1172,18 +1175,31 @@ export function createSettingsTab(screen, services) {
       });
     screen.render();
   }, { bg: COLORS.btnEdit });
-  audioSshEditBtn.top = 43;
+  audioSshEditBtn.top = 38;
   audioSshEditBtn.left = 52;
+  audioSshEditBtn.hide();
+
+  // Stream mode toggle: "Text Only" (recommended) or "Pulse Audio"
+  // Text Only = send TTS text to remote AgentVibes Receiver which speaks locally (no audio data transfer)
+  // Pulse Audio = stream audio file over SSH/PulseAudio tunnel
+  const audioStreamModeBtn = _createButton(box, screen, 'Text Only', COLORS, () => {
+    const current = configService.getConfig().audio_stream_mode ?? 'text';
+    configService.set('audio_stream_mode', current === 'text' ? 'pulse' : 'text');
+    refreshDisplay();
+  }, { bg: '#2e7d32' });  // green = recommended
+  audioStreamModeBtn.top = 38;
+  audioStreamModeBtn.left = 64;
+  audioStreamModeBtn.hide();
 
   // Explanation note
   blessed.text({
     parent: box,
-    top: 45,
+    top: 40,
     left: 6,
     width: '100%-10',
     wrap: false,
     tags: true,
-    content: `{#546e7a-fg}Use Remote to send TTS audio over SSH/PulseAudio tunnel to a machine with speakers.{/#546e7a-fg}`,
+    content: `{#546e7a-fg}Remote: sends TTS over SSH tunnel. Text Only = remote machine speaks (no audio transfer). Pulse Audio = streams audio.{/#546e7a-fg}`,
     style: { bg: COLORS.contentBg },
   });
 
@@ -1302,7 +1318,7 @@ export function createSettingsTab(screen, services) {
     volumeChangeBtn,
     verbosityChangeBtn, personalityChangeBtn,
     introEditBtn, introClearBtn,
-    audioDstChangeBtn, audioSshEditBtn,
+    audioDstChangeBtn, audioSshEditBtn, audioStreamModeBtn,
     fullPreviewBtn,
     saveGloballyBtn, saveLocallyBtn, cancelChangesBtn,
   ];
@@ -1331,6 +1347,7 @@ export function createSettingsTab(screen, services) {
     [introClearBtn,        introTextLabel],
     [audioDstChangeBtn,    audioDstLabel],
     [audioSshEditBtn,      audioSshLabel],
+    [audioStreamModeBtn,   audioSshLabel],
   ]);
 
   const _buttonToValue = new Map([
@@ -1349,6 +1366,7 @@ export function createSettingsTab(screen, services) {
     [introClearBtn,        introTextValue],
     [audioDstChangeBtn,    audioDstValue],
     [audioSshEditBtn,      audioSshValue],
+    [audioStreamModeBtn,   audioSshValue],
   ]);
 
   // Sync _currentIdx; highlight label (cyan) + value (bright blue + underline) on focus
@@ -1394,7 +1412,12 @@ export function createSettingsTab(screen, services) {
     const focused = _buttons[_currentIdx];
     let rowIdx = _rows.findIndex(row => row.includes(focused));
     if (rowIdx === -1) rowIdx = 0;
-    rowIdx = (rowIdx + delta + _rows.length) % _rows.length;
+    // Skip rows whose first button is hidden (e.g. SSH alias row when destination is local)
+    let attempts = 0;
+    do {
+      rowIdx = (rowIdx + delta + _rows.length) % _rows.length;
+      attempts++;
+    } while (_rows[rowIdx][0].hidden && attempts < _rows.length);
     const btn = _rows[rowIdx][0];
     _currentIdx = _buttons.indexOf(btn);
     _focusButton(btn);
@@ -1416,7 +1439,7 @@ export function createSettingsTab(screen, services) {
     [personalityChangeBtn],
     [introEditBtn, introClearBtn],
     [audioDstChangeBtn],
-    [audioSshEditBtn],
+    [audioSshEditBtn, audioStreamModeBtn],
     [fullPreviewBtn],
     [saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
   ];
@@ -1460,12 +1483,22 @@ export function createSettingsTab(screen, services) {
     const audioDst   = cfg.audio_destination ?? 'local';
     const audioAlias = cfg.audio_ssh_alias ?? '';
     audioDstValue.setContent(formatAudioDst(audioDst, audioAlias));
-    audioSshValue.setContent(audioAlias || '(none)');
-    // Dim SSH Alias row when destination is local
-    const sshDim = audioDst !== 'remote';
-    audioSshLabel.style.fg = sshDim ? COLORS.noticeFg : COLORS.labelFg;
-    audioSshValue.style.fg = sshDim ? COLORS.noticeFg : COLORS.valueFg;
-    audioSshEditBtn.style.bg = sshDim ? COLORS.btnDefault : COLORS.btnEdit;
+    // Show/hide SSH Alias row and stream mode toggle based on destination
+    if (audioDst === 'remote') {
+      audioSshLabel.show();
+      audioSshValue.show();
+      audioSshEditBtn.show();
+      audioStreamModeBtn.show();
+      audioSshValue.setContent(audioAlias || '(none)');
+      const streamMode = cfg.audio_stream_mode ?? 'text';
+      audioStreamModeBtn.setContent(streamMode === 'pulse' ? 'Pulse Audio' : 'Text Only ✓');
+      audioStreamModeBtn.style.bg = streamMode === 'text' ? '#2e7d32' : COLORS.btnChange;
+    } else {
+      audioSshLabel.hide();
+      audioSshValue.hide();
+      audioSshEditBtn.hide();
+      audioStreamModeBtn.hide();
+    }
 
     screen.render();
   }
