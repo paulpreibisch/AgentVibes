@@ -44,13 +44,7 @@ export LC_ALL=C
 
 # Get script directory for accessing other scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Respect CLAUDE_PROJECT_DIR when set by MCP (project context vs global installation)
-if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
-  CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
-else
-  CLAUDE_DIR="$(dirname "$SCRIPT_DIR")"
-fi
+CLAUDE_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Config file locations
 VERBOSITY_FILE="$CLAUDE_DIR/tts-verbosity.txt"
@@ -59,10 +53,10 @@ GLOBAL_VERBOSITY_FILE="$HOME/.claude/tts-verbosity.txt"
 #
 # @function get_verbosity
 # @context Returns the current verbosity level (low/medium/high)
-# @architecture Checks project-local first, then global, then defaults to "high"
+# @architecture Checks project-local first, then global, then defaults to "low"
 # @dependencies tts-verbosity.txt config file
 # @entrypoints Called by session-start hook, MCP tools, slash commands
-# @aiNotes Default to "high" to match installer default for new installations
+# @aiNotes Default to "low" for backward compatibility with existing installations
 #
 get_verbosity() {
   if [[ -f "$VERBOSITY_FILE" ]]; then
@@ -70,7 +64,7 @@ get_verbosity() {
   elif [[ -f "$GLOBAL_VERBOSITY_FILE" ]]; then
     cat "$GLOBAL_VERBOSITY_FILE"
   else
-    echo "high"
+    echo "low"
   fi
 }
 

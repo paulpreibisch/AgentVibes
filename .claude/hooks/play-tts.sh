@@ -39,41 +39,15 @@
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
 # @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
 #
-# **CRITICAL: This script MUST ALWAYS be called with `run_in_background: true` in Bash tool**
-# Do NOT wait for TTS playback to complete. Run in background so other tasks continue immediately.
-# Example: Bash (background): .claude/hooks/play-tts.sh "Acknowledging task start"
-#
 
 set -euo pipefail
 
 # Fix locale warnings
 export LC_ALL=C
 
-# Get script directory - handle symlinks correctly with readlink -f
-# This resolves: symlinks, relative paths, and working directory changes
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-
-# Find PROJECT_ROOT by searching up the directory tree for .claude/hooks
-# This handles non-standard installations and directory structures
-PROJECT_ROOT="$SCRIPT_DIR"
-while [[ "$PROJECT_ROOT" != "/" ]]; do
-  if [[ -d "$PROJECT_ROOT/.claude/hooks" ]]; then
-    # Found the .claude/hooks directory - PROJECT_ROOT is 2 levels up from hooks
-    PROJECT_ROOT="$(dirname "$(dirname "$PROJECT_ROOT")")"
-    break
-  fi
-  PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
-done
-
-# Verify PROJECT_ROOT is valid
-if [[ ! -d "$PROJECT_ROOT/.claude/hooks" ]]; then
-  echo "❌ ERROR: Could not find AgentVibes .claude/hooks directory" >&2
-  echo "   Script path: $SCRIPT_PATH" >&2
-  echo "   Searched up from: $SCRIPT_DIR" >&2
-  exit 1
-fi
-
+# Get script directory (needed for mute file check)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export PROJECT_ROOT  # Export for child scripts
 
 # Check if muted (persists across sessions)
@@ -126,60 +100,6 @@ TEXT="${TEXT//\\?/?}"        # Remove \?
 TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 TEXT="${TEXT//\\\\/\\}"      # Remove \\ (escaped backslash)
-
-# @function read_pretext_from_json
-# @intent Read pretext string from agentvibes.json config
-# @security Validates file ownership before reading (prevents symlink attacks)
-# @param $1 path to agentvibes.json
-read_pretext_from_json() {
-  local config_file="$1"
-  [[ -f "$config_file" ]] || return 0
-  # SECURITY: Only read files owned by the current user
-  local file_uid
-  file_uid=$(stat -c '%u' "$config_file" 2>/dev/null || stat -f '%u' "$config_file" 2>/dev/null || echo "")
-  [[ "$file_uid" == "$(id -u)" ]] || return 0
-  if command -v jq &>/dev/null; then
-    jq -r '.pretext // empty' "$config_file" 2>/dev/null || true
-  else
-    # Fallback: grep extraction when jq unavailable
-    grep -o '"pretext"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null \
-      | sed 's/.*"pretext"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | head -1 || true
-  fi
-}
-
-# Apply pretext to TEXT if configured
-# Priority: project .agentvibes/config/agentvibes.json > .claude/config/tts-pretext.txt > global ~/.agentvibes/config/agentvibes.json
-# AI agents can bypass by manually prepending their own text (text already starts with pretext value)
-PRETEXT=""
-
-# 1. Project-level JSON config (written by /agent-vibes:set-pretext)
-PRETEXT=$(read_pretext_from_json "$PROJECT_ROOT/.agentvibes/config/agentvibes.json")
-
-# 2. Project plain-text file (simpler alternative, also used by tests)
-if [[ -z "$PRETEXT" ]]; then
-  PRETEXT_TXT="$PROJECT_ROOT/.claude/config/tts-pretext.txt"
-  if [[ -f "$PRETEXT_TXT" ]]; then
-    TXT_UID=$(stat -c '%u' "$PRETEXT_TXT" 2>/dev/null || stat -f '%u' "$PRETEXT_TXT" 2>/dev/null || echo "")
-    if [[ "$TXT_UID" == "$(id -u)" ]]; then
-      PRETEXT=$(tr -d '\n\r' < "$PRETEXT_TXT")
-    fi
-  fi
-fi
-
-# 3. Global user config fallback
-if [[ -z "$PRETEXT" ]]; then
-  PRETEXT=$(read_pretext_from_json "$HOME/.agentvibes/config/agentvibes.json")
-fi
-
-# Prepend pretext to TEXT if found and not already present
-if [[ -n "$PRETEXT" ]]; then
-  # SECURITY: Strip newlines and cap length to prevent TTS injection via config file
-  PRETEXT=$(printf '%s' "$PRETEXT" | tr -d '\n\r' | cut -c1-50)
-  # Don't double-prepend if the message already starts with the pretext
-  if [[ "$TEXT" != "$PRETEXT"* ]]; then
-    TEXT="${PRETEXT}: ${TEXT}"
-  fi
-fi
 
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
@@ -236,9 +156,6 @@ speak_text() {
       ;;
     termux-ssh)
       "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
-      ;;
-    agentvibes-receiver-for-voiceless-connections)
-      "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
       ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
@@ -361,9 +278,6 @@ case "$ACTIVE_PROVIDER" in
     ;;
   termux-ssh)
     exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
-    ;;
-  agentvibes-receiver-for-voiceless-connections)
-    exec "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER"

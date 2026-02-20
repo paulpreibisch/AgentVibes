@@ -9,6 +9,8 @@
 
 import blessed from 'blessed';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { NavigationService, TAB_ORDER } from '../services/navigation-service.js';
 import { setupNavigation } from './navigation.js';
@@ -25,6 +27,10 @@ import { createHelpTab } from './tabs/help-tab.js';
 import { createReadmeTab } from './tabs/readme-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
+
+const _dir = path.dirname(fileURLToPath(import.meta.url));
+const _pkg = JSON.parse(readFileSync(path.join(_dir, '../../package.json'), 'utf8'));
+const APP_VERSION = _pkg.version;
 
 // Brand colours — consistent with UX design plan and architecture.md
 const COLORS = {
@@ -98,7 +104,7 @@ export class AgentVibesConsole {
       smartCSR: true,
       mouse: true,
       fullUnicode: true,
-      title: 'AgentVibes v4.0 TUI Console',
+      title: `AgentVibes v${APP_VERSION} TUI Console`,
     };
 
     // When AGENTVIBES_TEST_MODE is set, use a lightweight stub instead of a
@@ -145,7 +151,7 @@ export class AgentVibesConsole {
       left: 2,
       shrink: true,
       tags: true,
-      content: `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}4.0{/#ffd700-fg}  \u2502  \uD83D\uDCC1 ${cwd}`,
+      content: `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}${APP_VERSION}{/#ffd700-fg}  \u2502  \uD83D\uDCC1 ${cwd}`,
       style: { bg: COLORS.headerBg },
     });
 
@@ -350,7 +356,7 @@ export class AgentVibesConsole {
       width: '100%',
       height: 1,
       tags: true,
-      content: `  ${badges}  {right}⭐ github.com/preibisch/agentvibes  {/right}`,
+      content: `  ${badges}  {right}{#ffd700-fg}⭐ Love AgentVibes? Give us a star!{/#ffd700-fg}  github.com/preibisch/agentvibes  {/right}`,
       style: {
         fg: COLORS.textWhite,
         bg: COLORS.headerBg,
@@ -453,13 +459,15 @@ export class AgentVibesConsole {
         // `lines` and bleeds through whenever cells aren't fully overwritten.
         this.screen.clearRegion(0, this.screen.cols, 2, this.screen.rows - 2);
 
-        // Force-invalidate olines from the header's last row (2) through the
-        // content area. Row 2 (header bottom) and row 3 (tab bar) accumulate
+        // Force-invalidate olines for the entire visible area (rows 0..rows-3).
+        // Includes header rows 0-1 so the branded header is always redrawn on
+        // tab switches — prevents corruption from persisting across tabs.
+        // Row 2 (header bottom), row 3 (tab bar) and content rows accumulate
         // ghost rendering artifacts — draw() skips them when lines==olines even
         // though the terminal still shows stale chars from earlier renders.
         // Setting attr=-1 is impossible for any real cell, so draw() is forced
         // to physically rewrite every cell on the next render call.
-        for (let r = 2; r < this.screen.rows - 2; r++) {
+        for (let r = 0; r < this.screen.rows - 2; r++) {
           const orow = this.screen.olines[r];
           if (!orow) continue;
           for (let c = 0; c < this.screen.cols; c++) {
