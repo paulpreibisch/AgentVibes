@@ -640,34 +640,42 @@ export function createSettingsTab(screen, services) {
     width: '100%',
     bottom: 2,    // Above context footer + GitHub footer
     hidden: true,
-    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: COLORS.borderFg } },
     border: { type: 'line' },
-    borderStyle: { fg: COLORS.borderFg },
   });
 
   // Right column starts here — Audio Destination, Full Preview, and Config
   // Storage widgets are positioned at left: R + offset in the right column.
-  const R = 62;
+  const R = 90;
 
-  // Vertical column divider between left and right columns
+  // Vertical column divider — draws │ chars; section separators overlay ┼/┤/├ at intersections
   blessed.box({
     parent: box,
     top: 0,
-    left: R - 1,
+    left: R,
     width: 1,
     height: '100%',
-    style: { bg: COLORS.borderFg },
+    content: Array(50).fill('│').join('\n'),
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
   });
 
   // -------------------------------------------------------------------------
   // Section header: ── Provider & Voice ──
 
+  // Full-width separator at row 1 — both columns start here, ┼ at column divider
   blessed.text({
     parent: box,
     top: 1,
-    left: 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}🎤  Provider & Voice ${'─'.repeat(120)}{/#7986cb-fg}`,
+    left: 0,
+    right: 0,
+    content: `${'─'.repeat(R)}┼${'─'.repeat(200)}`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
+  blessed.text({
+    parent: box,
+    top: 1,
+    left: 1,
+    content: '{#7986cb-fg} 🎤 Provider & Voice {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -804,12 +812,20 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header: ── Audio Effects ──
 
+  // Left-column separator at row 9 — ends at column divider with ┤
   blessed.text({
     parent: box,
     top: 9,
-    left: 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}⚡  Audio Effects ${'─'.repeat(120)}{/#7986cb-fg}`,
+    left: 0,
+    width: R + 1,
+    content: `${'─'.repeat(R)}┤`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
+  blessed.text({
+    parent: box,
+    top: 9,
+    left: 1,
+    content: '{#7986cb-fg} ⚡ Audio Effects {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -851,12 +867,20 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header: ── Background Music ──
 
+  // Left-column separator at row 13 — ends at column divider with ┤
   blessed.text({
     parent: box,
     top: 13,
-    left: 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}🎸  Background Music ${'─'.repeat(120)}{/#7986cb-fg}`,
+    left: 0,
+    width: R + 1,
+    content: `${'─'.repeat(R)}┤`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
+  blessed.text({
+    parent: box,
+    top: 13,
+    left: 1,
+    content: '{#7986cb-fg} 🎸 Background Music {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -945,12 +969,20 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header: ── Personality & Verbosity ──
 
+  // Left-column separator at row 19 — ends at column divider with ┤
   blessed.text({
     parent: box,
     top: 19,
-    left: 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}🌈  Personality & Verbosity ${'─'.repeat(120)}{/#7986cb-fg}`,
+    left: 0,
+    width: R + 1,
+    content: `${'─'.repeat(R)}┤`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
+  blessed.text({
+    parent: box,
+    top: 19,
+    left: 1,
+    content: '{#7986cb-fg} 🌈 Personality & Verbosity {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1015,12 +1047,20 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header: ── Intro Text ──
 
+  // Left-column separator at row 26 — ends at column divider with ┤
   blessed.text({
     parent: box,
     top: 26,
-    left: 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}✍️  Intro Text ${'─'.repeat(120)}{/#7986cb-fg}`,
+    left: 0,
+    width: R + 1,
+    content: `${'─'.repeat(R)}┤`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
+  blessed.text({
+    parent: box,
+    top: 26,
+    left: 1,
+    content: '{#7986cb-fg} ✍️ Intro Text {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1062,12 +1102,20 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header: 🚀 Full Preview — RIGHT COLUMN row 8
 
+  // Right-column separator at row 8 — starts from column divider with ├
+  blessed.text({
+    parent: box,
+    top: 8,
+    left: R,
+    right: 0,
+    content: `├${'─'.repeat(200)}`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
   blessed.text({
     parent: box,
     top: 8,
     left: R + 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}🚀  Full Preview ${'─'.repeat(120)}{/#7986cb-fg}`,
+    content: '{#7986cb-fg} 🚀 Full Preview {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1075,17 +1123,17 @@ export function createSettingsTab(screen, services) {
   // Full Preview button — voice + reverb + background track combined
   const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
   fullPreviewBtn.top = 10;
-  fullPreviewBtn.left = R + 4;
+  fullPreviewBtn.left = R + 2;
 
   // -------------------------------------------------------------------------
   // Section header: 📡 Audio Destination — RIGHT COLUMN row 1
 
+  // Right column title at row 1 — rule already drawn by the full-width separator above
   blessed.text({
     parent: box,
     top: 1,
     left: R + 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}📡  Audio Destination ${'─'.repeat(120)}{/#7986cb-fg}`,
+    content: '{#7986cb-fg} 📡 Audio Destination {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1096,7 +1144,7 @@ export function createSettingsTab(screen, services) {
   const audioDstLabel = blessed.text({
     parent: box,
     top: 3,
-    left: R + 4,
+    left: R + 2,
     content: 'Destination:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -1104,8 +1152,8 @@ export function createSettingsTab(screen, services) {
   const audioDstValue = blessed.text({
     parent: box,
     top: 3,
-    left: R + 18,
-    width: 20,
+    left: R + 15,
+    width: 13,
     wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1142,7 +1190,7 @@ export function createSettingsTab(screen, services) {
     refreshDisplay();
   }, { bg: COLORS.btnChange });
   audioDstChangeBtn.top = 3;
-  audioDstChangeBtn.left = R + 40;
+  audioDstChangeBtn.left = R + 30;
 
   // -------------------------------------------------------------------------
   // SSH Alias row: label + value + [Edit] + [stream mode toggle] buttons
@@ -1151,7 +1199,7 @@ export function createSettingsTab(screen, services) {
   const audioSshLabel = blessed.text({
     parent: box,
     top: 4,
-    left: R + 4,
+    left: R + 2,
     hidden: true,
     content: 'SSH Alias:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1160,8 +1208,8 @@ export function createSettingsTab(screen, services) {
   const audioSshValue = blessed.text({
     parent: box,
     top: 4,
-    left: R + 18,
-    width: 20,
+    left: R + 15,
+    width: 13,
     wrap: false,
     hidden: true,
     content: '',  // populated by refreshDisplay()
@@ -1190,7 +1238,7 @@ export function createSettingsTab(screen, services) {
     screen.render();
   }, { bg: COLORS.btnEdit });
   audioSshEditBtn.top = 4;
-  audioSshEditBtn.left = R + 40;
+  audioSshEditBtn.left = R + 30;
   audioSshEditBtn.hide();
 
   // Stream mode toggle — row 5, its own row for readability.
@@ -1202,15 +1250,15 @@ export function createSettingsTab(screen, services) {
     refreshDisplay();
   }, { bg: '#2e7d32' });  // green = recommended
   audioStreamModeBtn.top = 5;
-  audioStreamModeBtn.left = R + 40;
+  audioStreamModeBtn.left = R + 2;
   audioStreamModeBtn.hide();
 
   // Explanation note — right column row 6
   blessed.text({
     parent: box,
     top: 6,
-    left: R + 4,
-    width: '100%-10',
+    left: R + 2,
+    width: '100%-94',
     wrap: false,
     tags: true,
     content: `{#546e7a-fg}Remote: sends TTS over SSH. Text Only = remote speaks (no audio transfer). Pulse = streams audio.{/#546e7a-fg}`,
@@ -1221,12 +1269,20 @@ export function createSettingsTab(screen, services) {
   // Section header: 💾 Config Storage
 
   // Section header: 💾 Config Storage — RIGHT COLUMN row 12
+  // Right-column separator at row 12 — starts from column divider with ├
+  blessed.text({
+    parent: box,
+    top: 12,
+    left: R,
+    right: 0,
+    content: `├${'─'.repeat(200)}`,
+    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
+  });
   blessed.text({
     parent: box,
     top: 12,
     left: R + 2,
-    width: '100%-6',
-    content: `{#7986cb-fg}💾  Config Storage ${'─'.repeat(120)}{/#7986cb-fg}`,
+    content: '{#7986cb-fg} 💾 Config Storage {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1235,7 +1291,7 @@ export function createSettingsTab(screen, services) {
   blessed.text({
     parent: box,
     top: 14,
-    left: R + 4,
+    left: R + 2,
     content: 'Global:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -1243,8 +1299,8 @@ export function createSettingsTab(screen, services) {
   const configGlobalValue = blessed.text({
     parent: box,
     top: 14,
-    left: R + 13,
-    width: '100%-78',
+    left: R + 10,
+    width: '100%-102',
     wrap: false,
     content: '',  // populated by refreshConfigDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1254,7 +1310,7 @@ export function createSettingsTab(screen, services) {
   blessed.text({
     parent: box,
     top: 15,
-    left: R + 4,
+    left: R + 2,
     content: 'Local:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -1262,8 +1318,8 @@ export function createSettingsTab(screen, services) {
   const configLocalValue = blessed.text({
     parent: box,
     top: 15,
-    left: R + 13,
-    width: '100%-78',
+    left: R + 10,
+    width: '100%-102',
     wrap: false,
     content: '',  // populated by refreshConfigDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1279,7 +1335,7 @@ export function createSettingsTab(screen, services) {
     });
   }, { bg: '#7b1fa2' });   // purple
   saveGloballyBtn.top = 17;
-  saveGloballyBtn.left = R + 4;
+  saveGloballyBtn.left = R + 2;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
     const data = configService.getConfig();
@@ -1290,7 +1346,7 @@ export function createSettingsTab(screen, services) {
     });
   }, { bg: '#2e7d32' });   // green
   saveLocallyBtn.top = 17;
-  saveLocallyBtn.left = R + 21;   // R+4 + 15(btn) + 2(gap)
+  saveLocallyBtn.left = R + 19;   // R+2 + 15(btn) + 2(gap)
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
     // Restore global config to snapshot taken at tab open
@@ -1307,8 +1363,8 @@ export function createSettingsTab(screen, services) {
     refreshConfigDisplay();
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
-  cancelChangesBtn.top = 17;
-  cancelChangesBtn.left = R + 37;   // R+21 + 14(btn) + 2(gap)
+  cancelChangesBtn.top = 18;
+  cancelChangesBtn.left = R + 2;   // own row below save buttons
 
   // -------------------------------------------------------------------------
   // Hint bar — keyboard shortcuts at the bottom of the settings area
@@ -1457,7 +1513,8 @@ export function createSettingsTab(screen, services) {
     [audioSshEditBtn],
     [audioStreamModeBtn],
     [fullPreviewBtn],
-    [saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
+    [saveGloballyBtn, saveLocallyBtn],
+    [cancelChangesBtn],
   ];
 
   for (const row of _rows) {
