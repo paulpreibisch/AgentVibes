@@ -608,6 +608,29 @@ export function createSettingsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // Audio destination helpers
+
+  function _detectSshAliases() {
+    try {
+      const sshConfigPath = path.join(os.homedir(), '.ssh', 'config');
+      const raw = fs.readFileSync(sshConfigPath, 'utf8');
+      const aliases = [];
+      for (const line of raw.split('\n')) {
+        const m = line.match(/^Host\s+(\S+)/i);
+        if (m && !m[1].includes('*') && !m[1].includes('?')) aliases.push(m[1]);
+      }
+      return aliases;
+    } catch {
+      return [];
+    }
+  }
+
+  function formatAudioDst(dst, alias) {
+    if (dst === 'remote') return `Remote → ${alias || '(no alias set)'}`;
+    return 'Local Speakers';
+  }
+
+  // -------------------------------------------------------------------------
   // Container box — fills content area, hidden until activated
 
   const box = blessed.box({
@@ -1041,11 +1064,135 @@ export function createSettingsTab(screen, services) {
   fullPreviewBtn.left = 52;
 
   // -------------------------------------------------------------------------
-  // Section header: 💾 Config Storage
+  // Section header: 📡 Audio Destination
 
   blessed.text({
     parent: box,
     top: 40,
+    left: 2,
+    width: '100%-6',
+    content: `{#7986cb-fg}📡  Audio Destination ${'─'.repeat(120)}{/#7986cb-fg}`,
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Destination row: label + value + [Change] button
+
+  const audioDstLabel = blessed.text({
+    parent: box,
+    top: 42,
+    left: 6,
+    content: 'Destination:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const audioDstValue = blessed.text({
+    parent: box,
+    top: 42,
+    left: 22,
+    width: 26,
+    wrap: false,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const audioDstChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
+    const aliases = _detectSshAliases();
+    const current = configService.getConfig().audio_destination ?? 'local';
+    const choices = ['local', 'remote'];
+    const nextIdx = (choices.indexOf(current) + 1) % choices.length;
+    const next = choices[nextIdx];
+    configService.set('audio_destination', next);
+    if (next === 'remote' && !(configService.getConfig().audio_ssh_alias)) {
+      // Prompt for alias immediately if switching to remote with no alias set
+      const detectedAliases = aliases.length > 0 ? ` (detected: ${aliases.join(', ')})` : '';
+      const prompt = blessed.prompt({
+        parent: screen,
+        top: 'center', left: 'center',
+        height: 'shrink', width: '60%',
+        border: 'line', tags: true,
+        style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: COLORS.sectionHdr } },
+      });
+      prompt.input(`SSH Host alias from ~/.ssh/config${detectedAliases}:`,
+        aliases[0] ?? '',
+        (err, val) => {
+          prompt.destroy();
+          if (!err && val && val.trim()) configService.set('audio_ssh_alias', val.trim());
+          refreshDisplay();
+          screen.render();
+        });
+      screen.render();
+      return;
+    }
+    refreshDisplay();
+  }, { bg: COLORS.btnChange });
+  audioDstChangeBtn.top = 42;
+  audioDstChangeBtn.left = 52;
+
+  // -------------------------------------------------------------------------
+  // SSH Alias row: label + value + [Edit] button
+
+  const audioSshLabel = blessed.text({
+    parent: box,
+    top: 43,
+    left: 6,
+    content: 'SSH Alias:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const audioSshValue = blessed.text({
+    parent: box,
+    top: 43,
+    left: 22,
+    width: 26,
+    wrap: false,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  const audioSshEditBtn = _createButton(box, screen, 'Edit', COLORS, () => {
+    const aliases = _detectSshAliases();
+    const current = configService.getConfig().audio_ssh_alias ?? '';
+    const detectedAliases = aliases.length > 0 ? ` (detected: ${aliases.join(', ')})` : '';
+    const prompt = blessed.prompt({
+      parent: screen,
+      top: 'center', left: 'center',
+      height: 'shrink', width: '60%',
+      border: 'line', tags: true,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: COLORS.sectionHdr } },
+    });
+    prompt.input(`SSH Host alias from ~/.ssh/config${detectedAliases}:`,
+      current || (aliases[0] ?? ''),
+      (err, val) => {
+        prompt.destroy();
+        if (!err && val !== null) configService.set('audio_ssh_alias', val.trim());
+        refreshDisplay();
+        screen.render();
+      });
+    screen.render();
+  }, { bg: COLORS.btnEdit });
+  audioSshEditBtn.top = 43;
+  audioSshEditBtn.left = 52;
+
+  // Explanation note
+  blessed.text({
+    parent: box,
+    top: 45,
+    left: 6,
+    width: '100%-10',
+    wrap: false,
+    tags: true,
+    content: `{#546e7a-fg}Use Remote to send TTS audio over SSH/PulseAudio tunnel to a machine with speakers.{/#546e7a-fg}`,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Section header: 💾 Config Storage
+
+  blessed.text({
+    parent: box,
+    top: 50,
     left: 2,
     width: '100%-6',
     content: `{#7986cb-fg}💾  Config Storage ${'─'.repeat(120)}{/#7986cb-fg}`,
@@ -1056,7 +1203,7 @@ export function createSettingsTab(screen, services) {
   // Info row 1: global config path
   blessed.text({
     parent: box,
-    top: 42,
+    top: 52,
     left: 6,
     content: 'Global:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1064,7 +1211,7 @@ export function createSettingsTab(screen, services) {
 
   const configGlobalValue = blessed.text({
     parent: box,
-    top: 42,
+    top: 52,
     left: 22,
     width: '100%-26',
     wrap: false,
@@ -1075,7 +1222,7 @@ export function createSettingsTab(screen, services) {
   // Info row 2: local config path (or "None")
   blessed.text({
     parent: box,
-    top: 43,
+    top: 53,
     left: 6,
     content: 'Local:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1083,7 +1230,7 @@ export function createSettingsTab(screen, services) {
 
   const configLocalValue = blessed.text({
     parent: box,
-    top: 43,
+    top: 53,
     left: 22,
     width: '100%-26',
     wrap: false,
@@ -1100,7 +1247,7 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
     });
   }, { bg: '#7b1fa2' });   // purple
-  saveGloballyBtn.top = 46;
+  saveGloballyBtn.top = 56;
   saveGloballyBtn.left = 52;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
@@ -1111,7 +1258,7 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
     });
   }, { bg: '#2e7d32' });   // green
-  saveLocallyBtn.top = 46;
+  saveLocallyBtn.top = 56;
   saveLocallyBtn.left = 70;   // 52+15(btn)+3(gap)
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
@@ -1129,7 +1276,7 @@ export function createSettingsTab(screen, services) {
     refreshConfigDisplay();
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
-  cancelChangesBtn.top = 46;
+  cancelChangesBtn.top = 56;
   cancelChangesBtn.left = 87;  // 70+14(btn)+3(gap)
 
   // -------------------------------------------------------------------------
@@ -1155,6 +1302,7 @@ export function createSettingsTab(screen, services) {
     volumeChangeBtn,
     verbosityChangeBtn, personalityChangeBtn,
     introEditBtn, introClearBtn,
+    audioDstChangeBtn, audioSshEditBtn,
     fullPreviewBtn,
     saveGloballyBtn, saveLocallyBtn, cancelChangesBtn,
   ];
@@ -1181,6 +1329,8 @@ export function createSettingsTab(screen, services) {
     [personalityChangeBtn, personalityLabel],
     [introEditBtn,         introTextLabel],
     [introClearBtn,        introTextLabel],
+    [audioDstChangeBtn,    audioDstLabel],
+    [audioSshEditBtn,      audioSshLabel],
   ]);
 
   const _buttonToValue = new Map([
@@ -1197,6 +1347,8 @@ export function createSettingsTab(screen, services) {
     [personalityChangeBtn, personalityValue],
     [introEditBtn,         introTextValue],
     [introClearBtn,        introTextValue],
+    [audioDstChangeBtn,    audioDstValue],
+    [audioSshEditBtn,      audioSshValue],
   ]);
 
   // Sync _currentIdx; highlight label (cyan) + value (bright blue + underline) on focus
@@ -1263,6 +1415,8 @@ export function createSettingsTab(screen, services) {
     [verbosityChangeBtn],
     [personalityChangeBtn],
     [introEditBtn, introClearBtn],
+    [audioDstChangeBtn],
+    [audioSshEditBtn],
     [fullPreviewBtn],
     [saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
   ];
@@ -1301,6 +1455,17 @@ export function createSettingsTab(screen, services) {
 
     // Group 5: Intro Text
     introTextValue.setContent(formatIntroText(cfg.pretext));
+
+    // Group 6: Audio Destination
+    const audioDst   = cfg.audio_destination ?? 'local';
+    const audioAlias = cfg.audio_ssh_alias ?? '';
+    audioDstValue.setContent(formatAudioDst(audioDst, audioAlias));
+    audioSshValue.setContent(audioAlias || '(none)');
+    // Dim SSH Alias row when destination is local
+    const sshDim = audioDst !== 'remote';
+    audioSshLabel.style.fg = sshDim ? COLORS.noticeFg : COLORS.labelFg;
+    audioSshValue.style.fg = sshDim ? COLORS.noticeFg : COLORS.valueFg;
+    audioSshEditBtn.style.bg = sshDim ? COLORS.btnDefault : COLORS.btnEdit;
 
     screen.render();
   }
