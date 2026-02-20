@@ -376,6 +376,10 @@ npx agentvibes install
 npx agentvibes-voice-browser
 ```
 
+**🐞 Bug Fixes in v3.6.0:**
+- Fixed `get_verbosity` MCP tool returning wrong level after fresh install (now reads from correct project directory, defaults to `high`)
+- Fixed Voice Browser Soprano TTS detection, Custom Music race conditions, installer emoji rendering
+
 💡 **Tip:** If `npx agentvibes` shows an older version, clear cache: `npm cache clean --force && npx agentvibes@latest --help`
 
 🐛 **Found a bug?** Report at [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
