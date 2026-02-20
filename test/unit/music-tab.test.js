@@ -119,11 +119,11 @@ describe('formatTrackLabel', () => {
   });
 
   test('strips agent_vibes_ prefix and _loop/_v2 suffixes', () => {
-    assert.strictEqual(formatTrackLabel('agent_vibes_arabic_v2_loop.mp3'), 'Arabic');
+    assert.strictEqual(formatTrackLabel('agent_vibes_arabic_v2_loop.mp3'), '🎵 Arabic Oud');
   });
 
   test('strips agentvibes_ prefix', () => {
-    assert.strictEqual(formatTrackLabel('agentvibes_soft_flamenco_loop.mp3'), 'Soft Flamenco');
+    assert.strictEqual(formatTrackLabel('agentvibes_soft_flamenco_loop.mp3'), '🎻 Soft Flamenco');
   });
 
   test('handles file with no prefix', () => {
@@ -131,6 +131,6 @@ describe('formatTrackLabel', () => {
   });
 
   test('title-cases multi-word labels', () => {
-    assert.strictEqual(formatTrackLabel('agent_vibes_bossa_nova_v2_loop.mp3'), 'Bossa Nova');
+    assert.strictEqual(formatTrackLabel('agent_vibes_bossa_nova_v2_loop.mp3'), '🌸 Bossa Nova');
   });
 });

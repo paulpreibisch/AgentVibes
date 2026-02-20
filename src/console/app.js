@@ -77,8 +77,8 @@ export class AgentVibesConsole {
     this._createFooter();
     this._registerHandlers();
     this._createPlaceholderTabs();
+    this._initNavigation();    // must run first so navigationService is live in services
     this._createRealTabs();
-    this._initNavigation();
     this._createModalOverlay();
     // Force-activate the start tab: switchTab() no-ops when _activeTab is already
     // set by the NavigationService constructor, so forceActivate() bypasses the
@@ -160,7 +160,8 @@ export class AgentVibesConsole {
       style: { bg: COLORS.headerBg },
     });
 
-    // Right-aligned git remote URL + branch (best-effort — silent if not in a git repo)
+    // Right-aligned: git remote + branch when available, else AgentVibes repo link
+    let topRightContent = `{#00e5ff-fg}github.com/preibisch/agentvibes{/#00e5ff-fg}`;
     try {
       const branchResult = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
         { encoding: 'utf8', timeout: 2000, cwd });
@@ -174,17 +175,18 @@ export class AgentVibesConsole {
           .replace(/\.git$/, '');
         // Strip protocol for compact display: https://github.com/… → github.com/…
         const displayUrl = repoUrl.replace(/^https?:\/\//, '');
-        blessed.text({
-          parent: this.headerBox,
-          top: 0,
-          right: 2,
-          shrink: true,
-          tags: true,
-          content: `{#00e5ff-fg}${displayUrl}{/#00e5ff-fg}  {#90a4ae-fg}\u2502{/#90a4ae-fg}  {#90a4ae-fg}\u2387{/#90a4ae-fg} {bright-white-fg}${branch}{/bright-white-fg}`,
-          style: { bg: COLORS.headerBg },
-        });
+        topRightContent = `{#00e5ff-fg}${displayUrl}{/#00e5ff-fg}  {#90a4ae-fg}\u2502{/#90a4ae-fg}  {#90a4ae-fg}\u2387{/#90a4ae-fg} {bright-white-fg}${branch}{/bright-white-fg}`;
       }
     } catch {}
+    blessed.text({
+      parent: this.headerBox,
+      top: 0,
+      right: 2,
+      shrink: true,
+      tags: true,
+      content: topRightContent,
+      style: { bg: COLORS.headerBg },
+    });
   }
 
   // ---------------------------------------------------------------------------

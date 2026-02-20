@@ -275,3 +275,112 @@ describe('ConfigService — setGlobal()', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe('ConfigService — getGlobalConfigPath / getLocalConfigPath / hasLocalConfig', () => {
+  let ConfigService;
+  before(async () => {
+    const mod = await import('../../src/services/config-service.js');
+    ConfigService = mod.ConfigService;
+  });
+
+  test('getGlobalConfigPath returns path inside homeDir', () => {
+    const svc = new ConfigService({ homeDir: '/home/test', projectRoot: '/proj' });
+    assert.strictEqual(svc.getGlobalConfigPath(), '/home/test/.agentvibes/config.json');
+  });
+
+  test('getLocalConfigPath returns path inside projectRoot', () => {
+    const svc = new ConfigService({ homeDir: '/home/test', projectRoot: '/proj' });
+    assert.strictEqual(svc.getLocalConfigPath(), '/proj/.agentvibes/config.json');
+  });
+
+  test('hasLocalConfig returns false when no local config file exists', () => {
+    const homeDir = makeTmpDir('has-local-false');
+    const projectRoot = makeTmpDir('proj-no-local');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot });
+      assert.strictEqual(svc.hasLocalConfig(), false);
+    } finally {
+      cleanDir(homeDir);
+      cleanDir(projectRoot);
+    }
+  });
+
+  test('hasLocalConfig returns true when local config file exists', () => {
+    const homeDir = makeTmpDir('has-local-true');
+    const projectRoot = makeTmpDir('proj-has-local');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot });
+      const localDir = path.join(projectRoot, '.agentvibes');
+      fs.mkdirSync(localDir, { recursive: true });
+      fs.writeFileSync(path.join(localDir, 'config.json'), '{}');
+      assert.strictEqual(svc.hasLocalConfig(), true);
+    } finally {
+      cleanDir(homeDir);
+      cleanDir(projectRoot);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe('ConfigService — saveAllToGlobal / saveAllToLocal', () => {
+  let ConfigService;
+  before(async () => {
+    const mod = await import('../../src/services/config-service.js');
+    ConfigService = mod.ConfigService;
+  });
+
+  test('saveAllToGlobal overwrites global config atomically', () => {
+    const homeDir = makeTmpDir('save-global');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot: '/tmp/proj' });
+      svc.saveAllToGlobal({ provider: 'piper', voice: 'test' });
+      assert.deepStrictEqual(svc.getGlobalConfig(), { provider: 'piper', voice: 'test' });
+    } finally {
+      cleanDir(homeDir);
+    }
+  });
+
+  test('saveAllToGlobal creates parent dir if needed', () => {
+    const homeDir = makeTmpDir('save-global-mkdir');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot: '/tmp/proj' });
+      svc.saveAllToGlobal({ foo: 'bar' });
+      assert.ok(fs.existsSync(path.join(homeDir, '.agentvibes', 'config.json')));
+    } finally {
+      cleanDir(homeDir);
+    }
+  });
+
+  test('saveAllToLocal creates .agentvibes dir and writes config', () => {
+    const homeDir = makeTmpDir('save-local');
+    const projectRoot = makeTmpDir('save-local-proj');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot });
+      svc.saveAllToLocal({ voice: 'local-voice' });
+      assert.deepStrictEqual(svc.getProjectConfig(), { voice: 'local-voice' });
+      assert.strictEqual(svc.hasLocalConfig(), true);
+    } finally {
+      cleanDir(homeDir);
+      cleanDir(projectRoot);
+    }
+  });
+
+  test('saveAllToLocal replaces entire local config (does not merge)', () => {
+    const homeDir = makeTmpDir('save-local-replace');
+    const projectRoot = makeTmpDir('save-local-replace-proj');
+    try {
+      const svc = new ConfigService({ homeDir, projectRoot });
+      svc.saveAllToLocal({ a: 1, b: 2 });
+      svc.saveAllToLocal({ a: 99 });
+      const result = svc.getProjectConfig();
+      assert.strictEqual(result.a, 99);
+      assert.strictEqual(result.b, undefined);
+    } finally {
+      cleanDir(homeDir);
+      cleanDir(projectRoot);
+    }
+  });
+});

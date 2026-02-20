@@ -48,22 +48,42 @@ const FOOTER_TEXT = '[↑↓/jk] Navigate  [Enter/Space] Preview  [Tab] Buttons 
 // Static catalog — correct real filenames; Soft Flamenco kept first for compat.
 // At runtime the UI scans .claude/audio/tracks/ dynamically so new tracks appear.
 
+// Full display names per track — emoji + label. Single-codepoint emoji only (no \uFE0F
+// variation selectors) so blessed renders them cleanly in list widgets.
+const TRACK_DISPLAY = Object.freeze({
+  'agentvibes_soft_flamenco_loop.mp3':                 '🎻 Soft Flamenco',
+  'agent_vibes_arabic_v2_loop.mp3':                    '🎵 Arabic Oud',
+  'agent_vibes_bachata_v1_loop.mp3':                   '🎺 Bachata',
+  'agent_vibes_bossa_nova_v2_loop.mp3':                '🌸 Bossa Nova',
+  'agent_vibes_celtic_harp_v1_loop.mp3':               '🎶 Celtic Harp',
+  'agent_vibes_chillwave_v2_loop.mp3':                 '🌊 Chillwave',
+  'agent_vibes_cumbia_v1_loop.mp3':                    '🎸 Cumbia',
+  'agent_vibes_dark_chill_step_loop.mp3':              '🌙 Dark Chill Step',
+  'agent_vibes_ganawa_ambient_v2_loop.mp3':            '🪘 Gnawa Ambient',
+  'agent_vibes_goa_trance_v2_loop.mp3':                '🌀 Goa Trance',
+  'agent_vibes_harpsichord_v2_loop.mp3':               '🎼 Harpsichord',
+  'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3': '🌺 Hawaiian Slack Key Guitar',
+  'agent_vibes_japanese_city_pop_v1_loop.mp3':         '🌆 Japanese City Pop',
+  'agent_vibes_salsa_v2_loop.mp3':                     '💃 Salsa',
+  'agent_vibes_tabla_dream_pop_v1_loop.mp3':           '🥁 Tabla Dream Pop',
+});
+
 const BUILT_IN_TRACK_CATALOG = Object.freeze([
-  { id: 'agentvibes_soft_flamenco_loop.mp3',                 label: 'Soft Flamenco' },
-  { id: 'agent_vibes_arabic_v2_loop.mp3',                    label: 'Arabic' },
-  { id: 'agent_vibes_bachata_v1_loop.mp3',                   label: 'Bachata' },
-  { id: 'agent_vibes_bossa_nova_v2_loop.mp3',                label: 'Bossa Nova' },
-  { id: 'agent_vibes_celtic_harp_v1_loop.mp3',               label: 'Celtic Harp' },
-  { id: 'agent_vibes_chillwave_v2_loop.mp3',                 label: 'Chillwave' },
-  { id: 'agent_vibes_cumbia_v1_loop.mp3',                    label: 'Cumbia' },
-  { id: 'agent_vibes_dark_chill_step_loop.mp3',              label: 'Dark Chill Step' },
-  { id: 'agent_vibes_ganawa_ambient_v2_loop.mp3',            label: 'Ganawa Ambient' },
-  { id: 'agent_vibes_goa_trance_v2_loop.mp3',                label: 'Goa Trance' },
-  { id: 'agent_vibes_harpsichord_v2_loop.mp3',               label: 'Harpsichord' },
-  { id: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3', label: 'Hawaiian Slack Key Guitar' },
-  { id: 'agent_vibes_japanese_city_pop_v1_loop.mp3',         label: 'Japanese City Pop' },
-  { id: 'agent_vibes_salsa_v2_loop.mp3',                     label: 'Salsa' },
-  { id: 'agent_vibes_tabla_dream_pop_v1_loop.mp3',           label: 'Tabla Dream Pop' },
+  { id: 'agentvibes_soft_flamenco_loop.mp3',                 label: '🎻 Soft Flamenco' },
+  { id: 'agent_vibes_arabic_v2_loop.mp3',                    label: '🎵 Arabic Oud' },
+  { id: 'agent_vibes_bachata_v1_loop.mp3',                   label: '🎺 Bachata' },
+  { id: 'agent_vibes_bossa_nova_v2_loop.mp3',                label: '🌸 Bossa Nova' },
+  { id: 'agent_vibes_celtic_harp_v1_loop.mp3',               label: '🎶 Celtic Harp' },
+  { id: 'agent_vibes_chillwave_v2_loop.mp3',                 label: '🌊 Chillwave' },
+  { id: 'agent_vibes_cumbia_v1_loop.mp3',                    label: '🎸 Cumbia' },
+  { id: 'agent_vibes_dark_chill_step_loop.mp3',              label: '🌙 Dark Chill Step' },
+  { id: 'agent_vibes_ganawa_ambient_v2_loop.mp3',            label: '🪘 Gnawa Ambient' },
+  { id: 'agent_vibes_goa_trance_v2_loop.mp3',                label: '🌀 Goa Trance' },
+  { id: 'agent_vibes_harpsichord_v2_loop.mp3',               label: '🎼 Harpsichord' },
+  { id: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3', label: '🌺 Hawaiian Slack Key Guitar' },
+  { id: 'agent_vibes_japanese_city_pop_v1_loop.mp3',         label: '🌆 Japanese City Pop' },
+  { id: 'agent_vibes_salsa_v2_loop.mp3',                     label: '💃 Salsa' },
+  { id: 'agent_vibes_tabla_dream_pop_v1_loop.mp3',           label: '🥁 Tabla Dream Pop' },
   { id: 'dreamy_house_loop.mp3',                             label: 'Dreamy House' },
 ]);
 
@@ -80,12 +100,15 @@ export function getBuiltInTracks() {
 
 /**
  * Generate a pretty label from a track filename.
- * Strips agent_vibes_/agentvibes_ prefix, _loop/_vN suffixes, then title-cases.
+ * Returns the canonical display name (with emoji) for known tracks.
+ * For unknown tracks, strips agent_vibes_/agentvibes_ prefix and _loop/_vN suffixes,
+ * then title-cases the result.
  *
  * @param {string} filename
  * @returns {string}
  */
 export function formatTrackLabel(filename) {
+  if (TRACK_DISPLAY[filename]) return TRACK_DISPLAY[filename];
   const label = filename
     .replace(/\.mp3$/i, '')
     .replace(/^agent_vibes_/i, '')

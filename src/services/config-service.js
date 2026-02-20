@@ -95,6 +95,45 @@ export class ConfigService {
   }
 
   // ---------------------------------------------------------------------------
+  // Path helpers
+
+  /** Returns the resolved global config file path. */
+  getGlobalConfigPath() {
+    return path.resolve(this._homeDir, '.agentvibes', 'config.json');
+  }
+
+  /** Returns the resolved local project config file path (regardless of whether it exists). */
+  getLocalConfigPath() {
+    return path.resolve(this._projectRoot, '.agentvibes', 'config.json');
+  }
+
+  /** Returns true if a local project config file exists. */
+  hasLocalConfig() {
+    return fs.existsSync(this.getLocalConfigPath());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk save
+
+  /**
+   * Overwrites the ENTIRE global config with the given object.
+   * Atomic write (tmp → rename). Creates dir if needed. chmod 600.
+   * @param {object} data
+   */
+  saveAllToGlobal(data) {
+    this._writeConfigAtomic(this.getGlobalConfigPath(), data);
+  }
+
+  /**
+   * Overwrites the ENTIRE local project config with the given object.
+   * Atomic write (tmp → rename). Creates dir if needed. chmod 600.
+   * @param {object} data
+   */
+  saveAllToLocal(data) {
+    this._writeConfigAtomic(this.getLocalConfigPath(), data);
+  }
+
+  // ---------------------------------------------------------------------------
   // Write (story 7.1)
 
   /**

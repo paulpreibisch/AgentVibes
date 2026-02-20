@@ -12,6 +12,7 @@
  */
 
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import { ConfigService } from '../src/services/config-service.js';
 import { launchConsole } from '../src/console/app.js';
 
@@ -74,7 +75,11 @@ export function resolveStartTab(args, configService) {
 // Main: run only when executed directly (not imported by tests)
 // ---------------------------------------------------------------------------
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// Resolve symlinks before comparing so the guard works when run via npm link / npx
+const _thisFile = fileURLToPath(import.meta.url);
+const _argv1    = (() => { try { return fs.realpathSync(process.argv[1]); } catch { return process.argv[1]; } })();
+
+if (_argv1 === _thisFile) {
   const configService = new ConfigService();
   const result = resolveStartTab(process.argv.slice(2), configService);
 
