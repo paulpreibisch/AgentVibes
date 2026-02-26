@@ -347,7 +347,7 @@ export function createInstallTab(screen, services) {
     _screen++;
     _showCurrentScreen();
   });
-  _s2ContinueBtn.top  = 11; _s2ContinueBtn.left = 4;
+  _s2ContinueBtn.top  = 12; _s2ContinueBtn.left = 4;
   // → also advances without the flash delay
   _s2ContinueBtn.key(['right'], () => { _screen++; _showCurrentScreen(); });
 
@@ -418,7 +418,8 @@ export function createInstallTab(screen, services) {
       ttsOk
         ? `  {${COLORS.successFg}-fg}✅  TTS Providers Detected{/${COLORS.successFg}-fg}`
         : `  {${COLORS.errorFg}-fg}⚠   No TTS provider found. Install Piper or Soprano first.{/${COLORS.errorFg}-fg}`,
-      '',  // ← [Continue →] button here (box row 11) when TTS detected
+      '',  // blank separator
+      '',  // ← [Continue →] button here (box row 12) when TTS detected
     ]));
     if (ttsOk) {
       _s2ContinueBtn.show();
