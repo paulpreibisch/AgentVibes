@@ -40,7 +40,7 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Tab] Buttons  [F] Favorite  [/] Search  [Q] Quit';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select  [F] Favorite  [/] Search  [Q] Quit';
 export const PIPER_VOICES_DIR = path.join(os.homedir(), '.local', 'share', 'piper', 'voices');
 
 // Column widths for the multi-column voice list
@@ -247,7 +247,7 @@ export function getVoiceMeta(voiceId) {
 export function createVoicesTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService } = services;
+  const { configService, providerService, focusMainTabBar } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -368,6 +368,11 @@ export function createVoicesTab(screen, services) {
   });
 
   // -------------------------------------------------------------------------
+  // Hint text shown in previewLine when the list has focus and nothing is playing
+  const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] select as default voice{/${COLORS.dimFg}-fg}`;
+  let _listFocused = false;
+
+  // -------------------------------------------------------------------------
   // Playback state
 
   let _playingProcess = null;
@@ -397,7 +402,7 @@ export function createVoicesTab(screen, services) {
     if (_playingVoiceId === voiceId) {
       _killPlayingProcess();
       _playingVoiceId = null;
-      previewLine.setContent('');
+      previewLine.setContent(_listFocused ? HINT_TEXT : '');
       screen.render();
       return;
     }
@@ -443,7 +448,7 @@ export function createVoicesTab(screen, services) {
         _playingProcess = null;
         previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Preview failed (piper error — is piper installed?){/${COLORS.activeFg}-fg}`);
         screen.render();
-        setTimeout(() => { previewLine.setContent(''); screen.render(); }, 4000);
+        setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 4000);
         return;
       }
 
@@ -463,8 +468,8 @@ export function createVoicesTab(screen, services) {
         if (_playingVoiceId === voiceId) {
           _playingVoiceId = null;
           _playingProcess = null;
-          previewLine.setContent('');
-          screen.render();
+          previewLine.setContent(_listFocused ? HINT_TEXT : '');
+          refreshDisplay(); // clears (playing) label
         }
         try { fs.unlinkSync(tempWav); } catch {}
       });
@@ -472,7 +477,7 @@ export function createVoicesTab(screen, services) {
       playProc.on('error', () => {
         _playingVoiceId = null;
         _playingProcess = null;
-        previewLine.setContent('');
+        previewLine.setContent(_listFocused ? HINT_TEXT : '');
         try { fs.unlinkSync(tempWav); } catch {}
       });
     });
@@ -482,7 +487,7 @@ export function createVoicesTab(screen, services) {
       _playingProcess = null;
       previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Cannot find piper — install with: pipx install piper-tts{/${COLORS.activeFg}-fg}`);
       screen.render();
-      setTimeout(() => { previewLine.setContent(''); screen.render(); }, 4000);
+      setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 4000);
     });
   }
 
@@ -566,6 +571,77 @@ export function createVoicesTab(screen, services) {
   installBtn.left = 38;
 
   // -------------------------------------------------------------------------
+  // Select-voice confirmation modal
+
+  function _openSelectVoiceModal(voiceId) {
+    const { displayName } = getVoiceMeta(voiceId);
+
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 54,
+      height: 7,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {${COLORS.activeFg}-fg}Set Default Voice{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+    });
+
+    blessed.text({
+      parent: modal,
+      top: 1,
+      left: 2,
+      right: 2,
+      content: `Set {${COLORS.valueFg}-fg}${displayName}{/${COLORS.valueFg}-fg} as your default voice?`,
+      tags: true,
+      style: { bg: COLORS.contentBg },
+    });
+
+    function _close() {
+      modal.destroy();
+      voiceList.focus();
+      screen.render();
+    }
+
+    function _makeBtn(label, bg, left, onClick) {
+      const btn = blessed.button({
+        parent: modal,
+        content: label,
+        top: 4,
+        left,
+        mouse: true,
+        keys: true,
+        shrink: true,
+        padding: { left: 1, right: 1 },
+        style: {
+          bg,
+          fg: 'white',
+          focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+          hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+        },
+      });
+      btn.key(['enter', 'space'], () => { _close(); onClick(); });
+      btn.on('click', () => btn.press());
+      return btn;
+    }
+
+    const okBtn     = _makeBtn('OK — Set Voice', COLORS.btnDefault,  2, () => {
+      providerService.setActiveVoice(voiceId);
+      refreshDisplay();
+    });
+    const cancelBtn = _makeBtn('Cancel',         '#546e7a',          20, () => {});
+
+    okBtn.key(['tab', 'right'],    () => { cancelBtn.focus(); screen.render(); });
+    cancelBtn.key(['tab', 'left'], () => { okBtn.focus();     screen.render(); });
+    modal.key(['escape', 'q'], _close);
+
+    modal.setFront();
+    okBtn.focus();
+    screen.render();
+  }
+
+  // -------------------------------------------------------------------------
   // State
 
   let _allVoices = [];
@@ -588,7 +664,7 @@ export function createVoicesTab(screen, services) {
       const name = displayName.length > COL_NAME_W
         ? displayName.slice(0, COL_NAME_W - 1) + '…'
         : displayName.padEnd(COL_NAME_W);
-      return ` ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}`;
+      return ` ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}${isPrev ? ' (playing)' : ''}`;
     });
   }
 
@@ -646,6 +722,15 @@ export function createVoicesTab(screen, services) {
     screen.render();
   });
 
+  // ↑ at the top of the list → jump to main header tab bar
+  voiceList.key(['up'], () => {
+    if (voiceList.selected === 0 && typeof focusMainTabBar === 'function') {
+      focusMainTabBar();
+      // Reset selection to 0 after built-in handler potentially wraps to end
+      setTimeout(() => { voiceList.select(0); screen.render(); }, 0);
+    }
+  });
+
   // 'f' in voiceList toggles favorite
   voiceList.key(['f'], () => {
     const voices = _getFilteredVoices();
@@ -666,12 +751,83 @@ export function createVoicesTab(screen, services) {
     }
   });
 
+  // Enter → open "Set as default voice" confirmation modal
+  voiceList.key(['enter'], () => {
+    const voices = _getFilteredVoices();
+    const selected = voices[voiceList.selected];
+    if (!selected) return;
+    _killPlayingProcess();
+    _playingVoiceId = null;
+    previewLine.setContent('');
+    screen.render();
+    _openSelectVoiceModal(selected);
+  });
+
+  // Blinking █ on selected row while list is focused
+  let _vlBlink = { interval: null, on: false, sel: -1 };
+  function _vlTick() {
+    _vlBlink.on = !_vlBlink.on;
+    const items = voiceList.items;
+    const cur = voiceList.selected ?? 0;
+    if (_vlBlink.sel !== cur && _vlBlink.sel >= 0 && items[_vlBlink.sel]) {
+      items[_vlBlink.sel].setContent((items[_vlBlink.sel].content ?? '').replace(/ █$/, ''));
+    }
+    _vlBlink.sel = cur;
+    if (items[cur]) {
+      const base = (items[cur].content ?? '').replace(/ █$/, '');
+      items[cur].setContent(_vlBlink.on ? `${base} █` : base);
+    }
+    screen.render();
+  }
+  voiceList.on('focus', () => {
+    _listFocused = true;
+    _vlBlink.on = true;
+    _vlBlink.sel = voiceList.selected ?? 0;
+    const items = voiceList.items;
+    if (items[_vlBlink.sel]) items[_vlBlink.sel].setContent((items[_vlBlink.sel].content ?? '') + ' █');
+    if (!_playingVoiceId) previewLine.setContent(HINT_TEXT);
+    screen.render();
+    _vlBlink.interval = setInterval(_vlTick, 500);
+  });
+  voiceList.on('blur', () => {
+    _listFocused = false;
+    if (!_playingVoiceId) previewLine.setContent('');
+    if (_vlBlink.interval) { clearInterval(_vlBlink.interval); _vlBlink.interval = null; }
+    const items = voiceList.items;
+    const sel = voiceList.selected ?? 0;
+    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/ █$/, ''));
+    screen.render();
+  });
+
   // Update info panel when selection changes
   voiceList.on('select item', () => {
+    if (_vlBlink.interval) _vlTick(); // move █ to newly selected row
     const voices = _getFilteredVoices();
     const sel = voices[voiceList.selected] ?? '';
     infoLine.setContent(`  ${_formatInfoTagged(sel)}`);
     screen.render();
+  });
+
+  // Type-to-jump: press a letter to jump to first voice whose display name starts with it
+  const _voiceJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'f']);
+  voiceList.on('keypress', (ch, key) => {
+    if (!ch || key.ctrl || key.meta) return;
+    const lower = ch.toLowerCase();
+    if (!/^[a-z]$/.test(lower)) return;
+    if (_voiceJumpBlocked.has(lower)) return;
+    const voices = _getFilteredVoices();
+    const count = voices.length;
+    if (count === 0) return;
+    const start = voiceList.selected ?? 0;
+    for (let i = 1; i <= count; i++) {
+      const idx = (start + i) % count;
+      const name = getVoiceMeta(voices[idx]).displayName.toLowerCase();
+      if (name.startsWith(lower)) {
+        voiceList.select(idx);
+        screen.render();
+        break;
+      }
+    }
   });
 
   // -------------------------------------------------------------------------
