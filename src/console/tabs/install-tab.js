@@ -198,6 +198,95 @@ export function createInstallTab(screen, services) {
   function _c(lines) { return lines.join('\n'); }
 
   // -------------------------------------------------------------------------
+  // Screen 4 action button callbacks
+
+  function _doEdit() {
+    if (box.hidden || _screen !== 4) return;
+    const prompt = blessed.prompt({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      height: 'shrink',
+      width: '60%',
+      border: 'line',
+      tags: true,
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        border: { fg: COLORS.sectionHdr },
+        label: { fg: COLORS.sectionHdr },
+      },
+    });
+    prompt.input('Intro text (prefix spoken before every TTS message):', _introText, (err, val) => {
+      prompt.destroy();
+      if (!err && val !== null) {
+        _introText = val.trim();
+        _renderScreen4();
+      }
+      screen.render();
+    });
+    screen.render();
+  }
+
+  function _doPreview() {
+    if (box.hidden || _screen !== 4) return;
+    const introVal  = _introText || getIntroDefault(process.cwd()) || 'AgentVibes';
+    const ttsText   = `${introVal}: Here`;
+    const ttsScript = path.resolve(process.cwd(), '.claude/hooks/play-tts.sh');
+    execFile('bash', [ttsScript, ttsText], {
+      env: { ...process.env, PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' },
+      timeout: 30000,
+    }, () => {});
+  }
+
+  function _doAccept() {
+    if (_screen !== 4) return;
+    _screen++;
+    _showCurrentScreen();
+  }
+
+  // -------------------------------------------------------------------------
+  // Screen 4 action buttons — real blessed widgets for keyboard focus + ←/→ nav
+
+  function _createInstallBtn(label, bg, onClick) {
+    const btn = blessed.button({
+      parent: box,
+      content: label,
+      mouse: true,
+      keys: true,
+      shrink: true,
+      hidden: true,
+      padding: { left: 1, right: 1 },
+      style: {
+        bg,
+        fg: '#ffffff',
+        focus: { bg: COLORS.btnFocus, fg: '#000000', bold: true },
+        hover: { bg: COLORS.btnFocus, fg: '#000000', bold: true },
+      },
+    });
+    btn.key(['enter', 'space'], onClick);
+    btn.on('click', () => btn.press());
+    return btn;
+  }
+
+  const _editBtn    = _createInstallBtn('Edit',              '#1565c0', _doEdit);
+  const _previewBtn = _createInstallBtn('Preview',           '#e65100', _doPreview);
+  const _acceptBtn  = _createInstallBtn('✓ Accept & Install','#2e7d32', _doAccept);
+
+  _editBtn.top    = 9;  _editBtn.left    = 4;
+  _previewBtn.top = 9;  _previewBtn.left = 12;
+  _acceptBtn.top  = 13; _acceptBtn.left  = 4;
+
+  // ←/→ navigation between the three buttons
+  // Note: Tab is NOT used here — 'tab' is registered globally by navigation.js (cycles tabs)
+  _editBtn.key(['right'],            () => { _previewBtn.focus(); screen.render(); });
+  _previewBtn.key(['right'],         () => { _acceptBtn.focus();  screen.render(); });
+  _acceptBtn.key(['right'],          () => { _editBtn.focus();    screen.render(); });
+  _previewBtn.key(['left', 'S-tab'], () => { _editBtn.focus();    screen.render(); });
+  _acceptBtn.key(['left', 'S-tab'],  () => { _previewBtn.focus(); screen.render(); });
+  _editBtn.key(['left', 'S-tab'],    () => { _acceptBtn.focus();  screen.render(); });
+
+  // -------------------------------------------------------------------------
   // Screen renderers
 
   const _HDR = (emoji, label) =>
@@ -299,11 +388,6 @@ export function createInstallTab(screen, services) {
     const folderName = getIntroDefault(process.cwd()) || 'AgentVibes';
     const example = `${folderName}: Here`;
 
-    // Tag-styled buttons (bg colour on the button text block)
-    const editBtn  = `{#2196f3-bg}{white-fg} E  Edit {/white-fg}{/#2196f3-bg}`;
-    const testBtn  = `{#ff9800-bg}{white-fg} T  Test {/white-fg}{/#ff9800-bg}`;
-    const saveBtn  = `{#4caf50-bg}{black-fg}  ✓  Accept & Install  [Enter]  {/black-fg}{/#4caf50-bg}`;
-
     contentBox.setContent(_c([
       _HDR('🎤', 'Provider & Voice'),
       '',
@@ -312,13 +396,15 @@ export function createInstallTab(screen, services) {
       '',
       _HDR('✍️', 'Intro Text'),
       '',
-      `  {${COLORS.labelFg}-fg}${'Intro text:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || '(none)'}  {/${COLORS.valueFg}-fg}${editBtn}  ${testBtn}`,
+      `  {${COLORS.labelFg}-fg}${'Intro text:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || '(none)'}{/${COLORS.valueFg}-fg}`,
+      '',  // ← [Edit]  [Preview]  buttons rendered as real widgets here (box row 9)
       '',
       `  {${COLORS.noticeFg}-fg}Example:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
       '',
-      `  ${saveBtn}`,
+      '',  // ← [✓ Accept & Install] button rendered as real widget here (box row 13)
     ]));
-    hintLine.setContent('  Screen 4/5: Config  |  [←] Back  |  [E] Edit  |  [T] Test TTS  |  [Enter] Accept & Install');
+    hintLine.setContent('  Screen 4/5: Config  |  [Esc] Back  |  [E] Edit  |  [P] Preview TTS  |  [Enter] Accept & Install');
+    _editBtn.focus();
     screen.render();
   }
 
@@ -328,7 +414,7 @@ export function createInstallTab(screen, services) {
     const globalPath  = configService.getGlobalConfigPath().replace(homeDir, '~');
     const localPath   = configService.getLocalConfigPath().replace(process.cwd() + '/', './');
 
-    const saveBtn   = `{#4caf50-bg}{black-fg}  ✓  Save Configuration & Install  [Enter]  {/black-fg}{/#4caf50-bg}`;
+    const saveBtn   = `{#2e7d32-bg}{white-fg}  ✓  Save Configuration & Install  [Enter]  {/white-fg}{/#2e7d32-bg}`;
     const cancelBtn = `{#f44336-bg}{white-fg}  ✗  Cancel  [Esc]  {/white-fg}{/#f44336-bg}`;
 
     contentBox.setContent(_c([
@@ -369,7 +455,7 @@ export function createInstallTab(screen, services) {
 
   function _showCompletionModal() {
     _completionModalOpen = true;
-    const okBtn = `{#4caf50-bg}{black-fg}    ✓  OK  [Enter]    {/black-fg}{/#4caf50-bg}`;
+    const okBtn = `{#2e7d32-bg}{white-fg}    ✓  OK  [Enter]    {/white-fg}{/#2e7d32-bg}`;
     _completionModalBox = blessed.box({
       parent: screen,
       top: 'center',
@@ -381,11 +467,11 @@ export function createInstallTab(screen, services) {
       style: {
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
-        border: { fg: '#4caf50' },
+        border: { fg: '#2e7d32' },
       },
       content: _c([
         '',
-        `  {#4caf50-fg}✅  Installation Complete!{/#4caf50-fg}`,
+        `  {${COLORS.successFg}-fg}✅  Installation Complete!{/${COLORS.successFg}-fg}`,
         '',
         `  {${COLORS.noticeFg}-fg}Configuration has been saved successfully.{/${COLORS.noticeFg}-fg}`,
         `  {${COLORS.noticeFg}-fg}Taking you to the Settings tab.{/${COLORS.noticeFg}-fg}`,
@@ -409,6 +495,13 @@ export function createInstallTab(screen, services) {
   }
 
   function _showCurrentScreen() {
+    // Show Screen 4 action buttons only on screen 4
+    if (_screen === 4) {
+      _editBtn.show(); _previewBtn.show(); _acceptBtn.show();
+    } else {
+      _editBtn.hide(); _previewBtn.hide(); _acceptBtn.hide();
+    }
+
     if (_screen !== _lastScreen) {
       // Clear via setContent('') so blessed diffs old→empty and repaints
       // every cell that had a character.  hintLine likewise.
@@ -435,6 +528,7 @@ export function createInstallTab(screen, services) {
 
   screen.key(['enter'], () => {
     if (box.hidden || _checking) return;
+    if (_screen === 4) return;  // Screen 4: Enter handled by the focused button
     if (_completionModalOpen) { _dismissCompletionModal(); return; }
     if (_screen < 5) {
       _screen++;
@@ -486,8 +580,10 @@ export function createInstallTab(screen, services) {
   });
 
   // Left arrow = go back (same logic as Escape)
+  // Screen 4: left arrow is handled by button ←/→ navigation; use Escape to go back
   screen.key(['left'], () => {
     if (box.hidden || _checking) return;
+    if (_screen === 4) return;
     if (_screen > 1) {
       _screen--;
       _showCurrentScreen();
@@ -505,33 +601,7 @@ export function createInstallTab(screen, services) {
   });
 
   // [E] on Screen 4: edit intro text inline
-  screen.key(['e', 'E'], () => {
-    if (box.hidden || _screen !== 4) return;
-    const prompt = blessed.prompt({
-      parent: screen,
-      top: 'center',
-      left: 'center',
-      height: 'shrink',
-      width: '60%',
-      border: 'line',
-      tags: true,
-      style: {
-        fg: COLORS.labelFg,
-        bg: COLORS.contentBg,
-        border: { fg: COLORS.sectionHdr },
-        label: { fg: COLORS.sectionHdr },
-      },
-    });
-    prompt.input('Intro text (prefix spoken before every TTS message):', _introText, (err, val) => {
-      prompt.destroy();
-      if (!err && val !== null) {
-        _introText = val.trim();
-        _renderScreen4();
-      }
-      screen.render();
-    });
-    screen.render();
-  });
+  screen.key(['e', 'E'], () => { _doEdit(); });
 
   // [O] anywhere: dismiss the completion modal (OK button)
   screen.key(['o', 'O'], () => {
@@ -539,17 +609,8 @@ export function createInstallTab(screen, services) {
     _dismissCompletionModal();
   });
 
-  // [T] on Screen 4: play test TTS using the current intro text
-  screen.key(['t', 'T'], () => {
-    if (box.hidden || _screen !== 4) return;
-    const introVal  = _introText || getIntroDefault(process.cwd()) || 'AgentVibes';
-    const ttsText   = `${introVal}: Here`;
-    const ttsScript = path.resolve(process.cwd(), '.claude/hooks/play-tts.sh');
-    execFile('bash', [ttsScript, ttsText], {
-      env: { ...process.env, PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' },
-      timeout: 30000,
-    }, () => {}); // fire-and-forget
-  });
+  // [P] on Screen 4: preview TTS using the current intro text
+  screen.key(['p', 'P'], () => { _doPreview(); });
 
   // -------------------------------------------------------------------------
   // Tab Component Contract
