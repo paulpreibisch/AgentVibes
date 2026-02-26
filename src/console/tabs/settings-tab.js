@@ -438,7 +438,7 @@ export function createSettingsTab(screen, services) {
 
     const music      = cfg.backgroundMusic ?? {};
     const musicOn    = music.enabled !== false;
-    const trackLabel = formatTrackName(music.track ?? '');
+    const trackLabel = _stripLeadingEmoji(formatTrackName(music.track ?? ''));
 
     const personality = (cfg.personality ?? '').trim();
     const hasPersonality = personality && personality !== 'none' && personality !== 'normal';
@@ -612,21 +612,21 @@ export function createSettingsTab(screen, services) {
           _killTest(); _restoreTestBtnsLabels();
           try { fs.unlinkSync(tempWav); } catch {}
           if (processedWav) { try { fs.unlinkSync(processedWav); } catch {} }
-          if (btn) _focusButton(btn);
+          if (btn && !btn.hidden) setImmediate(() => _focusButton(btn));
         });
         playProc.on('error', () => {
           const btn = _testInitiatorBtn;
           _killTest(); _restoreTestBtnsLabels();
           try { fs.unlinkSync(tempWav); } catch {}
           if (processedWav) { try { fs.unlinkSync(processedWav); } catch {} }
-          if (btn) _focusButton(btn);
+          if (btn && !btn.hidden) setImmediate(() => _focusButton(btn));
         });
       });
 
       synthProc.on('error', () => {
         const btn = _testInitiatorBtn;
         _killTest(); _restoreTestBtnsLabels();
-        if (btn) _focusButton(btn);
+        if (btn && !btn.hidden) setImmediate(() => _focusButton(btn));
       });
     }, leadInMs);
   }

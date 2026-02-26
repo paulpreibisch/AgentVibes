@@ -471,11 +471,19 @@ export function createMusicTab(screen, services) {
       _setMusic(configService, { track: trackId });
       refreshDisplay();
     });
-    const cancelBtn = _makeBtn('Cancel',         '#546e7a',         20, () => {});
+    const favBtn    = _makeBtn('★ Favorite',     COLORS.btnDefault, 20, () => {
+      toggleMusicFavorite(configService, trackId);
+      refreshDisplay();
+    });
+    const cancelBtn = _makeBtn('Cancel',         '#546e7a',         34, () => {});
 
-    okBtn.key(['tab', 'right'],    () => { cancelBtn.focus(); screen.render(); });
-    cancelBtn.key(['tab', 'left'], () => { okBtn.focus();     screen.render(); });
+    okBtn.key(['tab', 'right'],    () => { favBtn.focus();    screen.render(); });
+    favBtn.key(['tab', 'right'],   () => { cancelBtn.focus(); screen.render(); });
+    favBtn.key(['S-tab', 'left'],  () => { okBtn.focus();     screen.render(); });
+    cancelBtn.key(['tab', 'right'],() => { okBtn.focus();     screen.render(); });
+    cancelBtn.key(['S-tab', 'left'],() => { favBtn.focus();   screen.render(); });
     modal.key(['escape', 'q'], _close);
+    modal.key(['*'], () => { toggleMusicFavorite(configService, trackId); refreshDisplay(); });
 
     modal.setFront();
     okBtn.focus();
@@ -670,6 +678,18 @@ export function createMusicTab(screen, services) {
       setTimeout(() => { trackList.select(0); screen.render(); }, 0);
     }
   });
+
+  // [Tab] → navigate from list to bottom buttons (Tab cycles: list→toggle→setActive→fav→upload→list)
+  trackList.key(['tab'], () => { toggleBtn.focus(); screen.render(); });
+  toggleBtn.key(['tab'],       () => { setActiveBtn.focus();  screen.render(); });
+  setActiveBtn.key(['tab'],    () => { favoriteBtn.focus();   screen.render(); });
+  favoriteBtn.key(['tab'],     () => { uploadBtn.focus();     screen.render(); });
+  uploadBtn.key(['tab'],       () => { trackList.focus();     screen.render(); });
+  // Shift-Tab / Escape returns focus to list from any bottom button
+  toggleBtn.key(['S-tab', 'escape'],   () => { trackList.focus(); screen.render(); });
+  setActiveBtn.key(['S-tab', 'escape'],() => { trackList.focus(); screen.render(); });
+  favoriteBtn.key(['S-tab', 'escape'], () => { trackList.focus(); screen.render(); });
+  uploadBtn.key(['S-tab', 'escape'],   () => { trackList.focus(); screen.render(); });
 
   // Blinking █ on selected row while list is focused
   let _tlBlink = { interval: null, on: false, sel: -1 };
