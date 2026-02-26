@@ -596,18 +596,6 @@ export function createInstallTab(screen, services) {
     }
   });
 
-  screen.key(['down'], () => {
-    if (box.hidden) return;
-    if (_screen === 3 && _deps) {
-      const providers = [];
-      if (_deps.piper)   providers.push('piper');
-      if (_deps.soprano) providers.push('soprano');
-      const idx = providers.indexOf(_selectedProvider ?? providers[0]);
-      _selectedProvider = providers[Math.min(providers.length - 1, idx + 1)];
-      _renderScreen3();
-    }
-  });
-
   // Left arrow = go back (same logic as Escape)
   // Screen 4: left arrow is handled by button ←/→ navigation; use Escape to go back
   screen.key(['left'], () => {
@@ -629,6 +617,20 @@ export function createInstallTab(screen, services) {
       _showCurrentScreen();
     }
     // Screens 4 and 5 require explicit [Enter] to confirm
+  });
+
+  // Down arrow on Screen 1: re-focus Begin button (handles case where box grabbed focus)
+  screen.key(['down'], () => {
+    if (box.hidden) return;
+    if (_screen === 1) { _s1BeginBtn.focus(); screen.render(); return; }
+    if (_screen === 3 && _deps) {
+      const providers = [];
+      if (_deps.piper)   providers.push('piper');
+      if (_deps.soprano) providers.push('soprano');
+      const idx = providers.indexOf(_selectedProvider ?? providers[0]);
+      _selectedProvider = providers[Math.min(providers.length - 1, idx + 1)];
+      _renderScreen3();
+    }
   });
 
   // [E] on Screen 4: edit intro text inline
@@ -665,7 +667,14 @@ export function createInstallTab(screen, services) {
     },
 
     onFocus() {
-      box.focus();
+      // Focus the active interactive element, not just the box container
+      if (_screen === 1) {
+        _s1BeginBtn.focus();
+      } else if (_screen === 4) {
+        _editBtn.focus();
+      } else {
+        box.focus();
+      }
       screen.render();
     },
 
