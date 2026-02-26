@@ -1828,6 +1828,18 @@ export function createSettingsTab(screen, services) {
   }
 
   // ↓ / ↑ → navigate between row groups (skips siblings; use ←/→ for those)
+
+  // Returns the first non-hidden button in a row, or the first button if all are hidden.
+  // Needed because some rows have a hidden first button (e.g. [changeBtn, playBtn] when
+  // provider is not piper — changeBtn is hidden but playBtn is still reachable).
+  function _firstVisibleBtn(row) {
+    return row.find(b => !b.hidden) ?? row[0];
+  }
+
+  function _isRowVisible(row) {
+    return row.some(b => !b.hidden);
+  }
+
   function _navigateRow(delta) {
     const focused = _buttons[_currentIdx];
     let rowIdx = _rows.findIndex(row => row.includes(focused));
@@ -1846,17 +1858,18 @@ export function createSettingsTab(screen, services) {
     if (delta > 0 && rowIdx >= 1 && rowIdx <= lastContentIdx) {
       let isEffectiveLast = true;
       for (let r = rowIdx + 1; r <= lastContentIdx; r++) {
-        if (!_rows[r][0].hidden) { isEffectiveLast = false; break; }
+        if (_isRowVisible(_rows[r])) { isEffectiveLast = false; break; }
       }
       if (isEffectiveLast) {
         const tabIdx = SUB_TABS.indexOf(_activeSubTab);
         if (tabIdx < SUB_TABS.length - 1) {
           const nextTab = SUB_TABS[tabIdx + 1];
           _showSubTab(nextTab, true);
-          const firstRow = _rowsBySubTab[nextTab].find(row => !row[0].hidden);
+          const firstRow = _rowsBySubTab[nextTab].find(row => _isRowVisible(row));
           if (firstRow) {
-            _currentIdx = _buttons.indexOf(firstRow[0]);
-            _focusButton(firstRow[0]);
+            const btn = _firstVisibleBtn(firstRow);
+            _currentIdx = _buttons.indexOf(btn);
+            _focusButton(btn);
             return;
           }
         }
@@ -1873,24 +1886,26 @@ export function createSettingsTab(screen, services) {
         const prevRows = _rowsBySubTab[prevTab];
         let lastRow = null;
         for (let i = prevRows.length - 1; i >= 0; i--) {
-          if (!prevRows[i][0].hidden) { lastRow = prevRows[i]; break; }
+          if (_isRowVisible(prevRows[i])) { lastRow = prevRows[i]; break; }
         }
         if (lastRow) {
-          _currentIdx = _buttons.indexOf(lastRow[0]);
-          _focusButton(lastRow[0]);
+          const btn = _firstVisibleBtn(lastRow);
+          _currentIdx = _buttons.indexOf(btn);
+          _focusButton(btn);
           return;
         }
       }
       // First sub-tab: fall through (goes to sub-tab bar at row 0)
     }
 
-    // Skip rows whose first button is hidden (e.g. SSH alias row when destination is local)
+    // Skip rows where ALL buttons are hidden (e.g. SSH alias row when destination is local).
+    // Use _firstVisibleBtn so we land on the first visible button in a mixed row.
     let attempts = 0;
     do {
       rowIdx = (rowIdx + delta + _rows.length) % _rows.length;
       attempts++;
-    } while (_rows[rowIdx][0].hidden && attempts < _rows.length);
-    const btn = _rows[rowIdx][0];
+    } while (!_isRowVisible(_rows[rowIdx]) && attempts < _rows.length);
+    const btn = _firstVisibleBtn(_rows[rowIdx]);
     _currentIdx = _buttons.indexOf(btn);
     _focusButton(btn);
   }
