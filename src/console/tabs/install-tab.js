@@ -341,6 +341,17 @@ export function createInstallTab(screen, services) {
   _s1BeginBtn.key(['left', 'up', 'S-tab'],  () => { _s1ExitBtn.focus();   screen.render(); });
 
   // -------------------------------------------------------------------------
+  // Screen 2 button — Continue (shown after deps check passes)
+
+  const _s2ContinueBtn = _createInstallBtn('Continue →', '#1565c0', () => {
+    _screen++;
+    _showCurrentScreen();
+  });
+  _s2ContinueBtn.top  = 11; _s2ContinueBtn.left = 4;
+  // → also advances without the flash delay
+  _s2ContinueBtn.key(['right'], () => { _screen++; _showCurrentScreen(); });
+
+  // -------------------------------------------------------------------------
   // Screen renderers
 
   const _HDR = (emoji, label) =>
@@ -363,6 +374,7 @@ export function createInstallTab(screen, services) {
     const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
     let frameIdx = 0;
     _checking = true;
+    _s2ContinueBtn.hide();  // hidden during spinner
 
     contentBox.setContent(_c([
       _HDR('🔍', 'Dependency Check'),
@@ -392,6 +404,7 @@ export function createInstallTab(screen, services) {
     const ok  = () => `{${COLORS.successFg}-fg}✅  Installed{/${COLORS.successFg}-fg}`;
     const bad = () => `{${COLORS.errorFg}-fg}❌  Not found{/${COLORS.errorFg}-fg}`;
 
+    const ttsOk = _deps.piper || _deps.soprano;
     contentBox.setContent(_c([
       _HDR('🔍', 'Dependency Check'),
       '',
@@ -402,10 +415,15 @@ export function createInstallTab(screen, services) {
       `  {${COLORS.labelFg}-fg}${'Piper TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.piper   ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Soprano TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.soprano ? ok() : bad()}`,
       '',
-      _deps.piper || _deps.soprano
-        ? `  {${COLORS.successFg}-fg}✅  TTS Providers Detected — press Enter to continue{/${COLORS.successFg}-fg}`
+      ttsOk
+        ? `  {${COLORS.successFg}-fg}✅  TTS Providers Detected{/${COLORS.successFg}-fg}`
         : `  {${COLORS.errorFg}-fg}⚠   No TTS provider found. Install Piper or Soprano first.{/${COLORS.errorFg}-fg}`,
+      '',  // ← [Continue →] button here (box row 11) when TTS detected
     ]));
+    if (ttsOk) {
+      _s2ContinueBtn.show();
+      _s2ContinueBtn.focus();
+    }
     screen.render();
   }
 
@@ -557,6 +575,9 @@ export function createInstallTab(screen, services) {
       _s1BeginBtn.hide(); _s1ExitBtn.hide();
     }
 
+    // Screen 2 continue button: hidden on other screens; _renderScreen2 manages show/focus
+    if (_screen !== 2) _s2ContinueBtn.hide();
+
     // Show Screen 4 action buttons only on screen 4
     if (_screen === 4) {
       _editBtn.show(); _previewBtn.show(); _acceptBtn.show();
@@ -590,7 +611,8 @@ export function createInstallTab(screen, services) {
 
   screen.key(['enter'], () => {
     if (box.hidden || _checking) return;
-    if (_screen === 1) return;  // Screen 1: Enter handled by the focused button (Begin/Exit)
+    if (_screen === 1) return;  // Screen 1: Enter handled by Begin/Exit buttons
+    if (_screen === 2) return;  // Screen 2: Enter handled by Continue button
     if (_screen === 4) return;  // Screen 4: Enter handled by the focused button
     if (_completionModalOpen) { _dismissCompletionModal(); return; }
     if (_screen < 5) {
@@ -646,6 +668,7 @@ export function createInstallTab(screen, services) {
   screen.key(['right'], () => {
     if (box.hidden || _checking) return;
     if (_screen === 1) return;
+    if (_screen === 2) return;  // Screen 2: → handled by Continue button
     if (_screen < 4) {
       _screen++;
       _showCurrentScreen();
