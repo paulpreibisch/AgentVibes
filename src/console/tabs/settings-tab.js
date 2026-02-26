@@ -1396,7 +1396,7 @@ export function createSettingsTab(screen, services) {
   // Full Preview button — voice + reverb + background track combined
   const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
   fullPreviewBtn.bottom = 0;
-  fullPreviewBtn.right = 50;
+  fullPreviewBtn.left = 2;
 
   // -------------------------------------------------------------------------
   // Section header: 📡 Audio Destination
@@ -1598,7 +1598,7 @@ export function createSettingsTab(screen, services) {
     });
   }, { bg: '#7b1fa2' });   // purple
   saveGloballyBtn.bottom = 0;
-  saveGloballyBtn.right = 34;
+  saveGloballyBtn.left = 20;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
     const data = configService.getConfig();
@@ -1610,7 +1610,7 @@ export function createSettingsTab(screen, services) {
     });
   }, { bg: '#2e7d32' });   // green
   saveLocallyBtn.bottom = 0;
-  saveLocallyBtn.right = 19;
+  saveLocallyBtn.left = 37;
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
     // Restore global config to snapshot taken at tab open
@@ -1628,14 +1628,14 @@ export function createSettingsTab(screen, services) {
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
   cancelChangesBtn.bottom = 0;
-  cancelChangesBtn.right = 2;
+  cancelChangesBtn.left = 53;
 
   // -------------------------------------------------------------------------
   // Hint bar — keyboard shortcuts at the bottom of the settings area
 
   blessed.text({
     parent: box,
-    bottom: 0,
+    bottom: 1,
     left: 2,
     width: 82,
     tags: true,
