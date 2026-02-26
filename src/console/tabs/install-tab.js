@@ -38,8 +38,8 @@ const COLORS = {
   successFg:  '#69f0ae',  // Green — success
   errorFg:    '#ef9a9a',  // Red — error/missing
   btnDefault: '#283593',
-  btnFocus:   '#3f51b5',
-  btnFocusFg: '#ffffff',
+  btnFocus:   '#00e5ff',  // Cyan — focused button (system standard)
+  btnFocusFg: '#000000',  // Black text on cyan
   btnPress:   '#ff00ff',
   borderFg:   '#3f51b5',
   footerBg:   '#3f51b5',  // Indigo — Install tab footer
@@ -260,11 +260,44 @@ export function createInstallTab(screen, services) {
       style: {
         bg,
         fg: '#ffffff',
-        focus: { bg: COLORS.btnFocus, fg: '#000000', bold: true },
-        hover: { bg: COLORS.btnFocus, fg: '#000000', bold: true },
+        focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
       },
     });
-    btn.key(['enter', 'space'], onClick);
+
+    // Focus indicator: ►label◄ with blinking █ — matches settings-tab standard
+    let _blinkInterval = null;
+    btn.on('focus', () => {
+      const raw = btn.content.replace(/[►◄█]/g, '').trim();
+      btn.setContent(`►${raw}◄█`);
+      let _on = true;
+      screen.render();
+      _blinkInterval = setInterval(() => {
+        _on = !_on;
+        if (!btn.content.includes('►')) return;
+        const r = btn.content.replace(/[►◄█]/g, '').trim();
+        btn.setContent(_on ? `►${r}◄█` : `►${r}◄`);
+        screen.render();
+      }, 500);
+    });
+    btn.on('blur', () => {
+      if (_blinkInterval) { clearInterval(_blinkInterval); _blinkInterval = null; }
+      const raw = btn.content.replace(/[►◄█]/g, '').trim();
+      btn.setContent(raw);
+      screen.render();
+    });
+
+    // Press: magenta flash then invoke onClick
+    btn.key(['enter', 'space'], () => {
+      btn.style.bg = COLORS.btnPress;
+      btn.style.fg = 'white';
+      screen.render();
+      setTimeout(() => {
+        btn.style.bg = bg;
+        btn.style.fg = '#ffffff';
+        screen.render();
+        onClick();
+      }, 150);
+    });
     btn.on('click', () => btn.press());
     return btn;
   }
@@ -301,10 +334,11 @@ export function createInstallTab(screen, services) {
   _s1BeginBtn.top = 5; _s1BeginBtn.left = 4;
   _s1ExitBtn.top  = 5; _s1ExitBtn.left  = 20;
 
-  _s1BeginBtn.key(['right'],          () => { _s1ExitBtn.focus();   screen.render(); });
-  _s1ExitBtn.key(['right'],           () => { _s1BeginBtn.focus();  screen.render(); });
-  _s1ExitBtn.key(['left', 'S-tab'],   () => { _s1BeginBtn.focus();  screen.render(); });
-  _s1BeginBtn.key(['left', 'S-tab'],  () => { _s1ExitBtn.focus();   screen.render(); });
+  // ←/→ horizontal and ↑/↓ vertical — both navigate between the two buttons
+  _s1BeginBtn.key(['right', 'down'],  () => { _s1ExitBtn.focus();   screen.render(); });
+  _s1ExitBtn.key(['right', 'down'],   () => { _s1BeginBtn.focus();  screen.render(); });
+  _s1ExitBtn.key(['left', 'up', 'S-tab'],   () => { _s1BeginBtn.focus();  screen.render(); });
+  _s1BeginBtn.key(['left', 'up', 'S-tab'],  () => { _s1ExitBtn.focus();   screen.render(); });
 
   // -------------------------------------------------------------------------
   // Screen renderers
@@ -619,10 +653,10 @@ export function createInstallTab(screen, services) {
     // Screens 4 and 5 require explicit [Enter] to confirm
   });
 
-  // Down arrow on Screen 1: re-focus Begin button (handles case where box grabbed focus)
+  // Down arrow: Screen 3 provider nav; Screen 1 ↓ is handled by button key handlers
+  // (tab bar's el.key(['down']) → onFocus() focuses Begin, then button ↓ → Exit)
   screen.key(['down'], () => {
     if (box.hidden) return;
-    if (_screen === 1) { _s1BeginBtn.focus(); screen.render(); return; }
     if (_screen === 3 && _deps) {
       const providers = [];
       if (_deps.piper)   providers.push('piper');
