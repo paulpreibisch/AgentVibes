@@ -287,6 +287,26 @@ export function createInstallTab(screen, services) {
   _editBtn.key(['left', 'S-tab'],    () => { _acceptBtn.focus();  screen.render(); });
 
   // -------------------------------------------------------------------------
+  // Screen 1 buttons — Begin (cyan) and Exit (grey)
+
+  const _s1BeginBtn = _createInstallBtn('▶  Begin', '#00838f', () => {
+    _screen++;
+    _showCurrentScreen();
+  });
+  const _s1ExitBtn = _createInstallBtn('✗  Exit', '#546e7a', () => {
+    box.hide();
+    screen.render();
+  });
+
+  _s1BeginBtn.top = 5; _s1BeginBtn.left = 4;
+  _s1ExitBtn.top  = 5; _s1ExitBtn.left  = 20;
+
+  _s1BeginBtn.key(['right'],          () => { _s1ExitBtn.focus();   screen.render(); });
+  _s1ExitBtn.key(['right'],           () => { _s1BeginBtn.focus();  screen.render(); });
+  _s1ExitBtn.key(['left', 'S-tab'],   () => { _s1BeginBtn.focus();  screen.render(); });
+  _s1BeginBtn.key(['left', 'S-tab'],  () => { _s1ExitBtn.focus();   screen.render(); });
+
+  // -------------------------------------------------------------------------
   // Screen renderers
 
   const _HDR = (emoji, label) =>
@@ -298,9 +318,10 @@ export function createInstallTab(screen, services) {
       '',
       `  {${COLORS.noticeFg}-fg}TTS for AI assistants with personality.{/${COLORS.noticeFg}-fg}`,
       '',
-      `  {${COLORS.valueFg}-fg}Press [Enter] to begin  |  [Esc] to exit{/${COLORS.valueFg}-fg}`,
+      '',  // ← [▶ Begin] [✗ Exit] buttons here (box row 5)
     ]));
-    hintLine.setContent('  Screen 1/5: Welcome  |  [→] or [Enter] Next  |  [Esc] Exit');
+    hintLine.setContent('  Screen 1/5: Welcome  |  [←/→] Navigate  |  [Enter] Begin  |  [Esc] Exit');
+    _s1BeginBtn.focus();
     screen.render();
   }
 
@@ -495,6 +516,13 @@ export function createInstallTab(screen, services) {
   }
 
   function _showCurrentScreen() {
+    // Show Screen 1 buttons only on screen 1
+    if (_screen === 1) {
+      _s1BeginBtn.show(); _s1ExitBtn.show();
+    } else {
+      _s1BeginBtn.hide(); _s1ExitBtn.hide();
+    }
+
     // Show Screen 4 action buttons only on screen 4
     if (_screen === 4) {
       _editBtn.show(); _previewBtn.show(); _acceptBtn.show();
@@ -528,6 +556,7 @@ export function createInstallTab(screen, services) {
 
   screen.key(['enter'], () => {
     if (box.hidden || _checking) return;
+    if (_screen === 1) return;  // Screen 1: Enter handled by the focused button (Begin/Exit)
     if (_screen === 4) return;  // Screen 4: Enter handled by the focused button
     if (_completionModalOpen) { _dismissCompletionModal(); return; }
     if (_screen < 5) {
@@ -591,8 +620,10 @@ export function createInstallTab(screen, services) {
   });
 
   // Right arrow = go forward (same logic as Enter, without save/finish side-effects)
+  // Screen 1: right arrow handled by button ←/→ navigation
   screen.key(['right'], () => {
     if (box.hidden || _checking) return;
+    if (_screen === 1) return;
     if (_screen < 4) {
       _screen++;
       _showCurrentScreen();
