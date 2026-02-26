@@ -10,6 +10,7 @@
  */
 
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
@@ -40,22 +41,22 @@ const COLORS = {
   sectionHdr:   '#7986cb',  // Light blue — section dividers
   labelFg:      '#e3f2fd',  // Light blue text — labels
   valueFg:      '#ffd700',  // Yellow — current values
-  btnDefault:   BRAND_BLUE, // Indigo blue — default button bg
+  btnDefault:   '#37474f',  // Dark slate — default button bg
   btnFocus:     '#00e5ff',  // Cyan — focused button bg
   btnFocusFg:   '#000000',  // Black — focused button text
   btnPress:     '#ff00ff',  // Magenta — pressed button bg
-  btnChange:    '#ad1457',  // Muted deep pink — Change buttons
-  btnTest:      '#00796b',  // Teal — Test buttons
-  btnEdit:      '#1565c0',  // Dark blue — Edit buttons
-  btnEnableOn:  '#1b5e20',  // Dark green — Enabled toggle
-  btnEnableOff: '#e65100',  // Deep orange — Disabled toggle
+  btnChange:    '#37474f',  // Dark slate — Change buttons
+  btnTest:      '#37474f',  // Dark slate — Test buttons
+  btnEdit:      '#37474f',  // Dark slate — Edit buttons
+  btnEnableOn:  '#37474f',  // Dark slate — Enabled toggle
+  btnEnableOff: '#37474f',  // Dark slate — Disabled toggle
   borderFg:     '#7986cb',  // Light blue — borders
   footerBg:     '#2196f3',  // Blue — settings footer
   noticeFg:     '#90a4ae',  // Gray — stub notice text
 };
 
 const FOOTER_TEXT =
-  '[↑↓] Next Button  [Enter] Activate  [Space] Preview  [S/V/M/A/H/R] Switch Tab  [Q] Quit';
+  '[↑↓] Group  [←→] Sibling/Sub-tab  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit';
 
 // Default effects — single source of truth (used by _getEffects, _setEffects, refreshDisplay)
 const EFFECTS_DEFAULTS = Object.freeze({ reverbPreset: 'light' });
@@ -98,6 +99,31 @@ const PERSONALITIES = Object.freeze([
   'pirate', 'poetic', 'professional', 'rapper', 'robot', 'sarcastic',
   'sassy', 'surfer-dude', 'zen',
 ]);
+
+// Preview phrases — one short, exemplary, in-character line per personality.
+// Spoken automatically when the cursor lands on a personality in the picker.
+const PERSONALITY_PREVIEW_PHRASES = Object.freeze({
+  angry:        "UNACCEPTABLE! This build time is a DISASTER! Fix it NOW or so help me!",
+  annoying:     "Oh oh oh! Can I tell you something? Can I? Can I? PLEASE? It is so important!",
+  crass:        "Well damn, that code runs like my uncle's truck. Barely, and it smells funny.",
+  dramatic:     "The tests... have failed. I don't know how much longer I can do this.",
+  'dry-humor':  "Your code worked. I too am surprised.",
+  flirty:       "Ooh, a clean merge? You know exactly how to make my heart race.",
+  funny:        "Why do programmers hate nature? Too many bugs. I will show myself out.",
+  grandpa:      "Back in my day, we compiled by hand. Uphill. In the snow. Both ways.",
+  millennial:   "I literally cannot even with this error. I am so done. Like, actually deceased.",
+  moody:        "...It works. Whatever. Do not get used to it.",
+  pirate:       "Arrr! The build be sailin' smooth today, matey! No barnacles in sight!",
+  poetic:       "Like rivers to the sea, your code flows toward eventual compilation.",
+  professional: "I have completed the requested task and am prepared to document outcomes.",
+  rapper:       "Yo! Clean code flowin', tests are glowin', no bugs showin'!",
+  robot:        "TASK COMPLETE. EFFICIENCY: OPTIMAL. PROBABILITY OF SUCCESS: 97.3 PERCENT. BEEP.",
+  sarcastic:    "Oh wow, another bug. What a completely unexpected surprise. Truly shocking.",
+  sassy:        "Honey, whoever told you that was good code was not your friend.",
+  'surfer-dude':"Duuude! That commit totally shredded! Gnarly clean code, bro!",
+  zen:          "The bug is not the enemy. The bug is the teacher. Breathe. Commit.",
+  random:       "Who will I be today? Even I do not know. Expect the unexpected.",
+});
 
 // Human-readable track display names — matches installer track picker (src/installer.js:2280)
 const TRACK_NAMES = Object.freeze({
@@ -230,11 +256,18 @@ function createTestStub() {
 export function createSettingsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, navigationService } = services;
+  const { configService, providerService, navigationService, focusMainTabBar } = services;
 
   // Playback state for the voice sample button
   let _sampleProcess = null;
   let _samplePlaying = false;
+
+  // soprano-manager.sh wait-proc — tracked separately so killing it does NOT kill soprano-webui
+  let _sopranoMgrProc = null;
+
+  // Soprano WebUI status glyph — updated asynchronously when provider is soprano
+  let _sopranoStatusGlyph = '';
+  let _sopranoStatusProc  = null;
 
   const _sampleEnv = {
     ...process.env,
@@ -253,6 +286,7 @@ export function createSettingsTab(screen, services) {
   let _spinnerBtn   = null;
 
   function _startSpinner(btn, label) {
+    _stopSpinner();  // Clear any running spinner so label updates don't leak intervals
     _spinnerBtn = btn;
     _spinnerIdx = 0;
     btn.style.bg = SPINNER_PROCESSING_BG;
@@ -280,13 +314,13 @@ export function createSettingsTab(screen, services) {
     _testSpinnerIdx = 0;
     for (const b of _testBtns) {
       b.style.bg = SPINNER_PROCESSING_BG;
-      b.setContent(`${SPINNER_FRAMES[0]} ${_testBtnLabels.get(b) ?? 'Test'}`);
+      b.setContent(`${SPINNER_FRAMES[0]} ${_testBtnLabels.get(b) ?? '▶ Preview'}`);
     }
     screen.render();
     _testSpinnerTimer = setInterval(() => {
       _testSpinnerIdx = (_testSpinnerIdx + 1) % SPINNER_FRAMES.length;
       for (const b of _testBtns) {
-        b.setContent(`${SPINNER_FRAMES[_testSpinnerIdx]} ${_testBtnLabels.get(b) ?? 'Test'}`);
+        b.setContent(`${SPINNER_FRAMES[_testSpinnerIdx]} ${_testBtnLabels.get(b) ?? '▶ Preview'}`);
       }
       screen.render();
     }, 100);
@@ -299,6 +333,11 @@ export function createSettingsTab(screen, services) {
 
   function _killSample() {
     _stopSpinner();
+    // Kill manager wait-proc with direct SIGTERM (NOT process group) so soprano-webui keeps running
+    if (_sopranoMgrProc) {
+      try { _sopranoMgrProc.kill('SIGTERM'); } catch {}
+      _sopranoMgrProc = null;
+    }
     if (_sampleProcess) {
       try { process.kill(-_sampleProcess.pid, 'SIGTERM'); } catch {}
       _sampleProcess = null;
@@ -307,11 +346,12 @@ export function createSettingsTab(screen, services) {
   }
 
   // Test button state (shared for reverb [Test])
-  let _testActive   = false;
-  let _testMusicProc = null;
-  let _testVoiceProc = null;
-  let _testTimeout  = null;
-  const _testBtns   = [];  // populated after button creation
+  let _testActive       = false;
+  let _testMusicProc    = null;
+  let _testVoiceProc    = null;
+  let _testTimeout      = null;
+  let _testInitiatorBtn = null;  // button that started the current test (restored on completion)
+  const _testBtns       = [];  // populated after button creation
 
   // Music-only test state (background music [Test] — no voice synthesis)
   let _musicTestActive = false;
@@ -345,9 +385,11 @@ export function createSettingsTab(screen, services) {
     if (_testMusicProc) { try { process.kill(-_testMusicProc.pid, 'SIGTERM'); } catch {} _testMusicProc = null; }
     if (_testVoiceProc) { try { process.kill(-_testVoiceProc.pid, 'SIGTERM'); } catch {} _testVoiceProc = null; }
     _testActive = false;
+    _testInitiatorBtn = null;
     // Restore spinner labels to defaults (may have been overridden for soprano 'Loading model…')
-    _testBtnLabels.set(reverbTestBtn, 'Test');
-    _testBtnLabels.set(fullPreviewBtn, '▶ Full Preview');
+    _testBtnLabels.set(reverbTestBtn,      '▶ Preview');
+    _testBtnLabels.set(personalityTestBtn, '▶ Preview');
+    _testBtnLabels.set(fullPreviewBtn,     '▶ Full Preview');
   }
 
   function _setTestBtnsLabel(label) {
@@ -355,59 +397,78 @@ export function createSettingsTab(screen, services) {
     screen.render();
   }
 
-  let _starPhraseIdx = -1;  // cycles so the same phrase is never repeated back-to-back
+  // Restore each test button to its individual default label (from _testBtnLabels map).
+  // Replaces the old _restoreTestBtnsLabels() pattern which stomped on non-'Test' labels.
+  function _restoreTestBtnsLabels() {
+    for (const b of _testBtns) b.setContent(_testBtnLabels.get(b) ?? '▶ Preview');
+    screen.render();
+  }
 
-  const _STAR_PHRASES = [
-    "Hey, we'd love it if you gave Agent Vibes a GitHub star. It really helps us out.",
-    "Are you loving Agent Vibes? Please consider giving us a GitHub star. It means a lot.",
-    "Hey dude, did you give us a GitHub star yet? It would really help us out.",
-    "By the way, we love GitHub stars. It really helps our efforts. Go ahead and star us!",
-    "If Agent Vibes is making your day better, a GitHub star is the best way to say thanks.",
-    "Quick favour — if you're enjoying this, drop us a star on GitHub. We appreciate every single one.",
-    "Hey, stars on GitHub keep us motivated to keep building. Consider leaving one for us!",
-    "Psst — your GitHub star helps keep Agent Vibes free and open source. Just saying.",
-    "We put a lot of love into Agent Vibes. A star on GitHub would make our day.",
-    "Enjoying the vibes? Head over to GitHub and give us a star. It genuinely helps.",
+  // Read a random example response from the personality's .md file.
+  // Returns null when no personality is set or the file can't be parsed.
+  function _getPersonalityPhrase(personality) {
+    if (!personality || personality === 'none' || personality === 'normal') return null;
+    try {
+      const file = path.join(process.cwd(), '.claude', 'personalities', personality + '.md');
+      const lines = fs.readFileSync(file, 'utf8').split('\n');
+      const examples = lines
+        .filter(l => /^\s*- "/.test(l))
+        .map(l => l.trim().replace(/^- "/, '').replace(/"$/, '').trim())
+        .filter(Boolean);
+      return examples.length ? examples[Math.floor(Math.random() * examples.length)] : null;
+    } catch { return null; }
+  }
+
+  const _TEST_GREETINGS = [
+    'Hey', 'Hi there', 'Hello', 'Hey there', 'Howdy', 'Greetings', 'What\'s up',
   ];
 
-  function _buildPreviewPhrase() {
-    const cfg        = configService.getConfig();
-    const provider   = providerService.getActiveProvider();
-    const voice      = provider === 'soprano' ? 'Soprano' : (providerService.getActiveVoiceId() ?? 'unknown');
-    const pretext    = (cfg.pretext ?? '').trim();
+  function _testGreeting() {
+    return _TEST_GREETINGS[Math.floor(Math.random() * _TEST_GREETINGS.length)];
+  }
 
-    const effects    = cfg.effects ?? {};
-    const reverbOn   = effects.reverb !== false;
-    const reverbDesc = reverbOn ? `on, set to ${effects.reverbPreset ?? 'light'}` : 'off';
+  function _buildPreviewPhrase() {
+    const cfg       = configService.getConfig();
+    const provider  = providerService.getActiveProvider();
+    const voice     = provider === 'soprano' ? 'Soprano' : (providerService.getActiveVoiceId() ?? 'unknown');
+
+    const effects      = cfg.effects ?? {};
+    const reverbOn     = effects.reverb !== false;
+    const reverbPreset = effects.reverbPreset ?? 'light';
 
     const music      = cfg.backgroundMusic ?? {};
     const musicOn    = music.enabled !== false;
     const trackLabel = formatTrackName(music.track ?? '');
-    const musicDesc  = musicOn ? `on, playing ${trackLabel}` : 'off';
 
     const personality = (cfg.personality ?? '').trim();
-    const persDesc    = personality ? `set to ${personality}` : 'off';
-
-    _starPhraseIdx = (_starPhraseIdx + 1) % _STAR_PHRASES.length;
-    const starPhrase  = _STAR_PHRASES[_starPhraseIdx];
+    const hasPersonality = personality && personality !== 'none' && personality !== 'normal';
 
     const parts = [];
-    if (pretext) parts.push(pretext + '.');
-    parts.push(`I am ${voice}.`);
-    parts.push(`I have reverb ${reverbDesc}.`);
-    parts.push(`My background music track is ${musicDesc}.`);
-    parts.push('We hope you are enjoying Agent Vibes.');
-    parts.push(`My personality is ${persDesc}.`);
-    parts.push(starPhrase);
+    parts.push(`${_testGreeting()}.`);
+    parts.push('Agent Vibes here.');
+
+    let voicePart = `I am ${voice}`;
+    if (hasPersonality) voicePart += `, with ${personality} personality`;
+    voicePart += ',';
+    parts.push(voicePart);
+
+    if (reverbOn) parts.push(`reverb set at ${reverbPreset},`);
+    else          parts.push('reverb off,');
+
+    if (musicOn) parts.push(`and background music set to ${trackLabel}.`);
+    else         parts.push('and background music off.');
+
     return parts.join(' ');
   }
 
   // withMusic=true → Full Preview (voice + reverb + background track)
   // withMusic=false → Reverb Test (voice + reverb only, no background music)
-  function _runTest(withMusic = true) {
-    if (_testActive) { _killTest(); _setTestBtnsLabel('Test'); return; }
+  // phraseOverride → speak this text instead of the full _buildPreviewPhrase() summary
+  function _runTest(withMusic = true, phraseOverride = null) {
+    if (_testActive) { _killTest(); _restoreTestBtnsLabels(); return; }
 
     _testActive = true;
+    _testInitiatorBtn = _buttons[_currentIdx];
     _startTestSpinner();
 
     // Prefer the settings-tab key (backgroundMusic) over the music-tab key (music)
@@ -445,9 +506,10 @@ export function createSettingsTab(screen, services) {
     const provider   = providerService.getActiveProvider();
     const leadInMs   = provider === 'soprano' ? 0 : 2000;
     if (provider === 'soprano') {
-      // Override spinner labels so the user knows soprano is loading its neural model.
-      for (const b of _testBtns) _testBtnLabels.set(b, 'Loading model…');
-      for (const b of _testBtns) b.setContent(`${SPINNER_FRAMES[0]} Loading model…`);
+      // Use "Synthesizing…" when WebUI is already warm, "Loading model…" when cold.
+      const sopranoLabel = _sopranoStatusGlyph === ' 🟢' ? 'Synthesizing…' : 'Loading model…';
+      for (const b of _testBtns) _testBtnLabels.set(b, sopranoLabel);
+      for (const b of _testBtns) b.setContent(`${SPINNER_FRAMES[0]} ${sopranoLabel}`);
       screen.render();
     }
     _testTimeout = setTimeout(() => {
@@ -456,20 +518,39 @@ export function createSettingsTab(screen, services) {
 
       const provider  = providerService.getActiveProvider();  // re-read (may have changed)
       const tempWav   = path.join(os.tmpdir(), `agentvibes-test-${Date.now()}.wav`);
-      const ttsInput  = _buildPreviewPhrase();
+      const ttsInput  = phraseOverride ?? _buildPreviewPhrase();
 
       let synthProc;
       if (provider === 'soprano') {
-        synthProc = spawn('soprano', ['--output', tempWav, ttsInput], {
-          stdio: 'ignore', detached: true, env: _testEnv,
+        const port    = process.env.SOPRANO_PORT || '7860';
+        const synther = path.resolve(new URL(import.meta.url).pathname,
+          '..', '..', '..', '..', '.claude', 'hooks', 'soprano-gradio-synth.py');
+        const sopranoEnv = {
+          ...(_testEnv),
+          _AV_PHRASE:  ttsInput,
+          _AV_WAV:     tempWav,
+          _AV_SYNTHER: synther,
+          _AV_PORT:    String(port),
+        };
+        // Mirror the Play button: try Gradio WebUI → OpenAI-compat API → CLI fallback.
+        // This keeps the model warm instead of cold-loading it on every Test press.
+        const cmd = [
+          `python3 "$_AV_SYNTHER" "$_AV_PHRASE" "$_AV_WAV" "$_AV_PORT" 2>/dev/null`,
+          `curl -sf --max-time 30 "http://127.0.0.1:$_AV_PORT/v1/audio/speech"` +
+            ` -H "Content-Type: application/json"` +
+            ` -d "{\\"input\\":\\"$_AV_PHRASE\\"}" --output "$_AV_WAV" 2>/dev/null`,
+          `soprano "$_AV_PHRASE" -o "$_AV_WAV"`,
+        ].join(' || ');
+        synthProc = spawn('sh', ['-c', cmd], {
+          stdio: 'ignore', detached: true, env: sopranoEnv,
         });
       } else {
         const voiceId = providerService.getActiveVoiceId();
-        if (!voiceId) { _killTest(); _setTestBtnsLabel('Test'); return; }
+        if (!voiceId) { _killTest(); _restoreTestBtnsLabels(); return; }
         const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
         const safePiper = path.resolve(PIPER_VOICES_DIR);
         if (!voicePath.startsWith(safePiper + path.sep) && voicePath !== safePiper) {
-          _killTest(); _setTestBtnsLabel('Test'); return;
+          _killTest(); _restoreTestBtnsLabels(); return;
         }
         synthProc = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
           stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _testEnv,
@@ -482,7 +563,7 @@ export function createSettingsTab(screen, services) {
 
       synthProc.on('exit', (code) => {
         if (!_testActive || code !== 0) {
-          _killTest(); _setTestBtnsLabel('Test');
+          _killTest(); _restoreTestBtnsLabels();
           try { fs.unlinkSync(tempWav); } catch {}
           return;
         }
@@ -527,19 +608,25 @@ export function createSettingsTab(screen, services) {
         });
         _testVoiceProc = playProc;
         playProc.on('exit', () => {
-          _killTest(); _setTestBtnsLabel('Test');
+          const btn = _testInitiatorBtn;
+          _killTest(); _restoreTestBtnsLabels();
           try { fs.unlinkSync(tempWav); } catch {}
           if (processedWav) { try { fs.unlinkSync(processedWav); } catch {} }
+          if (btn) _focusButton(btn);
         });
         playProc.on('error', () => {
-          _killTest(); _setTestBtnsLabel('Test');
+          const btn = _testInitiatorBtn;
+          _killTest(); _restoreTestBtnsLabels();
           try { fs.unlinkSync(tempWav); } catch {}
           if (processedWav) { try { fs.unlinkSync(processedWav); } catch {} }
+          if (btn) _focusButton(btn);
         });
       });
 
       synthProc.on('error', () => {
-        _killTest(); _setTestBtnsLabel('Test');
+        const btn = _testInitiatorBtn;
+        _killTest(); _restoreTestBtnsLabels();
+        if (btn) _focusButton(btn);
       });
     }, leadInMs);
   }
@@ -555,14 +642,51 @@ export function createSettingsTab(screen, services) {
   function _runMusicTest() {
     if (_musicTestActive) {
       _killMusicTest();
-      musicTestBtn.setContent('Test');
+      musicTestBtn.setContent('▶ Preview');
       screen.render();
       return;
     }
 
     const musicCfg = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
     if (!musicCfg.enabled) {
-      _showNotice(screen, 'Music is disabled — enable it first');
+      // Show a small popup offering to enable music on the spot
+      const modal = blessed.box({
+        parent: screen, top: 'center', left: 'center', width: 46, height: 7,
+        border: { type: 'line' },
+        tags: true,
+        label: _modalTitle('Background Music'),
+        style: { bg: COLORS.contentBg, border: { fg: COLORS.btnFocus } },
+      });
+      blessed.text({
+        parent: modal, top: 1, left: 2, tags: true,
+        content: '{#e3f2fd-fg}Music is disabled. Enable it now?{/#e3f2fd-fg}',
+        style: { bg: COLORS.contentBg },
+      });
+      function _closeConfirm() {
+        modal.destroy();
+        try {
+          for (let r = 0; r < screen.height; r++)
+            for (let c = 0; c < screen.width; c++)
+              if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
+        } catch {}
+        _restoreFocus();
+        screen.render();
+      }
+      const enableBtn = _createButton(modal, screen, 'Enable', COLORS, () => {
+        _closeConfirm();
+        _setMusic(configService, { enabled: true });
+        refreshDisplay();
+        _runMusicTest();
+      });
+      enableBtn.top = 4; enableBtn.left = 4;
+      const cancelBtn = _createButton(modal, screen, 'Cancel', COLORS, _closeConfirm);
+      cancelBtn.top = 4; cancelBtn.left = 16;
+      modal.key(['escape', 'q'], _closeConfirm);
+      enableBtn.key(['right', 'tab'], () => { cancelBtn.focus(); screen.render(); });
+      cancelBtn.key(['left', 'S-tab'], () => { enableBtn.focus(); screen.render(); });
+      modal.setFront();
+      enableBtn.focus();
+      screen.render();
       return;
     }
     const trackId  = musicCfg.track ?? MUSIC_DEFAULTS.track;
@@ -572,7 +696,7 @@ export function createSettingsTab(screen, services) {
     if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
 
     _musicTestActive = true;
-    _startSpinner(musicTestBtn, 'Test');
+    _startSpinner(musicTestBtn, '▶ Preview');
 
     // Apply volume: ffplay 0-100, sox vol 0.0-1.0
     const vol         = musicCfg.volume ?? MUSIC_DEFAULTS.volume;
@@ -596,14 +720,14 @@ export function createSettingsTab(screen, services) {
     _musicTestProc.on('exit', () => {
       if (_musicTestActive) {
         _killMusicTest();
-        musicTestBtn.setContent('Test');
-        screen.render();
+        musicTestBtn.setContent('▶ Preview');
+        _focusButton(musicTestBtn);
       }
     });
     _musicTestProc.on('error', () => {
       _killMusicTest();
-      musicTestBtn.setContent('Test');
-      screen.render();
+      musicTestBtn.setContent('▶ Preview');
+      _focusButton(musicTestBtn);
     });
   }
 
@@ -640,46 +764,94 @@ export function createSettingsTab(screen, services) {
     width: '100%',
     bottom: 2,    // Above context footer + GitHub footer
     hidden: true,
+    scrollable: true,
+    alwaysScroll: true,
+    mouse: true,
+    scrollbar: { ch: '│', track: { bg: '#1e2a3a' }, style: { fg: COLORS.borderFg } },
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: COLORS.borderFg } },
     border: { type: 'line' },
   });
 
-  // Right column starts here — Audio Destination, Full Preview, and Config
-  // Storage widgets are positioned at left: R + offset in the right column.
-  const R = 90;
-
-  // Vertical column divider — draws │ chars; section separators overlay ┼/┤/├ at intersections
-  blessed.box({
-    parent: box,
-    top: 0,
-    left: R,
-    width: 1,
-    height: '100%',
-    content: Array(50).fill('│').join('\n'),
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
 
   // -------------------------------------------------------------------------
-  // Section header: ── Provider & Voice ──
+  // Sub-tab bar — Voice | Effects | Personality | Output
 
-  // Full-width separator at row 1 — both columns start here, ┼ at column divider
-  blessed.text({
-    parent: box,
-    top: 1,
-    left: 0,
-    right: 0,
-    wrap: false,
-    content: `${'─'.repeat(R)}┼${'─'.repeat(200)}`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 1,
-    left: 1,
-    content: '{#7986cb-fg} 🎤 Provider & Voice {/#7986cb-fg}',
-    tags: true,
+  const SUB_TABS = ['voice', 'effects', 'personality', 'output'];
+  const SUB_TAB_LABELS = {
+    voice:       ' [V] Voice ',
+    effects:     ' [E] Effects ',
+    personality: ' [P] Personality ',
+    output:      ' [O] Output ',
+  };
+  let _activeSubTab = 'voice';
+
+  const _subTabBar = blessed.box({
+    parent: box, top: 1, left: 1, height: 1,
     style: { bg: COLORS.contentBg },
   });
+
+  blessed.text({
+    parent: box, top: 2, left: 1, right: 1,
+    content: '─'.repeat(80),
+    style: { fg: '#37474f', bg: COLORS.contentBg },
+  });
+
+  const _subTabItemsMap = {};
+  let _xOff = 0;
+  for (const id of SUB_TABS) {
+    const lbl = SUB_TAB_LABELS[id];
+    const item = blessed.box({
+      parent: _subTabBar,
+      content: lbl, width: lbl.length, height: 1,
+      top: 0, left: _xOff,
+      keys: true, focusable: true,
+      style: { fg: '#00e5ff', bg: '#263238' },
+    });
+    _subTabItemsMap[id] = item;
+    _xOff += lbl.length;
+  }
+
+  function _updateSubTabBar() {
+    for (const id of SUB_TABS) {
+      const item = _subTabItemsMap[id];
+      if (id === _activeSubTab) {
+        item.style.fg = 'white';
+        item.style.bg = '#0288d1'; // light blue — active tab
+        item.style.bold = true;
+      } else {
+        item.style.fg = '#00e5ff';
+        item.style.bg = '#263238';
+        item.style.bold = false;
+      }
+    }
+  }
+
+  // Focused sub-tab item turns purple + blinking █; blur restores active/inactive colours
+  for (const id of SUB_TABS) {
+    const item      = _subTabItemsMap[id];
+    const _stBase   = SUB_TAB_LABELS[id];
+    const _stBlock  = _stBase.slice(0, -1) + '█'; // replace trailing space with block
+    let _stInterval = null;
+    item.on('focus', () => {
+      item.style.fg = 'white';
+      item.style.bg = '#9c27b0';
+      item.style.bold = true;
+      let _stOn = true;
+      item.setContent(_stBlock);
+      screen.render();
+      _stInterval = setInterval(() => {
+        _stOn = !_stOn;
+        item.setContent(_stOn ? _stBlock : _stBase);
+        screen.render();
+      }, 500);
+    });
+    item.on('blur', () => {
+      if (_stInterval) { clearInterval(_stInterval); _stInterval = null; }
+      item.setContent(_stBase);
+      _updateSubTabBar();
+      screen.render();
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Provider row: label + value + [Switch] button
@@ -708,7 +880,7 @@ export function createSettingsTab(screen, services) {
       refreshDisplay();
       _buttons[_currentIdx].focus();
       screen.render();
-    });
+    }, _restoreFocus);
   });
   switchBtn.top = 3;
   switchBtn.left = 52;
@@ -739,7 +911,7 @@ export function createSettingsTab(screen, services) {
       refreshDisplay();
       _buttons[_currentIdx].focus();
       screen.render();
-    });
+    }, _restoreFocus);
   }, { bg: COLORS.btnChange });
   changeBtn.top = 5;
   changeBtn.left = 52;
@@ -753,20 +925,20 @@ export function createSettingsTab(screen, services) {
     }
 
     const provider = providerService.getActiveProvider();
-    const phrase   = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+    const _activePers = (configService.getConfig().personality ?? '').trim();
+    const _hasPersonality = _activePers && _activePers !== 'none' && _activePers !== 'normal';
+    let phrase = `${_testGreeting()}. Agent Vibes here. I am ${provider === 'soprano' ? 'Soprano' : (providerService.getActiveVoiceId() ?? 'this voice')}`;
+    if (_hasPersonality) phrase += `, with ${_activePers} personality`;
+    phrase += '.';
     const tempWav  = path.join(os.tmpdir(), `agentvibes-sample-${Date.now()}.wav`);
 
     _samplePlaying = true;
-    // Soprano loads its neural model on each invocation — show a descriptive label
-    // so the user knows synthesis is in progress (not a hang).
-    const spinnerLabel = provider === 'soprano' ? 'Loading model…' : '▶ Play';
-    _startSpinner(playBtn, spinnerLabel);
 
     const _onSynthDone = (code) => {
       _stopSpinner();
       if (!_samplePlaying) { try { fs.unlinkSync(tempWav); } catch {} return; }
       if (code !== 0) {
-        _killSample(); playBtn.setContent('▶ Play'); screen.render();
+        _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn);
         try { fs.unlinkSync(tempWav); } catch {}
         return;
       }
@@ -775,21 +947,117 @@ export function createSettingsTab(screen, services) {
       const playCmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
       const playProc = spawn('sh', ['-c', playCmd], { stdio: 'ignore', detached: true, env: _sampleEnv });
       _sampleProcess = playProc;
-      const _done = () => { _killSample(); playBtn.setContent('▶ Play'); screen.render(); try { fs.unlinkSync(tempWav); } catch {} };
+      const _done = () => { _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); try { fs.unlinkSync(tempWav); } catch {} };
       playProc.on('exit', _done);
       playProc.on('error', _done);
     };
 
     if (provider === 'soprano') {
-      // Soprano: soprano --output <wav> "<text>"
-      const soprano = spawn('soprano', ['--output', tempWav, phrase], {
-        stdio: 'ignore', detached: true, env: _sampleEnv,
-      });
-      _sampleProcess = soprano;
-      soprano.on('exit', _onSynthDone);
-      soprano.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); });
+      const port        = process.env.SOPRANO_PORT || '7860';
+      const synther     = path.resolve(new URL(import.meta.url).pathname,
+        '..', '..', '..', '..', '.claude', 'hooks', 'soprano-gradio-synth.py');
+      const managerPath = path.resolve(new URL(import.meta.url).pathname,
+        '..', '..', '..', '..', '.claude', 'hooks', 'soprano-manager.sh');
+
+      // Fast-path: cached green status glyph confirms WebUI is healthy — skip manager wait.
+      // @why soprano-manager does an HTTP health check (up to 2s) even when already running;
+      //      if _refreshSopranoStatus() already confirmed 🟢 we can synthesize immediately.
+      if (_sopranoStatusGlyph === ' 🟢') {
+        _doSopranoSynth(true);
+      } else {
+        // Ask soprano-manager to ensure the WebUI is running and wait until healthy.
+        // If already running: exits in <200ms. If cold-starting: blocks up to 60s.
+        // Progressive label updates tell the user how long it's been waiting.
+        _startSpinner(playBtn, 'Starting Soprano…');
+
+        let _startSecs = 0;
+        const _startLabelTimer = setInterval(() => {
+          if (!_samplePlaying) { clearInterval(_startLabelTimer); return; }
+          _startSecs += 10;
+          // Re-call _startSpinner to replace the label; it stops the old interval first.
+          _startSpinner(playBtn, `Starting Soprano… (${_startSecs}s)`);
+        }, 10000);
+
+        if (fs.existsSync(managerPath)) {
+          const mgrProc = spawn('bash', [managerPath, 'start', '--wait'], {
+            stdio: ['ignore', 'ignore', 'pipe'],
+            env: { ...process.env, SOPRANO_PORT: port },
+          });
+          _sopranoMgrProc = mgrProc;  // tracked separately — kill() won't cascade to soprano-webui
+
+          mgrProc.on('exit', (code) => {
+            clearInterval(_startLabelTimer);
+            _sopranoMgrProc = null;
+            if (!_samplePlaying) return;
+            if (code === 5) {
+              // soprano-webui binary not installed
+              _stopSpinner();
+              _killSample();
+              playBtn.setContent('▶ Play');
+              _showNotice(screen, 'Soprano not installed — run: pip install soprano-tts');
+              _refreshSopranoStatus();
+              _focusButton(playBtn);
+              return;
+            }
+            // code 0 = WebUI ready (Synthesizing…); any other = timed out/error (Loading model…)
+            _doSopranoSynth(code === 0);
+          });
+
+          mgrProc.on('error', () => {
+            clearInterval(_startLabelTimer);
+            _sopranoMgrProc = null;
+            if (_samplePlaying) _doSopranoSynth(false);
+          });
+        } else {
+          // soprano-manager.sh not present — fall back to direct 2s HTTP check
+          clearInterval(_startLabelTimer);
+          const checkReq = http.get(
+            `http://127.0.0.1:${port}/gradio_api/info`,
+            { timeout: 2000 },
+            (res) => { res.resume(); _doSopranoSynth(true); },
+          );
+          checkReq.on('error', () => _doSopranoSynth(false));
+          checkReq.on('timeout', () => { checkReq.destroy(); _doSopranoSynth(false); });
+        }
+      }
+
+      function _doSopranoSynth(webUIUp) {
+        if (!_samplePlaying) return;
+        _startSpinner(playBtn, webUIUp ? 'Synthesizing…' : 'Loading model…');
+
+        // Pass phrase and output path via env vars — avoids all shell-escaping issues.
+        // Mode chain: WebUI (Gradio, model warm) → API server (OpenAI-compat) → CLI (slow cold-load).
+        const sopranoEnv = {
+          ...(_sampleEnv),
+          _AV_PHRASE:  phrase,
+          _AV_WAV:     tempWav,
+          _AV_SYNTHER: synther,
+          _AV_PORT:    String(port),
+        };
+        const cmd = [
+          // Mode 1: Gradio WebUI
+          `python3 "$_AV_SYNTHER" "$_AV_PHRASE" "$_AV_WAV" "$_AV_PORT" 2>/dev/null`,
+          // Mode 2: OpenAI-compatible API server (curl writes WAV directly)
+          `curl -sf --max-time 30 "http://127.0.0.1:$_AV_PORT/v1/audio/speech"` +
+            ` -H "Content-Type: application/json"` +
+            ` -d "{\\"input\\":\\"$_AV_PHRASE\\"}" --output "$_AV_WAV" 2>/dev/null`,
+          // Mode 3: CLI — reloads neural model each call (~15-30s)
+          `soprano "$_AV_PHRASE" -o "$_AV_WAV"`,
+        ].join(' || ');
+
+        const soprano = spawn('sh', ['-c', cmd], {
+          stdio: 'ignore', detached: true, env: sopranoEnv,
+        });
+        _sampleProcess = soprano;
+        soprano.on('exit', (code) => {
+          _onSynthDone(code);
+          _refreshSopranoStatus();  // Update status glyph after synthesis completes
+        });
+        soprano.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); });
+      }
     } else {
       // Piper (default): pipe text via stdin
+      _startSpinner(playBtn, 'Synthesizing…');
       const voiceId   = providerService.getActiveVoiceId();
       if (!voiceId) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
       const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
@@ -804,27 +1072,28 @@ export function createSettingsTab(screen, services) {
       piper.stdin.end();
       _sampleProcess = piper;
       piper.on('exit', _onSynthDone);
-      piper.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); });
+      piper.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); });
     }
   });
   playBtn.top = 5;
   playBtn.left = 64;
 
+  const voiceFileText = blessed.text({
+    parent: box,
+    top: 6,
+    left: 22,
+    right: 2,
+    wrap: false,
+    content: '.claude/tts-voice.txt',
+    style: { fg: '#546e7a', bg: COLORS.contentBg },
+  });
+
   // -------------------------------------------------------------------------
   // Section header: ── Audio Effects ──
 
-  // Left-column separator at row 9 — ends at column divider with ┤
-  blessed.text({
+  const audioEffectsHeader = blessed.text({
     parent: box,
-    top: 9,
-    left: 0,
-    width: R + 1,
-    content: `${'─'.repeat(R)}┤`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 9,
+    top: 3,
     left: 1,
     content: '{#7986cb-fg} ⚡ Audio Effects {/#7986cb-fg}',
     tags: true,
@@ -836,7 +1105,7 @@ export function createSettingsTab(screen, services) {
 
   const reverbLabel = blessed.text({
     parent: box,
-    top: 11,
+    top: 5,
     left: 6,
     content: 'Reverb:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -844,7 +1113,7 @@ export function createSettingsTab(screen, services) {
 
   const reverbValue = blessed.text({
     parent: box,
-    top: 11,
+    top: 5,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -856,30 +1125,31 @@ export function createSettingsTab(screen, services) {
     _openReverbPicker(screen, configService, (preset) => {
       _setEffects(configService, { reverbPreset: preset });
       refreshDisplay();
-    });
+    }, _restoreFocus);
   }, { bg: COLORS.btnChange });
-  reverbChangeBtn.top = 11;
+  reverbChangeBtn.top = 5;
   reverbChangeBtn.left = 52;
 
-  const reverbTestBtn = _createButton(box, screen, 'Test', COLORS, () => _runTest(false), { bg: COLORS.btnTest });
-  reverbTestBtn.top = 11;
+  const reverbTestBtn = _createButton(box, screen, '▶ Preview', COLORS, () => _runTest(false), { bg: COLORS.btnTest });
+  reverbTestBtn.top = 5;
   reverbTestBtn.left = 64;
+
+  const reverbPathText = blessed.text({
+    parent: box,
+    top: 6,
+    left: 22,
+    right: 2,
+    wrap: false,
+    content: '.agentvibes/config.json',
+    style: { fg: '#546e7a', bg: COLORS.contentBg },
+  });
 
   // -------------------------------------------------------------------------
   // Section header: ── Background Music ──
 
-  // Left-column separator at row 13 — ends at column divider with ┤
-  blessed.text({
+  const bgMusicHeader = blessed.text({
     parent: box,
-    top: 13,
-    left: 0,
-    width: R + 1,
-    content: `${'─'.repeat(R)}┤`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 13,
+    top: 7,
     left: 1,
     content: '{#7986cb-fg} 🎸 Background Music {/#7986cb-fg}',
     tags: true,
@@ -891,7 +1161,7 @@ export function createSettingsTab(screen, services) {
 
   const trackLabel = blessed.text({
     parent: box,
-    top: 15,
+    top: 9,
     left: 6,
     content: 'Track:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -899,7 +1169,7 @@ export function createSettingsTab(screen, services) {
 
   const trackValue = blessed.text({
     parent: box,
-    top: 15,
+    top: 9,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -912,9 +1182,9 @@ export function createSettingsTab(screen, services) {
       refreshDisplay();
       _buttons[_currentIdx].focus();
       screen.render();
-    });
+    }, _restoreFocus);
   }, { bg: COLORS.btnChange });
-  trackChangeBtn.top = 15;
+  trackChangeBtn.top = 9;
   trackChangeBtn.left = 52;
 
   const musicToggleBtn = _createButton(box, screen, 'Disabled', COLORS, () => {
@@ -925,19 +1195,29 @@ export function createSettingsTab(screen, services) {
     bg: COLORS.btnEnableOff,
     getDynamicBg: () => _getMusic(configService).enabled ? COLORS.btnEnableOn : COLORS.btnEnableOff,
   });
-  musicToggleBtn.top = 15;
+  musicToggleBtn.top = 9;
   musicToggleBtn.left = 64;
 
-  const musicTestBtn = _createButton(box, screen, 'Test', COLORS, _runMusicTest, { bg: COLORS.btnTest });
-  musicTestBtn.top = 15;
+  const musicTestBtn = _createButton(box, screen, '▶ Preview', COLORS, _runMusicTest, { bg: COLORS.btnTest });
+  musicTestBtn.top = 9;
   musicTestBtn.left = 78;
+
+  const trackPathText = blessed.text({
+    parent: box,
+    top: 10,
+    left: 22,
+    right: 2,
+    wrap: false,
+    content: '.agentvibes/config.json',
+    style: { fg: '#546e7a', bg: COLORS.contentBg },
+  });
 
   // -------------------------------------------------------------------------
   // Volume row: label + value + [Change] button
 
   const volumeLabel = blessed.text({
     parent: box,
-    top: 17,
+    top: 11,
     left: 6,
     content: 'Volume:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -945,7 +1225,7 @@ export function createSettingsTab(screen, services) {
 
   const volumeValue = blessed.text({
     parent: box,
-    top: 17,
+    top: 11,
     left: 22,
     width: 26,
     wrap: false,
@@ -962,38 +1242,17 @@ export function createSettingsTab(screen, services) {
         _runMusicTest();
       }
       refreshDisplay();
-    });
+    }, _restoreFocus);
   }, { bg: COLORS.btnChange });
-  volumeChangeBtn.top = 17;
+  volumeChangeBtn.top = 11;
   volumeChangeBtn.left = 52;
-
-  // -------------------------------------------------------------------------
-  // Section header: ── Personality & Verbosity ──
-
-  // Left-column separator at row 19 — ends at column divider with ┤
-  blessed.text({
-    parent: box,
-    top: 19,
-    left: 0,
-    width: R + 1,
-    content: `${'─'.repeat(R)}┤`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 19,
-    left: 1,
-    content: '{#7986cb-fg} 🌈 Personality & Verbosity {/#7986cb-fg}',
-    tags: true,
-    style: { bg: COLORS.contentBg },
-  });
 
   // -------------------------------------------------------------------------
   // Verbosity row: label + value + [Change] button
 
   const verbosityLabel = blessed.text({
     parent: box,
-    top: 21,
+    top: 3,
     left: 6,
     content: 'Verbosity:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1001,7 +1260,7 @@ export function createSettingsTab(screen, services) {
 
   const verbosityValue = blessed.text({
     parent: box,
-    top: 21,
+    top: 3,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -1010,17 +1269,27 @@ export function createSettingsTab(screen, services) {
   });
 
   const verbosityChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
-    _openVerbosityPicker(screen, configService, () => refreshDisplay());
+    _openVerbosityPicker(screen, configService, () => refreshDisplay(), _restoreFocus);
   }, { bg: COLORS.btnChange });
-  verbosityChangeBtn.top = 21;
+  verbosityChangeBtn.top = 3;
   verbosityChangeBtn.left = 52;
+
+  const verbosityPathText = blessed.text({
+    parent: box,
+    top: 4,
+    left: 22,
+    right: 2,
+    wrap: false,
+    content: '.claude/tts-verbosity.txt',
+    style: { fg: '#546e7a', bg: COLORS.contentBg },
+  });
 
   // -------------------------------------------------------------------------
   // Personality row: label + value + [Change] button
 
   const personalityLabel = blessed.text({
     parent: box,
-    top: 23,
+    top: 5,
     left: 6,
     content: 'Personality:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1028,7 +1297,7 @@ export function createSettingsTab(screen, services) {
 
   const personalityValue = blessed.text({
     parent: box,
-    top: 23,
+    top: 5,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -1040,26 +1309,39 @@ export function createSettingsTab(screen, services) {
     _openPersonalityPicker(screen, configService, (name) => {
       configService.set('personality', name);
       refreshDisplay();
-    });
+    }, _restoreFocus);
   }, { bg: COLORS.btnChange });
-  personalityChangeBtn.top = 23;
+  personalityChangeBtn.top = 5;
   personalityChangeBtn.left = 52;
+
+  const personalityTestBtn = _createButton(box, screen, '▶ Preview', COLORS, () => {
+    const personality = (configService.getConfig().personality ?? '').trim();
+    const example = _getPersonalityPhrase(personality);
+    const phrase = example
+      ? `${_testGreeting()}. Agent Vibes here. ${example}`
+      : _buildPreviewPhrase();
+    _runTest(false, phrase);
+  }, { bg: COLORS.btnTest });
+  personalityTestBtn.top = 5;
+  personalityTestBtn.left = 64;
+
+  const personalityFileText = blessed.text({
+    parent: box,
+    top: 6,
+    left: 22,
+    right: 2,
+    wrap: false,
+    tags: true,
+    content: '',  // populated by refreshDisplay()
+    style: { fg: '#546e7a', bg: COLORS.contentBg },
+  });
 
   // -------------------------------------------------------------------------
   // Section header: ── Intro Text ──
 
-  // Left-column separator at row 26 — ends at column divider with ┤
-  blessed.text({
+  const introTextHeader = blessed.text({
     parent: box,
-    top: 26,
-    left: 0,
-    width: R + 1,
-    content: `${'─'.repeat(R)}┤`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 26,
+    top: 8,
     left: 1,
     content: '{#7986cb-fg} ✍️ Intro Text {/#7986cb-fg}',
     tags: true,
@@ -1071,7 +1353,7 @@ export function createSettingsTab(screen, services) {
 
   const introTextLabel = blessed.text({
     parent: box,
-    top: 28,
+    top: 10,
     left: 6,
     content: 'Intro Text:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1079,7 +1361,7 @@ export function createSettingsTab(screen, services) {
 
   const introTextValue = blessed.text({
     parent: box,
-    top: 28,
+    top: 10,
     left: 22,
     width: 26,    // truncate before [Edit] at left:40
     wrap: false,
@@ -1088,53 +1370,40 @@ export function createSettingsTab(screen, services) {
   });
 
   const introEditBtn = _createButton(box, screen, 'Edit', COLORS, () => {
-    _openIntroTextEditor(screen, configService, () => { refreshDisplay(); });
+    _openIntroTextEditor(screen, configService, () => { refreshDisplay(); }, _restoreFocus);
   }, { bg: COLORS.btnEdit });
-  introEditBtn.top = 28;
+  introEditBtn.top = 10;
   introEditBtn.left = 52;
 
   const introClearBtn = _createButton(box, screen, 'Clear', COLORS, () => {
     configService.set('pretext', '');
     refreshDisplay();
   }, { bg: '#c62828' });
-  introClearBtn.top = 28;
+  introClearBtn.top = 10;
   introClearBtn.left = 64;
 
-  // -------------------------------------------------------------------------
-  // Section header: 🚀 Full Preview — RIGHT COLUMN row 8
-
-  // Right-column separator at row 8 — starts from column divider with ├
-  blessed.text({
+  const introPathText = blessed.text({
     parent: box,
-    top: 8,
-    left: R,
-    right: 0,
+    top: 11,
+    left: 22,
+    right: 2,
     wrap: false,
-    content: `├${'─'.repeat(200)}`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 8,
-    left: R + 2,
-    content: '{#7986cb-fg} 🚀 Full Preview {/#7986cb-fg}',
-    tags: true,
-    style: { bg: COLORS.contentBg },
+    content: '.agentvibes/config.json',
+    style: { fg: '#546e7a', bg: COLORS.contentBg },
   });
 
   // Full Preview button — voice + reverb + background track combined
   const fullPreviewBtn = _createButton(box, screen, '▶ Full Preview', COLORS, () => _runTest(true));
-  fullPreviewBtn.top = 10;
-  fullPreviewBtn.left = R + 2;
+  fullPreviewBtn.bottom = 0;
+  fullPreviewBtn.right = 50;
 
   // -------------------------------------------------------------------------
-  // Section header: 📡 Audio Destination — RIGHT COLUMN row 1
+  // Section header: 📡 Audio Destination
 
-  // Right column title at row 1 — rule already drawn by the full-width separator above
-  blessed.text({
+  const audioDstHeader = blessed.text({
     parent: box,
-    top: 1,
-    left: R + 2,
+    top: 3,
+    left: 2,
     content: '{#7986cb-fg} 📡 Audio Destination {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
@@ -1145,17 +1414,17 @@ export function createSettingsTab(screen, services) {
 
   const audioDstLabel = blessed.text({
     parent: box,
-    top: 3,
-    left: R + 2,
+    top: 5,
+    left: 6,
     content: 'Destination:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const audioDstValue = blessed.text({
     parent: box,
-    top: 3,
-    left: R + 15,
-    width: 13,
+    top: 5,
+    left: 22,
+    width: 26,
     wrap: false,
     content: '',  // populated by refreshDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1191,8 +1460,8 @@ export function createSettingsTab(screen, services) {
     }
     refreshDisplay();
   }, { bg: COLORS.btnChange });
-  audioDstChangeBtn.top = 3;
-  audioDstChangeBtn.left = R + 30;
+  audioDstChangeBtn.top = 5;
+  audioDstChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
   // SSH Alias row: label + value + [Edit] + [stream mode toggle] buttons
@@ -1200,8 +1469,8 @@ export function createSettingsTab(screen, services) {
 
   const audioSshLabel = blessed.text({
     parent: box,
-    top: 4,
-    left: R + 2,
+    top: 7,
+    left: 6,
     hidden: true,
     content: 'SSH Alias:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1209,9 +1478,9 @@ export function createSettingsTab(screen, services) {
 
   const audioSshValue = blessed.text({
     parent: box,
-    top: 4,
-    left: R + 15,
-    width: 13,
+    top: 7,
+    left: 22,
+    width: 26,
     wrap: false,
     hidden: true,
     content: '',  // populated by refreshDisplay()
@@ -1239,11 +1508,11 @@ export function createSettingsTab(screen, services) {
       });
     screen.render();
   }, { bg: COLORS.btnEdit });
-  audioSshEditBtn.top = 4;
-  audioSshEditBtn.left = R + 30;
+  audioSshEditBtn.top = 7;
+  audioSshEditBtn.left = 52;
   audioSshEditBtn.hide();
 
-  // Stream mode toggle — row 5, its own row for readability.
+  // Stream mode toggle
   // Streaming Text Only = send TTS text to remote AgentVibes Receiver which speaks locally (no audio data transfer)
   // Streaming Pulse Audio = stream audio file over SSH/PulseAudio tunnel
   const audioStreamModeBtn = _createButton(box, screen, 'Streaming Text Only ✓', COLORS, () => {
@@ -1251,16 +1520,16 @@ export function createSettingsTab(screen, services) {
     configService.set('audio_stream_mode', current === 'text' ? 'pulse' : 'text');
     refreshDisplay();
   }, { bg: '#2e7d32' });  // green = recommended
-  audioStreamModeBtn.top = 5;
-  audioStreamModeBtn.left = R + 2;
+  audioStreamModeBtn.top = 7;
+  audioStreamModeBtn.left = 64;
   audioStreamModeBtn.hide();
 
-  // Explanation note — right column row 6
-  blessed.text({
+  // Explanation note
+  const audioExplanationNote = blessed.text({
     parent: box,
-    top: 6,
-    left: R + 2,
-    width: '100%-94',
+    top: 9,
+    left: 6,
+    right: 2,
     wrap: false,
     tags: true,
     content: `{#546e7a-fg}Remote: sends TTS over SSH. Text Only = remote speaks (no audio transfer). Pulse = streams audio.{/#546e7a-fg}`,
@@ -1270,59 +1539,48 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header: 💾 Config Storage
 
-  // Section header: 💾 Config Storage — RIGHT COLUMN row 12
-  // Right-column separator at row 12 — starts from column divider with ├
-  blessed.text({
+  const configStorageHeader = blessed.text({
     parent: box,
-    top: 12,
-    left: R,
-    right: 0,
-    wrap: false,
-    content: `├${'─'.repeat(200)}`,
-    style: { fg: COLORS.borderFg, bg: COLORS.contentBg },
-  });
-  blessed.text({
-    parent: box,
-    top: 12,
-    left: R + 2,
+    top: 11,
+    left: 2,
     content: '{#7986cb-fg} 💾 Config Storage {/#7986cb-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
 
   // Info row 1: global config path
-  blessed.text({
+  const configGlobalLabel = blessed.text({
     parent: box,
-    top: 14,
-    left: R + 2,
+    top: 12,
+    left: 6,
     content: 'Global:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const configGlobalValue = blessed.text({
     parent: box,
-    top: 14,
-    left: R + 10,
-    width: '100%-102',
+    top: 12,
+    left: 22,
+    right: 2,
     wrap: false,
     content: '',  // populated by refreshConfigDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
   // Info row 2: local config path (or "None")
-  blessed.text({
+  const configLocalLabel = blessed.text({
     parent: box,
-    top: 15,
-    left: R + 2,
+    top: 13,
+    left: 6,
     content: 'Local:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
   const configLocalValue = blessed.text({
     parent: box,
-    top: 15,
-    left: R + 10,
-    width: '100%-102',
+    top: 13,
+    left: 22,
+    right: 2,
     wrap: false,
     content: '',  // populated by refreshConfigDisplay()
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
@@ -1335,10 +1593,11 @@ export function createSettingsTab(screen, services) {
     _showSavePreview(screen, path, data, () => {
       configService.saveAllToGlobal(data);
       refreshConfigDisplay();
+      _showNotice(screen, 'Settings Saved');
     });
   }, { bg: '#7b1fa2' });   // purple
-  saveGloballyBtn.top = 17;
-  saveGloballyBtn.left = R + 2;
+  saveGloballyBtn.bottom = 0;
+  saveGloballyBtn.right = 34;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
     const data = configService.getConfig();
@@ -1346,10 +1605,11 @@ export function createSettingsTab(screen, services) {
     _showSavePreview(screen, path, data, () => {
       configService.saveAllToLocal(data);
       refreshConfigDisplay();
+      _showNotice(screen, 'Settings Saved');
     });
   }, { bg: '#2e7d32' });   // green
-  saveLocallyBtn.top = 17;
-  saveLocallyBtn.left = R + 19;   // R+2 + 15(btn) + 2(gap)
+  saveLocallyBtn.bottom = 0;
+  saveLocallyBtn.right = 19;
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
     // Restore global config to snapshot taken at tab open
@@ -1366,8 +1626,8 @@ export function createSettingsTab(screen, services) {
     refreshConfigDisplay();
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
-  cancelChangesBtn.top = 18;
-  cancelChangesBtn.left = R + 2;   // own row below save buttons
+  cancelChangesBtn.bottom = 0;
+  cancelChangesBtn.right = 2;
 
   // -------------------------------------------------------------------------
   // Hint bar — keyboard shortcuts at the bottom of the settings area
@@ -1376,31 +1636,115 @@ export function createSettingsTab(screen, services) {
     parent: box,
     bottom: 0,
     left: 2,
-    right: 2,
+    width: 82,
     tags: true,
-    content: '{#455a64-fg}[↑↓] Group  [←→] Sibling  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit{/#455a64-fg}',
+    content: '{#455a64-fg}[↑↓] Group  [←→] Sibling/Sub-tab  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit{/#455a64-fg}',
     style: { bg: COLORS.contentBg },
   });
 
   // -------------------------------------------------------------------------
   // Display state + button-level focus navigation (story 7.6)
 
+  // Widget groups for each sub-tab (used by _showSubTab to show/hide)
+  const _subTabWidgets = {
+    voice: [
+      providerLabel, providerValue, switchBtn,
+      voiceLabel, voiceValue, changeBtn, playBtn, voiceFileText,
+    ],
+    effects: [
+      audioEffectsHeader,
+      reverbLabel, reverbValue, reverbChangeBtn, reverbTestBtn, reverbPathText,
+      bgMusicHeader,
+      trackLabel, trackValue, trackChangeBtn, musicToggleBtn, musicTestBtn, trackPathText,
+      volumeLabel, volumeValue, volumeChangeBtn,
+    ],
+    personality: [
+      verbosityLabel, verbosityValue, verbosityChangeBtn, verbosityPathText,
+      personalityLabel, personalityValue, personalityChangeBtn, personalityTestBtn, personalityFileText,
+      introTextHeader,
+      introTextLabel, introTextValue, introEditBtn, introClearBtn, introPathText,
+    ],
+    output: [
+      audioDstHeader,
+      audioDstLabel, audioDstValue, audioDstChangeBtn,
+      audioSshLabel, audioSshValue, audioSshEditBtn, audioStreamModeBtn, audioExplanationNote,
+      configStorageHeader,
+      configGlobalLabel, configGlobalValue,
+      configLocalLabel, configLocalValue,
+    ],
+  };
+
+  // Row groups per sub-tab for ↑↓ navigation
+  const _rowsBySubTab = {
+    voice:       [[switchBtn], [changeBtn, playBtn]],
+    effects:     [[reverbChangeBtn, reverbTestBtn], [trackChangeBtn, musicToggleBtn, musicTestBtn], [volumeChangeBtn]],
+    personality: [[verbosityChangeBtn], [personalityChangeBtn, personalityTestBtn], [introEditBtn, introClearBtn]],
+    output:      [[audioDstChangeBtn], [audioSshEditBtn, audioStreamModeBtn]],
+  };
+
+  const _subTabItemsArray = SUB_TABS.map(id => _subTabItemsMap[id]);
+
+  function _showSubTab(name, keepFocusOnBar = false) {
+    _activeSubTab = name;
+
+    // Hide all section widgets
+    for (const widgets of Object.values(_subTabWidgets)) {
+      for (const w of widgets) w.hide();
+    }
+
+    // Show active section widgets (SSH row controlled by refreshDisplay, not here)
+    const sshSpecific = [audioSshLabel, audioSshValue, audioSshEditBtn, audioStreamModeBtn];
+    for (const w of _subTabWidgets[name]) {
+      if (sshSpecific.includes(w)) continue;
+      w.show();
+    }
+
+    // If showing output tab, let refreshDisplay control SSH row visibility
+    if (name === 'output') refreshDisplay();
+
+    // Rebuild _rows: [subTabRow, ...contentRows, fullPreview, save, cancel]
+    _rows.length = 0;
+    _rows.push(_subTabItemsArray);
+    for (const row of _rowsBySubTab[name]) _rows.push(row);
+    _rows.push([fullPreviewBtn]);
+    _rows.push([saveGloballyBtn, saveLocallyBtn]);
+    _rows.push([cancelChangesBtn]);
+
+    _updateSubTabBar();
+
+    if (!keepFocusOnBar) {
+      const firstRow = _rowsBySubTab[name].find(row => !row[0].hidden);
+      if (firstRow) {
+        _currentIdx = _buttons.indexOf(firstRow[0]);
+        _focusButton(firstRow[0]);
+      }
+    }
+
+    screen.render();
+  }
+
   const _buttons = [
+    _subTabItemsMap.voice, _subTabItemsMap.effects,
+    _subTabItemsMap.personality, _subTabItemsMap.output,
     switchBtn, changeBtn, playBtn,
     reverbChangeBtn, reverbTestBtn,
     trackChangeBtn, musicToggleBtn, musicTestBtn,
     volumeChangeBtn,
-    verbosityChangeBtn, personalityChangeBtn,
+    verbosityChangeBtn, personalityChangeBtn, personalityTestBtn,
     introEditBtn, introClearBtn,
     audioDstChangeBtn, audioSshEditBtn, audioStreamModeBtn,
     fullPreviewBtn,
     saveGloballyBtn, saveLocallyBtn, cancelChangesBtn,
   ];
 
+  // Restore focus to the active settings button after any modal closes.
+  const _restoreFocus = () => _focusButton(_buttons[_currentIdx]);
+
   // Register test buttons for label sync (reverb + full preview share state)
-  _testBtns.push(reverbTestBtn, fullPreviewBtn);
-  _testBtnLabels.set(reverbTestBtn, 'Test');
-  _testBtnLabels.set(fullPreviewBtn, '▶ Full Preview');
+  _testBtns.push(reverbTestBtn, personalityTestBtn, fullPreviewBtn);
+  _testBtnLabels.set(reverbTestBtn,      '▶ Preview');
+  _testBtnLabels.set(personalityTestBtn, '▶ Preview');
+  _testBtnLabels.set(fullPreviewBtn,     '▶ Full Preview');
 
   let _currentIdx = 0;
 
@@ -1417,6 +1761,7 @@ export function createSettingsTab(screen, services) {
     [volumeChangeBtn,      volumeLabel],
     [verbosityChangeBtn,   verbosityLabel],
     [personalityChangeBtn, personalityLabel],
+    [personalityTestBtn,   personalityLabel],
     [introEditBtn,         introTextLabel],
     [introClearBtn,        introTextLabel],
     [audioDstChangeBtn,    audioDstLabel],
@@ -1436,6 +1781,7 @@ export function createSettingsTab(screen, services) {
     [volumeChangeBtn,      volumeValue],
     [verbosityChangeBtn,   verbosityValue],
     [personalityChangeBtn, personalityValue],
+    [personalityTestBtn,   personalityValue],
     [introEditBtn,         introTextValue],
     [introClearBtn,        introTextValue],
     [audioDstChangeBtn,    audioDstValue],
@@ -1486,6 +1832,58 @@ export function createSettingsTab(screen, services) {
     const focused = _buttons[_currentIdx];
     let rowIdx = _rows.findIndex(row => row.includes(focused));
     if (rowIdx === -1) rowIdx = 0;
+    // At the sub-tab bar (row 0): pressing ↑ moves focus to the main header tab bar
+    if (rowIdx === 0 && delta < 0) {
+      if (typeof focusMainTabBar === 'function') focusMainTabBar();
+      return;
+    }
+
+    // _rows layout: [0]=sub-tab bar, [1..lastContent]=per-tab rows, then 3 shared bottom rows
+    const BOTTOM_ROWS = 3; // [fullPreviewBtn], [saveGlobally+saveLocally], [cancelChanges]
+    const lastContentIdx = _rows.length - BOTTOM_ROWS - 1;
+
+    // Cross-tab forward: ↓ from the effective last visible content row → jump to next sub-tab
+    if (delta > 0 && rowIdx >= 1 && rowIdx <= lastContentIdx) {
+      let isEffectiveLast = true;
+      for (let r = rowIdx + 1; r <= lastContentIdx; r++) {
+        if (!_rows[r][0].hidden) { isEffectiveLast = false; break; }
+      }
+      if (isEffectiveLast) {
+        const tabIdx = SUB_TABS.indexOf(_activeSubTab);
+        if (tabIdx < SUB_TABS.length - 1) {
+          const nextTab = SUB_TABS[tabIdx + 1];
+          _showSubTab(nextTab, true);
+          const firstRow = _rowsBySubTab[nextTab].find(row => !row[0].hidden);
+          if (firstRow) {
+            _currentIdx = _buttons.indexOf(firstRow[0]);
+            _focusButton(firstRow[0]);
+            return;
+          }
+        }
+        // On the last sub-tab: fall through to normal (go to fullPreviewBtn)
+      }
+    }
+
+    // Cross-tab backward: ↑ from first content row (row 1) → jump to previous sub-tab's last row
+    if (delta < 0 && rowIdx === 1) {
+      const tabIdx = SUB_TABS.indexOf(_activeSubTab);
+      if (tabIdx > 0) {
+        const prevTab = SUB_TABS[tabIdx - 1];
+        _showSubTab(prevTab, true);
+        const prevRows = _rowsBySubTab[prevTab];
+        let lastRow = null;
+        for (let i = prevRows.length - 1; i >= 0; i--) {
+          if (!prevRows[i][0].hidden) { lastRow = prevRows[i]; break; }
+        }
+        if (lastRow) {
+          _currentIdx = _buttons.indexOf(lastRow[0]);
+          _focusButton(lastRow[0]);
+          return;
+        }
+      }
+      // First sub-tab: fall through (goes to sub-tab bar at row 0)
+    }
+
     // Skip rows whose first button is hidden (e.g. SSH alias row when destination is local)
     let attempts = 0;
     do {
@@ -1502,37 +1900,115 @@ export function createSettingsTab(screen, services) {
     btn.key(['up'],   () => _navigateRow(-1));
   }
 
-  // ← / → within a row — intercepts before tab-switch navigation fires
-  const _rows = [
-    [switchBtn],
-    [changeBtn, playBtn],
+  // ← / → within content rows — uses _buttonGroups (static); sub-tab bar has its own wiring
+  const _rows = [];  // populated dynamically by _showSubTab()
+
+  const _buttonGroups = [
+    [switchBtn], [changeBtn, playBtn],
     [reverbChangeBtn, reverbTestBtn],
     [trackChangeBtn, musicToggleBtn, musicTestBtn],
     [volumeChangeBtn],
     [verbosityChangeBtn],
-    [personalityChangeBtn],
+    [personalityChangeBtn, personalityTestBtn],
     [introEditBtn, introClearBtn],
     [audioDstChangeBtn],
-    [audioSshEditBtn],
-    [audioStreamModeBtn],
+    [audioSshEditBtn, audioStreamModeBtn],
     [fullPreviewBtn],
     [saveGloballyBtn, saveLocallyBtn],
     [cancelChangesBtn],
   ];
 
-  for (const row of _rows) {
+  for (const row of _buttonGroups) {
     for (let i = 0; i < row.length; i++) {
-      if (i < row.length - 1) row[i].key(['right'], () => _focusButton(row[i + 1]));
-      if (i > 0)              row[i].key(['left'],  () => _focusButton(row[i - 1]));
+      if (i < row.length - 1) {
+        row[i].key(['right'], () => {
+          // Skip hidden siblings (e.g. SSH/stream mode when destination is local)
+          let next = i + 1;
+          while (next < row.length && row[next].hidden) next++;
+          if (next < row.length) _focusButton(row[next]);
+        });
+      }
+      if (i > 0) {
+        row[i].key(['left'], () => {
+          let prev = i - 1;
+          while (prev >= 0 && row[prev].hidden) prev--;
+          if (prev >= 0) _focusButton(row[prev]);
+        });
+      }
     }
+  }
+
+  // Wire sub-tab ←/→ to switch tabs
+  for (let i = 0; i < SUB_TABS.length; i++) {
+    const item = _subTabItemsMap[SUB_TABS[i]];
+    if (i < SUB_TABS.length - 1) {
+      item.key(['right'], () => {
+        _showSubTab(SUB_TABS[i + 1], true);
+        _focusButton(_subTabItemsArray[i + 1]);
+      });
+    }
+    if (i > 0) {
+      item.key(['left'], () => {
+        _showSubTab(SUB_TABS[i - 1], true);
+        _focusButton(_subTabItemsArray[i - 1]);
+      });
+    }
+  }
+
+  // Initialize with Voice sub-tab active
+  _showSubTab('voice');
+  _currentIdx = _buttons.indexOf(switchBtn);
+
+  // @function _refreshSopranoStatus
+  // @intent Update the provider status glyph (🟢/🟡/🔴) without blocking the render loop
+  // @why soprano-manager status does an HTTP health-check (up to 2s) — must be async
+  function _refreshSopranoStatus() {
+    if (_sopranoStatusProc) {
+      try { _sopranoStatusProc.kill(); } catch {}
+      _sopranoStatusProc = null;
+    }
+    const managerPath = path.resolve(new URL(import.meta.url).pathname,
+      '..', '..', '..', '..', '.claude', 'hooks', 'soprano-manager.sh');
+    if (!fs.existsSync(managerPath)) return;
+
+    const proc = spawn('bash', [managerPath, 'status'], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    _sopranoStatusProc = proc;
+
+    proc.on('exit', (code) => {
+      _sopranoStatusProc = null;
+      // 0=running(🟢) 1=starting(🟡) 2=stopped(🔴) 3=conflict(🔴)
+      _sopranoStatusGlyph = code === 0 ? ' 🟢' : code === 1 ? ' 🟡' : ' 🔴';
+      if (providerService.getActiveProvider() === 'soprano') {
+        const name = _ALL_PROVIDERS.find(p => p.id === 'soprano')?.name ?? 'Soprano';
+        providerValue.setContent(name + _sopranoStatusGlyph);
+        screen.render();
+      }
+    });
+
+    proc.on('error', () => { _sopranoStatusProc = null; });
   }
 
   function refreshDisplay() {
     const activeProvider = providerService.getActiveProvider();
     const activeVoice = providerService.getActiveVoiceId();
-    providerValue.setContent(_ALL_PROVIDERS.find(p => p.id === activeProvider)?.name ?? activeProvider);
+    const provName = _ALL_PROVIDERS.find(p => p.id === activeProvider)?.name ?? activeProvider;
+    if (activeProvider === 'soprano') {
+      // Show cached glyph immediately, kick off async refresh for updated status
+      providerValue.setContent(provName + _sopranoStatusGlyph);
+      _refreshSopranoStatus();
+    } else {
+      providerValue.setContent(provName);
+      // Cancel any pending status check and clear glyph when leaving soprano
+      _sopranoStatusGlyph = '';
+      if (_sopranoStatusProc) { try { _sopranoStatusProc.kill(); } catch {} _sopranoStatusProc = null; }
+    }
     // Single-voice providers: show the provider name instead of voice ID
     voiceValue.setContent(activeProvider === 'soprano' ? 'Soprano' : activeVoice);
+    // Only Piper supports multiple installed voices — hide Change for single-voice providers
+    if (activeProvider === 'piper') { changeBtn.show(); playBtn.left = 64; voiceFileText.setContent('.claude/tts-voice.txt'); }
+    else { changeBtn.hide(); playBtn.left = 52; voiceFileText.setContent(''); }
 
     // Group 2: Audio Effects
     const effects = configService.getConfig().effects ?? EFFECTS_DEFAULTS;
@@ -1551,6 +2027,12 @@ export function createSettingsTab(screen, services) {
     const cfg = configService.getConfig();
     verbosityValue.setContent(formatVerbosity(cfg.verbosity));
     personalityValue.setContent(_stripLeadingEmoji(formatPersonality(cfg.personality)));
+    const _pers = (cfg.personality ?? '').trim();
+    personalityFileText.setContent(
+      (_pers && _pers !== 'none' && _pers !== 'normal')
+        ? `.claude/personalities/${_pers}.md`
+        : '',
+    );
 
     // Group 5: Intro Text
     introTextValue.setContent(formatIntroText(cfg.pretext));
@@ -1618,9 +2100,9 @@ export function createSettingsTab(screen, services) {
       _killSample();
       playBtn.setContent('▶ Play');
       _killTest();
-      _setTestBtnsLabel('Test');
+      _restoreTestBtnsLabels();
       _killMusicTest();
-      musicTestBtn.setContent('Test');
+      musicTestBtn.setContent('▶ Preview');
       box.hide();
       screen.render();
     },
@@ -1635,9 +2117,9 @@ export function createSettingsTab(screen, services) {
       _killSample();
       playBtn.setContent('▶ Play');
       _killTest();
-      _setTestBtnsLabel('Test');
+      _restoreTestBtnsLabels();
       _killMusicTest();
-      musicTestBtn.setContent('Test');
+      musicTestBtn.setContent('▶ Preview');
     },
 
     getFooterText() {
@@ -1670,14 +2152,25 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
     },
   });
 
-  // Focus indicators: prepend ► and append ◄
+  // Focus indicators: ►label◄ with blinking █ cursor
+  let _btnBlinkInterval = null;
   btn.on('focus', () => {
-    const raw = btn.content.replace(/[►◄]/g, '').trim();
-    btn.setContent(`►${raw}◄`);
+    const raw = btn.content.replace(/[►◄█]/g, '').trim();
+    btn.setContent(`►${raw}◄█`);
+    let _on = true;
     screen.render();
+    _btnBlinkInterval = setInterval(() => {
+      _on = !_on;
+      // Skip if spinner has overridden the content (no ► means spinner is active)
+      if (!btn.content.includes('►')) return;
+      const r = btn.content.replace(/[►◄█]/g, '').trim();
+      btn.setContent(_on ? `►${r}◄█` : `►${r}◄`);
+      screen.render();
+    }, 500);
   });
   btn.on('blur', () => {
-    const raw = btn.content.replace(/[►◄]/g, '').trim();
+    if (_btnBlinkInterval) { clearInterval(_btnBlinkInterval); _btnBlinkInterval = null; }
+    const raw = btn.content.replace(/[►◄█]/g, '').trim();
     btn.setContent(raw);
     screen.render();
   });
@@ -1728,7 +2221,7 @@ function _detectEnvLabel() {
   return { label: 'Linux', platform: 'linux' };
 }
 
-function _openProviderPicker(screen, providerService, onSelect) {
+function _openProviderPicker(screen, providerService, onSelect, onClose) {
   const { label: envLabel, platform } = _detectEnvLabel();
   const installed = new Set(providerService.getInstalledProviders());
   const current   = providerService.getActiveProvider();
@@ -1752,6 +2245,7 @@ function _openProviderPicker(screen, providerService, onSelect) {
         for (let c = 0; c < screen.width; c++)
           if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
     } catch {}
+    onClose?.();
     screen.render();
   }
 
@@ -1860,13 +2354,14 @@ function _openProviderPicker(screen, providerService, onSelect) {
 // Private: Destroy a list/modal widget and force-invalidate olines so blessed
 // physically redraws every cell the widget covered (avoids ghost rendering).
 
-function _destroyList(list, screen) {
+function _destroyList(list, screen, onClose) {
   list.destroy();
   try {
     for (let r = 0; r < screen.height; r++)
       for (let c = 0; c < screen.width; c++)
         if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
   } catch {}
+  onClose?.();
   screen.render();
 }
 
@@ -2006,7 +2501,7 @@ function _setEffects(configService, partial) {
 // ---------------------------------------------------------------------------
 // Private: Inline reverb preset picker
 
-function _openReverbPicker(screen, configService, onSelect) {
+function _openReverbPicker(screen, configService, onSelect, onClose) {
   const PRESETS = [
     { label: 'Off (Dry, no reverb)',        value: 'off' },
     { label: 'Light (Small room)',           value: 'light' },
@@ -2045,7 +2540,7 @@ function _openReverbPicker(screen, configService, onSelect) {
   list.key(['enter', 'space'], () => {
     const selected = PRESETS[list.selected];
     if (!selected) return;
-    _destroyList(list, screen);
+    _destroyList(list, screen, onClose);
 
     // Apply to audio config via effects-manager.sh
     const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
@@ -2059,7 +2554,7 @@ function _openReverbPicker(screen, configService, onSelect) {
   });
 
   list.key(['escape', 'q'], () => {
-    _destroyList(list, screen);
+    _destroyList(list, screen, onClose);
   });
 }
 
@@ -2079,7 +2574,7 @@ function _setMusic(configService, partial) {
 // ---------------------------------------------------------------------------
 // Private: Inline track picker
 
-function _openTrackPicker(screen, configService, onSelect) {
+function _openTrackPicker(screen, configService, onSelect, onClose) {
   // Scan .claude/audio/tracks/ dynamically; fall back to BUILT_IN_TRACKS if missing.
   const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
   let tracks;
@@ -2093,11 +2588,18 @@ function _openTrackPicker(screen, configService, onSelect) {
     tracks = BUILT_IN_TRACKS;
   }
 
+  const ADD_SENTINEL = '__ADD_CUSTOM_TRACK__';
+  const allItems = [...tracks, { file: ADD_SENTINEL, label: '+ Add Custom Track' }];
+
   const currentTrack = (configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track);
-  const items = tracks.map(t => (t.file === currentTrack ? `● ${t.label}` : `  ${t.label}`));
+  const items = allItems.map(t =>
+    t.file === ADD_SENTINEL
+      ? `  {#00e5ff-fg}+ Add Custom Track{/#00e5ff-fg}`
+      : (t.file === currentTrack ? `● ${t.label}` : `  ${t.label}`)
+  );
   const currentIdx = tracks.findIndex(t => t.file === currentTrack);
 
-  const listHeight = Math.min(tracks.length + 4, Math.floor(screen.rows * 0.7));
+  const listHeight = Math.min(allItems.length + 4, Math.floor(screen.rows * 0.7));
   const list = blessed.list({
     parent: screen,
     top: 'center',
@@ -2125,21 +2627,142 @@ function _openTrackPicker(screen, configService, onSelect) {
   screen.render();
 
   list.key(['enter', 'space'], () => {
-    const selected = tracks[list.selected];
+    const selected = allItems[list.selected];
     if (!selected) return;
-    _destroyList(list, screen);
+    if (selected.file === ADD_SENTINEL) {
+      // Destroy list first, then open path-input dialog
+      _destroyList(list, screen);
+      _openCustomTrackInput(screen, tracksDir, (newFile) => {
+        onSelect(newFile);
+      }, onClose);
+      return;
+    }
+    _destroyList(list, screen, onClose);
     onSelect(selected.file);
   });
 
   list.key(['escape', 'q'], () => {
-    _destroyList(list, screen);
+    _destroyList(list, screen, onClose);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Private: Custom track path-input dialog — copies an MP3 into tracks dir
+
+function _openCustomTrackInput(screen, tracksDir, onDone, onClose) {
+  let _closed = false;
+
+  const modal = blessed.box({
+    parent: screen,
+    top: 'center',
+    left: 'center',
+    width: 64,
+    height: 11,
+    border: { type: 'line' },
+    tags: true,
+    label: _modalTitle('Add Custom Track'),
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: COLORS.btnFocus } },
+  });
+
+  blessed.text({
+    parent: modal, top: 1, left: 2,
+    content: 'Enter full path to an MP3 file:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const inputBox = blessed.textbox({
+    parent: modal, top: 3, left: 2, right: 2, height: 3,
+    border: { type: 'line' },
+    inputOnFocus: true,
+    style: {
+      fg: COLORS.valueFg, bg: '#0d1b35',
+      border: { fg: COLORS.borderFg },
+      focus: { border: { fg: COLORS.btnFocus } },
+    },
+  });
+
+  const errText = blessed.text({
+    parent: modal, top: 7, left: 2, width: 58,
+    tags: true, content: '',
+    style: { bg: COLORS.contentBg },
+  });
+
+  function _close() {
+    if (_closed) return;
+    _closed = true;
+    modal.destroy();
+    try {
+      for (let r = 0; r < screen.height; r++)
+        for (let c = 0; c < screen.width; c++)
+          if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
+    } catch {}
+    onClose?.();
+    screen.render();
+  }
+
+  function _addTrack() {
+    const raw = inputBox.getValue().trim();
+    if (!raw) return;
+    const src = path.resolve(raw);
+
+    // Validate: must be a readable .mp3 file owned by the current user
+    if (!/\.mp3$/i.test(src)) {
+      errText.setContent('{red-fg}File must be an MP3 (.mp3){/red-fg}');
+      screen.render(); return;
+    }
+    try {
+      const stat = fs.statSync(src);
+      if (!stat.isFile()) throw new Error('not a file');
+      if (stat.uid !== undefined && stat.uid !== process.getuid?.()) {
+        errText.setContent('{red-fg}File not owned by current user{/red-fg}');
+        screen.render(); return;
+      }
+    } catch {
+      errText.setContent('{red-fg}File not found or not accessible{/red-fg}');
+      screen.render(); return;
+    }
+
+    const dest = path.join(tracksDir, path.basename(src));
+    try {
+      fs.mkdirSync(tracksDir, { recursive: true });
+      fs.copyFileSync(src, dest);
+    } catch {
+      errText.setContent('{red-fg}Could not copy file to tracks directory{/red-fg}');
+      screen.render(); return;
+    }
+
+    _closed = true;
+    modal.destroy();
+    try {
+      for (let r = 0; r < screen.height; r++)
+        for (let c = 0; c < screen.width; c++)
+          if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
+    } catch {}
+    screen.render();
+    onDone(path.basename(src));
+  }
+
+  inputBox.key(['enter'], _addTrack);
+  inputBox.key(['escape'], _close);
+
+  const addBtn = _createButton(modal, screen, 'Add Track', COLORS, _addTrack);
+  addBtn.bottom = 1; addBtn.left = 4;
+
+  const cancelBtn = _createButton(modal, screen, 'Cancel', COLORS, _close);
+  cancelBtn.bottom = 1; cancelBtn.left = 18;
+
+  addBtn.key(['tab'], () => { cancelBtn.focus(); screen.render(); });
+  cancelBtn.key(['tab'], () => { inputBox.focus(); screen.render(); });
+
+  modal.setFront();
+  inputBox.focus();
+  screen.render();
 }
 
 // ---------------------------------------------------------------------------
 // Private: Inline volume picker (10% steps: 10–100)
 
-function _openVolumePicker(screen, configService, onSelect) {
+function _openVolumePicker(screen, configService, onSelect, onClose) {
   const VOLUMES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
   const currentVol = configService.getConfig().backgroundMusic?.volume ?? MUSIC_DEFAULTS.volume;
   const currentIdx = Math.max(0, VOLUMES.indexOf(currentVol));
@@ -2187,6 +2810,7 @@ function _openVolumePicker(screen, configService, onSelect) {
         for (let c = 0; c < screen.width; c++)
           if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
     } catch {}
+    onClose?.();
     screen.render();
   }
 
@@ -2274,7 +2898,7 @@ function _openVolumePicker(screen, configService, onSelect) {
 // ---------------------------------------------------------------------------
 // Private: Full music browser modal — rich track selection with favorites + preview
 
-function _openMusicBrowserModal(screen, configService, navigationService, onDone) {
+function _openMusicBrowserModal(screen, configService, navigationService, onDone, onClose) {
   let _allTracks = [];
   let _showFavoritesOnly = false;
   let _previewProcess = null;
@@ -2317,6 +2941,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
       orow.dirty = true;
     }
 
+    onClose?.();
     screen.render();
     onDone();
   }
@@ -2547,7 +3172,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 // ---------------------------------------------------------------------------
 // Private: Inline verbosity picker
 
-function _openVerbosityPicker(screen, configService, onDone) {
+function _openVerbosityPicker(screen, configService, onDone, onClose) {
   const levels = ['Minimal', 'Low', 'Medium', 'High', 'Custom'];
   const current = configService.getConfig().verbosity ?? 'high';
   const currentIdx = Math.max(0, levels.findIndex(l => l.toLowerCase() === current));
@@ -2579,20 +3204,20 @@ function _openVerbosityPicker(screen, configService, onDone) {
   list.key(['enter', 'space'], () => {
     const selected = levels[list.selected];
     if (!selected) return;
-    _destroyList(list, screen);
+    _destroyList(list, screen, onClose);
     configService.set('verbosity', selected.toLowerCase());
     onDone();
   });
 
   list.key(['escape', 'q'], () => {
-    _destroyList(list, screen);
+    _destroyList(list, screen, onClose);
   });
 }
 
 // ---------------------------------------------------------------------------
 // Private: Inline intro text editor
 
-function _openIntroTextEditor(screen, configService, onDone) {
+function _openIntroTextEditor(screen, configService, onDone, onClose) {
   const current = configService.getConfig().pretext ?? '';
   let _closed = false;
 
@@ -2657,6 +3282,7 @@ function _openIntroTextEditor(screen, configService, onDone) {
       for (let c = 0; c < screen.cols; c++) { if (orow[c]) orow[c][0] = -1; }
       orow.dirty = true;
     }
+    onClose?.();
     screen.render();
   }
 
@@ -2679,7 +3305,7 @@ function _openIntroTextEditor(screen, configService, onDone) {
 // ---------------------------------------------------------------------------
 // Private: Full voice browser modal — replicates the Voices tab UX
 
-function _openVoiceBrowserModal(screen, providerService, configService, navigationService, onDone) {
+function _openVoiceBrowserModal(screen, providerService, configService, navigationService, onDone, onClose) {
   let _allVoices = [];
   let _filterText = '';
   let _playingProcess = null;
@@ -2725,6 +3351,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
       orow.dirty = true;
     }
 
+    onClose?.();
     screen.render();
     onDone();
   }
@@ -3093,7 +3720,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
 // ---------------------------------------------------------------------------
 // Private: Inline personality picker
 
-function _openPersonalityPicker(screen, configService, onSelect) {
+function _openPersonalityPicker(screen, configService, onSelect, onClose) {
   const current = configService.getConfig().personality ?? 'none';
   const currentIdx = Math.max(0, PERSONALITIES.indexOf(current));
 
@@ -3126,14 +3753,105 @@ function _openPersonalityPicker(screen, configService, onSelect) {
   list.focus();
   screen.render();
 
-  list.key(['enter', 'space'], () => {
+  // ---------- Hover TTS preview ----------
+
+  let _pickerTtsProc  = null;
+  let _playingItemIdx = -1;
+
+  // Add or remove " (playing)" from a list item (strips any trailing █ first)
+  function _setItemPlaying(idx, playing) {
+    const item = list.items?.[idx];
+    if (!item) return;
+    const base = (item.content ?? '').replace(/ █$/, '').replace(/ \(playing\)$/, '');
+    item.setContent(playing ? `${base} (playing)` : base);
+  }
+
+  function _killPickerTts() {
+    if (_pickerTtsProc) {
+      try { process.kill(-_pickerTtsProc.pid, 'SIGTERM'); } catch {}
+      _pickerTtsProc = null;
+    }
+    if (_playingItemIdx >= 0) {
+      _setItemPlaying(_playingItemIdx, false);
+      _playingItemIdx = -1;
+    }
+  }
+
+  function _speakPersonalityPreview(personality) {
+    _killPickerTts();
+    const phrase = PERSONALITY_PREVIEW_PHRASES[personality];
+    if (!phrase) return;
+    const ttsScript = path.join(process.cwd(), '.claude', 'hooks', 'play-tts.sh');
+    _pickerTtsProc = spawn('bash', [ttsScript, phrase], {
+      stdio: 'ignore',
+      detached: true,
+      env: {
+        ...process.env,
+        PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+        PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
+          .filter(Boolean).join(':'),
+      },
+    });
+    _playingItemIdx = list.selected;
+    _setItemPlaying(_playingItemIdx, true);
+    screen.render();
+    // Clear indicator when audio finishes naturally
+    _pickerTtsProc.on('exit', () => {
+      if (_playingItemIdx >= 0) {
+        _setItemPlaying(_playingItemIdx, false);
+        _playingItemIdx = -1;
+        screen.render();
+      }
+      _pickerTtsProc = null;
+    });
+    _pickerTtsProc.unref();
+  }
+
+  // Hover: auto-speaks preview phrase when cursor moves
+  list.on('select item', () => {
+    _speakPersonalityPreview(PERSONALITIES[list.selected]);
+  });
+
+  // [Space] plays the selected personality, or stops if the same item is already playing.
+  // Uses item-aware toggle so navigating with ↓ (which auto-plays) doesn't prevent Space from working.
+  list.key(['space'], () => {
+    if (_pickerTtsProc && _playingItemIdx === list.selected) {
+      _killPickerTts(); // true toggle: stop only if this exact item is playing
+    } else {
+      _speakPersonalityPreview(PERSONALITIES[list.selected]); // play or switch
+    }
+  });
+
+  // Type-to-jump: press a letter to jump to the first matching personality (cycles on repeat)
+  const _jumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'q']);
+  list.on('keypress', (ch, key) => {
+    if (!ch || key.ctrl || key.meta) return;
+    const lower = ch.toLowerCase();
+    if (!/^[a-z]$/.test(lower)) return;
+    if (_jumpBlocked.has(lower)) return;
+    const count = PERSONALITIES.length;
+    const start = list.selected ?? 0;
+    for (let i = 1; i <= count; i++) {
+      const idx = (start + i) % count;
+      if (PERSONALITIES[idx].startsWith(lower)) {
+        list.select(idx);
+        screen.render();
+        break;
+      }
+    }
+  });
+
+  // [Enter] confirms selection
+  list.key(['enter'], () => {
     const selected = PERSONALITIES[list.selected];
     if (!selected) return;
-    _destroyList(list, screen);
+    _killPickerTts();
+    _destroyList(list, screen, onClose);
     onSelect(selected);
   });
 
   list.key(['escape', 'q'], () => {
-    _destroyList(list, screen);
+    _killPickerTts();
+    _destroyList(list, screen, onClose);
   });
 }
