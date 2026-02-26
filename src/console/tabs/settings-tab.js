@@ -907,6 +907,7 @@ export function createSettingsTab(screen, services) {
   });
 
   const changeBtn = _createButton(box, screen, 'Change', COLORS, () => {
+    if (changeBtn.hidden) return;  // Guard: non-piper providers hide this button
     _openVoiceBrowserModal(screen, providerService, configService, navigationService, () => {
       refreshDisplay();
       _buttons[_currentIdx].focus();
