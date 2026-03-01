@@ -16,6 +16,13 @@
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { promises as _fsP } from 'node:fs';
+import {
+  copyCommandFiles, copyHookFiles, copyPersonalityFiles,
+  copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
+  copyConfigFiles, configureSessionStartHook,
+  installPluginManifest, checkAndInstallPiper,
+} from '../../installer.js';
 
 const _execFileAsync = promisify(execFile);
 
@@ -33,8 +40,8 @@ const COLORS = {
   contentBg:  '#0a0e1a',
   sectionHdr: '#7986cb',  // Light indigo/purple — section headers (matches settings tab)
   labelFg:    '#e3f2fd',
-  valueFg:    '#ffd700',
-  brandPink:  '#e91e63',  // Brand pink — AgentVibes logotype
+  valueFg:    '#ffff00',  // Yellow
+  brandPink:  '#f06292',  // Light magenta — AgentVibes logotype
   successFg:  '#69f0ae',  // Green — success
   errorFg:    '#ef9a9a',  // Red — error/missing
   btnDefault: '#283593',
@@ -69,7 +76,7 @@ export function getIntroDefault(projectDir) {
  */
 export function formatGreeting(introText, projectName) {
   const name = introText || projectName || 'AgentVibes';
-  return `${name} is ready! Welcome to AgentVibes. ⭐ Star us on GitHub at github.com/preibisch/agentvibes`;
+  return `${name} is ready! Welcome to AgentVibes. Love AgentVibes? We'd really appreciate it if you could give us a star on GitHub.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +141,7 @@ function createTestStub() {
 export function createInstallTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, navigationService } = services;
+  const { configService, providerService, navigationService } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -163,6 +170,13 @@ export function createInstallTab(screen, services) {
   let _screen5Announced    = false;  // TTS greeting fires once per wizard run
   let _completionModalOpen = false;
   let _completionModalBox  = null;
+
+  // Install state (populated during screen 5)
+  let _installLog      = [];   // array of blessed-tagged strings
+  let _installRunning  = false;
+  let _installComplete = false;
+  let _installError    = null;
+  let _lastSpinnerIdx  = -1;   // index of last ⟳ entry, replaced by ✓ on succeed
 
   // -------------------------------------------------------------------------
   // Content area — single persistent box, never detached.
@@ -228,27 +242,189 @@ export function createInstallTab(screen, services) {
     screen.render();
   }
 
-  function _doPreview() {
-    if (box.hidden || _screen !== 4) return;
-    const introVal  = _introText || getIntroDefault(process.cwd()) || 'AgentVibes';
-    const ttsText   = `${introVal}: Here`;
-    const ttsScript = path.resolve(process.cwd(), '.claude/hooks/play-tts.sh');
-    execFile('bash', [ttsScript, ttsText], {
-      env: { ...process.env, PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' },
-      timeout: 30000,
-    }, () => {});
+  // -------------------------------------------------------------------------
+  // TUI spinner adapter — captures copy-function progress into _installLog
+
+  function _makeSpinner() {
+    return {
+      start(msg) {
+        _installLog.push(`{${COLORS.noticeFg}-fg}  ⟳  ${msg}{/${COLORS.noticeFg}-fg}`);
+        _lastSpinnerIdx = _installLog.length - 1;
+        _renderScreen5();
+      },
+      succeed(msg) {
+        const line = `{${COLORS.successFg}-fg}  ✓  ${msg || ''}{/${COLORS.successFg}-fg}`;
+        if (_lastSpinnerIdx >= 0) {
+          _installLog[_lastSpinnerIdx] = line;
+        } else {
+          _installLog.push(line);
+        }
+        _lastSpinnerIdx = -1;
+        _renderScreen5();
+      },
+      info(msg) {
+        _installLog.push(`{${COLORS.noticeFg}-fg}  ℹ  ${msg}{/${COLORS.noticeFg}-fg}`);
+        _renderScreen5();
+      },
+      warn(msg) {
+        _installLog.push(`{#ffcc00-fg}  ⚠  ${msg}{/#ffcc00-fg}`);
+        _renderScreen5();
+      },
+      stop() {},
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Write AgentVibes config files into targetDir/.claude/
+
+  async function _writeInstallConfig(targetDir, provider) {
+    const claudeDir = path.join(targetDir, '.claude');
+    const configDir = path.join(claudeDir, 'config');
+    await _fsP.mkdir(configDir, { recursive: true });
+
+    const defaultVoices = {
+      piper:         'en_US-ryan-high',
+      macos:         'Samantha',
+      soprano:       'soprano-default',
+      'windows-piper': 'en_US-ryan-high',
+      'windows-sapi':  'Microsoft David Desktop',
+    };
+    const voice = defaultVoices[provider] ?? 'en_US-ryan-high';
+
+    await _fsP.writeFile(path.join(claudeDir, 'tts-provider.txt'), provider);
+    await _fsP.writeFile(path.join(claudeDir, 'tts-voice.txt'), voice);
+    await _fsP.writeFile(path.join(claudeDir, 'tts-verbosity.txt'), 'medium');
+
+    const pretext = _introText?.trim() ?? '';
+    if (pretext) {
+      await _fsP.writeFile(path.join(configDir, 'tts-pretext.txt'), pretext, { mode: 0o600 });
+    } else {
+      try { await _fsP.unlink(path.join(configDir, 'tts-pretext.txt')); } catch { /* ok */ }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Full installation sequence (runs on screen 5)
+
+  async function _runInstall() {
+    _installLog      = [];
+    _installRunning  = true;
+    _installComplete = false;
+    _installError    = null;
+    _lastSpinnerIdx  = -1;
+
+    const targetDir = process.cwd();
+    const provider  = _selectedProvider ?? 'piper';
+    const spinner   = _makeSpinner();
+
+    // Suppress console output from installer.js copy functions — they use
+    // chalk+console.log which would corrupt the blessed display.
+    const _origLog  = console.log;
+    const _origWarn = console.warn;
+    const _origErr  = console.error;
+    console.log  = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+
+    try {
+      // Create directory structure
+      spinner.start('Preparing .claude directory...');
+      await _fsP.mkdir(path.join(targetDir, '.claude', 'commands'), { recursive: true });
+      await _fsP.mkdir(path.join(targetDir, '.claude', 'hooks'),    { recursive: true });
+      await _fsP.mkdir(path.join(targetDir, '.claude', 'audio', 'tracks'), { recursive: true });
+      spinner.succeed('Directory structure ready');
+
+      await copyCommandFiles(targetDir, spinner);
+      await copyHookFiles(targetDir, spinner);
+      await copyPersonalityFiles(targetDir, spinner);
+      await copyPluginFiles(targetDir, spinner);
+      await copyBmadConfigFiles(targetDir, spinner);
+      await copyBackgroundMusicFiles(targetDir, spinner);
+      await copyConfigFiles(targetDir, spinner);
+      await configureSessionStartHook(targetDir, spinner);
+      await installPluginManifest(targetDir, spinner);
+
+      spinner.start('Writing configuration...');
+      await _writeInstallConfig(targetDir, provider);
+      spinner.succeed('Configuration saved');
+
+      // Create .mcp.json if it doesn't already exist
+      const mcpConfigPath = path.join(targetDir, '.mcp.json');
+      let _mcpCreated = false;
+      try {
+        await _fsP.access(mcpConfigPath);
+        // Already exists — skip to avoid overwriting user's config
+      } catch {
+        const mcpConfig = {
+          mcpServers: {
+            agentvibes: {
+              command: 'npx',
+              args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+            },
+          },
+        };
+        spinner.start('Creating .mcp.json...');
+        await _fsP.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+        spinner.succeed('.mcp.json created');
+        _mcpCreated = true;
+      }
+
+      if (provider === 'piper') {
+        spinner.start('Checking Piper TTS voices...');
+        await checkAndInstallPiper(targetDir, { yes: true, silent: true });
+        spinner.succeed('Piper TTS ready');
+      }
+
+      _installComplete = true;
+      _installRunning  = false;
+      _installLog.push('');
+      _installLog.push(`{${COLORS.successFg}-fg}  ✅  AgentVibes installed successfully!{/${COLORS.successFg}-fg}`);
+      if (_mcpCreated) {
+        _installLog.push(`{${COLORS.successFg}-fg}  📡  .mcp.json created — run: claude --mcp-config .mcp.json{/${COLORS.successFg}-fg}`);
+      }
+      _installLog.push(`{${COLORS.noticeFg}-fg}  ⭐ Star us on GitHub: github.com/preibisch/agentvibes{/${COLORS.noticeFg}-fg}`);
+
+    } catch (err) {
+      _installRunning = false;
+      _installError   = err.message;
+      _installLog.push(`{${COLORS.errorFg}-fg}  ✗  Installation failed: ${err.message}{/${COLORS.errorFg}-fg}`);
+    } finally {
+      console.log  = _origLog;
+      console.warn = _origWarn;
+      console.error = _origErr;
+    }
+
+    _renderScreen5();
+
+    // Show OK button now that install is done (success or error)
+    _s5OkBtn.show();
+    _s5OkBtn.focus();
+    screen.render();
+
+    // Play TTS greeting on success
+    if (_installComplete && !_screen5Announced) {
+      _screen5Announced = true;
+      const greeting = formatGreeting(_introText, getIntroDefault(process.cwd()));
+      const ttsScript = path.resolve(targetDir, '.claude/hooks/play-tts.sh');
+      execFile('bash', [ttsScript, greeting], {
+        env: { ...process.env, PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' },
+        timeout: 30000,
+      }, () => {});
+    }
   }
 
   function _doAccept() {
-    if (_screen !== 4) return;
+    if (_screen !== 4 || _installRunning) return;
     _screen++;
     _showCurrentScreen();
+    // Start install after screen transition renders (50ms delay in _showCurrentScreen)
+    setTimeout(() => _runInstall().catch(() => {}), 100);
   }
 
   // -------------------------------------------------------------------------
   // Screen 4 action buttons — real blessed widgets for keyboard focus + ←/→ nav
 
-  function _createInstallBtn(label, bg, onClick) {
+  function _createInstallBtn(label, bg, onClick, textColor = '#ffffff') {
     const btn = blessed.button({
       parent: box,
       content: label,
@@ -259,7 +435,7 @@ export function createInstallTab(screen, services) {
       padding: { left: 1, right: 1 },
       style: {
         bg,
-        fg: '#ffffff',
+        fg: textColor,
         focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
       },
     });
@@ -267,33 +443,39 @@ export function createInstallTab(screen, services) {
     // Focus indicator: ►label◄ with blinking █ — matches settings-tab standard
     let _blinkInterval = null;
     btn.on('focus', () => {
+      btn.style.bg = COLORS.btnFocus;
+      btn.style.fg = COLORS.btnFocusFg;
       const raw = btn.content.replace(/[►◄█]/g, '').trim();
-      btn.setContent(`►${raw}◄█`);
+      btn.setContent(`►${raw}◄ █`);
       let _on = true;
       screen.render();
       _blinkInterval = setInterval(() => {
         _on = !_on;
         if (!btn.content.includes('►')) return;
         const r = btn.content.replace(/[►◄█]/g, '').trim();
-        btn.setContent(_on ? `►${r}◄█` : `►${r}◄`);
+        btn.setContent(_on ? `►${r}◄ █` : `►${r}◄`);
         screen.render();
       }, 500);
     });
     btn.on('blur', () => {
       if (_blinkInterval) { clearInterval(_blinkInterval); _blinkInterval = null; }
+      btn.style.bg = bg;
+      btn.style.fg = textColor;
       const raw = btn.content.replace(/[►◄█]/g, '').trim();
       btn.setContent(raw);
       screen.render();
     });
 
     // Press: magenta flash then invoke onClick
+    // Guard: don't fire onClick when the completion modal is open — Enter should dismiss it.
     btn.key(['enter', 'space'], () => {
+      if (_completionModalOpen) return;
       btn.style.bg = COLORS.btnPress;
       btn.style.fg = 'white';
       screen.render();
       setTimeout(() => {
         btn.style.bg = bg;
-        btn.style.fg = '#ffffff';
+        btn.style.fg = textColor;
         screen.render();
         onClick();
       }, 150);
@@ -302,22 +484,17 @@ export function createInstallTab(screen, services) {
     return btn;
   }
 
-  const _editBtn    = _createInstallBtn('Edit',              '#1565c0', _doEdit);
-  const _previewBtn = _createInstallBtn('Preview',           '#e65100', _doPreview);
-  const _acceptBtn  = _createInstallBtn('✓ Accept & Install','#2e7d32', _doAccept);
+  const _editBtn   = _createInstallBtn('Edit',               '#1565c0', _doEdit);
+  const _acceptBtn = _createInstallBtn('✓ Accept & Install', COLORS.btnDefault, _doAccept);
 
-  _editBtn.top    = 9;  _editBtn.left    = 4;
-  _previewBtn.top = 9;  _previewBtn.left = 12;
-  _acceptBtn.top  = 13; _acceptBtn.left  = 4;
+  // Edit sits inline with the intro text row; Accept & Install is below
+  _editBtn.top   = 8;  _editBtn.left   = 36;
+  _acceptBtn.top = 13; _acceptBtn.left = 4;
 
-  // ←/→ navigation between the three buttons
+  // ↓/↑ navigate between Edit and Accept & Install
   // Note: Tab is NOT used here — 'tab' is registered globally by navigation.js (cycles tabs)
-  _editBtn.key(['right'],            () => { _previewBtn.focus(); screen.render(); });
-  _previewBtn.key(['right'],         () => { _acceptBtn.focus();  screen.render(); });
-  _acceptBtn.key(['right'],          () => { _editBtn.focus();    screen.render(); });
-  _previewBtn.key(['left', 'S-tab'], () => { _editBtn.focus();    screen.render(); });
-  _acceptBtn.key(['left', 'S-tab'],  () => { _previewBtn.focus(); screen.render(); });
-  _editBtn.key(['left', 'S-tab'],    () => { _acceptBtn.focus();  screen.render(); });
+  _editBtn.key(['down', 'right'],  () => { _acceptBtn.focus(); screen.render(); });
+  _acceptBtn.key(['up', 'left'],   () => { _editBtn.focus();   screen.render(); });
 
   // -------------------------------------------------------------------------
   // Screen 1 buttons — Begin (cyan) and Exit (grey)
@@ -350,6 +527,16 @@ export function createInstallTab(screen, services) {
   _s2ContinueBtn.top  = 12; _s2ContinueBtn.left = 4;
   // → also advances without the flash delay
   _s2ContinueBtn.key(['right'], () => { _screen++; _showCurrentScreen(); });
+
+  // Screen 3: no Continue button — Enter/→ on the list confirms selection and advances
+
+  // -------------------------------------------------------------------------
+  // Screen 5 button — OK (summary page only, config already saved on screen 4)
+
+  const _s5OkBtn = _createInstallBtn('✓  OK — Done', '#2e7d32', () => {
+    _dismissCompletionModal();
+  });
+  _s5OkBtn.bottom = 3; _s5OkBtn.left = 4;  // bottom-anchored: sits above hintLine (bottom:2)
 
   // -------------------------------------------------------------------------
   // Screen renderers
@@ -436,23 +623,34 @@ export function createInstallTab(screen, services) {
     if (providers.length === 0) providers.push('piper');  // fallback
     if (!_selectedProvider) _selectedProvider = providers[0];
 
-    // Pad items to 78 visible chars so they overwrite any stale cells from Screen 2.
+    // Pad items to 96 visible chars so they fully overwrite any stale cells from Screen 2.
+    // Selected row uses cyan bg + black text (matches button focus standard).
     const items = providers.map(p =>
       p === _selectedProvider
-        ? `{bold}{${COLORS.valueFg}-fg} ● ${p.padEnd(74)}{/${COLORS.valueFg}-fg}{/bold}`
-        : `   ${p.padEnd(75)}`
+        ? `{#00e5ff-bg}{#000000-fg}{bold} ● ${p.padEnd(92)}{/bold}{/#000000-fg}{/#00e5ff-bg}`
+        : `{${COLORS.labelFg}-fg}   ${p.padEnd(93)}{/${COLORS.labelFg}-fg}`
     );
 
+    // Pad item list to 3 entries so the Continue button sits at a fixed row
+    // and all stale lines from Screen 2 (which has ~10 lines) are overwritten.
+    const paddedItems = [...items];
+    while (paddedItems.length < 3) paddedItems.push(`   ${''.padEnd(93)}`);
+
+    // Append trailing blank rows (space-padded) so blessed rewrites every cell that
+    // screen 2 used. Two screen.render() calls in the same tick are batched, so the
+    // intermediate "clear" render never fires — trailing spaces here fix that in one pass.
+    const _blank = ' '.repeat(120);
+    const _trail = Array(12).fill(_blank);
     contentBox.setContent(_c([
       _HDR('🎤', 'Provider Selection'),
       '',
-      `  {${COLORS.noticeFg}-fg}${'Available TTS providers:'.padEnd(76)}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${'Available TTS providers:'.padEnd(94)}{/${COLORS.noticeFg}-fg}`,
       '',
-      ...items.map(i => `  ${i}`),
-      '',
-      `  {${COLORS.valueFg}-fg}${'[↑↓] Navigate  [Enter] Select & Continue'.padEnd(76)}{/${COLORS.valueFg}-fg}`,
+      ...paddedItems.map(i => `  ${i}`),
+      ..._trail,
     ]));
-    hintLine.setContent('  Screen 3/5: Provider  |  [←] Back  |  [↑↓] Choose  |  [Enter] Select');
+    hintLine.setContent('  Screen 3/5: Provider  |  [←] Back  |  [↑↓] Choose  |  [Enter/→] Confirm & Continue');
+    box.focus();
     screen.render();
   }
 
@@ -461,100 +659,74 @@ export function createInstallTab(screen, services) {
     const intro = _introText || '';
     const folderName = getIntroDefault(process.cwd()) || 'AgentVibes';
     const example = `${folderName}: Here`;
+    const voiceId = providerService?.getActiveVoiceId?.() ?? 'en_US-amy-medium';
 
     contentBox.setContent(_c([
       _HDR('🎤', 'Provider & Voice'),
       '',
       `  {${COLORS.labelFg}-fg}${'Provider:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
-      `  {${COLORS.labelFg}-fg}${'Voice:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.noticeFg}-fg}(default for ${provider}){/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${'Voice:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}(after installation, you can change in Settings){/${COLORS.noticeFg}-fg}`,
       '',
       _HDR('✍️', 'Intro Text'),
       '',
       `  {${COLORS.labelFg}-fg}${'Intro text:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || '(none)'}{/${COLORS.valueFg}-fg}`,
-      '',  // ← [Edit]  [Preview]  buttons rendered as real widgets here (box row 9)
+      // ↑ [Edit] button rendered inline at box row 8, left=36
       '',
       `  {${COLORS.noticeFg}-fg}Example:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
       '',
+      '',
       '',  // ← [✓ Accept & Install] button rendered as real widget here (box row 13)
     ]));
-    hintLine.setContent('  Screen 4/5: Config  |  [Esc] Back  |  [E] Edit  |  [P] Preview TTS  |  [Enter] Accept & Install');
-    _editBtn.focus();
+    hintLine.setContent('  Screen 4/5: Config  |  [Esc] Back  |  [E] Edit  |  [↓] Accept & Install');
+    _acceptBtn.focus();
     screen.render();
   }
 
   function _renderScreen5() {
-    const provider = _selectedProvider ?? 'piper';
-    const homeDir  = process.env.HOME || '';
-    const globalPath  = configService.getGlobalConfigPath().replace(homeDir, '~');
-    const localPath   = configService.getLocalConfigPath().replace(process.cwd() + '/', './');
+    const header = _installError
+      ? _HDR('❌', 'Installation Failed')
+      : _installComplete
+        ? _HDR('✅', 'Installation Complete')
+        : _HDR('⚙️', 'Installing AgentVibes...');
 
-    const saveBtn   = `{#2e7d32-bg}{white-fg}  ✓  Save Configuration & Install  [Enter]  {/white-fg}{/#2e7d32-bg}`;
-    const cancelBtn = `{#f44336-bg}{white-fg}  ✗  Cancel  [Esc]  {/white-fg}{/#f44336-bg}`;
+    const hint = (_installComplete || _installError)
+      ? '  Screen 5/5: Complete  |  [Enter] OK — Done'
+      : '  Screen 5/5: Installing...  |  Please wait';
+
+    // Show last 18 log lines so content fits in the box
+    const MAX_LINES = 18;
+    const visibleLog = _installLog.length > MAX_LINES
+      ? _installLog.slice(-MAX_LINES)
+      : _installLog;
 
     contentBox.setContent(_c([
-      _HDR('🎉', 'Configuration Complete'),
+      header,
       '',
-      `  {${COLORS.successFg}-fg}AgentVibes is configured and ready!{/${COLORS.successFg}-fg}`,
-      '',
-      `  {${COLORS.labelFg}-fg}${'Provider:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
-      `  {${COLORS.labelFg}-fg}${'Intro text:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${_introText || '(none)'}{/${COLORS.valueFg}-fg}`,
-      '',
-      _HDR('💾', 'Settings Location'),
-      '',
-      `  {${COLORS.labelFg}-fg}${'Global:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.noticeFg}-fg}${globalPath}{/${COLORS.noticeFg}-fg}`,
-      `  {${COLORS.labelFg}-fg}${'Project:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.noticeFg}-fg}${localPath}{/${COLORS.noticeFg}-fg}`,
-      '',
-      `  {${COLORS.noticeFg}-fg}⭐ Star us on GitHub: github.com/preibisch/agentvibes{/${COLORS.noticeFg}-fg}`,
-      '',
-      `  ${saveBtn}    ${cancelBtn}`,
+      ...visibleLog,
     ]));
-    hintLine.setContent('  Screen 5/5: Complete  |  [Enter] Save & Install  |  [Esc] Cancel');
-
-    // Auto-announce via TTS the first time this screen is shown this session
-    if (!_screen5Announced) {
-      _screen5Announced = true;
-      const greeting = formatGreeting(_introText, getIntroDefault(process.cwd()));
-      const ttsScript = path.resolve(process.cwd(), '.claude/hooks/play-tts.sh');
-      execFile('bash', [ttsScript, greeting], {
-        env: { ...process.env, PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' },
-        timeout: 30000,
-      }, () => {});
-    }
-
+    hintLine.setContent(hint);
     screen.render();
   }
 
-  // -------------------------------------------------------------------------
-  // Completion modal (shown after Save on Screen 5)
-
-  function _showCompletionModal() {
-    _completionModalOpen = true;
-    const okBtn = `{#2e7d32-bg}{white-fg}    ✓  OK  [Enter]    {/white-fg}{/#2e7d32-bg}`;
-    _completionModalBox = blessed.box({
+  function _showInstallNotice(message) {
+    const width = Math.max(28, message.length + 6);
+    const notice = blessed.box({
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 54,
-      height: 11,
-      border: 'line',
+      width,
+      height: 3,
+      border: { type: 'line' },
       tags: true,
+      content: `{center}${message}{/center}`,
       style: {
-        fg: COLORS.labelFg,
+        fg: '#e3f2fd',
         bg: COLORS.contentBg,
-        border: { fg: '#2e7d32' },
+        border: { fg: '#00e5ff' },
       },
-      content: _c([
-        '',
-        `  {${COLORS.successFg}-fg}✅  Installation Complete!{/${COLORS.successFg}-fg}`,
-        '',
-        `  {${COLORS.noticeFg}-fg}Configuration has been saved successfully.{/${COLORS.noticeFg}-fg}`,
-        `  {${COLORS.noticeFg}-fg}Taking you to the Settings tab.{/${COLORS.noticeFg}-fg}`,
-        '',
-        `  ${okBtn}`,
-        '',
-      ]),
     });
     screen.render();
+    setTimeout(() => { try { notice.destroy(); screen.render(); } catch {} }, 2500);
   }
 
   function _dismissCompletionModal() {
@@ -563,7 +735,9 @@ export function createInstallTab(screen, services) {
       _completionModalBox = null;
     }
     _completionModalOpen = false;
+    _screen = 1;
     box.hide();
+    _showInstallNotice('Installation Complete — Settings Saved');
     screen.render();
     navigationService?.switchTab('settings');
   }
@@ -579,20 +753,60 @@ export function createInstallTab(screen, services) {
     // Screen 2 continue button: hidden on other screens; _renderScreen2 manages show/focus
     if (_screen !== 2) _s2ContinueBtn.hide();
 
+    // Screen 5 OK button: hidden during active install, shown by _runInstall() on completion
+    if (_screen === 5 && (_installComplete || _installError)) {
+      _s5OkBtn.show();
+    } else {
+      _s5OkBtn.hide();
+    }
+
     // Show Screen 4 action buttons only on screen 4
     if (_screen === 4) {
-      _editBtn.show(); _previewBtn.show(); _acceptBtn.show();
+      _editBtn.show(); _acceptBtn.show();
     } else {
-      _editBtn.hide(); _previewBtn.hide(); _acceptBtn.hide();
+      _editBtn.hide(); _acceptBtn.hide();
     }
 
     if (_screen !== _lastScreen) {
-      // Clear via setContent('') so blessed diffs old→empty and repaints
-      // every cell that had a character.  hintLine likewise.
-      contentBox.setContent('');
-      hintLine.setContent('');
+      // Nuclear clear: force-invalidate every olines cell so blessed's diff renderer
+      // actually writes blanks to the terminal (blessed skips cells it thinks are
+      // unchanged — setting attr=-1 is impossible for any real cell so draw() is
+      // forced to physically rewrite every character).
+      try {
+        for (let r = 0; r < screen.height; r++) {
+          const orow = screen.olines?.[r];
+          if (!orow) continue;
+          for (let c = 0; c < screen.width; c++) {
+            if (orow[c]) orow[c][0] = -1;
+          }
+        }
+        // Row 2 (header bottom) never becomes dirty on its own — force it so
+        // draw() writes headerBg+spaces and overwrites any ghost terminal content.
+        if (screen.lines?.[2]) screen.lines[2].dirty = true;
+      } catch {}
+
+      const _clearLine = ' '.repeat(150);
+      const _clearPage = Array(25).fill(_clearLine).join('\n');
+      contentBox.setContent(_clearPage);
+      hintLine.setContent(_clearLine);
       screen.render();
+
+      const targetScreen = _screen;
       _lastScreen = _screen;
+      // 50 ms delay: enough for the terminal to display the blank frame before
+      // the new screen content overwrites it. setTimeout(0) is too fast —
+      // both renders land in the same display frame.
+      setTimeout(() => {
+        if (_screen !== targetScreen) return;
+        switch (_screen) {
+          case 1: _renderScreen1(); break;
+          case 2: _renderScreen2(); break;
+          case 3: _renderScreen3(); break;
+          case 4: _renderScreen4(); break;
+          case 5: _renderScreen5(); break;
+        }
+      }, 50);
+      return;
     }
     switch (_screen) {
       case 1: _renderScreen1(); break;
@@ -612,20 +826,14 @@ export function createInstallTab(screen, services) {
 
   screen.key(['enter'], () => {
     if (box.hidden || _checking) return;
+    if (_completionModalOpen) { _dismissCompletionModal(); return; }  // always first
     if (_screen === 1) return;  // Screen 1: Enter handled by Begin/Exit buttons
     if (_screen === 2) return;  // Screen 2: Enter handled by Continue button
     if (_screen === 4) return;  // Screen 4: Enter handled by the focused button
-    if (_completionModalOpen) { _dismissCompletionModal(); return; }
+    if (_screen === 5) return;  // Screen 5: Enter handled by OK button
     if (_screen < 5) {
       _screen++;
       _showCurrentScreen();
-    } else {
-      // Screen 5 "Save Configuration & Install" — persist config, show modal
-      try {
-        configService.set('provider', _selectedProvider ?? 'piper');
-        if (_introText) configService.set('pretext', _introText);
-      } catch {}
-      _showCompletionModal();
     }
   });
 
@@ -670,11 +878,9 @@ export function createInstallTab(screen, services) {
     if (box.hidden || _checking) return;
     if (_screen === 1) return;
     if (_screen === 2) return;  // Screen 2: → handled by Continue button
-    if (_screen < 4) {
-      _screen++;
-      _showCurrentScreen();
-    }
-    // Screens 4 and 5 require explicit [Enter] to confirm
+    if (_screen === 3) { _screen++; _showCurrentScreen(); return; }  // → confirms provider and advances
+    if (_screen === 4) return;  // Screen 4: → handled by button nav
+    if (_screen === 5) return;  // Screen 5: → handled by button nav
   });
 
   // Down arrow: Screen 3 provider nav; Screen 1 ↓ is handled by button key handlers
@@ -700,9 +906,6 @@ export function createInstallTab(screen, services) {
     _dismissCompletionModal();
   });
 
-  // [P] on Screen 4: preview TTS using the current intro text
-  screen.key(['p', 'P'], () => { _doPreview(); });
-
   // -------------------------------------------------------------------------
   // Tab Component Contract
 
@@ -712,6 +915,11 @@ export function createInstallTab(screen, services) {
     show() {
       _screen = 1;
       _screen5Announced = false;
+      _installLog      = [];
+      _installRunning  = false;
+      _installComplete = false;
+      _installError    = null;
+      _lastSpinnerIdx  = -1;
       if (_completionModalBox) { _completionModalBox.destroy(); _completionModalBox = null; }
       _completionModalOpen = false;
       box.show();
@@ -730,6 +938,8 @@ export function createInstallTab(screen, services) {
         _s1BeginBtn.focus();
       } else if (_screen === 4) {
         _editBtn.focus();
+      } else if (_screen === 5 && (_installComplete || _installError)) {
+        _s5OkBtn.focus();
       } else {
         box.focus();
       }

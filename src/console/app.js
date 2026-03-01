@@ -21,7 +21,6 @@ import { BRAND_PINK } from './brand-colors.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
 import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
-import { createAgentsTab } from './tabs/agents-tab.js';
 import { createInstallTab } from './tabs/install-tab.js';
 import { createHelpTab } from './tabs/help-tab.js';
 import { createReadmeTab } from './tabs/readme-tab.js';
@@ -86,11 +85,23 @@ export class AgentVibesConsole {
     this._initNavigation();    // must run first so navigationService is live in services
     this._createRealTabs();
     this._createModalOverlay();
+    // Initial render: draws header/tab-bar/footer into blessed's line buffer
+    // before forceActivate fires. Without this, lines[0..1] (header rows) are
+    // uninitialized when clearRegion() runs inside onSwitch, so blessed's draw()
+    // skips them (not dirty) and the header is invisible on first load.
+    this.screen.render();
     // Force-activate the start tab: switchTab() no-ops when _activeTab is already
     // set by the NavigationService constructor, so forceActivate() bypasses the
     // same-tab guard to fire onSwitch callbacks and render the initial UI state.
     this.navigationService.forceActivate(this.startTab);
     this.screen.render();
+    // Place cursor on the start tab's header item (purple = focused).
+    // User presses ↓/Enter to descend into content, or ←/→ to pick a different tab.
+    const startTabItem = this._tabItems?.[this.startTab];
+    if (startTabItem) {
+      startTabItem.focus();
+      this.screen.render();
+    }
     return this;
   }
 
@@ -101,7 +112,7 @@ export class AgentVibesConsole {
     // Screen options stored as property so tests can verify correct configuration
     // without needing to intercept the blessed.screen() call (ESM mock limitation).
     this._screenOptions = {
-      smartCSR: true,
+      smartCSR: false,
       mouse: true,
       fullUnicode: true,
       title: `AgentVibes v${APP_VERSION} TUI Console`,
@@ -151,7 +162,7 @@ export class AgentVibesConsole {
       left: 2,
       shrink: true,
       tags: true,
-      content: `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffd700-fg}${APP_VERSION}{/#ffd700-fg}  \u2502  \uD83D\uDCC1 ${cwd}`,
+      content: `{bright-cyan-fg}Agent{/bright-cyan-fg}{${BRAND_PINK}-fg}Vibes{/${BRAND_PINK}-fg}  {#90a4ae-fg}v{/#90a4ae-fg}{#ffff00-fg}${APP_VERSION}{/#ffff00-fg}  \u2502  \uD83D\uDCC1 ${cwd}`,
       style: { bg: COLORS.headerBg },
     });
 
@@ -162,12 +173,23 @@ export class AgentVibesConsole {
       left: 2,
       shrink: true,
       tags: true,
-      content: `{#546e7a-fg}Agent Vibes Customization Tool{/#546e7a-fg}`,
+      content: `{green-fg}Customization Tool{/green-fg}`,
+      style: { bg: COLORS.headerBg },
+    });
+
+    // Row 1: Quit shortcut — left-anchored after "Customization Tool" (18 chars at left:2)
+    blessed.text({
+      parent: this.headerBox,
+      top: 1,
+      left: 22,
+      shrink: true,
+      tags: true,
+      content: `{#ef9a9a-fg}[Q] Quit{/#ef9a9a-fg}`,
       style: { bg: COLORS.headerBg },
     });
 
     // Right-aligned: git remote + branch when available, else AgentVibes repo link
-    let topRightContent = `{#00e5ff-fg}github.com/preibisch/agentvibes{/#00e5ff-fg}`;
+    let topRightContent = `{${BRAND_PINK}-fg}github.com/preibisch/agentvibes{/${BRAND_PINK}-fg}`;
     try {
       const branchResult = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
         { encoding: 'utf8', timeout: 2000, cwd });
@@ -181,7 +203,7 @@ export class AgentVibesConsole {
           .replace(/\.git$/, '');
         // Strip protocol for compact display: https://github.com/… → github.com/…
         const displayUrl = repoUrl.replace(/^https?:\/\//, '');
-        topRightContent = `{#00e5ff-fg}${displayUrl}{/#00e5ff-fg}  {#90a4ae-fg}\u2502{/#90a4ae-fg}  {#90a4ae-fg}\u2387{/#90a4ae-fg} {bright-white-fg}${branch}{/bright-white-fg}`;
+        topRightContent = `{${BRAND_PINK}-fg}${displayUrl}{/${BRAND_PINK}-fg}  {#90a4ae-fg}\u2502{/#90a4ae-fg}  {#90a4ae-fg}\u2387{/#90a4ae-fg} {bright-white-fg}${branch}{/bright-white-fg}`;
       }
     } catch {}
     blessed.text({
@@ -200,38 +222,181 @@ export class AgentVibesConsole {
   // Each tab is a separate blessed.box. Active tab highlighted via style update.
 
   _createTabBar() {
+    // Background strip — screen child so blessed uses absolute coordinates directly.
+    // Tab items are ALSO screen children (not children of tabBarBox) to avoid the
+    // WSL/Windows Terminal parent-relative positioning bug that renders them 1 row
+    // too high (at row 2 instead of row 3), producing a ghost duplicate tab bar.
     this.tabBarBox = blessed.box({
+      parent: this.screen,
       top: 3,
       left: 0,
       width: '100%',
       height: 1,
       style: { bg: COLORS.tabBarBg },
     });
-    // Attach to screen FIRST so tabBarBox.screen is set before children are
-    // created. Child boxes inherit screen from parent via blessed's insert().
-    // If children are created before the parent is attached, el.screen = null
-    // and they render at position (0,0) — the header row area.
-    this.screen.append(this.tabBarBox);
 
-    // One box per tab — positioned sequentially. No tag parsing, no wrapping.
+    // One box per tab — direct screen children at absolute top:3. No tag parsing, no wrapping.
     this._tabItems = {};
     let xOffset = 1;
     for (const id of TAB_ORDER) {
       const label = TAB_DISPLAY_LABELS[id];
       const text = ` [${label[0]}] ${label} `;
       const el = blessed.box({
-        parent: this.tabBarBox,
-        top: 0,
+        parent: this.screen,
+        top: 3,
         left: xOffset,
         width: text.length,
         height: 1,
         content: text,
         tags: false,
+        keys: true,
+        focusable: true,
         style: { fg: COLORS.focusCyan, bg: COLORS.tabBarBg },
       });
       this._tabItems[id] = el;
       xOffset += text.length + 1; // 1-space gap between tabs
     }
+
+    // Right-aligned Quit item — direct screen child at absolute top:3
+    const _quitText  = ' [Q] Quit ';
+    const _quitBase  = _quitText;
+    const _quitBlock = _quitText.slice(0, -1) + '█';
+    let _quitInterval = null;
+    this._quitItem = blessed.box({
+      parent: this.screen,
+      top: 3,
+      right: 1,
+      width: _quitText.length,
+      height: 1,
+      content: _quitText,
+      tags: false,
+      keys: true,
+      focusable: true,
+      style: { fg: '#ef9a9a', bg: COLORS.tabBarBg },  // soft red — matches header quit hint
+    });
+    this._quitItem.on('focus', () => {
+      this._quitItem.style.fg = 'white';
+      this._quitItem.style.bg = '#9c27b0';
+      this._quitItem.setContent(_quitBlock);
+      this.screen.render();
+      _quitInterval = setInterval(() => {
+        const on = this._quitItem.content === _quitBlock;
+        this._quitItem.setContent(on ? _quitBase : _quitBlock);
+        this.screen.render();
+      }, 500);
+    });
+    this._quitItem.on('blur', () => {
+      if (_quitInterval) { clearInterval(_quitInterval); _quitInterval = null; }
+      this._quitItem.setContent(_quitBase);
+      this._quitItem.style.fg = '#ef9a9a';
+      this._quitItem.style.bg = COLORS.tabBarBg;
+      this.screen.render();
+    });
+    this._quitItem.key(['enter', 'space', 'q', 'Q'], () => {
+      this.screen.destroy();
+      process.exit(0);
+    });
+
+    // Keyboard navigation on the main tab items
+    const tabIds = TAB_ORDER;
+    for (let i = 0; i < tabIds.length; i++) {
+      const el = this._tabItems[tabIds[i]];
+
+      // Blinking block cursor: replace trailing space with █, toggle at 500ms
+      const _tabLabel     = TAB_DISPLAY_LABELS[tabIds[i]];
+      const _baseContent  = ` [${_tabLabel[0]}] ${_tabLabel} `;
+      const _blockContent = _baseContent.slice(0, -1) + '█';
+      let _cursorInterval = null;
+      let _cursorOn       = false;
+
+      el.on('focus', () => {
+        el.style.fg = 'white';
+        el.style.bg = '#9c27b0'; // purple — cursor on this tab item
+        _cursorOn = true;
+        el.setContent(_blockContent);
+        this.screen.render();
+        _cursorInterval = setInterval(() => {
+          _cursorOn = !_cursorOn;
+          el.setContent(_cursorOn ? _blockContent : _baseContent);
+          this.screen.render();
+        }, 500);
+      });
+      el.on('blur', () => {
+        if (_cursorInterval) { clearInterval(_cursorInterval); _cursorInterval = null; }
+        el.setContent(_baseContent);
+        // navigationService set up after _createTabBar, but blur fires lazily — safe
+        this._updateTabBar(this.navigationService?.getActiveTab() ?? tabIds[0]);
+        this.screen.render();
+      });
+
+      el.key(['left'], () => {
+        if (i === 0) {
+          this._quitItem?.focus();  // wrap: first tab ← → Quit
+        } else {
+          this._tabItems[tabIds[i - 1]].focus();
+        }
+      });
+      el.key(['right'], () => {
+        if (i === tabIds.length - 1) {
+          this._quitItem?.focus();  // wrap: last tab → → Quit
+        } else {
+          this._tabItems[tabIds[i + 1]].focus();
+        }
+      });
+      el.key(['enter', 'space'], () => {
+        this.navigationService.switchTab(tabIds[i]);
+      });
+      // ↓ or Escape returns focus to the active tab's content
+      el.key(['down', 'escape'], () => {
+        const activeTab = this.tabs[this.navigationService.getActiveTab()];
+        if (activeTab && typeof activeTab.onFocus === 'function') activeTab.onFocus();
+      });
+
+      // Tab: forward through header items; last item → Quit item
+      el.key(['tab'], () => {
+        if (i < tabIds.length - 1) {
+          this._tabItems[tabIds[i + 1]].focus();
+        } else {
+          this._quitItem?.focus();
+        }
+      });
+      // S-tab: backward through header items; first item → active tab's last bottom button
+      el.key(['S-tab'], () => {
+        if (i > 0) {
+          this._tabItems[tabIds[i - 1]].focus();
+        } else {
+          const activeTab = this.tabs?.[this.navigationService?.getActiveTab()];
+          if (activeTab && typeof activeTab.focusLastBottomRow === 'function') {
+            activeTab.focusLastBottomRow();
+          } else {
+            this._quitItem?.focus();
+          }
+        }
+      });
+    }
+
+    // Wire Quit item ← → and Tab/S-tab into the header navigation cycle
+    this._quitItem.key(['left'], () => {
+      this._tabItems[tabIds[tabIds.length - 1]]?.focus();  // ← Quit → last tab (Help)
+    });
+    this._quitItem.key(['right'], () => {
+      this._tabItems[tabIds[0]]?.focus();  // → Quit → first tab (Install), wrap
+    });
+    this._quitItem.key(['tab'], () => {
+      const activeTab = this.tabs?.[this.navigationService?.getActiveTab()];
+      if (activeTab && typeof activeTab.focusBottomRow === 'function') {
+        activeTab.focusBottomRow();
+      } else {
+        this._tabItems[tabIds[0]]?.focus();
+      }
+    });
+    this._quitItem.key(['S-tab'], () => {
+      this._tabItems[tabIds[tabIds.length - 1]]?.focus();
+    });
+    this._quitItem.key(['down', 'escape'], () => {
+      const activeTab = this.tabs?.[this.navigationService?.getActiveTab()];
+      if (activeTab && typeof activeTab.onFocus === 'function') activeTab.onFocus();
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -242,7 +407,7 @@ export class AgentVibesConsole {
     for (const [id, el] of Object.entries(this._tabItems)) {
       if (id === activeTabId) {
         el.style.fg = 'white';
-        el.style.bg = COLORS.activeTab;
+        el.style.bg = '#0288d1'; // bright light blue — matches sub-tab active color
         el.style.bold = true;
       } else {
         el.style.fg = COLORS.focusCyan;
@@ -356,7 +521,7 @@ export class AgentVibesConsole {
       width: '100%',
       height: 1,
       tags: true,
-      content: `  ${badges}  {right}{#ffd700-fg}⭐ Love AgentVibes? Give us a star!{/#ffd700-fg}  github.com/preibisch/agentvibes  {/right}`,
+      content: `  ${badges}  {#ffff00-fg}⭐ Love AgentVibes? Give us a star!{/#ffff00-fg}  github.com/preibisch/agentvibes`,
       style: {
         fg: COLORS.textWhite,
         bg: COLORS.headerBg,
@@ -389,7 +554,22 @@ export class AgentVibesConsole {
 
     const configService = new ConfigService();
     const providerService = new ProviderService(configService);
-    const services = { configService, providerService, navigationService: this.navigationService };
+    const services = {
+      configService,
+      providerService,
+      navigationService: this.navigationService,
+      focusMainTabBar: () => {
+        const id = this.navigationService.getActiveTab();
+        const item = this._tabItems?.[id];
+        if (item) item.focus();
+      },
+      focusFirstHeaderItem: () => {
+        this._tabItems?.[TAB_ORDER[0]]?.focus();
+      },
+      focusLastHeaderItem: () => {
+        this._tabItems?.[TAB_ORDER[TAB_ORDER.length - 1]]?.focus();
+      },
+    };
     this.tabs['settings'] = createSettingsTab(this.screen, services);
 
     // Destroy voices placeholder and mount real voices tab
@@ -405,13 +585,6 @@ export class AgentVibesConsole {
       musicPlaceholder.destroy();
     }
     this.tabs['music'] = createMusicTab(this.screen, services);
-
-    // Destroy agents placeholder and mount real agents tab
-    const agentsPlaceholder = this.tabs['agents'];
-    if (agentsPlaceholder && typeof agentsPlaceholder.destroy === 'function') {
-      agentsPlaceholder.destroy();
-    }
-    this.tabs['agents'] = createAgentsTab(this.screen, services);
 
     // Destroy install placeholder and mount real install wizard
     const installPlaceholder = this.tabs['install'];
@@ -452,12 +625,13 @@ export class AgentVibesConsole {
       this.screen.render = () => {};
 
       try {
-        // Nuclear clear: wipe from the tab bar row (3) through the content area.
+        // Nuclear clear: wipe the content area (row 4+) to remove stale cell content
+        // from the previous tab. Start at row 4 — header (0-2) and tab bar (3) are
+        // static widgets that don't need clearing; wiping them causes the double
+        // tab bar artifact (row 2 of header shows tab bar ghost from prior render).
         // blessed's render loop never resets the `lines` buffer before rendering
         // (see: blessed/lib/widgets/screen.js line 733, commented-out clear).
-        // Without this, stale cell content from the previous tab persists in
-        // `lines` and bleeds through whenever cells aren't fully overwritten.
-        this.screen.clearRegion(0, this.screen.cols, 2, this.screen.rows - 2);
+        this.screen.clearRegion(0, this.screen.cols, 4, this.screen.rows - 2);
 
         // Force-invalidate olines for the entire visible area (rows 0..rows-3).
         // Includes header rows 0-1 so the branded header is always redrawn on
@@ -475,6 +649,14 @@ export class AgentVibesConsole {
           }
           orow.dirty = true;
         }
+
+        // Row 2 (header bottom) is never dirty after draw 1 — its content (headerBg+
+        // spaces) never changes so element.render() never marks it dirty.  The olines
+        // invalidation above sets olines[2][c][0]=-1, but draw() only compares cells
+        // when lines[r].dirty is true; a false dirty flag skips the entire row without
+        // ever consulting olines.  Force-mark it dirty so draw() emits the explicit
+        // cup(3,1)+headerBg+spaces sequence and overwrites any ghost terminal content.
+        if (this.screen.lines?.[2]) this.screen.lines[2].dirty = true;
 
         // Update tab bar and footer inside suppression — no intermediate render.
         this._updateTabBar(tabId);
@@ -498,6 +680,11 @@ export class AgentVibesConsole {
             // paints last (on top) — belt-and-suspenders against any z-order issue.
             if (activeTab.box && typeof activeTab.box.setFront === 'function') {
               activeTab.box.setFront();
+            }
+            // Move any screen-level overlay widgets (e.g. junction chars) to front
+            // AFTER box.setFront() so they render on top of the box border.
+            if (typeof activeTab.moveOverlaysToFront === 'function') {
+              activeTab.moveOverlaysToFront();
             }
           } else {
             activeTab.hidden = false;
