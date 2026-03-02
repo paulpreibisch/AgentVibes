@@ -283,13 +283,15 @@ export function createInstallTab(screen, services) {
     await _fsP.mkdir(configDir, { recursive: true });
 
     const defaultVoices = {
-      piper:         'en_US-ryan-high',
-      macos:         'Samantha',
-      soprano:       'soprano-default',
+      piper:           'en_US-ryan-high',
+      macos:           'Samantha',
+      soprano:         'soprano-default',
       'windows-piper': 'en_US-ryan-high',
       'windows-sapi':  'Microsoft David Desktop',
     };
-    const voice = defaultVoices[provider] ?? 'en_US-ryan-high';
+    // Use voice from Settings if configured, otherwise fall back to provider default
+    const configuredVoice = configService?.getConfig?.()?.voice;
+    const voice = configuredVoice ?? (defaultVoices[provider] ?? 'en_US-ryan-high');
 
     await _fsP.writeFile(path.join(claudeDir, 'tts-provider.txt'), provider);
     await _fsP.writeFile(path.join(claudeDir, 'tts-voice.txt'), voice);
@@ -300,6 +302,28 @@ export function createInstallTab(screen, services) {
       await _fsP.writeFile(path.join(configDir, 'tts-pretext.txt'), pretext, { mode: 0o600 });
     } else {
       try { await _fsP.unlink(path.join(configDir, 'tts-pretext.txt')); } catch { /* ok */ }
+    }
+
+    // Apply background music settings from Settings tab.
+    // play-tts-piper.sh reads background-music-enabled.txt (not background-music.txt),
+    // so we must write that file explicitly when music is enabled.
+    const bgMusic = configService?.getConfig?.()?.backgroundMusic;
+    if (bgMusic?.enabled) {
+      await _fsP.writeFile(path.join(configDir, 'background-music-enabled.txt'), 'true');
+      // Update the track in audio-effects.cfg (copied from package defaults a moment ago).
+      // Only apply if the track name is a safe filename (no pipe characters or path separators).
+      const track = bgMusic.track;
+      if (track && !/[|/\\]/.test(track)) {
+        try {
+          const audioEffectsPath = path.join(configDir, 'audio-effects.cfg');
+          let content = await _fsP.readFile(audioEffectsPath, 'utf-8');
+          content = content.replace(
+            /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
+            `default|$1|${track}|$3`,
+          );
+          await _fsP.writeFile(audioEffectsPath, content);
+        } catch { /* audio-effects.cfg not yet present — non-fatal */ }
+      }
     }
   }
 
