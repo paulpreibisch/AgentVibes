@@ -18,7 +18,7 @@ import {
   PIPER_VOICES_DIR, COL_NAME_W, COL_GENDER_W, SAMPLE_PHRASES,
   parseVoiceId, scanInstalledVoices, getVoiceMeta, getFavorites, toggleFavorite,
 } from './voices-tab.js';
-import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite } from './music-tab.js';
+import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite, applyTrackToAudioEffects } from './music-tab.js';
 import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
@@ -1593,6 +1593,7 @@ export function createSettingsTab(screen, services) {
     const path = configService.getGlobalConfigPath();
     _showSavePreview(screen, path, data, () => {
       configService.saveAllToGlobal(data);
+      applyTrackToAudioEffects(data.backgroundMusic?.track);
       refreshConfigDisplay();
       _showNotice(screen, 'Settings Saved');
     }, () => { _currentIdx = _buttons.indexOf(saveGloballyBtn); _focusButton(saveGloballyBtn); });
@@ -1605,6 +1606,7 @@ export function createSettingsTab(screen, services) {
     const path = configService.getLocalConfigPath();
     _showSavePreview(screen, path, data, () => {
       configService.saveAllToLocal(data);
+      applyTrackToAudioEffects(data.backgroundMusic?.track);
       refreshConfigDisplay();
       _showNotice(screen, 'Settings Saved');
     }, () => { _currentIdx = _buttons.indexOf(saveLocallyBtn); _focusButton(saveLocallyBtn); });

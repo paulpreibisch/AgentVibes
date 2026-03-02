@@ -196,6 +196,26 @@ function _setMusic(configService, update) {
 }
 
 /**
+ * Patch the 'default' entry in audio-effects.cfg to use the given track.
+ * play-tts-piper.sh reads the track from audio-effects.cfg (not from config.json),
+ * so any track change must be reflected here to take effect at runtime.
+ * Safe to call with invalid/missing tracks — non-fatal on failure.
+ * @param {string} track - Filename like "agent_vibes_salsa_v2_loop.mp3"
+ */
+export function applyTrackToAudioEffects(track) {
+  if (!track || /[|/\\]/.test(track)) return;
+  const cfgFile = path.join(process.cwd(), '.claude', 'config', 'audio-effects.cfg');
+  try {
+    let content = fs.readFileSync(cfgFile, 'utf-8');
+    content = content.replace(
+      /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
+      `default|$1|${track}|$3`,
+    );
+    fs.writeFileSync(cfgFile, content, 'utf-8');
+  } catch { /* file may not exist — non-fatal */ }
+}
+
+/**
  * Get favorites array from config.musicFavorites.
  */
 export function getMusicFavorites(configService) {
@@ -601,6 +621,7 @@ export function createMusicTab(screen, services) {
     _killPlayingProcess();
     _playingTrackId = null;
     _setMusic(configService, { track: trackId });
+    applyTrackToAudioEffects(trackId);
     refreshDisplay();
     const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
     previewLine.setContent(`{${COLORS.activeFg}-fg}✓ Active track set: ${label}{/${COLORS.activeFg}-fg}`);
