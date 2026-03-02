@@ -26,17 +26,17 @@ if (!IS_TEST) {
 
 const COLORS = {
   contentBg:  '#0a0e1a',
-  sectionHdr: '#e65100',  // Orange — section headers for Music tab
+  sectionHdr: '#f06292',  // Light magenta — section headers for Music tab
   labelFg:    '#e3f2fd',
-  valueFg:    '#ffd700',
+  valueFg:    '#f06292',  // Light magenta — brand color
   activeFg:   '#69f0ae',  // Green — active/playing track
-  favoriteFg: '#ffb300',  // Amber — favorite star
-  btnDefault: '#e65100',  // Orange — Music tab buttons
-  btnFocus:   '#ff9800',
+  favoriteFg: '#ffff00',  // Yellow — favorite star
+  btnDefault: '#880e4f',  // Dark magenta — Music tab buttons
+  btnFocus:   '#00e5ff',  // Cyan — standard focus state
   btnFocusFg: '#000000',
   btnPress:   '#ff00ff',
-  borderFg:   '#ff9800',
-  footerBg:   '#ff9800',  // Orange — Music tab footer
+  borderFg:   '#f06292',  // Light magenta — border
+  footerBg:   '#880e4f',  // Dark magenta — Music tab footer
   noticeFg:   '#90a4ae',
   dimFg:      '#455a64',
   playingFg:  '#00e5ff',  // Cyan — currently previewing track indicator
@@ -84,7 +84,6 @@ const BUILT_IN_TRACK_CATALOG = Object.freeze([
   { id: 'agent_vibes_japanese_city_pop_v1_loop.mp3',         label: '🌆 Japanese City Pop' },
   { id: 'agent_vibes_salsa_v2_loop.mp3',                     label: '💃 Salsa' },
   { id: 'agent_vibes_tabla_dream_pop_v1_loop.mp3',           label: '🥁 Tabla Dream Pop' },
-  { id: 'dreamy_house_loop.mp3',                             label: 'Dreamy House' },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -263,7 +262,7 @@ export function createMusicTab(screen, services) {
     parent: box,
     top: 1,
     left: 2,
-    content: `{#e65100-fg}── Built-in Tracks ${'─'.repeat(48)}{/#e65100-fg}`,
+    content: `{${COLORS.sectionHdr}-fg}── Built-in Tracks ${'─'.repeat(48)}{/${COLORS.sectionHdr}-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -280,6 +279,7 @@ export function createMusicTab(screen, services) {
     keys: true,
     vi: true,
     mouse: true,
+    tags: true,
     border: { type: 'line' },
     scrollbar: { ch: '│', style: { fg: COLORS.sectionHdr } },
     style: {
@@ -298,7 +298,7 @@ export function createMusicTab(screen, services) {
     parent: box,
     top: '64%',
     left: 2,
-    content: `{#e65100-fg}── Music Status ${'─'.repeat(52)}{/#e65100-fg}`,
+    content: `{${COLORS.sectionHdr}-fg}── Music Status ${'─'.repeat(52)}{/${COLORS.sectionHdr}-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -340,11 +340,15 @@ export function createMusicTab(screen, services) {
       },
     });
     btn.on('focus', () => {
+      btn.style.bg = COLORS.btnFocus;
+      btn.style.fg = COLORS.btnFocusFg;
       const raw = btn.content.replace(/[►◄]/g, '').trim();
       btn.setContent(`►${raw}◄`);
       screen.render();
     });
     btn.on('blur', () => {
+      btn.style.bg = COLORS.btnDefault;
+      btn.style.fg = 'white';
       const raw = btn.content.replace(/[►◄]/g, '').trim();
       btn.setContent(raw);
       screen.render();
@@ -371,123 +375,68 @@ export function createMusicTab(screen, services) {
   toggleBtn.bottom = 4;
   toggleBtn.left = 4;
 
-  const setActiveBtn = _createBtn('[Set Active]', () => {
-    const trackId = _getSelectedTrackId();
-    if (trackId) {
-      _setMusic(configService, { track: trackId });
-      refreshDisplay();
-    }
-  });
-  setActiveBtn.bottom = 4;
-  setActiveBtn.left = 22;
-
-  const favoriteBtn = _createBtn('[★ Favorite]', () => {
-    const trackId = _getSelectedTrackId();
-    if (trackId) {
-      toggleMusicFavorite(configService, trackId);
-      refreshDisplay();
-    }
-  });
-  favoriteBtn.bottom = 4;
-  favoriteBtn.left = 38;
-
-  const uploadBtn = _createBtn('[Upload Help]', () => {
-    const notice = blessed.text({
-      parent: box,
-      top: 'center',
-      left: 'center',
-      content: 'Use /agent-vibes:background-music to manage custom tracks',
-      tags: true,
-      style: { fg: COLORS.noticeFg, bg: COLORS.contentBg },
-    });
-    screen.render();
-    setTimeout(() => { notice.destroy(); screen.render(); }, 3000);
-  });
-  uploadBtn.bottom = 4;
-  uploadBtn.left = 55;
-
-  // -------------------------------------------------------------------------
-  // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] select as background track{/${COLORS.dimFg}-fg}`;
-  let _listFocused = false;
-
-  // -------------------------------------------------------------------------
-  // Select-track confirmation modal
-
-  function _openSelectTrackModal(trackId) {
-    const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
-
+  const addCustomTrackBtn = _createBtn('[Add Custom Track]', () => {
     const modal = blessed.box({
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 58,
-      height: 7,
+      width: 66,
+      height: 11,
       border: { type: 'line' },
       tags: true,
-      label: ` {${COLORS.activeFg}-fg}Set Background Track{/${COLORS.activeFg}-fg} `,
-      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+      label: ` {${COLORS.activeFg}-fg}Add Custom Background Track{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.borderFg }, bg: COLORS.contentBg },
+      content: [
+        '',
+        `  {${COLORS.labelFg}-fg}To add a custom track:{/${COLORS.labelFg}-fg}`,
+        '',
+        `  {${COLORS.valueFg}-fg}1.{/${COLORS.valueFg}-fg}  Place an MP3/OGG/WAV file in:`,
+        `     {${COLORS.noticeFg}-fg}.claude/audio/tracks/{/${COLORS.noticeFg}-fg}`,
+        '',
+        `  {${COLORS.valueFg}-fg}2.{/${COLORS.valueFg}-fg}  Or run: {${COLORS.noticeFg}-fg}/agent-vibes:background-music{/${COLORS.noticeFg}-fg}`,
+        '',
+        `  {${COLORS.dimFg}-fg}[Esc / Enter] Close{/${COLORS.dimFg}-fg}`,
+      ].join('\n'),
     });
-
-    blessed.text({
-      parent: modal,
-      top: 1,
-      left: 2,
-      right: 2,
-      content: `Set {${COLORS.valueFg}-fg}${label}{/${COLORS.valueFg}-fg} as your background track?`,
-      tags: true,
-      style: { bg: COLORS.contentBg },
-    });
-
-    function _close() {
-      modal.destroy();
-      trackList.focus();
-      screen.render();
-    }
-
-    function _makeBtn(text, bg, left, onClick) {
-      const btn = blessed.button({
-        parent: modal,
-        content: text,
-        top: 4,
-        left,
-        mouse: true,
-        keys: true,
-        shrink: true,
-        padding: { left: 1, right: 1 },
-        style: {
-          bg,
-          fg: 'white',
-          focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
-          hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
-        },
-      });
-      btn.key(['enter', 'space'], () => { _close(); onClick(); });
-      btn.on('click', () => btn.press());
-      return btn;
-    }
-
-    const okBtn     = _makeBtn('OK — Set Track', COLORS.btnDefault, 2,  () => {
-      _setMusic(configService, { track: trackId });
-      refreshDisplay();
-    });
-    const favBtn    = _makeBtn('★ Favorite',     COLORS.btnDefault, 20, () => {
-      toggleMusicFavorite(configService, trackId);
-      refreshDisplay();
-    });
-    const cancelBtn = _makeBtn('Cancel',         '#546e7a',         34, () => {});
-
-    okBtn.key(['tab', 'right'],    () => { favBtn.focus();    screen.render(); });
-    favBtn.key(['tab', 'right'],   () => { cancelBtn.focus(); screen.render(); });
-    favBtn.key(['S-tab', 'left'],  () => { okBtn.focus();     screen.render(); });
-    cancelBtn.key(['tab', 'right'],() => { okBtn.focus();     screen.render(); });
-    cancelBtn.key(['S-tab', 'left'],() => { favBtn.focus();   screen.render(); });
-    modal.key(['escape', 'q'], _close);
-    modal.key(['*'], () => { toggleMusicFavorite(configService, trackId); refreshDisplay(); });
-
+    modal.key(['escape', 'enter', 'q'], () => { modal.destroy(); trackList.focus(); screen.render(); });
     modal.setFront();
-    okBtn.focus();
+    modal.focus();
     screen.render();
+  });
+  addCustomTrackBtn.bottom = 4;
+  addCustomTrackBtn.left = 26;
+
+  // -------------------------------------------------------------------------
+  // Hint text shown in previewLine when the list has focus and nothing is playing
+  const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] set as background track  [*] favorite{/${COLORS.dimFg}-fg}`;
+  let _listFocused = false;
+
+  // Inline selection hint appended to the currently highlighted track row.
+  // _hintBase stores the item's clean content (no hint, no █) so we never need
+  // a sentinel character — PUA chars like U+E000 render as Nerd Font icons.
+  const _ROW_HINT = `  {bright-black-fg}[Space] Play  [Enter] Select  [*] Favorite{/bright-black-fg}`;
+  let _hintIdx  = -1;
+  let _hintBase = '';   // content of items[_hintIdx] before hint was appended
+  let _refreshing = false;
+
+  function _updateHint(idx) {
+    const items = trackList.items;
+    // Restore previously hinted row using its saved base content
+    if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
+      const hadBlink = (items[_hintIdx].content ?? '').endsWith(' █');
+      items[_hintIdx].setContent(hadBlink ? _hintBase + ' █' : _hintBase);
+    }
+    // Add hint to the new row, saving its clean base first
+    if (idx >= 0 && items[idx]) {
+      let c = items[idx].content ?? '';
+      const hasBlink = c.endsWith(' █');
+      if (hasBlink) c = c.slice(0, -2);
+      _hintBase = c;
+      items[idx].setContent(c + _ROW_HINT + (hasBlink ? ' █' : ''));
+    } else {
+      _hintBase = '';
+    }
+    _hintIdx = idx;
   }
 
   // -------------------------------------------------------------------------
@@ -509,6 +458,7 @@ export function createMusicTab(screen, services) {
     ...process.env,
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
+    PULSE_SERVER: process.env.PULSE_SERVER || 'unix:/mnt/wslg/PulseServer',
   };
 
   /**
@@ -609,6 +559,9 @@ export function createMusicTab(screen, services) {
   }
 
   function refreshDisplay() {
+    _refreshing = true;
+    const savedIdx = trackList.selected ?? 0;
+
     _allTracks = _buildAllTracks();
     const { enabled, track: activeTrackId } = _getMusic(configService);
     const favorites = getMusicFavorites(configService);
@@ -619,25 +572,43 @@ export function createMusicTab(screen, services) {
     const activeLabel = (activeTrack?.label ?? formatTrackLabel(activeTrackId ?? '')) || 'None';
 
     trackList.setItems(items.length > 0 ? items : [' (no tracks match filter)']);
+    // Restore selection (setItems resets to 0)
+    const maxIdx = Math.max(0, (items.length > 0 ? items.length : 1) - 1);
+    trackList.select(Math.min(savedIdx, maxIdx));
+
+    // Re-apply inline hint if list is focused
+    if (_listFocused) {
+      _hintIdx = -1;
+      _hintBase = '';
+      _updateHint(trackList.selected ?? 0);
+    }
+
     statusLine.setContent(
       `  Music: ${formatMusicStatus(enabled)}  |  Active Track: ${activeLabel}  |  Filter: ${_showFavoritesOnly ? 'Favorites' : 'All'}`
     );
 
+    _refreshing = false;
     screen.render();
   }
 
   // -------------------------------------------------------------------------
   // Key bindings on trackList
 
-  // [Enter] → open "Set as background track" confirmation modal
+  // [Enter] → directly set selected track as active background track
   trackList.key(['enter'], () => {
     const trackId = _getSelectedTrackId();
     if (!trackId) return;
     _killPlayingProcess();
     _playingTrackId = null;
-    previewLine.setContent('');
+    _setMusic(configService, { track: trackId });
+    refreshDisplay();
+    const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
+    previewLine.setContent(`{${COLORS.activeFg}-fg}✓ Active track set: ${label}{/${COLORS.activeFg}-fg}`);
+    setTimeout(() => {
+      if (!_playingTrackId) previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      screen.render();
+    }, 1500);
     screen.render();
-    _openSelectTrackModal(trackId);
   });
 
   // [Space] → preview/stop track (toggle)
@@ -679,17 +650,31 @@ export function createMusicTab(screen, services) {
     }
   });
 
-  // [Tab] → navigate from list to bottom buttons (Tab cycles: list→toggle→setActive→fav→upload→list)
-  trackList.key(['tab'], () => { toggleBtn.focus(); screen.render(); });
-  toggleBtn.key(['tab'],       () => { setActiveBtn.focus();  screen.render(); });
-  setActiveBtn.key(['tab'],    () => { favoriteBtn.focus();   screen.render(); });
-  favoriteBtn.key(['tab'],     () => { uploadBtn.focus();     screen.render(); });
-  uploadBtn.key(['tab'],       () => { trackList.focus();     screen.render(); });
-  // Shift-Tab / Escape returns focus to list from any bottom button
-  toggleBtn.key(['S-tab', 'escape'],   () => { trackList.focus(); screen.render(); });
-  setActiveBtn.key(['S-tab', 'escape'],() => { trackList.focus(); screen.render(); });
-  favoriteBtn.key(['S-tab', 'escape'], () => { trackList.focus(); screen.render(); });
-  uploadBtn.key(['S-tab', 'escape'],   () => { trackList.focus(); screen.render(); });
+  // Escape at the list level → return to header tab bar
+  trackList.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+  });
+
+  // ↓ at the last item → descend into the button row (Toggle Music gets focus first)
+  // Note: Tab is NOT used here — navigation.js registers screen.key(['tab']) to cycle tabs,
+  // so element.key(['tab']) + screen.key(['tab']) both fire, causing a simultaneous tab-cycle.
+  trackList.key(['down'], () => {
+    const visible = _getVisibleTracks();
+    if (trackList.selected >= visible.length - 1) {
+      toggleBtn.focus();
+      screen.render();
+    }
+  });
+
+  // ←/→ navigate between the two buttons
+  toggleBtn.key(['right'],         () => { addCustomTrackBtn.focus(); screen.render(); });
+  addCustomTrackBtn.key(['right'], () => { toggleBtn.focus();         screen.render(); });
+  toggleBtn.key(['left'],          () => { addCustomTrackBtn.focus(); screen.render(); });
+  addCustomTrackBtn.key(['left'],  () => { toggleBtn.focus();         screen.render(); });
+
+  // ↑ or Escape from any button → back to track list
+  toggleBtn.key(['up', 'escape'],          () => { trackList.focus(); screen.render(); });
+  addCustomTrackBtn.key(['up', 'escape'],  () => { trackList.focus(); screen.render(); });
 
   // Blinking █ on selected row while list is focused
   let _tlBlink = { interval: null, on: false, sel: -1 };
@@ -711,6 +696,9 @@ export function createMusicTab(screen, services) {
     _listFocused = true;
     _tlBlink.on = true;
     _tlBlink.sel = trackList.selected ?? 0;
+    _hintIdx = -1;
+    _hintBase = '';
+    _updateHint(_tlBlink.sel);
     const items = trackList.items;
     if (items[_tlBlink.sel]) items[_tlBlink.sel].setContent((items[_tlBlink.sel].content ?? '') + ' █');
     if (!_playingTrackId) previewLine.setContent(HINT_TEXT);
@@ -723,12 +711,22 @@ export function createMusicTab(screen, services) {
     if (_tlBlink.interval) { clearInterval(_tlBlink.interval); _tlBlink.interval = null; }
     const items = trackList.items;
     const sel = trackList.selected ?? 0;
-    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/ █$/, ''));
+    if (items[sel]) {
+      // Restore the hinted item to its clean base; for non-hinted items just strip █
+      items[sel].setContent(sel === _hintIdx ? _hintBase : (items[sel].content ?? '').replace(/ █$/, ''));
+    }
+    if (_hintIdx >= 0 && _hintIdx !== sel && items[_hintIdx]) {
+      items[_hintIdx].setContent(_hintBase);
+    }
+    _hintIdx = -1;
+    _hintBase = '';
     screen.render();
   });
 
   // Refresh status text on cursor movement
   trackList.on('select item', () => {
+    if (_refreshing) return;
+    _updateHint(trackList.selected ?? 0);
     if (_tlBlink.interval) _tlTick(); // move █ to newly selected row
     const { enabled, track: activeTrackId } = _getMusic(configService);
     const activeTrack = _allTracks.find(t => t.id === activeTrackId);

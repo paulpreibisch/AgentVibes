@@ -40,7 +40,7 @@ const COLORS = {
   contentBg:    '#0a0e1a',  // Near-black content background
   sectionHdr:   '#7986cb',  // Light blue — section dividers
   labelFg:      '#e3f2fd',  // Light blue text — labels
-  valueFg:      '#ffd700',  // Yellow — current values
+  valueFg:      '#ffff00',  // Yellow — current values
   btnDefault:   '#37474f',  // Dark slate — default button bg
   btnFocus:     '#00e5ff',  // Cyan — focused button bg
   btnFocusFg:   '#000000',  // Black — focused button text
@@ -256,7 +256,7 @@ function createTestStub() {
 export function createSettingsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, navigationService, focusMainTabBar } = services;
+  const { configService, providerService, navigationService, focusMainTabBar, focusFirstHeaderItem, focusLastHeaderItem } = services;
 
   // Playback state for the voice sample button
   let _sampleProcess = null;
@@ -1595,10 +1595,10 @@ export function createSettingsTab(screen, services) {
       configService.saveAllToGlobal(data);
       refreshConfigDisplay();
       _showNotice(screen, 'Settings Saved');
-    });
+    }, () => { _currentIdx = _buttons.indexOf(saveGloballyBtn); _focusButton(saveGloballyBtn); });
   }, { bg: '#7b1fa2' });   // purple
   saveGloballyBtn.bottom = 0;
-  saveGloballyBtn.left = 20;
+  saveGloballyBtn.left = 24;
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
     const data = configService.getConfig();
@@ -1607,10 +1607,10 @@ export function createSettingsTab(screen, services) {
       configService.saveAllToLocal(data);
       refreshConfigDisplay();
       _showNotice(screen, 'Settings Saved');
-    });
+    }, () => { _currentIdx = _buttons.indexOf(saveLocallyBtn); _focusButton(saveLocallyBtn); });
   }, { bg: '#2e7d32' });   // green
   saveLocallyBtn.bottom = 0;
-  saveLocallyBtn.left = 37;
+  saveLocallyBtn.left = 46;
 
   const cancelChangesBtn = _createButton(box, screen, 'Cancel Changes', COLORS, () => {
     // Restore global config to snapshot taken at tab open
@@ -1628,20 +1628,7 @@ export function createSettingsTab(screen, services) {
     _showNotice(screen, 'Changes reverted');
   }, { bg: '#c62828' });   // red
   cancelChangesBtn.bottom = 0;
-  cancelChangesBtn.left = 53;
-
-  // -------------------------------------------------------------------------
-  // Hint bar — keyboard shortcuts at the bottom of the settings area
-
-  blessed.text({
-    parent: box,
-    bottom: 1,
-    left: 2,
-    width: 82,
-    tags: true,
-    content: '{#455a64-fg}[↑↓] Group  [←→] Sibling/Sub-tab  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit{/#455a64-fg}',
-    style: { bg: COLORS.contentBg },
-  });
+  cancelChangesBtn.left = 66;
 
   // -------------------------------------------------------------------------
   // Display state + button-level focus navigation (story 7.6)
@@ -1708,8 +1695,7 @@ export function createSettingsTab(screen, services) {
     _rows.push(_subTabItemsArray);
     for (const row of _rowsBySubTab[name]) _rows.push(row);
     _rows.push([fullPreviewBtn]);
-    _rows.push([saveGloballyBtn, saveLocallyBtn]);
-    _rows.push([cancelChangesBtn]);
+    _rows.push([saveGloballyBtn, saveLocallyBtn, cancelChangesBtn]);
 
     _updateSubTabBar();
 
@@ -1852,7 +1838,7 @@ export function createSettingsTab(screen, services) {
     }
 
     // _rows layout: [0]=sub-tab bar, [1..lastContent]=per-tab rows, then 3 shared bottom rows
-    const BOTTOM_ROWS = 3; // [fullPreviewBtn], [saveGlobally+saveLocally], [cancelChanges]
+    const BOTTOM_ROWS = 2; // [fullPreviewBtn], [saveGlobally+saveLocally+cancelChanges]
     const lastContentIdx = _rows.length - BOTTOM_ROWS - 1;
 
     // Cross-tab forward: ↓ from the effective last visible content row → jump to next sub-tab
@@ -1899,6 +1885,26 @@ export function createSettingsTab(screen, services) {
       // First sub-tab: fall through (goes to sub-tab bar at row 0)
     }
 
+    // In the bottom save row: ↓ navigates to the next visible sibling within the row
+    // rather than wrapping to row 0 (sub-tab bar) via modulo.
+    const lastRowIdx = _rows.length - 1;
+    if (delta > 0 && rowIdx === lastRowIdx) {
+      const row = _rows[lastRowIdx];
+      const posInRow = row.indexOf(focused);
+      for (let i = posInRow + 1; i < row.length; i++) {
+        if (!row[i].hidden) {
+          _currentIdx = _buttons.indexOf(row[i]);
+          _focusButton(row[i]);
+          return;
+        }
+      }
+      // Last sibling in the row — wrap up to sub-tab bar (row 0)
+      const topBtn = _firstVisibleBtn(_rows[0]);
+      _currentIdx = _buttons.indexOf(topBtn);
+      _focusButton(topBtn);
+      return;
+    }
+
     // Skip rows where ALL buttons are hidden (e.g. SSH alias row when destination is local).
     // Use _firstVisibleBtn so we land on the first visible button in a mixed row.
     let attempts = 0;
@@ -1912,8 +1918,9 @@ export function createSettingsTab(screen, services) {
   }
 
   for (const btn of _buttons) {
-    btn.key(['down'], () => _navigateRow(1));
-    btn.key(['up'],   () => _navigateRow(-1));
+    btn.key(['down'],   () => _navigateRow(1));
+    btn.key(['up'],     () => _navigateRow(-1));
+    btn.key(['escape'], () => { if (typeof focusMainTabBar === 'function') setTimeout(() => focusMainTabBar(), 0); });
   }
 
   // ← / → within content rows — uses _buttonGroups (static); sub-tab bar has its own wiring
@@ -1930,8 +1937,7 @@ export function createSettingsTab(screen, services) {
     [audioDstChangeBtn],
     [audioSshEditBtn, audioStreamModeBtn],
     [fullPreviewBtn],
-    [saveGloballyBtn, saveLocallyBtn],
-    [cancelChangesBtn],
+    [saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
   ];
 
   for (const row of _buttonGroups) {
@@ -1941,20 +1947,40 @@ export function createSettingsTab(screen, services) {
           // Skip hidden siblings (e.g. SSH/stream mode when destination is local)
           let next = i + 1;
           while (next < row.length && row[next].hidden) next++;
-          if (next < row.length) _focusButton(row[next]);
+          if (next < row.length) { _currentIdx = _buttons.indexOf(row[next]); _focusButton(row[next]); }
         });
       }
       if (i > 0) {
         row[i].key(['left'], () => {
           let prev = i - 1;
           while (prev >= 0 && row[prev].hidden) prev--;
-          if (prev >= 0) _focusButton(row[prev]);
+          if (prev >= 0) { _currentIdx = _buttons.indexOf(row[prev]); _focusButton(row[prev]); }
         });
       }
     }
   }
 
-  // Wire sub-tab ←/→ to switch tabs
+  // Tab/S-tab cycle: bottom buttons ↔ main header tab bar
+  // Debounce prevents key-repeat from firing on the newly-focused button in the same stroke.
+  let _tabBusy = false;
+  const _withTabDebounce = (fn) => () => {
+    if (_tabBusy) return;
+    _tabBusy = true;
+    setTimeout(() => { _tabBusy = false; }, 120);
+    fn();
+  };
+
+  fullPreviewBtn.key(['tab'],   _withTabDebounce(() => { _currentIdx = _buttons.indexOf(saveGloballyBtn); _focusButton(saveGloballyBtn); }));
+  saveGloballyBtn.key(['tab'],  _withTabDebounce(() => { _currentIdx = _buttons.indexOf(saveLocallyBtn);  _focusButton(saveLocallyBtn); }));
+  saveLocallyBtn.key(['tab'],   _withTabDebounce(() => { _currentIdx = _buttons.indexOf(cancelChangesBtn); _focusButton(cancelChangesBtn); }));
+  cancelChangesBtn.key(['tab'], _withTabDebounce(() => { if (typeof focusFirstHeaderItem === 'function') focusFirstHeaderItem(); }));
+
+  fullPreviewBtn.key(['S-tab'],   _withTabDebounce(() => { if (typeof focusLastHeaderItem === 'function') focusLastHeaderItem(); }));
+  saveGloballyBtn.key(['S-tab'],  _withTabDebounce(() => { _currentIdx = _buttons.indexOf(fullPreviewBtn);    _focusButton(fullPreviewBtn); }));
+  saveLocallyBtn.key(['S-tab'],   _withTabDebounce(() => { _currentIdx = _buttons.indexOf(saveGloballyBtn);   _focusButton(saveGloballyBtn); }));
+  cancelChangesBtn.key(['S-tab'], _withTabDebounce(() => { _currentIdx = _buttons.indexOf(saveLocallyBtn);    _focusButton(saveLocallyBtn); }));
+
+  // Wire sub-tab ←/→ and Tab/S-tab to switch sub-tabs
   for (let i = 0; i < SUB_TABS.length; i++) {
     const item = _subTabItemsMap[SUB_TABS[i]];
     if (i < SUB_TABS.length - 1) {
@@ -1969,6 +1995,17 @@ export function createSettingsTab(screen, services) {
         _focusButton(_subTabItemsArray[i - 1]);
       });
     }
+    // Tab/S-tab wrap-cycle through sub-tab bar (independent of global header Tab cycle)
+    item.key(['tab'], () => {
+      const next = (i + 1) % SUB_TABS.length;
+      _showSubTab(SUB_TABS[next], true);
+      _focusButton(_subTabItemsArray[next]);
+    });
+    item.key(['S-tab'], () => {
+      const prev = (i - 1 + SUB_TABS.length) % SUB_TABS.length;
+      _showSubTab(SUB_TABS[prev], true);
+      _focusButton(_subTabItemsArray[prev]);
+    });
   }
 
   // Initialize with Voice sub-tab active
@@ -2145,6 +2182,16 @@ export function createSettingsTab(screen, services) {
     getFooterColor() {
       return COLORS.footerBg;
     },
+
+    focusBottomRow() {
+      _currentIdx = _buttons.indexOf(fullPreviewBtn);
+      _focusButton(fullPreviewBtn);
+    },
+
+    focusLastBottomRow() {
+      _currentIdx = _buttons.indexOf(cancelChangesBtn);
+      _focusButton(cancelChangesBtn);
+    },
   };
 }
 
@@ -2171,8 +2218,10 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
   // Focus indicators: ►label◄ with blinking █ cursor
   let _btnBlinkInterval = null;
   btn.on('focus', () => {
+    btn.style.bg = COLORS.btnFocus;
+    btn.style.fg = COLORS.btnFocusFg;
     const raw = btn.content.replace(/[►◄█]/g, '').trim();
-    btn.setContent(`►${raw}◄█`);
+    btn.setContent(`►${raw}◄ █`);
     let _on = true;
     screen.render();
     _btnBlinkInterval = setInterval(() => {
@@ -2180,12 +2229,14 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
       // Skip if spinner has overridden the content (no ► means spinner is active)
       if (!btn.content.includes('►')) return;
       const r = btn.content.replace(/[►◄█]/g, '').trim();
-      btn.setContent(_on ? `►${r}◄█` : `►${r}◄`);
+      btn.setContent(_on ? `►${r}◄ █` : `►${r}◄`);
       screen.render();
     }, 500);
   });
   btn.on('blur', () => {
     if (_btnBlinkInterval) { clearInterval(_btnBlinkInterval); _btnBlinkInterval = null; }
+    btn.style.bg = getDynamicBg ? getDynamicBg() : baseBg;
+    btn.style.fg = 'white';
     const raw = btn.content.replace(/[►◄█]/g, '').trim();
     btn.setContent(raw);
     screen.render();
@@ -2402,7 +2453,7 @@ function _stripLeadingEmoji(s) {
  * @param {object} data     - config object to be saved
  * @param {Function} onConfirm - called only if user presses OK
  */
-function _showSavePreview(screen, filePath, data, onConfirm) {
+function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
   // Flatten nested objects one level deep
   const rawLines = [];
   for (const [k, v] of Object.entries(data)) {
@@ -2423,7 +2474,7 @@ function _showSavePreview(screen, filePath, data, onConfirm) {
   const sep       = '─'.repeat(Math.max(0, Math.min(innerW - 2, width - 6)));
 
   const taggedKV = rawLines.map(([k, v]) =>
-    `  {#90a4ae-fg}${k.padEnd(keyWidth)}:{/#90a4ae-fg} {#ffd700-fg}${v}{/#ffd700-fg}`
+    `  {#90a4ae-fg}${k.padEnd(keyWidth)}:{/#90a4ae-fg} {#ffff00-fg}${v}{/#ffff00-fg}`
   );
 
   // Content rows (all text rendered via box.content; buttons are child widgets)
@@ -2454,7 +2505,7 @@ function _showSavePreview(screen, filePath, data, onConfirm) {
     },
   });
 
-  function _close() { _destroyList(modal, screen); }
+  function _close() { _destroyList(modal, screen, onClose); }
 
   modal.key(['escape'], _close);
 

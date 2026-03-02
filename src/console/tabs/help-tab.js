@@ -22,7 +22,7 @@ const COLORS = {
   contentBg:  '#0a0e1a',
   sectionHdr: '#546e7a',  // Blue-gray — Help tab
   labelFg:    '#e3f2fd',
-  keyFg:      '#ffd700',  // Gold — keyboard shortcuts
+  keyFg:      '#ffff00',  // Yellow — keyboard shortcuts
   descFg:     '#90a4ae',  // Gray — descriptions
   borderFg:   '#607d8b',
   footerBg:   '#607d8b',  // Gray — Help tab footer
@@ -42,7 +42,6 @@ const SHORTCUT_SECTIONS = Object.freeze([
       { key: 'S',         desc: 'Switch to Settings tab' },
       { key: 'V',         desc: 'Switch to Voices tab' },
       { key: 'M',         desc: 'Switch to Music tab' },
-      { key: 'A',         desc: 'Switch to Agents tab' },
       { key: 'R',         desc: 'Switch to Readme tab' },
       { key: 'H',         desc: 'Switch to Help tab' },
       { key: 'I',         desc: 'Switch to Install tab' },
@@ -61,8 +60,7 @@ const SHORTCUT_SECTIONS = Object.freeze([
       { key: 'F',          desc: 'Toggle favorites filter (Voices/Music)' },
       { key: '*',          desc: 'Toggle favorite (Music tab)' },
       { key: 'M',          desc: 'Toggle music on/off (Music tab)' },
-      { key: 'P',          desc: 'Toggle party mode (Agents tab)' },
-      { key: 'R',          desc: 'Reset agent voice (Agents tab)' },
+
     ],
   },
   {
@@ -71,7 +69,7 @@ const SHORTCUT_SECTIONS = Object.freeze([
       { key: 'Blue   (#2196f3)',  desc: 'Settings tab footer' },
       { key: 'Teal   (#00695c)',  desc: 'Voices tab footer' },
       { key: 'Orange (#ff9800)',  desc: 'Music tab footer' },
-      { key: 'Purple (#9c27b0)',  desc: 'Agents tab footer' },
+
       { key: 'Dark   (#455a64)',  desc: 'Readme tab footer' },
       { key: 'Gray   (#607d8b)',  desc: 'Help tab footer' },
       { key: 'Indigo (#3f51b5)',  desc: 'Install tab footer' },
@@ -112,6 +110,8 @@ function createTestStub() {
  */
 export function createHelpTab(screen, services) {
   if (IS_TEST) return createTestStub();
+
+  const { focusMainTabBar } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -212,6 +212,18 @@ export function createHelpTab(screen, services) {
     searchBox.clearValue();
     searchBox.focus();
     screen.render();
+  });
+
+  // [↑] at top of content → jump to main header tab bar
+  scrollBox.key(['up'], () => {
+    if (scrollBox.getScroll() === 0 && typeof focusMainTabBar === 'function') {
+      focusMainTabBar();
+    }
+  });
+
+  // Escape → return to header tab bar
+  scrollBox.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
   // -------------------------------------------------------------------------

@@ -24,7 +24,7 @@ const COLORS = {
   contentBg:  '#0a0e1a',
   sectionHdr: '#7b1fa2',  // Purple — section headers for Agents tab
   labelFg:    '#e3f2fd',
-  valueFg:    '#ffd700',
+  valueFg:    '#ffff00',  // Yellow
   activeFg:   '#ce93d8',  // Light purple — selected agent
   btnDefault: '#6a1b9a',  // Purple — Agents tab buttons
   btnFocus:   '#9c27b0',
@@ -66,7 +66,7 @@ function createTestStub() {
 export function createAgentsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService } = services;
+  const { configService, providerService, focusMainTabBar } = services;
   const voiceStore = new AgentVoiceStore();
 
   // -------------------------------------------------------------------------
@@ -263,6 +263,75 @@ export function createAgentsTab(screen, services) {
     const current = voiceStore.getPartyMode();
     voiceStore.setPartyMode(!current);
     refreshDisplay();
+  });
+
+  // Type-to-jump: press a letter to jump to first agent whose name starts with it
+  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'r', 'p']);
+  agentList.on('keypress', (ch, key) => {
+    if (!ch || key.ctrl || key.meta) return;
+    const lower = ch.toLowerCase();
+    if (!/^[a-z]$/.test(lower)) return;
+    if (_agentJumpBlocked.has(lower)) return;
+    const count = _agents.length;
+    if (count === 0) return;
+    const start = agentList.selected ?? 0;
+    for (let i = 1; i <= count; i++) {
+      const idx = (start + i) % count;
+      const name = (_agents[idx]?.displayName ?? '').toLowerCase();
+      if (name.startsWith(lower)) {
+        agentList.select(idx);
+        screen.render();
+        break;
+      }
+    }
+  });
+
+  // Blinking █ on selected row while list is focused
+  let _alBlink = { interval: null, on: false, sel: -1 };
+  function _alTick() {
+    _alBlink.on = !_alBlink.on;
+    const items = agentList.items;
+    const cur = agentList.selected ?? 0;
+    if (_alBlink.sel !== cur && _alBlink.sel >= 0 && items[_alBlink.sel]) {
+      items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '').replace(/ █$/, ''));
+    }
+    _alBlink.sel = cur;
+    if (items[cur]) {
+      const base = (items[cur].content ?? '').replace(/ █$/, '');
+      items[cur].setContent(_alBlink.on ? `${base} █` : base);
+    }
+    screen.render();
+  }
+  agentList.on('focus', () => {
+    _alBlink.on = true;
+    _alBlink.sel = agentList.selected ?? 0;
+    const items = agentList.items;
+    if (items[_alBlink.sel]) items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '') + ' █');
+    screen.render();
+    _alBlink.interval = setInterval(_alTick, 500);
+  });
+  agentList.on('blur', () => {
+    if (_alBlink.interval) { clearInterval(_alBlink.interval); _alBlink.interval = null; }
+    const items = agentList.items;
+    const sel = agentList.selected ?? 0;
+    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/ █$/, ''));
+    screen.render();
+  });
+  agentList.on('select item', () => {
+    if (_alBlink.interval) _alTick();
+  });
+
+  // [↑] at top of list → jump to main header tab bar
+  agentList.key(['up'], () => {
+    if (agentList.selected === 0 && typeof focusMainTabBar === 'function') {
+      focusMainTabBar();
+      setTimeout(() => { agentList.select(0); screen.render(); }, 0);
+    }
+  });
+
+  // Escape at the list level → return to header tab bar
+  agentList.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
   // -------------------------------------------------------------------------

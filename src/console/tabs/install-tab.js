@@ -141,7 +141,7 @@ function createTestStub() {
 export function createInstallTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, navigationService } = services;
+  const { configService, providerService, navigationService, focusMainTabBar } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -506,6 +506,7 @@ export function createInstallTab(screen, services) {
   const _s1ExitBtn = _createInstallBtn('✗  Exit', '#546e7a', () => {
     box.hide();
     screen.render();
+    if (typeof focusMainTabBar === 'function') focusMainTabBar();
   });
 
   _s1BeginBtn.top = 5; _s1BeginBtn.left = 4;
@@ -846,6 +847,11 @@ export function createInstallTab(screen, services) {
     } else {
       box.hide();
       screen.render();
+      // Defer so the escape keypress event finishes propagating before focus changes.
+      // Calling focusMainTabBar() synchronously here would set focus to the tab bar
+      // item mid-event, causing its own key(['escape']) handler to fire in the same
+      // emission and call onFocus() → re-focus a button inside the now-hidden box.
+      if (typeof focusMainTabBar === 'function') setTimeout(() => focusMainTabBar(), 0);
     }
   });
 

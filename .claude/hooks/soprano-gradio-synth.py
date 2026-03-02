@@ -76,7 +76,7 @@ def submit_request(base: str, payload: bytes) -> str:
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=2) as resp:
                 return json.loads(resp.read())["event_id"]
         except urllib.error.URLError:
             continue

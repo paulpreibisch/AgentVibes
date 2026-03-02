@@ -26,7 +26,7 @@ const COLORS = {
   h1Fg:       '#69f0ae',  // Green — H1
   h2Fg:       '#82b1ff',  // Blue — H2
   h3Fg:       '#80d8ff',  // Light blue — H3
-  codeFg:     '#ffd700',  // Gold — code spans
+  codeFg:     '#ffff00',  // Yellow — code spans
   boldFg:     '#e3f2fd',  // Bright — bold text
   quoteFg:    '#90a4ae',  // Gray — blockquotes
   labelFg:    '#e3f2fd',
@@ -123,6 +123,8 @@ function createTestStub() {
 export function createReadmeTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
+  const { focusMainTabBar } = services;
+
   // -------------------------------------------------------------------------
   // Container
 
@@ -216,6 +218,18 @@ export function createReadmeTab(screen, services) {
   scrollBox.key(['pagedown'], () => {
     scrollBox.scroll(10);
     screen.render();
+  });
+
+  // [↑] at top of content → jump to main header tab bar
+  scrollBox.key(['up'], () => {
+    if (scrollBox.getScroll() === 0 && typeof focusMainTabBar === 'function') {
+      focusMainTabBar();
+    }
+  });
+
+  // Escape → return to header tab bar
+  scrollBox.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
   // -------------------------------------------------------------------------

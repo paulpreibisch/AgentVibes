@@ -7,7 +7,7 @@
  */
 
 /** Magenta-pink used for modal titles and the "Vibes" logotype. */
-export const BRAND_PINK = '#e91e63';
+export const BRAND_PINK = '#f06292';  // Light magenta — Pink 300
 
 /** Indigo blue used for default button backgrounds and primary accents. */
 export const BRAND_BLUE = '#3949ab';

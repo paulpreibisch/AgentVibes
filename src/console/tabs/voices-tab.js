@@ -27,9 +27,9 @@ const COLORS = {
   contentBg:  '#0a0e1a',
   sectionHdr: '#00897b',  // Teal — section headers for Voices tab
   labelFg:    '#e3f2fd',
-  valueFg:    '#ffd700',
+  valueFg:    '#f06292',  // Light magenta — brand color
   activeFg:   '#00e5ff',  // Cyan — active voice
-  favoriteFg: '#ffb300',  // Amber — favorite star
+  favoriteFg: '#ffff00',  // Yellow — favorite star
   btnDefault: '#00695c',  // Teal — Voices tab buttons
   btnFocus:   '#00e5ff',
   btnFocusFg: '#000000',
@@ -193,7 +193,7 @@ export function getFavorites(configService) {
  * @param {string} voiceId
  */
 export function toggleFavorite(configService, voiceId) {
-  const favs = _getFavorites(configService);
+  const favs = getFavorites(configService);
   const idx = favs.indexOf(voiceId);
   if (idx >= 0) {
     favs.splice(idx, 1);
@@ -326,6 +326,7 @@ export function createVoicesTab(screen, services) {
     keys: true,
     vi: true,
     mouse: true,
+    tags: true,
     border: { type: 'line' },
     scrollbar: { ch: '│', style: { fg: COLORS.sectionHdr } },
     style: {
@@ -371,6 +372,31 @@ export function createVoicesTab(screen, services) {
   // Hint text shown in previewLine when the list has focus and nothing is playing
   const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] select as default voice{/${COLORS.dimFg}-fg}`;
   let _listFocused = false;
+
+  // Inline selection hint appended to the currently highlighted voice row.
+  // _hintBase stores the item's clean content (no hint, no █) — no sentinel needed.
+  const _ROW_HINT = `  {bright-black-fg}[Space] Preview  [Enter] Select  [*] Favorite{/bright-black-fg}`;
+  let _hintIdx  = -1;
+  let _hintBase = '';   // content of items[_hintIdx] before hint was appended
+  let _refreshing = false;
+
+  function _updateHint(idx) {
+    const items = voiceList.items;
+    if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
+      const hadBlink = (items[_hintIdx].content ?? '').endsWith(' █');
+      items[_hintIdx].setContent(hadBlink ? _hintBase + ' █' : _hintBase);
+    }
+    if (idx >= 0 && items[idx]) {
+      let c = items[idx].content ?? '';
+      const hasBlink = c.endsWith(' █');
+      if (hasBlink) c = c.slice(0, -2);
+      _hintBase = c;
+      items[idx].setContent(c + _ROW_HINT + (hasBlink ? ' █' : ''));
+    } else {
+      _hintBase = '';
+    }
+    _hintIdx = idx;
+  }
 
   // -------------------------------------------------------------------------
   // Playback state
@@ -510,11 +536,15 @@ export function createVoicesTab(screen, services) {
       },
     });
     btn.on('focus', () => {
+      btn.style.bg = COLORS.btnFocus;
+      btn.style.fg = COLORS.btnFocusFg;
       const raw = btn.content.replace(/[►◄]/g, '').trim();
       btn.setContent(`►${raw}◄`);
       screen.render();
     });
     btn.on('blur', () => {
+      btn.style.bg = COLORS.btnDefault;
+      btn.style.fg = 'white';
       const raw = btn.content.replace(/[►◄]/g, '').trim();
       btn.setContent(raw);
       screen.render();
@@ -571,6 +601,27 @@ export function createVoicesTab(screen, services) {
   installBtn.left = 38;
 
   // -------------------------------------------------------------------------
+  // "Voice Changed" notice — auto-dismisses after 2 s
+
+  function _showVoiceChangedNotice(displayName) {
+    const notice = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 44,
+      height: 5,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {${COLORS.activeFg}-fg}Done{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+      content: `\n  {${COLORS.activeFg}-fg}✓ Voice changed: ${displayName}{/${COLORS.activeFg}-fg}`,
+    });
+    notice.setFront();
+    screen.render();
+    setTimeout(() => { notice.destroy(); screen.render(); }, 2000);
+  }
+
+  // -------------------------------------------------------------------------
   // Select-voice confirmation modal
 
   function _openSelectVoiceModal(voiceId) {
@@ -580,8 +631,8 @@ export function createVoicesTab(screen, services) {
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 54,
-      height: 7,
+      width: 60,
+      height: 8,
       border: { type: 'line' },
       tags: true,
       label: ` {${COLORS.activeFg}-fg}Set Default Voice{/${COLORS.activeFg}-fg} `,
@@ -598,7 +649,21 @@ export function createVoicesTab(screen, services) {
       style: { bg: COLORS.contentBg },
     });
 
+    // Status line shows playback state while modal is open
+    const modalStatus = blessed.text({
+      parent: modal,
+      top: 3,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: `{${COLORS.dimFg}-fg}Press Preview to audition this voice{/${COLORS.dimFg}-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
     function _close() {
+      _killPlayingProcess();
+      _playingVoiceId = null;
+      previewLine.setContent(_listFocused ? HINT_TEXT : '');
       modal.destroy();
       voiceList.focus();
       screen.render();
@@ -608,7 +673,7 @@ export function createVoicesTab(screen, services) {
       const btn = blessed.button({
         parent: modal,
         content: label,
-        top: 4,
+        top: 5,
         left,
         mouse: true,
         keys: true,
@@ -626,14 +691,49 @@ export function createVoicesTab(screen, services) {
       return btn;
     }
 
-    const okBtn     = _makeBtn('OK — Set Voice', COLORS.btnDefault,  2, () => {
+    const okBtn     = _makeBtn('OK — Set Voice', COLORS.btnDefault, 2,  () => {
       providerService.setActiveVoice(voiceId);
       refreshDisplay();
+      _showVoiceChangedNotice(displayName);
     });
-    const cancelBtn = _makeBtn('Cancel',         '#546e7a',          20, () => {});
+    const cancelBtn = _makeBtn('Cancel',         '#546e7a',         20, () => {});
 
-    okBtn.key(['tab', 'right'],    () => { cancelBtn.focus(); screen.render(); });
-    cancelBtn.key(['tab', 'left'], () => { okBtn.focus();     screen.render(); });
+    // Preview button — does NOT close the modal; plays/stops the voice inline
+    const previewBtn = blessed.button({
+      parent: modal,
+      content: 'Preview',
+      top: 5,
+      left: 33,
+      mouse: true,
+      keys: true,
+      shrink: true,
+      padding: { left: 1, right: 1 },
+      style: {
+        bg: '#e65100',
+        fg: 'white',
+        focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+        hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      },
+    });
+    previewBtn.key(['enter', 'space'], () => {
+      const isPlaying = _playingVoiceId === voiceId;
+      _previewVoice(voiceId);
+      modalStatus.setContent(isPlaying
+        ? `{${COLORS.dimFg}-fg}Stopped.{/${COLORS.dimFg}-fg}`
+        : `{${COLORS.activeFg}-fg}♪ Playing: ${displayName}…{/${COLORS.activeFg}-fg}`
+      );
+      screen.render();
+    });
+    previewBtn.on('click', () => previewBtn.press());
+
+    // Tab/arrow navigation: OK → Cancel → Preview → OK
+    okBtn.key(['tab', 'right'],         () => { cancelBtn.focus();  screen.render(); });
+    cancelBtn.key(['tab', 'right'],     () => { previewBtn.focus(); screen.render(); });
+    previewBtn.key(['tab', 'right'],    () => { okBtn.focus();      screen.render(); });
+    previewBtn.key(['left'],            () => { cancelBtn.focus();  screen.render(); });
+    cancelBtn.key(['left'],             () => { okBtn.focus();      screen.render(); });
+    okBtn.key(['left'],                 () => { previewBtn.focus(); screen.render(); });
+
     modal.key(['escape', 'q'], _close);
 
     modal.setFront();
@@ -683,6 +783,9 @@ export function createVoicesTab(screen, services) {
   }
 
   function refreshDisplay() {
+    _refreshing = true;
+    const savedIdx = voiceList.selected ?? 0;
+
     _allVoices = scanInstalledVoices();
     const active = providerService.getActiveVoiceId();
     const favorites = getFavorites(configService);
@@ -690,11 +793,21 @@ export function createVoicesTab(screen, services) {
     const items = _buildListItems(filtered, active, favorites);
 
     voiceList.setItems(items.length > 0 ? items : [' (no voices found — install piper first)']);
+    const maxIdx = Math.max(0, (items.length > 0 ? items.length : 1) - 1);
+    voiceList.select(Math.min(savedIdx, maxIdx));
+
+    // Re-apply inline hint if list is focused
+    if (_listFocused) {
+      _hintIdx = -1;
+      _hintBase = '';
+      _updateHint(voiceList.selected ?? 0);
+    }
 
     // Update info panel for currently selected item
     const sel = filtered[voiceList.selected] ?? active ?? '';
     infoLine.setContent(`  ${_formatInfoTagged(sel)}`);
 
+    _refreshing = false;
     screen.render();
   }
 
@@ -731,8 +844,13 @@ export function createVoicesTab(screen, services) {
     }
   });
 
-  // 'f' in voiceList toggles favorite
-  voiceList.key(['f'], () => {
+  // Escape at the list level → return to header tab bar
+  voiceList.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+  });
+
+  // 'f' or '*' in voiceList toggles favorite
+  voiceList.key(['f', '*'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -783,6 +901,9 @@ export function createVoicesTab(screen, services) {
     _listFocused = true;
     _vlBlink.on = true;
     _vlBlink.sel = voiceList.selected ?? 0;
+    _hintIdx = -1;
+    _hintBase = '';
+    _updateHint(_vlBlink.sel);
     const items = voiceList.items;
     if (items[_vlBlink.sel]) items[_vlBlink.sel].setContent((items[_vlBlink.sel].content ?? '') + ' █');
     if (!_playingVoiceId) previewLine.setContent(HINT_TEXT);
@@ -795,12 +916,21 @@ export function createVoicesTab(screen, services) {
     if (_vlBlink.interval) { clearInterval(_vlBlink.interval); _vlBlink.interval = null; }
     const items = voiceList.items;
     const sel = voiceList.selected ?? 0;
-    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/ █$/, ''));
+    if (items[sel]) {
+      items[sel].setContent(sel === _hintIdx ? _hintBase : (items[sel].content ?? '').replace(/ █$/, ''));
+    }
+    if (_hintIdx >= 0 && _hintIdx !== sel && items[_hintIdx]) {
+      items[_hintIdx].setContent(_hintBase);
+    }
+    _hintIdx = -1;
+    _hintBase = '';
     screen.render();
   });
 
   // Update info panel when selection changes
   voiceList.on('select item', () => {
+    if (_refreshing) return;
+    _updateHint(voiceList.selected ?? 0);
     if (_vlBlink.interval) _vlTick(); // move █ to newly selected row
     const voices = _getFilteredVoices();
     const sel = voices[voiceList.selected] ?? '';
@@ -829,6 +959,32 @@ export function createVoicesTab(screen, services) {
       }
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Button-row keyboard navigation
+  // ↓ at the last list item → descend into the button row (Switch Voice gets focus first)
+  // Note: Tab is NOT used — navigation.js registers screen.key(['tab']) to cycle tabs,
+  // so element.key(['tab']) + screen.key(['tab']) both fire simultaneously.
+  voiceList.key(['down'], () => {
+    const voices = _getFilteredVoices();
+    if (voiceList.selected >= voices.length - 1) {
+      switchBtn.focus();
+      screen.render();
+    }
+  });
+
+  // ←/→ navigate between the three buttons
+  switchBtn.key(['right'],    () => { favoriteBtn.focus();  screen.render(); });
+  favoriteBtn.key(['right'],  () => { installBtn.focus();   screen.render(); });
+  installBtn.key(['right'],   () => { switchBtn.focus();    screen.render(); });
+  switchBtn.key(['left'],     () => { installBtn.focus();   screen.render(); });
+  favoriteBtn.key(['left'],   () => { switchBtn.focus();    screen.render(); });
+  installBtn.key(['left'],    () => { favoriteBtn.focus();  screen.render(); });
+
+  // ↑ or Escape from any button → back to voice list
+  switchBtn.key(['up', 'escape'],   () => { voiceList.focus(); screen.render(); });
+  favoriteBtn.key(['up', 'escape'], () => { voiceList.focus(); screen.render(); });
+  installBtn.key(['up', 'escape'],  () => { voiceList.focus(); screen.render(); });
 
   // -------------------------------------------------------------------------
   // Tab Component Contract

@@ -3744,7 +3744,7 @@ async function checkAndInstallPiper(targetDir, options) {
       try {
         if (fsSync.existsSync(piperDownloadPath)) {
           execScript(`${piperDownloadPath} --yes`, {
-            stdio: 'inherit',
+            stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env
           });
           console.log(chalk.green('\n✅ Voice models downloaded successfully!\n'));
@@ -3788,7 +3788,7 @@ async function checkAndInstallPiper(targetDir, options) {
 
         try {
           execScript(`${piperInstallerPath} --non-interactive`, {
-            stdio: 'inherit',
+            stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env
           });
           console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
@@ -4582,7 +4582,8 @@ async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
  * @returns {Object} Mock spinner object
  */
 function createSilentSpinner() {
-  return { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} };
+  const s = { start: () => s, succeed: () => s, info: () => s, fail: () => s, warn: () => s, stop: () => s };
+  return s;
 }
 
 /**
@@ -4767,157 +4768,7 @@ async function install(options = {}) {
   const piperVoicesPath = userConfig.piperPath;
   const targetDir = options.directory || currentDir;
 
-  // Collect pre-install information pages
-  const preInstallPages = [];
-
-  // Page 1: Configuration Summary
-  const providerLabels = {
-    piper: 'Piper TTS',
-    macos: 'macOS Say',
-    soprano: 'Soprano TTS',
-    'termux-ssh': 'Termux SSH (Android)',
-    'ssh-pulseaudio': 'PulseAudio Tunnel',
-    pulseaudio: 'PulseAudio Tunnel',
-    'windows-piper': 'Windows Piper TTS',
-    'windows-sapi': 'Windows SAPI'
-  };
-  const reverbLabels = {
-    off: 'Off',
-    light: 'Light',
-    medium: 'Medium',
-    heavy: 'Heavy',
-    cathedral: 'Cathedral'
-  };
-  const verbosityLabels = {
-    high: 'High',
-    medium: 'Medium',
-    low: 'Low'
-  };
-
-  let configContent = chalk.bold('Your Configuration\n\n');
-  configContent += chalk.cyan('🎤 TTS Provider:\n');
-  configContent += chalk.white(`   ${providerLabels[selectedProvider]}\n`);
-  if (selectedProvider === 'piper' && piperVoicesPath) {
-    configContent += chalk.gray(`   Voice storage: ${piperVoicesPath}\n`);
-  }
-  if (selectedProvider === 'termux-ssh') {
-    if (userConfig.sshHost) {
-      configContent += chalk.gray(`   SSH host: ${userConfig.sshHost}\n`);
-    } else {
-      configContent += chalk.yellow(`   SSH host: Not configured (set later)\n`);
-    }
-  }
-  configContent += '\n';
-  configContent += chalk.cyan('🎛️  Audio Settings:\n');
-  configContent += chalk.white(`   Reverb: ${reverbLabels[userConfig.reverb]}\n`);
-  configContent += chalk.white(`   Background Music: ${userConfig.backgroundMusic.enabled ? 'Enabled' : 'Disabled'}\n`);
-  if (userConfig.backgroundMusic.enabled) {
-    // Find the track name from the track choices
-    const trackChoices = {
-      'agentvibes_soft_flamenco_loop.mp3': 'Soft Flamenco',
-      'agent_vibes_bachata_v1_loop.mp3': 'Bachata',
-      'agent_vibes_salsa_v2_loop.mp3': 'Salsa',
-      'agent_vibes_cumbia_v1_loop.mp3': 'Cumbia',
-      'agent_vibes_bossa_nova_v2_loop.mp3': 'Bossa Nova',
-      'agent_vibes_japanese_city_pop_v1_loop.mp3': 'Japanese City Pop',
-      'agent_vibes_chillwave_v2_loop.mp3': 'Chillwave',
-      'dreamy_house_loop.mp3': 'Dreamy House',
-      'agent_vibes_dark_chill_step_loop.mp3': 'Dark Chill Step',
-      'agent_vibes_goa_trance_v2_loop.mp3': 'Goa Trance',
-      'agent_vibes_harpsichord_v2_loop.mp3': 'Harpsichord',
-      'agent_vibes_celtic_harp_v1_loop.mp3': 'Celtic Harp',
-      'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3': 'Hawaiian Slack Key Guitar',
-      'agent_vibes_arabic_v2_loop.mp3': 'Arabic Oud',
-      'agent_vibes_ganawa_ambient_v2_loop.mp3': 'Gnawa Ambient',
-      'agent_vibes_tabla_dream_pop_v1_loop.mp3': 'Tabla Dream Pop'
-    };
-    const trackName = trackChoices[userConfig.backgroundMusic.track] || userConfig.backgroundMusic.track;
-    configContent += chalk.gray(`   Default track: ${trackName}\n`);
-  }
-  configContent += '\n';
-  configContent += chalk.cyan('😎 Personality:\n');
-  const personalityDisplay = userConfig.personality === 'none' ? 'None (Professional)' : userConfig.personality.charAt(0).toUpperCase() + userConfig.personality.slice(1);
-  configContent += chalk.white(`   ${personalityDisplay}\n`);
-  configContent += '\n';
-  configContent += chalk.cyan('🔊 Verbosity:\n');
-  configContent += chalk.white(`   ${verbosityLabels[userConfig.verbosity]}\n`);
-
-  const configBoxen = boxen(configContent.trim(), {
-    padding: 1,
-    margin: { top: 0, bottom: 0, left: 0, right: 0 },
-    borderStyle: 'round',
-    borderColor: 'green',
-    width: 80
-  });
-
-  // Don't add Configuration Summary to preInstallPages yet - we'll handle it specially
-
-  // Show pre-install pages up to (but NOT including) Configuration Summary
-  if (!options.yes && preInstallPages.length > 0) {
-    console.log(chalk.cyan('\n📖 Installation Preview\n'));
-    const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
-    // For pre-install, estimate post-install pages (will be exact in post-install)
-    const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
-    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall; // +1 for Config Summary
-
-    const result = await showPaginatedContent(preInstallPages, {
-      ...options,
-      continueLabel: '✓ Next',
-      pageOffset: preInstallOffset,
-      totalPages: estimatedTotal,
-      showPreviousOnFirst: true
-    });
-
-    // If user went back from first pre-install page, restart configuration
-    if (result === 'prev') {
-      console.log(chalk.yellow('\n↩️  Returning to configuration...\n'));
-      return install(options); // Restart the install function
-    }
-  }
-
-  // Handle Configuration Summary page specially with welcome message prompt
-  if (!options.yes) {
-    // Show Configuration Summary page
-    console.clear();
-    const currentPageNum = 4 + preInstallPages.length; // After config pages + pre-install pages
-    const estimatedPostInstall = 7;
-    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall;
-    const { header } = createPageHeaderFooter('Configuration Summary', currentPageNum, estimatedTotal, 0);
-
-    console.log(header);
-    console.log(configBoxen);
-    console.log('');
-    // Don't show welcome message text for termux-ssh (it won't work)
-    if (userConfig.provider !== 'termux-ssh') {
-      console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
-    }
-  }
-
-  // Ask welcome message question BEFORE showing navigation
-  // Skip for termux-ssh - welcome audio plays locally, not on Android device
-  if (!options.yes && userConfig.provider !== 'termux-ssh') {
-    // Ask if user wants to hear welcome message
-    const { playWelcome } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'playWelcome',
-        message: chalk.yellow('🎵 Listen to Welcome Message?'),
-        default: false,
-      },
-    ]);
-
-    if (playWelcome) {
-      console.log(''); // Spacing before spinner
-      const spinner = ora('Playing welcome message...').start();
-      await playWelcomeDemo(targetDir, spinner, options);
-      spinner.succeed(chalk.green('Welcome message complete!'));
-      console.log(''); // Spacing after completion
-    }
-  } else if (!options.yes && userConfig.provider === 'termux-ssh' || userConfig.provider === 'ssh-pulseaudio') {
-    console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux SSH)\n'));
-  }
-
-  // Now show navigation menu (Continue to installation)
+  // Confirm and start installation
   const { startInstall } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -4932,59 +4783,35 @@ async function install(options = {}) {
     process.exit(0);
   }
 
-  // User already confirmed by pressing "Start Installation", so no need for another confirmation
+  // Silent spinner for copy functions — suppresses per-file output
+  const silentSpinner = createSilentSpinner();
+
   console.log('');
-  const spinner = ora('Checking installation directory...').start();
+  const spinner = ora('Installing AgentVibes...').start();
 
   try {
     // Create .claude directory structure
     const claudeDir = path.join(targetDir, '.claude');
     const commandsDir = path.join(claudeDir, 'commands');
     const hooksDir = path.join(claudeDir, isNativeWindows() ? 'hooks-windows' : 'hooks');
+    const audioDir = path.join(claudeDir, 'audio');
+    const tracksDir = path.join(audioDir, 'tracks');
+    await fs.mkdir(commandsDir, { recursive: true });
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.mkdir(tracksDir, { recursive: true });
 
-    let exists = false;
-    try {
-      await fs.access(claudeDir);
-      exists = true;
-    } catch {}
-
-    if (!exists) {
-      spinner.info(chalk.yellow('Creating .claude directory structure...'));
-      const audioDir = path.join(claudeDir, 'audio');
-      const tracksDir = path.join(audioDir, 'tracks');
-      console.log(chalk.gray(`   → ${commandsDir}`));
-      console.log(chalk.gray(`   → ${hooksDir}`));
-      console.log(chalk.gray(`   → ${audioDir}`));
-      console.log(chalk.gray(`   → ${tracksDir}`));
-      await fs.mkdir(commandsDir, { recursive: true });
-      await fs.mkdir(hooksDir, { recursive: true });
-      await fs.mkdir(tracksDir, { recursive: true });
-      console.log(chalk.green('   ✓ Directories created!\n'));
-    } else {
-      spinner.succeed(chalk.green('.claude directory found!'));
-      console.log(chalk.gray(`   Location: ${claudeDir}\n`));
-
-      // Ensure audio/tracks directory exists even if .claude already exists
-      const audioDir = path.join(claudeDir, 'audio');
-      const tracksDir = path.join(audioDir, 'tracks');
-      await fs.mkdir(tracksDir, { recursive: true });
-    }
-
-    // Copy all files using helper functions
-    const commandResult = await copyCommandFiles(targetDir, spinner);
-    const hookResult = await copyHookFiles(targetDir, spinner);
-    const personalityResult = await copyPersonalityFiles(targetDir, spinner);
-    const pluginFileCount = await copyPluginFiles(targetDir, spinner);
-    const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
-    const backgroundMusicResult = await copyBackgroundMusicFiles(targetDir, spinner);
-    const configFileCount = await copyConfigFiles(targetDir, spinner);
-
-    // Configure hooks and manifests
-    await configureSessionStartHook(targetDir, spinner);
-    await installPluginManifest(targetDir, spinner);
+    // Copy all files silently
+    await copyCommandFiles(targetDir, silentSpinner);
+    await copyHookFiles(targetDir, silentSpinner);
+    await copyPersonalityFiles(targetDir, silentSpinner);
+    await copyPluginFiles(targetDir, silentSpinner);
+    await copyBmadConfigFiles(targetDir, silentSpinner);
+    await copyBackgroundMusicFiles(targetDir, silentSpinner);
+    await copyConfigFiles(targetDir, silentSpinner);
+    await configureSessionStartHook(targetDir, silentSpinner);
+    await installPluginManifest(targetDir, silentSpinner);
 
     // Save provider configuration
-    spinner.start('Saving provider configuration...');
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
     await fs.writeFile(providerConfigPath, selectedProvider);
 
@@ -5000,29 +4827,20 @@ async function install(options = {}) {
 
     // Set up receiver script if in receiver mode (Termux)
     if (userConfig.isReceiver) {
-      spinner.start('Setting up receiver script...');
-
       const receiverDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
       await fs.mkdir(receiverDir, { recursive: true, mode: 0o700 });
-
       const receiverScriptPath = path.join(receiverDir, 'receiver.sh');
       const templatePath = path.join(__dirname, '..', 'templates', 'agentvibes-receiver.sh');
-
       try {
         const templateContent = await fs.readFile(templatePath, 'utf8');
         await fs.writeFile(receiverScriptPath, templateContent, { mode: 0o755 });
-        spinner.succeed(chalk.green('Receiver script installed!'));
-        console.log(chalk.gray(`   Location: ${receiverScriptPath}\n`));
-      } catch (error) {
-        spinner.warn(chalk.yellow('Could not install receiver script'));
-        console.log(chalk.gray(`   Error: ${error.message}\n`));
+      } catch {
+        // Receiver script install failed — non-fatal
       }
     }
 
-    // Save setup guide for SSH-remote installations
+    // Save setup guide for SSH-remote installations (file only, no terminal output)
     if (selectedProvider === 'termux-ssh' || selectedProvider === 'ssh-pulseaudio') {
-      spinner.start('Saving setup guide...');
-
       const agentvibesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
       await fs.mkdir(agentvibesDir, { recursive: true, mode: 0o700 });
 
@@ -5083,414 +4901,100 @@ Troubleshooting:
 - Verify AgentVibes on receiver: ssh ${userConfig.sshHost || 'phone'} which agentvibes
 - Test receiver script: ssh ${userConfig.sshHost || 'phone'} ~/.agentvibes/receiver.sh "Test"
 `;
-
       try {
         await fs.writeFile(setupGuidePath, setupGuideContent);
-        spinner.succeed(chalk.green('Setup guide saved!'));
-        console.log(chalk.gray(`   Location: ${setupGuidePath}\n`));
-      } catch (error) {
-        spinner.warn(chalk.yellow('Could not save setup guide'));
-        console.log(chalk.gray(`   Error: ${error.message}\n`));
+      } catch {
+        // Setup guide write failed — non-fatal
       }
     }
 
-    // Set default voice based on user selection or provider defaults
+    // Set default voice
     const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
     let defaultVoice = userConfig.defaultVoice;
-
-    // Fallback to defaults if voice wasn't selected
     if (!defaultVoice) {
       switch (selectedProvider) {
-        case 'piper':
-          defaultVoice = 'en_US-ryan-high';
-          break;
-        case 'macos':
-          defaultVoice = 'Samantha';
-          break;
-        case 'windows-piper':
-          defaultVoice = 'en_US-ryan-high';
-          break;
-        case 'windows-sapi':
-          defaultVoice = 'Microsoft David Desktop';
-          break;
-        case 'soprano':
-          defaultVoice = 'soprano-default';
-          break;
-        case 'termux-ssh':
-          // Android TTS voices are managed in Android settings, not here
-          defaultVoice = 'android-system-default';
-          break;
-        default:
-          defaultVoice = 'Samantha';
-          break;
+        case 'piper':          defaultVoice = 'en_US-ryan-high'; break;
+        case 'macos':          defaultVoice = 'Samantha'; break;
+        case 'windows-piper':  defaultVoice = 'en_US-ryan-high'; break;
+        case 'windows-sapi':   defaultVoice = 'Microsoft David Desktop'; break;
+        case 'soprano':        defaultVoice = 'soprano-default'; break;
+        case 'termux-ssh':     defaultVoice = 'android-system-default'; break;
+        default:               defaultVoice = 'Samantha'; break;
       }
     }
     await fs.writeFile(voiceConfigPath, defaultVoice);
 
-    spinner.succeed();
-
     // Detect and migrate old configuration
-    await detectAndMigrateOldConfig(targetDir, spinner);
-
-    // Snapshot existing Piper voices BEFORE installation (for proper summary display)
-    let preExistingVoices = [];
-    if (selectedProvider === 'piper') {
-      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
-      try {
-        if (fsSync.existsSync(piperVoicesDir)) {
-          const files = fsSync.readdirSync(piperVoicesDir);
-          preExistingVoices = files
-            .filter(f => f.endsWith('.onnx'))
-            .map(f => f.replace('.onnx', ''));
-        }
-      } catch {
-        // Ignore errors
-      }
-    }
+    await detectAndMigrateOldConfig(targetDir, silentSpinner);
 
     // Auto-install Piper if selected
     if (selectedProvider === 'piper') {
+      spinner.text = 'Installing Piper TTS...';
       await checkAndInstallPiper(targetDir, options);
     } else if (selectedProvider === 'windows-piper') {
+      spinner.text = 'Installing Piper TTS for Windows...';
       await checkAndInstallPiperWindows(targetDir, options);
-    } else if (selectedProvider === 'soprano') {
-      console.log(chalk.magenta('⚡ Soprano TTS selected'));
-      console.log(chalk.gray('   Install: pip install soprano-tts'));
-      console.log(chalk.gray('   GPU:     pip install soprano-tts[lmdeploy]'));
-      console.log(chalk.gray('   Start:   soprano-webui\n'));
-    } else if (selectedProvider === 'windows-sapi') {
-      console.log(chalk.green('✓ Windows SAPI provider selected - no additional setup needed\n'));
     }
 
-    // Apply background music configuration from userConfig
-    if (backgroundMusicResult.count > 0) {
-      const configDir = path.join(claudeDir, 'config');
-      await fs.mkdir(configDir, { recursive: true });
-
-      if (userConfig.backgroundMusic.enabled) {
-        // Write enabled flag
-        const enabledFile = path.join(configDir, 'background-music-enabled.txt');
-        await fs.writeFile(enabledFile, 'true');
-
-        // Update audio-effects.cfg with selected track
+    // Apply background music configuration
+    const configDir = path.join(claudeDir, 'config');
+    await fs.mkdir(configDir, { recursive: true });
+    if (userConfig.backgroundMusic?.enabled) {
+      await fs.writeFile(path.join(configDir, 'background-music-enabled.txt'), 'true');
+      try {
         const audioEffectsPath = path.join(configDir, 'audio-effects.cfg');
         let audioEffectsContent = await fs.readFile(audioEffectsPath, 'utf-8');
-
-        // Update the default entry with selected track
         audioEffectsContent = audioEffectsContent.replace(
           /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
           `default|$1|${userConfig.backgroundMusic.track}|$3`
         );
-
         await fs.writeFile(audioEffectsPath, audioEffectsContent);
+      } catch {
+        // Audio effects config not yet available — non-fatal
       }
     }
 
-    // Apply reverb configuration from userConfig
-    const selectedReverb = userConfig.reverb;
-
-    // Apply verbosity configuration from userConfig
-    const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
-    await fs.writeFile(verbosityFile, userConfig.verbosity);
-
-    // Apply personality configuration from userConfig
+    // Apply verbosity, personality, pretext
+    await fs.writeFile(path.join(claudeDir, 'tts-verbosity.txt'), userConfig.verbosity);
     if (userConfig.personality && userConfig.personality !== 'none') {
-      const personalityFile = path.join(claudeDir, 'tts-personality.txt');
-      await fs.writeFile(personalityFile, userConfig.personality);
+      await fs.writeFile(path.join(claudeDir, 'tts-personality.txt'), userConfig.personality);
     }
-
-    // Apply pretext configuration from userConfig (already trimmed by filter)
-    // Story 1.2: File Persistence - Save to .claude/config/tts-pretext.txt
     if (userConfig.pretext && userConfig.pretext.trim()) {
-      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
-      const configDir = path.join(claudeDir, 'config');
-      await fs.mkdir(configDir, { recursive: true });
-      await fs.writeFile(pretextFile, userConfig.pretext, { mode: 0o600 });
+      await fs.writeFile(path.join(configDir, 'tts-pretext.txt'), userConfig.pretext, { mode: 0o600 });
     } else {
-      // Clear pretext if user chose not to set it
-      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
-      try {
-        await fs.unlink(pretextFile);
-      } catch (err) {
-        // File doesn't exist or can't be deleted - that's fine
-      }
+      try { await fs.unlink(path.join(configDir, 'tts-pretext.txt')); } catch { /* ok */ }
     }
 
-    // Initialize piperVoicesBoxen outside the conditional for proper scoping
-    let piperVoicesBoxen = null;
-
-    if (selectedProvider === 'macos') {
-      // macOS Say provider summary
-      console.log(chalk.white(`   • Using macOS built-in Say command`));
-      console.log(chalk.white(`   • System voices available (Samantha, Alex, etc.)`));
-      console.log(chalk.green(`   • No API key needed ✓`));
-      console.log(chalk.green(`   • Zero setup required ✓`));
-    } else {
-      // Check for installed Piper voices
-      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
-      let installedVoices = [];
-      let missingVoices = [];
-
-      const commonVoices = [
-        'en_US-lessac-medium',
-        'en_US-amy-medium',
-        'en_US-joe-medium',
-        'en_US-ryan-high',
-        'en_US-libritts-high',
-        '16Speakers'
-      ];
-
-      try {
-        if (fsSync.existsSync(piperVoicesDir)) {
-          const files = fsSync.readdirSync(piperVoicesDir);
-          installedVoices = files
-            .filter(f => f.endsWith('.onnx'))
-            .map(f => {
-              const voiceName = f.replace('.onnx', '');
-              const voicePath = path.join(piperVoicesDir, f);
-              try {
-                const stats = fsSync.statSync(voicePath);
-                const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
-                return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
-              } catch (statErr) {
-                // Skip files that can't be read (broken symlinks, etc)
-                return null;
-              }
-            })
-            .filter(v => v !== null);
-
-          // Check which common voices are missing
-          for (const voice of commonVoices) {
-            if (!installedVoices.some(v => v.name === voice)) {
-              missingVoices.push(voice);
-            }
-          }
-        } else {
-          missingVoices = commonVoices;
-        }
-      } catch (err) {
-        // On error, show default message
-        installedVoices = [];
-        missingVoices = commonVoices;
-      }
-
-      // Create Piper voices boxen (only if newly installed)
-      if (installedVoices.length > 0) {
-        // Separate newly installed from pre-existing voices
-        const newlyInstalled = installedVoices.filter(v => !preExistingVoices.includes(v.name));
-        const alreadyInstalled = installedVoices.filter(v => preExistingVoices.includes(v.name));
-
-        // Only create boxen if there are newly installed voices
-        if (newlyInstalled.length > 0) {
-          let content = chalk.bold.green(`${newlyInstalled.length} Newly Installed\n\n`);
-          newlyInstalled.forEach(voice => {
-            content += chalk.green(`✓ ${voice.name}`) + chalk.gray(` (${voice.size})\n`);
-            content += chalk.dim(`  ${voice.path}\n`);
-          });
-
-          if (alreadyInstalled.length > 0) {
-            content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
-            content += chalk.bold.cyan(`${alreadyInstalled.length} Already Installed\n\n`);
-            alreadyInstalled.forEach(voice => {
-              content += chalk.cyan(`✓ ${voice.name}`) + chalk.gray(` (${voice.size})\n`);
-              content += chalk.dim(`  ${voice.path}\n`);
-            });
-          }
-
-          // Add additional info at the bottom of boxen
-          content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
-          content += chalk.white('• 18 languages supported\n');
-          content += chalk.green('• No API key needed ✓');
-
-          piperVoicesBoxen = boxen(content.trim(), {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'round',
-            borderColor: 'cyan',
-            title: chalk.bold(`🎤 Piper Voices (${installedVoices.length} total)`),
-            titleAlignment: 'center'
-          });
-        }
-      }
-
-      if (missingVoices.length > 0) {
-        console.log(chalk.yellow(`   • ${missingVoices.length} voices to download:`));
-        missingVoices.forEach(voice => {
-          console.log(chalk.gray(`     → ${voice}`));
-        });
-      }
-
-      if (installedVoices.length === 0 && missingVoices.length === 0) {
-        console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
-      }
-    }
-    console.log('');
-
-    // Collect all boxens for pagination
-    const pages = [];
-    if (commandResult.boxen) {
-      pages.push({ title: 'Summary: Slash Commands', content: commandResult.boxen });
-    }
-    if (backgroundMusicResult.boxen) {
-      pages.push({ title: 'Summary: Background Music', content: backgroundMusicResult.boxen });
-    }
-    if (hookResult.boxen) {
-      pages.push({ title: 'Summary: TTS Scripts', content: hookResult.boxen });
-    }
-    if (personalityResult.boxen) {
-      pages.push({ title: 'Summary: Personalities', content: personalityResult.boxen });
-    }
-    if (piperVoicesBoxen) {
-      pages.push({ title: 'Summary: Piper Voices', content: piperVoicesBoxen });
-    }
-
-    // Recent Changes already shown on page 2 after welcome banner - no need to show again
-
-    // Handle MCP configuration - offer to create .mcp.json if not exists
-    await handleMcpConfiguration(targetDir, options);
-
-    // Create default BMAD voice assignments (works even if BMAD not installed yet)
-    await createDefaultBmadVoiceAssignmentsProactive(targetDir);
-
-    // Handle BMAD integration
-    const bmadDetection = await handleBmadIntegration(targetDir, options);
-    const bmadDetected = bmadDetection.installed;
-
-    if (bmadDetected) {
-      const versionLabel = bmadDetection.version === 6
-        ? `v${bmadDetection.detailedVersion}`
-        : 'v4';
-
-      const bmadContent =
-        chalk.green.bold(`🎉 BMAD-METHOD™ ${versionLabel} Detected!\n\n`) +
-        chalk.white.bold('We detected you ALREADY have the BMAD-METHOD™\n') +
-        chalk.white.bold('The Universal AI Agent Framework installed!\n\n') +
-        chalk.cyan('✨ Try the Party Mode command:\n') +
-        chalk.yellow.bold('   /bmad:core:workflows:party-mode\n\n') +
-        chalk.gray('AgentVibes will assign a unique voice to each agent\n') +
-        chalk.gray('while they help you with your project!\n\n') +
-        chalk.cyan('Other Commands:\n') +
-        chalk.gray('  • /agent-vibes:bmad status - View voice assignments\n') +
-        chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices');
-
-      pages.push({ title: 'BMAD Integration', content: bmadContent });
-    } else {
-      const bmadRecommendBoxen = boxen(
-        chalk.cyan.bold('💡 We also Recommend:\n\n') +
-        chalk.white.bold('BMAD-METHOD™: Universal AI Agent Framework\n\n') +
-        chalk.gray('AgentVibes auto-detects BMAD and assigns voices to agents!\n\n') +
-        chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      );
-
-      pages.push({ title: 'Recommended Tools', content: bmadRecommendBoxen });
-    }
-
-    // Apply reverb setting if not "off" (using dynamic import for ES modules)
+    // Apply reverb setting
+    const selectedReverb = userConfig.reverb;
     if (selectedReverb && selectedReverb !== 'off') {
       const effectsManagerPath = path.join(targetDir, '.claude', 'hooks', 'effects-manager.sh');
-      // Validate reverb value to prevent command injection
       const validReverb = ['light', 'medium', 'heavy', 'cathedral'];
       if (validReverb.includes(selectedReverb)) {
         try {
-          execFileSync('bash', [effectsManagerPath, 'set-reverb', selectedReverb, 'default'], {
-            stdio: 'pipe',
-          });
-        } catch (error) {
-          // Silent fail - will be shown in success message if needed
+          execFileSync('bash', [effectsManagerPath, 'set-reverb', selectedReverb, 'default'], { stdio: 'pipe' });
+        } catch {
+          // Reverb setting failed — non-fatal
         }
       }
     }
 
-    // Success message as final page (no boxen) - Customize based on setup type
-    let successContent = chalk.green.bold('✨ Installation Complete! ✨\n\n');
+    // MCP configuration and BMAD voice assignments (silent)
+    await handleMcpConfiguration(targetDir, { ...options, yes: true });
+    await createDefaultBmadVoiceAssignmentsProactive(targetDir);
+    await handleBmadIntegration(targetDir, { ...options, yes: true });
 
-    // Receiver mode success message (Termux/Phone)
-    if (userConfig.isReceiver) {
-      successContent +=
-        chalk.green('✓ Receiver mode configured!\n') +
-        chalk.green('✓ Receiver script: ~/.agentvibes/receiver.sh\n') +
-        chalk.green('✓ Provider: piper (local playback)\n\n') +
-        chalk.cyan('📋 Next: On your server, set this device as target:\n') +
-        chalk.white('    echo "phone" > ~/.claude/ssh-remote-host.txt\n\n') +
-        chalk.gray('(Use your SSH hostname or Tailscale name)\n\n');
-    }
-    // SSH-Remote success message (Voiceless server)
-    else if (selectedProvider === 'termux-ssh' || selectedProvider === 'ssh-pulseaudio') {
-      successContent +=
-        chalk.green('✓ Provider configured: ssh-remote\n\n') +
-        chalk.cyan('📋 Setup Instructions Saved:\n') +
-        chalk.white('   ~/.agentvibes/setup-guide.txt\n\n') +
-        chalk.cyan('Quick Start:\n') +
-        chalk.white('1. Install AgentVibes on target device\n') +
-        chalk.white('2. Configure SSH/Tailscale access\n') +
-        chalk.white('3. Test: agentvibes tts "Hello!"\n\n');
-    }
-    // Standard installation success message
-    else {
-      successContent +=
-        chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
-        chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n');
-    }
+    spinner.succeed(chalk.green('AgentVibes installed successfully!'));
 
-    // Common commands section for all installations
-    successContent +=
-      chalk.white('🎤 Available Commands:\n\n') +
-      chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
-      chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
-      chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
-      chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
-      chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
-      chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n\n');
-
-    if (!userConfig.isReceiver) {
-      successContent += chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n');
-    }
-
-    successContent +=
-      chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes\n') +
-      chalk.gray('📖 Docs: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes/blob/master/README.md');
-
-    pages.push({ title: 'Installation Complete', content: successContent });
-
-    // Show all pages with pagination navigation
-    const postInstallOffset = configPages + preInstallPages.length; // After config + pre-install pages
-    const actualTotalPages = configPages + preInstallPages.length + pages.length;
-
-    await showPaginatedContent(pages, {
-      ...options,
-      continueLabel: '✓ Installation Complete',
-      pageOffset: postInstallOffset,
-      totalPages: actualTotalPages
-    });
-
-    // Final message after pagination
-    console.log(chalk.green.bold('\n✅ AgentVibes is Ready!\n'));
-
-    // Check for .mcp.json file
-    const mcpConfigPath = path.join(targetDir, '.mcp.json');
-    const hasMcpConfig = fsSync.existsSync(mcpConfigPath);
-
-    if (hasMcpConfig) {
-      console.log(chalk.white('   Launch Claude Code with MCP:'));
-      console.log(chalk.cyan('   claude --mcp-config .mcp.json\n'));
-    } else {
-      console.log(chalk.white('   Start a new session to activate TTS.\n'));
-    }
-
-    console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
-    console.log(chalk.white('   • /agent-vibes:switch <name>') + chalk.gray(' - Change your voice'));
-    console.log(chalk.white('   • /agent-vibes:personality <style>') + chalk.gray(' - Set personality\n'));
-
-    // Play welcome demo with harpsichord intro and reverb voice (opt-in only)
-    if (options.withAudio) {
-      await playWelcomeDemo(targetDir, spinner, options);
-    }
+    // Clean final summary
+    console.log('');
+    console.log(chalk.green.bold('  ✅ Installation Complete'));
+    console.log(chalk.gray(`     Provider:  ${selectedProvider}`));
+    console.log(chalk.gray(`     Location:  ${targetDir}/.claude/`));
+    console.log(chalk.gray(`     Version:   ${VERSION}`));
+    console.log('');
+    console.log(chalk.white('  Run ') + chalk.cyan('npx agentvibes') + chalk.white(' to open the console.'));
+    console.log('');
 
   } catch (error) {
     spinner.fail('Installation failed!');
@@ -5509,7 +5013,6 @@ program
   .description('Install AgentVibes voice commands')
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
-  .option('--with-audio', 'Play welcome demo audio after installation')
   .action(async (options) => {
     await install(options);
   });
@@ -6151,5 +5654,11 @@ if (__entryFile === __argvFile) {
 }
 /* c8 ignore stop */
 
-// Export functions for testing
-export { isTermux, isNativeWindows, detectAndNotifyTermux };
+// Export functions for testing and TUI installer
+export {
+  isTermux, isNativeWindows, detectAndNotifyTermux,
+  copyCommandFiles, copyHookFiles, copyPersonalityFiles,
+  copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
+  copyConfigFiles, configureSessionStartHook,
+  installPluginManifest, checkAndInstallPiper,
+};

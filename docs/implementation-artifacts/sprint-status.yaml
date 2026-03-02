@@ -115,3 +115,13 @@ development_status:
   13-1-help-tab-keyboard-shortcuts-reference: done
   13-2-readme-tab-markdown-viewer: done
   epic-13-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # SPRINT 6 — Installer Completion
+  # ─────────────────────────────────────────────
+
+  # Epic 14: Installer Wiring & Simplification
+  epic-14: done
+  14-1-wire-tui-save-and-install: done
+  14-2-slim-legacy-cli-installer: done
+  epic-14-retrospective: optional

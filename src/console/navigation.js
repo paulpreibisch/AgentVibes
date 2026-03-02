@@ -11,7 +11,6 @@ const KEY_TO_TAB = {
   's': 'settings', 'S': 'settings',
   'v': 'voices',   'V': 'voices',
   'm': 'music',    'M': 'music',
-  'a': 'agents',   'A': 'agents',
   'r': 'readme',   'R': 'readme',
   'h': 'help',     'H': 'help',
   'i': 'install',  'I': 'install',
@@ -45,16 +44,10 @@ export function setupNavigation(screen, navigationService) {
     });
   }
 
-  // Tab / T → cycle to next tab; Shift+Tab → cycle to previous tab
-  screen.key(['tab', 't', 'T'], () => {
+  // T → cycle to next tab (Tab itself is handled by the tab bar and footer only)
+  screen.key(['t', 'T'], () => {
     if (!navigationService.isModalOpen()) {
       navigationService.cycleTab();
-    }
-  });
-
-  screen.key(['S-tab'], () => {
-    if (!navigationService.isModalOpen()) {
-      navigationService.cycleTabPrev();
     }
   });
 

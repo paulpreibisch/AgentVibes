@@ -27,10 +27,6 @@ export const FOOTER_CONFIG = {
     color: '#ff9800',
     text: ` ${key('Space')} Preview  ${key('Enter')} Select  ${key('M')} Toggle  ${key('*')} Fav  ${key('F')} Filter  ${key('↑↓')} Navigate`,
   },
-  agents: {
-    color: '#9c27b0',
-    text: ` ${key('↑↓')} Navigate  ${key('Enter')} Assign  ${key('Space')} Preview  ${key('R')} Reset`,
-  },
   readme: {
     color: '#455a64',
     text: ` ${key('↑↓')} Scroll  ${key('PgUp/PgDn')} Page  ${key('Home/End')} Jump`,
