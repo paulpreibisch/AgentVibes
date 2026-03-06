@@ -41,7 +41,40 @@ const COLORS = {
 };
 
 const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select  [F] Favorite  [/] Search  [Q] Quit';
-export const PIPER_VOICES_DIR = path.join(os.homedir(), '.local', 'share', 'piper', 'voices');
+/**
+ * Resolve the Piper voice storage directory using the same precedence as the
+ * shell-side get_voice_storage_dir() in piper-voice-manager.sh:
+ *   1. PIPER_VOICES_DIR env var
+ *   2. Project-local .claude/piper-voices-dir.txt (walk up from cwd)
+ *   3. Global ~/.claude/piper-voices-dir.txt
+ *   4. Default ~/.claude/piper-voices
+ */
+function resolvePiperVoicesDir() {
+  if (process.env.PIPER_VOICES_DIR) {
+    return process.env.PIPER_VOICES_DIR;
+  }
+
+  // Search up directory tree for .claude/piper-voices-dir.txt
+  let dir = process.cwd();
+  while (dir !== path.dirname(dir)) {
+    const cfg = path.join(dir, '.claude', 'piper-voices-dir.txt');
+    try {
+      if (fs.existsSync(cfg)) return fs.readFileSync(cfg, 'utf8').trim();
+    } catch { /* skip */ }
+    dir = path.dirname(dir);
+  }
+
+  // Global config
+  const globalCfg = path.join(os.homedir(), '.claude', 'piper-voices-dir.txt');
+  try {
+    if (fs.existsSync(globalCfg)) return fs.readFileSync(globalCfg, 'utf8').trim();
+  } catch { /* skip */ }
+
+  // Default fallback
+  return path.join(os.homedir(), '.claude', 'piper-voices');
+}
+
+export const PIPER_VOICES_DIR = resolvePiperVoicesDir();
 
 // Column widths for the multi-column voice list
 export const COL_NAME_W   = 26;
