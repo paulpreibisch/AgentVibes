@@ -130,7 +130,10 @@ export function inferGender(voiceId, dataset) {
  * @returns {string}
  */
 export function formatVoiceName(voiceId, dataset) {
-  const raw = dataset ?? voiceId.split('-')[1] ?? voiceId;
+  // Skip generic dataset values that aren't useful as display names
+  const GENERIC_DATASETS = new Set(['training', 'dataset', 'default', 'unknown', '']);
+  const usableDataset = dataset && !GENERIC_DATASETS.has(dataset.toLowerCase()) ? dataset : null;
+  const raw = usableDataset ?? voiceId.split('-')[1] ?? voiceId;
   if (DISPLAY_NAMES[raw]) return DISPLAY_NAMES[raw];
   return raw
     .replace(/_/g, ' ')
