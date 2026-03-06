@@ -16,7 +16,7 @@ import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   PIPER_VOICES_DIR, COL_NAME_W, COL_GENDER_W, SAMPLE_PHRASES,
-  parseVoiceId, scanInstalledVoices, getVoiceMeta, getFavorites, toggleFavorite,
+  parseVoiceId, parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, getFavorites, toggleFavorite,
 } from './voices-tab.js';
 import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite, applyTrackToAudioEffects } from './music-tab.js';
 import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
@@ -547,12 +547,15 @@ export function createSettingsTab(screen, services) {
       } else {
         const voiceId = providerService.getActiveVoiceId();
         if (!voiceId) { _killTest(); _restoreTestBtnsLabels(); return; }
-        const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+        const _ms = parseMultiSpeaker(voiceId);
+        const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
         const safePiper = path.resolve(PIPER_VOICES_DIR);
         if (!voicePath.startsWith(safePiper + path.sep) && voicePath !== safePiper) {
           _killTest(); _restoreTestBtnsLabels(); return;
         }
-        synthProc = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+        const _piperArgs = ['--model', voicePath, '--output_file', tempWav];
+        if (_ms.speakerId != null) _piperArgs.push('--speaker', String(_ms.speakerId));
+        synthProc = spawn('piper', _piperArgs, {
           stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _testEnv,
         });
         synthProc.stdin.write(ttsInput + '\n');
@@ -1061,12 +1064,15 @@ export function createSettingsTab(screen, services) {
       _startSpinner(playBtn, 'Synthesizing…');
       const voiceId   = providerService.getActiveVoiceId();
       if (!voiceId) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
-      const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+      const _ms2 = parseMultiSpeaker(voiceId);
+      const voicePath = path.resolve(PIPER_VOICES_DIR, _ms2.model + '.onnx');
       const safeBase  = path.resolve(PIPER_VOICES_DIR);
       if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) {
         _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return;
       }
-      const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+      const _piperArgs2 = ['--model', voicePath, '--output_file', tempWav];
+      if (_ms2.speakerId != null) _piperArgs2.push('--speaker', String(_ms2.speakerId));
+      const piper = spawn('piper', _piperArgs2, {
         stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _sampleEnv,
       });
       piper.stdin.write(phrase + '\n');
@@ -3623,14 +3629,17 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     _killPreview();
 
     // Path traversal guard
-    const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+    const _ms3 = parseMultiSpeaker(voiceId);
+    const voicePath = path.resolve(PIPER_VOICES_DIR, _ms3.model + '.onnx');
     const safeBase  = path.resolve(PIPER_VOICES_DIR);
     if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
     const phrase  = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
-    const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+    const _piperArgs3 = ['--model', voicePath, '--output_file', tempWav];
+    if (_ms3.speakerId != null) _piperArgs3.push('--speaker', String(_ms3.speakerId));
+    const piper = spawn('piper', _piperArgs3, {
       stdio: ['pipe', 'ignore', 'ignore'],
       detached: true,
       env: _spawnEnv,

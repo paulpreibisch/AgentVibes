@@ -91,6 +91,13 @@ const GENDER_MAP = {
   alan: 'Male', joe: 'Male', john: 'Male', ryan: 'Male', lessac: 'Male',
   kusal: 'Male', hfc_male: 'Male', danny: 'Male', arctic: 'Male',
   l2arctic: 'Male', libritts: 'Male', libritts_r: 'Male',
+  // 16Speakers multi-speaker model (names from speaker_id_map)
+  cori_samuel: 'Female', kara_shallenberg: 'Female', kristin_hughes: 'Female',
+  maria_kasper: 'Female', rose_ibex: 'Female', owlivia: 'Female',
+  jennifer_dorr: 'Female', emily_cripps: 'Female',
+  mike_pelton: 'Male', mark_nelson: 'Male', michael_scherer: 'Male',
+  james_k_white: 'Male', progressingamerica: 'Male', steve_c: 'Male',
+  paul_hampton: 'Male', martin_clifton: 'Male',
 };
 
 // Well-known piper dataset → nice display name
@@ -117,9 +124,9 @@ export function inferGender(voiceId, dataset) {
   // Explicit in name
   if (id.includes('_female') || ds.includes('female')) return 'Female';
   if (id.includes('_male')   || ds.includes('male'))   return 'Male';
-  // Lookup by dataset or name segment
+  // Lookup by dataset, name segment, or full id (for multi-speaker names)
   const key = ds || (id.split('-')[1] ?? '');
-  return GENDER_MAP[key] ?? '—';
+  return GENDER_MAP[key] ?? GENDER_MAP[id] ?? '—';
 }
 
 /**
@@ -195,19 +202,58 @@ function createTestStub() {
 
 // ---------------------------------------------------------------------------
 
+// Multi-speaker voice separator: "modelName::speakerName"
+export const MS_SEP = '::';
+
+/**
+ * Parse a voice entry that may be a multi-speaker ID.
+ * @param {string} voiceId - e.g. "16Speakers::Cori_Samuel" or "en_US-lessac-medium"
+ * @returns {{ model: string, speakerId: number|null, speakerName: string|null, isMultiSpeaker: boolean }}
+ */
+export function parseMultiSpeaker(voiceId) {
+  if (voiceId.includes(MS_SEP)) {
+    const [model, speakerName] = voiceId.split(MS_SEP, 2);
+    const jsonPath = path.join(PIPER_VOICES_DIR, model + '.onnx.json');
+    try {
+      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      const speakerId = data.speaker_id_map?.[speakerName] ?? null;
+      return { model, speakerId, speakerName, isMultiSpeaker: true };
+    } catch {
+      return { model, speakerId: null, speakerName, isMultiSpeaker: true };
+    }
+  }
+  return { model: voiceId, speakerId: null, speakerName: null, isMultiSpeaker: false };
+}
+
 /**
  * Scan PIPER_VOICES_DIR for installed voice IDs.
- * Returns sorted list of voice IDs (without .onnx extension).
+ * Expands multi-speaker models into individual speaker entries.
  *
  * @returns {string[]}
  */
 export function scanInstalledVoices() {
   try {
     const files = fs.readdirSync(PIPER_VOICES_DIR);
-    return files
-      .filter(f => f.endsWith('.onnx') && !f.endsWith('.onnx.json'))
-      .map(f => f.replace(/\.onnx$/, ''))
-      .sort();
+    const onnxFiles = files
+      .filter(f => f.endsWith('.onnx') && !f.endsWith('.onnx.json'));
+
+    const result = [];
+    for (const f of onnxFiles) {
+      const voiceId = f.replace(/\.onnx$/, '');
+      const jsonPath = path.join(PIPER_VOICES_DIR, voiceId + '.onnx.json');
+      try {
+        const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        if (data.num_speakers > 1 && data.speaker_id_map) {
+          // Expand multi-speaker model into individual entries
+          for (const speakerName of Object.keys(data.speaker_id_map)) {
+            result.push(`${voiceId}${MS_SEP}${speakerName}`);
+          }
+          continue;
+        }
+      } catch { /* fall through to add as single voice */ }
+      result.push(voiceId);
+    }
+    return result.sort();
   } catch {
     return [];
   }
@@ -253,6 +299,19 @@ const _metaCache = new Map();
  */
 export function getVoiceMeta(voiceId) {
   if (_metaCache.has(voiceId)) return _metaCache.get(voiceId);
+
+  const ms = parseMultiSpeaker(voiceId);
+  if (ms.isMultiSpeaker) {
+    const displayName = ms.speakerName.replace(/_/g, ' ');
+    const result = {
+      displayName,
+      gender: inferGender(ms.speakerName, null),
+      provider: `Piper (${ms.model})`,
+    };
+    _metaCache.set(voiceId, result);
+    return result;
+  }
+
   let dataset = null;
   try {
     const jsonPath = path.join(PIPER_VOICES_DIR, voiceId + '.onnx.json');
@@ -473,8 +532,9 @@ export function createVoicesTab(screen, services) {
     _killPlayingProcess();
     _playingVoiceId = null;
 
-    // Validate model path stays within PIPER_VOICES_DIR
-    const voicePath = path.resolve(PIPER_VOICES_DIR, voiceId + '.onnx');
+    // Resolve model path (may be multi-speaker)
+    const ms = parseMultiSpeaker(voiceId);
+    const voicePath = path.resolve(PIPER_VOICES_DIR, ms.model + '.onnx');
     const safeBase = path.resolve(PIPER_VOICES_DIR);
     if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) {
       return;
@@ -484,7 +544,9 @@ export function createVoicesTab(screen, services) {
     const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
     // Synthesize: spawn piper in its own process group; pass text via stdin with newline
-    const piper = spawn('piper', ['--model', voicePath, '--output_file', tempWav], {
+    const piperArgs = ['--model', voicePath, '--output_file', tempWav];
+    if (ms.speakerId != null) piperArgs.push('--speaker', String(ms.speakerId));
+    const piper = spawn('piper', piperArgs, {
       stdio: ['pipe', 'ignore', 'ignore'],
       detached: true,
       env: _spawnEnv,
@@ -554,6 +616,27 @@ export function createVoicesTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // Voice activation (handles multi-speaker model/speaker-id files)
+
+  function _activateVoice(voiceId) {
+    const ms = parseMultiSpeaker(voiceId);
+    const claudeDir = path.resolve(process.cwd(), '.claude');
+    if (ms.isMultiSpeaker) {
+      // Store speaker name as the voice, plus model + speaker ID for play-tts-piper.sh
+      providerService.setActiveVoice(ms.speakerName);
+      try {
+        fs.writeFileSync(path.join(claudeDir, 'tts-piper-model.txt'), ms.model, 'utf8');
+        fs.writeFileSync(path.join(claudeDir, 'tts-piper-speaker-id.txt'), String(ms.speakerId), 'utf8');
+      } catch { /* non-fatal */ }
+    } else {
+      providerService.setActiveVoice(voiceId);
+      // Clear multi-speaker files if switching to a single-speaker voice
+      try { fs.unlinkSync(path.join(claudeDir, 'tts-piper-model.txt')); } catch { /* ok */ }
+      try { fs.unlinkSync(path.join(claudeDir, 'tts-piper-speaker-id.txt')); } catch { /* ok */ }
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Buttons
 
   function _createBtn(label, onClick) {
@@ -603,7 +686,7 @@ export function createVoicesTab(screen, services) {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
-      providerService.setActiveVoice(selected);
+      _activateVoice(selected);
       refreshDisplay();
     }
   });
@@ -728,7 +811,7 @@ export function createVoicesTab(screen, services) {
     }
 
     const okBtn     = _makeBtn('OK — Set Voice', COLORS.btnDefault, 2,  () => {
-      providerService.setActiveVoice(voiceId);
+      _activateVoice(voiceId);
       refreshDisplay();
       _showVoiceChangedNotice(displayName);
     });
@@ -806,8 +889,16 @@ export function createVoicesTab(screen, services) {
 
   // Build a tagged info string with yellow labels for the info panel
   function _formatInfoTagged(voiceId) {
-    const { lang, name, quality } = parseVoiceId(voiceId);
     const Y = COLORS.valueFg;  // #ffd700 yellow
+    const ms = parseMultiSpeaker(voiceId);
+    if (ms.isMultiSpeaker) {
+      const name = ms.speakerName.replace(/_/g, ' ');
+      return `{${Y}-fg}Speaker:{/${Y}-fg} ${name}  ` +
+             `{${Y}-fg}Model:{/${Y}-fg} ${ms.model}  ` +
+             `{${Y}-fg}Speaker ID:{/${Y}-fg} ${ms.speakerId ?? '?'}  ` +
+             `{${Y}-fg}Provider:{/${Y}-fg} Piper`;
+    }
+    const { lang, name, quality } = parseVoiceId(voiceId);
     if (lang === 'unknown') {
       return `{${Y}-fg}Voice:{/${Y}-fg} ${voiceId}  {${Y}-fg}Provider:{/${Y}-fg} Piper`;
     }
