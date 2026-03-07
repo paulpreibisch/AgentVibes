@@ -2277,9 +2277,19 @@ async function collectConfiguration(options = {}) {
           console.log(chalk.gray('   ffmpeg is recommended (provides ffplay for MP3 playback).\n'));
 
           const _osPlatform = process.platform;
-          const _installCmd = _osPlatform === 'darwin'
-            ? 'brew install ffmpeg'
-            : 'sudo apt-get install -y ffmpeg';
+          let _installCmd;
+          if (_osPlatform === 'darwin') {
+            _installCmd = 'brew install ffmpeg';
+          } else {
+            // Prefer pkexec (GUI password dialog) when available — works in
+            // environments where sudo lacks a tty (e.g., AI assistant terminals).
+            // Fall back to sudo for headless/SSH setups.
+            let _hasPkexec = false;
+            try { _execSync('which pkexec', { stdio: 'pipe' }); _hasPkexec = true; } catch {}
+            _installCmd = _hasPkexec
+              ? 'pkexec apt-get install -y ffmpeg'
+              : 'sudo apt-get install -y ffmpeg';
+          }
 
           if (!options.yes) {
             const { installFfmpeg } = await inquirer.prompt([{
