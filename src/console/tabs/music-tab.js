@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -473,13 +473,33 @@ export function createMusicTab(screen, services) {
     }
   }
 
-  // Extended PATH for audio players (ffplay, play, mpg123)
+  // Extended PATH for audio players
   const _spawnEnv = {
     ...process.env,
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
     PULSE_SERVER: process.env.PULSE_SERVER || 'unix:/mnt/wslg/PulseServer',
   };
+
+  // Detect available MP3 player once at startup (avoids sh -c fallback chain issues)
+  const _MP3_PLAYERS = [
+    { bin: 'ffplay',  args: (f) => ['-nodisp', '-autoexit', '-loglevel', 'quiet', f] },
+    { bin: 'play',    args: (f) => [f] },
+    { bin: 'mpg123',  args: (f) => ['-q', f] },
+    { bin: 'cvlc',    args: (f) => ['--play-and-exit', '--no-video', f] },
+    { bin: 'mpv',     args: (f) => ['--no-video', '--really-quiet', f] },
+    { bin: 'afplay',  args: (f) => [f] },  // macOS
+  ];
+
+  let _detectedPlayer = null;
+  for (const p of _MP3_PLAYERS) {
+    try {
+      spawnSync('which', [p.bin], { stdio: 'ignore', env: _spawnEnv });
+      // which returns 0 if found — but spawnSync doesn't throw on non-zero
+      const r = spawnSync('which', [p.bin], { stdio: 'pipe', env: _spawnEnv });
+      if (r.status === 0) { _detectedPlayer = p; break; }
+    } catch { /* try next */ }
+  }
 
   /**
    * Preview a track by spawning an audio player.
@@ -508,16 +528,17 @@ export function createMusicTab(screen, services) {
     _killPlayingProcess();
     _playingTrackId = null;
 
-    // Spawn: try ffplay (ffmpeg), play (sox), mpg123, cvlc (VLC headless), mpv
-    const cmd = [
-      `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}"`,
-      `play "${trackPath}"`,
-      `mpg123 -q "${trackPath}"`,
-      `cvlc --play-and-exit --no-video --quiet "${trackPath}"`,
-      `mpv --no-video --really-quiet "${trackPath}"`,
-    ].join(' 2>/dev/null || ') + ' 2>/dev/null';
+    if (!_detectedPlayer) {
+      previewLine.setContent(`{red-fg}No MP3 player found. Install ffmpeg: sudo apt install ffmpeg{/red-fg}`);
+      screen.render();
+      setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 5000);
+      return;
+    }
 
-    _playingProcess = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: true, env: _spawnEnv });
+    // Spawn the detected player directly (no sh -c chain — avoids VLC/cvlc stderr issues)
+    _playingProcess = spawn(_detectedPlayer.bin, _detectedPlayer.args(trackPath), {
+      stdio: 'ignore', detached: true, env: _spawnEnv,
+    });
     _playingTrackId = trackId;
 
     const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);

@@ -3161,8 +3161,22 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
     _killPreview();
 
-    const cmd = `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}" 2>/dev/null || play "${trackPath}" 2>/dev/null || mpg123 -q "${trackPath}" 2>/dev/null || cvlc --play-and-exit --no-video --quiet "${trackPath}" 2>/dev/null || mpv --no-video --really-quiet "${trackPath}" 2>/dev/null`;
-    _previewProcess = spawn('sh', ['-c', cmd], {
+    // Detect player and spawn directly (sh -c chain breaks cvlc/VLC)
+    const _players = [
+      { bin: 'ffplay',  args: ['-nodisp', '-autoexit', '-loglevel', 'quiet', trackPath] },
+      { bin: 'play',    args: [trackPath] },
+      { bin: 'mpg123',  args: ['-q', trackPath] },
+      { bin: 'cvlc',    args: ['--play-and-exit', '--no-video', trackPath] },
+      { bin: 'mpv',     args: ['--no-video', '--really-quiet', trackPath] },
+      { bin: 'afplay',  args: [trackPath] },
+    ];
+    let _player = null;
+    for (const p of _players) {
+      const r = spawnSync('which', [p.bin], { stdio: 'pipe', env: _modalEnv });
+      if (r.status === 0) { _player = p; break; }
+    }
+    if (!_player) return;
+    _previewProcess = spawn(_player.bin, _player.args, {
       stdio: 'ignore', detached: true, env: _modalEnv,
     });
     _previewProcess.unref();
