@@ -70,21 +70,19 @@ ENCODED_AGENT=$(printf '%s' "$AGENT_NAME" | base64 -w 0)
 # Send text to remote for local AgentVibes playback
 echo "📱 Sending to $SSH_HOST for local playback..." >&2
 
-# Determine which receiver script exists and send encoded text, voice, and agent name
+# Try receiver scripts in order — single SSH call, no separate probe
 # SECURITY: Base64-encoded values are safe to pass as arguments (no shell metacharacters)
-# The receiver auto-detects and decodes base64 input
-if ssh "$SSH_HOST" "test -f ~/.termux/agentvibes-play.sh" 2>/dev/null; then
-  ssh "$SSH_HOST" "bash ~/.termux/agentvibes-play.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'" &
-  SSH_PID=$!
-elif ssh "$SSH_HOST" "test -f ~/.agentvibes/play-remote.sh" 2>/dev/null; then
-  ssh "$SSH_HOST" "bash ~/.agentvibes/play-remote.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'" &
-  SSH_PID=$!
-else
-  echo "⚠️  Receiver script not found on $SSH_HOST" >&2
-  echo "💡 Install: agentvibes install --ssh-receiver" >&2
-  exit 1
-fi
+ssh "$SSH_HOST" "
+  if [ -f ~/.agentvibes/play-remote.sh ]; then
+    bash ~/.agentvibes/play-remote.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'
+  elif [ -f ~/.termux/agentvibes-play.sh ]; then
+    bash ~/.termux/agentvibes-play.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'
+  else
+    echo 'Error: Receiver script not found' >&2
+    exit 1
+  fi
+" &
+SSH_PID=$!
 
-# Log the background PID for debugging (non-blocking)
-echo "✓ Sent to $SSH_HOST (PID: $SSH_PID, playing remotely)" >&2
+echo "Sent to $SSH_HOST (PID: $SSH_PID)" >&2
 exit 0

@@ -33,14 +33,18 @@ if [[ -z "$TEXT" ]]; then
     exit 1
 fi
 
-# SECURITY: If text is base64-encoded (from secure sender), decode it
-# Base64 text won't contain spaces or special chars, so we detect it heuristically
-if [[ "$TEXT" =~ ^[A-Za-z0-9+/]+=*$ ]] && [[ ${#TEXT} -gt 20 ]]; then
-    DECODED=$(printf '%s' "$TEXT" | base64 -d 2>/dev/null) || DECODED=""
-    if [[ -n "$DECODED" ]]; then
-        TEXT="$DECODED"
-    fi
+# SECURITY: Validate base64 format (reject shell metacharacters)
+if [[ ! "$TEXT" =~ ^[A-Za-z0-9+/=]+$ ]]; then
+    echo "Error: Text must be base64-encoded" >&2
+    exit 1
 fi
+
+# Decode base64
+DECODED=$(printf '%s' "$TEXT" | base64 -d 2>/dev/null) || {
+    echo "Error: Failed to decode base64 text" >&2
+    exit 1
+}
+TEXT="$DECODED"
 
 # SECURITY: Validate voice format (alphanumeric, hyphens, underscores only)
 if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then

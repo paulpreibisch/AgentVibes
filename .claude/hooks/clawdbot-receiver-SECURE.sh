@@ -26,20 +26,19 @@ VOICE="${2:-en_US-lessac-medium}"
 ENCODED_AGENT="${3:-}"
 ENCODED_INTRO="${4:-}"
 
-# SECURITY: Whitelist of allowed voice names
-ALLOWED_VOICES="en_US-amy-medium|en_US-lessac-medium|es_ES-mls_9972-low|es_ES-davefx-medium|en_US-joe-medium"
-
 # Validate inputs
 if [[ -z "$ENCODED_TEXT" ]]; then
-  echo "❌ No encoded text provided" >&2
+  echo "Error: No encoded text provided" >&2
   echo "Usage: $0 <base64_text> <voice> <base64_agent_name> [base64_intro]" >&2
   exit 1
 fi
 
-# SECURITY: Validate VOICE parameter against whitelist
-if ! [[ "$VOICE" =~ ^($ALLOWED_VOICES)$ ]]; then
-  echo "❌ Invalid voice name: $VOICE" >&2
-  echo "Allowed voices: $(echo "$ALLOWED_VOICES" | tr '|' ', ')" >&2
+# SECURITY: Validate base64 format (reject shell metacharacters)
+[[ "$ENCODED_TEXT" =~ ^[A-Za-z0-9+/=]+$ ]] || { echo "Error: invalid base64 text" >&2; exit 1; }
+
+# SECURITY: Validate VOICE parameter format (alphanumeric, hyphens, underscores only)
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "Error: Invalid voice name format: $VOICE" >&2
   exit 1
 fi
 
@@ -58,31 +57,30 @@ fi
 
 DECODED_AGENT="default"
 if [[ -n "$ENCODED_AGENT" ]]; then
-  DECODED_AGENT=$(echo -n "$ENCODED_AGENT" | base64 -d 2>/dev/null) || DECODED_AGENT="default"
-  
+  # SECURITY: Validate base64 format before decoding
+  [[ "$ENCODED_AGENT" =~ ^[A-Za-z0-9+/=]+$ ]] || ENCODED_AGENT=""
+  if [[ -n "$ENCODED_AGENT" ]]; then
+    DECODED_AGENT=$(echo -n "$ENCODED_AGENT" | base64 -d 2>/dev/null) || DECODED_AGENT="default"
+  fi
+
   # SECURITY: Validate agent name format (alphanumeric, dash, underscore only)
-  if ! [[ "$DECODED_AGENT" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "⚠️  Invalid agent name format, using 'default'" >&2
-    DECODED_AGENT="default"
-  fi
-  
+  [[ "$DECODED_AGENT" =~ ^[a-zA-Z0-9_-]+$ ]] || DECODED_AGENT="default"
+
   # SECURITY: Enforce length limit on agent name
-  if [[ ${#DECODED_AGENT} -gt 50 ]]; then
-    echo "⚠️  Agent name too long, using 'default'" >&2
-    DECODED_AGENT="default"
-  fi
+  [[ ${#DECODED_AGENT} -le 50 ]] || DECODED_AGENT="default"
 fi
 
 # Decode and prepend intro if provided
 DECODED_INTRO=""
 if [[ -n "$ENCODED_INTRO" ]]; then
-  DECODED_INTRO=$(echo -n "$ENCODED_INTRO" | base64 -d 2>/dev/null) || DECODED_INTRO=""
-  
-  # SECURITY: Enforce length limit on intro message
-  if [[ ${#DECODED_INTRO} -gt 200 ]]; then
-    echo "⚠️  Intro message too long, truncating" >&2
-    DECODED_INTRO="${DECODED_INTRO:0:200}"
+  # SECURITY: Validate base64 format before decoding
+  [[ "$ENCODED_INTRO" =~ ^[A-Za-z0-9+/=]+$ ]] || ENCODED_INTRO=""
+  if [[ -n "$ENCODED_INTRO" ]]; then
+    DECODED_INTRO=$(echo -n "$ENCODED_INTRO" | base64 -d 2>/dev/null) || DECODED_INTRO=""
   fi
+
+  # SECURITY: Enforce length limit on intro message
+  [[ ${#DECODED_INTRO} -le 200 ]] || DECODED_INTRO="${DECODED_INTRO:0:200}"
 fi
 
 # Prepend intro to text if configured
