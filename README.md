@@ -274,6 +274,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [💡 Common Workflows](#-common-workflows) - Quick examples
 - [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
 - [🔊 Remote Audio Setup](#-remote-audio-setup) - Play TTS from remote servers
+- [🛠️ Technical Documentation](#️-technical-documentation) - Audio architecture, cross-platform support, voice resolution
 - [🚨 Security Hardening Guide](docs/security-hardening-guide.md) - **REQUIRED if running OpenClaw on remote server**: SSH hardening, Fail2Ban, Tailscale, UFW, AIDE
 - [🔬 Technical Deep Dive](docs/technical-deep-dive.md) - How AgentVibes works under the hood
 - [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
@@ -1589,6 +1590,66 @@ AgentVibes supports **custom personalities** and **custom voices**.
 ✅ **No static/clicking** - Clean playback through SSH tunnels
 
 **[→ Remote Audio Setup Guide](docs/remote-audio-setup.md)** - Full PulseAudio configuration details
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🛠️ Technical Documentation
+
+### Audio Architecture
+
+AgentVibes uses a cross-platform audio module (`src/console/audio-env.js`) that handles player detection and environment configuration for all supported platforms.
+
+#### Platform Audio Support Matrix
+
+| Platform | PulseAudio Config | MP3 Players (preference order) | WAV Players (preference order) |
+|----------|-------------------|-------------------------------|-------------------------------|
+| **Native Linux** | System default (not overridden) | ffplay → play (sox) → mpg123 → cvlc → mpv | aplay → paplay → play → ffplay |
+| **WSL2** | Auto-detects `/mnt/wslg/PulseServer` | Same as Linux | Same as Linux |
+| **macOS** | Not applicable | ffplay → play → mpg123 → cvlc → mpv → afplay | aplay → paplay → play → ffplay → afplay |
+| **Windows** | Not applicable | ffplay → mpv (if installed) | ffplay → mpv → PowerShell SoundPlayer (built-in) |
+
+#### Key Design Decisions
+
+- **Direct spawn, not shell chains**: Audio players are spawned directly via Node's `spawn()` instead of `sh -c 'cmd1 || cmd2'` chains. VLC/cvlc crashes when stderr is redirected inside shell wrappers.
+- **Player detection at startup**: The available player is detected once using `which` and cached. No runtime fallback chains.
+- **PULSE_SERVER safety**: The WSL2 PulseServer path (`/mnt/wslg/PulseServer`) is only set when the socket file actually exists. Hardcoding it on native Linux silently breaks audio output.
+- **Windows WAV fallback**: PowerShell's `System.Media.SoundPlayer` is used as a built-in fallback when no cross-platform player is installed.
+
+#### Multi-Speaker Voice Models
+
+Piper supports multi-speaker ONNX models (e.g., `16Speakers.onnx`) that contain multiple voices in a single file. AgentVibes expands these automatically:
+
+- The `.onnx.json` metadata file contains `num_speakers` and `speaker_id_map`
+- `scanInstalledVoices()` expands multi-speaker models into individual selectable entries (e.g., `16Speakers::Cori_Samuel`)
+- When selected, the system writes `tts-piper-model.txt` and `tts-piper-speaker-id.txt` to `.claude/`
+- `play-tts-piper.sh` reads these files and passes `--speaker <id>` to the piper binary
+
+#### Voice Directory Resolution
+
+Voice storage follows the same precedence chain in both JavaScript and shell:
+
+1. `PIPER_VOICES_DIR` environment variable
+2. Project-local `.claude/piper-voices-dir.txt` (walks up directory tree)
+3. Global `~/.claude/piper-voices-dir.txt`
+4. Default `~/.claude/piper-voices`
+
+#### Required System Dependencies for Background Music
+
+Background music requires an MP3-capable audio player. The installer detects missing players and offers to install `ffmpeg` automatically. If no player is found, the Music tab displays a clear error message.
+
+```bash
+# Install ffmpeg (recommended — provides ffplay)
+# Ubuntu/Debian/WSL2:
+sudo apt install ffmpeg
+
+# macOS:
+brew install ffmpeg
+
+# Arch Linux:
+sudo pacman -S ffmpeg
+```
 
 [↑ Back to top](#-table-of-contents)
 
