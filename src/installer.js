@@ -2265,6 +2265,45 @@ async function collectConfiguration(options = {}) {
       config.backgroundMusic.enabled = enableMusic;
 
       if (enableMusic) {
+        // Check if an MP3-capable player is available; offer to install ffmpeg if not
+        const { execSync: _execSync } = await import('child_process');
+        const _mp3Players = ['ffplay', 'mpg123', 'mpv', 'cvlc'];
+        const _hasPlayer = _mp3Players.some(p => {
+          try { _execSync(`which ${p}`, { stdio: 'pipe' }); return true; } catch { return false; }
+        });
+        if (!_hasPlayer) {
+          console.log('');
+          console.log(chalk.yellow('⚠️  No MP3 player found — background music requires one.'));
+          console.log(chalk.gray('   ffmpeg is recommended (provides ffplay for MP3 playback).\n'));
+
+          const _osPlatform = process.platform;
+          const _installCmd = _osPlatform === 'darwin'
+            ? 'brew install ffmpeg'
+            : 'sudo apt-get install -y ffmpeg';
+
+          if (!options.yes) {
+            const { installFfmpeg } = await inquirer.prompt([{
+              type: 'confirm',
+              name: 'installFfmpeg',
+              message: chalk.yellow(`Install ffmpeg now? (${_installCmd})`),
+              default: true,
+            }]);
+            if (installFfmpeg) {
+              try {
+                console.log(chalk.cyan(`\n📦 Running: ${_installCmd}\n`));
+                const { execSync: _exec } = await import('child_process');
+                _exec(_installCmd, { stdio: 'inherit', timeout: 120000 });
+                console.log(chalk.green('\n✅ ffmpeg installed successfully!\n'));
+              } catch {
+                console.log(chalk.yellow('\n⚠️  ffmpeg installation failed. You can install it manually:'));
+                console.log(chalk.cyan(`   ${_installCmd}\n`));
+              }
+            } else {
+              console.log(chalk.gray(`   Install later with: ${_installCmd}\n`));
+            }
+          }
+        }
+
         // Add spacing before track selection
         console.log('');
         console.log(chalk.gray('🎼 Choose your default background music genre (you can change this anytime).'));
