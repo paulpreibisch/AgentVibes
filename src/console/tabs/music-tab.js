@@ -474,11 +474,15 @@ export function createMusicTab(screen, services) {
   }
 
   // Extended PATH for audio players
+  // Only set PULSE_SERVER if already defined or if the WSL socket exists — setting it
+  // to a non-existent path on native Linux silently breaks audio output.
+  const _pulseServer = process.env.PULSE_SERVER
+    || (fs.existsSync('/mnt/wslg/PulseServer') ? 'unix:/mnt/wslg/PulseServer' : undefined);
   const _spawnEnv = {
     ...process.env,
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
-    PULSE_SERVER: process.env.PULSE_SERVER || 'unix:/mnt/wslg/PulseServer',
+    ...(_pulseServer ? { PULSE_SERVER: _pulseServer } : {}),
   };
 
   // Detect available MP3 player once at startup (avoids sh -c fallback chain issues)

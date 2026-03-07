@@ -271,7 +271,7 @@ export function createSettingsTab(screen, services) {
 
   const _sampleEnv = {
     ...process.env,
-    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
   };
@@ -374,7 +374,7 @@ export function createSettingsTab(screen, services) {
 
   const _testEnv = {
     ...process.env,
-    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
   };
@@ -2848,7 +2848,7 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
 
   const _previewEnv = {
     ...process.env,
-    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
   };
@@ -2985,7 +2985,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
   const _modalEnv = {
     ...process.env,
-    PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
     PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
       .filter(Boolean).join(':'),
   };
@@ -3879,7 +3879,7 @@ function _openPersonalityPicker(screen, configService, onSelect, onClose) {
       detached: true,
       env: {
         ...process.env,
-        PULSE_SERVER: process.env.PULSE_SERVER ?? 'unix:/mnt/wslg/PulseServer',
+        ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
         PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
           .filter(Boolean).join(':'),
       },
