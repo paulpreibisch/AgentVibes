@@ -12,7 +12,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -473,37 +474,8 @@ export function createMusicTab(screen, services) {
     }
   }
 
-  // Extended PATH for audio players
-  // Only set PULSE_SERVER if already defined or if the WSL socket exists — setting it
-  // to a non-existent path on native Linux silently breaks audio output.
-  const _pulseServer = process.env.PULSE_SERVER
-    || (fs.existsSync('/mnt/wslg/PulseServer') ? 'unix:/mnt/wslg/PulseServer' : undefined);
-  const _spawnEnv = {
-    ...process.env,
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-    ...(_pulseServer ? { PULSE_SERVER: _pulseServer } : {}),
-  };
-
-  // Detect available MP3 player once at startup (avoids sh -c fallback chain issues)
-  const _MP3_PLAYERS = [
-    { bin: 'ffplay',  args: (f) => ['-nodisp', '-autoexit', '-loglevel', 'quiet', f] },
-    { bin: 'play',    args: (f) => [f] },
-    { bin: 'mpg123',  args: (f) => ['-q', f] },
-    { bin: 'cvlc',    args: (f) => ['--play-and-exit', '--no-video', f] },
-    { bin: 'mpv',     args: (f) => ['--no-video', '--really-quiet', f] },
-    { bin: 'afplay',  args: (f) => [f] },  // macOS
-  ];
-
-  let _detectedPlayer = null;
-  for (const p of _MP3_PLAYERS) {
-    try {
-      spawnSync('which', [p.bin], { stdio: 'ignore', env: _spawnEnv });
-      // which returns 0 if found — but spawnSync doesn't throw on non-zero
-      const r = spawnSync('which', [p.bin], { stdio: 'pipe', env: _spawnEnv });
-      if (r.status === 0) { _detectedPlayer = p; break; }
-    } catch { /* try next */ }
-  }
+  const _spawnEnv = buildAudioEnv();
+  const _detectedPlayer = detectMp3Player(_spawnEnv);
 
   /**
    * Preview a track by spawning an audio player.

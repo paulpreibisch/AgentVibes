@@ -16,8 +16,8 @@
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import _fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
+import { buildAudioEnv } from '../audio-env.js';
 import {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
@@ -432,7 +432,7 @@ export function createInstallTab(screen, services) {
       const greeting = formatGreeting(_introText, getIntroDefault(process.cwd()));
       const ttsScript = path.resolve(targetDir, '.claude/hooks/play-tts.sh');
       execFile('bash', [ttsScript, greeting], {
-        env: { ...process.env, ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : _fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}) },
+        env: buildAudioEnv(),
         timeout: 30000,
       }, () => {});
     }

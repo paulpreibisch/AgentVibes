@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -507,12 +508,7 @@ export function createVoicesTab(screen, services) {
     }
   }
 
-  // Extended PATH so piper (installed via pipx to ~/.local/bin) is found
-  const _spawnEnv = {
-    ...process.env,
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-  };
+  const _spawnEnv = buildAudioEnv();
 
   /**
    * Preview a voice by synthesizing a sample phrase with piper, then playing the wav.
@@ -577,8 +573,9 @@ export function createVoicesTab(screen, services) {
       }
 
       // Play the synthesized wav in its own process group so we can kill it
-      const cmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
-      const playProc = spawn('sh', ['-c', cmd], {
+      const _wavP = detectWavPlayer(_spawnEnv);
+      if (!_wavP) return;
+      const playProc = spawn(_wavP.bin, _wavP.args(tempWav), {
         stdio: 'ignore',
         detached: true,
         env: _spawnEnv,

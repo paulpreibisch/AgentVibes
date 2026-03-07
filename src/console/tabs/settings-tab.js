@@ -20,6 +20,7 @@ import {
 } from './voices-tab.js';
 import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite, applyTrackToAudioEffects } from './music-tab.js';
 import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
+import { buildAudioEnv, detectMp3Player, detectWavPlayer } from '../audio-env.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -269,12 +270,7 @@ export function createSettingsTab(screen, services) {
   let _sopranoStatusGlyph = '';
   let _sopranoStatusProc  = null;
 
-  const _sampleEnv = {
-    ...process.env,
-    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-  };
+  const _sampleEnv = buildAudioEnv();
 
   const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -372,12 +368,7 @@ export function createSettingsTab(screen, services) {
     }
   }
 
-  const _testEnv = {
-    ...process.env,
-    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-  };
+  const _testEnv = buildAudioEnv();
 
   function _killTest() {
     _stopTestSpinner();
@@ -605,10 +596,11 @@ export function createSettingsTab(screen, services) {
 
         _stopTestSpinner();
         _setTestBtnsLabel('■ Stop');
-        const playCmd = `aplay "${wavToPlay}" 2>/dev/null || play "${wavToPlay}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${wavToPlay}" 2>/dev/null`;
-        const playProc = spawn('sh', ['-c', playCmd], {
-          stdio: 'ignore', detached: true, env: _testEnv,
-        });
+        const _wavPlayer1 = detectWavPlayer(_testEnv);
+        const playProc = _wavPlayer1
+          ? spawn(_wavPlayer1.bin, _wavPlayer1.args(wavToPlay), { stdio: 'ignore', detached: true, env: _testEnv })
+          : null;
+        if (!playProc) { _killTest(); _restoreTestBtnsLabels(); return; }
         _testVoiceProc = playProc;
         playProc.on('exit', () => {
           const btn = _testInitiatorBtn;
@@ -948,8 +940,9 @@ export function createSettingsTab(screen, services) {
       }
       playBtn.setContent('■ Stop');
       screen.render();
-      const playCmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
-      const playProc = spawn('sh', ['-c', playCmd], { stdio: 'ignore', detached: true, env: _sampleEnv });
+      const _wavPlayer2 = detectWavPlayer(_sampleEnv);
+      if (!_wavPlayer2) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
+      const playProc = spawn(_wavPlayer2.bin, _wavPlayer2.args(tempWav), { stdio: 'ignore', detached: true, env: _sampleEnv });
       _sampleProcess = playProc;
       const _done = () => { _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); try { fs.unlinkSync(tempWav); } catch {} };
       playProc.on('exit', _done);
@@ -2846,12 +2839,7 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
   let _previewProcess = null;
   let _previewVol     = null;
 
-  const _previewEnv = {
-    ...process.env,
-    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-  };
+  const _previewEnv = buildAudioEnv();
 
   function _killPreview() {
     if (_previewProcess) {
@@ -2983,12 +2971,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
   // Block global Tab-to-cycle-tab while modal is open
   navigationService?.openModal();
 
-  const _modalEnv = {
-    ...process.env,
-    ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-  };
+  const _modalEnv = buildAudioEnv();
 
   function _killPreview() {
     if (_previewProcess) {
@@ -3161,22 +3144,9 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
     _killPreview();
 
-    // Detect player and spawn directly (sh -c chain breaks cvlc/VLC)
-    const _players = [
-      { bin: 'ffplay',  args: ['-nodisp', '-autoexit', '-loglevel', 'quiet', trackPath] },
-      { bin: 'play',    args: [trackPath] },
-      { bin: 'mpg123',  args: ['-q', trackPath] },
-      { bin: 'cvlc',    args: ['--play-and-exit', '--no-video', trackPath] },
-      { bin: 'mpv',     args: ['--no-video', '--really-quiet', trackPath] },
-      { bin: 'afplay',  args: [trackPath] },
-    ];
-    let _player = null;
-    for (const p of _players) {
-      const r = spawnSync('which', [p.bin], { stdio: 'pipe', env: _modalEnv });
-      if (r.status === 0) { _player = p; break; }
-    }
-    if (!_player) return;
-    _previewProcess = spawn(_player.bin, _player.args, {
+    const _mp3Player = detectMp3Player(_modalEnv);
+    if (!_mp3Player) return;
+    _previewProcess = spawn(_mp3Player.bin, _mp3Player.args(trackPath), {
       stdio: 'ignore', detached: true, env: _modalEnv,
     });
     _previewProcess.unref();
@@ -3404,11 +3374,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
   // Block global Tab-to-cycle-tab while modal is open
   navigationService?.openModal();
 
-  const _spawnEnv = {
-    ...process.env,
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(':'),
-  };
+  const _spawnEnv = buildAudioEnv();
 
   function _killPreview() {
     if (_playingProcess) {
@@ -3684,8 +3650,9 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
         return;
       }
 
-      const cmd = `aplay "${tempWav}" 2>/dev/null || play "${tempWav}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${tempWav}" 2>/dev/null`;
-      const playProc = spawn('sh', ['-c', cmd], {
+      const _wavPlayer3 = detectWavPlayer(_spawnEnv);
+      if (!_wavPlayer3) return;
+      const playProc = spawn(_wavPlayer3.bin, _wavPlayer3.args(tempWav), {
         stdio: 'ignore',
         detached: true,
         env: _spawnEnv,
@@ -3877,12 +3844,7 @@ function _openPersonalityPicker(screen, configService, onSelect, onClose) {
     _pickerTtsProc = spawn('bash', [ttsScript, phrase], {
       stdio: 'ignore',
       detached: true,
-      env: {
-        ...process.env,
-        ...(process.env.PULSE_SERVER ? { PULSE_SERVER: process.env.PULSE_SERVER } : fs.existsSync('/mnt/wslg/PulseServer') ? { PULSE_SERVER: 'unix:/mnt/wslg/PulseServer' } : {}),
-        PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-          .filter(Boolean).join(':'),
-      },
+      env: buildAudioEnv(),
     });
     _playingItemIdx = list.selected;
     _setItemPlaying(_playingItemIdx, true);
