@@ -508,11 +508,13 @@ export function createMusicTab(screen, services) {
     _killPlayingProcess();
     _playingTrackId = null;
 
-    // Spawn: try ffplay (ffmpeg), then play (sox), then mpg123
+    // Spawn: try ffplay (ffmpeg), play (sox), mpg123, cvlc (VLC headless), mpv
     const cmd = [
       `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}"`,
       `play "${trackPath}"`,
       `mpg123 -q "${trackPath}"`,
+      `cvlc --play-and-exit --no-video --quiet "${trackPath}"`,
+      `mpv --no-video --really-quiet "${trackPath}"`,
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     _playingProcess = spawn('sh', ['-c', cmd], { stdio: 'ignore', detached: true, env: _spawnEnv });

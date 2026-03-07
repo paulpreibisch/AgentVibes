@@ -3161,7 +3161,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
     _killPreview();
 
-    const cmd = `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}" 2>/dev/null || play "${trackPath}" 2>/dev/null || mpg123 -q "${trackPath}" 2>/dev/null`;
+    const cmd = `ffplay -nodisp -autoexit -loglevel quiet "${trackPath}" 2>/dev/null || play "${trackPath}" 2>/dev/null || mpg123 -q "${trackPath}" 2>/dev/null || cvlc --play-and-exit --no-video --quiet "${trackPath}" 2>/dev/null || mpv --no-video --really-quiet "${trackPath}" 2>/dev/null`;
     _previewProcess = spawn('sh', ['-c', cmd], {
       stdio: 'ignore', detached: true, env: _modalEnv,
     });
