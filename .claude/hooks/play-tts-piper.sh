@@ -473,7 +473,12 @@ if [[ -n "$BACKGROUND_MUSIC" ]]; then
   MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
   echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
 fi
-echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
+# Show speaker name for multi-speaker voices, otherwise show model name
+if [[ -n "${SPEAKER_ID:-}" ]] && [[ -n "${FILE_VOICE:-}" ]]; then
+  echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$FILE_VOICE${NC} ${WHITE}(Piper TTS)${NC}"
+else
+  echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
+fi
 
 # Show personality if configured
 PERSONALITY=$(cat "$PROJECT_ROOT/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
