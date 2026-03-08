@@ -54,8 +54,11 @@ const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Insta
  *   4. Default ~/.claude/piper-voices
  */
 function resolvePiperVoicesDir() {
+  const defaultDir = path.join(os.homedir(), '.claude', 'piper-voices');
   if (process.env.PIPER_VOICES_DIR) {
-    return process.env.PIPER_VOICES_DIR;
+    const resolved = path.resolve(process.env.PIPER_VOICES_DIR);
+    if (resolved.includes('..')) return defaultDir;
+    return resolved;
   }
 
   // Search up directory tree for .claude/piper-voices-dir.txt
@@ -75,7 +78,7 @@ function resolvePiperVoicesDir() {
   } catch { /* skip */ }
 
   // Default fallback
-  return path.join(os.homedir(), '.claude', 'piper-voices');
+  return defaultDir;
 }
 
 export const PIPER_VOICES_DIR = resolvePiperVoicesDir();
@@ -84,6 +87,7 @@ export const PIPER_VOICES_DIR = resolvePiperVoicesDir();
 // Voice catalog — loaded from voice-assignments.json (914 voices)
 
 let _catalogEntries = [];   // { voiceId, displayName, gender, model, type, speakerId }
+let _catalogMap = new Map(); // voiceId → catalog entry (rebuilt when catalog loads)
 let _catalogLoaded = false;
 
 /**
@@ -124,6 +128,9 @@ function loadCatalog() {
       });
     }
   } catch { /* non-fatal — catalog just won't show */ }
+  // Build lookup map for O(1) access by voiceId
+  _catalogMap = new Map();
+  for (const c of _catalogEntries) _catalogMap.set(c.voiceId, c);
 }
 
 /**
@@ -169,7 +176,7 @@ function patchLibriTTSSpeakerNames() {
     data.speaker_id_map = newMap;
     // Verify file ownership before writing (security: CLAUDE.md)
     const stat = fs.statSync(jsonPath);
-    if (stat.uid !== process.getuid()) return;
+    if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) return;
     fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf8');
   } catch { /* non-fatal */ }
 }
@@ -400,6 +407,11 @@ export function getVoiceMeta(voiceId) {
 
   const ms = parseMultiSpeaker(voiceId);
   if (ms.isMultiSpeaker) {
+    if (!ms.speakerName) {
+      const result = { displayName: voiceId, gender: '—', provider: `Piper (${ms.model})` };
+      _metaCache.set(voiceId, result);
+      return result;
+    }
     const displayName = ms.speakerName.replace(/_/g, ' ');
     const result = {
       displayName,
@@ -592,6 +604,8 @@ export function createVoicesTab(screen, services) {
     return _isInstalled(voiceId) ? _ROW_HINT_INSTALLED : _ROW_HINT_UNINSTALLED;
   }
 
+  // Known limitation: blink (' █') and hint text can briefly interleave when
+  // _vlTick fires between stripping and re-appending the hint. Accepted as cosmetic.
   function _updateHint(idx) {
     const items = voiceList.items;
     if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
@@ -615,6 +629,7 @@ export function createVoicesTab(screen, services) {
 
   let _playingProcess = null;
   let _playingVoiceId = null;
+  let _downloadProcess = null;
 
   // Kill the entire process group so child audio players (piper, aplay, play) all die
   function _killPlayingProcess() {
@@ -690,12 +705,23 @@ export function createVoicesTab(screen, services) {
 
       // Play the synthesized wav in its own process group so we can kill it
       const _wavP = detectWavPlayer(_spawnEnv);
-      if (!_wavP) return;
+      if (!_wavP) {
+        _playingVoiceId = null;
+        _playingProcess = null;
+        previewLine.setContent(`{red-fg}No audio player found. Install ffmpeg.{/red-fg}`);
+        screen.render();
+        setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 4000);
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
       const playProc = spawn(_wavP.bin, _wavP.args(tempWav), {
         stdio: 'ignore',
         detached: true,
         env: _spawnEnv,
       });
+      // Race note: _playingVoiceId could change between piper exit and here
+      // if the user stops playback. Re-check before assigning to avoid orphan.
+      if (_playingVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
       _playingProcess = playProc;
 
       previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing: ${voiceId}  (Enter/Space to stop){/${COLORS.activeFg}-fg}`);
@@ -725,6 +751,7 @@ export function createVoicesTab(screen, services) {
       previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Cannot find piper — install with: pipx install piper-tts{/${COLORS.activeFg}-fg}`);
       screen.render();
       setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 4000);
+      try { fs.unlinkSync(tempWav); } catch {}
     });
   }
 
@@ -734,6 +761,7 @@ export function createVoicesTab(screen, services) {
   function _activateVoice(voiceId) {
     const ms = parseMultiSpeaker(voiceId);
     const claudeDir = path.resolve(process.cwd(), '.claude');
+    try { fs.mkdirSync(claudeDir, { recursive: true }); } catch {}
     // Always write tts-voice.txt so shell scripts pick up the voice on reload
     try {
       fs.writeFileSync(path.join(claudeDir, 'tts-voice.txt'), voiceId, 'utf8');
@@ -871,6 +899,11 @@ export function createVoicesTab(screen, services) {
     // Save voice globally (all projects)
     const ms = parseMultiSpeaker(voiceId);
     const globalClaudeDir = path.resolve(os.homedir(), '.claude');
+    // Verify ownership before writing to global config dir
+    try {
+      const stat = fs.statSync(globalClaudeDir);
+      if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) return;
+    } catch {}
     if (ms.isMultiSpeaker) {
       configService.setGlobal('voice', voiceId);
       try {
@@ -931,6 +964,8 @@ export function createVoicesTab(screen, services) {
       screen.render();
     }
 
+    // Note: blessed's destroy() does not remove key listeners from child buttons,
+    // so modal button handlers may leak. This is a known blessed limitation.
     function _makeBtn(label, bg, left, top, onClick) {
       const btn = blessed.button({
         parent: modal,
@@ -1015,7 +1050,7 @@ export function createVoicesTab(screen, services) {
   // Download modal for uninstalled catalog voices
 
   function _openDownloadModal(voiceId) {
-    const cat = _catalogEntries.find(c => c.voiceId === voiceId);
+    const cat = _catalogMap.get(voiceId);
     const displayName = cat?.displayName ?? voiceId;
     const modelToDownload = cat?.type === 'libritts' ? 'en_US-libritts-high' : (cat?.model ?? voiceId);
     const isLibriTTS = cat?.type === 'libritts';
@@ -1070,11 +1105,11 @@ export function createVoicesTab(screen, services) {
 
       // Use piper-voice-manager.sh download_voice function
       const managerScript = path.resolve(process.cwd(), '.claude', 'hooks', 'piper-voice-manager.sh');
-      const downloadCmd = `source "${managerScript}" && download_voice "${modelToDownload}"`;
-      const dlProc = spawn('bash', ['-c', downloadCmd], {
+      const dlProc = spawn('bash', ['-c', 'source "$1" && download_voice "$2"', '_', managerScript, modelToDownload], {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: _spawnEnv,
       });
+      _downloadProcess = dlProc;
 
       let output = '';
       dlProc.stdout.on('data', (d) => { output += d.toString(); });
@@ -1082,6 +1117,7 @@ export function createVoicesTab(screen, services) {
 
       dlProc.on('exit', (code) => {
         _downloading = false;
+        _downloadProcess = null;
         if (code === 0) {
           // Patch speaker names for freshly downloaded LibriTTS model
           if (isLibriTTS) {
@@ -1102,6 +1138,7 @@ export function createVoicesTab(screen, services) {
 
       dlProc.on('error', () => {
         _downloading = false;
+        _downloadProcess = null;
         statusLine.setContent(`{red-fg}✗ Could not run download script{/red-fg}`);
         screen.render();
       });
@@ -1157,7 +1194,7 @@ export function createVoicesTab(screen, services) {
     return _allVoices.filter(v => {
       if (v.toLowerCase().includes(f)) return true;
       // Also search by catalog display name
-      const cat = _catalogEntries.find(c => c.voiceId === v);
+      const cat = _catalogMap.get(v);
       if (cat && cat.displayName.toLowerCase().includes(f)) return true;
       return false;
     });
@@ -1184,7 +1221,7 @@ export function createVoicesTab(screen, services) {
         provider = meta.provider;
       } else {
         // Catalog-only voice — use catalog metadata
-        const cat = _catalogEntries.find(c => c.voiceId === v);
+        const cat = _catalogMap.get(v);
         displayName = cat?.displayName ?? v;
         gender = cat?.gender ?? '—';
         provider = cat?.type === 'libritts' ? 'Piper (LibriTTS)' : 'Piper';
@@ -1208,7 +1245,7 @@ export function createVoicesTab(screen, services) {
 
     // Uninstalled catalog voice — show download prompt
     if (!_isInstalled(voiceId)) {
-      const cat = _catalogEntries.find(c => c.voiceId === voiceId);
+      const cat = _catalogMap.get(voiceId);
       const name = cat?.displayName ?? voiceId;
       const gender = cat?.gender ?? '—';
       const model = cat?.type === 'libritts' ? 'LibriTTS High (multi-speaker)' : (cat?.model ?? voiceId);
@@ -1390,6 +1427,7 @@ export function createVoicesTab(screen, services) {
 
   // Blinking █ on selected row while list is focused
   let _vlBlink = { interval: null, on: false, sel: -1 };
+  process.on('exit', () => { if (_vlBlink.interval) clearInterval(_vlBlink.interval); });
   function _vlTick() {
     _vlBlink.on = !_vlBlink.on;
     const items = voiceList.items;
@@ -1508,6 +1546,7 @@ export function createVoicesTab(screen, services) {
     hide() {
       _killPlayingProcess();
       _playingVoiceId = null;
+      if (_downloadProcess) { try { _downloadProcess.kill(); } catch {} _downloadProcess = null; }
       previewLine.setContent('');
       box.hide();
       screen.render();
@@ -1521,6 +1560,7 @@ export function createVoicesTab(screen, services) {
     onBlur() {
       _killPlayingProcess();
       _playingVoiceId = null;
+      if (_downloadProcess) { try { _downloadProcess.kill(); } catch {} _downloadProcess = null; }
     },
 
     getFooterText() {

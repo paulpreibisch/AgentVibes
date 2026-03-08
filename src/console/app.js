@@ -331,6 +331,7 @@ export class AgentVibesConsole {
       this._quitItem.style.bg = '#9c27b0';
       this._quitItem.setContent(_quitBlock);
       this.screen.render();
+      if (_quitInterval) { clearInterval(_quitInterval); _quitInterval = null; }
       _quitInterval = setInterval(() => {
         const on = this._quitItem.content === _quitBlock;
         this._quitItem.setContent(on ? _quitBase : _quitBlock);
@@ -367,6 +368,7 @@ export class AgentVibesConsole {
         _cursorOn = true;
         el.setContent(_blockContent);
         this.screen.render();
+        if (_cursorInterval) { clearInterval(_cursorInterval); _cursorInterval = null; }
         _cursorInterval = setInterval(() => {
           _cursorOn = !_cursorOn;
           el.setContent(_cursorOn ? _blockContent : _baseContent);

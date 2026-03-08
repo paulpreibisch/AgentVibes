@@ -24,6 +24,12 @@ import { buildAudioEnv, detectMp3Player, detectWavPlayer } from '../audio-env.js
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
+// Sanitize strings before passing as env vars to shell commands.
+// Removes characters that could cause shell injection when expanded inside sh -c.
+function _sanitizeForShell(str) {
+  return str.replace(/[`$\\(){}!]/g, '');
+}
+
 // Lazy-load blessed only in non-test mode (avoids screen requirement in tests)
 let blessed;
 if (!IS_TEST) {
@@ -399,6 +405,7 @@ export function createSettingsTab(screen, services) {
   // Returns null when no personality is set or the file can't be parsed.
   function _getPersonalityPhrase(personality) {
     if (!personality || personality === 'none' || personality === 'normal') return null;
+    if (personality.includes('..') || personality.includes('/') || personality.includes('\\')) return null;
     try {
       const file = path.join(process.cwd(), '.claude', 'personalities', personality + '.md');
       const lines = fs.readFileSync(file, 'utf8').split('\n');
@@ -520,7 +527,7 @@ export function createSettingsTab(screen, services) {
           '..', '..', '..', '..', '.claude', 'hooks', 'soprano-gradio-synth.py');
         const sopranoEnv = {
           ...(_testEnv),
-          _AV_PHRASE:  ttsInput,
+          _AV_PHRASE:  _sanitizeForShell(ttsInput),
           _AV_WAV:     tempWav,
           _AV_SYNTHER: synther,
           _AV_PORT:    String(port),
@@ -585,7 +592,7 @@ export function createSettingsTab(screen, services) {
         if (soxFx) {
           processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
           spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
-            stdio: 'ignore', env: _testEnv,
+            stdio: 'ignore', timeout: 5000, env: _testEnv,
           });
           // Use processed wav if sox succeeded
           try {
@@ -693,7 +700,6 @@ export function createSettingsTab(screen, services) {
     if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
 
     _musicTestActive = true;
-    _startSpinner(musicTestBtn, '▶ Preview');
 
     // Apply volume: ffplay 0-100, sox vol 0.0-1.0
     const vol         = musicCfg.volume ?? MUSIC_DEFAULTS.volume;
@@ -710,7 +716,6 @@ export function createSettingsTab(screen, services) {
       stdio: 'ignore', detached: true, env: _testEnv,
     });
     _musicTestProc.unref();
-    _stopSpinner();
     musicTestBtn.setContent('■ Stop');
     screen.render();
 
@@ -1030,7 +1035,7 @@ export function createSettingsTab(screen, services) {
         // Mode chain: WebUI (Gradio, model warm) → API server (OpenAI-compat) → CLI (slow cold-load).
         const sopranoEnv = {
           ...(_sampleEnv),
-          _AV_PHRASE:  phrase,
+          _AV_PHRASE:  _sanitizeForShell(phrase),
           _AV_WAV:     tempWav,
           _AV_SYNTHER: synther,
           _AV_PORT:    String(port),
@@ -1455,7 +1460,14 @@ export function createSettingsTab(screen, services) {
         aliases[0] ?? '',
         (err, val) => {
           prompt.destroy();
-          if (!err && val && val.trim()) configService.set('audio_ssh_alias', val.trim());
+          if (!err && val && val.trim()) {
+            const trimmed = val.trim();
+            if (/[;&|`$(){}\\<>]/.test(trimmed)) {
+              _showNotice(screen, 'Invalid alias — special characters not allowed');
+            } else {
+              configService.set('audio_ssh_alias', trimmed);
+            }
+          }
           refreshDisplay();
           screen.render();
         });
@@ -1506,7 +1518,14 @@ export function createSettingsTab(screen, services) {
       current || (aliases[0] ?? ''),
       (err, val) => {
         prompt.destroy();
-        if (!err && val !== null) configService.set('audio_ssh_alias', val.trim());
+        if (!err && val !== null) {
+          const trimmed = val.trim();
+          if (/[;&|`$(){}\\<>]/.test(trimmed)) {
+            _showNotice(screen, 'Invalid alias — special characters not allowed');
+          } else {
+            configService.set('audio_ssh_alias', trimmed);
+          }
+        }
         refreshDisplay();
         screen.render();
       });
@@ -1593,8 +1612,8 @@ export function createSettingsTab(screen, services) {
   // Action buttons row — right column, row 17
   const saveGloballyBtn = _createButton(box, screen, 'Save Globally', COLORS, () => {
     const data = configService.getConfig();
-    const path = configService.getGlobalConfigPath();
-    _showSavePreview(screen, path, data, () => {
+    const configPath = configService.getGlobalConfigPath();
+    _showSavePreview(screen, configPath, data, () => {
       configService.saveAllToGlobal(data);
       applyTrackToAudioEffects(data.backgroundMusic?.track);
       refreshConfigDisplay();
@@ -1606,8 +1625,8 @@ export function createSettingsTab(screen, services) {
 
   const saveLocallyBtn = _createButton(box, screen, 'Save Locally', COLORS, () => {
     const data = configService.getConfig();
-    const path = configService.getLocalConfigPath();
-    _showSavePreview(screen, path, data, () => {
+    const configPath = configService.getLocalConfigPath();
+    _showSavePreview(screen, configPath, data, () => {
       configService.saveAllToLocal(data);
       applyTrackToAudioEffects(data.backgroundMusic?.track);
       refreshConfigDisplay();
@@ -1680,9 +1699,12 @@ export function createSettingsTab(screen, services) {
   function _showSubTab(name, keepFocusOnBar = false) {
     _activeSubTab = name;
 
-    // Hide all section widgets
+    // Hide all section widgets; clear any active blink intervals on hidden buttons
     for (const widgets of Object.values(_subTabWidgets)) {
-      for (const w of widgets) w.hide();
+      for (const w of widgets) {
+        if (w._btnBlinkInterval) { clearInterval(w._btnBlinkInterval); w._btnBlinkInterval = null; }
+        w.hide();
+      }
     }
 
     // Show active section widgets (SSH row controlled by refreshDisplay, not here)
@@ -1804,8 +1826,7 @@ export function createSettingsTab(screen, services) {
   function _focusButton(btn) {
     const _orig = screen.render.bind(screen);
     screen.render = () => {};
-    btn.focus();
-    screen.render = _orig;
+    try { btn.focus(); } finally { screen.render = _orig; }
 
     screen.clearRegion(0, screen.cols, 4, screen.rows - 2);
     for (let r = 4; r < screen.rows - 2; r++) {
@@ -2164,6 +2185,11 @@ export function createSettingsTab(screen, services) {
       _restoreTestBtnsLabels();
       _killMusicTest();
       musicTestBtn.setContent('▶ Preview');
+      // Kill any pending soprano status check
+      if (_sopranoStatusProc) {
+        try { _sopranoStatusProc.kill(); } catch {}
+        _sopranoStatusProc = null;
+      }
       box.hide();
       screen.render();
     },
@@ -2224,7 +2250,8 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
   });
 
   // Focus indicators: ►label◄ with blinking █ cursor
-  let _btnBlinkInterval = null;
+  // Store interval on the button so it can be cleared when the button is hidden.
+  btn._btnBlinkInterval = null;
   btn.on('focus', () => {
     btn.style.bg = COLORS.btnFocus;
     btn.style.fg = COLORS.btnFocusFg;
@@ -2232,7 +2259,7 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
     btn.setContent(`►${raw}◄ █`);
     let _on = true;
     screen.render();
-    _btnBlinkInterval = setInterval(() => {
+    btn._btnBlinkInterval = setInterval(() => {
       _on = !_on;
       // Skip if spinner has overridden the content (no ► means spinner is active)
       if (!btn.content.includes('►')) return;
@@ -2242,7 +2269,7 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
     }, 500);
   });
   btn.on('blur', () => {
-    if (_btnBlinkInterval) { clearInterval(_btnBlinkInterval); _btnBlinkInterval = null; }
+    if (btn._btnBlinkInterval) { clearInterval(btn._btnBlinkInterval); btn._btnBlinkInterval = null; }
     btn.style.bg = getDynamicBg ? getDynamicBg() : baseBg;
     btn.style.fg = 'white';
     const raw = btn.content.replace(/[►◄█]/g, '').trim();
@@ -2443,12 +2470,12 @@ function _destroyList(list, screen, onClose) {
 // ---------------------------------------------------------------------------
 // Private: Show a temporary stub notice text
 
-// Strip a leading emoji character (code points > U+2000 cover all common emoji)
-// so double-width glyphs don't push inline button columns out of alignment.
+// Strip a leading emoji character (code points > U+2500 cover emoji ranges)
+// while preserving punctuation like en-dash (U+2013) and em-dash (U+2014).
 function _stripLeadingEmoji(s) {
   if (!s) return s;
   const cp = s.codePointAt(0);
-  return cp > 0x2000 ? s.slice(String.fromCodePoint(cp).length).trimStart() : s;
+  return cp > 0x2500 ? s.slice(String.fromCodePoint(cp).length).trimStart() : s;
 }
 
 /**
@@ -2531,6 +2558,10 @@ function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
   }, { bg: '#2e7d32' });
   okBtn.top  = btnRow;
   okBtn.left = midX + 2;
+
+  // Keyboard navigation between OK and Cancel buttons
+  okBtn.key(['tab', 'left', 'right'], () => { cancelBtn.focus(); screen.render(); });
+  cancelBtn.key(['tab', 'left', 'right'], () => { okBtn.focus(); screen.render(); });
 
   screen.render();
   okBtn.focus();

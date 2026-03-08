@@ -150,6 +150,9 @@ function createTestStub() {
 
 /**
  * Resolve the tracks directory for the running project.
+ * Uses process.cwd() because the TUI always runs from the project root
+ * and this function is called both internally and from exported helpers
+ * that lack configService context.
  * @returns {string}
  */
 function _getTracksDir() {
@@ -166,10 +169,11 @@ export function scanTracks() {
   const tracksDir = _getTracksDir();
   try {
     const files = fs.readdirSync(tracksDir);
+    const builtInIds = new Set(BUILT_IN_TRACK_CATALOG.map(t => t.id));
     return files
       .filter(f => /\.mp3$/i.test(f))
       .sort()
-      .map(f => ({ id: f, label: formatTrackLabel(f), isBuiltIn: true }));
+      .map(f => ({ id: f, label: formatTrackLabel(f), isBuiltIn: builtInIds.has(f) }));
   } catch {
     // Directory not found or unreadable — use the static catalog
     return BUILT_IN_TRACK_CATALOG.map(t => ({ ...t, isBuiltIn: true }));
@@ -213,7 +217,7 @@ export function applyTrackToAudioEffects(track) {
     let content = fs.readFileSync(cfgFile, 'utf-8');
     content = content.replace(
       /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
-      `default|$1|${track}|$3`,
+      (match, g1, g2, g3) => `default|${g1}|${track}|${g3}`,
     );
     fs.writeFileSync(cfgFile, content, 'utf-8');
   } catch { /* file may not exist — non-fatal */ }
@@ -454,6 +458,9 @@ export function createMusicTab(screen, services) {
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
 
+  // Known limitation: _updateHint and _tlTick (blink) can interleave,
+  // causing brief visual glitches. The _refreshing guard prevents the worst
+  // cases but is not a complete fix. Acceptable for a TUI animation.
   function _updateHint(idx) {
     const items = trackList.items;
     // Restore previously hinted row using its saved base content
@@ -483,13 +490,17 @@ export function createMusicTab(screen, services) {
   // Kill the entire process group so child audio processes (ffplay, play, mpg123) all die
   function _killPlayingProcess() {
     if (_playingProcess) {
-      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch (e) {
+        if (e.code !== 'ESRCH') console.error('Kill failed:', e.code);
+      }
       _playingProcess = null;
     }
   }
 
   const _spawnEnv = buildAudioEnv();
   const _detectedPlayer = detectMp3Player(_spawnEnv);
+
+  process.on('exit', () => { _killPlayingProcess(); });
 
   /**
    * Preview a track by spawning an audio player.
@@ -545,9 +556,12 @@ export function createMusicTab(screen, services) {
     });
 
     _playingProcess.on('error', () => {
-      _playingTrackId = null;
-      _playingProcess = null;
-      previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      if (_playingTrackId === trackId) {
+        _killPlayingProcess();
+        _playingTrackId = null;
+        _playingProcess = null;
+        previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      }
     });
   }
 
@@ -714,8 +728,7 @@ export function createMusicTab(screen, services) {
     }
 
     function _saveGlobally() {
-      const current = _getMusic(configService);
-      configService.setGlobal('backgroundMusic', { ...current, track: trackId });
+      configService.setGlobal('backgroundMusic', { track: trackId });
     }
 
     const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {
@@ -787,7 +800,8 @@ export function createMusicTab(screen, services) {
     });
     notice.setFront();
     screen.render();
-    setTimeout(() => { notice.destroy(); screen.render(); }, 2000);
+    let noticeDestroyed = false;
+    setTimeout(() => { if (!noticeDestroyed) { notice.destroy(); noticeDestroyed = true; screen.render(); } }, 2000);
   }
 
   // [Space] → preview/stop track (toggle)
@@ -857,6 +871,7 @@ export function createMusicTab(screen, services) {
 
   // Blinking █ on selected row while list is focused
   let _tlBlink = { interval: null, on: false, sel: -1 };
+  process.on('exit', () => { if (_tlBlink.interval) clearInterval(_tlBlink.interval); });
   function _tlTick() {
     _tlBlink.on = !_tlBlink.on;
     const items = trackList.items;

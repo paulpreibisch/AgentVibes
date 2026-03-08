@@ -66,14 +66,14 @@ if [[ -f "$PROJECT_UNMUTE_FILE" ]]; then
 elif [[ -f "$PROJECT_MUTE_FILE" ]]; then
   # Project explicitly muted
   if [[ -f "$GLOBAL_MUTE_FILE" ]]; then
-    echo "🔇 TTS muted (project + global)"
+    echo "🔇 TTS muted (project + global)" >&2
   else
-    echo "🔇 TTS muted (project)"
+    echo "🔇 TTS muted (project)" >&2
   fi
   exit 0
 elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   # Global mute and no project-level override
-  echo "🔇 TTS muted (global)"
+  echo "🔇 TTS muted (global)" >&2
   exit 0
 fi
 
@@ -291,8 +291,8 @@ case "$ACTIVE_PROVIDER" in
     exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
-    echo "❌ Unknown provider: $ACTIVE_PROVIDER"
-    echo "   Run: /agent-vibes:provider list"
+    echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2
+    echo "   Run: /agent-vibes:provider list" >&2
     exit 1
     ;;
 esac

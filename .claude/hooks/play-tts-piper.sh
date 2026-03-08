@@ -35,11 +35,21 @@
 # @related play-tts.sh, piper-voice-manager.sh, language-manager.sh, GitHub Issue #25
 #
 
+set -eo pipefail
+# Note: -u (nounset) omitted because sourced scripts (piper-voice-manager.sh,
+# language-manager.sh, audio-cache-utils.sh) use unset variables freely.
+# Variables in THIS script use ${VAR:-} defaults for safety.
+
+# Cleanup handler for temp files
+_CLEANUP_FILES=()
+cleanup() { rm -f "${_CLEANUP_FILES[@]+"${_CLEANUP_FILES[@]}"}"; }
+trap cleanup EXIT
+
 # Fix locale warnings
 export LC_ALL=C
 
-TEXT="$1"
-VOICE_OVERRIDE="$2"  # Optional: voice model name
+TEXT="${1:-}"
+VOICE_OVERRIDE="${2:-}"  # Optional: voice model name
 
 # Source voice manager and language manager
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,7 +84,7 @@ else
   # 2. Script location (for direct slash command usage)
   # 3. Global ~/.claude (fallback)
 
-  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ "${CLAUDE_PROJECT_DIR:-}" != *".."* ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
     # MCP context: Use the project directory where MCP was invoked
     VOICE_FILE="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
   elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
@@ -98,7 +108,12 @@ else
       # Multi-speaker voice
       VOICE_MODEL=$(cat "$MODEL_FILE" 2>/dev/null)
       SPEAKER_ID=$(cat "$SPEAKER_ID_FILE" 2>/dev/null)
-      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: $SPEAKER_ID)"
+      # Validate speaker ID is numeric
+      if [[ -n "$SPEAKER_ID" ]] && ! [[ "$SPEAKER_ID" =~ ^[0-9]+$ ]]; then
+        echo "Warning: Invalid speaker ID '$SPEAKER_ID', ignoring" >&2
+        SPEAKER_ID=""
+      fi
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
     # Check if it's a standard Piper model name or custom voice (just use as-is)
     elif [[ -n "$FILE_VOICE" ]]; then
       VOICE_MODEL="$FILE_VOICE"
@@ -178,7 +193,7 @@ fi
 # @intent Find appropriate directory for audio file storage
 # @why Supports project-local and global storage
 # @returns Sets $AUDIO_DIR global variable
-if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
   AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
 else
   # Fallback: try to find .claude directory in current path
@@ -191,13 +206,13 @@ else
     CURRENT_DIR=$(dirname "$CURRENT_DIR")
   done
   # Final fallback to global if no project .claude found
-  if [[ -z "$AUDIO_DIR" ]]; then
+  if [[ -z "${AUDIO_DIR:-}" ]]; then
     AUDIO_DIR="$HOME/.claude/audio"
   fi
 fi
 
 mkdir -p "$AUDIO_DIR"
-TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).wav"
+TEMP_FILE=$(mktemp "$AUDIO_DIR/tts-XXXXXX.wav")
 
 # @function get_speech_rate
 # @intent Determine speech rate for Piper synthesis
@@ -233,6 +248,11 @@ get_speech_rate() {
   # If this is a non-English voice and target config exists, use it
   if [[ "$CURRENT_LANGUAGE" != "english" ]] && [[ -n "$target_config" ]]; then
     local user_speed=$(cat "$target_config" 2>/dev/null)
+    # Validate speed is a positive number
+    if ! [[ "$user_speed" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$user_speed" == "0" ]] || [[ "$user_speed" == "0.0" ]]; then
+      echo "1.0"
+      return
+    fi
     # Convert user speed to Piper length-scale (invert)
     # User: 0.5=slower, 1.0=normal, 2.0=faster
     # Piper: 2.0=slower, 1.0=normal, 0.5=faster
@@ -244,6 +264,11 @@ get_speech_rate() {
   # Otherwise use main config if available
   if [[ -n "$main_config" ]]; then
     local user_speed=$(grep -v '^#' "$main_config" 2>/dev/null | grep -v '^$' | tail -1)
+    # Validate speed is a positive number
+    if ! [[ "$user_speed" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$user_speed" == "0" ]] || [[ "$user_speed" == "0.0" ]]; then
+      echo "1.0"
+      return
+    fi
     echo "scale=2; 1.0 / $user_speed" | bc -l 2>/dev/null || echo "1.0"
     return
   fi
@@ -266,7 +291,7 @@ SPEECH_RATE=$(get_speech_rate)
 # @exitcode 0=success, 4=synthesis error
 # @sideeffects Creates audio file
 # @edgecases Handles piper errors, invalid models, multi-speaker voices
-if [[ -n "$SPEAKER_ID" ]]; then
+if [[ -n "${SPEAKER_ID:-}" ]]; then
   # Multi-speaker voice: Pass speaker ID
   # Add 2-second pause between sentences for better pacing
   echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
@@ -303,7 +328,8 @@ fi
 # @returns Updates $TEMP_FILE to compressed version
 # @sideeffects Converts to mono 22kHz for lower bandwidth
 if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &> /dev/null; then
-  COMPRESSED_FILE="$AUDIO_DIR/tts-compressed-$(date +%s).wav"
+  COMPRESSED_FILE=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX.wav")
+  _CLEANUP_FILES+=("$COMPRESSED_FILE")
   # Convert to mono, 22kHz, 64kbps for remote sessions
   ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
 
@@ -321,7 +347,8 @@ fi
 # @sideeffects Modifies audio file
 # AI NOTE: Use ffmpeg if available, otherwise skip padding (degraded experience)
 if command -v ffmpeg &> /dev/null; then
-  PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
+  PADDED_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.wav")
+  _CLEANUP_FILES+=("$PADDED_FILE")
   # Add 200ms of silence at the beginning
   ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
     -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
@@ -340,7 +367,8 @@ fi
 # @sideeffects Applies audio effects and background music
 BACKGROUND_MUSIC=""
 if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
-  PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
+  PROCESSED_FILE=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX.wav")
+  _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
   PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
@@ -363,7 +391,10 @@ fi
 # @why Support multiple audio players and prevent overlapping audio in learning mode
 # @param Uses global: $TEMP_FILE, $CURRENT_LANGUAGE
 # @sideeffects Plays audio with lock mechanism for sequential playback
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
+mkdir -p "$_LOCK_DIR"
+chmod 700 "$_LOCK_DIR"
+LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
 
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do
@@ -381,7 +412,7 @@ fi
 
 # Track last target language audio for replay command
 if [[ "$CURRENT_LANGUAGE" != "english" ]]; then
-  TARGET_AUDIO_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/last-target-audio.txt"
+  TARGET_AUDIO_FILE="${CLAUDE_PROJECT_DIR:-${HOME}}/.claude/last-target-audio.txt"
   echo "$TEMP_FILE" > "$TARGET_AUDIO_FILE"
 fi
 
@@ -389,12 +420,13 @@ fi
 touch "$LOCK_FILE"
 
 # Create write lock file in audio directory to signal file is in-use (prevents race condition in cleanup)
-AUDIO_DIR="${TEMP_FILE%/*}"
-WRITE_LOCK_FILE="$AUDIO_DIR/$(basename "$TEMP_FILE" .wav).lock"
+_TEMP_DIR="${TEMP_FILE%/*}"
+WRITE_LOCK_FILE="$_TEMP_DIR/$(basename "$TEMP_FILE" .wav).lock"
 touch "$WRITE_LOCK_FILE"
+_CLEANUP_FILES+=("$LOCK_FILE" "$WRITE_LOCK_FILE")
 
 # Get audio duration for proper lock timing
-DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null)
+DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null || true)
 DURATION=${DURATION%.*}  # Round to integer
 DURATION=${DURATION:-1}   # Default to 1 second if detection fails
 
@@ -481,7 +513,7 @@ else
 fi
 
 # Show personality if configured
-PERSONALITY=$(cat "$PROJECT_ROOT/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
+PERSONALITY=$(cat "${PROJECT_ROOT:-/nonexistent}/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
 if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
   echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
 fi
@@ -496,9 +528,9 @@ fi
 
 # Show status indicators
 GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
-PROJECT_MUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-muted"
-PROJECT_UNMUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-unmuted"
-BACKGROUND_ENABLED_FILE="$PROJECT_ROOT/.claude/config/background-music-enabled.txt"
+PROJECT_MUTE_FILE="${PROJECT_ROOT:-/nonexistent}/.claude/agentvibes-muted"
+PROJECT_UNMUTE_FILE="${PROJECT_ROOT:-/nonexistent}/.claude/agentvibes-unmuted"
+BACKGROUND_ENABLED_FILE="${PROJECT_ROOT:-/nonexistent}/.claude/config/background-music-enabled.txt"
 GLOBAL_BACKGROUND_ENABLED_FILE="$HOME/.claude/config/background-music-enabled.txt"
 
 # Mute status indicator

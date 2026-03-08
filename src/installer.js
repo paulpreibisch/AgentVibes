@@ -45,7 +45,9 @@ import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { execSync, execFileSync, spawn } from 'node:child_process';
+import { execSync, execFileSync, spawn, spawnSync } from 'node:child_process';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import search from '@inquirer/search';
@@ -276,8 +278,8 @@ async function playVoiceSample(voiceName, provider) {
 
       // Play using sox/aplay - use spawn for non-blocking playback
       try {
-        // Try play first, fall back to aplay
-        const player = spawn('sh', ['-c', `play "${sampleFile}" 2>/dev/null || aplay "${sampleFile}" 2>/dev/null`], {
+        // Play using aplay directly (no shell interpolation — prevents command injection)
+        const player = spawn('aplay', [sampleFile], {
           detached: false,
           stdio: 'ignore'
         });
@@ -292,9 +294,10 @@ async function playVoiceSample(voiceName, provider) {
     // Generate sample on-the-fly if provider is running
     if (provider === 'piper' && isPiperInstalled()) {
       const text = `Hi, I'm ${voiceName.split('-')[1] || 'Piper'}`;
-      execSync(`echo "${text}" | piper --model ${voiceName} --output_raw | aplay -r 22050 -f S16_LE -c 1 2>/dev/null`, {
-        stdio: 'pipe',
-        timeout: 5000
+      // Use bash -c with positional args to prevent command injection via text/voiceName
+      spawnSync('bash', ['-c', 'echo "$1" | piper --model "$2" --output_raw | aplay -r 22050 -f S16_LE -t raw -', '_', text, voiceName], {
+        stdio: 'inherit',
+        timeout: 15000
       });
       return true;
     } else if (provider === 'soprano' && await isSopranoRunning()) {
@@ -310,13 +313,14 @@ async function playVoiceSample(voiceName, provider) {
       if (response.ok) {
         const audio = await response.arrayBuffer();
         // Save temporarily and play
-        const tempFile = `/tmp/soprano-sample-${Date.now()}.wav`;
+        const tempFile = path.join(os.tmpdir(), `soprano-sample-${crypto.randomBytes(8).toString('hex')}.wav`);
         fsSync.writeFileSync(tempFile, Buffer.from(audio));
-        execSync(`play "${tempFile}" 2>/dev/null || aplay "${tempFile}" 2>/dev/null`, {
-          stdio: 'pipe',
-          timeout: 5000
-        });
-        fsSync.unlinkSync(tempFile);
+        try {
+          // Use spawnSync with argument array to prevent command injection
+          spawnSync('aplay', [tempFile], { stdio: 'pipe', timeout: 5000 });
+        } finally {
+          fsSync.unlinkSync(tempFile);
+        }
         return true;
       }
     }
@@ -794,8 +798,7 @@ async function handleSystemDependenciesPage() {
 
     depContent += '\n' + chalk.gray('TTS will still work without optional tools');
 
-    // Add install commands
-    const os = await import('os');
+    // Add install commands (os imported at top level)
     const platform = os.platform();
     const installCmds = getInstallCommands(depResults.missing, platform);
 
@@ -852,7 +855,7 @@ async function handleCustomMusicTrack(userFilePath, tracksDir) {
     }
 
     // Verify file is within expected directory (prevent path traversal)
-    if (!resolvedPath.startsWith(path.resolve(process.env.HOME || process.env.USERPROFILE))) {
+    if (!resolvedPath.startsWith(path.resolve(os.homedir()))) {
       console.error(chalk.red('✗ File must be in your home directory or subdirectories.'));
       return null;
     }
@@ -952,10 +955,9 @@ async function previewAudioTrack(trackName, tracksDir) {
         playerArgs = ['--no-video', '--duration=10', '--volume=30', trackPath];
       }
 
-      // Spawn player process with safety timeout
+      // Spawn player process (manual setTimeout below handles the safety kill)
       const audioProcess = spawn(player, playerArgs, {
-        stdio: ['ignore', 'ignore', 'ignore'],
-        timeout: 12000 // 12 second timeout for safety
+        stdio: ['ignore', 'ignore', 'ignore']
       });
 
       // Store reference to current preview
@@ -1839,14 +1841,9 @@ async function collectConfiguration(options = {}) {
         }
 
         if (selectedVoice !== '__skip__') {
-          // Convert friendly name to Piper ID if using metadata
-          if (voiceMetadata && voiceMetadata.voices[selectedVoice]) {
-            config.defaultVoice = voiceMetadata.voices[selectedVoice].id;
-            console.log(chalk.green(`\n✓ Voice selected: ${voiceMetadata.voices[selectedVoice].displayName} (${config.defaultVoice})\n`));
-          } else {
-            config.defaultVoice = selectedVoice;
-            console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
-          }
+          // macOS voices use their name directly (no piper metadata conversion needed)
+          config.defaultVoice = selectedVoice;
+          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
 
           // Show hint about voice browser
           console.log(boxen(
@@ -4425,12 +4422,9 @@ async function executeMigrationScript(migrationScript, targetDir, spinner) {
   try {
     await fs.access(migrationScript);
 
-    // Execute migration script using execFile to prevent command injection
-    const { execFile } = require('child_process');
-    const { promisify } = require('util');
-    const execFilePromise = promisify(execFile);
-
-    await execFilePromise('bash', [migrationScript], { cwd: targetDir });
+    // Execute migration script using execFileSync to prevent command injection
+    // Uses top-level import of execFileSync (ESM-compatible, no require())
+    execFileSync('bash', [migrationScript], { cwd: targetDir, stdio: 'pipe' });
 
     spinner.succeed(chalk.green('✓ Configuration migrated to .agentvibes/'));
     console.log(chalk.gray('   Old locations: .claude/config/, .claude/plugins/'));
@@ -5123,7 +5117,8 @@ program
     console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
     console.log(chalk.gray(`   Package version: ${VERSION}`));
 
-    showReleaseInfo();
+    const releaseInfo = getReleaseInfoBoxen();
+    if (releaseInfo) console.log(releaseInfo);
 
     // Check if already installed
     const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');

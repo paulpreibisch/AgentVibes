@@ -88,9 +88,9 @@ get_agent_config() {
         return
     fi
 
-    # Try exact match first
+    # Try exact match first (use awk for safe literal matching)
     local config
-    config=$(grep -i "^${agent}|" "$CONFIG_FILE" 2>/dev/null | head -1)
+    config=$(awk -F'|' -v agent="$agent" 'tolower($1) == tolower(agent)' "$CONFIG_FILE" 2>/dev/null | head -1)
 
     # Fall back to default
     if [[ -z "$config" ]]; then
@@ -120,6 +120,16 @@ apply_sox_effects() {
         return 0
     fi
 
+    # Validate effects contain only allowed sox effect names and numeric params
+    local allowed_effects="gain|reverb|echo|chorus|flanger|phaser|tremolo|overdrive|bass|treble|equalizer|highpass|lowpass|bandpass|vol|speed|tempo|pitch|rate|pad|silence|trim|fade|norm|loudness|compand|contrast|delay|repeat|stat|remix"
+    for word in $effects; do
+      if ! [[ "$word" =~ ^-?[0-9]*\.?[0-9]+$ ]] && ! echo "$word" | grep -qiE "^($allowed_effects)$"; then
+        echo "Warning: Invalid sox effect '$word', skipping effects" >&2
+        cp "$input" "$output"
+        return 0
+      fi
+    done
+
     # Apply effects - note: effects string is intentionally unquoted to allow word splitting
     # shellcheck disable=SC2086
     sox "$input" "$output" $effects 2>/dev/null || {
@@ -141,7 +151,7 @@ get_background_position() {
     bg_name=$(basename "$bg_file")
 
     if [[ -f "$POSITION_FILE" ]]; then
-        grep "^${bg_name}:" "$POSITION_FILE" 2>/dev/null | cut -d: -f2 | tr -d '[:space:]' || echo "0"
+        awk -F: -v name="$bg_name" '$1 == name {print $2}' "$POSITION_FILE" 2>/dev/null | tr -d '[:space:]' | tail -1
     else
         echo "0"
     fi
@@ -159,12 +169,14 @@ save_background_position() {
 
     mkdir -p "$(dirname "$POSITION_FILE")"
 
-    # Remove old entry and add new one
+    # Remove old entry and add new one (atomic update via temp file + mv)
+    local tmp_pos
+    tmp_pos=$(mktemp "${POSITION_FILE}.XXXXXX")
     if [[ -f "$POSITION_FILE" ]]; then
-        grep -v "^${bg_name}:" "$POSITION_FILE" > "${POSITION_FILE}.tmp" 2>/dev/null || true
-        mv "${POSITION_FILE}.tmp" "$POSITION_FILE"
+        grep -v "^${bg_name}:" "$POSITION_FILE" > "$tmp_pos" 2>/dev/null || true
     fi
-    echo "${bg_name}:${position}" >> "$POSITION_FILE"
+    echo "${bg_name}:${position}" >> "$tmp_pos"
+    mv "$tmp_pos" "$POSITION_FILE"
 }
 
 # @function mix_background
@@ -337,9 +349,11 @@ main() {
     temp_effects=$(mktemp "$TEMP_DIR/effects-XXXXXX.wav")
     temp_final=$(mktemp "$TEMP_DIR/final-XXXXXX.wav")
 
-    # Clean up on exit - use double quotes to capture paths at definition time
-    # (local variables won't exist at trap execution time outside function scope)
-    trap "rm -f '$temp_effects' '$temp_final'" EXIT
+    # Clean up on exit - use a cleanup function to avoid trap injection
+    _cleanup_effects="$temp_effects"
+    _cleanup_final="$temp_final"
+    cleanup() { rm -f "$_cleanup_effects" "$_cleanup_final"; }
+    trap cleanup EXIT
 
     # Step 1: Apply sox effects
     if [[ -n "$sox_effects" ]]; then
