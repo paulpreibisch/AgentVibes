@@ -890,7 +890,7 @@ export function createVoicesTab(screen, services) {
       top: 'center',
       left: 'center',
       width: 66,
-      height: 9,
+      height: 10,
       border: { type: 'line' },
       tags: true,
       label: ` {${COLORS.activeFg}-fg}Set Default Voice{/${COLORS.activeFg}-fg} `,
@@ -966,7 +966,7 @@ export function createVoicesTab(screen, services) {
     const previewBtn = blessed.button({
       parent: modal,
       content: 'Preview',
-      top: 6,
+      top: 7,
       left: 2,
       mouse: true,
       keys: true,
