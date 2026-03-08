@@ -257,7 +257,7 @@ function createTestStub() {
 export function createSettingsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, navigationService, focusMainTabBar, focusFirstHeaderItem, focusLastHeaderItem } = services;
+  const { configService, providerService, navigationService, focusMainTabBar, focusFirstHeaderItem, focusLastHeaderItem, updateHeaderStatus } = services;
 
   // Playback state for the voice sample button
   let _sampleProcess = null;
@@ -2118,6 +2118,7 @@ export function createSettingsTab(screen, services) {
       audioStreamModeBtn.hide();
     }
 
+    if (typeof updateHeaderStatus === 'function') updateHeaderStatus();
     screen.render();
   }
 
