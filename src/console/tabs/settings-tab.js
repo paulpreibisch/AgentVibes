@@ -421,7 +421,9 @@ export function createSettingsTab(screen, services) {
   function _buildPreviewPhrase() {
     const cfg       = configService.getConfig();
     const provider  = providerService.getActiveProvider();
-    const voice     = provider === 'soprano' ? 'Soprano' : (providerService.getActiveVoiceId() ?? 'unknown');
+    const _rawVoice = providerService.getActiveVoiceId() ?? 'unknown';
+    const _msV = parseMultiSpeaker(_rawVoice);
+    const voice     = provider === 'soprano' ? 'Soprano' : (_msV.isMultiSpeaker ? _msV.speakerName : _rawVoice);
 
     const effects      = cfg.effects ?? {};
     const reverbOn     = effects.reverb !== false;
@@ -923,7 +925,9 @@ export function createSettingsTab(screen, services) {
     const provider = providerService.getActiveProvider();
     const _activePers = (configService.getConfig().personality ?? '').trim();
     const _hasPersonality = _activePers && _activePers !== 'none' && _activePers !== 'normal';
-    let phrase = `${_testGreeting()}. Agent Vibes here. I am ${provider === 'soprano' ? 'Soprano' : (providerService.getActiveVoiceId() ?? 'this voice')}`;
+    const _rawPlay = providerService.getActiveVoiceId() ?? 'this voice';
+    const _msPlay = parseMultiSpeaker(_rawPlay);
+    let phrase = `${_testGreeting()}. Agent Vibes here. I am ${provider === 'soprano' ? 'Soprano' : (_msPlay.isMultiSpeaker ? _msPlay.speakerName : _rawPlay)}`;
     if (_hasPersonality) phrase += `, with ${_activePers} personality`;
     phrase += '.';
     const tempWav  = path.join(os.tmpdir(), `agentvibes-sample-${Date.now()}.wav`);
@@ -2059,7 +2063,9 @@ export function createSettingsTab(screen, services) {
       if (_sopranoStatusProc) { try { _sopranoStatusProc.kill(); } catch {} _sopranoStatusProc = null; }
     }
     // Single-voice providers: show the provider name instead of voice ID
-    voiceValue.setContent(activeProvider === 'soprano' ? 'Soprano' : activeVoice);
+    // For multi-speaker voices, show speaker name (e.g., "Kristin_Hughes" not "16Speakers::Kristin_Hughes")
+    const _msDisplay = parseMultiSpeaker(activeVoice);
+    voiceValue.setContent(activeProvider === 'soprano' ? 'Soprano' : (_msDisplay.isMultiSpeaker ? _msDisplay.speakerName : activeVoice));
     // Only Piper supports multiple installed voices — hide Change for single-voice providers
     if (activeProvider === 'piper') { changeBtn.show(); playBtn.left = 64; voiceFileText.setContent('.claude/tts-voice.txt'); }
     else { changeBtn.hide(); playBtn.left = 52; voiceFileText.setContent(''); }

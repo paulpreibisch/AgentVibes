@@ -724,8 +724,8 @@ export function createVoicesTab(screen, services) {
     const ms = parseMultiSpeaker(voiceId);
     const claudeDir = path.resolve(process.cwd(), '.claude');
     if (ms.isMultiSpeaker) {
-      // Store speaker name as the voice, plus model + speaker ID for play-tts-piper.sh
-      providerService.setActiveVoice(ms.speakerName);
+      // Store full MS ID (e.g., "16Speakers::Kristin_Hughes") so list matching works
+      providerService.setActiveVoice(voiceId);
       try {
         fs.writeFileSync(path.join(claudeDir, 'tts-piper-model.txt'), ms.model, 'utf8');
         fs.writeFileSync(path.join(claudeDir, 'tts-piper-speaker-id.txt'), String(ms.speakerId), 'utf8');
