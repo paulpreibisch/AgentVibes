@@ -440,7 +440,7 @@ export function getVoiceMeta(voiceId) {
 export function createVoicesTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, focusMainTabBar } = services;
+  const { configService, providerService, focusMainTabBar, updateHeaderStatus } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -466,6 +466,17 @@ export function createVoicesTab(screen, services) {
     left: 2,
     content: `{#00897b-fg}── Voices ${'─'.repeat(58)}{/#00897b-fg}`,
     tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // Currently selected voice indicator (updated by refreshDisplay)
+  const activeVoiceText = blessed.text({
+    parent: box,
+    top: 1,
+    right: 4,
+    shrink: true,
+    tags: true,
+    content: '',
     style: { bg: COLORS.contentBg },
   });
 
@@ -1236,7 +1247,19 @@ export function createVoicesTab(screen, services) {
     const sel = filtered[voiceList.selected] ?? active ?? '';
     infoLine.setContent(`  ${_formatInfoTagged(sel)}`);
 
+    // Update "Currently Selected" header
+    if (active) {
+      const _msA = parseMultiSpeaker(active);
+      const activeName = _msA.isMultiSpeaker ? _msA.speakerName : active;
+      const meta = _isInstalled(active) ? getVoiceMeta(active) : null;
+      const displayName = meta?.displayName ?? activeName;
+      activeVoiceText.setContent(`{green-fg}✓ ${displayName}{/green-fg}`);
+    } else {
+      activeVoiceText.setContent(`{bright-black-fg}No voice selected{/bright-black-fg}`);
+    }
+
     _refreshing = false;
+    if (typeof updateHeaderStatus === 'function') updateHeaderStatus();
     screen.render();
   }
 
@@ -1254,6 +1277,19 @@ export function createVoicesTab(screen, services) {
   // Pressing Escape in search returns focus to voiceList
   searchBox.key(['escape'], () => {
     voiceList.focus();
+    screen.render();
+  });
+
+  // Page Up / Page Down — jump ~20 items at a time
+  const PAGE_SIZE = 20;
+  voiceList.key(['pagedown'], () => {
+    const voices = _getFilteredVoices();
+    const maxIdx = Math.max(0, voices.length - 1);
+    voiceList.select(Math.min((voiceList.selected ?? 0) + PAGE_SIZE, maxIdx));
+    screen.render();
+  });
+  voiceList.key(['pageup'], () => {
+    voiceList.select(Math.max((voiceList.selected ?? 0) - PAGE_SIZE, 0));
     screen.render();
   });
 

@@ -262,7 +262,7 @@ function _getCustomTracks(configService) {
 export function createMusicTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, focusMainTabBar } = services;
+  const { configService, focusMainTabBar, updateHeaderStatus } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -288,6 +288,17 @@ export function createMusicTab(screen, services) {
     left: 2,
     content: `{${COLORS.sectionHdr}-fg}── Built-in Tracks ${'─'.repeat(48)}{/${COLORS.sectionHdr}-fg}`,
     tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // Currently selected track indicator (updated by refreshDisplay)
+  const activeTrackText = blessed.text({
+    parent: box,
+    top: 1,
+    right: 4,
+    shrink: true,
+    tags: true,
+    content: '',
     style: { bg: COLORS.contentBg },
   });
 
@@ -609,7 +620,11 @@ export function createMusicTab(screen, services) {
       `  Music: ${formatMusicStatus(enabled)}  |  Active Track: ${activeLabel}  |  Filter: ${_showFavoritesOnly ? 'Favorites' : 'All'}`
     );
 
+    // Update "Currently Selected" header
+    activeTrackText.setContent(`{${COLORS.activeFg}-fg}✓ ${activeLabel}{/${COLORS.activeFg}-fg}`);
+
     _refreshing = false;
+    if (typeof updateHeaderStatus === 'function') updateHeaderStatus();
     screen.render();
   }
 

@@ -188,6 +188,17 @@ export class AgentVibesConsole {
       style: { bg: COLORS.headerBg },
     });
 
+    // Row 1 (right): Active settings summary [provider][voice][effects][music]
+    this._headerStatusText = blessed.text({
+      parent: this.headerBox,
+      top: 1,
+      right: 2,
+      shrink: true,
+      tags: true,
+      content: '',
+      style: { bg: COLORS.headerBg },
+    });
+
     // Right-aligned: git remote + branch when available, else AgentVibes repo link
     let topRightContent = `{${BRAND_PINK}-fg}github.com/preibisch/agentvibes{/${BRAND_PINK}-fg}`;
     try {
@@ -215,6 +226,47 @@ export class AgentVibesConsole {
       content: topRightContent,
       style: { bg: COLORS.headerBg },
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: Update header status summary [provider][voice][effects][music]
+
+  _updateHeaderStatus() {
+    if (!this._headerStatusText || !this._providerService || !this._configService) return;
+    try {
+      const provider = this._providerService.getActiveProvider() ?? 'piper';
+      const rawVoice = this._providerService.getActiveVoiceId() ?? '';
+      // Show speaker name for multi-speaker voices
+      const msSep = rawVoice.indexOf('::');
+      const voiceName = msSep >= 0 ? rawVoice.slice(msSep + 2) : rawVoice;
+      // Truncate long names
+      const voiceShort = voiceName.length > 18 ? voiceName.slice(0, 17) + '…' : voiceName;
+
+      const cfg = this._configService.getConfig();
+      const effects = cfg.effects ?? {};
+      const reverb = effects.reverbPreset ?? 'light';
+
+      const music = cfg.backgroundMusic ?? cfg.music ?? {};
+      const musicEnabled = music.enabled ?? false;
+      const trackFile = music.track ?? '';
+      // Strip prefixes and suffixes for compact display
+      const trackShort = trackFile
+        .replace(/\.mp3$/i, '')
+        .replace(/^agent_vibes_/i, '')
+        .replace(/^agentvibes_/i, '')
+        .replace(/_loop$/i, '')
+        .replace(/_v\d+$/i, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase())
+        .slice(0, 16) || 'None';
+
+      this._headerStatusText.setContent(
+        `{#90a4ae-fg}[{/#90a4ae-fg}{bright-cyan-fg}${provider}{/bright-cyan-fg}{#90a4ae-fg}]{/#90a4ae-fg} ` +
+        `{#90a4ae-fg}[{/#90a4ae-fg}{green-fg}${voiceShort}{/green-fg}{#90a4ae-fg}]{/#90a4ae-fg} ` +
+        `{#90a4ae-fg}[{/#90a4ae-fg}{yellow-fg}${reverb}{/yellow-fg}{#90a4ae-fg}]{/#90a4ae-fg} ` +
+        `{#90a4ae-fg}[{/#90a4ae-fg}{${musicEnabled ? 'magenta' : 'bright-black'}-fg}${musicEnabled ? trackShort : 'off'}{/${musicEnabled ? 'magenta' : 'bright-black'}-fg}{#90a4ae-fg}]{/#90a4ae-fg}`
+      );
+    } catch { /* non-fatal */ }
   }
 
   // ---------------------------------------------------------------------------
@@ -554,10 +606,13 @@ export class AgentVibesConsole {
 
     const configService = new ConfigService();
     const providerService = new ProviderService(configService);
+    this._configService = configService;
+    this._providerService = providerService;
     const services = {
       configService,
       providerService,
       navigationService: this.navigationService,
+      updateHeaderStatus: () => this._updateHeaderStatus(),
       focusMainTabBar: () => {
         const id = this.navigationService.getActiveTab();
         const item = this._tabItems?.[id];
@@ -658,9 +713,10 @@ export class AgentVibesConsole {
         // cup(3,1)+headerBg+spaces sequence and overwrites any ghost terminal content.
         if (this.screen.lines?.[2]) this.screen.lines[2].dirty = true;
 
-        // Update tab bar and footer inside suppression — no intermediate render.
+        // Update tab bar, footer, and header status inside suppression — no intermediate render.
         this._updateTabBar(tabId);
         this._updateContextFooter(tabId);
+        this._updateHeaderStatus();
 
         // Hide all inactive tabs via their proper hide() method so side-effects
         // (e.g. voice preview kill, previewLine clear) run correctly.
