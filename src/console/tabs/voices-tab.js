@@ -734,6 +734,10 @@ export function createVoicesTab(screen, services) {
   function _activateVoice(voiceId) {
     const ms = parseMultiSpeaker(voiceId);
     const claudeDir = path.resolve(process.cwd(), '.claude');
+    // Always write tts-voice.txt so shell scripts pick up the voice on reload
+    try {
+      fs.writeFileSync(path.join(claudeDir, 'tts-voice.txt'), voiceId, 'utf8');
+    } catch { /* non-fatal */ }
     if (ms.isMultiSpeaker) {
       // Store full MS ID (e.g., "16Speakers::Kristin_Hughes") so list matching works
       providerService.setActiveVoice(voiceId);
@@ -889,8 +893,8 @@ export function createVoicesTab(screen, services) {
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 66,
-      height: 10,
+      width: 72,
+      height: 8,
       border: { type: 'line' },
       tags: true,
       label: ` {${COLORS.activeFg}-fg}Set Default Voice{/${COLORS.activeFg}-fg} `,
@@ -966,8 +970,8 @@ export function createVoicesTab(screen, services) {
     const previewBtn = blessed.button({
       parent: modal,
       content: 'Preview',
-      top: 7,
-      left: 2,
+      top: 5,
+      left: 58,
       mouse: true,
       keys: true,
       shrink: true,

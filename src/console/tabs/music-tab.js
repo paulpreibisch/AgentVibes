@@ -631,23 +631,164 @@ export function createMusicTab(screen, services) {
   // -------------------------------------------------------------------------
   // Key bindings on trackList
 
-  // [Enter] → directly set selected track as active background track
+  // [Enter] → open save modal for selected track
   trackList.key(['enter'], () => {
     const trackId = _getSelectedTrackId();
     if (!trackId) return;
-    _killPlayingProcess();
-    _playingTrackId = null;
-    _setMusic(configService, { track: trackId });
-    applyTrackToAudioEffects(trackId);
-    refreshDisplay();
     const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
-    previewLine.setContent(`{${COLORS.activeFg}-fg}✓ Active track set: ${label}{/${COLORS.activeFg}-fg}`);
-    setTimeout(() => {
-      if (!_playingTrackId) previewLine.setContent(_listFocused ? HINT_TEXT : '');
-      screen.render();
-    }, 1500);
-    screen.render();
+    _openSaveModal(trackId, label);
   });
+
+  /**
+   * Save-track modal: Save Locally | Save Globally & Locally | Cancel | Preview
+   */
+  function _openSaveModal(trackId, displayName) {
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 72,
+      height: 8,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {${COLORS.activeFg}-fg}Set Background Track{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+    });
+
+    blessed.text({
+      parent: modal,
+      top: 1,
+      left: 2,
+      right: 2,
+      content: `Set {${COLORS.valueFg}-fg}${displayName}{/${COLORS.valueFg}-fg} as your background track?`,
+      tags: true,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const modalStatus = blessed.text({
+      parent: modal,
+      top: 3,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: `{${COLORS.dimFg}-fg}Press Preview to audition this track{/${COLORS.dimFg}-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    function _close() {
+      _killPlayingProcess();
+      _playingTrackId = null;
+      previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      modal.destroy();
+      trackList.focus();
+      screen.render();
+    }
+
+    function _makeBtn(lbl, bg, left, top, onClick) {
+      const btn = blessed.button({
+        parent: modal,
+        content: lbl,
+        top,
+        left,
+        mouse: true,
+        keys: true,
+        shrink: true,
+        padding: { left: 1, right: 1 },
+        style: {
+          bg,
+          fg: 'white',
+          focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+          hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+        },
+      });
+      btn.key(['enter', 'space'], () => { _close(); onClick(); });
+      btn.on('click', () => btn.press());
+      return btn;
+    }
+
+    function _saveLocally() {
+      _setMusic(configService, { track: trackId });
+      applyTrackToAudioEffects(trackId);
+      refreshDisplay();
+      _showTrackChangedNotice(displayName);
+    }
+
+    function _saveGlobally() {
+      const current = _getMusic(configService);
+      configService.setGlobal('backgroundMusic', { ...current, track: trackId });
+    }
+
+    const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {
+      _saveLocally();
+    });
+    const okGlobalBtn = _makeBtn('Save Globally & Locally', '#2e7d32', 18, 5, () => {
+      _saveLocally();
+      _saveGlobally();
+    });
+    const cancelBtn = _makeBtn('Cancel', '#546e7a', 46, 5, () => {});
+
+    // Preview button — does NOT close the modal; plays/stops the track inline
+    const previewBtn = blessed.button({
+      parent: modal,
+      content: 'Preview',
+      top: 5,
+      left: 58,
+      mouse: true,
+      keys: true,
+      shrink: true,
+      padding: { left: 1, right: 1 },
+      style: {
+        bg: '#e65100',
+        fg: 'white',
+        focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+        hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      },
+    });
+    previewBtn.key(['enter', 'space'], () => {
+      const isPlaying = _playingTrackId === trackId;
+      _playTrack(trackId);
+      modalStatus.setContent(isPlaying
+        ? `{${COLORS.dimFg}-fg}Stopped.{/${COLORS.dimFg}-fg}`
+        : `{${COLORS.playingFg}-fg}♪ Playing: ${displayName}…{/${COLORS.playingFg}-fg}`
+      );
+      screen.render();
+    });
+    previewBtn.on('click', () => previewBtn.press());
+
+    // Tab/arrow navigation: SaveLocal → SaveGlobal → Cancel → Preview → SaveLocal
+    okLocalBtn.key(['tab', 'right'],    () => { okGlobalBtn.focus(); screen.render(); });
+    okGlobalBtn.key(['tab', 'right'],   () => { cancelBtn.focus();   screen.render(); });
+    cancelBtn.key(['tab', 'right'],     () => { previewBtn.focus();  screen.render(); });
+    previewBtn.key(['tab', 'right'],    () => { okLocalBtn.focus();  screen.render(); });
+    previewBtn.key(['left'],            () => { cancelBtn.focus();   screen.render(); });
+    cancelBtn.key(['left'],             () => { okGlobalBtn.focus(); screen.render(); });
+    okGlobalBtn.key(['left'],           () => { okLocalBtn.focus();  screen.render(); });
+    okLocalBtn.key(['left'],            () => { previewBtn.focus();  screen.render(); });
+
+    modal.key(['escape', 'q'], _close);
+
+    modal.setFront();
+    okLocalBtn.focus();
+    screen.render();
+  }
+
+  function _showTrackChangedNotice(displayName) {
+    const notice = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 50,
+      height: 5,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {${COLORS.activeFg}-fg}Done{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+      content: `\n  {${COLORS.activeFg}-fg}✓ Track set: ${displayName}{/${COLORS.activeFg}-fg}`,
+    });
+    notice.setFront();
+    screen.render();
+    setTimeout(() => { notice.destroy(); screen.render(); }, 2000);
+  }
 
   // [Space] → preview/stop track (toggle)
   trackList.key(['space'], () => {
