@@ -863,6 +863,25 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Select-voice confirmation modal
 
+  function _activateVoiceGlobal(voiceId) {
+    // Save voice globally (all projects)
+    const ms = parseMultiSpeaker(voiceId);
+    const globalClaudeDir = path.resolve(os.homedir(), '.claude');
+    if (ms.isMultiSpeaker) {
+      configService.setGlobal('voice', voiceId);
+      try {
+        fs.writeFileSync(path.join(globalClaudeDir, 'tts-piper-model.txt'), ms.model, 'utf8');
+        fs.writeFileSync(path.join(globalClaudeDir, 'tts-piper-speaker-id.txt'), String(ms.speakerId), 'utf8');
+      } catch { /* non-fatal */ }
+    } else {
+      configService.setGlobal('voice', voiceId);
+      try { fs.unlinkSync(path.join(globalClaudeDir, 'tts-piper-model.txt')); } catch { /* ok */ }
+      try { fs.unlinkSync(path.join(globalClaudeDir, 'tts-piper-speaker-id.txt')); } catch { /* ok */ }
+    }
+    // Also write global tts-voice.txt for shell scripts
+    try { fs.writeFileSync(path.join(globalClaudeDir, 'tts-voice.txt'), ms.isMultiSpeaker ? voiceId : voiceId, 'utf8'); } catch { /* ok */ }
+  }
+
   function _openSelectVoiceModal(voiceId) {
     const { displayName } = getVoiceMeta(voiceId);
 
@@ -870,8 +889,8 @@ export function createVoicesTab(screen, services) {
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 60,
-      height: 8,
+      width: 66,
+      height: 9,
       border: { type: 'line' },
       tags: true,
       label: ` {${COLORS.activeFg}-fg}Set Default Voice{/${COLORS.activeFg}-fg} `,
@@ -908,11 +927,11 @@ export function createVoicesTab(screen, services) {
       screen.render();
     }
 
-    function _makeBtn(label, bg, left, onClick) {
+    function _makeBtn(label, bg, left, top, onClick) {
       const btn = blessed.button({
         parent: modal,
         content: label,
-        top: 5,
+        top,
         left,
         mouse: true,
         keys: true,
@@ -930,19 +949,25 @@ export function createVoicesTab(screen, services) {
       return btn;
     }
 
-    const okBtn     = _makeBtn('OK — Set Voice', COLORS.btnDefault, 2,  () => {
+    const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {
       _activateVoice(voiceId);
       refreshDisplay();
       _showVoiceChangedNotice(displayName);
     });
-    const cancelBtn = _makeBtn('Cancel',         '#546e7a',         20, () => {});
+    const okGlobalBtn = _makeBtn('Save Globally & Locally', '#2e7d32', 18, 5, () => {
+      _activateVoice(voiceId);
+      _activateVoiceGlobal(voiceId);
+      refreshDisplay();
+      _showVoiceChangedNotice(displayName);
+    });
+    const cancelBtn = _makeBtn('Cancel', '#546e7a', 46, 5, () => {});
 
     // Preview button — does NOT close the modal; plays/stops the voice inline
     const previewBtn = blessed.button({
       parent: modal,
       content: 'Preview',
-      top: 5,
-      left: 33,
+      top: 6,
+      left: 2,
       mouse: true,
       keys: true,
       shrink: true,
@@ -965,18 +990,20 @@ export function createVoicesTab(screen, services) {
     });
     previewBtn.on('click', () => previewBtn.press());
 
-    // Tab/arrow navigation: OK → Cancel → Preview → OK
-    okBtn.key(['tab', 'right'],         () => { cancelBtn.focus();  screen.render(); });
-    cancelBtn.key(['tab', 'right'],     () => { previewBtn.focus(); screen.render(); });
-    previewBtn.key(['tab', 'right'],    () => { okBtn.focus();      screen.render(); });
-    previewBtn.key(['left'],            () => { cancelBtn.focus();  screen.render(); });
-    cancelBtn.key(['left'],             () => { okBtn.focus();      screen.render(); });
-    okBtn.key(['left'],                 () => { previewBtn.focus(); screen.render(); });
+    // Tab/arrow navigation: SaveLocal → SaveGlobal → Cancel → Preview → SaveLocal
+    okLocalBtn.key(['tab', 'right'],    () => { okGlobalBtn.focus(); screen.render(); });
+    okGlobalBtn.key(['tab', 'right'],   () => { cancelBtn.focus();   screen.render(); });
+    cancelBtn.key(['tab', 'right'],     () => { previewBtn.focus();  screen.render(); });
+    previewBtn.key(['tab', 'right'],    () => { okLocalBtn.focus();  screen.render(); });
+    previewBtn.key(['left'],            () => { cancelBtn.focus();   screen.render(); });
+    cancelBtn.key(['left'],             () => { okGlobalBtn.focus(); screen.render(); });
+    okGlobalBtn.key(['left'],           () => { okLocalBtn.focus();  screen.render(); });
+    okLocalBtn.key(['left'],            () => { previewBtn.focus();  screen.render(); });
 
     modal.key(['escape', 'q'], _close);
 
     modal.setFront();
-    okBtn.focus();
+    okLocalBtn.focus();
     screen.render();
   }
 
