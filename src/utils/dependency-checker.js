@@ -147,7 +147,7 @@ function buildLinuxPackages(missing) {
   const pacman = [];
 
   const packageMap = {
-    sox: { apt: 'sox', dnf: 'sox', pacman: 'sox' },
+    sox: { apt: 'sox libsox-fmt-mp3', dnf: 'sox', pacman: 'sox' },
     ffmpeg: { apt: 'ffmpeg', dnf: 'ffmpeg', pacman: 'ffmpeg' },
     python: { apt: 'python3-pip', dnf: 'python3-pip', pacman: 'python-pip' },
     pipx: { apt: 'pipx', dnf: 'pipx', pacman: 'python-pipx' },
@@ -368,8 +368,8 @@ function buildCoreMissingList(missing, results) {
 function buildOptionalMissingList(missing) {
   const optionalMap = {
     curl: '• curl (downloading Piper TTS and voices)',
-    sox: '• sox (audio effects)',
-    ffmpeg: '• ffmpeg (background music, RDP optimization)',
+    sox: '• sox (background music mixing, audio effects)',
+    ffmpeg: '• ffmpeg (audio processing, RDP optimization)',
     bc: '• bc (audio processing calculations)',
     pipx: '• pipx (Piper TTS installation)',
     flock: '• flock (TTS queue file locking)',

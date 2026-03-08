@@ -12,7 +12,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -41,7 +44,7 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select  [F] Favorite  [/] Search  [Q] Quit';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [F] Favorite  [/] Search';
 /**
  * Resolve the Piper voice storage directory using the same precedence as the
  * shell-side get_voice_storage_dir() in piper-voice-manager.sh:
@@ -76,6 +79,100 @@ function resolvePiperVoicesDir() {
 }
 
 export const PIPER_VOICES_DIR = resolvePiperVoicesDir();
+
+// ---------------------------------------------------------------------------
+// Voice catalog — loaded from voice-assignments.json (914 voices)
+
+let _catalogEntries = [];   // { voiceId, displayName, gender, model, type, speakerId }
+let _catalogLoaded = false;
+
+/**
+ * Load the full voice catalog from voice-assignments.json.
+ * Called once on first tab show. Safe to call multiple times.
+ */
+function loadCatalog() {
+  if (_catalogLoaded) return;
+  _catalogLoaded = true;
+  try {
+    const catalogPath = path.resolve(__dirname, '..', '..', '..', 'voice-assignments.json');
+    if (!fs.existsSync(catalogPath)) return;
+    const data = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+
+    // LibriTTS multi-speaker entries (904 speakers from en_US-libritts-high model)
+    const libritts = data.libritts_speakers ?? {};
+    for (const [id, entry] of Object.entries(libritts)) {
+      _catalogEntries.push({
+        voiceId: `en_US-libritts-high${MS_SEP}${entry.voice_name}`,
+        displayName: entry.voice_name,
+        gender: (entry.gender ?? '').charAt(0).toUpperCase() + (entry.gender ?? '').slice(1),
+        model: 'en_US-libritts-high',
+        type: 'libritts',
+        speakerId: parseInt(id, 10),
+      });
+    }
+
+    // Curated standalone voices (10 individual models)
+    const curated = data.curated_voices ?? {};
+    for (const [, entry] of Object.entries(curated)) {
+      _catalogEntries.push({
+        voiceId: entry.model_file,
+        displayName: entry.voice_name,
+        gender: (entry.gender ?? '').charAt(0).toUpperCase() + (entry.gender ?? '').slice(1),
+        model: entry.model_file,
+        type: 'curated',
+        speakerId: null,
+      });
+    }
+  } catch { /* non-fatal — catalog just won't show */ }
+}
+
+/**
+ * Patch the speaker_id_map in a LibriTTS .onnx.json to use friendly names
+ * instead of raw corpus IDs (p3922 → Anna, p8699 → Bella, etc.).
+ * Reads the catalog's index→friendly-name mapping and rebuilds the map.
+ * Safe to call multiple times — skips if already patched.
+ */
+function patchLibriTTSSpeakerNames() {
+  try {
+    const jsonPath = path.join(PIPER_VOICES_DIR, 'en_US-libritts-high.onnx.json');
+    if (!fs.existsSync(jsonPath)) return;
+    const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    if (!data.speaker_id_map || data.num_speakers <= 1) return;
+
+    const names = Object.keys(data.speaker_id_map);
+    // Already patched if first name doesn't start with 'p' followed by digits
+    if (names.length > 0 && !/^p\d+$/.test(names[0])) return;
+
+    // Build index → p-name reverse map
+    const indexToP = {};
+    for (const [pname, idx] of Object.entries(data.speaker_id_map)) {
+      indexToP[idx] = pname;
+    }
+
+    // Load friendly names from catalog
+    const catalogPath = path.resolve(__dirname, '..', '..', '..', 'voice-assignments.json');
+    if (!fs.existsSync(catalogPath)) return;
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+    const speakers = catalog.libritts_speakers ?? {};
+
+    // Rebuild speaker_id_map with friendly names
+    const newMap = {};
+    for (const [idx, pname] of Object.entries(indexToP)) {
+      const friendly = speakers[idx]?.voice_name;
+      if (friendly) {
+        newMap[friendly] = parseInt(idx, 10);
+      } else {
+        newMap[pname] = parseInt(idx, 10);
+      }
+    }
+
+    data.speaker_id_map = newMap;
+    // Verify file ownership before writing (security: CLAUDE.md)
+    const stat = fs.statSync(jsonPath);
+    if (stat.uid !== process.getuid()) return;
+    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf8');
+  } catch { /* non-fatal */ }
+}
 
 // Column widths for the multi-column voice list
 export const COL_NAME_W   = 26;
@@ -367,7 +464,7 @@ export function createVoicesTab(screen, services) {
     parent: box,
     top: 1,
     left: 2,
-    content: `{#00897b-fg}── Installed Voices ${'─'.repeat(49)}{/#00897b-fg}`,
+    content: `{#00897b-fg}── Voices ${'─'.repeat(58)}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -471,10 +568,18 @@ export function createVoicesTab(screen, services) {
 
   // Inline selection hint appended to the currently highlighted voice row.
   // _hintBase stores the item's clean content (no hint, no █) — no sentinel needed.
-  const _ROW_HINT = `  {bright-black-fg}[Space] Preview  [Enter] Select  [*] Favorite{/bright-black-fg}`;
+  const _ROW_HINT_INSTALLED   = `  {bright-black-fg}[Space] Preview  [Enter] Select  [*] Favorite{/bright-black-fg}`;
+  const _ROW_HINT_UNINSTALLED = `  {bright-yellow-fg}[Enter] Download & Install{/bright-yellow-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
+
+  function _getRowHint(idx) {
+    const voices = _getFilteredVoices();
+    const voiceId = voices[idx];
+    if (!voiceId) return _ROW_HINT_INSTALLED;
+    return _isInstalled(voiceId) ? _ROW_HINT_INSTALLED : _ROW_HINT_UNINSTALLED;
+  }
 
   function _updateHint(idx) {
     const items = voiceList.items;
@@ -487,7 +592,7 @@ export function createVoicesTab(screen, services) {
       const hasBlink = c.endsWith(' █');
       if (hasBlink) c = c.slice(0, -2);
       _hintBase = c;
-      items[idx].setContent(c + _ROW_HINT + (hasBlink ? ' █' : ''));
+      items[idx].setContent(c + _getRowHint(idx) + (hasBlink ? ' █' : ''));
     } else {
       _hintBase = '';
     }
@@ -701,17 +806,24 @@ export function createVoicesTab(screen, services) {
   favoriteBtn.bottom = 4;
   favoriteBtn.left = 22;
 
-  const installBtn = _createBtn('[Install More...]', () => {
-    const notice = blessed.text({
-      parent: box,
-      top: 'center',
-      left: 'center',
-      content: 'Use /audio-browser to browse and install 914+ voices',
-      tags: true,
-      style: { fg: COLORS.noticeFg, bg: COLORS.contentBg },
-    });
-    screen.render();
-    setTimeout(() => { notice.destroy(); screen.render(); }, 3000);
+  const installBtn = _createBtn('[Download Voice]', () => {
+    const voices = _getFilteredVoices();
+    const selected = voices[voiceList.selected];
+    if (!selected) return;
+    if (_isInstalled(selected)) {
+      const notice = blessed.text({
+        parent: box,
+        top: 'center',
+        left: 'center',
+        content: 'Voice already installed. Scroll down to find uninstalled voices (greyed out).',
+        tags: true,
+        style: { fg: COLORS.noticeFg, bg: COLORS.contentBg },
+      });
+      screen.render();
+      setTimeout(() => { notice.destroy(); screen.render(); }, 3000);
+    } else {
+      _openDownloadModal(selected);
+    }
   });
   installBtn.bottom = 4;
   installBtn.left = 38;
@@ -858,28 +970,192 @@ export function createVoicesTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // Download modal for uninstalled catalog voices
+
+  function _openDownloadModal(voiceId) {
+    const cat = _catalogEntries.find(c => c.voiceId === voiceId);
+    const displayName = cat?.displayName ?? voiceId;
+    const modelToDownload = cat?.type === 'libritts' ? 'en_US-libritts-high' : (cat?.model ?? voiceId);
+    const isLibriTTS = cat?.type === 'libritts';
+
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 64,
+      height: 10,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {${COLORS.activeFg}-fg}Download Voice{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+    });
+
+    const msgLine = blessed.text({
+      parent: modal,
+      top: 1,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: `Download {${COLORS.valueFg}-fg}${displayName}{/${COLORS.valueFg}-fg}?\n\n` +
+        `Model: {${COLORS.activeFg}-fg}${modelToDownload}{/${COLORS.activeFg}-fg}` +
+        (isLibriTTS ? `  (~57 MB — unlocks all 904 LibriTTS speakers)` : `  (~25 MB)`),
+      style: { bg: COLORS.contentBg },
+    });
+
+    const statusLine = blessed.text({
+      parent: modal,
+      top: 5,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: '',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _downloading = false;
+
+    function _close() {
+      modal.destroy();
+      voiceList.focus();
+      screen.render();
+    }
+
+    function _startDownload() {
+      if (_downloading) return;
+      _downloading = true;
+      statusLine.setContent(`{${COLORS.activeFg}-fg}⬇ Downloading ${modelToDownload}…{/${COLORS.activeFg}-fg}`);
+      screen.render();
+
+      // Use piper-voice-manager.sh download_voice function
+      const managerScript = path.resolve(process.cwd(), '.claude', 'hooks', 'piper-voice-manager.sh');
+      const downloadCmd = `source "${managerScript}" && download_voice "${modelToDownload}"`;
+      const dlProc = spawn('bash', ['-c', downloadCmd], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: _spawnEnv,
+      });
+
+      let output = '';
+      dlProc.stdout.on('data', (d) => { output += d.toString(); });
+      dlProc.stderr.on('data', (d) => { output += d.toString(); });
+
+      dlProc.on('exit', (code) => {
+        _downloading = false;
+        if (code === 0) {
+          // Patch speaker names for freshly downloaded LibriTTS model
+          if (isLibriTTS) {
+            patchLibriTTSSpeakerNames();
+            _metaCache.clear();
+          }
+          statusLine.setContent(`{green-fg}✓ Downloaded successfully!{/green-fg}`);
+          screen.render();
+          setTimeout(() => {
+            _close();
+            refreshDisplay();
+          }, 1500);
+        } else {
+          statusLine.setContent(`{red-fg}✗ Download failed. ${output.slice(-80).trim()}{/red-fg}`);
+          screen.render();
+        }
+      });
+
+      dlProc.on('error', () => {
+        _downloading = false;
+        statusLine.setContent(`{red-fg}✗ Could not run download script{/red-fg}`);
+        screen.render();
+      });
+    }
+
+    function _makeBtn(label, bg, left, onClick) {
+      const btn = blessed.button({
+        parent: modal,
+        content: label,
+        top: 7,
+        left,
+        mouse: true,
+        keys: true,
+        shrink: true,
+        padding: { left: 1, right: 1 },
+        style: {
+          bg,
+          fg: 'white',
+          focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+          hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+        },
+      });
+      btn.key(['enter', 'space'], onClick);
+      btn.on('click', () => btn.press());
+      return btn;
+    }
+
+    const dlBtn     = _makeBtn('Download', COLORS.btnDefault, 2, _startDownload);
+    const cancelBtn = _makeBtn('Cancel',   '#546e7a',         16, _close);
+
+    dlBtn.key(['tab', 'right'], () => { cancelBtn.focus(); screen.render(); });
+    cancelBtn.key(['tab', 'right'], () => { dlBtn.focus(); screen.render(); });
+    dlBtn.key(['left'], () => { cancelBtn.focus(); screen.render(); });
+    cancelBtn.key(['left'], () => { dlBtn.focus(); screen.render(); });
+
+    modal.key(['escape', 'q'], () => { if (!_downloading) _close(); });
+
+    modal.setFront();
+    dlBtn.focus();
+    screen.render();
+  }
+
+  // -------------------------------------------------------------------------
   // State
 
-  let _allVoices = [];
+  let _allVoices = [];      // voice IDs (installed first, then catalog-only)
+  let _installedSet = new Set();  // which IDs are locally installed
   let _filterText = '';
 
   function _getFilteredVoices() {
     if (!_filterText) return _allVoices;
     const f = _filterText.toLowerCase();
-    return _allVoices.filter(v => v.toLowerCase().includes(f));
+    return _allVoices.filter(v => {
+      if (v.toLowerCase().includes(f)) return true;
+      // Also search by catalog display name
+      const cat = _catalogEntries.find(c => c.voiceId === v);
+      if (cat && cat.displayName.toLowerCase().includes(f)) return true;
+      return false;
+    });
+  }
+
+  function _isInstalled(voiceId) {
+    return _installedSet.has(voiceId);
   }
 
   function _buildListItems(voices, active, favorites) {
     return voices.map(v => {
+      const installed = _isInstalled(v);
       const isFav    = favorites.includes(v);
       const isActive = v === active;
       const isPrev   = v === _playingVoiceId;
       const star = isFav  ? '★' : ' ';
-      const dot  = isPrev ? '♪' : (isActive ? '●' : ' ');
-      const { displayName, gender, provider } = getVoiceMeta(v);
+      const dot  = isPrev ? '♪' : (isActive ? '{green-fg}✓{/green-fg}' : ' ');
+
+      let displayName, gender, provider;
+      if (installed) {
+        const meta = getVoiceMeta(v);
+        displayName = meta.displayName;
+        gender = meta.gender;
+        provider = meta.provider;
+      } else {
+        // Catalog-only voice — use catalog metadata
+        const cat = _catalogEntries.find(c => c.voiceId === v);
+        displayName = cat?.displayName ?? v;
+        gender = cat?.gender ?? '—';
+        provider = cat?.type === 'libritts' ? 'Piper (LibriTTS)' : 'Piper';
+      }
+
       const name = displayName.length > COL_NAME_W
         ? displayName.slice(0, COL_NAME_W - 1) + '…'
         : displayName.padEnd(COL_NAME_W);
+
+      if (!installed) {
+        // Greyed-out row for uninstalled catalog voices
+        return `{bright-black-fg} ${star}  ${name}${gender.padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
+      }
       return ` ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}${isPrev ? ' (playing)' : ''}`;
     });
   }
@@ -887,6 +1163,19 @@ export function createVoicesTab(screen, services) {
   // Build a tagged info string with yellow labels for the info panel
   function _formatInfoTagged(voiceId) {
     const Y = COLORS.valueFg;  // #ffd700 yellow
+
+    // Uninstalled catalog voice — show download prompt
+    if (!_isInstalled(voiceId)) {
+      const cat = _catalogEntries.find(c => c.voiceId === voiceId);
+      const name = cat?.displayName ?? voiceId;
+      const gender = cat?.gender ?? '—';
+      const model = cat?.type === 'libritts' ? 'LibriTTS High (multi-speaker)' : (cat?.model ?? voiceId);
+      return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
+             `{${Y}-fg}Gender:{/${Y}-fg} ${gender}  ` +
+             `{${Y}-fg}Model:{/${Y}-fg} ${model}  ` +
+             `{bright-yellow-fg}⬇ Press [Enter] to download and install{/bright-yellow-fg}`;
+    }
+
     const ms = parseMultiSpeaker(voiceId);
     if (ms.isMultiSpeaker) {
       const name = ms.speakerName.replace(/_/g, ' ');
@@ -910,7 +1199,23 @@ export function createVoicesTab(screen, services) {
     _refreshing = true;
     const savedIdx = voiceList.selected ?? 0;
 
-    _allVoices = scanInstalledVoices();
+    // Load catalog on first refresh and patch speaker names (once)
+    if (!_catalogLoaded) {
+      loadCatalog();
+      patchLibriTTSSpeakerNames();
+      _metaCache.clear();
+    }
+
+    // Installed voices (from local disk)
+    const installed = scanInstalledVoices();
+    _installedSet = new Set(installed);
+
+    // Merge: installed voices first, then uninstalled catalog voices
+    const catalogOnly = _catalogEntries
+      .filter(c => !_installedSet.has(c.voiceId))
+      .map(c => c.voiceId);
+    _allVoices = [...installed, ...catalogOnly];
+
     const active = providerService.getActiveVoiceId();
     const favorites = getFavorites(configService);
     const filtered = _getFilteredVoices();
@@ -984,16 +1289,22 @@ export function createVoicesTab(screen, services) {
   });
 
   // Space → preview voice (toggle: second press stops playback)
+  // Only works for installed voices — uninstalled need download first
   voiceList.key(['space'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
-    if (selected) {
-      _previewVoice(selected);
-      refreshDisplay();
+    if (!selected) return;
+    if (!_isInstalled(selected)) {
+      previewLine.setContent(`{bright-yellow-fg}⬇ Voice not installed — press [Enter] to download first{/bright-yellow-fg}`);
+      screen.render();
+      setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 3000);
+      return;
     }
+    _previewVoice(selected);
+    refreshDisplay();
   });
 
-  // Enter → open "Set as default voice" confirmation modal
+  // Enter → open "Set as default voice" or download uninstalled voice
   voiceList.key(['enter'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
@@ -1002,7 +1313,12 @@ export function createVoicesTab(screen, services) {
     _playingVoiceId = null;
     previewLine.setContent('');
     screen.render();
-    _openSelectVoiceModal(selected);
+
+    if (_isInstalled(selected)) {
+      _openSelectVoiceModal(selected);
+    } else {
+      _openDownloadModal(selected);
+    }
   });
 
   // Blinking █ on selected row while list is focused

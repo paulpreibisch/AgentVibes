@@ -494,6 +494,7 @@ GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
 PROJECT_MUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-muted"
 PROJECT_UNMUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-unmuted"
 BACKGROUND_ENABLED_FILE="$PROJECT_ROOT/.claude/config/background-music-enabled.txt"
+GLOBAL_BACKGROUND_ENABLED_FILE="$HOME/.claude/config/background-music-enabled.txt"
 
 # Mute status indicator
 if [[ -f "$PROJECT_UNMUTE_FILE" ]] && [[ -f "$GLOBAL_MUTE_FILE" ]]; then
@@ -506,7 +507,13 @@ fi
 
 # Background music status indicator
 if [[ -z "$BACKGROUND_MUSIC" ]]; then
+  _bg_enabled=false
   if [[ -f "$BACKGROUND_ENABLED_FILE" ]] && grep -q "true" "$BACKGROUND_ENABLED_FILE" 2>/dev/null; then
+    _bg_enabled=true
+  elif [[ -f "$GLOBAL_BACKGROUND_ENABLED_FILE" ]] && grep -q "true" "$GLOBAL_BACKGROUND_ENABLED_FILE" 2>/dev/null; then
+    _bg_enabled=true
+  fi
+  if [[ "$_bg_enabled" == "true" ]]; then
     echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Enabled but not playing (check config)${NC}"
   else
     echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Disabled${NC}"

@@ -10,16 +10,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "PULSE_SERVER=unix:/mnt/wslg/PulseServer AGENTVIBES_MIN_TOKENS=3 AGENTVIBES_SHORT_TOKENS=50 bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop.sh\""
-          }
-        ]
-      }
     ]
   }
 }

@@ -39,17 +39,18 @@ OUTPUT_FILE="${3:-}"
 CONFIG_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/audio-effects.cfg"
 BACKGROUNDS_DIR="$(cd "$SCRIPT_DIR/../audio" && pwd)/tracks"
 ENABLED_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/background-music-enabled.txt"
+GLOBAL_ENABLED_FILE="$HOME/.claude/config/background-music-enabled.txt"
 
-# Check if background music is globally enabled
+# Check if background music is enabled (project-local, then global fallback)
 is_background_music_enabled() {
-    # Default to false if file doesn't exist
-    if [[ ! -f "$ENABLED_FILE" ]]; then
+    local enabled=""
+    if [[ -f "$ENABLED_FILE" ]]; then
+        enabled=$(cat "$ENABLED_FILE" 2>/dev/null | tr -d '[:space:]')
+    elif [[ -f "$GLOBAL_ENABLED_FILE" ]]; then
+        enabled=$(cat "$GLOBAL_ENABLED_FILE" 2>/dev/null | tr -d '[:space:]')
+    else
         return 1  # Disabled by default
     fi
-
-    # Read the enabled flag
-    local enabled
-    enabled=$(cat "$ENABLED_FILE" 2>/dev/null | tr -d '[:space:]')
 
     # Return 0 (true) if enabled, 1 (false) otherwise
     [[ "$enabled" == "true" ]]

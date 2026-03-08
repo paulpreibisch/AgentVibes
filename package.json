@@ -64,6 +64,7 @@
     ".claude/verbosity.txt",
     ".claude/github-star-reminder.txt",
     ".claude/audio/voice-samples/",
+    "voice-assignments.json",
     ".agentvibes/",
     ".clawdbot/",
     ".mcp.json",

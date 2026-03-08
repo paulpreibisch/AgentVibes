@@ -1635,6 +1635,18 @@ Voice storage follows the same precedence chain in both JavaScript and shell:
 3. Global `~/.claude/piper-voices-dir.txt`
 4. Default `~/.claude/piper-voices`
 
+#### Voice Catalog System
+
+AgentVibes includes a 914-voice catalog (`voice-assignments.json`) that lets users browse, preview, and install voices directly from the Voices tab:
+
+- **10 Curated Voices** — Hand-picked high-quality voices installed by default
+- **904 LibriTTS Speakers** — Automatically extracted from the `16Speakers` multi-speaker model's `speaker_id_map`, plus the full LibriTTS catalog from Hugging Face
+- **Download on Demand** — Uninstalled voices appear greyed-out in the list; pressing Enter opens a download modal that fetches the voice via `piper-voice-manager.sh`
+- **Catalog Metadata** — Each entry includes `voiceId`, `displayName`, `gender`, `type` (curated/libritts), and download URL
+- **LibriTTS Speaker Names** — Raw numeric IDs are patched at load time using `patchLibriTTSSpeakerNames()` which maps speaker IDs to human-readable names from the registry
+
+The catalog is loaded once at tab initialization by `loadCatalog()`. Installed voices (from disk scan) are shown with full color; catalog-only voices are dimmed until downloaded.
+
 #### Required System Dependencies for Background Music
 
 Background music requires an MP3-capable audio player. The installer detects missing players and offers to install `ffmpeg` automatically. If no player is found, the Music tab displays a clear error message.

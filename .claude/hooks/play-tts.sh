@@ -101,6 +101,17 @@ TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 TEXT="${TEXT//\\\\/\\}"      # Remove \\ (escaped backslash)
 
+# Prepend intro text (pretext) if configured
+# Check project-local first, then global
+_PRETEXT_FILE="$PROJECT_ROOT/.claude/config/intro-text.txt"
+[[ -f "$_PRETEXT_FILE" ]] || _PRETEXT_FILE="$HOME/.claude/config/intro-text.txt"
+if [[ -f "$_PRETEXT_FILE" ]]; then
+  _PRETEXT="$(head -1 "$_PRETEXT_FILE" 2>/dev/null || true)"
+  if [[ -n "$_PRETEXT" ]]; then
+    TEXT="${_PRETEXT} ${TEXT}"
+  fi
+fi
+
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
 

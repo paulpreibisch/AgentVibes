@@ -2314,6 +2314,48 @@ async function collectConfiguration(options = {}) {
           }
         }
 
+        // Check for sox — required to mix background music into TTS audio
+        let _hasSox = false;
+        try { _execSync('which sox', { stdio: 'pipe' }); _hasSox = true; } catch {}
+        if (!_hasSox) {
+          console.log('');
+          console.log(chalk.yellow('⚠️  sox not found — required to mix background music into voice audio.'));
+          console.log(chalk.gray('   Without sox, you\'ll hear voice only, no background music.\n'));
+
+          const _osPlatform2 = process.platform;
+          let _soxCmd;
+          if (_osPlatform2 === 'darwin') {
+            _soxCmd = 'brew install sox';
+          } else {
+            let _hasPkexec2 = false;
+            try { _execSync('which pkexec', { stdio: 'pipe' }); _hasPkexec2 = true; } catch {}
+            _soxCmd = _hasPkexec2
+              ? 'pkexec apt-get install -y sox libsox-fmt-mp3'
+              : 'sudo apt-get install -y sox libsox-fmt-mp3';
+          }
+
+          if (!options.yes) {
+            const { installSox } = await inquirer.prompt([{
+              type: 'confirm',
+              name: 'installSox',
+              message: chalk.yellow(`Install sox now? (${_soxCmd})`),
+              default: true,
+            }]);
+            if (installSox) {
+              try {
+                console.log(chalk.cyan(`\n📦 Running: ${_soxCmd}\n`));
+                _execSync(_soxCmd, { stdio: 'inherit', timeout: 120000 });
+                console.log(chalk.green('\n✅ sox installed successfully!\n'));
+              } catch {
+                console.log(chalk.yellow('\n⚠️  sox installation failed. You can install it manually:'));
+                console.log(chalk.cyan(`   ${_soxCmd}\n`));
+              }
+            } else {
+              console.log(chalk.gray(`   Install later with: ${_soxCmd}\n`));
+            }
+          }
+        }
+
         // Add spacing before track selection
         console.log('');
         console.log(chalk.gray('🎼 Choose your default background music genre (you can change this anytime).'));

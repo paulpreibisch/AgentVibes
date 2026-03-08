@@ -181,19 +181,22 @@ export function scanTracks() {
  */
 function _getMusic(configService) {
   const cfg = configService.getConfig();
-  const music = cfg.music ?? {};
+  // Use backgroundMusic (matches settings-tab); fall back to legacy 'music' key
+  const music = cfg.backgroundMusic ?? cfg.music ?? {};
   return {
     enabled: music.enabled ?? false,
     track:   music.track ?? BUILT_IN_TRACK_CATALOG[0].id,
+    volume:  music.volume ?? 70,
   };
 }
 
 /**
  * Update music config (merge, never overwrite).
+ * Writes to 'backgroundMusic' key (shared with settings-tab).
  */
 function _setMusic(configService, update) {
   const current = _getMusic(configService);
-  configService.set('music', { ...current, ...update });
+  configService.set('backgroundMusic', { ...current, ...update });
 }
 
 /**
@@ -571,7 +574,7 @@ export function createMusicTab(screen, services) {
       const isActive  = t.id === activeTrackId;
       const isPrev    = t.id === _playingTrackId;
       const star = isFav  ? '★' : ' ';
-      const dot  = isPrev ? '♪' : (isActive ? '▶' : ' ');
+      const dot  = isPrev ? '♪' : (isActive ? '{green-fg}✓{/green-fg}' : ' ');
       const tag  = t.isBuiltIn ? '' : ' [custom]';
       return ` ${star}${dot} ${t.label}${tag}${isPrev ? ' (playing)' : ''}`;
     });

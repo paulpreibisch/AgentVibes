@@ -2069,7 +2069,7 @@ export function createSettingsTab(screen, services) {
     reverbValue.setContent(formatReverbState(effects.reverbPreset ?? 'light'));
 
     // Group 3: Background Music
-    const music = configService.getConfig().backgroundMusic ?? MUSIC_DEFAULTS;
+    const music = configService.getConfig().backgroundMusic ?? configService.getConfig().music ?? MUSIC_DEFAULTS;
     // Strip leading emoji so double-width chars don't misalign buttons on the same row
     trackValue.setContent(_stripLeadingEmoji(formatTrackName(music.track)));
     const musicEnabled = music.enabled ?? false;
