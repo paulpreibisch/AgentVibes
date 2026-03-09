@@ -42,9 +42,9 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ## 🌟 NEW FEATURE HIGHLIGHTS
 
-### 🎤 Agent Vibes v1.0 Voice Browser
+### 🖥️ AgentVibes v4.0 Interactive TUI Console
 
-![Voice Browser Banner](docs/installation-screenshots/voice-browser-screenshot.png)
+![AgentVibes TUI Console](docs/installation-screenshots/screenshot-voices.png)
 
 **🎤 Browse, Sample & Install 914 Voices in Real-Time**
 
@@ -417,7 +417,7 @@ macOS ships with bash 3.2 (from 2007). After this, everything works perfectly!
 
 **The easiest way to find your perfect voice!**
 
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
+![AgentVibes Voice Browser](docs/installation-screenshots/screenshot-voices.png)
 *Browse, sample, and install from 914 voices with real-time audio preview*
 
 ### Launch the Browser
