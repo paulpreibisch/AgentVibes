@@ -1,8 +1,6 @@
-# AgentVibes Private Dev — TODO
+# AgentVibes Dev — TODO
 
 > This file tracks all in-flight tasks so context is not lost between sessions.
-> All code changes are made in `/home/fire/claude/AgentVibes/` (public working copy)
-> and synced to `/home/fire/claude/AgentVibesPrivate/` (private fork).
 
 ---
 
@@ -10,8 +8,8 @@
 
 | # | Title | GitHub Issue | Priority |
 |---|-------|-------------|----------|
-| 1 | Install tab wizard screen transition artifacts | [#1](https://github.com/paulpreibisch/AgentVibesPrivate/issues/1) | High |
-| 2 | Install tab header inconsistency vs other tabs | [#2](https://github.com/paulpreibisch/AgentVibesPrivate/issues/2) | Medium |
+| 1 | Install tab wizard screen transition artifacts | #1 | High |
+| 2 | Install tab header inconsistency vs other tabs | #2 | Medium |
 
 ---
 
@@ -74,28 +72,6 @@ order) should have resolved the root cause.
 
 ---
 
-## Sync Instructions
+## Repo Info
 
-To sync changes from the working copy to the private repo:
-
-```bash
-# Rsync (excludes .git, node_modules, ~ dir, .bundler-temp)
-rsync -av --exclude='.git' --exclude='node_modules' --exclude='.bundler-temp' --exclude='~' \
-  /home/fire/claude/AgentVibes/ /home/fire/claude/AgentVibesPrivate/
-
-# Commit only tracked-file changes
-cd /home/fire/claude/AgentVibesPrivate
-git add <changed files>
-git commit -m "sync: ..."
-git push
-```
-
----
-
-## Private Repo Info
-
-- **Private repo:** https://github.com/paulpreibisch/AgentVibesPrivate (private)
-- **Public repo:** https://github.com/paulpreibisch/AgentVibes (public)
 - **Working branch:** `alpha`
-- **Local working copy:** `/home/fire/claude/AgentVibes/`
-- **Private fork local copy:** `/home/fire/claude/AgentVibesPrivate/`
