@@ -2614,22 +2614,22 @@ function showWelcome() {
  * Shown during install and update commands
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.5.8 - Provider Validation Security & UX Improvements\n\n') +
+  return chalk.cyan.bold('📦 AgentVibes v4.0.0 - Interactive Console & Voice Explorer\n\n') +
     chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('Critical security and reliability update for provider detection. Fixes command injection\n') +
-    chalk.cyan('vulnerabilities, prevents HOME directory injection attacks, and improves UX with explicit\n') +
-    chalk.cyan('provider detection messaging. Soprano TTS installed via pipx now correctly detected.\n\n') +
+    chalk.cyan('Major release with a full interactive TUI console, voice browser with 914+ voices,\n') +
+    chalk.cyan('and comprehensive platform support. Includes 58 security fixes, reliable TTS hooks,\n') +
+    chalk.cyan('and support for Windows, macOS, Android/Termux, and SSH-remote audio.\n\n') +
     chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🔐 Security Fixes - Fixed command injection, HOME injection prevention, path traversal\n') +
-    chalk.gray('   ✅ Provider Detection - Soprano via pipx now correctly detected\n') +
-    chalk.gray('   💬 Better Messaging - Explicit detection confirmation, detailed error messages\n') +
-    chalk.gray('   🧪 Enhanced Tests - Verification of actual detection values\n') +
-    chalk.gray('   🐛 Debug Support - Added logging for troubleshooting\n\n') +
+    chalk.gray('   🖥️  Interactive TUI Console - Settings, Voices, Music tabs with live preview\n') +
+    chalk.gray('   🎤 Voice Browser - Browse and preview 914+ Piper TTS voices\n') +
+    chalk.gray('   🔧 Reliable TTS Hooks - JSON context injection, auto git-init\n') +
+    chalk.gray('   🌍 Multi-Platform - Windows, macOS, Android/Termux, SSH-remote\n') +
+    chalk.gray('   🔐 Security Hardened - 58 issues fixed, 180+ security tests\n\n') +
     chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
     chalk.gray('🌐 Website: https://agentvibes.org\n') +
     chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
     chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-    chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License');
+    chalk.gray('Copyright © 2026 Paul Preibisch | Apache-2.0 License');
 }
 
 /**

@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.6.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.0.0
 
 ---
 
@@ -246,7 +246,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [🎤 Voice Browser v1.0](#-agent-vibes-v10-voice-browser) - Browse & sample 914 voices
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v3.6.0 "Voice Explorer" with Voice Browser, Friendly Names, Custom Music
+- [📰 Latest Release](#-latest-release) - v4.0.0 "Interactive Console & Voice Explorer"
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -293,79 +293,31 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.6.0 - "Voice Explorer" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.6.0)** 🎉
+**[v4.0.0 - Interactive Console & Voice Explorer](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.0.0)** 🎉
 
-### 🎤 AgentVibes Voice Browser
+AgentVibes v4.0.0 is a major release that transforms the user experience with a full interactive TUI console, a voice browser with 914+ voices, and comprehensive platform support including Windows, macOS, Android/Termux, and SSH remote audio.
 
-**Browse and sample 914 voices in real-time!**
+### 🖥️ Interactive TUI Console
 
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
+**Full terminal UI with tabbed navigation and real-time settings!**
 
-```bash
-npx agentvibes-voice-browser
-```
+![AgentVibes Voices Tab](docs/installation-screenshots/screenshot-voices.png)
 
-Interactive console browser with:
-- 🎧 Real-time voice sampling - hear before you choose
-- ⭐ Favorite system - mark your top voices
-- 🔍 Search & filter - find voices by personality, accent, gender
-- 📦 One-click install - install directly from browser
-- 🎨 Beautiful UI - stunning console interface
-
-**914 Total Voices:**
-- 904 Piper speaker variations (libritts-high)
-- 10 curated personality voices
-
-### 🎯 Major Features
-
-**🏷️ Friendly Voice Names**
-- No more cryptic IDs! Switch voices with names like "Ryan", "Joe", "Sarah"
-- All 904+ voices have memorable, personality-matched names
-- Voice metadata includes personalities, accents, and recommendations
+![AgentVibes Music Tab](docs/installation-screenshots/screenshot-music.png)
 
 ```bash
-# Before: /agent-vibes:switch en_US-libritts_r-medium-speaker-123
-# After:
-/agent-vibes:switch Ryan
+npx agentvibes install
 ```
 
-**💬 Intro Text (Pretext) Feature**
-- Custom prefix for all TTS announcements
-- Set during installation or anytime after
-- Perfect for personal branding: "FireBot: Starting analysis..."
-- Up to 50 characters, UTF-8 and emoji support
+### ✨ Key Highlights
 
-```bash
-npx agentvibes config intro-text
-```
-
-**🎵 Custom Background Music**
-- Upload your own audio files (.mp3, .wav, .ogg, .m4a)
-- **Battle-tested security:** 180+ attack variations blocked
-- Magic number validation ensures real audio files
-- File ownership verification (UID checks)
-- Audio duration validation (30-90s recommended, 300s max)
-- Secure storage with 600 permissions
-- Perfect for team audio branding
-
-```bash
-npx agentvibes config music
-```
-
-**🎨 Interactive Installer**
-- Preview voices during installation
-- Sample all 16 background music tracks
-- Audio environment auto-detection
-- Cross-platform preview support
-
-**🛡️ Security Hardening**
-- **180+ attack variations tested** - Path traversal, symlinks, Unicode, null bytes
-- **100% attack rejection rate** - All malicious attempts blocked
-- **OWASP compliant** - CWE-22 path traversal prevention verified
-- **Production certified** - Comprehensive security audit completed
-- **Defense-in-depth** - 7 validation layers protect your system
-- File ownership verification and secure storage (600 permissions)
-- Security audit report: `docs/security/SECURITY-AUDIT.md`
+- 🖥️ **Interactive TUI Console** - Full terminal UI with tabbed navigation (Settings, Voices, Music, Help)
+- 🎤 **914+ Voice Browser** - Browse, preview, and install voices with multi-speaker support
+- 🔊 **Reliable TTS Hooks** - SessionStart JSON output + auto git-init for guaranteed hook support
+- 🪟 **Windows Support** - Native Soprano, Piper, and SAPI providers
+- 📱 **Android/Termux** - Mobile TTS with termux-ssh provider
+- 🎵 **Background Music** - Custom track uploads with secure validation
+- 🛡️ **Security Hardened** - 58 issues fixed, 180+ attack variations tested
 
 ### Quick Install
 
@@ -381,7 +333,7 @@ npx agentvibes-voice-browser
 
 🐛 **Found a bug?** Report at [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
 
-[→ View Complete Release Notes](RELEASE_NOTES_v3.6.0.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+[→ View Complete Release Notes](RELEASE_NOTES.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 
