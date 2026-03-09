@@ -3765,6 +3765,31 @@ async function configureSessionStartHook(targetDir, spinner) {
 }
 
 /**
+ * Ensure target directory is a git repo (required for Claude Code hook context injection)
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function ensureGitRepo(targetDir, spinner) {
+  const gitDir = path.join(targetDir, '.git');
+  try {
+    await fs.access(gitDir);
+    // Already a git repo
+  } catch {
+    console.log(chalk.cyan('\n🔧 Initializing git repository (required for Claude Code hooks)...'));
+    try {
+      const { execSync: execSyncLocal } = await import('child_process');
+      execSyncLocal('git init', { cwd: targetDir, stdio: 'pipe' });
+      // Stage only files that exist
+      execSyncLocal('git add .', { cwd: targetDir, stdio: 'pipe' });
+      execSyncLocal('git commit -m "chore: initialize AgentVibes"', { cwd: targetDir, stdio: 'pipe' });
+      console.log(chalk.green('✓ Git repository initialized (required for TTS hooks)'));
+    } catch (error) {
+      console.log(chalk.yellow(`⚠ Could not initialize git repo - TTS hooks may not work: ${error.message}`));
+    }
+  }
+}
+
+/**
  * Install plugin manifest
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -4743,6 +4768,7 @@ async function performUpdateOperations(targetDir, spinner) {
   // Update settings.json
   spinner.text = 'Updating AgentVibes hook configuration...';
   await configureSessionStartHook(targetDir, silentSpinner);
+  await ensureGitRepo(targetDir, silentSpinner);
 
   // Detect and migrate old configuration
   spinner.text = 'Checking for old configuration...';
@@ -4895,6 +4921,7 @@ async function install(options = {}) {
     await copyConfigFiles(targetDir, silentSpinner);
     await configureSessionStartHook(targetDir, silentSpinner);
     await installPluginManifest(targetDir, silentSpinner);
+    await ensureGitRepo(targetDir, silentSpinner);
 
     // Save provider configuration
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
@@ -5745,6 +5772,6 @@ export {
   isTermux, isNativeWindows, detectAndNotifyTermux,
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
-  copyConfigFiles, configureSessionStartHook,
+  copyConfigFiles, configureSessionStartHook, ensureGitRepo,
   installPluginManifest, checkAndInstallPiper,
 };
