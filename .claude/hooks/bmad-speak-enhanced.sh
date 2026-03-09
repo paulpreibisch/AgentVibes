@@ -39,7 +39,7 @@ if [[ -f "$PROJECT_ROOT/.agentvibes/bmad/bmad-party-mode-disabled.flag" ]]; then
 fi
 
 # Check if BMAD is installed
-if [[ ! -f "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv" ]]; then
+if [[ ! -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" ]]; then
     exit 0
 fi
 
@@ -48,13 +48,13 @@ map_to_agent_id() {
     local name_or_id="$1"
 
     # If it looks like a file path, extract the agent ID
-    if [[ "$name_or_id" =~ \.bmad/.*/agents/([^/]+)\.md$ ]]; then
+    if [[ "$name_or_id" =~ _?\.?bmad/.*/agents/([^/]+)\.md$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return
     fi
 
     # Check if it's already an agent ID
-    local direct_match=$(grep -i "^\"*${name_or_id}\"*," "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv" | head -1)
+    local direct_match=$(grep -i "^\"*${name_or_id}\"*," "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" | head -1)
     if [[ -n "$direct_match" ]]; then
         echo "$name_or_id"
         return
@@ -73,7 +73,7 @@ map_to_agent_id() {
                 exit
             }
         }
-    ' "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv")
+    ' "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv")
 
     echo "$agent_id"
 }
@@ -94,7 +94,7 @@ get_display_name() {
                 exit
             }
         }
-    ' "$PROJECT_ROOT/.bmad/_cfg/agent-manifest.csv")
+    ' "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv")
 
     echo "$display_name"
 }

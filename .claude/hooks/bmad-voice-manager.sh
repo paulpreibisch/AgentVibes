@@ -281,10 +281,10 @@ sync_intros_from_manifest() {
         bmad_voice_map="bmad/_cfg/agent-voice-map.csv"
     fi
 
-    if [[ -f ".bmad/_cfg/agent-manifest.csv" ]]; then
-        manifest_file=".bmad/_cfg/agent-manifest.csv"
-    elif [[ -f "bmad/_cfg/agent-manifest.csv" ]]; then
-        manifest_file="bmad/_cfg/agent-manifest.csv"
+    if [[ -f "_bmad/_config/agent-manifest.csv" ]]; then
+        manifest_file="_bmad/_config/agent-manifest.csv"
+    elif [[ -f "_bmad/_config/agent-manifest.csv" ]]; then
+        manifest_file="_bmad/_config/agent-manifest.csv"
     fi
 
     # Both files must exist for sync to work
@@ -404,10 +404,10 @@ get_agent_intro() {
         if [[ -z "$intro" ]] || [[ "$intro" == "Hello! Ready to help with the discussion." ]]; then
             # Try to get display name from agent-manifest.csv
             local manifest_file=""
-            if [[ -f ".bmad/_cfg/agent-manifest.csv" ]]; then
-                manifest_file=".bmad/_cfg/agent-manifest.csv"
-            elif [[ -f "bmad/_cfg/agent-manifest.csv" ]]; then
-                manifest_file="bmad/_cfg/agent-manifest.csv"
+            if [[ -f "_bmad/_config/agent-manifest.csv" ]]; then
+                manifest_file="_bmad/_config/agent-manifest.csv"
+            elif [[ -f "_bmad/_config/agent-manifest.csv" ]]; then
+                manifest_file="_bmad/_config/agent-manifest.csv"
             fi
 
             if [[ -n "$manifest_file" ]]; then
