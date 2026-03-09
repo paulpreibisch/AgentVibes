@@ -105,7 +105,7 @@ else
     SPEAKER_ID_FILE="$VOICE_DIR/tts-piper-speaker-id.txt"
 
     if [[ -f "$MODEL_FILE" ]] && [[ -f "$SPEAKER_ID_FILE" ]]; then
-      # Multi-speaker voice
+      # Multi-speaker voice config found locally
       VOICE_MODEL=$(cat "$MODEL_FILE" 2>/dev/null)
       SPEAKER_ID=$(cat "$SPEAKER_ID_FILE" 2>/dev/null)
       # Validate speaker ID is numeric
@@ -114,9 +114,23 @@ else
         SPEAKER_ID=""
       fi
       echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
-    # Check if it's a standard Piper model name or custom voice (just use as-is)
+    # Fallback: check global ~/.claude/ for multi-speaker config files
+    elif [[ -f "$HOME/.claude/tts-piper-model.txt" ]] && [[ -f "$HOME/.claude/tts-piper-speaker-id.txt" ]]; then
+      VOICE_MODEL=$(cat "$HOME/.claude/tts-piper-model.txt" 2>/dev/null)
+      SPEAKER_ID=$(cat "$HOME/.claude/tts-piper-speaker-id.txt" 2>/dev/null)
+      if [[ -n "$SPEAKER_ID" ]] && ! [[ "$SPEAKER_ID" =~ ^[0-9]+$ ]]; then
+        echo "Warning: Invalid speaker ID '$SPEAKER_ID', ignoring" >&2
+        SPEAKER_ID=""
+      fi
+      echo "🎭 Using multi-speaker voice (global): $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
+    # Single-speaker voice or custom voice name
     elif [[ -n "$FILE_VOICE" ]]; then
-      VOICE_MODEL="$FILE_VOICE"
+      # Strip multi-speaker suffix if present (model::SpeakerName-Label)
+      if [[ "$FILE_VOICE" == *"::"* ]]; then
+        VOICE_MODEL="${FILE_VOICE%%::*}"
+      else
+        VOICE_MODEL="$FILE_VOICE"
+      fi
     fi
   fi
 
