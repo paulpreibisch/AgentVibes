@@ -433,6 +433,20 @@ Just code normally - AgentVibes automatically speaks task acknowledgments and co
 
 ---
 
+### TUI Console Commands
+
+AgentVibes includes a full **Text User Interface (TUI)** built with blessed.js for managing voices, music, settings, and installation — all from a single interactive console.
+
+| Command | Description |
+|---------|-------------|
+| `npx agentvibes` | Smart detection — opens Settings if installed, Install if not |
+| `npx agentvibes install` | Open the Install tab directly |
+| `npx agentvibes config` | Open the Settings tab directly |
+
+Once inside, use **Tab** / **Shift+Tab** to switch between tabs: **Voices**, **Music**, **Settings**, and **Install**. Use **[** / **]** to page through voice and music catalogs.
+
+---
+
 **🍎 macOS Users (One-Time Setup):**
 ```bash
 brew install bash  # Required for bash 5.x features
