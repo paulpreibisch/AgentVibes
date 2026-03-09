@@ -39,6 +39,7 @@ export const TAB_DISPLAY_LABELS = {
   settings: 'Settings',
   voices:   'Voices',
   music:    'Music',
+  agents:   'Agents',
   readme:   'Readme',
   help:     'Help',
   install:  'Install',

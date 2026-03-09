@@ -112,7 +112,7 @@ export class AgentVibesConsole {
     // Screen options stored as property so tests can verify correct configuration
     // without needing to intercept the blessed.screen() call (ESM mock limitation).
     this._screenOptions = {
-      smartCSR: false,
+      smartCSR: true,
       mouse: true,
       fullUnicode: true,
       title: `AgentVibes v${APP_VERSION} TUI Console`,

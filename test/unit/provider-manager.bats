@@ -46,12 +46,9 @@ teardown() {
 @test "provider-manager list works with no providers (edge case)" {
   # Temporarily rename all provider files to test no providers case
   local hooks_dir="$TEST_CLAUDE_DIR/hooks"
-  mv "$hooks_dir/play-tts-piper.sh" "$hooks_dir/play-tts-piper.sh.bak" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-macos.sh" "$hooks_dir/play-tts-macos.sh.bak" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-enhanced.sh" "$hooks_dir/play-tts-enhanced.sh.bak" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-termux-ssh.sh" "$hooks_dir/play-tts-termux-ssh.sh.bak" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-soprano.sh" "$hooks_dir/play-tts-soprano.sh.bak" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-ssh-remote.sh" "$hooks_dir/play-tts-ssh-remote.sh.bak" 2>/dev/null || true
+  for f in "$hooks_dir"/play-tts-*.sh; do
+    [[ -f "$f" ]] && mv "$f" "${f}.bak"
+  done
 
   run "$PROVIDER_MANAGER" list
 
@@ -59,12 +56,9 @@ teardown() {
   assert_output_contains "No providers found"
 
   # Restore files
-  mv "$hooks_dir/play-tts-piper.sh.bak" "$hooks_dir/play-tts-piper.sh" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-macos.sh.bak" "$hooks_dir/play-tts-macos.sh" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-enhanced.sh.bak" "$hooks_dir/play-tts-enhanced.sh" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-termux-ssh.sh.bak" "$hooks_dir/play-tts-termux-ssh.sh" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-soprano.sh.bak" "$hooks_dir/play-tts-soprano.sh" 2>/dev/null || true
-  mv "$hooks_dir/play-tts-ssh-remote.sh.bak" "$hooks_dir/play-tts-ssh-remote.sh" 2>/dev/null || true
+  for f in "$hooks_dir"/play-tts-*.sh.bak; do
+    [[ -f "$f" ]] && mv "$f" "${f%.bak}"
+  done
 }
 
 # ============================================================================
