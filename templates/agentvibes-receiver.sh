@@ -212,6 +212,11 @@ if [[ -n "$BG_VOLUME" ]] && [[ ! "$BG_VOLUME" =~ ^[0-9]+\.?[0-9]*$ ]]; then
   BG_VOLUME="0.10"
 fi
 
+# SECURITY: Validate speed is a number (prevents awk injection)
+if [[ -n "$SPEED" ]] && [[ ! "$SPEED" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+  SPEED=""
+fi
+
 # SECURITY: Validate provider format (known providers only)
 case "$PROVIDER" in
   piper|soprano|macos|windows-sapi) ;;
@@ -241,7 +246,7 @@ log_message() {
   local sender_ip="${SSH_CLIENT%% *}"
   [[ -z "$sender_ip" ]] && sender_ip="local"
   # Format: TIMESTAMP|STATUS|PROJECT|VOICE|TEXT_PREVIEW|DETAIL|IP|LOG_ID
-  local preview="$TEXT"
+  local preview="${TEXT:0:200}"
   printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
     "$timestamp" "$status" "${PROJECT:-unknown}" "$VOICE" "$preview" "$detail" "$sender_ip" "$LOG_ID" \
     >> "$LOG_FILE" 2>/dev/null || true
@@ -308,9 +313,9 @@ _generate_tts_soprano() {
     return 0
   fi
 
-  # Try CLI mode
+  # Try CLI mode — options before --, text as final positional arg
   if command -v soprano &>/dev/null; then
-    soprano "$TEXT" -o "$RAW_WAV" 2>/dev/null && return 0
+    soprano -o "$RAW_WAV" -- "$TEXT" 2>/dev/null && return 0
   fi
 
   log_message "ERROR" "Soprano TTS failed — is soprano running on port ${soprano_port}?"
@@ -415,8 +420,12 @@ PLAY_FILE="$RAW_WAV"
 # ---------------------------------------------------------------------------
 
 if [[ -n "$SOX_EFFECTS" ]] && command -v sox &>/dev/null; then
-  # SECURITY: sox effects are from sender config, validated at sender side
-  sox "$RAW_WAV" "$EFFECTS_WAV" $SOX_EFFECTS 2>/dev/null && PLAY_FILE="$EFFECTS_WAV"
+  # SECURITY: Validate effects contain only safe characters (alphanumeric, spaces, dots, hyphens, underscores)
+  if [[ "$SOX_EFFECTS" =~ ^[a-zA-Z0-9\ ._-]+$ ]]; then
+    sox "$RAW_WAV" "$EFFECTS_WAV" $SOX_EFFECTS 2>/dev/null && PLAY_FILE="$EFFECTS_WAV"
+  else
+    log_message "WARN" "Rejected unsafe sox effects: ${SOX_EFFECTS:0:50}"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

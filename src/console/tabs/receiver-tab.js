@@ -94,21 +94,30 @@ function _detectSetupState() {
     tcpModuleLoaded: false,
   };
   try {
-    // Check receiver user exists
+    // Resolve receiver user home directory dynamically (works on Linux + macOS)
+    let receiverHome = '';
     try {
       execSync('id agentvibes-receiver', { timeout: 3000, stdio: 'pipe' });
       state.receiverUserExists = true;
+      try {
+        receiverHome = execSync("getent passwd agentvibes-receiver 2>/dev/null | cut -d: -f6 || echo '/home/agentvibes-receiver'",
+          { timeout: 3000, stdio: 'pipe' }).toString().trim();
+      } catch { receiverHome = '/home/agentvibes-receiver'; }
     } catch { /* user does not exist */ }
 
     // Check receiver script installed
-    state.receiverScriptInstalled = existsSync('/home/agentvibes-receiver/.agentvibes/play-remote.sh');
+    if (receiverHome) {
+      state.receiverScriptInstalled = existsSync(path.join(receiverHome, '.agentvibes/play-remote.sh'));
+    }
 
     // Check voice models present
-    try {
-      const voices = execSync('ls /home/agentvibes-receiver/.claude/piper-voices/*.onnx 2>/dev/null | wc -l',
-        { timeout: 3000, stdio: 'pipe' }).toString().trim();
-      state.voiceModelsPresent = parseInt(voices, 10) > 0;
-    } catch { /* no access or no voices */ }
+    if (receiverHome) {
+      try {
+        const voices = execSync(`ls ${receiverHome}/.claude/piper-voices/*.onnx 2>/dev/null | wc -l`,
+          { timeout: 3000, stdio: 'pipe' }).toString().trim();
+        state.voiceModelsPresent = parseInt(voices, 10) > 0;
+      } catch { /* no access or no voices */ }
+    }
 
     // Check PipeWire TCP config
     const home = homedir();
@@ -118,7 +127,9 @@ function _detectSetupState() {
       path.join(home, '.config/pipewire/pipewire-pulse.conf.d/no-flat-volumes.conf'));
 
     // Check pulse cookie shared
-    state.pulseCookieShared = existsSync('/home/agentvibes-receiver/.config/pulse/cookie');
+    if (receiverHome) {
+      state.pulseCookieShared = existsSync(path.join(receiverHome, '.config/pulse/cookie'));
+    }
 
     // Check ForceCommand in sshd_config
     try {
@@ -189,7 +200,7 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
       '                (detected: ' + detectedPort + ' — ask user to confirm)',
       '  RECEIVER_NAME: SSH alias name (default: my-receiver)',
       '  TTS_PROVIDER:  Which TTS engine on the receiver?',
-      '                Options: piper (default, Linux), soprano (Windows),',
+      '                Options: piper (default, Linux), soprano (neural TTS, any platform),',
       '                macos (macOS say), windows-sapi (Windows SAPI)',
       '',
       'Replace <RECEIVER_IP>, <RECEIVER_PORT>, <RECEIVER_NAME>,',
@@ -278,7 +289,7 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
     '                (detected: ' + detectedPort + ' — ask user to confirm)',
     '  RECEIVER_NAME: SSH alias name (default: my-receiver)',
     '  TTS_PROVIDER:  Which TTS engine on the receiver?',
-    '                Options: piper (default, Linux), soprano (Windows),',
+    '                Options: piper (default, Linux), soprano (neural TTS, any platform),',
     '                macos (macOS say), windows-sapi (Windows SAPI)',
     '',
     'Replace <RECEIVER_IP>, <RECEIVER_PORT>, <RECEIVER_NAME>,',
@@ -815,8 +826,7 @@ export function createReceiverTab(screen, services) {
   }
 
   function _formatMessage(msg) {
-    const date = msg.timestamp.replace(/T/, ' ').substring(0, 10);
-    const time = msg.timestamp.replace(/T/, ' ').substring(11, 19);
+    const [date = '', time = ''] = (msg.timestamp || '').split('T');
     const statusRaw = msg.status === 'DONE' ? 'OK  ' :
                       msg.status === 'ERROR' ? 'ERR ' :
                       msg.status === 'PLAYING' ? 'PLAY' :
@@ -893,12 +903,24 @@ export function createReceiverTab(screen, services) {
   // -------------------------------------------------------------------------
   // Refresh display
 
-  // Cache network info (computed once, refreshed on display)
+  // Cache network info and tool checks (refresh every 30s, not every render)
   let _networkInfo = { tailscaleIp: '', localIp: '', sshPort: '22' };
+  let _toolChecksCache = '';
+  let _lastCacheTime = 0;
+  const CACHE_TTL_MS = 30000;
+
+  function _refreshCachedInfo() {
+    const now = Date.now();
+    if (now - _lastCacheTime > CACHE_TTL_MS) {
+      _networkInfo = _getNetworkInfo();
+      _toolChecksCache = _getToolChecks();
+      _lastCacheTime = now;
+    }
+  }
 
   function refreshDisplay() {
     const enabled = _isReceiverEnabled();
-    _networkInfo = _getNetworkInfo();
+    _refreshCachedInfo();
 
     // Toggle description box
     if (_showDescription) {
@@ -943,8 +965,7 @@ export function createReceiverTab(screen, services) {
 
     // Network + tools + log — IP yellow, port cyan
     const ipDisplay = _networkInfo.tailscaleIp || _networkInfo.localIp || 'unknown';
-    const tools = _getToolChecks();
-    infoLine.setContent(`  IP: {yellow-fg}{bold}${ipDisplay}{/bold}{/yellow-fg}  Port: {#4fc3f7-fg}{bold}${_networkInfo.sshPort}{/bold}{/#4fc3f7-fg}    Tools: ${tools}    Log: {#90a4ae-fg}${LOG_FILE}{/#90a4ae-fg}`);
+    infoLine.setContent(`  IP: {yellow-fg}{bold}${ipDisplay}{/bold}{/yellow-fg}  Port: {#4fc3f7-fg}{bold}${_networkInfo.sshPort}{/bold}{/#4fc3f7-fg}    Tools: ${_toolChecksCache}    Log: {#90a4ae-fg}${LOG_FILE}{/#90a4ae-fg}`);
 
     _updateFeedbackDefault();
 
@@ -1051,8 +1072,8 @@ export function createReceiverTab(screen, services) {
   });
 
   box.key(['a', 'A'], () => {
-    // Copy all visible content to clipboard
-    const text = contentBox.getContent();
+    // Copy all visible content to clipboard — strip blessed markup tags
+    const text = contentBox.getContent().replace(/\{[^}]*\}/g, '');
     const result = spawnSync('xclip', ['-selection', 'clipboard'], {
       input: text,
       timeout: 3000,
