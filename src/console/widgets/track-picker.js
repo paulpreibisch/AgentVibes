@@ -3,13 +3,16 @@
  *
  * Inline modal list for selecting background music tracks.
  * Extracted from settings-tab.js for reuse across tabs.
+ * Space previews track, Enter selects.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { formatTrackName } from './format-utils.js';
+import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;
@@ -58,12 +61,12 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
   );
   const currentIdx = tracks.findIndex(t => t.file === currentTrack);
 
-  const listHeight = Math.min(tracks.length + 4, Math.floor(screen.rows * 0.7));
+  const listHeight = Math.min(tracks.length + 6, Math.floor(screen.rows * 0.7));
   const list = blessed.list({
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 50,
+    width: 54,
     height: listHeight,
     border: { type: 'line' },
     tags: true,
@@ -81,18 +84,110 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
     },
   });
 
+  // Preview status line
+  const previewLine = blessed.text({
+    parent: screen,
+    top: list.top + listHeight,
+    left: 'center',
+    width: 54,
+    height: 1,
+    tags: true,
+    content: '{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}',
+    style: { fg: '#e3f2fd', bg: '#0a0e1a' },
+  });
+
   if (currentIdx >= 0) list.select(currentIdx);
   list.focus();
   screen.render();
 
-  list.key(['enter', 'space'], () => {
+  // Preview playback state
+  const _spawnEnv = buildAudioEnv();
+  const _mp3Player = detectMp3Player(_spawnEnv);
+  let _previewProc = null;
+  let _previewTrackId = null;
+
+  function _killPreview() {
+    if (_previewProc) {
+      try { process.kill(-_previewProc.pid, 'SIGTERM'); } catch {}
+      _previewProc = null;
+    }
+    _previewTrackId = null;
+  }
+
+  function _previewTrack(trackFile) {
+    // Toggle off if same track
+    if (_previewTrackId === trackFile) {
+      _killPreview();
+      previewLine.setContent('{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}');
+      screen.render();
+      return;
+    }
+
+    _killPreview();
+
+    const trackPath = path.resolve(tracksDir, trackFile);
+    const safeBase = path.resolve(tracksDir);
+    if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
+
+    if (!_mp3Player || !fs.existsSync(trackPath)) {
+      previewLine.setContent('{red-fg}No MP3 player found or track missing{/red-fg}');
+      screen.render();
+      setTimeout(() => {
+        previewLine.setContent('{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}');
+        screen.render();
+      }, 3000);
+      return;
+    }
+
+    _previewProc = spawn(_mp3Player.bin, _mp3Player.args(trackPath), {
+      stdio: 'ignore', detached: true, env: _spawnEnv,
+    });
+    _previewTrackId = trackFile;
+
+    const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
+    previewLine.setContent(`{#00e5ff-fg}♪ Previewing: ${label}  (Space to stop){/#00e5ff-fg}`);
+    screen.render();
+
+    _previewProc.on('exit', () => {
+      if (_previewTrackId === trackFile) {
+        _previewTrackId = null;
+        _previewProc = null;
+        previewLine.setContent('{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}');
+        screen.render();
+      }
+    });
+
+    _previewProc.on('error', () => {
+      _previewTrackId = null;
+      _previewProc = null;
+    });
+  }
+
+  function _close(callback) {
+    _killPreview();
+    previewLine.destroy();
+    if (callback) {
+      callback();
+      destroyList(list, screen, onClose);
+    } else {
+      destroyList(list, screen, onClose);
+    }
+  }
+
+  // Space = preview
+  list.key(['space'], () => {
+    const selected = tracks[list.selected];
+    if (selected) _previewTrack(selected.file);
+  });
+
+  // Enter = select
+  list.key(['enter'], () => {
     const selected = tracks[list.selected];
     if (!selected) return;
-    onSelect(selected.file);
-    destroyList(list, screen, onClose);
+    _close(() => onSelect(selected.file));
   });
 
   list.key(['escape', 'q'], () => {
-    destroyList(list, screen, onClose);
+    _close();
   });
 }

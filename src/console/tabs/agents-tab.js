@@ -64,9 +64,11 @@ const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 // Column widths for agent table
 const COL_ICON = 4;
-const COL_NAME = 22;
-const COL_VOICE = 24;
-const COL_PRETEXT = 20;
+const COL_NAME = 18;
+const COL_VOICE = 22;
+const COL_PRETEXT = 16;
+const COL_REVERB = 12;
+const COL_MUSIC = 16;
 
 // ---------------------------------------------------------------------------
 
@@ -199,7 +201,7 @@ export function createAgentsTab(screen, services) {
     left: 4,
     hidden: true,
     tags: true,
-    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Pretext'.padEnd(COL_PRETEXT)}Reverb{/#90a4ae-fg}`,
+    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Pretext'.padEnd(COL_PRETEXT)}${'Reverb'.padEnd(COL_REVERB)}Music{/#90a4ae-fg}`,
     style: { bg: COLORS.contentBg },
   });
 
@@ -348,8 +350,11 @@ export function createAgentsTab(screen, services) {
       const name = `${a.displayName}`.padEnd(COL_NAME).slice(0, COL_NAME);
       const voice = (profile.voice || '(global)').padEnd(COL_VOICE).slice(0, COL_VOICE);
       const pretext = (profile.pretext || '(default)').padEnd(COL_PRETEXT).slice(0, COL_PRETEXT);
-      const reverb = profile.reverbPreset || '(global)';
-      return ` ${icon}${name}${voice}${pretext}${reverb}`;
+      const reverb = (profile.reverbPreset || '(global)').padEnd(COL_REVERB).slice(0, COL_REVERB);
+      const music = profile.backgroundMusic?.track
+        ? formatTrackName(profile.backgroundMusic.track).slice(0, COL_MUSIC)
+        : '(global)';
+      return ` ${icon}${name}${voice}${pretext}${reverb}${music}`;
     });
   }
 
@@ -387,6 +392,34 @@ export function createAgentsTab(screen, services) {
     );
 
     screen.render();
+  }
+
+  // -------------------------------------------------------------------------
+  // Temporary "Saved!" toast notification
+
+  function _showSavedToast(agentName) {
+    const toast = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 34,
+      height: 3,
+      border: { type: 'line' },
+      tags: true,
+      content: `  {green-fg}{bold}✓ ${agentName} saved!{/bold}{/green-fg}`,
+      style: { fg: '#e3f2fd', bg: '#1b5e20', border: { fg: '#4caf50' } },
+    });
+    toast.setFront();
+    screen.render();
+    setTimeout(() => {
+      toast.destroy();
+      try {
+        for (let r = 0; r < screen.height; r++)
+          for (let c = 0; c < screen.width; c++)
+            if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
+      } catch {}
+      screen.render();
+    }, 1500);
   }
 
   // -------------------------------------------------------------------------
@@ -612,6 +645,8 @@ export function createAgentsTab(screen, services) {
       voiceStore.setAgentProfile(agent.id, toSave);
       _closeModal();
       refreshDisplay();
+      // Show temporary "Saved!" toast
+      _showSavedToast(agent.displayName);
     });
 
     const resetAllBtn = _modalBtn('Reset to Defaults', 14, () => {
