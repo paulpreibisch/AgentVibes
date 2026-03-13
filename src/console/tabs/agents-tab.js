@@ -433,70 +433,22 @@ export function createAgentsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
-  // Sample an agent with their full profile
+  // Sample an agent with their full profile (voice + pretext + reverb + music)
+  // Uses play-tts-enhanced.sh for the complete effects pipeline.
 
   function _sampleAgent(agent) {
-    _killPreview();
-    const gen = ++_playGeneration;
-
     const profile = voiceStore.getAgentProfile(agent.id);
-    const voiceId = profile.voice || configService.getConfig().voice || '';
-    if (!voiceId) return;
-
-    const pretext = profile.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
-    const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`;
-
-    const _ms = parseMultiSpeaker(voiceId);
-    const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
-    const safeBase = path.resolve(PIPER_VOICES_DIR);
-    if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
-
-    const _spawnEnv = buildAudioEnv();
-    const tempWav = _secureTempWav('agent-preview');
-
-    const _piperArgs = ['--model', voicePath, '--output_file', tempWav];
-    if (_ms.speakerId != null) _piperArgs.push('--speaker', String(_ms.speakerId));
-    const piper = spawn('piper', _piperArgs, {
-      stdio: ['pipe', 'ignore', 'ignore'],
-      detached: true,
-      env: _spawnEnv,
-    });
-    piper.stdin.write(phrase + '\n');
-    piper.stdin.end();
-    _playingProcess = piper;
-
-    piper.on('exit', (code) => {
-      if (gen !== _playGeneration) { try { fs.unlinkSync(tempWav); } catch {} return; }
-      if (code !== 0) {
-        _playingProcess = null;
-        try { fs.unlinkSync(tempWav); } catch {}
-        return;
-      }
-      const _wavPlayer = detectWavPlayer(_spawnEnv);
-      if (!_wavPlayer) {
-        _playingProcess = null;
-        try { fs.unlinkSync(tempWav); } catch {}
-        return;
-      }
-      const playProc = spawn(_wavPlayer.bin, _wavPlayer.args(tempWav), {
-        stdio: 'ignore',
-        detached: true,
-        env: _spawnEnv,
-      });
-      _playingProcess = playProc;
-      playProc.on('exit', () => {
-        if (gen === _playGeneration) _playingProcess = null;
-        try { fs.unlinkSync(tempWav); } catch {}
-      });
-      playProc.on('error', () => {
-        if (gen === _playGeneration) _playingProcess = null;
-        try { fs.unlinkSync(tempWav); } catch {}
-      });
-    });
-
-    piper.on('error', () => {
-      if (gen === _playGeneration) _playingProcess = null;
-      try { fs.unlinkSync(tempWav); } catch {}
+    const globalCfg = configService.getConfig();
+    _sampleWithFullProfile(agent, {
+      voice:           profile.voice         || globalCfg.voice || '',
+      pretext:         profile.pretext       || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title),
+      reverbPreset:    profile.reverbPreset  || globalCfg.effects?.reverbPreset || 'light',
+      personality:     profile.personality   || globalCfg.personality || 'none',
+      backgroundMusic: {
+        track:   profile.backgroundMusic?.track   || globalCfg.backgroundMusic?.track || '',
+        volume:  profile.backgroundMusic?.volume  ?? globalCfg.backgroundMusic?.volume ?? 70,
+        enabled: profile.backgroundMusic?.enabled ?? globalCfg.backgroundMusic?.enabled ?? false,
+      },
     });
   }
 
@@ -998,46 +950,86 @@ export function createAgentsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
-  // Sample agent with a draft profile (no save)
+  // Sample agent with a draft profile (no save) — same full pipeline
 
   function _sampleAgentWithDraft(agent, draft) {
+    _sampleWithFullProfile(agent, draft);
+  }
+
+  // -------------------------------------------------------------------------
+  // Shared: sample with full profile via play-tts-enhanced.sh
+  // Writes a temp agent profile JSON, then calls the enhanced TTS pipeline
+  // which applies voice + reverb + background music.
+
+  function _sampleWithFullProfile(agent, profile) {
     _killPreview();
     const gen = ++_playGeneration;
 
-    const voiceId = draft.voice;
+    const voiceId = profile.voice;
     if (!voiceId) return;
 
-    const pretext = draft.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
+    const pretext = profile.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
     const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`;
 
-    const _ms = parseMultiSpeaker(voiceId);
-    const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
-    const safeBase = path.resolve(PIPER_VOICES_DIR);
-    if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
-
     const _spawnEnv = buildAudioEnv();
-    const tempWav = _secureTempWav('draft-preview');
+    const scriptDir = path.join(_projectRoot, '.claude', 'hooks');
+    const enhancedScript = path.join(scriptDir, 'play-tts-enhanced.sh');
+    const plainScript = path.join(scriptDir, 'play-tts.sh');
 
-    const _piperArgs = ['--model', voicePath, '--output_file', tempWav];
-    if (_ms.speakerId != null) _piperArgs.push('--speaker', String(_ms.speakerId));
-    const piper = spawn('piper', _piperArgs, {
-      stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _spawnEnv,
-    });
-    piper.stdin.write(phrase + '\n');
-    piper.stdin.end();
-    _playingProcess = piper;
+    // Write temp profile JSON for per-agent reverb/personality/music overrides
+    let tempProfile = '';
+    if (profile.reverbPreset || profile.personality || profile.backgroundMusic?.track) {
+      const profileDir = path.join(process.env.XDG_RUNTIME_DIR || os.tmpdir(), `agentvibes-${process.getuid?.() ?? 'u'}`);
+      fs.mkdirSync(profileDir, { recursive: true, mode: 0o700 });
+      try { fs.chmodSync(profileDir, 0o700); } catch {}
+      tempProfile = path.join(profileDir, `agent-profile-sample-${crypto.randomUUID()}.json`);
+      const profileData = {};
+      if (profile.reverbPreset && profile.reverbPreset !== 'light') profileData.reverbPreset = profile.reverbPreset;
+      if (profile.personality && profile.personality !== 'none') profileData.personality = profile.personality;
+      if (profile.backgroundMusic?.track && profile.backgroundMusic?.enabled) {
+        profileData.backgroundMusic = {
+          track: profile.backgroundMusic.track,
+          volume: profile.backgroundMusic.volume ?? 70,
+        };
+      }
+      if (Object.keys(profileData).length > 0) {
+        fs.writeFileSync(tempProfile, JSON.stringify(profileData), { mode: 0o600 });
+      } else {
+        tempProfile = '';
+      }
+    }
 
-    piper.on('exit', (code) => {
-      if (gen !== _playGeneration) { try { fs.unlinkSync(tempWav); } catch {} return; }
-      if (code !== 0) { _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} return; }
-      const wp = detectWavPlayer(_spawnEnv);
-      if (!wp) { _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} return; }
-      const pp = spawn(wp.bin, wp.args(tempWav), { stdio: 'ignore', detached: true, env: _spawnEnv });
-      _playingProcess = pp;
-      pp.on('exit', () => { if (gen === _playGeneration) _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
-      pp.on('error', () => { if (gen === _playGeneration) _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
+    // Determine which script to use
+    const useEnhanced = fs.existsSync(enhancedScript) && tempProfile;
+    const script = useEnhanced ? enhancedScript : plainScript;
+
+    // Build env with agent profile path
+    const env = { ..._spawnEnv };
+    if (tempProfile) env.AGENTVIBES_AGENT_PROFILE = tempProfile;
+
+    // Spawn: play-tts-enhanced.sh "text" "agent_name" "voice_override"
+    // or:    play-tts.sh "text" "voice_override"
+    const args = useEnhanced
+      ? [script, phrase, agent.displayName || 'default', voiceId]
+      : [script, phrase, voiceId];
+
+    const proc = spawn('bash', args, {
+      stdio: 'ignore',
+      detached: true,
+      env,
+      cwd: _projectRoot,
     });
-    piper.on('error', () => { if (gen === _playGeneration) _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
+    _playingProcess = proc;
+
+    proc.on('exit', () => {
+      if (gen === _playGeneration) _playingProcess = null;
+      if (tempProfile) try { fs.unlinkSync(tempProfile); } catch {}
+    });
+
+    proc.on('error', () => {
+      if (gen === _playGeneration) _playingProcess = null;
+      if (tempProfile) try { fs.unlinkSync(tempProfile); } catch {}
+    });
   }
 
   // -------------------------------------------------------------------------
