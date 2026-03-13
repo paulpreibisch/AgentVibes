@@ -503,7 +503,7 @@ test('Text Sanitization - Piper produces clean speech on Windows', { skip: proce
     // Run sanitization logic in PowerShell and check the result
     const result = await runPowerShell([
       '-Command',
-      "$Text = 'Hello from C:\\Users\\Paul\\.claude'; $Text = $Text -replace '\\\\', ' '; $Text = $Text -replace '[{}<>|``~^]', ''; $Text = $Text -replace '\\s+', ' '; $Text = $Text.Trim(); Write-Host $Text"
+      "$Text = 'Hello from C:\\Users\\TestUser\\.claude'; $Text = $Text -replace '\\\\', ' '; $Text = $Text -replace '[{}<>|``~^]', ''; $Text = $Text -replace '\\s+', ' '; $Text = $Text.Trim(); Write-Host $Text"
     ]);
 
     assert.ok(

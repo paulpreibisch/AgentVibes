@@ -71,12 +71,12 @@ Test the fix by running TTS from different directories:
 
 ```bash
 # From project root
-cd /home/fire/claude/AgentVibes
+cd /path/to/AgentVibes
 ./.claude/hooks/play-tts.sh "Hello from project root"
 
 # From subdirectory
 cd src/installer
-/home/fire/claude/AgentVibes/.claude/hooks/play-tts.sh "Hello from subdirectory"
+/path/to/AgentVibes/.claude/hooks/play-tts.sh "Hello from subdirectory"
 
 # Via global symlink (if installed)
 play-tts "Hello from global symlink"

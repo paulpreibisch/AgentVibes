@@ -10,7 +10,7 @@
 #   1. JSON payload (v2): single base64-encoded JSON with all config
 #   2. Legacy positional args: base64_text voice_name (backward compat)
 #
-# Pipeline: piper TTS → sox effects → ffmpeg music mix → pw-play/paplay
+# Pipeline: TTS (piper|soprano|macos|windows-sapi) → sox effects → ffmpeg music mix → audio player
 # All steps run in foreground (required for SSH ForceCommand).
 #
 # Installation:
@@ -66,7 +66,15 @@ AGENTVIBES_PULSE_PORT="${AGENTVIBES_PULSE_PORT:-34567}"
 
 if [[ -z "${PULSE_SERVER:-}" ]]; then
   _own_runtime="/run/user/$(id -u)"
-  if [[ -e "$_own_runtime/pulse/native" ]]; then
+  # Detect if we're the dedicated receiver user — always use TCP to reach
+  # the desktop user's audio session, even if we have our own pulse socket.
+  _is_receiver_user=false
+  [[ "$(whoami)" == "agentvibes-receiver" ]] && _is_receiver_user=true
+
+  if [[ "$_is_receiver_user" == true ]]; then
+    # Dedicated receiver user — must use TCP to desktop user's PipeWire-Pulse
+    export PULSE_SERVER="tcp:127.0.0.1:$AGENTVIBES_PULSE_PORT"
+  elif [[ -e "$_own_runtime/pulse/native" ]]; then
     # Same user — use own Unix socket (fastest)
     export PULSE_SERVER="unix:$_own_runtime/pulse/native"
   else
@@ -88,9 +96,21 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 # PipeWire flat-volume side effects that drop the master volume.
 AUDIO_PLAYER=""
 AUDIO_PLAYER_ARGS=()
-# Detect the desktop user's default sink so we play on the right device
-# (receiver user may not share the same default)
-_default_sink=$(pactl get-default-sink 2>/dev/null || true)
+
+# Check for user-configured sink (set via TUI receiver tab [S] key)
+SINK_CONFIG="${AGENTVIBES_RECEIVER_SINK:-$HOME/.agentvibes/receiver-sink.txt}"
+_default_sink=""
+if [[ -f "$SINK_CONFIG" ]]; then
+  _configured_sink=$(head -1 "$SINK_CONFIG" 2>/dev/null | tr -d '[:space:]')
+  # Validate sink name format (alphanumeric, hyphens, underscores, dots)
+  if [[ -n "$_configured_sink" ]] && [[ "$_configured_sink" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+    _default_sink="$_configured_sink"
+  fi
+fi
+# Fall back to system default if no valid config
+if [[ -z "$_default_sink" ]]; then
+  _default_sink=$(pactl get-default-sink 2>/dev/null || true)
+fi
 
 if command -v paplay &>/dev/null; then
   AUDIO_PLAYER="paplay"
@@ -138,6 +158,7 @@ BG_VOLUME="0.10"
 PROJECT=""
 PRETEXT=""
 SPEED=""
+PROVIDER="piper"
 
 # Detect JSON payload (starts with '{')
 if [[ "$DECODED" == "{"* ]]; then
@@ -152,6 +173,7 @@ if [[ "$DECODED" == "{"* ]]; then
     PROJECT=$(printf '%s' "$DECODED" | jq -r '.project // empty' 2>/dev/null) || PROJECT=""
     PRETEXT=$(printf '%s' "$DECODED" | jq -r '.pretext // empty' 2>/dev/null) || PRETEXT=""
     SPEED=$(printf '%s' "$DECODED" | jq -r '.speed // empty' 2>/dev/null) || SPEED=""
+    PROVIDER=$(printf '%s' "$DECODED" | jq -r '.provider // "piper"' 2>/dev/null) || PROVIDER="piper"
   else
     # Fallback: extract with grep/sed (no jq available)
     TEXT=$(printf '%s' "$DECODED" | grep -o '"text"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//' || true)
@@ -162,8 +184,10 @@ if [[ "$DECODED" == "{"* ]]; then
     PROJECT=$(printf '%s' "$DECODED" | grep -o '"project"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//' || true)
     PRETEXT=$(printf '%s' "$DECODED" | grep -o '"pretext"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//' || true)
     SPEED=$(printf '%s' "$DECODED" | grep -o '"speed"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//' || true)
+    PROVIDER=$(printf '%s' "$DECODED" | grep -o '"provider"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//' || true)
     [[ -z "$VOICE" ]] && VOICE="en_US-lessac-medium"
     [[ -z "$BG_VOLUME" ]] && BG_VOLUME="0.10"
+    [[ -z "$PROVIDER" ]] && PROVIDER="piper"
   fi
 else
   # Legacy format: plain text, voice from positional arg
@@ -188,6 +212,12 @@ if [[ -n "$BG_VOLUME" ]] && [[ ! "$BG_VOLUME" =~ ^[0-9]+\.?[0-9]*$ ]]; then
   BG_VOLUME="0.10"
 fi
 
+# SECURITY: Validate provider format (known providers only)
+case "$PROVIDER" in
+  piper|soprano|macos|windows-sapi) ;;
+  *) PROVIDER="piper" ;;
+esac
+
 # Prepend pretext if provided
 if [[ -n "$PRETEXT" ]]; then
   TEXT="${PRETEXT}. ${TEXT}"
@@ -211,13 +241,13 @@ log_message() {
   local sender_ip="${SSH_CLIENT%% *}"
   [[ -z "$sender_ip" ]] && sender_ip="local"
   # Format: TIMESTAMP|STATUS|PROJECT|VOICE|TEXT_PREVIEW|DETAIL|IP|LOG_ID
-  local preview="${TEXT:0:60}"
+  local preview="$TEXT"
   printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
     "$timestamp" "$status" "${PROJECT:-unknown}" "$VOICE" "$preview" "$detail" "$sender_ip" "$LOG_ID" \
     >> "$LOG_FILE" 2>/dev/null || true
 }
 
-log_message "RECEIVED" "effects=${SOX_EFFECTS:-none} music=${BG_FILE:-none}"
+log_message "RECEIVED" "provider=${PROVIDER} effects=${SOX_EFFECTS:-none} music=${BG_FILE:-none}"
 
 # ---------------------------------------------------------------------------
 # Temp files with cleanup
@@ -232,38 +262,151 @@ FINAL_WAV=$(mktemp "$_TEMP_BASE/agentvibes-recv-final-XXXXXX.wav")
 trap 'rm -f "$RAW_WAV" "$EFFECTS_WAV" "$FINAL_WAV"' EXIT
 
 # ---------------------------------------------------------------------------
-# Step 1: Generate TTS with piper
+# Step 1: Generate TTS audio (multi-provider dispatch)
 # ---------------------------------------------------------------------------
 
-MODEL="$VOICES_DIR/${VOICE}.onnx"
-if [[ ! -f "$MODEL" ]]; then
-  # Fallback: try any available voice rather than failing
-  FALLBACK_MODEL=$(find "$VOICES_DIR" -maxdepth 1 -name '*.onnx' -type f 2>/dev/null | head -1)
-  if [[ -n "$FALLBACK_MODEL" ]]; then
-    FALLBACK_VOICE=$(basename "$FALLBACK_MODEL" .onnx)
-    log_message "WARN" "Voice $VOICE not found, falling back to $FALLBACK_VOICE"
-    echo "Warning: Voice $VOICE not found, using $FALLBACK_VOICE" >&2
-    VOICE="$FALLBACK_VOICE"
-    MODEL="$FALLBACK_MODEL"
-  else
-    log_message "ERROR" "No voice models found in $VOICES_DIR"
-    echo "Error: No voice models found in $VOICES_DIR" >&2
-    exit 1
+_generate_tts_piper() {
+  local model="$VOICES_DIR/${VOICE}.onnx"
+  if [[ ! -f "$model" ]]; then
+    # Fallback: try any available voice rather than failing
+    local fallback
+    fallback=$(find "$VOICES_DIR" -maxdepth 1 -name '*.onnx' -type f 2>/dev/null | head -1)
+    if [[ -n "$fallback" ]]; then
+      local fallback_name
+      fallback_name=$(basename "$fallback" .onnx)
+      log_message "WARN" "Voice $VOICE not found, falling back to $fallback_name"
+      echo "Warning: Voice $VOICE not found, using $fallback_name" >&2
+      VOICE="$fallback_name"
+      model="$fallback"
+    else
+      log_message "ERROR" "No voice models found in $VOICES_DIR"
+      echo "Error: No voice models found in $VOICES_DIR" >&2
+      return 1
+    fi
   fi
-fi
 
-PIPER_ARGS=(--model "$MODEL" --output_file "$RAW_WAV")
+  local args=(--model "$model" --output_file "$RAW_WAV")
+  if [[ -n "$SPEED" ]] && [[ "$SPEED" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+    args+=(--length_scale "$SPEED")
+  fi
 
-# Add speed/length_scale if provided
-if [[ -n "$SPEED" ]] && [[ "$SPEED" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-  PIPER_ARGS+=(--length_scale "$SPEED")
-fi
-
-echo "$TEXT" | piper "${PIPER_ARGS[@]}" 2>/dev/null || {
-  log_message "ERROR" "Piper TTS failed"
-  echo "Error: Piper TTS generation failed" >&2
-  exit 1
+  echo "$TEXT" | piper "${args[@]}" 2>/dev/null || {
+    log_message "ERROR" "Piper TTS failed"
+    echo "Error: Piper TTS generation failed" >&2
+    return 1
+  }
 }
+
+_generate_tts_soprano() {
+  local soprano_port="${SOPRANO_PORT:-7860}"
+
+  # Try API mode first (OpenAI-compatible endpoint)
+  if curl -sf -X POST "http://127.0.0.1:${soprano_port}/v1/audio/speech" \
+    -H "Content-Type: application/json" \
+    -d "{\"input\":$(printf '%s' "$TEXT" | jq -Rs .)}" \
+    --output "$RAW_WAV" 2>/dev/null; then
+    return 0
+  fi
+
+  # Try CLI mode
+  if command -v soprano &>/dev/null; then
+    soprano "$TEXT" -o "$RAW_WAV" 2>/dev/null && return 0
+  fi
+
+  log_message "ERROR" "Soprano TTS failed — is soprano running on port ${soprano_port}?"
+  echo "Error: Soprano TTS unavailable (tried API and CLI)" >&2
+  return 1
+}
+
+_generate_tts_macos() {
+  if ! command -v say &>/dev/null; then
+    log_message "ERROR" "macOS say command not found"
+    echo "Error: macOS say command not available" >&2
+    return 1
+  fi
+
+  local say_args=(-v "$VOICE")
+  # Convert speed multiplier to WPM (say uses WPM, default ~200)
+  if [[ -n "$SPEED" ]] && [[ "$SPEED" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+    local wpm
+    wpm=$(awk "BEGIN {printf \"%d\", 200 * $SPEED}")
+    say_args+=(-r "$wpm")
+  fi
+
+  # say outputs AIFF — convert to WAV for consistent pipeline
+  local aiff_tmp="${RAW_WAV%.wav}.aiff"
+  echo "$TEXT" | say "${say_args[@]}" -o "$aiff_tmp" 2>/dev/null || {
+    log_message "ERROR" "macOS say failed"
+    rm -f "$aiff_tmp"
+    return 1
+  }
+
+  if command -v ffmpeg &>/dev/null; then
+    ffmpeg -y -i "$aiff_tmp" "$RAW_WAV" </dev/null 2>/dev/null
+    rm -f "$aiff_tmp"
+  else
+    # No ffmpeg — rename and hope player handles AIFF
+    mv "$aiff_tmp" "$RAW_WAV"
+  fi
+}
+
+_generate_tts_windows_sapi() {
+  # Windows SAPI via PowerShell (works in WSL2 via powershell.exe)
+  local ps_cmd=""
+  if command -v powershell.exe &>/dev/null; then
+    ps_cmd="powershell.exe"
+  elif command -v pwsh &>/dev/null; then
+    ps_cmd="pwsh"
+  else
+    log_message "ERROR" "PowerShell not found for Windows SAPI"
+    echo "Error: PowerShell required for Windows SAPI" >&2
+    return 1
+  fi
+
+  # SECURITY: Escape text for PowerShell single-quoted string
+  local escaped_text
+  escaped_text=$(printf '%s' "$TEXT" | sed "s/'/''/g")
+
+  local rate=0
+  if [[ -n "$SPEED" ]] && [[ "$SPEED" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+    # SAPI rate: -10 to 10, 0 is normal. Speed 1.0=0, 2.0=5, 0.5=-5
+    rate=$(awk "BEGIN {r = ($SPEED - 1.0) * 10; if (r > 10) r = 10; if (r < -10) r = -10; printf \"%d\", r}")
+  fi
+
+  $ps_cmd -NoProfile -Command "
+    Add-Type -AssemblyName System.Speech
+    \$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+    \$synth.Rate = $rate
+    \$synth.SetOutputToWaveFile('$(wslpath -w "$RAW_WAV" 2>/dev/null || echo "$RAW_WAV")')
+    \$synth.Speak('$escaped_text')
+    \$synth.Dispose()
+  " 2>/dev/null || {
+    log_message "ERROR" "Windows SAPI TTS failed"
+    echo "Error: Windows SAPI generation failed" >&2
+    return 1
+  }
+}
+
+# Dispatch to the appropriate TTS provider
+case "$PROVIDER" in
+  piper)
+    _generate_tts_piper || exit 1
+    ;;
+  soprano)
+    _generate_tts_soprano || exit 1
+    ;;
+  macos)
+    _generate_tts_macos || exit 1
+    ;;
+  windows-sapi)
+    _generate_tts_windows_sapi || exit 1
+    ;;
+  *)
+    log_message "ERROR" "Unknown provider: $PROVIDER"
+    echo "Error: Unknown TTS provider: $PROVIDER" >&2
+    exit 1
+    ;;
+esac
 
 PLAY_FILE="$RAW_WAV"
 
@@ -305,14 +448,14 @@ if [[ -z "$AUDIO_PLAYER" ]]; then
   exit 1
 fi
 
-log_message "PLAYING" "player=$AUDIO_PLAYER"
-
 # Save master volume before playback — flat-volumes in PipeWire/PulseAudio
 # can change master volume when a new stream connects from another user.
 _saved_vol=""
 if command -v pactl &>/dev/null; then
   _saved_vol=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]*%' | head -1)
 fi
+
+log_message "PLAYING" "player=$AUDIO_PLAYER sink=${_default_sink:-unknown} vol=${_saved_vol:-?} pulse=${PULSE_SERVER:-unset}"
 
 _play_err=$($AUDIO_PLAYER "${AUDIO_PLAYER_ARGS[@]}" "$PLAY_FILE" 2>&1) || {
   log_message "ERROR" "Playback failed with $AUDIO_PLAYER: $_play_err"

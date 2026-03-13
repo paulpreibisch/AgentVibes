@@ -169,6 +169,25 @@ TCPEOF
 chown "$DESKTOP_USER:$(id -gn "$DESKTOP_USER")" "$PIPEWIRE_CONF"
 echo "  [ok] PipeWire TCP config installed ($PIPEWIRE_CONF)"
 
+# Disable flat volumes — prevents receiver streams from hijacking master volume
+# Without this, PipeWire can change the master volume and default sink when the
+# receiver user plays audio, causing other audio to drop to ~31% on a wrong device
+FLAT_VOL_CONF="$PIPEWIRE_CONF_DIR/no-flat-volumes.conf"
+if [[ ! -f "$FLAT_VOL_CONF" ]]; then
+  cat > "$FLAT_VOL_CONF" << 'FLATEOF'
+# Disable flat volumes — prevents receiver streams from changing master volume
+# Without this, cross-user audio (from agentvibes-receiver) can hijack the
+# master volume level and switch the default sink to an unintended device
+pulse.properties = {
+    pulse.flat.volumes = false
+}
+FLATEOF
+  chown "$DESKTOP_USER:$(id -gn "$DESKTOP_USER")" "$FLAT_VOL_CONF"
+  echo "  [ok] Flat volumes disabled (prevents volume hijacking)"
+else
+  echo "  [ok] no-flat-volumes.conf already exists"
+fi
+
 # Load module now if PipeWire is running
 if sudo -u "$DESKTOP_USER" XDG_RUNTIME_DIR="/run/user/$DESKTOP_UID" \
   pactl load-module module-native-protocol-tcp auth-cookie-enabled=1 auth-anonymous=0 listen=127.0.0.1 port=34567 2>/dev/null; then

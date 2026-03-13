@@ -93,6 +93,21 @@ if [[ -f "$SPEED_FILE" ]]; then
   SPEED=$(cat "$SPEED_FILE" 2>/dev/null || true)
 fi
 
+# Read active TTS provider
+PROVIDER=""
+PROVIDER_FILE="$PROJECT_ROOT/.agentvibes/config/provider.txt"
+if [[ -f "$PROVIDER_FILE" ]]; then
+  PROVIDER=$(cat "$PROVIDER_FILE" 2>/dev/null || true)
+fi
+# Fallback: check agentvibes.json
+if [[ -z "$PROVIDER" ]]; then
+  AGENTVIBES_JSON="$PROJECT_ROOT/.agentvibes/config/agentvibes.json"
+  if [[ -f "$AGENTVIBES_JSON" ]] && command -v jq &>/dev/null; then
+    PROVIDER=$(jq -r '.provider // empty' "$AGENTVIBES_JSON" 2>/dev/null || true)
+  fi
+fi
+[[ -z "$PROVIDER" ]] && PROVIDER="piper"
+
 # ---------------------------------------------------------------------------
 # Build JSON payload
 # ---------------------------------------------------------------------------
@@ -109,15 +124,16 @@ build_json_payload() {
       --arg project "$PROJECT_NAME" \
       --arg pretext "$PRETEXT" \
       --arg speed "$SPEED" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed}'
+      --arg provider "$PROVIDER" \
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider}'
   else
     # Manual JSON — escape double quotes and backslashes in text
     local escaped_text
     escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED"
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER"
   fi
 }
 

@@ -3,8 +3,9 @@
 # Preview all 16 speakers in the 16Speakers.onnx voice model
 #
 
-MODEL_PATH="/home/fire/claude/AgentVibes/mcp-server/voices/16Speakers.onnx"
-OUTPUT_DIR="/home/fire/claude/AgentVibes/mcp-server/voices/previews"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODEL_PATH="$SCRIPT_DIR/16Speakers.onnx"
+OUTPUT_DIR="$SCRIPT_DIR/previews"
 SAMPLE_TEXT="Hello, this is speaker number"
 
 # Create output directory

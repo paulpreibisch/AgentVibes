@@ -20,7 +20,7 @@ Create a native Android app that acts as an audio receiver for OpenClaw TTS mess
 ## 🎨 UI Design (6 Screens)
 
 All mockups generated using Gemini Nano-Banana-Pro API and available in:
-`/home/fire/claude/AgentVibes/mockups/agentvibes-receiver/`
+`mockups/agentvibes-receiver/`
 
 ### Screen 1: Onboarding (01-onboarding.jpg)
 - Welcome screen with value proposition
@@ -385,8 +385,8 @@ All mockups generated using Gemini Nano-Banana-Pro API and available in:
 
 - **Main AgentVibes Repo:** https://github.com/paulpreibisch/AgentVibes
 - **OpenClaw Website:** https://openclaw.ai/
-- **Mockups Location:** `/home/fire/claude/AgentVibes/mockups/agentvibes-receiver/`
-- **Mockup Generator Script:** `/home/fire/claude/AgentVibes/mockups/generate-agentvibes-receiver-mockups.cjs`
+- **Mockups Location:** `mockups/agentvibes-receiver/`
+- **Mockup Generator Script:** `mockups/generate-agentvibes-receiver-mockups.cjs`
 - **Party Mode Conversation:** Full conversation archived in this issue
 
 ---

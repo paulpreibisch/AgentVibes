@@ -133,7 +133,7 @@ echo ""
 echo "  Running full TTS pipeline as $RECEIVER_USER..."
 PAYLOAD=$(echo '{"text":"AgentVibes receiver test successful","voice":"en_US-lessac-medium"}' | base64 -w 0)
 OUTPUT=$(sudo -u "$RECEIVER_USER" \
-  SSH_CLIENT="127.0.0.1 12345 45217" \
+  SSH_CLIENT="127.0.0.1 12345 22" \
   XDG_RUNTIME_DIR="$XDG_DIR" \
   bash "$RECEIVER_SCRIPT" "$PAYLOAD" 2>&1) || true
 

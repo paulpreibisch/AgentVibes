@@ -1,44 +1,44 @@
-# Audio Tunnel Troubleshooting - 2025-10-16
+# SSH Audio Tunnel Troubleshooting
 
 ## Problem Summary
 
-The audio tunnel that was working yesterday stopped functioning today. Users experienced:
+The SSH audio tunnel stops functioning. Common symptoms:
 - `speaker-test` failing with "Connection refused"
 - SSH tunnel showing "Warning: remote port forwarding failed for listen port 14713"
 
 ## Root Cause Analysis
 
 ### Primary Issue: Stale SSH Processes
-**Multiple old SSH sessions** on ubuntu-rdp (remote server) were holding port 14713, preventing new tunnels from binding to that port.
+**Multiple old SSH sessions** on the remote server may be holding port 14713, preventing new tunnels from binding to that port.
 
 ```bash
-# Investigation revealed:
+# Investigation on remote server:
 $ sudo lsof -i :14713
-COMMAND     PID          USER   FD   TYPE   DEVICE SIZE/OFF NODE NAME
-sshd    2845015 administrator    7u  IPv6 70604344      0t0  TCP ip6-localhost:14713 (LISTEN)
-sshd    2845015 administrator    9u  IPv4 70604345      0t0  TCP localhost:14713 (LISTEN)
+COMMAND     PID   USER   FD   TYPE   DEVICE SIZE/OFF NODE NAME
+sshd      12345   user    7u  IPv6 70604344      0t0  TCP ip6-localhost:14713 (LISTEN)
+sshd      12345   user    9u  IPv4 70604345      0t0  TCP localhost:14713 (LISTEN)
 ```
 
 ### Secondary Issue: Stopped socat Bridge
-The socat bridge on WSL (Windows side) had stopped running, breaking the connection chain even if the tunnel worked.
+The socat bridge on WSL (Windows side) may have stopped running, breaking the connection chain even if the tunnel is intact.
 
 ## How the Audio Tunnel Works
 
 ```
-ubuntu-rdp (Remote)           WSL (Windows)                Windows
-    │                              │                          │
-    │ Speaker-test/TTS             │                          │
-    │         ↓                    │                          │
-    │  PULSE_SERVER=              │                          │
-    │  tcp:localhost:14713         │                          │
-    │         ↓                    │                          │
-    │  [SSH Tunnel Port 14713] ←──┴──→ [socat Bridge]        │
-    │                              │      ↓                   │
-    │                              │  TCP:14713 →            │
-    │                              │  UNIX:/mnt/wslg/        │
-    │                              │  PulseServer            │
-    │                              │      ↓                   │
-    │                              │  [WSL PulseAudio] ───→ Speakers
+Remote Server                 WSL (Windows)                Windows
+    |                              |                          |
+    | Speaker-test/TTS             |                          |
+    |         v                    |                          |
+    |  PULSE_SERVER=               |                          |
+    |  tcp:localhost:14713         |                          |
+    |         v                    |                          |
+    |  [SSH Tunnel Port 14713] <---+---> [socat Bridge]       |
+    |                              |      v                   |
+    |                              |  TCP:14713 ->            |
+    |                              |  UNIX:/mnt/wslg/         |
+    |                              |  PulseServer             |
+    |                              |      v                   |
+    |                              |  [WSL PulseAudio] ---> Speakers
 ```
 
 ## Symptoms
@@ -63,9 +63,11 @@ ubuntu-rdp (Remote)           WSL (Windows)                Windows
 
 ## The Fix
 
+In these examples, replace `<remote-server>` with your SSH host alias or hostname (e.g., the `Host` entry from your `~/.ssh/config`).
+
 ### Step 1: Kill Stale Processes on Remote Server
 ```bash
-ssh ubuntu-rdp 'sudo fuser -k 14713/tcp'
+ssh <remote-server> 'sudo fuser -k 14713/tcp'
 ```
 
 This forcefully kills all processes (including zombie SSH sessions) holding port 14713 on the remote server.
@@ -86,21 +88,21 @@ wsl ss -tlnp | Select-String ":14713"
 
 ### Step 3: Kill Local Stale SSH Tunnels
 ```bash
-wsl bash -c "pkill -f 'ssh.*ubuntu-rdp'"
+wsl bash -c "pkill -f 'ssh.*<remote-server>'"
 ```
 
 ### Step 4: Create Fresh SSH Tunnel
 ```bash
-wsl bash -c "ssh -f -N -R 14713:localhost:14713 ubuntu-rdp"
+wsl bash -c "ssh -f -N -R 14713:localhost:14713 <remote-server>"
 ```
 
 ### Step 5: Verify Everything Works
 ```bash
 # Check tunnel exists on remote
-wsl bash -c "ssh ubuntu-rdp 'netstat -tlnp | grep 14713'"
+wsl bash -c "ssh <remote-server> 'netstat -tlnp | grep 14713'"
 
 # Test audio
-ssh ubuntu-rdp
+ssh <remote-server>
 export PULSE_SERVER=tcp:localhost:14713
 speaker-test -t sine -f 1000 -l 1
 ```
@@ -117,12 +119,12 @@ speaker-test -t sine -f 1000 -l 1
 
 1. **Always use `-f` flag for background tunnels:**
    ```bash
-   ssh -f -N -R 14713:localhost:14713 ubuntu-rdp
+   ssh -f -N -R 14713:localhost:14713 <remote-server>
    ```
 
 2. **Check for existing tunnels before creating new ones:**
    ```bash
-   ssh ubuntu-rdp 'sudo lsof -i :14713'
+   ssh <remote-server> 'sudo lsof -i :14713'
    ```
 
 3. **Clean exit from SSH sessions:**
@@ -140,13 +142,13 @@ speaker-test -t sine -f 1000 -l 1
 
 ## Automated Solution
 
-The updated `fix-audio-tunnel.sh` script now handles:
-- ✅ Kills stale SSH processes on remote server
-- ✅ Restarts socat bridge on WSL
-- ✅ Kills local stale SSH tunnels
-- ✅ Creates fresh tunnel
-- ✅ Verifies connection works
-- ✅ Tests audio playback
+The `fix-audio-tunnel.sh` script handles:
+- Kills stale SSH processes on remote server
+- Restarts socat bridge on WSL
+- Kills local stale SSH tunnels
+- Creates fresh tunnel
+- Verifies connection works
+- Tests audio playback
 
 ## Future Improvements
 
@@ -165,7 +167,7 @@ fi
 ### 2. SSH Config Improvement
 Add these to `~/.ssh/config` for more reliable connections:
 ```
-Host ubuntu-rdp
+Host your-remote-server
     ServerAliveInterval 30
     ServerAliveCountMax 3
     ExitOnForwardFailure yes
@@ -178,9 +180,9 @@ Add tunnel status to shell prompt or status bar:
 # In .bashrc or .zshrc
 audio_tunnel_status() {
   if ss -tlnp 2>/dev/null | grep -q :14713; then
-    echo "🔊"
+    echo "[audio:up]"
   else
-    echo "🔇"
+    echo "[audio:down]"
   fi
 }
 ```
@@ -210,7 +212,7 @@ When working correctly, you should see:
    # Output: socat listening on *:14713
    ```
 
-2. **On ubuntu-rdp:**
+2. **On the remote server:**
    ```bash
    netstat -tlnp | grep 14713
    # Output: listening on 127.0.0.1:14713 and ::1:14713
@@ -231,28 +233,30 @@ When working correctly, you should see:
 
 ## Diagnostic Commands Cheat Sheet
 
+Replace `<remote-server>` with your SSH host alias or hostname.
+
 ```bash
 # Check socat bridge (on WSL)
 wsl ss -tlnp | grep 14713
 
 # Check tunnel on remote
-ssh ubuntu-rdp 'netstat -tlnp | grep 14713'
+ssh <remote-server> 'netstat -tlnp | grep 14713'
 
 # Find processes using port
-ssh ubuntu-rdp 'sudo lsof -i :14713'
+ssh <remote-server> 'sudo lsof -i :14713'
 
 # Check PulseAudio connection
-ssh ubuntu-rdp 'export PULSE_SERVER=tcp:localhost:14713 && pactl info'
+ssh <remote-server> 'export PULSE_SERVER=tcp:localhost:14713 && pactl info'
 
 # Test audio
-ssh ubuntu-rdp 'export PULSE_SERVER=tcp:localhost:14713 && speaker-test -t sine -f 1000 -l 1'
+ssh <remote-server> 'export PULSE_SERVER=tcp:localhost:14713 && speaker-test -t sine -f 1000 -l 1'
 
 # Kill stale processes
-ssh ubuntu-rdp 'sudo fuser -k 14713/tcp'
+ssh <remote-server> 'sudo fuser -k 14713/tcp'
 
 # Kill local SSH tunnels
-wsl pkill -f 'ssh.*ubuntu-rdp'
+wsl pkill -f 'ssh.*<remote-server>'
 
 # Create new tunnel
-wsl bash -c "ssh -f -N -R 14713:localhost:14713 ubuntu-rdp"
+wsl bash -c "ssh -f -N -R 14713:localhost:14713 <remote-server>"
 ```
