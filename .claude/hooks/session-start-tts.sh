@@ -96,6 +96,15 @@ cat << EOF
 4. Keep under 150 chars
 5. Always include errors
 
+## BMAD Agent Voice Routing
+If a BMAD agent is active (file `.bmad-agent-context` exists), use `bmad-speak.sh` instead of `play-tts.sh`:
+```
+Bash: .claude/hooks/bmad-speak.sh "AGENT_ID" "[text]"
+```
+Where AGENT_ID is the content of `.bmad-agent-context` (e.g., "analyst", "architect", "pm").
+This routes TTS through the per-agent voice profile (voice, pretext, reverb, music).
+If `.bmad-agent-context` does NOT exist, use `play-tts.sh` as normal.
+
 Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning
 
 EOF
