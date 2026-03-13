@@ -153,7 +153,24 @@ else
         SPEAKER_ID=""
       fi
       echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
-    # Check if it's a standard Piper model name or custom voice (just use as-is)
+    # Check if voice uses Model::SpeakerName format (from AgentVibes config)
+    elif [[ -n "$FILE_VOICE" ]] && [[ "$FILE_VOICE" == *"::"* ]]; then
+      VOICE_MODEL="${FILE_VOICE%%::*}"
+      _SPEAKER_NAME="${FILE_VOICE#*::}"
+      voice_dir=$(get_voice_storage_dir)
+      _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+      if [[ -f "$_JSON_FILE" ]]; then
+        SPEAKER_ID=$(node -e "
+          try {
+            const j = JSON.parse(require('fs').readFileSync('$_JSON_FILE','utf8'));
+            const map = j.speaker_id_map || {};
+            const id = map['$_SPEAKER_NAME'];
+            if (id !== undefined) process.stdout.write(String(id));
+          } catch {}
+        " 2>/dev/null || true)
+      fi
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+    # Standard Piper model name or custom voice (just use as-is)
     elif [[ -n "$FILE_VOICE" ]]; then
       VOICE_MODEL="$FILE_VOICE"
     fi
