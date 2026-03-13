@@ -407,8 +407,8 @@ export function createReceiverTab(screen, services) {
     const project = `{#4fc3f7-fg}${msg.project.substring(0, 12).padEnd(12)}{/#4fc3f7-fg}`;
     const voice = `{#ffb74d-fg}${msg.voice.substring(0, 18).padEnd(18)}{/#ffb74d-fg}`;
     const music = `{#a5d6a7-fg}${(msg.music || '—').substring(0, 15).padEnd(15)}{/#a5d6a7-fg}`;
-    const text = `{#fff9c4-fg}${msg.textPreview.substring(0, 25)}{/#fff9c4-fg}`;
-    return `{#90a4ae-fg}${date} ${time}{/#90a4ae-fg}  ${logId}  ${status}  ${ip}  ${project}  ${voice}  ${music}  ${text}`;
+    const text = `{red-fg}${msg.textPreview}{/red-fg}`;
+    return `${logId}  {#90a4ae-fg}${date} ${time}{/#90a4ae-fg}  ${status}  ${ip}  ${project}  ${voice}  ${music}  ${text}`;
   }
 
   // -------------------------------------------------------------------------
@@ -499,7 +499,7 @@ export function createReceiverTab(screen, services) {
         ].join('\n');
         contentBox.setContent(text);
       } else {
-        const header = `{#90a4ae-fg}${'DATE'.padEnd(10)} ${'TIME'.padEnd(8)}{/#90a4ae-fg}  {#607d8b-fg}${'ID'.padEnd(5)}{/#607d8b-fg}  {bold}${'STAT'.padEnd(4)}{/bold}  {#ce93d8-fg}${'IP'.padEnd(15)}{/#ce93d8-fg}  {#4fc3f7-fg}${'PROJECT'.padEnd(12)}{/#4fc3f7-fg}  {#ffb74d-fg}${'VOICE'.padEnd(18)}{/#ffb74d-fg}  {#a5d6a7-fg}${'MUSIC'.padEnd(15)}{/#a5d6a7-fg}  {#fff9c4-fg}TEXT{/#fff9c4-fg}`;
+        const header = `{#607d8b-fg}${'ID'.padEnd(5)}{/#607d8b-fg}  {#90a4ae-fg}${'DATE'.padEnd(10)} ${'TIME'.padEnd(8)}{/#90a4ae-fg}  {bold}${'STAT'.padEnd(4)}{/bold}  {#ce93d8-fg}${'IP'.padEnd(15)}{/#ce93d8-fg}  {#4fc3f7-fg}${'PROJECT'.padEnd(12)}{/#4fc3f7-fg}  {#ffb74d-fg}${'VOICE'.padEnd(18)}{/#ffb74d-fg}  {#a5d6a7-fg}${'MUSIC'.padEnd(15)}{/#a5d6a7-fg}  {red-fg}TEXT{/red-fg}`;
         const separator = '─'.repeat(78);
         const lines = [header, separator];
         // Group log lines per request — show one row with final status
