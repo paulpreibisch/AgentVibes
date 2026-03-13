@@ -58,8 +58,15 @@ BMAD_SPEAK="$PROJECT_DIR/.claude/hooks/bmad-speak.sh"
 
 if [[ -f "$BMAD_CONTEXT" ]] && [[ -f "$BMAD_SPEAK" ]]; then
   AGENT_ID=$(head -1 "$BMAD_CONTEXT" 2>/dev/null | tr -d '[:space:]')
+
+  # Party mode: context file contains "party-mode" — skip stop hook TTS entirely.
+  # Party mode handles its own TTS inline via bmad-speak.sh per agent.
+  if [[ "$AGENT_ID" == "party-mode" ]]; then
+    exit 0
+  fi
+
   if [[ -n "$AGENT_ID" ]] && [[ "$AGENT_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    # Use bmad-speak which reads per-agent voice/pretext from bmad-voice-map.json
+    # Single agent mode: use bmad-speak for per-agent voice/pretext
     bash "$BMAD_SPEAK" "$AGENT_ID" "$MESSAGE" &
     exit 0
   fi
