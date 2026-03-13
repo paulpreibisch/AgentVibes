@@ -4,16 +4,13 @@
 **Updated:** 2026-02-15
 **Status:** Active (Using BMAD Methodology)
 
-## TTS Protocol (MANDATORY)
+## TTS Protocol
 
-**ALWAYS call TTS inline (never `run_in_background: true`):**
-```bash
-PULSE_SERVER=unix:/mnt/wslg/PulseServer bash ".claude/hooks/play-tts.sh" "text to speak"
-```
-- Provider: `piper` (WSL bash, NOT Windows PowerShell)
-- Mode: `full` (`.agentvibes/config/mode.txt`) — Claude calls TTS directly, no stop-hook Audio Summary
-- Pretext: configured in `.agentvibes/config/agentvibes.json` (prepended automatically by play-tts.sh)
-- Call at: task acknowledgment + task completion (high verbosity = also reasoning/findings)
+**TTS is handled automatically by the stop hook** — do NOT call `play-tts.sh` or `bmad-speak.sh` manually.
+The global stop hook at `~/.claude/hooks/stop-tts.sh` auto-speaks responses and detects active BMAD agents
+via `.bmad-agent-context` for per-agent voice routing.
+
+**Do NOT use `PULSE_SERVER=unix:/mnt/wslg/PulseServer`** — this machine is native Linux, not WSL.
 
 ## Overview
 
