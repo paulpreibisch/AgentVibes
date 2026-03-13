@@ -201,8 +201,9 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
     const selected = PERSONALITIES[list.selected];
     if (!selected) return;
     _killPickerTts();
-    destroyList(list, screen, onClose);
+    // Call onSelect before destroying to avoid stale-state re-renders
     onSelect(selected);
+    destroyList(list, screen, onClose);
   });
 
   list.key(['escape', 'q'], () => {

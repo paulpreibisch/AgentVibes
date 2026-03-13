@@ -19,11 +19,16 @@ import {
   parseMultiSpeaker, scanInstalledVoices, getVoiceMeta,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+
+// Max pretext length to prevent excessively long TTS utterances
+const MAX_PRETEXT_LENGTH = 200;
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -121,9 +126,24 @@ export function createAgentsTab(screen, services) {
   const { configService, providerService, focusMainTabBar, navigationService } = services;
   const voiceStore = new AgentVoiceStore();
 
+  // Capture cwd once at construction (L1 fix)
+  const _projectRoot = process.cwd();
+
   let _bmadDetected = false;
   let _agents = [];
   let _playingProcess = null;
+  let _playGeneration = 0; // H4: generation counter to prevent orphaned processes
+
+  /**
+   * Create a secure temp file path using XDG_RUNTIME_DIR or user-specific dir (H3 fix).
+   */
+  function _secureTempWav(prefix) {
+    const baseDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
+    const dir = path.join(baseDir, `agentvibes-${process.getuid?.() ?? 'u'}`);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(dir, 0o700); } catch {}
+    return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
+  }
 
   // -------------------------------------------------------------------------
   // Container
@@ -337,8 +357,8 @@ export function createAgentsTab(screen, services) {
   // Refresh display
 
   function refreshDisplay() {
-    _bmadDetected = isBmadDetected(process.cwd());
-    _agents = scanBmadAgents(process.cwd());
+    _bmadDetected = isBmadDetected(_projectRoot);
+    _agents = scanBmadAgents(_projectRoot);
 
     if (!_bmadDetected) {
       _showOnboardingState();
@@ -384,6 +404,7 @@ export function createAgentsTab(screen, services) {
 
   function _sampleAgent(agent) {
     _killPreview();
+    const gen = ++_playGeneration;
 
     const profile = voiceStore.getAgentProfile(agent.id);
     const voiceId = profile.voice || configService.getConfig().voice || '';
@@ -398,7 +419,7 @@ export function createAgentsTab(screen, services) {
     if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
     const _spawnEnv = buildAudioEnv();
-    const tempWav = path.join(os.tmpdir(), `agentvibes-agent-preview-${Date.now()}.wav`);
+    const tempWav = _secureTempWav('agent-preview');
 
     const _piperArgs = ['--model', voicePath, '--output_file', tempWav];
     if (_ms.speakerId != null) _piperArgs.push('--speaker', String(_ms.speakerId));
@@ -412,13 +433,18 @@ export function createAgentsTab(screen, services) {
     _playingProcess = piper;
 
     piper.on('exit', (code) => {
+      if (gen !== _playGeneration) { try { fs.unlinkSync(tempWav); } catch {} return; }
       if (code !== 0) {
         _playingProcess = null;
         try { fs.unlinkSync(tempWav); } catch {}
         return;
       }
       const _wavPlayer = detectWavPlayer(_spawnEnv);
-      if (!_wavPlayer) return;
+      if (!_wavPlayer) {
+        _playingProcess = null;
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
       const playProc = spawn(_wavPlayer.bin, _wavPlayer.args(tempWav), {
         stdio: 'ignore',
         detached: true,
@@ -426,17 +452,18 @@ export function createAgentsTab(screen, services) {
       });
       _playingProcess = playProc;
       playProc.on('exit', () => {
-        _playingProcess = null;
+        if (gen === _playGeneration) _playingProcess = null;
         try { fs.unlinkSync(tempWav); } catch {}
       });
       playProc.on('error', () => {
-        _playingProcess = null;
+        if (gen === _playGeneration) _playingProcess = null;
         try { fs.unlinkSync(tempWav); } catch {}
       });
     });
 
     piper.on('error', () => {
-      _playingProcess = null;
+      if (gen === _playGeneration) _playingProcess = null;
+      try { fs.unlinkSync(tempWav); } catch {}
     });
   }
 
@@ -600,17 +627,7 @@ export function createAgentsTab(screen, services) {
       _closed = true;
       _killPreview();
       navigationService?.closeModal();
-      modal.destroy();
-      screen.clearRegion(0, screen.cols, 2, screen.rows - 2);
-      for (let r = 2; r < screen.rows - 2; r++) {
-        const orow = screen.olines[r];
-        if (!orow) continue;
-        for (let c = 0; c < screen.cols; c++) {
-          if (orow[c]) orow[c][0] = -1;
-        }
-        orow.dirty = true;
-      }
-      screen.render();
+      destroyList(modal, screen);
     }
 
     // Field editing via Enter
@@ -727,18 +744,7 @@ export function createAgentsTab(screen, services) {
       if (_vpClosed) return;
       _vpClosed = true;
       _killVP();
-      vpModal.destroy();
-      screen.clearRegion(0, screen.cols, 2, screen.rows - 2);
-      for (let r = 2; r < screen.rows - 2; r++) {
-        const orow = screen.olines[r];
-        if (!orow) continue;
-        for (let c = 0; c < screen.cols; c++) {
-          if (orow[c]) orow[c][0] = -1;
-        }
-        orow.dirty = true;
-      }
-      onDone();
-      screen.render();
+      destroyList(vpModal, screen, onDone);
     }
 
     const vpModal = blessed.box({
@@ -844,7 +850,7 @@ export function createAgentsTab(screen, services) {
       const safeBase = path.resolve(PIPER_VOICES_DIR);
       if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
-      const tempWav = path.join(os.tmpdir(), `agentvibes-vp-${Date.now()}.wav`);
+      const tempWav = _secureTempWav('vp');
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
       const args = ['--model', voicePath, '--output_file', tempWav];
@@ -942,16 +948,11 @@ export function createAgentsTab(screen, services) {
       if (_editClosed) return;
       _editClosed = true;
       if (save) {
-        draft.pretext = inputBox.getValue().trim() || draft.pretext;
+        const raw = inputBox.getValue().trim();
+        // M7: enforce max pretext length
+        draft.pretext = (raw || draft.pretext).slice(0, MAX_PRETEXT_LENGTH);
       }
-      editModal.destroy();
-      try {
-        for (let r = 0; r < screen.height; r++)
-          for (let c = 0; c < screen.width; c++)
-            if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
-      } catch {}
-      onDone();
-      screen.render();
+      destroyList(editModal, screen, onDone);
     }
 
     inputBox.key(['enter'], () => _closeEdit(true));
@@ -966,6 +967,7 @@ export function createAgentsTab(screen, services) {
 
   function _sampleAgentWithDraft(agent, draft) {
     _killPreview();
+    const gen = ++_playGeneration;
 
     const voiceId = draft.voice;
     if (!voiceId) return;
@@ -979,7 +981,7 @@ export function createAgentsTab(screen, services) {
     if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
     const _spawnEnv = buildAudioEnv();
-    const tempWav = path.join(os.tmpdir(), `agentvibes-draft-preview-${Date.now()}.wav`);
+    const tempWav = _secureTempWav('draft-preview');
 
     const _piperArgs = ['--model', voicePath, '--output_file', tempWav];
     if (_ms.speakerId != null) _piperArgs.push('--speaker', String(_ms.speakerId));
@@ -991,15 +993,16 @@ export function createAgentsTab(screen, services) {
     _playingProcess = piper;
 
     piper.on('exit', (code) => {
+      if (gen !== _playGeneration) { try { fs.unlinkSync(tempWav); } catch {} return; }
       if (code !== 0) { _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} return; }
       const wp = detectWavPlayer(_spawnEnv);
-      if (!wp) return;
+      if (!wp) { _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} return; }
       const pp = spawn(wp.bin, wp.args(tempWav), { stdio: 'ignore', detached: true, env: _spawnEnv });
       _playingProcess = pp;
-      pp.on('exit', () => { _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
-      pp.on('error', () => { _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
+      pp.on('exit', () => { if (gen === _playGeneration) _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
+      pp.on('error', () => { if (gen === _playGeneration) _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
     });
-    piper.on('error', () => { _playingProcess = null; });
+    piper.on('error', () => { if (gen === _playGeneration) _playingProcess = null; try { fs.unlinkSync(tempWav); } catch {} });
   }
 
   // -------------------------------------------------------------------------

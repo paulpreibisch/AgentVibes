@@ -73,7 +73,6 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   list.key(['enter', 'space'], () => {
     const selected = REVERB_PRESETS[list.selected];
     if (!selected) return;
-    destroyList(list, screen, onClose);
 
     if (applyToEffectsManager) {
       const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
@@ -84,7 +83,9 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
       });
     }
 
+    // Call onSelect before destroying to avoid stale-state re-renders
     onSelect(selected.value);
+    destroyList(list, screen, onClose);
   });
 
   list.key(['escape', 'q'], () => {

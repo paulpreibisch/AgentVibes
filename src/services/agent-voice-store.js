@@ -26,6 +26,64 @@ import os from 'node:os';
 import path from 'node:path';
 
 // ---------------------------------------------------------------------------
+// Agent ID validation — prevents prototype pollution via __proto__ / constructor keys
+
+const VALID_AGENT_ID = /^[a-z0-9][a-z0-9_-]*$/i;
+
+/**
+ * Validate an agent ID is safe for use as an object property key.
+ * Rejects __proto__, constructor, toString, etc.
+ * @param {string} id
+ * @returns {boolean}
+ */
+function _isValidAgentId(id) {
+  if (!id || typeof id !== 'string') return false;
+  if (!VALID_AGENT_ID.test(id)) return false;
+  // Explicit blocklist for prototype pollution vectors
+  const blocked = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty']);
+  return !blocked.has(id);
+}
+
+// ---------------------------------------------------------------------------
+// Advisory file locking for atomic read-modify-write
+
+/**
+ * Acquire an advisory lock via exclusive file open.
+ * Retries briefly on EEXIST; returns fd on success, null on timeout.
+ */
+function _acquireLock(lockPath) {
+  const maxRetries = 20;
+  const retryMs = 50;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY, 0o600);
+      return fd;
+    } catch (err) {
+      if (err.code !== 'EEXIST') return null;
+      // Stale lock detection: if lock file is older than 5 seconds, remove it
+      try {
+        const stat = fs.statSync(lockPath);
+        if (Date.now() - stat.mtimeMs > 5000) {
+          try { fs.unlinkSync(lockPath); } catch {}
+        }
+      } catch {}
+      // Busy-wait with small delay (sync context — TUI is single-threaded)
+      const end = Date.now() + retryMs;
+      while (Date.now() < end) { /* spin */ }
+    }
+  }
+  return null; // Proceed without lock rather than blocking forever
+}
+
+/**
+ * Release advisory lock.
+ */
+function _releaseLock(fd, lockPath) {
+  try { if (fd != null) fs.closeSync(fd); } catch {}
+  try { fs.unlinkSync(lockPath); } catch {}
+}
+
+// ---------------------------------------------------------------------------
 // Single-voice provider detection (story 11.3)
 
 const SINGLE_VOICE_PROVIDERS = Object.freeze(new Set(['soprano']));
@@ -78,8 +136,11 @@ export function parseBmadManifest(projectRoot) {
       // Filter to core and bmm modules only
       if (module !== 'core' && module !== 'bmm') continue;
 
+      const agentId = cols[nameIdx] ?? '';
+      if (!_isValidAgentId(agentId)) continue;
+
       agents.push({
-        id: cols[nameIdx] ?? '',
+        id: agentId,
         displayName: cols[displayIdx] ?? cols[nameIdx] ?? '',
         title: cols[titleIdx] ?? '',
         icon: cols[iconIdx] ?? '',
@@ -220,16 +281,26 @@ export class AgentVoiceStore {
   }
 
   /**
-   * Atomically write store data.
+   * Atomically write store data with advisory file locking.
    * @param {{ voiceMap: object, partyMode: boolean, agents: object }} data
    */
   _writeStore(data) {
     const dir = path.dirname(this._filePath);
-    fs.mkdirSync(dir, { recursive: true });
-    const tmpPath = `${this._filePath}.tmp`;
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(tmpPath, this._filePath);
-    fs.chmodSync(this._filePath, 0o600);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // Ensure directory is user-only even if it already existed
+    try { fs.chmodSync(dir, 0o700); } catch {}
+
+    // Advisory lock: prevent concurrent read-modify-write from clobbering data
+    const lockPath = `${this._filePath}.lock`;
+    const lockFd = _acquireLock(lockPath);
+    try {
+      const tmpPath = `${this._filePath}.tmp`;
+      fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), { encoding: 'utf8', mode: 0o600 });
+      fs.renameSync(tmpPath, this._filePath);
+      fs.chmodSync(this._filePath, 0o600);
+    } finally {
+      _releaseLock(lockFd, lockPath);
+    }
   }
 
   /**
@@ -252,6 +323,7 @@ export class AgentVoiceStore {
    * @param {string} voiceId
    */
   setVoice(agentId, voiceId) {
+    if (!_isValidAgentId(agentId)) return;
     const store = this._readStore();
     store.voiceMap[agentId] = voiceId;
     if (!store.agents[agentId]) store.agents[agentId] = {};
@@ -264,6 +336,7 @@ export class AgentVoiceStore {
    * @param {string} agentId
    */
   resetVoice(agentId) {
+    if (!_isValidAgentId(agentId)) return;
     const store = this._readStore();
     delete store.voiceMap[agentId];
     if (store.agents[agentId]) delete store.agents[agentId].voice;
@@ -297,13 +370,14 @@ export class AgentVoiceStore {
    * @returns {{ voice?: string, pretext?: string, reverbPreset?: string, personality?: string, backgroundMusic?: object }}
    */
   getAgentProfile(agentId) {
+    if (!_isValidAgentId(agentId)) return {};
     const store = this._readStore();
-    const profile = store.agents[agentId] ?? {};
+    const profile = { ...(store.agents[agentId] ?? {}) };
     // Compat: if voice is only in voiceMap, include it
     if (!profile.voice && store.voiceMap[agentId]) {
       profile.voice = store.voiceMap[agentId];
     }
-    return { ...profile };
+    return profile;
   }
 
   /**
@@ -312,6 +386,7 @@ export class AgentVoiceStore {
    * @param {{ voice?: string, pretext?: string, reverbPreset?: string, personality?: string, backgroundMusic?: object }} partial
    */
   setAgentProfile(agentId, partial) {
+    if (!_isValidAgentId(agentId)) return;
     const store = this._readStore();
     if (!store.agents[agentId]) store.agents[agentId] = {};
     Object.assign(store.agents[agentId], partial);
@@ -325,6 +400,7 @@ export class AgentVoiceStore {
    * @param {string} agentId
    */
   resetAgentProfile(agentId) {
+    if (!_isValidAgentId(agentId)) return;
     const store = this._readStore();
     delete store.agents[agentId];
     delete store.voiceMap[agentId];

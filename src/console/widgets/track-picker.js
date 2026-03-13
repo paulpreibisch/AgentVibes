@@ -88,8 +88,8 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
   list.key(['enter', 'space'], () => {
     const selected = tracks[list.selected];
     if (!selected) return;
-    destroyList(list, screen, onClose);
     onSelect(selected.file);
+    destroyList(list, screen, onClose);
   });
 
   list.key(['escape', 'q'], () => {
