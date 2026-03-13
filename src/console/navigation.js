@@ -11,6 +11,7 @@ const KEY_TO_TAB = {
   's': 'settings', 'S': 'settings',
   'v': 'voices',   'V': 'voices',
   'm': 'music',    'M': 'music',
+  'a': 'agents',   'A': 'agents',
   'x': 'receiver', 'X': 'receiver',
   'r': 'readme',   'R': 'readme',
   'h': 'help',     'H': 'help',

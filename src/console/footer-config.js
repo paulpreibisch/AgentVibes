@@ -35,6 +35,10 @@ export const FOOTER_CONFIG = {
     color: '#607d8b',
     text: ` ${key('↑↓')} Scroll  ${key('Q')} Quit`,
   },
+  agents: {
+    color: '#9c27b0',
+    text: ` ${key('↑↓')} Navigate  ${key('Enter')} Edit Agent  ${key('Space')} Sample  ${key('R')} Reset  ${key('P')} Party Mode`,
+  },
   receiver: {
     color: '#00897b',
     text: ` ${key('E')} Enable  ${key('D')} Details  ${key('C')} Clear Log`,
