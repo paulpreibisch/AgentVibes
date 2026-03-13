@@ -57,7 +57,7 @@ const COLORS = {
   linkFg:     '#00e5ff',
 };
 
-const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Enter] Edit Agent  [Space] Sample  [R] Reset  [P] Party Mode  [Q] Quit';
+const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Enter] Edit Agent  [Space] Sample  [R] Reset  [Q] Quit';
 const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
@@ -315,17 +315,10 @@ export function createAgentsTab(screen, services) {
   resetBtn.bottom = 4;
   resetBtn.left = 4;
 
-  const partyBtn = _createBtn('[P] Party Mode', () => {
-    voiceStore.setPartyMode(!voiceStore.getPartyMode());
-    refreshDisplay();
-  });
-  partyBtn.bottom = 4;
-  partyBtn.left = 20;
-
   // -------------------------------------------------------------------------
   // Show/hide helpers for the two states
 
-  const _bmadWidgets = [sectionHeader, columnHeader, agentList, statusDivider, statusLine, warningLine, resetBtn, partyBtn];
+  const _bmadWidgets = [sectionHeader, columnHeader, agentList, statusDivider, statusLine, warningLine, resetBtn];
 
   function _showBmadState() {
     onboardingBox.hide();
@@ -373,23 +366,17 @@ export function createAgentsTab(screen, services) {
 
     _showBmadState();
 
-    const partyMode = voiceStore.getPartyMode();
     const provider = providerService.getProvider?.() ?? configService.getConfig().provider ?? 'piper';
-    const singleVoice = isSingleVoiceProvider(provider);
 
     const items = _buildListItems(_agents);
     agentList.setItems(items);
 
     statusLine.setContent(
-      `  Party Mode: ${partyMode ? '{green-fg}Enabled{/green-fg}' : 'Disabled'}  |  Provider: ${provider}  |  Agents: ${_agents.length}`
+      `  Provider: ${provider}  |  Agents: ${_agents.length}`
     );
     statusLine.options.tags = true;
 
-    warningLine.setContent(
-      partyMode && singleVoice
-        ? `  ⚠ Provider "${provider}" has only 1 voice — all agents will sound the same`
-        : ''
-    );
+    warningLine.setContent('');
 
     screen.render();
   }
@@ -965,9 +952,7 @@ export function createAgentsTab(screen, services) {
     _killPreview();
     const gen = ++_playGeneration;
 
-    const voiceId = profile.voice;
-    if (!voiceId) return;
-
+    const voiceId = profile.voice || '';
     const pretext = profile.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
     const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`;
 
@@ -978,43 +963,45 @@ export function createAgentsTab(screen, services) {
 
     // Write temp profile JSON for per-agent reverb/personality/music overrides
     let tempProfile = '';
-    if (profile.reverbPreset || profile.personality || profile.backgroundMusic?.track) {
+    const profileData = {};
+    if (profile.reverbPreset && profile.reverbPreset !== 'light') profileData.reverbPreset = profile.reverbPreset;
+    if (profile.personality && profile.personality !== 'none') profileData.personality = profile.personality;
+    if (profile.backgroundMusic?.track && profile.backgroundMusic?.enabled) {
+      profileData.backgroundMusic = {
+        track: profile.backgroundMusic.track,
+        volume: profile.backgroundMusic.volume ?? 70,
+      };
+    }
+
+    if (Object.keys(profileData).length > 0) {
       const profileDir = path.join(process.env.XDG_RUNTIME_DIR || os.tmpdir(), `agentvibes-${process.getuid?.() ?? 'u'}`);
       fs.mkdirSync(profileDir, { recursive: true, mode: 0o700 });
       try { fs.chmodSync(profileDir, 0o700); } catch {}
       tempProfile = path.join(profileDir, `agent-profile-sample-${crypto.randomUUID()}.json`);
-      const profileData = {};
-      if (profile.reverbPreset && profile.reverbPreset !== 'light') profileData.reverbPreset = profile.reverbPreset;
-      if (profile.personality && profile.personality !== 'none') profileData.personality = profile.personality;
-      if (profile.backgroundMusic?.track && profile.backgroundMusic?.enabled) {
-        profileData.backgroundMusic = {
-          track: profile.backgroundMusic.track,
-          volume: profile.backgroundMusic.volume ?? 70,
-        };
-      }
-      if (Object.keys(profileData).length > 0) {
-        fs.writeFileSync(tempProfile, JSON.stringify(profileData), { mode: 0o600 });
-      } else {
-        tempProfile = '';
-      }
+      fs.writeFileSync(tempProfile, JSON.stringify(profileData), { mode: 0o600 });
     }
 
-    // Determine which script to use
-    const useEnhanced = fs.existsSync(enhancedScript) && tempProfile;
-    const script = useEnhanced ? enhancedScript : plainScript;
+    // Use enhanced pipeline when we have profile overrides AND the script exists
+    const useEnhanced = tempProfile && fs.existsSync(enhancedScript);
 
     // Build env with agent profile path
     const env = { ..._spawnEnv };
     if (tempProfile) env.AGENTVIBES_AGENT_PROFILE = tempProfile;
 
-    // Spawn: play-tts-enhanced.sh "text" "agent_name" "voice_override"
-    // or:    play-tts.sh "text" "voice_override"
-    const args = useEnhanced
-      ? [script, phrase, agent.displayName || 'default', voiceId]
-      : [script, phrase, voiceId];
+    // Build args:
+    //   enhanced: play-tts-enhanced.sh "text" "agent_name" "voice"
+    //   plain:    play-tts.sh "text" ["voice"]
+    let args;
+    if (useEnhanced) {
+      args = [enhancedScript, phrase, agent.displayName || 'default'];
+      if (voiceId) args.push(voiceId);
+    } else {
+      args = [plainScript, phrase];
+      if (voiceId) args.push(voiceId);
+    }
 
     const proc = spawn('bash', args, {
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'ignore'],
       detached: true,
       env,
       cwd: _projectRoot,
@@ -1043,10 +1030,6 @@ export function createAgentsTab(screen, services) {
     }
   });
 
-  agentList.key(['p', 'P'], () => {
-    voiceStore.setPartyMode(!voiceStore.getPartyMode());
-    refreshDisplay();
-  });
 
   agentList.key(['enter'], () => {
     const agent = _agents[agentList.selected];
@@ -1059,7 +1042,7 @@ export function createAgentsTab(screen, services) {
   });
 
   // Type-to-jump
-  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'r', 'p']);
+  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'r']);
   agentList.on('keypress', (ch, key) => {
     if (!ch || key.ctrl || key.meta) return;
     const lower = ch.toLowerCase();
