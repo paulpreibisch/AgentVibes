@@ -173,8 +173,9 @@ if [[ -n "$PROFILE_REVERB" ]] || [[ -n "$PROFILE_PERSONALITY" ]] || [[ -n "$PROF
     require('fs').writeFileSync('$TEMP_PROFILE', JSON.stringify(p), { mode: 0o600 });
   " 2>/dev/null || true
 
-  # Clean up temp profile after this script exits
-  trap 'rm -f "$TEMP_PROFILE"' EXIT
+  # NOTE: Do NOT clean up temp profile here — the queue worker processes it
+  # asynchronously and cleans it up after use (see tts-queue-worker.sh).
+  # Removing it here would race with the background queue consumer.
 fi
 
 # ---------------------------------------------------------------------------

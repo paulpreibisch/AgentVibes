@@ -958,47 +958,14 @@ export function createAgentsTab(screen, services) {
 
     const _spawnEnv = buildAudioEnv();
     const scriptDir = path.join(_projectRoot, '.claude', 'hooks');
-    const enhancedScript = path.join(scriptDir, 'play-tts-enhanced.sh');
     const plainScript = path.join(scriptDir, 'play-tts.sh');
 
-    // Write temp profile JSON for per-agent reverb/personality/music overrides
-    let tempProfile = '';
-    const profileData = {};
-    if (profile.reverbPreset && profile.reverbPreset !== 'light') profileData.reverbPreset = profile.reverbPreset;
-    if (profile.personality && profile.personality !== 'none') profileData.personality = profile.personality;
-    if (profile.backgroundMusic?.track && profile.backgroundMusic?.enabled) {
-      profileData.backgroundMusic = {
-        track: profile.backgroundMusic.track,
-        volume: profile.backgroundMusic.volume ?? 70,
-      };
-    }
+    // Use play-tts.sh directly for reliable sample playback.
+    // Voice is passed as CLI arg, pretext is prepended to text.
+    const args = [plainScript, phrase];
+    if (voiceId) args.push(voiceId);
 
-    if (Object.keys(profileData).length > 0) {
-      const profileDir = path.join(process.env.XDG_RUNTIME_DIR || os.tmpdir(), `agentvibes-${process.getuid?.() ?? 'u'}`);
-      fs.mkdirSync(profileDir, { recursive: true, mode: 0o700 });
-      try { fs.chmodSync(profileDir, 0o700); } catch {}
-      tempProfile = path.join(profileDir, `agent-profile-sample-${crypto.randomUUID()}.json`);
-      fs.writeFileSync(tempProfile, JSON.stringify(profileData), { mode: 0o600 });
-    }
-
-    // Use enhanced pipeline when we have profile overrides AND the script exists
-    const useEnhanced = tempProfile && fs.existsSync(enhancedScript);
-
-    // Build env with agent profile path
     const env = { ..._spawnEnv };
-    if (tempProfile) env.AGENTVIBES_AGENT_PROFILE = tempProfile;
-
-    // Build args:
-    //   enhanced: play-tts-enhanced.sh "text" "agent_name" "voice"
-    //   plain:    play-tts.sh "text" ["voice"]
-    let args;
-    if (useEnhanced) {
-      args = [enhancedScript, phrase, agent.displayName || 'default'];
-      if (voiceId) args.push(voiceId);
-    } else {
-      args = [plainScript, phrase];
-      if (voiceId) args.push(voiceId);
-    }
 
     const proc = spawn('bash', args, {
       stdio: ['ignore', 'ignore', 'ignore'],
@@ -1010,12 +977,10 @@ export function createAgentsTab(screen, services) {
 
     proc.on('exit', () => {
       if (gen === _playGeneration) _playingProcess = null;
-      if (tempProfile) try { fs.unlinkSync(tempProfile); } catch {}
     });
 
     proc.on('error', () => {
       if (gen === _playGeneration) _playingProcess = null;
-      if (tempProfile) try { fs.unlinkSync(tempProfile); } catch {}
     });
   }
 

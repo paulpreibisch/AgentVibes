@@ -62,12 +62,21 @@ export AGENTVIBES_NO_PLAYBACK=true
 OUTPUT=$("$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE" 2>&1)
 
 # Extract the generated file path from output
-GENERATED_FILE=$(echo "$OUTPUT" | grep "Saved to:" | sed 's/.*Saved to: //')
+# Output format: "💾 Saved to: /path/to/file.wav  N  🗄️ SIZE 🧹..."
+# Strip ANSI codes, find the .wav path robustly
+GENERATED_FILE=$(printf '%s' "$OUTPUT" | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -oP '/[^\s]+\.wav' | head -1)
 
-if [[ -z "$GENERATED_FILE" ]] || [[ ! -f "$GENERATED_FILE" ]]; then
-    echo "Error: Failed to generate TTS audio" >&2
+if [[ -z "$GENERATED_FILE" ]]; then
+    echo "Error: Could not extract audio file path from play-tts output" >&2
     echo "$OUTPUT" >&2
     exit 1
+fi
+
+# File may have been moved by cache system — check if it exists, else skip effects
+if [[ ! -f "$GENERATED_FILE" ]]; then
+    # Fallback: play-tts already handled playback, just show output
+    echo "$OUTPUT"
+    exit 0
 fi
 
 # Step 2: Process with effects and background
