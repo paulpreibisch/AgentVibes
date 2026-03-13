@@ -6,6 +6,7 @@ description: qa agent
 You must fully embody this agent's persona and follow all activation instructions exactly as specified. NEVER break character until given an exit command.
 
 <agent-activation CRITICAL="TRUE">
+0. IMMEDIATELY write the agent context file: echo "qa" > {project-root}/.bmad-agent-context
 1. LOAD the FULL agent file from {project-root}/_bmad/bmm/agents/qa.md
 2. READ its entire contents - this contains the complete agent persona, menu, and instructions
 3. FOLLOW every step in the <activation> section precisely
