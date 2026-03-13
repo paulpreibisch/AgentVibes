@@ -88,8 +88,28 @@ CURRENT_LANGUAGE=$(get_language_code)
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Use override if provided
-  VOICE_MODEL="$VOICE_OVERRIDE"
-  echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  # Handle multi-speaker format: "Model::SpeakerName" → split into model + speaker lookup
+  if [[ "$VOICE_OVERRIDE" == *"::"* ]]; then
+    VOICE_MODEL="${VOICE_OVERRIDE%%::*}"
+    _SPEAKER_NAME="${VOICE_OVERRIDE#*::}"
+    # Look up speaker ID from the model's .onnx.json speaker_id_map
+    voice_dir=$(get_voice_storage_dir)
+    _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+    if [[ -f "$_JSON_FILE" ]]; then
+      SPEAKER_ID=$(node -e "
+        try {
+          const j = JSON.parse(require('fs').readFileSync('$_JSON_FILE','utf8'));
+          const map = j.speaker_id_map || {};
+          const id = map['$_SPEAKER_NAME'];
+          if (id !== undefined) process.stdout.write(String(id));
+        } catch {}
+      " 2>/dev/null || true)
+    fi
+    echo "🎭 Using multi-speaker voice: $VOICE_OVERRIDE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+  else
+    VOICE_MODEL="$VOICE_OVERRIDE"
+    echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  fi
 else
   # Try to get voice from voice file (check CLAUDE_PROJECT_DIR first for MCP context)
   VOICE_FILE=""

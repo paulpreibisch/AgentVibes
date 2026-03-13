@@ -612,7 +612,7 @@ export function createAgentsTab(screen, services) {
 
       switch (field.key) {
         case 'voice':
-          _openVoicePickerForAgent(draft, () => {
+          _openVoicePickerForAgent(agent, draft, () => {
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -697,7 +697,7 @@ export function createAgentsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Voice picker for agent detail panel
 
-  function _openVoicePickerForAgent(draft, onDone) {
+  function _openVoicePickerForAgent(agent, draft, onDone) {
     let _allVoices = [];
     let _filterText = '';
     let _previewProc = null;
@@ -729,7 +729,7 @@ export function createAgentsTab(screen, services) {
       height: '88%',
       border: { type: 'line' },
       tags: true,
-      label: _modalTitle('Select Agent Voice'),
+      label: _modalTitle(`Select Voice for ${agent.icon || ''} ${agent.displayName}`),
       style: {
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
