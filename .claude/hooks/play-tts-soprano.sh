@@ -50,6 +50,17 @@ export LC_ALL=C
 TEXT="$1"
 VOICE_OVERRIDE="$2"  # Ignored — Soprano has a single voice, kept for provider contract
 
+# Strip emojis, asterisks, and markdown formatting
+TEXT=$(printf '%s' "$TEXT" | perl -CSD -pe '
+  s/[\x{1F300}-\x{1F9FF}]//g;
+  s/[\x{2600}-\x{27BF}]//g;
+  s/[\x{FE00}-\x{FE0F}]//g;
+  s/[\x{200D}]//g;
+  s/[\x{2500}-\x{257F}]//g;
+  s/[\x{2580}-\x{259F}]//g;
+  s/\*+//g; s/#+\s*//g; s/`//g; s/~+//g; s/^\s*[-]\s*//g;
+')
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/audio-cache-utils.sh"
 

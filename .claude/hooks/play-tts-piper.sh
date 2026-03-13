@@ -51,6 +51,21 @@ export LC_ALL=C
 TEXT="${1:-}"
 VOICE_OVERRIDE="${2:-}"  # Optional: voice model name
 
+# Strip emojis, asterisks, and markdown formatting that Piper would speak literally
+TEXT=$(printf '%s' "$TEXT" | perl -CSD -pe '
+  s/[\x{1F300}-\x{1F9FF}]//g;   # emoticons, symbols, pictographs
+  s/[\x{2600}-\x{27BF}]//g;     # misc symbols, dingbats
+  s/[\x{FE00}-\x{FE0F}]//g;     # variation selectors
+  s/[\x{200D}]//g;               # zero-width joiner
+  s/[\x{2500}-\x{257F}]//g;     # box drawing (─━ etc)
+  s/[\x{2580}-\x{259F}]//g;     # block elements
+  s/\*+//g;                       # asterisks (bold/italic markdown)
+  s/#+\s*//g;                     # heading markers
+  s/`//g;                         # backticks
+  s/~+//g;                        # strikethrough
+  s/^\s*[-]\s*//g;                # list dashes
+')
+
 # Source voice manager and language manager
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/piper-voice-manager.sh"
