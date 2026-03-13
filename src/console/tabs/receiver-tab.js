@@ -293,6 +293,7 @@ export function createReceiverTab(screen, services) {
     left: 2,
     width: '96%',
     bottom: 2,
+    tags: true,
     scrollable: true,
     alwaysScroll: true,
     scrollbar: { ch: '│', style: { fg: COLORS.sectionHdr } },
@@ -389,19 +390,25 @@ export function createReceiverTab(screen, services) {
   function _formatMessage(msg) {
     const date = msg.timestamp.replace(/T/, ' ').substring(0, 10);
     const time = msg.timestamp.replace(/T/, ' ').substring(11, 19);
-    const status = msg.status === 'DONE' ? 'OK  ' :
-                   msg.status === 'ERROR' ? 'ERR ' :
-                   msg.status === 'PLAYING' ? 'PLAY' :
-                   msg.status === 'RECEIVED' ? 'RECV' :
-                   msg.status === 'WARN' ? 'WARN' :
-                   msg.status.substring(0, 4).padEnd(4);
-    const logId = (msg.logId || '—').padEnd(5);
-    const ip = (msg.ip || '—').substring(0, 15).padEnd(15);
-    const project = msg.project.substring(0, 12).padEnd(12);
-    const voice = msg.voice.substring(0, 18).padEnd(18);
-    const music = (msg.music || '—').substring(0, 15).padEnd(15);
-    const text = msg.textPreview.substring(0, 25);
-    return `${date} ${time}  ${logId}  ${status}  ${ip}  ${project}  ${voice}  ${music}  ${text}`;
+    const statusRaw = msg.status === 'DONE' ? 'OK  ' :
+                      msg.status === 'ERROR' ? 'ERR ' :
+                      msg.status === 'PLAYING' ? 'PLAY' :
+                      msg.status === 'RECEIVED' ? 'RECV' :
+                      msg.status === 'WARN' ? 'WARN' :
+                      msg.status.substring(0, 4).padEnd(4);
+    // Color-coded status
+    const statusColor = msg.status === 'DONE' ? 'green' :
+                        msg.status === 'ERROR' ? 'red' :
+                        msg.status === 'WARN' ? 'yellow' :
+                        msg.status === 'PLAYING' ? 'cyan' : 'white';
+    const status = `{${statusColor}-fg}${statusRaw}{/${statusColor}-fg}`;
+    const logId = `{#607d8b-fg}${(msg.logId || '—').padEnd(5)}{/#607d8b-fg}`;
+    const ip = `{#ce93d8-fg}${(msg.ip || '—').substring(0, 15).padEnd(15)}{/#ce93d8-fg}`;
+    const project = `{#4fc3f7-fg}${msg.project.substring(0, 12).padEnd(12)}{/#4fc3f7-fg}`;
+    const voice = `{#ffb74d-fg}${msg.voice.substring(0, 18).padEnd(18)}{/#ffb74d-fg}`;
+    const music = `{#a5d6a7-fg}${(msg.music || '—').substring(0, 15).padEnd(15)}{/#a5d6a7-fg}`;
+    const text = `{#fff9c4-fg}${msg.textPreview.substring(0, 25)}{/#fff9c4-fg}`;
+    return `{#90a4ae-fg}${date} ${time}{/#90a4ae-fg}  ${logId}  ${status}  ${ip}  ${project}  ${voice}  ${music}  ${text}`;
   }
 
   // -------------------------------------------------------------------------
@@ -428,7 +435,7 @@ export function createReceiverTab(screen, services) {
     }
     checks.push(player !== 'none' ? `{green-fg}${player}{/green-fg}` : '{red-fg}no player{/red-fg}');
 
-    healthLine.setContent(`  Tools: ${checks.join('  ')}`);
+    healthLine.setContent(`  Tools: ${checks.join('  ')}    Log: {bold}${LOG_FILE}{/bold}`);
   }
 
   // -------------------------------------------------------------------------
@@ -492,7 +499,7 @@ export function createReceiverTab(screen, services) {
         ].join('\n');
         contentBox.setContent(text);
       } else {
-        const header = `${'DATE'.padEnd(10)} ${'TIME'.padEnd(8)}  ${'ID'.padEnd(5)}  ${'STAT'.padEnd(4)}  ${'IP'.padEnd(15)}  ${'PROJECT'.padEnd(12)}  ${'VOICE'.padEnd(18)}  ${'MUSIC'.padEnd(15)}  TEXT`;
+        const header = `{#90a4ae-fg}${'DATE'.padEnd(10)} ${'TIME'.padEnd(8)}{/#90a4ae-fg}  {#607d8b-fg}${'ID'.padEnd(5)}{/#607d8b-fg}  {bold}${'STAT'.padEnd(4)}{/bold}  {#ce93d8-fg}${'IP'.padEnd(15)}{/#ce93d8-fg}  {#4fc3f7-fg}${'PROJECT'.padEnd(12)}{/#4fc3f7-fg}  {#ffb74d-fg}${'VOICE'.padEnd(18)}{/#ffb74d-fg}  {#a5d6a7-fg}${'MUSIC'.padEnd(15)}{/#a5d6a7-fg}  {#fff9c4-fg}TEXT{/#fff9c4-fg}`;
         const separator = '─'.repeat(78);
         const lines = [header, separator];
         // Group log lines per request — show one row with final status
