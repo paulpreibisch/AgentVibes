@@ -168,10 +168,9 @@ fi
 
 mkdir -p "$AUDIO_DIR"
 
-# Generate unique filename
-TIMESTAMP=$(date +%s)
-TEMP_FILE="$AUDIO_DIR/tts-${TIMESTAMP}.aiff"
-FINAL_FILE="$AUDIO_DIR/tts-padded-${TIMESTAMP}.wav"
+# SECURITY: Use mktemp for unpredictable filenames (#130)
+TEMP_FILE=$(mktemp "$AUDIO_DIR/tts-XXXXXX.aiff")
+FINAL_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.wav")
 
 # @function get_speech_rate
 # @intent Determine speech rate for synthesis
@@ -226,14 +225,27 @@ if command -v ffmpeg &> /dev/null; then
   fi
 else
   # No ffmpeg - use AIFF directly (rename for consistency)
-  FINAL_FILE="$AUDIO_DIR/tts-padded-${TIMESTAMP}.aiff"
+  FINAL_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.aiff")
   mv "$TEMP_FILE" "$FINAL_FILE"
   TEMP_FILE="$FINAL_FILE"
 fi
 
 # @function play_audio
 # @intent Play generated audio - via PulseAudio tunnel for SSH, afplay for local
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+# SECURITY: Use user-isolated lock directory (#129)
+_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
+mkdir -p "$_LOCK_DIR"
+chmod 700 "$_LOCK_DIR"
+LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
+
+# Auto-remove stale lock files (older than 30 seconds)
+if [ -f "$LOCK_FILE" ]; then
+  _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+  _lock_age=$(( $(date +%s) - _lock_mtime ))
+  if [[ $_lock_age -gt 30 ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
 
 # Wait for previous audio to finish (max 30 seconds)
 for i in {1..60}; do

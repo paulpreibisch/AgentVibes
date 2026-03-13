@@ -103,7 +103,11 @@ fi
 # @intent Find appropriate directory for audio file storage
 # @why Supports project-local and global storage
 # @returns Sets $AUDIO_DIR global variable
-if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+# SECURITY: Canonicalize path to prevent traversal (#128)
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+  CLAUDE_PROJECT_DIR=$(cd "${CLAUDE_PROJECT_DIR}" 2>/dev/null && pwd -P) || CLAUDE_PROJECT_DIR=""
+fi
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
   AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
 else
   CURRENT_DIR="$PWD"
@@ -120,7 +124,8 @@ else
 fi
 
 mkdir -p "$AUDIO_DIR"
-TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).wav"
+# SECURITY: Use mktemp for unpredictable filenames (#130)
+TEMP_FILE=$(mktemp "$AUDIO_DIR/tts-XXXXXX.wav")
 
 # @function synthesize_speech
 # @intent Generate speech using best available Soprano mode
@@ -137,9 +142,12 @@ if check_webui_server; then
 elif check_api_server; then
   # OpenAI-compatible API mode — direct curl
   SYNTH_MODE="api"
+  # SECURITY: Use proper JSON encoding to prevent injection (#133)
+  _JSON_PAYLOAD=$(printf '%s' "$TEXT" | python3 -c 'import sys,json; print(json.dumps({"input":sys.stdin.read()}))' 2>/dev/null) || \
+    _JSON_PAYLOAD=$(printf '{"input":"%s"}' "$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')")
   curl -sf "http://127.0.0.1:${SOPRANO_PORT}/v1/audio/speech" \
     -H "Content-Type: application/json" \
-    -d "$(printf '{"input":"%s"}' "$(echo "$TEXT" | sed 's/"/\\"/g')")" \
+    -d "$_JSON_PAYLOAD" \
     --output "$TEMP_FILE" 2>/dev/null
 else
   # CLI fallback — reloads model each call (slowest)
@@ -168,7 +176,7 @@ fi
 # @intent Compress TTS audio for remote sessions (SSH/RDP)
 # @why Reduces bandwidth and prevents choppy playback
 if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &>/dev/null; then
-  COMPRESSED_FILE="$AUDIO_DIR/tts-compressed-$(date +%s).wav"
+  COMPRESSED_FILE=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX.wav")
   ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
   if [[ -f "$COMPRESSED_FILE" ]]; then
     rm -f "$TEMP_FILE"
@@ -180,7 +188,7 @@ fi
 # @intent Add silence to prevent WSL audio static
 # @why WSL audio subsystem cuts off first ~200ms
 if command -v ffmpeg &>/dev/null; then
-  PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
+  PADDED_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.wav")
   ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
     -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
     -map "[out]" -y "$PADDED_FILE" 2>/dev/null
@@ -212,7 +220,24 @@ fi
 # @function play_audio
 # @intent Play generated audio using available player with sequential playback
 # @why Support multiple audio players and prevent overlapping audio
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+# SECURITY: Use user-isolated lock directory (#129)
+_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
+mkdir -p "$_LOCK_DIR"
+chmod 700 "$_LOCK_DIR"
+LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
+
+# Auto-remove stale lock files (older than 30 seconds)
+if [ -f "$LOCK_FILE" ]; then
+  if [[ "$(uname)" == "Darwin" ]]; then
+    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+  else
+    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
+  fi
+  _lock_age=$(( $(date +%s) - _lock_mtime ))
+  if [[ $_lock_age -gt 30 ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
 
 for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then

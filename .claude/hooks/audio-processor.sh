@@ -173,7 +173,8 @@ save_background_position() {
     local tmp_pos
     tmp_pos=$(mktemp "${POSITION_FILE}.XXXXXX")
     if [[ -f "$POSITION_FILE" ]]; then
-        grep -v "^${bg_name}:" "$POSITION_FILE" > "$tmp_pos" 2>/dev/null || true
+        # SECURITY: Use grep -F for fixed string matching (#134)
+        grep -vF "${bg_name}:" "$POSITION_FILE" > "$tmp_pos" 2>/dev/null || true
     fi
     echo "${bg_name}:${position}" >> "$tmp_pos"
     mv "$tmp_pos" "$POSITION_FILE"
@@ -338,7 +339,10 @@ main() {
     chmod 700 "$TEMP_DIR"
 
     # SECURITY: Verify ownership of temp directory
-    if [[ "$(stat -c '%u' "$TEMP_DIR" 2>/dev/null || stat -f '%u' "$TEMP_DIR" 2>/dev/null)" != "$(id -u)" ]]; then
+    # SECURITY: Handle stat failure explicitly (#134)
+    local _dir_uid
+    _dir_uid=$(stat -c '%u' "$TEMP_DIR" 2>/dev/null || stat -f '%u' "$TEMP_DIR" 2>/dev/null)
+    if [[ -z "$_dir_uid" ]] || [[ "$_dir_uid" != "$(id -u)" ]]; then
         echo "Error: Temp directory not owned by current user: $TEMP_DIR" >&2
         exit 1
     fi

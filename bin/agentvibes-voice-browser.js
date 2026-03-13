@@ -242,12 +242,15 @@ class AgentVibesVoiceBrowser {
       for (const line of lines) {
         try {
           const voice = JSON.parse(line);
-          voices.push({
-            name: voice.Name,
-            gender: voice.Gender?.toLowerCase() || 'unknown',
-            language: voice.Culture || 'en-US',
-            provider: 'windows-sapi'
-          });
+          // SECURITY: Validate expected schema from PowerShell output (#133)
+          if (voice && typeof voice.Name === 'string' && voice.Name.length > 0) {
+            voices.push({
+              name: voice.Name,
+              gender: typeof voice.Gender === 'string' ? voice.Gender.toLowerCase() : 'unknown',
+              language: typeof voice.Culture === 'string' ? voice.Culture : 'en-US',
+              provider: 'windows-sapi'
+            });
+          }
         } catch {}
       }
       return voices;
@@ -1309,7 +1312,8 @@ class AgentVibesVoiceBrowser {
 
     for (const player of players) {
       try {
-        await execAsync(`which ${player.cmd} 2>/dev/null`);
+        // SECURITY: Use spawnSync instead of shell string (#126)
+          if (spawnSync('which', [player.cmd], { stdio: 'ignore' }).status !== 0) throw new Error('not found');
 
         const audioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });
         this.currentAudioProcess = audioProcess;
@@ -1508,7 +1512,10 @@ class AgentVibesVoiceBrowser {
 
   async playWindowsSAPIVoice(row, sampleText) {
     try {
-      const psScript = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.SelectVoice('${row.name}'); $synth.Speak('${sampleText.replace(/'/g, "''")}')`;
+      // SECURITY: Escape row.name and sampleText for PowerShell single-quote context (#124)
+      const safeName = row.name.replace(/'/g, "''");
+      const safeText = sampleText.replace(/'/g, "''");
+      const psScript = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.SelectVoice('${safeName}'); $synth.Speak('${safeText}')`;
       const process = spawn('powershell', ['-Command', psScript], { stdio: 'ignore' });
       this.currentAudioProcess = process;
 
@@ -1547,9 +1554,18 @@ class AgentVibesVoiceBrowser {
       };
       await fs.writeFile(payloadFile, JSON.stringify(payload));
 
-      // Call Soprano API to generate audio (OpenAI format)
-      const curlCmd = `curl -s -m 10 -X POST http://127.0.0.1:7860/v1/audio/speech -H "Content-Type: application/json" -d @${payloadFile} -o ${outputFile}`;
-      await execAsync(curlCmd);
+      // SECURITY: Use spawn with argument array instead of shell string (#125)
+      await new Promise((resolve, reject) => {
+        const curlProc = spawn('curl', [
+          '-s', '-m', '10', '-X', 'POST',
+          'http://127.0.0.1:7860/v1/audio/speech',
+          '-H', 'Content-Type: application/json',
+          '-d', `@${payloadFile}`,
+          '-o', outputFile
+        ], { stdio: 'ignore' });
+        curlProc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`curl exited ${code}`)));
+        curlProc.on('error', reject);
+      });
 
       // Clean up payload file
       try {
@@ -1565,7 +1581,8 @@ class AgentVibesVoiceBrowser {
 
       for (const player of players) {
         try {
-          await execAsync(`which ${player.cmd} 2>/dev/null`);
+          // SECURITY: Use spawnSync instead of shell string (#126)
+          if (spawnSync('which', [player.cmd], { stdio: 'ignore' }).status !== 0) throw new Error('not found');
 
           const audioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });
           this.currentAudioProcess = audioProcess;
@@ -1630,10 +1647,8 @@ class AgentVibesVoiceBrowser {
       }
 
       const modelPath = path.join(CONFIG.PIPER_VOICES_DIR, `${safeModel}.onnx`);
-      try {
-        await fs.access(outputFile);
-      } catch {
-        // Use spawn instead of execAsync to prevent command injection
+      // SECURITY: Always regenerate instead of TOCTOU check (#132)
+      {
         const piperProcess = spawn(CONFIG.PIPER_PATH, [
           '--model', modelPath,
           '--output_file', outputFile
@@ -1666,10 +1681,8 @@ class AgentVibesVoiceBrowser {
         return;
       }
 
-      try {
-        await fs.access(outputFile);
-      } catch {
-        // Use spawn instead of execAsync to prevent command injection
+      // SECURITY: Always regenerate instead of TOCTOU check (#132)
+      {
         const piperProcess = spawn(CONFIG.PIPER_PATH, [
           '--model', CONFIG.MODEL_PATH,
           '--speaker', row.id.toString(),
@@ -1694,7 +1707,8 @@ class AgentVibesVoiceBrowser {
 
     for (const player of players) {
       try {
-        await execAsync(`which ${player.cmd} 2>/dev/null`);
+        // SECURITY: Use spawnSync instead of shell string (#126)
+          if (spawnSync('which', [player.cmd], { stdio: 'ignore' }).status !== 0) throw new Error('not found');
 
         // SECURITY: Store process immediately to prevent leak
         const audioProcess = spawn(player.cmd, player.args, { stdio: 'ignore' });

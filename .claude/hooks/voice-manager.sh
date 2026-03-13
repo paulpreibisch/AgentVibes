@@ -49,7 +49,11 @@ to_lower() {
 # 2. Script location (for direct slash command usage)
 # 3. Global ~/.claude (fallback)
 
-if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+# SECURITY: Canonicalize path to prevent traversal (#128)
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+  CLAUDE_PROJECT_DIR=$(cd "${CLAUDE_PROJECT_DIR}" 2>/dev/null && pwd -P) || CLAUDE_PROJECT_DIR=""
+fi
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
   # MCP context: Use the project directory where MCP was invoked
   CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
 else

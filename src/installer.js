@@ -4910,15 +4910,19 @@ async function install(options = {}) {
       await fs.writeFile(sshHostConfigPath, userConfig.sshHost);
     }
 
-    // Set up receiver script if in receiver mode (Termux)
+    // Set up receiver script if in receiver mode
     if (userConfig.isReceiver) {
       const receiverDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
       await fs.mkdir(receiverDir, { recursive: true, mode: 0o700 });
-      const receiverScriptPath = path.join(receiverDir, 'receiver.sh');
       const templatePath = path.join(__dirname, '..', 'templates', 'agentvibes-receiver.sh');
       try {
         const templateContent = await fs.readFile(templatePath, 'utf8');
+        // Install as play-remote.sh (ForceCommand target)
+        const receiverScriptPath = path.join(receiverDir, 'play-remote.sh');
         await fs.writeFile(receiverScriptPath, templateContent, { mode: 0o755 });
+        // Also install as receiver.sh for backward compatibility
+        const legacyPath = path.join(receiverDir, 'receiver.sh');
+        await fs.writeFile(legacyPath, templateContent, { mode: 0o755 });
       } catch {
         // Receiver script install failed — non-fatal
       }

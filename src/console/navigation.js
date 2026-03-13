@@ -3,7 +3,7 @@
  * Story 6.2: Tab Bar & Global Keyboard Navigation
  *
  * Registers all global key bindings on the Blessed screen.
- * Tab shortcuts (S/V/M/A/R/H/I) are blocked when a modal is open.
+ * Tab shortcuts (S/V/M/X/R/H/I) are blocked when a modal is open.
  */
 
 /** Map of key → tab ID for global tab shortcut keys */
@@ -11,6 +11,7 @@ const KEY_TO_TAB = {
   's': 'settings', 'S': 'settings',
   'v': 'voices',   'V': 'voices',
   'm': 'music',    'M': 'music',
+  'x': 'receiver', 'X': 'receiver',
   'r': 'readme',   'R': 'readme',
   'h': 'help',     'H': 'help',
   'i': 'install',  'I': 'install',

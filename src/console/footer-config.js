@@ -35,6 +35,10 @@ export const FOOTER_CONFIG = {
     color: '#607d8b',
     text: ` ${key('↑↓')} Scroll  ${key('Q')} Quit`,
   },
+  receiver: {
+    color: '#00897b',
+    text: ` ${key('E')} Enable  ${key('D')} Details  ${key('C')} Clear Log`,
+  },
   install: {
     color: '#1a237e',
     text: ` ${key('↑↓')} Navigate  ${key('Enter')} Select  ${key('Esc')} Back`,

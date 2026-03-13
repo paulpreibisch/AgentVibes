@@ -84,7 +84,11 @@ else
   # 2. Script location (for direct slash command usage)
   # 3. Global ~/.claude (fallback)
 
-  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ "${CLAUDE_PROJECT_DIR:-}" != *".."* ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+  # SECURITY: Canonicalize path to prevent traversal (#128)
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+    CLAUDE_PROJECT_DIR=$(cd "${CLAUDE_PROJECT_DIR}" 2>/dev/null && pwd -P) || CLAUDE_PROJECT_DIR=""
+  fi
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
     # MCP context: Use the project directory where MCP was invoked
     VOICE_FILE="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
   elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
@@ -293,12 +297,11 @@ SPEECH_RATE=$(get_speech_rate)
 # @edgecases Handles piper errors, invalid models, multi-speaker voices
 if [[ -n "${SPEAKER_ID:-}" ]]; then
   # Multi-speaker voice: Pass speaker ID
-  # Add 2-second pause between sentences for better pacing
-  echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  # SECURITY: Use printf instead of echo for pipe safety (#134)
+  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 else
   # Single-speaker voice
-  # Add 2-second pause between sentences for better pacing
-  echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
@@ -396,6 +399,22 @@ mkdir -p "$_LOCK_DIR"
 chmod 700 "$_LOCK_DIR"
 LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
 
+# Auto-remove stale lock files (older than 30 seconds) to prevent permanent blocking
+# This handles cases where the background cleanup process was killed mid-playback
+if [ -f "$LOCK_FILE" ]; then
+  _lock_age=0
+  if [[ "$(uname)" == "Darwin" ]]; then
+    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+  else
+    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
+  fi
+  _now=$(date +%s)
+  _lock_age=$((_now - _lock_mtime))
+  if [[ $_lock_age -gt 30 ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
+
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
@@ -428,7 +447,10 @@ _CLEANUP_FILES+=("$LOCK_FILE" "$WRITE_LOCK_FILE")
 # Get audio duration for proper lock timing
 DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null || true)
 DURATION=${DURATION%.*}  # Round to integer
-DURATION=${DURATION:-1}   # Default to 1 second if detection fails
+# SECURITY: Validate duration is numeric (#134)
+if ! [[ "${DURATION:-}" =~ ^[0-9]+$ ]]; then
+  DURATION=1
+fi
 
 # Play audio in background (skip if in test mode or no-playback mode)
 # AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
