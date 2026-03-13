@@ -149,7 +149,7 @@ describe('AgentVibesConsole - Navigation (Story 6.2)', () => {
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
     const content = instance._renderTabBarContent('settings');
-    const expectedShortcuts = ['[S]', '[V]', '[M]', '[A]', '[X]', '[R]', '[H]', '[I]'];
+    const expectedShortcuts = ['[S]', '[V]', '[M]', '[B]', '[X]', '[R]', '[H]', '[I]'];
     for (const shortcut of expectedShortcuts) {
       assert.ok(content.includes(shortcut),
         `Tab bar content must include shortcut '${shortcut}' (AC#1)`);
