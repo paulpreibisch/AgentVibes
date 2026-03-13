@@ -31,6 +31,32 @@ if [[ "${AGENTVIBES_PARTY_MODE:-false}" == "true" ]]; then
     CONFIG_KEY="_party_mode"
 fi
 
+# ---------------------------------------------------------------------------
+# Per-agent profile overrides (from bmad-voice-map.json via bmad-speak.sh)
+# If AGENTVIBES_AGENT_PROFILE is set and the file exists, apply reverb/personality/music
+# overrides by temporarily setting effects-manager config for this agent
+AGENT_PROFILE="${AGENTVIBES_AGENT_PROFILE:-}"
+
+if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
+    # Read profile fields using node (reliable JSON parsing)
+    _PROFILE_REVERB=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(p.reverbPreset||'')}catch{}" 2>/dev/null || true)
+    _PROFILE_MUSIC_TRACK=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(p.backgroundMusic?.track||'')}catch{}" 2>/dev/null || true)
+    _PROFILE_MUSIC_VOL=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(String(p.backgroundMusic?.volume||''))}catch{}" 2>/dev/null || true)
+
+    # Apply per-agent reverb via effects-manager (scoped to this agent's config key)
+    if [[ -n "$_PROFILE_REVERB" ]] && [[ -f "$SCRIPT_DIR/effects-manager.sh" ]]; then
+        bash "$SCRIPT_DIR/effects-manager.sh" set-reverb "$_PROFILE_REVERB" "$CONFIG_KEY" 2>/dev/null || true
+    fi
+
+    # Override background music track/volume for this invocation via env vars
+    if [[ -n "$_PROFILE_MUSIC_TRACK" ]]; then
+        export AGENTVIBES_BG_TRACK="$_PROFILE_MUSIC_TRACK"
+    fi
+    if [[ -n "$_PROFILE_MUSIC_VOL" ]]; then
+        export AGENTVIBES_BG_VOLUME="$_PROFILE_MUSIC_VOL"
+    fi
+fi
+
 # Step 1: Generate TTS WITHOUT playback
 export AGENTVIBES_NO_PLAYBACK=true
 OUTPUT=$("$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE" 2>&1)

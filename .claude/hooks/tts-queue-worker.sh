@@ -86,6 +86,11 @@ process_queue() {
     TEXT=$(echo -n "$TEXT_B64" | base64 -d)
     VOICE=$(echo -n "$VOICE_B64" | base64 -d)
     AGENT=$(echo -n "${AGENT_B64:-}" | base64 -d 2>/dev/null || echo "default")
+    AGENT_PROFILE="${PROFILE_PATH:-}"
+
+    # Export agent profile path so play-tts-enhanced.sh can read per-agent overrides
+    # (reverb preset, personality, background music track/volume)
+    export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
 
     # Use enhanced TTS with agent-specific background music if agent is specified
     # and background music is enabled
@@ -101,6 +106,12 @@ process_queue() {
         bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
       fi
     fi
+
+    # Clean up agent profile temp file after use
+    if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
+      rm -f "$AGENT_PROFILE"
+    fi
+    unset AGENTVIBES_AGENT_PROFILE
 
     # Add configurable pause between speakers for natural conversation flow
     sleep $SPEAKER_DELAY
