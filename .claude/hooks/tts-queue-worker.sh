@@ -92,19 +92,13 @@ process_queue() {
     # (reverb preset, personality, background music track/volume)
     export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
 
-    # Use enhanced TTS with agent-specific background music if agent is specified
-    # and background music is enabled
-    if [[ -f "$SCRIPT_DIR/play-tts-enhanced.sh" ]] && [[ "$AGENT" != "default" ]] && [[ -n "$AGENT" ]]; then
-      # Party mode: each agent gets their unique background music from audio-effects.cfg
-      bash "$SCRIPT_DIR/play-tts-enhanced.sh" "$TEXT" "$AGENT" "$VOICE" || true
+    # Use play-tts.sh directly with voice override for reliable playback.
+    # play-tts-enhanced.sh has ANSI path extraction issues that cause silent failures.
+    # The voice override ensures the correct per-agent voice is used.
+    if [[ -n "${VOICE:-}" ]]; then
+      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
     else
-      # Standard TTS without background music
-      # Display output to show file location (GitHub Issue #39)
-      if [[ -n "${VOICE:-}" ]]; then
-        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
-      else
-        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
-      fi
+      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
     fi
 
     # Clean up agent profile temp file after use
