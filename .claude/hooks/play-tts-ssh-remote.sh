@@ -93,20 +93,26 @@ if [[ -f "$SPEED_FILE" ]]; then
   SPEED=$(cat "$SPEED_FILE" 2>/dev/null || true)
 fi
 
-# Read active TTS provider
+# Read the TTS provider the RECEIVER should use to generate audio.
+# This is separate from the sender's own provider (which is "ssh-remote").
+# Check receiver-provider.txt first, then fall back to "piper".
 PROVIDER=""
-PROVIDER_FILE="$PROJECT_ROOT/.agentvibes/config/provider.txt"
-if [[ -f "$PROVIDER_FILE" ]]; then
-  PROVIDER=$(cat "$PROVIDER_FILE" 2>/dev/null || true)
+RECEIVER_PROVIDER_FILE="$PROJECT_ROOT/.agentvibes/config/receiver-provider.txt"
+if [[ -f "$RECEIVER_PROVIDER_FILE" ]]; then
+  PROVIDER=$(cat "$RECEIVER_PROVIDER_FILE" 2>/dev/null || true)
 fi
-# Fallback: check agentvibes.json
+# Also check home-level config
 if [[ -z "$PROVIDER" ]]; then
-  AGENTVIBES_JSON="$PROJECT_ROOT/.agentvibes/config/agentvibes.json"
-  if [[ -f "$AGENTVIBES_JSON" ]] && command -v jq &>/dev/null; then
-    PROVIDER=$(jq -r '.provider // empty' "$AGENTVIBES_JSON" 2>/dev/null || true)
+  RECEIVER_PROVIDER_FILE="$HOME/.agentvibes/config/receiver-provider.txt"
+  if [[ -f "$RECEIVER_PROVIDER_FILE" ]]; then
+    PROVIDER=$(cat "$RECEIVER_PROVIDER_FILE" 2>/dev/null || true)
   fi
 fi
-[[ -z "$PROVIDER" ]] && PROVIDER="piper"
+# Validate — only known TTS providers (not transport providers like ssh-remote)
+case "${PROVIDER:-}" in
+  piper|soprano|macos|windows-sapi) ;;
+  *) PROVIDER="piper" ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Build JSON payload
