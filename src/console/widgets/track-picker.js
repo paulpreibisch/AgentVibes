@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { destroyList } from './destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
-import { formatTrackName } from '../tabs/settings-tab.js';
+import { formatTrackName } from './format-utils.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;

@@ -13,7 +13,7 @@ import { AgentVoiceStore, scanBmadAgents, isBmadDetected, isSingleVoiceProvider 
 import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openPersonalityPicker, PERSONALITIES, PERSONALITY_EMOJIS } from '../widgets/personality-picker.js';
 import { openTrackPicker } from '../widgets/track-picker.js';
-import { formatReverbState, formatTrackName } from './settings-tab.js';
+import { formatReverbState, formatTrackName } from '../widgets/format-utils.js';
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
   parseMultiSpeaker, scanInstalledVoices, getVoiceMeta,
