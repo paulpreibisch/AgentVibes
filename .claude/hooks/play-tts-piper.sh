@@ -530,20 +530,6 @@ disown
 # Get audio cache path
 AUDIO_DIR_PATH=$(get_audio_dir)
 
-# Color codes
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-PURPLE='\033[0;35m'
-LIGHT_PURPLE='\033[1;35m'
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-ORANGE='\033[0;33m'
-WHITE='\033[1;37m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-GOLD='\033[38;5;226m'
-NC='\033[0m'
-
 # Check if banner is enabled (default: on)
 _BANNER_ENABLED=true
 if [[ -f "$HOME/.agentvibes/banner-disabled" ]]; then
@@ -553,57 +539,49 @@ elif [[ -f "${PROJECT_ROOT:-/nonexistent}/.agentvibes/banner-disabled" ]]; then
 fi
 
 # CRITICAL: Run auto-cleanup FIRST (before calculating size)
-# This ensures we display the POST-cleanup size, not pre-cleanup size
 AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
 INITIAL_SIZE=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
 if [[ $INITIAL_SIZE -gt $((AUTO_CLEAN_THRESHOLD * 1048576)) ]]; then
   DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$AUTO_CLEAN_THRESHOLD")
   if [[ $DELETED -gt 0 ]] && [[ "$_BANNER_ENABLED" == "true" ]]; then
-    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files${NC}"
+    echo "🧹 Auto-cleaned $DELETED old files"
   fi
 fi
 
+# Write output path for play-tts-enhanced.sh (avoids output parsing entirely)
+if [[ -n "${AGENTVIBES_WAV_OUTPATH:-}" ]]; then
+  echo "$TEMP_FILE" > "$AGENTVIBES_WAV_OUTPATH"
+fi
+
 if [[ "$_BANNER_ENABLED" == "true" ]]; then
-  # NOW calculate cache stats after cleanup
   FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
   SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
   SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
 
-  # Dynamic color coding based on cache size
-  CACHE_COLOR=$GREEN
-  if [[ $SIZE_BYTES -gt 3221225472 ]]; then
-    CACHE_COLOR=$RED
-  elif [[ $SIZE_BYTES -gt 524288000 ]]; then
-    CACHE_COLOR=$YELLOW
-  fi
-
-  # Display with file count (now showing accurate post-cleanup size)
-  echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
+  echo "💾 Saved to: $TEMP_FILE $FILE_COUNT 🗄️ $SIZE_HUMAN 🧹[${AUTO_CLEAN_THRESHOLD}mb]"
 
   if [[ -n "$BACKGROUND_MUSIC" ]]; then
-    MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
-    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
+    echo "🎵 Background music: $(basename "$BACKGROUND_MUSIC")"
   fi
   if [[ -n "${SPEAKER_ID:-}" ]] && [[ -n "${FILE_VOICE:-}" ]]; then
-    echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$FILE_VOICE${NC} ${WHITE}(Piper TTS)${NC}"
+    echo "🎤 Voice used: $FILE_VOICE (Piper TTS)"
   else
-    echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
+    echo "🎤 Voice used: $VOICE_MODEL (Piper TTS)"
   fi
 
   PERSONALITY=$(cat "${PROJECT_ROOT:-/nonexistent}/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
   if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
-    echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
+    echo "💫 Personality: $PERSONALITY"
   fi
 
-  # Tip: how to toggle banner
-  echo -e "\033[38;5;240mSay: \"Turn off banner\" to hide this output\033[0m"
+  echo "Say: \"Turn off banner\" to hide this output"
 fi
 
 # Check audio folder size and warn if getting large
 if [[ "$_BANNER_ENABLED" == "true" ]] && [[ -d "$AUDIO_DIR_PATH" ]]; then
   AUDIO_SIZE=$(du -sm "$AUDIO_DIR_PATH" 2>/dev/null | cut -f1)
   if [[ -n "$AUDIO_SIZE" ]] && [[ "$AUDIO_SIZE" -gt 100 ]]; then
-    echo -e "\033[0;31m⚠️  Audio cache is ${AUDIO_SIZE}MB - Run: /agent-vibes:cleanup\033[0m"
+    echo "⚠️  Audio cache is ${AUDIO_SIZE}MB - Run: /agent-vibes:cleanup"
   fi
 fi
 
@@ -632,8 +610,8 @@ if [[ -z "$BACKGROUND_MUSIC" ]]; then
     _bg_enabled=true
   fi
   if [[ "$_bg_enabled" == "true" ]]; then
-    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Enabled but not playing (check config)${NC}"
+    echo "🎵 Background music: Enabled but not playing (check config)"
   else
-    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Disabled${NC}"
+    echo "🎵 Background music: Disabled"
   fi
 fi

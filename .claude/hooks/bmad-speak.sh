@@ -192,15 +192,13 @@ fi
 SPEECH_LOCK="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-speech.lock"
 
 # Acquire lock (wait up to 120s, retry every 0.5s)
+# Clean up stale file locks from older flock-based version
+[[ -f "$SPEECH_LOCK" ]] && rm -f "$SPEECH_LOCK"
 _WAIT=0
 while ! mkdir "$SPEECH_LOCK" 2>/dev/null; do
-  # Stale lock: if older than 60s, break it
-  if [[ -d "$SPEECH_LOCK" ]]; then
+  if [[ -e "$SPEECH_LOCK" ]]; then
     _LOCK_AGE=$(( $(date +%s) - $(stat -c '%Y' "$SPEECH_LOCK" 2>/dev/null || stat -f '%m' "$SPEECH_LOCK" 2>/dev/null || echo 0) ))
-    if [[ $_LOCK_AGE -gt 60 ]]; then
-      rmdir "$SPEECH_LOCK" 2>/dev/null || true
-      continue
-    fi
+    [[ $_LOCK_AGE -gt 60 ]] && { rm -rf "$SPEECH_LOCK" 2>/dev/null || true; continue; }
   fi
   sleep 0.5
   _WAIT=$((_WAIT + 1))
@@ -208,7 +206,7 @@ while ! mkdir "$SPEECH_LOCK" 2>/dev/null; do
 done
 trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
 
-# Speak directly — synthesize + play inline. Shows banner output.
+# Speak with agent's voice
 if [[ -n "$AGENT_VOICE" ]]; then
   bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
 else

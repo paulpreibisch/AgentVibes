@@ -59,24 +59,20 @@ fi
 
 # Step 1: Generate TTS WITHOUT playback
 export AGENTVIBES_NO_PLAYBACK=true
-OUTPUT=$("$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE" 2>&1)
+export AGENTVIBES_WAV_OUTPATH="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-last-wav-$$.txt"
+"$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE"
 
-# Extract the generated file path from output
-# Output format: "💾 Saved to: /path/to/file.wav  N  🗄️ SIZE 🧹..."
-# Strip ANSI codes, find the .wav path robustly
-GENERATED_FILE=$(printf '%s' "$OUTPUT" | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -oP '/[^\s]+\.wav' | head -1)
-
-if [[ -z "$GENERATED_FILE" ]]; then
-    echo "Error: Could not extract audio file path from play-tts output" >&2
-    echo "$OUTPUT" >&2
-    exit 1
+# Read the generated file path (written by play-tts-piper.sh via AGENTVIBES_WAV_OUTPATH)
+GENERATED_FILE=""
+if [[ -f "$AGENTVIBES_WAV_OUTPATH" ]]; then
+    GENERATED_FILE=$(cat "$AGENTVIBES_WAV_OUTPATH")
+    rm -f "$AGENTVIBES_WAV_OUTPATH"
 fi
+unset AGENTVIBES_WAV_OUTPATH
 
-# File may have been moved by cache system — check if it exists, else skip effects
-if [[ ! -f "$GENERATED_FILE" ]]; then
-    # Fallback: play-tts already handled playback, just show output
-    echo "$OUTPUT"
-    exit 0
+if [[ -z "$GENERATED_FILE" ]] || [[ ! -f "$GENERATED_FILE" ]]; then
+    echo "Error: Could not find generated audio file" >&2
+    exit 1
 fi
 
 # Step 2: Process with effects and background
