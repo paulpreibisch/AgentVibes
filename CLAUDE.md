@@ -4,14 +4,6 @@
 **Updated:** 2026-02-15
 **Status:** Active (Using BMAD Methodology)
 
-## TTS Protocol
-
-**TTS is handled automatically by the stop hook** — do NOT call `play-tts.sh` or `bmad-speak.sh` manually.
-The global stop hook at `~/.claude/hooks/stop-tts.sh` auto-speaks responses and detects active BMAD agents
-via `.bmad-agent-context` for per-agent voice routing.
-
-**Do NOT use `PULSE_SERVER=unix:/mnt/wslg/PulseServer`** — this machine is native Linux, not WSL.
-
 ## Overview
 
 AgentVibes is a Text-to-Speech system for AI assistants with personality support.
