@@ -187,10 +187,26 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 
-# Serialize speech with flock — prevents overlap when Claude fires parallel calls
+# Serialize speech — prevents overlap when Claude fires parallel calls
+# Uses mkdir as a portable atomic lock (works on Linux, macOS, WSL)
 SPEECH_LOCK="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-speech.lock"
-exec 201>"$SPEECH_LOCK"
-flock -x -w 120 201 || true
+
+# Acquire lock (wait up to 120s, retry every 0.5s)
+_WAIT=0
+while ! mkdir "$SPEECH_LOCK" 2>/dev/null; do
+  # Stale lock: if older than 60s, break it
+  if [[ -d "$SPEECH_LOCK" ]]; then
+    _LOCK_AGE=$(( $(date +%s) - $(stat -c '%Y' "$SPEECH_LOCK" 2>/dev/null || stat -f '%m' "$SPEECH_LOCK" 2>/dev/null || echo 0) ))
+    if [[ $_LOCK_AGE -gt 60 ]]; then
+      rmdir "$SPEECH_LOCK" 2>/dev/null || true
+      continue
+    fi
+  fi
+  sleep 0.5
+  _WAIT=$((_WAIT + 1))
+  [[ $_WAIT -gt 240 ]] && break
+done
+trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
 
 # Speak directly — synthesize + play inline. Shows banner output.
 if [[ -n "$AGENT_VOICE" ]]; then
@@ -200,8 +216,8 @@ else
 fi
 
 # Release lock
-flock -u 201
-exec 201>&-
+rmdir "$SPEECH_LOCK" 2>/dev/null || true
+trap - EXIT
 
 # Clean up temp profile after use
 if [[ -n "$TEMP_PROFILE" ]] && [[ -f "$TEMP_PROFILE" ]]; then
