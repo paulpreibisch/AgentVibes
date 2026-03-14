@@ -187,10 +187,15 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Speak with agent's voice using queue system (non-blocking for Claude)
+# Speak with agent's voice — inline call to play-tts.sh so output banner shows
 
 if [[ -n "$AGENT_VOICE" ]]; then
-  bash "$SCRIPT_DIR/tts-queue.sh" add "$FULL_TEXT" "$AGENT_VOICE" "$AGENT_NAME_OR_ID" "$TEMP_PROFILE" &
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
 else
-  bash "$SCRIPT_DIR/tts-queue.sh" add "$FULL_TEXT" "" "$AGENT_NAME_OR_ID" "$TEMP_PROFILE" &
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
+fi
+
+# Clean up temp profile after use
+if [[ -n "$TEMP_PROFILE" ]] && [[ -f "$TEMP_PROFILE" ]]; then
+  rm -f "$TEMP_PROFILE"
 fi
