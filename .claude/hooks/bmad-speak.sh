@@ -187,13 +187,51 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Speak with agent's voice — inline call to play-tts.sh so output banner shows
+# Per-agent colors for party mode visual distinction
+declare -A AGENT_COLORS=(
+  ["bmad-master"]="35"   # magenta
+  ["analyst"]="36"       # cyan
+  ["architect"]="34"     # blue
+  ["dev"]="32"           # green
+  ["pm"]="33"            # yellow
+  ["qa"]="31"            # red
+  ["quick-flow-solo-dev"]="95"  # light magenta
+  ["sm"]="96"            # light cyan
+  ["tech-writer"]="94"   # light blue
+  ["ux-designer"]="92"   # light green
+)
+AGENT_COLOR="${AGENT_COLORS[$AGENT_ID]:-37}"  # default white
 
+# Look up display name from manifest for the header
+DISPLAY_NAME="$AGENT_NAME_OR_ID"
+if [[ -n "$AGENT_ID" ]] && [[ -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" ]]; then
+  _DN=$(grep "^\"*${AGENT_ID}\"*," "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" | head -1 | cut -d',' -f2 | sed 's/^"//;s/"$//')
+  [[ -n "$_DN" ]] && DISPLAY_NAME="$_DN"
+fi
+
+# ---------------------------------------------------------------------------
+# Serialize speech with a lock file — prevents agents talking over each other
+# in party mode when Claude fires multiple Bash calls
+
+SPEECH_LOCK="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-speech.lock"
+
+# Print colored agent header before speaking
+printf "\033[${AGENT_COLOR};1m🎤 [%s] speaking...\033[0m\n" "$DISPLAY_NAME"
+
+# Acquire lock (wait up to 60s for previous agent to finish)
+exec 201>"$SPEECH_LOCK"
+flock -x -w 60 201 || true
+
+# Speak with agent's voice — inline call to play-tts.sh so output banner shows
 if [[ -n "$AGENT_VOICE" ]]; then
   bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
 else
   bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
 fi
+
+# Release lock
+flock -u 201
+exec 201>&-
 
 # Clean up temp profile after use
 if [[ -n "$TEMP_PROFILE" ]] && [[ -f "$TEMP_PROFILE" ]]; then
