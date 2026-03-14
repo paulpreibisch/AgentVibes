@@ -79,27 +79,37 @@ process_queue() {
     # Reset idle counter - we have work
     idle_count=0
 
-    # Load TTS request
+    # Load queue item
     source "$queue_item"
 
-    # Decode base64 values
-    TEXT=$(echo -n "$TEXT_B64" | base64 -d)
-    VOICE=$(echo -n "$VOICE_B64" | base64 -d)
-    AGENT=$(echo -n "${AGENT_B64:-}" | base64 -d 2>/dev/null || echo "default")
-
-    # Use enhanced TTS with agent-specific background music if agent is specified
-    # and background music is enabled
-    if [[ -f "$SCRIPT_DIR/play-tts-enhanced.sh" ]] && [[ "$AGENT" != "default" ]] && [[ -n "$AGENT" ]]; then
-      # Party mode: each agent gets their unique background music from audio-effects.cfg
-      bash "$SCRIPT_DIR/play-tts-enhanced.sh" "$TEXT" "$AGENT" "$VOICE" || true
+    # Check if this is a pre-generated WAV playback item
+    if [[ -n "${PLAY_WAV:-}" ]] && [[ -f "$PLAY_WAV" ]]; then
+      # Play the pre-generated WAV directly (synthesis already done by bmad-speak)
+      if command -v paplay &>/dev/null; then
+        paplay "$PLAY_WAV" 2>/dev/null || true
+      elif command -v aplay &>/dev/null; then
+        aplay -q "$PLAY_WAV" 2>/dev/null || true
+      elif command -v ffplay &>/dev/null; then
+        ffplay -nodisp -autoexit -loglevel quiet "$PLAY_WAV" 2>/dev/null || true
+      fi
     else
-      # Standard TTS without background music
-      # Display output to show file location (GitHub Issue #39)
+      # Full TTS request — decode and synthesize + play
+      TEXT=$(echo -n "${TEXT_B64:-}" | base64 -d 2>/dev/null || echo "")
+      VOICE=$(echo -n "${VOICE_B64:-}" | base64 -d 2>/dev/null || echo "")
+      AGENT_PROFILE="${PROFILE_PATH:-}"
+
+      export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
+
       if [[ -n "${VOICE:-}" ]]; then
         bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
       else
         bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
       fi
+
+      if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
+        rm -f "$AGENT_PROFILE"
+      fi
+      unset AGENTVIBES_AGENT_PROFILE
     fi
 
     # Add configurable pause between speakers for natural conversation flow

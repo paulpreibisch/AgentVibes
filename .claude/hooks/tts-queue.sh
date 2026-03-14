@@ -34,10 +34,12 @@ fi
 # @param $1 dialogue text
 # @param $2 voice name (optional)
 # @param $3 agent name (optional, for background music in party mode)
+# @param $4 agent profile path (optional, PID-scoped temp JSON with reverb/personality/music overrides)
 add_to_queue() {
   local text="$1"
   local voice="${2:-}"
   local agent="${3:-default}"
+  local profile_path="${4:-}"
 
   # Create unique queue item with timestamp
   local timestamp=$(date +%s%N)
@@ -48,6 +50,7 @@ add_to_queue() {
 TEXT_B64=$(echo -n "$text" | base64 -w0)
 VOICE_B64=$(echo -n "$voice" | base64 -w0)
 AGENT_B64=$(echo -n "$agent" | base64 -w0)
+PROFILE_PATH=$profile_path
 EOF
 
   # Start queue worker if not already running
@@ -113,10 +116,32 @@ show_queue() {
   fi
 }
 
+# @function play_wav
+# @intent Queue a pre-generated WAV file for sequential playback
+# @param $1 path to WAV file
+play_wav() {
+  local wav_file="$1"
+  [[ -z "$wav_file" ]] && return 1
+  [[ ! -f "$wav_file" ]] && return 1
+
+  local timestamp=$(date +%s%N)
+  local queue_file="$QUEUE_DIR/$timestamp.queue"
+
+  # Write a playback-only queue item (no synthesis needed)
+  cat > "$queue_file" <<EOF
+PLAY_WAV=$wav_file
+EOF
+
+  start_worker_if_needed
+}
+
 # Main command dispatcher
 case "${1:-help}" in
   add)
-    add_to_queue "${2:-}" "${3:-}" "${4:-default}"
+    add_to_queue "${2:-}" "${3:-}" "${4:-default}" "${5:-}"
+    ;;
+  play)
+    play_wav "${2:-}"
     ;;
   clear)
     clear_queue
@@ -125,10 +150,11 @@ case "${1:-help}" in
     show_queue
     ;;
   *)
-    echo "Usage: tts-queue.sh {add|clear|status}"
+    echo "Usage: tts-queue.sh {add|play|clear|status}"
     echo ""
     echo "Commands:"
-    echo "  add <text> [voice] [agent]  Add TTS request to queue with optional agent for background music"
+    echo "  add <text> [voice] [agent]  Add TTS request to queue"
+    echo "  play <wav_file>             Queue a pre-generated WAV for playback"
     echo "  clear                       Clear all pending requests"
     echo "  status                      Show queue status"
     exit 1

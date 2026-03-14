@@ -88,8 +88,28 @@ CURRENT_LANGUAGE=$(get_language_code)
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Use override if provided
-  VOICE_MODEL="$VOICE_OVERRIDE"
-  echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  # Handle multi-speaker format: "Model::SpeakerName" → split into model + speaker lookup
+  if [[ "$VOICE_OVERRIDE" == *"::"* ]]; then
+    VOICE_MODEL="${VOICE_OVERRIDE%%::*}"
+    _SPEAKER_NAME="${VOICE_OVERRIDE#*::}"
+    # Look up speaker ID from the model's .onnx.json speaker_id_map
+    voice_dir=$(get_voice_storage_dir)
+    _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+    if [[ -f "$_JSON_FILE" ]]; then
+      SPEAKER_ID=$(node -e "
+        try {
+          const j = JSON.parse(require('fs').readFileSync('$_JSON_FILE','utf8'));
+          const map = j.speaker_id_map || {};
+          const id = map['$_SPEAKER_NAME'];
+          if (id !== undefined) process.stdout.write(String(id));
+        } catch {}
+      " 2>/dev/null || true)
+    fi
+    echo "🎭 Using multi-speaker voice: $VOICE_OVERRIDE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+  else
+    VOICE_MODEL="$VOICE_OVERRIDE"
+    echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  fi
 else
   # Try to get voice from voice file (check CLAUDE_PROJECT_DIR first for MCP context)
   VOICE_FILE=""
@@ -133,7 +153,24 @@ else
         SPEAKER_ID=""
       fi
       echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
-    # Check if it's a standard Piper model name or custom voice (just use as-is)
+    # Check if voice uses Model::SpeakerName format (from AgentVibes config)
+    elif [[ -n "$FILE_VOICE" ]] && [[ "$FILE_VOICE" == *"::"* ]]; then
+      VOICE_MODEL="${FILE_VOICE%%::*}"
+      _SPEAKER_NAME="${FILE_VOICE#*::}"
+      voice_dir=$(get_voice_storage_dir)
+      _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+      if [[ -f "$_JSON_FILE" ]]; then
+        SPEAKER_ID=$(node -e "
+          try {
+            const j = JSON.parse(require('fs').readFileSync('$_JSON_FILE','utf8'));
+            const map = j.speaker_id_map || {};
+            const id = map['$_SPEAKER_NAME'];
+            if (id !== undefined) process.stdout.write(String(id));
+          } catch {}
+        " 2>/dev/null || true)
+      fi
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+    # Standard Piper model name or custom voice (just use as-is)
     elif [[ -n "$FILE_VOICE" ]]; then
       VOICE_MODEL="$FILE_VOICE"
     fi
@@ -507,56 +544,63 @@ CYAN='\033[0;36m'
 GOLD='\033[38;5;226m'
 NC='\033[0m'
 
+# Check if banner is enabled (default: on)
+_BANNER_ENABLED=true
+if [[ -f "$HOME/.agentvibes/banner-disabled" ]]; then
+  _BANNER_ENABLED=false
+elif [[ -f "${PROJECT_ROOT:-/nonexistent}/.agentvibes/banner-disabled" ]]; then
+  _BANNER_ENABLED=false
+fi
+
 # CRITICAL: Run auto-cleanup FIRST (before calculating size)
 # This ensures we display the POST-cleanup size, not pre-cleanup size
 AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
 INITIAL_SIZE=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
 if [[ $INITIAL_SIZE -gt $((AUTO_CLEAN_THRESHOLD * 1048576)) ]]; then
   DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$AUTO_CLEAN_THRESHOLD")
-  if [[ $DELETED -gt 0 ]]; then
+  if [[ $DELETED -gt 0 ]] && [[ "$_BANNER_ENABLED" == "true" ]]; then
     echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files${NC}"
   fi
 fi
 
-# NOW calculate cache stats after cleanup
-FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
-SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
-SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
+if [[ "$_BANNER_ENABLED" == "true" ]]; then
+  # NOW calculate cache stats after cleanup
+  FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
+  SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
+  SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
 
-# Dynamic color coding based on cache size
-# Green: < 500MB (small)
-# Yellow: 500MB - 3GB (lots)
-# Red: > 3GB (extreme)
-CACHE_COLOR=$GREEN
-if [[ $SIZE_BYTES -gt 3221225472 ]]; then  # > 3GB
-  CACHE_COLOR=$RED
-elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
-  CACHE_COLOR=$YELLOW
-fi
+  # Dynamic color coding based on cache size
+  CACHE_COLOR=$GREEN
+  if [[ $SIZE_BYTES -gt 3221225472 ]]; then
+    CACHE_COLOR=$RED
+  elif [[ $SIZE_BYTES -gt 524288000 ]]; then
+    CACHE_COLOR=$YELLOW
+  fi
 
-# Display with file count (now showing accurate post-cleanup size)
-echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
+  # Display with file count (now showing accurate post-cleanup size)
+  echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
 
-if [[ -n "$BACKGROUND_MUSIC" ]]; then
-  # Extract just the filename to save space
-  MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
-  echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
-fi
-# Show speaker name for multi-speaker voices, otherwise show model name
-if [[ -n "${SPEAKER_ID:-}" ]] && [[ -n "${FILE_VOICE:-}" ]]; then
-  echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$FILE_VOICE${NC} ${WHITE}(Piper TTS)${NC}"
-else
-  echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
-fi
+  if [[ -n "$BACKGROUND_MUSIC" ]]; then
+    MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
+    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
+  fi
+  if [[ -n "${SPEAKER_ID:-}" ]] && [[ -n "${FILE_VOICE:-}" ]]; then
+    echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$FILE_VOICE${NC} ${WHITE}(Piper TTS)${NC}"
+  else
+    echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
+  fi
 
-# Show personality if configured
-PERSONALITY=$(cat "${PROJECT_ROOT:-/nonexistent}/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
-if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
-  echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
+  PERSONALITY=$(cat "${PROJECT_ROOT:-/nonexistent}/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
+  if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
+    echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
+  fi
+
+  # Tip: how to toggle banner
+  echo -e "\033[38;5;240mSay: \"Turn off banner\" to hide this output\033[0m"
 fi
 
 # Check audio folder size and warn if getting large
-if [[ -d "$AUDIO_DIR_PATH" ]]; then
+if [[ "$_BANNER_ENABLED" == "true" ]] && [[ -d "$AUDIO_DIR_PATH" ]]; then
   AUDIO_SIZE=$(du -sm "$AUDIO_DIR_PATH" 2>/dev/null | cut -f1)
   if [[ -n "$AUDIO_SIZE" ]] && [[ "$AUDIO_SIZE" -gt 100 ]]; then
     echo -e "\033[0;31m⚠️  Audio cache is ${AUDIO_SIZE}MB - Run: /agent-vibes:cleanup\033[0m"
