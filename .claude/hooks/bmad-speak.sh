@@ -187,12 +187,21 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 
+# Serialize speech with flock — prevents overlap when Claude fires parallel calls
+SPEECH_LOCK="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-speech.lock"
+exec 201>"$SPEECH_LOCK"
+flock -x -w 120 201 || true
+
 # Speak directly — synthesize + play inline. Shows banner output.
 if [[ -n "$AGENT_VOICE" ]]; then
   bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
 else
   bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
 fi
+
+# Release lock
+flock -u 201
+exec 201>&-
 
 # Clean up temp profile after use
 if [[ -n "$TEMP_PROFILE" ]] && [[ -f "$TEMP_PROFILE" ]]; then
