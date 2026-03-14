@@ -821,6 +821,42 @@ class AgentVibesServer:
         result = await self._run_script("clean-audio-cache.sh", [])
         return result if result else "❌ Failed to clean audio cache"
 
+    async def set_banner(self, enabled: bool) -> str:
+        """
+        Enable or disable the TTS output banner (voice info, file path, cache size).
+
+        Args:
+            enabled: True to show banner, False to hide it
+
+        Returns:
+            Confirmation message
+        """
+        banner_file = Path.home() / ".agentvibes" / "banner-disabled"
+        if enabled:
+            # Remove the disable flag
+            try:
+                banner_file.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return "✅ TTS banner enabled — voice info will show after each speech"
+        else:
+            # Create the disable flag
+            banner_file.parent.mkdir(parents=True, exist_ok=True)
+            banner_file.touch()
+            return "🔇 TTS banner disabled — speech will play without output info"
+
+    async def get_banner(self) -> str:
+        """
+        Check if the TTS output banner is enabled or disabled.
+
+        Returns:
+            Current banner status
+        """
+        banner_file = Path.home() / ".agentvibes" / "banner-disabled"
+        if banner_file.exists():
+            return "🔇 TTS banner: **disabled**\n\nSay: \"Turn on banner\" to re-enable"
+        return "✅ TTS banner: **enabled**\n\nSay: \"Turn off banner\" to disable"
+
     # Helper methods
     def _build_script_env(self) -> dict:
         """Build environment dict for script execution (shared by all script runners)"""
