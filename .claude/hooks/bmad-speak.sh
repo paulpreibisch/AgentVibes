@@ -187,20 +187,9 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Per-agent colors for party mode visual distinction
-declare -A AGENT_COLORS=(
-  ["bmad-master"]="35"   # magenta
-  ["analyst"]="36"       # cyan
-  ["architect"]="34"     # blue
-  ["dev"]="32"           # green
-  ["pm"]="33"            # yellow
-  ["qa"]="31"            # red
-  ["quick-flow-solo-dev"]="95"  # light magenta
-  ["sm"]="96"            # light cyan
-  ["tech-writer"]="94"   # light blue
-  ["ux-designer"]="92"   # light green
-)
-AGENT_COLOR="${AGENT_COLORS[$AGENT_ID]:-37}"  # default white
+# Per-agent color from bmad-voice-map.json (customizable per agent)
+AGENT_COLOR=$(read_agent_profile "$AGENT_ID" "color")
+[[ -z "$AGENT_COLOR" ]] && AGENT_COLOR="37"  # default white
 
 # Look up display name from manifest for the header
 DISPLAY_NAME="$AGENT_NAME_OR_ID"
@@ -210,28 +199,29 @@ if [[ -n "$AGENT_ID" ]] && [[ -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv
 fi
 
 # ---------------------------------------------------------------------------
-# Serialize speech with a lock file — prevents agents talking over each other
-# in party mode when Claude fires multiple Bash calls
-
-SPEECH_LOCK="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-speech.lock"
-
-# Print colored agent header before speaking
+# Print colored agent header
 printf "\033[${AGENT_COLOR};1m🎤 [%s] speaking...\033[0m\n" "$DISPLAY_NAME"
 
-# Acquire lock (wait up to 60s for previous agent to finish)
-exec 201>"$SPEECH_LOCK"
-flock -x -w 60 201 || true
-
-# Speak with agent's voice — inline call to play-tts.sh so output banner shows
+# Synthesize audio inline (shows banner output) but skip playback
+# Then queue the generated WAV for sequential playback by the queue worker
+export AGENTVIBES_NO_PLAYBACK=true
 if [[ -n "$AGENT_VOICE" ]]; then
-  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
+  OUTPUT=$(bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" 2>&1)
 else
-  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
+  OUTPUT=$(bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" 2>&1)
 fi
+unset AGENTVIBES_NO_PLAYBACK
 
-# Release lock
-flock -u 201
-exec 201>&-
+# Show the banner output inline (voice info, file path, etc.)
+echo "$OUTPUT"
+
+# Extract the generated WAV path for queued playback
+WAV_FILE=$(printf '%s' "$OUTPUT" | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -oP '/[^\s]+\.wav' | head -1)
+
+if [[ -n "$WAV_FILE" ]] && [[ -f "$WAV_FILE" ]]; then
+  # Queue the WAV file for sequential playback (non-blocking)
+  bash "$SCRIPT_DIR/tts-queue.sh" play "$WAV_FILE" &
+fi
 
 # Clean up temp profile after use
 if [[ -n "$TEMP_PROFILE" ]] && [[ -f "$TEMP_PROFILE" ]]; then

@@ -79,33 +79,38 @@ process_queue() {
     # Reset idle counter - we have work
     idle_count=0
 
-    # Load TTS request
+    # Load queue item
     source "$queue_item"
 
-    # Decode base64 values
-    TEXT=$(echo -n "$TEXT_B64" | base64 -d)
-    VOICE=$(echo -n "$VOICE_B64" | base64 -d)
-    AGENT=$(echo -n "${AGENT_B64:-}" | base64 -d 2>/dev/null || echo "default")
-    AGENT_PROFILE="${PROFILE_PATH:-}"
-
-    # Export agent profile path so play-tts-enhanced.sh can read per-agent overrides
-    # (reverb preset, personality, background music track/volume)
-    export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
-
-    # Use play-tts.sh directly with voice override for reliable playback.
-    # play-tts-enhanced.sh has ANSI path extraction issues that cause silent failures.
-    # The voice override ensures the correct per-agent voice is used.
-    if [[ -n "${VOICE:-}" ]]; then
-      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
+    # Check if this is a pre-generated WAV playback item
+    if [[ -n "${PLAY_WAV:-}" ]] && [[ -f "$PLAY_WAV" ]]; then
+      # Play the pre-generated WAV directly (synthesis already done by bmad-speak)
+      if command -v paplay &>/dev/null; then
+        paplay "$PLAY_WAV" 2>/dev/null || true
+      elif command -v aplay &>/dev/null; then
+        aplay -q "$PLAY_WAV" 2>/dev/null || true
+      elif command -v ffplay &>/dev/null; then
+        ffplay -nodisp -autoexit -loglevel quiet "$PLAY_WAV" 2>/dev/null || true
+      fi
     else
-      bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
-    fi
+      # Full TTS request — decode and synthesize + play
+      TEXT=$(echo -n "${TEXT_B64:-}" | base64 -d 2>/dev/null || echo "")
+      VOICE=$(echo -n "${VOICE_B64:-}" | base64 -d 2>/dev/null || echo "")
+      AGENT_PROFILE="${PROFILE_PATH:-}"
 
-    # Clean up agent profile temp file after use
-    if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
-      rm -f "$AGENT_PROFILE"
+      export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
+
+      if [[ -n "${VOICE:-}" ]]; then
+        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
+      else
+        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
+      fi
+
+      if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
+        rm -f "$AGENT_PROFILE"
+      fi
+      unset AGENTVIBES_AGENT_PROFILE
     fi
-    unset AGENTVIBES_AGENT_PROFILE
 
     # Add configurable pause between speakers for natural conversation flow
     sleep $SPEAKER_DELAY

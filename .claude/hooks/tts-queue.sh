@@ -116,10 +116,32 @@ show_queue() {
   fi
 }
 
+# @function play_wav
+# @intent Queue a pre-generated WAV file for sequential playback
+# @param $1 path to WAV file
+play_wav() {
+  local wav_file="$1"
+  [[ -z "$wav_file" ]] && return 1
+  [[ ! -f "$wav_file" ]] && return 1
+
+  local timestamp=$(date +%s%N)
+  local queue_file="$QUEUE_DIR/$timestamp.queue"
+
+  # Write a playback-only queue item (no synthesis needed)
+  cat > "$queue_file" <<EOF
+PLAY_WAV=$wav_file
+EOF
+
+  start_worker_if_needed
+}
+
 # Main command dispatcher
 case "${1:-help}" in
   add)
     add_to_queue "${2:-}" "${3:-}" "${4:-default}" "${5:-}"
+    ;;
+  play)
+    play_wav "${2:-}"
     ;;
   clear)
     clear_queue
@@ -128,10 +150,11 @@ case "${1:-help}" in
     show_queue
     ;;
   *)
-    echo "Usage: tts-queue.sh {add|clear|status}"
+    echo "Usage: tts-queue.sh {add|play|clear|status}"
     echo ""
     echo "Commands:"
-    echo "  add <text> [voice] [agent]  Add TTS request to queue with optional agent for background music"
+    echo "  add <text> [voice] [agent]  Add TTS request to queue"
+    echo "  play <wav_file>             Queue a pre-generated WAV for playback"
     echo "  clear                       Clear all pending requests"
     echo "  status                      Show queue status"
     exit 1
