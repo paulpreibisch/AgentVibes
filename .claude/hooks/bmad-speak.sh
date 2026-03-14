@@ -187,25 +187,11 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 
-# Synthesize audio inline (shows banner output) but skip playback
-# Then queue the generated WAV for sequential playback by the queue worker
-export AGENTVIBES_NO_PLAYBACK=true
+# Speak directly — synthesize + play inline. Shows banner output.
 if [[ -n "$AGENT_VOICE" ]]; then
-  OUTPUT=$(bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" 2>&1)
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
 else
-  OUTPUT=$(bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" 2>&1)
-fi
-unset AGENTVIBES_NO_PLAYBACK
-
-# Show the banner output inline (voice info, file path, etc.)
-echo "$OUTPUT"
-
-# Extract the generated WAV path for queued playback
-WAV_FILE=$(printf '%s' "$OUTPUT" | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -oP '/[^\s]+\.wav' | head -1)
-
-if [[ -n "$WAV_FILE" ]] && [[ -f "$WAV_FILE" ]]; then
-  # Queue the WAV file for sequential playback (non-blocking)
-  bash "$SCRIPT_DIR/tts-queue.sh" play "$WAV_FILE" &
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
 fi
 
 # Clean up temp profile after use
