@@ -39,6 +39,7 @@ export const TAB_DISPLAY_LABELS = {
   settings: 'Settings',
   voices:   'Voices',
   music:    'Music',
+  agents:   'BMad',
   receiver: 'Receiver',
   readme:   'Readme',
   help:     'Help',
@@ -47,5 +48,6 @@ export const TAB_DISPLAY_LABELS = {
 
 /** Override shortcut key for tabs where first letter conflicts */
 export const TAB_SHORTCUT_KEYS = {
+  agents:   'B',
   receiver: 'X',
 };

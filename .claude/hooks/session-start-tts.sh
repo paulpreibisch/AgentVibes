@@ -96,6 +96,25 @@ cat << EOF
 4. Keep under 150 chars
 5. Always include errors
 
+## BMAD Agent Voice Routing
+If `.bmad-agent-context` exists, check its content:
+
+**Single agent mode** (content is an agent ID like "analyst"):
+Use `bmad-speak.sh` instead of `play-tts.sh`:
+```
+Bash: .claude/hooks/bmad-speak.sh "AGENT_ID" "[text]"
+```
+
+**Party mode** (content is "party-mode"):
+Each agent speaks via `bmad-speak.sh` with their display name. The queue system ensures sequential playback — agents speak one at a time, not overlapping:
+```
+Bash: .claude/hooks/bmad-speak.sh "Winston" "[Winston's response]"
+Bash: .claude/hooks/bmad-speak.sh "Mary" "[Mary's response]"
+```
+IMPORTANT: In party mode, do NOT use `play-tts.sh`. Always use `bmad-speak.sh` with the agent's display name. Do NOT call multiple bmad-speak.sh in parallel — call them sequentially so the queue processes them in order.
+
+If `.bmad-agent-context` does NOT exist, use `play-tts.sh` as normal.
+
 Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning
 
 EOF

@@ -16,12 +16,12 @@ describe('NavigationService - Module Structure', () => {
   test('TAB_ORDER is exported from navigation-service.js', async () => {
     const { TAB_ORDER } = await import('../../src/services/navigation-service.js');
     assert.ok(Array.isArray(TAB_ORDER), 'TAB_ORDER must be an array');
-    assert.ok(TAB_ORDER.length === 7, 'TAB_ORDER must have 7 tabs');
+    assert.ok(TAB_ORDER.length === 8, 'TAB_ORDER must have 8 tabs');
   });
 
   test('TAB_ORDER contains all required tab IDs', async () => {
     const { TAB_ORDER } = await import('../../src/services/navigation-service.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'readme', 'help', 'install'];
+    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'install'];
     for (const id of required) {
       assert.ok(TAB_ORDER.includes(id), `TAB_ORDER must include '${id}'`);
     }

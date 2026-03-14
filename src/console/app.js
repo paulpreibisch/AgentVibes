@@ -25,6 +25,7 @@ import { createInstallTab } from './tabs/install-tab.js';
 import { createHelpTab } from './tabs/help-tab.js';
 import { createReadmeTab } from './tabs/readme-tab.js';
 import { createReceiverTab } from './tabs/receiver-tab.js';
+import { createAgentsTab } from './tabs/agents-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -480,10 +481,11 @@ export class AgentVibesConsole {
   _renderTabBarContent(activeTabId) {
     return TAB_ORDER.map(id => {
       const label = TAB_DISPLAY_LABELS[id];
+      const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
       if (id === activeTabId) {
-        return `{bold}{white-fg}[${label[0]}] ${label}{/white-fg}{/bold}`;
+        return `{bold}{white-fg}[${shortcutKey}] ${label}{/white-fg}{/bold}`;
       }
-      return `{#82b1ff-fg}[${label[0]}] ${label}{/#82b1ff-fg}`;
+      return `{#82b1ff-fg}[${shortcutKey}] ${label}{/#82b1ff-fg}`;
     }).join('  ');
   }
 
@@ -658,6 +660,13 @@ export class AgentVibesConsole {
       helpPlaceholder.destroy();
     }
     this.tabs['help'] = createHelpTab(this.screen, services);
+
+    // Destroy agents placeholder and mount real agents tab
+    const agentsPlaceholder = this.tabs['agents'];
+    if (agentsPlaceholder && typeof agentsPlaceholder.destroy === 'function') {
+      agentsPlaceholder.destroy();
+    }
+    this.tabs['agents'] = createAgentsTab(this.screen, services);
 
     // Destroy receiver placeholder and mount real receiver tab
     const receiverPlaceholder = this.tabs['receiver'];
