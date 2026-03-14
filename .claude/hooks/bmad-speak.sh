@@ -187,20 +187,21 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Per-agent color from bmad-voice-map.json (customizable per agent)
-AGENT_COLOR=$(read_agent_profile "$AGENT_ID" "color")
-[[ -z "$AGENT_COLOR" ]] && AGENT_COLOR="37"  # default white
-
-# Look up display name from manifest for the header
+# Look up display name and icon from manifest for the header
 DISPLAY_NAME="$AGENT_NAME_OR_ID"
+AGENT_ICON=""
 if [[ -n "$AGENT_ID" ]] && [[ -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" ]]; then
-  _DN=$(grep "^\"*${AGENT_ID}\"*," "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" | head -1 | cut -d',' -f2 | sed 's/^"//;s/"$//')
+  _LINE=$(grep "^\"*${AGENT_ID}\"*," "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" | head -1)
+  _DN=$(echo "$_LINE" | cut -d',' -f2 | sed 's/^"//;s/"$//')
+  _TITLE=$(echo "$_LINE" | cut -d',' -f3 | sed 's/^"//;s/"$//')
+  _ICON=$(echo "$_LINE" | cut -d',' -f4 | sed 's/^"//;s/"$//')
   [[ -n "$_DN" ]] && DISPLAY_NAME="$_DN"
+  [[ -n "$_ICON" ]] && AGENT_ICON="$_ICON "
 fi
 
 # ---------------------------------------------------------------------------
-# Print colored agent header
-printf "\033[${AGENT_COLOR};1m🎤 [%s] speaking...\033[0m\n" "$DISPLAY_NAME"
+# Print agent header with icon and title
+echo "${AGENT_ICON}🎤 ${DISPLAY_NAME} (${_TITLE:-Agent}) speaking..."
 
 # Synthesize audio inline (shows banner output) but skip playback
 # Then queue the generated WAV for sequential playback by the queue worker
