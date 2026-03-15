@@ -37,8 +37,14 @@ MESSAGE=$(echo "$INPUT" | node -e "
     try {
       const j = JSON.parse(d);
       const msg = j.last_assistant_message || '';
+      // Strip markdown before TTS — prevent "asterisk asterisk" being spoken literally
+      const stripped = msg
+        .replace(/\*\*/g, '').replace(/\*/g, '')
+        .replace(/`[^`]*`/g, '').replace(/`/g, '')
+        .replace(/#+\s*/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');  // [text](url) → text
       // Truncate to 150 chars for TTS
-      const trimmed = msg.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      const trimmed = stripped.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
       process.stdout.write(trimmed.length > 150 ? trimmed.slice(0, 147) + '...' : trimmed);
     } catch(e) {
       process.exit(0);
