@@ -39,9 +39,10 @@ AGENT_PROFILE="${AGENTVIBES_AGENT_PROFILE:-}"
 
 if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
     # Read profile fields using node (reliable JSON parsing)
-    _PROFILE_REVERB=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(p.reverbPreset||'')}catch{}" 2>/dev/null || true)
-    _PROFILE_MUSIC_TRACK=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(p.backgroundMusic?.track||'')}catch{}" 2>/dev/null || true)
-    _PROFILE_MUSIC_VOL=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(String(p.backgroundMusic?.volume||''))}catch{}" 2>/dev/null || true)
+    # SECURITY: Pass values via env vars to prevent shell injection
+    _PROFILE_REVERB=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(p.reverbPreset||'')}catch{}" 2>/dev/null || true)
+    _PROFILE_MUSIC_TRACK=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(p.backgroundMusic?.track||'')}catch{}" 2>/dev/null || true)
+    _PROFILE_MUSIC_VOL=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume||''))}catch{}" 2>/dev/null || true)
 
     # Apply per-agent reverb via effects-manager (scoped to this agent's config key)
     if [[ -n "$_PROFILE_REVERB" ]] && [[ -f "$SCRIPT_DIR/effects-manager.sh" ]]; then
@@ -59,24 +60,23 @@ fi
 
 # Step 1: Generate TTS WITHOUT playback
 export AGENTVIBES_NO_PLAYBACK=true
-OUTPUT=$("$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE" 2>&1)
+export AGENTVIBES_WAV_OUTPATH="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-last-wav-$$.txt"
 
-# Extract the generated file path from output
-# Output format: "💾 Saved to: /path/to/file.wav  N  🗄️ SIZE 🧹..."
-# Strip ANSI codes, find the .wav path robustly
-GENERATED_FILE=$(printf '%s' "$OUTPUT" | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -oP '/[^\s]+\.wav' | head -1)
+# Cleanup temp outpath file on exit
+trap 'rm -f "$AGENTVIBES_WAV_OUTPATH"' EXIT
+"$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE"
 
-if [[ -z "$GENERATED_FILE" ]]; then
-    echo "Error: Could not extract audio file path from play-tts output" >&2
-    echo "$OUTPUT" >&2
-    exit 1
+# Read the generated file path (written by play-tts-piper.sh via AGENTVIBES_WAV_OUTPATH)
+GENERATED_FILE=""
+if [[ -f "$AGENTVIBES_WAV_OUTPATH" ]]; then
+    GENERATED_FILE=$(cat "$AGENTVIBES_WAV_OUTPATH")
+    rm -f "$AGENTVIBES_WAV_OUTPATH"
 fi
+unset AGENTVIBES_WAV_OUTPATH
 
-# File may have been moved by cache system — check if it exists, else skip effects
-if [[ ! -f "$GENERATED_FILE" ]]; then
-    # Fallback: play-tts already handled playback, just show output
-    echo "$OUTPUT"
-    exit 0
+if [[ -z "$GENERATED_FILE" ]] || [[ ! -f "$GENERATED_FILE" ]]; then
+    echo "Error: Could not find generated audio file" >&2
+    exit 1
 fi
 
 # Step 2: Process with effects and background

@@ -64,11 +64,12 @@ read_agent_profile() {
   fi
 
   # Use node for JSON parsing (always available in AgentVibes projects)
-  node -e "
+  # SECURITY: Pass values via env vars to prevent shell injection
+  _VOICE_MAP="$VOICE_MAP_FILE" _AGENT_ID="$agent_id" _FIELD="$field" node -e "
     try {
-      const d = JSON.parse(require('fs').readFileSync('$VOICE_MAP_FILE','utf8'));
-      const a = d.agents?.['$agent_id'] ?? {};
-      const f = '$field';
+      const d = JSON.parse(require('fs').readFileSync(process.env._VOICE_MAP,'utf8'));
+      const a = d.agents?.[process.env._AGENT_ID] ?? {};
+      const f = process.env._FIELD;
       if (f.includes('.')) {
         const [k1, k2] = f.split('.');
         process.stdout.write(String(a[k1]?.[k2] ?? ''));
@@ -162,15 +163,18 @@ if [[ -n "$PROFILE_REVERB" ]] || [[ -n "$PROFILE_PERSONALITY" ]] || [[ -n "$PROF
   TEMP_PROFILE="$PROFILE_DIR/agent-profile-$$.json"
 
   # Write profile as JSON for reliable parsing downstream
-  node -e "
+  # SECURITY: Pass values via env vars to prevent shell injection
+  _P_REVERB="$PROFILE_REVERB" _P_PERSONALITY="$PROFILE_PERSONALITY" \
+  _P_MUSIC_TRACK="$PROFILE_MUSIC_TRACK" _P_MUSIC_VOL="${PROFILE_MUSIC_VOLUME:-70}" \
+  _P_OUTFILE="$TEMP_PROFILE" node -e "
     const p = {};
-    if ('$PROFILE_REVERB') p.reverbPreset = '$PROFILE_REVERB';
-    if ('$PROFILE_PERSONALITY') p.personality = '$PROFILE_PERSONALITY';
-    if ('$PROFILE_MUSIC_TRACK') p.backgroundMusic = {
-      track: '$PROFILE_MUSIC_TRACK',
-      volume: parseInt('${PROFILE_MUSIC_VOLUME:-70}') || 70
+    if (process.env._P_REVERB) p.reverbPreset = process.env._P_REVERB;
+    if (process.env._P_PERSONALITY) p.personality = process.env._P_PERSONALITY;
+    if (process.env._P_MUSIC_TRACK) p.backgroundMusic = {
+      track: process.env._P_MUSIC_TRACK,
+      volume: parseInt(process.env._P_MUSIC_VOL) || 70
     };
-    require('fs').writeFileSync('$TEMP_PROFILE', JSON.stringify(p), { mode: 0o600 });
+    require('fs').writeFileSync(process.env._P_OUTFILE, JSON.stringify(p), { mode: 0o600 });
   " 2>/dev/null || true
 
   # NOTE: Do NOT clean up temp profile here — the queue worker processes it
@@ -187,26 +191,35 @@ if [[ -n "$AGENT_INTRO" ]]; then
 fi
 
 
-# Synthesize audio inline (shows banner output) but skip playback
-# Then queue the generated WAV for sequential playback by the queue worker
-export AGENTVIBES_NO_PLAYBACK=true
+# Serialize speech — prevents overlap when Claude fires parallel calls
+# Uses mkdir as a portable atomic lock (works on Linux, macOS, WSL)
+SPEECH_LOCK="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-speech.lock"
+
+# Acquire lock (wait up to 120s, retry every 0.5s)
+# Clean up stale file locks from older flock-based version
+[[ -f "$SPEECH_LOCK" ]] && rm -f "$SPEECH_LOCK"
+_WAIT=0
+while ! mkdir "$SPEECH_LOCK" 2>/dev/null; do
+  if [[ -e "$SPEECH_LOCK" ]]; then
+    _LOCK_AGE=$(( $(date +%s) - $(stat -c '%Y' "$SPEECH_LOCK" 2>/dev/null || stat -f '%m' "$SPEECH_LOCK" 2>/dev/null || echo 0) ))
+    [[ $_LOCK_AGE -gt 60 ]] && { rm -rf "$SPEECH_LOCK" 2>/dev/null || true; continue; }
+  fi
+  sleep 0.5
+  _WAIT=$((_WAIT + 1))
+  [[ $_WAIT -gt 240 ]] && break
+done
+trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
+
+# Speak with agent's voice
 if [[ -n "$AGENT_VOICE" ]]; then
-  OUTPUT=$(bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" 2>&1)
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
 else
-  OUTPUT=$(bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" 2>&1)
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
 fi
-unset AGENTVIBES_NO_PLAYBACK
 
-# Show the banner output inline (voice info, file path, etc.)
-echo "$OUTPUT"
-
-# Extract the generated WAV path for queued playback
-WAV_FILE=$(printf '%s' "$OUTPUT" | sed "s/$(printf '\033')\[[0-9;]*m//g" | grep -oP '/[^\s]+\.wav' | head -1)
-
-if [[ -n "$WAV_FILE" ]] && [[ -f "$WAV_FILE" ]]; then
-  # Queue the WAV file for sequential playback (non-blocking)
-  bash "$SCRIPT_DIR/tts-queue.sh" play "$WAV_FILE" &
-fi
+# Release lock
+rmdir "$SPEECH_LOCK" 2>/dev/null || true
+trap - EXIT
 
 # Clean up temp profile after use
 if [[ -n "$TEMP_PROFILE" ]] && [[ -f "$TEMP_PROFILE" ]]; then
