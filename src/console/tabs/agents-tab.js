@@ -57,7 +57,7 @@ const COLORS = {
   linkFg:     '#00e5ff',
 };
 
-const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Enter] Edit Agent  [Space] Sample  [R] Reset  [Q] Quit';
+const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Enter] Edit  [Space] Preview  [R] Reset  [A] Auto-assign  [B] Bulk  [Q] Quit';
 const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
@@ -262,6 +262,16 @@ export function createAgentsTab(screen, services) {
     style: { fg: COLORS.warnFg, bg: COLORS.contentBg },
   });
 
+  const hintLine = blessed.text({
+    parent: box,
+    top: '60%',
+    left: 4,
+    hidden: true,
+    tags: true,
+    content: '{#546e7a-fg}[Space] Preview agent  [Enter] Configure agent{/#546e7a-fg}',
+    style: { bg: COLORS.contentBg },
+  });
+
   // -------------------------------------------------------------------------
   // Buttons
 
@@ -315,10 +325,18 @@ export function createAgentsTab(screen, services) {
   resetBtn.bottom = 4;
   resetBtn.left = 4;
 
+  const autoAssignBtn = _createBtn('[A] Auto-assign', () => _autoAssignAll());
+  autoAssignBtn.bottom = 4;
+  autoAssignBtn.left = 18;
+
+  const bulkEditBtn = _createBtn('[B] Bulk Edit', () => _openBulkEditMenu());
+  bulkEditBtn.bottom = 4;
+  bulkEditBtn.left = 36;
+
   // -------------------------------------------------------------------------
   // Show/hide helpers for the two states
 
-  const _bmadWidgets = [sectionHeader, columnHeader, agentList, statusDivider, statusLine, warningLine, resetBtn];
+  const _bmadWidgets = [sectionHeader, columnHeader, agentList, hintLine, statusDivider, statusLine, warningLine, resetBtn, autoAssignBtn, bulkEditBtn];
 
   function _showBmadState() {
     onboardingBox.hide();
@@ -339,7 +357,7 @@ export function createAgentsTab(screen, services) {
     }
     return agents.map(a => {
       const profile = voiceStore.getAgentProfile(a.id);
-      const icon = (a.icon || '  ').padEnd(COL_ICON);
+      const icon = (a.icon ? `${a.icon} ` : '    ').padEnd(COL_ICON);
       const name = `${a.displayName}`.padEnd(COL_NAME).slice(0, COL_NAME);
       const voice = (profile.voice || '(global)').padEnd(COL_VOICE).slice(0, COL_VOICE);
       const pretext = (profile.pretext || '(default)').padEnd(COL_PRETEXT).slice(0, COL_PRETEXT);
@@ -985,6 +1003,266 @@ export function createAgentsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // Auto-assign helpers
+
+  function _shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function _autoAssignVoices() {
+    const installed = scanInstalledVoices();
+    if (installed.length === 0) return false;
+
+    // Separate by gender for variety
+    const females = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Female'));
+    const males   = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Male'));
+    const others  = _shuffleArray(installed.filter(v => !['Male', 'Female'].includes(getVoiceMeta(v).gender)));
+
+    // Interleave female/male for natural variety, then others
+    const pool = [];
+    const maxLen = Math.max(females.length, males.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < females.length) pool.push(females[i]);
+      if (i < males.length)   pool.push(males[i]);
+    }
+    pool.push(...others);
+
+    const used = new Set();
+    _agents.forEach((agent, i) => {
+      const voice = pool.find(v => !used.has(v)) ?? pool[i % pool.length];
+      if (voice) {
+        used.add(voice);
+        voiceStore.setAgentProfile(agent.id, { voice });
+      }
+    });
+    return true;
+  }
+
+  function _autoAssignMusic() {
+    const tracksDir = path.join(_projectRoot, '.claude', 'audio', 'tracks');
+    let tracks = [];
+    try {
+      tracks = fs.readdirSync(tracksDir).filter(f => /\.mp3$/i.test(f));
+    } catch { /* no tracks dir */ }
+    if (tracks.length === 0) return false;
+
+    const shuffled = _shuffleArray(tracks);
+    _agents.forEach((agent, i) => {
+      const track = shuffled[i % shuffled.length];
+      const existing = voiceStore.getAgentProfile(agent.id);
+      voiceStore.setAgentProfile(agent.id, {
+        backgroundMusic: { track, volume: existing.backgroundMusic?.volume ?? 70, enabled: true },
+      });
+    });
+    return true;
+  }
+
+  function _autoAssignAll() {
+    if (_agents.length === 0) return;
+    const voiceOk = _autoAssignVoices();
+    const musicOk = _autoAssignMusic();
+    refreshDisplay();
+    const msg = voiceOk && musicOk ? 'Voices and music auto-assigned'
+               : voiceOk ? 'Voices auto-assigned' : 'Auto-assign: no voices found';
+    _showSavedToast(msg);
+  }
+
+  // -------------------------------------------------------------------------
+  // Bulk edit menu
+
+  function _openBulkEditMenu() {
+    const BULK_ACTIONS = [
+      { label: '  Randomize Voices (gender-aware)',      key: 'voices' },
+      { label: '  Randomize Music (unique per agent)',   key: 'music' },
+      { label: '  Randomize Both',                       key: 'both' },
+      { label: '  Set Same Music for All Agents...',     key: 'setMusic' },
+      { label: '  Set Same Pretext for All Agents...',   key: 'setPretext' },
+      { label: '  Set Same Reverb for All Agents...',    key: 'setReverb' },
+      { label: '  Reset All Agent Profiles',             key: 'resetAll' },
+    ];
+
+    const menuList = blessed.list({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 52,
+      height: BULK_ACTIONS.length + 4,
+      border: { type: 'line' },
+      tags: true,
+      label: _modalTitle('Bulk Edit'),
+      keys: true,
+      vi: true,
+      mouse: true,
+      items: BULK_ACTIONS.map(a => a.label),
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        border: { fg: COLORS.btnFocus },
+        selected: { bg: '#4a148c', fg: COLORS.activeFg, bold: true },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+
+    blessed.text({
+      parent: menuList,
+      bottom: -1,
+      left: 1,
+      width: 48,
+      height: 1,
+      tags: true,
+      content: '{#455a64-fg}[Enter] Select  [Esc] Cancel{/#455a64-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    menuList.setFront();
+    menuList.focus();
+    screen.render();
+
+    let _menuClosed = false;
+    function _closeMenu(callback) {
+      if (_menuClosed) return;
+      _menuClosed = true;
+      destroyList(menuList, screen, callback);
+    }
+
+    menuList.key(['enter'], () => {
+      const action = BULK_ACTIONS[menuList.selected];
+      if (!action) return;
+
+      switch (action.key) {
+        case 'voices':
+          _closeMenu(() => {
+            if (_autoAssignVoices()) { refreshDisplay(); _showSavedToast('Voices randomized'); }
+          });
+          break;
+
+        case 'music':
+          _closeMenu(() => {
+            if (_autoAssignMusic()) { refreshDisplay(); _showSavedToast('Music randomized'); }
+          });
+          break;
+
+        case 'both':
+          _closeMenu(() => { _autoAssignAll(); });
+          break;
+
+        case 'setMusic':
+          _closeMenu(() => {
+            openTrackPicker(screen, '', (track) => {
+              _agents.forEach(agent => {
+                const p = voiceStore.getAgentProfile(agent.id);
+                voiceStore.setAgentProfile(agent.id, {
+                  backgroundMusic: { track, volume: p.backgroundMusic?.volume ?? 70, enabled: true },
+                });
+              });
+              refreshDisplay();
+              _showSavedToast('Music set for all agents');
+              agentList.focus();
+            }, () => { agentList.focus(); screen.render(); });
+          });
+          break;
+
+        case 'setPretext':
+          _closeMenu(() => { _openBulkPretextEditor(); });
+          break;
+
+        case 'setReverb':
+          _closeMenu(() => {
+            openReverbPicker(screen, '', (val) => {
+              _agents.forEach(agent => voiceStore.setAgentProfile(agent.id, { reverbPreset: val }));
+              refreshDisplay();
+              _showSavedToast('Reverb set for all agents');
+              agentList.focus();
+            }, () => { agentList.focus(); screen.render(); }, { applyToEffectsManager: false });
+          });
+          break;
+
+        case 'resetAll':
+          _closeMenu(() => {
+            _agents.forEach(agent => voiceStore.resetAgentProfile(agent.id));
+            refreshDisplay();
+            _showSavedToast('All profiles reset');
+          });
+          break;
+      }
+    });
+
+    menuList.key(['escape', 'q'], () => {
+      _closeMenu(() => { agentList.focus(); screen.render(); });
+    });
+  }
+
+  function _openBulkPretextEditor() {
+    const editModal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 60,
+      height: 9,
+      border: { type: 'line' },
+      tags: true,
+      label: _modalTitle('Set Pretext for All Agents'),
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: '#00e5ff' } },
+    });
+    editModal.setFront();
+
+    blessed.text({
+      parent: editModal, top: 1, left: 2,
+      content: 'Pretext to apply to all agents (leave empty to clear):',
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+    });
+
+    const inputBox = blessed.textbox({
+      parent: editModal, top: 3, left: 2, right: 2, height: 3,
+      border: { type: 'line' },
+      inputOnFocus: true,
+      style: {
+        fg: COLORS.valueFg, bg: '#0d1b35',
+        border: { fg: COLORS.borderFg },
+        focus: { border: { fg: '#00e5ff' } },
+      },
+    });
+
+    blessed.text({
+      parent: editModal, bottom: 1, left: 2, tags: true,
+      content: '{#455a64-fg}[Enter] Apply to all  [Esc] Cancel{/#455a64-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _closed = false;
+    function _close(save) {
+      if (_closed) return;
+      _closed = true;
+      if (save) {
+        const raw = inputBox.getValue().trim().slice(0, MAX_PRETEXT_LENGTH);
+        _agents.forEach(agent => {
+          if (raw) {
+            voiceStore.setAgentProfile(agent.id, { pretext: raw });
+          } else {
+            const p = voiceStore.getAgentProfile(agent.id);
+            const { pretext: _removed, ...rest } = p;
+            voiceStore.resetAgentProfile(agent.id);
+            if (Object.keys(rest).length > 0) voiceStore.setAgentProfile(agent.id, rest);
+          }
+        });
+        refreshDisplay();
+        _showSavedToast('Pretext set for all agents');
+      }
+      destroyList(editModal, screen, () => { agentList.focus(); screen.render(); });
+    }
+
+    inputBox.key(['enter'], () => _close(true));
+    inputBox.key(['escape'], () => _close(false));
+    inputBox.focus();
+    screen.render();
+  }
+
+  // -------------------------------------------------------------------------
   // Key bindings
 
   agentList.key(['r', 'R'], () => {
@@ -1006,8 +1284,11 @@ export function createAgentsTab(screen, services) {
     if (agent) _sampleAgent(agent);
   });
 
+  agentList.key(['a', 'A'], () => { _autoAssignAll(); });
+  agentList.key(['b', 'B'], () => { _openBulkEditMenu(); });
+
   // Type-to-jump
-  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'r']);
+  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'r', 'a', 'b']);
   agentList.on('keypress', (ch, key) => {
     if (!ch || key.ctrl || key.meta) return;
     const lower = ch.toLowerCase();
@@ -1034,12 +1315,12 @@ export function createAgentsTab(screen, services) {
     const items = agentList.items;
     const cur = agentList.selected ?? 0;
     if (_alBlink.sel !== cur && _alBlink.sel >= 0 && items[_alBlink.sel]) {
-      items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '').replace(/ █$/, ''));
+      items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '').replace(/  █$/, ''));
     }
     _alBlink.sel = cur;
     if (items[cur]) {
-      const base = (items[cur].content ?? '').replace(/ █$/, '');
-      items[cur].setContent(_alBlink.on ? `${base} █` : base);
+      const base = (items[cur].content ?? '').replace(/  █$/, '');
+      items[cur].setContent(_alBlink.on ? `${base}  █` : base);
     }
     screen.render();
   }
@@ -1047,7 +1328,7 @@ export function createAgentsTab(screen, services) {
     _alBlink.on = true;
     _alBlink.sel = agentList.selected ?? 0;
     const items = agentList.items;
-    if (items[_alBlink.sel]) items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '') + ' █');
+    if (items[_alBlink.sel]) items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '') + '  █');
     screen.render();
     _alBlink.interval = setInterval(_alTick, 500);
   });
@@ -1055,7 +1336,7 @@ export function createAgentsTab(screen, services) {
     if (_alBlink.interval) { clearInterval(_alBlink.interval); _alBlink.interval = null; }
     const items = agentList.items;
     const sel = agentList.selected ?? 0;
-    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/ █$/, ''));
+    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/  █$/, ''));
     screen.render();
   });
   agentList.on('select item', () => {
