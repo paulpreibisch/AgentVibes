@@ -67,9 +67,9 @@ function _acquireLock(lockPath) {
           try { fs.unlinkSync(lockPath); } catch {}
         }
       } catch {}
-      // Busy-wait with small delay (sync context — TUI is single-threaded)
-      const end = Date.now() + retryMs;
-      while (Date.now() < end) { /* spin */ }
+      // Brief sync delay (10ms) — acceptable for a single-threaded TUI lock retry
+      const buf = new SharedArrayBuffer(4);
+      Atomics.wait(new Int32Array(buf), 0, 0, retryMs);
     }
   }
   return null; // Proceed without lock rather than blocking forever

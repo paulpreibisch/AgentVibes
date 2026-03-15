@@ -22,6 +22,7 @@ if (!IS_TEST) {
 }
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
+const _hintLabel = '{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}';
 
 const BUILT_IN_TRACKS = [
   { label: '🎻 Soft Flamenco',  file: 'agentvibes_soft_flamenco_loop.mp3' },
@@ -84,17 +85,25 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
     },
   });
 
-  // Preview status line
-  const previewLine = blessed.text({
-    parent: screen,
-    top: list.top + listHeight,
-    left: 'center',
-    width: 54,
-    height: 1,
-    tags: true,
-    content: '{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}',
-    style: { fg: '#e3f2fd', bg: '#0a0e1a' },
-  });
+  // Helper: update hint text in the bottom border label
+  function _setHint(text) {
+    list.setLabel({ text: _modalTitle('Select Track'), side: 'left' });
+    // Use _ prefix convention for bottom border content (blessed doesn't have setFooter)
+    list._label2 && list._label2.destroy();
+    list._label2 = blessed.text({
+      parent: list,
+      bottom: -1,
+      left: 1,
+      width: 50,
+      height: 1,
+      tags: true,
+      content: text,
+      style: { fg: '#e3f2fd' },
+    });
+    screen.render();
+  }
+
+  _setHint(_hintLabel);
 
   if (currentIdx >= 0) list.select(currentIdx);
   list.focus();
@@ -118,8 +127,7 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
     // Toggle off if same track
     if (_previewTrackId === trackFile) {
       _killPreview();
-      previewLine.setContent('{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}');
-      screen.render();
+      _setHint(_hintLabel);
       return;
     }
 
@@ -130,11 +138,9 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
     if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
 
     if (!_mp3Player || !fs.existsSync(trackPath)) {
-      previewLine.setContent('{red-fg}No MP3 player found or track missing{/red-fg}');
-      screen.render();
+      _setHint('{red-fg}No MP3 player found or track missing{/red-fg}');
       setTimeout(() => {
-        previewLine.setContent('{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}');
-        screen.render();
+        _setHint(_hintLabel);
       }, 3000);
       return;
     }
@@ -145,15 +151,13 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
     _previewTrackId = trackFile;
 
     const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
-    previewLine.setContent(`{#00e5ff-fg}♪ Previewing: ${label}  (Space to stop){/#00e5ff-fg}`);
-    screen.render();
+    _setHint(`{#00e5ff-fg}♪ Previewing: ${label}  (Space to stop){/#00e5ff-fg}`);
 
     _previewProc.on('exit', () => {
       if (_previewTrackId === trackFile) {
         _previewTrackId = null;
         _previewProc = null;
-        previewLine.setContent('{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}');
-        screen.render();
+        _setHint(_hintLabel);
       }
     });
 
@@ -165,7 +169,7 @@ export function openTrackPicker(screen, currentTrack, onSelect, onClose) {
 
   function _close(callback) {
     _killPreview();
-    previewLine.destroy();
+    if (list._label2) list._label2.destroy();
     if (callback) {
       callback();
       destroyList(list, screen, onClose);
