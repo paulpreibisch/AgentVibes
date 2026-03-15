@@ -12,7 +12,7 @@
 import { AgentVoiceStore, scanBmadAgents, isBmadDetected, isSingleVoiceProvider } from '../../services/agent-voice-store.js';
 import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openPersonalityPicker, PERSONALITIES, PERSONALITY_EMOJIS } from '../widgets/personality-picker.js';
-import { openTrackPicker } from '../widgets/track-picker.js';
+import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatReverbState, formatTrackName } from '../widgets/format-utils.js';
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
@@ -674,8 +674,9 @@ export function createAgentsTab(screen, services) {
           break;
 
         case 'music':
-          openTrackPicker(screen, draft.backgroundMusic.track, (track) => {
+          openTrackPicker(screen, draft.backgroundMusic.track, draft.backgroundMusic.volume, (track, volume) => {
             draft.backgroundMusic.track = track;
+            draft.backgroundMusic.volume = volume;
             draft.backgroundMusic.enabled = true;
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
@@ -1081,6 +1082,7 @@ export function createAgentsTab(screen, services) {
       { label: '  Randomize Music (unique per agent)',   key: 'music' },
       { label: '  Randomize Both',                       key: 'both' },
       { label: '  Set Same Music for All Agents...',     key: 'setMusic' },
+      { label: '  Set Same Volume for All Agents...',    key: 'setVolume' },
       { label: '  Set Same Pretext for All Agents...',   key: 'setPretext' },
       { label: '  Set Same Reverb for All Agents...',    key: 'setReverb' },
       { label: '  Reset All Agent Profiles',             key: 'resetAll' },
@@ -1153,15 +1155,33 @@ export function createAgentsTab(screen, services) {
 
         case 'setMusic':
           _closeMenu(() => {
-            openTrackPicker(screen, '', (track) => {
+            openTrackPicker(screen, '', 70, (track, volume) => {
               _agents.forEach(agent => {
                 const p = voiceStore.getAgentProfile(agent.id);
                 voiceStore.setAgentProfile(agent.id, {
-                  backgroundMusic: { track, volume: p.backgroundMusic?.volume ?? 70, enabled: true },
+                  backgroundMusic: { track, volume, enabled: true },
                 });
               });
               refreshDisplay();
               _showSavedToast('Music set for all agents');
+              agentList.focus();
+            }, () => { agentList.focus(); screen.render(); });
+          });
+          break;
+
+        case 'setVolume':
+          _closeMenu(() => {
+            const curVol = voiceStore.getAgentProfile(_agents[0]?.id)?.backgroundMusic?.volume ?? 70;
+            openVolumeInput(screen, curVol, (volume) => {
+              _agents.forEach(agent => {
+                const p = voiceStore.getAgentProfile(agent.id);
+                const bm = p.backgroundMusic || {};
+                voiceStore.setAgentProfile(agent.id, {
+                  backgroundMusic: { ...bm, volume },
+                });
+              });
+              refreshDisplay();
+              _showSavedToast(`Volume set to ${volume}% for all agents`);
               agentList.focus();
             }, () => { agentList.focus(); screen.render(); });
           });

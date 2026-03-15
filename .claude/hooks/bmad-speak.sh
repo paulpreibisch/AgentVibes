@@ -204,13 +204,15 @@ if [[ -n "$PROFILE_REVERB" ]] || [[ -n "$PROFILE_PERSONALITY" ]] || [[ -n "$PROF
   # SECURITY: Pass values via env vars to prevent shell injection
   _P_REVERB="$PROFILE_REVERB" _P_PERSONALITY="$PROFILE_PERSONALITY" \
   _P_MUSIC_TRACK="$PROFILE_MUSIC_TRACK" _P_MUSIC_VOL="${PROFILE_MUSIC_VOLUME:-70}" \
+  _P_MUSIC_ENABLED="$PROFILE_MUSIC_ENABLED" \
   _P_OUTFILE="$TEMP_PROFILE" node -e "
     const p = {};
     if (process.env._P_REVERB) p.reverbPreset = process.env._P_REVERB;
     if (process.env._P_PERSONALITY) p.personality = process.env._P_PERSONALITY;
     if (process.env._P_MUSIC_TRACK) p.backgroundMusic = {
       track: process.env._P_MUSIC_TRACK,
-      volume: parseInt(process.env._P_MUSIC_VOL) || 70
+      volume: parseInt(process.env._P_MUSIC_VOL) || 70,
+      enabled: process.env._P_MUSIC_ENABLED === 'true'
     };
     require('fs').writeFileSync(process.env._P_OUTFILE, JSON.stringify(p), { mode: 0o600 });
   " 2>/dev/null || true
