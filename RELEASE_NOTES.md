@@ -1,5 +1,82 @@
 # AgentVibes Release Notes
 
+## 🎉 v4.2 — "Party Mode" Release
+
+**Release Date:** March 2026
+
+### 🤖 What is BMAD?
+
+The BMad Method (Build More Architect Dreams) is an AI-driven development framework module within the BMad Method Ecosystem that helps you build software through the whole process from ideation and planning all the way through agentic implementation. It provides specialized AI agents, guided workflows, and intelligent planning that adapts to your project's complexity, whether you're fixing a bug or building an enterprise platform.
+
+### 🎭 BMAD Multi-Agent Party Mode Voices
+
+The biggest BMAD update yet. When BMAD's party mode runs a multi-agent discussion, every agent now speaks with their own individually configured voice, background music, reverb, and personality — making each agent immediately recognizable and bringing your multi-agent sessions to life.
+
+**Per-Agent Configuration:**
+- 🎙️ **Voice** — Choose from 914 voices per agent
+- 🎵 **Background Music** — Unique ambient track per agent (cinematic, lo-fi, jazz, etc.)
+- 🎛️ **Reverb** — none / room / hall / cathedral / studio
+- 💬 **Pretext** — Custom intro phrase before every speech ("Winston says:...")
+- 🎭 **Personality** — sarcastic, dramatic, pirate, cheerful, etc.
+
+**Configuration stored in:** `~/.agentvibes/bmad-voice-map.json`
+
+**Enable:**
+```bash
+/agent-vibes:bmad-party enable
+```
+
+### 🎛️ BMad Tab — Visual Agent Configurator
+
+New **BMad Tab** added to `npx agentvibes` TUI for managing all BMAD agents visually:
+
+```bash
+npx agentvibes   # Press B to open BMad Tab
+```
+
+**Agent table** shows all installed agents with icon, name, title, voice, and music columns.
+
+| Key | Action |
+|-----|--------|
+| `↑↓` / `jk` | Navigate agents |
+| `Enter` | Open agent configurator (voice, pretext, reverb, personality, music) |
+| `Space` | Preview agent with full profile (voice + music + reverb) |
+| `A` | Auto-assign unique voices to all agents (gender-aware randomization) |
+| `B` | Bulk Edit menu — set music/pretext/reverb for all at once |
+| `R` | Reset agent to defaults |
+
+### 🖥️ SSH Receiver Tab — Remote Audio Streaming
+
+New **Receiver Tab** in the TUI enables streaming TTS audio from voiceless remote servers to your local machine over TCP — perfect for cloud dev boxes, WSL, and SSH sessions.
+
+### ⚡ TTS Latency Reduced ~1 Second
+
+- **Batched Node.js profile reads** — 6 `node -e` calls collapsed into 1 (saves ~900ms per agent speech)
+- **inotifywait queue worker** — file-event-driven queue eliminates polling delay
+- **Background cache cleanup** — off the critical path every 10th call
+
+### 🎨 ANSI Colors Restored to Banner
+
+The inline TTS banner now shows full ANSI color (gold voice, cyan reverb, traffic-light cache size). Fixed via `AGENTVIBES_WAV_OUTPATH` sidecar file — no more stdout parsing broken by ANSI codes.
+
+### 🔕 Banner Toggle
+
+Hide TTS info banner without muting audio: `touch ~/.agentvibes/banner-disabled` or say "turn off the TTS banner" via MCP.
+
+### 🔇 Party Mode Overlap & Markdown Fixes
+
+- **No overlap** — `wait "$PLAYER_PID"` keeps speech lock held until audio fully completes
+- **No "asterisk asterisk"** — markdown stripped in `bmad-speak.sh` before TTS
+
+### 🛡️ Security
+
+- Adversarial code review — 58 issues identified and addressed
+- Agent ID injection prevention, PID-scoped temp profile files, env-var-based Node.js JSON reads
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.6.0...v4.2
+
+---
+
 ## ✨ v3.5.10 - Soprano Detection Fixes & Enhanced Installer Features
 
 **Release Date:** February 14, 2026
