@@ -202,7 +202,7 @@ export function createAgentsTab(screen, services) {
     left: 4,
     hidden: true,
     tags: true,
-    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Pretext'.padEnd(COL_PRETEXT)}${'Reverb'.padEnd(COL_REVERB)}${'Music'.padEnd(COL_MUSIC)}Vol{/#90a4ae-fg}`,
+    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Reverb'.padEnd(COL_REVERB)}${'Music'.padEnd(COL_MUSIC)}${'Vol'.padEnd(COL_VOL)}  Pretext{/#90a4ae-fg}`,
     style: { bg: COLORS.contentBg },
   });
 
@@ -358,19 +358,21 @@ export function createAgentsTab(screen, services) {
     }
     return agents.map(a => {
       const profile = voiceStore.getAgentProfile(a.id);
-      const icon = (a.icon ? `${a.icon} ` : '    ').padEnd(COL_ICON);
+      // Strip variation selectors (e.g. U+FE0F on 🏗️) so padEnd uses visual width
+      const rawIcon = (a.icon || '').replace(/\uFE0F/g, '');
+      const icon = (rawIcon ? `${rawIcon} ` : '   ').padEnd(COL_ICON);
       const name = `${a.displayName}`.padEnd(COL_NAME).slice(0, COL_NAME);
       const voiceRaw = formatVoiceName(profile.voice);
       const voice = voiceRaw.padEnd(COL_VOICE).slice(0, COL_VOICE);
-      const pretext = (profile.pretext || '(default)').padEnd(COL_PRETEXT).slice(0, COL_PRETEXT);
       const reverb = (profile.reverbPreset || '(global)').padEnd(COL_REVERB).slice(0, COL_REVERB);
       const music = (profile.backgroundMusic?.track
         ? formatTrackName(profile.backgroundMusic.track)
         : '(global)').padEnd(COL_MUSIC).slice(0, COL_MUSIC);
       const vol = profile.backgroundMusic?.enabled
-        ? `${profile.backgroundMusic.volume ?? 70}%`.padEnd(COL_VOL)
-        : '—    ';
-      return ` ${icon}${name}${voice}${pretext}${reverb}${music}${vol}`;
+        ? ` ${profile.backgroundMusic.volume ?? 70}%`.padEnd(COL_VOL)
+        : ' —   ';
+      const pretext = (profile.pretext || '(default)').slice(0, COL_PRETEXT);
+      return ` ${icon}${name}${voice}${reverb}${music}${vol}  ${pretext}`;
     });
   }
 
