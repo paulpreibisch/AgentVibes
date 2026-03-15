@@ -506,8 +506,9 @@ if ! [[ "${DURATION:-}" =~ ^[0-9]+$ ]]; then
   DURATION=1
 fi
 
-# Play audio in background (skip if in test mode or no-playback mode)
+# Play audio (skip if in test mode or no-playback mode)
 # AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+PLAYER_PID=""
 if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
   # Detect platform and use appropriate audio player
   if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -616,4 +617,11 @@ if [[ -z "$BACKGROUND_MUSIC" ]]; then
   else
     echo "🎵 Background music: Disabled"
   fi
+fi
+
+# Wait for audio player to finish before returning.
+# This keeps the bmad-speak.sh speech lock held until playback is actually done,
+# preventing party-mode agents from talking over each other.
+if [[ -n "$PLAYER_PID" ]]; then
+  wait "$PLAYER_PID" 2>/dev/null || true
 fi
