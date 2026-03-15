@@ -57,7 +57,7 @@ const COLORS = {
   linkFg:     '#00e5ff',
 };
 
-const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Enter] Edit  [Space] Preview  [R] Reset  [A] Auto-assign  [B] Bulk  [Q] Quit';
+const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
 const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
@@ -263,13 +263,14 @@ export function createAgentsTab(screen, services) {
     style: { fg: COLORS.warnFg, bg: COLORS.contentBg },
   });
 
+  // Hint shown inline next to the action buttons at bottom of list
   const hintLine = blessed.text({
     parent: box,
-    top: '60%',
+    bottom: 5,
     left: 4,
     hidden: true,
     tags: true,
-    content: '{#546e7a-fg}[Space] Preview agent  [Enter] Configure agent{/#546e7a-fg}',
+    content: '{#546e7a-fg}[Space] Preview  [Enter] Configure  [X] Reset  [A] Auto-assign  [B] Bulk Edit{/#546e7a-fg}',
     style: { bg: COLORS.contentBg },
   });
 
@@ -316,7 +317,7 @@ export function createAgentsTab(screen, services) {
     return btn;
   }
 
-  const resetBtn = _createBtn('[R] Reset', () => {
+  const resetBtn = _createBtn('[X] Reset', () => {
     const agent = _agents[agentList.selected];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
@@ -337,7 +338,7 @@ export function createAgentsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Show/hide helpers for the two states
 
-  const _bmadWidgets = [sectionHeader, columnHeader, agentList, hintLine, statusDivider, statusLine, warningLine, resetBtn, autoAssignBtn, bulkEditBtn];
+  const _bmadWidgets = [sectionHeader, columnHeader, agentList, hintLine, resetBtn, autoAssignBtn, bulkEditBtn];
 
   function _showBmadState() {
     onboardingBox.hide();
@@ -391,17 +392,8 @@ export function createAgentsTab(screen, services) {
 
     _showBmadState();
 
-    const provider = providerService.getProvider?.() ?? configService.getConfig().provider ?? 'piper';
-
     const items = _buildListItems(_agents);
     agentList.setItems(items);
-
-    statusLine.setContent(
-      `  Provider: ${provider}  |  Agents: ${_agents.length}`
-    );
-    statusLine.options.tags = true;
-
-    warningLine.setContent('');
 
     screen.render();
   }
@@ -1292,7 +1284,7 @@ export function createAgentsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Key bindings
 
-  agentList.key(['r', 'R'], () => {
+  agentList.key(['x', 'X'], () => {
     const agent = _agents[agentList.selected];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
@@ -1315,7 +1307,7 @@ export function createAgentsTab(screen, services) {
   agentList.key(['b', 'B'], () => { _openBulkEditMenu(); });
 
   // Type-to-jump
-  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'r', 'a', 'b']);
+  const _agentJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'x', 'a', 'b']);
   agentList.on('keypress', (ch, key) => {
     if (!ch || key.ctrl || key.meta) return;
     const lower = ch.toLowerCase();
