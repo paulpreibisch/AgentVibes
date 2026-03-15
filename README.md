@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.1
 
 ---
 
@@ -50,7 +50,7 @@ The BMad Method (Build More Architect Dreams) is an AI-driven development framew
 
 When BMAD's party mode activates multiple agents in a discussion, each agent speaks with their unique assigned voice — making the Architect, PM, Developer, QA, and Analyst immediately recognizable and bringing your multi-agent sessions to life.
 
-**What's New in v4.2:**
+**What's New in v4.1:**
 - 🎙️ **Per-Agent Voices** — Each BMAD agent (Architect, PM, Dev, QA, Analyst...) speaks with their own voice
 - 🎵 **Per-Agent Background Music** — Different ambient track per agent (cinematic, lo-fi, jazz...)
 - 🎛️ **Per-Agent Reverb & Personality** — Unique audio character for each agent
@@ -274,7 +274,7 @@ Configure now: `npx agentvibes config music`
 
 ### 🎯 Key Features
 
-**🌟 NEW IN v4.2 — BMAD Party Mode & SSH Receiver:**
+**🌟 NEW IN v4.1 — BMAD Party Mode & SSH Receiver:**
 - 🎭 **BMAD Party Mode Voices** — Each agent speaks with their unique voice, music, reverb, personality
 - 🖥️ **SSH Receiver Tab** — Stream TTS audio from headless servers to your local machine over TCP
 - 🎛️ **BMad Tab (TUI)** — Visual agent configurator with auto-assign and bulk edit
@@ -355,7 +355,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [🎤 Voice Browser v1.0](#-agent-vibes-v10-voice-browser) - Browse & sample 914 voices
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v4.2 "Party Mode" with BMAD voices, SSH Receiver, TTS latency improvements
+- [📰 Latest Release](#-latest-release) - v4.1 "Party Mode" with BMAD voices, SSH Receiver, TTS latency improvements
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -402,7 +402,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v4.2 - "Party Mode" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.2)** 🎉
+**[v4.1 - "Party Mode" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.1)** 🎉
 
 ### 🎭 BMAD Multi-Agent Party Mode Voices
 
@@ -502,7 +502,7 @@ npx agentvibes install
 
 🐛 **Found a bug?** Report at [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
 
-[→ View Complete Release Notes](RELEASE_NOTES_v4.2.md) | [→ View Previous Release](RELEASE_NOTES_v3.6.0.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+[→ View Complete Release Notes](RELEASE_NOTES_v4.1.md) | [→ View Previous Release (v4.0.1)](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.0.1) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 

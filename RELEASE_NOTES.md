@@ -1,6 +1,6 @@
 # AgentVibes Release Notes
 
-## 🎉 v4.2 — "Party Mode" Release
+## 🎉 v4.1 — "Party Mode" Release
 
 **Release Date:** March 2026
 
@@ -73,7 +73,7 @@ Hide TTS info banner without muting audio: `touch ~/.agentvibes/banner-disabled`
 - Adversarial code review — 58 issues identified and addressed
 - Agent ID injection prevention, PID-scoped temp profile files, env-var-based Node.js JSON reads
 
-**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.6.0...v4.2
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v4.0.1...v4.1
 
 ---
 
