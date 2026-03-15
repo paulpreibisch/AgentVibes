@@ -96,11 +96,12 @@ if [[ -n "$VOICE_OVERRIDE" ]]; then
     voice_dir=$(get_voice_storage_dir)
     _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
     if [[ -f "$_JSON_FILE" ]]; then
-      SPEAKER_ID=$(node -e "
+      # SECURITY: Pass values via env vars to prevent shell injection
+      SPEAKER_ID=$(_JSON="$_JSON_FILE" _SPKR="$_SPEAKER_NAME" node -e "
         try {
-          const j = JSON.parse(require('fs').readFileSync('$_JSON_FILE','utf8'));
+          const j = JSON.parse(require('fs').readFileSync(process.env._JSON,'utf8'));
           const map = j.speaker_id_map || {};
-          const id = map['$_SPEAKER_NAME'];
+          const id = map[process.env._SPKR];
           if (id !== undefined) process.stdout.write(String(id));
         } catch {}
       " 2>/dev/null || true)
@@ -160,11 +161,12 @@ else
       voice_dir=$(get_voice_storage_dir)
       _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
       if [[ -f "$_JSON_FILE" ]]; then
-        SPEAKER_ID=$(node -e "
+        # SECURITY: Pass values via env vars to prevent shell injection
+        SPEAKER_ID=$(_JSON="$_JSON_FILE" _SPKR="$_SPEAKER_NAME" node -e "
           try {
-            const j = JSON.parse(require('fs').readFileSync('$_JSON_FILE','utf8'));
+            const j = JSON.parse(require('fs').readFileSync(process.env._JSON,'utf8'));
             const map = j.speaker_id_map || {};
-            const id = map['$_SPEAKER_NAME'];
+            const id = map[process.env._SPKR];
             if (id !== undefined) process.stdout.write(String(id));
           } catch {}
         " 2>/dev/null || true)

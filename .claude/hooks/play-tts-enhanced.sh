@@ -39,9 +39,10 @@ AGENT_PROFILE="${AGENTVIBES_AGENT_PROFILE:-}"
 
 if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
     # Read profile fields using node (reliable JSON parsing)
-    _PROFILE_REVERB=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(p.reverbPreset||'')}catch{}" 2>/dev/null || true)
-    _PROFILE_MUSIC_TRACK=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(p.backgroundMusic?.track||'')}catch{}" 2>/dev/null || true)
-    _PROFILE_MUSIC_VOL=$(node -e "try{const p=JSON.parse(require('fs').readFileSync('$AGENT_PROFILE','utf8'));process.stdout.write(String(p.backgroundMusic?.volume||''))}catch{}" 2>/dev/null || true)
+    # SECURITY: Pass values via env vars to prevent shell injection
+    _PROFILE_REVERB=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(p.reverbPreset||'')}catch{}" 2>/dev/null || true)
+    _PROFILE_MUSIC_TRACK=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(p.backgroundMusic?.track||'')}catch{}" 2>/dev/null || true)
+    _PROFILE_MUSIC_VOL=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume||''))}catch{}" 2>/dev/null || true)
 
     # Apply per-agent reverb via effects-manager (scoped to this agent's config key)
     if [[ -n "$_PROFILE_REVERB" ]] && [[ -f "$SCRIPT_DIR/effects-manager.sh" ]]; then
@@ -60,6 +61,9 @@ fi
 # Step 1: Generate TTS WITHOUT playback
 export AGENTVIBES_NO_PLAYBACK=true
 export AGENTVIBES_WAV_OUTPATH="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-last-wav-$$.txt"
+
+# Cleanup temp outpath file on exit
+trap 'rm -f "$AGENTVIBES_WAV_OUTPATH"' EXIT
 "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE"
 
 # Read the generated file path (written by play-tts-piper.sh via AGENTVIBES_WAV_OUTPATH)

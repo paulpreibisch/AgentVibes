@@ -64,11 +64,12 @@ read_agent_profile() {
   fi
 
   # Use node for JSON parsing (always available in AgentVibes projects)
-  node -e "
+  # SECURITY: Pass values via env vars to prevent shell injection
+  _VOICE_MAP="$VOICE_MAP_FILE" _AGENT_ID="$agent_id" _FIELD="$field" node -e "
     try {
-      const d = JSON.parse(require('fs').readFileSync('$VOICE_MAP_FILE','utf8'));
-      const a = d.agents?.['$agent_id'] ?? {};
-      const f = '$field';
+      const d = JSON.parse(require('fs').readFileSync(process.env._VOICE_MAP,'utf8'));
+      const a = d.agents?.[process.env._AGENT_ID] ?? {};
+      const f = process.env._FIELD;
       if (f.includes('.')) {
         const [k1, k2] = f.split('.');
         process.stdout.write(String(a[k1]?.[k2] ?? ''));
@@ -162,15 +163,18 @@ if [[ -n "$PROFILE_REVERB" ]] || [[ -n "$PROFILE_PERSONALITY" ]] || [[ -n "$PROF
   TEMP_PROFILE="$PROFILE_DIR/agent-profile-$$.json"
 
   # Write profile as JSON for reliable parsing downstream
-  node -e "
+  # SECURITY: Pass values via env vars to prevent shell injection
+  _P_REVERB="$PROFILE_REVERB" _P_PERSONALITY="$PROFILE_PERSONALITY" \
+  _P_MUSIC_TRACK="$PROFILE_MUSIC_TRACK" _P_MUSIC_VOL="${PROFILE_MUSIC_VOLUME:-70}" \
+  _P_OUTFILE="$TEMP_PROFILE" node -e "
     const p = {};
-    if ('$PROFILE_REVERB') p.reverbPreset = '$PROFILE_REVERB';
-    if ('$PROFILE_PERSONALITY') p.personality = '$PROFILE_PERSONALITY';
-    if ('$PROFILE_MUSIC_TRACK') p.backgroundMusic = {
-      track: '$PROFILE_MUSIC_TRACK',
-      volume: parseInt('${PROFILE_MUSIC_VOLUME:-70}') || 70
+    if (process.env._P_REVERB) p.reverbPreset = process.env._P_REVERB;
+    if (process.env._P_PERSONALITY) p.personality = process.env._P_PERSONALITY;
+    if (process.env._P_MUSIC_TRACK) p.backgroundMusic = {
+      track: process.env._P_MUSIC_TRACK,
+      volume: parseInt(process.env._P_MUSIC_VOL) || 70
     };
-    require('fs').writeFileSync('$TEMP_PROFILE', JSON.stringify(p), { mode: 0o600 });
+    require('fs').writeFileSync(process.env._P_OUTFILE, JSON.stringify(p), { mode: 0o600 });
   " 2>/dev/null || true
 
   # NOTE: Do NOT clean up temp profile here — the queue worker processes it

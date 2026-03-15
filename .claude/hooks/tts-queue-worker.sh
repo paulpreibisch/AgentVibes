@@ -13,7 +13,7 @@ if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
   QUEUE_DIR="$XDG_RUNTIME_DIR/agentvibes-tts-queue"
 else
   # Fallback to user-specific temp directory
-  QUEUE_DIR="/tmp/agentvibes-tts-queue-$USER"
+  QUEUE_DIR="/tmp/agentvibes-tts-queue-$(id -u)"
 fi
 
 # Security: Validate queue directory exists and has correct ownership
@@ -79,8 +79,21 @@ process_queue() {
     # Reset idle counter - we have work
     idle_count=0
 
-    # Load queue item
-    source "$queue_item"
+    # Load queue item — explicit key=value parsing (SECURITY: never source untrusted files)
+    TEXT_B64=""
+    VOICE_B64=""
+    AGENT_B64=""
+    PROFILE_PATH=""
+    PLAY_WAV=""
+    while IFS='=' read -r _key _val; do
+      case "$_key" in
+        TEXT_B64)      TEXT_B64="$_val" ;;
+        VOICE_B64)     VOICE_B64="$_val" ;;
+        AGENT_B64)     AGENT_B64="$_val" ;;
+        PROFILE_PATH)  PROFILE_PATH="$_val" ;;
+        PLAY_WAV)      PLAY_WAV="$_val" ;;
+      esac
+    done < "$queue_item"
 
     # Check if this is a pre-generated WAV playback item
     if [[ -n "${PLAY_WAV:-}" ]] && [[ -f "$PLAY_WAV" ]]; then
