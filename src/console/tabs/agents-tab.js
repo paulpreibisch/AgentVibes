@@ -13,7 +13,7 @@ import { AgentVoiceStore, scanBmadAgents, isBmadDetected, isSingleVoiceProvider 
 import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openPersonalityPicker, PERSONALITIES, PERSONALITY_EMOJIS } from '../widgets/personality-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
-import { formatReverbState, formatTrackName } from '../widgets/format-utils.js';
+import { formatReverbState, formatTrackName, formatVoiceName } from '../widgets/format-utils.js';
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
   parseMultiSpeaker, scanInstalledVoices, getVoiceMeta,
@@ -63,12 +63,13 @@ const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 // Column widths for agent table
-const COL_ICON = 4;
-const COL_NAME = 18;
-const COL_VOICE = 22;
-const COL_PRETEXT = 16;
-const COL_REVERB = 12;
-const COL_MUSIC = 16;
+const COL_ICON    = 4;
+const COL_NAME    = 16;
+const COL_VOICE   = 15;  // beautified names avg 5-14 chars
+const COL_PRETEXT = 14;
+const COL_REVERB  = 10;
+const COL_MUSIC   = 13;
+const COL_VOL     = 5;   // e.g. "70%" or "100%"
 
 // ---------------------------------------------------------------------------
 
@@ -201,7 +202,7 @@ export function createAgentsTab(screen, services) {
     left: 4,
     hidden: true,
     tags: true,
-    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Pretext'.padEnd(COL_PRETEXT)}${'Reverb'.padEnd(COL_REVERB)}Music{/#90a4ae-fg}`,
+    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Pretext'.padEnd(COL_PRETEXT)}${'Reverb'.padEnd(COL_REVERB)}${'Music'.padEnd(COL_MUSIC)}Vol{/#90a4ae-fg}`,
     style: { bg: COLORS.contentBg },
   });
 
@@ -359,13 +360,17 @@ export function createAgentsTab(screen, services) {
       const profile = voiceStore.getAgentProfile(a.id);
       const icon = (a.icon ? `${a.icon} ` : '    ').padEnd(COL_ICON);
       const name = `${a.displayName}`.padEnd(COL_NAME).slice(0, COL_NAME);
-      const voice = (profile.voice || '(global)').padEnd(COL_VOICE).slice(0, COL_VOICE);
+      const voiceRaw = formatVoiceName(profile.voice);
+      const voice = voiceRaw.padEnd(COL_VOICE).slice(0, COL_VOICE);
       const pretext = (profile.pretext || '(default)').padEnd(COL_PRETEXT).slice(0, COL_PRETEXT);
       const reverb = (profile.reverbPreset || '(global)').padEnd(COL_REVERB).slice(0, COL_REVERB);
-      const music = profile.backgroundMusic?.track
-        ? formatTrackName(profile.backgroundMusic.track).slice(0, COL_MUSIC)
-        : '(global)';
-      return ` ${icon}${name}${voice}${pretext}${reverb}${music}`;
+      const music = (profile.backgroundMusic?.track
+        ? formatTrackName(profile.backgroundMusic.track)
+        : '(global)').padEnd(COL_MUSIC).slice(0, COL_MUSIC);
+      const vol = profile.backgroundMusic?.enabled
+        ? `${profile.backgroundMusic.volume ?? 70}%`.padEnd(COL_VOL)
+        : '—    ';
+      return ` ${icon}${name}${voice}${pretext}${reverb}${music}${vol}`;
     });
   }
 

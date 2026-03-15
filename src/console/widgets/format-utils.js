@@ -39,6 +39,47 @@ export function formatTrackName(track) {
 }
 
 /**
+ * Beautify a raw voice identifier for display in narrow table columns.
+ *
+ * Examples:
+ *   16Speakers::Rose_Ibex       → Rose Ibex
+ *   16Speakers::Emily_Cripps    → Emily Cripps
+ *   en_US-kusal-medium          → Kusal
+ *   en_US-lessac-high           → Lessac
+ *   en_US-libritts_r-medium     → Libritts R
+ *   kristin                     → Kristin
+ *
+ * @param {string} voice - raw voice identifier
+ * @returns {string}
+ */
+export function formatVoiceName(voice) {
+  if (!voice) return '(global)';
+
+  let name;
+  if (voice.includes('::')) {
+    // 16Speakers::Rose_Ibex → extract after '::'
+    name = voice.split('::')[1];
+  } else {
+    const parts = voice.split('-');
+    const QUALITIES = new Set(['high', 'medium', 'low']);
+    if (parts.length >= 2 && /^[a-z]{2}_[A-Z]{2}$/.test(parts[0])) {
+      // Strip locale prefix and quality suffix
+      name = parts.slice(1).filter(p => !QUALITIES.has(p)).join(' ');
+    } else {
+      name = voice;
+    }
+  }
+
+  // Replace underscores with spaces, title-case each word
+  return name
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ') || '(global)';
+}
+
+/**
  * @param {string} preset - 'off' | 'light' | 'medium' | 'heavy' | 'cathedral'
  * @returns {string}
  */
