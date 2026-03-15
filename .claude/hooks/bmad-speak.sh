@@ -98,7 +98,7 @@ read_agent_profile_all() {
   fi
 
   if [[ ! -f "$VOICE_MAP_FILE" ]]; then
-    echo "|||||"
+    echo "||||||"
     return
   fi
 
@@ -113,10 +113,11 @@ read_agent_profile_all() {
         String(a.personality ?? ''),
         String(a.backgroundMusic?.track ?? ''),
         String(a.backgroundMusic?.volume ?? ''),
+        String(a.backgroundMusic?.enabled ?? ''),
       ];
       process.stdout.write(fields.join('|'));
-    } catch { process.stdout.write('|||||'); }
-  " 2>/dev/null || echo "|||||"
+    } catch { process.stdout.write('||||||'); }
+  " 2>/dev/null || echo "||||||"
 }
 
 # ---------------------------------------------------------------------------
@@ -168,11 +169,12 @@ PROFILE_REVERB=""
 PROFILE_PERSONALITY=""
 PROFILE_MUSIC_TRACK=""
 PROFILE_MUSIC_VOLUME=""
+PROFILE_MUSIC_ENABLED=""
 
 if [[ -n "$AGENT_ID" ]] && [[ -f "$VOICE_MAP_FILE" ]]; then
   # Single Node.js call for all fields — avoids ~900ms of per-call startup overhead
   _ALL_FIELDS=$(read_agent_profile_all "$AGENT_ID")
-  IFS='|' read -r PROFILE_VOICE PROFILE_PRETEXT PROFILE_REVERB PROFILE_PERSONALITY PROFILE_MUSIC_TRACK PROFILE_MUSIC_VOLUME <<< "$_ALL_FIELDS"
+  IFS='|' read -r PROFILE_VOICE PROFILE_PRETEXT PROFILE_REVERB PROFILE_PERSONALITY PROFILE_MUSIC_TRACK PROFILE_MUSIC_VOLUME PROFILE_MUSIC_ENABLED <<< "$_ALL_FIELDS"
 fi
 
 # Fallback to bmad-voice-manager.sh if no profile voice found
@@ -245,6 +247,20 @@ while ! mkdir "$SPEECH_LOCK" 2>/dev/null; do
   [[ $_WAIT -gt 240 ]] && break
 done
 trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
+
+# Pass per-agent background music to audio-processor.sh via env vars.
+# Convert volume from percentage (0-100) to decimal (0.0-1.0) as expected by ffmpeg.
+if [[ -n "$PROFILE_MUSIC_TRACK" ]] && [[ "$PROFILE_MUSIC_ENABLED" == "true" ]]; then
+  export AGENTVIBES_BG_TRACK="$PROFILE_MUSIC_TRACK"
+  _vol_pct="${PROFILE_MUSIC_VOLUME:-70}"
+  # Validate numeric before converting
+  if [[ "$_vol_pct" =~ ^[0-9]+$ ]]; then
+    export AGENTVIBES_BG_VOLUME
+    AGENTVIBES_BG_VOLUME=$(awk "BEGIN{printf \"%.2f\", ${_vol_pct}/100}")
+  else
+    export AGENTVIBES_BG_VOLUME="0.70"
+  fi
+fi
 
 # Speak with agent's voice
 if [[ -n "$AGENT_VOICE" ]]; then

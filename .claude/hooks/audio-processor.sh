@@ -328,6 +328,14 @@ main() {
     # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
+    # Per-agent background music override from bmad-speak.sh (takes priority over cfg file).
+    # AGENTVIBES_BG_TRACK = filename only (looked up in BACKGROUNDS_DIR)
+    # AGENTVIBES_BG_VOLUME = decimal 0.0-1.0
+    if [[ -n "${AGENTVIBES_BG_TRACK:-}" ]]; then
+        background_file="$AGENTVIBES_BG_TRACK"
+        bg_volume="${AGENTVIBES_BG_VOLUME:-0.70}"
+    fi
+
     # SECURITY: Use secure temp directory per CLAUDE.md guidelines
     # Prefer XDG_RUNTIME_DIR (user-owned, restricted permissions)
     # Fall back to user-specific directory in /tmp
@@ -382,8 +390,14 @@ main() {
         background_path="$BACKGROUNDS_DIR/$background_file"
     fi
 
+    # Per-agent track overrides global enable flag — if the profile says enabled=true, play it.
+    local _bg_allowed=false
+    if is_background_music_enabled || [[ -n "${AGENTVIBES_BG_TRACK:-}" ]]; then
+        _bg_allowed=true
+    fi
+
     local used_background=""
-    if is_background_music_enabled && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
+    if [[ "$_bg_allowed" == "true" ]] && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
         echo "  → Mixing background: $background_file at ${bg_volume} volume" >&2
         mix_background "$temp_effects" "$background_path" "$bg_volume" "$temp_final"
         used_background="$background_path"  # Return full path instead of just filename
