@@ -78,7 +78,8 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
 fi
 
 TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"  # Optional: voice name or ID
+VOICE_OVERRIDE="${2:-}"      # Optional: voice name or ID
+AGENT_PROFILE_FILE="${3:-}"  # Optional: path to per-agent profile JSON (from bmad-speak.sh)
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then
@@ -153,10 +154,11 @@ speak_text() {
   local text="$1"
   local voice="${2:-}"
   local provider="${3:-$ACTIVE_PROVIDER}"
+  local profile_file="${4:-$AGENT_PROFILE_FILE}"
 
   case "$provider" in
     piper)
-      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice"
+      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice" "$profile_file"
       ;;
     soprano)
       "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
@@ -280,7 +282,7 @@ fi
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   piper)
-    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "$AGENT_PROFILE_FILE"
     ;;
   soprano)
     exec "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"

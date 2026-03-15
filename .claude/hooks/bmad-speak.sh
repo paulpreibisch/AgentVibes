@@ -248,25 +248,13 @@ while ! mkdir "$SPEECH_LOCK" 2>/dev/null; do
 done
 trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
 
-# Pass per-agent background music to audio-processor.sh via env vars.
-# Convert volume from percentage (0-100) to decimal (0.0-1.0) as expected by ffmpeg.
-if [[ -n "$PROFILE_MUSIC_TRACK" ]] && [[ "$PROFILE_MUSIC_ENABLED" == "true" ]]; then
-  export AGENTVIBES_BG_TRACK="$PROFILE_MUSIC_TRACK"
-  _vol_pct="${PROFILE_MUSIC_VOLUME:-70}"
-  # Validate numeric before converting
-  if [[ "$_vol_pct" =~ ^[0-9]+$ ]]; then
-    export AGENTVIBES_BG_VOLUME
-    AGENTVIBES_BG_VOLUME=$(awk "BEGIN{printf \"%.2f\", ${_vol_pct}/100}")
-  else
-    export AGENTVIBES_BG_VOLUME="0.70"
-  fi
-fi
-
-# Speak with agent's voice
+# Speak with agent's voice, passing the temp profile path as arg 3 so
+# play-tts-piper.sh → audio-processor.sh can read per-agent music settings
+# without any env vars (safe for concurrent multi-project use).
 if [[ -n "$AGENT_VOICE" ]]; then
-  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE"
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" "$TEMP_PROFILE"
 else
-  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT"
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "" "$TEMP_PROFILE"
 fi
 
 # Release lock

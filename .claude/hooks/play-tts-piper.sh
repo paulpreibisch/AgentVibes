@@ -49,7 +49,8 @@ trap cleanup EXIT
 export LC_ALL=C
 
 TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"  # Optional: voice model name
+VOICE_OVERRIDE="${2:-}"       # Optional: voice model name
+AGENT_PROFILE_FILE="${3:-}"   # Optional: path to per-agent profile JSON (from bmad-speak.sh)
 
 # Strip emojis, asterisks, and markdown formatting that Piper would speak literally
 TEXT=$(printf '%s' "$TEXT" | perl -CSD -pe '
@@ -427,7 +428,7 @@ if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   PROCESSED_FILE=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX.wav")
   _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
-  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
+  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
     PROCESSED_FILE="$TEMP_FILE"
     PROCESSOR_OUTPUT="$TEMP_FILE|"

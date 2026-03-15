@@ -34,6 +34,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 INPUT_FILE="${1:-}"
 AGENT_NAME="${2:-default}"
 OUTPUT_FILE="${3:-}"
+AGENT_PROFILE_FILE="${4:-}"  # Optional: path to per-agent profile JSON (from bmad-speak.sh)
 
 # Config and directories (resolve to absolute paths)
 CONFIG_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/audio-effects.cfg"
@@ -328,12 +329,23 @@ main() {
     # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
-    # Per-agent background music override from bmad-speak.sh (takes priority over cfg file).
-    # AGENTVIBES_BG_TRACK = filename only (looked up in BACKGROUNDS_DIR)
-    # AGENTVIBES_BG_VOLUME = decimal 0.0-1.0
-    if [[ -n "${AGENTVIBES_BG_TRACK:-}" ]]; then
-        background_file="$AGENTVIBES_BG_TRACK"
-        bg_volume="${AGENTVIBES_BG_VOLUME:-0.70}"
+    # Per-agent background music override from bmad-speak.sh profile JSON (takes priority over cfg).
+    # The profile file is a PID-scoped temp file written by bmad-speak.sh; no env var leakage.
+    if [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
+        # SECURITY: Pass profile path via env var to avoid shell injection in node -e string
+        local _prof_track _prof_vol _prof_enabled
+        _prof_track=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(p.backgroundMusic?.track??'')}catch{process.stdout.write('')}" 2>/dev/null || true)
+        _prof_vol=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        _prof_enabled=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.enabled??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        if [[ "$_prof_enabled" == "true" ]] && [[ -n "$_prof_track" ]]; then
+            background_file="$_prof_track"
+            # Convert percentage volume (0-100) to decimal (0.0-1.0) for ffmpeg
+            if [[ "$_prof_vol" =~ ^[0-9]+$ ]]; then
+                bg_volume=$(awk "BEGIN{printf \"%.2f\", ${_prof_vol}/100}")
+            else
+                bg_volume="0.70"
+            fi
+        fi
     fi
 
     # SECURITY: Use secure temp directory per CLAUDE.md guidelines
@@ -390,10 +402,15 @@ main() {
         background_path="$BACKGROUNDS_DIR/$background_file"
     fi
 
-    # Per-agent track overrides global enable flag — if the profile says enabled=true, play it.
+    # Per-agent profile enables music independently of the global flag.
     local _bg_allowed=false
-    if is_background_music_enabled || [[ -n "${AGENTVIBES_BG_TRACK:-}" ]]; then
+    if is_background_music_enabled; then
         _bg_allowed=true
+    elif [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
+        # A valid agent profile with enabled=true overrides the global off switch.
+        local _check_enabled
+        _check_enabled=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.enabled??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        [[ "$_check_enabled" == "true" ]] && _bg_allowed=true
     fi
 
     local used_background=""
