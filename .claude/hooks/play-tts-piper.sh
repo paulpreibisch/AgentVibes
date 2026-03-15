@@ -553,14 +553,34 @@ elif [[ -f "${PROJECT_ROOT:-/nonexistent}/.agentvibes/banner-disabled" ]]; then
   _BANNER_ENABLED=false
 fi
 
-# CRITICAL: Run auto-cleanup FIRST (before calculating size)
+# Run auto-cleanup off the critical path: only every 10th call, in background after playback starts.
+# Counter file lives in the secure lock dir (user-specific, already created above).
 AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
-INITIAL_SIZE=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
-if [[ $INITIAL_SIZE -gt $((AUTO_CLEAN_THRESHOLD * 1048576)) ]]; then
-  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$AUTO_CLEAN_THRESHOLD")
-  if [[ $DELETED -gt 0 ]] && [[ "$_BANNER_ENABLED" == "true" ]]; then
-    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files${NC}"
-  fi
+_CALL_COUNTER_FILE="$_LOCK_DIR/agentvibes-tts-call-count"
+_CALL_COUNT=$(cat "$_CALL_COUNTER_FILE" 2>/dev/null || echo "0")
+# SECURITY: Validate counter is numeric before arithmetic
+if ! [[ "$_CALL_COUNT" =~ ^[0-9]+$ ]]; then _CALL_COUNT=0; fi
+_CALL_COUNT=$((_CALL_COUNT + 1))
+echo "$_CALL_COUNT" > "$_CALL_COUNTER_FILE"
+
+if (( _CALL_COUNT % 10 == 0 )); then
+  # Capture values needed inside the subshell before forking
+  _CLEANUP_AUDIO_DIR="$AUDIO_DIR_PATH"
+  _CLEANUP_THRESHOLD="$AUTO_CLEAN_THRESHOLD"
+  _CLEANUP_BANNER="$_BANNER_ENABLED"
+  # Source the utils inside the subshell (functions are not exported)
+  _CLEANUP_UTILS="$SCRIPT_DIR/audio-cache-utils.sh"
+  (
+    source "$_CLEANUP_UTILS" 2>/dev/null || exit 0
+    _INITIAL_SIZE=$(calculate_tts_size_bytes "$_CLEANUP_AUDIO_DIR")
+    if [[ $_INITIAL_SIZE -gt $((_CLEANUP_THRESHOLD * 1048576)) ]]; then
+      _DELETED=$(auto_clean_old_files "$_CLEANUP_AUDIO_DIR" "$_CLEANUP_THRESHOLD")
+      if [[ ${_DELETED:-0} -gt 0 ]] && [[ "$_CLEANUP_BANNER" == "true" ]]; then
+        echo -e "\033[0;33m🧹 Auto-cleaned $_DELETED old files\033[0m"
+      fi
+    fi
+  ) &
+  disown
 fi
 
 # Write output path for play-tts-enhanced.sh (avoids stdout parsing — colors are safe)

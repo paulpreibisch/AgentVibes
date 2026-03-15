@@ -140,9 +140,11 @@ apply_sox_effects() {
 
 # Position tracking file for continuous playback
 POSITION_FILE="$SCRIPT_DIR/../config/background-music-position.txt"
+# Lock file for position file — prevents race conditions in party mode with concurrent agents
+POSITION_LOCK="/tmp/agentvibes-bgpos-$(id -u).lock"
 
 # @function get_background_position
-# @intent Get saved position for a background track
+# @intent Get saved position for a background track (caller must hold POSITION_LOCK)
 # @param $1 Background file path
 # @returns Position in seconds (or 0 if not found)
 get_background_position() {
@@ -158,7 +160,7 @@ get_background_position() {
 }
 
 # @function save_background_position
-# @intent Save position for a background track
+# @intent Save position for a background track (caller must hold POSITION_LOCK)
 # @param $1 Background file path
 # @param $2 New position in seconds
 save_background_position() {
@@ -217,48 +219,58 @@ mix_background() {
     bg_duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$background" 2>/dev/null)
     bg_duration=${bg_duration:-0}
 
-    # Get saved position for this track (continuous playback)
+    # Read the start position and pre-compute the new position atomically under flock.
+    # This prevents party-mode race conditions where concurrent agents both read the
+    # same position, compute independently, and overwrite each other's updates.
     local start_pos
-    start_pos=$(get_background_position "$background")
-
-    # Validate start_pos: if too small (floating point error) or invalid, reset to 0
-    if command -v bc &> /dev/null; then
-        if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]] || (( $(echo "$start_pos < 0.001" | bc -l) )); then
-            start_pos="0"
-        fi
-    else
-        # Without bc, just check if it's a valid number
-        if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-            start_pos="0"
-        fi
-    fi
-
-    # If position exceeds track length, wrap around
-    if command -v bc &> /dev/null && [[ -n "$bg_duration" ]]; then
-        if (( $(echo "$start_pos >= $bg_duration" | bc -l) )); then
-            start_pos=$(echo "$start_pos % $bg_duration" | bc -l)
-        fi
-    fi
-
-    # Extend total duration by 2 seconds for background music fade out
-    local total_duration
-    if command -v bc &> /dev/null; then
-        total_duration=$(echo "$duration + 2" | bc -l)
-    else
-        total_duration=$(awk "BEGIN {print $duration + 2}")
-    fi
-
-    # Calculate new position after this clip (including fade out time)
     local new_pos
-    if command -v bc &> /dev/null; then
-        new_pos=$(echo "$start_pos + $total_duration" | bc -l)
-        # Wrap around if needed
-        if [[ -n "$bg_duration" ]] && (( $(echo "$new_pos >= $bg_duration" | bc -l) )); then
-            new_pos=$(echo "$new_pos % $bg_duration" | bc -l)
+    local total_duration
+    {
+        flock -x 200
+
+        # Get saved position for this track (continuous playback)
+        start_pos=$(get_background_position "$background")
+
+        # Validate start_pos: if too small (floating point error) or invalid, reset to 0
+        if command -v bc &> /dev/null; then
+            if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]] || (( $(echo "$start_pos < 0.001" | bc -l) )); then
+                start_pos="0"
+            fi
+        else
+            # Without bc, just check if it's a valid number
+            if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+                start_pos="0"
+            fi
         fi
-    else
-        new_pos="0"
-    fi
+
+        # If position exceeds track length, wrap around
+        if command -v bc &> /dev/null && [[ -n "$bg_duration" ]]; then
+            if (( $(echo "$start_pos >= $bg_duration" | bc -l) )); then
+                start_pos=$(echo "$start_pos % $bg_duration" | bc -l)
+            fi
+        fi
+
+        # Extend total duration by 2 seconds for background music fade out
+        if command -v bc &> /dev/null; then
+            total_duration=$(echo "$duration + 2" | bc -l)
+        else
+            total_duration=$(awk "BEGIN {print $duration + 2}")
+        fi
+
+        # Calculate new position after this clip (including fade out time)
+        if command -v bc &> /dev/null; then
+            new_pos=$(echo "$start_pos + $total_duration" | bc -l)
+            # Wrap around if needed
+            if [[ -n "$bg_duration" ]] && (( $(echo "$new_pos >= $bg_duration" | bc -l) )); then
+                new_pos=$(echo "$new_pos % $bg_duration" | bc -l)
+            fi
+        else
+            new_pos="0"
+        fi
+
+        # Claim the new position immediately so concurrent agents advance past it
+        save_background_position "$background" "$new_pos"
+    } 200>"$POSITION_LOCK"
 
     # Mix: Seek to position in background, apply volume and fades
     # Background fades in at start (0.3s), continues under speech, then fades out over 2s after speech ends
@@ -303,9 +315,6 @@ mix_background() {
         cp "$voice" "$output"
         return
     }
-
-    # Save new position for next time
-    save_background_position "$background" "$new_pos"
 }
 
 # Main processing

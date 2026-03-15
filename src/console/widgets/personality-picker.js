@@ -10,6 +10,9 @@ import { spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
 import { buildAudioEnv } from '../audio-env.js';
 import { BRAND_PINK } from '../brand-colors.js';
+import { PERSONALITY_EMOJIS, PERSONALITIES } from '../constants/personalities.js';
+
+export { PERSONALITY_EMOJIS, PERSONALITIES };
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;
@@ -19,37 +22,6 @@ if (!IS_TEST) {
 }
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
-
-export const PERSONALITY_EMOJIS = Object.freeze({
-  angry:        '😠',
-  annoying:     '😤',
-  crass:        '🤬',
-  dramatic:     '🎭',
-  'dry-humor':  '😐',
-  flirty:       '😘',
-  funny:        '😂',
-  grandpa:      '👴',
-  millennial:   '🙄',
-  moody:        '😒',
-  none:         '😊',
-  normal:       '😊',
-  pirate:       '⚓',
-  poetic:       '📜',
-  professional: '👔',
-  rapper:       '🎤',
-  robot:        '🤖',
-  sarcastic:    '😏',
-  sassy:        '💁',
-  'surfer-dude':'🏄',
-  zen:          '🧘',
-});
-
-export const PERSONALITIES = Object.freeze([
-  'none', 'angry', 'annoying', 'crass', 'dramatic', 'dry-humor',
-  'flirty', 'funny', 'grandpa', 'millennial', 'moody', 'normal',
-  'pirate', 'poetic', 'professional', 'rapper', 'robot', 'sarcastic',
-  'sassy', 'surfer-dude', 'zen',
-]);
 
 const PERSONALITY_PREVIEW_PHRASES = Object.freeze({
   angry:        "UNACCEPTABLE! This build time is a DISASTER! Fix it NOW or so help me!",

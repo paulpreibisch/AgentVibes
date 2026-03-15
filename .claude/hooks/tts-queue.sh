@@ -45,11 +45,14 @@ add_to_queue() {
   local timestamp=$(date +%s%N)
   local queue_file="$QUEUE_DIR/$timestamp.queue"
 
-  # Write request to queue file (base64 encoded to handle all special chars)
+  # Write request to queue file using direct storage
+  # Text is stored in a separate .txt file (handles newlines and special chars safely)
+  # Voice and agent are simple identifiers with no special chars
+  printf '%s' "$text" > "${queue_file%.queue}.txt"
   cat > "$queue_file" <<EOF
-TEXT_B64=$(echo -n "$text" | base64 -w0)
-VOICE_B64=$(echo -n "$voice" | base64 -w0)
-AGENT_B64=$(echo -n "$agent" | base64 -w0)
+TEXT_FILE=${queue_file%.queue}.txt
+VOICE=$voice
+AGENT=$agent
 PROFILE_PATH=$profile_path
 EOF
 

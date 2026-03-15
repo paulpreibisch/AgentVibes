@@ -23,8 +23,10 @@ import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
 import { buildAudioEnv, detectMp3Player, detectWavPlayer } from '../audio-env.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { openReverbPicker } from '../widgets/reverb-picker.js';
-import { openPersonalityPicker, PERSONALITY_EMOJIS as _SHARED_PE, PERSONALITIES as _SHARED_P } from '../widgets/personality-picker.js';
+import { openPersonalityPicker } from '../widgets/personality-picker.js';
+import { PERSONALITY_EMOJIS } from '../constants/personalities.js';
 import { formatTrackName as _sharedFormatTrackName, formatReverbState as _sharedFormatReverbState } from '../widgets/format-utils.js';
+import { showNotice as _showNoticeWidget } from '../widgets/notice.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -78,63 +80,8 @@ const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_f
 // Verbosity display labels
 const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', minimal: 'Minimal', custom: 'Custom' });
 
-// Personality emojis — mirrors installer.js personalityEmojis (src/installer.js:84)
-const PERSONALITY_EMOJIS = Object.freeze({
-  angry:        '😠',
-  annoying:     '😤',
-  crass:        '🤬',
-  dramatic:     '🎭',
-  'dry-humor':  '😐',
-  flirty:       '😘',
-  funny:        '😂',
-  grandpa:      '👴',
-  millennial:   '🙄',
-  moody:        '😒',
-  none:         '😊',
-  normal:       '😊',
-  pirate:       '⚓',
-  poetic:       '📜',
-  professional: '👔',
-  rapper:       '🎤',
-  robot:        '🤖',
-  sarcastic:    '😏',
-  sassy:        '💁',
-  'surfer-dude':'🏄',
-  zen:          '🧘',
-});
-
-// Known personalities (matches .claude/personalities/ directory)
-const PERSONALITIES = Object.freeze([
-  'none', 'angry', 'annoying', 'crass', 'dramatic', 'dry-humor',
-  'flirty', 'funny', 'grandpa', 'millennial', 'moody', 'normal',
-  'pirate', 'poetic', 'professional', 'rapper', 'robot', 'sarcastic',
-  'sassy', 'surfer-dude', 'zen',
-]);
-
-// Preview phrases — one short, exemplary, in-character line per personality.
-// Spoken automatically when the cursor lands on a personality in the picker.
-const PERSONALITY_PREVIEW_PHRASES = Object.freeze({
-  angry:        "UNACCEPTABLE! This build time is a DISASTER! Fix it NOW or so help me!",
-  annoying:     "Oh oh oh! Can I tell you something? Can I? Can I? PLEASE? It is so important!",
-  crass:        "Well damn, that code runs like my uncle's truck. Barely, and it smells funny.",
-  dramatic:     "The tests... have failed. I don't know how much longer I can do this.",
-  'dry-humor':  "Your code worked. I too am surprised.",
-  flirty:       "Ooh, a clean merge? You know exactly how to make my heart race.",
-  funny:        "Why do programmers hate nature? Too many bugs. I will show myself out.",
-  grandpa:      "Back in my day, we compiled by hand. Uphill. In the snow. Both ways.",
-  millennial:   "I literally cannot even with this error. I am so done. Like, actually deceased.",
-  moody:        "...It works. Whatever. Do not get used to it.",
-  pirate:       "Arrr! The build be sailin' smooth today, matey! No barnacles in sight!",
-  poetic:       "Like rivers to the sea, your code flows toward eventual compilation.",
-  professional: "I have completed the requested task and am prepared to document outcomes.",
-  rapper:       "Yo! Clean code flowin', tests are glowin', no bugs showin'!",
-  robot:        "TASK COMPLETE. EFFICIENCY: OPTIMAL. PROBABILITY OF SUCCESS: 97.3 PERCENT. BEEP.",
-  sarcastic:    "Oh wow, another bug. What a completely unexpected surprise. Truly shocking.",
-  sassy:        "Honey, whoever told you that was good code was not your friend.",
-  'surfer-dude':"Duuude! That commit totally shredded! Gnarly clean code, bro!",
-  zen:          "The bug is not the enemy. The bug is the teacher. Breathe. Commit.",
-  random:       "Who will I be today? Even I do not know. Expect the unexpected.",
-});
+// Personality emojis and names imported from src/console/constants/personalities.js
+// (via the import at the top of this file)
 
 // Human-readable track display names — moved to shared widgets/format-utils.js
 // TRACK_NAMES constant removed (M1 dedup). Use formatTrackName() instead.
@@ -2537,27 +2484,7 @@ function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
 }
 
 function _showNotice(screen, message) {
-  const width = Math.max(28, message.length + 6);
-  const modal = blessed.box({
-    parent: screen,
-    top: 'center',
-    left: 'center',
-    width,
-    height: 3,
-    border: { type: 'line' },
-    tags: true,
-    content: `{center}${message}{/center}`,
-    style: {
-      fg: '#e3f2fd',
-      bg: COLORS.contentBg,
-      border: { fg: '#00e5ff' },
-    },
-  });
-  screen.render();
-
-  setTimeout(() => {
-    destroyList(modal, screen);
-  }, 2500);
+  _showNoticeWidget(screen, message, { bg: COLORS.contentBg });
 }
 
 // ---------------------------------------------------------------------------
