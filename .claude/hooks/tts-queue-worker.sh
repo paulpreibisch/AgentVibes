@@ -71,8 +71,13 @@ process_queue() {
         exit 0
       fi
 
-      # Wait 1 second and check again
-      sleep 1
+      # Wait for a new queue item — use inotifywait if available to avoid polling
+      # Use a 1-second timeout (-t 1) so the idle counter still advances correctly
+      if command -v inotifywait &>/dev/null; then
+        inotifywait -q -e create -t 1 "$QUEUE_DIR" 2>/dev/null || true
+      else
+        sleep 1
+      fi
       continue
     fi
 
@@ -80,16 +85,16 @@ process_queue() {
     idle_count=0
 
     # Load queue item — explicit key=value parsing (SECURITY: never source untrusted files)
-    TEXT_B64=""
-    VOICE_B64=""
-    AGENT_B64=""
+    TEXT_FILE=""
+    VOICE=""
+    AGENT=""
     PROFILE_PATH=""
     PLAY_WAV=""
     while IFS='=' read -r _key _val; do
       case "$_key" in
-        TEXT_B64)      TEXT_B64="$_val" ;;
-        VOICE_B64)     VOICE_B64="$_val" ;;
-        AGENT_B64)     AGENT_B64="$_val" ;;
+        TEXT_FILE)     TEXT_FILE="$_val" ;;
+        VOICE)         VOICE="$_val" ;;
+        AGENT)         AGENT="$_val" ;;
         PROFILE_PATH)  PROFILE_PATH="$_val" ;;
         PLAY_WAV)      PLAY_WAV="$_val" ;;
       esac
@@ -106,15 +111,18 @@ process_queue() {
         ffplay -nodisp -autoexit -loglevel quiet "$PLAY_WAV" 2>/dev/null || true
       fi
     else
-      # Full TTS request — decode and synthesize + play
-      TEXT=$(echo -n "${TEXT_B64:-}" | base64 -d 2>/dev/null || echo "")
-      VOICE=$(echo -n "${VOICE_B64:-}" | base64 -d 2>/dev/null || echo "")
+      # Full TTS request — read text from companion file, use voice/agent directly
+      TEXT=""
+      if [[ -n "${TEXT_FILE:-}" ]] && [[ -f "$TEXT_FILE" ]]; then
+        TEXT=$(cat "$TEXT_FILE")
+        rm -f "$TEXT_FILE"
+      fi
       AGENT_PROFILE="${PROFILE_PATH:-}"
 
       export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
 
       if [[ -n "${VOICE:-}" ]]; then
-        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
+        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "${VOICE}" || true
       else
         bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
       fi
@@ -128,8 +136,8 @@ process_queue() {
     # Add configurable pause between speakers for natural conversation flow
     sleep $SPEAKER_DELAY
 
-    # Remove processed item
-    rm -f "$queue_item"
+    # Remove processed item and any companion text file
+    rm -f "$queue_item" "${queue_item%.queue}.txt"
   done
 }
 

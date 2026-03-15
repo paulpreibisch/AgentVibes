@@ -84,6 +84,41 @@ read_agent_profile() {
   " 2>/dev/null || echo ""
 }
 
+# Read all profile fields in a single Node.js invocation to avoid ~900ms of overhead.
+# Returns: voice|pretext|reverbPreset|personality|backgroundMusic.track|backgroundMusic.volume
+# Outputs `|||||` if the file is missing or the agent is not found.
+# SECURITY: Pass values via env vars to prevent shell injection
+read_agent_profile_all() {
+  local agent_id="$1"
+
+  # Validate agent_id format (prevent injection)
+  if [[ ! "$agent_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "|||||"
+    return
+  fi
+
+  if [[ ! -f "$VOICE_MAP_FILE" ]]; then
+    echo "|||||"
+    return
+  fi
+
+  _VOICE_MAP="$VOICE_MAP_FILE" _AGENT_ID="$agent_id" node -e "
+    try {
+      const d = JSON.parse(require('fs').readFileSync(process.env._VOICE_MAP,'utf8'));
+      const a = d.agents?.[process.env._AGENT_ID] ?? {};
+      const fields = [
+        String(a.voice ?? ''),
+        String(a.pretext ?? ''),
+        String(a.reverbPreset ?? ''),
+        String(a.personality ?? ''),
+        String(a.backgroundMusic?.track ?? ''),
+        String(a.backgroundMusic?.volume ?? ''),
+      ];
+      process.stdout.write(fields.join('|'));
+    } catch { process.stdout.write('|||||'); }
+  " 2>/dev/null || echo "|||||"
+}
+
 # ---------------------------------------------------------------------------
 # Map display name to agent ID
 
@@ -135,12 +170,9 @@ PROFILE_MUSIC_TRACK=""
 PROFILE_MUSIC_VOLUME=""
 
 if [[ -n "$AGENT_ID" ]] && [[ -f "$VOICE_MAP_FILE" ]]; then
-  PROFILE_VOICE=$(read_agent_profile "$AGENT_ID" "voice")
-  PROFILE_PRETEXT=$(read_agent_profile "$AGENT_ID" "pretext")
-  PROFILE_REVERB=$(read_agent_profile "$AGENT_ID" "reverbPreset")
-  PROFILE_PERSONALITY=$(read_agent_profile "$AGENT_ID" "personality")
-  PROFILE_MUSIC_TRACK=$(read_agent_profile "$AGENT_ID" "backgroundMusic.track")
-  PROFILE_MUSIC_VOLUME=$(read_agent_profile "$AGENT_ID" "backgroundMusic.volume")
+  # Single Node.js call for all fields — avoids ~900ms of per-call startup overhead
+  _ALL_FIELDS=$(read_agent_profile_all "$AGENT_ID")
+  IFS='|' read -r PROFILE_VOICE PROFILE_PRETEXT PROFILE_REVERB PROFILE_PERSONALITY PROFILE_MUSIC_TRACK PROFILE_MUSIC_VOLUME <<< "$_ALL_FIELDS"
 fi
 
 # Fallback to bmad-voice-manager.sh if no profile voice found
