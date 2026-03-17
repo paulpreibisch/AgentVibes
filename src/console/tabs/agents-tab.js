@@ -63,13 +63,18 @@ const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 // Column widths for agent table
-const COL_ICON    = 4;
-const COL_NAME    = 16;
-const COL_VOICE   = 15;  // beautified names avg 5-14 chars
-const COL_PRETEXT = 14;
-const COL_REVERB  = 10;
-const COL_MUSIC   = 13;
-const COL_VOL     = 5;   // e.g. "70%" or "100%"
+const COL_ICON     = 4;
+const COL_NAME     = 16;
+const COL_VOICE    = 12;  // beautified names avg 5-11 chars
+const COL_GENDER   = 8;
+const COL_PROVIDER = 12;
+const COL_PRETEXT  = 14;
+const COL_REVERB   = 10;
+const COL_MUSIC    = 11;
+const COL_VOL      = 5;   // e.g. "70%" or "100%"
+
+// Inline hint appended to the selected row when list is focused
+const _ROW_HINT_BMAD = `  {bright-black-fg}[Space] Preview  [Enter] Configure{/bright-black-fg}`;
 
 // ---------------------------------------------------------------------------
 
@@ -202,7 +207,7 @@ export function createAgentsTab(screen, services) {
     left: 4,
     hidden: true,
     tags: true,
-    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${'Agent'.padEnd(COL_NAME)}${'Voice'.padEnd(COL_VOICE)}${'Reverb'.padEnd(COL_REVERB)}${'Music'.padEnd(COL_MUSIC)}${'Vol'.padEnd(COL_VOL)}  Pretext{/#90a4ae-fg}`,
+    content: `{#90a4ae-fg}${''.padEnd(COL_ICON)}${' Agent'.padEnd(COL_NAME)}${' Voice'.padEnd(COL_VOICE)}${' Gender'.padEnd(COL_GENDER)}${' Provider'.padEnd(COL_PROVIDER)}${' Reverb'.padEnd(COL_REVERB)}${' Music'.padEnd(COL_MUSIC)}${' Vol'.padEnd(COL_VOL)}  Pretext{/#90a4ae-fg}`,
     style: { bg: COLORS.contentBg },
   });
 
@@ -219,6 +224,7 @@ export function createAgentsTab(screen, services) {
     keys: true,
     vi: true,
     mouse: true,
+    tags: true,
     border: { type: 'line' },
     scrollbar: { ch: '│', style: { fg: COLORS.sectionHdr } },
     style: {
@@ -362,18 +368,21 @@ export function createAgentsTab(screen, services) {
       // Strip variation selectors (e.g. U+FE0F on 🏗️) so padEnd uses visual width
       const rawIcon = (a.icon || '').replace(/\uFE0F/g, '');
       const icon = (rawIcon ? `${rawIcon} ` : '   ').padEnd(COL_ICON);
-      const name = `${a.displayName}`.padEnd(COL_NAME).slice(0, COL_NAME);
+      const name = ` ${a.displayName}`.padEnd(COL_NAME).slice(0, COL_NAME);
       const voiceRaw = formatVoiceName(profile.voice);
-      const voice = voiceRaw.padEnd(COL_VOICE).slice(0, COL_VOICE);
-      const reverb = (profile.reverbPreset || '(global)').padEnd(COL_REVERB).slice(0, COL_REVERB);
-      const music = (profile.backgroundMusic?.track
+      const voice = (' ' + voiceRaw).padEnd(COL_VOICE).slice(0, COL_VOICE);
+      const meta = profile.voice ? getVoiceMeta(profile.voice) : { gender: '—', provider: '—' };
+      const gender = (' ' + meta.gender).padEnd(COL_GENDER).slice(0, COL_GENDER);
+      const provider = (' ' + meta.provider).padEnd(COL_PROVIDER).slice(0, COL_PROVIDER);
+      const reverb = (' ' + (profile.reverbPreset || '(global)')).padEnd(COL_REVERB).slice(0, COL_REVERB);
+      const music = (' ' + (profile.backgroundMusic?.track
         ? formatTrackName(profile.backgroundMusic.track)
-        : '(global)').padEnd(COL_MUSIC).slice(0, COL_MUSIC);
+        : '(global)')).padEnd(COL_MUSIC).slice(0, COL_MUSIC);
       const vol = profile.backgroundMusic?.enabled
         ? ` ${profile.backgroundMusic.volume ?? 70}%`.padEnd(COL_VOL)
-        : ' —   ';
-      const pretext = (profile.pretext || '(default)').slice(0, COL_PRETEXT);
-      return ` ${icon}${name}${voice}${reverb}${music}${vol}  ${pretext}`;
+        : '  —  ';
+      const pretext = ' ' + (profile.pretext || '(default)').slice(0, COL_PRETEXT - 1);
+      return ` ${icon}${name}${voice}${gender}${provider}${reverb}${music}${vol}  ${pretext}`;
     });
   }
 
@@ -394,6 +403,12 @@ export function createAgentsTab(screen, services) {
 
     const items = _buildListItems(_agents);
     agentList.setItems(items);
+
+    if (_listFocused) {
+      _hintIdx = -1;
+      _hintBase = '';
+      _updateHint(agentList.selected ?? 0);
+    }
 
     screen.render();
   }
@@ -427,9 +442,55 @@ export function createAgentsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // Row spinner (animated braille while preview is playing)
+
+  const _SPIN_PFX = '{#00e5ff-fg}';
+  const _SPIN_SFX = '{/#00e5ff-fg}';
+  const _SPIN_PFX_TOTAL_LEN = _SPIN_PFX.length + 1 + _SPIN_SFX.length; // tag + 1 frame char + close tag
+  const _SPIN_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let _spinnerInterval  = null;
+  let _spinnerFrameIdx  = 0;
+  let _spinnerAgentIdx  = -1;
+
+  // Strip the spinner prefix (tag+frame+close or plain first char) to get the row tail.
+  function _stripSpinnerPfx(c) {
+    return c.startsWith(_SPIN_PFX) ? c.slice(_SPIN_PFX_TOTAL_LEN) : c.slice(1);
+  }
+
+  function _startSpinner(agentIdx) {
+    _stopSpinner();
+    _spinnerAgentIdx = agentIdx;
+    _spinnerFrameIdx = 0;
+    const items = agentList.items;
+    const item = items[_spinnerAgentIdx];
+    if (item) {
+      item.setContent(`${_SPIN_PFX}${_SPIN_FRAMES[0]}${_SPIN_SFX}${_stripSpinnerPfx(item.content ?? ' ')}`);
+      screen.render();
+    }
+    _spinnerInterval = setInterval(() => {
+      _spinnerFrameIdx = (_spinnerFrameIdx + 1) % _SPIN_FRAMES.length;
+      const it = agentList.items[_spinnerAgentIdx];
+      if (!it) return;
+      it.setContent(`${_SPIN_PFX}${_SPIN_FRAMES[_spinnerFrameIdx]}${_SPIN_SFX}${_stripSpinnerPfx(it.content ?? ' ')}`);
+      screen.render();
+    }, 80);
+  }
+
+  function _stopSpinner() {
+    if (_spinnerInterval) { clearInterval(_spinnerInterval); _spinnerInterval = null; }
+    if (_spinnerAgentIdx >= 0) {
+      const item = agentList.items[_spinnerAgentIdx];
+      if (item) item.setContent(' ' + _stripSpinnerPfx(item.content ?? ' '));
+      _spinnerAgentIdx = -1;
+      screen.render();
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Kill any playing preview
 
   function _killPreview() {
+    _stopSpinner();
     if (_playingProcess) {
       try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
       _playingProcess = null;
@@ -970,6 +1031,10 @@ export function createAgentsTab(screen, services) {
     _killPreview();
     const gen = ++_playGeneration;
 
+    // Start spinner on the agent's row in the list
+    const agentIdx = _agents.findIndex(a => a.id === agent.id);
+    if (agentIdx >= 0) _startSpinner(agentIdx);
+
     const voiceId = profile.voice || '';
     const pretext = profile.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
     const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`;
@@ -994,11 +1059,11 @@ export function createAgentsTab(screen, services) {
     _playingProcess = proc;
 
     proc.on('exit', () => {
-      if (gen === _playGeneration) _playingProcess = null;
+      if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
     });
 
     proc.on('error', () => {
-      if (gen === _playGeneration) _playingProcess = null;
+      if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
     });
   }
 
@@ -1327,6 +1392,29 @@ export function createAgentsTab(screen, services) {
     }
   });
 
+  // Inline row hint (appended to selected row while list is focused)
+  let _listFocused = false;
+  let _hintIdx  = -1;
+  let _hintBase = '';   // row content before hint was appended (no hint, no █)
+
+  function _updateHint(idx) {
+    const items = agentList.items;
+    if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
+      const hadBlink = (items[_hintIdx].content ?? '').endsWith('  █');
+      items[_hintIdx].setContent(hadBlink ? _hintBase + '  █' : _hintBase);
+    }
+    if (idx >= 0 && items[idx]) {
+      let c = items[idx].content ?? '';
+      const hasBlink = c.endsWith('  █');
+      if (hasBlink) c = c.slice(0, -3);
+      _hintBase = c;
+      items[idx].setContent(c + _ROW_HINT_BMAD + (hasBlink ? '  █' : ''));
+    } else {
+      _hintBase = '';
+    }
+    _hintIdx = idx;
+  }
+
   // Blinking cursor
   let _alBlink = { interval: null, on: false, sel: -1 };
   function _alTick() {
@@ -1344,21 +1432,34 @@ export function createAgentsTab(screen, services) {
     screen.render();
   }
   agentList.on('focus', () => {
+    _listFocused = true;
     _alBlink.on = true;
     _alBlink.sel = agentList.selected ?? 0;
+    _hintIdx = -1;
+    _hintBase = '';
+    _updateHint(_alBlink.sel);
     const items = agentList.items;
     if (items[_alBlink.sel]) items[_alBlink.sel].setContent((items[_alBlink.sel].content ?? '') + '  █');
     screen.render();
     _alBlink.interval = setInterval(_alTick, 500);
   });
   agentList.on('blur', () => {
+    _listFocused = false;
     if (_alBlink.interval) { clearInterval(_alBlink.interval); _alBlink.interval = null; }
     const items = agentList.items;
     const sel = agentList.selected ?? 0;
-    if (items[sel]) items[sel].setContent((items[sel].content ?? '').replace(/  █$/, ''));
+    if (items[sel]) {
+      items[sel].setContent(sel === _hintIdx ? _hintBase : (items[sel].content ?? '').replace(/  █$/, ''));
+    }
+    if (_hintIdx >= 0 && _hintIdx !== sel && items[_hintIdx]) {
+      items[_hintIdx].setContent(_hintBase);
+    }
+    _hintIdx = -1;
+    _hintBase = '';
     screen.render();
   });
   agentList.on('select item', () => {
+    _updateHint(agentList.selected ?? 0);
     if (_alBlink.interval) _alTick();
   });
 
