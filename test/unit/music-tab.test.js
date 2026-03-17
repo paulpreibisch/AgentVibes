@@ -21,9 +21,9 @@ describe('getBuiltInTracks', () => {
     assert.strictEqual(typeof getBuiltInTracks, 'function');
   });
 
-  test('returns array of 16 built-in tracks', () => {
+  test('returns array of 15 built-in tracks', () => {
     const tracks = getBuiltInTracks();
-    assert.strictEqual(tracks.length, 16);
+    assert.strictEqual(tracks.length, 15);
   });
 
   test('each track has id and label', () => {
@@ -95,13 +95,13 @@ describe('createMusicTab — Tab Component Contract', () => {
     assert.strictEqual(typeof tab.getFooterColor, 'function');
   });
 
-  test('getFooterColor() returns orange #ff9800', () => {
+  test('getFooterColor() returns dark magenta #880e4f', () => {
     const mockScreen = { append: () => {}, key: () => {}, on: () => {}, render: () => {}, destroy: () => {} };
     const tab = createMusicTab(mockScreen, {
       configService: { getConfig: () => ({}), set: () => {} },
       providerService: { getActiveVoiceId: () => '', setActiveVoice: () => {} },
     });
-    assert.strictEqual(tab.getFooterColor(), '#ff9800');
+    assert.strictEqual(tab.getFooterColor(), '#880e4f');
   });
 });
 

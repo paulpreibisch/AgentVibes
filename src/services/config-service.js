@@ -122,6 +122,7 @@ export class ConfigService {
    */
   saveAllToGlobal(data) {
     this._writeConfigAtomic(this.getGlobalConfigPath(), data);
+    this._syncToTextFiles(path.resolve(this._homeDir, '.claude'), data);
   }
 
   /**
@@ -131,6 +132,7 @@ export class ConfigService {
    */
   saveAllToLocal(data) {
     this._writeConfigAtomic(this.getLocalConfigPath(), data);
+    this._syncToTextFiles(path.resolve(this._projectRoot, '.claude'), data);
   }
 
   // ---------------------------------------------------------------------------
@@ -169,6 +171,28 @@ export class ConfigService {
 
   // ---------------------------------------------------------------------------
   // Private helpers
+
+  /**
+   * Sync config.json values to .claude/ text files that TTS scripts read.
+   * Only writes files that the config has values for. Silently ignores errors.
+   * @param {string} claudeDir - Path to .claude/ directory
+   * @param {object} data - Config data object
+   */
+  _syncToTextFiles(claudeDir, data) {
+    if (!claudeDir || !data) return;
+    try {
+      if (!fs.existsSync(claudeDir)) return;
+      if (data.voice) {
+        fs.writeFileSync(path.join(claudeDir, 'tts-voice.txt'), String(data.voice));
+      }
+      if (data.provider) {
+        fs.writeFileSync(path.join(claudeDir, 'tts-provider.txt'), String(data.provider));
+      }
+      if (data.verbosity) {
+        fs.writeFileSync(path.join(claudeDir, 'tts-verbosity.txt'), String(data.verbosity));
+      }
+    } catch { /* best-effort sync */ }
+  }
 
   /**
    * Read and parse a JSON config file.

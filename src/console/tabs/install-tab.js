@@ -22,7 +22,7 @@ import {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
   copyConfigFiles, configureSessionStartHook,
-  installPluginManifest, checkAndInstallPiper,
+  installPluginManifest, checkAndInstallPiper, ensureGitRepo,
 } from '../../installer.js';
 
 const _execFileAsync = promisify(execFile);
@@ -368,6 +368,7 @@ export function createInstallTab(screen, services) {
       await copyConfigFiles(targetDir, spinner);
       await configureSessionStartHook(targetDir, spinner);
       await installPluginManifest(targetDir, spinner);
+      await ensureGitRepo(targetDir, spinner);
 
       spinner.start('Writing configuration...');
       await _writeInstallConfig(targetDir, provider);

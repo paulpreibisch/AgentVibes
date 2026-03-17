@@ -40,9 +40,15 @@ set -eo pipefail
 # language-manager.sh, audio-cache-utils.sh) use unset variables freely.
 # Variables in THIS script use ${VAR:-} defaults for safety.
 
-# Cleanup handler for temp files
+# Cleanup handler for temp files (preserves final output in $TEMP_FILE)
 _CLEANUP_FILES=()
-cleanup() { rm -f "${_CLEANUP_FILES[@]+"${_CLEANUP_FILES[@]}"}"; }
+cleanup() {
+  local f
+  for f in "${_CLEANUP_FILES[@]+"${_CLEANUP_FILES[@]}"}"; do
+    [[ "$f" == "${TEMP_FILE:-}" ]] && continue
+    rm -f "$f"
+  done
+}
 trap cleanup EXIT
 
 # Fix locale warnings

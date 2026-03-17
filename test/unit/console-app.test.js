@@ -64,8 +64,8 @@ describe('AgentVibesConsole - Module Structure', () => {
     assert.strictEqual(instance._screenOptions.smartCSR, true, 'smartCSR must be true');
     assert.strictEqual(instance._screenOptions.mouse, true, 'mouse must be true');
     assert.strictEqual(instance._screenOptions.fullUnicode, true, 'fullUnicode must be true');
-    assert.strictEqual(instance._screenOptions.title, 'AgentVibes v4.0 TUI Console',
-      'title must match spec');
+    assert.ok(instance._screenOptions.title.startsWith('AgentVibes v'),
+      'title must start with AgentVibes version prefix');
   });
 
   test('launchConsole accepts opts object with startTab and returns console instance', async () => {

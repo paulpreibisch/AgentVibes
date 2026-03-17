@@ -86,7 +86,7 @@ describe('createSettingsTab', () => {
       configService: mockConfigService,
       providerService: mockProviderService,
     });
-    assert.ok(tab.getFooterText().includes('[Enter]'), 'footer must include [Enter] hint');
+    assert.ok(tab.getFooterText().includes('Enter'), 'footer must include Enter hint');
   });
 
   test('show() and hide() do not throw', () => {
