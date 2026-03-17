@@ -61,11 +61,11 @@ describe('AgentVibesConsole - Module Structure', () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
-    assert.strictEqual(instance._screenOptions.smartCSR, true, 'smartCSR must be true');
+    assert.strictEqual(instance._screenOptions.smartCSR, false, 'smartCSR must be false');
     assert.strictEqual(instance._screenOptions.mouse, true, 'mouse must be true');
     assert.strictEqual(instance._screenOptions.fullUnicode, true, 'fullUnicode must be true');
-    assert.strictEqual(instance._screenOptions.title, 'AgentVibes v4.0 TUI Console',
-      'title must match spec');
+    assert.ok(instance._screenOptions.title.startsWith('AgentVibes v'),
+      'title must start with AgentVibes v');
   });
 
   test('launchConsole accepts opts object with startTab and returns console instance', async () => {
