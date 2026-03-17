@@ -57,7 +57,7 @@ huggingface-cli repo create piper-custom-voices --type model --license apache-2.
 Run this script to download all three voices:
 
 ```bash
-cd /home/fire/claude/AgentVibes/mcp-server/voices
+cd /path/to/AgentVibes/mcp-server/voices
 
 # Download Kristin (Public Domain)
 curl -L "https://sfo3.digitaloceanspaces.com/bkmdls/kristin.onnx" -o kristin.onnx
@@ -173,7 +173,7 @@ All voices created by **Bryce Beattie** (https://brycebeattie.com/files/tts/)
 ## Step 7: Upload to HuggingFace
 
 ```bash
-cd /home/fire/claude/AgentVibes/mcp-server/voices
+cd /path/to/AgentVibes/mcp-server/voices
 
 # Upload all files
 huggingface-cli upload agentvibes/piper-custom-voices . . --repo-type model

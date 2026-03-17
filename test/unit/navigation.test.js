@@ -41,7 +41,7 @@ describe('navigation.js - setupNavigation', () => {
     setupNavigation(stubScreen, nav);
 
     // Verify all tab shortcuts are registered
-    const expectedKeys = ['s', 'S', 'v', 'V', 'm', 'M', 'a', 'A', 'r', 'R', 'h', 'H', 'i', 'I', 't', 'T', 'escape'];
+    const expectedKeys = ['s', 'S', 'v', 'V', 'm', 'M', 'b', 'B', 'r', 'R', 'h', 'H', 'i', 'I', 't', 'T', 'escape'];
     for (const key of expectedKeys) {
       assert.ok(registeredKeys.includes(key),
         `Key '${key}' must be registered by setupNavigation`);

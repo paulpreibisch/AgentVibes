@@ -7,7 +7,7 @@
  */
 
 /** Ordered list of all tab IDs — used for cycling and validation */
-export const TAB_ORDER = ['install', 'settings', 'voices', 'music', 'agents', 'readme', 'help'];
+export const TAB_ORDER = ['install', 'settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help'];
 
 export class NavigationService {
   /**

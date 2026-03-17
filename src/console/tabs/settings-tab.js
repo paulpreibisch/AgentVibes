@@ -21,6 +21,12 @@ import {
 import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite, applyTrackToAudioEffects } from './music-tab.js';
 import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
 import { buildAudioEnv, detectMp3Player, detectWavPlayer } from '../audio-env.js';
+import { destroyList } from '../widgets/destroy-list.js';
+import { openReverbPicker } from '../widgets/reverb-picker.js';
+import { openPersonalityPicker } from '../widgets/personality-picker.js';
+import { PERSONALITY_EMOJIS } from '../constants/personalities.js';
+import { formatTrackName as _sharedFormatTrackName, formatReverbState as _sharedFormatReverbState } from '../widgets/format-utils.js';
+import { showNotice as _showNoticeWidget } from '../widgets/notice.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -74,82 +80,11 @@ const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_f
 // Verbosity display labels
 const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', minimal: 'Minimal', custom: 'Custom' });
 
-// Personality emojis — mirrors installer.js personalityEmojis (src/installer.js:84)
-const PERSONALITY_EMOJIS = Object.freeze({
-  angry:        '😠',
-  annoying:     '😤',
-  crass:        '🤬',
-  dramatic:     '🎭',
-  'dry-humor':  '😐',
-  flirty:       '😘',
-  funny:        '😂',
-  grandpa:      '👴',
-  millennial:   '🙄',
-  moody:        '😒',
-  none:         '😊',
-  normal:       '😊',
-  pirate:       '⚓',
-  poetic:       '📜',
-  professional: '👔',
-  rapper:       '🎤',
-  robot:        '🤖',
-  sarcastic:    '😏',
-  sassy:        '💁',
-  'surfer-dude':'🏄',
-  zen:          '🧘',
-});
+// Personality emojis and names imported from src/console/constants/personalities.js
+// (via the import at the top of this file)
 
-// Known personalities (matches .claude/personalities/ directory)
-const PERSONALITIES = Object.freeze([
-  'none', 'angry', 'annoying', 'crass', 'dramatic', 'dry-humor',
-  'flirty', 'funny', 'grandpa', 'millennial', 'moody', 'normal',
-  'pirate', 'poetic', 'professional', 'rapper', 'robot', 'sarcastic',
-  'sassy', 'surfer-dude', 'zen',
-]);
-
-// Preview phrases — one short, exemplary, in-character line per personality.
-// Spoken automatically when the cursor lands on a personality in the picker.
-const PERSONALITY_PREVIEW_PHRASES = Object.freeze({
-  angry:        "UNACCEPTABLE! This build time is a DISASTER! Fix it NOW or so help me!",
-  annoying:     "Oh oh oh! Can I tell you something? Can I? Can I? PLEASE? It is so important!",
-  crass:        "Well damn, that code runs like my uncle's truck. Barely, and it smells funny.",
-  dramatic:     "The tests... have failed. I don't know how much longer I can do this.",
-  'dry-humor':  "Your code worked. I too am surprised.",
-  flirty:       "Ooh, a clean merge? You know exactly how to make my heart race.",
-  funny:        "Why do programmers hate nature? Too many bugs. I will show myself out.",
-  grandpa:      "Back in my day, we compiled by hand. Uphill. In the snow. Both ways.",
-  millennial:   "I literally cannot even with this error. I am so done. Like, actually deceased.",
-  moody:        "...It works. Whatever. Do not get used to it.",
-  pirate:       "Arrr! The build be sailin' smooth today, matey! No barnacles in sight!",
-  poetic:       "Like rivers to the sea, your code flows toward eventual compilation.",
-  professional: "I have completed the requested task and am prepared to document outcomes.",
-  rapper:       "Yo! Clean code flowin', tests are glowin', no bugs showin'!",
-  robot:        "TASK COMPLETE. EFFICIENCY: OPTIMAL. PROBABILITY OF SUCCESS: 97.3 PERCENT. BEEP.",
-  sarcastic:    "Oh wow, another bug. What a completely unexpected surprise. Truly shocking.",
-  sassy:        "Honey, whoever told you that was good code was not your friend.",
-  'surfer-dude':"Duuude! That commit totally shredded! Gnarly clean code, bro!",
-  zen:          "The bug is not the enemy. The bug is the teacher. Breathe. Commit.",
-  random:       "Who will I be today? Even I do not know. Expect the unexpected.",
-});
-
-// Human-readable track display names — matches installer track picker (src/installer.js:2280)
-const TRACK_NAMES = Object.freeze({
-  'agentvibes_soft_flamenco_loop.mp3':                 '🎻 Soft Flamenco',
-  'agent_vibes_bachata_v1_loop.mp3':                   '🎺 Bachata',
-  'agent_vibes_salsa_v2_loop.mp3':                     '💃 Salsa',
-  'agent_vibes_cumbia_v1_loop.mp3':                    '🎸 Cumbia',
-  'agent_vibes_bossa_nova_v2_loop.mp3':                '🌸 Bossa Nova',
-  'agent_vibes_japanese_city_pop_v1_loop.mp3':         '🌆 Japanese City Pop',
-  'agent_vibes_chillwave_v2_loop.mp3':                 '🌊 Chillwave',
-  'agent_vibes_dark_chill_step_loop.mp3':              '🌙 Dark Chill Step',
-  'agent_vibes_goa_trance_v2_loop.mp3':                '🌀 Goa Trance',
-  'agent_vibes_harpsichord_v2_loop.mp3':               '🎼 Harpsichord',
-  'agent_vibes_celtic_harp_v1_loop.mp3':               '🎻 Celtic Harp',
-  'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3': '🌺 Hawaiian Slack Key Guitar',
-  'agent_vibes_arabic_v2_loop.mp3':                    '🎵 Arabic Oud',
-  'agent_vibes_ganawa_ambient_v2_loop.mp3':            '🪘 Gnawa Ambient',
-  'agent_vibes_tabla_dream_pop_v1_loop.mp3':           '🥁 Tabla Dream Pop',
-});
+// Human-readable track display names — moved to shared widgets/format-utils.js
+// TRACK_NAMES constant removed (M1 dedup). Use formatTrackName() instead.
 
 // Built-in track list for the picker (fallback when tracks dir is missing)
 const BUILT_IN_TRACKS = [
@@ -166,10 +101,7 @@ const BUILT_IN_TRACKS = [
  * @param {string} preset - 'off' | 'light' | 'medium' | 'heavy' | 'cathedral'
  * @returns {string}
  */
-export function formatReverbState(preset) {
-  const LABELS = { off: 'Off', light: 'Light (Small room)', medium: 'Medium (Conference room)', heavy: 'Heavy (Large hall)', cathedral: 'Cathedral (Epic space)' };
-  return LABELS[preset] ?? LABELS.light;
-}
+export const formatReverbState = _sharedFormatReverbState;
 
 /**
  * @param {boolean} enabled
@@ -192,18 +124,7 @@ export function formatVolume(volume) {
  * @param {string} track - filename (e.g. 'agentvibes_soft_flamenco_loop.mp3')
  * @returns {string}
  */
-export function formatTrackName(track) {
-  if (!track) return 'None';
-  if (TRACK_NAMES[track]) return TRACK_NAMES[track];
-  // Custom/unknown track: strip extension, agentvibes_/agent_vibes_ prefix,
-  // _v1/_v2/_loop/_v1_loop/_v2_loop suffixes, then title-case each word
-  return track
-    .replace(/\.[^.]+$/, '')
-    .replace(/^agentvibes_|^agent_vibes_/, '')
-    .replace(/_v\d+_loop$|_loop$|_v\d+$/, '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
+export const formatTrackName = _sharedFormatTrackName;
 
 /**
  * @param {string} verbosity - 'high' | 'medium' | 'low'
@@ -1131,7 +1052,7 @@ export function createSettingsTab(screen, services) {
   });
 
   const reverbChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
-    _openReverbPicker(screen, configService, (preset) => {
+    openReverbPicker(screen, configService.getConfig().effects?.reverbPreset ?? 'light', (preset) => {
       _setEffects(configService, { reverbPreset: preset });
       refreshDisplay();
     }, _restoreFocus);
@@ -1315,7 +1236,7 @@ export function createSettingsTab(screen, services) {
   });
 
   const personalityChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
-    _openPersonalityPicker(screen, configService, (name) => {
+    openPersonalityPicker(screen, configService.getConfig().personality ?? 'none', (name) => {
       configService.set('personality', name);
       refreshDisplay();
     }, _restoreFocus);
@@ -2453,19 +2374,14 @@ function _openProviderPicker(screen, providerService, onSelect, onClose) {
 }
 
 // ---------------------------------------------------------------------------
-// Private: Destroy a list/modal widget and force-invalidate olines so blessed
-// physically redraws every cell the widget covered (avoids ghost rendering).
+// Private: Destroy helper — now imported from shared widgets/destroy-list.js
+// (kept as comment for git blame traceability)
 
-function _destroyList(list, screen, onClose) {
-  list.destroy();
-  try {
-    for (let r = 0; r < screen.height; r++)
-      for (let c = 0; c < screen.width; c++)
-        if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
-  } catch {}
-  onClose?.();
-  screen.render();
-}
+// NOTE: The following line was the old _destroyList definition, now using shared import:
+// import { destroyList } from '../widgets/destroy-list.js';
+//
+// Old code removed to eliminate duplication (M1 fix).
+// The shared destroyList has identical behavior.
 
 // ---------------------------------------------------------------------------
 // Private: Show a temporary stub notice text
@@ -2540,7 +2456,7 @@ function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
     },
   });
 
-  function _close() { _destroyList(modal, screen, onClose); }
+  function _close() { destroyList(modal, screen, onClose); }
 
   modal.key(['escape'], _close);
 
@@ -2568,27 +2484,7 @@ function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
 }
 
 function _showNotice(screen, message) {
-  const width = Math.max(28, message.length + 6);
-  const modal = blessed.box({
-    parent: screen,
-    top: 'center',
-    left: 'center',
-    width,
-    height: 3,
-    border: { type: 'line' },
-    tags: true,
-    content: `{center}${message}{/center}`,
-    style: {
-      fg: '#e3f2fd',
-      bg: COLORS.contentBg,
-      border: { fg: '#00e5ff' },
-    },
-  });
-  screen.render();
-
-  setTimeout(() => {
-    _destroyList(modal, screen);
-  }, 2500);
+  _showNoticeWidget(screen, message, { bg: COLORS.contentBg });
 }
 
 // ---------------------------------------------------------------------------
@@ -2605,64 +2501,8 @@ function _setEffects(configService, partial) {
 }
 
 // ---------------------------------------------------------------------------
-// Private: Inline reverb preset picker
-
-function _openReverbPicker(screen, configService, onSelect, onClose) {
-  const PRESETS = [
-    { label: 'Off (Dry, no reverb)',        value: 'off' },
-    { label: 'Light (Small room)',           value: 'light' },
-    { label: 'Medium (Conference room)',     value: 'medium' },
-    { label: 'Heavy (Large hall)',           value: 'heavy' },
-    { label: 'Cathedral (Epic space)',       value: 'cathedral' },
-  ];
-
-  const currentPreset = configService.getConfig().effects?.reverbPreset ?? 'light';
-  const currentIdx = Math.max(0, PRESETS.findIndex(p => p.value === currentPreset));
-
-  const list = blessed.list({
-    parent: screen,
-    top: 'center',
-    left: 'center',
-    width: 40,
-    height: PRESETS.length + 4,
-    border: { type: 'line' },
-    tags: true,
-    label: _modalTitle('Select Reverb Preset'),
-    items: PRESETS.map((p, i) => (i === currentIdx ? `● ${p.label}` : `  ${p.label}`)),
-    keys: true,
-    vi: false,
-    mouse: true,
-    style: {
-      border: { fg: COLORS.btnFocus },
-      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
-      item: { fg: '#e3f2fd' },
-    },
-  });
-
-  list.select(currentIdx);
-  list.focus();
-  screen.render();
-
-  list.key(['enter', 'space'], () => {
-    const selected = PRESETS[list.selected];
-    if (!selected) return;
-    _destroyList(list, screen, onClose);
-
-    // Apply to audio config via effects-manager.sh
-    const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
-    spawnSync('bash', [effectsScript, 'set-reverb', selected.value, 'default'], {
-      stdio: 'ignore',
-      timeout: 5000,
-      env: { ...process.env },
-    });
-
-    onSelect(selected.value);
-  });
-
-  list.key(['escape', 'q'], () => {
-    _destroyList(list, screen, onClose);
-  });
-}
+// Private: _openReverbPicker removed — now using shared import:
+//   import { openReverbPicker } from '../widgets/reverb-picker.js';
 
 // ---------------------------------------------------------------------------
 // Private: Background music config read/write helpers
@@ -2737,18 +2577,18 @@ function _openTrackPicker(screen, configService, onSelect, onClose) {
     if (!selected) return;
     if (selected.file === ADD_SENTINEL) {
       // Destroy list first, then open path-input dialog
-      _destroyList(list, screen);
+      destroyList(list, screen);
       _openCustomTrackInput(screen, tracksDir, (newFile) => {
         onSelect(newFile);
       }, onClose);
       return;
     }
-    _destroyList(list, screen, onClose);
+    destroyList(list, screen, onClose);
     onSelect(selected.file);
   });
 
   list.key(['escape', 'q'], () => {
-    _destroyList(list, screen, onClose);
+    destroyList(list, screen, onClose);
   });
 }
 
@@ -3301,13 +3141,13 @@ function _openVerbosityPicker(screen, configService, onDone, onClose) {
   list.key(['enter', 'space'], () => {
     const selected = levels[list.selected];
     if (!selected) return;
-    _destroyList(list, screen, onClose);
+    destroyList(list, screen, onClose);
     configService.set('verbosity', selected.toLowerCase());
     onDone();
   });
 
   list.key(['escape', 'q'], () => {
-    _destroyList(list, screen, onClose);
+    destroyList(list, screen, onClose);
   });
 }
 
@@ -3815,135 +3655,5 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
 }
 
 // ---------------------------------------------------------------------------
-// Private: Inline personality picker
-
-function _openPersonalityPicker(screen, configService, onSelect, onClose) {
-  const current = configService.getConfig().personality ?? 'none';
-  const currentIdx = Math.max(0, PERSONALITIES.indexOf(current));
-
-  const list = blessed.list({
-    parent: screen,
-    top: 'center',
-    left: 'center',
-    width: 44,
-    height: Math.min(PERSONALITIES.length + 4, 22),
-    border: { type: 'line' },
-    tags: true,
-    label: _modalTitle('Select Personality'),
-    items: PERSONALITIES.map((p, i) => {
-      const emoji = PERSONALITY_EMOJIS[p] ?? '✨';
-      const label = p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1);
-      const mark  = i === currentIdx ? '✅' : '   ';
-      return `${mark} ${emoji} ${label}`;
-    }),
-    keys: true,
-    vi: true,
-    mouse: true,
-    style: {
-      border: { fg: COLORS.btnFocus },
-      selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
-      item: { fg: '#e3f2fd' },
-    },
-  });
-
-  list.select(currentIdx);
-  list.focus();
-  screen.render();
-
-  // ---------- Hover TTS preview ----------
-
-  let _pickerTtsProc  = null;
-  let _playingItemIdx = -1;
-
-  // Add or remove " (playing)" from a list item (strips any trailing █ first)
-  function _setItemPlaying(idx, playing) {
-    const item = list.items?.[idx];
-    if (!item) return;
-    const base = (item.content ?? '').replace(/ █$/, '').replace(/ \(playing\)$/, '');
-    item.setContent(playing ? `${base} (playing)` : base);
-  }
-
-  function _killPickerTts() {
-    if (_pickerTtsProc) {
-      try { process.kill(-_pickerTtsProc.pid, 'SIGTERM'); } catch {}
-      _pickerTtsProc = null;
-    }
-    if (_playingItemIdx >= 0) {
-      _setItemPlaying(_playingItemIdx, false);
-      _playingItemIdx = -1;
-    }
-  }
-
-  function _speakPersonalityPreview(personality) {
-    _killPickerTts();
-    const phrase = PERSONALITY_PREVIEW_PHRASES[personality];
-    if (!phrase) return;
-    const ttsScript = path.join(process.cwd(), '.claude', 'hooks', 'play-tts.sh');
-    _pickerTtsProc = spawn('bash', [ttsScript, phrase], {
-      stdio: 'ignore',
-      detached: true,
-      env: buildAudioEnv(),
-    });
-    _playingItemIdx = list.selected;
-    _setItemPlaying(_playingItemIdx, true);
-    screen.render();
-    // Clear indicator when audio finishes naturally
-    _pickerTtsProc.on('exit', () => {
-      if (_playingItemIdx >= 0) {
-        _setItemPlaying(_playingItemIdx, false);
-        _playingItemIdx = -1;
-        screen.render();
-      }
-      _pickerTtsProc = null;
-    });
-    _pickerTtsProc.unref();
-  }
-
-  // Hover: auto-speaks preview phrase when cursor moves
-  list.on('select item', () => {
-    _speakPersonalityPreview(PERSONALITIES[list.selected]);
-  });
-
-  // [Space] plays the selected personality, or stops if the same item is already playing.
-  // Uses item-aware toggle so navigating with ↓ (which auto-plays) doesn't prevent Space from working.
-  list.key(['space'], () => {
-    if (_pickerTtsProc && _playingItemIdx === list.selected) {
-      _killPickerTts(); // true toggle: stop only if this exact item is playing
-    } else {
-      _speakPersonalityPreview(PERSONALITIES[list.selected]); // play or switch
-    }
-  });
-
-  // Type-to-jump: press a letter to jump to the first matching personality (cycles on repeat)
-  const _jumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'q']);
-  list.on('keypress', (ch, key) => {
-    if (!ch || key.ctrl || key.meta) return;
-    const lower = ch.toLowerCase();
-    if (!/^[a-z]$/.test(lower)) return;
-    if (_jumpBlocked.has(lower)) return;
-    const count = PERSONALITIES.length;
-    const start = list.selected ?? 0;
-    for (let i = 1; i <= count; i++) {
-      const idx = (start + i) % count;
-      if (PERSONALITIES[idx].startsWith(lower)) {
-        list.select(idx);
-        screen.render();
-        break;
-      }
-    }
-  });
-
-  // [Enter] confirms selection
-  list.key(['enter'], () => {
-    const selected = PERSONALITIES[list.selected];
-    if (!selected) return;
-    _killPickerTts();
-    _destroyList(list, screen, onClose);
-    onSelect(selected);
-  });
-
-  list.key(['escape', 'q'], () => {
-    _killPickerTts();
-    _destroyList(list, screen, onClose);
-  });
-}
+// Private: _openPersonalityPicker removed — now using shared import:
+//   import { openPersonalityPicker } from '../widgets/personality-picker.js';

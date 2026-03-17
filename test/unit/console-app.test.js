@@ -144,12 +144,12 @@ describe('AgentVibesConsole - Navigation (Story 6.2)', () => {
       'navigationService active tab must match startTab option');
   });
 
-  test('_renderTabBarContent includes all 7 tab shortcut labels', async () => {
+  test('_renderTabBarContent includes all 8 tab shortcut labels', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
     const content = instance._renderTabBarContent('settings');
-    const expectedShortcuts = ['[S]', '[V]', '[M]', '[A]', '[R]', '[H]', '[I]'];
+    const expectedShortcuts = ['[S]', '[V]', '[M]', '[B]', '[X]', '[R]', '[H]', '[I]'];
     for (const shortcut of expectedShortcuts) {
       assert.ok(content.includes(shortcut),
         `Tab bar content must include shortcut '${shortcut}' (AC#1)`);

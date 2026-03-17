@@ -55,7 +55,23 @@ trap cleanup EXIT
 export LC_ALL=C
 
 TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"  # Optional: voice model name
+VOICE_OVERRIDE="${2:-}"       # Optional: voice model name
+AGENT_PROFILE_FILE="${3:-}"   # Optional: path to per-agent profile JSON (from bmad-speak.sh)
+
+# Strip emojis, asterisks, and markdown formatting that Piper would speak literally
+TEXT=$(printf '%s' "$TEXT" | perl -CSD -pe '
+  s/[\x{1F300}-\x{1F9FF}]//g;   # emoticons, symbols, pictographs
+  s/[\x{2600}-\x{27BF}]//g;     # misc symbols, dingbats
+  s/[\x{FE00}-\x{FE0F}]//g;     # variation selectors
+  s/[\x{200D}]//g;               # zero-width joiner
+  s/[\x{2500}-\x{257F}]//g;     # box drawing (─━ etc)
+  s/[\x{2580}-\x{259F}]//g;     # block elements
+  s/\*+//g;                       # asterisks (bold/italic markdown)
+  s/#+\s*//g;                     # heading markers
+  s/`//g;                         # backticks
+  s/~+//g;                        # strikethrough
+  s/^\s*[-]\s*//g;                # list dashes
+')
 
 # Source voice manager and language manager
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,8 +95,29 @@ CURRENT_LANGUAGE=$(get_language_code)
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Use override if provided
-  VOICE_MODEL="$VOICE_OVERRIDE"
-  echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  # Handle multi-speaker format: "Model::SpeakerName" → split into model + speaker lookup
+  if [[ "$VOICE_OVERRIDE" == *"::"* ]]; then
+    VOICE_MODEL="${VOICE_OVERRIDE%%::*}"
+    _SPEAKER_NAME="${VOICE_OVERRIDE#*::}"
+    # Look up speaker ID from the model's .onnx.json speaker_id_map
+    voice_dir=$(get_voice_storage_dir)
+    _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+    if [[ -f "$_JSON_FILE" ]]; then
+      # SECURITY: Pass values via env vars to prevent shell injection
+      SPEAKER_ID=$(_JSON="$_JSON_FILE" _SPKR="$_SPEAKER_NAME" node -e "
+        try {
+          const j = JSON.parse(require('fs').readFileSync(process.env._JSON,'utf8'));
+          const map = j.speaker_id_map || {};
+          const id = map[process.env._SPKR];
+          if (id !== undefined) process.stdout.write(String(id));
+        } catch {}
+      " 2>/dev/null || true)
+    fi
+    echo "🎭 Using multi-speaker voice: $VOICE_OVERRIDE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+  else
+    VOICE_MODEL="$VOICE_OVERRIDE"
+    echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  fi
 else
   # Try to get voice from voice file (check CLAUDE_PROJECT_DIR first for MCP context)
   VOICE_FILE=""
@@ -90,7 +127,11 @@ else
   # 2. Script location (for direct slash command usage)
   # 3. Global ~/.claude (fallback)
 
-  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ "${CLAUDE_PROJECT_DIR:-}" != *".."* ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+  # SECURITY: Canonicalize path to prevent traversal (#128)
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+    CLAUDE_PROJECT_DIR=$(cd "${CLAUDE_PROJECT_DIR}" 2>/dev/null && pwd -P) || CLAUDE_PROJECT_DIR=""
+  fi
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
     # MCP context: Use the project directory where MCP was invoked
     VOICE_FILE="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
   elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
@@ -120,16 +161,25 @@ else
         SPEAKER_ID=""
       fi
       echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
-    # Fallback: check global ~/.claude/ for multi-speaker config files
-    elif [[ -f "$HOME/.claude/tts-piper-model.txt" ]] && [[ -f "$HOME/.claude/tts-piper-speaker-id.txt" ]]; then
-      VOICE_MODEL=$(cat "$HOME/.claude/tts-piper-model.txt" 2>/dev/null)
-      SPEAKER_ID=$(cat "$HOME/.claude/tts-piper-speaker-id.txt" 2>/dev/null)
-      if [[ -n "$SPEAKER_ID" ]] && ! [[ "$SPEAKER_ID" =~ ^[0-9]+$ ]]; then
-        echo "Warning: Invalid speaker ID '$SPEAKER_ID', ignoring" >&2
-        SPEAKER_ID=""
+    # Check if voice uses Model::SpeakerName format (from AgentVibes config)
+    elif [[ -n "$FILE_VOICE" ]] && [[ "$FILE_VOICE" == *"::"* ]]; then
+      VOICE_MODEL="${FILE_VOICE%%::*}"
+      _SPEAKER_NAME="${FILE_VOICE#*::}"
+      voice_dir=$(get_voice_storage_dir)
+      _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+      if [[ -f "$_JSON_FILE" ]]; then
+        # SECURITY: Pass values via env vars to prevent shell injection
+        SPEAKER_ID=$(_JSON="$_JSON_FILE" _SPKR="$_SPEAKER_NAME" node -e "
+          try {
+            const j = JSON.parse(require('fs').readFileSync(process.env._JSON,'utf8'));
+            const map = j.speaker_id_map || {};
+            const id = map[process.env._SPKR];
+            if (id !== undefined) process.stdout.write(String(id));
+          } catch {}
+        " 2>/dev/null || true)
       fi
-      echo "🎭 Using multi-speaker voice (global): $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
-    # Single-speaker voice or custom voice name
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+    # Standard Piper model name or custom voice (just use as-is)
     elif [[ -n "$FILE_VOICE" ]]; then
       # Strip multi-speaker suffix if present (model::SpeakerName-Label)
       if [[ "$FILE_VOICE" == *"::"* ]]; then
@@ -313,12 +363,11 @@ SPEECH_RATE=$(get_speech_rate)
 # @edgecases Handles piper errors, invalid models, multi-speaker voices
 if [[ -n "${SPEAKER_ID:-}" ]]; then
   # Multi-speaker voice: Pass speaker ID
-  # Add 2-second pause between sentences for better pacing
-  echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  # SECURITY: Use printf instead of echo for pipe safety (#134)
+  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 else
   # Single-speaker voice
-  # Add 2-second pause between sentences for better pacing
-  echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
@@ -390,7 +439,7 @@ if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   PROCESSED_FILE=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX.wav")
   _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
-  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
+  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
     PROCESSED_FILE="$TEMP_FILE"
     PROCESSOR_OUTPUT="$TEMP_FILE|"
@@ -415,6 +464,22 @@ _LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
 mkdir -p "$_LOCK_DIR"
 chmod 700 "$_LOCK_DIR"
 LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
+
+# Auto-remove stale lock files (older than 30 seconds) to prevent permanent blocking
+# This handles cases where the background cleanup process was killed mid-playback
+if [ -f "$LOCK_FILE" ]; then
+  _lock_age=0
+  if [[ "$(uname)" == "Darwin" ]]; then
+    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+  else
+    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
+  fi
+  _now=$(date +%s)
+  _lock_age=$((_now - _lock_mtime))
+  if [[ $_lock_age -gt 30 ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
 
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do
@@ -448,10 +513,14 @@ _CLEANUP_FILES+=("$LOCK_FILE" "$WRITE_LOCK_FILE")
 # Get audio duration for proper lock timing
 DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null || true)
 DURATION=${DURATION%.*}  # Round to integer
-DURATION=${DURATION:-1}   # Default to 1 second if detection fails
+# SECURITY: Validate duration is numeric (#134)
+if ! [[ "${DURATION:-}" =~ ^[0-9]+$ ]]; then
+  DURATION=1
+fi
 
-# Play audio in background (skip if in test mode or no-playback mode)
+# Play audio (skip if in test mode or no-playback mode)
 # AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+PLAYER_PID=""
 if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
   # Detect platform and use appropriate audio player
   if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -476,70 +545,95 @@ disown
 # Get audio cache path
 AUDIO_DIR_PATH=$(get_audio_dir)
 
-# Color codes
+# Color codes (safe to use — WAV path is passed via AGENTVIBES_WAV_OUTPATH, not parsed from stdout)
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 PURPLE='\033[0;35m'
-LIGHT_PURPLE='\033[1;35m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
 WHITE='\033[1;37m'
-MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 GOLD='\033[38;5;226m'
 NC='\033[0m'
 
-# CRITICAL: Run auto-cleanup FIRST (before calculating size)
-# This ensures we display the POST-cleanup size, not pre-cleanup size
+# Check if banner is enabled (default: on)
+_BANNER_ENABLED=true
+if [[ -f "$HOME/.agentvibes/banner-disabled" ]]; then
+  _BANNER_ENABLED=false
+elif [[ -f "${PROJECT_ROOT:-/nonexistent}/.agentvibes/banner-disabled" ]]; then
+  _BANNER_ENABLED=false
+fi
+
+# Run auto-cleanup off the critical path: only every 10th call, in background after playback starts.
+# Counter file lives in the secure lock dir (user-specific, already created above).
 AUTO_CLEAN_THRESHOLD=$(get_auto_clean_threshold)
-INITIAL_SIZE=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
-if [[ $INITIAL_SIZE -gt $((AUTO_CLEAN_THRESHOLD * 1048576)) ]]; then
-  DELETED=$(auto_clean_old_files "$AUDIO_DIR_PATH" "$AUTO_CLEAN_THRESHOLD")
-  if [[ $DELETED -gt 0 ]]; then
-    echo -e "${ORANGE}🧹 Auto-cleaned $DELETED old files${NC}"
+_CALL_COUNTER_FILE="$_LOCK_DIR/agentvibes-tts-call-count"
+_CALL_COUNT=$(cat "$_CALL_COUNTER_FILE" 2>/dev/null || echo "0")
+# SECURITY: Validate counter is numeric before arithmetic
+if ! [[ "$_CALL_COUNT" =~ ^[0-9]+$ ]]; then _CALL_COUNT=0; fi
+_CALL_COUNT=$((_CALL_COUNT + 1))
+echo "$_CALL_COUNT" > "$_CALL_COUNTER_FILE"
+
+if (( _CALL_COUNT % 10 == 0 )); then
+  # Capture values needed inside the subshell before forking
+  _CLEANUP_AUDIO_DIR="$AUDIO_DIR_PATH"
+  _CLEANUP_THRESHOLD="$AUTO_CLEAN_THRESHOLD"
+  _CLEANUP_BANNER="$_BANNER_ENABLED"
+  # Source the utils inside the subshell (functions are not exported)
+  _CLEANUP_UTILS="$SCRIPT_DIR/audio-cache-utils.sh"
+  (
+    source "$_CLEANUP_UTILS" 2>/dev/null || exit 0
+    _INITIAL_SIZE=$(calculate_tts_size_bytes "$_CLEANUP_AUDIO_DIR")
+    if [[ $_INITIAL_SIZE -gt $((_CLEANUP_THRESHOLD * 1048576)) ]]; then
+      _DELETED=$(auto_clean_old_files "$_CLEANUP_AUDIO_DIR" "$_CLEANUP_THRESHOLD")
+      if [[ ${_DELETED:-0} -gt 0 ]] && [[ "$_CLEANUP_BANNER" == "true" ]]; then
+        echo -e "\033[0;33m🧹 Auto-cleaned $_DELETED old files\033[0m"
+      fi
+    fi
+  ) &
+  disown
+fi
+
+# Write output path for play-tts-enhanced.sh (avoids stdout parsing — colors are safe)
+if [[ -n "${AGENTVIBES_WAV_OUTPATH:-}" ]]; then
+  echo "$TEMP_FILE" > "$AGENTVIBES_WAV_OUTPATH"
+fi
+
+if [[ "$_BANNER_ENABLED" == "true" ]]; then
+  FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
+  SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
+  SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
+
+  # Dynamic color coding based on cache size
+  CACHE_COLOR=$GREEN
+  if [[ $SIZE_BYTES -gt 3221225472 ]]; then
+    CACHE_COLOR=$RED
+  elif [[ $SIZE_BYTES -gt 524288000 ]]; then
+    CACHE_COLOR=$YELLOW
   fi
-fi
 
-# NOW calculate cache stats after cleanup
-FILE_COUNT=$(count_tts_files "$AUDIO_DIR_PATH")
-SIZE_BYTES=$(calculate_tts_size_bytes "$AUDIO_DIR_PATH")
-SIZE_HUMAN=$(bytes_to_human "$SIZE_BYTES")
+  echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
 
-# Dynamic color coding based on cache size
-# Green: < 500MB (small)
-# Yellow: 500MB - 3GB (lots)
-# Red: > 3GB (extreme)
-CACHE_COLOR=$GREEN
-if [[ $SIZE_BYTES -gt 3221225472 ]]; then  # > 3GB
-  CACHE_COLOR=$RED
-elif [[ $SIZE_BYTES -gt 524288000 ]]; then  # > 500MB
-  CACHE_COLOR=$YELLOW
-fi
+  if [[ -n "$BACKGROUND_MUSIC" ]]; then
+    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$(basename "$BACKGROUND_MUSIC")${NC}"
+  fi
+  if [[ -n "${SPEAKER_ID:-}" ]] && [[ -n "${FILE_VOICE:-}" ]]; then
+    echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$FILE_VOICE${NC} ${WHITE}(Piper TTS)${NC}"
+  else
+    echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
+  fi
 
-# Display with file count (now showing accurate post-cleanup size)
-echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
+  PERSONALITY=$(cat "${PROJECT_ROOT:-/nonexistent}/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
+  if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
+    echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
+  fi
 
-if [[ -n "$BACKGROUND_MUSIC" ]]; then
-  # Extract just the filename to save space
-  MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
-  echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
-fi
-# Show speaker name for multi-speaker voices, otherwise show model name
-if [[ -n "${SPEAKER_ID:-}" ]] && [[ -n "${FILE_VOICE:-}" ]]; then
-  echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$FILE_VOICE${NC} ${WHITE}(Piper TTS)${NC}"
-else
-  echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
-fi
-
-# Show personality if configured
-PERSONALITY=$(cat "${PROJECT_ROOT:-/nonexistent}/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")
-if [[ -n "$PERSONALITY" ]] && [[ "$PERSONALITY" != "none" ]] && [[ "$PERSONALITY" != "normal" ]]; then
-  echo -e "${WHITE}💫 Personality:${NC} ${YELLOW}$PERSONALITY${NC}"
+  echo -e "\033[38;5;240mSay: \"Turn off banner\" to hide this output\033[0m"
 fi
 
 # Check audio folder size and warn if getting large
-if [[ -d "$AUDIO_DIR_PATH" ]]; then
+if [[ "$_BANNER_ENABLED" == "true" ]] && [[ -d "$AUDIO_DIR_PATH" ]]; then
   AUDIO_SIZE=$(du -sm "$AUDIO_DIR_PATH" 2>/dev/null | cut -f1)
   if [[ -n "$AUDIO_SIZE" ]] && [[ "$AUDIO_SIZE" -gt 100 ]]; then
     echo -e "\033[0;31m⚠️  Audio cache is ${AUDIO_SIZE}MB - Run: /agent-vibes:cleanup\033[0m"
@@ -571,8 +665,15 @@ if [[ -z "$BACKGROUND_MUSIC" ]]; then
     _bg_enabled=true
   fi
   if [[ "$_bg_enabled" == "true" ]]; then
-    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Enabled but not playing (check config)${NC}"
+    echo "🎵 Background music: Enabled but not playing (check config)"
   else
-    echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Disabled${NC}"
+    echo "🎵 Background music: Disabled"
   fi
+fi
+
+# Wait for audio player to finish before returning.
+# This keeps the bmad-speak.sh speech lock held until playback is actually done,
+# preventing party-mode agents from talking over each other.
+if [[ -n "$PLAYER_PID" ]]; then
+  wait "$PLAYER_PID" 2>/dev/null || true
 fi

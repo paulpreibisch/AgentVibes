@@ -22,10 +22,10 @@ describe('footer-config.js - Module Structure', () => {
   });
 });
 
-describe('footer-config.js - All 7 tabs covered', () => {
-  test('FOOTER_CONFIG has entries for all 7 tab IDs', async () => {
+describe('footer-config.js - All 8 tabs covered', () => {
+  test('FOOTER_CONFIG has entries for all 8 tab IDs', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'readme', 'help', 'install'];
+    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'install'];
     for (const tabId of required) {
       assert.ok(Object.hasOwn(FOOTER_CONFIG, tabId),
         `FOOTER_CONFIG must have an entry for tab '${tabId}'`);
@@ -112,12 +112,13 @@ describe('footer-config.js - Text content per tab (AC#3)', () => {
       'Music footer must mention Navigate');
   });
 
-  test('Agents footer text includes Navigate, Assign, and Reset shortcuts', async () => {
+  test('Agents footer text includes Navigate, Edit, and Reset shortcuts', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
     assert.ok(FOOTER_CONFIG.agents.text.includes('Navigate') ||
               FOOTER_CONFIG.agents.text.includes('↑↓'),
       'Agents footer must mention Navigate');
-    assert.ok(FOOTER_CONFIG.agents.text.includes('Assign'), 'Agents footer must mention Assign');
+    assert.ok(FOOTER_CONFIG.agents.text.includes('Edit') || FOOTER_CONFIG.agents.text.includes('Assign'),
+      'Agents footer must mention Edit or Assign');
     assert.ok(FOOTER_CONFIG.agents.text.includes('Reset'), 'Agents footer must mention Reset');
   });
 
