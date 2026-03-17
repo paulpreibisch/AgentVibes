@@ -4,17 +4,6 @@
 **Updated:** 2026-02-15
 **Status:** Active (Using BMAD Methodology)
 
-## TTS Protocol (MANDATORY)
-
-**ALWAYS call TTS inline (never `run_in_background: true`):**
-```bash
-PULSE_SERVER=unix:/mnt/wslg/PulseServer bash ".claude/hooks/play-tts.sh" "text to speak"
-```
-- Provider: `piper` (WSL bash, NOT Windows PowerShell)
-- Mode: `full` (`.agentvibes/config/mode.txt`) — Claude calls TTS directly, no stop-hook Audio Summary
-- Pretext: configured in `.agentvibes/config/agentvibes.json` (prepended automatically by play-tts.sh)
-- Call at: task acknowledgment + task completion (high verbosity = also reasoning/findings)
-
 ## Overview
 
 AgentVibes is a Text-to-Speech system for AI assistants with personality support.

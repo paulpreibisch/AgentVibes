@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.6.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.2
 
 ---
 
@@ -40,37 +40,94 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW FEATURE HIGHLIGHTS
+## 🌟 NEW IN v4.2 — BMAD Voices, SSH Receiver & More
 
-### 🎤 Agent Vibes v1.0 Voice Browser
+### 🎭 BMAD Party Mode — Every Agent Has Its Own Voice
 
-![Voice Browser Banner](docs/installation-screenshots/voice-browser-screenshot.png)
+The BMad Method (Build More Architect Dreams) is an AI-driven development framework that helps you build software from ideation through agentic implementation with specialized AI agents, guided workflows, and intelligent planning that adapts to your project's complexity.
 
-**🎤 Browse, Sample & Install 914 Voices in Real-Time**
+**Every BMAD agent now speaks with their own unique voice, music, and personality.**
+
+When party mode runs a multi-agent discussion, the Architect, PM, Developer, QA, and Analyst each sound completely different — making every role immediately recognizable.
+
+**Auto-enabled** — if BMAD is installed, party mode activates automatically. Open the BMad Tab to configure each agent:
 
 ```bash
-npx agentvibes-voice-browser
+npx agentvibes   # Press B to open the BMad Tab
 ```
 
-The new **AgentVibes Voice Browser** is an interactive console application that lets you:
+**Per-agent configuration:**
+- 🎙️ **Voice** — 914 voices to choose from, auto-assigned gender-aware
+- 🎵 **Background Music** — Unique ambient track per agent (cinematic, lo-fi, jazz...)
+- 🎚️ **Music Volume** — Per-agent level, or set all at once via Bulk Edit
+- 🎛️ **Reverb** — none / room / hall / cathedral / studio per agent
+- 💬 **Pretext** — Custom intro phrase ("Winston says:..." before every line)
+- 🎭 **Personality** — sarcastic, dramatic, pirate, cheerful, and more
+- 🔇 **No Overlap** — Speech lock ensures agents never talk over each other
+- ✨ **Markdown-Clean** — Asterisks and formatting stripped before TTS
 
-- 🎧 **Hear Before You Choose** - Real-time audio sampling with one keypress
-- ⭐ **Mark Your Favorites** - Build your personal voice collection
-- 🔍 **Smart Search** - Filter by name, personality, accent, or gender
-- 📦 **One-Click Install** - Press 'I' to instantly switch to any voice
-- 🎨 **Beautiful Interface** - Stunning terminal UI powered by blessed.js
+### 🎛️ BMad Tab — Visual Agent Configurator
 
-**914 Total Voices:**
-- 904 High-Quality Piper TTS Speakers (libritts-high model)
-- 10 Hand-Curated Personality Voices
+The `npx agentvibes` TUI now includes a full **BMad Tab** for managing every agent visually — inspired by the Voices tab, with the same columns and navigation polish:
 
-**Perfect for:**
-- Finding your ideal AI voice
-- Exploring voice characteristics
-- Quick voice switching
-- Building favorite collections
+```bash
+npx agentvibes   # Press B for BMad Tab
+```
 
-Launch now: `npx agentvibes-voice-browser`
+| Agent | Voice | Gender | Provider | Reverb | Music | Vol | Pretext |
+|-------|-------|--------|----------|--------|-------|-----|---------|
+| 🏢 Winston | Rose Ibex | Female | Piper (LibriTTS) | studio | jazz | 65% | Winston says |
+| 🧠 Larry | Kusal | Male | Piper | hall | cinematic | 80% | Larry says |
+
+**Highlights:**
+- **Beautified voice names** — `16Speakers::Rose_Ibex` shows as `Rose Ibex`; `en_US-kusal-medium` shows as `Kusal`
+- **Gender & Provider columns** — see voice metadata at a glance, just like the Voices tab
+- **Inline row hints** — navigate to any agent and see `[Space] Preview  [Enter] Configure` on the row itself
+- **Preview spinner** — animated `⠋⠙⠹⠸` braille spinner while audio plays
+
+| Key | Action |
+|-----|--------|
+| `↑↓` / `jk` | Navigate agents |
+| `Space` | Preview agent (spinner shows while playing) |
+| `Enter` | Configure voice, music, volume, reverb, personality, pretext |
+| `A` | Auto-assign unique voices (gender-aware, no repeats) |
+| `B` | Bulk Edit — set music / volume / pretext / reverb for all agents |
+| `X` | Reset agent to defaults |
+
+---
+
+### 🖥️ SSH Receiver — Hear Your Headless Server
+
+**Run Claude on a cloud box and hear the TTS on your local machine.**
+
+The new **Receiver Tab** streams TTS audio from voiceless remote servers to your local machine over TCP — perfect for AWS/GCP dev boxes, WSL2, and SSH sessions.
+
+```bash
+# On your local machine — open TUI, go to Receiver tab, click Start
+npx agentvibes
+
+# On the remote server — AgentVibes auto-detects the receiver and streams
+```
+
+Zero-config forwarding. Works with Piper, macOS Say, and Soprano.
+
+---
+
+### ⚡ TTS Latency -~1 Second
+
+- **Batched Node.js calls** — 6 separate profile reads collapsed into 1 (~900ms saved)
+- **inotifywait queue** — file-event-based worker, no polling delay
+- **Background cache cleanup** — off the critical path every 10th call
+
+---
+
+### 🎨 ANSI Banner Colors + Toggle
+
+Full color in the TTS banner (gold voice, cyan reverb, traffic-light cache). Hide it without muting:
+
+```bash
+touch ~/.agentvibes/banner-disabled   # or say "turn off the TTS banner"
+```
 
 ---
 
@@ -78,8 +135,10 @@ Launch now: `npx agentvibes-voice-browser`
 
 **Add custom prefixes to every TTS announcement!**
 
+Configure via the AgentVibes TUI Settings tab:
+
 ```bash
-npx agentvibes config intro-text
+npx agentvibes   # Navigate to Settings tab
 ```
 
 Transform generic AI responses into your personal brand:
@@ -113,7 +172,7 @@ Transform generic AI responses into your personal brand:
 - `"CodeBot: "` - Development assistant
 - `"Chef AI: "` - Cooking helper
 
-Configure now: `npx agentvibes config intro-text`
+Configure via: `npx agentvibes` → Settings tab
 
 ---
 
@@ -121,11 +180,13 @@ Configure now: `npx agentvibes config intro-text`
 
 **Upload your own background music with battle-tested security!**
 
+Configure via the AgentVibes TUI Music tab:
+
 ```bash
-npx agentvibes config music
+npx agentvibes   # Navigate to Music tab
 ```
 
-Replace the default background tracks with your own audio files for complete sonic branding.
+Replace the default background tracks with your own audio files.
 
 **Supported Formats:**
 - 🎵 MP3 (.mp3)
@@ -150,10 +211,10 @@ Replace the default background tracks with your own audio files for complete son
 - Duration warnings for non-optimal lengths
 
 **Perfect for:**
-- 🎸 **Team Audio Branding** - Company theme music
-- 🎮 **Gaming Sessions** - Epic background tracks
-- 🎼 **Personal Playlists** - Your favorite instrumental
-- 🎹 **Focus Music** - Lo-fi, classical, ambient
+- 🎮 **Making coding fun** - Your favorite beats while you build
+- 🎼 **Setting the mood** - Match the music to the task (lo-fi for debugging, epic for shipping)
+- 🗂️ **Identifying projects** - Different track per repo so you always know which project Claude is in
+- 🎹 **Deep focus** - Ambient or classical to stay in flow
 
 **Features:**
 - Preview before setting
@@ -169,7 +230,7 @@ Replace the default background tracks with your own audio files for complete son
 4. Enable/Disable - Toggle background music
 5. Preview current - Sample your music
 
-Configure now: `npx agentvibes config music`
+Configure via: `npx agentvibes` → Music tab
 
 **Security Certified:** See full audit report at `docs/security/SECURITY-AUDIT.md`
 
@@ -177,8 +238,17 @@ Configure now: `npx agentvibes config music`
 
 ### 🎯 Key Features
 
+**🌟 NEW IN v4.2 — BMAD Party Mode & SSH Receiver:**
+- 🎭 **BMAD Party Mode Voices** — Each agent speaks with their unique voice, music, reverb, personality
+- 🖥️ **SSH Receiver Tab** — Stream TTS audio from headless servers to your local machine over TCP
+- 🎛️ **BMad Tab (TUI)** — Visual agent configurator with auto-assign and bulk edit
+- ⚡ **TTS Latency -1s** — Batched Node.js calls, inotifywait queue, background cleanup
+- 🎨 **ANSI Banner Colors Restored** — Gold/cyan/traffic-light colors in TTS info banner
+- 🔕 **Banner Toggle** — Hide TTS banner without muting (`~/.agentvibes/banner-disabled`)
+- 🔇 **No Party Mode Overlap** — Agents wait for full audio before next speaks
+- 🧹 **Markdown-Clean Speech** — Asterisks/formatting stripped automatically from party mode
+
 **🌟 NEW IN v3.6.0 — Voice Explorer Release:**
-- 🎤 **Voice Browser** - Browse, sample, and install 914 voices interactively
 - 🏷️ **Friendly Voice Names** - "Ryan" instead of "en_US-libritts_r-medium-speaker-123"
 - 💬 **Intro Text (Pretext)** - Custom prefix for all TTS ("FireBot: Starting...")
 - 🎵 **Custom Background Music** - Upload your own audio files with battle-tested security
@@ -243,10 +313,11 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
 - [🌟 NEW FEATURE HIGHLIGHTS](#-new-feature-highlights) - **START HERE!**
-  - [🎤 Voice Browser v1.0](#-agent-vibes-v10-voice-browser) - Browse & sample 914 voices
+  - [🎭 BMAD Party Mode](#-bmad-party-mode--multi-agent-voice-conversations) - Per-agent voices, music, reverb
+  - [🖥️ SSH Receiver](#️-agentvibes-receiver--remote-audio-streaming) - Stream audio from headless servers
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v3.6.0 "Voice Explorer" with Voice Browser, Friendly Names, Custom Music
+- [📰 Latest Release](#-latest-release) - v4.2 "Party Mode" — BMAD multi-agent voices, SSH Receiver, BMad Tab, ~1s latency improvement
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -256,7 +327,6 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [For Claude Code](docs/mcp-setup.md#for-claude-code) - Project-specific setup
 
 ### Core Features
-- [🎤 AgentVibes Voice Browser](#-agentvibes-voice-browser) - **Browse and sample 914 voices interactively**
 - [🎤 Commands Reference](#-commands-reference) - All available commands
 - [🎙️ Verbosity Control](#%EF%B8%8F-verbosity-control) - Control how much Claude speaks (low/medium/high)
 - [🎭 Personalities vs Sentiments](#-personalities-vs-sentiments) - Two systems explained
@@ -293,95 +363,81 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.6.0 - "Voice Explorer" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.6.0)** 🎉
+**[v4.2 - "Party Mode" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.2)** 🎉
 
-### 🎤 AgentVibes Voice Browser
+This is the biggest AgentVibes release since the TUI launched in v4.0. Two headline features: **BMAD Party Mode** gives every agent their own voice and music, and the **SSH Receiver** lets you hear your headless server speak on your local machine.
 
-**Browse and sample 914 voices in real-time!**
+### 🎭 BMAD Party Mode — Multi-Agent Voice Conversations
 
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
+The BMad Method (Build More Architect Dreams) is an AI-driven development framework module that helps you build software from ideation through agentic implementation with specialized AI agents, guided workflows, and intelligent planning.
 
-```bash
-npx agentvibes-voice-browser
-```
+Every agent in a BMAD discussion now speaks with their own individually configured voice, music, reverb, and personality — making the Architect, PM, Developer, QA, and Analyst immediately recognizable the moment they speak.
 
-Interactive console browser with:
-- 🎧 Real-time voice sampling - hear before you choose
-- ⭐ Favorite system - mark your top voices
-- 🔍 Search & filter - find voices by personality, accent, gender
-- 📦 One-click install - install directly from browser
-- 🎨 Beautiful UI - stunning console interface
-
-**914 Total Voices:**
-- 904 Piper speaker variations (libritts-high)
-- 10 curated personality voices
-
-### 🎯 Major Features
-
-**🏷️ Friendly Voice Names**
-- No more cryptic IDs! Switch voices with names like "Ryan", "Joe", "Sarah"
-- All 904+ voices have memorable, personality-matched names
-- Voice metadata includes personalities, accents, and recommendations
+**Auto-enabled** — party mode activates automatically when BMAD is detected. Configure agents visually:
 
 ```bash
-# Before: /agent-vibes:switch en_US-libritts_r-medium-speaker-123
-# After:
-/agent-vibes:switch Ryan
+npx agentvibes   # Press B for BMad Tab
 ```
 
-**💬 Intro Text (Pretext) Feature**
-- Custom prefix for all TTS announcements
-- Set during installation or anytime after
-- Perfect for personal branding: "FireBot: Starting analysis..."
-- Up to 50 characters, UTF-8 and emoji support
+**Each agent gets:**
+- 🎙️ **Their own voice** — 914 to choose from, or auto-assign gender-aware
+- 🎵 **Their own music track** — cinematic for the Architect, lo-fi for the Dev
+- 🎚️ **Their own volume** — fine-tune per-agent, or bulk-set all at once
+- 🎛️ **Their own reverb** — studio, hall, cathedral, room, or none
+- 💬 **Their own pretext** — "Winston says:..." before every line
+- 🎭 **Their own personality** — sarcastic, dramatic, pirate, cheerful...
+- 🔇 **No overlap** — agents wait for full audio before the next one speaks
+- ✨ **Markdown stripped** — no "asterisk asterisk" in TTS output
+
+### 🎛️ BMad Tab — Full Visual Agent Configurator
+
+Manage every agent from an interactive table — same polish as the Voices tab:
+
+| Key | Action |
+|-----|--------|
+| `Space` | Preview agent with full profile (animated spinner while playing) |
+| `Enter` | Configure voice, music, volume, reverb, personality, pretext |
+| `A` | Auto-assign unique voices (gender-aware, no repeats) |
+| `B` | Bulk Edit — set music / volume / pretext / reverb for all agents |
+| `X` | Reset agent to defaults |
+
+The table shows **Voice, Gender, Provider, Reverb, Music, Vol, Pretext** columns. Voice names are automatically beautified: `16Speakers::Rose_Ibex` → `Rose Ibex`.
+
+### 🖥️ SSH Receiver — Hear Your Headless Server
+
+Stream TTS from a cloud box, WSL2, or any voiceless server directly to your local machine over TCP:
 
 ```bash
-npx agentvibes config intro-text
+# Local: open TUI → Receiver tab → Start
+npx agentvibes
+
+# Remote: AgentVibes auto-detects the receiver and streams audio to you
 ```
 
-**🎵 Custom Background Music**
-- Upload your own audio files (.mp3, .wav, .ogg, .m4a)
-- **Battle-tested security:** 180+ attack variations blocked
-- Magic number validation ensures real audio files
-- File ownership verification (UID checks)
-- Audio duration validation (30-90s recommended, 300s max)
-- Secure storage with 600 permissions
-- Perfect for team audio branding
+### ⚡ ~1 Second Faster TTS
 
+- 6 Node.js profile reads collapsed into 1 (~900ms saved per speech)
+- `inotifywait` queue worker — no polling delay
+- Cache cleanup runs off the critical path
+
+### 🎨 ANSI Colors Restored + Banner Toggle
+
+Full color in the TTS banner. Silence it without muting audio:
 ```bash
-npx agentvibes config music
+touch ~/.agentvibes/banner-disabled   # or: "turn off the TTS banner" via MCP
 ```
-
-**🎨 Interactive Installer**
-- Preview voices during installation
-- Sample all 16 background music tracks
-- Audio environment auto-detection
-- Cross-platform preview support
-
-**🛡️ Security Hardening**
-- **180+ attack variations tested** - Path traversal, symlinks, Unicode, null bytes
-- **100% attack rejection rate** - All malicious attempts blocked
-- **OWASP compliant** - CWE-22 path traversal prevention verified
-- **Production certified** - Comprehensive security audit completed
-- **Defense-in-depth** - 7 validation layers protect your system
-- File ownership verification and secure storage (600 permissions)
-- Security audit report: `docs/security/SECURITY-AUDIT.md`
 
 ### Quick Install
 
 ```bash
-# Install AgentVibes
 npx agentvibes install
-
-# Launch Voice Browser
-npx agentvibes-voice-browser
 ```
 
-💡 **Tip:** If `npx agentvibes` shows an older version, clear cache: `npm cache clean --force && npx agentvibes@latest --help`
+💡 **Tip:** If `npx agentvibes` shows an older version: `npm cache clean --force && npx agentvibes@latest`
 
-🐛 **Found a bug?** Report at [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
+🐛 **Found a bug?** [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
 
-[→ View Complete Release Notes](RELEASE_NOTES_v3.6.0.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+[→ View Complete Release Notes](RELEASE_NOTES.md) | [→ View Previous Release (v4.0.1)](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.0.1) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 
@@ -443,7 +499,7 @@ AgentVibes includes a full **Text User Interface (TUI)** built with blessed.js f
 | `npx agentvibes install` | Open the Install tab directly |
 | `npx agentvibes config` | Open the Settings tab directly |
 
-Once inside, use **Tab** / **Shift+Tab** to switch between tabs: **Voices**, **Music**, **Settings**, and **Install**. Use **[** / **]** to page through voice and music catalogs.
+Once inside, use **Tab** / **Shift+Tab** to switch between tabs: **Voices**, **Music**, **BMad**, **Settings**, **Receiver**, and **Install**. Use **[** / **]** to page through voice and music catalogs.
 
 ---
 
@@ -458,67 +514,6 @@ macOS ships with bash 3.2 (from 2007). After this, everything works perfectly!
 **[→ Full Setup Guide](docs/quick-start.md)** - Advanced options, provider switching, and detailed setup
 
 [↑ Back to top](#-table-of-contents)
-
----
-
-## 🎤 AgentVibes Voice Browser
-
-**The easiest way to find your perfect voice!**
-
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
-*Browse, sample, and install from 914 voices with real-time audio preview*
-
-### Launch the Browser
-
-```bash
-npx agentvibes-voice-browser
-```
-
-### Features
-
-- **914 Voices** - Browse 904 Piper speakers + 10 curated voices
-- **Real-Time Sampling** - Press ENTER to hear any voice instantly
-- **Favorite System** - Mark favorites for quick access
-- **Smart Search** - Filter by name, personality, accent, or gender
-- **One-Click Install** - Press 'I' to install and switch to a voice
-- **Beautiful UI** - Stunning console interface with blessed.js
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| **ENTER** | Play voice sample |
-| **I** | Install/Select voice for AgentVibes |
-| **F** | Toggle favorite |
-| **/** | Search voices |
-| **ESC** | Clear search / Back |
-| **↑/↓** | Navigate list |
-| **G** | Jump to top |
-| **Shift+G** | Jump to bottom |
-| **H** | Show help |
-| **Q** | Quit |
-
-### Voice Categories
-
-**Curated Voices** (10 hand-picked personalities):
-- Professional, Friendly, Authoritative, Warm, Energetic
-- Technical, Calm, Narrator, Conversational, Enthusiastic
-
-**Speaker Variations** (904 from libritts-high):
-- Male and female speakers
-- Various accents and tones
-- High-quality neural voices
-- Unique characteristics
-
-### Finding Your Perfect Voice
-
-1. **Launch browser:** `npx agentvibes-voice-browser`
-2. **Search by trait:** Press `/` and type "friendly" or "professional"
-3. **Sample voices:** Navigate with arrows, press ENTER to hear
-4. **Mark favorites:** Press 'F' on voices you like
-5. **Install:** Press 'I' to set as your AgentVibes voice
-
-**Pro Tip:** Use the search to find voices matching your project's mood!
 
 [↑ Back to top](#-table-of-contents)
 
@@ -867,24 +862,11 @@ AgentVibes provides **50+ slash commands** and **natural language MCP equivalent
 
 **[→ View Complete Command Reference](docs/commands.md)** - All voice, system, personality, sentiment, language, and BMAD commands with MCP equivalents
 
-### Voice Browser Commands
-
-```bash
-# Launch voice browser
-npx agentvibes-voice-browser
-
-# Or use global command (if installed globally)
-agentvibes-voice-browser
-```
-
-**MCP Equivalent:** Currently CLI-only (no MCP command)
-
 ### Intro Text Commands
 
 ```bash
-# Configure intro text
-/agent-vibes:config intro-text
-npx agentvibes config intro-text
+# Configure intro text — open Settings tab
+npx agentvibes
 
 # View current intro text
 cat ~/.claude/config/intro-text.txt
@@ -900,16 +882,8 @@ cat ~/.claude/config/intro-text.txt
 ### Custom Music Commands
 
 ```bash
-# Configure background music
-/agent-vibes:config music
-npx agentvibes config music
-
-# Menu options:
-# 1. Change music - Upload new audio file
-# 2. Remove music - Clear custom music
-# 3. Reset to default - Restore built-in tracks
-# 4. Enable/Disable - Toggle background music
-# 5. Preview current - Sample current music
+# Configure background music — open Music tab
+npx agentvibes
 ```
 
 **MCP Equivalent:**
@@ -1017,7 +991,7 @@ Every task acknowledgment plays **twice** - first in English, then in your targe
 
 ## 🗣️ Voice Library
 
-**NEW in v3.6.0:** Use the **[AgentVibes Voice Browser](#-agentvibes-voice-browser)** to browse, sample, and install from 914 voices! Launch with `npx agentvibes-voice-browser`.
+Use the **AgentVibes TUI installer** (`/audio-browser`) to browse, sample, and install from 914 voices interactively.
 
 ### Friendly Voice Names
 
@@ -1881,19 +1855,19 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 - **Optional**: sox (audio effects), ffmpeg (background music, padding)
 - All TTS generation works without optional dependencies - they just enhance the experience
 
-### Voice Browser & New Features
+### Voice Features
 
-**Q: How do I use the Voice Browser?**
-**A:** Simply run `npx agentvibes-voice-browser` and you'll see an interactive console with 914 voices. Use arrow keys to navigate, ENTER to sample voices, 'I' to install, 'F' to favorite, and '/' to search.
+**Q: How do I browse and install voices?**
+**A:** Use the built-in TUI installer by running `/audio-browser` in Claude Code. Navigate with arrow keys, press ENTER to sample voices, and select one to install. AgentVibes switches to the chosen voice automatically.
 
 **Q: What are friendly voice names?**
 **A:** Instead of technical IDs like `en_US-ryan-high`, you can now use simple names like "Ryan" when switching voices. All 904+ voices have friendly names matched to their characteristics.
 
 **Q: How do I set up custom intro text?**
-**A:** During installation, you'll be prompted for intro text. You can also configure it anytime with `npx agentvibes config intro-text`. Enter text like "FireBot: " and it will prefix all TTS announcements.
+**A:** During installation you'll be prompted for intro text. You can also configure it anytime via `npx agentvibes` → Settings tab. Enter text like "FireBot: " and it will prefix all TTS announcements.
 
 **Q: Can I use my own background music?**
-**A:** Yes! Run `npx agentvibes config music` and select "Change music". Provide the path to your audio file (.mp3, .wav, .ogg, or .m4a). Files are validated for security and must be under 50MB.
+**A:** Yes! Run `npx agentvibes` and open the Music tab. Select "Change music" and provide the path to your audio file (.mp3, .wav, .ogg, or .m4a). Files are validated for security and must be under 50MB.
 
 **Q: What's the recommended duration for custom music?**
 **A:** Between 30-90 seconds is ideal for smooth looping. The system supports up to 300 seconds (5 minutes) but will warn you if the duration is non-optimal.
@@ -1901,14 +1875,11 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 **Q: Are friendly voice names case-sensitive?**
 **A:** No! You can type "ryan", "Ryan", or "RYAN" - they all work. The voice resolution is case-insensitive.
 
-**Q: Can I favorite voices without installing them?**
-**A:** Yes! In the Voice Browser, press 'F' to mark any voice as a favorite. Favorites are saved and you can filter to show only favorites later.
-
 **Q: Does custom music work with all TTS providers?**
 **A:** Yes! Custom background music works with Piper TTS, Soprano, macOS Say, and Windows SAPI.
 
 **Q: Can I preview music before setting it as my background?**
-**A:** Yes! When configuring custom music with `npx agentvibes config music`, you can select "Preview current" to hear your music. During installation, you can also sample all built-in tracks.
+**A:** Yes! In `npx agentvibes` → Music tab, select "Preview current" to hear your music. During installation, you can also sample all built-in tracks.
 
 **Q: What security measures protect custom music uploads?**
 **A:** AgentVibes implements **defense-in-depth security with 7 validation layers**, tested against 180+ attack variations:

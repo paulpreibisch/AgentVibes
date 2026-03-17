@@ -34,12 +34,20 @@ export function createPlaceholderTab(contentArea, label) {
   return box;
 }
 
-/** Map of tabId → display label for all 7 tabs */
+/** Map of tabId → display label for all tabs */
 export const TAB_DISPLAY_LABELS = {
   settings: 'Settings',
   voices:   'Voices',
   music:    'Music',
+  agents:   'BMad',
+  receiver: 'Receiver',
   readme:   'Readme',
   help:     'Help',
   install:  'Install',
+};
+
+/** Override shortcut key for tabs where first letter conflicts */
+export const TAB_SHORTCUT_KEYS = {
+  agents:   'B',
+  receiver: 'X',
 };

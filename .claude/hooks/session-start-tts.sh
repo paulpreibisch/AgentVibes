@@ -64,6 +64,16 @@ CONTEXT+="4. Keep under 150 chars\n"
 CONTEXT+="5. Always include errors\n\n"
 CONTEXT+="Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning"
 
+# Add BMAD agent voice routing instructions
+CONTEXT+="\n\n## BMAD Agent Voice Routing\n"
+CONTEXT+="If \`.bmad-agent-context\` exists, check its content:\n\n"
+CONTEXT+="**Single agent mode** (content is an agent ID like \"analyst\"):\n"
+CONTEXT+="Use \`bmad-speak.sh\` instead of \`play-tts.sh\`:\n\n\n"
+CONTEXT+="**Party mode** (content is \"party-mode\"):\n"
+CONTEXT+="Each agent speaks via \`bmad-speak.sh\` with their display name. The queue system ensures sequential playback — agents speak one at a time, not overlapping:\n\n"
+CONTEXT+="IMPORTANT: In party mode, do NOT use \`play-tts.sh\`. Always use \`bmad-speak.sh\` with the agent's display name. Do NOT call multiple bmad-speak.sh in parallel — call them sequentially so the queue processes them in order.\n\n"
+CONTEXT+="If \`.bmad-agent-context\` does NOT exist, use \`play-tts.sh\` as normal."
+
 # Escape for JSON (handle newlines, quotes, backslashes)
 ESCAPED=$(printf '%s' "$CONTEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')
 

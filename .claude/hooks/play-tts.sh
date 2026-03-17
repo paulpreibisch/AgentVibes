@@ -78,7 +78,8 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
 fi
 
 TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"  # Optional: voice name or ID
+VOICE_OVERRIDE="${2:-}"      # Optional: voice name or ID
+AGENT_PROFILE_FILE="${3:-}"  # Optional: path to per-agent profile JSON (from bmad-speak.sh)
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then
@@ -92,14 +93,13 @@ if [[ -n "$VOICE_OVERRIDE" ]] && [[ "$VOICE_OVERRIDE" =~ [';|&$`<>(){}'] ]]; the
   exit 1
 fi
 
-# Remove backslash escaping that Claude might add for special chars
-# In single quotes these don't need escaping, but Claude sometimes adds backslashes
+# Remove backslash escaping that Claude might add for SAFE special chars only
+# SECURITY: Only unescape punctuation chars that cannot form shell commands (#127)
+# Never unescape $, `, \, or other shell metacharacters
 TEXT="${TEXT//\\!/!}"        # Remove \!
-TEXT="${TEXT//\\\$/\$}"      # Remove \$
 TEXT="${TEXT//\\?/?}"        # Remove \?
 TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
-TEXT="${TEXT//\\\\/\\}"      # Remove \\ (escaped backslash)
 
 # Prepend intro text (pretext) if configured
 # Check project-local first, then global
@@ -154,10 +154,11 @@ speak_text() {
   local text="$1"
   local voice="${2:-}"
   local provider="${3:-$ACTIVE_PROVIDER}"
+  local profile_file="${4:-$AGENT_PROFILE_FILE}"
 
   case "$provider" in
     piper)
-      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice"
+      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice" "$profile_file"
       ;;
     soprano)
       "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
@@ -206,7 +207,8 @@ handle_learning_mode() {
 
   # 2. Auto-translate to target language
   local translated
-  translated=$(python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
+  # SECURITY: Add timeout to prevent hanging (#134)
+  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
 
   # Small pause between languages
   sleep 0.5
@@ -241,7 +243,8 @@ handle_translation_mode() {
 
   # Translate text
   local translated
-  translated=$(python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
+  # SECURITY: Add timeout to prevent hanging (#134)
+  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
 
   # Get voice for target language if no override specified
   local voice_to_use="$VOICE_OVERRIDE"
@@ -279,7 +282,7 @@ fi
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   piper)
-    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "$AGENT_PROFILE_FILE"
     ;;
   soprano)
     exec "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"

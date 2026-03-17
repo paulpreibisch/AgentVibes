@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { NavigationService, TAB_ORDER } from '../services/navigation-service.js';
 import { setupNavigation } from './navigation.js';
-import { createPlaceholderTab, TAB_DISPLAY_LABELS } from './tabs/placeholder-tab.js';
+import { createPlaceholderTab, TAB_DISPLAY_LABELS, TAB_SHORTCUT_KEYS } from './tabs/placeholder-tab.js';
 import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
 import { BRAND_PINK } from './brand-colors.js';
@@ -24,6 +24,8 @@ import { createMusicTab } from './tabs/music-tab.js';
 import { createInstallTab } from './tabs/install-tab.js';
 import { createHelpTab } from './tabs/help-tab.js';
 import { createReadmeTab } from './tabs/readme-tab.js';
+import { createReceiverTab } from './tabs/receiver-tab.js';
+import { createAgentsTab } from './tabs/agents-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -292,7 +294,8 @@ export class AgentVibesConsole {
     let xOffset = 1;
     for (const id of TAB_ORDER) {
       const label = TAB_DISPLAY_LABELS[id];
-      const text = ` [${label[0]}] ${label} `;
+      const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
+      const text = ` [${shortcutKey}] ${label} `;
       const el = blessed.box({
         parent: this.screen,
         top: 3,
@@ -478,10 +481,11 @@ export class AgentVibesConsole {
   _renderTabBarContent(activeTabId) {
     return TAB_ORDER.map(id => {
       const label = TAB_DISPLAY_LABELS[id];
+      const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
       if (id === activeTabId) {
-        return `{bold}{white-fg}[${label[0]}] ${label}{/white-fg}{/bold}`;
+        return `{bold}{white-fg}[${shortcutKey}] ${label}{/white-fg}{/bold}`;
       }
-      return `{#82b1ff-fg}[${label[0]}] ${label}{/#82b1ff-fg}`;
+      return `{#82b1ff-fg}[${shortcutKey}] ${label}{/#82b1ff-fg}`;
     }).join('  ');
   }
 
@@ -656,6 +660,20 @@ export class AgentVibesConsole {
       helpPlaceholder.destroy();
     }
     this.tabs['help'] = createHelpTab(this.screen, services);
+
+    // Destroy agents placeholder and mount real agents tab
+    const agentsPlaceholder = this.tabs['agents'];
+    if (agentsPlaceholder && typeof agentsPlaceholder.destroy === 'function') {
+      agentsPlaceholder.destroy();
+    }
+    this.tabs['agents'] = createAgentsTab(this.screen, services);
+
+    // Destroy receiver placeholder and mount real receiver tab
+    const receiverPlaceholder = this.tabs['receiver'];
+    if (receiverPlaceholder && typeof receiverPlaceholder.destroy === 'function') {
+      receiverPlaceholder.destroy();
+    }
+    this.tabs['receiver'] = createReceiverTab(this.screen, services);
 
     const readmePlaceholder = this.tabs['readme'];
     if (readmePlaceholder && typeof readmePlaceholder.destroy === 'function') {

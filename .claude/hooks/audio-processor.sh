@@ -34,6 +34,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 INPUT_FILE="${1:-}"
 AGENT_NAME="${2:-default}"
 OUTPUT_FILE="${3:-}"
+AGENT_PROFILE_FILE="${4:-}"  # Optional: path to per-agent profile JSON (from bmad-speak.sh)
 
 # Config and directories (resolve to absolute paths)
 CONFIG_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/audio-effects.cfg"
@@ -140,9 +141,11 @@ apply_sox_effects() {
 
 # Position tracking file for continuous playback
 POSITION_FILE="$SCRIPT_DIR/../config/background-music-position.txt"
+# Lock file for position file — prevents race conditions in party mode with concurrent agents
+POSITION_LOCK="/tmp/agentvibes-bgpos-$(id -u).lock"
 
 # @function get_background_position
-# @intent Get saved position for a background track
+# @intent Get saved position for a background track (caller must hold POSITION_LOCK)
 # @param $1 Background file path
 # @returns Position in seconds (or 0 if not found)
 get_background_position() {
@@ -158,7 +161,7 @@ get_background_position() {
 }
 
 # @function save_background_position
-# @intent Save position for a background track
+# @intent Save position for a background track (caller must hold POSITION_LOCK)
 # @param $1 Background file path
 # @param $2 New position in seconds
 save_background_position() {
@@ -173,7 +176,8 @@ save_background_position() {
     local tmp_pos
     tmp_pos=$(mktemp "${POSITION_FILE}.XXXXXX")
     if [[ -f "$POSITION_FILE" ]]; then
-        grep -v "^${bg_name}:" "$POSITION_FILE" > "$tmp_pos" 2>/dev/null || true
+        # SECURITY: Use grep -F for fixed string matching (#134)
+        grep -vF "${bg_name}:" "$POSITION_FILE" > "$tmp_pos" 2>/dev/null || true
     fi
     echo "${bg_name}:${position}" >> "$tmp_pos"
     mv "$tmp_pos" "$POSITION_FILE"
@@ -216,48 +220,58 @@ mix_background() {
     bg_duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$background" 2>/dev/null)
     bg_duration=${bg_duration:-0}
 
-    # Get saved position for this track (continuous playback)
+    # Read the start position and pre-compute the new position atomically under flock.
+    # This prevents party-mode race conditions where concurrent agents both read the
+    # same position, compute independently, and overwrite each other's updates.
     local start_pos
-    start_pos=$(get_background_position "$background")
-
-    # Validate start_pos: if too small (floating point error) or invalid, reset to 0
-    if command -v bc &> /dev/null; then
-        if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]] || (( $(echo "$start_pos < 0.001" | bc -l) )); then
-            start_pos="0"
-        fi
-    else
-        # Without bc, just check if it's a valid number
-        if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-            start_pos="0"
-        fi
-    fi
-
-    # If position exceeds track length, wrap around
-    if command -v bc &> /dev/null && [[ -n "$bg_duration" ]]; then
-        if (( $(echo "$start_pos >= $bg_duration" | bc -l) )); then
-            start_pos=$(echo "$start_pos % $bg_duration" | bc -l)
-        fi
-    fi
-
-    # Extend total duration by 2 seconds for background music fade out
-    local total_duration
-    if command -v bc &> /dev/null; then
-        total_duration=$(echo "$duration + 2" | bc -l)
-    else
-        total_duration=$(awk "BEGIN {print $duration + 2}")
-    fi
-
-    # Calculate new position after this clip (including fade out time)
     local new_pos
-    if command -v bc &> /dev/null; then
-        new_pos=$(echo "$start_pos + $total_duration" | bc -l)
-        # Wrap around if needed
-        if [[ -n "$bg_duration" ]] && (( $(echo "$new_pos >= $bg_duration" | bc -l) )); then
-            new_pos=$(echo "$new_pos % $bg_duration" | bc -l)
+    local total_duration
+    {
+        flock -x 200
+
+        # Get saved position for this track (continuous playback)
+        start_pos=$(get_background_position "$background")
+
+        # Validate start_pos: if too small (floating point error) or invalid, reset to 0
+        if command -v bc &> /dev/null; then
+            if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]] || (( $(echo "$start_pos < 0.001" | bc -l) )); then
+                start_pos="0"
+            fi
+        else
+            # Without bc, just check if it's a valid number
+            if ! [[ "$start_pos" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+                start_pos="0"
+            fi
         fi
-    else
-        new_pos="0"
-    fi
+
+        # If position exceeds track length, wrap around
+        if command -v bc &> /dev/null && [[ -n "$bg_duration" ]]; then
+            if (( $(echo "$start_pos >= $bg_duration" | bc -l) )); then
+                start_pos=$(echo "$start_pos % $bg_duration" | bc -l)
+            fi
+        fi
+
+        # Extend total duration by 2 seconds for background music fade out
+        if command -v bc &> /dev/null; then
+            total_duration=$(echo "$duration + 2" | bc -l)
+        else
+            total_duration=$(awk "BEGIN {print $duration + 2}")
+        fi
+
+        # Calculate new position after this clip (including fade out time)
+        if command -v bc &> /dev/null; then
+            new_pos=$(echo "$start_pos + $total_duration" | bc -l)
+            # Wrap around if needed
+            if [[ -n "$bg_duration" ]] && (( $(echo "$new_pos >= $bg_duration" | bc -l) )); then
+                new_pos=$(echo "$new_pos % $bg_duration" | bc -l)
+            fi
+        else
+            new_pos="0"
+        fi
+
+        # Claim the new position immediately so concurrent agents advance past it
+        save_background_position "$background" "$new_pos"
+    } 200>"$POSITION_LOCK"
 
     # Mix: Seek to position in background, apply volume and fades
     # Background fades in at start (0.3s), continues under speech, then fades out over 2s after speech ends
@@ -302,9 +316,6 @@ mix_background() {
         cp "$voice" "$output"
         return
     }
-
-    # Save new position for next time
-    save_background_position "$background" "$new_pos"
 }
 
 # Main processing
@@ -317,6 +328,25 @@ main() {
 
     # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
+
+    # Per-agent background music override from bmad-speak.sh profile JSON (takes priority over cfg).
+    # The profile file is a PID-scoped temp file written by bmad-speak.sh; no env var leakage.
+    if [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
+        # SECURITY: Pass profile path via env var to avoid shell injection in node -e string
+        local _prof_track _prof_vol _prof_enabled
+        _prof_track=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(p.backgroundMusic?.track??'')}catch{process.stdout.write('')}" 2>/dev/null || true)
+        _prof_vol=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        _prof_enabled=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.enabled??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        if [[ "$_prof_enabled" == "true" ]] && [[ -n "$_prof_track" ]]; then
+            background_file="$_prof_track"
+            # Convert percentage volume (0-100) to decimal (0.0-1.0) for ffmpeg
+            if [[ "$_prof_vol" =~ ^[0-9]+$ ]]; then
+                bg_volume=$(awk "BEGIN{printf \"%.2f\", ${_prof_vol}/100}")
+            else
+                bg_volume="0.70"
+            fi
+        fi
+    fi
 
     # SECURITY: Use secure temp directory per CLAUDE.md guidelines
     # Prefer XDG_RUNTIME_DIR (user-owned, restricted permissions)
@@ -338,7 +368,10 @@ main() {
     chmod 700 "$TEMP_DIR"
 
     # SECURITY: Verify ownership of temp directory
-    if [[ "$(stat -c '%u' "$TEMP_DIR" 2>/dev/null || stat -f '%u' "$TEMP_DIR" 2>/dev/null)" != "$(id -u)" ]]; then
+    # SECURITY: Handle stat failure explicitly (#134)
+    local _dir_uid
+    _dir_uid=$(stat -c '%u' "$TEMP_DIR" 2>/dev/null || stat -f '%u' "$TEMP_DIR" 2>/dev/null)
+    if [[ -z "$_dir_uid" ]] || [[ "$_dir_uid" != "$(id -u)" ]]; then
         echo "Error: Temp directory not owned by current user: $TEMP_DIR" >&2
         exit 1
     fi
@@ -369,8 +402,19 @@ main() {
         background_path="$BACKGROUNDS_DIR/$background_file"
     fi
 
+    # Per-agent profile enables music independently of the global flag.
+    local _bg_allowed=false
+    if is_background_music_enabled; then
+        _bg_allowed=true
+    elif [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
+        # A valid agent profile with enabled=true overrides the global off switch.
+        local _check_enabled
+        _check_enabled=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.enabled??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        [[ "$_check_enabled" == "true" ]] && _bg_allowed=true
+    fi
+
     local used_background=""
-    if is_background_music_enabled && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
+    if [[ "$_bg_allowed" == "true" ]] && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
         echo "  → Mixing background: $background_file at ${bg_volume} volume" >&2
         mix_background "$temp_effects" "$background_path" "$bg_volume" "$temp_final"
         used_background="$background_path"  # Return full path instead of just filename

@@ -10,7 +10,8 @@ if [ -z "$OCT_8_ELEVELABS_API_KEY" ]; then
   exit 1
 fi
 
-OUTPUT_DIR="/home/fire/claude/AgentVibes/agentvibes.org/public/audio/elevenlabs"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_DIR="$SCRIPT_DIR/../../agentvibes.org/public/audio/elevenlabs"
 mkdir -p "$OUTPUT_DIR"
 
 # Define personality texts

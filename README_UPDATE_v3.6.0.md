@@ -576,7 +576,7 @@ Update the version number at the top of the README (around line 14):
 - [ ] Version numbers consistent across files
 
 ### Screenshot Requirements:
-- **Voice Browser Screenshot**: Save `/mnt/c/Users/Paul/Pictures/Screenshots/Screenshot 2026-02-16 032244.png` to `docs/installation-screenshots/voice-browser-screenshot.png`
+- **Voice Browser Screenshot**: Save a screenshot of the voice browser to `docs/installation-screenshots/voice-browser-screenshot.png`
 - Image shows the voice browser interface with 924 voices, keyboard shortcuts, and voice info panel
 - Caption: "Browse, sample, and install from 914 voices with real-time audio preview"
 

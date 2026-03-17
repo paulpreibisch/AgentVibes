@@ -3,13 +3,14 @@
 # File: scripts/install-ssh-receiver.sh
 # Repository: https://github.com/paulpreibisch/AgentVibes
 #
-# AgentVibes SSH-Remote Receiver Installer
-# Installs the receiver script for ssh-remote TTS provider
+# AgentVibes SSH-Remote Receiver Installer (v2)
+# Installs the self-contained receiver script for SSH TTS playback.
+#
+# The receiver accepts a single base64-encoded JSON payload containing
+# text, voice, effects, music, and project info from the sender.
 #
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/paulpreibisch/AgentVibes/main/scripts/install-ssh-receiver.sh | bash
-#   OR
-#   agentvibes install --ssh-receiver
 #
 # Copyright (c) 2025 Paul Preibisch
 # Licensed under Apache-2.0
@@ -17,9 +18,9 @@
 
 set -euo pipefail
 
-echo "╔════════════════════════════════════════╗"
-echo "║  AgentVibes SSH-Remote Receiver Setup  ║"
-echo "╚════════════════════════════════════════╝"
+echo ""
+echo "  AgentVibes SSH Receiver Setup"
+echo "  =============================="
 echo ""
 
 # Detect platform
@@ -35,134 +36,156 @@ elif [[ "$(uname)" == "Linux" ]]; then
     INSTALL_DIR="$HOME/.agentvibes"
 fi
 
-echo "✓ Detected platform: $PLATFORM"
+echo "  Platform: $PLATFORM"
 
-# Check if AgentVibes is installed
-if ! command -v agentvibes >/dev/null 2>&1; then
+# ---------------------------------------------------------------------------
+# Check dependencies
+# ---------------------------------------------------------------------------
+
+MISSING=()
+
+if ! command -v piper >/dev/null 2>&1; then
+    MISSING+=("piper")
+fi
+
+if ! command -v sox >/dev/null 2>&1; then
+    echo "  [warn] sox not found — effects will be skipped"
+fi
+
+if ! command -v ffmpeg >/dev/null 2>&1; then
+    echo "  [warn] ffmpeg not found — background music will be skipped"
+fi
+
+# Check for audio player
+AUDIO_PLAYER=""
+if command -v pw-play >/dev/null 2>&1; then
+    AUDIO_PLAYER="pw-play"
+elif command -v paplay >/dev/null 2>&1; then
+    AUDIO_PLAYER="paplay"
+elif command -v aplay >/dev/null 2>&1; then
+    AUDIO_PLAYER="aplay"
+fi
+
+if [[ -z "$AUDIO_PLAYER" ]]; then
+    MISSING+=("audio player (pw-play, paplay, or aplay)")
+fi
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
     echo ""
-    echo "❌ AgentVibes not found!"
-    echo "💡 Install first: npm install -g agentvibes"
+    echo "  Missing required dependencies:"
+    for dep in "${MISSING[@]}"; do
+        echo "    - $dep"
+    done
+    echo ""
+    echo "  Install piper: pipx install piper-tts"
+    echo "  Install audio: sudo apt install pipewire-utils (or pulseaudio-utils)"
     exit 1
 fi
 
-echo "✓ AgentVibes installed"
+echo "  Audio player: $AUDIO_PLAYER"
+
+# ---------------------------------------------------------------------------
+# Install receiver script
+# ---------------------------------------------------------------------------
 
 # SECURITY: Create install directory with restrictive permissions
 mkdir -p "$INSTALL_DIR"
 chmod 700 "$INSTALL_DIR"
 
-# Download or copy receiver script
-RECEIVER_SCRIPT="$INSTALL_DIR/agentvibes-play.sh"
+RECEIVER_SCRIPT="$INSTALL_DIR/play-remote.sh"
 
-echo ""
-echo "📥 Installing receiver script to: $RECEIVER_SCRIPT"
-
-# SECURITY NOTE: We download from GitHub over HTTPS
-# For additional security, verify the script manually before first use
-echo "⚠️  Security: Review the script at $RECEIVER_SCRIPT before use" >&2
+echo "  Installing to: $RECEIVER_SCRIPT"
 
 # Try to download from GitHub (main branch)
+DOWNLOADED=false
 if command -v curl >/dev/null 2>&1; then
     if curl -fsSL -o "$RECEIVER_SCRIPT" \
         "https://raw.githubusercontent.com/paulpreibisch/AgentVibes/main/templates/agentvibes-receiver.sh" 2>/dev/null; then
-        echo "✓ Downloaded from GitHub"
-    else
-        echo "⚠️  GitHub download failed, using embedded template"
-        # Fallback: embed the script with security fixes
-        cat > "$RECEIVER_SCRIPT" << 'RECEIVER_EOF'
-#!/usr/bin/env bash
-# AgentVibes SSH-TTS Receiver (embedded template)
-set -euo pipefail
-TEXT="${1:-}"
-VOICE="${2:-en_US-ryan-high}"
-[[ -z "$TEXT" ]] && { echo "❌ No text" >&2; exit 1; }
-# SECURITY: Decode base64 if input appears to be encoded
-if [[ "$TEXT" =~ ^[A-Za-z0-9+/]+=*$ ]] && [[ ${#TEXT} -gt 20 ]]; then
-    DECODED=$(printf '%s' "$TEXT" | base64 -d 2>/dev/null) || DECODED=""
-    [[ -n "$DECODED" ]] && TEXT="$DECODED"
-fi
-# SECURITY: Validate voice format
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "❌ Invalid voice format" >&2; exit 1
-fi
-export AGENTVIBES_NO_REMINDERS=1
-if command -v agentvibes >/dev/null 2>&1; then
-    AGENTVIBES_ROOT="$(dirname "$(dirname "$(which agentvibes)")")/lib/node_modules/agentvibes"
-elif [[ -d ~/.npm-global/lib/node_modules/agentvibes ]]; then
-    AGENTVIBES_ROOT="$HOME/.npm-global/lib/node_modules/agentvibes"
-elif [[ -d /data/data/com.termux/files/usr/lib/node_modules/agentvibes ]]; then
-    AGENTVIBES_ROOT="/data/data/com.termux/files/usr/lib/node_modules/agentvibes"
-else
-    echo "❌ AgentVibes not found" >&2; exit 1
-fi
-PLAY_TTS="$AGENTVIBES_ROOT/.claude/hooks/play-tts.sh"
-[[ ! -f "$PLAY_TTS" ]] && { echo "❌ play-tts.sh missing" >&2; exit 1; }
-echo "🎵 Playing via AgentVibes..." >&2
-bash "$PLAY_TTS" "$TEXT" "$VOICE"
-RECEIVER_EOF
+        DOWNLOADED=true
+        echo "  Downloaded from GitHub"
     fi
-else
-    echo "⚠️  curl not found, using embedded template"
-    # Fallback: embed the script with security fixes
-    cat > "$RECEIVER_SCRIPT" << 'RECEIVER_EOF'
-#!/usr/bin/env bash
-# AgentVibes SSH-TTS Receiver (embedded template)
-set -euo pipefail
-TEXT="${1:-}"
-VOICE="${2:-en_US-ryan-high}"
-[[ -z "$TEXT" ]] && { echo "❌ No text" >&2; exit 1; }
-# SECURITY: Decode base64 if input appears to be encoded
-if [[ "$TEXT" =~ ^[A-Za-z0-9+/]+=*$ ]] && [[ ${#TEXT} -gt 20 ]]; then
-    DECODED=$(printf '%s' "$TEXT" | base64 -d 2>/dev/null) || DECODED=""
-    [[ -n "$DECODED" ]] && TEXT="$DECODED"
 fi
-# SECURITY: Validate voice format
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "❌ Invalid voice format" >&2; exit 1
-fi
-export AGENTVIBES_NO_REMINDERS=1
-if command -v agentvibes >/dev/null 2>&1; then
-    AGENTVIBES_ROOT="$(dirname "$(dirname "$(which agentvibes)")")/lib/node_modules/agentvibes"
-elif [[ -d ~/.npm-global/lib/node_modules/agentvibes ]]; then
-    AGENTVIBES_ROOT="$HOME/.npm-global/lib/node_modules/agentvibes"
-elif [[ -d /data/data/com.termux/files/usr/lib/node_modules/agentvibes ]]; then
-    AGENTVIBES_ROOT="/data/data/com.termux/files/usr/lib/node_modules/agentvibes"
-else
-    echo "❌ AgentVibes not found" >&2; exit 1
-fi
-PLAY_TTS="$AGENTVIBES_ROOT/.claude/hooks/play-tts.sh"
-[[ ! -f "$PLAY_TTS" ]] && { echo "❌ play-tts.sh missing" >&2; exit 1; }
-echo "🎵 Playing via AgentVibes..." >&2
-bash "$PLAY_TTS" "$TEXT" "$VOICE"
-RECEIVER_EOF
+
+if [[ "$DOWNLOADED" != "true" ]]; then
+    echo "  [error] Failed to download receiver script" >&2
+    echo "  Try: curl -sSL https://raw.githubusercontent.com/paulpreibisch/AgentVibes/main/templates/agentvibes-receiver.sh -o $RECEIVER_SCRIPT" >&2
+    exit 1
 fi
 
 # Make executable
 chmod +x "$RECEIVER_SCRIPT"
-echo "✓ Made executable"
 
-# Test the script
-echo ""
-echo "🧪 Testing receiver script..."
-if "$RECEIVER_SCRIPT" "AgentVibes SSH-Remote receiver installed successfully!" 2>&1 | grep -q "🎵"; then
-    echo "✓ Test successful!"
-else
-    echo "⚠️  Test completed (check audio output manually)"
+# Create log directory
+mkdir -p "$HOME/.agentvibes"
+
+# ---------------------------------------------------------------------------
+# Create voice directory if needed
+# ---------------------------------------------------------------------------
+
+VOICES_DIR="$HOME/.claude/piper-voices"
+if [[ ! -d "$VOICES_DIR" ]]; then
+    echo ""
+    echo "  Voice models directory not found: $VOICES_DIR"
+    echo "  You'll need to download at least one piper voice model."
+    echo "  Example: piper --download-dir $VOICES_DIR --model en_US-lessac-medium"
 fi
 
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+
 echo ""
-echo "╔════════════════════════════════════════╗"
-echo "║  ✅ Installation Complete!             ║"
-echo "╚════════════════════════════════════════╝"
+echo "  Installation complete!"
 echo ""
-echo "📍 Receiver script: $RECEIVER_SCRIPT"
+echo "  Receiver script: $RECEIVER_SCRIPT"
+echo "  Log file:        $HOME/.agentvibes/receiver.log"
+echo "  Voice models:    $VOICES_DIR"
 echo ""
-echo "🎯 Next Steps:"
-echo "   1. On your SOURCE device (server/desktop):"
-echo "      agentvibes provider switch ssh-remote"
-echo "      echo 'android' > ~/.claude/ssh-remote-host.txt"
+
+# ---------------------------------------------------------------------------
+# Dedicated user setup (optional but recommended)
+# ---------------------------------------------------------------------------
+
+echo "  =============================================="
+echo "  OPTION A: Same-user mode (simpler)"
+echo "  =============================================="
+echo "  Already done! The receiver runs as your user."
 echo ""
-echo "   2. Test from SOURCE device:"
-echo "      agentvibes tts 'Hello from the server!'"
+echo "  OPTION B: Dedicated user (more secure)"
+echo "  =============================================="
 echo ""
-echo "📚 Docs: https://agentvibes.org/docs/ssh-remote"
+echo "  Run these commands to set up a dedicated receiver user:"
+echo ""
+echo "    # 1. Create user and add to audio + your group"
+echo "    sudo useradd -m -s /bin/bash agentvibes-receiver"
+echo "    sudo usermod -aG audio,\$(id -gn) agentvibes-receiver"
+echo ""
+echo "    # 2. Install receiver for dedicated user"
+echo "    sudo cp $RECEIVER_SCRIPT /home/agentvibes-receiver/.agentvibes/play-remote.sh"
+echo "    sudo chown agentvibes-receiver:agentvibes-receiver /home/agentvibes-receiver/.agentvibes/play-remote.sh"
+echo ""
+echo "    # 3. Grant audio session access (PipeWire/PulseAudio)"
+echo "    sudo setfacl -m u:agentvibes-receiver:rx /run/user/\$(id -u)"
+echo "    # Persist across reboots:"
+echo "    echo \"a /run/user/\$(id -u) - - - - m:u:agentvibes-receiver:rx\" \\"
+echo "      | sudo tee /etc/tmpfiles.d/agentvibes-receiver.conf"
+echo ""
+echo "    # 4. Grant read access to voices"
+echo "    sudo setfacl -R -m u:agentvibes-receiver:rx $VOICES_DIR"
+echo ""
+echo "    # 5. ForceCommand in /etc/ssh/sshd_config:"
+echo "    #   Match User agentvibes-receiver"
+echo "    #       ForceCommand /home/agentvibes-receiver/.agentvibes/play-remote.sh"
+echo "    #       PasswordAuthentication no"
+echo "    #       PermitTTY no"
+echo "    # Then: sudo systemctl reload sshd"
+echo ""
+echo "  =============================================="
+echo "  SENDER SETUP (on the remote server)"
+echo "  =============================================="
+echo ""
+echo "    echo 'receiver-hostname' > .claude/ssh-remote-host.txt"
+echo ""
+echo "  Test from sender:"
+echo "    ssh receiver-host \$(echo '{\"text\":\"hello\",\"voice\":\"en_US-lessac-medium\"}' | base64 -w 0)"
+echo ""
