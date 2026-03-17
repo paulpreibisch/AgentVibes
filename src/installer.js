@@ -4693,6 +4693,45 @@ async function updateCommandFiles(targetDir, spinner) {
 }
 
 /**
+ * Critical hooks that must always be kept up-to-date in every installation,
+ * including the global ~/.claude/hooks/ directory.
+ * These hooks contain bug fixes (e.g. markdown stripping) that must propagate
+ * on every `npx agentvibes update` regardless of target directory.
+ */
+const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'session-start-tts.sh'];
+
+/**
+ * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.
+ * Runs silently during every `update` — only touches files that are already installed.
+ * @param {string} srcHooksDir - Source hooks directory from the package
+ * @param {string} [homeDirOverride] - Override home dir (for testing only)
+ * @returns {Promise<number>} Number of hooks updated
+ */
+async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
+  const globalHooksDir = path.join(homeDirOverride || os.homedir(), '.claude', 'hooks');
+  let updated = 0;
+  try {
+    await fs.access(globalHooksDir);
+  } catch {
+    return 0; // global hooks dir not present — nothing to do
+  }
+
+  for (const hook of CRITICAL_HOOKS) {
+    const destPath = path.join(globalHooksDir, hook);
+    const srcPath = path.join(srcHooksDir, hook);
+    try {
+      await fs.access(destPath); // only update if already installed
+      await fs.copyFile(srcPath, destPath);
+      await fs.chmod(destPath, 0o750);
+      updated++;
+    } catch {
+      // file not in global dir or src missing — skip silently
+    }
+  }
+  return updated;
+}
+
+/**
  * Perform all update operations
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -4709,6 +4748,14 @@ async function performUpdateOperations(targetDir, spinner) {
   spinner.text = 'Updating TTS scripts...';
   const hookResult = await copyHookFiles(targetDir, silentSpinner);
   console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
+
+  // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs)
+  const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
+  const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
+  const globalHooksUpdated = await updateGlobalHooks(srcHooksDir);
+  if (globalHooksUpdated > 0) {
+    console.log(chalk.green(`✓ Updated ${globalHooksUpdated} critical scripts in ~/.claude/hooks/`));
+  }
 
   // Update personalities
   spinner.text = 'Updating personality templates...';
@@ -5751,4 +5798,5 @@ export {
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
   copyConfigFiles, configureSessionStartHook,
   installPluginManifest, checkAndInstallPiper,
+  updateGlobalHooks, CRITICAL_HOOKS,
 };
