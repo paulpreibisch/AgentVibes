@@ -146,7 +146,7 @@ else
     SPEAKER_ID_FILE="$VOICE_DIR/tts-piper-speaker-id.txt"
 
     if [[ -f "$MODEL_FILE" ]] && [[ -f "$SPEAKER_ID_FILE" ]]; then
-      # Multi-speaker voice
+      # Multi-speaker voice config found locally
       VOICE_MODEL=$(cat "$MODEL_FILE" 2>/dev/null)
       SPEAKER_ID=$(cat "$SPEAKER_ID_FILE" 2>/dev/null)
       # Validate speaker ID is numeric
@@ -175,7 +175,12 @@ else
       echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
     # Standard Piper model name or custom voice (just use as-is)
     elif [[ -n "$FILE_VOICE" ]]; then
-      VOICE_MODEL="$FILE_VOICE"
+      # Strip multi-speaker suffix if present (model::SpeakerName-Label)
+      if [[ "$FILE_VOICE" == *"::"* ]]; then
+        VOICE_MODEL="${FILE_VOICE%%::*}"
+      else
+        VOICE_MODEL="$FILE_VOICE"
+      fi
     fi
   fi
 
