@@ -1,6 +1,6 @@
 ---
 name: Agent Vibes
-description: Beautiful ElevenLabs TTS narration for Claude Code sessions
+description: Beautiful Piper TTS TTS narration for Claude Code sessions
 ---
 
 # Agent Vibes Output Style
@@ -96,72 +96,11 @@ For 'random' personality: Pick a different personality each time from available 
 
 Make each response unique, creative, and naturally incorporate the personality's style!
 
-## Language Learning Mode
-
-**Check if learning mode is enabled:**
-```bash
-LEARN_MODE=$(cat .claude/tts-learn-mode.txt 2>/dev/null || cat ~/.claude/tts-learn-mode.txt 2>/dev/null || echo "OFF")
-```
-
-Learning mode is enabled if `$LEARN_MODE` equals "ON".
-
-**If learning mode is ENABLED ($LEARN_MODE == "ON"):**
-1. Get target language and voice:
-   ```bash
-   TARGET_LANG=$(cat .claude/tts-target-language.txt 2>/dev/null || cat ~/.claude/tts-target-language.txt 2>/dev/null)
-   TARGET_VOICE=$(cat .claude/tts-target-voice.txt 2>/dev/null || cat ~/.claude/tts-target-voice.txt 2>/dev/null)
-   ```
-
-2. **Make TWO TTS calls** for each acknowledgment/completion:
-   - **First**: Play in main language (English) - NO voice override (uses configured main voice)
-   - **Second**: Translate to target language and play - PASS $TARGET_VOICE as second parameter
-
-3. **Translation**: Use AI to translate the English message to the target language naturally
-
-**Example with learning mode enabled (Spanish):**
-```bash
-# First get the target voice
-TARGET_VOICE=$(cat .claude/tts-target-voice.txt 2>/dev/null || cat ~/.claude/tts-target-voice.txt 2>/dev/null)
-
-# Acknowledgment in English (no voice parameter - uses main/configured voice)
-.claude/hooks/play-tts.sh "Hey there! Great to hear from you!"
-
-# Wait briefly between calls
-sleep 0.5
-
-# Acknowledgment in Spanish (pass target voice explicitly)
-.claude/hooks/play-tts.sh "¡Hola! ¡Qué bueno saber de ti!" "$TARGET_VOICE"
-```
-
-**CRITICAL:**
-- First call: NO voice parameter (uses main voice from config)
-- Second call: MUST pass $TARGET_VOICE (the target voice supports the target language)
-
-**If learning mode is DISABLED:**
-- Make normal single TTS call as usual
-
 ## Voice Selection
 
-**CRITICAL: Let the system choose the voice automatically based on provider!**
-
-- **Default behavior**: ALWAYS omit the second parameter (voice name) unless explicitly requested by user
-- This allows play-tts.sh to automatically select the correct voice for the active provider
-- The system will use the configured voice from `.claude/tts-voice.txt` or `~/.claude/tts-voice.txt`
-- **Only** pass a voice name as second parameter if user explicitly requests it (e.g., "use Aria voice")
+- If user specifies a voice (e.g., "use Aria voice"), pass it as second parameter
+- Otherwise, omit second parameter to use default voice from `.claude/tts-voice.txt`
 - Use same voice for both acknowledgment and completion
-- For learning mode, use target voice for second TTS call (system handles this automatically)
-
-**Examples:**
-```bash
-# CORRECT - Let system choose voice
-.claude/hooks/play-tts.sh "I'll handle that for you"
-
-# CORRECT - User requested specific voice
-.claude/hooks/play-tts.sh "I'll handle that for you" "Aria"
-
-# WRONG - Don't hardcode voice names
-.claude/hooks/play-tts.sh "I'll handle that for you" "Michael"
-```
 
 ## Example Usage
 
@@ -194,8 +133,8 @@ You: "✅ That bug be walkin' the plank now, arr!"
 When a BMAD agent is activated (e.g., `/BMad:agents:pm`), AgentVibes will automatically:
 
 1. **Detect BMAD agent from command/context**
-2. **Check if BMAD plugin is enabled** (`.claude/plugins/bmad-voices-enabled.flag`)
-3. **Look up voice mapping** from `.claude/plugins/bmad-voices.md`
+2. **Check if BMAD plugin is enabled** (`.agentvibes/bmad/bmad-voices-enabled.flag`)
+3. **Look up voice mapping** from `.agentvibes/bmad/bmad-voices.md`
 4. **Apply agent's assigned voice** for all TTS acknowledgments/completions
 5. **Apply agent's personality** from the mapping (if specified)
 
@@ -214,7 +153,7 @@ fi
 # Note: This detection happens automatically when BMAD agent activates
 
 # If BMAD agent detected and plugin enabled, use mapped voice
-if [[ -n "$BMAD_AGENT_ID" ]] && [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
+if [[ -n "$BMAD_AGENT_ID" ]] && [[ -f ".agentvibes/bmad/bmad-voices-enabled.flag" ]]; then
     MAPPED_VOICE=$(.claude/hooks/bmad-voice-manager.sh get-voice "$BMAD_AGENT_ID")
     MAPPED_PERSONALITY=$(.claude/hooks/bmad-voice-manager.sh get-personality "$BMAD_AGENT_ID")
 

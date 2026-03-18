@@ -1,6 +1,38 @@
-#!/bin/bash
-# Language Manager for AgentVibes
-# Manages language settings and multilingual voice selection
+#!/usr/bin/env bash
+#
+# File: .claude/hooks/language-manager.sh
+#
+# AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+# Website: https://agentvibes.org
+# Repository: https://github.com/paulpreibisch/AgentVibes
+#
+# Co-created by Paul Preibisch with Claude AI
+# Copyright (c) 2025 Paul Preibisch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DISCLAIMER: This software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# express or implied. Use at your own risk. See the Apache License for details.
+#
+# ---
+#
+# @fileoverview Language Manager - Manages multilingual TTS with 30+ language support
+# @context Enables TTS in multiple languages with provider-specific voice recommendations (Piper native voices)
+# @architecture Dual-map system: PIPER_VOICES for provider-aware voice selection
+# @dependencies provider-manager.sh for active provider detection, .claude/tts-language.txt for state
+# @entrypoints Called by /agent-vibes:language commands, play-tts-*.sh for voice resolution
+# @patterns Provider abstraction, language-to-voice mapping, backward compatibility with legacy LANGUAGE_VOICES
+# @related play-tts-piper.sh, provider-manager.sh, learn-manager.sh
 
 # Determine target .claude directory based on context
 # Priority:
@@ -10,7 +42,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -d "${CLAUDE_PROJECT_DIR:-}/.claude" ]]; then
   # MCP context: Use the project directory where MCP was invoked
   CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
 else
@@ -32,92 +64,57 @@ mkdir -p "$CLAUDE_DIR"
 # Source provider manager to detect active provider
 source "$SCRIPT_DIR/provider-manager.sh" 2>/dev/null || true
 
-# Language to ElevenLabs multilingual voice mapping
-declare -A ELEVENLABS_VOICES=(
-    ["spanish"]="Antoni"
-    ["french"]="Rachel"
-    ["german"]="Domi"
-    ["italian"]="Bella"
-    ["portuguese"]="Matilda"
-    ["chinese"]="Antoni"
-    ["japanese"]="Antoni"
-    ["korean"]="Antoni"
-    ["russian"]="Domi"
-    ["polish"]="Antoni"
-    ["dutch"]="Rachel"
-    ["turkish"]="Antoni"
-    ["arabic"]="Antoni"
-    ["hindi"]="Antoni"
-    ["swedish"]="Rachel"
-    ["danish"]="Rachel"
-    ["norwegian"]="Rachel"
-    ["finnish"]="Rachel"
-    ["czech"]="Domi"
-    ["romanian"]="Rachel"
-    ["ukrainian"]="Domi"
-    ["greek"]="Antoni"
-    ["bulgarian"]="Domi"
-    ["croatian"]="Domi"
-    ["slovak"]="Domi"
-)
+# =============================================================================
+# BASH 3.2 COMPATIBILITY: Function-based lookups instead of associative arrays
+# macOS ships with Bash 3.2 which doesn't support declare -A (added in Bash 4.0)
+# =============================================================================
 
-# Language to Piper voice model mapping
-declare -A PIPER_VOICES=(
-    ["spanish"]="es_ES-davefx-medium"
-    ["french"]="fr_FR-siwis-medium"
-    ["german"]="de_DE-thorsten-medium"
-    ["italian"]="it_IT-riccardo-x_low"
-    ["portuguese"]="pt_BR-faber-medium"
-    ["chinese"]="zh_CN-huayan-medium"
-    ["japanese"]="ja_JP-hikari-medium"
-    ["korean"]="ko_KR-eunyoung-medium"
-    ["russian"]="ru_RU-dmitri-medium"
-    ["polish"]="pl_PL-darkman-medium"
-    ["dutch"]="nl_NL-rdh-medium"
-    ["turkish"]="tr_TR-dfki-medium"
-    ["arabic"]="ar_JO-kareem-medium"
-    ["hindi"]="hi_IN-amitabh-medium"
-    ["swedish"]="sv_SE-nst-medium"
-    ["danish"]="da_DK-talesyntese-medium"
-    ["norwegian"]="no_NO-talesyntese-medium"
-    ["finnish"]="fi_FI-harri-medium"
-    ["czech"]="cs_CZ-jirka-medium"
-    ["romanian"]="ro_RO-mihai-medium"
-    ["ukrainian"]="uk_UA-lada-x_low"
-    ["greek"]="el_GR-rapunzelina-low"
-    ["bulgarian"]="bg_BG-valentin-medium"
-    ["croatian"]="hr_HR-gorana-medium"
-    ["slovak"]="sk_SK-lili-medium"
-)
 
-# Backward compatibility: Keep LANGUAGE_VOICES for existing code
-declare -A LANGUAGE_VOICES=(
-    ["spanish"]="Antoni"
-    ["french"]="Rachel"
-    ["german"]="Domi"
-    ["italian"]="Bella"
-    ["portuguese"]="Matilda"
-    ["chinese"]="Antoni"
-    ["japanese"]="Antoni"
-    ["korean"]="Antoni"
-    ["russian"]="Domi"
-    ["polish"]="Antoni"
-    ["dutch"]="Rachel"
-    ["turkish"]="Antoni"
-    ["arabic"]="Antoni"
-    ["hindi"]="Antoni"
-    ["swedish"]="Rachel"
-    ["danish"]="Rachel"
-    ["norwegian"]="Rachel"
-    ["finnish"]="Rachel"
-    ["czech"]="Domi"
-    ["romanian"]="Rachel"
-    ["ukrainian"]="Domi"
-    ["greek"]="Antoni"
-    ["bulgarian"]="Domi"
-    ["croatian"]="Domi"
-    ["slovak"]="Domi"
-)
+# Get Piper voice for a language
+_get_piper_voice() {
+    local lang="$1"
+    case "$lang" in
+        spanish) echo "es_ES-davefx-medium" ;;
+        french) echo "fr_FR-siwis-medium" ;;
+        german) echo "de_DE-thorsten-medium" ;;
+        italian) echo "it_IT-riccardo-x_low" ;;
+        portuguese) echo "pt_BR-faber-medium" ;;
+        chinese) echo "zh_CN-huayan-medium" ;;
+        japanese) echo "ja_JP-hikari-medium" ;;
+        korean) echo "ko_KR-eunyoung-medium" ;;
+        russian) echo "ru_RU-dmitri-medium" ;;
+        polish) echo "pl_PL-darkman-medium" ;;
+        dutch) echo "nl_NL-rdh-medium" ;;
+        turkish) echo "tr_TR-dfki-medium" ;;
+        arabic) echo "ar_JO-kareem-medium" ;;
+        hindi) echo "hi_IN-amitabh-medium" ;;
+        swedish) echo "sv_SE-nst-medium" ;;
+        danish) echo "da_DK-talesyntese-medium" ;;
+        norwegian) echo "no_NO-talesyntese-medium" ;;
+        finnish) echo "fi_FI-harri-medium" ;;
+        czech) echo "cs_CZ-jirka-medium" ;;
+        romanian) echo "ro_RO-mihai-medium" ;;
+        ukrainian) echo "uk_UA-lada-x_low" ;;
+        greek) echo "el_GR-rapunzelina-low" ;;
+        bulgarian) echo "bg_BG-valentin-medium" ;;
+        croatian) echo "hr_HR-gorana-medium" ;;
+        slovak) echo "sk_SK-lili-medium" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Get default (Piper) voice for a language - backward compatibility
+_get_language_voice() {
+    _get_piper_voice "$1"
+}
+
+# Check if language is supported
+_is_language_supported() {
+    local lang="$1"
+    local voice
+    voice=$(_get_piper_voice "$lang")
+    [[ -n "$voice" ]]
+}
 
 # Supported languages list
 SUPPORTED_LANGUAGES="spanish, french, german, italian, portuguese, chinese, japanese, korean, polish, dutch, turkish, russian, arabic, hindi, swedish, danish, norwegian, finnish, czech, romanian, ukrainian, greek, bulgarian, croatian, slovak"
@@ -140,8 +137,8 @@ set_language() {
         return 0
     fi
 
-    # Check if language is supported
-    if [[ ! " ${!LANGUAGE_VOICES[@]} " =~ " ${lang} " ]]; then
+    # Check if language is supported (Bash 3.2 compatible)
+    if ! _is_language_supported "$lang"; then
         echo "❌ Language '$lang' not supported"
         echo ""
         echo "Supported languages:"
@@ -159,14 +156,15 @@ set_language() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider=$(cat "$HOME/.claude/tts-provider.txt")
     else
-        provider="elevenlabs"
+        provider="piper"
     fi
 
-    local recommended_voice=$(get_voice_for_language "$lang" "$provider")
+    local recommended_voice
+    recommended_voice=$(get_voice_for_language "$lang" "$provider")
 
-    # Fallback to old mapping if provider-aware function returns empty
+    # Fallback to default mapping if provider-aware function returns empty
     if [[ -z "$recommended_voice" ]]; then
-        recommended_voice="${LANGUAGE_VOICES[$lang]}"
+        recommended_voice=$(_get_language_voice "$lang")
     fi
 
     echo "✓ Language set to: $lang"
@@ -188,14 +186,15 @@ get_language() {
         elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
             provider=$(cat "$HOME/.claude/tts-provider.txt")
         else
-            provider="elevenlabs"
+            provider="piper"
         fi
 
-        local recommended_voice=$(get_voice_for_language "$lang" "$provider")
+        local recommended_voice
+        recommended_voice=$(get_voice_for_language "$lang" "$provider")
 
-        # Fallback to old mapping
+        # Fallback to default mapping
         if [[ -z "$recommended_voice" ]]; then
-            recommended_voice="${LANGUAGE_VOICES[$lang]}"
+            recommended_voice=$(_get_language_voice "$lang")
         fi
 
         echo "Current language: $lang"
@@ -242,12 +241,12 @@ get_best_voice_for_language() {
     fi
 
     # Return recommended voice for language
-    echo "${LANGUAGE_VOICES[$lang]}"
+    _get_language_voice "$lang"
 }
 
 # Function to get voice for a specific language and provider
 # Usage: get_voice_for_language <language> [provider]
-# Provider: "elevenlabs" or "piper" (auto-detected if not provided)
+# Provider: "piper" or "macos" (auto-detected if not provided)
 get_voice_for_language() {
     local language="$1"
     local provider="${2:-}"
@@ -279,22 +278,23 @@ get_voice_for_language() {
                 if [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
                     provider=$(cat "$HOME/.claude/tts-provider.txt")
                 else
-                    provider="elevenlabs"  # Default
+                    provider="piper"  # Default
                 fi
             fi
         fi
     fi
 
-    # Return appropriate voice based on provider
+    # Return appropriate voice based on provider (Bash 3.2 compatible)
     case "$provider" in
         piper)
-            echo "${PIPER_VOICES[$language]:-}"
+            _get_piper_voice "$language"
             ;;
-        elevenlabs)
-            echo "${ELEVENLABS_VOICES[$language]:-}"
+        macos)
+            # macOS doesn't have per-language voices, use default
+            echo ""
             ;;
         *)
-            echo "${ELEVENLABS_VOICES[$language]:-}"
+            _get_piper_voice "$language"
             ;;
     esac
 }
@@ -339,8 +339,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         list)
             echo "Supported languages and recommended voices:"
             echo ""
-            for lang in "${!LANGUAGE_VOICES[@]}"; do
-                printf "%-15s → %s\n" "$lang" "${LANGUAGE_VOICES[$lang]}"
+            # Bash 3.2 compatible - use explicit list instead of associative array keys
+            # Note: 'local' can't be used outside functions in Bash 3.2
+            for lang in spanish french german italian portuguese chinese japanese korean russian polish dutch turkish arabic hindi swedish danish norwegian finnish czech romanian ukrainian greek bulgarian croatian slovak; do
+                printf "%-15s → %s\n" "$lang" "$(_get_language_voice "$lang")"
             done | sort
             ;;
         *)

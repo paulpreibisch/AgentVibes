@@ -1,0 +1,210 @@
+# AgentVibes - macOS TTS Provider Smoke Test
+#
+# Cost-optimized workflow for testing macOS `say` command integration.
+# Only runs when TTS-related files change OR manually triggered.
+#
+# macOS runners cost 10x Linux runners, so we:
+# - Use path filters to avoid unnecessary runs
+# - Keep tests minimal (smoke test only)
+# - Support manual trigger for on-demand testing
+
+name: Test macOS TTS Provider
+
+on:
+  # Manual trigger - run whenever you need to test
+  workflow_dispatch:
+    inputs:
+      voice:
+        description: 'Voice to test (e.g., Samantha, Alex, Daniel)'
+        required: false
+        default: 'Samantha'
+      test_text:
+        description: 'Text to speak'
+        required: false
+        default: 'Hello from AgentVibes! Testing macOS text to speech provider.'
+
+  # Only run on pushes that change TTS-related files
+  push:
+    paths:
+      - '.claude/hooks/*macos*'
+      - '.claude/hooks/play-tts*.sh'
+      - '.claude/hooks/voice*.sh'
+      - '.claude/tts-provider.txt'
+      - '.github/workflows/test-macos-tts.yml'
+
+  # Only run on PRs that change TTS-related files
+  pull_request:
+    paths:
+      - '.claude/hooks/*macos*'
+      - '.claude/hooks/play-tts*.sh'
+      - '.claude/hooks/voice*.sh'
+      - '.claude/tts-provider.txt'
+      - '.github/workflows/test-macos-tts.yml'
+
+jobs:
+  smoke-test-macos-say:
+    name: Smoke Test - macOS say command
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify macOS environment
+        run: |
+          echo "::group::System Info"
+          sw_vers
+          echo "::endgroup::"
+
+          echo "::group::Verify say command exists"
+          which say
+          say --version 2>/dev/null || echo "say command available (no --version flag)"
+          echo "::endgroup::"
+
+      - name: List available voices
+        run: |
+          echo "::group::Available macOS Voices"
+          say -v ? | head -30
+          echo "... (showing first 30 voices)"
+          echo ""
+          echo "Total voices available: $(say -v ? | wc -l)"
+          echo "::endgroup::"
+
+      - name: Test default voice output
+        run: |
+          VOICE="${{ github.event.inputs.voice || 'Samantha' }}"
+          TEXT="${{ github.event.inputs.test_text || 'Hello from AgentVibes! Testing macOS text to speech.' }}"
+
+          echo "Testing voice: $VOICE"
+          echo "Test text: $TEXT"
+
+          # Generate audio file
+          say -v "$VOICE" -o test-output.aiff "$TEXT"
+
+          # Verify file was created
+          if [[ -f test-output.aiff ]]; then
+            echo "✅ Audio file created successfully"
+            ls -lh test-output.aiff
+            file test-output.aiff
+          else
+            echo "❌ Failed to create audio file"
+            exit 1
+          fi
+
+      - name: Test multiple voices
+        run: |
+          echo "Testing multiple common voices..."
+
+          VOICES=("Samantha" "Alex" "Victoria" "Daniel")
+
+          for voice in "${VOICES[@]}"; do
+            echo "Testing voice: $voice"
+            if say -v "$voice" -o "test-${voice}.aiff" "Testing $voice voice" 2>/dev/null; then
+              if [[ -f "test-${voice}.aiff" ]] && [[ -s "test-${voice}.aiff" ]]; then
+                echo "  ✅ $voice: OK ($(ls -lh test-${voice}.aiff | awk '{print $5}'))"
+              else
+                echo "  ⚠️ $voice: File empty or missing"
+              fi
+            else
+              echo "  ⚠️ $voice: Voice may not be available on this runner"
+            fi
+          done
+
+      - name: Test play-tts-macos.sh provider
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          echo "::group::Testing play-tts-macos.sh provider"
+
+          if [[ -f ".claude/hooks/play-tts-macos.sh" ]]; then
+            echo "Found play-tts-macos.sh, testing..."
+            chmod +x .claude/hooks/play-tts-macos.sh
+
+            # Create required directories
+            mkdir -p .claude/audio
+
+            # Test with default voice
+            echo "Test 1: Default voice"
+            AGENTVIBES_TEST_MODE=true .claude/hooks/play-tts-macos.sh "AgentVibes macOS provider test"
+
+            # Test with specific voice
+            echo ""
+            echo "Test 2: Specific voice (Alex)"
+            AGENTVIBES_TEST_MODE=true .claude/hooks/play-tts-macos.sh "Testing Alex voice" "Alex"
+
+            # Verify audio files were created
+            echo ""
+            echo "Generated audio files:"
+            ls -lh .claude/audio/ 2>/dev/null || echo "No audio directory"
+
+            echo "✅ play-tts-macos.sh tests passed"
+          else
+            echo "❌ play-tts-macos.sh not found"
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+      - name: Test macos-voice-manager.sh
+        run: |
+          echo "::group::Testing macos-voice-manager.sh"
+
+          if [[ -f ".claude/hooks/macos-voice-manager.sh" ]]; then
+            chmod +x .claude/hooks/macos-voice-manager.sh
+
+            echo "Test 1: List voices"
+            .claude/hooks/macos-voice-manager.sh list | head -20
+
+            echo ""
+            echo "Test 2: List English voices"
+            .claude/hooks/macos-voice-manager.sh list-english
+
+            echo ""
+            echo "Test 3: Recommended voices"
+            .claude/hooks/macos-voice-manager.sh recommended
+
+            echo ""
+            echo "Test 4: Validate Samantha voice"
+            .claude/hooks/macos-voice-manager.sh validate Samantha
+
+            echo ""
+            echo "Test 5: Voice info"
+            .claude/hooks/macos-voice-manager.sh info Samantha
+
+            echo "✅ macos-voice-manager.sh tests passed"
+          else
+            echo "⚠️ macos-voice-manager.sh not found - skipping"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Test provider switching
+        run: |
+          echo "::group::Testing provider manager with macOS"
+
+          if [[ -f ".claude/hooks/provider-manager.sh" ]]; then
+            chmod +x .claude/hooks/provider-manager.sh
+
+            echo "Test 1: List providers"
+            .claude/hooks/provider-manager.sh list
+
+            echo ""
+            echo "Test 2: Validate macOS provider"
+            .claude/hooks/provider-manager.sh validate macos && echo "✅ macOS provider validated"
+
+            echo "✅ Provider manager tests passed"
+          else
+            echo "⚠️ provider-manager.sh not found - skipping"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Upload test audio artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-tts-test-output
+          path: |
+            test-*.aiff
+            .claude/audio/*
+          retention-days: 7

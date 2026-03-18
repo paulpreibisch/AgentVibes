@@ -119,7 +119,7 @@ Quickly change voice for specific agent.
 - `personality` (optional): Personality to apply (default: normal)
 
 ### `edit`
-Opens `.claude/plugins/bmad-voices.md` for manual editing.
+Opens `.agentvibes/bmad/bmad-voices.md` for manual editing.
 
 **Example:**
 ```
@@ -132,8 +132,8 @@ Edit the markdown table directly to change voice mappings.
 ## How It Works
 
 ### Voice Assignment
-1. **Plugin File**: `.claude/plugins/bmad-voices.md` contains voice-to-agent mappings
-2. **Activation Flag**: `.claude/plugins/bmad-voices-enabled.flag` enables/disables the plugin
+1. **Plugin File**: `.agentvibes/bmad/bmad-voices.md` contains voice-to-agent mappings
+2. **Activation Flag**: `.agentvibes/bmad/bmad-voices-enabled.flag` enables/disables the plugin
 
 ### TTS Injection (Automatic)
 When you run `/agent-vibes:bmad enable`, the system automatically:
@@ -156,25 +156,27 @@ activation-instructions:
 
 ### Provider Support
 The TTS injection works with **any configured TTS provider**:
-- ✅ **ElevenLabs** - Uses AI voices with full voice mapping
+- ✅ **Piper TTS** - Uses AI voices with full voice mapping
 - ✅ **Piper TTS** - Uses neural voices (free, offline)
 
 The system automatically detects your configured provider via `/agent-vibes:provider info` and uses the appropriate TTS engine. You can switch providers anytime with `/agent-vibes:provider switch` and the BMAD agents will continue speaking using the new provider.
 
-## Available BMAD Agents
+## Available BMAD Agents (Provider-Aware)
 
-| Agent ID | Role | Default Voice |
-|----------|------|---------------|
-| pm | Product Manager | Matthew Schmitz |
-| dev | Developer | Jessica Anne Bogart |
-| qa | QA Engineer | Ralf Eisend |
-| architect | Architect | Michael |
-| po | Product Owner | Amy |
-| analyst | Analyst | Lutz Laugh |
-| sm | Scrum Master | Ms. Walker |
-| ux-expert | UX Expert | Aria |
-| bmad-master | BMAD Master | Aria |
-| bmad-orchestrator | Orchestrator | Ms. Walker |
+The voice used depends on your active TTS provider. Run `/agent-vibes:provider info` to check your provider.
+
+| Agent ID | Role | Piper TTS Voice | Piper Voice |
+|----------|------|------------------|-------------|
+| pm | Product Manager | Matthew Schmitz | en_US-ryan-high |
+| dev | Developer | Aria | en_US-amy-medium |
+| analyst | Business Analyst | Jessica Anne Bogart | en_US-kristin-medium |
+| architect | Architect | Michael | en_GB-alan-medium |
+| sm | Scrum Master | Matthew Schmitz | en_US-joe-medium |
+| tea | Test Architect | Michael | en_US-arctic-medium |
+| tech-writer | Technical Writer | Aria | en_US-lessac-medium |
+| ux-designer | UX Designer | Jessica Anne Bogart | en_US-lessac-medium |
+| frame-expert | Visual Designer | Matthew Schmitz | en_GB-alan-medium |
+| bmad-master | BMAD Master | Michael | en_US-danny-low |
 
 ## Implementation Details
 

@@ -1,0 +1,18 @@
+# AgentVibes Audio Tunnel Configuration
+# Copy this file to audio-tunnel.config and customize for your setup
+# DO NOT commit audio-tunnel.config to git (it's in .gitignore)
+
+# Remote server hostname (from your ~/.ssh/config)
+REMOTE_HOST="your-remote-host"
+
+# Tunnel port (default: 14713)
+TUNNEL_PORT="14713"
+
+# PulseAudio socket path (WSL default)
+PULSE_SOCKET="/mnt/wslg/PulseServer"
+
+# Log file for automatic fixes
+AUTO_FIX_LOG="/tmp/audio-tunnel-autofix.log"
+
+# Healthcheck interval in minutes (for cron setup)
+CHECK_INTERVAL="5"

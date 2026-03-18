@@ -9,8 +9,8 @@ An MCP (Model Context Protocol) server that brings AgentVibes text-to-speech cap
 - 🎤 **Text-to-Speech**: Convert any text to natural-sounding speech
 - 🎭 **Personalities**: Choose from flirty, sarcastic, pirate, robot, zen, and more!
 - 🌍 **Multi-language**: Speak in 25+ languages (Spanish, French, German, etc.)
-- 🎵 **Multiple Voices**: Access 30+ premium ElevenLabs voices or free Piper voices
-- 🔄 **Two Providers**: ElevenLabs (premium AI) or Piper (free, offline)
+- 🎵 **Multiple Voices**: Access 30+ premium Piper TTS voices or free Piper voices
+- 🔄 **Two Providers**: Piper TTS (premium AI) or Piper (free, offline)
 - ⚙️ **Full Configuration**: Manage voices, personalities, and languages
 
 ## Prerequisites
@@ -23,8 +23,7 @@ git clone https://github.com/paulpreibisch/AgentVibes.git
 cd AgentVibes
 
 # Install dependencies (choose one):
-# Option 1: ElevenLabs (premium, requires API key)
-export ELEVENLABS_API_KEY="your-api-key-here"
+# Option 1: Piper TTS (premium, requires API key)
 
 # Option 2: Piper (free, offline)
 pipx install piper-tts
@@ -93,7 +92,6 @@ Add the AgentVibes MCP server:
       "command": "python",
       "args": ["/absolute/path/to/AgentVibes/mcp-server/server.py"],
       "env": {
-        "ELEVENLABS_API_KEY": "your-api-key-here"
       }
     }
   }
@@ -251,7 +249,7 @@ Claude Desktop:
 
 ### Audio Not Playing
 
-1. **ElevenLabs users:** Check your API key is set in the config
+1. **Piper TTS users:** Check your API key is set in the config
 2. **Piper users:** Ensure Piper is installed: `piper --version`
 3. **WSL users:** Make sure audio is configured (see AgentVibes main README)
 4. Test TTS directly:
@@ -292,7 +290,7 @@ echo "pirate" > .claude/tts-personality.txt
 echo "spanish" > .claude/tts-language.txt
 ```
 
-### Using Piper (Free, Offline) Instead of ElevenLabs
+### Using Piper (Free, Offline) Instead of Piper TTS
 
 ```bash
 # Switch to Piper provider
@@ -337,7 +335,7 @@ MIT License - see the main AgentVibes repository for details.
 
 - **AgentVibes GitHub:** https://github.com/paulpreibisch/AgentVibes
 - **MCP Protocol:** https://modelcontextprotocol.io
-- **ElevenLabs:** https://elevenlabs.io
+- **Piper TTS:** https://piper.io
 - **Piper TTS:** https://github.com/rhasspy/piper
 
 ---

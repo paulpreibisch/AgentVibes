@@ -1,1674 +1,1203 @@
-# 🎤 AgentVibes Release Notes
+# AgentVibes Release Notes
 
-## 📦 v2.0.16 - Remote Audio Setup Guide & Scripts (2025-10-12)
+## 🎉 v4.2 — "Party Mode" Release
 
-### 🤖 AI Summary
+**Release Date:** March 2026
 
-This patch release adds comprehensive documentation and automated setup scripts for running AgentVibes TTS on remote servers with local audio playback. Users can now easily configure PulseAudio to tunnel audio from their remote Linux servers (cloud VPS, home servers) to their local Windows speakers via SSH. Perfect for remote development workflows with VS Code Remote-SSH, this release includes interactive setup scripts for both Linux and Windows, complete with backups, validation, and troubleshooting guides.
+This is the biggest AgentVibes release since the TUI launched in v4.0. Two headline features: **BMAD Party Mode** gives every agent their own voice and music, and the **SSH Receiver** lets you hear your headless server speak on your local machine.
 
-### ✨ New Features
+### 🤖 What is BMAD?
 
-#### 📚 Remote Audio Setup Documentation
-- **Comprehensive guide** - Complete docs at `docs/remote-audio-setup.md`
-- **Architecture explained** - Detailed breakdown: Server → SSH Tunnel → WSL → Windows Speakers
-- **Manual & automatic setup** - Choose your path: scripts or manual configuration
-- **Troubleshooting section** - Common issues with solutions
-- **VS Code integration** - Works seamlessly with Remote-SSH extension
-- **Security considerations** - Explains encrypted tunneling and port configuration
+The BMad Method (Build More Architect Dreams) is an AI-driven development framework module within the BMad Method Ecosystem that helps you build software through the whole process from ideation and planning all the way through agentic implementation. It provides specialized AI agents, guided workflows, and intelligent planning that adapts to your project's complexity, whether you're fixing a bug or building an enterprise platform.
 
-**What's Covered:**
-```
-- Prerequisites and system requirements
-- Step-by-step manual setup (Linux + Windows)
-- Automated scripts (see below)
-- Port configuration (4713, 14713)
-- Verification commands and testing
-- Common issues and fixes
-- Multiple server configurations
-```
+### 🎭 BMAD Party Mode — Every Agent Has Its Own Voice
 
-#### 🐧 Linux Setup Script (`setup-remote-audio.sh`)
-- **Automated PulseAudio configuration** - Sets up network support automatically
-- **Shell detection** - Auto-detects bash/zsh and configures appropriately
-- **Environment variables** - Adds `PULSE_SERVER=tcp:localhost:14713`
-- **Automatic backups** - Creates timestamped backups before any changes
-- **Colorful CLI** - Beautiful progress indicators and clear messaging
-- **Verification steps** - Shows commands to test audio after setup
-- **Safe execution** - Validates prerequisites before making changes
+When BMAD's party mode runs a multi-agent discussion, every agent now speaks with their own individually configured voice, background music, reverb, and personality — making the Architect, PM, Developer, QA, and Analyst immediately recognizable the moment they speak.
 
-**Usage:**
 ```bash
-curl -O https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/scripts/setup-remote-audio.sh
-chmod +x setup-remote-audio.sh
-./setup-remote-audio.sh
+/agent-vibes:bmad-party enable
 ```
 
-#### 🪟 Windows PowerShell Script (`setup-windows-audio.ps1`)
-- **SSH tunnel configuration** - Automatically adds RemoteForward to SSH config
-- **WSL validation** - Checks for WSL2 with GUI support (WSLg)
-- **OpenSSH detection** - Verifies OpenSSH Client is installed
-- **Host alias creation** - Generates friendly SSH host names
-- **Backup and safety** - Creates timestamped backups of SSH config
-- **Connection testing** - Optional SSH connection test after setup
-- **Parameter support** - Flexible options for users and ports
+**Per-agent configuration:**
+- 🎙️ **Voice** — 914 voices to choose from, auto-assigned gender-aware
+- 🎵 **Background Music** — Unique ambient track per agent (cinematic, lo-fi, jazz...)
+- 🎚️ **Music Volume** — Per-agent level, or bulk-set all at once
+- 🎛️ **Reverb** — none / room / hall / cathedral / studio
+- 💬 **Pretext** — Custom intro phrase ("Winston says:..." before every line)
+- 🎭 **Personality** — sarcastic, dramatic, pirate, cheerful, and more
+- 🔇 **No overlap** — speech lock held until audio fully completes
+- ✨ **Markdown stripped** — asterisks and formatting removed before TTS
 
-**Usage:**
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/scripts/setup-windows-audio.ps1" -OutFile "setup-windows-audio.ps1"
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\setup-windows-audio.ps1 -RemoteHost "192.168.1.100"
-```
+**Configuration stored in:** `~/.agentvibes/bmad-voice-map.json`
 
-**Parameters:**
-- `-RemoteHost` (required) - Server hostname or IP
-- `-RemoteUser` (optional) - SSH username (defaults to current user)
-- `-TunnelPort` (optional) - Audio tunnel port (default: 14713)
-- `-SSHConfigPath` (optional) - Custom SSH config location
+### 🎛️ BMad Tab — Full Visual Agent Configurator
 
-#### 📖 Scripts Documentation
-- **New scripts README** - Complete documentation at `scripts/README.md`
-- **Usage examples** - Shows common workflows and scenarios
-- **Troubleshooting guide** - Script-specific issues and solutions
-- **Setup order** - Clear steps: Windows first, then Linux
-- **Common issues** - Audio doesn't play, connection refused, etc.
+New **BMad Tab** in `npx agentvibes` for managing every agent visually — built with the same polish as the Voices tab:
 
-### 📝 Documentation Updates
-
-#### Main README Enhancements
-- **Remote Audio Setup section** - New major section with quick setup
-- **Table of Contents update** - Added 🔊 Remote Audio Setup entry
-- **Quick setup commands** - Copy-paste ready PowerShell and bash commands
-- **Architecture visualization** - Clear diagram of audio flow
-- **Resource links** - Links to detailed docs and script READMEs
-
-**New README Section:**
-```markdown
-## 🔊 Remote Audio Setup
-
-**Running AgentVibes on a remote server but want to hear TTS on your local machine?**
-
-Perfect for:
-- Remote development on cloud/VPS servers
-- Home server with local audio playback
-- VS Code Remote-SSH workflows
-- Any SSH-based remote development
-
-[Complete documentation, scripts, and setup guide included]
-```
-
-### 🛠️ What Gets Configured
-
-#### On Linux Server:
-- **PulseAudio config** - `~/.config/pulse/default.pa` with network support
-- **Environment variable** - `PULSE_SERVER=tcp:localhost:14713` in shell config
-- **Automatic backups** - Preserves your existing configurations
-- **Shell integration** - Works with bash or zsh automatically
-
-#### On Windows Client:
-- **SSH tunnel** - `RemoteForward 14713 localhost:14713` in SSH config
-- **WSL compatibility** - Leverages WSLg for audio routing
-- **Host configuration** - Clean SSH config entries with keep-alive
-- **Backup safety** - Timestamps existing configs before changes
-
-### 🎯 Use Cases
-
-**Perfect for:**
-1. **Cloud Development** - Run AgentVibes on AWS/GCP/Azure, hear TTS locally
-2. **Home Lab Servers** - Powerful remote server, convenient local audio
-3. **VS Code Remote-SSH** - Seamless integration with Remote-SSH extension
-4. **Team Environments** - Shared remote development with personal audio
-5. **Resource-heavy Tasks** - Use remote CPU/RAM, enjoy local audio feedback
-
-### 📊 Files Added
-
-**Documentation (2 files):**
-- `docs/remote-audio-setup.md` (265 lines) - Complete setup guide
-- `scripts/README.md` (117 lines) - Scripts documentation
-
-**Setup Scripts (2 files):**
-- `scripts/setup-remote-audio.sh` (214 lines) - Linux automation
-- `scripts/setup-windows-audio.ps1` (274 lines) - Windows automation
-
-**Main README:**
-- Updated `README.md` (61 lines added) - Remote audio section
-
-**Total Changes:** 931 insertions across 5 files
-
-### 🔧 Technical Architecture
-
-```
-┌─────────────────┐
-│  Remote Linux   │
-│     Server      │
-│                 │
-│  PulseAudio     │
-│   Port 4713     │
-└────────┬────────┘
-         │
-         │ SSH Tunnel
-         │ (RemoteForward 14713:localhost:14713)
-         │
-┌────────▼────────┐
-│  Windows        │
-│   Client        │
-│                 │
-│  WSL → Speakers │
-└─────────────────┘
-```
-
-**Key Components:**
-- **Port 4713** - Standard PulseAudio TCP port on remote
-- **Port 14713** - SSH tunnel port for forwarding
-- **WSLg** - Windows Subsystem for Linux with GUI support
-- **RemoteForward** - SSH reverse tunnel (server → client)
-
-### 💡 Usage Examples
-
-#### Quick Setup
 ```bash
-# 1. On Windows (configure SSH tunnel)
-.\setup-windows-audio.ps1 -RemoteHost "myserver.com"
-
-# 2. On Linux server (configure PulseAudio)
-./setup-remote-audio.sh
-
-# 3. Reconnect via SSH
-ssh myserver.com
-
-# 4. Test audio
-speaker-test -t sine -f 1000 -l 1
+npx agentvibes   # Press B to open BMad Tab
 ```
 
-#### VS Code Remote-SSH
+The agent table shows **Voice, Gender, Provider, Reverb, Music, Vol, and Pretext** columns. Voice names are automatically beautified: `16Speakers::Rose_Ibex` → `Rose Ibex`, `en_US-kusal-medium` → `Kusal`.
+
+| Key | Action |
+|-----|--------|
+| `↑↓` / `jk` | Navigate agents |
+| `Space` | Preview agent with full profile (animated spinner while playing) |
+| `Enter` | Configure voice, music, volume, reverb, personality, pretext |
+| `A` | Auto-assign unique voices to all agents (gender-aware, no repeats) |
+| `B` | Bulk Edit — set music / volume / pretext / reverb for all agents |
+| `X` | Reset agent to defaults |
+
+**BMad Tab highlights:**
+- Inline row hints — navigate to any agent and see `[Space] Preview  [Enter] Configure` on the row
+- Animated `⠋⠙⠹⠸` braille spinner while audio plays
+- Gender & Provider columns — same metadata as the Voices tab
+
+### 🖥️ SSH Receiver Tab — Hear Your Headless Server
+
+New **Receiver Tab** streams TTS from voiceless remote servers to your local machine over TCP — perfect for cloud dev boxes (AWS, GCP, Azure), WSL2, and SSH sessions.
+
 ```bash
-# Tunnel is automatically established by VS Code
-# No manual SSH connection needed!
-1. Open VS Code
-2. Connect to remote host
-3. Audio just works 🎵
+# On local machine: open TUI → Receiver tab → Start
+npx agentvibes
+
+# Remote server auto-detects the receiver and streams audio to you
 ```
 
-#### Verification Commands
-```bash
-# Check environment variable
-echo $PULSE_SERVER
-# Should show: tcp:localhost:14713
+### ⚡ TTS Latency Reduced ~1 Second
 
-# Verify tunnel
-ss -tlnp | grep :14713
-# Should show listening socket
+- **Batched Node.js profile reads** — 6 `node -e` calls collapsed into 1 (~900ms saved per speech)
+- **inotifywait queue worker** — file-event-driven queue, no polling delay
+- **Background cache cleanup** — off the critical path every 10th call
 
-# Test PulseAudio
-pactl info
-# Should show server: tcp:localhost:14713
-```
+### 🎨 ANSI Colors Restored to Banner
 
-### 🔄 Migration Notes
+Full ANSI color in the TTS banner (gold voice, cyan reverb, traffic-light cache size), fixed via `AGENTVIBES_WAV_OUTPATH` sidecar file.
 
-**For All Users:**
-- This is a documentation and tooling release
-- No changes to AgentVibes core functionality
-- Existing installations work exactly the same
-- Remote audio setup is optional and opt-in
+### 🔕 Banner Toggle
 
-**To Use Remote Audio:**
-1. Follow the guide at `docs/remote-audio-setup.md`
-2. Run automated scripts or configure manually
-3. Reconnect via SSH and test audio
+Hide TTS info banner without muting: `touch ~/.agentvibes/banner-disabled` or say "turn off the TTS banner" via MCP.
 
-**Requirements:**
-- Remote Linux server with PulseAudio
-- Local Windows machine with WSL2
-- SSH access to remote server
-- Internet connection for initial setup
+### 🛡️ Security
 
-### 🙏 Credits
+- Adversarial code review — 58 issues identified and addressed
+- Agent ID injection prevention, PID-scoped temp profile files
+- Env-var-based Node.js JSON reads (no shell interpolation)
 
-This feature was developed based on a working remote audio configuration. Special thanks to the community members who shared their setups and helped test the automation scripts!
-
-### 📚 Additional Resources
-
-- [Remote Audio Setup Guide](docs/remote-audio-setup.md) - Complete documentation
-- [Scripts README](scripts/README.md) - Script usage and troubleshooting
-- [AgentVibes Website](https://agentvibes.org) - Main documentation
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v4.0.1...v4.2
 
 ---
 
-## 📦 v2.0.15 - BMAD Plugin Auto-Enable Fix (2025-10-12)
+## ✨ v3.5.10 - Soprano Detection Fixes & Enhanced Installer Features
 
-### 🤖 AI Summary
+**Release Date:** February 14, 2026
 
-This patch release fixes a critical bug where the BMAD voice plugin was not automatically enabled during installation, even when BMAD was detected. Users installing AgentVibes with BMAD present would find plugin files created but the plugin non-functional because the crucial `.claude/activation-instructions` file was missing and the plugin wasn't enabled. Now, when BMAD is detected, the installer automatically creates activation instructions, enables the plugin, and sets everything up to work out of the box.
+### 🎯 Summary
 
-### 🐛 Bug Fixes
+Production release combining critical bug fixes and new installer features. Fixed Soprano TTS detection for pipx installations (the core issue reported by users), resolved 5 execSync API misuse bugs that were breaking Python package detection, and eliminated 100+ lines of code duplication. Introduces new installer features: custom music track support with preview functionality, personality emoji mapping for better visual recognition, and pretext configuration allowing users to customize agent introductions.
 
-#### BMAD Plugin Auto-Enable Not Working
-- **Fixed**: Plugin not enabled when BMAD detected during installation
-- **Fixed**: Missing `.claude/activation-instructions` file prevented BMAD agents from creating context
-- **Root Cause**: Installer created plugin files but never enabled the plugin or created activation instructions
-- **Impact**: BMAD voice integration was non-functional after fresh installs
-- **Solution**: Auto-enable plugin and create activation-instructions when BMAD detected
+### ✨ Key Features & Fixes
 
-**What Was Broken:**
-```bash
-# Before: Plugin files created but not actually working
-npx agentvibes install  # (with BMAD present)
-# ✓ Created .claude/plugins/bmad-voices.md
-# ✗ No .claude/plugins/bmad-voices-enabled.flag (plugin disabled!)
-# ✗ No .claude/activation-instructions (agents don't know what to do!)
+**🔧 Critical Bug Fixes:**
+- **Soprano TTS Detection:** Fixed detection when installed via pipx (was showing "not installed" despite working)
+- **execSync API Bugs:** Fixed 5 locations using incorrect API signature (array args with execSync)
+- **Code Duplication:** Eliminated 100+ lines of duplicate code between Soprano and Piper validators
+- **API Consistency:** All provider validation functions now return consistent response structures
+- **Python Package Detection:** Fixed broken Python pip detection that was silently failing
 
-# Result: BMAD agents don't speak, voice switching doesn't work
-```
+**🎨 New Installer Features:**
+- **Custom Music Tracks:** Users can now upload and preview their own background music
+- **Personality Emojis:** Visual recognition mapping (😊 for none, 🎭 for dramatic, 💁 for sassy, etc.)
+- **Pretext Configuration:** Custom agent introductions (e.g., "FireBot: " prefix for all messages)
+- **Track Preview:** Audio preview with support for ffplay, sox, and mpv players
 
-**After Fix:**
-```bash
-# After: Plugin fully configured and working
-npx agentvibes install  # (with BMAD present)
-# ✓ Created .claude/plugins/bmad-voices.md
-# ✓ Created .claude/plugins/bmad-voices-enabled.flag (auto-enabled!)
-# ✓ Created .claude/activation-instructions (agents know what to do!)
-# 🎤 Auto-enabled BMAD voice plugin
+**🛡️ Security & Quality:**
+- Improved path traversal protection in provider validation
+- Enhanced error handling and logging
+- Reduced code complexity by 29% through deduplication
+- Test coverage improved: 56.61% → 63.67%
 
-# Result: BMAD agents speak automatically with assigned voices!
-```
+### 📊 Technical Details
 
-#### Missing Activation Instructions
-- **Fixed**: `.claude/activation-instructions` not created by installer
-- **Fixed**: Manual `/agent-vibes:bmad enable` also didn't create instructions
-- **Impact**: BMAD agents couldn't create `.bmad-agent-context` file
-- **Solution**: Both installer and manual enable now create comprehensive activation instructions
+**Soprano Detection Improvements:**
+- Checks command in PATH first (most reliable for pipx)
+- Falls back to ~/.local/bin directory check
+- Checks pipx venv directory for installation
+- Final fallback to Python pip package detection
+- Consistent error messages showing all checked locations
 
-**Why This File Matters:**
+**Code Quality Metrics:**
+- File size reduced by 145 lines (-29%)
+- Code duplication eliminated (was ~100 lines)
+- Test coverage improved +7.06%
+- All 114 tests passing
+- Provider validator now 63.67% covered (up from 56.61%)
 
-The `.claude/activation-instructions` file tells BMAD agents to:
-1. Create `.bmad-agent-context` file with agent ID when activating
-2. Clean up the context file when exiting
-3. This allows AgentVibes to detect which agent is active and switch voices
+**Installer Enhancements:**
+- Added personality emoji mapping (26 personalities)
+- Custom track upload with validation
+- File type restrictions (.mp3, .wav, .ogg, .m4a)
+- Registry storage in ~/.agentvibes/custom-tracks.json
+- Audio preview before finalizing selection
 
-Without this file, agents never create the context file, so AgentVibes can't detect them and voice switching fails silently.
+### 🔒 Security Notes
 
-### 📝 Technical Changes
+- All spawnSync calls now use correct array argument form
+- Path traversal prevention maintained in all operations
+- HOME injection protection via os.homedir()
+- No hardcoded credentials introduced
+- Input validation for file uploads and track selection
 
-**Modified: `src/installer.js`** (Lines 668-743)
-- Added auto-enable logic when BMAD detected
-- Creates `.claude/plugins/bmad-voices-enabled.flag` automatically
-- Creates `.claude/activation-instructions` with full BMAD agent instructions
-- Updates success message to reflect auto-enable status
-- Fixed command examples in BMAD detection box (was `/agent-vibes-bmad`, now `/agent-vibes:bmad`)
+### 🐛 Known Limitations
 
-**Modified: `.claude/hooks/bmad-voice-manager.sh`** (Lines 106-168)
-- Added automatic creation of `.claude/activation-instructions` when enabling
-- Uses heredoc to embed full activation instructions
-- Only creates file if it doesn't exist (preserves customizations)
-- Shows confirmation message when file created
+- Audio preview requires ffplay, sox, or mpv (feature gracefully degrades if unavailable)
+- Custom track registry is stored locally per user
+- Some legacy bash scripts still lack strict mode (pre-existing, low risk)
 
-**Added: `templates/activation-instructions-bmad.md`**
-- Template file documenting the activation instructions
-- Reference for what gets created by the system
-- Explains why the file is critical for BMAD integration
+### 🙏 Acknowledgments
 
-### 🎯 User Impact
-
-**Before v2.0.15:**
-- Fresh AgentVibes install with BMAD: Voice integration didn't work
-- Users had to manually debug why BMAD agents weren't speaking
-- Required manual creation of activation-instructions file
-- Plugin appeared "enabled" but wasn't actually functional
-
-**After v2.0.15:**
-- Fresh install with BMAD: Everything works immediately
-- BMAD agents speak automatically with assigned voices
-- Voice switching works out of the box
-- No manual configuration needed
-
-### 🔄 Opt-Out Design
-
-**Philosophy: Auto-enable with easy opt-out**
-- If you have BMAD installed, you probably want voice integration
-- Better to work by default than require manual setup
-- Users can easily disable with `/agent-vibes:bmad disable` if unwanted
-
-### 📊 Files Changed
-
-**Modified (2 files):**
-- `src/installer.js` (87 lines added, 6 lines removed)
-- `.claude/hooks/bmad-voice-manager.sh` (63 lines added)
-
-**Added (1 file):**
-- `templates/activation-instructions-bmad.md` (54 lines)
-
-**Total Changes:** 204 insertions, 6 deletions across 3 files
-
-### 🔄 Migration Notes
-
-**For New Users:**
-- No action needed - BMAD plugin auto-enables and works immediately
-- Just run `npx agentvibes install` in directory with BMAD
-
-**For Existing Users (v2.0.14 and earlier):**
-
-If you previously installed AgentVibes and found BMAD voice integration not working:
-
-```bash
-# Update AgentVibes
-/agent-vibes:update
-
-# The plugin will auto-enable on next install if BMAD detected
-# Or manually enable:
-/agent-vibes:bmad enable
-```
-
-**To Disable BMAD Plugin (if unwanted):**
-```bash
-/agent-vibes:bmad disable
-```
-
-### 💡 What Gets Created
-
-When BMAD is detected during installation, the system creates:
-
-1. **`.claude/plugins/bmad-voices.md`** - Voice-to-agent mappings
-2. **`.claude/plugins/bmad-voices-enabled.flag`** - Enables the plugin
-3. **`.claude/activation-instructions`** - Instructions for BMAD agents
-
-**Sample Activation Instructions:**
-```markdown
-## STEP 3.5a: Create BMAD Context File (CRITICAL)
-
-**IMMEDIATELY after agent identification, create the context file:**
-
-```bash
-echo "$AGENT_ID" > .bmad-agent-context
-```
-
-This allows AgentVibes to:
-1. Detect which BMAD agent is active
-2. Look up the correct voice mapping
-3. Automatically speak questions using the agent's assigned voice
-```
-
-### 🙏 Credits
-
-Thanks to the user who reported this issue in the md-presentations directory! This led to discovering that the BMAD plugin setup was incomplete for all fresh installations.
+This release includes fixes identified through adversarial code review, ensuring production-quality reliability and security alignment with CLAUDE.md standards.
 
 ---
 
-## 📦 v2.0.14 - README Version Fix for npm (2025-10-11)
+## 🛡️ v3.5.8 - Provider Validation Security & UX Improvements
 
-### 🤖 AI Summary
+**Release Date:** February 12, 2026
 
-This patch release updates the npm package's README to display the correct version numbers. Since v2.0.13 was published before the README was corrected, the npm website displayed outdated version information. This release ensures users see v2.0.14 everywhere.
+### 🎯 Summary
 
-### 🐛 Bug Fixes
+Critical security and reliability update for provider detection. Fixes command injection vulnerabilities in validation code, prevents HOME directory injection attacks, and improves UX with explicit provider detection messaging. Soprano TTS installed via pipx is now correctly detected (previously showed "not installed" due to ES module import error). All 8 critical code review issues resolved with comprehensive security hardening and enhanced error reporting.
 
-#### npm README Version Display
-- **Fixed**: npm package page now shows correct version (v2.0.14)
-- **Root Cause**: v2.0.13 was published with uncorrected README
-- **Impact**: Users visiting npmjs.com/package/agentvibes now see accurate version info
-- **Solution**: Republish with corrected README
+### ✨ Key Improvements
 
-### 📝 What Changed
+- **🔐 Security Fixes:** Fixed command injection vulnerability (template strings → array form), prevented HOME injection attacks, added path traversal protection
+- **✅ Provider Detection:** Soprano via pipx now correctly detected; added checkedLocations tracking for transparency
+- **💬 Better Messaging:** Explicit "Detected and selected!" confirmation; detailed error messages showing what was checked
+- **🧪 Test Coverage:** Enhanced tests verify actual detection values, not just types
+- **🐛 Debugging:** Added [DEBUG] logging for troubleshooting provider issues
 
-**Modified: `README.md`**
-- Author line now shows v2.0.14
-- Latest Release section shows v2.0.14
+### 🔴 Critical Fixes
 
-**Modified: `package.json`, `package-lock.json`**
-- Bumped version from 2.0.13 to 2.0.14
+1. **Command Injection Prevention** - All execSync calls now use array form (security: CLAUDE.md)
+2. **HOME Directory Injection** - Switched to os.homedir() instead of process.env.HOME
+3. **Path Traversal Protection** - Added path.resolve() validation for pipx venv directories
 
-### 🔄 Migration Notes
+### 🟡 Medium Fixes
 
-**For All Users:**
-- No functional changes - this is purely a documentation update
-- Update via `/agent-vibes:update` to get latest version
-- All features from v2.0.13 are identical
+4. **Pipx Logic Improved** - Tracks checked locations even on success (transparency)
+5. **Silent Failures Eliminated** - Added [DEBUG] error logging for diagnostics
+6. **Test Quality Enhanced** - Verify message content, not just types
+7. **Documentation** - Added JSDoc comments explaining security-critical imports
+8. **Error Differentiation** - Better distinction between different failure types
 
----
+### 📊 Technical Impact
 
-## 📦 v2.0.13 - Workflow Fix & Clean Release (2025-10-11)
-
-### 🤖 AI Summary
-
-This patch release fixes the npm publish workflow's README update patterns and provides a clean version without the experimental remote-SSH features that were accidentally included in v2.0.11 and v2.0.12. The workflow now correctly updates the README version information during releases, and users get a stable version based on v2.0.10.
-
-### 🐛 Bug Fixes
-
-#### Publish Workflow README Update Fix
-- **Fixed sed patterns** - Workflow now correctly matches and updates README release section
-- **Flexible pattern matching** - Handles different release title formats ("Multi-Provider Revolution" vs "Release Notes")
-- **Correct version display** - README now shows v2.0.13 in both author line and latest release section
-
-#### Clean Version Without Remote-SSH Features
-- **Skipped v2.0.11/v2.0.12** - These versions included experimental remote TTS forwarding features
-- **Based on v2.0.10** - This is a clean release from the stable master branch
-- **No breaking changes** - All existing functionality from v2.0.10 is preserved
-
-### 📝 Technical Changes
-
-**Modified: `.github/workflows/publish.yml`**
-- Updated sed pattern from exact "Release Notes" match to flexible `[^\]]*` pattern
-- Improved pattern to match any title format in release section header
-- Added comment explaining the flexible matching approach
-
-**Modified: `package.json`, `package-lock.json`**
-- Bumped version from 2.0.10 to 2.0.13
-
-### 🔄 Migration Notes
-
-**For All Users:**
-- Update via `/agent-vibes:update` or `npx agentvibes@latest install`
-- No breaking changes - all settings and configurations preserved
-- If you were on v2.0.12, this removes the remote-SSH code
-
-**Deprecation Notice:**
-- v2.0.12 includes experimental features and should be avoided
-- v2.0.13 is the recommended stable version
+- Soprano detection now works reliably for both pip and pipx installations
+- Reduced false negatives in provider validation
+- Enhanced security posture aligned with CLAUDE.md security mandates
+- Improved debuggability with explicit error messages
 
 ---
 
-## 📦 v2.0.10 - GitHub Star Reminder & Provider Fixes (2025-01-10)
+## 🔧 v3.5.7 - CLI Fix: npx Command Output & Startup Hooks
 
-### 🤖 AI Summary
+**Release Date:** February 12, 2026
 
-This patch release adds a gentle daily GitHub star reminder system and fixes critical bugs in provider switching and output style commands. Users can now be reminded to star the project (once per day, easily disabled), the ElevenLabs provider switching now works correctly with proper language support for 30+ languages, and all documentation now shows the correct output style command `Agent Vibes` instead of the lowercase `agent-vibes`.
+Fixes critical bug where `npx agent-vibes install` and other commands produced no output, making CLI unusable. Root cause: bin/agent-vibes used dynamic import without passing arguments to installer.js on local execution. Also removed broken hook configurations (pre_compact.py, notification.ts) that didn't exist and caused startup errors in Claude Code settings.
 
-### ✨ New Features
+### 🎯 What's Fixed
 
-#### Daily GitHub Star Reminder System
-- **Gentle reminders** - Shows once per day when using TTS
-- **Easy to disable** - Run `echo "disabled" > .claude/github-star-reminder.txt`
-- **Non-intrusive** - Beautiful formatted message with clear instructions
-- **Community support** - Encourages users to support the project
-- **Smart tracking** - Date-based reminder system prevents spam
+- **npx agent-vibes now works** - `npx agent-vibes install`, `npx agent-vibes --help`, all commands produce proper output
+- **Startup hook errors gone** - Removed non-existent hook references from settings.json (pre_compact.py, notification.ts)
+- **CLI execution proper** - Both npx and local execution now use execFileSync with proper argument passing
 
-**Example Reminder:**
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⭐ Enjoying AgentVibes?
+### 🚀 Technical Details
 
-   If you find this project helpful, please consider giving us
-   a star on GitHub! It helps others discover AgentVibes and
-   motivates us to keep improving it.
-
-   👉 https://github.com/paulpreibisch/AgentVibes
-
-   Thank you for your support! 🙏
-
-   💡 To disable these reminders, run:
-   echo "disabled" > .claude/github-star-reminder.txt
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-#### Piper TTS Installer Script
-- **Automated installation** - Created `.claude/hooks/piper-installer.sh`
-- **Platform detection** - Checks for WSL/Linux compatibility
-- **Dependency management** - Installs pipx automatically if needed
-- **Voice downloads** - Offers to download voice models after installation
-- **Clear instructions** - Provides next steps and usage guide
-
-### 🐛 Bug Fixes
-
-#### Provider Switching Function Fixes
-- **Fixed function name mismatch** - `get_current_language()` → `get_language_code()` in provider-commands.sh:102
-- **Fixed ElevenLabs language support** - `get_current_language()` → `get_language_code()` in play-tts-elevenlabs.sh:52
-- **Added language validation** - New `is_language_supported()` function validates provider/language compatibility
-- **Implemented language mapping** - Full 30+ language code mapping (spanish→es, french→fr, etc.)
-- **Provider switching works** - Users can now switch between ElevenLabs and Piper without errors
-
-**What Was Broken:**
-```bash
-# Before: Provider switching failed with "command not found" error
-/agent-vibes:provider switch elevenlabs
-# .claude/hooks/provider-commands.sh: line 102: get_current_language: command not found
-
-# After: Works perfectly
-/agent-vibes:provider switch elevenlabs
-# ✓ Provider switched to: elevenlabs
-```
-
-#### Output Style Command Correction
-- **Fixed installer** - Updated `src/installer.js` (2 locations)
-- **Fixed hooks** - Updated check-output-style.sh, personality-manager.sh, voice-manager.sh
-- **Correct command** - Changed `/output-style agent-vibes` → `/output-style Agent Vibes`
-- **Consistent docs** - All documentation now shows the correct command
-
-**Why This Matters:**
-The output style name is case-sensitive in Claude Code. The incorrect lowercase command would fail silently, preventing users from enabling TTS narration.
-
-### 🔧 Technical Changes
-
-#### GitHub Star Reminder Implementation
-**New Files:**
-- `.claude/hooks/github-star-reminder.sh` - Main reminder script with disable support
-- `.claude/github-star-reminder.txt` - Tracks last reminder date
-
-**Integration:**
-- Added to `play-tts.sh` router (runs before TTS playback)
-- Silent errors (2>/dev/null || true) prevent disruption
-- Project-local or global config support
-
-**Disable Options:**
-1. Echo "disabled" to reminder file
-2. Create `.claude/github-star-reminder-disabled.flag`
-3. Create `~/.claude/github-star-reminder-disabled.flag`
-
-#### Provider Command Fixes
-**Modified Functions:**
-- `provider-commands.sh`:
-  - Added `is_language_supported()` function (lines 15-42)
-  - Fixed `get_current_language()` call to `get_language_code()` (line 131)
-
-- `play-tts-elevenlabs.sh`:
-  - Fixed `get_current_language()` call to `get_language_code()` (line 52)
-  - Replaced `get_language_code_for_name()` with full case statement (lines 56-83)
-  - Supports all 30+ languages with ISO 639-1 codes
-
-**Language Code Mapping:**
-```bash
-case "$CURRENT_LANGUAGE" in
-  spanish) LANGUAGE_CODE="es" ;;
-  french) LANGUAGE_CODE="fr" ;;
-  german) LANGUAGE_CODE="de" ;;
-  italian) LANGUAGE_CODE="it" ;;
-  # ... 26 more languages
-  english|*) LANGUAGE_CODE="en" ;;
-esac
-```
-
-#### Output Style Updates
-**Files Modified:**
-- `src/installer.js` - Lines 588, 614
-- `.claude/hooks/check-output-style.sh` - Line 45
-- `.claude/hooks/personality-manager.sh` - Line 197
-- `.claude/hooks/voice-manager.sh` - Line 248
-
-All now correctly reference `/output-style Agent Vibes` instead of the incorrect lowercase version.
-
-### 🎯 User Impact
-
-**Before v2.0.10:**
-- Provider switching failed with cryptic "command not found" errors
-- Users couldn't switch between ElevenLabs and Piper
-- Documentation showed wrong output style command
-- No gentle reminder to support the project
-
-**After v2.0.10:**
-- Provider switching works seamlessly
-- Full 30+ language support with ElevenLabs
-- Correct output style command everywhere
-- Optional daily star reminder (easily disabled)
-- Piper TTS installer for easy setup
-
-### 📊 Files Changed
-
-**Added (3 files):**
-- `.claude/hooks/github-star-reminder.sh` (94 lines)
-- `.claude/hooks/piper-installer.sh` (144 lines)
-- `.claude/github-star-reminder.txt` (1 line)
-
-**Modified (8 files):**
-- `.claude/hooks/check-output-style.sh` (4 lines changed)
-- `.claude/hooks/personality-manager.sh` (4 lines changed)
-- `.claude/hooks/play-tts-elevenlabs.sh` (33 lines added)
-- `.claude/hooks/play-tts.sh` (3 lines added)
-- `.claude/hooks/provider-commands.sh` (31 lines added)
-- `.claude/hooks/voice-manager.sh` (4 lines changed)
-- `README.md` (4 lines changed)
-- `src/installer.js` (4 lines changed)
-
-**Test Updates (3 files):**
-- `test/helpers/test-helper.bash` (6 lines changed)
-- `test/unit/personality-manager.bats` (20 lines changed)
-- `test/unit/personality-voice-mapping.bats` (21 lines changed)
-- `test/unit/play-tts.bats` (9 lines removed)
-
-**Total Changes:** 347 insertions, 35 deletions across 15 files
-
-### 🔄 Migration Notes
-
-**For All Users:**
-- Update via `/agent-vibes:update` or `npx agentvibes update`
-- No breaking changes - all existing settings preserved
-- GitHub star reminder shows once per day (easily disabled)
-- Provider switching now works correctly
-
-**To Disable GitHub Star Reminders:**
-```bash
-echo "disabled" > .claude/github-star-reminder.txt
-```
-
-**To Install Piper TTS:**
-```bash
-.claude/hooks/piper-installer.sh
-```
-
-### 💡 What's Next
-
-The next release (v2.1.0) will focus on:
-- Enhanced Piper TTS voice management
-- Improved multilingual voice selection
-- Additional personality styles
-- BMAD plugin enhancements
-
-### 📝 Commits in This Release
-
-```
-869b1e8 feat: Add Piper TTS installer and improve GitHub star reminders
-a9f3b0b feat: Add daily GitHub star reminder system
-18c389e fix: Update output style command and provider switching functions
-07ee376 test: Remove flaky API key test
-5a1a78b test: Skip flaky API key test in CI environments
-4ff1075 Merge branch 'master' of github.com:paulpreibisch/AgentVibes
-73d8303 test: Update tests for provider-aware personality system
-ec21c34 docs: Update README to version v2.0.9 [skip ci]
-```
-
-### 🙏 Credits
-
-- Thanks to users who reported the provider switching issues
-- Special appreciation to the community for supporting AgentVibes
-- ElevenLabs team for their excellent multilingual API
-
----
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-
----
-
-# 🎤 AgentVibes Release Notes
-
-## 📦 v2.0.9 - Installer Release Notes Fix (2025-01-07)
-
-### 🤖 AI Summary
-
-This patch release fixes a critical bug where the installer and updater commands were showing outdated v1.1.x commit messages instead of the current v2.0.8+ release notes. The commands now correctly read from RELEASE_NOTES.md which is included in the npm package.
-
-### 🐛 Bug Fixes
-
-#### Installer Release Notes Display
-- **Fixed install command** - Now reads from RELEASE_NOTES.md instead of git log
-- **Fixed update command** - Now shows actual v2.0.x release notes instead of v1.1.x commits
-- **npm package compatibility** - Works correctly when installed via `npx agentvibes` (not a git repo)
-- **Consistent display** - Both install and update show the same latest release information
-
-### 🎯 User Impact
-
-**Before:** Running `npx agentvibes update` showed confusing old commit messages from v1.1.2 era.
-
-**After:** Both `install` and `update` commands show the correct latest release notes from v2.0.9, including the provider-aware personalities feature and all recent improvements.
-
-### 📊 Files Changed
-- Modified: src/installer.js (57 insertions, 31 deletions)
-
-## 📦 v2.0.8 - Provider-Aware Personalities (2025-01-07)
-
-### 🤖 AI Summary
-
-This patch release makes the personality system fully provider-aware, fixing a critical issue where personality switching would fail to play TTS acknowledgments when using Piper TTS. Users can now seamlessly switch personalities regardless of which TTS provider they're using, with each personality automatically selecting the appropriate voice for the active provider.
-
-### ✨ New Features
-
-#### Provider-Aware Personality Voice Switching
-- **Dual voice mappings** - All 19 personality files now include both `elevenlabs_voice` and `piper_voice` fields
-- **Automatic voice selection** - Personality manager detects active TTS provider and switches to appropriate voice automatically
-- **Piper voice mappings**:
-  - Female personalities (sarcastic, flirty, sassy, dramatic) → `en_US-amy-medium`
-  - Male casual (funny, pirate, surfer-dude, crass) → `en_US-joe-medium`
-  - Professional (professional, normal, dry-humor, poetic, zen) → `en_US-lessac-medium`
-  - Energetic (angry, annoying, robot) → `en_US-ryan-high`
-  - Character voices (grandpa, moody) → `en_US-libritts-high`
-
-#### Output Style Detection Helper
-- **New check-output-style.sh** - Helper script for future output style detection features
-- **User-friendly tips** - Voice and personality commands now show helpful tip about enabling agent-vibes output style
-- **Better UX** - Users are guided to `/output-style agent-vibes` when needed
-
-### 🐛 Bug Fixes
-
-#### Whoami Command Provider Detection
-- **Fixed provider display** - `/agent-vibes:whoami` now correctly shows active provider (Piper TTS or ElevenLabs)
-- **Updated command description** - Metadata now mentions both providers instead of hardcoding "ElevenLabs"
-- **Accurate information** - Users see "Provider: Piper TTS (Free, Offline)" when using Piper
-
-#### Voice Manager Provider Support
-- **Piper model name recognition** - Voice manager now accepts Piper voice model names (e.g., `en_US-amy-medium`)
-- **Provider-aware validation** - Skips ElevenLabs voice validation when using Piper with Piper model names
-- **Smart voice ID display** - Only shows ElevenLabs voice ID when actually using ElevenLabs
-
-#### Piper TTS Voice File Reading
-- **Fixed voice file lookup** - `play-tts-piper.sh` now correctly reads voice from `.claude/tts-voice.txt`
-- **Project-local support** - Checks project-local `.claude/tts-voice.txt` first, then global `~/.claude/tts-voice.txt`
-- **Piper model detection** - Validates voice names contain underscore and dash pattern for Piper models
-
-### 🔧 Technical Changes
-
-#### Personality Manager Improvements
-- **Provider detection** - Reads `tts-provider.txt` to determine active provider
-- **Conditional voice selection** - Uses `piper_voice` field when Piper is active, `elevenlabs_voice` for ElevenLabs
-- **Fallback voice** - Defaults to `en_US-lessac-medium` if no Piper voice specified
-- **New field support** - Added `piper_voice` field extraction to `get_personality_data` function
-
-#### Voice Manager Refactoring
-- **Provider-aware switch logic** - Detects Piper model names and bypasses ElevenLabs validation
-- **Pattern matching** - Uses `*"_"*"-"*` pattern to identify Piper voice model names
-- **Cleaner output** - Removed voice ID display for Piper voices since they don't use IDs
-
-#### Personality File Structure
-- **Clearer naming** - Renamed `voice:` to `elevenlabs_voice:` in all personality frontmatter
-- **Dual provider support** - Every personality now has both ElevenLabs and Piper voice assignments
-- **Consistency** - Standardized field naming across all 19 personality files
-
-### 🎯 User Impact
-
-**Before:** Setting a personality like `/agent-vibes:personality sarcastic` while using Piper TTS would try to use an ElevenLabs voice name that doesn't exist in Piper, resulting in no audio playback for acknowledgments/completions.
-
-**After:** Personality switching seamlessly works with both providers:
-- Using Piper? Gets `en_US-amy-medium` for sarcastic personality
-- Using ElevenLabs? Gets "Jessica Anne Bogart" voice
-- Always hear proper TTS acknowledgments and completions!
-
-### 📊 Files Changed
-- Modified: 3 hook scripts (personality-manager.sh, voice-manager.sh, play-tts-piper.sh)
-- Modified: 19 personality files (all now have dual voice mappings)
-- Modified: 1 command file (whoami.md)
-- Added: 1 new helper script (check-output-style.sh)
-
-**Total Changes:** 247 insertions, 69 deletions across 25 files
-
-## 📦 v2.0.7 - Bug Fixes & UX Improvements (2025-01-07)
-
-### 🤖 AI Summary
-
-This patch release fixes critical issues with the voice preview command and significantly improves the installer UX. The `/agent-vibes:preview` command now correctly handles provider-specific voices and provides helpful guidance when users try to preview voices from the wrong provider. The installer adds interactive provider selection with automatic API key setup and shell configuration, making first-time setup much smoother.
-
-### 🐛 Bug Fixes
-
-#### Voice Preview Command Fixed
-- **Fixed provider-aware voice previewing** - The `/agent-vibes:preview` command now correctly routes through the provider system instead of directly calling ElevenLabs-specific code
-- **Intelligent voice detection** - Detects when you try to preview an ElevenLabs voice (like "Antoni") while using Piper and provides helpful guidance with alternatives
-- **Support for specific voice previews** - Can now preview individual Piper voices by model name (e.g., `/agent-vibes:preview en_US-lessac-medium`)
-- **Fixed language-manager error** - Resolved issue where sourcing `language-manager.sh` would trigger unwanted command handler execution showing "AgentVibes Language Manager" usage text
-- **Fixed function name mismatch** - Corrected `get_current_language` to `get_language_code` in play-tts-piper.sh
-
-#### Provider Routing Improvements
-- **Simplified play-tts.sh router** - Streamlined routing logic for cleaner provider delegation
-- **Fixed provider routing** - Ensures TTS requests always route to the active provider correctly
-- **Better error handling** - Clear, helpful messages when voice/provider mismatch occurs
-
-### ✨ Installer UX Enhancements
-
-#### Interactive Provider Selection
-- **Provider choice prompt** - Installer now asks which TTS provider you want (Piper or ElevenLabs) with clear descriptions
-- **Automatic API key setup** - Detects your shell (bash/zsh) and offers to add ELEVENLABS_API_KEY to shell config file
-- **Shell detection** - Intelligently detects whether you're using bash or zsh and configures the correct file
-- **Multiple setup paths** - Choose between automatic shell config, manual setup, or skip API key configuration
-- **Piper voices path configuration** - Added prompt for custom Piper voice storage location
-
-#### Clearer Installation Messaging
-- **Better location explanation** - Clear explanation of why AgentVibes installs in `.claude/` directory (Claude Code auto-discovery)
-- **Removed confusing prompts** - Simplified installation directory selection to avoid confusion
-- **Better confirmation flow** - Two-step confirmation: location first, then provider/installation
-- **Installation summary** - Shows exactly what will be installed before proceeding
-
-### 🔧 Update Command Improvements
-
-- **Fixed version display** - Update command now correctly shows v2.0.x instead of v1.1.3
-- **Synced with install command** - Both install and update commands now show identical release notes and formatting
-- **Directory filtering** - Properly filters out directories when counting hooks and personalities
-- **Consistent formatting** - Matches install command's beautiful display style
-
-### 🛠️ Code Quality
-
-- **Fixed undefined variable** - Replaced `srcPersonalityFiles` with correct variable name
-- **Proper scope management** - Moved `piperVoicesPath` declaration to correct scope to avoid undefined errors
-- **Command handler isolation** - Wrapped language-manager.sh case statement to only run when executed directly, not when sourced
-
----
-
-### 📊 Changes Summary
-
-**Files Modified:** 8 files
-- `.claude/commands/agent-vibes/preview.md` - Provider-aware routing
-- `.claude/hooks/language-manager.sh` - Command handler isolation fix
-- `.claude/hooks/play-tts-piper.sh` - Function name correction
-- `.claude/hooks/play-tts.sh` - Simplified router
-- `.claude/hooks/provider-commands.sh` - Enhanced Piper preview support
-- `src/installer.js` - Interactive setup & UX improvements
-- `.claude/commands/release.md` - Documentation update
-- `.claude/piper-voices-dir.txt` - Storage config
-
-**Lines Changed:**
-- Added: 275 lines
-- Removed: 354 lines
-- Net: -79 lines (cleaner codebase!)
-
----
-
-### 🎯 What's Improved
-
-#### For New Users
-- **Much easier setup** - Interactive prompts guide you through provider selection and API key configuration
-- **Clearer explanations** - Better messaging about where files are installed and why (Claude Code auto-discovery)
-- **Faster onboarding** - Shell detection and automatic config file modification save manual steps
-
-#### For Existing Users
-- **Preview command works correctly** - No more language-manager errors when previewing voices
-- **Provider switching is seamless** - Better error messages when voice/provider mismatch occurs
-- **Update command is accurate** - Shows correct version and release notes instead of old v1.1.3
-
-#### For Developers
-- **Cleaner codebase** - Removed 79 lines of unnecessary code
-- **Better separation of concerns** - Command handlers only run when appropriate
-- **Improved maintainability** - More consistent code patterns across scripts
-
----
-
-### 🔧 Technical Details
-
-#### Provider Preview Architecture
-The preview command now uses a three-tier detection system:
-
-1. **ElevenLabs Provider**: Routes to `voice-manager.sh preview` for ElevenLabs voice listing
-2. **Piper Provider with voice arg**:
-   - Detects Piper voice format (`en_US-*-medium`)
-   - Detects ElevenLabs voice names (shows helpful error with alternatives)
-   - Validates voice model exists before previewing
-3. **Piper Provider without args**: Shows first 3 sample voices (Lessac, Amy, Joe)
-
-#### Language Manager Fix
-The `language-manager.sh` script now checks if it's being executed directly vs sourced:
-
-```bash
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    # Only run command handler when executed directly
-    case "${1:-}" in
-        set|get|code|check-voice|best-voice|list)
-            # Handle commands
-        ;;
-    esac
-fi
-```
-
-This prevents the case statement from executing when the script is sourced by other scripts like `play-tts-piper.sh`.
-
-#### Installer Flow
-```
-1. Show installation details and location
-2. Provider selection (Piper/ElevenLabs)
-   ├─ If ElevenLabs: Check for API key
-   │  ├─ Detect shell (bash/zsh)
-   │  ├─ Offer to add to shell config
-   │  ├─ Manual setup option
-   │  └─ Skip option
-   └─ If Piper: Ask for voice storage path
-3. Explain .claude/ installation location with reasoning
-4. Confirm installation location
-5. Show installation summary
-6. Final confirmation
-7. Install all files
-8. Show success summary with next steps
-```
-
----
-
-### 💡 Usage Examples
-
-#### Preview Commands
-```bash
-# Preview with Piper (no args = first 3 voices)
-/agent-vibes:preview
-
-# Preview specific Piper voice
-/agent-vibes:preview en_US-lessac-medium
-
-# Try to preview ElevenLabs voice while using Piper
-/agent-vibes:preview Antoni
-# ❌ 'Antoni' appears to be an ElevenLabs voice
-# You're currently using Piper TTS (free provider).
-# Options:
-#   1. Run /agent-vibes:list to see available Piper voices
-#   2. Switch to ElevenLabs: /agent-vibes:provider switch elevenlabs
-```
-
-#### Installer Provider Selection
-```bash
-npx agentvibes install
-
-# 🎭 Choose Your TTS Provider:
-# ? Which TTS provider would you like to use?
-#   🆓 Piper TTS (Free, Offline) - 50+ neural voices, no API key needed
-#   🎤 ElevenLabs (Premium) - 150+ AI voices, requires API key
-```
-
----
-
-### 📦 Upgrade Notes
-
-**From v2.0.6:**
-```bash
-npm update -g agentvibes
-# or
-/agent-vibes:update
-```
-
-**No breaking changes** - This is a pure bug fix and UX improvement release. All existing configurations, voices, personalities, and settings are preserved.
-
----
-
-### 🙏 Credits
-
-- **Voice Preview Fix**: Resolved GitHub issue reported by users experiencing language-manager errors
-- **Provider Architecture**: Multi-provider system improvements continue to mature
-- **Installer UX**: Community feedback on first-time setup experience led to these improvements
-
----
-
-### 📚 Resources
-
-- **Documentation**: https://agentvibes.org
-- **GitHub**: https://github.com/paulpreibisch/AgentVibes
-- **Issues**: https://github.com/paulpreibisch/AgentVibes/issues
-
----
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-
----
-
-## 📦 v1.1.3 - Symlink Support & Audio Fixes (2025-10-04)
-
-### 🤖 AI Summary
-
-This patch release fixes critical issues with symlinked `.claude/hooks` directories and adds WSL audio static prevention. Users who share hooks across multiple projects via symlinks (common in team environments) will now have proper project-local settings isolation. Additionally, WSL users experiencing audio static at the beginning of TTS playback now get automatic silence padding to eliminate the issue.
-
-### 🐛 Bug Fixes
-
-#### Symlinked Hooks Directory Support
-- **Fixed**: Settings interference when `.claude/hooks` is a symlink
-- **Root Cause**: Scripts used physical path resolution which broke project isolation
-- **Impact**: Multiple projects sharing symlinked hooks now maintain separate voices/personalities
-- **Solution**: Use logical paths (`pwd` without `-P`) to preserve symlink structure
-- **Benefit**: Works seamlessly for both normal and symlinked installations
-
-**What Was Broken:**
-```bash
-# Before: Projects sharing symlinked hooks interfered with each other
-Project A: .claude/hooks -> /shared/hooks (uses Project B's voice!)
-Project B: .claude/hooks -> /shared/hooks (correct)
-
-# After: Each project maintains independent settings
-Project A: Uses .claude/tts-voice.txt (correct!)
-Project B: Uses .claude/tts-voice.txt (correct!)
-```
-
-#### WSL Audio Static Prevention
-- **Fixed**: Static/pop at beginning of TTS audio in WSL environments
-- **Root Cause**: Audio driver initialization delay
-- **Solution**: Add 200ms silence padding before audio playback using ffmpeg
-- **Benefit**: Clean, static-free audio playback
-
-### 🔧 Technical Changes
-
-**Modified Files:**
-- `.claude/hooks/voice-manager.sh` - Fixed path resolution for symlinks
-- `.claude/hooks/personality-manager.sh` - Fixed path resolution for symlinks
-- `.claude/hooks/sentiment-manager.sh` - Fixed path resolution for symlinks
-- `.claude/hooks/language-manager.sh` - Fixed path resolution for symlinks
-- `.claude/hooks/play-tts.sh` - Added ffmpeg silence padding
-
-**Path Resolution Changes:**
-```bash
-# Before (broken with symlinks):
-PROJECT_ROOT="$SCRIPT_DIR/../.."
-VOICE_FILE="$PROJECT_ROOT/.claude/tts-voice.txt"
-
-# After (works with and without symlinks):
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="$(dirname "$SCRIPT_PATH")"
-VOICE_FILE="$CLAUDE_DIR/tts-voice.txt"
-```
-
-**Audio Padding Implementation:**
-```bash
-# Add 200ms silence at start to prevent static
-if command -v ffmpeg &> /dev/null; then
-  ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 \
-    -i "${TEMP_FILE}" -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
-    -map "[out]" -y "${PADDED_FILE}"
-fi
-```
-
-### 💡 Use Cases Now Supported
-
-**Team Environments with Shared Hooks:**
-```bash
-# Share hooks across team projects
-team-9/SageDev/.claude/hooks -> /shared/team-hooks
-team-10/production/.claude/hooks -> /shared/team-hooks
-
-# Each project maintains independent settings
-team-9/SageDev/.claude/tts-voice.txt = "Sarcastic Voice"
-team-10/production/.claude/tts-voice.txt = "Professional Voice"
-```
-
-**WSL Audio Users:**
-- No more static/pop sounds at audio start
-- Smooth, professional TTS playback
-- Works automatically if ffmpeg is installed
-
-### 📊 Release Stats
-
-- **5 files changed**: All manager scripts updated for symlink support
-- **1 audio enhancement**: Silence padding for WSL
-- **2 critical bugs fixed**
-- **0 breaking changes**
-- **100% backward compatible**: Normal installations unaffected
-
-### 🔄 Migration Notes
-
-**For Existing Users:**
-- If you don't use symlinks: No action needed, everything works as before
-- If you use symlinked hooks: Update via `/agent-vibes:update` to fix settings isolation
-- WSL users: Install ffmpeg for static-free audio (`sudo apt-get install ffmpeg`)
-
-**For New Users:**
-- Symlinks work out of the box
-- No special configuration needed
-
----
-
-## 📝 Recent Commits
-
-```
-2044dc5 chore: Bump version to 1.1.2
-8460977 fix: Installer now uses correct directory when run via npx
-2ce7910 docs: Update version to v1.1.1 [skip ci]
-5dc3ed1 docs: Update README to version v1.1.1 [skip ci]
-2a46ab9 feat: Release v1.1.1 - Enhanced update display
-```
-
----
-
-## 📦 v1.1.2 - NPX Installation Fix (2025-10-04)
-
-### 🤖 AI Summary
-
-This patch release fixes a critical bug where `npx agentvibes install` incorrectly installed files to the npm cache directory instead of the user's actual project directory. The installer now properly detects the original working directory when run via npx by using the `INIT_CWD` environment variable, ensuring files are installed in the correct location every time.
-
-### 🐛 Bug Fixes
-
-#### NPX Installation Directory Bug
-- **Fixed**: Installer using wrong directory when run via `npx agentvibes install`
-- **Root Cause**: `process.cwd()` returns npm cache location during npx execution
-- **Impact**: Files were installed to `/home/user/.npm/_npx/...` instead of project directory
-- **Solution**: Use `process.env.INIT_CWD` (set by npm/npx) to get actual user's working directory
-- **Benefit**: Installations now work correctly in all scenarios
-
-**What Was Broken:**
-```bash
-$ cd /my/project
-$ npx agentvibes install
-
-# Before: Installed to /home/user/.npm/_npx/.../node_modules/agentvibes/.claude/
-# After:  Installs to /my/project/.claude/ ✓
-```
-
-### 🔧 Technical Changes
-
-**Modified Files:**
-- `src/installer.js` - Fixed directory detection in all 3 command handlers
-
-**Implementation:**
+**Before v3.5.7:**
 ```javascript
-// Before (broken):
-const currentDir = process.cwd();
-
-// After (fixed):
-const currentDir = process.env.INIT_CWD || process.cwd();
+// bin/agent-vibes (local execution path)
+import('../src/installer.js');  // ❌ No args, doesn't await
 ```
 
-**Commands Fixed:**
-- `install` command (line 70)
-- `update` command (line 428)
-- `status` command (line 855)
-
-### 💡 Why INIT_CWD?
-
-When you run `npx agentvibes install`:
-1. npm downloads package to cache: `/home/user/.npm/_npx/...`
-2. npm sets `INIT_CWD` to your original directory: `/my/project`
-3. npm runs the script from cache directory
-4. `process.cwd()` returns cache directory (wrong!)
-5. `process.env.INIT_CWD` returns your project directory (correct!)
-
-### 📊 Release Stats
-
-- **1 file changed**: src/installer.js
-- **3 functions fixed**: install, update, status
-- **6 lines added**: Comments explaining the fix
-- **1 critical bug fixed**
-- **0 breaking changes**
-
----
-
-## 📝 Recent Commits
-
-```
-2ce7910 docs: Update version to v1.1.1 [skip ci]
-5dc3ed1 docs: Update README to version v1.1.1 [skip ci]
-2a46ab9 feat: Release v1.1.1 - Enhanced update display
-c07d3fe feat: Enhance update display with both release notes and commit messages
-047accd docs: Update version to v1.1.0 [skip ci]
-```
-
----
-
-## 📦 v1.1.1 - Enhanced Update Display (2025-01-04)
-
-### 🤖 AI Summary
-
-This patch release improves the update experience by displaying both the AI-generated release summary AND the 5 latest commit messages. Users now see the high-level "what changed" from release notes plus the detailed commit history with hashes and titles. This provides better transparency during updates and helps users understand exactly what's being installed.
-
-### ✨ Improvements
-
-**Dual Information Display:**
-- **📰 Latest Release** - Shows AI summary from RELEASE_NOTES.md with version
-- **📝 Latest Commit Messages** - Shows 5 most recent commits with hashes and titles
-- Applies to both pre-update confirmation screen and post-update summary
-- Text wrapping at 80 characters for better readability
-
-**What You See Now:**
-```
-📰 Latest Release (v1.1.0):
-
-   This minor release introduces self-update capabilities to AgentVibes!
-   Users can now update directly from Claude Code with...
-
-📝 Latest Commit Messages:
-
-   047accd docs: Update version to v1.1.0 [skip ci]
-   f972e54 docs: Update version to v1.1.0 [skip ci]
-   fa6dcf6 chore: Bump version to 1.1.0
-   4a83777 feat: Add self-update system with commands
-   75b1cf8 docs: Update version to v1.0.23 [skip ci]
-```
-
-### 🔧 Technical Changes
-
-**Modified Files:**
-- `src/installer.js` - Enhanced both pre-update and post-update display sections
-
-**Implementation:**
-- Extracts AI summary from RELEASE_NOTES.md first (priority)
-- Falls back to git log for commit messages
-- If git unavailable, reads commits from RELEASE_NOTES.md
-- Word-wraps long summaries for terminal display
-
-### 💡 Benefits
-
-1. **Context**: See the big picture (release summary) AND the details (commits)
-2. **Transparency**: Know exactly what commits you're getting
-3. **Traceability**: Commit hashes let you review changes on GitHub
-4. **Better UX**: No more choosing between commits OR summary - get both!
-
----
-
-## 📝 Recent Commits
-
-```
-c07d3fe feat: Enhance update display with both release notes and commit messages
-047accd docs: Update version to v1.1.0 [skip ci]
-f972e54 docs: Update version to v1.1.0 [skip ci]
-fa6dcf6 chore: Bump version to 1.1.0
-4a83777 feat: Add self-update system with commands
-```
-
----
-
-## 📦 v1.1.0 - Self-Update & Version Management (2025-01-04)
-
-### 🤖 AI Summary
-
-This minor release introduces self-update capabilities to AgentVibes! Users can now update directly from Claude Code with `/agent-vibes:update` and check their version with `/agent-vibes:version`. The update process includes a beautiful confirmation screen with ASCII art, shows recent changes and release notes, and preserves all custom settings. This eliminates the need for manual npm/git commands and provides full transparency into what's changing during updates.
-
-### ✨ New Features
-
-#### Self-Update System
-- **`/agent-vibes:version`** - Check installed version instantly
-- **`/agent-vibes:update`** - Update to latest version with one command
-  - Beautiful confirmation screen with two-tone ASCII art
-  - Shows recent changes and release notes (from git or RELEASE_NOTES.md)
-  - Preserves all custom settings, voices, and configurations
-  - Works from npx, npm global, or source installations
-  - Optional `--yes` flag for non-interactive updates
-
-#### Quick Update Workflow
-```bash
-/agent-vibes:version           # Check current version
-/agent-vibes:update            # Update with confirmation
-/agent-vibes:update --yes      # Update without prompts
-```
-
-### 📚 Documentation Improvements
-
-- **Enhanced README**: Added "System Commands" section with version and update commands
-- **Better Update Instructions**: Reorganized update section with clearer methods
-- **Version Checking Guide**: Documented how to check and verify versions
-- **Release Notes Display**: Updates now show what's changed in the latest version
-- **Quick Update Section**: Highlighted fastest update method at top of section
-
-### 🔧 Technical Changes
-
-**New Command Files:**
-- `.claude/commands/agent-vibes/update.md` - Update command definition with examples
-- `.claude/commands/agent-vibes/version.md` - Version command definition
-
-**Documentation Updates:**
-- Updated README.md with system commands table
-- Improved update documentation flow
-- Added "Quick Update (From Claude Code)" section
-- Enhanced "What Gets Updated" list with release notes item
-
-**Implementation Details:**
-- Update command wraps existing `npx agentvibes update` installer function
-- Version command wraps `npx agentvibes --version` for consistent output
-- Both commands work seamlessly from within Claude Code sessions
-
-### 🎯 Why This Matters
-
-**Before v1.1.0:**
-Users had to exit Claude Code and manually run:
-```bash
-npm update -g agentvibes
-# or
-cd ~/AgentVibes && git pull && npm install
-```
-
-**After v1.1.0:**
-Users can update directly from Claude Code:
-```bash
-/agent-vibes:update
-```
-
-The update process now includes:
-- ✅ Visual confirmation with package version
-- ✅ Recent changes from git log or RELEASE_NOTES.md
-- ✅ File-by-file update progress with counts
-- ✅ Summary of what was updated
-- ✅ Preservation of all custom configurations
-
-### 📝 What Gets Updated
-
-When you run `/agent-vibes:update`, these components are refreshed:
-- ✅ All slash commands (11+ commands)
-- ✅ TTS scripts and hooks (6+ scripts)
-- ✅ Personality templates (new ones added, existing updated)
-- ✅ Output styles (agent-vibes.md)
-- ✅ BMAD plugin configurations
-- ✅ Voice configuration mappings
-
-**Safe Updates**: Your voice settings, custom personalities, sentiment preferences, language settings, and all user configurations are always preserved!
-
-### 📊 Release Stats
-
-- **3 files changed**: 2 new command files, 1 README update
-- **2 new commands**: `/agent-vibes:version`, `/agent-vibes:update`
-- **1 documentation section** enhanced: "🔄 Updating"
-- **0 breaking changes**
-
-### 💡 User Experience Improvements
-
-1. **Convenience**: Update without leaving Claude Code
-2. **Transparency**: See what's changing before confirming
-3. **Safety**: Settings and customizations always preserved
-4. **Visibility**: Version command helps troubleshooting
-5. **Consistency**: Same update experience across all install methods
-
----
-
-## 📝 Recent Commits
-
-```
-75b1cf8 docs: Update version to v1.0.23 [skip ci]
-```
-
----
-
-# Release v1.0.20
-
-## 🤖 AI Summary
-
-This patch release improves the user experience when installing or updating via npx by adding a fallback to display release notes from RELEASE_NOTES.md when git is unavailable. Users running `npx agentvibes update` will now see the latest release summary instead of git errors, making it clear what's new in each version.
-
-## 🐛 Bug Fixes
-
-### Installer Release Notes Fallback
-- **Fixed**: Update/install commands showing "fatal: not a git repository" error
-- **Root Cause**: npx cache doesn't include .git directory
-- **Impact**: Users now see release notes even when git is unavailable
-- **Solution**: Added fallback to read RELEASE_NOTES.md and extract latest release summary
-- **Benefit**: Better transparency about what's being installed/updated
-
-## 📝 Technical Changes
-
-### Modified Files
-
-**src/installer.js** (+56 lines)
-- Added RELEASE_NOTES.md fallback for both install and update commands
-- Extracts latest release header and AI summary
-- Displays formatted release notes when git log fails
-- Graceful degradation when neither git nor release notes available
-
-### Key Implementation Details
-
-**Release Notes Fallback:**
+**After v3.5.7:**
 ```javascript
-try {
-  // Try git log first
-  const gitLog = execSync('git log --oneline --no-decorate -5', {...});
-  // ... show git commits
-} catch (error) {
-  // Fallback to RELEASE_NOTES.md
-  const releaseNotes = await fs.readFile('RELEASE_NOTES.md', 'utf8');
-  // Extract and display latest release summary
-  console.log(chalk.cyan(`📰 ${releaseHeader}`));
-  console.log(chalk.white(`   ${summaryText}`));
-}
+// bin/agent-vibes (all execution paths)
+execFileSync('node', [installerPath, ...arguments_], {
+  stdio: 'inherit',
+  cwd: isNpxExecution ? path.dirname(__dirname) : process.cwd(),
+});  // ✅ Passes args, proper I/O
 ```
-
-## 🔄 Migration Notes
-
-### For Users
-
-**No action required** - This is an installer improvement:
-- Next time you run `npx agentvibes update` you'll see release notes
-- Works even when installing from npm cache without git
-- Shows latest release summary automatically
-
-### For Package Maintainers
-
-**Benefits:**
-- Users always see what's new, even via npx
-- RELEASE_NOTES.md now serves as fallback documentation
-- Better user experience for npm package installations
-
-## 📝 Recent Commits
-
-```
-456abb0 docs: Update version to v1.0.21 [skip ci]
-3dfdcb5 fix: Include RELEASE_NOTES.md in npm package for installer fallback
-96f8a9b docs: Update README and RELEASE_NOTES to v1.0.20 [skip ci]
-5e2e3cc chore: Bump version to 1.0.20 for npm publish
-1636b14 feat: Show release notes from RELEASE_NOTES.md when git is unavailable
-```
-
-## 📊 Release Stats
-
-- **5 commits** since v1.0.19
-- **3 files changed**: .npmignore, README.md, RELEASE_NOTES.md
-- **10 insertions**, **4 deletions**
-- **1 bug fix**: RELEASE_NOTES.md now included in npm package
-- **0 breaking changes**
-
-## 🎯 User Experience Improvements
-
-1. **Transparency**: See what's new even when installing via npx
-2. **No Errors**: Graceful fallback instead of git errors
-3. **Consistent**: Same release info whether from git or npm
-4. **Informative**: Latest release summary shown in all scenarios
-
-## 💡 Example Output
-
-When running `npx agentvibes update`:
-
-**Before (v1.0.19):**
-```
-✨ Update complete!
-fatal: not a git repository (or any of the parent directories): .git
-💡 Changes will take effect immediately!
-```
-
-**After (v1.0.20):**
-```
-✨ Update complete!
-
-📰 Release v1.0.19
-
-   This release brings powerful multilingual support to AgentVibes! Users can now make Claude speak in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and many more...
-
-💡 Changes will take effect immediately!
-```
-
-## 🙏 Credits
-
-Thanks to users who reported the confusing git error messages when updating via npx!
 
 ---
 
-# Release v1.0.19
+## 🔧 v3.5.6 - Bug Fix: Bash Hook Parameter Handling
 
-## 🤖 AI Summary
+**Release Date:** February 11, 2026
 
-This release brings powerful multilingual support to AgentVibes! Users can now make Claude speak in 30+ languages including Spanish, French, German, Italian, Portuguese, Chinese, Japanese, and many more. The system automatically selects optimal multilingual voices and seamlessly integrates with existing personalities and the BMAD plugin. Additionally, this release includes critical bug fixes for slash command discovery and comprehensive documentation updates.
+Fixes critical regression in v3.5.5 where bash hooks failed with unbound variable errors when called with optional parameters under strict mode. Affects `play-tts.sh` and `provider-manager.sh`.
+
+---
+
+## 📦 v3.5.5 - Native Windows Support: Soprano, Piper & SAPI Providers
+
+**Release Date:** February 12, 2026
+
+### 🎯 Why v3.5.5?
+
+v3.5.5 brings **native Windows support** to AgentVibes with a full-featured PowerShell installer and three TTS providers. Windows users no longer need WSL - AgentVibes runs natively with Soprano (neural), Piper (offline neural), or Windows SAPI (zero-setup) voices. The installer also adds **background music selection** (16 genre tracks), **reverb/audio effects** (via ffmpeg aecho), and **verbosity control** for the TTS experience.
+
+### 🚀 Key Highlights
+
+#### 🖥️ Native Windows TTS (NEW!)
+- **3 providers**: Soprano (ultra-fast neural), Piper (offline neural), Windows SAPI (built-in)
+- **Beautiful PowerShell installer** with figlet banner and interactive setup
+- **8 hook scripts** for complete TTS functionality on Windows
+- **MCP server** auto-resolves `.sh` to `.ps1` on Windows
+- **46 Windows-specific unit tests** with full coverage
+
+#### 🎵 Background Music Selection
+- **16 genre tracks**: Flamenco, Bachata, Bossa Nova, City Pop, Chillwave, and more
+- **Interactive picker** in the installer with descriptions
+- **ffmpeg mixing**: 2s intro, voice over music, 2s fade-out outro
+
+#### 🎛️ Reverb / Audio Effects
+- **5 reverb levels**: Off, Light, Medium, Heavy, Cathedral
+- **ffmpeg aecho filter** (no SOX dependency on Windows)
+- Applied before background music mixing for clean layering
+
+#### 🔊 Verbosity Control
+- **3 levels**: High (full reasoning), Medium (key updates), Low (essential only)
+- Integrates with session-start-tts.ps1 protocol instructions
+
+### 🤖 AI Summary
+
+AgentVibes v3.5.5 delivers native Windows support with a polished PowerShell installer offering three TTS providers (Soprano neural, Piper offline, Windows SAPI), background music selection from 16 genre tracks, reverb effects via ffmpeg aecho filter, and verbosity control. The release includes 8 Windows hook scripts, MCP server platform detection for automatic .sh-to-.ps1 resolution, and 46 new unit tests. Security hardening adds path traversal prevention with regex allowlisting and path containment checks, reverb config allowlist validation, and strict mode compliance across all scripts. Cross-platform test fixes ensure the full 93-test suite passes on both Windows and Unix.
+
+---
 
 ## ✨ New Features
 
-### 🌍 Multilingual Language Support
+### Native Windows TTS
+- Full PowerShell installer (`setup-windows.ps1`) with figlet banner and interactive UX
+- Soprano provider (`play-tts-soprano.ps1`) with Gradio WebUI integration
+- Piper provider (`play-tts-windows-piper.ps1`) with auto-download of voices from HuggingFace
+- Windows SAPI provider (`play-tts-windows-sapi.ps1`) with zero-setup built-in voices
+- TTS router (`play-tts.ps1`) with mute support, background music mixing, and reverb
+- Provider manager, voice manager, audio cache utils, and session-start hook scripts
+- MCP server `.sh` to `.ps1` auto-resolution on Windows
 
-**Speak in 30+ Languages**
-- Added `/agent-vibes:set-language <language>` command
-- Support for Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, and 20+ more languages
-- Automatic multilingual voice selection based on language
-- Works seamlessly with personalities and BMAD plugin
-- Language settings persist across sessions
-
-**Language Manager System**
-- New `language-manager.sh` script handles language switching
-- Intelligent voice recommendations per language:
-  - Spanish → Antoni/Matilda
-  - French → Rachel/Charlotte
-  - German → Domi/Charlotte
-  - Italian → Bella
-  - Portuguese → Matilda
-- Stores language preference in `.claude/tts-language.txt`
-
-**New Multilingual Voices Added**
-- **Antoni** - Optimized for Spanish, general multilingual (30+ languages)
-- **Rachel** - Optimized for French, professional multilingual
-- **Domi** - Optimized for German, strong confident voice
-- **Bella** - Optimized for Italian, soft engaging voice
-- **Charlotte** - European languages specialist
-- **Matilda** - Latin languages specialist
-
-### 📚 Documentation Enhancements
-
-**Updated README**
-- Added comprehensive "Change Language" section with examples
-- New "Language Commands" table in Commands Reference
-- Added "🌍 Multilingual Support" to Table of Contents
-- Documented all 30+ supported languages
-- Included multilingual voice recommendations and usage tips
-
-**New Language Command Documentation**
-- Created `.claude/commands/agent-vibes/set-language.md`
-- Detailed usage examples and language list
-- Explains how language system works
-- Voice recommendations per language
-
-## 🐛 Bug Fixes
-
-### Slash Command Discovery Fix
-- **Fixed**: Commands in `.claude/commands/agent-vibes/` were not appearing in autocomplete
-- **Root Cause**: Missing `commands.json` registration file
-- **Impact**: All `/agent-vibes:*` subcommands are now discoverable
-- **Added**: Proper `commands.json` with all 13 subcommands registered:
-  - list, preview, switch, whoami, sample, replay
-  - personality, sentiment, set-pretext, set-language
-  - add, get
-
-### Installer File Filtering
-- **Fixed**: Project-specific files being included in installer
-- **Impact**: Cleaner installations without unnecessary local files
-- **Changed**: Added filters to exclude `.claude/tts-*.txt` and other session files
-
-## 📝 Technical Changes
-
-### New Files Added
-
-**Language Management System**
-- `.claude/commands/agent-vibes/set-language.md` - Command documentation
-- `.claude/hooks/language-manager.sh` - Language switching logic
-- `.claude/commands/agent-vibes/commands.json` - Command registration
-
-**Voice Configuration**
-- Added 6 multilingual voices to `voices-config.sh`:
-  - Antoni (ErXwobaYiN019PkySvjV)
-  - Rachel (21m00Tcm4TlvDq8ikWAM)
-  - Domi (AZnzlk1XvdvUeBnXmlld)
-  - Bella (EXAVITQu4vr4xnSDxMaL)
-  - Charlotte (XB0fDUnXU5powFXDhCwa)
-  - Matilda (XrExE9yKIg1WjnnlVkGX)
-
-### Modified Files
-
-**Output Style Updates** (`agent-vibes.md`)
-- Enhanced language detection logic
-- Added multilingual voice fallback system
-- Priority order: Language → Sentiment → Personality → Default
-- Improved BMAD integration with language support
-
-**Installer Improvements** (`src/installer.js`)
-- Enhanced file filtering to exclude session-specific files
-- Better validation of ElevenLabs voice IDs
-- Improved installation messaging
-
-### Key Implementation Details
-
-**Language Priority System:**
-```bash
-# Check order:
-1. Language setting (.claude/tts-language.txt)
-2. Sentiment setting (.claude/tts-sentiment.txt)
-3. Personality setting (.claude/tts-personality.txt)
-4. Default voice
-```
-
-**Multilingual Voice Mapping:**
-```bash
-declare -A LANGUAGE_VOICES=(
-    ["spanish"]="Antoni"
-    ["french"]="Rachel"
-    ["german"]="Domi"
-    ["italian"]="Bella"
-    # ... 20+ more languages
-)
-```
-
-**BMAD + Language Integration:**
-- When BMAD agent is active AND language is set:
-  - Tries agent's assigned voice first
-  - Falls back to multilingual voice if agent's voice doesn't support language
-  - Maintains agent's personality style in chosen language
-
-## 🔄 Migration Notes
-
-### For Users
-
-**To Start Using Multilingual Features:**
-```bash
-# Set your preferred language
-/agent-vibes:set-language spanish
-
-# Claude will now speak in Spanish!
-# To go back to English:
-/agent-vibes:set-language english
-```
-
-**Recommended Voices for Languages:**
-- Use `/agent-vibes:set-language list` to see all supported languages
-- System auto-selects best voice for your language
-- Can manually switch voices with `/agent-vibes:switch <voice>`
-
-### For Existing AgentVibes Users
-
-**No Breaking Changes:**
-- Existing voice/personality settings preserved
-- Language defaults to English
-- All previous commands work exactly the same
-- New language feature is opt-in
-
-## 📊 Release Stats
-
-- **7 commits** since v1.0.18
-- **8 files changed**:
-  - 3 new files (set-language.md, language-manager.sh, commands.json)
-  - 5 modified files (README.md, agent-vibes.md, voices-config.sh, installer.js)
-- **467 insertions**, **45 deletions**
-- **2 major features**: Multilingual support, Command registration fix
-- **2 bug fixes**: Slash commands, Installer filtering
-- **0 breaking changes**
-
-## 🎯 User Experience Improvements
-
-1. **Global Language Support**: Speak with Claude in your native language
-2. **Automatic Voice Selection**: System picks best multilingual voice
-3. **Seamless Integration**: Works with all existing features
-4. **Better Discovery**: All commands now show in autocomplete
-5. **Comprehensive Docs**: Complete guide to using languages
-
-## 💡 Usage Examples
-
-### Basic Language Switching
-```bash
-# Switch to Spanish
-/agent-vibes:set-language spanish
-
-# Claude responds in Spanish
-"¡Voy a hacer esa tarea para ti!"
-
-# Switch back to English
-/agent-vibes:set-language english
-```
-
-### Language + Personality
-```bash
-# Set language to French
-/agent-vibes:set-language french
-
-# Use pirate personality
-/agent-vibes:personality pirate
-
-# Get French pirate responses!
-"Arr, je vais conquérir ce code pour toi, moussaillon!"
-```
-
-### Language + BMAD
-```bash
-# Set language to German
-/agent-vibes:set-language german
-
-# Activate BMAD PM agent
-/BMad:agents:pm
-
-# PM speaks in German with professional voice
-"Ich werde diese Anforderungen für Sie analysieren"
-```
-
-## 🌍 Supported Languages
-
-**Complete List (30+ languages):**
-Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Polish, Dutch, Turkish, Russian, Arabic, Hindi, Swedish, Danish, Norwegian, Finnish, Czech, Romanian, Ukrainian, Greek, Bulgarian, Croatian, Slovak, and more!
-
-## 🙏 Credits
-
-Special thanks to the ElevenLabs team for their amazing multilingual voice technology! The new Multilingual v2 model makes it possible to provide natural-sounding TTS in 30+ languages.
+### Installer Enhancements
+- Background music selection with 16 genre tracks and interactive picker
+- Reverb/audio effects selection (Off/Light/Medium/Heavy/Cathedral)
+- Verbosity control (High/Medium/Low) for TTS protocol instructions
+- Updated completion screen showing all 4 settings (provider, background, reverb, verbosity)
 
 ---
 
-# Release v1.0.18
+## 🐛 Bug Fixes
 
-[Previous release notes preserved below...]
+### Security Fixes
+- Fix path traversal in background music config reader (regex allowlist + path containment)
+- Add allowlist validation for reverb-level.txt config (prevent invalid values)
+- Add `set -euo pipefail` strict mode to `play-tts.sh` for Sonar compliance
+
+### Cross-Platform Fixes
+- Fix self-copy error when setup-windows.ps1 runs from project root
+- Fix test executable permission checks on Windows (skip Unix mode bits)
+- Fix test path separator comparison in uninstall test (use `path.join` not hardcoded `/`)
+
+---
+
+## 🏗️ Improvements
+
+### Code Quality
+- Reverb config uses switch-as-allowlist pattern - file content never flows into commands
+- All SoundPlayer instances wrapped in try/finally for resource disposal
+- Environment variable cleanup (`AGENTVIBES_NO_PLAY`) on all exit paths
+- Input validation with regex + range checks for all installer prompts
+
+### Testing
+- 46 new Windows-specific unit tests (hook scripts, providers, security, encoding)
+- 3 cross-platform test fixes for Windows compatibility
+- Full suite: 93 Node tests passing on Windows
+
+---
+
+## 📊 Statistics
+
+- **7 commits** since v3.4.1
+- **3,769 lines added**, 211 removed across 24 files
+- **9 new PowerShell scripts** for Windows TTS
+- **93 tests passing** (46 Windows + 47 cross-platform)
+- **24/24 Sonar quality gates** passing
+- **Security score**: All path traversal and injection vectors reviewed
+
+---
+
+## 🔧 Technical Details
+
+### Files Added
+- `.claude/hooks-windows/play-tts.ps1`: TTS router with reverb and background music
+- `.claude/hooks-windows/play-tts-soprano.ps1`: Soprano neural TTS provider
+- `.claude/hooks-windows/play-tts-windows-piper.ps1`: Piper offline TTS provider
+- `.claude/hooks-windows/play-tts-windows-sapi.ps1`: Windows SAPI built-in voices
+- `.claude/hooks-windows/provider-manager.ps1`: Provider switching
+- `.claude/hooks-windows/voice-manager-windows.ps1`: Voice browsing and selection
+- `.claude/hooks-windows/audio-cache-utils.ps1`: Cache management
+- `.claude/hooks-windows/session-start-tts.ps1`: Auto-activates TTS on Claude start
+- `setup-windows.ps1`: Full Windows installer with 4 interactive sections
+- `test/unit/windows-tts.test.js`: 46 Windows-specific unit tests
+
+### Breaking Changes
+None - all changes are backward compatible. Existing Unix/macOS installations are unaffected.
+
+---
+
+## 🎓 Migration Notes
+
+### For New Windows Users
+1. Run `npx agentvibes install` (Node.js) or `.\setup-windows.ps1` (PowerShell)
+2. Follow the interactive setup
+3. Choose provider (Soprano, Piper, or SAPI)
+4. Select background music, reverb, and verbosity
+5. TTS works automatically in Claude Code sessions
+
+### For Existing Unix/macOS Users
+- No changes required - your setup continues working
+- All Unix bash hooks remain untouched
+- Only `play-tts.sh` gained `set -euo pipefail` (strict mode)
+
+---
+
+## 🙏 Acknowledgments
+
+### Project Lead
+- **[@paulpreibisch](https://github.com/paulpreibisch)** (Paul Preibisch) — Creator and maintainer of AgentVibes
+
+### Community Contributors
+- **[@nathanchase](https://github.com/nathanchase)** — For contributing the Soprano TTS provider in v3.4.0, whose ultra-fast neural engine is now one of the three Windows-native providers
+- **[@alexeyv](https://github.com/alexeyv)** — For suggesting native Windows support and recommending Windows SAPI as a zero-dependency provider
+- **[@bmadcode](https://github.com/bmadcode)** (Brian Madison) — Creator of the [BMAD Method](https://github.com/bmadcode/BMAD-METHOD), used daily for planning and building AgentVibes features
+
+### Quality Assurance
+- **Adversarial Security Review**: Path traversal, injection, and resource disposal all validated
+- **Testing**: 93/93 tests passing (100% suite coverage)
+- **Quality Gates**: 24/24 Sonar requirements validated
+- **Co-Authored-By**: Claude Opus 4.6
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.4.1...v3.5.5
+
+---
+
+## 📦 v3.4.0 - Soprano TTS, Security Hardening & Environment Intelligence
+
+**Release Date:** February 10, 2026
+
+### 🎯 Why v3.4.0?
+
+v3.4.0 introduces **Soprano TTS** - an ultra-fast neural TTS provider with GPU acceleration, comprehensive **security hardening** across the codebase, and **intelligent environment detection** that recognizes PulseAudio tunnels for remote audio scenarios.
+
+### 🚀 Key Highlights
+
+#### ⚡ Soprano TTS Provider (NEW!)
+- **80M parameter neural model** with premium female English voice
+- **20x CPU speed** (vs Piper), **2000x GPU speed** with CUDA
+- **3 synthesis modes**: WebUI (Gradio), API (OpenAI-compatible), CLI (fallback)
+- **Auto-detection**: Checks for running Gradio server, falls back gracefully
+- **<1GB memory footprint** - perfect for low-RAM systems
+- **Provider-aware voice management**: Auto-selects single voice, shows model specs
+- **Thanks to [@nathanchase](https://github.com/nathanchase)** for this contribution! ([see acknowledgments](#-acknowledgments))
+
+#### 🛡️ Security Hardening (9.5/10 Score)
+- **Timeouts on system commands**: Prevents installer hangs (nvidia-smi, sysctl, meminfo)
+- **Bounds checking**: Validates array access before parsing system output
+- **NaN validation**: Prevents crashes from malformed memory/GPU detection
+- **Case-insensitive checks**: PulseAudio tunnel detection handles TCP: and tcp:
+- **Code duplication eliminated**: Extracted PulseAudio helper function (DRY)
+
+#### 🌐 Environment Intelligence
+- **PulseAudio tunnel detection**: Recognizes `PULSE_SERVER=tcp:*` as working audio
+- **Context-aware messaging**:
+  - "🌐 PulseAudio Tunnel Detected!" for SSH + tunnel setups
+  - "🔊 Audio Output Detected!" for local speakers
+  - Distinguishes local/tunnel/hybrid configurations
+- **Smart environment classification**:
+  - DESKTOP: Local audio OR active PulseAudio tunnel
+  - VOICELESS: No audio AND no tunnel
+  - PHONE: Termux/Android devices
+
+#### 🎤 Installer Enhancements
+- **Provider-aware voice pages**: Soprano shows model specs, Piper shows 50+ voices
+- **Auto-selection logic**: Soprano (1 voice) auto-selects, no manual choice needed
+- **GPU-based recommendations**: "Your GPU will run Soprano 2000x faster!"
+- **RAM-based suggestions**: Low memory systems see "Soprano uses <1GB" message
+- **Better RAM display**: Shows "512MB" instead of "0GB" for sub-1GB systems
+
+### 🤖 AI Summary
+
+AgentVibes v3.4.0 brings Soprano TTS - an 80M parameter neural provider offering 20x CPU and 2000x GPU acceleration with sub-1GB memory footprint - plus comprehensive security hardening (timeouts, bounds checking, NaN validation) and intelligent environment detection that recognizes PulseAudio tunnels as working audio for remote scenarios. The enhanced installer provides context-aware messaging distinguishing local speakers from SSH tunnels, GPU-based provider recommendations (Soprano for CUDA users, macOS Say for Apple, Piper for versatility), and provider-specific voice pages that auto-select Soprano's single voice while showcasing model specifications. This release achieves a 9.5/10 security score through systematic defensive programming, making AgentVibes production-ready for enterprise deployments while expanding TTS provider options for diverse hardware configurations.
+
+---
+
+## ✨ New Features
+
+### Soprano TTS Provider
+- Add Soprano TTS provider script with 3 synthesis modes (WebUI, API, CLI) (#95)
+- Integrate Soprano into TTS router and provider manager
+- Add soprano-gradio-synth.py helper for WebUI/SSE protocol
+- Provider-aware voice selection page with model specifications
+- Auto-select single Soprano voice with performance details
+
+### Installer Intelligence
+- Add `detectSystemCapabilities()` for GPU/RAM detection
+- Add `hasPulseAudioTunnel()` helper function
+- Context-aware audio detection messaging (tunnel vs local)
+- GPU-based provider ordering (Soprano first for CUDA users)
+- RAM-based recommendations (<4GB systems see Soprano first)
+- Provider-specific intro messages (Soprano vs Piper vs macOS)
+
+### Environment Detection
+- PulseAudio tunnel recognition via PULSE_SERVER env var
+- Case-insensitive TCP protocol detection
+- Smart DESKTOP classification (local audio OR tunnel)
+- Improved VOICELESS detection (no audio AND no tunnel)
+
+---
+
+## 🐛 Bug Fixes
+
+### Security Fixes
+- Add 5s timeout to nvidia-smi to prevent GPU detection hangs
+- Add 3s timeout to sysctl/meminfo to prevent memory detection hangs
+- Add bounds checking before parsing sysctl output (macOS)
+- Add bounds checking before parsing /proc/meminfo (Linux)
+- Add NaN validation for parseInt() memory size parsing
+- Fix case sensitivity in PULSE_SERVER detection (handles TCP: and tcp:)
+
+### Test Fixes
+- Fix provider-manager test #90: Add soprano and ssh-remote to cleanup list
+- Ensure zero-provider edge case properly simulates empty state
+
+### User Experience
+- Fix RAM display for <1GB systems (show "512MB" not "0GB")
+- Fix PulseAudio selection triggering wrong setup flow
+- Separate PulseAudio tunnel setup from SSH receiver setup
+
+---
+
+## 🏗️ Improvements
+
+### Code Quality
+- Extract PulseAudio detection to helper function (DRY principle)
+- Implement system capabilities caching (eliminates duplicate calls)
+- Add comprehensive error handling in detectSystemCapabilities()
+- Improve code comments for security-critical sections
+
+### Performance
+- Cache system detection results (prevents duplicate nvidia-smi calls)
+- Add timeouts to prevent indefinite hangs
+- Optimize provider detection with early returns
+
+### Documentation
+- Add comprehensive commit message documenting all changes
+- Document security improvements (timeouts, bounds checking, NaN validation)
+- Explain PulseAudio tunnel detection architecture
+- Detail environment classification logic
+
+---
+
+## 📊 Statistics
+
+- **91 commits** since v3.3.0
+- **817 lines added** in merge to master
+- **6 files modified** in core integration
+- **260 tests passing** (213 BATS + 47 Node)
+- **Security score**: 7.5/10 → 9.5/10
+- **Test coverage**: 100% pass rate
+
+---
+
+## 🔧 Technical Details
+
+### Files Modified
+- `src/installer.js`: +335 lines (security fixes, environment detection, Soprano integration)
+- `test/unit/provider-manager.bats`: +4 lines (fix edge case test)
+- `.claude/hooks/play-tts-soprano.sh`: +320 lines (new provider)
+- `.claude/hooks/soprano-gradio-synth.py`: +139 lines (new helper)
+- `.claude/hooks/provider-manager.sh`: +17 lines (Soprano support)
+- `.claude/hooks/play-tts.sh`: +6 lines (route to Soprano)
+
+### Breaking Changes
+None - all changes are backward compatible.
+
+### Dependencies
+- **New**: `soprano-tts` (Python package, optional)
+- **Recommended**: CUDA-capable GPU for 2000x speedup (optional)
+- **Compatible**: Works on CPU-only systems (20x vs Piper)
+
+---
+
+## 🎓 Migration Notes
+
+### For New Users
+1. Run `npx agentvibes install`
+2. Installer auto-detects your hardware (GPU, RAM, platform)
+3. Soprano appears as option if you have working audio
+4. Select Soprano for ultra-fast TTS with GPU acceleration
+
+### For Existing Users
+1. Update: `npx agentvibes update`
+2. Switch provider: `/agent-vibes:provider switch soprano`
+3. Test: `/agent-vibes:sample soprano-default`
+4. Optionally install soprano-tts: `pip install soprano-tts`
+
+### PulseAudio Tunnel Users
+- Installer now auto-detects your tunnel configuration
+- Shows "🌐 PulseAudio Tunnel Detected!" instead of "speakers"
+- Provides DESKTOP mode options (Soprano, Piper, macOS Say)
+- No manual configuration needed
+
+---
+
+## 🙏 Acknowledgments
+
+### Special Thanks
+
+**🎉 [@nathanchase](https://github.com/nathanchase)** - For contributing the Soprano TTS Provider integration (PR #95)! Nathan's work brings ultra-fast neural TTS with GPU acceleration to AgentVibes, offering 20x CPU and 2000x GPU performance improvements. The comprehensive integration includes WebUI, API, and CLI synthesis modes with intelligent auto-detection and graceful fallback. Thank you for this outstanding contribution! 🚀
+
+### Quality Assurance
+
+- **Security Review**: Adversarial code review achieved 9.5/10 score
+- **Testing**: All 260 tests pass (100% suite coverage)
+- **Quality Gates**: All Sonar requirements validated
+- **Co-Authored-By**: Claude Sonnet 4.5
+
+---
+
+## 📚 Additional Resources
+
+- [Soprano TTS Documentation](https://github.com/paulpreibisch/AgentVibes/blob/master/docs/providers.md#soprano-tts)
+- [PulseAudio Tunnel Setup](https://github.com/paulpreibisch/AgentVibes/blob/master/docs/SSH_REMOTE_SETUP.md)
+- [Security Hardening Guide](https://github.com/paulpreibisch/AgentVibes/blob/master/docs/security-hardening-guide.md)
+- [Provider Comparison](https://github.com/paulpreibisch/AgentVibes/blob/master/docs/providers.md)
+
+---
+
+**Full Changelog**: https://github.com/paulpreibisch/AgentVibes/compare/v3.3.0...v3.4.0
+
+---
+
+## 📦 v3.3.0 - Remote TTS, Smart Installer, OpenClaw Receiver & Cache Management
+
+**Release Date:** February 5, 2026
+
+### 🎯 Why v3.3.0?
+
+v3.3.0 transforms AgentVibes into a **universal TTS platform** for any environment:
+
+- **SSH-Remote Provider** - Generate TTS on servers, receive audio on your phone/computer
+- **Termux/Android Support** - Native Piper TTS on mobile devices
+- **OpenClaw Integration** - Turn voiceless servers into Siri-like conversational AI
+- **AgentVibes Receiver** - Receive and play audio from remote servers on your device
+- **Smart Installer** - Auto-detects your environment (voiceless, GUI, Termux, SSH)
+- **Intelligent Cache Management** - Real-time tracking and auto-cleanup prevents disk bloat
+
+#### 🌐 Real-World Use Case: OpenClaw + AgentVibes Receiver
+
+You deploy OpenClaw on a voiceless Mac mini (or remote server) where users message you via WhatsApp, Telegram, or Discord. With v3.3.0:
+
+**Before AgentVibes Receiver:**
+- User messages: "Tell me a joke"
+- Mac mini processes request
+- Text response appears in chat
+- 😞 No audio - silent experience
+
+**After AgentVibes Receiver:**
+1. **Install AgentVibes** on your Mac mini (or remote server)
+2. **Install AgentVibes Receiver** on your phone/iPad/laptop
+3. **Connect via Tailscale** (one-time setup)
+4. **User messages:** "Tell me a joke"
+5. **Mac mini generates TTS** with your configured voice
+6. **Audio streams to your device** via SSH tunnel
+7. **Your speakers play:** 🔊 "Why did the AI go to school? To improve its learning model!"
+8. **User in WhatsApp also hears** the audio playing (Siri-like experience)
+
+Result: OpenClaw transforms from **silent text AI** → **Conversational AI with voice**
+
+Perfect for:
+- 🖥️ Mac mini with OpenClaw
+- 🖥️ Remote servers (AWS, DigitalOcean, Linode)
+- 🏗️ Container deployments (Docker)
+- 🔧 WSL (Windows Subsystem for Linux)
+- 📱 Any voiceless environment needing audio
+
+### 🤖 AI Summary
+
+AgentVibes v3.3.0 unleashes the platform across new frontiers: remote servers via SSH-PulseAudio tunneling, Android/Termux environments with native Piper support, and OpenClaw (formerly Clawdbot) multi-agent orchestration. The redesigned smart installer detects your environment (voiceless, GUI, SSH, Termux) and shows only relevant options, plus optional BMAD personality injection for advanced users. Every TTS output now displays real-time cache metrics (file count/size with dynamic colors) plus intelligent size-based auto-cleanup that deletes oldest files when the cache exceeds threshold. The release includes comprehensive TTS queue management to prevent audio overlap, audio effects support across all providers, and full MCP tool integration for programmatic control. This release transforms AgentVibes into a universal TTS platform.
+
+**Key Highlights:**
+- 🌍 **SSH-Remote TTS** - Remote device playback via PulseAudio tunneling (servers, containers, WSL)
+- 📱 **Android/Termux Support** - Native Piper TTS on Android with termux-media-player integration
+- 🤖 **OpenClaw Receiver** (formerly Clawdbot) - AgentVibes Receiver for receiving TTS from voiceless servers
+- 🧠 **Smart Installer** - Voiceless environment detection + personality injection for BMAD
+- 📊 **Real-Time Cache Tracking** - File count and size on every output with dynamic colors
+- 🧹 **Intelligent Auto-Cleanup** - Size-based threshold (15MB default) prevents storage bloat
+- 🎵 **Queue Management** - Prevents TTS audio overlap via centralized queue system
+- ⚙️ **Audio Effects** - Full support across SSH-remote, Termux-ssh, and local providers
+- 📁 **Uninstall Command** - Comprehensive cleanup with full documentation
+- ✅ **96 Commits** - Massive feature expansion with 213 BATS tests passing
+
+### ✨ New Features
+
+#### 🌍 Remote SSH TTS Support
+
+**SSH-Remote Provider:**
+- Play TTS on remote servers via SSH + PulseAudio tunneling
+- Zero-dependency for audio output (uses PulseAudio network tunnel)
+- Perfect for deployed Claude Code on servers, containers, WSL
+- Auto-configuration of PulseAudio TCP module
+- Fallback to local playback if SSH unavailable
+- Full compatibility with all voice selection and audio effects
+
+**SSH-PulseAudio Integration:**
+- Automatic SSH connection detection and setup
+- Secure TCP tunnel for audio stream transmission
+- Support for both interactive and batch TTS operations
+- Persistent audio configuration per SSH session
+
+#### 📱 Android/Termux Support
+
+**Termux-SSH Provider:**
+- Native Piper TTS on Android via Termux environment
+- Uses termux-media-player for audio playback
+- Full voice selection and effects support
+- Automatic temp directory detection
+- Integration with Tailscale for secure remote access
+- Comprehensive setup guide with QR codes
+
+**Android Installation:**
+- Self-contained Termux installer script
+- One-command setup: `curl https://agentvibes.org/install-android | bash`
+- Automatic dependency detection and installation
+- Piper voice download management
+
+#### 🎙️ OpenClaw Integration & AgentVibes Receiver
+
+**What is AgentVibes Receiver?**
+
+AgentVibes Receiver is a **lightweight audio client** that receives and plays TTS audio from remote servers where OpenClaw is installed. It runs on your phone, tablet, or personal computer and connects to voiceless servers via SSH tunnel.
+
+**The Problem It Solves:**
+- OpenClaw running on Mac mini/remote server has no audio output
+- Users message via WhatsApp/Telegram/Discord - get text responses only
+- 😞 No voice = Less engaging AI experience
+
+**AgentVibes Receiver Solution:**
+1. **Lightweight client** runs on your device (phone/tablet/laptop)
+2. **SSH tunnel** securely connects to your voiceless server
+3. **Audio streams** from server to your device via PulseAudio
+4. **Auto-plays** on your speakers when OpenClaw responds
+5. **Siri-like experience** - Text + Voice in one flow
+
+**How It Works:**
+
+```
+┌──────────────────────────────┐
+│ Your Mac mini / Server       │
+│ (OpenClaw + AgentVibes)      │
+│ ├─ No audio output           │
+│ ├─ Generates TTS             │
+│ └─ Sends via SSH tunnel      │
+└──────────────────────────────┘
+            ↓ SSH Tunnel (encrypted)
+┌──────────────────────────────┐
+│ Your Phone / Laptop          │
+│ (AgentVibes Receiver)        │
+│ ├─ Receives audio stream     │
+│ ├─ Plays on speakers         │
+│ └─ You hear OpenClaw speak   │
+└──────────────────────────────┘
+```
+
+**Example Flow:**
+```
+WhatsApp: "Tell me a joke"
+        ↓
+Mac mini: Processes with Claude
+        ↓
+Generates TTS: "Why did the AI... [audio file]"
+        ↓ SSH tunnel
+Your Phone: Plays audio 🔊
+        ↓
+You hear: "Why did the AI go to school?"
+```
+
+**AgentVibes Receiver Features:**
+- **One-Time Setup** - Pair with server via SSH key
+- **Automatic Connection** - Reconnects if interrupted
+- **Real-Time Streaming** - Low latency audio playback
+- **SSH Encryption** - Secure tunnel for audio
+- **Tailscale Support** - Easy VPN for remote servers
+- **Multiple Servers** - Connect to different OpenClaw instances
+- **Voice Control** - Full voice selection on the server side
+- **Cache Metrics** - Monitor audio generation and cleanup
+
+**OpenClaw Skill Integration:**
+- Installed automatically with AgentVibes on OpenClaw server
+- Full feature access:
+  - Voice selection (50+ voices)
+  - Personality/sentiment (sarcastic, flirty, etc.)
+  - Audio effects (reverb, echo, pitch)
+  - Speech speed (0.5x - 3.0x)
+  - Language translation (speak in different languages)
+  - Real-time cache tracking
+  - Automatic cleanup of old audio files
+
+#### 🧠 Smart Installer Enhancements
+
+**Voiceless Environment Detection:**
+- Auto-detects if GUI audio is unavailable (headless servers, containers)
+- Offers SSH-remote TTS as alternative for voiceless environments
+- Prevents installation of unnecessary audio dependencies
+
+**Personality Injection (BMAD):**
+- Interactive prompt during install for BMAD users
+- Optional TTS personality configuration
+- Sentiment/personality selection built into setup flow
+- Skipped for non-BMAD environments
+
+**Provider Auto-Selection:**
+- Intelligent detection of available providers:
+  - macOS Say (macOS systems)
+  - Piper TTS (all systems)
+  - SSH-remote (if SSH available)
+  - Termux-ssh (Android/Termux)
+- Shows only relevant providers in installation
+
+**Better UX:**
+- Clear descriptions of each provider
+- Setup URLs for complex providers (Tailscale)
+- Comprehensive help text for each option
+- Git log integration for recent changes
+
+#### 📊 Real-Time TTS Cache Tracking & Intelligent Auto-Cleanup
+
+**Why Cache Management Matters:**
+- TTS audio files accumulate quickly
+- Server deployments can run out of disk space silently
+- Users have no visibility into cache size or cleanup status
+- Manual cleanup is inconvenient and error-prone
+
+**Cache Display on Every Output:**
+Every time you generate TTS, you see real-time cache metrics:
+```
+💾 Saved to: /home/user/.claude/audio/tts-1770274925.wav 📦 28 20.9MB 🧹[15mb]
+```
+
+What you see:
+- 💾 **Full path** - Clickable file for replay or sharing
+- 📦 **28** - File count in cache
+- **20.9MB** - Total cache size (color-coded):
+  - 🟢 Green: <500MB
+  - 🟡 Yellow: 500MB-3GB
+  - 🔴 Red: >3GB
+- 🧹 **[15mb]** - Auto-cleanup threshold
+
+**Intelligent Size-Based Auto-Cleanup:**
+- Deletes oldest files when cache exceeds threshold (default: 15MB)
+- Silent operation (no blocking prompts)
+- Write-lock protection prevents conflicts with TTS generation
+- Respects active TTS (won't delete while generating)
+
+**Configuration:**
+```bash
+# Per-project threshold override
+echo "50" > .claude/tts-auto-clean-threshold.txt  # 50MB limit
+
+# Or disable cleanup
+echo "0" > .claude/tts-auto-clean-threshold.txt   # Disable
+```
+
+**Manual Cleanup:**
+```bash
+# Non-interactive cleanup
+/agent-vibes:clean
+
+# Or programmatically via MCP
+await agent_vibes.clean_audio_cache()
+```
+
+#### 🎵 TTS Queue Management
+
+**Overlap Prevention:**
+- Centralized queue system for TTS operations
+- Prevents simultaneous audio playback
+- Critical for Clawdbot multi-agent scenarios
+- Atomic queue operations ensure consistency
+
+**Queue Integration:**
+- Automatic in OpenClaw Receiver
+- Optional in standalone environments
+- Fallback to sequential playback
+
+#### ⚙️ Audio Effects Across All Providers
+
+**Effects Support:**
+- Reverb, echo, pitch, EQ available
+- SSH-remote provider: Full effects support
+- Termux-ssh provider: Full effects support
+- All local providers: Unchanged effects behavior
+
+**Configuration:**
+- Per-session override via environment variables
+- Project-local settings via config files
+- Persistent across TTS operations
+
+#### 📁 Comprehensive Uninstall Command
+
+**`/agent-vibes:uninstall` Skill:**
+- Complete removal of AgentVibes and dependencies
+- Interactive prompts for user confirmation
+- Option to preserve configuration
+- Detailed removal logs
+- Full documentation included
+
+### 🐛 Bug Fixes
+
+- **TTS Overlap** - Fixed audio overlapping via queue management
+- **Termux Audio** - Proper detection and use of termux-media-player
+- **SSH Detection** - Improved SSH environment detection logic
+- **Race Conditions** - Write-lock mechanism prevents cleanup conflicts
+- **Temp Directory** - Proper Termux temp directory handling
+- **Color Codes** - Fixed GOLD color (256-color \033[38;5;226m)
+- **Stat Compatibility** - BSD/GNU stat detection with proper output suppression
+- **Syntax Validation** - Fixed installer.js syntax errors
+- **Coverage Testing** - Proper coverage file generation for CI/CD
+
+### 🔒 Security & Quality
+
+- **No Hardcoded Credentials** - All secure operations use environment variables
+- **SSH Safety** - Secure PulseAudio tunnel authentication
+- **Atomic Operations** - Queue and receiver use atomic file operations
+- **Input Validation** - All external inputs validated
+- **Pre-existing Limitations** - TTS scripts lack `set -euo pipefail` (pre-existing)
+- **Sonar Compliance** - Security hotspots resolved, quality gates passing
+- **Test Coverage** - 213 BATS tests + 47 Node unit tests
+
+### ✅ Testing & Validation
+
+- **213 BATS Tests** - Core functionality validation
+- **47 Node Tests** - JavaScript/installer validation
+- **Cross-Platform** - Piper, macOS, SSH-remote, Termux-ssh
+- **Environment Tests** - Voiceless, GUI, SSH, Termux detection
+- **Audio Effects** - All providers tested
+- **Backwards Compatible** - No breaking changes to existing code
+
+---
+
+## 📦 v3.2.0 - Clawdbot Integration: AI Assistants on Any Messenger
+
+**Release Date:** January 27, 2026
+
+### 🎯 Why v3.2.0?
+
+This minor release adds **native Clawdbot integration** to AgentVibes, bringing professional TTS to the revolutionary AI assistant you can access via any instant messenger. Clawdbot connects Claude AI to WhatsApp, Telegram, Discord, and more—and now with AgentVibes, your Clawdbot can speak with 50+ professional voices in 30+ languages. This release also includes SonarCloud quality gate improvements and CI/CD workflow enhancements.
+
+### 🤖 AI Summary
+
+AgentVibes v3.2.0 introduces seamless integration with Clawdbot, the revolutionary AI assistant accessible via any instant messenger. With this release, Clawdbot users get professional TTS with 50+ voices, remote SSH audio support for server deployments, and zero-configuration setup—just install AgentVibes and the Clawdbot skill is ready. The release also includes quality improvements: SonarCloud workflow fixes, enhanced documentation for disabling quality gate checks, and improved test coverage validation.
+
+**Key Highlights:**
+- 🤖 **Clawdbot Integration** - Native TTS support for Clawdbot AI assistant framework
+- 💬 **Messenger Platforms** - Works with WhatsApp, Telegram, Discord via Clawdbot
+- 🔊 **Remote SSH Audio** - Perfect for Clawdbot on remote servers with PulseAudio tunneling
+- 📦 **Simple Install** - Just `npx agentvibes install` and it works
+- 🛡️ **SonarCloud Fixes** - Quality gate workflow improvements and documentation
+- ✅ **Full Test Coverage** - All 213 BATS + 47 Node tests passing
+
+### ✨ New Features
+
+**Clawdbot Skill (`.clawdbot/`):**
+- New `.clawdbot/` directory with skill integration files
+- `README.md` - Clawdbot integration overview and setup guide
+- `skill/SKILL.md` - Comprehensive skill documentation with voice selection, background music, effects, personalities, and remote SSH audio setup
+- Automatically distributed via npm package
+- Zero-configuration when AgentVibes is installed
+
+**README Updates:**
+- Added "🤖 Clawdbot Integration" section with full documentation
+- Updated header to include Clawdbot alongside Claude Code, Claude Desktop, and Warp Terminal
+- Added Clawdbot to Quick Links table
+- Clawdbot description: "A revolutionary AI assistant you can access via any instant messenger"
+- Website link: https://clawd.bot
+
+**package.json Updates:**
+- Added `.clawdbot/` to npm files array for distribution
+- Added `clawdbot` to keywords for npm discoverability
+- Updated description to mention Clawdbot support
+
+### 🐛 Bug Fixes
+
+- **SonarCloud Quality Gate** - Disabled quality gate status reporting to GitHub to prevent false CI failures
+- **Coverage File Generation** - Ensured coverage file is generated before SonarCloud scan
+- **CLI Test Coverage** - Added CLI tests and excluded CLI entry point from coverage requirements
+- **macOS Runner** - Removed macos-15-large runner to avoid GitHub billing limits
+- **Piper Voice Test** - Updated installation test to match current voice list
+
+### 📚 Documentation
+
+- Added step-by-step SonarCloud dashboard configuration guide
+- Added guide to disable SonarCloud GitHub App checks
+- Comprehensive Clawdbot integration documentation with SSH audio examples
+
+### 🔒 Security & Quality
+
+- ✅ All Sonar quality gates validated
+- ✅ No hardcoded credentials in changes
+- ✅ New Clawdbot files are documentation only (no executable code)
+- ✅ All 213 BATS + 47 Node tests passing
+
+### 📊 Changes Summary
+
+- **Files Added:** 2 (`.clawdbot/README.md`, `.clawdbot/skill/SKILL.md`)
+- **Files Modified:** 2 (`README.md`, `package.json`)
+- **Commits Since v3.1.0:** 11 (5 fixes, 4 docs, 1 test, 1 debug)
+
+### 🎯 User Impact
+
+**For Clawdbot Users:**
+- Professional TTS with 50+ voices in 30+ languages
+- Works on remote servers with SSH audio tunneling
+- Zero API costs—Piper TTS is free and offline
+- Automatic integration when AgentVibes is installed
+
+**For Existing Users:**
+- Zero breaking changes
+- All existing features work exactly the same
+- Clawdbot support is additive
+
+### 🚀 Migration Notes
+
+No migration required! This is a fully backward-compatible minor release.
+
+**To Use with Clawdbot:**
+1. Install: `npx agentvibes install`
+2. Speak: `npx agentvibes speak "Hello!"`
+
+### 📦 Full Changelog
+
+**Feature Commits:**
+- `(pending)` feat: Add Clawdbot integration
+
+**Bug Fix Commits:**
+- `5cd97d52` fix: Disable SonarCloud quality gate status reporting to GitHub
+- `12f822e6` fix: Disable quality gate failure in SonarCloud workflow
+- `0d26ccc2` fix: Ensure coverage file is generated before SonarCloud scan
+- `c2465508` fix: Add CLI tests and exclude CLI entry point from coverage
+- `c673afe1` fix: Remove macos-15-large runner to avoid GitHub billing limits
+- `92271732` fix: Update Piper installation test to match current voice list
+
+**Documentation Commits:**
+- `f72dd977` docs: Add guide to disable SonarCloud GitHub App checks
+- `6587519b` docs: Add step-by-step SonarCloud dashboard configuration guide
+- `ba765f50` docs: Add SonarCloud quality gate configuration guidance
+
+**Test Commits:**
+- `47f08a79` test: Trigger workflow to verify SonarCloud quality gate fix
+
+**Debug Commits:**
+- `84945d25` debug: Add coverage file verification to SonarCloud workflow
+
+---
+
+## 📦 v3.1.0 - Android Native Support: Run Claude Code on Your Phone
+
+**Release Date:** January 22, 2026
+
+### 🎯 Why v3.1.0?
+
+This minor release brings **native Android support** to AgentVibes, enabling developers to run Claude Code with professional TTS voices directly on Android devices via Termux. No SSH required, no remote server needed—just install Termux on your Android phone or tablet and get the full AgentVibes experience locally. This complements the v3.0.0 termux-ssh provider by offering a **complete mobile development solution**: use native Termux for local Android development, or use termux-ssh when connecting to remote servers.
+
+### 🤖 AI Summary
+
+AgentVibes v3.1.0 introduces native Android/Termux support, enabling developers to run Claude Code with professional TTS voices directly on their Android devices. Through automatic detection and a specialized installer, AgentVibes now runs Piper TTS via proot-distro with Debian (solving Android's glibc compatibility issues), uses termux-media-player for audio playback, and includes comprehensive Android-specific documentation. Perfect for developers who want to code on-the-go with their Android phone or tablet using the full power of Claude Code and AgentVibes.
+
+**Key Highlights:**
+- 🤖 **Native Android Support** - Run Claude Code with TTS directly on Android devices via Termux
+- 📦 **Automatic Termux Detection** - AgentVibes auto-detects Android and runs specialized installation
+- 🎯 **Proot-Distro Integration** - Solves glibc compatibility with proot Debian environment
+- 🔊 **Android Audio Playback** - Uses termux-media-player for native Android audio routing
+- 📚 **Comprehensive Documentation** - Complete Android setup guide with troubleshooting and F-Droid instructions
+- ✅ **Full Test Coverage** - All 213 BATS + 38 Node tests passing with Android compatibility
+
+### ✨ New Features
+
+**Termux Installer (`.claude/hooks/termux-installer.sh`):**
+- New 224-line installer specifically for Android/Termux environments
+- Automatically installs proot-distro with Debian (for glibc compatibility)
+- Downloads and configures Piper TTS binary in proot environment
+- Creates `/usr/bin/piper` wrapper that routes through proot
+- Installs audio dependencies: ffmpeg, sox, bc, termux-api
+- Interactive voice selection with 50+ language options
+- Validates Termux environment before proceeding
+
+**Termux Detection (`src/installer.js`):**
+- New `isTermux()` function checks for `/data/data/com.termux` directory
+- New `detectAndNotifyTermux()` displays Android detection messages
+- Auto-configures piper provider with Termux-compatible voice
+- Shows Termux-specific installation instructions
+- Piper installer automatically redirects to termux-installer.sh on Android
+
+**Audio Processor Updates (`.claude/hooks/audio-processor.sh`):**
+- Detects Termux environment for temp directory selection
+- Uses `${PREFIX}/tmp` on Termux, `/tmp` on standard systems
+- Ensures audio effects work correctly on Android
+- Cross-platform compatibility maintained
+
+**Piper Installer Updates (`.claude/hooks/piper-installer.sh`):**
+- Auto-detects Termux and redirects to specialized installer
+- Shows clear message when routing to Termux-specific setup
+
+**Android Audio Playback (`.claude/hooks/play-tts-piper.sh`):**
+- Detects Android/Termux environment
+- Uses `termux-media-player` instead of `paplay` on Android
+- Audio routes through Android's native media system
+
+### 📚 Documentation
+
+**New Android Setup Section (`README.md`):**
+- Added "🤖 Android / Termux" section to System Requirements
+- Complete 3-step installation guide for Android devices
+- Explanation of why Termux needs special handling (bionic vs glibc)
+- Requirements: Termux app from F-Droid, Termux:API, Android 7.0+
+- Audio playback architecture explanation
+- Setup verification commands
+- Troubleshooting table for common issues
+- Clear explanation of why F-Droid version is required (not Google Play)
+- Updated Quick Links table with direct link to Android setup
+
+### 🐛 Bug Fixes
+
+- **Test #90 Fix** - Added termux-ssh provider to test cleanup list for "no providers found" edge case
+- **Temp Directory Detection** - Fixed audio-processor.sh defaulting to Termux paths on non-Termux systems
+- **Sonar Compliance** - Added `set -euo pipefail` strict mode to termux-installer.sh for security
+
+### 🔒 Security & Quality
+
+- ✅ All Sonar quality gates validated
+- ✅ Strict mode (`set -euo pipefail`) on all new bash scripts
+- ✅ No hardcoded credentials
+- ✅ Proper variable quoting and input validation
+- ✅ Cross-platform temp directory handling
+- ✅ All 213 BATS + 38 Node tests passing
+
+### 📊 Changes Summary
+
+- **Files Modified:** 7
+- **Lines Added:** +391
+- **Lines Removed:** -8
+- **New Files:** 1 (termux-installer.sh)
+- **Commits:** 8 (5 fixes, 1 feature, 1 docs, 1 merge)
+
+### 🎯 User Impact
+
+**For Android Users:**
+- Can now run Claude Code directly on Android phones/tablets
+- Full TTS support with 50+ voices and languages
+- No remote server required for basic usage
+- Works offline after initial voice downloads
+
+**For Developers:**
+- Complete mobile development solution (native + SSH)
+- Native Termux for local Android development
+- Termux-SSH provider for remote server connections
+- Seamless integration with existing AgentVibes workflows
+
+**For Existing Users:**
+- Zero breaking changes
+- All existing features work exactly the same
+- New Android support is opt-in via Termux installation
+
+### 🚀 Migration Notes
+
+No migration required! This is a fully backward-compatible minor release.
+
+**To Try Android Support:**
+1. Install [Termux from F-Droid](https://f-droid.org/en/packages/com.termux/)
+2. Install [Termux:API](https://f-droid.org/en/packages/com.termux.api/)
+3. In Termux: `pkg install nodejs-lts`
+4. Run: `npx agentvibes install`
+
+AgentVibes will auto-detect Termux and run the specialized installer.
+
+### 📦 Full Changelog
+
+**Feature Commits:**
+- `e9d4cf95` feat: Add Android/Termux support for Piper TTS
+
+**Bug Fix Commits:**
+- `aa4d3cdd` fix: Add termux-ssh provider to test #90 cleanup list
+- `c1b00c6d` fix: Use termux-media-player for audio playback on Android
+- `f96ab89a` fix: Properly detect Termux environment for temp directory
+- `e2efeb06` fix: Add strict mode to termux-installer.sh for Sonar compliance
+
+**Documentation Commits:**
+- `701a9412` docs: Add comprehensive Android/Termux setup section to README
+
+**Merge Commits:**
+- `a5d3f546` Merge feature/android-termux into master
+- `95f04e70` Merge origin/master into feature/pulseaudio-reverse-tunnel
+
+---
+
+## 📦 v3.0.0 - Cross-Platform Remote Audio: Termux SSH Provider
+
+**Release Date:** January 8, 2026
+
+### 🎯 Why v3.0.0?
+
+This major release marks a significant milestone in AgentVibes' evolution, introducing **mobile-first interactive AI conversations**. The termux-ssh provider enables a revolutionary workflow: **have fully interactive, hands-free conversations with Claude Code using just your mobile device**—whether you're coding locally on your laptop with audio routed to your phone, or working on remote servers from anywhere in the world. This architectural breakthrough represents a new paradigm: **"Code with your hands, converse with your voice."**
+
+### 🤖 AI Summary
+
+AgentVibes v3.0.0 introduces the termux-ssh TTS provider, enabling **true mobile-first interactive conversations with Claude Code**. Route TTS audio to your Android device via SSH—whether coding locally on your laptop or on remote servers—and have hands-free, voice-driven conversations with Claude using just your phone. This major release includes comprehensive Tailscale VPN setup documentation for internet-wide access, full MCP server integration, and transforms how developers interact with AI assistants. Perfect for developers who want to experience AI conversations naturally through their mobile device while their hands stay on the keyboard.
+
+**Key Highlights:**
+- 📱 **Mobile-First AI Conversations** - Have fully interactive, hands-free conversations with Claude Code using just your Android device
+- 💻 **Local + Remote Development** - Works for both local coding (laptop → phone audio) and remote server development
+- 🌐 **Tailscale Integration** - Comprehensive guide for internet-wide device access without port forwarding or firewall configuration
+- 🔧 **Enhanced Installer** - Interactive SSH host configuration with validation and clear use-case guidance
+- 🎯 **Full MCP Compatibility** - Complete integration with all MCP commands and workflows
+- 🛡️ **Quality Gates Integration** - Automated security validation in release process
+
+### 🎥 Demo Video
+
+**Watch it in action:** [Mobile-First AI Conversations with Claude Code](https://youtu.be/ngLiA_KQtTA?si=wTwS4CJidIxWqLIP)
+
+See the termux-ssh provider in action—fully interactive, hands-free conversations with Claude Code using just your Android device.
+
+### ✨ New Features
+
+**Termux SSH TTS Provider (`.claude/hooks/play-tts-termux-ssh.sh`):**
+- New TTS provider for Android via SSH connection
+- Routes text to `termux-tts-speak` on remote Android device
+- Configuration priority: env var → project → global
+- Secure quote escaping for safe text transmission
+- 196 lines of fully documented code
+
+**Installer Updates (`src/installer.js`):**
+- Added termux-ssh to provider selection menu
+- Interactive SSH host alias configuration with validation
+- Saves host alias to `.claude/termux-ssh-host.txt`
+- Clear use case description: "Only choose if your project is on a remote server and you want audio sent to your Android device"
+- Documentation link to TERMUX_SETUP.md
+
+**TTS Router Updates (`.claude/hooks/play-tts.sh`):**
+- Added termux-ssh provider routing in two locations
+- Full integration with existing provider detection
+- Supports mixed-provider mode (Piper + Termux)
+
+**MCP Server Integration (`mcp-server/server.py`):**

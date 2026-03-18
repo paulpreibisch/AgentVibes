@@ -1,0 +1,7 @@
+agent,piper,mac,intro
+analyst,en_US-kristin-medium,Samantha,"Hi! I'm Mary."
+architect,en_GB-alan-medium,Daniel,"Hello! Winston here."
+dev,en_US-amy-medium,Karen,"Hey! Amelia here."
+pm,en_US-ryan-high,Alex,"Hi everyone! I'm John."
+fallback-only,,Samantha,"I only have macOS voice."
+piper-only,en_US-joe-medium,,"I only have Piper voice."

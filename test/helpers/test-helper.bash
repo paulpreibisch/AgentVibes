@@ -8,11 +8,13 @@ setup_test_env() {
   export TEST_CLAUDE_DIR="${TEST_HOME}/.claude"
   export TEST_AUDIO_DIR="${TEST_CLAUDE_DIR}/audio"
   export TEST_PERSONALITIES_DIR="${TEST_CLAUDE_DIR}/personalities"
+  export TEST_PIPER_VOICES_DIR="${TEST_CLAUDE_DIR}/piper-voices"
 
   mkdir -p "$TEST_HOME"
   mkdir -p "$TEST_CLAUDE_DIR"
   mkdir -p "$TEST_AUDIO_DIR"
   mkdir -p "$TEST_PERSONALITIES_DIR"
+  mkdir -p "$TEST_PIPER_VOICES_DIR"
 
   # Override HOME for isolated testing
   export HOME="$TEST_HOME"
@@ -21,7 +23,19 @@ setup_test_env() {
   export ELEVENLABS_API_KEY="test_api_key_mock"
   export CLAUDE_PROJECT_DIR="${BATS_TEST_TMPDIR}/project"
 
+  # Enable test mode for scripts to skip audio generation
+  export AGENTVIBES_TEST_MODE="true"
+
+  # Detect CI environment
+  if [[ "${CI:-false}" == "true" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    export AGENTVIBES_CI_MODE="true"
+  fi
+
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude/audio"
+  mkdir -p "$CLAUDE_PROJECT_DIR/.claude"
+
+  # Note: Voice models are no longer bundled in git
+  # Tests use standard voice names without requiring actual voice files
 }
 
 # Clean up test environment
@@ -45,17 +59,30 @@ mock_curl() {
 
 # Extract output file from arguments
 OUTPUT_FILE=""
+prev_arg=""
 for arg in "$@"; do
-  if [[ "$prev_arg" == "-o" ]]; then
+  if [[ "$prev_arg" == "-o" ]] || [[ "$prev_arg" == "--output" ]]; then
     OUTPUT_FILE="$arg"
     break
   fi
   prev_arg="$arg"
 done
 
-# Generate a minimal silent MP3 (base64 encoded)
-# This is a valid but minimal MP3 file that's essentially silent
-echo "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAABhADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAhAD5AAAAAAAAAAAAAAAAAAAAAP/7kGQAAANUMEoFPeACNQV40KEYABEY41g5vAAA9RjpZxRTAImU+W8eshaFpAQgALAAYALATx/nYDYCMJ0HITQYYA7AH4c7MoGsnCMU5pnW+OQnBcDrQ9Xx7w37/D+PimYavV8elKUpT9H5fjvhn+mP+n/9P+7vSJ/nf//5m5IEgwJJVljCJJJJIlzfUlJJJL/+ZJJIliTJZJJJJIid//+ZJJJZJJJJJJJf/nf//0P//7U=" | base64 -d > "$OUTPUT_FILE"
+# If no output file specified, just succeed
+if [[ -z "$OUTPUT_FILE" ]]; then
+  echo '{"success":true}'
+  exit 0
+fi
+
+# Create parent directory if needed
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+# Generate a minimal valid MP3 file (base64 encoded)
+# This is a real but tiny MP3 file that's essentially silent
+echo "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAABhADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAhAD5AAAAAAAAAAAAAAAAAAAAAP/7kGQAAANUMEoFPeACNQV40KEYABEY41g5vAAA9RjpZxRTAImU+W8eshaFpAQgALAAYALATx/nYDYCMJ0HITQYYA7AH4c7MoGsnCMU5pnW+OQnBcDrQ9Xx7w37/D+PimYavV8elKUpT9H5fjvhn+mP+n/9P+7vSJ/nf//5m5IEgwJJVljCJJJJIlzfUlJJJL/+ZJJIliTJZJJJJIid//+ZJJJZJJJJJJJf/nf//0P//7U=" | base64 -d > "$OUTPUT_FILE" 2>/dev/null || {
+  # Fallback: create a minimal placeholder file if base64 fails
+  echo "MOCK_AUDIO_FILE" > "$OUTPUT_FILE"
+}
 
 # Simulate successful response
 exit 0
@@ -90,6 +117,70 @@ exit 0
 EOF
   chmod +x "${BATS_TEST_TMPDIR}/mpg123"
 
+  # Create mock piper for TTS testing
+  cat > "${BATS_TEST_TMPDIR}/piper" << 'EOF'
+#!/bin/bash
+# Mock piper TTS - generates test audio without real TTS
+# Parse arguments to find output file
+OUTPUT_FILE=""
+MODEL_FILE=""
+SPEAKER_ID=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output_file)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL_FILE="$2"
+      shift 2
+      ;;
+    --speaker)
+      SPEAKER_ID="$2"
+      shift 2
+      ;;
+    --length-scale|--sentence-silence)
+      # Ignore these params but consume the value
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+# Read input text from stdin (piper expects this)
+read -r TEXT
+
+# If no output file specified, use default
+if [[ -z "$OUTPUT_FILE" ]]; then
+  OUTPUT_FILE="output.wav"
+fi
+
+# Create parent directory if needed
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+# Generate a minimal valid WAV file (44 bytes - smallest valid WAV)
+# RIFF header (12 bytes) + fmt chunk (24 bytes) + data chunk header (8 bytes)
+printf 'RIFF' > "$OUTPUT_FILE"
+printf '\x24\x00\x00\x00' >> "$OUTPUT_FILE"  # File size - 8
+printf 'WAVE' >> "$OUTPUT_FILE"
+printf 'fmt ' >> "$OUTPUT_FILE"
+printf '\x10\x00\x00\x00' >> "$OUTPUT_FILE"  # fmt chunk size (16)
+printf '\x01\x00' >> "$OUTPUT_FILE"           # Audio format (1 = PCM)
+printf '\x01\x00' >> "$OUTPUT_FILE"           # Channels (1 = mono)
+printf '\x44\xac\x00\x00' >> "$OUTPUT_FILE"   # Sample rate (44100)
+printf '\x88\x58\x01\x00' >> "$OUTPUT_FILE"   # Byte rate
+printf '\x02\x00' >> "$OUTPUT_FILE"           # Block align
+printf '\x10\x00' >> "$OUTPUT_FILE"           # Bits per sample (16)
+printf 'data' >> "$OUTPUT_FILE"
+printf '\x00\x00\x00\x00' >> "$OUTPUT_FILE"   # Data chunk size (0 = silent)
+
+exit 0
+EOF
+  chmod +x "${BATS_TEST_TMPDIR}/piper"
+
   export PATH="${BATS_TEST_TMPDIR}:$PATH"
 }
 
@@ -113,6 +204,11 @@ setup_agentvibes_scripts() {
 
   # Make scripts executable
   chmod +x "$TEST_CLAUDE_DIR/hooks/"*.sh
+
+  # Ensure all config subdirectories exist
+  mkdir -p "$TEST_CLAUDE_DIR/config"
+  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/config"
+  mkdir -p "$HOME/.claude/config"
 }
 
 # Create a test personality file

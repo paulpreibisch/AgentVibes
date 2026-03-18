@@ -1,5 +1,38 @@
-#!/bin/bash
-# Personality manager for AgentVibes - adds character to TTS messages
+#!/usr/bin/env bash
+#
+# File: .claude/hooks/personality-manager.sh
+#
+# AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+# Website: https://agentvibes.org
+# Repository: https://github.com/paulpreibisch/AgentVibes
+#
+# Co-created by Paul Preibisch with Claude AI
+# Copyright (c) 2025 Paul Preibisch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DISCLAIMER: This software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# express or implied. Use at your own risk. See the Apache License for details.
+#
+# ---
+#
+# @fileoverview Personality Manager - Adds character and emotional style to TTS voices
+# @context Enables voices to have distinct personalities (flirty, sarcastic, pirate, etc.) with provider-aware voice assignment
+# @architecture Markdown-based personality templates with provider-specific voice mappings (Piper vs macOS)
+# @dependencies .claude/personalities/*.md files, voice-manager.sh, play-tts.sh, provider-manager.sh
+# @entrypoints Called by /agent-vibes:personality slash commands
+# @patterns Template-based configuration, provider abstraction, random personality support
+# @related .claude/personalities/*.md, voice-manager.sh, .claude/tts-personality.txt
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PERSONALITIES_DIR="$SCRIPT_DIR/../personalities"
@@ -50,7 +83,7 @@ get_personality_data() {
       grep "^description:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
       ;;
     voice)
-      grep "^elevenlabs_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+      grep "^piper_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
       ;;
     piper_voice)
       grep "^piper_voice:" "$file" | cut -d: -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
@@ -77,38 +110,48 @@ list_personalities() {
 
 case "$1" in
   list)
-    echo "🎭 Available Personalities:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
     # Get current personality
     CURRENT="normal"
     if [ -f "$PERSONALITY_FILE" ]; then
       CURRENT=$(cat "$PERSONALITY_FILE")
     fi
 
-    # List personalities from markdown files
-    echo "Built-in personalities:"
-    for personality in $(list_personalities | sort); do
-      desc=$(get_personality_data "$personality" "description")
-      if [[ "$personality" == "$CURRENT" ]]; then
-        echo "  ✓ $personality - $desc (current)"
-      else
-        echo "  - $personality - $desc"
-      fi
-    done
+    # Use Node.js formatter for beautiful boxen display
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    FORMATTER="$PROJECT_ROOT/src/cli/list-personalities.js"
 
-    # Add random option
-    if [[ "$CURRENT" == "random" ]]; then
-      echo "  ✓ random - Picks randomly each time (current)"
+    # Use Node.js formatter if available
+    if [[ -f "$FORMATTER" ]] && command -v node &> /dev/null; then
+      node "$FORMATTER" "$PERSONALITIES_DIR" "$CURRENT"
     else
-      echo "  - random - Picks randomly each time"
-    fi
+      # Fallback to plain text display
+      echo "🎭 Available Personalities:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "Usage: /agent-vibes:personality <name>"
-    echo "       /agent-vibes:personality add <name>"
-    echo "       /agent-vibes:personality edit <name>"
+      echo "Built-in personalities:"
+      for personality in $(list_personalities | sort); do
+        desc=$(get_personality_data "$personality" "description")
+        if [[ "$personality" == "$CURRENT" ]]; then
+          echo "  ✓ $personality - $desc (current)"
+        else
+          echo "  - $personality - $desc"
+        fi
+      done
+
+      # Add random option
+      if [[ "$CURRENT" == "random" ]]; then
+        echo "  ✓ random - Picks randomly each time (current)"
+      else
+        echo "  - random - Picks randomly each time"
+      fi
+
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo ""
+      echo "Usage: /agent-vibes:personality <name>"
+      echo "       /agent-vibes:personality add <name>"
+      echo "       /agent-vibes:personality edit <name>"
+    fi
     ;;
 
   set|switch)
@@ -146,7 +189,7 @@ case "$1" in
       PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
     fi
 
-    ACTIVE_PROVIDER="elevenlabs"  # default
+    ACTIVE_PROVIDER="piper"  # default
     if [[ -n "$PROVIDER_FILE" ]]; then
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
     fi
@@ -161,7 +204,7 @@ case "$1" in
         ASSIGNED_VOICE="en_US-lessac-medium"
       fi
     else
-      # Use ElevenLabs voice (reads from elevenlabs_voice: field)
+      # Use Piper voice (reads from piper_voice: field)
       ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "voice")
     fi
 
@@ -300,6 +343,86 @@ EOF
     echo "🎭 Personality reset to: normal"
     ;;
 
+  set-favorite-voice)
+    PERSONALITY="$2"
+    NEW_VOICE="$3"
+
+    if [[ -z "$PERSONALITY" ]] || [[ -z "$NEW_VOICE" ]]; then
+      echo "❌ Please specify both personality name and voice name"
+      echo "Usage: $0 set-favorite-voice <personality> <voice>"
+      exit 1
+    fi
+
+    FILE="$PERSONALITIES_DIR/${PERSONALITY}.md"
+    if [[ ! -f "$FILE" ]]; then
+      echo "❌ Personality '$PERSONALITY' not found"
+      exit 1
+    fi
+
+    # Detect active TTS provider
+    PROVIDER_FILE=""
+    if [[ -f "$CLAUDE_DIR/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$CLAUDE_DIR/tts-provider.txt"
+    elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
+      PROVIDER_FILE="$HOME/.claude/tts-provider.txt"
+    fi
+
+    ACTIVE_PROVIDER="piper"  # default
+    if [[ -n "$PROVIDER_FILE" ]]; then
+      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+    fi
+
+    # Determine which field to update based on provider
+    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      VOICE_FIELD="piper_voice"
+      CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "piper_voice")
+    else
+      # macOS or other provider
+      VOICE_FIELD="macos_voice"
+      CURRENT_VOICE=$(get_personality_data "$PERSONALITY" "macos_voice")
+    fi
+
+    # Check if personality already has a favorite voice assigned
+    if [[ -n "$CURRENT_VOICE" ]] && [[ "$CURRENT_VOICE" != "$NEW_VOICE" ]]; then
+      echo "⚠️  WARNING: Personality '$PERSONALITY' already has a favorite voice assigned!"
+      echo ""
+      echo "   Current favorite ($ACTIVE_PROVIDER): $CURRENT_VOICE"
+      echo "   New voice: $NEW_VOICE"
+      echo ""
+      echo "Do you want to replace the favorite voice?"
+      echo ""
+      read -p "Enter your choice (yes/no): " CHOICE
+
+      case "$CHOICE" in
+        yes|y|YES|Y)
+          echo "✅ Replacing favorite voice..."
+          ;;
+        no|n|NO|N)
+          echo "❌ Keeping current favorite voice: $CURRENT_VOICE"
+          exit 0
+          ;;
+        *)
+          echo "❌ Invalid choice. Keeping current favorite voice: $CURRENT_VOICE"
+          exit 1
+          ;;
+      esac
+    fi
+
+    # Update the voice in the personality file
+    if grep -q "^${VOICE_FIELD}:" "$FILE"; then
+      # Field exists, replace it
+      sed -i "s/^${VOICE_FIELD}:.*/${VOICE_FIELD}: ${NEW_VOICE}/" "$FILE"
+    else
+      # Field doesn't exist, add it after the frontmatter
+      sed -i "/^---$/,/^---$/ { /^---$/a\\
+${VOICE_FIELD}: ${NEW_VOICE}
+}" "$FILE"
+    fi
+
+    echo "✅ Favorite voice for '$PERSONALITY' personality set to: $NEW_VOICE ($ACTIVE_PROVIDER)"
+    echo "📝 Updated file: $FILE"
+    ;;
+
   *)
     # If a single argument is provided and it's not a command, treat it as "set <personality>"
     if [[ -n "$1" ]] && [[ -f "$PERSONALITIES_DIR/${1}.md" || "$1" == "random" ]]; then
@@ -314,11 +437,13 @@ EOF
       echo "  add <name>                        - Create new personality"
       echo "  edit <name>                       - Show path to edit personality"
       echo "  get                               - Show current personality"
+      echo "  set-favorite-voice <name> <voice> - Set favorite voice for a personality"
       echo "  reset                             - Reset to normal"
       echo ""
       echo "Examples:"
       echo "  /agent-vibes:personality flirty"
       echo "  /agent-vibes:personality add cowboy"
+      echo "  /agent-vibes:personality set-favorite-voice flirty \"Aria\""
     fi
     ;;
 esac

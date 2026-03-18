@@ -1,0 +1,52 @@
+# AgentVibes Audio Effects Configuration
+# Format: AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME
+#
+# SOX_EFFECTS: sox effect chain (leave empty for none)
+#   - reverb <reverberance> <HF-damping> <room-scale>
+#   - pitch <cents> (100 cents = 1 semitone)
+#   - equalizer <freq> <width>q <gain-dB>
+#   - gain <dB>
+#   - compand <attack,decay> <soft-knee-dB:in-dB,out-dB>
+#
+# BACKGROUND_FILE: path to ambient audio (relative to .claude/audio/tracks/)
+# BACKGROUND_VOLUME: 0.0-1.0 (0.20-0.40 recommended)
+#
+# Example: John|reverb 30 50 80|my-track.mp3|0.10
+
+# BMAD Agents - each with unique audio personality
+
+# PM John - upbeat, driving energy
+John|gain -1 equalizer 3000 1q +2|agentvibes_soft_flamenco_loop.mp3|0.30
+
+# Architect Winston - deep, authoritative
+Winston|reverb 40 50 90 gain -2|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# Developer Amelia - clean, precise
+Amelia|compand 0.3,1 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# Business Analyst Mary - warm, analytical
+Mary|equalizer 200 1q +3 equalizer 2500 1q -2|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# Scrum Master Bob - refined, organized
+Bob|reverb 30 40 70 compand 0.2,0.5 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# Test Architect Murat - crisp, analytical
+Murat|equalizer 4000 1q +3 compand 0.1,0.3 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# UX Designer Sally - warm, empathetic
+Sally|reverb 25 40 70 equalizer 300 1q +2|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# Tech Writer Paige - clear, patient
+Paige|compand 0.2,0.5 6:-70,-60,-20|agentvibes_soft_flamenco_loop.mp3|0.20
+
+# Frame Expert Saif - structured, detail-oriented
+Saif|equalizer 2000 1q +2|agentvibes_soft_flamenco_loop.mp3|0.10
+
+# BMad Master - wise orchestrator
+BMad Master|reverb 50 60 100 pitch -100|agentvibes_soft_flamenco_loop.mp3|0.30
+
+# Party mode room ambiance - used when multiple agents are talking
+_party_mode|compand 0.3,1 6:-70,-60,-20|agent_vibes_dark_chill_step_loop.mp3|0.40
+
+# Default (no agent specified) - clean with subtle enhancement and chillwave background
+default||agentvibes_soft_flamenco_loop.mp3|0.30

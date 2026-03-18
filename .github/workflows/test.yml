@@ -2,13 +2,20 @@ name: Test Suite
 
 on:
   push:
-    branches: [ master, v1 ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, v1 ]
+    branches: [ master ]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: ['18', '20']
 
     steps:
       - name: Checkout code
@@ -17,23 +24,37 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
         run: npm install
 
-      - name: Install BATS
+      - name: Install BATS and Bash 4+
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bats
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y bats sox ffmpeg
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Install bash 5.x (required for associative arrays in tests)
+            brew install bash bats-core sox ffmpeg
+            # Add to PATH
+            echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+          fi
 
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
-        run: npm test
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Ensure BATS uses bash 5.x for associative array support
+            export PATH="$(brew --prefix)/bin:$PATH"
+            echo "Using Bash version: $(bash --version | head -n 1)"
+          fi
+          npm test
 
       - name: Report test results
         if: always()
         run: |
-          echo "✅ Test suite completed"
+          echo "✅ Test suite completed on ${{ matrix.os }} with Node ${{ matrix.node-version }}"
           echo "See test results above"

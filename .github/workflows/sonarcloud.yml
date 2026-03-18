@@ -1,0 +1,78 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: read
+
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install BATS
+        run: sudo npm install -g bats
+
+      - name: Install sox for audio tests
+        run: sudo apt-get update && sudo apt-get install -y sox
+
+      - name: Run BATS tests
+        run: npm run test:syntax && AGENTVIBES_TEST_MODE=true bats test/unit/*.bats
+        continue-on-error: true  # Don't fail the workflow if tests fail
+        env:
+          AGENTVIBES_TEST_MODE: true
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+        env:
+          AGENTVIBES_TEST_MODE: true
+
+      - name: Verify coverage file exists
+        run: |
+          echo "Checking for coverage file..."
+          if [ -f coverage/lcov.info ]; then
+            echo "✅ coverage/lcov.info exists"
+            echo "File size: $(wc -l < coverage/lcov.info) lines"
+            echo "First 20 lines:"
+            head -20 coverage/lcov.info
+          else
+            echo "❌ coverage/lcov.info NOT FOUND"
+            ls -la coverage/ || echo "coverage/ directory does not exist"
+          fi
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@ba3875ecf642b2129de2b589510c81a8b53dbf4e # master as of 2025-12-08
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarCloud Results
+        if: always()
+        run: |
+          echo "📊 SonarCloud analysis complete"
+          echo "View detailed results: https://sonarcloud.io/dashboard?id=paulpreibisch_AgentVibes"
+          echo ""
+          echo "Note: Quality gate may fail for commits with mostly test/config changes."
+          echo "See .sonarcloud-quality-gate.md for details."

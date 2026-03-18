@@ -11,26 +11,157 @@ yarn-error.log*
 *.swp
 *.swo
 *~
-.claude/audio/
+# Audio files (but keep background music tracks)
+.claude/audio/*
+!.claude/audio/tracks/
+!.claude/audio/tracks/*.mp3
+!.claude/audio/backgrounds/
+.claude/audio/backgrounds/*
+!.claude/audio/backgrounds/README.md
+!.claude/audio/backgrounds/dreamy-house.mp3
+!.claude/audio/backgrounds/agent-vibes-dark-chill-step.mp3
+
+# TTS cache files (NEVER commit these - they can be 5GB+)
+.claude/audio/tts-*.mp3
+.claude/audio/tts-*.wav
+.claude/audio/tts-padded-*.mp3
+.claude/audio/tts-padded-*.wav
+.claude/audio/bmad-party-mode-recordings/
+
 .claude/journal/
 .claude/tts-*.txt
-.claude/config/
+# Config files (but keep audio-effects sample template)
+.claude/config/*
+!.claude/config/audio-effects.cfg.sample
+# User's actual config (don't overwrite customizations)
+.claude/config/audio-effects.cfg
 .claude/settings.local.json
-.claude/plugins/.bmad-previous-settings
+.agentvibes/
+.claude/piper-voices/
+.claude/piper-voices-dir.txt
+.claude/github-star-reminder.txt
 .bmad-agent-context
 *.tgz
 *.code-workspace
+*.db
+*.sqlite
+*.sqlite3
+
+# Voice model files (too large for git, download separately)
+mcp-server/voices/*.onnx
+mcp-server/voices/*.onnx.json
+templates/audio/welcome-demo.wav
+templates/audio/*.wav
 
 # BMAD Documentation (never commit)
+.bmad/
 .bmad-core/
 .claude/commands/BMad/
+.claude/commands/bmad/
+.claude/commands/agent-vibes-bmad.md
+.claude/commands/agent-vibes-bmad-party.md
+.claude/hooks/bmad-party-manager.sh
+.claude/hooks/stop.sh
 docs/stories/
 docs/prd.md
+docs/*.snagx
+docs/Screenshot*.png
+docs/macos-piper-issue.md
+docs/stargazer-cms-prd.md
+docs/whatsapp-*.md
 PRODUCT_REQUIREMENTS.md
 WORKSPACE_GUIDE.md
 WORKSPACE_SETUP_SUMMARY.md
-.claude/commands/agent-vibes-bmad.md
+RELEASE_NOTES_*_DRAFT.md
+github-profile-draft.md
 agentvibes.org/
+agentvibes/org/
+
+# MCP Server config (user-specific)
+.mcp.json
+.mcp-minimal.json
+
+# Local symlinks (user-specific paths)
+screenshots
+sounds
+personalities
+
+# Local utility scripts
+fixcolors
+sonar
+scripts/fix-wsl-audio.sh
+scripts/fix-audio-tunnel.sh
+scripts/fix-audio-tunnel-complete.sh
+scripts/check-audio-tunnel.sh
+scripts/check_audio_tunnel.sh
+scripts/health-check-tunnel.sh
+scripts/audio-tunnel.config
+
+# Test state files
+.test-bmad-config
+
+# Windows NTFS metadata
+*:Zone.Identifier
+
+# Windows NUL device artifacts (created by >NUL redirects in PowerShell)
+nul
+
+# Backup and temp files
+*.backup-*
+*.new
+.claude/personalities/backups/
 
 # LinkedIn articles (personal drafts)
 linkedin/
+
+# Scripts folder - user-specific config
+scripts/audio-tunnel.config
+.sonarqube-storage/
+
+# AgentVibes hide/show feature - local user state (never commit)
+.claude/.agentvibes-backup/
+.claude/.agentvibes-hidden.flag
+
+# Stargazer CMS - Private project (separate repo)
+../agentvibes-stargazers/
+
+# Journal files (may contain sensitive conversation logs)
+.claude/journal/
+agentvibes.org/.claude/journal/
+coverage/
+
+# BMAD project artifacts and planning docs (separate workflow)
+_bmad/
+docs/epics.md
+docs/stories.md
+docs/analysis/
+docs/implementation-artifacts/
+docs/planning-artifacts/
+docs/requirements/
+docs/excalidraw-diagrams/
+
+# Release guides and installer docs (temporary, for releases only)
+RELEASE_GUIDE_*.md
+RELEASE_NOTES_v*.md
+RELEASE_PACKAGE_SUMMARY.md
+INSTALLER-ENHANCEMENT-*.md
+INSTALLER-ENHANCEMENT-COMPLETION-REPORT.md
+INSTALLER-ENHANCEMENT-INDEX.md
+INSTALLER-ENHANCEMENT-SUMMARY.md
+
+# Installation screenshots (generated during testing)
+docs/installation-screenshots/
+
+# Voice sample generation scripts (user-specific)
+scripts/generate-*.sh
+scripts/regenerate-*.sh
+
+# Local project state files
+.agentvibes-unmuted
+.claude/hooks/post-response.sh
+.claude/story-workflow.sh
+bin/ensure-soprano-running.sh
+docs/personality-preview-phrases.md
+
+# Test infrastructure (not part of core package)
+test/installer/

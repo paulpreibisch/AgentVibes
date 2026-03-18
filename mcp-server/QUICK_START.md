@@ -54,7 +54,6 @@ python3 test_server.py
       "command": "python3",
       "args": ["/FULL/PATH/TO/AgentVibes/mcp-server/server.py"],
       "env": {
-        "ELEVENLABS_API_KEY": "sk-..."
       }
     }
   }
@@ -160,7 +159,7 @@ Copy from `examples/custom_instructions.md` to enable automatic voice acknowledg
 
 ### Using Piper (Free, Offline)
 
-If you don't have an ElevenLabs API key:
+If you don't have an Piper TTS API key:
 
 ```bash
 # Install Piper
@@ -170,7 +169,6 @@ pipx install piper-tts
 cd /path/to/AgentVibes
 .claude/hooks/provider-manager.sh switch piper
 
-# Update Claude Desktop config (remove ELEVENLABS_API_KEY)
 {
   "mcpServers": {
     "agentvibes": {

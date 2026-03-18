@@ -1,11 +1,58 @@
-#!/bin/bash
-# Language Learning Mode Manager for AgentVibes
-# Handles dual-language TTS for language learning
+#!/usr/bin/env bash
+#
+# File: .claude/hooks/learn-manager.sh
+#
+# AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+# Website: https://agentvibes.org
+# Repository: https://github.com/paulpreibisch/AgentVibes
+#
+# Co-created by Paul Preibisch with Claude AI
+# Copyright (c) 2025 Paul Preibisch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DISCLAIMER: This software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# express or implied. Use at your own risk. See the Apache License for details.
+#
+# ---
+#
+# @fileoverview Language Learning Mode Manager - Enables dual-language TTS for immersive learning
+# @context Speaks responses in both main language (English) and target language (Spanish, French, etc.) for language practice
+# @architecture Manages main/target language pairs with voice mappings, auto-configures recommended voices per language
+# @dependencies play-tts.sh (dual invocation), language-manager.sh (voice recommendations), .claude/tts-*.txt state files
+# @entrypoints Called by /agent-vibes:learn commands to enable/disable learning mode
+# @patterns Dual-voice orchestration, auto-configuration, greeting on activation, provider-aware voice selection
+# @related language-manager.sh, play-tts.sh, .claude/tts-learn-mode.txt, .claude/tts-target-language.txt
 
-set -e
+# Only set strict mode when executed directly, not when sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -e
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$SCRIPT_DIR/../.."
+
+# Bash 3.2 compatible lowercase function (macOS ships with bash 3.2)
+# ${var,,} syntax requires bash 4.0+
+_to_lower() {
+  echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+# Use PWD for project dir when called from project context, fall back to script-relative
+if [[ -d "$PWD/.claude" ]]; then
+    PROJECT_DIR="$PWD"
+else
+    PROJECT_DIR="$SCRIPT_DIR/../.."
+fi
 
 # Configuration files (project-local first, then global fallback)
 MAIN_LANG_FILE="$PROJECT_DIR/.claude/tts-main-language.txt"
@@ -63,7 +110,7 @@ get_target_language() {
 get_greeting_for_language() {
     local language="$1"
 
-    case "${language,,}" in
+    case "$(_to_lower "$language")" in
         spanish|español)
             echo "¡Hola! Soy tu profesor de español. ¡Vamos a aprender juntos!"
             ;;
@@ -140,7 +187,7 @@ set_target_language() {
         elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
             provider=$(cat "$HOME/.claude/tts-provider.txt")
         else
-            provider="elevenlabs"
+            provider="piper"
         fi
         echo -e "   (for ${GREEN}$provider${NC} TTS)"
         echo ""
@@ -160,7 +207,7 @@ set_target_language() {
                 echo -e "${YELLOW}   (Voice not yet downloaded - greeting will play after first download)${NC}"
             fi
         else
-            # ElevenLabs - just play it in background
+            # macOS or other provider - just play it in background
             nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$recommended_voice" >/dev/null 2>&1 &
         fi
     else
@@ -181,7 +228,7 @@ get_recommended_voice_for_language() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider=$(cat "$HOME/.claude/tts-provider.txt")
     else
-        provider="elevenlabs"  # Default
+        provider="piper"  # Default
     fi
 
     # Source language manager and get provider-specific voice
@@ -192,7 +239,7 @@ get_recommended_voice_for_language() {
 
     # Fallback to hardcoded suggestions if function failed
     if [[ -z "$recommended_voice" ]]; then
-        case "${language,,}" in
+        case "$(_to_lower "$language")" in
             spanish|español)
                 recommended_voice=$([ "$provider" = "piper" ] && echo "es_ES-davefx-medium" || echo "Antoni")
                 ;;
@@ -232,7 +279,7 @@ suggest_voice_for_language() {
     elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
         provider=$(cat "$HOME/.claude/tts-provider.txt")
     else
-        provider="elevenlabs"
+        provider="piper"
     fi
 
     echo ""
@@ -304,7 +351,7 @@ enable_learn_mode() {
             elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
                 provider=$(cat "$HOME/.claude/tts-provider.txt")
             else
-                provider="elevenlabs"
+                provider="piper"
             fi
             echo -e "   (for ${GREEN}$provider${NC} TTS)"
             echo ""
@@ -327,7 +374,7 @@ enable_learn_mode() {
         elif [[ -f "$HOME/.claude/tts-provider.txt" ]]; then
             provider=$(cat "$HOME/.claude/tts-provider.txt")
         else
-            provider="elevenlabs"
+            provider="piper"
         fi
 
         # Check if we're using Piper and if the voice is available
@@ -341,7 +388,7 @@ enable_learn_mode() {
                 echo -e "${YELLOW}   (Voice not yet downloaded - greeting will play after first download)${NC}"
             fi
         else
-            # ElevenLabs - just play it in background
+            # macOS or other provider - just play it in background
             nohup "$SCRIPT_DIR/play-tts.sh" "$greeting" "$target_voice" >/dev/null 2>&1 &
         fi
     fi
@@ -398,7 +445,8 @@ show_status() {
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
-# Main command handler
+# Main command handler - only run if script is executed directly, not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 case "${1:-}" in
     get-main-language)
         get_main_language
@@ -441,3 +489,4 @@ case "${1:-}" in
         exit 1
         ;;
 esac
+fi

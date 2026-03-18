@@ -2,7 +2,7 @@
 
 ## Overview
 
-AgentVibes uses **BATS (Bash Automated Testing System)** for comprehensive testing without calling real ElevenLabs API or playing audio.
+AgentVibes uses **BATS (Bash Automated Testing System)** for comprehensive testing without calling real Piper TTS API or playing audio.
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ npm run test:verbose
 
 **No API Calls:**
 - `curl` is mocked to return silent test MP3 files
-- No actual ElevenLabs API requests
+- No actual Piper TTS API requests
 - No token usage during testing
 
 **No Audio Playback:**
@@ -119,7 +119,7 @@ Available helpers from `test/helpers/test-helper.bash`:
 
 - `setup_test_env()` - Create isolated test environment
 - `teardown_test_env()` - Clean up after tests
-- `mock_curl()` - Mock ElevenLabs API
+- `mock_curl()` - Mock Piper TTS API
 - `mock_audio_players()` - Mock audio playback
 - `setup_agentvibes_scripts()` - Copy scripts to test location
 - `create_test_personality()` - Create test personality files

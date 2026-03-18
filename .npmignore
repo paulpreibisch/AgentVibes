@@ -1,10 +1,14 @@
 # Development and local files
 .claude/journal/
-.claude/audio/
+.claude/audio/*
+!.claude/audio/tracks/
+!.claude/audio/tracks/*.mp3
 .claude/config/
 .claude/settings.local.json
 .claude/tts-*.txt
+.agentvibes/
 .claude/personalities/backups/
+.claude/piper-voices/
 *.code-workspace
 
 # Git files
@@ -46,3 +50,33 @@ RELEASE_PROCESS.md
 
 # NOTE: RELEASE_NOTES.md is intentionally NOT ignored - it's used by the installer
 # to display release information when git is unavailable (e.g., when running via npx)
+
+# Large demo/template audio files (too large for npm)
+templates/audio/*.wav
+
+# Voice model files (too large for npm, downloaded separately via piper-download-voices.sh)
+mcp-server/voices/*.onnx
+mcp-server/voices/*.onnx.json
+mcp-server/voices/previews/
+mcp-server/voices/*.sh
+mcp-server/voices/README.md
+
+# BMAD bundle files (internal tooling, not needed by end users)
+mcp-server/bmad-bundles/*.txt
+mcp-server/bmad-bundles/VOICE_MAPPINGS.md
+
+# Internal documentation
+docs/huggingface-setup-guide.md
+
+# Sensitive/internal directories (not for public npm)
+agentvibes.org/
+agentvibes/
+
+# Backup files
+*.backup
+src/*.backup
+
+# BMAD workflows (separate package, not part of AgentVibes core)
+.bmad/
+.claude/commands/bmad/
+.claude/commands/BMad/

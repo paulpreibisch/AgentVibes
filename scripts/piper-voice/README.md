@@ -68,7 +68,7 @@ echo "Hello from Piper!" | piper \
 ### With AgentVibes
 
 Integration with AgentVibes is coming soon! This will allow you to:
-- Use Piper as an alternative to ElevenLabs
+- Use Piper as an alternative to Piper TTS
 - Switch between providers with `/agent-vibes:provider`
 - Save on API costs while maintaining quality
 

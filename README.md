@@ -1,17 +1,34 @@
 # 🎤 AgentVibes
 
-> **Bring your Claude AI sessions to life with voice!**
+> **Finally! Your agents can talk back!**
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **Warp Terminal** - **ElevenLabs AI** or **Piper TTS (Free!)**
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
 
-[![npm version](https://img.shields.io/npm/v/agentvibes?color=blue)](https://www.npmjs.com/package/agentvibes)
+[![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v2.0.16
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.2
+
+---
+
+## 🚀 Quick Links
+
+| I want to... | Go here |
+|--------------|---------|
+| **Install AgentVibes** (just `npx`, no git!) | [Quick Start Guide](docs/quick-start.md) |
+| **Run Claude Code on Android** | [Android/Termux Setup](#-android--termux) |
+| **Secure OpenClaw on Remote Server** | [Security Hardening Guide](docs/security-hardening-guide.md) ⚠️ |
+| **Understand what I need** | [Prerequisites](#-prerequisites) |
+| **Set up on Windows (Native)** | [Windows Native Setup](WINDOWS-SETUP.md) |
+| **Set up on Windows (Claude Desktop/WSL)** | [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md) |
+| **Use with OpenClaw** | [OpenClaw Integration](#-openclaw-integration) |
+| **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
+| **Switch voices** | [Voice Library](docs/voice-library.md) |
+| **Fix issues** (git-lfs? MCP tokens? Read this!) | [Troubleshooting](docs/troubleshooting.md) & [FAQ](#-frequently-asked-questions-faq) |
 
 ---
 
@@ -19,50 +36,326 @@
 
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
-Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp Terminal - AgentVibes brings AI to life with professional voices and personalities.
+Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Terminal, or running OpenClaw - AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🌟 NEW IN v4.2 — BMAD Voices, SSH Receiver & More
+
+### 🎭 BMAD Party Mode — Every Agent Has Its Own Voice
+
+The BMad Method (Build More Architect Dreams) is an AI-driven development framework that helps you build software from ideation through agentic implementation with specialized AI agents, guided workflows, and intelligent planning that adapts to your project's complexity.
+
+**Every BMAD agent now speaks with their own unique voice, music, and personality.**
+
+When party mode runs a multi-agent discussion, the Architect, PM, Developer, QA, and Analyst each sound completely different — making every role immediately recognizable.
+
+**Auto-enabled** — if BMAD is installed, party mode activates automatically. Open the BMad Tab to configure each agent:
+
+```bash
+npx agentvibes   # Press B to open the BMad Tab
+```
+
+**Per-agent configuration:**
+- 🎙️ **Voice** — 914 voices to choose from, auto-assigned gender-aware
+- 🎵 **Background Music** — Unique ambient track per agent (cinematic, lo-fi, jazz...)
+- 🎚️ **Music Volume** — Per-agent level, or set all at once via Bulk Edit
+- 🎛️ **Reverb** — none / room / hall / cathedral / studio per agent
+- 💬 **Pretext** — Custom intro phrase ("Winston says:..." before every line)
+- 🎭 **Personality** — sarcastic, dramatic, pirate, cheerful, and more
+- 🔇 **No Overlap** — Speech lock ensures agents never talk over each other
+- ✨ **Markdown-Clean** — Asterisks and formatting stripped before TTS
+
+### 🎛️ BMad Tab — Visual Agent Configurator
+
+The `npx agentvibes` TUI now includes a full **BMad Tab** for managing every agent visually — inspired by the Voices tab, with the same columns and navigation polish:
+
+```bash
+npx agentvibes   # Press B for BMad Tab
+```
+
+| Agent | Voice | Gender | Provider | Reverb | Music | Vol | Pretext |
+|-------|-------|--------|----------|--------|-------|-----|---------|
+| 🏢 Winston | Rose Ibex | Female | Piper (LibriTTS) | studio | jazz | 65% | Winston says |
+| 🧠 Larry | Kusal | Male | Piper | hall | cinematic | 80% | Larry says |
+
+**Highlights:**
+- **Beautified voice names** — `16Speakers::Rose_Ibex` shows as `Rose Ibex`; `en_US-kusal-medium` shows as `Kusal`
+- **Gender & Provider columns** — see voice metadata at a glance, just like the Voices tab
+- **Inline row hints** — navigate to any agent and see `[Space] Preview  [Enter] Configure` on the row itself
+- **Preview spinner** — animated `⠋⠙⠹⠸` braille spinner while audio plays
+
+| Key | Action |
+|-----|--------|
+| `↑↓` / `jk` | Navigate agents |
+| `Space` | Preview agent (spinner shows while playing) |
+| `Enter` | Configure voice, music, volume, reverb, personality, pretext |
+| `A` | Auto-assign unique voices (gender-aware, no repeats) |
+| `B` | Bulk Edit — set music / volume / pretext / reverb for all agents |
+| `X` | Reset agent to defaults |
+
+---
+
+### 🖥️ SSH Receiver — Hear Your Headless Server
+
+**Run Claude on a cloud box and hear the TTS on your local machine.**
+
+The new **Receiver Tab** streams TTS audio from voiceless remote servers to your local machine over TCP — perfect for AWS/GCP dev boxes, WSL2, and SSH sessions.
+
+```bash
+# On your local machine — open TUI, go to Receiver tab, click Start
+npx agentvibes
+
+# On the remote server — AgentVibes auto-detects the receiver and streams
+```
+
+Zero-config forwarding. Works with Piper, macOS Say, and Soprano.
+
+---
+
+### ⚡ TTS Latency -~1 Second
+
+- **Batched Node.js calls** — 6 separate profile reads collapsed into 1 (~900ms saved)
+- **inotifywait queue** — file-event-based worker, no polling delay
+- **Background cache cleanup** — off the critical path every 10th call
+
+---
+
+### 🎨 ANSI Banner Colors + Toggle
+
+Full color in the TTS banner (gold voice, cyan reverb, traffic-light cache). Hide it without muting:
+
+```bash
+touch ~/.agentvibes/banner-disabled   # or say "turn off the TTS banner"
+```
+
+---
+
+### 💬 Intro Text (Pretext) - Your Personal AI Branding
+
+**Add custom prefixes to every TTS announcement!**
+
+Configure via the AgentVibes TUI Settings tab:
+
+```bash
+npx agentvibes   # Navigate to Settings tab
+```
+
+Transform generic AI responses into your personal brand:
+
+**Before:**
+```
+"Starting analysis of the codebase..."
+```
+
+**After (with "FireBot: " intro text):**
+```
+"FireBot: Starting analysis of the codebase..."
+```
+
+**Perfect for:**
+- 🤖 **Personal AI Branding** - Make Claude sound like your custom assistant
+- 🏢 **Team Identity** - Company bots with branded voices
+- 🎮 **Character Roleplay** - Gaming assistants with character names
+- 🎓 **Teaching Contexts** - Professor Bot, Tutor AI, etc.
+
+**Features:**
+- Up to 50 characters
+- UTF-8 and emoji support 🎉
+- Set during installation or anytime after
+- Works with all TTS providers
+- Applies to every single announcement
+
+**Examples:**
+- `"JARVIS: "` - Iron Man style
+- `"🤖 Assistant: "` - With emoji
+- `"CodeBot: "` - Development assistant
+- `"Chef AI: "` - Cooking helper
+
+Configure via: `npx agentvibes` → Settings tab
+
+---
+
+### 🎵 Custom Background Music - Complete Audio Control
+
+**Upload your own background music with battle-tested security!**
+
+Configure via the AgentVibes TUI Music tab:
+
+```bash
+npx agentvibes   # Navigate to Music tab
+```
+
+Replace the default background tracks with your own audio files.
+
+**Supported Formats:**
+- 🎵 MP3 (.mp3)
+- 🎵 WAV (.wav)
+- 🎵 OGG (.ogg)
+- 🎵 M4A (.m4a)
+
+**Security First:**
+- ✅ **180+ attack variations tested** - Path traversal, symlinks, Unicode tricks
+- ✅ **100% attack rejection rate** - Every malicious attempt blocked
+- ✅ **OWASP CWE-22 compliant** - Industry-standard security
+- ✅ **7 validation layers** - Defense-in-depth architecture
+- ✅ **File ownership verification** - Only your files accepted
+- ✅ **Magic number validation** - Real audio files only
+- ✅ **Secure storage** - 600 permissions, restricted directory
+
+**Smart Validation:**
+- Recommended duration: 30-90 seconds (optimal looping)
+- Maximum: 300 seconds (5 minutes)
+- Maximum size: 50MB
+- Automatic format detection
+- Duration warnings for non-optimal lengths
+
+**Perfect for:**
+- 🎮 **Making coding fun** - Your favorite beats while you build
+- 🎼 **Setting the mood** - Match the music to the task (lo-fi for debugging, epic for shipping)
+- 🗂️ **Identifying projects** - Different track per repo so you always know which project Claude is in
+- 🎹 **Deep focus** - Ambient or classical to stay in flow
+
+**Features:**
+- Preview before setting
+- One-command upload
+- Works with all TTS providers
+- Loops seamlessly under voice
+- Easy restore to defaults
+
+**Menu Options:**
+1. Change music - Upload new audio file
+2. Remove music - Clear custom music
+3. Reset to default - Restore built-in tracks (16 genres)
+4. Enable/Disable - Toggle background music
+5. Preview current - Sample your music
+
+Configure via: `npx agentvibes` → Music tab
+
+**Security Certified:** See full audit report at `docs/security/SECURITY-AUDIT.md`
+
+---
 
 ### 🎯 Key Features
 
-- 🎙️ **AgentVibes MCP** - **NEW!** Natural language control for Claude Code, Claude Desktop & Warp (no slash commands!)
-- 🎭 **Multi-Provider Support** - Choose ElevenLabs (150+ premium voices) or Piper TTS (50+ free voices)
-- 🌍 **30+ Languages** - Multilingual support with native voice quality
+**🌟 NEW IN v4.2 — BMAD Party Mode & SSH Receiver:**
+- 🎭 **BMAD Party Mode Voices** — Each agent speaks with their unique voice, music, reverb, personality
+- 🖥️ **SSH Receiver Tab** — Stream TTS audio from headless servers to your local machine over TCP
+- 🎛️ **BMad Tab (TUI)** — Visual agent configurator with auto-assign and bulk edit
+- ⚡ **TTS Latency -1s** — Batched Node.js calls, inotifywait queue, background cleanup
+- 🎨 **ANSI Banner Colors Restored** — Gold/cyan/traffic-light colors in TTS info banner
+- 🔕 **Banner Toggle** — Hide TTS banner without muting (`~/.agentvibes/banner-disabled`)
+- 🔇 **No Party Mode Overlap** — Agents wait for full audio before next speaks
+- 🧹 **Markdown-Clean Speech** — Asterisks/formatting stripped automatically from party mode
+
+**🌟 NEW IN v3.6.0 — Voice Explorer Release:**
+- 🏷️ **Friendly Voice Names** - "Ryan" instead of "en_US-libritts_r-medium-speaker-123"
+- 💬 **Intro Text (Pretext)** - Custom prefix for all TTS ("FireBot: Starting...")
+- 🎵 **Custom Background Music** - Upload your own audio files with battle-tested security
+- 🎨 **Interactive Installer** - Preview voices and music during installation
+- 🛡️ **Security Hardening** - 180+ attack variations tested, 100% blocked, OWASP compliant
+
+**🪟 NEW IN v3.5.5 — Native Windows Support:**
+- 🖥️ **Windows Native TTS** - Soprano, Piper, and Windows SAPI providers. No WSL required!
+- 🎵 **Background Music** - 16 genre tracks mixed under voice
+- 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg
+- 🔊 **Verbosity Control** - High, Medium, or Low settings
+- 🎨 **Beautiful Installer** - `npx agentvibes install` or `.\setup-windows.ps1`
+
+**⚡ v3.4.0 Highlights:**
+- 🎤 **Soprano TTS Provider** - Ultra-fast neural TTS with 20x CPU, 2000x GPU acceleration (thanks [@nathanchase](https://github.com/nathanchase)!)
+- 🛡️ **Security Hardening** - 9.5/10 score with comprehensive validation and timeouts
+- 🌐 **Environment Intelligence** - PulseAudio tunnel auto-detection for SSH scenarios
+
+**⚡ Core Features:**
+- ⚡ **One-Command Install** - Get started in 30 seconds (`npx agentvibes install` or `.\setup-windows.ps1` without Node.js)
+- 🎭 **Multi-Provider Support** - Soprano (neural), Piper TTS (50+ free voices), macOS Say (100+ built-in), or Windows SAPI
 - 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
+- 🎙️ **Verbosity Control** - Choose how much Claude speaks (LOW, MEDIUM, HIGH)
+- 🎙️ **AgentVibes MCP** - Natural language control ("Switch to Aria voice") for Claude Code, Desktop & Warp
+- 🔊 **SSH Audio Optimization** - Auto-detects remote sessions and eliminates static (VS Code Remote SSH, cloud dev)
+
+**🎭 Personalization:**
 - 🎭 **19 Built-in Personalities** - From sarcastic to flirty, pirate to dry humor
 - 💬 **Advanced Sentiment System** - Apply personality styles to ANY voice without changing it
+- 🎵 **Voice Preview & Replay** - Listen before you choose, replay last 10 TTS messages
+
+**🚀 Integrations & Power Features:**
 - 🔌 **Enhanced BMAD Plugin** - Auto voice switching for BMAD agents with multilingual support
 - 🔊 **Live Audio Feedback** - Hear task acknowledgments and completions in any language
-- 🎵 **Voice Preview & Replay** - Listen before you choose, replay last 10 TTS messages
-- 🆓 **Free Option Available** - Use Piper TTS with no API key required
-- ⚡ **One-Command Install** - Get started in seconds
+- 🌍 **30+ Languages** - Multilingual support with native voice quality
+- 🆓 **Free & Open** - Use Piper TTS with no API key required
+
+### 🤗 Hugging Face AI Voice Models
+
+**AgentVibes' Piper TTS uses 100% Hugging Face-trained AI voice models** from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices).
+
+**What are Hugging Face voice models?**
+
+Hugging Face voice models are pre-trained artificial intelligence models hosted on the Hugging Face Model Hub platform, designed to convert text into human-like speech (Text-to-Speech or TTS) or perform other speech tasks like voice cloning and speech-to-speech translation. They're accessible via their Transformers library for easy use in applications like voice assistants, audio generation, and more.
+
+**Key Benefits:**
+- 🎯 **Human-like Speech** - VITS-based neural models for natural pronunciation and intonation
+- 🌍 **35+ Languages** - Multilingual support with native accents
+- 🆓 **100% Open Source** - All Piper voices are free HF models (Tacotron2, FastSpeech2, VITS)
+- 🔧 **Developer-Friendly** - Fine-tune, customize, or deploy for various audio projects
+- ⚡ **Offline & Fast** - No API keys, no internet needed once installed
+
+All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-source AI voice models, ensuring high-quality, natural-sounding speech synthesis across all supported platforms.
 
 ---
 
 ## 📑 Table of Contents
 
 ### Getting Started
-- [🚀 Quick Start](#-quick-start) - Install in 3 steps
+- [🚀 Quick Start](#-quick-start) - Get voice in 30 seconds (3 simple steps)
+- [📱 Android/Termux](#-quick-setup-android--termux-claude-code-on-your-phone) - Run Claude Code on your phone
+- [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
-- [🎙️ NEW: AgentVibes MCP](#️-agentvibes-mcp-easiest-way-to-use-agentvibes) - **Easiest way** - Natural language commands
-- [📰 Latest Release](#-latest-release) - What's new
+- [🌟 NEW FEATURE HIGHLIGHTS](#-new-feature-highlights) - **START HERE!**
+  - [🎭 BMAD Party Mode](#-bmad-party-mode--multi-agent-voice-conversations) - Per-agent voices, music, reverb
+  - [🖥️ SSH Receiver](#️-agentvibes-receiver--remote-audio-streaming) - Stream audio from headless servers
+  - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
+  - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
+- [📰 Latest Release](#-latest-release) - v4.2 "Party Mode" — BMAD multi-agent voices, SSH Receiver, BMad Tab, ~1s latency improvement
+- [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
+
+### AgentVibes MCP (Natural Language Control)
+- [🎙️ AgentVibes MCP Overview](#%EF%B8%8F-agentvibes-mcp) - **Easiest way** - Natural language commands
+  - [For Claude Desktop](docs/mcp-setup.md#for-claude-desktop) - Windows/WSL setup, Python requirements
+  - [For Warp Terminal](docs/mcp-setup.md#for-warp-terminal) - Warp configuration
+  - [For Claude Code](docs/mcp-setup.md#for-claude-code) - Project-specific setup
 
 ### Core Features
 - [🎤 Commands Reference](#-commands-reference) - All available commands
+- [🎙️ Verbosity Control](#%EF%B8%8F-verbosity-control) - Control how much Claude speaks (low/medium/high)
 - [🎭 Personalities vs Sentiments](#-personalities-vs-sentiments) - Two systems explained
-- [🗣️ Voice Library](#️-voice-library) - 27+ professional voices
-- [🌍 Multilingual Support](#change-language) - Speak in 30+ languages
+- [🗣️ Voice Library](#%EF%B8%8F-voice-library) - 914 voices with friendly names
 - [🔌 BMAD Plugin](#-bmad-plugin) - Auto voice switching for BMAD agents
+- [🎙️ AgentVibes Receiver - NEW!](#%EF%B8%8F-agentvibes-receiver-remote-audio-streaming-from-voiceless-servers) - Remote audio streaming from voiceless servers
+
+### Integrations & Platforms
+- [🤖 OpenClaw Integration](#-openclaw-integration) - Use AgentVibes with OpenClaw messaging platform
+  - [🎙️ AgentVibes Skill for OpenClaw](#-agentvibes-skill-for-openclaw---what-you-get) - 50+ voices, effects, personalities for OpenClaw
+  - [📱 AgentVibes Receiver](#-agentvibes-receiver-local-phone-) - Remote audio on phones/local machines
 
 ### Advanced Topics
 - [📦 Installation Structure](#-installation-structure) - What gets installed
-- [💡 Usage Examples](#-usage-examples) - Common workflows
+- [💡 Common Workflows](#-common-workflows) - Quick examples
 - [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
 - [🔊 Remote Audio Setup](#-remote-audio-setup) - Play TTS from remote servers
-- [💰 Pricing & Usage](#-pricing--usage) - ElevenLabs costs & monitoring
+- [🛠️ Technical Documentation](#️-technical-documentation) - Audio architecture, cross-platform support, voice resolution
+- [🚨 Security Hardening Guide](docs/security-hardening-guide.md) - **REQUIRED if running OpenClaw on remote server**: SSH hardening, Fail2Ban, Tailscale, UFW, AIDE
+- [🔬 Technical Deep Dive](docs/technical-deep-dive.md) - How AgentVibes works under the hood
 - [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
 
 ### Additional Resources
 - [🔗 Useful Links](#-useful-links) - Voice typing & AI tools
 - [🔄 Updating](#-updating) - Keep AgentVibes current
+- [🗑️ Uninstalling](#️-uninstalling) - Remove AgentVibes cleanly
+- [❓ FAQ](#-frequently-asked-questions-faq) - **NEW!** Common questions answered (git-lfs, MCP tokens, installation)
+- [🍎 macOS Testing](docs/macos-testing.md) - Automated testing on macOS with GitHub Actions
+- [🤗 Hugging Face Voice Models](docs/hugging-face-models.md) - Technical details on AI voice models
 - [🙏 Credits](#-credits) - Acknowledgments
 - [🤝 Contributing](#-contributing) - Show support
 
@@ -70,353 +363,479 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or using Warp 
 
 ## 📰 Latest Release
 
-**[v2.0.16 - Release Notes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v2.0.16)** 🎉
+**[v4.2 - "Party Mode" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.2)** 🎉
 
-**NEW: AgentVibes MCP!** Control AgentVibes with natural language in Claude Code, Claude Desktop, and Warp Terminal - no need to remember slash commands!
+This is the biggest AgentVibes release since the TUI launched in v4.0. Two headline features: **BMAD Party Mode** gives every agent their own voice and music, and the **SSH Receiver** lets you hear your headless server speak on your local machine.
 
-Expanded voice library (27+ voices), **Multi-provider TTS support** (ElevenLabs + Piper TTS), **30+ languages**, **AgentVibes MCP integration** for Claude Code/Desktop/Warp, advanced sentiment system, enhanced BMAD integration, and comprehensive multilingual support.
+### 🎭 BMAD Party Mode — Multi-Agent Voice Conversations
 
-**Key highlights:**
-- 🎙️ **AgentVibes MCP** - Natural language control for Claude Code, Claude Desktop & Warp Terminal
-- 🎭 **Multi-Provider Support** - Switch between ElevenLabs (150+ voices) and Piper TTS (50+ free voices)
-- 🌍 **30+ Languages** - Speak in Spanish, French, German, Chinese, Japanese, and more
-- 🎤 **27+ Professional Voices** - Expanded voice library with multilingual support
-- 💬 **Advanced Sentiment System** - Apply personality styles to ANY voice
-- 🔌 **Enhanced BMAD Plugin** - Multilingual agent voices with personality mapping
+The BMad Method (Build More Architect Dreams) is an AI-driven development framework module that helps you build software from ideation through agentic implementation with specialized AI agents, guided workflows, and intelligent planning.
 
-[→ View Full Release Notes](RELEASE_NOTES_V2.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+Every agent in a BMAD discussion now speaks with their own individually configured voice, music, reverb, and personality — making the Architect, PM, Developer, QA, and Analyst immediately recognizable the moment they speak.
 
----
+**Auto-enabled** — party mode activates automatically when BMAD is detected. Configure agents visually:
 
-## 🎙️ AgentVibes MCP (Easiest Way to Use AgentVibes!)
-
-**🎯 The easiest way to control AgentVibes - just talk naturally!**
-
-In addition to installing AgentVibes in Claude Code using the NPX installer, we **highly recommend** installing the AgentVibes MCP server. This allows you to control AgentVibes simply by talking naturally to it (especially if you've installed [WhisperTyping](https://whispertyping.com/)), rather than having to remember slash commands.
-
-**Note:** Slash commands (`/agent-vibes:*`) only work in Claude Code. For Claude Desktop and Warp Terminal, you **must** use the AgentVibes MCP for voice control.
-
-Instead of remembering slash commands like `/agent-vibes:switch Aria`, just say:
-- "Switch to Aria voice"
-- "Change to pirate personality"
-- "Speak in Spanish"
-- "List available voices"
-
-### Why Use AgentVibes MCP?
-
-✅ **Natural language** - No commands to memorize
-
-✅ **Works everywhere** - Claude Desktop, Claude Code, Warp Terminal
-
-✅ **Unified interface** - Same tools across all apps
-
-✅ **Smart context** - Project-specific or global settings
-
-### Quick MCP Setup
-
-#### For Claude Desktop
-
-**⚠️ IMPORTANT Requirements:**
-
-- **Windows:** WSL (Windows Subsystem for Linux) must be enabled
-- **Python 3:** Must be installed on your system ([Download Python](https://www.python.org/downloads/))
-  - The MCP server will automatically install Python packages (mcp, pipx, Piper TTS)
-  - But Python 3 itself must be installed first by you
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "agentvibes": {
-      "command": "npx",
-      "args": ["-y", "agentvibes-mcp-server"],
-      "env": {
-        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
-      }
-    }
-  }
-}
+```bash
+npx agentvibes   # Press B for BMad Tab
 ```
 
-#### For Warp Terminal
+**Each agent gets:**
+- 🎙️ **Their own voice** — 914 to choose from, or auto-assign gender-aware
+- 🎵 **Their own music track** — cinematic for the Architect, lo-fi for the Dev
+- 🎚️ **Their own volume** — fine-tune per-agent, or bulk-set all at once
+- 🎛️ **Their own reverb** — studio, hall, cathedral, room, or none
+- 💬 **Their own pretext** — "Winston says:..." before every line
+- 🎭 **Their own personality** — sarcastic, dramatic, pirate, cheerful...
+- 🔇 **No overlap** — agents wait for full audio before the next one speaks
+- ✨ **Markdown stripped** — no "asterisk asterisk" in TTS output
 
-Add to `~/.warp/mcp.json`:
+### 🎛️ BMad Tab — Full Visual Agent Configurator
 
-```json
-{
-  "agentvibes": {
-    "command": "npx",
-    "args": ["-y", "agentvibes-mcp-server"],
-    "env": {
-      "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
-    }
-  }
-}
+Manage every agent from an interactive table — same polish as the Voices tab:
+
+| Key | Action |
+|-----|--------|
+| `Space` | Preview agent with full profile (animated spinner while playing) |
+| `Enter` | Configure voice, music, volume, reverb, personality, pretext |
+| `A` | Auto-assign unique voices (gender-aware, no repeats) |
+| `B` | Bulk Edit — set music / volume / pretext / reverb for all agents |
+| `X` | Reset agent to defaults |
+
+The table shows **Voice, Gender, Provider, Reverb, Music, Vol, Pretext** columns. Voice names are automatically beautified: `16Speakers::Rose_Ibex` → `Rose Ibex`.
+
+### 🖥️ SSH Receiver — Hear Your Headless Server
+
+Stream TTS from a cloud box, WSL2, or any voiceless server directly to your local machine over TCP:
+
+```bash
+# Local: open TUI → Receiver tab → Start
+npx agentvibes
+
+# Remote: AgentVibes auto-detects the receiver and streams audio to you
 ```
 
-#### For Claude Code
+### ⚡ ~1 Second Faster TTS
 
-Add to `.mcp-minimal.json` in your project:
+- 6 Node.js profile reads collapsed into 1 (~900ms saved per speech)
+- `inotifywait` queue worker — no polling delay
+- Cache cleanup runs off the critical path
 
-```json
-{
-  "mcpServers": {
-    "agentvibes": {
-      "command": "npx",
-      "args": ["-y", "agentvibes-mcp-server"],
-      "env": {
-        "ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"
-      }
-    }
-  }
-}
+### 🎨 ANSI Colors Restored + Banner Toggle
+
+Full color in the TTS banner. Silence it without muting audio:
+```bash
+touch ~/.agentvibes/banner-disabled   # or: "turn off the TTS banner" via MCP
 ```
 
-**That's it!** Restart the app and start using natural language:
+### Quick Install
 
-```
-"Switch to Northern Terry voice"
-"Change personality to sarcastic"
-"What voices are available?"
-"Speak in French"
-"Show my current configuration"
-```
-
-### AgentVibes MCP vs Slash Commands
-
-| Feature | AgentVibes MCP | Slash Commands |
-|---------|-----------|----------------|
-| **Ease of Use** | Natural language | Must remember syntax |
-| **Works In** | Claude Desktop, Warp, Claude Code | Claude Code only |
-| **Setup** | Add to config file | Auto-installed |
-| **Examples** | "Switch voice to Aria" | `/agent-vibes:switch Aria` |
-
-**💡 Recommendation:** Use **AgentVibes MCP for daily use** (easier), **slash commands for scripting** (precise).
-
-### Available AgentVibes MCP Tools
-
-All these work with natural language:
-
-| Tool | Example Command |
-|------|-----------------|
-| **text_to_speech** | "Say hello in a pirate voice" |
-| **list_voices** | "What voices are available?" |
-| **set_voice** | "Change to Aria voice" |
-| **list_personalities** | "Show me all personalities" |
-| **set_personality** | "Set personality to flirty" |
-| **set_language** | "Speak in Spanish" |
-| **get_config** | "What's my current voice?" |
-| **replay_audio** | "Replay the last message" |
-
-### Where Settings Are Saved
-
-The MCP server is smart about where it saves settings:
-
-- **Warp Terminal** → Global `~/.claude/` (terminal-wide settings)
-- **Claude Code** → Project `.claude/` (per-project settings)
-- **Claude Desktop** → Project `.claude/` (per-project settings)
-
-This means different projects can have different voices/personalities!
-
-[↑ Back to top](#-table-of-contents)
-
----
-
-## 🚀 Claude Code Quick Start
-
-### Step 1: Install AgentVibes
-
-Choose your preferred installation method:
-
-#### **Option A: Using npx (Recommended)** ⚡
-No installation needed! Run directly:
 ```bash
 npx agentvibes install
 ```
 
-#### **Option B: Install globally via npm** 📦
-Install once, use anywhere:
-```bash
-npm install -g agentvibes
-agentvibes install
-```
+💡 **Tip:** If `npx agentvibes` shows an older version: `npm cache clean --force && npx agentvibes@latest`
 
-#### **Option C: From source (Development)** 🔧
-Clone and run from repository:
-```bash
-git clone https://github.com/paulpreibisch/AgentVibes.git
-cd AgentVibes
-npm install
-node bin/agent-vibes install
-```
+🐛 **Found a bug?** [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
 
-### Step 2: Choose Your TTS Provider
-
-AgentVibes supports two TTS providers - pick the one that fits your needs:
-
-#### **Option A: Piper TTS (Free, Recommended for Getting Started)** 🆓
-
-**No setup required!** Piper TTS works out of the box with zero configuration.
-
-- ✅ Completely free, no API key needed
-- ✅ Works offline (perfect for Windows, WSL, Linux)
-- ✅ 50+ neural voices
-- ✅ 18 languages supported
-- ✅ Privacy-focused local processing
-
-**To use:** Just install AgentVibes and you're done! The installer will set Piper as default if no ElevenLabs key is detected.
-
-#### **Option B: ElevenLabs (Premium AI Voices)** 🎤
-
-**Best for production and variety.** Requires API key but offers 150+ premium voices.
-
-- ✅ 150+ professional AI voices
-- ✅ 30+ languages with multilingual v2
-- ✅ Studio-quality audio with emotional range
-- ✅ Character voices and unique personalities
-
-**Setup steps:**
-
-1. Sign up at [elevenlabs.io](https://elevenlabs.io/) (free tier: 10,000 chars/month)
-2. Copy your API key from the dashboard
-3. Add it to your environment:
-
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-echo 'export ELEVENLABS_API_KEY="your-api-key-here"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-**Switch providers anytime:** `/agent-vibes:provider switch`
-
-### Step 3: Enable Voice ⚠️ **CRITICAL STEP**
-
-#### For Claude Code:
-**🔴 REQUIRED:** You MUST run this command to enable TTS in Claude Code:
-```bash
-/output-style agent-vibes
-```
-
-#### For Claude Desktop/Warp:
-**Already works!** AgentVibes MCP is enabled by default once configured.
-
-**That's it! Claude will now speak to you!** 🎉
+[→ View Complete Release Notes](RELEASE_NOTES.md) | [→ View Previous Release (v4.0.1)](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.0.1) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 
 ---
 
-## 🎭 Multi-Provider Support
+## 🎙️ AgentVibes MCP
 
-AgentVibes v2.0 introduces **multi-provider TTS support** - choose between premium ElevenLabs AI voices or free offline Piper TTS!
+Agent Vibes was originally created to give the Claude Code assistant a voice! Simply install it with an npx command in your terminal, and Claude Code can talk back to you.
 
-### 🎤 ElevenLabs (Premium AI Voices)
+We've now enhanced this capability by adding an MCP (Model Context Protocol) server. This integration exposes Agent Vibes' functionality directly to your AI assistant, allowing you to configure and control Agent Vibes using natural language instead of typing "/" slash commands.
 
-**Features:**
-- 150+ professional AI voices
-- 30+ languages with multilingual v2 model
-- Studio-quality audio with emotional range
-- Character voices, accents, and unique personalities
-- Voices include: Aria, Archer, Cowboy Bob, Pirate Marshal, Grandpa Spuds, Jessica Anne Bogart, and more!
+Setting it up is straightforward: just add the MCP server to your Claude Code configuration files.
 
-**Requirements:**
-- ElevenLabs API key (get free tier at [elevenlabs.io](https://elevenlabs.io))
-- Internet connection for API calls
+But the convenience doesn't stop there. With the MCP server in place, Claude Desktop can now use Agent Vibes too! We've even tested it successfully with Warp, an AI assistant that helps you navigate Windows and other operating systems.
 
-**Pricing (2025):**
-- Free: 10,000 chars/month (light use)
-- Starter: $5/month - 30,000 chars
-- Creator: $22/month - 100,000 chars
-- Pro: $99/month - 500,000 chars
+We're thrilled about this expansion because it means Claude Desktop and Warp can finally talk back as well!
 
-### 🆓 Piper TTS (Free, Offline)
+If you decide to use the MCP server on Claude Desktop, after configuration, give Claude Desktop this command: "every time i give you a command, speak the acknowledgement using agentvibes and the confirmation about what you completed, when done"—and watch the magic happen!
 
-**Features:**
-- 50+ neural voices, completely free
-- 18 languages supported
-- No API key required
-- Works offline (perfect for Windows, WSL, and Linux)
-- Privacy-focused local processing
-- Cross-platform support (Windows, macOS, Linux)
+**🎯 Control AgentVibes with natural language - no slash commands to remember!**
 
-**Requirements:**
-- None! Works out of the box
-- Automatic voice download on first use
-- Native Windows support - no additional setup needed
+Just say "Switch to Aria voice" or "Speak in Spanish" instead of typing commands.
 
-### Provider Commands
+**Works in:** Claude Desktop, Claude Code, Warp Terminal
 
+**[→ View Complete MCP Setup Guide](docs/mcp-setup.md)** - Full setup for all platforms, configuration examples, available tools, and MCP vs slash commands comparison
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🚀 Quick Start - Get Voice in 30 Seconds
+
+**3 Simple Steps:**
+
+### 1️⃣ Install
 ```bash
-# View current provider
-/agent-vibes:provider info
-# MCP: "What's my current TTS provider?" or "Show provider info"
-
-# List available providers
-/agent-vibes:provider list
-# MCP: "List all TTS providers" or "What providers are available?"
-
-# Switch providers instantly
-/agent-vibes:provider switch
-# MCP: "Switch to Piper TTS" or "Change provider to ElevenLabs"
-
-# Test provider functionality
-/agent-vibes:provider test
-# MCP: "Test my TTS provider" or "Test ElevenLabs connection"
+npx agentvibes install
 ```
 
-### Switching Between Providers
+### 2️⃣ Choose Provider (Auto-Detected)
+- **macOS**: Native `say` provider (100+ voices) ✨
+- **Linux/WSL**: Piper TTS (50+ free voices) 🎙️
+- **Windows Native**: Soprano, Piper, or SAPI 🪟
+- **Android**: Termux with auto-setup 📱
 
-**During Installation:**
-The installer asks which provider you prefer and sets it up automatically.
+### 3️⃣ Use in Claude Code
+Just code normally - AgentVibes automatically speaks task acknowledgments and completions! 🔊
 
-**After Installation:**
+---
+
+### TUI Console Commands
+
+AgentVibes includes a full **Text User Interface (TUI)** built with blessed.js for managing voices, music, settings, and installation — all from a single interactive console.
+
+| Command | Description |
+|---------|-------------|
+| `npx agentvibes` | Smart detection — opens Settings if installed, Install if not |
+| `npx agentvibes install` | Open the Install tab directly |
+| `npx agentvibes config` | Open the Settings tab directly |
+
+Once inside, use **Tab** / **Shift+Tab** to switch between tabs: **Voices**, **Music**, **BMad**, **Settings**, **Receiver**, and **Install**. Use **[** / **]** to page through voice and music catalogs.
+
+---
+
+**🍎 macOS Users (One-Time Setup):**
 ```bash
-# Switch to Piper TTS (free)
-/agent-vibes:provider switch
-# Select: piper
+brew install bash  # Required for bash 5.x features
+```
+macOS ships with bash 3.2 (from 2007). After this, everything works perfectly!
 
-# Switch to ElevenLabs (premium)
-/agent-vibes:provider switch
-# Select: elevenlabs
+---
+
+**[→ Full Setup Guide](docs/quick-start.md)** - Advanced options, provider switching, and detailed setup
+
+[↑ Back to top](#-table-of-contents)
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 📋 Prerequisites - What You Actually Need
+
+### Minimum (Core Features)
+**✅ REQUIRED:**
+- **Node.js** ≥16.0 - Check with: `node --version`
+
+### Required for Full Features
+**✅ STRONGLY RECOMMENDED:**
+- **Python** 3.10+ - Needed for Piper TTS voice engine
+- **bash** 5.0+ - macOS only (macOS ships with 3.2 from 2007)
+
+### Optional but Recommended
+**⭕ OPTIONAL (TTS still works without them):**
+- **sox** - Audio effects (reverb, EQ, pitch shifting)
+- **ffmpeg** - Background music, audio padding, RDP compression
+
+### NOT Required (Despite What You've Heard)
+**❌ DEFINITELY NOT NEEDED:**
+- ❌ Git or git-lfs (npm handles everything)
+- ❌ Repository cloning (unless you're contributing code)
+- ❌ Build tools or C++ compilers (pre-built package ready to use)
+
+### Installation Methods
+
+| Method | Command | Use Case |
+|--------|---------|----------|
+| **✅ RECOMMENDED: NPX (via npm)** | `npx agentvibes install` | **All platforms** - Just want to use AgentVibes |
+| **🪟 Windows PowerShell** | `.\setup-windows.ps1` | **Windows** - Standalone installer (no Node.js needed) |
+| **⚠️ Git Clone** | `git clone ...` | **Developers Only** - Contributing code |
+
+**Why npx?** Zero git operations, no build steps, just 30 seconds to voice!
+
+### For Developers (Contributing Code)
+
+If you want to contribute to AgentVibes:
+```bash
+git clone https://github.com/paulpreibisch/AgentVibes.git
+cd AgentVibes
+npm install
+npm link
 ```
 
-**Automatic Fallback:**
-If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper TTS.
+Requires: Node.js 16+, Git (no git-lfs), and `npm link` familiarity.
 
-### Provider Comparison
+[↑ Back to top](#-table-of-contents)
 
-| Feature | ElevenLabs | Piper TTS |
-|---------|-----------|-----------|
-| **Voices** | 150+ premium AI | 50+ neural voices |
-| **Cost** | $0-99/month | Free forever |
-| **Quality** | Studio-grade | High-quality neural |
-| **Languages** | 30+ with multilingual v2 | 18 languages |
-| **Offline** | ❌ Requires internet | ✅ Works offline |
-| **API Key** | ✅ Required | ❌ Not needed |
-| **Emotional Range** | ✅ Advanced | ⚠️ Limited |
-| **Character Voices** | ✅ Extensive library | ⚠️ Standard voices |
-| **Platform Support** | All platforms | Windows, macOS, Linux, WSL |
-| **Best For** | Production, demos, variety | Development, privacy, Windows users |
+---
 
-### Which Provider Should I Choose?
+---
 
-**Choose ElevenLabs if:**
-- You want premium studio-quality voices
-- You need extensive character voice variety
-- You're creating demos or production content
-- You want advanced emotional range
-- You have a budget for API costs
+## 📱 Quick Setup: Android & Termux (Claude Code on Your Phone!)
 
-**Choose Piper TTS if:**
-- You want completely free TTS (especially great for Windows!)
-- You prefer offline/local processing
-- You're on Windows, WSL, or Linux
-- You value privacy and data control
-- You're in development/testing phase
-- You don't want to manage API keys or billing
+**Want to run Claude Code on your Android phone with professional voices?**
 
-**Pro Tip:** Use Piper for development and ElevenLabs for production/demos!
+Simply install Termux from F-Droid (NOT Google Play) and run:
+```bash
+pkg update && pkg upgrade
+pkg install nodejs-lts
+npx agentvibes install
+```
+
+Termux auto-detects and installs everything needed (proot-distro for compatibility, Piper TTS, audio playback).
+
+**[→ Full Android/Termux Setup Guide](#-android--termux)** - Detailed troubleshooting and verification steps
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 📋 System Requirements
+
+AgentVibes requires certain system dependencies for optimal audio processing and playback. Requirements vary by operating system and TTS provider.
+
+### Core Requirements (All Platforms)
+
+| Tool | Required For | Why It's Needed |
+|------|-------------|-----------------|
+| **Node.js** ≥16.0 | All platforms | Runtime for AgentVibes installer and MCP server |
+| **Bash** ≥5.0 | macOS | Modern bash features (macOS ships with 3.2 from 2007) |
+| **Python** 3.10+ | Piper TTS, MCP server | Runs Piper voice engine and MCP server |
+
+### Audio Processing Tools (Recommended)
+
+| Tool | Status | Purpose | Impact if Missing |
+|------|--------|---------|------------------|
+| **sox** | Recommended | Audio effects (reverb, EQ, pitch, compression) | No audio effects, still works |
+| **ffmpeg** | Recommended | Background music mixing, audio padding, RDP compression | No background music or RDP optimization |
+
+### Platform-Specific Requirements
+
+#### 🐧 Linux / WSL
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y sox ffmpeg python3-pip pipx
+
+# Fedora/RHEL
+sudo dnf install -y sox ffmpeg python3-pip pipx
+
+# Arch Linux
+sudo pacman -S sox ffmpeg python-pip python-pipx
+```
+
+**Audio Playback** (one of the following):
+- `paplay` (PulseAudio - usually pre-installed)
+- `aplay` (ALSA - fallback)
+- `mpg123` (fallback)
+- `mpv` (fallback)
+
+**Why these tools?**
+- **sox**: Applies audio effects defined in `.claude/config/audio-effects.cfg` (reverb, pitch shifting, EQ, compression)
+- **ffmpeg**: Mixes background music tracks, adds silence padding to prevent audio cutoff, compresses audio for RDP/SSH sessions
+- **paplay/aplay**: Plays generated TTS audio files
+- **pipx**: Isolated Python environment manager for Piper TTS installation
+
+#### 🍎 macOS
+
+```bash
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Required: Modern bash
+brew install bash
+
+# Recommended: Audio processing tools
+brew install sox ffmpeg pipx
+```
+
+**Audio Playback**:
+- `afplay` (built-in - always available)
+- `say` (built-in - for macOS TTS provider)
+
+**Why these tools?**
+- **bash 5.x**: macOS ships with bash 3.2 which lacks associative arrays and other modern features AgentVibes uses
+- **sox**: Same audio effects processing as Linux
+- **ffmpeg**: Same background music and padding as Linux
+- **afplay**: Built-in macOS audio player
+- **say**: Built-in macOS text-to-speech (alternative to Piper)
+
+#### 🪟 Windows
+
+**Option A: Native Windows (Recommended)**
+
+AgentVibes now supports native Windows with three TTS providers. No WSL required!
+
+```powershell
+# Interactive Node.js installer (recommended)
+npx agentvibes install
+
+# Or use the standalone PowerShell installer
+.\setup-windows.ps1
+```
+
+**Providers available natively:**
+- **Soprano** - Ultra-fast neural TTS (best quality, requires `pip install soprano-tts`)
+- **Windows Piper** - High quality offline neural voices (auto-downloaded)
+- **Windows SAPI** - Built-in Windows voices (zero setup)
+
+**Requirements:** Node.js 16+, PowerShell 5.1+, ffmpeg (optional, for background music & reverb)
+
+See [Windows Native Setup Guide](WINDOWS-SETUP.md) for full instructions.
+
+**Option B: WSL (Legacy)**
+
+For Claude Desktop or WSL-based workflows, follow the [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md).
+
+```powershell
+# Install WSL from PowerShell (Administrator)
+wsl --install -d Ubuntu
+```
+
+Then follow Linux requirements above inside WSL.
+
+#### 🤖 Android / Termux
+
+**Running Claude Code on Your Android Using Termux**
+
+AgentVibes fully supports Android devices through the [Termux app](https://termux.dev/). This enables you to run Claude Code with professional TTS voices directly on your Android phone or tablet!
+
+**Quick Setup:**
+
+```bash
+# 1. Install Termux from F-Droid (NOT Google Play - it's outdated)
+# Download: https://f-droid.org/en/packages/com.termux/
+
+# 2. Install Node.js in Termux
+pkg update && pkg upgrade
+pkg install nodejs-lts
+
+# 3. Install AgentVibes (auto-detects Android and runs Termux installer)
+npx agentvibes install
+```
+
+**What Gets Installed?**
+
+The Termux installer automatically sets up:
+- **proot-distro** with Debian (for glibc compatibility)
+- **Piper TTS** via proot wrapper (Android uses bionic libc, not glibc)
+- **termux-media-player** for audio playback (`paplay` doesn't work on Android)
+- **Audio dependencies**: ffmpeg, sox, bc for processing
+- **termux-api** for Android-specific audio routing
+
+**Why Termux Instead of Standard Installation?**
+
+Android's architecture requires special handling:
+- ❌ Standard pip/pipx fails (missing wheels for bionic libc)
+- ❌ Linux binaries require glibc (Android uses bionic)
+- ❌ `/tmp` directory is not accessible on Android
+- ❌ Standard audio tools like `paplay` don't exist
+
+✅ Termux installer solves all these issues with proot-distro and Android-native audio playback!
+
+**Requirements:**
+- [Termux app](https://f-droid.org/en/packages/com.termux/) (from F-Droid, NOT Google Play)
+- [Termux:API](https://f-droid.org/en/packages/com.termux.api/) (for audio playback)
+- Android 7.0+ (recommended: Android 10+)
+- ~500MB free storage (for Piper TTS + voice models)
+
+**Audio Playback:**
+- Uses `termux-media-player` instead of `paplay`
+- Audio automatically routes through Android's media system
+- Supports all Piper TTS voices (50+ languages)
+
+**Verifying Your Setup:**
+
+```bash
+# Check Termux environment
+echo $PREFIX               # Should show /data/data/com.termux/files/usr
+
+# Check Node.js
+node --version             # Should be ≥16.0
+
+# Check if Piper is installed
+which piper                # Should return /data/data/com.termux/files/usr/bin/piper
+
+# Test audio playback
+termux-media-player play /path/to/audio.wav
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| "piper: not found" | Run `npx agentvibes install` - auto-detects Termux |
+| No audio playback | Install Termux:API from F-Droid |
+| Permission denied | Run `termux-setup-storage` to grant storage access |
+| Slow installation | Use WiFi, not mobile data (~300MB download) |
+
+**Why F-Droid and Not Google Play?**
+
+Google Play's Termux version is outdated and unsupported. Always use the [F-Droid version](https://f-droid.org/en/packages/com.termux/) for the latest security updates and compatibility.
+
+### TTS Provider Requirements
+
+#### Piper TTS (Free, Offline)
+- **Python** 3.10+
+- **pipx** (for isolated installation)
+- **Disk Space**: ~50MB per voice model
+- **Internet**: Only for initial voice downloads
+
+```bash
+# Installed automatically by AgentVibes
+pipx install piper-tts
+```
+
+#### macOS Say (Built-in, macOS Only)
+- No additional requirements
+- 100+ voices pre-installed on macOS
+- Use: `/agent-vibes:provider switch macos`
+
+### Verifying Your Setup
+
+```bash
+# Check all dependencies
+node --version    # Should be ≥16.0
+python3 --version # Should be ≥3.10
+bash --version    # Should be ≥5.0 (macOS users!)
+sox --version     # Optional but recommended
+ffmpeg -version   # Optional but recommended
+pipx --version    # Required for Piper TTS
+
+# Check audio playback (Linux/WSL)
+paplay --version || aplay --version
+
+# Check audio playback (macOS)
+which afplay      # Should return /usr/bin/afplay
+```
+
+### What Happens Without Optional Dependencies?
+
+| Missing Tool | Impact | Workaround |
+|-------------|--------|------------|
+| sox | No audio effects (reverb, EQ, pitch) | TTS still works, just no effects |
+| ffmpeg | No background music, no audio padding | TTS still works, audio may cut off slightly early |
+| paplay/aplay | No audio playback on Linux | Install at least one audio player |
+
+**All TTS generation still works** - optional tools only enhance the experience!
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🎭 Choose Your Voice Provider
+
+**Piper TTS** (free, works offline on Linux/WSL) or **macOS Say** (free, built-in on Mac) - pick one and switch anytime.
+
+| Provider | Platform | Cost | Quality | Setup |
+|----------|----------|------|---------|-------|
+| **macOS Say** | macOS only | Free (built-in) | ⭐⭐⭐⭐ | Zero config |
+| **Piper** | Linux/WSL/Windows | Free | ⭐⭐⭐⭐ | Auto-downloads |
+| **Soprano** | Linux/WSL/Windows | Free | ⭐⭐⭐⭐⭐ | `pip install soprano-tts` |
+| **Windows SAPI** | Windows | Free (built-in) | ⭐⭐⭐ | Zero config |
+
+On macOS, the native `say` provider is automatically detected and recommended!
+
+**[→ Provider Comparison Guide](docs/providers.md)**
 
 [↑ Back to top](#-table-of-contents)
 
@@ -424,67 +843,134 @@ If ElevenLabs API key is missing, AgentVibes automatically falls back to Piper T
 
 ## 🎤 Commands Reference
 
-All commands are prefixed with `/agent-vibes:`
+AgentVibes provides **50+ slash commands** and **natural language MCP equivalents**.
 
-### Voice Commands
+**Quick Examples:**
+```bash
+# Voice control
+/agent-vibes:switch Aria              # Or: "Switch to Aria voice"
+/agent-vibes:list                     # Or: "List all voices"
 
-| Command | AgentVibes MCP Equivalent | Description |
-|---------|----------------|-------------|
-| `/agent-vibes:list` | "List all voices" or "What voices are available?" | Show all available voices |
-| `/agent-vibes:switch <voice>` | "Switch to Aria voice" or "Change voice to Cowboy Bob" | Change to a different voice |
-| `/agent-vibes:whoami` | "What's my current voice?" or "Show my configuration" | Show current voice, sentiment & personality |
-| `/agent-vibes:preview [N]` | "Preview voices" or "Let me hear the first 5 voices" | Preview voices with audio samples |
-| `/agent-vibes:sample <voice>` | "Test Aria voice" or "Let me hear Cowboy Bob" | Test a specific voice |
-| `/agent-vibes:add <name> <id>` | "Add custom voice MyVoice with ID abc123" | Add custom ElevenLabs voice |
-| `/agent-vibes:replay [N]` | "Replay last message" or "Replay the 3rd message" | Replay recent TTS audio |
-| `/agent-vibes:get` | "What voice am I using?" or "Get current voice" | Get currently selected voice |
+# Personality & sentiment
+/agent-vibes:personality pirate       # Or: "Set personality to pirate"
+/agent-vibes:sentiment sarcastic      # Or: "Apply sarcastic sentiment"
 
-### System Commands
+# Language & learning
+/agent-vibes:set-language spanish     # Or: "Speak in Spanish"
+/agent-vibes:learn                    # Or: "Enable learning mode"
+```
 
-| Command | AgentVibes MCP Equivalent | Description |
-|---------|----------------|-------------|
-| `/agent-vibes:version` | "What version of AgentVibes?" or "Show version" | Show installed AgentVibes version |
-| `/agent-vibes:update [--yes]` | "Update AgentVibes" or "Upgrade to latest version" | Update to latest version |
+**[→ View Complete Command Reference](docs/commands.md)** - All voice, system, personality, sentiment, language, and BMAD commands with MCP equivalents
 
-### Personality Commands
+### Intro Text Commands
 
-| Command | AgentVibes MCP Equivalent | Description |
-|---------|----------------|-------------|
-| `/agent-vibes:personality <name>` | "Set personality to pirate" or "Change to sarcastic personality" | Set personality (changes voice + style) |
-| `/agent-vibes:personality list` | "List all personalities" or "What personalities are available?" | Show all personalities |
-| `/agent-vibes:personality add <name>` | "Create custom personality called mycustom" | Create custom personality |
-| `/agent-vibes:personality edit <name>` | "Edit the flirty personality" | Edit personality file |
-| `/agent-vibes:personality get` | "What's my current personality?" or "Show personality" | Show current personality |
-| `/agent-vibes:personality reset` | "Reset personality to normal" or "Remove personality" | Reset to normal |
+```bash
+# Configure intro text — open Settings tab
+npx agentvibes
 
-### Sentiment Commands
+# View current intro text
+cat ~/.claude/config/intro-text.txt
+```
 
-| Command | AgentVibes MCP Equivalent | Description |
-|---------|----------------|-------------|
-| `/agent-vibes:sentiment <name>` | "Apply sarcastic sentiment" or "Add flirty sentiment to voice" | Apply sentiment to current voice |
-| `/agent-vibes:sentiment list` | "List all sentiments" or "What sentiments are available?" | Show all available sentiments |
-| `/agent-vibes:sentiment get` | "What's my current sentiment?" or "Show sentiment" | Show current sentiment |
-| `/agent-vibes:sentiment clear` | "Clear sentiment" or "Remove sentiment" | Remove sentiment |
+**MCP Equivalent:**
+```
+"Set my intro text to 'FireBot: '"
+"What's my current intro text?"
+"Clear my intro text"
+```
 
-### Language Commands
+### Custom Music Commands
 
-| Command | AgentVibes MCP Equivalent | Description |
-|---------|----------------|-------------|
-| `/agent-vibes:set-language <language>` | "Speak in Spanish" or "Change language to French" | Set TTS language (30+ supported) |
-| `/agent-vibes:set-language english` | "Reset to English" or "Change language to English" | Reset to English |
-| `/agent-vibes:set-language list` | "List all languages" or "What languages are supported?" | Show all supported languages |
-| `/agent-vibes:whoami` | "What's my current language?" or "Show configuration" | Show current language + voice |
+```bash
+# Configure background music — open Music tab
+npx agentvibes
+```
 
-### BMAD Plugin Commands
+**MCP Equivalent:**
+```
+"Configure my background music"
+"Add custom background music"
+"Remove custom music"
+"Preview my background music"
+```
 
-| Command | AgentVibes MCP Equivalent | Description |
-|---------|----------------|-------------|
-| `/agent-vibes-bmad status` | "Show BMAD plugin status" or "What's the BMAD configuration?" | Show BMAD plugin status & mappings |
-| `/agent-vibes-bmad enable` | "Enable BMAD voice plugin" or "Turn on BMAD voices" | Enable automatic voice switching |
-| `/agent-vibes-bmad disable` | "Disable BMAD plugin" or "Turn off BMAD voices" | Disable plugin (restores previous settings) |
-| `/agent-vibes-bmad list` | "List BMAD agent voices" or "Show BMAD voice mappings" | List all BMAD agent voice mappings |
-| `/agent-vibes-bmad set <agent> <voice> [personality]` | "Set PM agent to Aria voice with zen personality" | Update agent mapping |
-| `/agent-vibes-bmad edit` | "Edit BMAD configuration" or "Open BMAD voice config" | Edit configuration file |
+### Friendly Voice Name Commands
+
+```bash
+# Switch using friendly name
+/agent-vibes:switch Ryan
+/agent-vibes:switch Sarah
+
+# List all voices with friendly names
+/agent-vibes:list
+
+# Get current voice (shows friendly name if available)
+/agent-vibes:whoami
+```
+
+**MCP Equivalent:**
+```
+"Switch to Ryan voice"
+"Use the Sarah voice"
+"List all available voices"
+```
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🎙️ Verbosity Control
+
+**Control how much Claude speaks while working!** 🔊
+
+Choose from three verbosity levels:
+
+### LOW (Minimal) 🔇
+- Acknowledgments only (start of task)
+- Completions only (end of task)
+- Perfect for quiet work sessions
+
+### MEDIUM (Balanced) 🤔
+- Acknowledgments + completions
+- Major decisions ("I'll use grep to search")
+- Key findings ("Found 12 instances")
+- Perfect for understanding decisions without full narration
+
+### HIGH (Maximum Transparency) 💭
+- All reasoning ("Let me search for all instances")
+- All decisions ("I'll use grep for this")
+- All findings ("Found it at line 1323")
+- Perfect for learning mode, debugging complex tasks
+
+**Quick Commands:**
+```bash
+/agent-vibes:verbosity           # Show current level
+/agent-vibes:verbosity high      # Maximum transparency
+/agent-vibes:verbosity medium    # Balanced
+/agent-vibes:verbosity low       # Minimal (default)
+```
+
+**MCP Equivalent:**
+```
+"Set verbosity to high"
+"What's my current verbosity level?"
+```
+
+💡 **How it works:** Claude uses emoji markers (💭 🤔 ✓) in its text, and AgentVibes automatically detects and speaks them based on your verbosity level. No manual TTS calls needed!
+
+⚠️ **Note:** Changes take effect on next Claude Code session restart.
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 📚 Language Learning Mode
+
+**🎯 Learn Spanish (or 30+ languages) while you program!** 🌍
+
+Every task acknowledgment plays **twice** - first in English, then in your target language. Context-based learning while you code!
+
+**[→ View Complete Learning Mode Guide](docs/language-learning-mode.md)** - Full tutorial, quick start, commands, speech rate control, supported languages, and pro tips
 
 [↑ Back to top](#-table-of-contents)
 
@@ -492,52 +978,12 @@ All commands are prefixed with `/agent-vibes:`
 
 ## 🎭 Personalities vs Sentiments
 
-### 🎪 Personalities (Voice + Style)
+**Two ways to add personality:**
 
-**Personalities change BOTH voice AND how Claude talks.** Each has a dedicated ElevenLabs voice:
+- **🎪 Personalities** - Changes BOTH voice AND speaking style (e.g., `pirate` personality = Pirate Marshal voice + pirate speak)
+- **💭 Sentiments** - Keeps your current voice, only changes speaking style (e.g., Aria voice + sarcastic sentiment)
 
-| Personality | Voice | Style |
-|------------|-------|-------|
-| **sarcastic** | Jessica Anne Bogart | Dry wit and cutting observations |
-| **flirty** | Jessica Anne Bogart | Playful charm and compliments |
-| **pirate** | Pirate Marshal | Seafaring swagger - "Arr matey!" |
-| **grandpa** | Grandpa Spuds Oxley | Rambling nostalgic stories |
-| **dry-humor** | Aria | British wit and deadpan delivery |
-| **angry** | Demon Monster | Frustrated and loud |
-| **robot** | Dr. Von Fusion | Mechanical and precise |
-| **zen** | Aria | Peaceful and mindful |
-| **professional** | Matthew Schmitz | Formal and corporate |
-
-**All 19 personalities:** sarcastic, flirty, pirate, grandpa, dry-humor, angry, robot, zen, professional, dramatic, millennial, surfer-dude, sassy, poetic, moody, funny, annoying, crass, normal, random
-
-```bash
-/agent-vibes:personality sarcastic
-/agent-vibes:personality pirate
-/agent-vibes:personality list
-```
-
-### 💭 Sentiments (Style Only)
-
-**Sentiments apply personality styles to YOUR current voice:**
-
-```bash
-# Use YOUR voice with sarcastic attitude
-/agent-vibes:sentiment sarcastic
-
-# Clear sentiment
-/agent-vibes:sentiment clear
-```
-
-**Key Difference:**
-- **Personality** = Changes voice + style (e.g., Pirate Marshal + pirate speak)
-- **Sentiment** = Keeps your voice + adds style (e.g., Your Voice + sarcasm)
-
-### 🎤 Combine Voice + Sentiment
-
-```bash
-# Switch to Aria with sarcastic sentiment
-/agent-vibes:switch Aria --sentiment sarcastic
-```
+**[→ Complete Personalities Guide](docs/personalities.md)** - All 19 personalities, create custom ones
 
 [↑ Back to top](#-table-of-contents)
 
@@ -545,13 +991,35 @@ All commands are prefixed with `/agent-vibes:`
 
 ## 🗣️ Voice Library
 
-AgentVibes includes **27 unique ElevenLabs voices** with multilingual support. See full voice library [here](#-voice-library-full-list).
+Use the **AgentVibes TUI installer** (`/audio-browser`) to browse, sample, and install from 914 voices interactively.
 
-💡 **Tip:** Click voice names to hear samples on ElevenLabs!
+### Friendly Voice Names
+
+All voices now have memorable names! Instead of technical IDs like `en_US-libritts_r-medium-speaker-123`, just use friendly names like **Ryan**, **Joe**, or **Sarah**.
+
+**Voice Metadata Includes:**
+- Display name and technical ID
+- Gender, accent, and region
+- Personality traits (professional, warm, friendly, etc.)
+- Recommended use cases
+- Quality rating and sample rate
+
+### Voice Categories
+
+**Curated Voices** (10 personalities):
+These hand-picked voices cover common use cases with clear characteristics.
+
+**Speaker Variations** (904 voices):
+High-quality Piper TTS voices from the libritts-high model. Each speaker has unique vocal characteristics, accents, and tones.
+
+### Popular Voices
+
+AgentVibes includes professional AI voices from Piper TTS and macOS Say with multilingual support.
+
 🎧 **Try in Claude Code:** `/agent-vibes:preview` to hear all voices
 🌍 **Multilingual:** Use Antoni, Rachel, Domi, or Bella for automatic language detection
 
-[→ View Full Voice Library](#-voice-library-full-list)
+**[→ View Complete Voice Library](docs/voice-library.md)** - All voices with clickable samples, descriptions, and best use cases
 
 [↑ Back to top](#-table-of-contents)
 
@@ -561,9 +1029,484 @@ AgentVibes includes **27 unique ElevenLabs voices** with multilingual support. S
 
 **Automatically switch voices when using BMAD agents!**
 
-The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`) and automatically uses the assigned voice for that role. See full BMAD documentation [here](#-bmad-plugin-full-documentation).
+The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`) and automatically uses the assigned voice for that role.
 
-[→ View Full BMAD Documentation](#-bmad-plugin-full-documentation)
+**Version Support**: AgentVibes supports both BMAD v4 and v6-alpha installations. Version detection is automatic - just install BMAD and AgentVibes will detect and configure itself correctly!
+
+### 🔊 TTS Injection: How It Works
+
+BMAD uses a **loosely-coupled injection system** for voice integration. BMAD source files contain placeholder markers that AgentVibes replaces with speaking instructions during installation:
+
+**Before Installation (BMAD Source):**
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  <!-- TTS_INJECTION:agent-tts -->
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+**After Installation (with AgentVibes enabled):**
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  - When responding to user messages, speak your responses using TTS:
+      Call: `.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'`
+      Where {agent-id} is your agent type (pm, architect, dev, etc.)
+
+  - Auto Voice Switching: AgentVibes automatically switches to the voice
+      assigned for your agent role when activated
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+**After Installation (with TTS disabled):**
+```xml
+<rules>
+  <r>ALWAYS communicate in {communication_language}...</r>
+  <r>Stay in character until exit selected</r>
+</rules>
+```
+
+This design means **any TTS provider** can integrate with BMAD by replacing these markers with their own instructions!
+
+**[→ View Complete BMAD Documentation](docs/bmad-plugin.md)** - All agent mappings, language support, TTS injection details, plugin management, and customization
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🤖 OpenClaw Integration
+
+**Use AgentVibes TTS with OpenClaw - the revolutionary AI assistant you can access via any instant messenger!**
+
+**What is OpenClaw?** [OpenClaw](https://openclaw.ai/) is a revolutionary AI assistant that brings Claude AI to your favorite messaging platforms - WhatsApp, Telegram, Discord, and more. No apps to install, no websites to visit - just message your AI assistant like you would a friend.
+
+🌐 **Website**: https://openclaw.ai/
+
+AgentVibes seamlessly integrates with OpenClaw, providing professional text-to-speech for AI assistants running on messaging platforms and remote servers.
+
+### 🚨 CRITICAL: Security Before Running OpenClaw on Any Remote Server
+
+⚠️ **SECURITY IS NOT OPTIONAL** - Running OpenClaw on a remote server exposes your infrastructure to attack vectors including SSH compromise, credential theft, and lateral movement.
+
+**👉 READ THIS FIRST:** [Security Hardening Guide](docs/security-hardening-guide.md) - **Required reading** covering:
+- ✅ SSH hardening (key-only auth, port 2222, fail2ban)
+- ✅ Firewall configuration (UFW/iptables)
+- ✅ Intrusion detection (AIDE, Wazuh)
+- ✅ VPN tunneling (Tailscale alternative to direct SSH)
+
+**Do not expose your OpenClaw server to the internet without reading this guide.**
+
+### 🎯 Key Benefits
+
+- **Free & Offline**: No API costs, works without internet
+- **Remote SSH Audio**: Audio tunnels from server to local machine via PulseAudio
+- **50+ Voices**: Professional AI voices in 30+ languages
+- **Zero Config**: Automatic when AgentVibes is installed
+
+### 🚀 Installation
+
+AgentVibes includes a ready-to-use OpenClaw skill that enables TTS on messaging platforms. The setup involves two components:
+
+#### Component 1: OpenClaw Server (Remote)
+
+Install AgentVibes on your OpenClaw server:
+
+```bash
+# On your remote server where OpenClaw is running
+npx agentvibes install
+```
+
+The OpenClaw skill is **automatically included** in the AgentVibes npm package at `.clawdbot/skill/SKILL.md`.
+
+**How to activate the skill in OpenClaw:**
+
+1. **Locate the skill** - After installing AgentVibes, the skill is at:
+   ```
+   node_modules/agentvibes/.clawdbot/skill/SKILL.md
+   ```
+
+2. **Link to OpenClaw skills directory** (if OpenClaw uses skills):
+   ```bash
+   # Example - adjust path based on your OpenClaw installation
+   ln -s $(npm root -g)/agentvibes/.clawdbot/skill/SKILL.md ~/.openclaw/skills/agentvibes.md
+   ```
+
+3. **OpenClaw auto-detection** - Many OpenClaw setups automatically detect AgentVibes when it's installed. Check your OpenClaw logs for:
+   ```
+   ✓ AgentVibes skill detected and loaded
+   ```
+
+---
+
+#### 🎙️ AgentVibes Voice Management Skill for OpenClaw
+
+Manage your text-to-speech voices across multiple providers with the AgentVibes Voice Management Skill:
+
+**Voice Management Features:**
+- 🎤 **50+ Professional Voices** - Across Piper TTS, Piper (free offline), and macOS Say providers
+- 🔀 **Multi-Provider Support** - Switch between Piper TTS (premium), Piper (free), and macOS Say
+- 👂 **Voice Preview** - Listen to voices before selecting them
+- 🎚️ **Voice Customization** - Add custom voices, set pretext, control speech rate
+- 📋 **Voice Management** - List, switch, replay, and manage your voice library
+- 🔇 **Mute Control** - Mute/unmute TTS output with persistent settings
+- 🌍 **Multilingual Support** - Voices in 30+ languages across all providers
+
+**Installation Confirmation:**
+✅ The skill is **automatically included** in the AgentVibes npm package at:
+```
+node_modules/agentvibes/.clawdbot/skill/SKILL.md
+```
+
+No extra setup needed - when you run `npx agentvibes install` on your OpenClaw server, the skill is ready to use!
+
+**Full Skill Documentation:**
+**[→ View Complete AgentVibes Skill Guide](.clawdbot/skill/SKILL.md)** - 430+ lines covering:
+- Quick start with 50+ voice options
+- Background music & effects management
+- Personality system (19+ styles)
+- Voice effects (reverb, reverb, EQ)
+- Speed & verbosity control
+- Remote SSH audio setup
+- Troubleshooting & complete reference
+
+**Popular Voice Examples:**
+```bash
+# Female voices
+npx agentvibes speak "Hello" --voice en_US-amy-medium
+npx agentvibes speak "Bonjour" --voice fr_FR-siwis-medium
+
+# Male voices
+npx agentvibes speak "Hello" --voice en_US-lessac-medium
+npx agentvibes speak "Good day" --voice en_GB-alan-medium
+
+# Add personality!
+bash ~/.claude/hooks/personality-manager.sh set sarcastic
+bash ~/.claude/hooks/play-tts.sh "Oh wonderful, another request"
+```
+
+---
+
+#### Component 2: AgentVibes Receiver (Local/Phone) ⚠️ REQUIRED
+
+**CRITICAL: You MUST install AgentVibes on your phone (or local machine) to receive and play audio!**
+
+Without this, audio cannot be heard - the server generates TTS but needs a receiver to play it.
+
+**Install on Android Phone (Termux):**
+
+1. **Install Termux from F-Droid** (NOT Google Play):
+   - Download: https://f-droid.org/en/packages/com.termux/
+
+2. **Install Node.js in Termux:**
+   ```bash
+   pkg update && pkg upgrade
+   pkg install nodejs-lts
+   ```
+
+3. **Install AgentVibes in Termux:**
+   ```bash
+   npx agentvibes install
+   ```
+
+4. **Install Termux:API** (for audio playback):
+   - Download: https://f-droid.org/en/packages/com.termux.api/
+   - Then in Termux: `pkg install termux-api`
+
+**Install on Local Mac/Linux:**
+
+```bash
+npx agentvibes install
+```
+
+**Why is this needed?**
+- The **server generates TTS** but has no speakers (headless)
+- AgentVibes on your **phone acts as the audio receiver** via SSH tunnel
+- Audio tunnels from server → SSH → phone → speakers 🔊
+
+Without AgentVibes installed on the receiving device, you'll generate audio but hear nothing!
+
+#### How It Works: Server → SSH Tunnel → Local Playback
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  1. User messages OpenClaw via Telegram/WhatsApp       │
+│     "Tell me about the weather"                         │
+└─────────────────────────────────────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────────────┐
+│  2. OpenClaw (Server) processes request with Claude    │
+│     AgentVibes skill generates TTS audio               │
+└─────────────────────────────────────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────────────┐
+│  3. Audio tunnels through SSH → PulseAudio (port 14713)│
+│     Server: PULSE_SERVER=tcp:localhost:14713           │
+└─────────────────────────────────────────────────────────┘
+                      ↓
+┌─────────────────────────────────────────────────────────┐
+│  4. Local AgentVibes receives and plays audio          │
+│     Phone speakers, laptop speakers, etc.              │
+│     🔊 "The weather is sunny and 72 degrees"            │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Architecture:**
+- **Server (OpenClaw)**: Generates TTS, sends via PulseAudio
+- **SSH Tunnel**: RemoteForward port 14713 (encrypted transport)
+- **Local (Termux/Desktop)**: AgentVibes receives audio, plays on speakers
+
+This creates a **Siri-like experience** - message from anywhere, hear responses on your phone! 📱🎤
+
+### 📝 Usage
+
+#### Basic TTS Commands
+
+```bash
+# Basic TTS
+npx agentvibes speak "Hello from OpenClaw"
+
+# With different voices
+npx agentvibes speak "Hello" --voice en_US-amy-medium
+npx agentvibes speak "Bonjour" --voice fr_FR-siwis-medium
+
+# List available voices
+npx agentvibes voices
+```
+
+#### Advanced: Direct Hook Usage with Voice Override
+
+For programmatic control, use the TTS hook directly:
+
+```bash
+# Basic: Use default voice
+bash ~/.claude/hooks/play-tts.sh "Hello from OpenClaw"
+
+# Advanced: Override voice per message
+bash ~/.claude/hooks/play-tts.sh "Welcome message" "en_US-amy-medium"
+bash ~/.claude/hooks/play-tts.sh "Bonjour!" "fr_FR-siwis-medium"
+bash ~/.claude/hooks/play-tts.sh "British greeting" "en_GB-alan-medium"
+```
+
+**Parameters:**
+- `$1` - **TEXT** (required): Message to speak
+- `$2` - **VOICE** (optional): Voice name to override default
+
+#### Audio Effects Configuration for OpenClaw
+
+**File**: `.claude/config/audio-effects.cfg`
+
+Customize audio effects, background music, and voice processing per agent or use default settings:
+
+**Format:**
+```
+AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME
+```
+
+**Example Configuration:**
+
+```bash
+# Default - subtle background music
+default||agentvibes_soft_flamenco_loop.mp3|0.30
+
+# Custom agent with reverb + background
+MyAgent|reverb 40 50 90 gain -2|agentvibes_soft_flamenco_loop.mp3|0.20
+
+# Agent with pitch shift and EQ
+Assistant|pitch -100 equalizer 3000 1q +2|agentvibes_dark_chill_step_loop.mp3|0.15
+```
+
+**Available SOX Effects:**
+
+| Effect | Syntax | Example | Description |
+|--------|--------|---------|-------------|
+| **Reverb** | `reverb <reverberance> <HF-damping> <room-scale>` | `reverb 40 50 90` | Adds room ambiance (light: 30 40 70, heavy: 50 60 100) |
+| **Pitch** | `pitch <cents>` | `pitch -100` | Shift pitch (100 cents = 1 semitone, negative = lower) |
+| **Equalizer** | `equalizer <freq> <width>q <gain-dB>` | `equalizer 3000 1q +2` | Boost/cut frequencies (bass: 200Hz, treble: 4000Hz) |
+| **Gain** | `gain <dB>` | `gain -2` | Adjust volume (negative = quieter, positive = louder) |
+| **Compand** | `compand <attack,decay> <threshold:in,out>` | `compand 0.3,1 6:-70,-60,-20` | Dynamic range compression (makes quiet parts louder) |
+
+**Background Music Tracks:**
+
+Built-in tracks available in `.claude/audio/tracks/`:
+- `agentvibes_soft_flamenco_loop.mp3` - Warm, rhythmic flamenco
+- `agentvibes_dark_chill_step_loop.mp3` - Modern chill electronic
+- (50+ additional tracks available)
+
+**Background Volume:**
+- `0.10` - Very subtle (10%)
+- `0.20` - Subtle (20%)
+- `0.30` - Moderate (30%, recommended default)
+- `0.40` - Noticeable (40%, party mode)
+
+**Example: OpenClaw Custom Configuration**
+
+Create `.claude/config/audio-effects.cfg` on your OpenClaw server:
+
+```bash
+# OpenClaw assistant - warm voice with subtle reverb
+OpenClaw|reverb 30 40 70 gain -1|agentvibes_soft_flamenco_loop.mp3|0.25
+
+# Help desk agent - clear, bright voice
+HelpDesk|equalizer 4000 1q +3 compand 0.2,0.5 6:-70,-60,-20|agentvibes_dark_chill_step_loop.mp3|0.15
+
+# Default fallback
+default||agentvibes_soft_flamenco_loop.mp3|0.30
+```
+
+**How AgentVibes Applies Effects:**
+
+1. **Generate TTS** - Create base audio with Piper TTS
+2. **Apply SOX effects** - Process audio (reverb, EQ, pitch, etc.)
+3. **Mix background** - Blend background music at specified volume
+4. **Tunnel via SSH** - Send processed audio to local receiver
+5. **Play on device** - Output to phone/laptop speakers
+
+This allows **per-message customization** or **consistent agent branding** with unique audio signatures!
+
+### 🔊 Remote SSH Audio
+
+Perfect for running OpenClaw on a remote server with audio on your local machine:
+
+**Quick Setup:**
+
+1. **Remote server** - Configure PulseAudio:
+```bash
+echo 'export PULSE_SERVER=tcp:localhost:14713' >> ~/.bashrc
+source ~/.bashrc
+```
+
+2. **Local machine** - Add SSH tunnel (`~/.ssh/config`):
+```
+Host your-server
+    RemoteForward 14713 localhost:14713
+```
+
+3. **Connect and test**:
+```bash
+ssh your-server
+agentvibes speak "Testing remote audio from OpenClaw"
+```
+
+Audio plays on your local speakers! 🔊
+
+### 📚 Documentation
+
+- **OpenClaw Skill**: [.clawdbot/README.md](.clawdbot/README.md)
+- **OpenClaw Website**: https://openclaw.ai/
+- **Remote Audio Setup**: [docs/remote-audio-setup.md](docs/remote-audio-setup.md)
+- **Security Hardening**: [docs/security-hardening-guide.md](docs/security-hardening-guide.md) ⚠️
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🎙️ AgentVibes Receiver: Remote Audio Streaming from Voiceless Servers
+
+**Receive and play TTS audio from servers that have no audio output!**
+
+AgentVibes Receiver is a lightweight audio client that runs on your phone, tablet, or personal computer, which receives TTS audio from remote voiceless servers, where your OpenClaw Personal Assistant or your Claude Code project is installed.
+
+### 🎯 What AgentVibes Receiver Solves
+
+You have OpenClaw running on a Mac mini or remote server with **no audio output**:
+- 🖥️ Mac mini (silent)
+- 🖥️ Ubuntu server (headless)
+- ☁️ AWS/DigitalOcean instance
+- 📦 Docker container
+- 🪟 WSL (Windows Subsystem for Linux)
+
+Users message you via WhatsApp, Telegram, Discord but only get text responses:
+- ❌ No voice = Less engaging experience
+- ❌ No personality = Feels robotic
+- ❌ No audio cues = Miss important context
+
+**AgentVibes Receiver transforms this:**
+- ✅ OpenClaw speaks with voice (Siri-like experience)
+- ✅ Audio streams to your device automatically
+- ✅ You hear responses on your speakers
+- ✅ Users get a conversational AI experience
+
+### 🔧 How It Works
+
+**One-time setup:**
+1. Install AgentVibes on your voiceless server with OpenClaw
+2. Install AgentVibes Receiver on your personal device (phone/tablet/laptop)
+3. Connect via SSH tunnel (or Tailscale VPN)
+4. Done - automatic from then on
+
+**Flow diagram:**
+```
+┌──────────────────────────────────────────┐
+│ Your Mac mini / Server                   │
+│ (OpenClaw + AgentVibes)                  │
+│ • Generates TTS audio                    │
+│ • Sends via SSH tunnel                   │
+└──────────────────────────────────────────┘
+        ↓ Encrypted SSH tunnel
+┌──────────────────────────────────────────┐
+│ Your Phone / Laptop                      │
+│ (AgentVibes Receiver)                    │
+│ • Receives audio stream (or text stream) │
+│ • Auto-plays on device speakers          │
+└──────────────────────────────────────────┘
+```
+
+**Real-world example:**
+```
+📱 WhatsApp: "Tell me about quantum computing"
+        ↓
+🖥️ Mac mini: OpenClaw processes + generates TTS
+        ↓ SSH tunnel (audio or text stream)
+📱 Your phone (Agent Vibes Receiver): Plays audio 🔊
+        ↓
+You hear on your device speakers: "Quantum computing uses quantum bits..."
+        ↓
+💬 Conversation feels alive!
+```
+
+### ✨ Key Features
+
+| Feature | Benefit |
+|---------|---------|
+| **One-Time Pairing** | SSH key setup, automatic reconnect |
+| **Real-Time Streaming** | Low-latency audio playback |
+| **SSH Encryption** | Secure audio tunnel |
+| **Tailscale Support** | Easy VPN for remote servers |
+| **Voice Selection** | Configure server-side voice |
+| **Audio Effects** | Reverb, echo, pitch on server |
+| **Cache Tracking** | Monitor audio generation |
+| **Multiple Servers** | Connect to different OpenClaw instances |
+
+### 🚀 Perfect For
+
+- 🖥️ **Mac mini + OpenClaw** - Home server with professional voices
+- ☁️ **Remote Servers** - OpenClaw on AWS/GCP/DigitalOcean
+- 📱 **WhatsApp/Telegram** - Users message, hear responses
+- 🎓 **Discord Bots** - Bot speaks with voices
+- 🏗️ **Docker/Containers** - Containerized OpenClaw with audio
+- 🔧 **WSL Development** - Windows developers using voiceless WSL
+
+### 📝 Setup
+
+```bash
+# On your server (Mac mini, Ubuntu, AWS, etc.)
+npx agentvibes install
+# Selects OpenClaw option
+# AgentVibes installs with SSH-Remote provider
+
+# On your personal device (phone, laptop, tablet)
+npx agentvibes receiver setup
+# Pairing prompt with server SSH key
+# Done!
+```
+
+### 📚 Documentation
+
+**[→ View AgentVibes Receiver Setup Guide](docs/agentvibes-receiver.md)** - Pairing, SSH configuration, Tailscale setup, troubleshooting
+
+**[→ View OpenClaw Integration Guide](docs/openclaw-integration.md)** - Server setup, voice configuration, audio effects, and best practices
 
 [↑ Back to top](#-table-of-contents)
 
@@ -571,83 +1514,34 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 
 ## 📦 Installation Structure
 
-See what gets installed [here](#-installation-structure-full-details).
+**What gets installed:** Commands, hooks, personalities, and plugins in `.claude/` directory.
 
-[→ View Full Installation Structure](#-installation-structure-full-details)
+**[→ View Complete Installation Structure](docs/installation-structure.md)** - Full directory tree, file descriptions, and settings storage
 
 [↑ Back to top](#-table-of-contents)
 
 ---
 
-## 💡 Usage Examples
-
-### Switch Voices
+## 💡 Common Workflows
 
 ```bash
+# Switch voices
 /agent-vibes:list                    # See all voices
-/agent-vibes:switch Aria             # Switch to Aria
-/agent-vibes:switch "Cowboy Bob"     # Switch to Cowboy Bob
-/agent-vibes:whoami                  # Check current setup
-```
+/agent-vibes:switch Aria             # Change voice
 
-### Try Personalities
-
-```bash
-/agent-vibes:personality sarcastic   # Sarcastic + Jessica Anne Bogart
-/agent-vibes:personality pirate      # Pirate + Pirate Marshal
-/agent-vibes:personality dry-humor   # British wit + Aria
+# Try personalities
+/agent-vibes:personality pirate      # Pirate voice + style
 /agent-vibes:personality list        # See all 19 personalities
-```
 
-### Use Sentiments
+# Speak in other languages
+/agent-vibes:set-language spanish    # Speak in Spanish
+/agent-vibes:set-language list       # See 30+ languages
 
-```bash
-/agent-vibes:switch Aria             # Set to Aria voice
-/agent-vibes:sentiment sarcastic     # Add sarcasm to Aria
-/agent-vibes:sentiment clear         # Remove sentiment
-```
-
-### Audio Replay
-
-```bash
+# Replay audio
 /agent-vibes:replay                  # Replay last message
-/agent-vibes:replay 3                # Replay 3rd-to-last
 ```
 
-### Voice Preview
-
-```bash
-/agent-vibes:preview                 # Hear first 3 voices
-/agent-vibes:preview 10              # Hear first 10
-/agent-vibes:preview last 5          # Hear last 5
-```
-
-### Change Language
-
-Make Claude speak in **30+ languages** using multilingual voices:
-
-```bash
-# Set to Spanish
-/agent-vibes:set-language spanish
-
-# Set to French
-/agent-vibes:set-language french
-
-# Set to German
-/agent-vibes:set-language german
-
-# See all supported languages
-/agent-vibes:set-language list
-
-# Reset to English
-/agent-vibes:set-language english
-```
-
-**Supported Languages:**
-- Spanish, French, German, Italian, Portuguese
-- Chinese, Japanese, Korean, Hindi, Arabic
-- Polish, Dutch, Turkish, Swedish, Russian
-- And 15+ more!
+**💡 Tip:** Using MCP? Just say "Switch to Aria voice" or "Speak in Spanish" instead of typing commands.
 
 [↑ Back to top](#-table-of-contents)
 
@@ -655,48 +1549,21 @@ Make Claude speak in **30+ languages** using multilingual voices:
 
 ## 🔧 Advanced Features
 
-### Custom Personalities
+AgentVibes supports **custom personalities** and **custom voices**.
 
-1. Create new personality:
-   ```bash
-   /agent-vibes:personality add mycustom
-   ```
-
-2. Edit `.claude/personalities/mycustom.md`:
-   ```markdown
-   ---
-   name: mycustom
-   description: My style
-   voice: Aria
-   ---
-
-   ## AI Instructions
-   Speak in your unique style...
-   ```
-
-3. Use it:
-   ```bash
-   /agent-vibes:personality mycustom
-   ```
-
-### Add Custom Voices
-
+**Quick Examples:**
 ```bash
-# Get voice ID from elevenlabs.io
+# Create custom personality
+/agent-vibes:personality add mycustom
+
+# Add custom Piper voice
 /agent-vibes:add "My Voice" abc123xyz789
-```
 
-### Use in Custom Output Styles
-
-```markdown
-I'll do the task
+# Use in custom output styles
 [Bash: .claude/hooks/play-tts.sh "Starting" "Aria"]
-
-... work ...
-
-✅ Done
-[Bash: .claude/hooks/play-tts.sh "Complete" "Cowboy Bob"]
 ```
+
+**[→ View Advanced Features Guide](docs/advanced-features.md)** - Custom personalities, custom voices, and more
 
 [↑ Back to top](#-table-of-contents)
 
@@ -704,35 +1571,85 @@ I'll do the task
 
 ## 🔊 Remote Audio Setup
 
-**Running AgentVibes on a remote server but want to hear TTS on your local machine?**
+**Running AgentVibes on a remote server?** No problem!
 
-We've got you covered! Our remote audio setup guides you through configuring PulseAudio to tunnel audio from your remote Linux server to your local Windows speakers via SSH.
+✅ **Auto-detects SSH sessions** - Works with VS Code Remote SSH, regular SSH, cloud dev environments
+✅ **Zero configuration** - Audio optimizes automatically
+✅ **No static/clicking** - Clean playback through SSH tunnels
 
-**[→ Remote Audio Setup Guide](docs/remote-audio-setup.md)**
+**[→ Remote Audio Setup Guide](docs/remote-audio-setup.md)** - Full PulseAudio configuration details
 
 [↑ Back to top](#-table-of-contents)
 
 ---
 
-## 💰 Pricing & Usage
+## 🛠️ Technical Documentation
 
-### ElevenLabs Pricing (2025)
+### Audio Architecture
 
-| Plan | Monthly Cost | Characters/Month | Best For |
-|------|-------------|------------------|----------|
-| **Free** | $0 | 10,000 | Trying it out, light use |
-| **Starter** | $5 | 30,000 | Casual coding (1-2 hrs/day) |
-| **Creator** | $22 | 100,000 | Regular coding (4-5 hrs/day) |
-| **Pro** | $99 | 500,000 | Heavy daily use (8+ hrs/day) |
-| **Scale** | $330 | 2,000,000 | Professional/teams |
+AgentVibes uses a cross-platform audio module (`src/console/audio-env.js`) that handles player detection and environment configuration for all supported platforms.
 
-### Monitor Your Usage
+#### Platform Audio Support Matrix
 
-**Track consumption in real-time:**
+| Platform | PulseAudio Config | MP3 Players (preference order) | WAV Players (preference order) |
+|----------|-------------------|-------------------------------|-------------------------------|
+| **Native Linux** | System default (not overridden) | ffplay → play (sox) → mpg123 → cvlc → mpv | aplay → paplay → play → ffplay |
+| **WSL2** | Auto-detects `/mnt/wslg/PulseServer` | Same as Linux | Same as Linux |
+| **macOS** | Not applicable | ffplay → play → mpg123 → cvlc → mpv → afplay | aplay → paplay → play → ffplay → afplay |
+| **Windows** | Not applicable | ffplay → mpv (if installed) | ffplay → mpv → PowerShell SoundPlayer (built-in) |
 
-1. **Go to ElevenLabs Dashboard**: https://elevenlabs.io/app/usage
-2. **Monitor**: Credits used, character breakdown, billing period
-3. **Set alerts**: Check usage weekly, watch for spikes
+#### Key Design Decisions
+
+- **Direct spawn, not shell chains**: Audio players are spawned directly via Node's `spawn()` instead of `sh -c 'cmd1 || cmd2'` chains. VLC/cvlc crashes when stderr is redirected inside shell wrappers.
+- **Player detection at startup**: The available player is detected once using `which` and cached. No runtime fallback chains.
+- **PULSE_SERVER safety**: The WSL2 PulseServer path (`/mnt/wslg/PulseServer`) is only set when the socket file actually exists. Hardcoding it on native Linux silently breaks audio output.
+- **Windows WAV fallback**: PowerShell's `System.Media.SoundPlayer` is used as a built-in fallback when no cross-platform player is installed.
+
+#### Multi-Speaker Voice Models
+
+Piper supports multi-speaker ONNX models (e.g., `16Speakers.onnx`) that contain multiple voices in a single file. AgentVibes expands these automatically:
+
+- The `.onnx.json` metadata file contains `num_speakers` and `speaker_id_map`
+- `scanInstalledVoices()` expands multi-speaker models into individual selectable entries (e.g., `16Speakers::Cori_Samuel`)
+- When selected, the system writes `tts-piper-model.txt` and `tts-piper-speaker-id.txt` to `.claude/`
+- `play-tts-piper.sh` reads these files and passes `--speaker <id>` to the piper binary
+
+#### Voice Directory Resolution
+
+Voice storage follows the same precedence chain in both JavaScript and shell:
+
+1. `PIPER_VOICES_DIR` environment variable
+2. Project-local `.claude/piper-voices-dir.txt` (walks up directory tree)
+3. Global `~/.claude/piper-voices-dir.txt`
+4. Default `~/.claude/piper-voices`
+
+#### Voice Catalog System
+
+AgentVibes includes a 914-voice catalog (`voice-assignments.json`) that lets users browse, preview, and install voices directly from the Voices tab:
+
+- **10 Curated Voices** — Hand-picked high-quality voices installed by default
+- **904 LibriTTS Speakers** — Automatically extracted from the `16Speakers` multi-speaker model's `speaker_id_map`, plus the full LibriTTS catalog from Hugging Face
+- **Download on Demand** — Uninstalled voices appear greyed-out in the list; pressing Enter opens a download modal that fetches the voice via `piper-voice-manager.sh`
+- **Catalog Metadata** — Each entry includes `voiceId`, `displayName`, `gender`, `type` (curated/libritts), and download URL
+- **LibriTTS Speaker Names** — Raw numeric IDs are patched at load time using `patchLibriTTSSpeakerNames()` which maps speaker IDs to human-readable names from the registry
+
+The catalog is loaded once at tab initialization by `loadCatalog()`. Installed voices (from disk scan) are shown with full color; catalog-only voices are dimmed until downloaded.
+
+#### Required System Dependencies for Background Music
+
+Background music requires an MP3-capable audio player. The installer detects missing players and offers to install `ffmpeg` automatically. If no player is found, the Music tab displays a clear error message.
+
+```bash
+# Install ffmpeg (recommended — provides ffplay)
+# Ubuntu/Debian/WSL2:
+sudo apt install ffmpeg
+
+# macOS:
+brew install ffmpeg
+
+# Arch Linux:
+sudo pacman -S ffmpeg
+```
 
 [↑ Back to top](#-table-of-contents)
 
@@ -744,17 +1661,15 @@ We've got you covered! Our remote audio setup guides you through configuring Pul
 
 - 🎤 **[WhisperTyping](https://whispertyping.com/)** - Fast voice-to-text typing for developers
 - 🗣️ **[OpenWhisper (Azure)](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/whisper-overview)** - Microsoft's speech-to-text service
-- 🎙️ **[ElevenLabs](https://elevenlabs.io/)** - Premium AI voice synthesis
 - 🆓 **[Piper TTS](https://github.com/rhasspy/piper)** - Free offline neural TTS
 - 🤖 **[Claude Code](https://claude.com/claude-code)** - AI coding assistant
 - 🎭 **[BMAD METHOD](https://github.com/bmad-code-org/BMAD-METHOD)** - Multi-agent framework
 
 ### AgentVibes Resources
 
-- 📊 **[Usage Dashboard](https://elevenlabs.io/app/usage)** - Monitor ElevenLabs usage
-- 💳 **[Pricing Page](https://elevenlabs.io/pricing)** - ElevenLabs plans
 - 🐛 **[Issues](https://github.com/paulpreibisch/AgentVibes/issues)** - Report bugs
 - 📝 **[Changelog](https://github.com/paulpreibisch/AgentVibes/releases)** - Version history
+- 📰 **[Technical Deep Dive - LinkedIn Article](https://www.linkedin.com/pulse/agent-vibes-add-voice-claude-code-deep-dive-npx-paul-preibisch-8zrcc/)** - How AgentVibes works under the hood
 
 [↑ Back to top](#-table-of-contents)
 
@@ -762,39 +1677,42 @@ We've got you covered! Our remote audio setup guides you through configuring Pul
 
 ## ❓ Troubleshooting
 
-### No Audio Playing?
+**Common Issues:**
 
-1. Check API key: `echo $ELEVENLABS_API_KEY`
-2. Check output style: `/output-style agent-vibes`
-3. Test playback: `/agent-vibes:sample Aria`
+**❌ Error: "git-lfs is not installed"**
 
-### Commands Not Found?
+**AgentVibes does NOT require git-lfs.** This error suggests:
 
+1. **Wrong installation method** - Use npm, not git clone:
+   ```bash
+   # ✅ CORRECT - Use this:
+   npx agentvibes install
+
+   # ❌ WRONG - Don't clone unless contributing:
+   git clone https://github.com/paulpreibisch/AgentVibes.git
+   ```
+
+2. **Different project** - You may be in a BMAD-METHOD or other repo that uses git-lfs
+
+3. **Global git config** - Your git may have lfs enabled globally:
+   ```bash
+   git config --global --list | grep lfs
+   ```
+
+**Solution:** Use `npx agentvibes install` - no git operations needed!
+
+---
+
+**No Audio Playing?**
+1. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
+2. Test: `/agent-vibes:sample Aria`
+
+**Commands Not Found?**
 ```bash
-# Verify installation
-npx agentvibes status
-
-# Reinstall
 npx agentvibes install --yes
 ```
 
-### Wrong Voice Playing?
-
-```bash
-# Check current setup
-/agent-vibes:whoami
-
-# Reset if needed
-/agent-vibes:personality reset
-/agent-vibes:sentiment clear
-```
-
-### MCP Not Working?
-
-1. **Check config file**: Verify JSON syntax in `claude_desktop_config.json` or `.mcp-minimal.json`
-2. **Restart app**: Close and reopen Claude Desktop/Warp/Claude Code
-3. **Check logs**: Look for MCP connection errors in app logs
-4. **Verify npx**: Run `npx -y agentvibes-mcp-server` manually to test
+**[→ View Complete Troubleshooting Guide](docs/troubleshooting.md)** - Solutions for audio issues, command problems, MCP errors, voice issues, and more
 
 [↑ Back to top](#-table-of-contents)
 
@@ -802,53 +1720,215 @@ npx agentvibes install --yes
 
 ## 🔄 Updating
 
-### Quick Update (From Claude Code)
-
-The fastest way to update is directly from Claude Code:
-
+**Quick Update (From Claude Code):**
 ```bash
 /agent-vibes:update
 ```
 
-This checks for the latest version and updates with confirmation.
-
-### Alternative Methods
-
-#### If installed via npx:
+**Alternative Methods:**
 ```bash
+# Via npx
 npx agentvibes update --yes
+
+# Via npm (if installed globally)
+npm update -g agentvibes && agentvibes update --yes
 ```
 
-#### If installed globally via npm:
+**Check Version:** `/agent-vibes:version`
+
+**[→ View Complete Update Guide](docs/updating.md)** - All update methods, version checking, what gets updated, and troubleshooting
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🗑️ Uninstalling
+
+**Quick Uninstall (Project Only):**
 ```bash
-npm update -g agentvibes
-agentvibes update --yes
+npx agentvibes uninstall
 ```
 
-#### If installed from source:
+**Uninstall Options:**
 ```bash
-cd ~/AgentVibes
-git pull origin master
-npm install
-node bin/agent-vibes update --yes
+# Interactive uninstall (confirms before removing)
+npx agentvibes uninstall
+
+# Auto-confirm (skip confirmation prompt)
+npx agentvibes uninstall --yes
+
+# Also remove global configuration
+npx agentvibes uninstall --global
+
+# Complete uninstall including Piper TTS
+npx agentvibes uninstall --global --with-piper
 ```
 
-### Check Your Version
+**What Gets Removed:**
 
+**Project-level (default):**
+- `.claude/commands/agent-vibes/` - Slash commands
+- `.claude/hooks/` - TTS scripts
+- `.claude/personalities/` - Personality templates
+- `.claude/output-styles/` - Output styles
+- `.claude/audio/` - Audio cache
+- `.claude/tts-*.txt` - TTS configuration files
+- `.agentvibes/` - BMAD integration files
+
+**Global (with `--global` flag):**
+- `~/.claude/` - Global configuration
+- `~/.agentvibes/` - Global cache
+
+**Piper TTS (with `--with-piper` flag):**
+- `~/piper/` - Piper TTS installation
+
+**To Reinstall:**
 ```bash
-/agent-vibes:version
+npx agentvibes install
 ```
 
-### What Gets Updated
+**💡 Tips:**
+- Default uninstall only removes project-level files
+- Use `--global` if you want to completely reset AgentVibes
+- Use `--with-piper` if you also want to remove the Piper TTS engine
+- Run `npx agentvibes status` to check installation status
 
-The update command will:
-- ✅ Update all slash commands
-- ✅ Update TTS scripts and plugins
-- ✅ Add new personalities (keeps your custom ones)
-- ✅ Update output styles
-- ✅ Update MCP server
-- ✅ Show recent changes and release notes
-- ⚠️  Preserves your voice settings and configurations
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+### Installation & Setup
+
+**Q: Does AgentVibes require git-lfs?**
+**A:** **NO.** AgentVibes has zero git-lfs requirement. Use `npx agentvibes install` - no git operations needed.
+
+**Q: Do I need to clone the GitHub repository?**
+**A:** **NO** (unless you're contributing code). Normal users should use `npx agentvibes install`. Repository cloning is only for developers who want to contribute to the project.
+
+**Q: Why is the GitHub repo so large?**
+**A:** The repo includes demo files and development dependencies (node_modules). The actual npm package you download is **< 50MB** and optimized for users.
+
+**Q: What's the difference between npm install and git clone?**
+**A:**
+- `npx agentvibes install` → **For users** - Downloads pre-built package, zero git operations, instant setup
+- `git clone ...` → **For developers only** - Full source code, development setup, contributing code
+
+**Q: I saw an error about git-lfs, is something wrong?**
+**A:** You're likely:
+1. Using wrong installation method (use `npx` not `git clone`)
+2. In a different project directory that uses git-lfs
+3. Have global git config with lfs enabled
+
+AgentVibes itself does NOT use or require git-lfs.
+
+### Features & Usage
+
+**Q: Does MCP consume tokens from my context window?**
+**A:** **YES.** Every MCP tool schema adds to the context window. AgentVibes MCP is designed to be minimal (~1500-2000 tokens), but if you're concerned about token usage, you can use slash commands instead of MCP.
+
+**Q: What's the difference between using MCP vs slash commands?**
+**A:**
+- **MCP**: Natural language ("Switch to Aria voice"), uses ~1500-2000 context tokens
+- **Slash commands**: Explicit commands (`/agent-vibes:switch Aria`), zero token overhead
+
+Both do the exact same thing - MCP is more convenient, slash commands are more token-efficient.
+
+**Q: Is AgentVibes just a bash script?**
+**A:** No. AgentVibes includes:
+- Multi-provider TTS abstraction (Piper TTS, macOS Say)
+- Voice management system with 50+ voices
+- Personality & sentiment system
+- Language learning mode with bilingual playback
+- Audio effects processing (reverb, EQ, compression)
+- MCP server for natural language control
+- BMAD integration for multi-agent voice switching
+- Remote audio optimization for SSH/RDP sessions
+
+**Q: Can I use AgentVibes without BMAD?**
+**A:** **YES.** AgentVibes works standalone. BMAD integration is optional - only activates if you install BMAD separately.
+
+**Q: What are the audio dependencies?**
+**A:**
+- **Required**: Node.js 16+, Python 3.10+ (for Piper TTS)
+- **Optional**: sox (audio effects), ffmpeg (background music, padding)
+- All TTS generation works without optional dependencies - they just enhance the experience
+
+### Voice Features
+
+**Q: How do I browse and install voices?**
+**A:** Use the built-in TUI installer by running `/audio-browser` in Claude Code. Navigate with arrow keys, press ENTER to sample voices, and select one to install. AgentVibes switches to the chosen voice automatically.
+
+**Q: What are friendly voice names?**
+**A:** Instead of technical IDs like `en_US-ryan-high`, you can now use simple names like "Ryan" when switching voices. All 904+ voices have friendly names matched to their characteristics.
+
+**Q: How do I set up custom intro text?**
+**A:** During installation you'll be prompted for intro text. You can also configure it anytime via `npx agentvibes` → Settings tab. Enter text like "FireBot: " and it will prefix all TTS announcements.
+
+**Q: Can I use my own background music?**
+**A:** Yes! Run `npx agentvibes` and open the Music tab. Select "Change music" and provide the path to your audio file (.mp3, .wav, .ogg, or .m4a). Files are validated for security and must be under 50MB.
+
+**Q: What's the recommended duration for custom music?**
+**A:** Between 30-90 seconds is ideal for smooth looping. The system supports up to 300 seconds (5 minutes) but will warn you if the duration is non-optimal.
+
+**Q: Are friendly voice names case-sensitive?**
+**A:** No! You can type "ryan", "Ryan", or "RYAN" - they all work. The voice resolution is case-insensitive.
+
+**Q: Does custom music work with all TTS providers?**
+**A:** Yes! Custom background music works with Piper TTS, Soprano, macOS Say, and Windows SAPI.
+
+**Q: Can I preview music before setting it as my background?**
+**A:** Yes! In `npx agentvibes` → Music tab, select "Preview current" to hear your music. During installation, you can also sample all built-in tracks.
+
+**Q: What security measures protect custom music uploads?**
+**A:** AgentVibes implements **defense-in-depth security with 7 validation layers**, tested against 180+ attack variations:
+
+1. **Path Validation** - `path.resolve()` prevents traversal attacks (../, encoded, Unicode)
+2. **Home Directory Boundary** - Files must be within your home directory
+3. **File Existence Check** - Verifies file actually exists
+4. **File Type Verification** - Must be a regular file (not device, socket, etc.)
+5. **Ownership Verification** - File must be owned by you (UID check)
+6. **Format Validation** - Magic number checking ensures real audio files
+7. **Secure Storage** - Files copied to restricted directory with 600 permissions
+
+**Security Certification:**
+- ✅ 100% attack rejection rate (107/107 tests passed)
+- ✅ OWASP CWE-22 compliant (path traversal prevention)
+- ✅ No information disclosure in error messages
+- ✅ Production-ready and certified secure
+
+See full security audit: `docs/security/SECURITY-AUDIT.md`
+
+**Q: Has the security been independently verified?**
+**A:** Yes! AgentVibes v3.6.0 includes a comprehensive security audit with 180+ attack variations tested. All path traversal, symlink, Unicode, null byte, and edge case attacks were successfully blocked (100% rejection rate). The system is OWASP CWE-22 compliant and includes a detailed security audit report at `docs/security/SECURITY-AUDIT.md`.
+
+**Q: What attack patterns were tested?**
+**A:** The security test suite covers:
+- **Path Traversal:** 100 variations (basic, URL-encoded, Unicode, null bytes, mixed)
+- **Symlink Attacks:** 10 variations (sensitive files, chains, traversal targets)
+- **Hard Link Attacks:** 5 variations (ownership verification)
+- **Edge Cases:** 65+ variations (CRLF, whitespace, Unicode normalization, platform-specific)
+
+Every attack was correctly rejected with no information disclosure.
+
+### Troubleshooting
+
+**Q: Why isn't Claude speaking?**
+**A:** Common causes:
+1. Hook not installed - Run `npx agentvibes install --yes`
+2. Audio player missing - Install `sox` and `ffmpeg`
+3. TTS protocol not enabled in settings
+4. Test with `/agent-vibes:sample Aria`
+
+**Q: Can I use this on Windows?**
+**A:** Yes! AgentVibes supports **native Windows** with PowerShell scripts (Soprano, Piper, SAPI providers). See [Windows Native Setup](WINDOWS-SETUP.md). WSL is also supported for legacy workflows - see [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md).
+
+**Q: How do I reduce token usage?**
+**A:**
+1. Use slash commands instead of MCP (zero context token overhead)
+2. Set verbosity to LOW (`/agent-vibes:verbosity low`)
+3. Disable BMAD integration if not using it
 
 [↑ Back to top](#-table-of-contents)
 
@@ -857,20 +1937,18 @@ The update command will:
 ## ⚠️ Important Disclaimers
 
 **API Costs & Usage:**
-- ElevenLabs usage may incur charges based on your subscription tier and character usage
+- Usage is completely free with Piper TTS and Mac Say (no API costs)
 - Users are solely responsible for their own API costs and usage
-- Free tier: 10,000 characters/month | Paid plans: $5-99/month
-- See [ElevenLabs Pricing](https://elevenlabs.io/pricing) for current rates
+
 
 **Third-Party Services:**
-- This project integrates with ElevenLabs (TTS API) and Piper TTS (local processing)
-- We are **not affiliated with, endorsed by, or officially connected** to ElevenLabs, Anthropic, or Claude
-- ElevenLabs and Piper TTS are subject to their respective terms of service
+- This project integrates with Piper TTS (local processing) and macOS Say (system built-in)
+- We are **not affiliated with, endorsed by, or officially connected** to Anthropic, Apple, or Claude
+- Piper TTS is subject to its terms of service
 
 **Privacy & Data:**
-- **ElevenLabs**: Your text prompts are sent to ElevenLabs servers for processing
 - **Piper TTS**: All processing happens locally on your machine, no external data transmission
-- Review [ElevenLabs Privacy Policy](https://elevenlabs.io/privacy) for their data handling
+- **macOS Say**: All processing happens locally using Apple's built-in speech synthesis
 
 **Software License:**
 - Provided "as-is" under Apache 2.0 License without warranty of any kind
@@ -895,10 +1973,15 @@ The update command will:
 - 🌐 GitHub: [paulpreibisch](https://github.com/paulpreibisch)
 
 **Powered by:**
-- [ElevenLabs](https://elevenlabs.io/) - Premium AI voices
 - [Piper TTS](https://github.com/rhasspy/piper) - Free neural voices
+- [Soprano TTS](https://github.com/suno-ai/bark) - Ultra-fast neural TTS
+- **Windows SAPI** - Native Windows text-to-speech
+- **macOS Say** - Native macOS text-to-speech
 - [Claude Code](https://claude.com/claude-code) - AI coding assistant
 - Licensed under Apache 2.0
+
+**Contributors:**
+- 🎤 [@nathanchase](https://github.com/nathanchase) - Soprano TTS Provider integration (PR #95) - Ultra-fast neural TTS with GPU acceleration
 
 **Special Thanks:**
 - 💡 [Claude Code Hooks Mastery](https://github.com/disler/claude-code-hooks-mastery) by [@disler](https://github.com/disler) - Hooks inspiration
@@ -922,191 +2005,3 @@ If AgentVibes makes your coding more fun:
 
 [↑ Back to top](#-table-of-contents)
 
----
-
-# 📚 Appendix
-
-## 🗣️ Voice Library (Full List)
-
-### 🌍 Multilingual Voices (Supports 30+ Languages)
-
-Perfect for international projects! These voices work with Spanish, French, German, Italian, Portuguese, and many more languages using ElevenLabs' Multilingual v2 model.
-
-| Voice | Character | Languages | Best For |
-|-------|-----------|-----------|----------|
-| [Antoni](https://elevenlabs.io/voice-library/antoni/ErXwobaYiN019PkySvjV) | Well-balanced | 30+ | International, Spanish |
-| [Rachel](https://elevenlabs.io/voice-library/rachel/21m00Tcm4TlvDq8ikWAM) | Clear, professional | 30+ | Global communication, French |
-| [Domi](https://elevenlabs.io/voice-library/domi/AZnzlk1XvdvUeBnXmlld) | Strong, confident | 30+ | Leadership, German |
-| [Bella](https://elevenlabs.io/voice-library/bella/EXAVITQu4vr4xnSDxMaL) | Soft, engaging | 30+ | Friendly, Italian |
-
-### 🗣️ Language-Optimized Voices
-
-| Voice | Character | Optimized For |
-|-------|-----------|---------------|
-| [Charlotte](https://elevenlabs.io/voice-library/charlotte/XB0fDUnXU5powFXDhCwa) | Expressive | French, German, Spanish |
-| [Matilda](https://elevenlabs.io/voice-library/matilda/XrExE9yKIg1WjnnlVkGX) | Warm | Spanish, Portuguese |
-
-### 🎭 English Character Voices
-
-| Voice | Character | Best For |
-|-------|-----------|----------|
-| [Aria](https://elevenlabs.io/voice-library/aria-professional-narration/TC0Zp7WVFzhA8zpTlRqV) | Clear professional | Default, all-purpose |
-| [Archer](https://elevenlabs.io/voice-library/archer/L0Dsvb3SLTyegXwtm47J) | Authoritative | Leadership, orchestration |
-| [Jessica Anne Bogart](https://elevenlabs.io/voice-library/jessica-anne-bogart/flHkNRp1BlvT73UL6gyz) | Wickedly eloquent | Sarcastic, flirty |
-| [Pirate Marshal](https://elevenlabs.io/voice-library/pirate-marshal/PPzYpIqttlTYA83688JI) | Authentic pirate | Pirate personality |
-| [Grandpa Spuds Oxley](https://elevenlabs.io/voice-library/grandpa-spuds-oxley/NOpBlnGInO9m6vDvFkFC) | Wise elder | Grandpa personality |
-| [Matthew Schmitz](https://elevenlabs.io/voice-library/matthew-schmitz/0SpgpJ4D3MpHCiWdyTg3) | Deep baritone | Professional |
-| [Cowboy Bob](https://elevenlabs.io/voice-library/cowboy-bob/KTPVrSVAEUSJRClDzBw7) | Western charm | Casual, friendly |
-| [Northern Terry](https://elevenlabs.io/voice-library/northern-terry/wo6udizrrtpIxWGp2qJk) | Eccentric British | Quirky responses |
-| [Ms. Walker](https://elevenlabs.io/voice-library/ms-walker/DLsHlh26Ugcm6ELvS0qi) | Warm teacher | Professional |
-| [Dr. Von Fusion](https://elevenlabs.io/voice-library/dr-von-fusion/yjJ45q8TVCrtMhEKurxY) | Mad scientist | Robot personality |
-| [Michael](https://elevenlabs.io/voice-library/michael/U1Vk2oyatMdYs096Ety7) | British urban | Professional |
-| [Ralf Eisend](https://elevenlabs.io/voice-library/ralf-eisend/A9evEp8yGjv4c3WsIKuY) | International | Multi-cultural |
-| [Amy](https://elevenlabs.io/voice-library/amy/bhJUNIXWQQ94l8eI2VUf) | Chinese accent | Diverse |
-| [Lutz Laugh](https://elevenlabs.io/voice-library/lutz-laugh/9yzdeviXkFddZ4Oz8Mok) | Jovial | Funny |
-| [Burt Reynolds](https://elevenlabs.io/voice-library/burt-reynolds/4YYIPFl9wE5c4L2eu2Gb) | Smooth baritone | Confident |
-| [Juniper](https://elevenlabs.io/voice-library/juniper/aMSt68OGf4xUZAnLpTU8) | Warm, friendly | Relations |
-| [Tiffany](https://elevenlabs.io/voice-library/tiffany/6aDn1KB0hjpdcocrUkmq) | Professional | Leadership |
-| [Tom](https://elevenlabs.io/voice-library/tom/DYkrAHD8iwork3YSUBbs) | Professional | Coordination |
-| [Demon Monster](https://elevenlabs.io/voice-library/demon-monster/vfaqCOvlrKi4Zp7C2IAm) | Deep, spooky | Dramatic |
-
-[↑ Back to top](#-table-of-contents)
-
----
-
-## 🔌 BMAD Plugin (Full Documentation)
-
-**Automatically switch voices when using BMAD agents!**
-
-The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`) and automatically uses the assigned voice for that role.
-
-### Default BMAD Voice Mappings
-
-| Agent | Role | Voice | Personality |
-|-------|------|-------|-------------|
-| **pm** | Product Manager | Jessica Anne Bogart | professional |
-| **dev** | Developer | Matthew Schmitz | normal |
-| **qa** | QA Engineer | Burt Reynolds | professional |
-| **architect** | Architect | Michael | normal |
-| **po** | Product Owner | Tiffany | professional |
-| **analyst** | Analyst | Ralf Eisend | normal |
-| **sm** | Scrum Master | Ms. Walker | professional |
-| **ux-expert** | UX Expert | Aria | normal |
-| **bmad-master** | BMAD Master | Archer | zen |
-| **bmad-orchestrator** | Orchestrator | Tom | professional |
-
-### Plugin Management
-
-```bash
-# Check status (auto-enables if BMAD detected)
-/agent-vibes-bmad status
-
-# Disable plugin
-/agent-vibes-bmad disable
-
-# Re-enable plugin
-/agent-vibes-bmad enable
-
-# Customize agent voice
-/agent-vibes-bmad set pm "Aria" zen
-
-# Edit configuration
-/agent-vibes-bmad edit
-```
-
-### How It Works
-
-1. **Auto-Detection**: Plugin checks for `.bmad-core/install-manifest.yaml`
-2. **Auto-Enable**: Enables automatically when BMAD is detected
-3. **Settings Preservation**: Saves your previous voice/personality when enabling
-4. **Restore on Disable**: Restores previous settings when disabling
-
-### 🌍 Language Support with BMAD
-
-When you set a language, AgentVibes intelligently selects the best voice:
-
-**Language Priority System:**
-1. **BMAD Agent Active** + **Language Set**: Uses multilingual version of agent's assigned voice
-   - If agent's voice doesn't support the language → switches to Antoni/Rachel/Domi/Bella (multilingual)
-2. **BMAD Agent Active** + **No Language Set**: Uses agent's assigned voice (default English)
-3. **No BMAD Agent** + **Language Set**: Uses current voice if multilingual, otherwise switches to Antoni
-4. **No BMAD Agent** + **No Language Set**: Uses current voice/personality normally
-
-**Example Workflow:**
-```bash
-# Set language to Spanish
-/agent-vibes:set-language spanish
-
-# Activate BMAD PM agent
-/BMad:agents:pm
-# → Will try to use Jessica Anne Bogart for Spanish
-# → If not multilingual, falls back to Antoni (Spanish-optimized)
-
-# All TTS will speak in Spanish with appropriate voice
-```
-
-**Supported Languages:**
-- Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Polish, Dutch, Turkish, Russian, and 20+ more
-
-**Multilingual Fallback Voices:**
-- **Antoni** - Best for Spanish
-- **Rachel** - Best for French
-- **Domi** - Best for German
-- **Bella** - Best for Italian
-- **Charlotte** - European languages
-- **Matilda** - Latin languages
-
-[↑ Back to top](#-table-of-contents)
-
----
-
-## 📦 Installation Structure (Full Details)
-
-```
-your-project/
-└── .claude/
-    ├── commands/
-    │   ├── agent-vibes/              # 15 voice commands
-    │   └── agent-vibes-bmad.md       # BMAD plugin command
-    ├── hooks/
-    │   ├── play-tts.sh               # Main TTS (provider-aware)
-    │   ├── play-tts-elevenlabs.sh    # ElevenLabs implementation
-    │   ├── play-tts-piper.sh         # Piper implementation
-    │   ├── provider-manager.sh       # Provider switching
-    │   ├── provider-commands.sh      # Provider CLI
-    │   ├── language-manager.sh       # Language system
-    │   ├── voice-manager.sh          # Voice switching
-    │   ├── personality-manager.sh    # Personality system
-    │   ├── sentiment-manager.sh      # Sentiment system
-    │   ├── bmad-voice-manager.sh     # BMAD integration
-    │   ├── piper-voice-manager.sh    # Piper voices
-    │   ├── piper-download-voices.sh  # Piper downloader
-    │   └── voices-config.sh          # Voice ID mappings
-    ├── personalities/                # 19 personality templates
-    ├── plugins/
-    │   └── bmad-voices.md            # BMAD voice mappings
-    ├── output-styles/
-    │   └── agent-vibes.md            # Voice output style
-    └── audio/                        # Generated TTS files
-```
-
-### Voice Settings Storage
-
-**Project-Local Settings** (`.claude/` in project):
-- **Current Provider**: `tts-provider.txt` - Active TTS provider (elevenlabs/piper)
-- **Current Voice**: `tts-voice.txt` - Selected voice name
-- **Current Personality**: `tts-personality.txt` - Active personality
-- **Current Sentiment**: `tts-sentiment.txt` - Active sentiment
-- **Current Language**: `tts-language.txt` - Selected language
-
-**Global Fallback** (`~/.claude/`):
-Settings fall back to global config if project-local doesn't exist.
-
-**How it works:**
-1. AgentVibes checks `.claude/` in current project first
-2. Falls back to `~/.claude/` if project setting doesn't exist
-3. This allows different voices/personalities per project!
-
-Settings persist across Claude Code sessions!
-
-[↑ Back to top](#-table-of-contents)

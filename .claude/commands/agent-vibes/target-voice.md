@@ -19,7 +19,7 @@ Recommended multilingual voices:
 - **Charlotte** - European languages
 - **Matilda** - Latin languages
 
-These voices support 30+ languages using ElevenLabs' Multilingual v2 model.
+These voices support 30+ languages using Piper TTS' Multilingual v2 model.
 
 After setting your target voice:
 - Enable learning mode with `/agent-vibes:learn`

@@ -1,8 +1,43 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# @fileoverview Speech Speed Manager for Piper TTS
+# File: .claude/hooks/speed-manager.sh
+#
+# AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+# Website: https://agentvibes.org
+# Repository: https://github.com/paulpreibisch/AgentVibes
+#
+# Co-created by Paul Preibisch with Claude AI
+# Copyright (c) 2025 Paul Preibisch
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DISCLAIMER: This software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# express or implied, including but not limited to the warranties of
+# merchantability, fitness for a particular purpose and noninfringement.
+# In no event shall the authors or copyright holders be liable for any claim,
+# damages or other liability, whether in an action of contract, tort or
+# otherwise, arising from, out of or in connection with the software or the
+# use or other dealings in the software.
+#
+# ---
+#
+# @fileoverview Speech Speed Manager for Multi-Provider TTS
 # @context Manage speech rate for main and target language voices
-# @architecture Simple config file manager for Piper length-scale parameter
+# @architecture Simple config file manager supporting Piper (length-scale) and macOS (speed API parameter)
+# @dependencies .claude/config/tts-speech-rate.txt, .claude/config/tts-target-speech-rate.txt
+# @entrypoints Called by /agent-vibes:set-speed slash command
+# @patterns Provider-agnostic speed config, legacy file migration, random tongue twisters for testing
+# @related play-tts.sh, play-tts-piper.sh, play-tts-macos.sh, learn-manager.sh
 #
 
 # Get script directory
@@ -29,13 +64,18 @@ fi
 
 mkdir -p "$CONFIG_DIR"
 
-MAIN_SPEED_FILE="$CONFIG_DIR/piper-speech-rate.txt"
-TARGET_SPEED_FILE="$CONFIG_DIR/piper-target-speech-rate.txt"
+MAIN_SPEED_FILE="$CONFIG_DIR/tts-speech-rate.txt"
+TARGET_SPEED_FILE="$CONFIG_DIR/tts-target-speech-rate.txt"
+
+# Legacy file paths for backward compatibility (Piper-specific naming)
+LEGACY_MAIN_SPEED_FILE="$CONFIG_DIR/piper-speech-rate.txt"
+LEGACY_TARGET_SPEED_FILE="$CONFIG_DIR/piper-target-speech-rate.txt"
 
 # @function parse_speed_value
-# @intent Convert user-friendly speed notation to Piper length-scale value
-# @param $1 Speed string (e.g., "2x", "+2x", "-2x", "0.5x", "normal")
-# @returns Numeric length-scale value
+# @intent Convert user-friendly speed notation to normalized speed multiplier
+# @param $1 Speed string (e.g., "2x", "0.5x", "normal")
+# @returns Numeric speed value (0.5=slower, 1.0=normal, 2.0=faster, 3.0=very fast)
+# @note This is the user-facing scale - provider scripts will convert as needed
 parse_speed_value() {
   local input="$1"
 
@@ -45,22 +85,23 @@ parse_speed_value() {
       echo "1.0"
       return
       ;;
-    fast|-2x|0.5x)
+    slow|slower|0.5x)
       echo "0.5"
       return
       ;;
-    slow|+2x|2x|2.0)
+    fast|2x|2.0)
       echo "2.0"
       return
       ;;
-    slower|+3x|3x|3.0)
+    faster|3x|3.0)
       echo "3.0"
       return
       ;;
   esac
 
-  # Strip leading '+' if present
+  # Strip leading '+' or '-' if present
   input="${input#+}"
+  input="${input#-}"
 
   # Strip trailing 'x' if present
   input="${input%x}"
@@ -127,47 +168,68 @@ set_speed() {
 
   case "$speed_value" in
     0.5)
-      echo "Effect: 2x faster (half duration)"
+      echo "Effect: Half speed (slower)"
       ;;
     1.0)
       echo "Effect: Normal speed"
       ;;
     2.0)
-      echo "Effect: 2x slower (great for language learning)"
+      echo "Effect: Double speed (faster)"
       ;;
     3.0)
-      echo "Effect: 3x slower (very slow, detailed learning)"
+      echo "Effect: Triple speed (very fast)"
       ;;
     *)
       if (( $(echo "$speed_value > 1.0" | bc -l) )); then
-        echo "Effect: Slower speech"
-      else
         echo "Effect: Faster speech"
+      else
+        echo "Effect: Slower speech"
       fi
       ;;
   esac
 
   echo ""
-  echo "Note: Speed control only works with Piper TTS voices"
+  echo "Note: Speed control works with Piper and macOS providers"
 
-  # Test the new speed
-  if command -v bc &> /dev/null; then
-    local test_msg
-    if [[ "$is_target" == true ]]; then
-      test_msg="Velocidad de voz ajustada para aprender mejor"
-    else
-      test_msg="Speech speed adjusted successfully"
-    fi
+  # Array of simple test messages to demonstrate speed
+  local test_messages=(
+    "Testing speed change"
+    "Speed test in progress"
+    "Checking audio speed"
+    "Speed configuration test"
+    "Audio speed test"
+  )
 
-    echo ""
-    echo "🔊 Testing new speed..."
-    "$SCRIPT_DIR/play-tts.sh" "$test_msg" &
+  # Pick a random test message
+  local random_index=$((RANDOM % ${#test_messages[@]}))
+  local test_msg="${test_messages[$random_index]}"
+
+  echo ""
+  echo "🔊 Testing new speed with: \"$test_msg\""
+  "$SCRIPT_DIR/play-tts.sh" "$test_msg" &
+}
+
+# @function migrate_legacy_files
+# @intent Migrate from old piper-specific files to provider-agnostic files
+# @why Ensure backward compatibility when upgrading from Piper-only to multi-provider
+migrate_legacy_files() {
+  # Migrate main speed file
+  if [[ -f "$LEGACY_MAIN_SPEED_FILE" ]] && [[ ! -f "$MAIN_SPEED_FILE" ]]; then
+    cp "$LEGACY_MAIN_SPEED_FILE" "$MAIN_SPEED_FILE"
+  fi
+
+  # Migrate target speed file
+  if [[ -f "$LEGACY_TARGET_SPEED_FILE" ]] && [[ ! -f "$TARGET_SPEED_FILE" ]]; then
+    cp "$LEGACY_TARGET_SPEED_FILE" "$TARGET_SPEED_FILE"
   fi
 }
 
 # @function get_speed
 # @intent Display current speech speed settings
 get_speed() {
+  # Migrate legacy files if needed
+  migrate_legacy_files
+
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "   Current Speech Speed Settings"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -186,10 +248,12 @@ get_speed() {
     local target_speed=$(cat "$TARGET_SPEED_FILE" 2>/dev/null)
     echo "Target language: ${target_speed}x"
   else
-    echo "Target language: 2.0x (default, 2x slower for learning)"
+    echo "Target language: 0.5x (default, slower for learning)"
   fi
 
   echo ""
+  echo "Scale: 0.5x=slower, 1.0x=normal, 2.0x=faster, 3.0x=very fast"
+  echo "Works with: Piper TTS and macOS"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
@@ -213,14 +277,15 @@ case "${1:-}" in
     echo "  /agent-vibes:set-speed get              Show current speeds"
     echo ""
     echo "Speed values:"
-    echo "  0.5x or -2x  = 2x faster"
-    echo "  1x or normal = Normal speed"
-    echo "  2x or +2x    = 2x slower (great for learning)"
-    echo "  3x or +3x    = 3x slower"
+    echo "  0.5x or slow/slower = Half speed (slower)"
+    echo "  1x or normal        = Normal speed"
+    echo "  2x or fast          = Double speed (faster)"
+    echo "  3x or faster        = Triple speed (very fast)"
     echo ""
     echo "Examples:"
-    echo "  /agent-vibes:set-speed target 2x"
-    echo "  /agent-vibes:set-speed 0.5x"
-    echo "  /agent-vibes:set-speed normal"
+    echo "  /agent-vibes:set-speed 2x        # Make voice faster"
+    echo "  /agent-vibes:set-speed 0.5x      # Make voice slower"
+    echo "  /agent-vibes:set-speed target 0.5x  # Slow down target language for learning"
+    echo "  /agent-vibes:set-speed normal    # Reset to normal"
     ;;
 esac

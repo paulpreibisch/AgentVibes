@@ -1,0 +1,127 @@
+# generated: 2026-02-16
+# project: AgentVibes
+# project_key: AVI
+# tracking_system: file-system
+# story_location: docs/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - SM creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review workflow
+
+generated: "2026-02-16"
+project: AgentVibes
+project_key: AVI
+tracking_system: file-system
+story_location: docs/implementation-artifacts
+
+# NOTE: Previous Epics 1-5 (Installer Enhancement) and Epic 4 (Custom Background Music)
+# are complete and tracked in git history. Epic 4 (Sprint 3) was 100% done as of 2026-02-16.
+
+development_status:
+
+  # ─────────────────────────────────────────────
+  # SPRINT 4 — TUI Console Foundation + Core UI
+  # ─────────────────────────────────────────────
+
+  # Epic 6: Core TUI Console Framework
+  epic-6: done
+  6-1-blessed-js-app-scaffold-and-screen-setup: done
+  6-2-tab-bar-and-global-keyboard-navigation: done
+  6-3-color-coded-context-footer-system: done
+  6-4-modal-overlay-component: done
+  6-5-command-routing-and-entry-points: done
+  epic-6-retrospective: optional
+
+  # Epic 7: Settings Tab
+  epic-7: done
+  7-1-provider-and-voice-settings-group: done
+  7-2-audio-effects-settings-group: done
+  7-3-background-music-settings-group: done
+  7-4-personality-and-verbosity-settings-group: done
+  7-5-intro-text-settings-group: done
+  7-6-button-level-focus-navigation-system: done
+  7-7-personality-selector-modal: done
+  7-8-voice-selector-modal: done
+  7-9-music-selector-modal: done
+  epic-7-retrospective: optional
+
+  # Epic 8: Voices Tab
+  epic-8: done
+  8-1-voice-table-with-sort-search-and-filter: done
+  8-2-voice-info-panel-and-preview: done
+  8-3-favorites-management-voices: done
+  8-4-voice-install-feature: done
+  epic-8-retrospective: optional
+
+  # Epic 12: Installer Wizard (5-Screen Flow)
+  epic-12: done
+  12-1-installer-screen-1-welcome-and-purpose: done
+  12-2-installer-screen-2-auto-dependency-check: done
+  12-3-installer-screen-3-provider-selection: done
+  12-4-installer-screen-4-voice-config-and-intro-text: done
+  12-5-installer-screen-5-install-and-live-tts-greeting: done
+  epic-12-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # SPRINT 5 — Feature Completion
+  # ─────────────────────────────────────────────
+
+  # Epic 9: Music Tab
+  epic-9: done
+  9-1-built-in-track-library-with-preview-and-select: done
+  9-2-custom-track-upload-and-management: done
+  9-3-music-enable-disable-and-favorites: done
+  epic-9-retrospective: optional
+
+  # Epic 10: Verbosity System Enhancement
+  epic-10: done
+  10-1-minimal-and-low-verbosity-levels: done
+  10-2-custom-verbosity-mode: done
+  10-3-migration-logic-and-notice-ui: done
+  10-4-verbosityservice-class-and-hook-integration: done
+  epic-10-retrospective: optional
+
+  # Epic 11: Agents Tab (BMAD Voice Management)
+  epic-11: done
+  11-1-global-voice-storage-and-migration: done
+  11-2-agents-tab-ui: done
+  11-3-multi-provider-support-and-single-voice-warning: done
+  11-4-party-mode-toggle-and-provider-switching-prompt: done
+  11-5-bmad-detection-and-optional-install-setup: done
+  epic-11-retrospective: optional
+
+  # Epic 13: Help & Readme Tabs
+  epic-13: done
+  13-1-help-tab-keyboard-shortcuts-reference: done
+  13-2-readme-tab-markdown-viewer: done
+  epic-13-retrospective: optional
+
+  # ─────────────────────────────────────────────
+  # SPRINT 6 — Installer Completion
+  # ─────────────────────────────────────────────
+
+  # Epic 14: Installer Wiring & Simplification
+  epic-14: done
+  14-1-wire-tui-save-and-install: done
+  14-2-slim-legacy-cli-installer: done
+  epic-14-retrospective: optional

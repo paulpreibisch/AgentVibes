@@ -1,13 +1,49 @@
 #!/usr/bin/env python3
 """
-AgentVibes MCP Server
+File: mcp-server/server.py
 
-Exposes AgentVibes text-to-speech capabilities as MCP tools.
-Supports ElevenLabs and Piper TTS providers with personality, language, and voice management.
+AgentVibes - Finally, your AI Agents can Talk Back! Text-to-Speech WITH personality for AI Assistants!
+Website: https://agentvibes.org
+Repository: https://github.com/paulpreibisch/AgentVibes
+
+Co-created by Paul Preibisch with Claude AI
+Copyright (c) 2025 Paul Preibisch
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+DISCLAIMER: This software is provided "AS IS", WITHOUT WARRANTY OF ANY KIND,
+express or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose and noninfringement.
+In no event shall the authors or copyright holders be liable for any claim,
+damages or other liability, whether in an action of contract, tort or
+otherwise, arising from, out of or in connection with the software or the
+use or other dealings in the software.
+
+---
+
+@fileoverview MCP Server exposing AgentVibes TTS capabilities via Model Context Protocol
+@context Provides natural language control of TTS features for Claude Desktop, Warp, and other MCP clients
+@architecture MCP Server implementation wrapping bash scripts, async subprocess execution for non-blocking I/O
+@dependencies .claude/hooks/*.sh scripts, MCP SDK, Python asyncio, subprocess
+@entrypoints Called by Claude Desktop/Warp via MCP protocol (stdio transport)
+@patterns Tool registry pattern, async subprocess wrapping, provider abstraction, state file management
+@related GitHub repo, mcp-server/test_server.py, .claude/hooks/play-tts.sh, docs/ai-optimized-documentation-standards.md
 """
 
 import asyncio
+import json
 import os
+import platform
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -20,11 +56,34 @@ import mcp.server.stdio
 class AgentVibesServer:
     """MCP Server for AgentVibes TTS functionality"""
 
+    # Script name constants (addresses SonarCloud S1192)
+    VOICE_MANAGER_SCRIPT = "voice-manager.sh"
+    PERSONALITY_MANAGER_SCRIPT = "personality-manager.sh"
+    LANGUAGE_MANAGER_SCRIPT = "language-manager.sh"
+    BACKGROUND_MUSIC_MANAGER_SCRIPT = "background-music-manager.sh"
+    EFFECTS_MANAGER_SCRIPT = "effects-manager.sh"
+
+    # Path constants (addresses SonarCloud S1192)
+    CLAUDE_DIR_NAME = ".claude"
+    MUTE_FILE_NAME = ".agentvibes-muted"
+    SEPARATOR = "━" * 39
+
     def __init__(self):
         """Initialize the AgentVibes MCP server"""
+        # Detect native Windows (not WSL)
+        self.is_windows = platform.system() == "Windows" and not os.environ.get("WSL_DISTRO_NAME")
+
+        # Script name constants — Windows uses .ps1, Unix uses .sh
+        if self.is_windows:
+            self.VOICE_MANAGER_SCRIPT = "voice-manager-windows.ps1"
+            self.PERSONALITY_MANAGER_SCRIPT = "personality-manager.ps1"
+            self.LANGUAGE_MANAGER_SCRIPT = "language-manager.ps1"
+            self.BACKGROUND_MUSIC_MANAGER_SCRIPT = "background-music-manager.ps1"
+            self.EFFECTS_MANAGER_SCRIPT = "effects-manager.ps1"
+
         # Find the .claude directory (project-local or global)
         self.claude_dir = self._find_claude_dir()
-        self.hooks_dir = self.claude_dir / "hooks"
+        self.hooks_dir = self.claude_dir / ("hooks-windows" if self.is_windows else "hooks")
         # Store AgentVibes root directory for environment variable
         self.agentvibes_root = self.claude_dir.parent
 
@@ -33,14 +92,71 @@ class AgentVibesServer:
         # Get the AgentVibes root directory (parent of mcp-server)
         script_dir = Path(__file__).resolve().parent  # mcp-server/
         agentvibes_root = script_dir.parent  # AgentVibes/
-        claude_dir = agentvibes_root / ".claude"
+        claude_dir = agentvibes_root / self.CLAUDE_DIR_NAME
 
-        # Use project-local .claude if it exists
+        # ALWAYS use package .claude for hooks (even in NPX cache)
+        # The package ALWAYS has .claude/ with all the hooks
         if claude_dir.exists() and claude_dir.is_dir():
             return claude_dir
 
-        # Fallback to global ~/.claude
-        return Path.home() / ".claude"
+        # Fallback to global ~/.claude (should never happen in properly installed package)
+        return Path.home() / self.CLAUDE_DIR_NAME
+
+    def _resolve_friendly_name(self, voice_name: str) -> str:
+        """
+        Resolve friendly name to Piper voice ID using voice-metadata.json.
+
+        Args:
+            voice_name: Friendly name (e.g., "ryan") or Piper ID
+
+        Returns:
+            Resolved Piper voice ID, or original voice_name if not found
+        """
+        import re
+
+        metadata_path = self.agentvibes_root / ".agentvibes" / "config" / "voice-metadata.json"
+
+        # SECURITY: Verify file exists and is not a symlink
+        if not metadata_path.exists() or metadata_path.is_symlink():
+            return voice_name
+
+        # SECURITY: Verify file ownership matches current user (Unix only)
+        try:
+            if hasattr(os, 'getuid'):
+                stat_info = metadata_path.stat()
+                if stat_info.st_uid != os.getuid():
+                    return voice_name
+        except (OSError, AttributeError):
+            pass
+
+        try:
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+
+            voices = metadata.get('voices', {})
+            voice_lower = voice_name.lower()
+
+            resolved_id = None
+
+            # Check if it's a friendly name key
+            if voice_lower in voices:
+                resolved_id = voices[voice_lower].get('id')
+
+            # Check if it matches a displayName
+            if not resolved_id:
+                for friendly_name, voice_data in voices.items():
+                    if voice_data.get('displayName', '').lower() == voice_lower:
+                        resolved_id = voice_data.get('id')
+                        break
+
+            # SECURITY: Validate resolved ID matches safe pattern
+            if resolved_id and re.match(r'^[a-zA-Z0-9_-]+$', resolved_id):
+                return resolved_id
+
+        except (json.JSONDecodeError, KeyError, IOError, TypeError):
+            pass
+
+        return voice_name
 
     async def text_to_speech(
         self,
@@ -70,46 +186,27 @@ class AgentVibesServer:
             if personality:
                 original_personality = await self._get_personality()
                 await self._run_script(
-                    "personality-manager.sh", ["set", personality]
+                    self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
                 )
 
             # Temporarily set language if specified
             if language:
                 original_language = await self._get_language()
-                await self._run_script("language-manager.sh", ["set", language])
+                await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
 
-            # Call the TTS script via bash explicitly
-            play_tts = self.hooks_dir / "play-tts.sh"
-            args = ["bash", str(play_tts), text]
-            if voice:
-                args.append(voice)
-
-            # Set environment and ensure PATH includes .local/bin
-            env = os.environ.copy()
-
-            # Determine where to save settings based on context:
-            # 1. If cwd has .claude/ → Use cwd (real project)
-            # 2. If cwd == AgentVibes dir → Use global ~/.claude/ (Warp)
-            # 3. Otherwise → Use AgentVibes/.claude/ (development)
-            cwd = Path.cwd()
-            if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
-                # Real project with .claude directory
-                env["CLAUDE_PROJECT_DIR"] = str(cwd)
-            elif cwd == self.agentvibes_root:
-                # Running from AgentVibes itself (Warp) - use global
-                # Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
-                pass
+            # Call the TTS script via appropriate shell
+            tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
+            play_tts = self.hooks_dir / tts_script
+            if self.is_windows:
+                args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text]
+                if voice:
+                    args.extend(["-VoiceOverride", voice])
             else:
-                # Development context - use AgentVibes directory
-                env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
-            # Add common locations for piper to PATH
-            home_dir = Path.home()
-            local_bin = str(home_dir / ".local" / "bin")
-            if "PATH" in env:
-                if local_bin not in env["PATH"]:
-                    env["PATH"] = f"{local_bin}:{env['PATH']}"
-            else:
-                env["PATH"] = local_bin
+                args = ["bash", str(play_tts), text]
+                if voice:
+                    args.append(voice)
+
+            env = self._build_script_env()
 
             result = await asyncio.create_subprocess_exec(
                 *args,
@@ -117,35 +214,41 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await result.communicate()
+            try:
+                stdout, stderr = await result.communicate()
 
-            if result.returncode == 0:
-                output = stdout.decode().strip()
-                # Extract file path from output
-                for line in output.split("\n"):
-                    if "Saved to:" in line:
-                        file_path = line.split("Saved to:")[1].strip()
-                        truncated = (
-                            f"{text[:50]}..." if len(text) > 50 else text
-                        )
-                        return f"✅ Spoke: {truncated}\n📁 Audio saved: {file_path}"
+                if result.returncode == 0:
+                    output = stdout.decode().strip()
+                    # Extract file path from output
+                    for line in output.split("\n"):
+                        if "Saved to:" in line:
+                            file_path = line.split("Saved to:")[1].strip()
+                            truncated = (
+                                f"{text[:50]}..." if len(text) > 50 else text
+                            )
+                            return f"✅ Spoke: {truncated}\n📁 Audio saved: {file_path}"
 
-                return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
-            else:
-                error = stderr.decode().strip()
-                stdout_output = stdout.decode().strip()
-                full_error = f"{error}\nStdout: {stdout_output}" if stdout_output else error
-                return f"❌ TTS failed: {full_error}"
+                    return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
+                else:
+                    error = stderr.decode().strip()
+                    stdout_output = stdout.decode().strip()
+                    full_error = f"{error}\nStdout: {stdout_output}" if stdout_output else error
+                    return f"❌ TTS failed: {full_error}"
+            finally:
+                # Ensure process cleanup
+                if result.returncode is None:
+                    result.kill()
+                    await result.wait()
 
         finally:
             # Restore original settings
             if original_personality:
                 await self._run_script(
-                    "personality-manager.sh", ["set", original_personality]
+                    self.PERSONALITY_MANAGER_SCRIPT, ["set", original_personality]
                 )
             if original_language:
                 await self._run_script(
-                    "language-manager.sh", ["set", original_language]
+                    self.LANGUAGE_MANAGER_SCRIPT, ["set", original_language]
                 )
 
     async def list_voices(self) -> str:
@@ -160,50 +263,68 @@ class AgentVibesServer:
         current_voice = await self._get_current_voice()
 
         # voice-manager.sh list-simple is now provider-aware
-        result = await self._run_script("voice-manager.sh", ["list-simple"])
+        result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["list-simple"])
         if result:
             voices = result.strip().split("\n")
             voices = [v for v in voices if v]  # Filter empty strings
 
             if not voices:
                 return (
-                    "📦 No voices available\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    "For Piper: Download voices using /agent-vibes:provider download <voice-name>\n"
-                    "Example: en_US-lessac-medium, en_GB-alba-medium"
+                    f"📦 No voices available\n"
+                    f"{self.SEPARATOR}\n"
+                    f"For Piper: Download voices using /agent-vibes:provider download <voice-name>\n"
+                    f"Example: en_US-lessac-medium, en_GB-alba-medium"
                 )
 
-            # Determine provider label for display
+            # Determine provider label and alternative provider
             if "Piper" in provider:
                 provider_label = "Piper TTS"
-            elif "ElevenLabs" in provider:
-                provider_label = "ElevenLabs"
+                alternative_provider = "macOS"
+            elif "macOS" in provider:
+                provider_label = "macOS TTS"
+                alternative_provider = "Piper"
+            elif "Termux" in provider or "Android" in provider:
+                provider_label = "Termux SSH (Android)"
+                alternative_provider = "Piper"
             else:
                 provider_label = "TTS"
+                alternative_provider = None
 
             output = f"🎤 Available {provider_label} Voices:\n"
-            output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            output += f"{self.SEPARATOR}\n"
             for voice in voices:
                 marker = " ✓ (current)" if voice == current_voice else ""
                 output += f"  • {voice}{marker}\n"
-            output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            output += f"{self.SEPARATOR}\n"
+
+            # Add provider switch hint
+            if alternative_provider:
+                output += f"\n💡 Switch to {alternative_provider}? Use: set_provider(provider=\"{alternative_provider.lower()}\")\n"
+
             return output
         return "❌ Failed to list voices"
 
     async def set_voice(self, voice_name: str) -> str:
         """
-        Switch to a different voice.
+        Switch to a different voice (supports friendly names like "ryan" or "katherine").
 
         Args:
-            voice_name: Name of the voice to switch to
+            voice_name: Friendly name (e.g., "ryan") or Piper voice ID
 
         Returns:
             Success or error message
         """
+        # Resolve friendly name to Piper ID
+        original_name = voice_name
+        resolved_name = self._resolve_friendly_name(voice_name)
+
         result = await self._run_script(
-            "voice-manager.sh", ["switch", voice_name, "--silent"]
+            self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name, "--silent"]
         )
+
         if result and "✅" in result:
+            if original_name.lower() != resolved_name.lower():
+                return f"✅ Voice switched to: {original_name} ({resolved_name})"
             return f"✅ Voice switched to: {voice_name}"
         return f"❌ Failed to switch voice: {result}"
 
@@ -214,7 +335,7 @@ class AgentVibesServer:
         Returns:
             Formatted list of personalities with descriptions
         """
-        result = await self._run_script("personality-manager.sh", ["list"])
+        result = await self._run_script(self.PERSONALITY_MANAGER_SCRIPT, ["list"])
         return result if result else "❌ Failed to list personalities"
 
     async def set_personality(self, personality: str) -> str:
@@ -228,7 +349,7 @@ class AgentVibesServer:
             Success or error message
         """
         result = await self._run_script(
-            "personality-manager.sh", ["set", personality]
+            self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
         )
         if result and "🎭" in result:
             return result
@@ -247,12 +368,12 @@ class AgentVibesServer:
         provider = await self._get_provider()
 
         output = "🎤 Current AgentVibes Configuration\n"
-        output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        output += f"{self.SEPARATOR}\n"
         output += f"Provider: {provider}\n"
         output += f"Voice: {voice}\n"
         output += f"Personality: {personality}\n"
         output += f"Language: {language}\n"
-        output += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        output += f"{self.SEPARATOR}\n"
         return output
 
     async def set_language(self, language: str) -> str:
@@ -265,7 +386,7 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script("language-manager.sh", ["set", language])
+        result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
         if result and "✓" in result:
             return result
         return f"❌ Failed to set language: {result}"
@@ -280,47 +401,506 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script("voice-manager.sh", ["replay", str(n)])
+        result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["replay", str(n)])
         if result and "🔊" in result:
             return result
         return f"❌ Failed to replay audio: {result}"
 
+    async def set_provider(self, provider: str) -> str:
+        """
+        Switch TTS provider between Piper, macOS, and Termux SSH.
+
+        Args:
+            provider: Provider name ("piper", "macos", or "termux-ssh")
+
+        Returns:
+            Success or error message
+        """
+        provider = provider.lower()
+        if self.is_windows:
+            valid_providers = ["windows-piper", "windows-sapi", "soprano"]
+        else:
+            valid_providers = ["piper", "macos", "termux-ssh", "soprano"]
+        if provider not in valid_providers:
+            return f"❌ Invalid provider: {provider}. Choose from: {', '.join(valid_providers)}"
+
+        result = await self._run_script("provider-manager.sh", ["switch", provider])
+        if result and ("✓" in result or "[OK]" in result):
+            # Automatically speak confirmation in the new provider's voice
+            provider_names = {
+                "macos": "macOS",
+                "termux-ssh": "Termux SSH",
+                "piper": "Piper",
+                "windows-piper": "Windows Piper",
+                "windows-sapi": "Windows SAPI",
+                "soprano": "Soprano",
+            }
+            provider_name = provider_names.get(provider, provider.title())
+            confirmation_text = f"Successfully switched to {provider_name} provider"
+
+            try:
+                # Speak the confirmation with 5 second timeout to prevent hanging
+                await asyncio.wait_for(
+                    self.text_to_speech(confirmation_text),
+                    timeout=5.0
+                )
+                # Return the provider switch result plus TTS confirmation
+                return f"{result}\n🔊 Spoken confirmation: {confirmation_text}"
+            except asyncio.TimeoutError:
+                # Timeout - provider may need setup (e.g., Piper not installed)
+                return f"{result}\n⚠️ Provider switched (TTS confirmation timed out - provider may need setup)"
+            except Exception as e:
+                # If TTS fails, still return success for the provider switch
+                return f"{result}\n⚠️ Provider switched but TTS confirmation failed: {e}"
+
+        return f"❌ Failed to switch provider: {result}"
+
+    async def set_learn_mode(self, enabled: bool) -> str:
+        """
+        Enable or disable language learning mode.
+
+        When enabled, TTS speaks in both your main language and target language.
+
+        Args:
+            enabled: True to enable, False to disable
+
+        Returns:
+            Success or error message
+        """
+        action = "enable" if enabled else "disable"
+        result = await self._run_script("learn-manager.sh", [action])
+        if result and "✓" in result:
+            return result
+        return f"❌ Failed to set learn mode: {result}"
+
+    async def set_speed(self, speed: str, target: bool = False) -> str:
+        """
+        Set speech speed for main or target voice.
+
+        Works with both Piper and macOS providers.
+
+        Args:
+            speed: Speed value (e.g., "0.5x", "1x", "2x", "normal", "fast", "slow")
+            target: If True, sets target language speed; if False, sets main voice speed
+
+        Returns:
+            Success or error message
+        """
+        # Security: Using secrets.choice for cryptographically secure random selection
+        # Even though this is just for UI variety, we use secrets to satisfy security scanners
+        import secrets
+
+        args = ["target", speed] if target else [speed]
+        result = await self._run_script("speed-manager.sh", args)
+        if result and "✓" in result:
+            # Simple test messages to demonstrate the new speed
+            test_messages = [
+                "Testing speed change",
+                "Speed test in progress",
+                "Checking audio speed",
+                "Speed configuration test",
+                "Audio speed test",
+            ]
+
+            # Pick a random test message and speak it
+            test_message = secrets.choice(test_messages)
+
+            try:
+                # Speak the test message to demonstrate the new speed
+                await self.text_to_speech(test_message)
+                return f"{result}\n🔊 Testing new speed: \"{test_message}\""
+            except Exception as e:
+                # If TTS fails, still return success for the speed change
+                return f"{result}\n⚠️ Speed changed but demo failed: {e}"
+
+        return f"❌ Failed to set speed: {result}"
+
+    async def get_speed(self) -> str:
+        """
+        Get current speech speed settings.
+
+        Returns:
+            Current speed settings for main and target voices
+        """
+        result = await self._run_script("speed-manager.sh", ["get"])
+        return result if result else "❌ Failed to get speed settings"
+
+    async def download_extra_voices(self, auto_yes: bool = False) -> str:
+        """
+        Download extra high-quality Piper voices from HuggingFace.
+
+        Downloads custom voices: Kristin, Jenny, and Tracy/16Speakers.
+
+        Args:
+            auto_yes: If True, skips confirmation prompt and downloads automatically
+
+        Returns:
+            Success message with download summary
+        """
+        args = ["--yes"] if auto_yes else []
+        result = await self._run_script("download-extra-voices.sh", args)
+        if result and ("✅" in result or "Successfully downloaded" in result or "already downloaded" in result):
+            return result
+        return f"❌ Failed to download extra voices: {result}"
+
+    async def get_verbosity(self) -> str:
+        """
+        Get current verbosity level.
+
+        Returns:
+            Current verbosity level with description
+        """
+        result = await self._run_script("verbosity-manager.sh", ["get"])
+        if result:
+            level = result.strip()
+            descriptions = {
+                "low": "LOW - Acknowledgments + Completions only (minimal)",
+                "medium": "MEDIUM - + Major decisions and findings (balanced)",
+                "high": "HIGH - All reasoning (maximum transparency)"
+            }
+            desc = descriptions.get(level, level)
+            return f"🎙️ Current Verbosity: {desc}\n\n💡 Change with: set_verbosity(level=\"low|medium|high\")"
+        return "❌ Failed to get verbosity level"
+
+    async def set_verbosity(self, level: str) -> str:
+        """
+        Set verbosity level to control how much Claude speaks.
+
+        Args:
+            level: Verbosity level (low, medium, or high)
+
+        Returns:
+            Success or error message
+        """
+        result = await self._run_script("verbosity-manager.sh", ["set", level])
+        if result and "✅" in result:
+            return f"{result}\n\n⚠️  Restart Claude Code for changes to take effect"
+        return f"❌ Failed to set verbosity: {result}"
+
+    def _get_mute_files(self) -> list:
+        """Get all mute file paths for current platform"""
+        files = [
+            Path.home() / self.MUTE_FILE_NAME,
+            Path.cwd() / self.CLAUDE_DIR_NAME / "agentvibes-muted",
+        ]
+        # Windows PowerShell scripts check tts-muted.txt in .claude dir
+        if self.is_windows:
+            files.append(Path.home() / self.CLAUDE_DIR_NAME / "tts-muted.txt")
+        return files
+
+    async def mute(self) -> str:
+        """
+        Mute all TTS output. Creates a persistent mute flag.
+
+        Returns:
+            Success message confirming mute is active
+        """
+        try:
+            mute_file = Path.home() / self.MUTE_FILE_NAME
+            mute_file.touch()
+            # On Windows, also write tts-muted.txt for PowerShell script compatibility
+            if self.is_windows:
+                win_mute = Path.home() / self.CLAUDE_DIR_NAME / "tts-muted.txt"
+                win_mute.parent.mkdir(parents=True, exist_ok=True)
+                win_mute.write_text("true")
+            return "🔇 AgentVibes TTS muted. All voice output is now silenced.\n\n💡 To unmute, use: unmute()"
+        except Exception as e:
+            return f"❌ Failed to mute: {e}"
+
+    async def unmute(self) -> str:
+        """
+        Unmute TTS output. Removes the mute flag.
+
+        Returns:
+            Success message confirming TTS is restored
+        """
+        removed = []
+        try:
+            for mute_file in self._get_mute_files():
+                if mute_file.exists():
+                    # tts-muted.txt uses content "true"/"false", others use file existence
+                    if mute_file.name == "tts-muted.txt":
+                        content = mute_file.read_text().strip()
+                        if content == "true":
+                            mute_file.write_text("false")
+                            removed.append(str(mute_file.name))
+                    else:
+                        mute_file.unlink()
+                        removed.append(str(mute_file.name))
+
+            if removed:
+                return f"🔊 AgentVibes TTS unmuted. Voice output is now restored.\n   (Removed: {', '.join(removed)} mute flag)"
+            else:
+                return "🔊 AgentVibes TTS was not muted. Voice output is active."
+        except Exception as e:
+            return f"❌ Failed to unmute: {e}"
+
+    async def is_muted(self) -> str:
+        """
+        Check if TTS is currently muted.
+
+        Returns:
+            Current mute status
+        """
+        for mute_file in self._get_mute_files():
+            if mute_file.exists():
+                # tts-muted.txt uses content "true"/"false"
+                if mute_file.name == "tts-muted.txt":
+                    content = mute_file.read_text().strip()
+                    if content == "true":
+                        return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
+                else:
+                    return "🔇 TTS is currently MUTED\n\n💡 To unmute, use: unmute()"
+        return "🔊 TTS is currently ACTIVE\n\n💡 To mute, use: mute()"
+
+    async def list_background_music(self) -> str:
+        """
+        List all available background music tracks.
+
+        Returns:
+            Formatted list of all pre-packaged background music files
+        """
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["list"])
+        return result if result else "❌ Failed to list background music"
+
+    async def set_background_music(self, track_name: str, agent_name: Optional[str] = None) -> str:
+        """
+        Set background music track for a specific agent, all agents, or as default.
+
+        Args:
+            track_name: Track filename or partial name for fuzzy matching
+            agent_name: Agent name ('all' for all agents, None for default)
+
+        Returns:
+            Success or error message
+        """
+        import re
+
+        # Get list of available tracks for fuzzy matching
+        list_result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["list"])
+        if not list_result or "❌" in list_result:
+            return "❌ Failed to list background music tracks"
+
+        # Parse track names
+        tracks = []
+        for line in list_result.split("\n"):
+            match = re.match(r'\s*\d+\.\s+(.+)', line)
+            if match:
+                tracks.append(match.group(1))
+
+        # Try to find a matching track (case-insensitive partial match)
+        track_lower = track_name.lower()
+        matched_track = None
+
+        # First try exact match
+        for track in tracks:
+            if track.lower() == track_lower:
+                matched_track = track
+                break
+
+        # If no exact match, try partial match
+        if not matched_track:
+            for track in tracks:
+                if track_lower in track.lower():
+                    matched_track = track
+                    break
+
+        if not matched_track:
+            # Show available tracks to help user
+            available = "\n".join([f"  • {t}" for t in tracks])
+            return f"❌ No track matching '{track_name}' found.\n\nAvailable tracks:\n{available}\n\n💡 Try a partial match like 'celtic' or 'chillwave'"
+
+        # Determine which command to use based on agent_name
+        if agent_name and agent_name.lower() == "all":
+            # Set for all agents
+            result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-all", matched_track])
+        elif agent_name:
+            # Set for specific agent
+            result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-agent", agent_name, matched_track])
+        else:
+            # Set as default
+            result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-default", matched_track])
+
+        if result and "✅" in result:
+            if matched_track.lower() != track_name.lower():
+                return f"{result}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
+            return result
+        return f"❌ Failed to set background music: {result}"
+
+    async def enable_background_music(self, enabled: bool) -> str:
+        """
+        Enable or disable background music globally.
+
+        Args:
+            enabled: True to enable, False to disable
+
+        Returns:
+            Success or error message
+        """
+        command = "on" if enabled else "off"
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, [command])
+        return result if result else f"❌ Failed to {'enable' if enabled else 'disable'} background music"
+
+    async def set_background_music_volume(self, volume: float) -> str:
+        """
+        Set background music volume.
+
+        Args:
+            volume: Volume level (0.0-1.0)
+
+        Returns:
+            Success or error message
+        """
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["volume", str(volume)])
+        return result if result else "❌ Failed to set background music volume"
+
+    async def get_background_music_status(self) -> str:
+        """
+        Get current background music configuration.
+
+        Returns:
+            Status information
+        """
+        result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["status"])
+        return result if result else "❌ Failed to get background music status"
+
+    async def set_reverb(self, level: str, agent: str = "default", apply_all: bool = False) -> str:
+        """
+        Set reverb level for an agent or globally.
+
+        Args:
+            level: Reverb level (off, light, medium, heavy, cathedral)
+            agent: Agent name (default: "default")
+            apply_all: Apply to all agents (default: False)
+
+        Returns:
+            Success message
+        """
+        args = ["set-reverb", level, agent]
+        if apply_all:
+            args.append("--all")
+        result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, args)
+        return result if result else f"✅ Set reverb to {level}"
+
+    async def get_reverb(self, agent: str = "default") -> str:
+        """
+        Get current reverb level for an agent.
+
+        Args:
+            agent: Agent name (default: "default")
+
+        Returns:
+            Current reverb level
+        """
+        result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["get-reverb", agent])
+        if result:
+            return f"Current reverb level for {agent}: {result.strip()}"
+        return f"❌ Failed to get reverb for {agent}"
+
+    async def list_audio_effects(self) -> str:
+        """
+        List all audio effects for all agents.
+
+        Returns:
+            Effects configuration
+        """
+        result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["list"])
+        return result if result else "❌ Failed to list audio effects"
+
+    async def clean_audio_cache(self) -> str:
+        """
+        Clean all TTS audio cache files and report space freed.
+
+        Non-interactive cleanup suitable for MCP tool usage. Deletes all
+        TTS-generated audio files (wav, mp3, aiff) while preserving
+        background music tracks.
+
+        Returns:
+            Cleanup results with file count and space freed
+        """
+        result = await self._run_script("clean-audio-cache.sh", [])
+        return result if result else "❌ Failed to clean audio cache"
+
+    async def set_banner(self, enabled: bool) -> str:
+        """
+        Enable or disable the TTS output banner (voice info, file path, cache size).
+
+        Args:
+            enabled: True to show banner, False to hide it
+
+        Returns:
+            Confirmation message
+        """
+        banner_file = Path.home() / ".agentvibes" / "banner-disabled"
+        if enabled:
+            # Remove the disable flag
+            try:
+                banner_file.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return "✅ TTS banner enabled — voice info will show after each speech"
+        else:
+            # Create the disable flag
+            banner_file.parent.mkdir(parents=True, exist_ok=True)
+            banner_file.touch()
+            return "🔇 TTS banner disabled — speech will play without output info"
+
+    async def get_banner(self) -> str:
+        """
+        Check if the TTS output banner is enabled or disabled.
+
+        Returns:
+            Current banner status
+        """
+        banner_file = Path.home() / ".agentvibes" / "banner-disabled"
+        if banner_file.exists():
+            return "🔇 TTS banner: **disabled**\n\nSay: \"Turn on banner\" to re-enable"
+        return "✅ TTS banner: **enabled**\n\nSay: \"Turn off banner\" to disable"
+
     # Helper methods
+    def _build_script_env(self) -> dict:
+        """Build environment dict for script execution (shared by all script runners)"""
+        env = os.environ.copy()
+
+        # Determine where to save settings based on context:
+        # 1. If cwd has .claude/ → Use cwd (real Claude Code project)
+        # 2. Otherwise → Use global ~/.claude/ (Claude Desktop, Warp, etc.)
+        # Note: Hooks are ALWAYS from package .claude/ (self.claude_dir)
+        cwd = Path.cwd()
+        if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
+            env["CLAUDE_PROJECT_DIR"] = str(cwd)
+
+        # Add common locations for piper to PATH (Unix only)
+        if not self.is_windows:
+            home_dir = Path.home()
+            local_bin = str(home_dir / ".local" / "bin")
+            if "PATH" in env:
+                if local_bin not in env["PATH"]:
+                    env["PATH"] = f"{local_bin}:{env['PATH']}"
+            else:
+                env["PATH"] = local_bin
+
+        return env
+
     async def _run_script(self, script_name: str, args: list[str]) -> str:
-        """Run a bash script and return output"""
+        """Run a script and return output (bash on Unix, PowerShell on Windows)"""
+        # Auto-resolve .sh → .ps1 on Windows (class constants handle special cases)
+        if self.is_windows and script_name.endswith('.sh'):
+            script_name = script_name[:-3] + '.ps1'
         script_path = self.hooks_dir / script_name
         if not script_path.exists():
             return f"Script not found: {script_path}"
 
-        # Explicitly call bash to run the script
-        cmd = ["bash", str(script_path)] + args
-
-        # Set environment and ensure PATH includes .local/bin
-        env = os.environ.copy()
-
-        # Determine where to save settings based on context:
-        # 1. If cwd has .claude/ → Use cwd (real project)
-        # 2. If cwd == AgentVibes dir → Use global ~/.claude/ (Warp)
-        # 3. Otherwise → Use AgentVibes/.claude/ (development)
-        cwd = Path.cwd()
-        if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
-            # Real project with .claude directory
-            env["CLAUDE_PROJECT_DIR"] = str(cwd)
-        elif cwd == self.agentvibes_root:
-            # Running from AgentVibes itself (Warp) - use global
-            # Don't set CLAUDE_PROJECT_DIR, let scripts fall back to ~/.claude
-            pass
+        # Build command — PowerShell on Windows, bash on Unix
+        if self.is_windows:
+            cmd = [
+                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(script_path)
+            ] + args
         else:
-            # Development context - use AgentVibes directory
-            env["CLAUDE_PROJECT_DIR"] = str(self.agentvibes_root)
-        # Add common locations for piper to PATH
-        home_dir = Path.home()
-        local_bin = str(home_dir / ".local" / "bin")
-        if "PATH" in env:
-            if local_bin not in env["PATH"]:
-                env["PATH"] = f"{local_bin}:{env['PATH']}"
-        else:
-            env["PATH"] = local_bin
+            cmd = ["bash", str(script_path)] + args
+
+        env = self._build_script_env()
 
         try:
             result = await asyncio.create_subprocess_exec(
@@ -329,20 +909,26 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await result.communicate()
-            if result.returncode == 0:
-                return stdout.decode().strip()
-            else:
-                error_msg = stderr.decode().strip()
-                if not error_msg:  # If stderr is empty, include stdout for debugging
-                    error_msg = f"Return code {result.returncode}. Stdout: {stdout.decode().strip()}"
-                return error_msg
+            try:
+                stdout, stderr = await result.communicate()
+                if result.returncode == 0:
+                    return stdout.decode().strip()
+                else:
+                    error_msg = stderr.decode().strip()
+                    if not error_msg:  # If stderr is empty, include stdout for debugging
+                        error_msg = f"Return code {result.returncode}. Stdout: {stdout.decode().strip()}"
+                    return error_msg
+            finally:
+                # Ensure process cleanup
+                if result.returncode is None:
+                    result.kill()
+                    await result.wait()
         except Exception as e:
             return f"Error running script: {e}"
 
     async def _get_current_voice(self) -> str:
         """Get the currently active voice"""
-        result = await self._run_script("voice-manager.sh", ["get"])
+        result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["get"])
         return result.strip() if result else "Unknown"
 
     async def _get_personality(self) -> str:
@@ -350,31 +936,50 @@ class AgentVibesServer:
         personality_file = self.claude_dir / "tts-personality.txt"
         if not personality_file.exists():
             # Try global
-            personality_file = Path.home() / ".claude" / "tts-personality.txt"
+            personality_file = Path.home() / self.CLAUDE_DIR_NAME / "tts-personality.txt"
 
-        if personality_file.exists():
-            return personality_file.read_text().strip()
+        try:
+            if personality_file.exists():
+                return personality_file.read_text().strip()
+        except (PermissionError, UnicodeDecodeError, OSError) as e:
+            # Log error but don't crash - return default
+            import sys
+            print(f"Warning: Could not read personality file: {e}", file=sys.stderr)
         return "normal"
 
     async def _get_language(self) -> str:
         """Get the current language setting"""
-        result = await self._run_script("language-manager.sh", ["code"])
+        result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["code"])
         return result.strip() if result else "english"
 
     async def _get_provider(self) -> str:
         """Get the active TTS provider"""
         provider_file = self.claude_dir / "tts-provider.txt"
         if not provider_file.exists():
-            provider_file = Path.home() / ".claude" / "tts-provider.txt"
+            provider_file = Path.home() / self.CLAUDE_DIR_NAME / "tts-provider.txt"
 
-        if provider_file.exists():
-            provider = provider_file.read_text().strip()
-            if provider == "elevenlabs":
-                return "ElevenLabs (Premium AI)"
-            elif provider == "piper":
-                return "Piper TTS (Free, Offline)"
-            return provider
-        return "ElevenLabs (Premium AI)"
+        provider_labels = {
+            "macos": "macOS TTS",
+            "piper": "Piper TTS (Free, Offline)",
+            "termux-ssh": "Termux SSH (Android)",
+            "windows-piper": "Windows Piper TTS (Free, Offline)",
+            "windows-sapi": "Windows SAPI (Built-in)",
+            "soprano": "Soprano TTS (Ultra-fast Neural)",
+        }
+        try:
+            if provider_file.exists():
+                provider = provider_file.read_text().strip()
+                # Strip BOM from PowerShell-written files
+                provider = provider.lstrip('\ufeff')
+                return provider_labels.get(provider, provider)
+        except (PermissionError, UnicodeDecodeError, OSError) as e:
+            # Log error but don't crash - return default
+            import sys
+            print(f"Warning: Could not read provider file: {e}", file=sys.stderr)
+        # Default based on platform
+        if self.is_windows:
+            return "Windows SAPI (Built-in)"
+        return "Piper TTS (Free, Offline)"
 
 
 # Create the MCP server
@@ -390,7 +995,7 @@ async def list_tools() -> list[Tool]:
             name="text_to_speech",
             description="""Convert text to speech using AgentVibes TTS.
 
-Supports both ElevenLabs (premium) and Piper (free, offline) providers.
+Supports both macOS TTS and Piper (free, offline) providers.
 Can use different voices, personalities, and languages.
 
 Perfect for:
@@ -499,6 +1104,255 @@ Examples:
                 },
             },
         ),
+        Tool(
+            name="set_provider",
+            description="Switch between TTS providers" + (
+                ": Windows Piper, Windows SAPI, or Soprano" if agent_vibes.is_windows
+                else ": macOS TTS, Piper (free, offline), Soprano, or Termux SSH (Android)"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": (
+                            "Provider name: 'windows-piper', 'windows-sapi', or 'soprano'"
+                            if agent_vibes.is_windows
+                            else "Provider name: 'piper', 'macos', 'soprano', or 'termux-ssh'"
+                        ),
+                        "enum": (
+                            ["windows-piper", "windows-sapi", "soprano"]
+                            if agent_vibes.is_windows
+                            else ["piper", "macos", "soprano", "termux-ssh"]
+                        ),
+                    }
+                },
+                "required": ["provider"],
+            },
+        ),
+        Tool(
+            name="set_learn_mode",
+            description="Enable or disable language learning mode. When ON, TTS speaks in both your main language and target language for bilingual learning.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable learning mode, False to disable"
+                    }
+                },
+                "required": ["enabled"],
+            },
+        ),
+        Tool(
+            name="set_speed",
+            description="Set speech speed for main or target voice. Works with both Piper and macOS providers. Use this to make voices faster or slower.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "speed": {
+                        "type": "string",
+                        "description": "Speed value: '0.5x' or 'slow/slower' (half speed, slower), '1x' or 'normal' (normal speed), '2x' or 'fast' (double speed, faster), '3x' or 'faster' (triple speed, very fast)"
+                    },
+                    "target": {
+                        "type": "boolean",
+                        "description": "If true, sets target language speed (for learning mode); if false or omitted, sets main voice speed",
+                        "default": False
+                    }
+                },
+                "required": ["speed"],
+            },
+        ),
+        Tool(
+            name="get_speed",
+            description="Get current speech speed settings for main and target voices",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="download_extra_voices",
+            description="Download extra high-quality custom Piper voices from HuggingFace. Includes: Kristin (US female), Jenny (UK female with Irish accent), and Tracy/16Speakers (multi-speaker). Perfect for adding variety to your TTS voices.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "auto_yes": {
+                        "type": "boolean",
+                        "description": "Skip confirmation prompt and download automatically (default: False)",
+                        "default": False
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="get_verbosity",
+            description="Get current AgentVibes verbosity level (low/medium/high). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken).",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_verbosity",
+            description="""Set AgentVibes verbosity level to control how much Claude speaks while working.
+
+Verbosity Levels:
+- LOW: Only acknowledgments (start) and completions (end). Minimal interruption.
+- MEDIUM: + Major decisions and key findings. Balanced transparency.
+- HIGH: All reasoning, decisions, and findings. Maximum transparency.
+
+Perfect for:
+- LOW: Quiet work sessions, minimal distraction
+- MEDIUM: Understanding major decisions without full narration
+- HIGH: Full transparency, learning mode, debugging complex tasks
+
+Note: Changes take effect on next Claude Code session restart.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "string",
+                        "description": "Verbosity level to set",
+                        "enum": ["low", "medium", "high"]
+                    }
+                },
+                "required": ["level"],
+            },
+        ),
+        Tool(
+            name="mute",
+            description="Mute all AgentVibes TTS output. Creates a persistent mute flag that silences all voice output until unmuted. Persists across sessions.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="unmute",
+            description="Unmute AgentVibes TTS output. Removes the mute flag and restores voice output.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="is_muted",
+            description="Check if TTS is currently muted.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="list_background_music",
+            description="List all available pre-packaged background music tracks. Shows all audio files that can be used as background music for TTS.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_background_music",
+            description="""Set background music track for a specific agent, all agents, or as default. Supports smart fuzzy matching.
+
+Perfect for:
+- "change background music to flamenco" - Sets for all agents
+- "set John's background music to celtic harp" - Agent-specific
+- "use chillwave as default background" - Default for new agents
+
+Fuzzy matching examples:
+- "flamenco" matches "agentvibes_soft_flamenco_loop.mp3"
+- "celtic" matches "agent_vibes_celtic_harp_v1_loop.mp3"
+- "bossa" matches "agent_vibes_bossa_nova_v2_loop.mp3"
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "track_name": {
+                        "type": "string",
+                        "description": "Track filename or partial name for fuzzy matching (e.g., 'celtic', 'flamenco', 'bossa nova')",
+                    },
+                    "agent_name": {
+                        "type": "string",
+                        "description": "Agent name to configure (optional). Use 'all' for all agents, omit for default",
+                    },
+                },
+                "required": ["track_name"],
+            },
+        ),
+        Tool(
+            name="enable_background_music",
+            description="Enable or disable background music globally. When enabled, TTS audio will be mixed with background music at configured volume (default 30%).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable background music, False to disable",
+                    }
+                },
+                "required": ["enabled"],
+            },
+        ),
+        Tool(
+            name="set_background_music_volume",
+            description="Set the volume level for background music (0.0-1.0). Recommended: 0.20-0.40 for subtle background ambiance.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "volume": {
+                        "type": "number",
+                        "description": "Volume level (0.0 = silent, 0.30 = default, 1.0 = full volume)",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                    }
+                },
+                "required": ["volume"],
+            },
+        ),
+        Tool(
+            name="get_background_music_status",
+            description="Get current background music configuration including enabled status, volume, default track, and number of available tracks.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_reverb",
+            description="""Set reverb level for TTS audio. Can apply globally (default agent), to a specific agent, or to all agents.
+
+Reverb adds room/space ambiance to the voice, making it sound like it's in a small room, conference room, or large hall.
+
+Examples:
+- set_reverb(level="medium") - Set reverb for default agent
+- set_reverb(level="cathedral", agent="Winston") - Set cathedral reverb for Winston
+- set_reverb(level="light", apply_all=True) - Set light reverb for all agents
+- set_reverb(level="off") - Turn off reverb for default agent
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "level": {
+                        "type": "string",
+                        "description": "Reverb level",
+                        "enum": ["off", "light", "medium", "heavy", "cathedral"]
+                    },
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name (optional, defaults to 'default'). Examples: Winston, John, Mary, Amelia",
+                    },
+                    "apply_all": {
+                        "type": "boolean",
+                        "description": "Apply to all agents (optional, default: false)",
+                    }
+                },
+                "required": ["level"],
+            },
+        ),
+        Tool(
+            name="get_reverb",
+            description="Get current reverb level for a specific agent or default",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name (optional, defaults to 'default')",
+                    }
+                },
+            },
+        ),
+        Tool(
+            name="list_audio_effects",
+            description="List current audio effects configuration for all agents, including reverb levels and other effects",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="clean_audio_cache",
+            description="Clean all TTS audio cache files and report space freed. Non-interactive cleanup that removes all wav/mp3/aiff files while preserving background music tracks.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -528,6 +1382,54 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "replay_audio":
             n = arguments.get("n", 1)
             result = await agent_vibes.replay_audio(n)
+        elif name == "set_provider":
+            result = await agent_vibes.set_provider(arguments["provider"])
+        elif name == "set_learn_mode":
+            result = await agent_vibes.set_learn_mode(arguments["enabled"])
+        elif name == "set_speed":
+            target = arguments.get("target", False)
+            result = await agent_vibes.set_speed(arguments["speed"], target)
+        elif name == "get_speed":
+            result = await agent_vibes.get_speed()
+        elif name == "download_extra_voices":
+            auto_yes = arguments.get("auto_yes", False)
+            result = await agent_vibes.download_extra_voices(auto_yes)
+        elif name == "get_verbosity":
+            result = await agent_vibes.get_verbosity()
+        elif name == "set_verbosity":
+            result = await agent_vibes.set_verbosity(arguments["level"])
+        elif name == "mute":
+            result = await agent_vibes.mute()
+        elif name == "unmute":
+            result = await agent_vibes.unmute()
+        elif name == "is_muted":
+            result = await agent_vibes.is_muted()
+        elif name == "list_background_music":
+            result = await agent_vibes.list_background_music()
+        elif name == "set_background_music":
+            track_name = arguments.get("track_name")
+            agent_name = arguments.get("agent_name")
+            result = await agent_vibes.set_background_music(track_name, agent_name)
+        elif name == "enable_background_music":
+            enabled = arguments.get("enabled")
+            result = await agent_vibes.enable_background_music(enabled)
+        elif name == "set_background_music_volume":
+            volume = arguments.get("volume")
+            result = await agent_vibes.set_background_music_volume(volume)
+        elif name == "get_background_music_status":
+            result = await agent_vibes.get_background_music_status()
+        elif name == "set_reverb":
+            level = arguments["level"]
+            agent = arguments.get("agent", "default")
+            apply_all = arguments.get("apply_all", False)
+            result = await agent_vibes.set_reverb(level, agent, apply_all)
+        elif name == "get_reverb":
+            agent = arguments.get("agent", "default")
+            result = await agent_vibes.get_reverb(agent)
+        elif name == "list_audio_effects":
+            result = await agent_vibes.list_audio_effects()
+        elif name == "clean_audio_cache":
+            result = await agent_vibes.clean_audio_cache()
         else:
             result = f"Unknown tool: {name}"
 

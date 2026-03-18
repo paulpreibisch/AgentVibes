@@ -1,15 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "agentvibes",
-  "version": "2.0.17-beta.8",
-  "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code and Claude Desktop (via MCP) with multi-provider support.",
+  "version": "4.2.0",
+  "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code, Claude Desktop (via MCP), and Clawdbot with multi-provider support.",
   "homepage": "https://agentvibes.org",
   "keywords": [
-    "elevenlabs",
     "tts",
     "text-to-speech",
+    "piper-tts",
     "claude-code",
     "claude-desktop",
+    "clawdbot",
     "mcp",
     "model-context-protocol",
     "voice",
@@ -26,23 +27,75 @@
   "type": "module",
   "main": "src/installer.js",
   "bin": {
-    "agentvibes": "./bin/agent-vibes",
-    "agent-vibes": "./bin/agent-vibes",
-    "agentvibes-mcp-server": "./bin/mcp-server"
+    "agentvibes": "bin/agentvibes.js",
+    "agent-vibes": "bin/agent-vibes",
+    "agentvibes-mcp-server": "bin/mcp-server.js",
+    "agentvibes-voice-browser": "bin/agentvibes-voice-browser.js",
+    "test-bmad-pr": "bin/test-bmad-pr"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "templates/*.sh",
+    "templates/*.md",
+    "templates/audio/*.mp3",
+    "mcp-server/*.py",
+    "mcp-server/*.js",
+    "mcp-server/*.md",
+    "mcp-server/*.txt",
+    "mcp-server/*.toml",
+    "mcp-server/*.json",
+    "mcp-server/docs/",
+    "mcp-server/examples/",
+    ".claude/commands/agent-vibes/",
+    ".claude/commands/agent-vibes-bmad-voices.md",
+    ".claude/commands/agent-vibes-rdp.md",
+    ".claude/hooks/",
+    ".claude/hooks-windows/",
+    ".claude/personalities/",
+    ".claude/output-styles/",
+    ".claude/audio/tracks/",
+    ".claude/config/",
+    ".claude/docs/",
+    ".claude/language-voices.yaml",
+    ".claude/settings.json",
+    ".claude/activation-instructions",
+    ".claude/piper-voices-dir.txt",
+    ".claude/verbosity.txt",
+    ".claude/github-star-reminder.txt",
+    ".claude/audio/voice-samples/",
+    "voice-assignments.json",
+    ".agentvibes/",
+    ".clawdbot/",
+    ".mcp.json",
+    "setup-windows.ps1",
+    "WINDOWS-SETUP.md",
+    "README.md",
+    "RELEASE_NOTES.md",
+    "LICENSE",
+    "CLAUDE.md"
+  ],
   "scripts": {
     "install-local": "node src/installer.js install",
     "postinstall": "node mcp-server/install-deps.js",
     "install-mcp-deps": "node mcp-server/install-deps.js",
-    "test": "bats test/unit/*.bats",
-    "test:verbose": "bats -t test/unit/*.bats"
+    "voice-browser": "node bin/agentvibes-voice-browser.js",
+    "test": "npm run test:syntax && AGENTVIBES_TEST_MODE=true bats test/unit/*.bats && npm run test:coverage",
+    "test:syntax": "node -c src/installer.js && node -c mcp-server/install-deps.js",
+    "test:bats": "AGENTVIBES_TEST_MODE=true bats test/unit/*.bats",
+    "test:node": "node --test test/unit/*.test.js",
+    "test:coverage": "c8 --reporter=lcov --reporter=text node --test test/unit/*.test.js",
+    "test:verbose": "AGENTVIBES_TEST_MODE=true bats -t test/unit/*.bats"
   },
   "dependencies": {
+    "@inquirer/search": "^3.1.3",
+    "blessed": "^0.1.81",
     "boxen": "^7.0.0",
     "chalk": "^5.0.0",
     "commander": "^10.0.0",
     "figlet": "^1.6.0",
     "inquirer": "^12.0.0",
+    "js-yaml": "^4.1.1",
     "ora": "^6.0.0"
   },
   "engines": {
@@ -50,5 +103,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "c8": "^10.1.3"
   }
 }
