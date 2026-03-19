@@ -1,5 +1,36 @@
 # AgentVibes Release Notes
 
+## 🎉 v4.3 — "Windows Parity" Release
+
+**Release Date:** March 2026
+
+Windows now has full feature parity with Linux/WSL for background music, voice selection, and the TUI installer.
+
+### 🎵 Background Music on Windows
+- **New `background-music-manager.ps1`** — full Windows port of the bash background music manager
+- **play-tts.ps1 reads from `audio-effects.cfg`** — same config as Linux with per-agent track support
+- **ffmpeg auto-install** via `winget` during installer flow
+- **PATH auto-refresh** so ffmpeg works immediately after install without shell restart
+
+### 🎤 Voice & Provider Fixes
+- **Voice selection from TUI works** — play-tts-windows-piper.ps1 now reads `tts-voice.txt` (set by TUI)
+- **Multi-speaker model support** — voices like libritts-high with named speakers (e.g. Bella, Evan) pass `--speaker` flag to Piper
+- **Voice manager, provider manager, and download-extra-voices** updated for Windows paths
+
+### 🖥️ TUI & Installer Fixes
+- **`bin/agent-vibes` routes to blessed TUI** instead of old CLI installer
+- **Music preview overlap fixed** — switching tracks kills the previous player on Windows via `taskkill`
+- **ffmpeg shown in dependency check** screen with install status
+- **Voices display with proper friendly names** in the TUI
+
+### 🔧 MCP Server Fixes
+- **Track name parsing** strips Windows `\r\n` line endings
+- **`[OK]` success markers** accepted alongside emoji markers (PowerShell 5.1 can't handle UTF-8 emoji in scripts)
+
+**Previous release:** [v4.2](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.2)
+
+---
+
 ## 🎉 v4.2 — "Party Mode" Release
 
 **Release Date:** March 2026
