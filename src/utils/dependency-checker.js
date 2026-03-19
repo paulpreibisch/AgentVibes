@@ -284,13 +284,16 @@ export function checkDependencies(options = {}) {
     }
   }
 
-  // Optional tools (Unix-only — Windows uses native providers)
+  // Optional tools
   if (!isWindows) {
     results.optional.sox = commandExists('sox');
     if (!results.optional.sox) {
       results.missing.sox = true;
     }
+  }
 
+  // ffmpeg is needed on ALL platforms for background music mixing
+  {
     results.optional.ffmpeg = commandExists('ffmpeg');
     if (!results.optional.ffmpeg) {
       results.missing.ffmpeg = true;

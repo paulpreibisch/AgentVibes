@@ -16,6 +16,7 @@
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
 import { buildAudioEnv } from '../audio-env.js';
 import {
@@ -91,7 +92,10 @@ export function formatGreeting(introText, projectName) {
  */
 async function _commandExistsAsync(cmd) {
   try {
-    await _execFileAsync(cmd, ['--version'], { stdio: 'pipe', timeout: 5000 });
+    // On Windows, commands like 'npm' are .cmd batch files that require shell: true
+    const opts = { stdio: 'pipe', timeout: 5000 };
+    if (process.platform === 'win32') opts.shell = true;
+    await _execFileAsync(cmd, ['--version'], opts);
     return true;
   } catch (err) {
     if (err.code === 'ENOENT') return false;
@@ -104,14 +108,26 @@ async function _commandExistsAsync(cmd) {
  * @returns {Promise<{ node: boolean, npm: boolean, piper: boolean, soprano: boolean }>}
  */
 async function _checkDependenciesAsync() {
-  const [node, npm, piper, sopranoTts, sopranoWebui] = await Promise.all([
+  const [node, npm, piperCmd, sopranoTts, sopranoWebui, ffmpeg] = await Promise.all([
     _commandExistsAsync('node'),
     _commandExistsAsync('npm'),
     _commandExistsAsync('piper'),
     _commandExistsAsync('soprano-tts'),
     _commandExistsAsync('soprano-webui'),
+    _commandExistsAsync('ffmpeg'),
   ]);
-  return { node, npm, piper, soprano: sopranoTts || sopranoWebui };
+
+  // On Windows, Piper is a standalone exe at %LOCALAPPDATA%\Programs\Piper\piper.exe
+  let piper = piperCmd;
+  if (!piper && process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA ||
+      (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+    if (localAppData) {
+      piper = fs.existsSync(path.join(localAppData, 'Programs', 'Piper', 'piper.exe'));
+    }
+  }
+
+  return { node, npm, piper, soprano: sopranoTts || sopranoWebui, ffmpeg };
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +644,7 @@ export function createInstallTab(screen, services) {
       `  {${COLORS.labelFg}-fg}${'npm'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.npm     ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Piper TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.piper   ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Soprano TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.soprano ? ok() : bad()}`,
+      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  Not found (needed for background music){/${COLORS.errorFg}-fg}`}`,
       '',
       ttsOk
         ? `  {${COLORS.successFg}-fg}✅  TTS Providers Detected{/${COLORS.successFg}-fg}`

@@ -684,9 +684,9 @@ class AgentVibesServer:
         # Parse track names
         tracks = []
         for line in list_result.split("\n"):
-            match = re.match(r'\s*\d+\.\s+(.+)', line)
+            match = re.match(r'\s*\d+\.\s+(.+)', line.strip())
             if match:
-                tracks.append(match.group(1))
+                tracks.append(match.group(1).strip())
 
         # Try to find a matching track (case-insensitive partial match)
         track_lower = track_name.lower()
@@ -721,7 +721,7 @@ class AgentVibesServer:
             # Set as default
             result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-default", matched_track])
 
-        if result and "✅" in result:
+        if result and ("✅" in result or "[OK]" in result):
             if matched_track.lower() != track_name.lower():
                 return f"{result}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
             return result
