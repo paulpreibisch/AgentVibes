@@ -65,7 +65,7 @@ export async function validateProvider(providerName) {
     case 'windows-sapi':
       return await validateWindowsSAPI();
     case 'windows-piper':
-      return await validatePiperInstallation();
+      return await validateWindowsPiperInstallation();
     case 'termux-ssh':
     case 'ssh-remote':
     case 'ssh-pulseaudio':
@@ -111,7 +111,10 @@ async function validatePipxProvider(providerName, packageName) {
   checkedLocations.push('pipx venv');
 
   // Check Python package installations (comprehensive version detection)
-  const pythonCommands = ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
+  // On Windows, 'py' is the standard Python launcher and often the only one in PATH
+  const pythonCommands = process.platform === 'win32'
+    ? ['py', 'python', 'python3', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8']
+    : ['python3', 'python', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3.8'];
 
   for (const pythonCmd of pythonCommands) {
     try {
@@ -208,6 +211,43 @@ export async function validateWindowsSAPI() {
 
   // Windows SAPI is built-in, always available
   return { installed: true, message: 'Windows SAPI available' };
+}
+
+/**
+ * Validate Windows Piper TTS installation
+ * Checks for piper.exe at the standard Windows install location
+ * @returns {Promise<{installed: boolean, message: string, checkedLocations?: string[], error?: string}>}
+ */
+export async function validateWindowsPiperInstallation() {
+  if (process.platform !== 'win32') {
+    return await validatePiperInstallation(); // Fall back to Unix checks
+  }
+
+  const checkedLocations = [];
+
+  // Check the standard Windows install path
+  const localAppData = process.env.LOCALAPPDATA ||
+    (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+  if (localAppData) {
+    const piperExe = path.join(localAppData, 'Programs', 'Piper', 'piper.exe');
+    checkedLocations.push(piperExe);
+    if (fs.existsSync(piperExe)) {
+      return { installed: true, message: 'Piper TTS detected (Windows exe)', checkedLocations };
+    }
+  }
+
+  // Also check PATH in case user installed it differently
+  if (commandExistsInPath('piper')) {
+    return { installed: true, message: 'Piper TTS detected (in PATH)', checkedLocations: ['PATH'] };
+  }
+  checkedLocations.push('PATH');
+
+  return {
+    installed: false,
+    message: `Piper TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
+    error: 'WINDOWS_PIPER_NOT_FOUND',
+    checkedLocations
+  };
 }
 
 /**
@@ -328,10 +368,11 @@ export function getProviderInstallCommand(providerName) {
  * @returns {object} {success: boolean, message: string, command?: string, verified?: boolean}
  */
 export async function attemptProviderInstallation(providerName) {
-  // Whitelist approach - only allow known providers (MEDIUM #1 fix)
+  // Whitelist approach - only allow known providers
   const providers = {
     soprano: 'soprano-tts',
-    piper: 'piper-tts'
+    piper: 'piper-tts',
+    'windows-piper': 'piper-windows-exe'
   };
 
   const pkgName = providers[providerName];
@@ -339,9 +380,22 @@ export async function attemptProviderInstallation(providerName) {
     return { success: false, message: `Unknown provider: ${providerName}` };
   }
 
+  // Windows Piper: download exe instead of pip install
+  // The actual download is handled by checkAndInstallPiperWindows() in installer.js.
+  // Signal success here so the installer flow continues to that function.
+  if (providerName === 'windows-piper') {
+    return {
+      success: true,
+      message: 'Windows Piper will be downloaded during installation',
+      command: 'checkAndInstallPiperWindows()',
+      verified: false // Verification happens after the actual download
+    };
+  }
+
+  const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
   // Strategy 1: Try regular pip install (using spawnSync for correct API usage)
   try {
-    // Show installation in progress
     console.log(`   Attempting: pip install ${pkgName}...`);
     const result = spawnSync('pip', ['install', pkgName], {
       stdio: 'inherit',
@@ -351,7 +405,6 @@ export async function attemptProviderInstallation(providerName) {
     if (result.error || result.status !== 0) {
       // Strategy 1 failed - continue to Strategy 2
     } else {
-      // Verify installation actually worked (proves it's installed)
       const validation = await validateProvider(providerName);
       if (validation.installed) {
         return {
@@ -377,9 +430,8 @@ export async function attemptProviderInstallation(providerName) {
     });
 
     if (result.error || result.status !== 0) {
-      // Both strategies failed
+      // Strategy 2 failed
     } else {
-      // Verify installation actually worked (proves it's installed)
       const validation = await validateProvider(providerName);
       if (validation.installed) {
         return {
@@ -393,11 +445,41 @@ export async function attemptProviderInstallation(providerName) {
       return { success: true, message: `Successfully installed via pipx`, command: `pipx install ${pkgName}` };
     }
   } catch (error) {
-    // Both strategies failed
+    // Strategy 2 failed
   }
 
-  // Both strategies failed - consistent error message (MEDIUM #2 fix)
-  return { success: false, message: `Installation failed. Please install manually:\n   pip install ${pkgName}\n   or\n   pipx install ${pkgName}` };
+  // Strategy 3 (Windows only): Try 'py -m pip' which is the standard Windows Python launcher
+  if (isWindows) {
+    try {
+      console.log(`   Attempting: py -m pip install ${pkgName}...`);
+      const result = spawnSync('py', ['-m', 'pip', 'install', pkgName], {
+        stdio: 'inherit',
+        timeout: 60000
+      });
+
+      if (!result.error && result.status === 0) {
+        const validation = await validateProvider(providerName);
+        if (validation.installed) {
+          return {
+            success: true,
+            message: `Successfully installed via py -m pip`,
+            command: `py -m pip install ${pkgName}`,
+            verified: true
+          };
+        }
+
+        return { success: true, message: `Successfully installed via py -m pip`, command: `py -m pip install ${pkgName}` };
+      }
+    } catch (error) {
+      // Strategy 3 failed
+    }
+  }
+
+  // All strategies failed
+  const installHint = isWindows
+    ? `Installation failed. Please install manually:\n   py -m pip install ${pkgName}\n   or\n   pip install ${pkgName}`
+    : `Installation failed. Please install manually:\n   pip install ${pkgName}\n   or\n   pipx install ${pkgName}`;
+  return { success: false, message: installHint };
 }
 
 /**

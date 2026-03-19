@@ -13,8 +13,47 @@
 
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import { ConfigService } from '../src/services/config-service.js';
-import { launchConsole } from '../src/console/app.js';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Ensure all npm dependencies are installed before importing modules that need them.
+ * This prevents "Cannot find package" errors when running via npx with a stale cache
+ * or from a fresh clone without npm install.
+ */
+function ensureDependencies() {
+  const pkgRoot = path.resolve(__dirname, '..');
+  const nodeModules = path.join(pkgRoot, 'node_modules');
+  const pkgJsonPath = path.join(pkgRoot, 'package.json');
+
+  // Quick check: if node_modules doesn't exist or blessed is missing, run npm install
+  const criticalPackages = ['blessed', 'chalk', 'inquirer', 'commander'];
+  const missing = criticalPackages.filter(
+    pkg => !fs.existsSync(path.join(nodeModules, pkg))
+  );
+
+  if (missing.length === 0) return;
+
+  process.stderr.write(
+    `\n  Installing missing dependencies (${missing.join(', ')})...\n\n`
+  );
+
+  try {
+    execFileSync('npm', ['install', '--no-audit', '--no-fund'], {
+      cwd: pkgRoot,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+  } catch {
+    process.stderr.write(
+      '\n  Failed to install dependencies. Please run: npm install\n\n'
+    );
+    process.exit(1);
+  }
+}
 
 /**
  * Resolve CLI args to a TUI start tab or an error.
@@ -80,6 +119,13 @@ const _thisFile = fileURLToPath(import.meta.url);
 const _argv1    = (() => { try { return fs.realpathSync(process.argv[1]); } catch { return process.argv[1]; } })();
 
 if (_argv1 === _thisFile) {
+  // Ensure deps are installed BEFORE dynamic imports that need them
+  ensureDependencies();
+
+  // Dynamic imports — only loaded after deps are confirmed present
+  const { ConfigService } = await import('../src/services/config-service.js');
+  const { launchConsole } = await import('../src/console/app.js');
+
   const configService = new ConfigService();
   const result = resolveStartTab(process.argv.slice(2), configService);
 

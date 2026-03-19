@@ -530,15 +530,19 @@ export function createMusicTab(screen, services) {
     _playingTrackId = null;
 
     if (!_detectedPlayer) {
-      previewLine.setContent(`{red-fg}No MP3 player found. Install ffmpeg: sudo apt install ffmpeg{/red-fg}`);
+      const installHint = process.platform === 'win32'
+        ? 'No MP3 player found. Install ffmpeg: winget install ffmpeg'
+        : 'No MP3 player found. Install ffmpeg: sudo apt install ffmpeg';
+      previewLine.setContent(`{red-fg}${installHint}{/red-fg}`);
       screen.render();
       setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 5000);
       return;
     }
 
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     // Spawn the detected player directly (no sh -c chain — avoids VLC/cvlc stderr issues)
     _playingProcess = spawn(_detectedPlayer.bin, _detectedPlayer.args(trackPath), {
-      stdio: 'ignore', detached: true, env: _spawnEnv,
+      stdio: 'ignore', detached: !_isWin, windowsHide: true, env: _spawnEnv,
     });
     _playingTrackId = trackId;
 

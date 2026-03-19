@@ -71,6 +71,20 @@ const WIN_WAV_PLAYER = {
     `(New-Object Media.SoundPlayer '${f.replace(/'/g, "''")}').PlaySync()`],
 };
 
+/** Windows MP3 player — use WPF MediaPlayer (supports MP3, WAV, WMA, etc.) */
+const WIN_MP3_PLAYER = {
+  bin: 'powershell',
+  args: (f) => ['-NoProfile', '-Command',
+    `Add-Type -AssemblyName PresentationCore; ` +
+    `$p = New-Object System.Windows.Media.MediaPlayer; ` +
+    `$p.Open([uri]'${f.replace(/'/g, "''")}'); ` +
+    `$p.Play(); ` +
+    `Start-Sleep -Milliseconds 500; ` +
+    `while ($p.NaturalDuration.HasTimeSpan -and $p.Position -lt $p.NaturalDuration.TimeSpan) { Start-Sleep -Milliseconds 200 }; ` +
+    `if (-not $p.NaturalDuration.HasTimeSpan) { Start-Sleep -Seconds 30 }; ` +
+    `$p.Close()`],
+};
+
 /**
  * Detect the first available player from a list.
  * Caches results per list so `which` is only called once per binary.
@@ -86,7 +100,8 @@ function _detect(players, env) {
       if (_cache.get(p.bin)) return p;
       continue;
     }
-    const r = spawnSync('which', [p.bin], { stdio: 'pipe', env });
+    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+    const r = spawnSync(whichCmd, [p.bin], { stdio: 'pipe', env });
     const found = r.status === 0;
     _cache.set(p.bin, found);
     if (found) return p;
@@ -103,6 +118,10 @@ function _detect(players, env) {
  */
 export function detectMp3Player(env) {
   env = env || buildAudioEnv();
+  if (process.platform === 'win32') {
+    // Try cross-platform players first, fall back to WPF MediaPlayer
+    return _detect(MP3_PLAYERS, env) || WIN_MP3_PLAYER;
+  }
   return _detect(MP3_PLAYERS, env);
 }
 

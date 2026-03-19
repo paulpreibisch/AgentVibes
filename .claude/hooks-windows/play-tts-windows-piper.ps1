@@ -30,7 +30,12 @@ $VoiceFile = "$ClaudeDir\tts-voice-piper.txt"
 # Voices and Piper binary are global (shared across projects, ~100MB+)
 $UserClaudeDir = "$env:USERPROFILE\.claude"
 $VoicesDir = "$UserClaudeDir\piper-voices"
+# Try standard install location first, then fall back to PATH
 $PiperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
+if (-not (Test-Path $PiperExe)) {
+    $found = Get-Command piper.exe -ErrorAction SilentlyContinue
+    if ($found) { $PiperExe = $found.Source }
+}
 
 # Ensure directories exist
 foreach ($dir in @($AudioDir, $VoicesDir)) {
@@ -57,8 +62,22 @@ elseif (Test-Path $VoiceFile) {
 }
 
 # Default voice if not specified
+# Prefer en_US-lessac-medium (bundled/commonly installed) over en_US-ryan-high
 if (-not $VoiceName) {
-    $VoiceName = "en_US-ryan-high"
+    $UserClaudePiperDir = "$env:USERPROFILE\.claude\piper-voices"
+    if (Test-Path "$UserClaudePiperDir\en_US-lessac-medium.onnx") {
+        $VoiceName = "en_US-lessac-medium"
+    } elseif (Test-Path "$UserClaudePiperDir\en_US-ryan-high.onnx") {
+        $VoiceName = "en_US-ryan-high"
+    } else {
+        # Fallback: use first available .onnx file, or default name for auto-download
+        $firstVoice = Get-ChildItem -Path $UserClaudePiperDir -Filter "*.onnx" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($firstVoice) {
+            $VoiceName = $firstVoice.BaseName
+        } else {
+            $VoiceName = "en_US-lessac-medium"
+        }
+    }
 }
 
 # Security: Validate voice name to prevent path traversal

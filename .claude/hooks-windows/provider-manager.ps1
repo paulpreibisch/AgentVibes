@@ -42,9 +42,13 @@ function Get-AvailableProviders {
         installed = $true
     }
 
-    # Check if Piper is installed
+    # Check if Piper is installed (standard location or PATH)
     $piperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
     $piperInstalled = Test-Path $piperExe
+    if (-not $piperInstalled) {
+        $found = Get-Command piper.exe -ErrorAction SilentlyContinue
+        $piperInstalled = $null -ne $found
+    }
 
     $available += @{
         name = "windows-piper"
@@ -93,11 +97,12 @@ function Set-ActiveProvider {
         return $false
     }
 
-    # If trying to set piper, check if installed
+    # If trying to set piper, check if installed (standard location or PATH)
     if ($NewProvider -eq "windows-piper") {
         $piperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
-        if (-not (Test-Path $piperExe)) {
-            Write-Host "[WARNING] Piper not installed at: $piperExe" -ForegroundColor Yellow
+        $piperFound = (Test-Path $piperExe) -or ($null -ne (Get-Command piper.exe -ErrorAction SilentlyContinue))
+        if (-not $piperFound) {
+            Write-Host "[WARNING] Piper not installed. Not found at: $piperExe or in PATH" -ForegroundColor Yellow
             Write-Host "Run: .\setup-windows.ps1 to install Piper" -ForegroundColor Yellow
             return $false
         }
