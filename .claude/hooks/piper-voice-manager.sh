@@ -84,8 +84,10 @@ get_voice_storage_dir() {
       done
 
       # Check global config
-      if [[ -z "$config_file" ]] && [[ -f "$HOME/.claude/piper-voices-dir.txt" ]]; then
-        config_file="$HOME/.claude/piper-voices-dir.txt"
+      # Prefer $USERPROFILE on Windows where $HOME may be a MINGW-internal path
+      local _home="${USERPROFILE:-$HOME}"
+      if [[ -z "$config_file" ]] && [[ -f "$_home/.claude/piper-voices-dir.txt" ]]; then
+        config_file="$_home/.claude/piper-voices-dir.txt"
       fi
     fi
 
@@ -94,9 +96,22 @@ get_voice_storage_dir() {
     fi
   fi
 
+  # Validate the path is reachable — on Windows/MINGW, stale config files may
+  # contain bogus paths like /home/user that map to C:/Program Files/Git/home/
+  if [[ -n "$voice_dir" ]]; then
+    local parent_dir
+    parent_dir=$(dirname "$voice_dir")
+    if ! mkdir -p "$parent_dir" 2>/dev/null; then
+      voice_dir=""
+    fi
+  fi
+
   # Fallback to default global storage
+  # On Windows (MINGW/Git Bash), $HOME may resolve to a bogus Git-internal path;
+  # prefer $USERPROFILE which always points to the real Windows home directory.
   if [[ -z "$voice_dir" ]]; then
-    voice_dir="$HOME/.claude/piper-voices"
+    local home_dir="${USERPROFILE:-$HOME}"
+    voice_dir="$home_dir/.claude/piper-voices"
   fi
 
   mkdir -p "$voice_dir"
@@ -197,6 +212,12 @@ parse_voice_components() {
 download_voice() {
   local voice_name="$1"
   local lang_code="${2:-}"
+
+  # Security: validate voice name to prevent path traversal
+  if [[ ! "$voice_name" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+    echo "❌ Invalid voice name: $voice_name" >&2
+    return 1
+  fi
 
   local voice_dir
   voice_dir=$(get_voice_storage_dir)

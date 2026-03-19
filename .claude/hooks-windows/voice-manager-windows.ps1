@@ -6,7 +6,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('list', 'switch', 'get')]
+    [ValidateSet('list', 'list-simple', 'switch', 'get')]
     [string]$Command = 'list',
 
     [Parameter(Position = 1)]
@@ -38,8 +38,35 @@ function Get-SAPIVoices {
     return $voices
 }
 
-# Get Piper voices
+# Get Piper voices (checks both global and project-local directories)
 function Get-PiperVoices {
+    $GlobalVoicesDir = "$env:USERPROFILE\.claude\piper-voices"
+    # Also check project-local .claude/piper-voices
+    $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $ProjectDir = Split-Path -Parent (Split-Path -Parent $ScriptPath)
+    $ProjectVoicesDir = Join-Path $ProjectDir ".claude\piper-voices"
+
+    $allVoices = @()
+
+    foreach ($VoicesDir in @($GlobalVoicesDir, $ProjectVoicesDir)) {
+        if (-not (Test-Path $VoicesDir)) {
+            continue
+        }
+
+        $onnxFiles = Get-ChildItem -Path $VoicesDir -Filter "*.onnx" -ErrorAction SilentlyContinue
+        foreach ($file in $onnxFiles) {
+            $name = $file.BaseName
+            if ($allVoices -notcontains $name) {
+                $allVoices += $name
+            }
+        }
+    }
+
+    return $allVoices
+}
+
+# Legacy wrapper for single-dir callers
+function Get-PiperVoicesLegacy {
     $VoicesDir = "$ClaudeDir\piper-voices"
 
     if (-not (Test-Path $VoicesDir)) {
@@ -80,11 +107,14 @@ function List-Voices {
     Write-Host ""
 
     # Piper voices
-    Write-Host "[PIPER] Piper (High Quality):" -ForegroundColor Green
+    $PiperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
+    $piperInstalled = Test-Path $PiperExe
+    $piperLabel = if ($piperInstalled) { "[PIPER] Piper (High Quality):" } else { "[PIPER] Piper (NOT INSTALLED - run setup-windows.ps1):" }
+    Write-Host $piperLabel -ForegroundColor $(if ($piperInstalled) { "Green" } else { "Yellow" })
     $piperVoices = Get-PiperVoices
 
     if ($piperVoices.Count -eq 0) {
-        Write-Host "   (No voices downloaded - run setup-windows.ps1)" -ForegroundColor Gray
+        Write-Host "   (No voices downloaded - run download-piper-voices.ps1)" -ForegroundColor Gray
     }
     else {
         $piperVoices | ForEach-Object {
@@ -159,6 +189,26 @@ function Show-CurrentVoice {
 switch ($Command) {
     'list' {
         List-Voices
+    }
+
+    'list-simple' {
+        # Machine-parseable list for MCP server - one voice name per line
+        if ($ActiveProvider -eq "windows-sapi" -or $ActiveProvider -eq "sapi") {
+            $voices = Get-SAPIVoices
+            foreach ($v in $voices) { Write-Output $v }
+        }
+        elseif ($ActiveProvider -eq "windows-piper" -or $ActiveProvider -eq "piper") {
+            $voices = Get-PiperVoices
+            foreach ($v in ($voices | Sort-Object)) { Write-Output $v }
+        }
+        elseif ($ActiveProvider -eq "soprano") {
+            Write-Output "Soprano-1.1-80M"
+        }
+        else {
+            # Fallback: try Piper voices
+            $voices = Get-PiperVoices
+            foreach ($v in ($voices | Sort-Object)) { Write-Output $v }
+        }
     }
 
     'switch' {

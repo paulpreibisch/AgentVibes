@@ -670,12 +670,24 @@ export function createVoicesTab(screen, services) {
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
     const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
-    // Synthesize: spawn piper in its own process group; pass text via stdin with newline
+    // Synthesize: spawn piper; on Windows use the exe path directly
+    const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    let piperBin = 'piper';
+    if (isWindows) {
+      const localAppData = process.env.LOCALAPPDATA ||
+        (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+      if (localAppData) {
+        const exePath = path.join(localAppData, 'Programs', 'Piper', 'piper.exe');
+        if (fs.existsSync(exePath)) piperBin = exePath;
+      }
+    }
     const piperArgs = ['--model', voicePath, '--output_file', tempWav];
     if (ms.speakerId != null) piperArgs.push('--speaker', String(ms.speakerId));
-    const piper = spawn('piper', piperArgs, {
+    // On Windows, avoid detached:true which opens a visible console window
+    const piper = spawn(piperBin, piperArgs, {
       stdio: ['pipe', 'ignore', 'ignore'],
-      detached: true,
+      detached: !isWindows,
+      windowsHide: true,
       env: _spawnEnv,
     });
     piper.stdin.write(phrase + '\n');
@@ -716,7 +728,8 @@ export function createVoicesTab(screen, services) {
       }
       const playProc = spawn(_wavP.bin, _wavP.args(tempWav), {
         stdio: 'ignore',
-        detached: true,
+        detached: !isWindows,
+        windowsHide: true,
         env: _spawnEnv,
       });
       // Race note: _playingVoiceId could change between piper exit and here
@@ -1100,26 +1113,91 @@ export function createVoicesTab(screen, services) {
     function _startDownload() {
       if (_downloading) return;
       _downloading = true;
-      statusLine.setContent(`{${COLORS.activeFg}-fg}⬇ Downloading ${modelToDownload}…{/${COLORS.activeFg}-fg}`);
-      screen.render();
 
-      // Use piper-voice-manager.sh download_voice function
-      const managerScript = path.resolve(process.cwd(), '.claude', 'hooks', 'piper-voice-manager.sh');
-      const dlProc = spawn('bash', ['-c', 'source "$1" && download_voice "$2"', '_', managerScript, modelToDownload], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: _spawnEnv,
-      });
+      // Animated spinner
+      const spinFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+      let spinIdx = 0;
+      let dlPhase = 'Downloading model';
+      const progressBar = (pct) => {
+        const filled = Math.round(pct / 5);
+        const empty = 20 - filled;
+        return '█'.repeat(filled) + '░'.repeat(empty);
+      };
+
+      const spinTimer = setInterval(() => {
+        spinIdx = (spinIdx + 1) % spinFrames.length;
+        const frame = spinFrames[spinIdx];
+        statusLine.setContent(
+          `{${COLORS.activeFg}-fg}${frame} ${dlPhase}… ${modelToDownload}{/${COLORS.activeFg}-fg}`
+        );
+        screen.render();
+      }, 100);
+
+      // Download voice model — use PowerShell on Windows, bash on Unix
+      const packageRoot = path.resolve(__dirname, '..', '..', '..');
+      const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      let dlProc;
+
+      if (isWindows) {
+        const piperVoicesDir = resolvePiperVoicesDir();
+        const hfBase = 'https://huggingface.co/rhasspy/piper-voices/resolve/main';
+        const match = modelToDownload.match(/^([a-z]{2})_([A-Z]{2})-([a-zA-Z0-9_]+)-([a-z]+)$/);
+        let modelUrl, configUrl;
+        if (match) {
+          const [, lang, region, speaker, quality] = match;
+          const hfPath = `${lang}/${lang}_${region}/${speaker}/${quality}`;
+          modelUrl = `${hfBase}/${hfPath}/${modelToDownload}.onnx`;
+          configUrl = `${hfBase}/${hfPath}/${modelToDownload}.onnx.json`;
+        } else {
+          const customBase = 'https://huggingface.co/agentvibes/piper-custom-voices/resolve/main';
+          modelUrl = `${customBase}/${modelToDownload}.onnx`;
+          configUrl = `${customBase}/${modelToDownload}.onnx.json`;
+        }
+        const modelFile = path.join(piperVoicesDir, `${modelToDownload}.onnx`);
+        const configFile = path.join(piperVoicesDir, `${modelToDownload}.onnx.json`);
+        // PowerShell script with progress reporting
+        const psScript = `
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $voicesDir = '${piperVoicesDir.replace(/'/g, "''")}'
+          if (-not (Test-Path $voicesDir)) { New-Item -ItemType Directory -Path $voicesDir -Force | Out-Null }
+          Write-Output 'PHASE:model'
+          Invoke-WebRequest -Uri '${modelUrl}' -OutFile '${modelFile.replace(/'/g, "''")}' -ErrorAction Stop
+          Write-Output 'PHASE:config'
+          Invoke-WebRequest -Uri '${configUrl}' -OutFile '${configFile.replace(/'/g, "''")}' -ErrorAction Stop
+          Write-Output 'PHASE:done'
+        `;
+        dlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: _spawnEnv,
+        });
+      } else {
+        const managerScript = path.resolve(packageRoot, '.claude', 'hooks', 'piper-voice-manager.sh');
+        dlProc = spawn('bash', ['-c', 'source "$1" && download_voice "$2"', '_', managerScript, modelToDownload], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: _spawnEnv,
+        });
+      }
       _downloadProcess = dlProc;
 
       let output = '';
-      dlProc.stdout.on('data', (d) => { output += d.toString(); });
+      dlProc.stdout.on('data', (d) => {
+        const chunk = d.toString();
+        output += chunk;
+        // Update phase based on progress markers
+        if (chunk.includes('PHASE:config') || chunk.includes('config file')) {
+          dlPhase = 'Downloading config';
+        } else if (chunk.includes('PHASE:done') || chunk.includes('successfully')) {
+          dlPhase = 'Finishing up';
+        }
+      });
       dlProc.stderr.on('data', (d) => { output += d.toString(); });
 
       dlProc.on('exit', (code) => {
+        clearInterval(spinTimer);
         _downloading = false;
         _downloadProcess = null;
         if (code === 0) {
-          // Patch speaker names for freshly downloaded LibriTTS model
           if (isLibriTTS) {
             patchLibriTTSSpeakerNames();
             _metaCache.clear();
@@ -1137,6 +1215,7 @@ export function createVoicesTab(screen, services) {
       });
 
       dlProc.on('error', () => {
+        clearInterval(spinTimer);
         _downloading = false;
         _downloadProcess = null;
         statusLine.setContent(`{red-fg}✗ Could not run download script{/red-fg}`);
@@ -1235,7 +1314,7 @@ export function createVoicesTab(screen, services) {
         // Greyed-out row for uninstalled catalog voices
         return `{bright-black-fg} ${star}  ${name}${gender.padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
       }
-      return ` ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}${isPrev ? ' (playing)' : ''}`;
+      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}${isPrev ? ' (playing)' : ''}{/${COLORS.labelFg}-fg}`;
     });
   }
 

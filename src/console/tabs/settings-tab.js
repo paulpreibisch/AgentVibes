@@ -29,6 +29,25 @@ import { formatTrackName as _sharedFormatTrackName, formatReverbState as _shared
 import { showNotice as _showNoticeWidget } from '../widgets/notice.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
+const _IS_WINDOWS = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
+/** Resolve piper binary path — uses exe on Windows, 'piper' in PATH on Unix */
+function _resolvePiperBin() {
+  if (_IS_WINDOWS) {
+    const lad = process.env.LOCALAPPDATA ||
+      (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+    if (lad) {
+      const exe = path.join(lad, 'Programs', 'Piper', 'piper.exe');
+      if (fs.existsSync(exe)) return exe;
+    }
+  }
+  return 'piper';
+}
+
+/** Build spawn options with Windows-safe defaults (no visible console, no detached) */
+function _spawnOpts(env, extraOpts = {}) {
+  return { stdio: 'ignore', detached: !_IS_WINDOWS, windowsHide: true, env, ...extraOpts };
+}
 
 // Sanitize strings before passing as env vars to shell commands.
 // Removes characters that could cause shell injection when expanded inside sh -c.
@@ -413,9 +432,14 @@ export function createSettingsTab(screen, services) {
           `play "${trackPath}" repeat 9999 vol ${volFraction}`,
           `mpg123 -q --loop -1 "${trackPath}"`,
         ].join(' 2>/dev/null || ') + ' 2>/dev/null';
-        _testMusicProc = spawn('sh', ['-c', musicCmd], {
-          stdio: 'ignore', detached: true, env: _testEnv,
-        });
+        if (_IS_WINDOWS) {
+          const _mp3P = detectMp3Player(_testEnv);
+          _testMusicProc = _mp3P
+            ? spawn(_mp3P.bin, _mp3P.args(trackPath), _spawnOpts(_testEnv))
+            : null;
+        } else {
+          _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
+        }
         _testMusicProc.unref();
       }
     }
@@ -463,7 +487,7 @@ export function createSettingsTab(screen, services) {
           `soprano "$_AV_PHRASE" -o "$_AV_WAV"`,
         ].join(' || ');
         synthProc = spawn('sh', ['-c', cmd], {
-          stdio: 'ignore', detached: true, env: sopranoEnv,
+          stdio: 'ignore', detached: !_IS_WINDOWS, windowsHide: true, env: sopranoEnv,
         });
       } else {
         const voiceId = providerService.getActiveVoiceId();
@@ -476,8 +500,8 @@ export function createSettingsTab(screen, services) {
         }
         const _piperArgs = ['--model', voicePath, '--output_file', tempWav];
         if (_ms.speakerId != null) _piperArgs.push('--speaker', String(_ms.speakerId));
-        synthProc = spawn('piper', _piperArgs, {
-          stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _testEnv,
+        synthProc = spawn(_resolvePiperBin(), _piperArgs, {
+          stdio: ['pipe', 'ignore', 'ignore'], detached: !_IS_WINDOWS, windowsHide: true, env: _testEnv,
         });
         synthProc.stdin.write(ttsInput + '\n');
         synthProc.stdin.end();
@@ -528,7 +552,7 @@ export function createSettingsTab(screen, services) {
         _setTestBtnsLabel('■ Stop');
         const _wavPlayer1 = detectWavPlayer(_testEnv);
         const playProc = _wavPlayer1
-          ? spawn(_wavPlayer1.bin, _wavPlayer1.args(wavToPlay), { stdio: 'ignore', detached: true, env: _testEnv })
+          ? spawn(_wavPlayer1.bin, _wavPlayer1.args(wavToPlay), _spawnOpts(_testEnv))
           : null;
         if (!playProc) { _killTest(); _restoreTestBtnsLabels(); return; }
         _testVoiceProc = playProc;
@@ -633,9 +657,14 @@ export function createSettingsTab(screen, services) {
       `mpg123 -q "${trackPath}"`,
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
-    _musicTestProc = spawn('sh', ['-c', cmd], {
-      stdio: 'ignore', detached: true, env: _testEnv,
-    });
+    if (_IS_WINDOWS) {
+      const _mp3P2 = detectMp3Player(_testEnv);
+      _musicTestProc = _mp3P2
+        ? spawn(_mp3P2.bin, _mp3P2.args(trackPath), _spawnOpts(_testEnv))
+        : null;
+    } else {
+      _musicTestProc = spawn('sh', ['-c', cmd], _spawnOpts(_testEnv));
+    }
     _musicTestProc.unref();
     musicTestBtn.setContent('■ Stop');
     screen.render();
@@ -872,7 +901,7 @@ export function createSettingsTab(screen, services) {
       screen.render();
       const _wavPlayer2 = detectWavPlayer(_sampleEnv);
       if (!_wavPlayer2) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
-      const playProc = spawn(_wavPlayer2.bin, _wavPlayer2.args(tempWav), { stdio: 'ignore', detached: true, env: _sampleEnv });
+      const playProc = spawn(_wavPlayer2.bin, _wavPlayer2.args(tempWav), _spawnOpts(_sampleEnv));
       _sampleProcess = playProc;
       const _done = () => { _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); try { fs.unlinkSync(tempWav); } catch {} };
       playProc.on('exit', _done);
@@ -973,7 +1002,7 @@ export function createSettingsTab(screen, services) {
         ].join(' || ');
 
         const soprano = spawn('sh', ['-c', cmd], {
-          stdio: 'ignore', detached: true, env: sopranoEnv,
+          stdio: 'ignore', detached: !_IS_WINDOWS, windowsHide: true, env: sopranoEnv,
         });
         _sampleProcess = soprano;
         soprano.on('exit', (code) => {
@@ -995,8 +1024,8 @@ export function createSettingsTab(screen, services) {
       }
       const _piperArgs2 = ['--model', voicePath, '--output_file', tempWav];
       if (_ms2.speakerId != null) _piperArgs2.push('--speaker', String(_ms2.speakerId));
-      const piper = spawn('piper', _piperArgs2, {
-        stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _sampleEnv,
+      const piper = spawn(_resolvePiperBin(), _piperArgs2, {
+        stdio: ['pipe', 'ignore', 'ignore'], detached: !_IS_WINDOWS, windowsHide: true, env: _sampleEnv,
       });
       piper.stdin.write(phrase + '\n');
       piper.stdin.end();
@@ -2779,9 +2808,14 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
       `mpg123 -q "${trackPath}"`,
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
-    _previewProcess = spawn('sh', ['-c', cmd], {
-      stdio: 'ignore', detached: true, env: _previewEnv,
-    });
+    if (_IS_WINDOWS) {
+      const _mp3P3 = detectMp3Player(_previewEnv);
+      _previewProcess = _mp3P3
+        ? spawn(_mp3P3.bin, _mp3P3.args(trackPath), _spawnOpts(_previewEnv))
+        : null;
+    } else {
+      _previewProcess = spawn('sh', ['-c', cmd], _spawnOpts(_previewEnv));
+    }
     _previewProcess.unref();
     _refreshList();
 
@@ -3024,8 +3058,9 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
     const _mp3Player = detectMp3Player(_modalEnv);
     if (!_mp3Player) return;
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     _previewProcess = spawn(_mp3Player.bin, _mp3Player.args(trackPath), {
-      stdio: 'ignore', detached: true, env: _modalEnv,
+      stdio: 'ignore', detached: !_isWin, windowsHide: true, env: _modalEnv,
     });
     _previewProcess.unref();
     _previewTrackId = trackId;
@@ -3495,11 +3530,22 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
     const phrase  = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
+    const _isWinPreview = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    let _piperBin3 = 'piper';
+    if (_isWinPreview) {
+      const _lad = process.env.LOCALAPPDATA ||
+        (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+      if (_lad) {
+        const _exe = path.join(_lad, 'Programs', 'Piper', 'piper.exe');
+        if (fs.existsSync(_exe)) _piperBin3 = _exe;
+      }
+    }
     const _piperArgs3 = ['--model', voicePath, '--output_file', tempWav];
     if (_ms3.speakerId != null) _piperArgs3.push('--speaker', String(_ms3.speakerId));
-    const piper = spawn('piper', _piperArgs3, {
+    const piper = spawn(_piperBin3, _piperArgs3, {
       stdio: ['pipe', 'ignore', 'ignore'],
-      detached: true,
+      detached: !_isWinPreview,
+      windowsHide: true,
       env: _spawnEnv,
     });
     piper.stdin.write(phrase + '\n');
@@ -3532,7 +3578,8 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
       if (!_wavPlayer3) return;
       const playProc = spawn(_wavPlayer3.bin, _wavPlayer3.args(tempWav), {
         stdio: 'ignore',
-        detached: true,
+        detached: !_isWinPreview,
+        windowsHide: true,
         env: _spawnEnv,
       });
       _playingProcess = playProc;

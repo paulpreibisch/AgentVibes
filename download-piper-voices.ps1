@@ -26,10 +26,22 @@ Write-Host ""
 # Voice models to download
 $Voices = @(
     @{
+        name = "en_US-lessac-medium"
+        description = "Male voice (medium quality) - DEFAULT"
+        modelUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx"
+        configUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
+    },
+    @{
         name = "en_US-ryan-high"
-        description = "Male voice (high quality) - DEFAULT"
+        description = "Male voice (high quality)"
         modelUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/en_US-ryan-high.onnx"
         configUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/en_US-ryan-high.onnx.json"
+    },
+    @{
+        name = "en_GB-alba-medium"
+        description = "Female voice, British English (medium quality)"
+        modelUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alba/medium/en_GB-alba-medium.onnx"
+        configUrl = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alba/medium/en_GB-alba-medium.onnx.json"
     }
 )
 

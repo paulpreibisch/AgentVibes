@@ -131,6 +131,24 @@ function isNativeWindows() {
 }
 
 /**
+ * Get the platform-correct Piper provider name
+ * Windows uses 'windows-piper', all other platforms use 'piper'
+ * @returns {string} The correct piper provider identifier
+ */
+function getPiperProvider() {
+  return isNativeWindows() ? 'windows-piper' : 'piper';
+}
+
+/**
+ * Check if a provider is any piper variant (piper or windows-piper)
+ * @param {string} provider - The provider name to check
+ * @returns {boolean} True if the provider is a piper variant
+ */
+function isPiperProvider(provider) {
+  return provider === 'piper' || provider === 'windows-piper';
+}
+
+/**
  * Detect if running on Android/Termux and display message
  * @returns {boolean} True if running on Termux/Android
  */
@@ -227,6 +245,21 @@ function getPersonalityIcon(personality, emojiSupported) {
  * @returns {boolean} True if piper command exists
  */
 function isPiperInstalled() {
+  // On Windows, check standard install location then PATH
+  if (isNativeWindows()) {
+    const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+    if (localAppData) {
+      const piperExe = path.join(localAppData, 'Programs', 'Piper', 'piper.exe');
+      if (fsSync.existsSync(piperExe)) return true;
+    }
+    // Also check PATH (e.g. pip-installed piper)
+    try {
+      execSync('where piper.exe', { stdio: 'pipe', timeout: 3000 });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   try {
     execSync('which piper', {
       stdio: 'pipe',
@@ -250,6 +283,19 @@ function isSopranoInstalled() {
     });
     return true;
   } catch (e) {
+    // On Windows, 'which' may not find Python scripts; try 'py -m pip show' as fallback
+    if (isNativeWindows()) {
+      try {
+        const result = spawnSync('py', ['-m', 'pip', 'show', 'soprano-tts'], {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 10000
+        });
+        return result.status === 0 && result.stdout && result.stdout.includes('Name:');
+      } catch (e2) {
+        return false;
+      }
+    }
     return false;
   }
 }
@@ -292,7 +338,7 @@ async function playVoiceSample(voiceName, provider) {
     }
 
     // Generate sample on-the-fly if provider is running
-    if (provider === 'piper' && isPiperInstalled()) {
+    if (isPiperProvider(provider) && isPiperInstalled()) {
       const text = `Hi, I'm ${voiceName.split('-')[1] || 'Piper'}`;
       // Use bash -c with positional args to prevent command injection via text/voiceName
       spawnSync('bash', ['-c', 'echo "$1" | piper --model "$2" --output_raw | aplay -r 22050 -f S16_LE -t raw -', '_', text, voiceName], {
@@ -1518,19 +1564,19 @@ async function collectConfiguration(options = {}) {
 
       // Handle special receiver mode for Termux
       if (config.provider === 'piper-receiver') {
-        config.provider = 'piper';
+        config.provider = getPiperProvider();
         config.isReceiver = true;
       }
 
       // Handle silent mode (voiceless servers that don't want audio)
       if (config.provider === 'silent') {
         // Silent mode uses piper but won't actually play audio
-        config.provider = 'piper';
+        config.provider = getPiperProvider();
         config.isSilent = true;
       }
 
       // If Piper selected, ask for voice storage location
-      if (config.provider === 'piper' || config.provider === 'windows-piper' || config.isReceiver) {
+      if (isPiperProvider(config.provider) || config.isReceiver) {
         const homeDir = process.env.HOME || process.env.USERPROFILE;
         const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
 
@@ -1679,7 +1725,7 @@ async function collectConfiguration(options = {}) {
         voiceIntroMessage = chalk.white('Soprano Voice Configuration\n\n') +
                            chalk.gray('Soprano has a single premium neural voice.\n') +
                            chalk.gray('Voice details and specifications shown below.');
-      } else if (config.provider === 'piper') {
+      } else if (isPiperProvider(config.provider)) {
         voiceIntroMessage = chalk.white('Choose a default voice for your AgentVibes.\n\n') +
                            chalk.gray('Piper offers 50+ voices in 18+ languages.\n') +
                            chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>');
@@ -1704,7 +1750,7 @@ async function collectConfiguration(options = {}) {
         }
       ));
 
-      if (config.provider === 'piper') {
+      if (isPiperProvider(config.provider)) {
         // Check if Piper is installed for voice previews
         const piperAvailable = isPiperInstalled();
 
@@ -2262,20 +2308,28 @@ async function collectConfiguration(options = {}) {
       config.backgroundMusic.enabled = enableMusic;
 
       if (enableMusic) {
-        // Check if an MP3-capable player is available; offer to install ffmpeg if not
+        // Check if ffmpeg is available; offer to install if not
         const { execSync: _execSync } = await import('child_process');
-        const _mp3Players = ['ffplay', 'mpg123', 'mpv', 'cvlc'];
-        const _hasPlayer = _mp3Players.some(p => {
-          try { _execSync(`which ${p}`, { stdio: 'pipe' }); return true; } catch { return false; }
-        });
-        if (!_hasPlayer) {
-          console.log('');
-          console.log(chalk.yellow('⚠️  No MP3 player found — background music requires one.'));
-          console.log(chalk.gray('   ffmpeg is recommended (provides ffplay for MP3 playback).\n'));
+        const _osPlatform = process.platform;
+        let _hasFfmpeg = false;
+        try {
+          if (_osPlatform === 'win32') {
+            _execSync('where ffmpeg', { stdio: 'pipe' });
+          } else {
+            _execSync('which ffmpeg', { stdio: 'pipe' });
+          }
+          _hasFfmpeg = true;
+        } catch {}
 
-          const _osPlatform = process.platform;
+        if (!_hasFfmpeg) {
+          console.log('');
+          console.log(chalk.yellow('⚠️  ffmpeg not found — required for background music mixing.'));
+          console.log(chalk.gray('   ffmpeg mixes background music with TTS voice output.\n'));
+
           let _installCmd;
-          if (_osPlatform === 'darwin') {
+          if (_osPlatform === 'win32') {
+            _installCmd = 'winget install --id Gyan.FFmpeg -e --source winget';
+          } else if (_osPlatform === 'darwin') {
             _installCmd = 'brew install ffmpeg';
           } else {
             // Prefer pkexec (GUI password dialog) when available — works in
@@ -2299,7 +2353,7 @@ async function collectConfiguration(options = {}) {
               try {
                 console.log(chalk.cyan(`\n📦 Running: ${_installCmd}\n`));
                 const { execSync: _exec } = await import('child_process');
-                _exec(_installCmd, { stdio: 'inherit', timeout: 120000 });
+                _exec(_installCmd, { stdio: 'inherit', timeout: 300000 });
                 console.log(chalk.green('\n✅ ffmpeg installed successfully!\n'));
               } catch {
                 console.log(chalk.yellow('\n⚠️  ffmpeg installation failed. You can install it manually:'));
@@ -4038,14 +4092,14 @@ async function checkAndInstallPiperWindows(targetDir, options) {
     return;
   }
   const voicesDir = path.join(homeDir, '.claude', 'piper-voices');
-  const voiceName = 'en_US-ryan-high';
+  const voiceName = 'en_US-lessac-medium';
   const modelFile = path.join(voicesDir, voiceName + '.onnx');
   if (!fsSync.existsSync(modelFile)) {
-    spinner.start('Downloading default voice (en_US-ryan-high)...');
+    spinner.start('Downloading default voice (en_US-lessac-medium)...');
     try {
       await fs.mkdir(voicesDir, { recursive: true });
-      const modelUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/${voiceName}.onnx`;
-      const configUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/${voiceName}.onnx.json`;
+      const modelUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/${voiceName}.onnx`;
+      const configUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/${voiceName}.onnx.json`;
       await downloadFile(modelUrl, modelFile);
       await downloadFile(configUrl, modelFile + '.json');
       spinner.succeed(chalk.green('Default voice downloaded!\n'));
@@ -4974,7 +5028,7 @@ async function install(options = {}) {
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
     await fs.writeFile(providerConfigPath, selectedProvider);
 
-    if (selectedProvider === 'piper' && piperVoicesPath) {
+    if (isPiperProvider(selectedProvider) && piperVoicesPath) {
       const piperConfigPath = path.join(claudeDir, 'piper-voices-dir.txt');
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
@@ -5078,7 +5132,7 @@ Troubleshooting:
       switch (selectedProvider) {
         case 'piper':          defaultVoice = 'en_US-ryan-high'; break;
         case 'macos':          defaultVoice = 'Samantha'; break;
-        case 'windows-piper':  defaultVoice = 'en_US-ryan-high'; break;
+        case 'windows-piper':  defaultVoice = 'en_US-lessac-medium'; break;
         case 'windows-sapi':   defaultVoice = 'Microsoft David Desktop'; break;
         case 'soprano':        defaultVoice = 'soprano-default'; break;
         case 'termux-ssh':     defaultVoice = 'android-system-default'; break;
@@ -5091,12 +5145,13 @@ Troubleshooting:
     await detectAndMigrateOldConfig(targetDir, silentSpinner);
 
     // Auto-install Piper if selected
-    if (selectedProvider === 'piper') {
+    if (isPiperProvider(selectedProvider)) {
       spinner.text = 'Installing Piper TTS...';
-      await checkAndInstallPiper(targetDir, options);
-    } else if (selectedProvider === 'windows-piper') {
-      spinner.text = 'Installing Piper TTS for Windows...';
-      await checkAndInstallPiperWindows(targetDir, options);
+      if (isNativeWindows()) {
+        await checkAndInstallPiperWindows(targetDir, options);
+      } else {
+        await checkAndInstallPiper(targetDir, options);
+      }
     }
 
     // Apply background music configuration
