@@ -89,12 +89,20 @@ if (Test-Path $ReverbFile) {
 $HasReverb = $ReverbLevel -ne "off"
 
 # Check ffmpeg availability for background music mixing or reverb
+# Refresh PATH from registry so newly-installed tools are found without shell restart
 $HasFfmpeg = $false
 if ($BgEnabled -or $HasReverb) {
     try {
         $null = Get-Command ffmpeg -ErrorAction Stop
         $HasFfmpeg = $true
-    } catch {}
+    } catch {
+        # PATH may be stale (common after winget install); refresh from registry
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        try {
+            $null = Get-Command ffmpeg -ErrorAction Stop
+            $HasFfmpeg = $true
+        } catch {}
+    }
 }
 
 # If background music or reverb enabled and ffmpeg available, tell provider to skip playback
@@ -152,31 +160,64 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
 
         # Mix with background music if enabled
         if ($BgEnabled) {
-            # Get background track - default to bachata, or read from config
+            # Read background track and volume from audio-effects.cfg (matches Linux behavior)
             $TracksDir = "$ClaudeDir\audio\tracks"
-            $DefaultTrack = "agent_vibes_bachata_v1_loop.mp3"
-            $DefaultTrackFile = "$ConfigDir\background-music-default.txt"
-            if (Test-Path $DefaultTrackFile) {
-                $configTrack = (Get-Content $DefaultTrackFile -Raw).Trim()
-                # Validate: filename only, no path separators or traversal
-                if ($configTrack -and $configTrack -match '^[a-zA-Z0-9_\-\.]+$') {
-                    $DefaultTrack = $configTrack
+            $DefaultTrack = ""
+            $BgVolume = "0.25"
+            $AudioEffectsCfg = "$ConfigDir\audio-effects.cfg"
+
+            if (Test-Path $AudioEffectsCfg) {
+                # Try agent-specific config first, then fall back to default
+                # Format: AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME
+                $agentName = $env:AGENTVIBES_AGENT_NAME
+                $configLine = $null
+
+                $cfgLines = Get-Content $AudioEffectsCfg
+                if ($agentName) {
+                    foreach ($line in $cfgLines) {
+                        if ($line -match "^$([regex]::Escape($agentName))\|") {
+                            $configLine = $line
+                            break
+                        }
+                    }
+                }
+                # Fall back to default
+                if (-not $configLine) {
+                    foreach ($line in $cfgLines) {
+                        if ($line -match '^default\|') {
+                            $configLine = $line
+                            break
+                        }
+                    }
+                }
+
+                if ($configLine) {
+                    $parts = $configLine -split '\|'
+                    if ($parts.Length -ge 3 -and $parts[2]) {
+                        $trackName = $parts[2].Trim()
+                        # Validate: filename only, no path separators or traversal
+                        if ($trackName -match '^[a-zA-Z0-9_\-\.]+$') {
+                            $DefaultTrack = $trackName
+                        }
+                    }
+                    if ($parts.Length -ge 4 -and $parts[3]) {
+                        $volVal = $parts[3].Trim()
+                        if ($volVal -match '^\d+\.?\d*$') { $BgVolume = $volVal }
+                    }
                 }
             }
+
+            # Fallback if no track found in config
+            if (-not $DefaultTrack) {
+                $DefaultTrack = "agent_vibes_celtic_harp_v1_loop.mp3"
+            }
+
             $BgTrackPath = Join-Path $TracksDir $DefaultTrack
             # Path containment: verify resolved path stays within tracks directory
             $ResolvedBgTrack = [System.IO.Path]::GetFullPath($BgTrackPath)
             $ResolvedTracksDir = [System.IO.Path]::GetFullPath($TracksDir)
             if (-not $ResolvedBgTrack.StartsWith($ResolvedTracksDir + [System.IO.Path]::DirectorySeparatorChar)) {
-                $BgTrackPath = Join-Path $TracksDir "agent_vibes_bachata_v1_loop.mp3"
-            }
-
-            # Get volume (default 0.25)
-            $BgVolume = "0.25"
-            $VolumeFile = "$ConfigDir\background-music-volume.txt"
-            if (Test-Path $VolumeFile) {
-                $vol = (Get-Content $VolumeFile -Raw).Trim()
-                if ($vol -match '^\d+\.?\d*$') { $BgVolume = $vol }
+                $BgTrackPath = Join-Path $TracksDir "agent_vibes_celtic_harp_v1_loop.mp3"
             }
 
             if (Test-Path $BgTrackPath) {
