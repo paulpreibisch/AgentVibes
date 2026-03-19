@@ -25,7 +25,11 @@ if (Test-Path $ProjectClaudeDir) {
 
 # Audio cache and voice config use project-local .claude
 $AudioDir = "$ClaudeDir\audio"
+# Try provider-specific file first, then generic tts-voice.txt (set by TUI)
 $VoiceFile = "$ClaudeDir\tts-voice-piper.txt"
+if (-not (Test-Path $VoiceFile)) {
+    $VoiceFile = "$ClaudeDir\tts-voice.txt"
+}
 
 # Voices and Piper binary are global (shared across projects, ~100MB+)
 $UserClaudeDir = "$env:USERPROFILE\.claude"
@@ -59,6 +63,16 @@ if ($VoiceOverride) {
 }
 elseif (Test-Path $VoiceFile) {
     $VoiceName = (Get-Content $VoiceFile -Raw).Trim()
+    # Strip display name suffix (e.g. "en_US-libritts-high::Bella-9" -> "en_US-libritts-high")
+    # and extract speaker ID if present
+    if ($VoiceName -match '::') {
+        $parts = $VoiceName -split '::'
+        $VoiceName = $parts[0]
+        # Extract speaker number from display name (e.g. "Bella-9" -> speaker 9)
+        if ($parts.Length -ge 2 -and $parts[1] -match '-(\d+)$') {
+            $env:PIPER_SPEAKER = $Matches[1]
+        }
+    }
 }
 
 # Default voice if not specified
@@ -147,10 +161,12 @@ try {
     Write-Host "[SYNTH] Synthesizing with Piper..." -ForegroundColor Cyan
 
     # Run Piper with text input
-    $Text | & $PiperExe `
-        --model $VoiceModelFile `
-        --output-file $AudioFile `
-        2>$null
+    # Add --speaker for multi-speaker models (e.g. libritts-high with speaker 9)
+    $piperArgs = @("--model", $VoiceModelFile, "--output-file", $AudioFile)
+    if ($env:PIPER_SPEAKER) {
+        $piperArgs += @("--speaker", $env:PIPER_SPEAKER)
+    }
+    $Text | & $PiperExe @piperArgs 2>$null
 
     if (-not (Test-Path $AudioFile)) {
         Write-Host "[ERROR] Piper synthesis failed" -ForegroundColor Red
