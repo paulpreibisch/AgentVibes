@@ -490,8 +490,18 @@ export function createMusicTab(screen, services) {
   // Kill the entire process group so child audio processes (ffplay, play, mpg123) all die
   function _killPlayingProcess() {
     if (_playingProcess) {
-      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch (e) {
-        if (e.code !== 'ESRCH') console.error('Kill failed:', e.code);
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      try {
+        if (_isWin) {
+          // Windows: kill the process tree via taskkill (process group kill doesn't work)
+          spawn('taskkill', ['/F', '/T', '/PID', String(_playingProcess.pid)], {
+            stdio: 'ignore', windowsHide: true,
+          });
+        } else {
+          process.kill(-_playingProcess.pid, 'SIGTERM');
+        }
+      } catch (e) {
+        if (e.code !== 'ESRCH') { /* ignore */ }
       }
       _playingProcess = null;
     }
