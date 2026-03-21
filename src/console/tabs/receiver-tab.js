@@ -83,6 +83,7 @@ function _getNetworkInfo() {
  * Used to determine whether instructions should show full setup or just verification.
  */
 function _detectSetupState() {
+  const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
   const state = {
     receiverUserExists: false,
     receiverScriptInstalled: false,
@@ -92,56 +93,102 @@ function _detectSetupState() {
     pulseCookieShared: false,
     forceCommandConfigured: false,
     tcpModuleLoaded: false,
+    isWindows: isWin,
+    sshdRunning: false,
+    ffmpegInstalled: false,
+    piperInstalled: false,
   };
   try {
-    // Resolve receiver user home directory dynamically (works on Linux + macOS)
-    let receiverHome = '';
-    try {
-      execSync('id agentvibes-receiver', { timeout: 3000, stdio: 'pipe' });
-      state.receiverUserExists = true;
+    if (isWin) {
+      // Windows detection
+      const home = homedir();
+      state.receiverScriptInstalled = existsSync(path.join(home, '.agentvibes', 'play-remote.ps1'));
+      state.receiverUserExists = true; // Windows uses the current user, no separate user needed
+
+      // Check voice models
+      const voicesDir = path.join(home, '.claude', 'piper-voices');
       try {
-        receiverHome = execSync("getent passwd agentvibes-receiver 2>/dev/null | cut -d: -f6 || echo '/home/agentvibes-receiver'",
-          { timeout: 3000, stdio: 'pipe' }).toString().trim();
-      } catch { receiverHome = '/home/agentvibes-receiver'; }
-    } catch { /* user does not exist */ }
+        const files = require('fs').readdirSync(voicesDir).filter(f => f.endsWith('.onnx'));
+        state.voiceModelsPresent = files.length > 0;
+      } catch { /* no voices */ }
 
-    // Check receiver script installed
-    if (receiverHome) {
-      state.receiverScriptInstalled = existsSync(path.join(receiverHome, '.agentvibes/play-remote.sh'));
-    }
-
-    // Check voice models present
-    if (receiverHome) {
+      // Check sshd running
       try {
-        const voices = execSync(`ls ${receiverHome}/.claude/piper-voices/*.onnx 2>/dev/null | wc -l`,
-          { timeout: 3000, stdio: 'pipe' }).toString().trim();
-        state.voiceModelsPresent = parseInt(voices, 10) > 0;
-      } catch { /* no access or no voices */ }
+        const svc = execSync('powershell -NoProfile -Command "(Get-Service sshd -EA SilentlyContinue).Status"',
+          { timeout: 5000, stdio: 'pipe' }).toString().trim();
+        state.sshdRunning = svc === 'Running';
+      } catch { /* sshd not installed */ }
+
+      // Check ForceCommand in Windows sshd_config
+      try {
+        const sshdConf = readFileSync('C:\\ProgramData\\ssh\\sshd_config', 'utf-8');
+        state.forceCommandConfigured = sshdConf.includes('ForceCommand') && sshdConf.includes('play-remote.ps1');
+      } catch { /* no read access */ }
+
+      // Check ffmpeg
+      try {
+        execSync('where ffmpeg', { timeout: 3000, stdio: 'pipe' });
+        state.ffmpegInstalled = true;
+      } catch { /* not found */ }
+
+      // Check piper
+      try {
+        execSync('where piper', { timeout: 3000, stdio: 'pipe' });
+        state.piperInstalled = true;
+      } catch {
+        const piperPath = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Piper', 'piper.exe');
+        state.piperInstalled = existsSync(piperPath);
+      }
+
+      // Windows doesn't need PipeWire/PulseAudio — mark as N/A
+      state.pipewireTcpConfigured = true;
+      state.flatVolumesDisabled = true;
+      state.pulseCookieShared = true;
+      state.tcpModuleLoaded = true;
+    } else {
+      // Linux/macOS detection (original)
+      let receiverHome = '';
+      try {
+        execSync('id agentvibes-receiver', { timeout: 3000, stdio: 'pipe' });
+        state.receiverUserExists = true;
+        try {
+          receiverHome = execSync("getent passwd agentvibes-receiver 2>/dev/null | cut -d: -f6 || echo '/home/agentvibes-receiver'",
+            { timeout: 3000, stdio: 'pipe' }).toString().trim();
+        } catch { receiverHome = '/home/agentvibes-receiver'; }
+      } catch { /* user does not exist */ }
+
+      if (receiverHome) {
+        state.receiverScriptInstalled = existsSync(path.join(receiverHome, '.agentvibes/play-remote.sh'));
+      }
+
+      if (receiverHome) {
+        try {
+          const voices = execSync(`ls ${receiverHome}/.claude/piper-voices/*.onnx 2>/dev/null | wc -l`,
+            { timeout: 3000, stdio: 'pipe' }).toString().trim();
+          state.voiceModelsPresent = parseInt(voices, 10) > 0;
+        } catch { /* no access or no voices */ }
+      }
+
+      const home = homedir();
+      state.pipewireTcpConfigured = existsSync(
+        path.join(home, '.config/pipewire/pipewire-pulse.conf.d/agentvibes-tcp.conf'));
+      state.flatVolumesDisabled = existsSync(
+        path.join(home, '.config/pipewire/pipewire-pulse.conf.d/no-flat-volumes.conf'));
+
+      if (receiverHome) {
+        state.pulseCookieShared = existsSync(path.join(receiverHome, '.config/pulse/cookie'));
+      }
+
+      try {
+        const sshdConf = readFileSync('/etc/ssh/sshd_config', 'utf-8');
+        state.forceCommandConfigured = sshdConf.includes('Match User agentvibes-receiver');
+      } catch { /* no read access */ }
+
+      try {
+        const modules = execSync('pactl list modules short 2>/dev/null', { timeout: 3000, stdio: 'pipe' }).toString();
+        state.tcpModuleLoaded = modules.includes('module-native-protocol-tcp');
+      } catch { /* pactl not available */ }
     }
-
-    // Check PipeWire TCP config
-    const home = homedir();
-    state.pipewireTcpConfigured = existsSync(
-      path.join(home, '.config/pipewire/pipewire-pulse.conf.d/agentvibes-tcp.conf'));
-    state.flatVolumesDisabled = existsSync(
-      path.join(home, '.config/pipewire/pipewire-pulse.conf.d/no-flat-volumes.conf'));
-
-    // Check pulse cookie shared
-    if (receiverHome) {
-      state.pulseCookieShared = existsSync(path.join(receiverHome, '.config/pulse/cookie'));
-    }
-
-    // Check ForceCommand in sshd_config
-    try {
-      const sshdConf = readFileSync('/etc/ssh/sshd_config', 'utf-8');
-      state.forceCommandConfigured = sshdConf.includes('Match User agentvibes-receiver');
-    } catch { /* no read access */ }
-
-    // Check TCP module loaded
-    try {
-      const modules = execSync('pactl list modules short 2>/dev/null', { timeout: 3000, stdio: 'pipe' }).toString();
-      state.tcpModuleLoaded = modules.includes('module-native-protocol-tcp');
-    } catch { /* pactl not available */ }
   } catch { /* detection failed, assume not set up */ }
   return state;
 }
@@ -158,14 +205,30 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
   const detectedIp = networkInfo.tailscaleIp || networkInfo.localIp || '';
   const detectedPort = networkInfo.sshPort || '22';
   const state = _detectSetupState();
-  const allReady = state.receiverUserExists && state.receiverScriptInstalled &&
-    state.voiceModelsPresent && state.pipewireTcpConfigured &&
-    state.flatVolumesDisabled && state.pulseCookieShared &&
-    state.forceCommandConfigured && state.tcpModuleLoaded;
+  const isWin = state.isWindows;
+  const allReady = isWin
+    ? (state.receiverScriptInstalled && state.voiceModelsPresent &&
+       state.sshdRunning && state.forceCommandConfigured)
+    : (state.receiverUserExists && state.receiverScriptInstalled &&
+       state.voiceModelsPresent && state.pipewireTcpConfigured &&
+       state.flatVolumesDisabled && state.pulseCookieShared &&
+       state.forceCommandConfigured && state.tcpModuleLoaded);
 
   // Build status header showing what's detected
   const check = (ok) => ok ? '[OK]' : '[--]';
-  const statusLines = [
+  const statusLines = isWin ? [
+    '============================================================',
+    'SETUP STATUS — Windows (auto-detected)',
+    '============================================================',
+    '',
+    '  ' + check(state.sshdRunning) + ' OpenSSH Server running',
+    '  ' + check(state.forceCommandConfigured) + ' SSH ForceCommand configured',
+    '  ' + check(state.receiverScriptInstalled) + ' Receiver script (play-remote.ps1)',
+    '  ' + check(state.voiceModelsPresent) + ' Piper voice models installed',
+    '  ' + check(state.piperInstalled) + ' Piper TTS installed',
+    '  ' + check(state.ffmpegInstalled) + ' ffmpeg installed (background music)',
+    '',
+  ] : [
     '============================================================',
     'SETUP STATUS (auto-detected)',
     '============================================================',
@@ -182,6 +245,44 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
   ];
 
   if (allReady) {
+    if (isWin) {
+      return [
+        'Press [A] to copy all text to your clipboard.',
+        '',
+        ...statusLines,
+        'All checks passed! Windows receiver is ready.',
+        '',
+        '============================================================',
+        'SERVER SETUP (the remote machine running Claude)',
+        '============================================================',
+        '',
+        '  1. Add SSH alias (~/.ssh/config on the server):',
+        '',
+        '     Host <RECEIVER_NAME>',
+        '       HostName ' + (detectedIp || '<RECEIVER_IP>'),
+        '       Port 45123',
+        '       User ' + (process.env.USERNAME || '<WINDOWS_USER>'),
+        '       IdentityFile ~/.ssh/id_ed25519',
+        '',
+        '  2. Tell AgentVibes where to send TTS:',
+        '     echo "<RECEIVER_NAME>" > .claude/ssh-remote-host.txt',
+        '',
+        '  3. Switch to ssh-remote provider:',
+        '     echo "ssh-remote" > .claude/tts-provider.txt',
+        '',
+        '',
+        '============================================================',
+        'VERIFICATION',
+        '============================================================',
+        '',
+        'From the server:',
+        '  echo \'{"text":"Hello","voice":"en_US-lessac-medium"}\' \\',
+        '    | base64 | xargs ssh <RECEIVER_NAME>',
+        '',
+        'Check log: type %USERPROFILE%\\.agentvibes\\receiver.log',
+        '',
+      ].join('\n');
+    }
     return [
       'Press [A] to copy all text to your clipboard.',
       '',
@@ -191,87 +292,167 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
       '',
       '',
       '============================================================',
-      'BEFORE YOU BEGIN — Ask the user for these values:',
-      '============================================================',
-      '',
-      '  RECEIVER_IP:   The receiver machine IP or Tailscale hostname',
-      detectedIp ? '                (detected: ' + detectedIp + ' — ask user to confirm)' : '                (could not auto-detect — user must provide)',
-      '  RECEIVER_PORT: The SSH port on the receiver machine',
-      '                (detected: ' + detectedPort + ' — ask user to confirm)',
-      '  RECEIVER_NAME: SSH alias name (default: my-receiver)',
-      '  TTS_PROVIDER:  Which TTS engine on the receiver?',
-      '                Options: piper (default, Linux), soprano (neural TTS, any platform),',
-      '                macos (macOS say), windows-sapi (Windows SAPI)',
-      '',
-      'Replace <RECEIVER_IP>, <RECEIVER_PORT>, <RECEIVER_NAME>,',
-      'and <TTS_PROVIDER> in commands below with user-provided values.',
-      '',
-      '',
-      '============================================================',
       'SERVER SETUP (the remote machine running Claude)',
       '============================================================',
       'Sender hook: .claude/hooks/play-tts-ssh-remote.sh',
-      'Config file: .agentvibes/config/agentvibes.json',
-      '',
-      'Run these steps on the remote server that needs TTS.',
       '',
       '1. Add an SSH alias for the receiver (~/.ssh/config):',
       '',
       '     Host <RECEIVER_NAME>',
       '       HostName <RECEIVER_IP>',
-      '       Port <RECEIVER_PORT>',
+      detectedIp ? '       # detected: ' + detectedIp : '',
+      '       Port ' + detectedPort,
       '       User agentvibes-receiver',
       '       IdentityFile ~/.ssh/id_ed25519',
       '',
       '2. Tell AgentVibes where to send TTS:',
-      '',
       '     echo "<RECEIVER_NAME>" > .claude/ssh-remote-host.txt',
       '',
-      '3. Switch to the ssh-remote provider:',
-      '',
-      '     # In .agentvibes/config/agentvibes.json set "provider": "ssh-remote"',
-      '     # Or run: agentvibes provider switch ssh-remote',
+      '3. Switch to ssh-remote provider:',
+      '     echo "ssh-remote" > .claude/tts-provider.txt',
       '',
       '',
       '============================================================',
-      'AUDIBLE VERIFICATION TESTS',
+      'VERIFICATION',
       '============================================================',
       '',
-      'Test 1 — Local audio (no SSH, verifies audio pipeline):',
+      'Test from server:',
+      '  echo \'{"text":"Hello","voice":"en_US-lessac-medium"}\' \\',
+      '    | base64 | xargs ssh <RECEIVER_NAME>',
       '',
-      '  sudo -u agentvibes-receiver \\',
-      '    PULSE_SERVER=tcp:127.0.0.1:34567 \\',
-      '    paplay /usr/share/sounds/freedesktop/stereo/bell.oga',
-      '  # You should hear a bell sound',
-      '',
-      'Test 2 — Local TTS pipeline (no SSH):',
-      '',
-      '  sudo -u agentvibes-receiver \\',
-      '    PULSE_SERVER=tcp:127.0.0.1:34567 \\',
-      '    /home/agentvibes-receiver/.agentvibes/play-remote.sh \\',
-      '    "$(echo \'{"text":"Receiver setup verified","voice":"en_US-lessac-medium"}\' | base64)"',
-      '  # You should hear spoken text',
-      '',
-      'Test 3 — End-to-end from server (uses tmux for split view):',
-      '',
-      '  tmux new-session -d -s av-test \\',
-      '    "tail -f /home/agentvibes-receiver/.agentvibes/receiver.log"',
-      '  tmux split-window -h -t av-test \\',
-      '    "ssh <your-server>"',
-      '  tmux attach -t av-test',
-      '',
-      '  Then in the server pane:',
-      '    ssh <RECEIVER_NAME> "$(echo \'{"text":"Hello from server","voice":"en_US-lessac-medium"}\' | base64)"',
-      '  # Left pane: log shows RECEIVED -> PLAYING -> DONE',
-      '  # Speakers: you hear the TTS audio',
-      '',
-      'Test 4 — Full AgentVibes pipeline from server:',
-      '  bash .claude/hooks/play-tts.sh "End to end test complete"',
+      'Full pipeline:',
+      '  bash .claude/hooks/play-tts.sh "Receiver test complete"',
       '',
     ].join('\n');
   }
 
   // Full setup instructions (when not everything is detected)
+
+  // ---- WINDOWS INSTRUCTIONS ----
+  if (isWin) {
+    return [
+      'Press [A] to copy all text to your clipboard.',
+      'Give this to an AI agent on your server to set up the sender.',
+      '',
+      ...statusLines,
+      '',
+      '============================================================',
+      'BEFORE YOU BEGIN — Ask the user for these values:',
+      '============================================================',
+      '',
+      '  RECEIVER_IP:   This Windows machine\'s Tailscale IP',
+      detectedIp ? '                (detected: ' + detectedIp + ' — ask user to confirm)' : '                (run: tailscale ip -4)',
+      '  RECEIVER_PORT: 45123 (hardened non-standard port)',
+      '  RECEIVER_NAME: SSH alias name (default: my-receiver)',
+      '  WINDOWS_USER:  Windows username (e.g. Paul)',
+      '',
+      '',
+      '============================================================',
+      'WHAT IS SSH RECEIVER?',
+      '============================================================',
+      '',
+      'AgentVibes SSH Receiver lets remote servers (cloud VPS, dev',
+      'servers) send TTS audio to this Windows machine. The server',
+      'sends text + voice config over SSH, and this machine generates',
+      'and plays audio locally through its speakers.',
+      '',
+      'Server AI  --[SSH/Tailscale]-->  Windows  --[Piper+ffmpeg]-->  Speakers',
+      '',
+      'Security: SSH is hardened with key-only auth, ForceCommand',
+      '(no shell access), non-standard port, Tailscale-only binding.',
+      '',
+      '',
+      '============================================================',
+      'PART 1: WINDOWS RECEIVER SETUP (this machine)',
+      '============================================================',
+      'Setup script: setup-ssh-receiver.ps1',
+      'Receiver script: templates/agentvibes-receiver.ps1',
+      '',
+      'Step 1: Install prerequisites (if not already done)',
+      '',
+      '  a) Install Tailscale (for secure networking):',
+      '     winget install --id Tailscale.Tailscale -e',
+      '     Then sign in with your Tailscale account.',
+      '',
+      '  b) Install OpenSSH Server (admin PowerShell):',
+      '     Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0',
+      '',
+      '  c) Install Piper TTS and ffmpeg (if not installed):',
+      '     Run the AgentVibes installer: node bin/agent-vibes install',
+      '     It will check and install ffmpeg automatically.',
+      '',
+      'Step 2: Run the automated setup script (admin PowerShell)',
+      '',
+      '  cd C:\\path\\to\\AgentVibes',
+      '  powershell -ExecutionPolicy Bypass -File setup-ssh-receiver.ps1',
+      '',
+      '  This script handles everything:',
+      '    - Deploys hardened sshd_config (port 45123, key-only, ForceCommand)',
+      '    - Installs receiver script to ~/.agentvibes/play-remote.ps1',
+      '    - Adds firewall rule (Tailscale IPs only)',
+      '    - Restarts sshd',
+      '',
+      'Step 3: Add the sender\'s SSH public key',
+      '',
+      '  Get the public key from your server:',
+      '    ssh your-server "cat ~/.ssh/id_ed25519.pub"',
+      '',
+      '  Then in admin PowerShell on this Windows machine:',
+      '    Set-Content -Path "C:\\ProgramData\\ssh\\administrators_authorized_keys" `',
+      '      -Value "paste-the-public-key-here"',
+      '    cmd /c \'icacls C:\\ProgramData\\ssh\\administrators_authorized_keys `',
+      '      /inheritance:r /grant "SYSTEM:F" /grant "BUILTIN\\Administrators:F"\'',
+      '    Restart-Service sshd',
+      '',
+      'Step 4: Security hardening details',
+      '',
+      '  The setup script configures:',
+      '    Port:          45123 (non-standard)',
+      '    ListenAddress:  Tailscale IP only (not 0.0.0.0)',
+      '    Auth:          SSH key only (no passwords)',
+      '    ForceCommand:  Can ONLY run the receiver script (no shell)',
+      '    Forwarding:    All disabled (TCP, agent, X11, tunnel)',
+      '    Firewall:      Port 45123 from 100.0.0.0/8 (Tailscale) only',
+      '',
+      '',
+      '============================================================',
+      'PART 2: SERVER SETUP (the remote machine running Claude)',
+      '============================================================',
+      '',
+      '  1. Add SSH alias (~/.ssh/config on the server):',
+      '',
+      '     Host <RECEIVER_NAME>',
+      '       HostName <RECEIVER_IP>',
+      '       Port 45123',
+      '       User <WINDOWS_USER>',
+      '       IdentityFile ~/.ssh/id_ed25519',
+      '',
+      '  2. Tell AgentVibes where to send TTS:',
+      '     echo "<RECEIVER_NAME>" > .claude/ssh-remote-host.txt',
+      '',
+      '  3. Switch to ssh-remote provider:',
+      '     echo "ssh-remote" > .claude/tts-provider.txt',
+      '',
+      '',
+      '============================================================',
+      'PART 3: VERIFICATION',
+      '============================================================',
+      '',
+      'Test from the server:',
+      '',
+      '  echo \'{"text":"Hello from server","voice":"en_US-lessac-medium"}\' \\',
+      '    | base64 | xargs ssh <RECEIVER_NAME>',
+      '',
+      '  Expected: Audio plays on Windows speakers.',
+      '  Check log: type %USERPROFILE%\\.agentvibes\\receiver.log',
+      '',
+      'Test full AgentVibes pipeline:',
+      '  bash .claude/hooks/play-tts.sh "Receiver test complete"',
+      '',
+    ].join('\n');
+  }
+
+  // ---- LINUX/macOS INSTRUCTIONS (original) ----
   return [
     'Press [A] to copy all text to your clipboard.',
     'Give this to an AI agent on your server AND local machine',
@@ -1074,22 +1255,21 @@ export function createReceiverTab(screen, services) {
   box.key(['a', 'A'], () => {
     // Copy all visible content to clipboard — strip blessed markup tags
     const text = contentBox.getContent().replace(/\{[^}]*\}/g, '');
-    const result = spawnSync('xclip', ['-selection', 'clipboard'], {
-      input: text,
-      timeout: 3000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    if (result.status === 0) {
-      _showFeedback('{green-fg}Copied to clipboard!{/green-fg}');
-    } else {
-      // Fallback: try xsel, wl-copy, pbcopy
-      for (const [cmd, args] of [['xsel', ['--clipboard', '--input']], ['wl-copy', []], ['pbcopy', []]]) {
-        const r = spawnSync(cmd, args, { input: text, timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] });
-        if (r.status === 0) {
-          _showFeedback('{green-fg}Copied to clipboard!{/green-fg}');
-          return;
-        }
+    // Try platform-appropriate clipboard command
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    const clipCmds = _isWin
+      ? [['clip', []]]
+      : [['xclip', ['-selection', 'clipboard']], ['xsel', ['--clipboard', '--input']], ['wl-copy', []], ['pbcopy', []]];
+    let copied = false;
+    for (const [cmd, args] of clipCmds) {
+      const r = spawnSync(cmd, args, { input: text, timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] });
+      if (r.status === 0) {
+        _showFeedback('{green-fg}Copied to clipboard!{/green-fg}');
+        copied = true;
+        break;
       }
+    }
+    if (!copied) {
       // Last resort: save to file
       const filePath = path.join(AGENTVIBES_DIR, 'receiver-clipboard.txt');
       try {

@@ -165,3 +165,4 @@ docs/personality-preview-phrases.md
 
 # Test infrastructure (not part of core package)
 test/installer/
+fix-ssh-keys*.ps1

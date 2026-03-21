@@ -38,6 +38,11 @@ $VoicesDir = "$UserClaudeDir\piper-voices"
 $PiperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
 if (-not (Test-Path $PiperExe)) {
     $found = Get-Command piper.exe -ErrorAction SilentlyContinue
+    if (-not $found) {
+        # PATH may be stale (SSH sessions inherit minimal PATH); refresh from registry
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $found = Get-Command piper.exe -ErrorAction SilentlyContinue
+    }
     if ($found) { $PiperExe = $found.Source }
 }
 
@@ -63,15 +68,15 @@ if ($VoiceOverride) {
 }
 elseif (Test-Path $VoiceFile) {
     $VoiceName = (Get-Content $VoiceFile -Raw).Trim()
-    # Strip display name suffix (e.g. "en_US-libritts-high::Bella-9" -> "en_US-libritts-high")
-    # and extract speaker ID if present
-    if ($VoiceName -match '::') {
-        $parts = $VoiceName -split '::'
-        $VoiceName = $parts[0]
-        # Extract speaker number from display name (e.g. "Bella-9" -> speaker 9)
-        if ($parts.Length -ge 2 -and $parts[1] -match '-(\d+)$') {
-            $env:PIPER_SPEAKER = $Matches[1]
-        }
+}
+
+# Strip display name suffix (e.g. "en_US-libritts-high::Bella-9" -> "en_US-libritts-high")
+# and extract speaker ID if present (works for both override and file)
+if ($VoiceName -match '::') {
+    $parts = $VoiceName -split '::'
+    $VoiceName = $parts[0]
+    if ($parts.Length -ge 2 -and $parts[1] -match '-(\d+)$') {
+        $env:PIPER_SPEAKER = $Matches[1]
     }
 }
 
