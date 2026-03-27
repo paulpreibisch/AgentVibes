@@ -492,7 +492,14 @@ export function createAgentsTab(screen, services) {
   function _killPreview() {
     _stopSpinner();
     if (_playingProcess) {
-      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      try {
+        // On Windows, negative-PID process group kill is unsupported
+        if (process.platform === 'win32') {
+          _playingProcess.kill();
+        } else {
+          process.kill(-_playingProcess.pid, 'SIGTERM');
+        }
+      } catch {}
       _playingProcess = null;
     }
   }
@@ -787,7 +794,13 @@ export function createAgentsTab(screen, services) {
 
     function _killVP() {
       if (_previewProc) {
-        try { process.kill(-_previewProc.pid, 'SIGTERM'); } catch {}
+        try {
+          if (process.platform === 'win32') {
+            _previewProc.kill();
+          } else {
+            process.kill(-_previewProc.pid, 'SIGTERM');
+          }
+        } catch {}
         _previewProc = null;
       }
       _previewVoiceId = null;
@@ -898,6 +911,8 @@ export function createAgentsTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); screen.render(); return; }
       _killVP();
 
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
       const _ms = parseMultiSpeaker(voiceId);
       const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
       const safeBase = path.resolve(PIPER_VOICES_DIR);
@@ -906,10 +921,24 @@ export function createAgentsTab(screen, services) {
       const tempWav = _secureTempWav('vp');
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
+      // Resolve piper binary (on Windows, find piper.exe)
+      let _piperBin = 'piper';
+      if (_isWin) {
+        const _lad = process.env.LOCALAPPDATA ||
+          (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+        if (_lad) {
+          const _ep = path.join(_lad, 'Programs', 'Piper', 'piper.exe');
+          if (fs.existsSync(_ep)) _piperBin = _ep;
+        }
+      }
+
       const args = ['--model', voicePath, '--output_file', tempWav];
       if (_ms.speakerId != null) args.push('--speaker', String(_ms.speakerId));
-      const piper = spawn('piper', args, {
-        stdio: ['pipe', 'ignore', 'ignore'], detached: true, env: _spawnEnv,
+      const piper = spawn(_piperBin, args, {
+        stdio: ['pipe', 'ignore', 'ignore'],
+        detached: !_isWin,
+        windowsHide: true,
+        env: _spawnEnv,
       });
       piper.stdin.write(phrase + '\n');
       piper.stdin.end();
@@ -926,7 +955,12 @@ export function createAgentsTab(screen, services) {
         if (code !== 0) { _previewProc = null; _previewVoiceId = null; return; }
         const wp = detectWavPlayer(_spawnEnv);
         if (!wp) return;
-        const pp = spawn(wp.bin, wp.args(tempWav), { stdio: 'ignore', detached: true, env: _spawnEnv });
+        const pp = spawn(wp.bin, wp.args(tempWav), {
+          stdio: 'ignore',
+          detached: !_isWin,
+          windowsHide: true,
+          env: _spawnEnv,
+        });
         _previewProc = pp;
         if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}{/bright-cyan-fg}`); screen.render(); }
         pp.on('exit', () => {
@@ -1039,30 +1073,112 @@ export function createAgentsTab(screen, services) {
     const pretext = profile.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
     const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`;
 
+    const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
+    if (isWindows) {
+      // On Windows, synthesize with piper.exe directly then play the wav,
+      // avoiding bash/wsl.exe which opens a visible console window.
+      _sampleWithPiperDirect(gen, voiceId, phrase);
+    } else {
+      // On Linux/macOS/WSL, use play-tts.sh
+      const _spawnEnv = buildAudioEnv();
+      const scriptDir = path.join(_projectRoot, '.claude', 'hooks');
+      const plainScript = path.join(scriptDir, 'play-tts.sh');
+      const args = [plainScript, phrase];
+      if (voiceId) args.push(voiceId);
+
+      const proc = spawn('bash', args, {
+        stdio: ['ignore', 'ignore', 'ignore'],
+        detached: true,
+        env: { ..._spawnEnv },
+        cwd: _projectRoot,
+      });
+      _playingProcess = proc;
+
+      proc.on('exit', () => {
+        if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
+      });
+      proc.on('error', () => {
+        if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
+      });
+    }
+  }
+
+  /** Windows-native sample: piper.exe → wav → detectWavPlayer */
+  function _sampleWithPiperDirect(gen, voiceId, phrase) {
     const _spawnEnv = buildAudioEnv();
-    const scriptDir = path.join(_projectRoot, '.claude', 'hooks');
-    const plainScript = path.join(scriptDir, 'play-tts.sh');
 
-    // Use play-tts.sh directly for reliable sample playback.
-    // Voice is passed as CLI arg, pretext is prepended to text.
-    const args = [plainScript, phrase];
-    if (voiceId) args.push(voiceId);
+    // Resolve piper binary
+    let piperBin = 'piper';
+    const localAppData = process.env.LOCALAPPDATA ||
+      (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+    if (localAppData) {
+      const exePath = path.join(localAppData, 'Programs', 'Piper', 'piper.exe');
+      if (fs.existsSync(exePath)) piperBin = exePath;
+    }
 
-    const env = { ..._spawnEnv };
+    // Resolve voice model path
+    const ms = parseMultiSpeaker(voiceId);
+    const voicePath = path.resolve(PIPER_VOICES_DIR, ms.model + '.onnx');
+    const safeBase = path.resolve(PIPER_VOICES_DIR);
+    if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) {
+      _stopSpinner();
+      return;
+    }
 
-    const proc = spawn('bash', args, {
-      stdio: ['ignore', 'ignore', 'ignore'],
-      detached: true,
-      env,
-      cwd: _projectRoot,
+    const tempWav = path.join(os.tmpdir(), `agentvibes-agent-preview-${Date.now()}.wav`);
+    const piperArgs = ['--model', voicePath, '--output_file', tempWav];
+    if (ms.speakerId != null) piperArgs.push('--speaker', String(ms.speakerId));
+
+    const piper = spawn(piperBin, piperArgs, {
+      stdio: ['pipe', 'ignore', 'ignore'],
+      detached: false,
+      windowsHide: true,
+      env: _spawnEnv,
     });
-    _playingProcess = proc;
+    piper.stdin.write(phrase + '\n');
+    piper.stdin.end();
+    _playingProcess = piper;
 
-    proc.on('exit', () => {
-      if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
+    piper.on('exit', (code) => {
+      if (gen !== _playGeneration) {
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
+      if (code !== 0) {
+        _playingProcess = null;
+        _stopSpinner();
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
+
+      // Play the synthesized wav
+      const wavPlayer = detectWavPlayer(_spawnEnv);
+      if (!wavPlayer) {
+        _playingProcess = null;
+        _stopSpinner();
+        try { fs.unlinkSync(tempWav); } catch {}
+        return;
+      }
+      const playProc = spawn(wavPlayer.bin, wavPlayer.args(tempWav), {
+        stdio: 'ignore',
+        detached: false,
+        windowsHide: true,
+        env: _spawnEnv,
+      });
+      _playingProcess = playProc;
+
+      playProc.on('exit', () => {
+        if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
+        try { fs.unlinkSync(tempWav); } catch {}
+      });
+      playProc.on('error', () => {
+        if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
+        try { fs.unlinkSync(tempWav); } catch {}
+      });
     });
 
-    proc.on('error', () => {
+    piper.on('error', () => {
       if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); }
     });
   }
@@ -1079,32 +1195,75 @@ export function createAgentsTab(screen, services) {
     return a;
   }
 
+  // Common first-name → gender map for gender-aware auto-assign.
+  // Only needs to cover names likely used as BMAD agent display names.
+  const _NAME_GENDER = {
+    // Female
+    amelia: 'Female', amy: 'Female', anna: 'Female', betty: 'Female',
+    claire: 'Female', dana: 'Female', emma: 'Female', faye: 'Female',
+    grace: 'Female', heather: 'Female', ivy: 'Female', jane: 'Female',
+    jenny: 'Female', julia: 'Female', kate: 'Female', laura: 'Female',
+    lily: 'Female', maria: 'Female', mary: 'Female', nina: 'Female',
+    olivia: 'Female', paige: 'Female', rachel: 'Female', sally: 'Female',
+    sara: 'Female', sarah: 'Female', sophie: 'Female', tina: 'Female',
+    wendy: 'Female', zoe: 'Female',
+    // Male
+    alan: 'Male', barry: 'Male', bob: 'Male', carl: 'Male',
+    charlie: 'Male', dan: 'Male', david: 'Male', eric: 'Male',
+    frank: 'Male', george: 'Male', hank: 'Male', jack: 'Male',
+    james: 'Male', joe: 'Male', john: 'Male', kevin: 'Male',
+    leo: 'Male', mark: 'Male', max: 'Male', murat: 'Male',
+    nick: 'Male', oscar: 'Male', paul: 'Male', ray: 'Male',
+    ryan: 'Male', saif: 'Male', sam: 'Male', steve: 'Male',
+    tom: 'Male', victor: 'Male', winston: 'Male', zach: 'Male',
+  };
+
+  /** Infer agent gender from display name (first word). */
+  function _inferAgentGender(agent) {
+    const firstName = (agent.displayName || '').split(/[\s(]/)[0].toLowerCase();
+    return _NAME_GENDER[firstName] || null;
+  }
+
   function _autoAssignVoices() {
     const installed = scanInstalledVoices();
     if (installed.length === 0) return false;
 
-    // Separate by gender for variety
-    const females = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Female'));
-    const males   = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Male'));
-    const others  = _shuffleArray(installed.filter(v => !['Male', 'Female'].includes(getVoiceMeta(v).gender)));
+    // Separate voices by gender
+    const femaleVoices = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Female'));
+    const maleVoices   = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Male'));
+    const otherVoices  = _shuffleArray(installed.filter(v => !['Male', 'Female'].includes(getVoiceMeta(v).gender)));
 
-    // Interleave female/male for natural variety, then others
-    const pool = [];
-    const maxLen = Math.max(females.length, males.length);
-    for (let i = 0; i < maxLen; i++) {
-      if (i < females.length) pool.push(females[i]);
-      if (i < males.length)   pool.push(males[i]);
+    // Separate agents by gender
+    const femaleAgents = _agents.filter(a => _inferAgentGender(a) === 'Female');
+    const maleAgents   = _agents.filter(a => _inferAgentGender(a) === 'Male');
+    const otherAgents  = _agents.filter(a => !_inferAgentGender(a));
+
+    const usedVoices = new Set();
+
+    // Assign matching-gender voices first, then fall back to any available
+    function assignGroup(agents, preferredPool, fallbackPools) {
+      const allPools = [preferredPool, ...fallbackPools];
+      agents.forEach(agent => {
+        let voice = null;
+        for (const pool of allPools) {
+          voice = pool.find(v => !usedVoices.has(v));
+          if (voice) break;
+        }
+        // If all unique voices exhausted, reuse from preferred pool
+        if (!voice && preferredPool.length > 0) {
+          voice = preferredPool[usedVoices.size % preferredPool.length];
+        }
+        if (voice) {
+          usedVoices.add(voice);
+          voiceStore.setAgentProfile(agent.id, { voice });
+        }
+      });
     }
-    pool.push(...others);
 
-    const used = new Set();
-    _agents.forEach((agent, i) => {
-      const voice = pool.find(v => !used.has(v)) ?? pool[i % pool.length];
-      if (voice) {
-        used.add(voice);
-        voiceStore.setAgentProfile(agent.id, { voice });
-      }
-    });
+    assignGroup(femaleAgents, femaleVoices, [otherVoices, maleVoices]);
+    assignGroup(maleAgents,   maleVoices,   [otherVoices, femaleVoices]);
+    assignGroup(otherAgents,  otherVoices,   [maleVoices, femaleVoices]);
+
     return true;
   }
 
