@@ -35,8 +35,8 @@ const COLORS = {
   activeFg:   '#00e5ff',  // Cyan — active voice
   favoriteFg: '#ffff00',  // Yellow — favorite star
   btnDefault: '#00695c',  // Teal — Voices tab buttons
-  btnFocus:   '#00e5ff',
-  btnFocusFg: '#000000',
+  btnFocus:   '#2e7d32',  // Green — focused/selected
+  btnFocusFg: '#ffffff',
   btnPress:   '#ff00ff',
   borderFg:   '#00897b',
   footerBg:   '#00695c',  // Teal — Voices tab footer
@@ -513,7 +513,7 @@ export function createVoicesTab(screen, services) {
     keys: true,
     style: {
       fg: COLORS.valueFg,
-      bg: '#1a237e',
+      bg: '#1a3a5c',
       focus: { bg: '#283593' },
     },
   });
@@ -549,7 +549,7 @@ export function createVoicesTab(screen, services) {
       fg: COLORS.labelFg,
       bg: COLORS.contentBg,
       border: { fg: COLORS.borderFg },
-      selected: { bg: '#1a237e', fg: COLORS.activeFg, bold: true },
+      selected: { bg: '#2e7d32', fg: '#ffffff', bold: true },
       item: { fg: COLORS.labelFg },
     },
   });
@@ -1006,7 +1006,7 @@ export function createVoicesTab(screen, services) {
       refreshDisplay();
       _showVoiceChangedNotice(displayName);
     });
-    const okGlobalBtn = _makeBtn('Save Globally & Locally', '#2e7d32', 18, 5, () => {
+    const okGlobalBtn = _makeBtn('Save Globally & Locally', '#1565c0', 18, 5, () => {
       _activateVoice(voiceId);
       _activateVoiceGlobal(voiceId);
       refreshDisplay();

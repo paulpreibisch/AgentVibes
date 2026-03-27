@@ -19,7 +19,7 @@ $VoiceSapiFile = "$ClaudeDir\tts-voice-sapi.txt"
 $VoicePiperFile = "$ClaudeDir\tts-voice-piper.txt"
 
 # Get active provider
-$ActiveProvider = "windows-sapi"
+$ActiveProvider = "sapi"
 if (Test-Path $ProviderFile) {
     $ActiveProvider = (Get-Content $ProviderFile -Raw).Trim()
 }
@@ -147,11 +147,11 @@ function Switch-Voice {
     $VoiceFile = ""
     $ValidVoices = @()
 
-    if ($ActiveProvider -eq "windows-sapi") {
+    if ($ActiveProvider -eq "sapi" -or $ActiveProvider -eq "windows-sapi") {
         $VoiceFile = $VoiceSapiFile
         $ValidVoices = Get-SAPIVoices
     }
-    elseif ($ActiveProvider -eq "windows-piper") {
+    elseif ($ActiveProvider -eq "piper" -or $ActiveProvider -eq "windows-piper") {
         $VoiceFile = $VoicePiperFile
         $ValidVoices = Get-PiperVoices
     }
@@ -174,7 +174,7 @@ function Switch-Voice {
 
 # Show current voice
 function Show-CurrentVoice {
-    $VoiceFile = if ($ActiveProvider -eq "windows-sapi") { $VoiceSapiFile } else { $VoicePiperFile }
+    $VoiceFile = if ($ActiveProvider -eq "sapi" -or $ActiveProvider -eq "windows-sapi") { $VoiceSapiFile } else { $VoicePiperFile }
     $CurrentVoice = Get-CurrentVoice $VoiceFile
 
     if ($CurrentVoice) {

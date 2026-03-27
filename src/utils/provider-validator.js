@@ -62,6 +62,7 @@ export async function validateProvider(providerName) {
       return await validatePiperInstallation();
     case 'macos':
       return await validateMacOSProvider();
+    case 'sapi':
     case 'windows-sapi':
       return await validateWindowsSAPI();
     case 'windows-piper':
@@ -542,8 +543,9 @@ export function getProviderDisplayName(providerName) {
     soprano: 'Soprano TTS',
     piper: 'Piper TTS',
     macos: 'macOS Say',
+    sapi: 'Windows SAPI',
     'windows-sapi': 'Windows SAPI',
-    'windows-piper': 'Windows Piper TTS'
+    'windows-piper': 'Piper TTS'
   };
 
   return names[providerName] || providerName;

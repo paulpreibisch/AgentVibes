@@ -70,19 +70,19 @@ const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 const COLORS = {
   contentBg:    '#0a0e1a',  // Near-black content background
-  sectionHdr:   '#7986cb',  // Light blue — section dividers
+  sectionHdr:   '#90caf9',  // Light blue — section dividers
   labelFg:      '#e3f2fd',  // Light blue text — labels
   valueFg:      '#ffff00',  // Yellow — current values
   btnDefault:   '#37474f',  // Dark slate — default button bg
-  btnFocus:     '#00e5ff',  // Cyan — focused button bg
-  btnFocusFg:   '#000000',  // Black — focused button text
+  btnFocus:     '#2e7d32',  // Green — focused/selected button bg
+  btnFocusFg:   '#ffffff',  // White — focused button text
   btnPress:     '#ff00ff',  // Magenta — pressed button bg
   btnChange:    '#37474f',  // Dark slate — Change buttons
   btnTest:      '#37474f',  // Dark slate — Test buttons
   btnEdit:      '#37474f',  // Dark slate — Edit buttons
   btnEnableOn:  '#37474f',  // Dark slate — Enabled toggle
   btnEnableOff: '#37474f',  // Dark slate — Disabled toggle
-  borderFg:     '#7986cb',  // Light blue — borders
+  borderFg:     '#90caf9',  // Light blue — borders
   footerBg:     '#2196f3',  // Blue — settings footer
   noticeFg:     '#90a4ae',  // Gray — stub notice text
 };
@@ -757,7 +757,7 @@ export function createSettingsTab(screen, services) {
       content: lbl, width: lbl.length, height: 1,
       top: 0, left: _xOff,
       keys: true, focusable: true,
-      style: { fg: '#00e5ff', bg: '#263238' },
+      style: { fg: 'bright-cyan', bg: '#263238' },
     });
     _subTabItemsMap[id] = item;
     _xOff += lbl.length;
@@ -771,7 +771,7 @@ export function createSettingsTab(screen, services) {
         item.style.bg = '#0288d1'; // light blue — active tab
         item.style.bold = true;
       } else {
-        item.style.fg = '#00e5ff';
+        item.style.fg = 'bright-cyan';
         item.style.bg = '#263238';
         item.style.bold = false;
       }
@@ -1054,7 +1054,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 3,
     left: 1,
-    content: '{#7986cb-fg} ⚡ Audio Effects {/#7986cb-fg}',
+    content: '{#90caf9-fg} ⚡ Audio Effects {/#90caf9-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1110,7 +1110,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 7,
     left: 1,
-    content: '{#7986cb-fg} 🎸 Background Music {/#7986cb-fg}',
+    content: '{#90caf9-fg} 🎸 Background Music {/#90caf9-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1302,7 +1302,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 8,
     left: 1,
-    content: '{#7986cb-fg} ✍️ Intro Text {/#7986cb-fg}',
+    content: '{#90caf9-fg} ✍️ Intro Text {/#90caf9-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1363,7 +1363,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 3,
     left: 2,
-    content: '{#7986cb-fg} 📡 Audio Destination {/#7986cb-fg}',
+    content: '{#90caf9-fg} 📡 Audio Destination {/#90caf9-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1492,7 +1492,7 @@ export function createSettingsTab(screen, services) {
     const current = configService.getConfig().audio_stream_mode ?? 'text';
     configService.set('audio_stream_mode', current === 'text' ? 'pulse' : 'text');
     refreshDisplay();
-  }, { bg: '#2e7d32' });  // green = recommended
+  }, { bg: '#1565c0' });  // blue — distinct from green focus
   audioStreamModeBtn.top = 7;
   audioStreamModeBtn.left = 64;
   audioStreamModeBtn.hide();
@@ -1516,7 +1516,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 11,
     left: 2,
-    content: '{#7986cb-fg} 💾 Config Storage {/#7986cb-fg}',
+    content: '{#90caf9-fg} 💾 Config Storage {/#90caf9-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1582,7 +1582,7 @@ export function createSettingsTab(screen, services) {
       refreshConfigDisplay();
       _showNotice(screen, 'Settings Saved');
     }, () => { _currentIdx = _buttons.indexOf(saveLocallyBtn); _focusButton(saveLocallyBtn); });
-  }, { bg: '#2e7d32' });   // green
+  }, { bg: '#1565c0' });   // blue — distinct from green focus
   saveLocallyBtn.bottom = 0;
   saveLocallyBtn.left = 46;
 
@@ -2081,7 +2081,7 @@ export function createSettingsTab(screen, services) {
       audioSshValue.setContent(audioAlias || '(none)');
       const streamMode = cfg.audio_stream_mode ?? 'text';
       audioStreamModeBtn.setContent(streamMode === 'pulse' ? 'Streaming Pulse Audio' : 'Streaming Text Only ✓');
-      audioStreamModeBtn.style.bg = streamMode === 'text' ? '#2e7d32' : COLORS.btnChange;
+      audioStreamModeBtn.style.bg = streamMode === 'text' ? '#1565c0' : COLORS.btnChange;
     } else {
       audioSshLabel.hide();
       audioSshValue.hide();
@@ -2252,14 +2252,14 @@ function _createButton(parent, screen, label, COLORS, onClick, opts = {}) {
 const _ALL_PROVIDERS = [
   { id: 'piper',        name: 'Piper TTS',    platforms: ['linux', 'darwin', 'win32'], desc: 'High-quality local neural TTS' },
   { id: 'soprano',      name: 'Soprano',      platforms: ['linux', 'darwin'],          desc: 'Ultra-fast neural TTS (single voice)' },
-  { id: 'windows-sapi', name: 'Windows SAPI', platforms: ['win32'],                   desc: 'Windows built-in text-to-speech' },
+  { id: 'sapi',         name: 'Windows SAPI', platforms: ['win32'],                   desc: 'Windows built-in text-to-speech' },
   { id: 'macos',        name: 'Mac Say',      platforms: ['darwin'],                  desc: 'macOS built-in text-to-speech' },
 ];
 
 const _INSTALL_CMDS = {
   piper:          ['pip install piper-tts', 'OR:   pipx install piper-tts', '', 'Voices are downloaded separately:', 'Run: agentvibes install  (then choose Piper)'],
   soprano:        ['pip install soprano-tts', 'OR:   pipx install soprano-tts', '', 'Keep model loaded for fast synthesis:', 'soprano-webui'],
-  'windows-sapi': ['Built-in on Windows — no install required.', 'Only works in a native Windows shell,', 'not inside WSL. Use piper or soprano in WSL.'],
+  sapi:           ['Built-in on Windows — no install required.', 'Only works in a native Windows shell,', 'not inside WSL. Use piper or soprano in WSL.'],
   macos:          ['Built-in on macOS — no install required.', 'The say command ships with every Mac.'],
 };
 
@@ -2354,7 +2354,7 @@ function _openProviderPicker(screen, providerService, onSelect, onClose) {
         _close(); onSelect(prov.id);
       } else {
         const lines = _INSTALL_CMDS[prov.id] ?? ['No instructions available.'];
-        instrTitle.setContent(`{#7986cb-fg}Install — ${prov.name}:{/#7986cb-fg}`);
+        instrTitle.setContent(`{#90caf9-fg}Install — ${prov.name}:{/#90caf9-fg}`);
         instrContent.setContent(lines.map(l => l ? `{#00e5ff-fg}${l}{/#00e5ff-fg}` : '').join('\n'));
         screen.render();
       }
@@ -2369,7 +2369,7 @@ function _openProviderPicker(screen, providerService, onSelect, onClose) {
 
   const instrTitle = blessed.text({
     parent: modal, top: 11, left: 1, width: 66, tags: true,
-    content: '{#7986cb-fg}Install instructions — click Install beside a provider:{/#7986cb-fg}',
+    content: '{#90caf9-fg}Install instructions — click Install beside a provider:{/#90caf9-fg}',
     style: { bg: COLORS.contentBg },
   });
   const instrContent = blessed.text({
@@ -2500,7 +2500,7 @@ function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
   const okBtn = _createButton(modal, screen, 'OK — Save', COLORS, () => {
     _close();
     onConfirm();
-  }, { bg: '#2e7d32' });
+  }, { bg: '#1565c0' });
   okBtn.top  = btnRow;
   okBtn.left = midX + 2;
 
@@ -2951,7 +2951,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
       fg: COLORS.labelFg,
       bg: COLORS.contentBg,
       border: { fg: COLORS.borderFg },
-      selected: { bg: '#1a237e', fg: '#00e5ff', bold: true },
+      selected: { bg: '#2e7d32', fg: '#ffffff', bold: true },
       item: { fg: COLORS.labelFg },
     },
   });
@@ -3362,7 +3362,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     keys: true,
     style: {
       fg: COLORS.valueFg,
-      bg: '#1a237e',
+      bg: '#1a3a5c',
       focus: { bg: '#283593' },
     },
   });
@@ -3372,7 +3372,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     parent: modal,
     top: 2,
     left: 6,
-    content: `{#7986cb-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#7986cb-fg}`,
+    content: `{#90caf9-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#90caf9-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -3393,7 +3393,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
       fg: COLORS.labelFg,
       bg: COLORS.contentBg,
       border: { fg: COLORS.borderFg },
-      selected: { bg: '#1a237e', fg: '#00e5ff', bold: true },
+      selected: { bg: '#2e7d32', fg: '#ffffff', bold: true },
       item: { fg: COLORS.labelFg },
     },
   });
@@ -3403,7 +3403,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     parent: modal,
     bottom: 5,
     left: 2,
-    content: `{#7986cb-fg}── Voice Info ${'─'.repeat(50)}{/#7986cb-fg}`,
+    content: `{#90caf9-fg}── Voice Info ${'─'.repeat(50)}{/#90caf9-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });

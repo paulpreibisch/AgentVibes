@@ -47,7 +47,7 @@ const COLORS = {
   valueFg:    '#ffff00',
   activeFg:   '#ce93d8',
   btnDefault: '#6a1b9a',
-  btnFocus:   '#9c27b0',
+  btnFocus:   '#2e7d32',  // Green — focused/selected
   btnFocusFg: '#ffffff',
   btnPress:   '#ff00ff',
   borderFg:   '#9c27b0',
@@ -628,8 +628,8 @@ export function createAgentsTab(screen, services) {
         style: {
           bg: COLORS.btnDefault,
           fg: 'white',
-          focus: { bg: '#00e5ff', fg: '#000000', bold: true },
-          hover: { bg: '#00e5ff', fg: '#000000', bold: true },
+          focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+          hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         },
       });
       btn.on('focus', () => {
@@ -825,7 +825,7 @@ export function createAgentsTab(screen, services) {
     const vpSearch = blessed.textbox({
       parent: vpModal, top: 1, left: 11, width: 40, height: 1,
       inputOnFocus: true, keys: true,
-      style: { fg: COLORS.valueFg, bg: '#1a237e', focus: { bg: '#283593' } },
+      style: { fg: COLORS.valueFg, bg: '#1a3a5c', focus: { bg: '#245a80' } },
     });
 
     // Column header
@@ -833,7 +833,7 @@ export function createAgentsTab(screen, services) {
     const COL_G = 10;
     blessed.text({
       parent: vpModal, top: 2, left: 6, tags: true,
-      content: `{#7986cb-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/#7986cb-fg}`,
+      content: `{#90caf9-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/#90caf9-fg}`,
       style: { bg: COLORS.contentBg },
     });
 
@@ -845,7 +845,7 @@ export function createAgentsTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: COLORS.borderFg },
-        selected: { bg: '#1a237e', fg: '#00e5ff', bold: true },
+        selected: { bg: '#2e7d32', fg: '#ffffff', bold: true },
         item: { fg: COLORS.labelFg },
       },
     });

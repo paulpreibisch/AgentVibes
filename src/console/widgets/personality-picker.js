@@ -59,8 +59,8 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
   const currentIdx = Math.max(0, PERSONALITIES.indexOf(current));
 
   const COLORS = {
-    btnFocus: '#00e5ff',
-    btnFocusFg: '#000000',
+    btnFocus: '#2e7d32',
+    btnFocusFg: '#ffffff',
   };
 
   const list = blessed.list({

@@ -10,7 +10,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, chmodSync, unlinkSync, watchFile, unwatchFile } from 'node:fs';
-import { execSync, spawnSync } from 'node:child_process';
+import { execSync, spawnSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -962,6 +962,81 @@ export function createReceiverTab(screen, services) {
     }
   }
 
+  /**
+   * Send a test TTS message from this machine to the receiver via SSH.
+   * Mirrors the payload format used by play-tts-ssh-remote.sh.
+   */
+  function _sendTest() {
+    // Read SSH host
+    const projectRoot = path.resolve(_thisDir, '..', '..', '..');
+    const hostPaths = [
+      path.join(projectRoot, '.claude', 'ssh-remote-host.txt'),
+      path.join(homedir(), '.claude', 'ssh-remote-host.txt'),
+    ];
+    let sshHost = '';
+    for (const p of hostPaths) {
+      try { sshHost = readFileSync(p, 'utf-8').trim(); break; } catch { /* next */ }
+    }
+    if (!sshHost) {
+      _showFeedback('{red-fg}No SSH host configured — set .claude/ssh-remote-host.txt{/red-fg}');
+      return;
+    }
+    // Validate host format
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(sshHost)) {
+      _showFeedback('{red-fg}Invalid SSH host format{/red-fg}');
+      return;
+    }
+
+    // Read voice (best-effort, fall back to default)
+    let voice = 'en_US-lessac-medium';
+    const voicePaths = [
+      path.join(projectRoot, '.claude', 'tts-voice.txt'),
+      path.join(homedir(), '.agentvibes', 'config', 'voice.txt'),
+    ];
+    for (const p of voicePaths) {
+      try { const v = readFileSync(p, 'utf-8').trim(); if (v) { voice = v; break; } } catch { /* next */ }
+    }
+
+    const payload = JSON.stringify({
+      text: 'AgentVibes receiver test — if you hear this, it works!',
+      voice,
+      effects: '',
+      music: '',
+      volume: '0.10',
+      project: 'agentvibes-tui',
+      pretext: '',
+      speed: '1.0',
+      provider: 'piper',
+    });
+
+    const encoded = Buffer.from(payload).toString('base64');
+
+    _showFeedback('{yellow-fg}Sending test to ' + sshHost + '...{/yellow-fg}');
+    screen.render();
+
+    // Fire SSH in background — don't block the TUI
+    const child = spawn('ssh', ['-o', 'ConnectTimeout=5', sshHost, encoded], {
+      stdio: 'ignore',
+      detached: true,
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        _showFeedback('{green-fg}Test sent! Check receiver for audio playback.{/green-fg}');
+      } else {
+        _showFeedback(`{red-fg}SSH failed (exit ${code}) — check host and key config{/red-fg}`);
+      }
+      screen.render();
+    });
+
+    child.on('error', (err) => {
+      _showFeedback(`{red-fg}SSH error: ${err.message}{/red-fg}`);
+      screen.render();
+    });
+
+    child.unref();
+  }
+
   // -------------------------------------------------------------------------
   // Log parsing
 
@@ -1128,12 +1203,13 @@ export function createReceiverTab(screen, services) {
     const detailLabel = _showDetails
       ? '{#4fc3f7-fg}{bold}[D]{/bold} Messages{/#4fc3f7-fg}'
       : '{#4fc3f7-fg}{bold}[D]{/bold} Setup Guide{/#4fc3f7-fg}';
+    const testKey = '{#ffd54f-fg}{bold}[P]{/bold} Test{/#ffd54f-fg}';
     const clearKey = '{#ffb74d-fg}{bold}[C]{/bold} Clear Log{/#ffb74d-fg}';
     const copyKey = '{#a5d6a7-fg}{bold}[A]{/bold} Copy{/#a5d6a7-fg}';
     const descLabel = _showDescription
       ? '{#90a4ae-fg}{bold}[?]{/bold} Hide Info{/#90a4ae-fg}'
       : '{#90a4ae-fg}{bold}[?]{/bold} What is this?{/#90a4ae-fg}';
-    actionsLine.setContent(`  ${enableLabel}    ${speakerKey}    ${detailLabel}    ${clearKey}    ${copyKey}    ${descLabel}`);
+    actionsLine.setContent(`  ${enableLabel}    ${speakerKey}    ${testKey}    ${detailLabel}    ${clearKey}    ${copyKey}    ${descLabel}`);
 
     // Status + Speaker
     const statusIcon = enabled ? '{green-fg}● ON{/green-fg}' : '{yellow-fg}● OFF{/yellow-fg}';
@@ -1361,6 +1437,10 @@ export function createReceiverTab(screen, services) {
       box.focus();
       screen.render();
     });
+  });
+
+  box.key(['p', 'P'], () => {
+    _sendTest();
   });
 
   box.key(['c', 'C'], () => {

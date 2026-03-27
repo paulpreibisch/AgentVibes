@@ -131,16 +131,15 @@ function isNativeWindows() {
 }
 
 /**
- * Get the platform-correct Piper provider name
- * Windows uses 'windows-piper', all other platforms use 'piper'
- * @returns {string} The correct piper provider identifier
+ * Get the Piper provider name (always 'piper' on all platforms)
+ * @returns {string} The piper provider identifier
  */
 function getPiperProvider() {
-  return isNativeWindows() ? 'windows-piper' : 'piper';
+  return 'piper';
 }
 
 /**
- * Check if a provider is any piper variant (piper or windows-piper)
+ * Check if a provider is piper (accepts legacy 'windows-piper' for backwards compat)
  * @param {string} provider - The provider name to check
  * @returns {boolean} True if the provider is a piper variant
  */
@@ -1108,7 +1107,7 @@ async function collectConfiguration(options = {}) {
       config.defaultVoice = 'en_US-lessac-medium';
       config.isTermux = true;
     } else if (isNativeWindows()) {
-      config.provider = 'windows-piper';
+      config.provider = 'piper';
       config.defaultVoice = 'en_US-ryan-high';
     } else {
       config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
@@ -1328,7 +1327,7 @@ async function collectConfiguration(options = {}) {
       else if (isNativeWindows()) {
         providerChoices.push({
           name: chalk.green('🎵 Windows Piper TTS (Recommended)') + chalk.gray(' - High quality neural voices'),
-          value: 'windows-piper'
+          value: 'piper'
         });
         providerChoices.push({
           name: chalk.magenta('⚡ Soprano TTS') + chalk.gray(' - Ultra-fast neural, 1 premium voice'),
@@ -1336,7 +1335,7 @@ async function collectConfiguration(options = {}) {
         });
         providerChoices.push({
           name: chalk.blue('🔊 Windows SAPI (Built-in)') + chalk.gray(' - Basic quality, zero setup'),
-          value: 'windows-sapi'
+          value: 'sapi'
         });
       }
       // DESKTOP: Smart provider ordering
@@ -1419,7 +1418,7 @@ async function collectConfiguration(options = {}) {
           name: 'provider',
           message: chalk.yellow('Select TTS provider:'),
           choices: providerChoices,
-          default: config.provider || (isNativeWindows() ? 'windows-piper' : (isMacOS ? 'macos' : 'piper'))
+          default: config.provider || (isMacOS ? 'macos' : 'piper')
         }]);
 
         // Check if user wants to go back to previous page
@@ -1944,7 +1943,7 @@ async function collectConfiguration(options = {}) {
         currentPage++;
         continue;
 
-      } else if (config.provider === 'windows-sapi') {
+      } else if (config.provider === 'sapi' || config.provider === 'windows-sapi') {
         const sapiVoices = [
           { name: chalk.cyan('Microsoft David Desktop') + chalk.gray(' (Male, American)'), value: 'Microsoft David Desktop' },
           { name: chalk.magenta('Microsoft Zira Desktop') + chalk.gray(' (Female, American)'), value: 'Microsoft Zira Desktop' },
@@ -5132,8 +5131,7 @@ Troubleshooting:
       switch (selectedProvider) {
         case 'piper':          defaultVoice = 'en_US-ryan-high'; break;
         case 'macos':          defaultVoice = 'Samantha'; break;
-        case 'windows-piper':  defaultVoice = 'en_US-lessac-medium'; break;
-        case 'windows-sapi':   defaultVoice = 'Microsoft David Desktop'; break;
+        case 'sapi':           defaultVoice = 'Microsoft David Desktop'; break;
         case 'soprano':        defaultVoice = 'soprano-default'; break;
         case 'termux-ssh':     defaultVoice = 'android-system-default'; break;
         default:               defaultVoice = 'Samantha'; break;

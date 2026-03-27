@@ -41,7 +41,7 @@ export const FOOTER_CONFIG = {
   },
   receiver: {
     color: '#00897b',
-    text: ` ${key('E')} Enable  ${key('D')} Details  ${key('C')} Clear Log`,
+    text: ` ${key('E')} Enable  ${key('P')} Test  ${key('D')} Details  ${key('C')} Clear Log`,
   },
   install: {
     color: '#1a237e',

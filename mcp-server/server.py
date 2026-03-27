@@ -739,6 +739,20 @@ class AgentVibesServer:
         """
         command = "on" if enabled else "off"
         result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, [command])
+        # Sync to .agentvibes/config.json (TUI source of truth)
+        try:
+            import json
+            cfg_path = self.agentvibes_root / ".agentvibes" / "config.json"
+            cfg = {}
+            if cfg_path.exists():
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            if "backgroundMusic" not in cfg:
+                cfg["backgroundMusic"] = {}
+            cfg["backgroundMusic"]["enabled"] = enabled
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            pass  # best-effort sync
         return result if result else f"❌ Failed to {'enable' if enabled else 'disable'} background music"
 
     async def set_background_music_volume(self, volume: float) -> str:

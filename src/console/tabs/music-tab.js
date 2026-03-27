@@ -33,8 +33,8 @@ const COLORS = {
   activeFg:   '#69f0ae',  // Green — active/playing track
   favoriteFg: '#ffff00',  // Yellow — favorite star
   btnDefault: '#880e4f',  // Dark magenta — Music tab buttons
-  btnFocus:   '#00e5ff',  // Cyan — standard focus state
-  btnFocusFg: '#000000',
+  btnFocus:   '#2e7d32',  // Green — focused/selected
+  btnFocusFg: '#ffffff',
   btnPress:   '#ff00ff',
   borderFg:   '#f06292',  // Light magenta — border
   footerBg:   '#880e4f',  // Dark magenta — Music tab footer
@@ -748,7 +748,7 @@ export function createMusicTab(screen, services) {
     const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {
       _saveLocally();
     });
-    const okGlobalBtn = _makeBtn('Save Globally & Locally', '#2e7d32', 18, 5, () => {
+    const okGlobalBtn = _makeBtn('Save Globally & Locally', '#1565c0', 18, 5, () => {
       _saveLocally();
       _saveGlobally();
     });

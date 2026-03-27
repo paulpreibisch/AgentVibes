@@ -38,7 +38,7 @@ if (Test-Path $MuteFile) {
 }
 
 # Determine active provider
-$ActiveProvider = "windows-sapi"
+$ActiveProvider = "sapi"
 if (Test-Path $ProviderFile) {
     $ActiveProvider = (Get-Content $ProviderFile -Raw).Trim()
 }
@@ -47,10 +47,10 @@ if (Test-Path $ProviderFile) {
 $ProviderScript = ""
 
 switch ($ActiveProvider) {
-    "windows-sapi" {
+    { $_ -in "sapi", "windows-sapi" } {
         $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1"
     }
-    "windows-piper" {
+    { $_ -in "piper", "windows-piper" } {
         $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1"
     }
     "soprano" {
@@ -70,11 +70,26 @@ if (-not (Test-Path $ProviderScript)) {
 }
 
 # Check if background music is enabled
+# Primary source of truth: .agentvibes/config.json (used by TUI console)
+# Fallback: .claude/config/background-music-enabled.txt (legacy PowerShell config)
 $ConfigDir = "$ClaudeDir\config"
 $BgEnabled = $false
-$BgEnabledFile = "$ConfigDir\background-music-enabled.txt"
-if (Test-Path $BgEnabledFile) {
-    $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
+$AgentVibesConfig = Join-Path (Split-Path -Parent $ClaudeDir) ".agentvibes\config.json"
+if (Test-Path $AgentVibesConfig) {
+    try {
+        $json = Get-Content $AgentVibesConfig -Raw | ConvertFrom-Json
+        if ($json.backgroundMusic -and $null -ne $json.backgroundMusic.enabled) {
+            $BgEnabled = [bool]$json.backgroundMusic.enabled
+        }
+    } catch {
+        $BgEnabled = $false
+    }
+} else {
+    # Fallback to legacy txt config
+    $BgEnabledFile = "$ConfigDir\background-music-enabled.txt"
+    if (Test-Path $BgEnabledFile) {
+        $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
+    }
 }
 
 # Check if reverb is enabled (allowlist validation)
@@ -111,15 +126,37 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
 }
 
 # Call the provider script
+# When post-processing (reverb/music), capture output preserving InformationRecord colors.
+# Otherwise call directly so Write-Host colors pass through to the terminal.
+$NeedsPostProcess = ($BgEnabled -or $HasReverb) -and $HasFfmpeg
 try {
-    if ($VoiceOverride) {
-        $providerOutput = & $ProviderScript $Text $VoiceOverride 2>&1
+    if ($NeedsPostProcess) {
+        if ($VoiceOverride) {
+            $providerOutput = & $ProviderScript $Text $VoiceOverride 6>&1 2>&1
+        } else {
+            $providerOutput = & $ProviderScript $Text 6>&1 2>&1
+        }
+        # Re-emit preserving colors from InformationRecords (Write-Host output)
+        foreach ($item in $providerOutput) {
+            if ($item -is [System.Management.Automation.InformationRecord]) {
+                $msg = $item.MessageData
+                if ($msg -is [System.Management.Automation.HostInformationMessage]) {
+                    Write-Host $msg.Message -ForegroundColor $msg.ForegroundColor -NoNewline:$msg.NoNewLine
+                    if (-not $msg.NoNewLine) { Write-Host }
+                } else {
+                    Write-Host "$item"
+                }
+            } else {
+                Write-Host "$item"
+            }
+        }
+    } else {
+        if ($VoiceOverride) {
+            & $ProviderScript $Text $VoiceOverride
+        } else {
+            & $ProviderScript $Text
+        }
     }
-    else {
-        $providerOutput = & $ProviderScript $Text 2>&1
-    }
-    # Show provider output
-    $providerOutput | ForEach-Object { Write-Host $_ }
 }
 catch {
     Write-Host "[ERROR] TTS Error: $_" -ForegroundColor Red

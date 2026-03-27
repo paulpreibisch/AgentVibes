@@ -40,15 +40,15 @@ if (!IS_TEST) {
 
 const COLORS = {
   contentBg:  '#0a0e1a',
-  sectionHdr: '#7986cb',  // Light indigo/purple — section headers (matches settings tab)
+  sectionHdr: '#90caf9',  // Light indigo/purple — section headers (matches settings tab)
   labelFg:    '#e3f2fd',
   valueFg:    '#ffff00',  // Yellow
   brandPink:  '#f06292',  // Light magenta — AgentVibes logotype
   successFg:  '#69f0ae',  // Green — success
   errorFg:    '#ef9a9a',  // Red — error/missing
   btnDefault: '#283593',
-  btnFocus:   '#00e5ff',  // Cyan — focused button (system standard)
-  btnFocusFg: '#000000',  // Black text on cyan
+  btnFocus:   '#2e7d32',  // Green — focused/selected
+  btnFocusFg: '#ffffff',  // White text on green
   btnPress:   '#ff00ff',
   borderFg:   '#3f51b5',
   footerBg:   '#3f51b5',  // Indigo — Install tab footer
@@ -303,8 +303,7 @@ export function createInstallTab(screen, services) {
       piper:           'en_US-ryan-high',
       macos:           'Samantha',
       soprano:         'soprano-default',
-      'windows-piper': 'en_US-ryan-high',
-      'windows-sapi':  'Microsoft David Desktop',
+      sapi:            'Microsoft David Desktop',
     };
     // Use voice from Settings if configured, otherwise fall back to provider default
     const configuredVoice = configService?.getConfig?.()?.voice;
@@ -576,7 +575,7 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 5 button — OK (summary page only, config already saved on screen 4)
 
-  const _s5OkBtn = _createInstallBtn('✓  OK — Done', '#2e7d32', () => {
+  const _s5OkBtn = _createInstallBtn('✓  OK — Done', '#1565c0', () => {
     _dismissCompletionModal();
   });
   _s5OkBtn.bottom = 3; _s5OkBtn.left = 4;  // bottom-anchored: sits above hintLine (bottom:2)

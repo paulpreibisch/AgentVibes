@@ -135,8 +135,8 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
   }
 
   const COLORS = {
-    btnFocus: '#00e5ff',
-    btnFocusFg: '#000000',
+    btnFocus: '#2e7d32',
+    btnFocusFg: '#ffffff',
   };
 
   const items = tracks.map(t =>

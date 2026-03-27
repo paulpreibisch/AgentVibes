@@ -42,8 +42,8 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   const currentIdx = Math.max(0, REVERB_PRESETS.findIndex(p => p.value === currentPreset));
 
   const COLORS = {
-    btnFocus: '#00e5ff',
-    btnFocusFg: '#000000',
+    btnFocus: '#2e7d32',
+    btnFocusFg: '#ffffff',
   };
 
   const list = blessed.list({

@@ -15,7 +15,7 @@ param(
 
 $ClaudeDir = "$env:USERPROFILE\.claude"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
-$ValidProviders = @('windows-piper', 'windows-sapi', 'soprano')
+$ValidProviders = @('piper', 'windows-piper', 'sapi', 'windows-sapi', 'soprano')
 
 # Ensure claude directory exists
 if (-not (Test-Path $ClaudeDir)) {
@@ -29,7 +29,7 @@ function Get-ActiveProvider {
     }
 
     # Default to SAPI (zero dependencies)
-    return "windows-sapi"
+    return "sapi"
 }
 
 function Get-AvailableProviders {
@@ -37,7 +37,7 @@ function Get-AvailableProviders {
 
     # Always available
     $available += @{
-        name = "windows-sapi"
+        name = "sapi"
         description = "Windows SAPI (Built-in, No Installation)"
         installed = $true
     }
@@ -51,7 +51,7 @@ function Get-AvailableProviders {
     }
 
     $available += @{
-        name = "windows-piper"
+        name = "piper"
         description = "Windows Piper (High Quality, Requires Installation)"
         installed = $piperInstalled
     }
@@ -98,7 +98,7 @@ function Set-ActiveProvider {
     }
 
     # If trying to set piper, check if installed (standard location or PATH)
-    if ($NewProvider -eq "windows-piper") {
+    if ($NewProvider -eq "piper" -or $NewProvider -eq "windows-piper") {
         $piperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
         $piperFound = (Test-Path $piperExe) -or ($null -ne (Get-Command piper.exe -ErrorAction SilentlyContinue))
         if (-not $piperFound) {
