@@ -70,7 +70,7 @@ const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 const COLORS = {
   contentBg:    '#0a0e1a',  // Near-black content background
-  sectionHdr:   '#90caf9',  // Light blue — section dividers
+  sectionHdr:   'bright-cyan',  // Matches header "Agent" color
   labelFg:      '#e3f2fd',  // Light blue text — labels
   valueFg:      '#ffff00',  // Yellow — current values
   btnDefault:   '#37474f',  // Dark slate — default button bg
@@ -82,7 +82,7 @@ const COLORS = {
   btnEdit:      '#37474f',  // Dark slate — Edit buttons
   btnEnableOn:  '#37474f',  // Dark slate — Enabled toggle
   btnEnableOff: '#37474f',  // Dark slate — Disabled toggle
-  borderFg:     '#90caf9',  // Light blue — borders
+  borderFg:     'bright-cyan',  // Matches section headers
   footerBg:     '#2196f3',  // Blue — settings footer
   noticeFg:     '#90a4ae',  // Gray — stub notice text
 };
@@ -806,11 +806,23 @@ export function createSettingsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // Section header: ── Provider & Voice ──
+
+  const providerVoiceHeader = blessed.text({
+    parent: box,
+    top: 3,
+    left: 1,
+    content: '{bright-cyan-fg} 🎤 Provider & Voice {/bright-cyan-fg}',
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
   // Provider row: label + value + [Switch] button
 
   const providerLabel = blessed.text({
     parent: box,
-    top: 3,
+    top: 5,
     left: 6,
     content: 'Provider:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -818,7 +830,7 @@ export function createSettingsTab(screen, services) {
 
   const providerValue = blessed.text({
     parent: box,
-    top: 3,
+    top: 5,
     left: 22,
     width: 26,    // truncate before [Switch] at left:40
     wrap: false,
@@ -834,7 +846,7 @@ export function createSettingsTab(screen, services) {
       screen.render();
     }, _restoreFocus);
   });
-  switchBtn.top = 3;
+  switchBtn.top = 5;
   switchBtn.left = 52;
 
   // -------------------------------------------------------------------------
@@ -842,7 +854,7 @@ export function createSettingsTab(screen, services) {
 
   const voiceLabel = blessed.text({
     parent: box,
-    top: 5,
+    top: 7,
     left: 6,
     content: 'Current Voice:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -850,7 +862,7 @@ export function createSettingsTab(screen, services) {
 
   const voiceValue = blessed.text({
     parent: box,
-    top: 5,
+    top: 7,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -866,7 +878,7 @@ export function createSettingsTab(screen, services) {
       screen.render();
     }, _restoreFocus);
   }, { bg: COLORS.btnChange });
-  changeBtn.top = 5;
+  changeBtn.top = 7;
   changeBtn.left = 52;
 
   const playBtn = _createButton(box, screen, '▶ Play', COLORS, () => {
@@ -1034,12 +1046,12 @@ export function createSettingsTab(screen, services) {
       piper.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); });
     }
   });
-  playBtn.top = 5;
+  playBtn.top = 7;
   playBtn.left = 64;
 
   const voiceFileText = blessed.text({
     parent: box,
-    top: 6,
+    top: 8,
     left: 22,
     right: 2,
     wrap: false,
@@ -1054,7 +1066,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 3,
     left: 1,
-    content: '{#90caf9-fg} ⚡ Audio Effects {/#90caf9-fg}',
+    content: '{bright-cyan-fg} ⚡ Audio Effects {/bright-cyan-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1110,7 +1122,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 7,
     left: 1,
-    content: '{#90caf9-fg} 🎸 Background Music {/#90caf9-fg}',
+    content: '{bright-cyan-fg} 🎸 Background Music {/bright-cyan-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1207,11 +1219,23 @@ export function createSettingsTab(screen, services) {
   volumeChangeBtn.left = 52;
 
   // -------------------------------------------------------------------------
+  // Section header: ── Style ──
+
+  const styleHeader = blessed.text({
+    parent: box,
+    top: 3,
+    left: 1,
+    content: '{bright-cyan-fg} 🎭 Style {/bright-cyan-fg}',
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  // -------------------------------------------------------------------------
   // Verbosity row: label + value + [Change] button
 
   const verbosityLabel = blessed.text({
     parent: box,
-    top: 3,
+    top: 5,
     left: 6,
     content: 'Verbosity:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1219,7 +1243,7 @@ export function createSettingsTab(screen, services) {
 
   const verbosityValue = blessed.text({
     parent: box,
-    top: 3,
+    top: 5,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -1230,12 +1254,12 @@ export function createSettingsTab(screen, services) {
   const verbosityChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
     _openVerbosityPicker(screen, configService, () => refreshDisplay(), _restoreFocus);
   }, { bg: COLORS.btnChange });
-  verbosityChangeBtn.top = 3;
+  verbosityChangeBtn.top = 5;
   verbosityChangeBtn.left = 52;
 
   const verbosityPathText = blessed.text({
     parent: box,
-    top: 4,
+    top: 6,
     left: 22,
     right: 2,
     wrap: false,
@@ -1248,7 +1272,7 @@ export function createSettingsTab(screen, services) {
 
   const personalityLabel = blessed.text({
     parent: box,
-    top: 5,
+    top: 7,
     left: 6,
     content: 'Personality:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1256,7 +1280,7 @@ export function createSettingsTab(screen, services) {
 
   const personalityValue = blessed.text({
     parent: box,
-    top: 5,
+    top: 7,
     left: 22,
     width: 26,    // truncate before [Change] at left:40
     wrap: false,
@@ -1270,7 +1294,7 @@ export function createSettingsTab(screen, services) {
       refreshDisplay();
     }, _restoreFocus);
   }, { bg: COLORS.btnChange });
-  personalityChangeBtn.top = 5;
+  personalityChangeBtn.top = 7;
   personalityChangeBtn.left = 52;
 
   const personalityTestBtn = _createButton(box, screen, '▶ Preview', COLORS, () => {
@@ -1281,12 +1305,12 @@ export function createSettingsTab(screen, services) {
       : _buildPreviewPhrase();
     _runTest(false, phrase);
   }, { bg: COLORS.btnTest });
-  personalityTestBtn.top = 5;
+  personalityTestBtn.top = 7;
   personalityTestBtn.left = 64;
 
   const personalityFileText = blessed.text({
     parent: box,
-    top: 6,
+    top: 8,
     left: 22,
     right: 2,
     wrap: false,
@@ -1300,9 +1324,9 @@ export function createSettingsTab(screen, services) {
 
   const introTextHeader = blessed.text({
     parent: box,
-    top: 8,
+    top: 10,
     left: 1,
-    content: '{#90caf9-fg} ✍️ Intro Text {/#90caf9-fg}',
+    content: '{bright-cyan-fg} ✍️ Intro Text {/bright-cyan-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1312,7 +1336,7 @@ export function createSettingsTab(screen, services) {
 
   const introTextLabel = blessed.text({
     parent: box,
-    top: 10,
+    top: 12,
     left: 6,
     content: 'Intro Text:',
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
@@ -1320,7 +1344,7 @@ export function createSettingsTab(screen, services) {
 
   const introTextValue = blessed.text({
     parent: box,
-    top: 10,
+    top: 12,
     left: 22,
     width: 26,    // truncate before [Edit] at left:40
     wrap: false,
@@ -1331,19 +1355,19 @@ export function createSettingsTab(screen, services) {
   const introEditBtn = _createButton(box, screen, 'Edit', COLORS, () => {
     _openIntroTextEditor(screen, configService, () => { refreshDisplay(); }, _restoreFocus);
   }, { bg: COLORS.btnEdit });
-  introEditBtn.top = 10;
+  introEditBtn.top = 12;
   introEditBtn.left = 52;
 
   const introClearBtn = _createButton(box, screen, 'Clear', COLORS, () => {
     configService.set('pretext', '');
     refreshDisplay();
   }, { bg: '#c62828' });
-  introClearBtn.top = 10;
+  introClearBtn.top = 12;
   introClearBtn.left = 64;
 
   const introPathText = blessed.text({
     parent: box,
-    top: 11,
+    top: 13,
     left: 22,
     right: 2,
     wrap: false,
@@ -1363,7 +1387,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 3,
     left: 2,
-    content: '{#90caf9-fg} 📡 Audio Destination {/#90caf9-fg}',
+    content: '{bright-cyan-fg} 📡 Audio Destination {/bright-cyan-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1516,7 +1540,7 @@ export function createSettingsTab(screen, services) {
     parent: box,
     top: 11,
     left: 2,
-    content: '{#90caf9-fg} 💾 Config Storage {/#90caf9-fg}',
+    content: '{bright-cyan-fg} 💾 Config Storage {/bright-cyan-fg}',
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -1610,6 +1634,7 @@ export function createSettingsTab(screen, services) {
   // Widget groups for each sub-tab (used by _showSubTab to show/hide)
   const _subTabWidgets = {
     voice: [
+      providerVoiceHeader,
       providerLabel, providerValue, switchBtn,
       voiceLabel, voiceValue, changeBtn, playBtn, voiceFileText,
     ],
@@ -1621,6 +1646,7 @@ export function createSettingsTab(screen, services) {
       volumeLabel, volumeValue, volumeChangeBtn,
     ],
     personality: [
+      styleHeader,
       verbosityLabel, verbosityValue, verbosityChangeBtn, verbosityPathText,
       personalityLabel, personalityValue, personalityChangeBtn, personalityTestBtn, personalityFileText,
       introTextHeader,
@@ -2304,7 +2330,7 @@ function _openProviderPicker(screen, providerService, onSelect, onClose) {
   // Environment header
   blessed.text({
     parent: modal, top: 0, left: 1, tags: true,
-    content: `{#00e5ff-fg}🖥  Environment:{/#00e5ff-fg} {bold}${envLabel}{/bold}`,
+    content: `{bright-cyan-fg}🖥  Environment:{/bright-cyan-fg} {bold}${envLabel}{/bold}`,
     style: { bg: COLORS.contentBg },
   });
   blessed.text({
@@ -2354,8 +2380,8 @@ function _openProviderPicker(screen, providerService, onSelect, onClose) {
         _close(); onSelect(prov.id);
       } else {
         const lines = _INSTALL_CMDS[prov.id] ?? ['No instructions available.'];
-        instrTitle.setContent(`{#90caf9-fg}Install — ${prov.name}:{/#90caf9-fg}`);
-        instrContent.setContent(lines.map(l => l ? `{#00e5ff-fg}${l}{/#00e5ff-fg}` : '').join('\n'));
+        instrTitle.setContent(`{bright-cyan-fg}Install — ${prov.name}:{/bright-cyan-fg}`);
+        instrContent.setContent(lines.map(l => l ? `{bright-cyan-fg}${l}{/bright-cyan-fg}` : '').join('\n'));
         screen.render();
       }
     });
@@ -2369,7 +2395,7 @@ function _openProviderPicker(screen, providerService, onSelect, onClose) {
 
   const instrTitle = blessed.text({
     parent: modal, top: 11, left: 1, width: 66, tags: true,
-    content: '{#90caf9-fg}Install instructions — click Install beside a provider:{/#90caf9-fg}',
+    content: '{bright-cyan-fg}Install instructions — click Install beside a provider:{/bright-cyan-fg}',
     style: { bg: COLORS.contentBg },
   });
   const instrContent = blessed.text({
@@ -2481,7 +2507,7 @@ function _showSavePreview(screen, filePath, data, onConfirm, onClose) {
     style: {
       fg: '#e3f2fd',
       bg: COLORS.contentBg,
-      border: { fg: '#00e5ff' },
+      border: { fg: 'bright-cyan' },
     },
   });
 
@@ -2569,7 +2595,7 @@ function _openTrackPicker(screen, configService, onSelect, onClose) {
   const currentTrack = (configService.getConfig().backgroundMusic?.track ?? MUSIC_DEFAULTS.track);
   const items = allItems.map(t =>
     t.file === ADD_SENTINEL
-      ? `  {#00e5ff-fg}+ Add Custom Track{/#00e5ff-fg}`
+      ? `  {bright-cyan-fg}+ Add Custom Track{/bright-cyan-fg}`
       : (t.file === currentTrack ? `● ${t.label}` : `  ${t.label}`)
   );
   const currentIdx = tracks.findIndex(t => t.file === currentTrack);
@@ -2964,7 +2990,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
     right: 2,
     tags: true,
     content: '',
-    style: { fg: '#00e5ff', bg: COLORS.contentBg },
+    style: { fg: 'bright-cyan', bg: COLORS.contentBg },
   });
 
   // ---- File location hint ----
@@ -3067,7 +3093,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
     const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
     if (!_closed) {
-      modalPreviewLine.setContent(`{#00e5ff-fg}\u266A Previewing: ${label}  (Space to stop){/#00e5ff-fg}`);
+      modalPreviewLine.setContent(`{bright-cyan-fg}\u266A Previewing: ${label}  (Space to stop){/bright-cyan-fg}`);
       screen.render();
     }
 
@@ -3372,7 +3398,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     parent: modal,
     top: 2,
     left: 6,
-    content: `{#90caf9-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#90caf9-fg}`,
+    content: `{bright-cyan-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/bright-cyan-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -3403,7 +3429,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     parent: modal,
     bottom: 5,
     left: 2,
-    content: `{#90caf9-fg}── Voice Info ${'─'.repeat(50)}{/#90caf9-fg}`,
+    content: `{bright-cyan-fg}── Voice Info ${'─'.repeat(50)}{/bright-cyan-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -3425,7 +3451,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     right: 2,
     tags: true,
     content: '',
-    style: { fg: '#00e5ff', bg: COLORS.contentBg },
+    style: { fg: 'bright-cyan', bg: COLORS.contentBg },
   });
 
   // ---- Key hint bar ----
@@ -3554,7 +3580,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     _playingProcess = piper;
     _playingVoiceId = voiceId;
     if (!_closed) {
-      modalPreviewLine.setContent(`{#00e5ff-fg}♪ Synthesizing: ${voiceId}…{/#00e5ff-fg}`);
+      modalPreviewLine.setContent(`{bright-cyan-fg}♪ Synthesizing: ${voiceId}…{/bright-cyan-fg}`);
       screen.render();
     }
 
@@ -3567,7 +3593,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
         _playingVoiceId = null;
         _playingProcess = null;
         if (!_closed) {
-          modalPreviewLine.setContent('{#00e5ff-fg}♪ Preview failed (piper error — is piper installed?){/#00e5ff-fg}');
+          modalPreviewLine.setContent('{bright-cyan-fg}♪ Preview failed (piper error — is piper installed?){/bright-cyan-fg}');
           screen.render();
           setTimeout(() => { if (!_closed) { modalPreviewLine.setContent(''); screen.render(); } }, 4000);
         }
@@ -3585,7 +3611,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
       _playingProcess = playProc;
 
       if (!_closed) {
-        modalPreviewLine.setContent(`{#00e5ff-fg}♪ Playing: ${voiceId}  (Space to stop){/#00e5ff-fg}`);
+        modalPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}  (Space to stop){/bright-cyan-fg}`);
         screen.render();
       }
 
@@ -3610,7 +3636,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
       _playingVoiceId = null;
       _playingProcess = null;
       if (!_closed) {
-        modalPreviewLine.setContent('{#00e5ff-fg}♪ Cannot find piper — install with: pipx install piper-tts{/#00e5ff-fg}');
+        modalPreviewLine.setContent('{bright-cyan-fg}♪ Cannot find piper — install with: pipx install piper-tts{/bright-cyan-fg}');
         screen.render();
         setTimeout(() => { if (!_closed) { modalPreviewLine.setContent(''); screen.render(); } }, 4000);
       }

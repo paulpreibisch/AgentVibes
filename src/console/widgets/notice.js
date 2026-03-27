@@ -22,13 +22,13 @@ if (!IS_TEST) {
  * @param {object} [opts]
  * @param {string} [opts.bg='#0a0e1a']       - background colour
  * @param {string} [opts.fg='#e3f2fd']       - foreground colour
- * @param {string} [opts.borderFg='#00e5ff'] - border colour
+ * @param {string} [opts.borderFg='bright-cyan'] - border colour
  * @param {number} [opts.durationMs=2500]    - auto-dismiss delay in ms
  */
 export function showNotice(screen, message, opts = {}) {
   const bg         = opts.bg         ?? '#0a0e1a';
   const fg         = opts.fg         ?? '#e3f2fd';
-  const borderFg   = opts.borderFg   ?? '#00e5ff';
+  const borderFg   = opts.borderFg   ?? 'bright-cyan';
   const durationMs = opts.durationMs ?? 2500;
 
   const width = Math.max(28, message.length + 6);

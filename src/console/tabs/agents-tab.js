@@ -54,7 +54,7 @@ const COLORS = {
   footerBg:   '#9c27b0',
   noticeFg:   '#90a4ae',
   warnFg:     '#ff9800',
-  linkFg:     '#00e5ff',
+  linkFg:     'bright-cyan',
 };
 
 const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
@@ -110,13 +110,13 @@ Cursor, or GitHub Copilot, you're ready to get started.
 
 {bold}Install BMAD in your project:{/bold}
 
-  {#00e5ff-fg}npx bmad-method install{/#00e5ff-fg}
+  {bright-cyan-fg}npx bmad-method install{/bright-cyan-fg}
 
 
 {bold}Learn more:{/bold}
 
-  {#00e5ff-fg}https://docs.bmad-method.org/{/#00e5ff-fg}
-  {#00e5ff-fg}https://github.com/bmad-code-org/BMAD-METHOD{/#00e5ff-fg}
+  {bright-cyan-fg}https://docs.bmad-method.org/{/bright-cyan-fg}
+  {bright-cyan-fg}https://github.com/bmad-code-org/BMAD-METHOD{/bright-cyan-fg}
 
 
 {#90a4ae-fg}Once BMAD is installed, this tab will show all your agents and let you
@@ -444,8 +444,8 @@ export function createAgentsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Row spinner (animated braille while preview is playing)
 
-  const _SPIN_PFX = '{#00e5ff-fg}';
-  const _SPIN_SFX = '{/#00e5ff-fg}';
+  const _SPIN_PFX = '{bright-cyan-fg}';
+  const _SPIN_SFX = '{/bright-cyan-fg}';
   const _SPIN_PFX_TOTAL_LEN = _SPIN_PFX.length + 1 + _SPIN_SFX.length; // tag + 1 frame char + close tag
   const _SPIN_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let _spinnerInterval  = null;
@@ -812,7 +812,7 @@ export function createAgentsTab(screen, services) {
       style: {
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
-        border: { fg: '#00e5ff' },
+        border: { fg: 'bright-cyan' },
       },
     });
     vpModal.setFront();
@@ -833,7 +833,7 @@ export function createAgentsTab(screen, services) {
     const COL_G = 10;
     blessed.text({
       parent: vpModal, top: 2, left: 6, tags: true,
-      content: `{#90caf9-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/#90caf9-fg}`,
+      content: `{bright-cyan-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/bright-cyan-fg}`,
       style: { bg: COLORS.contentBg },
     });
 
@@ -857,7 +857,7 @@ export function createAgentsTab(screen, services) {
 
     const vpPreviewLine = blessed.text({
       parent: vpModal, bottom: 3, left: 2, right: 2, tags: true,
-      content: '', style: { fg: '#00e5ff', bg: COLORS.contentBg },
+      content: '', style: { fg: 'bright-cyan', bg: COLORS.contentBg },
     });
 
     blessed.text({
@@ -917,7 +917,7 @@ export function createAgentsTab(screen, services) {
       _previewVoiceId = voiceId;
 
       if (!_vpClosed) {
-        vpPreviewLine.setContent(`{#00e5ff-fg}♪ Synthesizing: ${voiceId}...{/#00e5ff-fg}`);
+        vpPreviewLine.setContent(`{bright-cyan-fg}♪ Synthesizing: ${voiceId}...{/bright-cyan-fg}`);
         screen.render();
       }
 
@@ -928,7 +928,7 @@ export function createAgentsTab(screen, services) {
         if (!wp) return;
         const pp = spawn(wp.bin, wp.args(tempWav), { stdio: 'ignore', detached: true, env: _spawnEnv });
         _previewProc = pp;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{#00e5ff-fg}♪ Playing: ${voiceId}{/#00e5ff-fg}`); screen.render(); }
+        if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}{/bright-cyan-fg}`); screen.render(); }
         pp.on('exit', () => {
           if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }
           try { fs.unlinkSync(tempWav); } catch {}
@@ -974,7 +974,7 @@ export function createAgentsTab(screen, services) {
       border: { type: 'line' },
       tags: true,
       label: _modalTitle('Edit Pretext'),
-      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: '#00e5ff' } },
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'bright-cyan' } },
     });
     editModal.setFront();
 
@@ -992,7 +992,7 @@ export function createAgentsTab(screen, services) {
       style: {
         fg: COLORS.valueFg, bg: '#0d1b35',
         border: { fg: COLORS.borderFg },
-        focus: { border: { fg: '#00e5ff' } },
+        focus: { border: { fg: 'bright-cyan' } },
       },
     });
 
@@ -1291,7 +1291,7 @@ export function createAgentsTab(screen, services) {
       border: { type: 'line' },
       tags: true,
       label: _modalTitle('Set Pretext for All Agents'),
-      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: '#00e5ff' } },
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'bright-cyan' } },
     });
     editModal.setFront();
 
@@ -1308,7 +1308,7 @@ export function createAgentsTab(screen, services) {
       style: {
         fg: COLORS.valueFg, bg: '#0d1b35',
         border: { fg: COLORS.borderFg },
-        focus: { border: { fg: '#00e5ff' } },
+        focus: { border: { fg: 'bright-cyan' } },
       },
     });
 

@@ -40,7 +40,7 @@ const COLORS = {
   footerBg:   '#880e4f',  // Dark magenta — Music tab footer
   noticeFg:   '#90a4ae',
   dimFg:      '#455a64',
-  playingFg:  '#00e5ff',  // Cyan — currently previewing track indicator
+  playingFg:  'bright-cyan',  // Cyan — currently previewing track indicator
 };
 
 const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select  [M] Toggle  [*] Favorite  [F] Filter  [Q] Quit';

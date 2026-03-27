@@ -180,7 +180,7 @@ export function createHelpTab(screen, services) {
     hidden: true,
     inputOnFocus: true,
     keys: true,
-    style: { fg: COLORS.keyFg, bg: '#1a237e', focus: { bg: '#283593' } },
+    style: { fg: COLORS.keyFg, bg: '#1a3a5c', focus: { bg: '#245a80' } },
   });
 
   blessed.text({

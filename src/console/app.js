@@ -38,7 +38,7 @@ const COLORS = {
   headerBg: '#1a237e',      // Dark navy — header and footer
   tabBarBg: '#263238',      // Dark blue-gray — tab bar
   contentBg: '#0a0e1a',     // Near-black — content area background
-  focusCyan: '#00e5ff',     // Cyan — focus state
+  focusCyan: 'bright-cyan',  // Matches "Agent" in header title
   activeTab: '#3949ab',     // Blue — active tab highlight
   textWhite: 'white',
   textDim: '#90a4ae',       // Gray — placeholder / dim text
@@ -485,7 +485,7 @@ export class AgentVibesConsole {
       if (id === activeTabId) {
         return `{bold}{white-fg}[${shortcutKey}] ${label}{/white-fg}{/bold}`;
       }
-      return `{#82b1ff-fg}[${shortcutKey}] ${label}{/#82b1ff-fg}`;
+      return `{bright-cyan-fg}[${shortcutKey}] ${label}{/bright-cyan-fg}`;
     }).join('  ');
   }
 

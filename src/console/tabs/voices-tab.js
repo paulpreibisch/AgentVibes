@@ -32,7 +32,7 @@ const COLORS = {
   sectionHdr: '#00897b',  // Teal — section headers for Voices tab
   labelFg:    '#e3f2fd',
   valueFg:    '#f06292',  // Light magenta — brand color
-  activeFg:   '#00e5ff',  // Cyan — active voice
+  activeFg:   'bright-cyan',  // Cyan — active voice
   favoriteFg: '#ffff00',  // Yellow — favorite star
   btnDefault: '#00695c',  // Teal — Voices tab buttons
   btnFocus:   '#2e7d32',  // Green — focused/selected

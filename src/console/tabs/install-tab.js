@@ -40,7 +40,7 @@ if (!IS_TEST) {
 
 const COLORS = {
   contentBg:  '#0a0e1a',
-  sectionHdr: '#90caf9',  // Light indigo/purple — section headers (matches settings tab)
+  sectionHdr: 'bright-cyan',  // Matches header "Agent" color
   labelFg:    '#e3f2fd',
   valueFg:    '#ffff00',  // Yellow
   brandPink:  '#f06292',  // Light magenta — AgentVibes logotype
@@ -50,8 +50,8 @@ const COLORS = {
   btnFocus:   '#2e7d32',  // Green — focused/selected
   btnFocusFg: '#ffffff',  // White text on green
   btnPress:   '#ff00ff',
-  borderFg:   '#3f51b5',
-  footerBg:   '#3f51b5',  // Indigo — Install tab footer
+  borderFg:   'bright-cyan',
+  footerBg:   '#5c6bc0',  // Lighter indigo — Install tab footer
   noticeFg:   '#90a4ae',
 };
 
@@ -765,7 +765,7 @@ export function createInstallTab(screen, services) {
       style: {
         fg: '#e3f2fd',
         bg: COLORS.contentBg,
-        border: { fg: '#00e5ff' },
+        border: { fg: 'bright-cyan' },
       },
     });
     screen.render();

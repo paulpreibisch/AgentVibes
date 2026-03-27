@@ -47,7 +47,7 @@ export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
     border: { type: 'line' },
     tags: true,
     label: _modalTitle('Music Volume'),
-    style: { border: { fg: '#00e5ff' } },
+    style: { border: { fg: 'bright-cyan' } },
   });
 
   const barText = blessed.text({
@@ -71,7 +71,7 @@ export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
   function _renderBar() {
     const filled = Math.round(vol / 5);
     const empty = 20 - filled;
-    const bar = '{#00e5ff-fg}' + '█'.repeat(filled) + '{/#00e5ff-fg}' +
+    const bar = '{bright-cyan-fg}' + '█'.repeat(filled) + '{/bright-cyan-fg}' +
                 '{#263238-fg}' + '░'.repeat(empty) + '{/#263238-fg}';
     barText.setContent(`{#90a4ae-fg}Volume:{/#90a4ae-fg} ${bar} {bold}${vol}%{/bold}`);
     screen.render();
@@ -233,7 +233,7 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     _previewTrackId = trackFile;
 
     const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
-    _setHint(`{#00e5ff-fg}♪ Previewing: ${label}  (Space to stop){/#00e5ff-fg}`);
+    _setHint(`{bright-cyan-fg}♪ Previewing: ${label}  (Space to stop){/bright-cyan-fg}`);
 
     _previewProc.on('exit', () => {
       if (_previewTrackId === trackFile) {
