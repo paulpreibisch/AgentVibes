@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.4
 
 ---
 
@@ -40,20 +40,29 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v4.3 — Windows Parity Release
+## 🌟 NEW IN v4.4 — Full Platform Parity Release
 
-### 🖥️ Full Windows Support
-Background music, voice selection, and the TUI installer now work identically on Windows:
+### 🪟 Windows MCP Parity — 27/27 Tools Working
 
-- **Background music mixing** via ffmpeg (auto-installed via `winget`)
-- **Voice selection from TUI** — multi-speaker models (Bella, Evan, etc.) fully supported
-- **Music preview** — no more overlapping tracks when switching
-- **ffmpeg dependency check** in installer with one-click install
-- **PATH auto-refresh** — no shell restart needed after installing ffmpeg
+All MCP tools now work natively on Windows. Previously 12 tools silently failed due to missing scripts:
+
+- **6 new PowerShell scripts** — personality-manager, speed-manager, language-manager, learn-manager, verbosity-manager, clean-audio-cache
+- **Unified provider naming** — `piper` and `sapi` on all platforms (no more `windows-piper`/`windows-sapi`)
+- **replay command** added to voice-manager for Windows
+- **Adversarial review** — 24 issues found, 10 fixed (3 CRITICAL, 4 HIGH, 3 MEDIUM)
+- **28 new tests** covering script parity, effects round-trip, provider management, and naming consistency
+- **Feature-platform matrix** — [docs/feature-platform-matrix.md](docs/feature-platform-matrix.md) tracks all 85 features across Linux, macOS, Windows, and WSL
+
+### Bug Fixes (HIGH)
+- ffmpeg stderr redirected to temp file instead of literal `"NUL"` file
+- `AGENTVIBES_NO_PLAY` env var properly cleaned up on error paths
+- `PIPER_SPEAKER` env var no longer leaks between voice switches
+- Provider config now uses project-local `.claude` (not always global)
+- Text sanitization relaxed — `$50 (USD)` no longer becomes `50 USD`
 
 ---
 
-## 🌟 v4.2 — BMAD Voices, SSH Receiver & More
+## 🌟 v4.3 — Windows Parity + BMAD Party Mode
 
 ### 🎭 BMAD Party Mode — Every Agent Has Its Own Voice
 
