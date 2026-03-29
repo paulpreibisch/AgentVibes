@@ -418,7 +418,7 @@ class AgentVibesServer:
         """
         provider = provider.lower()
         if self.is_windows:
-            valid_providers = ["windows-piper", "windows-sapi", "soprano"]
+            valid_providers = ["piper", "sapi", "soprano"]
         else:
             valid_providers = ["piper", "macos", "termux-ssh", "soprano"]
         if provider not in valid_providers:
@@ -431,8 +431,7 @@ class AgentVibesServer:
                 "macos": "macOS",
                 "termux-ssh": "Termux SSH",
                 "piper": "Piper",
-                "windows-piper": "Windows Piper",
-                "windows-sapi": "Windows SAPI",
+                "sapi": "Windows SAPI",
                 "soprano": "Soprano",
             }
             provider_name = provider_names.get(provider, provider.title())
@@ -976,8 +975,7 @@ class AgentVibesServer:
             "macos": "macOS TTS",
             "piper": "Piper TTS (Free, Offline)",
             "termux-ssh": "Termux SSH (Android)",
-            "windows-piper": "Windows Piper TTS (Free, Offline)",
-            "windows-sapi": "Windows SAPI (Built-in)",
+            "sapi": "Windows SAPI (Built-in)",
             "soprano": "Soprano TTS (Ultra-fast Neural)",
         }
         try:
@@ -1130,12 +1128,12 @@ Examples:
                     "provider": {
                         "type": "string",
                         "description": (
-                            "Provider name: 'windows-piper', 'windows-sapi', or 'soprano'"
+                            "Provider name: 'piper', 'sapi', or 'soprano'"
                             if agent_vibes.is_windows
                             else "Provider name: 'piper', 'macos', 'soprano', or 'termux-ssh'"
                         ),
                         "enum": (
-                            ["windows-piper", "windows-sapi", "soprano"]
+                            ["piper", "sapi", "soprano"]
                             if agent_vibes.is_windows
                             else ["piper", "macos", "soprano", "termux-ssh"]
                         ),

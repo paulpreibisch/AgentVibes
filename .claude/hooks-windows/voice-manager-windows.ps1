@@ -6,7 +6,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('list', 'list-simple', 'switch', 'get')]
+    [ValidateSet('list', 'list-simple', 'switch', 'get', 'replay')]
     [string]$Command = 'list',
 
     [Parameter(Position = 1)]
@@ -222,5 +222,39 @@ switch ($Command) {
 
     'get' {
         Show-CurrentVoice
+    }
+
+    'replay' {
+        $n = if ($VoiceName) { [int]$VoiceName } else { 1 }
+        $AudioDir = Join-Path (Split-Path -Parent $ClaudeDir) ".claude\audio"
+        if (-not (Test-Path $AudioDir)) {
+            $AudioDir = Join-Path $ClaudeDir "audio"
+        }
+        # Find project-local audio dir first
+        $ScriptClaudeDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+        $ProjectAudioDir = Join-Path $ScriptClaudeDir "audio"
+        if (Test-Path $ProjectAudioDir) { $AudioDir = $ProjectAudioDir }
+
+        $recentFiles = Get-ChildItem -Path $AudioDir -Filter "tts-*.wav" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 10
+
+        if (-not $recentFiles -or $recentFiles.Count -eq 0) {
+            Write-Output "No recent audio files found"
+            exit 1
+        }
+
+        if ($n -gt $recentFiles.Count) {
+            Write-Output "Only $($recentFiles.Count) recent files available (requested #$n)"
+            exit 1
+        }
+
+        $targetFile = $recentFiles[$n - 1]
+        Write-Output "Replaying: $($targetFile.Name)"
+
+        # Play using SoundPlayer
+        Add-Type -AssemblyName System.Media
+        $player = New-Object System.Media.SoundPlayer $targetFile.FullName
+        $player.PlaySync()
+        $player.Dispose()
     }
 }

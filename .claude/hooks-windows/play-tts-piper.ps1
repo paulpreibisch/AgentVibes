@@ -156,9 +156,9 @@ if (-not (Test-Path $VoiceModelFile)) {
     }
 }
 
-# Sanitize text for speech - strip shell metacharacters and PS special chars
+# Sanitize text for speech - strip only dangerous shell metacharacters
 $Text = $Text -replace '\\', ' '
-$Text = $Text -replace '[{}<>|`~^$;"''()]', ''
+$Text = $Text -replace '[{}<>|`~^;]', ''
 $Text = $Text -replace '\s+', ' '
 $Text = $Text.Trim()
 

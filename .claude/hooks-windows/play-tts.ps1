@@ -48,10 +48,10 @@ $ProviderScript = ""
 
 switch ($ActiveProvider) {
     { $_ -in "sapi", "windows-sapi" } {
-        $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1"
+        $ProviderScript = "$HooksDir\play-tts-sapi.ps1"
     }
     { $_ -in "piper", "windows-piper" } {
-        $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1"
+        $ProviderScript = "$HooksDir\play-tts-piper.ps1"
     }
     "soprano" {
         $ProviderScript = "$HooksDir\play-tts-soprano.ps1"
@@ -160,13 +160,13 @@ try {
 }
 catch {
     Write-Host "[ERROR] TTS Error: $_" -ForegroundColor Red
-    $env:AGENTVIBES_NO_PLAY = $null
+    Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
     exit 1
 }
 
 # Apply reverb and/or mix with background music
 if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
-    $env:AGENTVIBES_NO_PLAY = $null
+    Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
 
     # Find the most recent TTS wav file
     $AudioDir = "$ClaudeDir\audio"
@@ -188,7 +188,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
             if ($reverbFilter) {
                 $reverbedFile = "$AudioDir\tts-reverbed.wav"
                 $reverbArgs = "-y -i `"$voicePath`" -af `"$reverbFilter`" `"$reverbedFile`""
-                $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $reverbArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL"
+                $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $reverbArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "$env:TEMP\agentvibes-ffmpeg-stderr.txt"
                 if ($proc.ExitCode -eq 0 -and (Test-Path $reverbedFile)) {
                     $voicePath = $reverbedFile
                 }
@@ -263,7 +263,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                 try {
                     # Get voice duration to calculate total length
                     $probArgs = "-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 `"$voicePath`""
-                    $durationProc = Start-Process -FilePath "ffprobe" -ArgumentList $probArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL" -RedirectStandardOutput "$env:TEMP\agentvibes-duration.txt"
+                    $durationProc = Start-Process -FilePath "ffprobe" -ArgumentList $probArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "$env:TEMP\agentvibes-ffmpeg-stderr.txt" -RedirectStandardOutput "$env:TEMP\agentvibes-duration.txt"
                     $voiceDuration = 5  # default fallback
                     if (Test-Path "$env:TEMP\agentvibes-duration.txt") {
                         $durStr = (Get-Content "$env:TEMP\agentvibes-duration.txt" -Raw).Trim()
@@ -278,7 +278,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
 
                     # Run ffmpeg - use Start-Process to avoid stderr issues with $ErrorActionPreference
                     $ffmpegArgs = "-y -stream_loop -1 -i `"$BgTrackPath`" -i `"$voicePath`" -filter_complex `"$filter`" -map `"[out]`" -t $totalDuration `"$MixedFile`""
-                    $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $ffmpegArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL"
+                    $proc = Start-Process -FilePath "ffmpeg" -ArgumentList $ffmpegArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "$env:TEMP\agentvibes-ffmpeg-stderr.txt"
 
                     if ($proc.ExitCode -eq 0 -and (Test-Path $MixedFile) -and (Get-Item $MixedFile).Length -gt 0) {
                         # Play the mixed audio
@@ -340,5 +340,5 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
         }
     }
 } else {
-    $env:AGENTVIBES_NO_PLAY = $null
+    Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
 }

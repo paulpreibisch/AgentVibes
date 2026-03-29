@@ -31,8 +31,9 @@ if ($env:SOPRANO_PORT -and $env:SOPRANO_PORT -match '^\d+$') {
 }
 $SopranoDevice = if ($env:SOPRANO_DEVICE) { $env:SOPRANO_DEVICE } else { "auto" }
 
-# Sanitize text for TTS - strip shell metacharacters and PS special chars
-$Text = $Text -replace '[\\`"{}$<>|~^;''()]', '' -replace '\s+', ' '
+# Sanitize text for TTS - strip only dangerous shell metacharacters
+# Keep $, parens, quotes — these are harmless for TTS text piped to stdin
+$Text = $Text -replace '[\\`{}<>|~^;]', '' -replace '\s+', ' '
 $Text = $Text.Trim()
 
 if (-not $Text) {

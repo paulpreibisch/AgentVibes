@@ -1,33 +1,85 @@
 # AgentVibes Release Notes
 
-## 🎉 v4.3 — "Windows Parity" Release
+## 🎉 v4.4.0 — "Full Platform Parity" Release
 
 **Release Date:** March 2026
 
-Windows now has full feature parity with Linux/WSL for background music, voice selection, and the TUI installer.
+The biggest AgentVibes release since the TUI launched in v4.0. Three headline features: **BMAD Party Mode** gives every agent their own voice and music, **Windows Parity** brings full feature support to native Windows, and the **SSH Receiver** lets you hear your headless server speak on your local machine. Plus two rounds of adversarial code review hardening with 17+ security fixes.
 
-### 🎵 Background Music on Windows
-- **New `background-music-manager.ps1`** — full Windows port of the bash background music manager
-- **play-tts.ps1 reads from `audio-effects.cfg`** — same config as Linux with per-agent track support
-- **ffmpeg auto-install** via `winget` during installer flow
-- **PATH auto-refresh** so ffmpeg works immediately after install without shell restart
+### 🪟 Windows Parity — First-Class Windows Support
 
-### 🎤 Voice & Provider Fixes
-- **Voice selection from TUI works** — play-tts-windows-piper.ps1 now reads `tts-voice.txt` (set by TUI)
-- **Multi-speaker model support** — voices like libritts-high with named speakers (e.g. Bella, Evan) pass `--speaker` flag to Piper
-- **Voice manager, provider manager, and download-extra-voices** updated for Windows paths
+AgentVibes now runs natively on Windows with full feature parity:
 
-### 🖥️ TUI & Installer Fixes
+- **Background music on Windows** — New `background-music-manager.ps1`, full port of the Linux bash manager
+- **play-tts.ps1** reads `audio-effects.cfg` with per-agent track support, same as Linux
+- **ffmpeg auto-install** via `winget` during installer, PATH auto-refresh (no shell restart)
+- **Piper TTS native** — `piper.exe` resolved from `LOCALAPPDATA`, no WSL/bash needed
+- **Voice selection works** — `play-tts-windows-piper.ps1` reads `tts-voice.txt` set by TUI
+- **Multi-speaker models** — voices like libritts-high pass `--speaker` flag to Piper on Windows
+- **Windows SSH Receiver** — `setup-ssh-receiver.ps1` + `agentvibes-receiver.ps1` templates with hardened `sshd_config`
+- **TUI color contrast** — fixed for Windows Terminal (green focus, layout consistency)
+- **Music preview overlap** — switching tracks kills previous player via `taskkill`
+- **MCP Server** — strips `\r\n` line endings, accepts `[OK]` markers for PowerShell 5.1 compatibility
+
+### 🎭 BMAD Party Mode — Every Agent Has Its Own Voice
+
+When BMAD's party mode runs a multi-agent discussion, every agent speaks with their own individually configured voice, background music, reverb, and personality — making the Architect, PM, Developer, QA, and Analyst immediately recognizable.
+
+**Per-agent configuration:**
+- 🎙️ **Voice** — 914 voices, gender-aware auto-assign
+- 🎵 **Background Music** — Unique ambient track per agent (cinematic, lo-fi, jazz...)
+- 🎚️ **Music Volume** — Per-agent level, or bulk-set all at once
+- 🎛️ **Reverb** — none / room / hall / cathedral / studio
+- 💬 **Pretext** — Custom intro phrase ("Winston says:..." before every line)
+- 🎭 **Personality** — sarcastic, dramatic, pirate, cheerful, and more
+- 🔇 **No overlap** — speech lock serializes agents (mkdir-based, portable across platforms)
+- ✨ **Markdown stripped** — asterisks, emojis, and formatting removed before TTS
+
+### 🎛️ BMad Tab — Full Visual Agent Configurator
+
+New **BMad Tab** (`B` key) in `npx agentvibes` for managing every agent visually:
+
+- Voice, Gender, Provider, Reverb, Music, Vol, and Pretext columns
+- Voice names auto-beautified: `16Speakers::Rose_Ibex` → `Rose Ibex`
+- `Space` to preview with full profile (animated braille spinner while playing)
+- `Enter` to configure, `A` to auto-assign, `B` for bulk edit, `X` to reset
+
+### 🖥️ SSH Receiver Tab — Hear Your Headless Server
+
+New **Receiver Tab** streams TTS from voiceless remote servers to your local machine over TCP — perfect for cloud dev boxes, WSL2, and SSH sessions. Multi-provider TTS support, color-coded log columns, and platform-aware setup guide.
+
+### ⚡ Performance & UX
+- **TTS latency reduced ~1s** — batched 6 Node.js calls into 1, inotifywait queue worker, background cache cleanup
+- **ANSI colors restored** to TTS banner via `AGENTVIBES_WAV_OUTPATH` sidecar file
+- **Banner toggle** — hide TTS info without muting: `touch ~/.agentvibes/banner-disabled`
 - **`bin/agent-vibes` routes to blessed TUI** instead of old CLI installer
-- **Music preview overlap fixed** — switching tracks kills the previous player on Windows via `taskkill`
-- **ffmpeg shown in dependency check** screen with install status
-- **Voices display with proper friendly names** in the TUI
+- **Global hooks updated on upgrade** — `~/.claude/hooks/` synced automatically (#141)
+- **Markdown stripping in stop hook** — no more "asterisk asterisk" spoken aloud
 
-### 🔧 MCP Server Fixes
-- **Track name parsing** strips Windows `\r\n` line endings
-- **`[OK]` success markers** accepted alongside emoji markers (PowerShell 5.1 can't handle UTF-8 emoji in scripts)
+### 🔧 Code Hardening (Adversarial Review)
 
-**Previous release:** [v4.2](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.2)
+Two rounds of adversarial code review with 17+ fixes across HIGH and MEDIUM severity:
+
+**Round 2 (v4.4.0):**
+- Temp file leak on piper error — cleanup added to error handler (#151)
+- Orphaned player process — generation counter gates player spawn (#152)
+- Duplicate piper resolution — extracted `_resolvePiperBin()` shared helper (#153)
+- Race condition in process handoff — double generation check (#154)
+- Voice reuse modulo bug — per-group round-robin counter (#155)
+- Ambiguous gender names removed from hardcoded map (#156)
+
+**Round 1 (earlier commits):**
+- 11 receiver-tab security findings addressed
+- All HIGH and MEDIUM issues from agents-tab review fixed
+- Portable speech lock (mkdir instead of flock)
+- Path traversal prevention, credential masking, resource cleanup throughout
+
+### 🛡️ Quality
+- 611 Node unit tests passing, 213 BATS tests passing
+- Sonar quality gates validated across all changed files
+- JS syntax verified on all modules
+
+**Previous release:** [v4.0.0](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.0.0)
 
 ---
 

@@ -13,9 +13,19 @@ param(
     [string]$Provider
 )
 
-$ClaudeDir = "$env:USERPROFILE\.claude"
+# Use project-local .claude if available, like play-tts.ps1 does
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectClaudeDir = Split-Path -Parent $ScriptDir
+if (Test-Path (Join-Path $ProjectClaudeDir "config")) {
+    $ClaudeDir = $ProjectClaudeDir
+} else {
+    $ClaudeDir = "$env:USERPROFILE\.claude"
+}
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
-$ValidProviders = @('piper', 'windows-piper', 'sapi', 'windows-sapi', 'soprano')
+$ValidProviders = @('piper', 'sapi', 'soprano')
+# Backwards compat: normalize old names
+if ($Provider -eq 'windows-piper') { $Provider = 'piper' }
+if ($Provider -eq 'windows-sapi') { $Provider = 'sapi' }
 
 # Ensure claude directory exists
 if (-not (Test-Path $ClaudeDir)) {
@@ -97,8 +107,12 @@ function Set-ActiveProvider {
         return $false
     }
 
+    # Normalize legacy names
+    if ($NewProvider -eq "windows-piper") { $NewProvider = "piper" }
+    if ($NewProvider -eq "windows-sapi") { $NewProvider = "sapi" }
+
     # If trying to set piper, check if installed (standard location or PATH)
-    if ($NewProvider -eq "piper" -or $NewProvider -eq "windows-piper") {
+    if ($NewProvider -eq "piper") {
         $piperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
         $piperFound = (Test-Path $piperExe) -or ($null -ne (Get-Command piper.exe -ErrorAction SilentlyContinue))
         if (-not $piperFound) {
