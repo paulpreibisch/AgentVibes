@@ -56,11 +56,34 @@ New **Receiver Tab** streams TTS from voiceless remote servers to your local mac
 - **Global hooks updated on upgrade** — `~/.claude/hooks/` synced automatically (#141)
 - **Markdown stripping in stop hook** — no more "asterisk asterisk" spoken aloud
 
+### 🔌 Windows MCP Parity — 27/27 Tools Working (#157)
+
+All MCP tools now work natively on Windows (previously 12 silently failed):
+
+- **6 new PowerShell scripts** — personality-manager, speed-manager, language-manager, learn-manager, verbosity-manager, clean-audio-cache
+- **Unified provider naming** — `piper` and `sapi` on all platforms (no more `windows-piper`/`windows-sapi`)
+- **replay command** added to voice-manager for Windows
+- **28 new tests** — script parity, effects round-trip, provider management, naming consistency
+- **Feature-platform matrix** — `docs/feature-platform-matrix.md` tracks all 85 features across 4 platforms
+- **Adversarial review** found 24 issues, 10 fixed in this release
+
+**HIGH bug fixes:**
+- ffmpeg stderr redirected to temp file instead of literal `"NUL"` file on disk
+- `AGENTVIBES_NO_PLAY` env var properly cleaned up on error/kill paths
+- `PIPER_SPEAKER` env var no longer leaks between voice switches
+- Provider config now uses project-local `.claude` directory
+- Text over-sanitization fixed — `$50 (USD)` no longer becomes `50 USD`
+
 ### 🔧 Code Hardening (Adversarial Review)
 
-Two rounds of adversarial code review with 17+ fixes across HIGH and MEDIUM severity:
+Three rounds of adversarial code review with 27+ fixes across HIGH and MEDIUM severity:
 
-**Round 2 (v4.4.0):**
+**Round 3 (v4.4.0 — Windows parity):**
+- 6 CRITICAL missing script gaps closed (#157)
+- 4 HIGH severity bugs fixed (NUL redirect, env var leaks, config scope, speaker leak)
+- 3 MEDIUM fixes (text sanitization, error handling, provider naming)
+
+**Round 2 (v4.4.0 — agents tab):**
 - Temp file leak on piper error — cleanup added to error handler (#151)
 - Orphaned player process — generation counter gates player spawn (#152)
 - Duplicate piper resolution — extracted `_resolvePiperBin()` shared helper (#153)
@@ -75,7 +98,8 @@ Two rounds of adversarial code review with 17+ fixes across HIGH and MEDIUM seve
 - Path traversal prevention, credential masking, resource cleanup throughout
 
 ### 🛡️ Quality
-- 611 Node unit tests passing, 213 BATS tests passing
+- 639 Node unit tests passing, 213 BATS tests passing
+- 28 new Windows-specific platform parity tests
 - Sonar quality gates validated across all changed files
 - JS syntax verified on all modules
 
