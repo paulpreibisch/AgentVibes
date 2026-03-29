@@ -39,6 +39,7 @@ export class ProviderService {
    */
   setActiveProvider(provider) {
     this._config.set('provider', provider);
+    this._config.setGlobal('provider', provider);
     this._syncProviderFile(provider);
   }
 
@@ -95,19 +96,29 @@ export class ProviderService {
 
   /**
    * Returns the currently active voice ID from config.
-   * Defaults to 'en_US-amy-medium' if not configured.
-   * @returns {string}
+   * Falls back to first installed voice if not configured.
+   * @returns {string|null}
    */
   getActiveVoiceId() {
-    return this._config.getConfig().voice ?? 'en_US-amy-medium';
+    const voice = this._config.getConfig().voice;
+    if (voice) return voice;
+    // Detect first installed voice instead of hardcoding a default that may not exist
+    const voicesDir = path.join(os.homedir(), '.claude', 'piper-voices');
+    try {
+      const models = fs.readdirSync(voicesDir).filter(f => f.endsWith('.onnx'));
+      if (models.length > 0) return models[0].replace(/\.onnx$/, '');
+    } catch { /* dir may not exist */ }
+    return null;
   }
 
   /**
    * Sets the active voice ID in config.
+   * Writes to both project (if exists) and global config for portability.
    * @param {string} voiceId
    */
   setActiveVoice(voiceId) {
     this._config.set('voice', voiceId);
+    this._config.setGlobal('voice', voiceId);
   }
 
   // ---------------------------------------------------------------------------

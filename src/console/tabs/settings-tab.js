@@ -37,8 +37,18 @@ function _resolvePiperBin() {
     const lad = process.env.LOCALAPPDATA ||
       (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
     if (lad) {
+      // Standalone binary install
       const exe = path.join(lad, 'Programs', 'Piper', 'piper.exe');
       if (fs.existsSync(exe)) return exe;
+      // pip-installed piper (Python Scripts directory)
+      const pyScripts = path.join(lad, 'Programs', 'Python');
+      try {
+        const pyDirs = fs.readdirSync(pyScripts).filter(d => d.startsWith('Python'));
+        for (const d of pyDirs) {
+          const pipExe = path.join(pyScripts, d, 'Scripts', 'piper.exe');
+          if (fs.existsSync(pipExe)) return pipExe;
+        }
+      } catch { /* no Python installs */ }
     }
   }
   return 'piper';
@@ -906,13 +916,18 @@ export function createSettingsTab(screen, services) {
       if (!_samplePlaying) { try { fs.unlinkSync(tempWav); } catch {} return; }
       if (code !== 0) {
         _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn);
+        _showNotice(screen, 'Voice synthesis failed — check voice model');
         try { fs.unlinkSync(tempWav); } catch {}
         return;
       }
       playBtn.setContent('■ Stop');
       screen.render();
       const _wavPlayer2 = detectWavPlayer(_sampleEnv);
-      if (!_wavPlayer2) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
+      if (!_wavPlayer2) {
+        _stopSpinner(); _killSample(); playBtn.setContent('▶ Play');
+        _showNotice(screen, 'No audio player found — install ffplay, sox, or mpv');
+        screen.render(); return;
+      }
       const playProc = spawn(_wavPlayer2.bin, _wavPlayer2.args(tempWav), _spawnOpts(_sampleEnv));
       _sampleProcess = playProc;
       const _done = () => { _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); try { fs.unlinkSync(tempWav); } catch {} };
@@ -1027,23 +1042,59 @@ export function createSettingsTab(screen, services) {
       // Piper (default): pipe text via stdin
       _startSpinner(playBtn, 'Synthesizing…');
       const voiceId   = providerService.getActiveVoiceId();
-      if (!voiceId) { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return; }
+      if (!voiceId) {
+        _stopSpinner(); _killSample(); playBtn.setContent('▶ Play');
+        _showNotice(screen, 'No voice selected — choose a voice first');
+        screen.render(); return;
+      }
       const _ms2 = parseMultiSpeaker(voiceId);
       const voicePath = path.resolve(PIPER_VOICES_DIR, _ms2.model + '.onnx');
       const safeBase  = path.resolve(PIPER_VOICES_DIR);
       if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) {
-        _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); screen.render(); return;
+        _stopSpinner(); _killSample(); playBtn.setContent('▶ Play');
+        _showNotice(screen, 'Invalid voice path');
+        screen.render(); return;
+      }
+      const piperBin2 = _resolvePiperBin();
+      if (piperBin2 === 'piper') {
+        // Bare command — verify it exists in PATH before spawning
+        const whichCmd = _IS_WINDOWS ? 'where' : 'which';
+        const whichResult = spawnSync(whichCmd, [_IS_WINDOWS ? 'piper.exe' : 'piper'], { stdio: 'pipe', env: _sampleEnv });
+        if (whichResult.status !== 0) {
+          _stopSpinner(); _killSample(); playBtn.setContent('▶ Play');
+          _showNotice(screen, 'Piper not installed — run the installer or: pip install piper-tts');
+          _focusButton(playBtn); screen.render(); return;
+        }
       }
       const _piperArgs2 = ['--model', voicePath, '--output_file', tempWav];
       if (_ms2.speakerId != null) _piperArgs2.push('--speaker', String(_ms2.speakerId));
-      const piper = spawn(_resolvePiperBin(), _piperArgs2, {
-        stdio: ['pipe', 'ignore', 'ignore'], detached: !_IS_WINDOWS, windowsHide: true, env: _sampleEnv,
+      const piper = spawn(piperBin2, _piperArgs2, {
+        stdio: ['pipe', 'ignore', 'pipe'], detached: !_IS_WINDOWS, windowsHide: true, env: _sampleEnv,
       });
+      let _piperStderr = '';
+      piper.stderr.on('data', (d) => { _piperStderr += d.toString(); });
       piper.stdin.write(phrase + '\n');
       piper.stdin.end();
       _sampleProcess = piper;
-      piper.on('exit', _onSynthDone);
-      piper.on('error', () => { _stopSpinner(); _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn); });
+      piper.on('exit', (code) => {
+        if (code !== 0 && _piperStderr) {
+          // Python tracebacks: actual error is the LAST non-empty line
+          const lines = _piperStderr.split('\n').map(l => l.trim()).filter(Boolean);
+          const errLine = lines[lines.length - 1] || lines[0] || 'unknown error';
+          _stopSpinner();
+          if (!_samplePlaying) { try { fs.unlinkSync(tempWav); } catch {} return; }
+          _killSample(); playBtn.setContent('▶ Play'); _focusButton(playBtn);
+          _showNotice(screen, errLine.length > 100 ? errLine.substring(0, 97) + '…' : errLine);
+          try { fs.unlinkSync(tempWav); } catch {}
+          return;
+        }
+        _onSynthDone(code);
+      });
+      piper.on('error', (e) => {
+        _stopSpinner(); _killSample(); playBtn.setContent('▶ Play');
+        _showNotice(screen, `Piper failed: ${e.message}`);
+        _focusButton(playBtn);
+      });
     }
   });
   playBtn.top = 7;

@@ -5139,6 +5139,19 @@ Troubleshooting:
     }
     await fs.writeFile(voiceConfigPath, defaultVoice);
 
+    // Sync voice + provider to global .agentvibes/config.json so TUI finds them
+    // regardless of which directory it's launched from
+    const globalAvDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
+    try {
+      await fs.mkdir(globalAvDir, { recursive: true });
+      const globalCfgPath = path.join(globalAvDir, 'config.json');
+      let globalCfg = {};
+      try { globalCfg = JSON.parse(await fs.readFile(globalCfgPath, 'utf8')); } catch { /* new file */ }
+      globalCfg.voice = defaultVoice;
+      globalCfg.provider = selectedProvider;
+      await fs.writeFile(globalCfgPath, JSON.stringify(globalCfg, null, 2), { mode: 0o600 });
+    } catch { /* best-effort global sync */ }
+
     // Detect and migrate old configuration
     await detectAndMigrateOldConfig(targetDir, silentSpinner);
 
