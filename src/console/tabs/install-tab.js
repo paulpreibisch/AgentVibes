@@ -19,6 +19,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
 import { buildAudioEnv } from '../audio-env.js';
+import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
 import {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
@@ -178,8 +179,10 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Wizard state
 
-  let _screen = 1;
-  let _lastScreen = 0;
+  let _screen = 0;
+  let _lastScreen = -1;
+  let _lang = 'en';
+  let _langIdx = 0;
   let _deps = null;
   let _checking = false;
   let _selectedProvider = null;
@@ -586,6 +589,23 @@ export function createInstallTab(screen, services) {
   const _HDR = (emoji, label) =>
     `{${COLORS.sectionHdr}-fg}${emoji}  ${label} ${'─'.repeat(100)}{/${COLORS.sectionHdr}-fg}`;
 
+  function _renderScreen0() {
+    const lines = [
+      _HDR('🌐', 'Language / Idioma / Langue / Sprache / 言語 / भाषा / 语言 / 언어'),
+      '',
+      '  Select your language:',
+      '',
+      ...SUPPORTED_LANGUAGES.map((l, i) =>
+        i === _langIdx
+          ? `  {green-fg}► ${l.name}{/green-fg}`
+          : `    ${l.name}`
+      ),
+    ];
+    contentBox.setContent(_c(lines));
+    hintLine.setContent('  Screen 0: Language  |  [↑/↓] Select  |  [Enter] Apply & Continue  |  [→] Skip (English)');
+    screen.render();
+  }
+
   function _renderScreen1() {
     contentBox.setContent(_c([
       _HDR('🔧', 'Setup Wizard'),
@@ -778,7 +798,7 @@ export function createInstallTab(screen, services) {
       _completionModalBox = null;
     }
     _completionModalOpen = false;
-    _screen = 1;
+    _screen = 0;
     box.hide();
     _showInstallNotice('Installation Complete — Settings Saved');
     screen.render();
@@ -792,6 +812,8 @@ export function createInstallTab(screen, services) {
     } else {
       _s1BeginBtn.hide(); _s1ExitBtn.hide();
     }
+
+    // Screen 0 has no button widgets — nav is handled via key handlers
 
     // Screen 2 continue button: hidden on other screens; _renderScreen2 manages show/focus
     if (_screen !== 2) _s2ContinueBtn.hide();
@@ -842,6 +864,7 @@ export function createInstallTab(screen, services) {
       setTimeout(() => {
         if (_screen !== targetScreen) return;
         switch (_screen) {
+          case 0: _renderScreen0(); break;
           case 1: _renderScreen1(); break;
           case 2: _renderScreen2(); break;
           case 3: _renderScreen3(); break;
@@ -852,6 +875,7 @@ export function createInstallTab(screen, services) {
       return;
     }
     switch (_screen) {
+      case 0: _renderScreen0(); break;
       case 1: _renderScreen1(); break;
       case 2: _renderScreen2(); break;
       case 3: _renderScreen3(); break;
@@ -870,6 +894,12 @@ export function createInstallTab(screen, services) {
   screen.key(['enter'], () => {
     if (box.hidden || _checking) return;
     if (_completionModalOpen) { _dismissCompletionModal(); return; }  // always first
+    if (_screen === 0) {  // Screen 0: apply selected language and advance
+      _lang = SUPPORTED_LANGUAGES[_langIdx].value;
+      _screen = 1;
+      _showCurrentScreen();
+      return;
+    }
     if (_screen === 1) return;  // Screen 1: Enter handled by Begin/Exit buttons
     if (_screen === 2) return;  // Screen 2: Enter handled by Continue button
     if (_screen === 4) return;  // Screen 4: Enter handled by the focused button
@@ -883,7 +913,7 @@ export function createInstallTab(screen, services) {
   screen.key(['escape'], () => {
     if (box.hidden || _checking) return;
     if (_completionModalOpen) { _dismissCompletionModal(); return; }
-    if (_screen > 1) {
+    if (_screen > 0) {
       _screen--;
       _showCurrentScreen();
     } else {
@@ -899,6 +929,11 @@ export function createInstallTab(screen, services) {
 
   screen.key(['up'], () => {
     if (box.hidden) return;
+    if (_screen === 0) {
+      _langIdx = Math.max(0, _langIdx - 1);
+      _renderScreen0();
+      return;
+    }
     if (_screen === 3 && _deps) {
       const providers = [];
       if (_deps.piper)   providers.push('piper');
@@ -914,16 +949,23 @@ export function createInstallTab(screen, services) {
   screen.key(['left'], () => {
     if (box.hidden || _checking) return;
     if (_screen === 4) return;
-    if (_screen > 1) {
+    if (_screen > 0) {
       _screen--;
       _showCurrentScreen();
     }
   });
 
   // Right arrow = go forward (same logic as Enter, without save/finish side-effects)
+  // Screen 0: → skips language selection (keeps English)
   // Screen 1: right arrow handled by button ←/→ navigation
   screen.key(['right'], () => {
     if (box.hidden || _checking) return;
+    if (_screen === 0) {  // → skips: keep current _lang (default 'en') and advance
+      _lang = SUPPORTED_LANGUAGES[_langIdx].value;
+      _screen = 1;
+      _showCurrentScreen();
+      return;
+    }
     if (_screen === 1) return;
     if (_screen === 2) return;  // Screen 2: → handled by Continue button
     if (_screen === 3) { _screen++; _showCurrentScreen(); return; }  // → confirms provider and advances
@@ -931,10 +973,15 @@ export function createInstallTab(screen, services) {
     if (_screen === 5) return;  // Screen 5: → handled by button nav
   });
 
-  // Down arrow: Screen 3 provider nav; Screen 1 ↓ is handled by button key handlers
+  // Down arrow: Screen 0 language nav; Screen 3 provider nav; Screen 1 ↓ is handled by button key handlers
   // (tab bar's el.key(['down']) → onFocus() focuses Begin, then button ↓ → Exit)
   screen.key(['down'], () => {
     if (box.hidden) return;
+    if (_screen === 0) {
+      _langIdx = Math.min(SUPPORTED_LANGUAGES.length - 1, _langIdx + 1);
+      _renderScreen0();
+      return;
+    }
     if (_screen === 3 && _deps) {
       const providers = [];
       if (_deps.piper)   providers.push('piper');
@@ -961,7 +1008,9 @@ export function createInstallTab(screen, services) {
     box,
 
     show() {
-      _screen = 1;
+      _screen = 0;
+      _langIdx = 0;
+      _lang = 'en';
       _screen5Announced = false;
       _installLog      = [];
       _installRunning  = false;
@@ -982,7 +1031,9 @@ export function createInstallTab(screen, services) {
 
     onFocus() {
       // Focus the active interactive element, not just the box container
-      if (_screen === 1) {
+      if (_screen === 0) {
+        box.focus();  // Screen 0 uses key handlers, no button widgets
+      } else if (_screen === 1) {
         _s1BeginBtn.focus();
       } else if (_screen === 4) {
         _editBtn.focus();
