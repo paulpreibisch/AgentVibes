@@ -18,6 +18,8 @@ import {
   PIPER_VOICES_DIR, COL_NAME_W, COL_GENDER_W, SAMPLE_PHRASES,
   parseVoiceId, parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, getFavorites, toggleFavorite,
 } from './voices-tab.js';
+import { LanguageService } from '../../services/language-service.js';
+import { SUPPORTED_LANGUAGES } from '../../i18n/strings.js';
 import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite, applyTrackToAudioEffects } from './music-tab.js';
 import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
 import { buildAudioEnv, detectMp3Player, detectWavPlayer } from '../audio-env.js';
@@ -738,12 +740,13 @@ export function createSettingsTab(screen, services) {
   // -------------------------------------------------------------------------
   // Sub-tab bar — Voice | Effects | Personality | Output
 
-  const SUB_TABS = ['voice', 'effects', 'personality', 'output'];
+  const SUB_TABS = ['voice', 'effects', 'personality', 'output', 'language'];
   const SUB_TAB_LABELS = {
     voice:       ' [V] Voice ',
     effects:     ' [E] Effects ',
     personality: ' [P] Personality ',
     output:      ' [O] Output ',
+    language:    ' [L] Language ',
   };
   let _activeSubTab = 'voice';
 
@@ -1680,6 +1683,88 @@ export function createSettingsTab(screen, services) {
   cancelChangesBtn.left = 66;
 
   // -------------------------------------------------------------------------
+  // Section: 🌐 Language
+
+  const languageSectionHeader = blessed.text({
+    parent: box,
+    top: 3,
+    left: 1,
+    content: '{bright-cyan-fg} 🌐 Language {/bright-cyan-fg}',
+    tags: true,
+    style: { bg: COLORS.contentBg },
+  });
+
+  const languageCurrentLabel = blessed.text({
+    parent: box,
+    top: 5,
+    left: 6,
+    content: 'Language:',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const languageCurrentValue = blessed.text({
+    parent: box,
+    top: 5,
+    left: 22,
+    width: 30,
+    wrap: false,
+    content: '',
+    style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
+  });
+
+  let _langListIdx = 0;
+
+  const languageList = blessed.box({
+    parent: box,
+    top: 7,
+    left: 4,
+    width: 40,
+    height: Math.min(SUPPORTED_LANGUAGES.length + 2, 12),
+    tags: true,
+    content: '',
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  function _renderLangList() {
+    const lines = SUPPORTED_LANGUAGES.map((l, i) =>
+      i === _langListIdx
+        ? `{green-fg}► ${l.name}{/green-fg}`
+        : `  ${l.name}`
+    );
+    languageList.setContent(lines.join('\n'));
+  }
+
+  const langApplyBtn = _createButton(box, screen, '✓ Apply Language', COLORS, () => {
+    const selected = SUPPORTED_LANGUAGES[_langListIdx];
+    if (selected && services.languageService) {
+      services.languageService.setLang(selected.value);
+      refreshLanguageDisplay();
+      _showNotice(screen, `Language: ${selected.name}`);
+    }
+  }, { bg: '#2e7d32' });
+  langApplyBtn.top = 7 + Math.min(SUPPORTED_LANGUAGES.length + 2, 12) + 1;
+  langApplyBtn.left = 4;
+
+  function refreshLanguageDisplay() {
+    const currentLang = services.languageService?.getLang() ?? 'en';
+    const found = SUPPORTED_LANGUAGES.find(l => l.value === currentLang);
+    languageCurrentValue.setContent(found ? found.name : currentLang);
+    const idx = SUPPORTED_LANGUAGES.findIndex(l => l.value === currentLang);
+    if (idx >= 0) _langListIdx = idx;
+    _renderLangList();
+    screen.render();
+  }
+
+  // Key navigation for language list
+  box.key(['up', 'down'], (ch, key) => {
+    if (_activeSubTab !== 'language') return;
+    if (key.name === 'up') _langListIdx = Math.max(0, _langListIdx - 1);
+    if (key.name === 'down') _langListIdx = Math.min(SUPPORTED_LANGUAGES.length - 1, _langListIdx + 1);
+    _renderLangList();
+    screen.render();
+  });
+
+  // -------------------------------------------------------------------------
   // Display state + button-level focus navigation (story 7.6)
 
   // Widget groups for each sub-tab (used by _showSubTab to show/hide)
@@ -1711,6 +1796,12 @@ export function createSettingsTab(screen, services) {
       configGlobalLabel, configGlobalValue,
       configLocalLabel, configLocalValue,
     ],
+    language: [
+      languageSectionHeader,
+      languageCurrentLabel, languageCurrentValue,
+      languageList,
+      langApplyBtn,
+    ],
   };
 
   // Row groups per sub-tab for ↑↓ navigation
@@ -1719,6 +1810,7 @@ export function createSettingsTab(screen, services) {
     effects:     [[reverbChangeBtn, reverbTestBtn], [trackChangeBtn, musicToggleBtn, musicTestBtn], [volumeChangeBtn]],
     personality: [[verbosityChangeBtn], [personalityChangeBtn, personalityTestBtn], [introEditBtn, introClearBtn]],
     output:      [[audioDstChangeBtn], [audioSshEditBtn, audioStreamModeBtn]],
+    language:    [[langApplyBtn]],
   };
 
   const _subTabItemsArray = SUB_TABS.map(id => _subTabItemsMap[id]);
@@ -2065,6 +2157,9 @@ export function createSettingsTab(screen, services) {
   _showSubTab('voice');
   _currentIdx = _buttons.indexOf(switchBtn);
 
+  // Keyboard shortcuts for direct sub-tab access
+  box.key(['l', 'L'], () => { _showSubTab('language'); });
+
   // @function _refreshSopranoStatus
   // @intent Update the provider status glyph (🟢/🟡/🔴) without blocking the render loop
   // @why soprano-manager status does an HTTP health-check (up to 2s) — must be async
@@ -2196,6 +2291,7 @@ export function createSettingsTab(screen, services) {
       box.show();
       refreshDisplay();
       refreshConfigDisplay();
+      refreshLanguageDisplay();
       // Force full olines invalidation — prevents ghost rows when the tab becomes visible
       try {
         for (let r = 0; r < screen.height; r++)

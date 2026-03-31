@@ -610,6 +610,9 @@ export function createInstallTab(screen, services) {
   }
 
   function _renderScreen1() {
+    // Update button labels to current language before focus triggers the decorator
+    _s1BeginBtn.setContent(t(_getLang(), 'beginBtn'));
+    _s1ExitBtn.setContent(t(_getLang(), 'exitBtn'));
     contentBox.setContent(_c([
       _HDR('🔧', t(_getLang(), 'setupWizard')),
       '',
