@@ -532,26 +532,44 @@ export function createSettingsTab(screen, services) {
           return;
         }
 
-        // Apply sox reverb based on current preset (read from config, not bash script)
+        // Apply reverb based on current preset (read from config)
         const preset = configService.getConfig().effects?.reverbPreset ?? EFFECTS_DEFAULTS.reverbPreset;
-
-        const SOX_REVERB = {
-          light:    'reverb 20 50 50',
-          medium:   'reverb 40 50 70',
-          heavy:    'reverb 70 50 100',
-          cathedral: 'reverb 90 30 100',
-        };
-        const soxFx = SOX_REVERB[preset];
 
         let wavToPlay = tempWav;
         let processedWav = null;
 
-        if (soxFx) {
+        if (preset && preset !== 'off') {
           processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
-          spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
-            stdio: 'ignore', timeout: 5000, env: _testEnv,
-          });
-          // Use processed wav if sox succeeded
+          if (_IS_WINDOWS) {
+            // Windows: use ffmpeg aecho (same filter as play-tts.ps1)
+            const FFMPEG_REVERB = {
+              light:     'aecho=0.8:0.88:60:0.4',
+              medium:    'aecho=0.8:0.88:60|120:0.4|0.3',
+              heavy:     'aecho=0.8:0.88:60|120|180:0.4|0.3|0.2',
+              cathedral: 'aecho=0.8:0.88:100|200|300|400:0.3|0.25|0.2|0.15',
+            };
+            const filter = FFMPEG_REVERB[preset];
+            if (filter) {
+              spawnSync('ffmpeg', ['-y', '-i', tempWav, '-af', filter, processedWav], {
+                stdio: 'ignore', timeout: 5000, env: _testEnv,
+              });
+            }
+          } else {
+            // Linux/macOS: use sox
+            const SOX_REVERB = {
+              light:    'reverb 20 50 50',
+              medium:   'reverb 40 50 70',
+              heavy:    'reverb 70 50 100',
+              cathedral: 'reverb 90 30 100',
+            };
+            const soxFx = SOX_REVERB[preset];
+            if (soxFx) {
+              spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
+                stdio: 'ignore', timeout: 5000, env: _testEnv,
+              });
+            }
+          }
+          // Use processed wav if effect succeeded
           try {
             fs.accessSync(processedWav);
             wavToPlay = processedWav;
@@ -1153,6 +1171,13 @@ export function createSettingsTab(screen, services) {
   const reverbChangeBtn = _createButton(box, screen, 'Change', COLORS, () => {
     openReverbPicker(screen, configService.getConfig().effects?.reverbPreset ?? 'light', (preset) => {
       _setEffects(configService, { reverbPreset: preset });
+      // On Windows, sync reverb-level.txt so play-tts.ps1 picks it up
+      if (_IS_WINDOWS) {
+        const effectsMgr = path.join(process.cwd(), '.claude', 'hooks-windows', 'effects-manager.ps1');
+        spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', effectsMgr, 'set-reverb', preset, 'default'], {
+          stdio: 'ignore', timeout: 5000,
+        });
+      }
       refreshDisplay();
     }, _restoreFocus);
   }, { bg: COLORS.btnChange });
