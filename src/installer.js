@@ -72,6 +72,8 @@ import {
 } from './utils/provider-validator.js';
 import { promptForCustomMusic } from './installer/music-file-input.js';
 import { createPreviewListPrompt } from './utils/preview-list-prompt.js';
+import { selectLanguage } from './installer/language-screen.js';
+import { t } from './i18n/strings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -4939,8 +4941,14 @@ async function install(options = {}) {
   const configOffset = 0;
 
   // Loop to allow going back to welcome screen
+  let lang = 'en';
   let userConfig = null;
+  const isNonInteractive = options.yes || options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1';
   while (!userConfig) {
+    // Language selection screen — skip in non-interactive / CI mode
+    if (!isNonInteractive) {
+      lang = await selectLanguage(lang);
+    }
     showWelcome();
 
     // Show release notes and recent changes after welcome banner
@@ -4973,6 +4981,7 @@ async function install(options = {}) {
     // Returns null if user wants to go back to welcome
     userConfig = await collectConfiguration({
       ...options,
+      lang,
       pageOffset: configOffset,
       totalPages: configPages // Temporary, will show correct count later
     });
@@ -5202,6 +5211,13 @@ Troubleshooting:
       } catch {
         // Audio effects config not yet available — non-fatal
       }
+    }
+
+    // Persist language selection — validate against known codes before writing
+    if (lang && /^[a-zA-Z]{2}(-[a-zA-Z]{2})?$/.test(lang)) {
+      const langConfigPath = path.join(claudeDir, 'config', 'language.txt');
+      await fs.mkdir(path.join(claudeDir, 'config'), { recursive: true });
+      await fs.writeFile(langConfigPath, lang, { mode: 0o600 });
     }
 
     // Apply verbosity, personality, pretext
