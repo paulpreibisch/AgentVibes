@@ -20,8 +20,8 @@ Legend:
 |---|---------|--------|:-----------:|:-------:|:---:|-----------|----------|:----:|
 | 1 | TTS playback (main) | `play-tts` | Y | Y | Y | - (hook) | `text_to_speech` | Y |
 | 2 | Piper TTS provider | `play-tts-piper` | Y | - | Y | `/provider switch piper` | `set_provider` | Y |
-| 3 | Windows Piper provider | `play-tts-windows-piper` | N/A | Y | N/A | `/provider switch windows-piper` | `set_provider` | Y |
-| 4 | Windows SAPI provider | `play-tts-windows-sapi` | N/A | Y | N/A | `/provider switch windows-sapi` | `set_provider` | Y |
+| 3 | Windows Piper provider | `play-tts-piper` | N/A | Y | N/A | `/provider switch piper` | `set_provider` | Y |
+| 4 | Windows SAPI provider | `play-tts-sapi` | N/A | Y | N/A | `/provider switch sapi` | `set_provider` | Y |
 | 5 | macOS Say provider | `play-tts-macos` | Y | N/A | N/A | `/provider switch macos` | `set_provider` | - |
 | 6 | Soprano provider | `play-tts-soprano` | Y | Y | Y | `/provider switch soprano` | `set_provider` | - |
 | 7 | Termux SSH provider | `play-tts-termux-ssh` | Y | - | Y | `/provider switch termux-ssh` | `set_provider` | - |

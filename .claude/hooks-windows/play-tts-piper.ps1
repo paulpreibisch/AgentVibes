@@ -1,5 +1,5 @@
 #
-# File: .claude/hooks-windows/play-tts-windows-piper.ps1
+# File: .claude/hooks-windows/play-tts-piper.ps1
 #
 # AgentVibes - Windows Piper TTS Provider
 # High-quality neural TTS using Piper.exe

@@ -22,7 +22,7 @@ if (Test-Path (Join-Path $ProjectClaudeDir "config")) {
     $ClaudeDir = "$env:USERPROFILE\.claude"
 }
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
-$ValidProviders = @('piper', 'sapi', 'soprano')
+$ValidProviders = @('piper', 'sapi', 'soprano', 'termux-ssh')
 # Backwards compat: normalize old names
 if ($Provider -eq 'windows-piper') { $Provider = 'piper' }
 if ($Provider -eq 'windows-sapi') { $Provider = 'sapi' }
@@ -89,6 +89,21 @@ function Get-AvailableProviders {
         name = "soprano"
         description = "Soprano TTS (Ultra-fast Neural, pip install soprano-tts)"
         installed = $sopranoInstalled
+    }
+
+    # Check if termux-ssh is configured (ssh.exe available + host configured)
+    $termuxSshConfigured = $false
+    $sshExe = Get-Command ssh.exe -ErrorAction SilentlyContinue
+    if ($sshExe) {
+        $hostFile = "$ClaudeDir\termux-ssh-host.txt"
+        $globalHostFile = "$env:USERPROFILE\.claude\termux-ssh-host.txt"
+        $termuxSshConfigured = (Test-Path $hostFile) -or (Test-Path $globalHostFile) -or ($env:TERMUX_SSH_HOST -ne "")
+    }
+
+    $available += @{
+        name = "termux-ssh"
+        description = "Android Termux SSH TTS (plays on Android via termux-tts-speak)"
+        installed = $termuxSshConfigured
     }
 
     return $available

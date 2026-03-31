@@ -199,7 +199,12 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
 
   function _killPreview() {
     if (_previewProc) {
-      try { process.kill(-_previewProc.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _previewProc.kill(); } catch {}
+      } else {
+        try { process.kill(-_previewProc.pid, 'SIGTERM'); } catch {}
+      }
       _previewProc = null;
     }
     _previewTrackId = null;

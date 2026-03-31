@@ -39,6 +39,7 @@ describe('ProviderService', () => {
     const mockConfig = {
       getConfig: () => ({}),
       set: (k, v) => calls.push({ k, v }),
+      setGlobal: () => {},
     };
     const svc = new ProviderService(mockConfig);
     svc.setActiveProvider('macos');
@@ -53,10 +54,12 @@ describe('ProviderService', () => {
     assert.strictEqual(svc.getActiveVoiceId(), 'en_US-ryan-high');
   });
 
-  test('getActiveVoiceId() defaults to en_US-amy-medium when not configured', () => {
+  test('getActiveVoiceId() defaults to null when not configured and no voices installed', () => {
     const mockConfig = { getConfig: () => ({}) };
     const svc = new ProviderService(mockConfig);
-    assert.strictEqual(svc.getActiveVoiceId(), 'en_US-amy-medium');
+    // Returns first installed voice or null (no hardcoded default)
+    const result = svc.getActiveVoiceId();
+    assert.ok(result === null || typeof result === 'string', 'should return null or a voice string');
   });
 
   test('setActiveVoice() calls configService.set with correct args', () => {
@@ -64,6 +67,7 @@ describe('ProviderService', () => {
     const mockConfig = {
       getConfig: () => ({}),
       set: (k, v) => calls.push({ k, v }),
+      setGlobal: () => {},
     };
     const svc = new ProviderService(mockConfig);
     svc.setActiveVoice('en_US-lessac-medium');

@@ -141,7 +141,7 @@ Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile"
 # Configure voice for play-tts.ps1
 # ---------------------------------------------------------------------------
 
-# Write voice to tts-voice.txt so play-tts-windows-piper.ps1 picks it up
+# Write voice to tts-voice.txt so play-tts-piper.ps1 picks it up
 # Format: "voiceId" or "voiceId::SpeakerName-ID"
 $voiceFile = "$ClaudeDir\tts-voice.txt"
 Set-Content -Path $voiceFile -Value $script:Voice -NoNewline -ErrorAction SilentlyContinue

@@ -283,8 +283,8 @@ if (-not (Test-Path $HooksDir)) {
 $HookScriptInfo = @(
     @{ Name = "play-tts.ps1"; Desc = "Main TTS router - dispatches to active provider" },
     @{ Name = "play-tts-soprano.ps1"; Desc = "Soprano neural voice provider (fastest)" },
-    @{ Name = "play-tts-windows-piper.ps1"; Desc = "Piper offline neural voice provider" },
-    @{ Name = "play-tts-windows-sapi.ps1"; Desc = "Windows built-in SAPI voice provider" },
+    @{ Name = "play-tts-piper.ps1"; Desc = "Piper offline neural voice provider" },
+    @{ Name = "play-tts-sapi.ps1"; Desc = "Windows built-in SAPI voice provider" },
     @{ Name = "provider-manager.ps1"; Desc = "Switch between TTS providers" },
     @{ Name = "voice-manager-windows.ps1"; Desc = "Browse and select voice models" },
     @{ Name = "audio-cache-utils.ps1"; Desc = "Manage TTS audio file cache" },
@@ -765,11 +765,11 @@ try {
             }
         }
         "piper" {
-            & "$HooksDir\play-tts-windows-piper.ps1" $TestMessage | Out-Null
+            & "$HooksDir\play-tts-piper.ps1" $TestMessage | Out-Null
             Write-Ok "Piper TTS is working"
         }
         "sapi" {
-            & "$HooksDir\play-tts-windows-sapi.ps1" $TestMessage | Out-Null
+            & "$HooksDir\play-tts-sapi.ps1" $TestMessage | Out-Null
             Write-Ok "Windows SAPI is working"
         }
     }

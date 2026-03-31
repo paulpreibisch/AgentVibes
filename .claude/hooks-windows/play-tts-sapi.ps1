@@ -1,5 +1,5 @@
 #
-# File: .claude/hooks-windows/play-tts-windows-sapi.ps1
+# File: .claude/hooks-windows/play-tts-sapi.ps1
 #
 # AgentVibes - Windows SAPI TTS Provider (Zero Dependencies)
 # Uses built-in Windows System.Speech API

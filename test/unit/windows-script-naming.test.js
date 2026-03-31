@@ -59,13 +59,11 @@ test('Naming: server.py class constants override auto-conversion for known misma
 });
 
 test('Naming: all .ps1 scripts follow standard naming (no windows- prefix in hook scripts)', () => {
-  // Provider scripts (play-tts-windows-piper.ps1, play-tts-windows-sapi.ps1) use
-  // "windows-" prefix. This means auto-conversion from play-tts-piper.sh would
-  // produce play-tts-piper.ps1, NOT play-tts-windows-piper.ps1
+  // Provider scripts should use standard names (play-tts-piper.ps1, play-tts-sapi.ps1)
+  // without the "windows-" prefix, matching the cross-platform naming convention.
   const problematicNames = [
     { windowsName: 'play-tts-windows-piper.ps1', standardName: 'play-tts-piper.ps1' },
     { windowsName: 'play-tts-windows-sapi.ps1', standardName: 'play-tts-sapi.ps1' },
-    { windowsName: 'voice-manager-windows.ps1', standardName: 'voice-manager.ps1' },
   ];
 
   const mismatches = [];
@@ -78,15 +76,7 @@ test('Naming: all .ps1 scripts follow standard naming (no windows- prefix in hoo
     }
   }
 
-  if (mismatches.length > 0) {
-    // Document the mismatches — these need fixing for auto-conversion to work
-    console.log(`  Naming mismatches found (${mismatches.length}):`);
-    mismatches.forEach(m => console.log(`    - ${m}`));
-  }
-
-  // This test documents the issue but doesn't hard-fail since class constants
-  // currently work around it. Uncomment the assertion below when fixing:
-  // assert.strictEqual(mismatches.length, 0, `Naming mismatches: ${mismatches.join('; ')}`);
+  assert.strictEqual(mismatches.length, 0, `Naming mismatches: ${mismatches.join('; ')}`);
 });
 
 // ============================================================
@@ -114,11 +104,11 @@ const PLATFORM_SPECIFIC = new Set([
 
 // Scripts that are handled differently on Windows (not a 1:1 port)
 const WINDOWS_HANDLED_DIFFERENTLY = new Set([
-  'play-tts-piper',       // -> play-tts-windows-piper.ps1
+  'play-tts-piper',       // -> play-tts-piper.ps1
   'voice-manager',        // -> voice-manager-windows.ps1
   'play-tts-enhanced',    // effects handled in play-tts.ps1 directly
   'piper-voice-manager',  // handled by voice-manager-windows.ps1
-  'piper-multispeaker-registry', // data baked into play-tts-windows-piper.ps1
+  'piper-multispeaker-registry', // data baked into play-tts-piper.ps1
   'piper-download-voices', // handled by download-extra-voices.ps1
 ]);
 

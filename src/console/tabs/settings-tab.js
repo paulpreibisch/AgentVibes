@@ -291,7 +291,12 @@ export function createSettingsTab(screen, services) {
       _sopranoMgrProc = null;
     }
     if (_sampleProcess) {
-      try { process.kill(-_sampleProcess.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _sampleProcess.kill(); } catch {}
+      } else {
+        try { process.kill(-_sampleProcess.pid, 'SIGTERM'); } catch {}
+      }
       _sampleProcess = null;
     }
     _samplePlaying = false;
@@ -329,8 +334,9 @@ export function createSettingsTab(screen, services) {
   function _killTest() {
     _stopTestSpinner();
     if (_testTimeout)   { clearTimeout(_testTimeout); _testTimeout = null; }
-    if (_testMusicProc) { try { process.kill(-_testMusicProc.pid, 'SIGTERM'); } catch {} _testMusicProc = null; }
-    if (_testVoiceProc) { try { process.kill(-_testVoiceProc.pid, 'SIGTERM'); } catch {} _testVoiceProc = null; }
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    if (_testMusicProc) { try { _isWin ? _testMusicProc.kill() : process.kill(-_testMusicProc.pid, 'SIGTERM'); } catch {} _testMusicProc = null; }
+    if (_testVoiceProc) { try { _isWin ? _testVoiceProc.kill() : process.kill(-_testVoiceProc.pid, 'SIGTERM'); } catch {} _testVoiceProc = null; }
     _testActive = false;
     _testInitiatorBtn = null;
     // Restore spinner labels to defaults (may have been overridden for soprano 'Loading model…')
@@ -592,7 +598,12 @@ export function createSettingsTab(screen, services) {
 
   function _killMusicTest() {
     if (_musicTestProc) {
-      try { process.kill(-_musicTestProc.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _musicTestProc.kill(); } catch {}
+      } else {
+        try { process.kill(-_musicTestProc.pid, 'SIGTERM'); } catch {}
+      }
       _musicTestProc = null;
     }
     _musicTestActive = false;
@@ -2827,7 +2838,12 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
 
   function _killPreview() {
     if (_previewProcess) {
-      try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _previewProcess.kill(); } catch {}
+      } else {
+        try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
+      }
       _previewProcess = null;
     }
     _previewVol = null;
@@ -2964,7 +2980,12 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
   function _killPreview() {
     if (_previewProcess) {
-      try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _previewProcess.kill(); } catch {}
+      } else {
+        try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
+      }
       _previewProcess = null;
     }
     _previewTrackId = null;
@@ -3368,7 +3389,12 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
 
   function _killPreview() {
     if (_playingProcess) {
-      try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _playingProcess.kill(); } catch {}
+      } else {
+        try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
+      }
       _playingProcess = null;
     }
     _playingVoiceId = null;

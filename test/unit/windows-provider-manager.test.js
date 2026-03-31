@@ -52,8 +52,8 @@ test('Provider: provider-manager.ps1 exists', () => {
 
 test('Provider: all provider play-tts scripts exist on Windows', () => {
   const expectedProviderScripts = [
-    'play-tts-windows-piper.ps1',
-    'play-tts-windows-sapi.ps1',
+    'play-tts-piper.ps1',
+    'play-tts-sapi.ps1',
     'play-tts-soprano.ps1',
   ];
 

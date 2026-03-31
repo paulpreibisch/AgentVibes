@@ -96,6 +96,6 @@ describe('createInstallTab — Tab Component Contract', () => {
       configService: { getConfig: () => ({}), set: () => {}, isInstalled: () => false },
       providerService: { getActiveVoiceId: () => '', setActiveVoice: () => {}, getProvider: () => 'piper' },
     });
-    assert.strictEqual(tab.getFooterColor(), '#3f51b5');
+    assert.strictEqual(tab.getFooterColor(), '#5c6bc0');
   });
 });

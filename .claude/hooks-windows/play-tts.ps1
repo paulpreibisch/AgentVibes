@@ -14,15 +14,20 @@ param(
 )
 
 # Configuration paths
-# First check if we're running from a project directory with .claude
+# Priority: CLAUDE_PROJECT_DIR env var → script's parent project → user profile
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptPath)) ".claude"
 
-# Use project .claude if running from there, otherwise use user profile
-if (Test-Path $ProjectClaudeDir) {
-    $ClaudeDir = $ProjectClaudeDir
+if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) {
+    $ClaudeDir = "$env:CLAUDE_PROJECT_DIR\.claude"
 } else {
-    $ClaudeDir = "$env:USERPROFILE\.claude"
+    $PackageClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptPath)) ".claude"
+    if (Test-Path "$env:USERPROFILE\.claude\tts-provider.txt") {
+        $ClaudeDir = "$env:USERPROFILE\.claude"
+    } elseif (Test-Path $PackageClaudeDir) {
+        $ClaudeDir = $PackageClaudeDir
+    } else {
+        $ClaudeDir = "$env:USERPROFILE\.claude"
+    }
 }
 
 $HooksDir = "$ClaudeDir\hooks-windows"
@@ -55,6 +60,9 @@ switch ($ActiveProvider) {
     }
     "soprano" {
         $ProviderScript = "$HooksDir\play-tts-soprano.ps1"
+    }
+    "termux-ssh" {
+        $ProviderScript = "$HooksDir\play-tts-termux-ssh.ps1"
     }
     default {
         Write-Host "[ERROR] Unknown provider: $ActiveProvider" -ForegroundColor Red

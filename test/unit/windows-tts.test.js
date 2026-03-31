@@ -20,8 +20,8 @@ const downloadScript = join(projectRoot, 'download-piper-voices.ps1');
 
 const HOOK_SCRIPTS = [
   'play-tts.ps1',
-  'play-tts-windows-piper.ps1',
-  'play-tts-windows-sapi.ps1',
+  'play-tts-piper.ps1',
+  'play-tts-sapi.ps1',
   'play-tts-soprano.ps1',
   'provider-manager.ps1',
   'voice-manager-windows.ps1',
@@ -77,8 +77,8 @@ test('Hook Scripts Source - all scripts are non-empty', () => {
 test('Hook Scripts Source - TTS scripts have param($Text)', () => {
   const ttsScripts = [
     'play-tts.ps1',
-    'play-tts-windows-piper.ps1',
-    'play-tts-windows-sapi.ps1',
+    'play-tts-piper.ps1',
+    'play-tts-sapi.ps1',
     'play-tts-soprano.ps1',
   ];
 
@@ -127,11 +127,11 @@ test('Voice Download URLs - setup-windows.ps1 uses correct HF path', () => {
   );
 });
 
-test('Voice Download URLs - play-tts-windows-piper.ps1 uses correct fallback HF path', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+test('Voice Download URLs - play-tts-piper.ps1 uses correct fallback HF path', () => {
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('en/en_US/ryan/high'),
-    'play-tts-windows-piper.ps1 should use HF path en/en_US/ryan/high as fallback'
+    'play-tts-piper.ps1 should use HF path en/en_US/ryan/high as fallback'
   );
 });
 
@@ -147,7 +147,7 @@ test('Voice Download URLs - no scripts use broken /v/ path', () => {
   const filesToCheck = [
     setupScript,
     downloadScript,
-    join(hooksDir, 'play-tts-windows-piper.ps1'),
+    join(hooksDir, 'play-tts-piper.ps1'),
   ];
 
   for (const filePath of filesToCheck) {
@@ -160,11 +160,11 @@ test('Voice Download URLs - no scripts use broken /v/ path', () => {
 });
 
 // ============================================================
-// Suite: Piper URL Builder (dynamic URL in play-tts-windows-piper.ps1)
+// Suite: Piper URL Builder (dynamic URL in play-tts-piper.ps1)
 // ============================================================
 
 test('Piper URL Builder - dynamic URL pattern parses voice name correctly', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
 
   // Should have the regex pattern for parsing voice names
   assert.ok(
@@ -180,7 +180,7 @@ test('Piper URL Builder - dynamic URL pattern parses voice name correctly', () =
 });
 
 test('Piper URL Builder - uses huggingface.co base URL', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('huggingface.co/rhasspy/piper-voices/resolve/main'),
     'Should use correct HuggingFace base URL'
@@ -276,8 +276,8 @@ test('Provider Manager - get command returns default', { skip: process.platform 
     );
 
     assert.ok(
-      result.stdout.includes('windows-sapi'),
-      'Default provider should be windows-sapi'
+      result.stdout.includes('sapi'),
+      'Default provider should be sapi'
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -291,14 +291,14 @@ test('Provider Manager - switch command writes provider file', { skip: process.p
 
   try {
     const result = await runPowerShell(
-      ['-File', join(hooksDir, 'provider-manager.ps1'), 'switch', 'windows-sapi'],
+      ['-File', join(hooksDir, 'provider-manager.ps1'), 'switch', 'sapi'],
       { env: { USERPROFILE: tempDir } }
     );
 
     const providerFile = join(claudeDir, 'tts-provider.txt');
     assert.ok(existsSync(providerFile), 'Provider file should be created');
     const content = readFileSync(providerFile, 'utf-8').trim();
-    assert.strictEqual(content, 'windows-sapi', 'Provider file should contain windows-sapi');
+    assert.strictEqual(content, 'sapi', 'Provider file should contain sapi');
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -311,8 +311,8 @@ test('Provider Manager - switch command writes provider file', { skip: process.p
 test('TTS Router Config - defaults to windows-sapi', () => {
   const content = readFileSync(join(hooksDir, 'play-tts.ps1'), 'utf-8');
   assert.ok(
-    content.includes('$ActiveProvider = "windows-sapi"'),
-    'play-tts.ps1 should default to windows-sapi'
+    content.includes('$ActiveProvider = "sapi"'),
+    'play-tts.ps1 should default to sapi'
   );
 });
 
@@ -343,11 +343,11 @@ test('TTS Router Config - handles unknown provider', () => {
 test('TTS Router Config - routes to correct provider scripts', () => {
   const content = readFileSync(join(hooksDir, 'play-tts.ps1'), 'utf-8');
   assert.ok(
-    content.includes('play-tts-windows-sapi.ps1'),
+    content.includes('play-tts-sapi.ps1'),
     'play-tts.ps1 should reference SAPI provider script'
   );
   assert.ok(
-    content.includes('play-tts-windows-piper.ps1'),
+    content.includes('play-tts-piper.ps1'),
     'play-tts.ps1 should reference Piper provider script'
   );
 });
@@ -395,8 +395,8 @@ test('Audio Cache Utils - ValidateSet matches switch cases', () => {
 test('Path Security - TTS scripts use $ScriptPath resolution', () => {
   const ttsScripts = [
     'play-tts.ps1',
-    'play-tts-windows-piper.ps1',
-    'play-tts-windows-sapi.ps1',
+    'play-tts-piper.ps1',
+    'play-tts-sapi.ps1',
   ];
 
   for (const script of ttsScripts) {
@@ -411,8 +411,8 @@ test('Path Security - TTS scripts use $ScriptPath resolution', () => {
 test('Path Security - TTS scripts fall back to $env:USERPROFILE', () => {
   const ttsScripts = [
     'play-tts.ps1',
-    'play-tts-windows-piper.ps1',
-    'play-tts-windows-sapi.ps1',
+    'play-tts-piper.ps1',
+    'play-tts-sapi.ps1',
   ];
 
   for (const script of ttsScripts) {
@@ -461,7 +461,7 @@ test('Path Security - provider-manager uses $env:USERPROFILE for config', () => 
 // ============================================================
 
 test('Text Sanitization - Piper script strips backslashes', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes("-replace '\\\\', ' '"),
     'Piper script should replace backslashes with spaces'
@@ -469,7 +469,7 @@ test('Text Sanitization - Piper script strips backslashes', () => {
 });
 
 test('Text Sanitization - SAPI script strips backslashes', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-sapi.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-sapi.ps1'), 'utf-8');
   assert.ok(
     content.includes("-replace '\\\\', ' '"),
     'SAPI script should replace backslashes with spaces'
@@ -477,7 +477,7 @@ test('Text Sanitization - SAPI script strips backslashes', () => {
 });
 
 test('Text Sanitization - both TTS scripts strip special characters', () => {
-  const ttsScripts = ['play-tts-windows-piper.ps1', 'play-tts-windows-sapi.ps1'];
+  const ttsScripts = ['play-tts-piper.ps1', 'play-tts-sapi.ps1'];
 
   for (const script of ttsScripts) {
     const content = readFileSync(join(hooksDir, script), 'utf-8');
@@ -511,7 +511,7 @@ test('Text Sanitization - Piper produces clean speech on Windows', { skip: proce
       'Sanitized text should not contain backslashes'
     );
     assert.ok(
-      result.stdout.trim() === 'Hello from C: Users Paul .claude',
+      result.stdout.trim() === 'Hello from C: Users TestUser .claude',
       `Sanitized text should replace backslashes with spaces, got: "${result.stdout.trim()}"`
     );
   } finally {
@@ -542,7 +542,7 @@ test('Encoding - no emoji characters in hook scripts', () => {
 // ============================================================
 
 test('Piper Provider - script checks for piper.exe', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('piper.exe'),
     'Piper provider should check for piper.exe'
@@ -554,7 +554,7 @@ test('Piper Provider - script checks for piper.exe', () => {
 });
 
 test('Piper Provider - voices use global path not project-local', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('$UserClaudeDir'),
     'Piper provider should define $UserClaudeDir for global paths'
@@ -566,7 +566,7 @@ test('Piper Provider - voices use global path not project-local', () => {
 });
 
 test('Piper Provider - default voice is en_US-ryan-high', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('"en_US-ryan-high"'),
     'Piper provider should default to en_US-ryan-high voice'
@@ -574,7 +574,7 @@ test('Piper Provider - default voice is en_US-ryan-high', () => {
 });
 
 test('Piper Provider - supports voice override parameter', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('$VoiceOverride'),
     'Piper provider should accept VoiceOverride parameter'
@@ -582,7 +582,7 @@ test('Piper Provider - supports voice override parameter', () => {
 });
 
 test('Piper Provider - auto-downloads missing voice models', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('Invoke-WebRequest'),
     'Piper provider should download missing voice models'
@@ -594,7 +594,7 @@ test('Piper Provider - auto-downloads missing voice models', () => {
 });
 
 test('Piper Provider - generates WAV output', () => {
-  const content = readFileSync(join(hooksDir, 'play-tts-windows-piper.ps1'), 'utf-8');
+  const content = readFileSync(join(hooksDir, 'play-tts-piper.ps1'), 'utf-8');
   assert.ok(
     content.includes('--output-file'),
     'Piper provider should use --output-file for WAV output'
