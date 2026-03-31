@@ -532,12 +532,8 @@ export function createSettingsTab(screen, services) {
           return;
         }
 
-        // Apply sox reverb based on current preset
-        const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
-        const presetResult = spawnSync('bash', [effectsScript, 'get-reverb', 'default'], {
-          encoding: 'utf8', timeout: 3000, env: _testEnv,
-        });
-        const preset = (presetResult.stdout || '').trim();
+        // Apply sox reverb based on current preset (read from config, not bash script)
+        const preset = configService.getConfig().effects?.reverbPreset ?? EFFECTS_DEFAULTS.reverbPreset;
 
         const SOX_REVERB = {
           light:    'reverb 20 50 50',
