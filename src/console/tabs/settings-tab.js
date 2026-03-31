@@ -449,10 +449,7 @@ export function createSettingsTab(screen, services) {
           `mpg123 -q --loop -1 "${trackPath}"`,
         ].join(' 2>/dev/null || ') + ' 2>/dev/null';
         if (_IS_WINDOWS) {
-          const _mp3P = detectMp3Player(_testEnv);
-          _testMusicProc = _mp3P
-            ? spawn(_mp3P.bin, _mp3P.args(trackPath), _spawnOpts(_testEnv))
-            : null;
+          _testMusicProc = spawn('ffplay', ['-nodisp', '-loop', '0', '-loglevel', 'quiet', '-volume', String(vol), trackPath], _spawnOpts(_testEnv));
         } else {
           _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
         }
@@ -693,10 +690,7 @@ export function createSettingsTab(screen, services) {
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     if (_IS_WINDOWS) {
-      const _mp3P2 = detectMp3Player(_testEnv);
-      _musicTestProc = _mp3P2
-        ? spawn(_mp3P2.bin, _mp3P2.args(trackPath), _spawnOpts(_testEnv))
-        : null;
+      _musicTestProc = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(vol), trackPath], _spawnOpts(_testEnv));
     } else {
       _musicTestProc = spawn('sh', ['-c', cmd], _spawnOpts(_testEnv));
     }
@@ -2923,10 +2917,7 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     if (_IS_WINDOWS) {
-      const _mp3P3 = detectMp3Player(_previewEnv);
-      _previewProcess = _mp3P3
-        ? spawn(_mp3P3.bin, _mp3P3.args(trackPath), _spawnOpts(_previewEnv))
-        : null;
+      _previewProcess = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(vol), trackPath], _spawnOpts(_previewEnv));
     } else {
       _previewProcess = spawn('sh', ['-c', cmd], _spawnOpts(_previewEnv));
     }
