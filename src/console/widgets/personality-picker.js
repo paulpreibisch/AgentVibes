@@ -105,7 +105,12 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
 
   function _killPickerTts() {
     if (_pickerTtsProc) {
-      try { process.kill(-_pickerTtsProc.pid, 'SIGTERM'); } catch {}
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      if (_isWin) {
+        try { _pickerTtsProc.kill(); } catch {}
+      } else {
+        try { process.kill(-_pickerTtsProc.pid, 'SIGTERM'); } catch {}
+      }
       _pickerTtsProc = null;
     }
     if (_playingItemIdx >= 0) {
@@ -118,12 +123,22 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
     _killPickerTts();
     const phrase = PERSONALITY_PREVIEW_PHRASES[personality];
     if (!phrase) return;
-    const ttsScript = path.join(process.cwd(), '.claude', 'hooks', 'play-tts.sh');
-    _pickerTtsProc = spawn('bash', [ttsScript, phrase], {
-      stdio: 'ignore',
-      detached: true,
-      env: buildAudioEnv(),
-    });
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    const _env = buildAudioEnv();
+    if (_isWin) {
+      const ttsScript = path.join(process.cwd(), '.claude', 'hooks-windows', 'play-tts.ps1');
+      _pickerTtsProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ttsScript, phrase], {
+        stdio: 'ignore',
+        env: _env,
+      });
+    } else {
+      const ttsScript = path.join(process.cwd(), '.claude', 'hooks', 'play-tts.sh');
+      _pickerTtsProc = spawn('bash', [ttsScript, phrase], {
+        stdio: 'ignore',
+        detached: true,
+        env: _env,
+      });
+    }
     _playingItemIdx = list.selected;
     _setItemPlaying(_playingItemIdx, true);
     screen.render();
