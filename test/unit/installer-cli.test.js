@@ -79,6 +79,42 @@ test('CLI entry point - invalid command shows error', async () => {
   );
 });
 
+test('--non-interactive flag is recognized in install --help', async () => {
+  const result = await runInstaller(['install', '--help']);
+  assert.ok(
+    result.stdout.includes('non-interactive') || result.stderr.includes('non-interactive'),
+    '--non-interactive flag should appear in install help output'
+  );
+});
+
+test('AGENT_VIBES_NON_INTERACTIVE env var triggers non-interactive mode', async () => {
+  // Run install with env var set but in a safe test context
+  // We expect it to attempt non-interactive install and either:
+  // - Print [AV] Non-interactive mode detected (if piper check fails/passes)
+  // - Exit non-zero because piper isn't installed in test env
+  const child = await new Promise((resolve) => {
+    const proc = spawn('node', [installerPath, 'install', '--directory', '/tmp/av-test-noninteractive'], {
+      env: {
+        ...process.env,
+        AGENT_VIBES_NON_INTERACTIVE: '1',
+        AGENTVIBES_TEST_MODE: 'true'
+      }
+    });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('close', (exitCode) => resolve({ stdout, stderr, exitCode }));
+    setTimeout(() => { proc.kill(); resolve({ stdout, stderr, exitCode: -1 }); }, 8000);
+  });
+
+  const output = child.stdout + child.stderr;
+  assert.ok(
+    output.includes('[AV]'),
+    'Non-interactive mode should output [AV] prefixed lines'
+  );
+});
+
 test('Exported functions are available for import', async () => {
   // This test verifies the export statement works
   const { isTermux, detectAndNotifyTermux } = await import('../../src/installer.js');

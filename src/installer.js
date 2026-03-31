@@ -1115,6 +1115,9 @@ async function collectConfiguration(options = {}) {
     }
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
+    // AI agent / non-interactive defaults: no reverb, no background music
+    config.reverb = 'none';
+    config.backgroundMusic = { enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' };
     return config;
   }
 
@@ -4979,19 +4982,37 @@ async function install(options = {}) {
   const piperVoicesPath = userConfig.piperPath;
   const targetDir = options.directory || currentDir;
 
-  // Confirm and start installation
-  const { startInstall } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'startInstall',
-      message: chalk.yellow('✅ Start Installation?'),
-      default: true,
-    },
-  ]);
+  // Non-interactive mode: structured logging and piper validation before install
+  if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+    console.log(`[AV] Non-interactive mode detected`);
+    console.log(`[AV] Provider: ${selectedProvider} | Platform: ${process.platform}`);
 
-  if (!startInstall) {
-    console.log(chalk.red('\n❌ Installation cancelled.\n'));
-    process.exit(0);
+    if (isPiperProvider(selectedProvider) && !isPiperInstalled()) {
+      process.stderr.write(`[AV ERROR] Piper binaries not found.\n`);
+      process.stderr.write(`[AV] To install Piper manually, run:\n`);
+      process.stderr.write(`[AV]   npx agentvibes --install-piper\n`);
+      process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
+      process.exit(1);
+    }
+
+    console.log(`[AV] Installing to: ${targetDir}/.claude/`);
+  }
+
+  // Confirm and start installation (skip in non-interactive / --yes mode)
+  if (!options.yes && !options.nonInteractive && process.env.AGENT_VIBES_NON_INTERACTIVE !== '1') {
+    const { startInstall } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'startInstall',
+        message: chalk.yellow('✅ Start Installation?'),
+        default: true,
+      },
+    ]);
+
+    if (!startInstall) {
+      console.log(chalk.red('\n❌ Installation cancelled.\n'));
+      process.exit(0);
+    }
   }
 
   // Silent spinner for copy functions — suppresses per-file output
@@ -5215,19 +5236,28 @@ Troubleshooting:
 
     spinner.succeed(chalk.green('AgentVibes installed successfully!'));
 
-    // Clean final summary
-    console.log('');
-    console.log(chalk.green.bold('  ✅ Installation Complete'));
-    console.log(chalk.gray(`     Provider:  ${selectedProvider}`));
-    console.log(chalk.gray(`     Location:  ${targetDir}/.claude/`));
-    console.log(chalk.gray(`     Version:   ${VERSION}`));
-    console.log('');
-    console.log(chalk.white('  Run ') + chalk.cyan('npx agentvibes') + chalk.white(' to open the console.'));
-    console.log('');
+    if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+      console.log(`[AV] Installation complete`);
+      console.log(`[AV] Provider: ${selectedProvider} | Location: ${targetDir}/.claude/ | Version: ${VERSION}`);
+    } else {
+      // Clean final summary
+      console.log('');
+      console.log(chalk.green.bold('  ✅ Installation Complete'));
+      console.log(chalk.gray(`     Provider:  ${selectedProvider}`));
+      console.log(chalk.gray(`     Location:  ${targetDir}/.claude/`));
+      console.log(chalk.gray(`     Version:   ${VERSION}`));
+      console.log('');
+      console.log(chalk.white('  Run ') + chalk.cyan('npx agentvibes') + chalk.white(' to open the console.'));
+      console.log('');
+    }
 
   } catch (error) {
-    spinner.fail('Installation failed!');
-    console.error(chalk.red('\n❌ Error:'), error.message);
+    if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+      process.stderr.write(`[AV ERROR] Installation failed: ${error.message}\n`);
+    } else {
+      spinner.fail('Installation failed!');
+      console.error(chalk.red('\n❌ Error:'), error.message);
+    }
     process.exit(1);
   }
 }
@@ -5242,7 +5272,15 @@ program
   .description('Install AgentVibes voice commands')
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
+  .option('--non-interactive', 'Skip TUI and install with defaults (for AI agents and CI pipelines). Also triggered by AGENT_VIBES_NON_INTERACTIVE=1 env var.')
   .action(async (options) => {
+    // Merge env var trigger into options
+    if (process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+      options.nonInteractive = true;
+    }
+    if (options.nonInteractive) {
+      options.yes = true;
+    }
     await install(options);
   });
 
