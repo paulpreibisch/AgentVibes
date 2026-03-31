@@ -308,6 +308,7 @@ export class AgentVibesConsole {
         height: 1,
         content: text,
         tags: false,
+        wrap: false,
         keys: true,
         focusable: true,
         style: { fg: COLORS.focusCyan, bg: COLORS.tabBarBg },
@@ -493,13 +494,18 @@ export class AgentVibesConsole {
       this._headerQuitText.setContent(`{#ef9a9a-fg}${t(lang, 'quitLabel')}{/#ef9a9a-fg}`);
     }
 
-    // Update tab bar item labels — keep widths stable (use English as baseline)
+    // Update tab bar item labels — resize and reposition to fit translated labels
+    let xOffset = 1;
     for (const id of TAB_ORDER) {
       const el = this._tabItems?.[id];
       if (!el) continue;
       const label = getTabLabel(id, lang);
       const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
-      el.setContent(` [${shortcutKey}] ${label} `);
+      const text = ` [${shortcutKey}] ${label} `;
+      el.left = xOffset;
+      el.width = text.length;
+      el.setContent(text);
+      xOffset += text.length + 1;
     }
 
     // Update active tab's footer text if it supports language-aware footer

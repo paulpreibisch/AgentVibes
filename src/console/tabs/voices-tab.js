@@ -452,7 +452,8 @@ export function getVoiceMeta(voiceId) {
 export function createVoicesTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, focusMainTabBar, updateHeaderStatus } = services;
+  const { configService, providerService, focusMainTabBar, updateHeaderStatus, languageService } = services;
+  const _tl = (key) => languageService ? languageService.t(key) : key;
 
   // -------------------------------------------------------------------------
   // Container
@@ -472,11 +473,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header
 
-  blessed.text({
+  const voicesSectionHdr = blessed.text({
     parent: box,
     top: 1,
     left: 2,
-    content: `{#00897b-fg}── Voices ${'─'.repeat(58)}{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesHeader')}${'─'.repeat(58)}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -495,11 +496,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Search input
 
-  blessed.text({
+  const searchLabelText = blessed.text({
     parent: box,
     top: 3,
     left: 4,
-    content: 'Search:',
+    content: _tl('searchLabel'),
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
@@ -521,11 +522,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Column header row (sits between search and voice list border)
 
-  blessed.text({
+  const colHeaderText = blessed.text({
     parent: box,
     top: 4,
     left: 6,
-    content: `{#00897b-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}${_tl('voicesColGender').padEnd(COL_GENDER_W)}${_tl('voicesColProvider')}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -557,11 +558,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Info panel
 
-  blessed.text({
+  const voiceInfoHdr = blessed.text({
     parent: box,
     top: '60%',
     left: 2,
-    content: `{#00897b-fg}── Voice Info ${'─'.repeat(54)}{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesInfoHeader')}${'─'.repeat(54)}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -840,7 +841,7 @@ export function createVoicesTab(screen, services) {
     return btn;
   }
 
-  const switchBtn = _createBtn('[Switch Voice]', () => {
+  const switchBtn = _createBtn(_tl('voicesSwitchBtn'), () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -851,7 +852,7 @@ export function createVoicesTab(screen, services) {
   switchBtn.bottom = 4;
   switchBtn.left = 4;
 
-  const favoriteBtn = _createBtn('[★ Favorite]', () => {
+  const favoriteBtn = _createBtn(_tl('voicesFavoriteBtn'), () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -862,7 +863,7 @@ export function createVoicesTab(screen, services) {
   favoriteBtn.bottom = 4;
   favoriteBtn.left = 22;
 
-  const installBtn = _createBtn('[Download Voice]', () => {
+  const installBtn = _createBtn(_tl('voicesDownloadBtn'), () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (!selected) return;
@@ -1611,6 +1612,24 @@ export function createVoicesTab(screen, services) {
   installBtn.key(['up', 'escape'],  () => { voiceList.focus(); screen.render(); });
 
   // -------------------------------------------------------------------------
+  // Language refresh
+
+  function refreshVoicesLabels() {
+    voicesSectionHdr.setContent(`{#00897b-fg}${_tl('voicesHeader')}${'─'.repeat(58)}{/#00897b-fg}`);
+    searchLabelText.setContent(_tl('searchLabel'));
+    colHeaderText.setContent(`{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}${_tl('voicesColGender').padEnd(COL_GENDER_W)}${_tl('voicesColProvider')}{/#00897b-fg}`);
+    voiceInfoHdr.setContent(`{#00897b-fg}${_tl('voicesInfoHeader')}${'─'.repeat(54)}{/#00897b-fg}`);
+    switchBtn.setContent(_tl('voicesSwitchBtn'));
+    favoriteBtn.setContent(_tl('voicesFavoriteBtn'));
+    installBtn.setContent(_tl('voicesDownloadBtn'));
+    screen.render();
+  }
+
+  if (languageService) {
+    languageService.onChange(() => refreshVoicesLabels());
+  }
+
+  // -------------------------------------------------------------------------
   // Tab Component Contract
 
   return {
@@ -1643,7 +1662,7 @@ export function createVoicesTab(screen, services) {
     },
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('voicesFooter');
     },
 
     getFooterColor() {
