@@ -608,13 +608,13 @@ export function createInstallTab(screen, services) {
 
   function _renderScreen1() {
     contentBox.setContent(_c([
-      _HDR('🔧', 'Setup Wizard'),
+      _HDR('🔧', t(_lang, 'setupWizard')),
       '',
-      `  {${COLORS.noticeFg}-fg}TTS for AI assistants with personality.{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_lang, 'setupWizardSubtitle')}{/${COLORS.noticeFg}-fg}`,
       '',
       '',  // ← [▶ Begin] [✗ Exit] buttons here (box row 5)
     ]));
-    hintLine.setContent('  Screen 1/5: Welcome  |  [←/→] Navigate  |  [Enter] Begin  |  [Esc] Exit');
+    hintLine.setContent(`  ${t(_lang, 'screen1Hint')}`);
     _s1BeginBtn.focus();
     screen.render();
   }
@@ -626,19 +626,19 @@ export function createInstallTab(screen, services) {
     _s2ContinueBtn.hide();  // hidden during spinner
 
     contentBox.setContent(_c([
-      _HDR('🔍', 'Dependency Check'),
+      _HDR('🔍', t(_lang, 'dependencyCheck')),
       '',
-      `  {${COLORS.noticeFg}-fg}${frames[0]}  Checking dependencies...{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${frames[0]}  ${t(_lang, 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
     ]));
-    hintLine.setContent('  Screen 2/5: Dependencies  |  [←] Back  |  [Enter] Next');
+    hintLine.setContent(`  ${t(_lang, 'screen2Hint')}`);
     screen.render();
 
     const spinInterval = setInterval(() => {
       frameIdx = (frameIdx + 1) % frames.length;
       contentBox.setContent(_c([
-        _HDR('🔍', 'Dependency Check'),
+        _HDR('🔍', t(_lang, 'dependencyCheck')),
         '',
-        `  {${COLORS.noticeFg}-fg}${frames[frameIdx]}  Checking dependencies...{/${COLORS.noticeFg}-fg}`,
+        `  {${COLORS.noticeFg}-fg}${frames[frameIdx]}  ${t(_lang, 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
       ]));
       screen.render();
     }, 100);
@@ -650,24 +650,24 @@ export function createInstallTab(screen, services) {
       _checking = false;
     }
 
-    const ok  = () => `{${COLORS.successFg}-fg}✅  Installed{/${COLORS.successFg}-fg}`;
-    const bad = () => `{${COLORS.errorFg}-fg}❌  Not found{/${COLORS.errorFg}-fg}`;
+    const ok  = () => `{${COLORS.successFg}-fg}✅  ${t(_lang, 'installed')}{/${COLORS.successFg}-fg}`;
+    const bad = () => `{${COLORS.errorFg}-fg}❌  ${t(_lang, 'notFound')}{/${COLORS.errorFg}-fg}`;
 
     const ttsOk = _deps.piper || _deps.soprano;
     contentBox.setContent(_c([
-      _HDR('🔍', 'Dependency Check'),
+      _HDR('🔍', t(_lang, 'dependencyCheck')),
       '',
-      `  {${COLORS.noticeFg}-fg}${'Dependency'.padEnd(14)}Status{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_lang, 'depColumn').padEnd(14)}${t(_lang, 'statusColumn')}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.noticeFg}-fg}${'─'.repeat(78)}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.labelFg}-fg}${'Node.js'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.node    ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'npm'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.npm     ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Piper TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.piper   ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Soprano TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.soprano ? ok() : bad()}`,
-      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  Not found (needed for background music){/${COLORS.errorFg}-fg}`}`,
+      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  ${t(_lang, 'ffmpegMissing')}{/${COLORS.errorFg}-fg}`}`,
       '',
       ttsOk
-        ? `  {${COLORS.successFg}-fg}✅  TTS Providers Detected{/${COLORS.successFg}-fg}`
-        : `  {${COLORS.errorFg}-fg}⚠   No TTS provider found. Install Piper or Soprano first.{/${COLORS.errorFg}-fg}`,
+        ? `  {${COLORS.successFg}-fg}✅  ${t(_lang, 'ttsDetected')}{/${COLORS.successFg}-fg}`
+        : `  {${COLORS.errorFg}-fg}⚠   ${t(_lang, 'noTtsFound')}{/${COLORS.errorFg}-fg}`,
       '',  // blank separator
       '',  // ← [Continue →] button here (box row 12) when TTS detected
     ]));
@@ -705,14 +705,14 @@ export function createInstallTab(screen, services) {
     const _blank = ' '.repeat(120);
     const _trail = Array(12).fill(_blank);
     contentBox.setContent(_c([
-      _HDR('🎤', 'Provider Selection'),
+      _HDR('🎤', t(_lang, 'providerSelection')),
       '',
-      `  {${COLORS.noticeFg}-fg}${'Available TTS providers:'.padEnd(94)}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_lang, 'availableProviders').padEnd(94)}{/${COLORS.noticeFg}-fg}`,
       '',
       ...paddedItems.map(i => `  ${i}`),
       ..._trail,
     ]));
-    hintLine.setContent('  Screen 3/5: Provider  |  [←] Back  |  [↑↓] Choose  |  [Enter/→] Confirm & Continue');
+    hintLine.setContent(`  ${t(_lang, 'screen3Hint')}`);
     box.focus();
     screen.render();
   }
@@ -725,36 +725,36 @@ export function createInstallTab(screen, services) {
     const voiceId = providerService?.getActiveVoiceId?.() ?? 'en_US-amy-medium';
 
     contentBox.setContent(_c([
-      _HDR('🎤', 'Provider & Voice'),
+      _HDR('🎤', t(_lang, 'providerAndVoice')),
       '',
-      `  {${COLORS.labelFg}-fg}${'Provider:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
-      `  {${COLORS.labelFg}-fg}${'Voice:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}(after installation, you can change in Settings){/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_lang, 'providerLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_lang, 'voiceLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}${t(_lang, 'voiceChangeHint')}{/${COLORS.noticeFg}-fg}`,
       '',
-      _HDR('✍️', 'Intro Text'),
+      _HDR('✍️', t(_lang, 'introText')),
       '',
-      `  {${COLORS.labelFg}-fg}${'Intro text:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || '(none)'}{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_lang, 'introTextLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || `(${t(_lang, 'none')})`}{/${COLORS.valueFg}-fg}`,
       // ↑ [Edit] button rendered inline at box row 8, left=36
       '',
-      `  {${COLORS.noticeFg}-fg}Example:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_lang, 'example')}:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
       '',
       '',
       '',  // ← [✓ Accept & Install] button rendered as real widget here (box row 13)
     ]));
-    hintLine.setContent('  Screen 4/5: Config  |  [Esc] Back  |  [E] Edit  |  [↓] Accept & Install');
+    hintLine.setContent(`  ${t(_lang, 'screen4Hint')}`);
     _acceptBtn.focus();
     screen.render();
   }
 
   function _renderScreen5() {
     const header = _installError
-      ? _HDR('❌', 'Installation Failed')
+      ? _HDR('❌', t(_lang, 'installationFailed'))
       : _installComplete
-        ? _HDR('✅', 'Installation Complete')
-        : _HDR('⚙️', 'Installing AgentVibes...');
+        ? _HDR('✅', t(_lang, 'installComplete'))
+        : _HDR('⚙️', t(_lang, 'installing'));
 
     const hint = (_installComplete || _installError)
-      ? '  Screen 5/5: Complete  |  [Enter] OK — Done'
-      : '  Screen 5/5: Installing...  |  Please wait';
+      ? `  ${t(_lang, 'screen5HintDone')}`
+      : `  ${t(_lang, 'screen5HintWait')}`;
 
     // Show last 18 log lines so content fits in the box
     const MAX_LINES = 18;
