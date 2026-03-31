@@ -808,26 +808,28 @@ export function createSettingsTab(screen, services) {
 
   // Focused sub-tab item turns purple + blinking █; blur restores active/inactive colours
   for (const id of SUB_TABS) {
-    const item      = _subTabItemsMap[id];
-    const _stBase   = SUB_TAB_LABELS[id];
-    const _stBlock  = _stBase.slice(0, -1) + '█'; // replace trailing space with block
+    const item = _subTabItemsMap[id];
+    // Always read current content so post-init language changes are preserved
+    const _getStBase  = () => item.content.replace(/█$/, ' ');
     let _stInterval = null;
     item.on('focus', () => {
       item.style.fg = 'white';
       item.style.bg = '#9c27b0';
       item.style.bold = true;
       let _stOn = true;
-      item.setContent(_stBlock);
+      const base = _getStBase();
+      item.setContent(base.slice(0, -1) + '█');
       screen.render();
       _stInterval = setInterval(() => {
         _stOn = !_stOn;
-        item.setContent(_stOn ? _stBlock : _stBase);
+        const b = _getStBase();
+        item.setContent(_stOn ? b.slice(0, -1) + '█' : b);
         screen.render();
       }, 500);
     });
     item.on('blur', () => {
       if (_stInterval) { clearInterval(_stInterval); _stInterval = null; }
-      item.setContent(_stBase);
+      item.setContent(_getStBase());
       _updateSubTabBar();
       screen.render();
     });

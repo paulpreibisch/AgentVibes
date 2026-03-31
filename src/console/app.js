@@ -364,10 +364,8 @@ export class AgentVibesConsole {
       const el = this._tabItems[tabIds[i]];
 
       // Blinking block cursor: replace trailing space with █, toggle at 500ms
-      // Use a getter so the content reflects any post-init language changes.
+      // Always derive from current el.content so language changes are preserved.
       const _getBaseContent = () => el.content.replace(/█$/, ' ');
-      const _baseContent  = el.content;
-      const _blockContent = _baseContent.slice(0, -1) + '█';
       let _cursorInterval = null;
       let _cursorOn       = false;
 
