@@ -141,7 +141,7 @@ function createTestStub() {
     hide: () => {},
     onFocus: () => {},
     onBlur: () => {},
-    getFooterText: () => FOOTER_TEXT,
+    getFooterText: () => t('en', 'footerText'),
     getFooterColor: () => COLORS.footerBg,
   };
 }
@@ -159,7 +159,7 @@ function createTestStub() {
 export function createInstallTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, navigationService, focusMainTabBar } = services;
+  const { configService, providerService, navigationService, focusMainTabBar, languageService } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -181,7 +181,10 @@ export function createInstallTab(screen, services) {
 
   let _screen = 0;
   let _lastScreen = -1;
-  let _lang = 'en';
+  // _lang is now owned by languageService; keep a local helper for convenience
+  // and a local _langIdx for the language-picker UI (Screen 0).
+  const _getLang = () => languageService?.getLang() ?? 'en';
+  const _tl = (key) => languageService?.t(key) ?? t('en', key);
   let _langIdx = 0;
   let _deps = null;
   let _checking = false;
@@ -543,11 +546,11 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 1 buttons — Begin (cyan) and Exit (grey)
 
-  const _s1BeginBtn = _createInstallBtn('▶  Begin', '#00838f', () => {
+  const _s1BeginBtn = _createInstallBtn(_tl('beginBtn'), '#00838f', () => {
     _screen++;
     _showCurrentScreen();
   });
-  const _s1ExitBtn = _createInstallBtn('✗  Exit', '#546e7a', () => {
+  const _s1ExitBtn = _createInstallBtn(_tl('exitBtn'), '#546e7a', () => {
     box.hide();
     screen.render();
     if (typeof focusMainTabBar === 'function') focusMainTabBar();
@@ -608,13 +611,13 @@ export function createInstallTab(screen, services) {
 
   function _renderScreen1() {
     contentBox.setContent(_c([
-      _HDR('🔧', t(_lang, 'setupWizard')),
+      _HDR('🔧', t(_getLang(), 'setupWizard')),
       '',
-      `  {${COLORS.noticeFg}-fg}${t(_lang, 'setupWizardSubtitle')}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'setupWizardSubtitle')}{/${COLORS.noticeFg}-fg}`,
       '',
       '',  // ← [▶ Begin] [✗ Exit] buttons here (box row 5)
     ]));
-    hintLine.setContent(`  ${t(_lang, 'screen1Hint')}`);
+    hintLine.setContent(`  ${t(_getLang(), 'screen1Hint')}`);
     _s1BeginBtn.focus();
     screen.render();
   }
@@ -626,19 +629,19 @@ export function createInstallTab(screen, services) {
     _s2ContinueBtn.hide();  // hidden during spinner
 
     contentBox.setContent(_c([
-      _HDR('🔍', t(_lang, 'dependencyCheck')),
+      _HDR('🔍', t(_getLang(), 'dependencyCheck')),
       '',
-      `  {${COLORS.noticeFg}-fg}${frames[0]}  ${t(_lang, 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${frames[0]}  ${t(_getLang(), 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
     ]));
-    hintLine.setContent(`  ${t(_lang, 'screen2Hint')}`);
+    hintLine.setContent(`  ${t(_getLang(), 'screen2Hint')}`);
     screen.render();
 
     const spinInterval = setInterval(() => {
       frameIdx = (frameIdx + 1) % frames.length;
       contentBox.setContent(_c([
-        _HDR('🔍', t(_lang, 'dependencyCheck')),
+        _HDR('🔍', t(_getLang(), 'dependencyCheck')),
         '',
-        `  {${COLORS.noticeFg}-fg}${frames[frameIdx]}  ${t(_lang, 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
+        `  {${COLORS.noticeFg}-fg}${frames[frameIdx]}  ${t(_getLang(), 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
       ]));
       screen.render();
     }, 100);
@@ -650,24 +653,24 @@ export function createInstallTab(screen, services) {
       _checking = false;
     }
 
-    const ok  = () => `{${COLORS.successFg}-fg}✅  ${t(_lang, 'installed')}{/${COLORS.successFg}-fg}`;
-    const bad = () => `{${COLORS.errorFg}-fg}❌  ${t(_lang, 'notFound')}{/${COLORS.errorFg}-fg}`;
+    const ok  = () => `{${COLORS.successFg}-fg}✅  ${t(_getLang(), 'installed')}{/${COLORS.successFg}-fg}`;
+    const bad = () => `{${COLORS.errorFg}-fg}❌  ${t(_getLang(), 'notFound')}{/${COLORS.errorFg}-fg}`;
 
     const ttsOk = _deps.piper || _deps.soprano;
     contentBox.setContent(_c([
-      _HDR('🔍', t(_lang, 'dependencyCheck')),
+      _HDR('🔍', t(_getLang(), 'dependencyCheck')),
       '',
-      `  {${COLORS.noticeFg}-fg}${t(_lang, 'depColumn').padEnd(14)}${t(_lang, 'statusColumn')}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'depColumn').padEnd(14)}${t(_getLang(), 'statusColumn')}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.noticeFg}-fg}${'─'.repeat(78)}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.labelFg}-fg}${'Node.js'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.node    ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'npm'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.npm     ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Piper TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.piper   ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Soprano TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.soprano ? ok() : bad()}`,
-      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  ${t(_lang, 'ffmpegMissing')}{/${COLORS.errorFg}-fg}`}`,
+      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  ${t(_getLang(), 'ffmpegMissing')}{/${COLORS.errorFg}-fg}`}`,
       '',
       ttsOk
-        ? `  {${COLORS.successFg}-fg}✅  ${t(_lang, 'ttsDetected')}{/${COLORS.successFg}-fg}`
-        : `  {${COLORS.errorFg}-fg}⚠   ${t(_lang, 'noTtsFound')}{/${COLORS.errorFg}-fg}`,
+        ? `  {${COLORS.successFg}-fg}✅  ${t(_getLang(), 'ttsDetected')}{/${COLORS.successFg}-fg}`
+        : `  {${COLORS.errorFg}-fg}⚠   ${t(_getLang(), 'noTtsFound')}{/${COLORS.errorFg}-fg}`,
       '',  // blank separator
       '',  // ← [Continue →] button here (box row 12) when TTS detected
     ]));
@@ -705,14 +708,14 @@ export function createInstallTab(screen, services) {
     const _blank = ' '.repeat(120);
     const _trail = Array(12).fill(_blank);
     contentBox.setContent(_c([
-      _HDR('🎤', t(_lang, 'providerSelection')),
+      _HDR('🎤', t(_getLang(), 'providerSelection')),
       '',
-      `  {${COLORS.noticeFg}-fg}${t(_lang, 'availableProviders').padEnd(94)}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'availableProviders').padEnd(94)}{/${COLORS.noticeFg}-fg}`,
       '',
       ...paddedItems.map(i => `  ${i}`),
       ..._trail,
     ]));
-    hintLine.setContent(`  ${t(_lang, 'screen3Hint')}`);
+    hintLine.setContent(`  ${t(_getLang(), 'screen3Hint')}`);
     box.focus();
     screen.render();
   }
@@ -725,36 +728,36 @@ export function createInstallTab(screen, services) {
     const voiceId = providerService?.getActiveVoiceId?.() ?? 'en_US-amy-medium';
 
     contentBox.setContent(_c([
-      _HDR('🎤', t(_lang, 'providerAndVoice')),
+      _HDR('🎤', t(_getLang(), 'providerAndVoice')),
       '',
-      `  {${COLORS.labelFg}-fg}${`${t(_lang, 'providerLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
-      `  {${COLORS.labelFg}-fg}${`${t(_lang, 'voiceLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}${t(_lang, 'voiceChangeHint')}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_getLang(), 'providerLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_getLang(), 'voiceLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}${t(_getLang(), 'voiceChangeHint')}{/${COLORS.noticeFg}-fg}`,
       '',
-      _HDR('✍️', t(_lang, 'introText')),
+      _HDR('✍️', t(_getLang(), 'introText')),
       '',
-      `  {${COLORS.labelFg}-fg}${`${t(_lang, 'introTextLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || `(${t(_lang, 'none')})`}{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_getLang(), 'introTextLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || `(${t(_getLang(), 'none')})`}{/${COLORS.valueFg}-fg}`,
       // ↑ [Edit] button rendered inline at box row 8, left=36
       '',
-      `  {${COLORS.noticeFg}-fg}${t(_lang, 'example')}:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'example')}:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
       '',
       '',
       '',  // ← [✓ Accept & Install] button rendered as real widget here (box row 13)
     ]));
-    hintLine.setContent(`  ${t(_lang, 'screen4Hint')}`);
+    hintLine.setContent(`  ${t(_getLang(), 'screen4Hint')}`);
     _acceptBtn.focus();
     screen.render();
   }
 
   function _renderScreen5() {
     const header = _installError
-      ? _HDR('❌', t(_lang, 'installationFailed'))
+      ? _HDR('❌', t(_getLang(), 'installationFailed'))
       : _installComplete
-        ? _HDR('✅', t(_lang, 'installComplete'))
-        : _HDR('⚙️', t(_lang, 'installing'));
+        ? _HDR('✅', t(_getLang(), 'installComplete'))
+        : _HDR('⚙️', t(_getLang(), 'installing'));
 
     const hint = (_installComplete || _installError)
-      ? `  ${t(_lang, 'screen5HintDone')}`
-      : `  ${t(_lang, 'screen5HintWait')}`;
+      ? `  ${t(_getLang(), 'screen5HintDone')}`
+      : `  ${t(_getLang(), 'screen5HintWait')}`;
 
     // Show last 18 log lines so content fits in the box
     const MAX_LINES = 18;
@@ -895,7 +898,7 @@ export function createInstallTab(screen, services) {
     if (box.hidden || _checking) return;
     if (_completionModalOpen) { _dismissCompletionModal(); return; }  // always first
     if (_screen === 0) {  // Screen 0: apply selected language and advance
-      _lang = SUPPORTED_LANGUAGES[_langIdx].value;
+      if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
       _screen = 1;
       _showCurrentScreen();
       return;
@@ -961,7 +964,7 @@ export function createInstallTab(screen, services) {
   screen.key(['right'], () => {
     if (box.hidden || _checking) return;
     if (_screen === 0) {  // → skips: keep current _lang (default 'en') and advance
-      _lang = SUPPORTED_LANGUAGES[_langIdx].value;
+      if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
       _screen = 1;
       _showCurrentScreen();
       return;
@@ -1010,7 +1013,7 @@ export function createInstallTab(screen, services) {
     show() {
       _screen = 0;
       _langIdx = 0;
-      _lang = 'en';
+      // _lang now lives in languageService — don't reset it here
       _screen5Announced = false;
       _installLog      = [];
       _installRunning  = false;
@@ -1048,7 +1051,7 @@ export function createInstallTab(screen, services) {
     onBlur() {},
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('footerText');
     },
 
     getFooterColor() {

@@ -7,6 +7,7 @@
  */
 
 import blessed from 'blessed';
+import { t } from '../../i18n/strings.js';
 
 /**
  * Create a hidden placeholder box for a tab, appended into the content area.
@@ -51,3 +52,29 @@ export const TAB_SHORTCUT_KEYS = {
   agents:   'B',
   receiver: 'X',
 };
+
+/**
+ * Return the translated display label for a tab.
+ * Falls back to TAB_DISPLAY_LABELS[id] if no i18n key is found.
+ *
+ * @param {string} id   - Tab identifier (e.g. 'settings', 'voices')
+ * @param {string} lang - BCP-47 language code (e.g. 'es', 'zh-CN')
+ * @returns {string}
+ */
+export function getTabLabel(id, lang = 'en') {
+  const keyMap = {
+    install:  'tabInstall',
+    settings: 'tabSettings',
+    voices:   'tabVoices',
+    music:    'tabMusic',
+    agents:   'tabBmad',
+    receiver: 'tabReceiver',
+    readme:   'tabReadme',
+    help:     'tabHelp',
+  };
+  const key = keyMap[id];
+  if (!key) return TAB_DISPLAY_LABELS[id] ?? id;
+  const translated = t(lang, key);
+  // t() returns the key itself when missing — fall back to English display label
+  return (translated && translated !== key) ? translated : (TAB_DISPLAY_LABELS[id] ?? id);
+}

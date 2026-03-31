@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { NavigationService, TAB_ORDER } from '../services/navigation-service.js';
 import { setupNavigation } from './navigation.js';
-import { createPlaceholderTab, TAB_DISPLAY_LABELS, TAB_SHORTCUT_KEYS } from './tabs/placeholder-tab.js';
+import { createPlaceholderTab, TAB_DISPLAY_LABELS, TAB_SHORTCUT_KEYS, getTabLabel } from './tabs/placeholder-tab.js';
+import { LanguageService } from '../services/language-service.js';
+import { t } from '../i18n/strings.js';
 import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
 import { BRAND_PINK } from './brand-colors.js';
@@ -169,7 +171,7 @@ export class AgentVibesConsole {
     });
 
     // Row 1: subtitle
-    blessed.text({
+    this._headerSubtitleText = blessed.text({
       parent: this.headerBox,
       top: 1,
       left: 2,
@@ -180,7 +182,7 @@ export class AgentVibesConsole {
     });
 
     // Row 1: Quit shortcut — left-anchored after "Customization Tool" (18 chars at left:2)
-    blessed.text({
+    this._headerQuitText = blessed.text({
       parent: this.headerBox,
       top: 1,
       left: 22,
@@ -291,9 +293,11 @@ export class AgentVibesConsole {
 
     // One box per tab — direct screen children at absolute top:3. No tag parsing, no wrapping.
     this._tabItems = {};
+    this._tabItemXOffsets = {};  // track x positions for label refresh
     let xOffset = 1;
     for (const id of TAB_ORDER) {
-      const label = TAB_DISPLAY_LABELS[id];
+      const lang = this._languageService?.getLang() ?? 'en';
+      const label = getTabLabel(id, lang);
       const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
       const text = ` [${shortcutKey}] ${label} `;
       const el = blessed.box({
@@ -309,6 +313,7 @@ export class AgentVibesConsole {
         style: { fg: COLORS.focusCyan, bg: COLORS.tabBarBg },
       });
       this._tabItems[id] = el;
+      this._tabItemXOffsets[id] = xOffset;
       xOffset += text.length + 1; // 1-space gap between tabs
     }
 
@@ -359,8 +364,9 @@ export class AgentVibesConsole {
       const el = this._tabItems[tabIds[i]];
 
       // Blinking block cursor: replace trailing space with █, toggle at 500ms
-      const _tabLabel     = TAB_DISPLAY_LABELS[tabIds[i]];
-      const _baseContent  = ` [${_tabLabel[0]}] ${_tabLabel} `;
+      // Use a getter so the content reflects any post-init language changes.
+      const _getBaseContent = () => el.content.replace(/█$/, ' ');
+      const _baseContent  = el.content;
       const _blockContent = _baseContent.slice(0, -1) + '█';
       let _cursorInterval = null;
       let _cursorOn       = false;
@@ -369,18 +375,21 @@ export class AgentVibesConsole {
         el.style.fg = 'white';
         el.style.bg = '#9c27b0'; // purple — cursor on this tab item
         _cursorOn = true;
-        el.setContent(_blockContent);
+        const _base  = _getBaseContent();
+        const _block = _base.slice(0, -1) + '█';
+        el.setContent(_block);
         this.screen.render();
         if (_cursorInterval) { clearInterval(_cursorInterval); _cursorInterval = null; }
         _cursorInterval = setInterval(() => {
           _cursorOn = !_cursorOn;
-          el.setContent(_cursorOn ? _blockContent : _baseContent);
+          const b = _getBaseContent();
+          el.setContent(_cursorOn ? b.slice(0, -1) + '█' : b);
           this.screen.render();
         }, 500);
       });
       el.on('blur', () => {
         if (_cursorInterval) { clearInterval(_cursorInterval); _cursorInterval = null; }
-        el.setContent(_baseContent);
+        el.setContent(_getBaseContent());
         // navigationService set up after _createTabBar, but blur fires lazily — safe
         this._updateTabBar(this.navigationService?.getActiveTab() ?? tabIds[0]);
         this.screen.render();
@@ -475,12 +484,41 @@ export class AgentVibesConsole {
   }
 
   // ---------------------------------------------------------------------------
+  // Private: Refresh all chrome strings (header subtitle, tab bar labels) when lang changes
+
+  _refreshChrome(lang) {
+    // Update header subtitle "Customization Tool"
+    if (this._headerSubtitleText) {
+      this._headerSubtitleText.setContent(`{green-fg}${t(lang, 'customizationTool')}{/green-fg}`);
+    }
+    if (this._headerQuitText) {
+      this._headerQuitText.setContent(`{#ef9a9a-fg}${t(lang, 'quitLabel')}{/#ef9a9a-fg}`);
+    }
+
+    // Update tab bar item labels — keep widths stable (use English as baseline)
+    for (const id of TAB_ORDER) {
+      const el = this._tabItems?.[id];
+      if (!el) continue;
+      const label = getTabLabel(id, lang);
+      const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
+      el.setContent(` [${shortcutKey}] ${label} `);
+    }
+
+    // Update active tab's footer text if it supports language-aware footer
+    const activeId = this.navigationService?.getActiveTab();
+    if (activeId) this._updateContextFooter(activeId);
+
+    this.screen.render();
+  }
+
+  // ---------------------------------------------------------------------------
   // Private: Render tab bar content string for given active tab
   // (kept as a pure helper for unit tests; real rendering uses _updateTabBar)
 
   _renderTabBarContent(activeTabId) {
+    const lang = this._languageService?.getLang() ?? 'en';
     return TAB_ORDER.map(id => {
-      const label = TAB_DISPLAY_LABELS[id];
+      const label = getTabLabel(id, lang);
       const shortcutKey = TAB_SHORTCUT_KEYS[id] || label[0];
       if (id === activeTabId) {
         return `{bold}{white-fg}[${shortcutKey}] ${label}{/white-fg}{/bold}`;
@@ -614,9 +652,14 @@ export class AgentVibesConsole {
     const providerService = new ProviderService(configService);
     this._configService = configService;
     this._providerService = providerService;
+    const languageService = new LanguageService();
+    this._languageService = languageService;
+    // Refresh UI chrome when language changes
+    languageService.onChange(lang => this._refreshChrome(lang));
     const services = {
       configService,
       providerService,
+      languageService,
       navigationService: this.navigationService,
       updateHeaderStatus: () => this._updateHeaderStatus(),
       focusMainTabBar: () => {
