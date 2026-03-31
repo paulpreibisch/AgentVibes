@@ -531,8 +531,8 @@ export function createInstallTab(screen, services) {
     return btn;
   }
 
-  const _editBtn   = _createInstallBtn('Edit',               '#1565c0', _doEdit);
-  const _acceptBtn = _createInstallBtn('✓ Accept & Install', COLORS.btnDefault, _doAccept);
+  const _editBtn   = _createInstallBtn(_tl('editInstallBtn'),  '#1565c0', _doEdit);
+  const _acceptBtn = _createInstallBtn(_tl('acceptInstallBtn'), COLORS.btnDefault, _doAccept);
 
   // Edit sits inline with the intro text row; Accept & Install is below
   _editBtn.top   = 8;  _editBtn.left   = 36;
@@ -568,7 +568,7 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 2 button — Continue (shown after deps check passes)
 
-  const _s2ContinueBtn = _createInstallBtn('Continue →', '#1565c0', () => {
+  const _s2ContinueBtn = _createInstallBtn(_tl('continueArrowBtn'), '#1565c0', () => {
     _screen++;
     _showCurrentScreen();
   });
@@ -581,7 +581,7 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 5 button — OK (summary page only, config already saved on screen 4)
 
-  const _s5OkBtn = _createInstallBtn('✓  OK — Done', '#1565c0', () => {
+  const _s5OkBtn = _createInstallBtn(_tl('okDoneBtn'), '#1565c0', () => {
     _dismissCompletionModal();
   });
   _s5OkBtn.bottom = 3; _s5OkBtn.left = 4;  // bottom-anchored: sits above hintLine (bottom:2)
@@ -678,6 +678,7 @@ export function createInstallTab(screen, services) {
       '',  // ← [Continue →] button here (box row 12) when TTS detected
     ]));
     if (ttsOk) {
+      _s2ContinueBtn.setContent(_tl('continueArrowBtn'));
       _s2ContinueBtn.show();
       _s2ContinueBtn.focus();
     }
@@ -747,6 +748,8 @@ export function createInstallTab(screen, services) {
       '',  // ← [✓ Accept & Install] button rendered as real widget here (box row 13)
     ]));
     hintLine.setContent(`  ${t(_getLang(), 'screen4Hint')}`);
+    _editBtn.setContent(_tl('editInstallBtn'));
+    _acceptBtn.setContent(_tl('acceptInstallBtn'));
     _acceptBtn.focus();
     screen.render();
   }

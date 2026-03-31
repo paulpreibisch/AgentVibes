@@ -19,7 +19,7 @@ import {
   parseVoiceId, parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, getFavorites, toggleFavorite,
 } from './voices-tab.js';
 import { LanguageService } from '../../services/language-service.js';
-import { SUPPORTED_LANGUAGES } from '../../i18n/strings.js';
+import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
 import { formatTrackLabel, scanTracks, getMusicFavorites, toggleMusicFavorite, applyTrackToAudioEffects } from './music-tab.js';
 import { BRAND_PINK, BRAND_BLUE } from '../brand-colors.js';
 import { buildAudioEnv, detectMp3Player, detectWavPlayer } from '../audio-env.js';
@@ -101,6 +101,7 @@ const COLORS = {
 
 const FOOTER_TEXT =
   '[↑↓] Group  [←→] Sibling/Sub-tab  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit';
+// (legacy constant kept for test stub; UI uses _getFooter() which reads current language)
 
 // Default effects — single source of truth (used by _getEffects, _setEffects, refreshDisplay)
 const EFFECTS_DEFAULTS = Object.freeze({ reverbPreset: 'light' });
@@ -216,6 +217,14 @@ export function createSettingsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
   const { configService, providerService, navigationService, focusMainTabBar, focusFirstHeaderItem, focusLastHeaderItem, updateHeaderStatus } = services;
+  const _getLang = () => services.languageService?.getLang() ?? 'en';
+  const _t = (key) => t(_getLang(), key);
+
+  // Re-render all labels immediately when language changes (live update, no tab switch needed)
+  services.languageService?.onChange(() => {
+    refreshLabels();
+    screen.render();
+  });
 
   // Playback state for the voice sample button
   let _sampleProcess = null;
@@ -268,13 +277,13 @@ export function createSettingsTab(screen, services) {
     _testSpinnerIdx = 0;
     for (const b of _testBtns) {
       b.style.bg = SPINNER_PROCESSING_BG;
-      b.setContent(`${SPINNER_FRAMES[0]} ${_testBtnLabels.get(b) ?? '▶ Preview'}`);
+      b.setContent(`${SPINNER_FRAMES[0]} ${_testBtnLabels.get(b) ?? _t('previewBtn')}`);
     }
     screen.render();
     _testSpinnerTimer = setInterval(() => {
       _testSpinnerIdx = (_testSpinnerIdx + 1) % SPINNER_FRAMES.length;
       for (const b of _testBtns) {
-        b.setContent(`${SPINNER_FRAMES[_testSpinnerIdx]} ${_testBtnLabels.get(b) ?? '▶ Preview'}`);
+        b.setContent(`${SPINNER_FRAMES[_testSpinnerIdx]} ${_testBtnLabels.get(b) ?? _t('previewBtn')}`);
       }
       screen.render();
     }, 100);
@@ -336,9 +345,9 @@ export function createSettingsTab(screen, services) {
     _testActive = false;
     _testInitiatorBtn = null;
     // Restore spinner labels to defaults (may have been overridden for soprano 'Loading model…')
-    _testBtnLabels.set(reverbTestBtn,      '▶ Preview');
-    _testBtnLabels.set(personalityTestBtn, '▶ Preview');
-    _testBtnLabels.set(fullPreviewBtn,     '▶ Full Preview');
+    _testBtnLabels.set(reverbTestBtn,      _t('previewBtn'));
+    _testBtnLabels.set(personalityTestBtn, _t('previewBtn'));
+    _testBtnLabels.set(fullPreviewBtn,     _t('fullPreviewBtn'));
   }
 
   function _setTestBtnsLabel(label) {
@@ -349,7 +358,7 @@ export function createSettingsTab(screen, services) {
   // Restore each test button to its individual default label (from _testBtnLabels map).
   // Replaces the old _restoreTestBtnsLabels() pattern which stomped on non-'Test' labels.
   function _restoreTestBtnsLabels() {
-    for (const b of _testBtns) b.setContent(_testBtnLabels.get(b) ?? '▶ Preview');
+    for (const b of _testBtns) b.setContent(_testBtnLabels.get(b) ?? _t('previewBtn'));
     screen.render();
   }
 
@@ -741,12 +750,18 @@ export function createSettingsTab(screen, services) {
   // Sub-tab bar — Voice | Effects | Personality | Output
 
   const SUB_TABS = ['voice', 'effects', 'personality', 'output', 'language'];
+  // Fixed-width labels (English) — widths used for layout at creation time
   const SUB_TAB_LABELS = {
     voice:       ' [V] Voice ',
     effects:     ' [E] Effects ',
     personality: ' [P] Personality ',
     output:      ' [O] Output ',
     language:    ' [L] Language ',
+  };
+  // Keys map for i18n lookup
+  const SUB_TAB_KEYS = {
+    voice: 'subTabVoice', effects: 'subTabEffects', personality: 'subTabPersonality',
+    output: 'subTabOutput', language: 'subTabLanguage',
   };
   let _activeSubTab = 'voice';
 
@@ -2281,6 +2296,64 @@ export function createSettingsTab(screen, services) {
   }
 
   // -------------------------------------------------------------------------
+  // refreshLabels — update all static label/header/button strings to current language
+  // Called from show() so strings update whenever the user returns to this tab after a lang change.
+
+  function refreshLabels() {
+    // Sub-tab bar labels (content only — widths fixed at creation)
+    for (const id of SUB_TABS) {
+      _subTabItemsMap[id].setContent(_t(SUB_TAB_KEYS[id]));
+    }
+    // Section headers
+    providerVoiceHeader.setContent(`{bright-cyan-fg}${_t('sectionProviderVoice')}{/bright-cyan-fg}`);
+    audioEffectsHeader.setContent(`{bright-cyan-fg}${_t('sectionAudioEffects')}{/bright-cyan-fg}`);
+    bgMusicHeader.setContent(`{bright-cyan-fg}${_t('sectionBgMusic')}{/bright-cyan-fg}`);
+    styleHeader.setContent(`{bright-cyan-fg}${_t('sectionStyle')}{/bright-cyan-fg}`);
+    introTextHeader.setContent(`{bright-cyan-fg}${_t('sectionIntroText')}{/bright-cyan-fg}`);
+    audioDstHeader.setContent(`{bright-cyan-fg}${_t('sectionAudioDest')}{/bright-cyan-fg}`);
+    configStorageHeader.setContent(`{bright-cyan-fg}${_t('sectionConfigStorage')}{/bright-cyan-fg}`);
+    languageSectionHeader.setContent(`{bright-cyan-fg}${_t('sectionLanguage')}{/bright-cyan-fg}`);
+    // Row labels
+    providerLabel.setContent(_t('providerRowLabel'));
+    voiceLabel.setContent(_t('currentVoiceLabel'));
+    reverbLabel.setContent(_t('reverbLabel'));
+    trackLabel.setContent(_t('trackLabel'));
+    volumeLabel.setContent(_t('volumeLabel'));
+    verbosityLabel.setContent(_t('verbosityLabel'));
+    personalityLabel.setContent(_t('personalityLabel'));
+    introTextLabel.setContent(_t('introTextRowLabel'));
+    audioDstLabel.setContent(_t('destinationLabel'));
+    audioSshLabel.setContent(_t('sshAliasLabel'));
+    configGlobalLabel.setContent(_t('globalLabel'));
+    configLocalLabel.setContent(_t('localLabel'));
+    languageCurrentLabel.setContent(_t('languageLabel'));
+    // Buttons (only the ones with fixed labels — not dynamic state buttons)
+    switchBtn.setContent(_t('switchBtn'));
+    changeBtn.setContent(_t('changeBtn'));
+    reverbChangeBtn.setContent(_t('changeBtn'));
+    trackChangeBtn.setContent(_t('changeBtn'));
+    volumeChangeBtn.setContent(_t('changeBtn'));
+    verbosityChangeBtn.setContent(_t('changeBtn'));
+    personalityChangeBtn.setContent(_t('changeBtn'));
+    audioDstChangeBtn.setContent(_t('changeBtn'));
+    playBtn.setContent(_t('playBtn'));
+    reverbTestBtn.setContent(_t('previewBtn'));
+    _testBtnLabels.set(reverbTestBtn,      _t('previewBtn'));
+    personalityTestBtn.setContent(_t('previewBtn'));
+    _testBtnLabels.set(personalityTestBtn, _t('previewBtn'));
+    fullPreviewBtn.setContent(_t('fullPreviewBtn'));
+    _testBtnLabels.set(fullPreviewBtn,     _t('fullPreviewBtn'));
+    musicTestBtn.setContent(_t('previewBtn'));
+    saveGloballyBtn.setContent(_t('saveGloballyBtn'));
+    saveLocallyBtn.setContent(_t('saveLocallyBtn'));
+    cancelChangesBtn.setContent(_t('cancelChangesBtn'));
+    introEditBtn.setContent(_t('editBtn'));
+    introClearBtn.setContent(_t('clearBtn'));
+    audioSshEditBtn.setContent(_t('editBtn'));
+    langApplyBtn.setContent(_t('applyLanguageBtn'));
+  }
+
+  // -------------------------------------------------------------------------
   // Tab Component Contract implementation
 
   return {
@@ -2289,6 +2362,7 @@ export function createSettingsTab(screen, services) {
     show() {
       _captureSnapshot();
       box.show();
+      refreshLabels();
       refreshDisplay();
       refreshConfigDisplay();
       refreshLanguageDisplay();
@@ -2333,7 +2407,7 @@ export function createSettingsTab(screen, services) {
     },
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _t('settingsFooter');
     },
 
     getFooterColor() {
