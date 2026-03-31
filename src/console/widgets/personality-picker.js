@@ -6,6 +6,8 @@
  */
 
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
 import { buildAudioEnv } from '../audio-env.js';
@@ -126,7 +128,10 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
     const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     const _env = buildAudioEnv();
     if (_isWin) {
-      const ttsScript = path.join(process.cwd(), '.claude', 'hooks-windows', 'play-tts.ps1');
+      // Prefer project-local install, fall back to global ~/.claude install
+      const _cwdScript = path.join(process.cwd(), '.claude', 'hooks-windows', 'play-tts.ps1');
+      const _homeScript = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts.ps1');
+      const ttsScript = fs.existsSync(_cwdScript) ? _cwdScript : _homeScript;
       _pickerTtsProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ttsScript, phrase], {
         stdio: 'ignore',
         env: _env,
@@ -149,6 +154,14 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
         screen.render();
       }
       _pickerTtsProc = null;
+    });
+    _pickerTtsProc.on('error', () => {
+      _pickerTtsProc = null;
+      if (_playingItemIdx >= 0) {
+        _setItemPlaying(_playingItemIdx, false);
+        _playingItemIdx = -1;
+        screen.render();
+      }
     });
     _pickerTtsProc.unref();
   }

@@ -291,8 +291,7 @@ export function createSettingsTab(screen, services) {
       _sopranoMgrProc = null;
     }
     if (_sampleProcess) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
+      if (_IS_WINDOWS) {
         try { _sampleProcess.kill(); } catch {}
       } else {
         try { process.kill(-_sampleProcess.pid, 'SIGTERM'); } catch {}
@@ -334,9 +333,8 @@ export function createSettingsTab(screen, services) {
   function _killTest() {
     _stopTestSpinner();
     if (_testTimeout)   { clearTimeout(_testTimeout); _testTimeout = null; }
-    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-    if (_testMusicProc) { try { _isWin ? _testMusicProc.kill() : process.kill(-_testMusicProc.pid, 'SIGTERM'); } catch {} _testMusicProc = null; }
-    if (_testVoiceProc) { try { _isWin ? _testVoiceProc.kill() : process.kill(-_testVoiceProc.pid, 'SIGTERM'); } catch {} _testVoiceProc = null; }
+    if (_testMusicProc) { try { _IS_WINDOWS ? _testMusicProc.kill() : process.kill(-_testMusicProc.pid, 'SIGTERM'); } catch {} _testMusicProc = null; }
+    if (_testVoiceProc) { try { _IS_WINDOWS ? _testVoiceProc.kill() : process.kill(-_testVoiceProc.pid, 'SIGTERM'); } catch {} _testVoiceProc = null; }
     _testActive = false;
     _testInitiatorBtn = null;
     // Restore spinner labels to defaults (may have been overridden for soprano 'Loading model…')
@@ -449,11 +447,13 @@ export function createSettingsTab(screen, services) {
           `mpg123 -q --loop -1 "${trackPath}"`,
         ].join(' 2>/dev/null || ') + ' 2>/dev/null';
         if (_IS_WINDOWS) {
-          _testMusicProc = spawn('ffplay', ['-nodisp', '-loop', '0', '-loglevel', 'quiet', '-volume', String(vol), trackPath], _spawnOpts(_testEnv));
+          const _clampedVol = Math.max(10, Math.min(100, vol));
+          _testMusicProc = spawn('ffplay', ['-nodisp', '-loop', '0', '-loglevel', 'quiet', '-volume', String(_clampedVol), trackPath], _spawnOpts(_testEnv));
+          _testMusicProc.on('error', () => { _testMusicProc = null; });
         } else {
           _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
         }
-        _testMusicProc.unref();
+        _testMusicProc?.unref();
       }
     }
 
@@ -566,10 +566,15 @@ export function createSettingsTab(screen, services) {
               });
             }
           }
-          // Use processed wav if effect succeeded
+          // Use processed wav only if effect succeeded and file has content
           try {
-            fs.accessSync(processedWav);
-            wavToPlay = processedWav;
+            const _stat = fs.statSync(processedWav);
+            if (_stat.size > 0) {
+              wavToPlay = processedWav;
+            } else {
+              fs.unlinkSync(processedWav);
+              processedWav = null;
+            }
           } catch {
             processedWav = null;
           }
@@ -609,8 +614,7 @@ export function createSettingsTab(screen, services) {
 
   function _killMusicTest() {
     if (_musicTestProc) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
+      if (_IS_WINDOWS) {
         try { _musicTestProc.kill(); } catch {}
       } else {
         try { process.kill(-_musicTestProc.pid, 'SIGTERM'); } catch {}
@@ -690,7 +694,9 @@ export function createSettingsTab(screen, services) {
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     if (_IS_WINDOWS) {
-      _musicTestProc = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(vol), trackPath], _spawnOpts(_testEnv));
+      const _clampedVol2 = Math.max(10, Math.min(100, vol));
+      _musicTestProc = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(_clampedVol2), trackPath], _spawnOpts(_testEnv));
+      _musicTestProc.on('error', () => { _killMusicTest(); musicTestBtn.setContent('▶ Preview'); screen.render(); });
     } else {
       _musicTestProc = spawn('sh', ['-c', cmd], _spawnOpts(_testEnv));
     }
@@ -1167,10 +1173,15 @@ export function createSettingsTab(screen, services) {
       _setEffects(configService, { reverbPreset: preset });
       // On Windows, sync reverb-level.txt so play-tts.ps1 picks it up
       if (_IS_WINDOWS) {
-        const effectsMgr = path.join(process.cwd(), '.claude', 'hooks-windows', 'effects-manager.ps1');
-        spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', effectsMgr, 'set-reverb', preset, 'default'], {
-          stdio: 'ignore', timeout: 5000,
-        });
+        const _validPresets = new Set(['off', 'light', 'medium', 'heavy', 'cathedral']);
+        if (_validPresets.has(preset)) {
+          const _cwdMgr = path.join(process.cwd(), '.claude', 'hooks-windows', 'effects-manager.ps1');
+          const _homeMgr = path.join(os.homedir(), '.claude', 'hooks-windows', 'effects-manager.ps1');
+          const effectsMgr = fs.existsSync(_cwdMgr) ? _cwdMgr : _homeMgr;
+          spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', effectsMgr, 'set-reverb', preset, 'default'], {
+            stdio: 'ignore', timeout: 5000,
+          });
+        }
       }
       refreshDisplay();
     }, _restoreFocus);
@@ -2853,8 +2864,7 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
 
   function _killPreview() {
     if (_previewProcess) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
+      if (_IS_WINDOWS) {
         try { _previewProcess.kill(); } catch {}
       } else {
         try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
@@ -2917,7 +2927,9 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     if (_IS_WINDOWS) {
-      _previewProcess = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(vol), trackPath], _spawnOpts(_previewEnv));
+      const _clampedVol3 = Math.max(10, Math.min(100, vol));
+      _previewProcess = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(_clampedVol3), trackPath], _spawnOpts(_previewEnv));
+      _previewProcess.on('error', () => { _previewProcess = null; _previewVol = null; _refreshList(); });
     } else {
       _previewProcess = spawn('sh', ['-c', cmd], _spawnOpts(_previewEnv));
     }
@@ -2992,8 +3004,7 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
   function _killPreview() {
     if (_previewProcess) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
+      if (_IS_WINDOWS) {
         try { _previewProcess.kill(); } catch {}
       } else {
         try { process.kill(-_previewProcess.pid, 'SIGTERM'); } catch {}
@@ -3168,9 +3179,8 @@ function _openMusicBrowserModal(screen, configService, navigationService, onDone
 
     const _mp3Player = detectMp3Player(_modalEnv);
     if (!_mp3Player) return;
-    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     _previewProcess = spawn(_mp3Player.bin, _mp3Player.args(trackPath), {
-      stdio: 'ignore', detached: !_isWin, windowsHide: true, env: _modalEnv,
+      stdio: 'ignore', detached: !_IS_WINDOWS, windowsHide: true, env: _modalEnv,
     });
     _previewProcess.unref();
     _previewTrackId = trackId;
@@ -3401,8 +3411,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
 
   function _killPreview() {
     if (_playingProcess) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
+      if (_IS_WINDOWS) {
         try { _playingProcess.kill(); } catch {}
       } else {
         try { process.kill(-_playingProcess.pid, 'SIGTERM'); } catch {}
@@ -3645,9 +3654,9 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
     const phrase  = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
-    const _isWinPreview = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    const _IS_WINDOWS = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     let _piperBin3 = 'piper';
-    if (_isWinPreview) {
+    if (_IS_WINDOWS) {
       const _lad = process.env.LOCALAPPDATA ||
         (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
       if (_lad) {
@@ -3659,7 +3668,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     if (_ms3.speakerId != null) _piperArgs3.push('--speaker', String(_ms3.speakerId));
     const piper = spawn(_piperBin3, _piperArgs3, {
       stdio: ['pipe', 'ignore', 'ignore'],
-      detached: !_isWinPreview,
+      detached: !_IS_WINDOWS,
       windowsHide: true,
       env: _spawnEnv,
     });
@@ -3693,7 +3702,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
       if (!_wavPlayer3) return;
       const playProc = spawn(_wavPlayer3.bin, _wavPlayer3.args(tempWav), {
         stdio: 'ignore',
-        detached: !_isWinPreview,
+        detached: !_IS_WINDOWS,
         windowsHide: true,
         env: _spawnEnv,
       });
