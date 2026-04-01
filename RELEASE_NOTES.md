@@ -1,5 +1,42 @@
 # AgentVibes Release Notes
 
+## 🌍 v4.5.0 — "Speak Every Language" Release
+
+**Release Date:** April 2026
+
+Full multilingual TUI support across all 9 languages, complete Windows security hardening, and zero failing tests.
+
+### 🌍 Multilingual TUI — 9 Languages
+
+Every screen, tab, button, and label in the `npx agentvibes` TUI is now fully translated:
+
+- **English, Spanish, French, German, Portuguese, Japanese, Korean, Chinese (Simplified), Italian**
+- Language selection on first launch (Screen 0 of the installer wizard)
+- Language sub-tab in Settings — switch language live without restarting
+- All tab bar labels, button text, footer hints, and status messages translated
+- BMAD tab and SSH Receiver tab fully localized
+- Per-language i18n files (`src/i18n/en.js`, `es.js`, `fr.js`, ...) with English fallback
+
+### 🪟 Windows Security & Bug Fixes
+
+- **Temp filenames** — All `Date.now()` temp filenames replaced with `randomUUID()` across JS and PowerShell (unpredictable, prevents temp file hijacking)
+- **Shell injection** — `execSync('which ...', { shell: true })` replaced with `spawnSync` (no shell expansion)
+- **Music player** — Hardcoded `ffplay` on Windows replaced with `detectMp3Player()` (respects user's installed player)
+- **Boolean coercion** — `isWindowsTerminal` now correctly returns `true/false` instead of leaking `WT_SESSION` UUID string
+- **Network mount detection** — `.match()` result properly coerced to boolean
+
+### 🎙️ Cross-Platform BMAD Speak
+
+- `bin/bmad-speak.js` — cross-platform entry point for BMAD agent speech
+- `.claude/hooks-windows/bmad-speak.ps1` — native Windows BMAD speak with per-agent personality routing
+
+### 🧪 Test Suite
+
+- 600 tests, 0 failures
+- Full cross-platform coverage (Windows path separators, chmod skip, provider file restore)
+
+---
+
 ## 🎉 v4.4.0 — "Full Platform Parity" Release
 
 **Release Date:** March 2026
