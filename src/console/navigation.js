@@ -35,8 +35,9 @@ const KEY_TO_TAB = {
  *
  * @param {object} screen - Blessed screen instance (or stub in tests)
  * @param {import('../services/navigation-service.js').NavigationService} navigationService
+ * @param {function} [focusMainTabBar] - Optional callback to return focus to the tab bar
  */
-export function setupNavigation(screen, navigationService) {
+export function setupNavigation(screen, navigationService, focusMainTabBar) {
   // Tab switching shortcuts — one handler per key (both cases)
   for (const [key, tabId] of Object.entries(KEY_TO_TAB)) {
     screen.key([key], () => {
@@ -53,10 +54,12 @@ export function setupNavigation(screen, navigationService) {
     }
   });
 
-  // Escape — close modal (story 6.4 will expand modal handling)
+  // Escape — close modal if open, otherwise return focus to tab bar
   screen.key(['escape'], () => {
     if (navigationService.isModalOpen()) {
       navigationService.closeModal();
+    } else if (typeof focusMainTabBar === 'function') {
+      focusMainTabBar();
     }
   });
 }
