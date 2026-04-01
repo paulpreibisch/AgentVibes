@@ -422,6 +422,53 @@ export function createSettingsTab(screen, services) {
     return parts.join(' ');
   }
 
+  function _startTestMusic(musicCfg) {
+    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+    const trackId   = musicCfg.track ?? 'agentvibes_soft_flamenco_loop.mp3';
+    const trackPath = path.resolve(tracksDir, trackId);
+    const safeMusic = path.resolve(tracksDir);
+    const trackExists = (trackPath.startsWith(safeMusic + path.sep) || trackPath === safeMusic)
+      && (() => { try { fs.accessSync(trackPath); return true; } catch { return false; } })();
+    if (!trackExists) return;
+    const vol         = musicCfg.volume ?? MUSIC_DEFAULTS.volume;
+    const volFraction = (Math.max(10, Math.min(100, vol)) / 100).toFixed(2);
+    if (_IS_WINDOWS) {
+      const _mp3P = detectMp3Player(_testEnv);
+      _testMusicProc = _mp3P
+        ? spawn(_mp3P.bin, _mp3P.args(trackPath), _spawnOpts(_testEnv))
+        : null;
+    } else {
+      const musicCmd = [
+        `ffplay -nodisp -loop 0 -loglevel quiet -volume ${vol} "${trackPath}"`,
+        `play "${trackPath}" repeat 9999 vol ${volFraction}`,
+        `mpg123 -q --loop -1 "${trackPath}"`,
+      ].join(' 2>/dev/null || ') + ' 2>/dev/null';
+      _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
+    }
+    if (_testMusicProc) _testMusicProc.unref();
+  }
+
+  function _applyReverbToWav(tempWav, preset) {
+    const SOX_REVERB = {
+      light:     'reverb 20 50 50',
+      medium:    'reverb 40 50 70',
+      heavy:     'reverb 70 50 100',
+      cathedral: 'reverb 90 30 100',
+    };
+    const soxFx = SOX_REVERB[preset];
+    if (!soxFx) return { wavToPlay: tempWav, processedWav: null };
+    const processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
+    spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
+      stdio: 'ignore', timeout: 5000, env: _testEnv,
+    });
+    try {
+      fs.accessSync(processedWav);
+      return { wavToPlay: processedWav, processedWav };
+    } catch {
+      return { wavToPlay: tempWav, processedWav: null };
+    }
+  }
+
   // withMusic=true → Full Preview (voice + reverb + background track)
   // withMusic=false → Reverb Test (voice + reverb only, no background music)
   // phraseOverride → speak this text instead of the full _buildPreviewPhrase() summary
@@ -436,34 +483,8 @@ export function createSettingsTab(screen, services) {
     const musicCfg = configService.getConfig().backgroundMusic
       ?? configService.getConfig().music
       ?? {};
-    const trackId   = musicCfg.track ?? 'agentvibes_soft_flamenco_loop.mp3';
-    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
-    const trackPath = path.resolve(tracksDir, trackId);
-    const safeMusic = path.resolve(tracksDir);
-
     // Start background music loop (Full Preview only — not reverb Test)
-    if (withMusic) {
-      const trackExists = (trackPath.startsWith(safeMusic + path.sep) || trackPath === safeMusic)
-        && (() => { try { fs.accessSync(trackPath); return true; } catch { return false; } })();
-      if (trackExists) {
-        const vol         = musicCfg.volume ?? MUSIC_DEFAULTS.volume;
-        const volFraction = (Math.max(10, Math.min(100, vol)) / 100).toFixed(2);
-        const musicCmd = [
-          `ffplay -nodisp -loop 0 -loglevel quiet -volume ${vol} "${trackPath}"`,
-          `play "${trackPath}" repeat 9999 vol ${volFraction}`,
-          `mpg123 -q --loop -1 "${trackPath}"`,
-        ].join(' 2>/dev/null || ') + ' 2>/dev/null';
-        if (_IS_WINDOWS) {
-          const _mp3P = detectMp3Player(_testEnv);
-          _testMusicProc = _mp3P
-            ? spawn(_mp3P.bin, _mp3P.args(trackPath), _spawnOpts(_testEnv))
-            : null;
-        } else {
-          _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
-        }
-        _testMusicProc.unref();
-      }
-    }
+    if (withMusic) _startTestMusic(musicCfg);
 
     // Lead-in before voice synthesis.
     // Soprano CLI loads the neural model fresh each call (cold-start: 5–120s depending on hardware).
@@ -544,30 +565,7 @@ export function createSettingsTab(screen, services) {
         });
         const preset = (presetResult.stdout || '').trim();
 
-        const SOX_REVERB = {
-          light:    'reverb 20 50 50',
-          medium:   'reverb 40 50 70',
-          heavy:    'reverb 70 50 100',
-          cathedral: 'reverb 90 30 100',
-        };
-        const soxFx = SOX_REVERB[preset];
-
-        let wavToPlay = tempWav;
-        let processedWav = null;
-
-        if (soxFx) {
-          processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
-          spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
-            stdio: 'ignore', timeout: 5000, env: _testEnv,
-          });
-          // Use processed wav if sox succeeded
-          try {
-            fs.accessSync(processedWav);
-            wavToPlay = processedWav;
-          } catch {
-            processedWav = null;
-          }
-        }
+        const { wavToPlay, processedWav } = _applyReverbToWav(tempWav, preset);
 
         _stopTestSpinner();
         _setTestBtnsLabel('■ Stop');
