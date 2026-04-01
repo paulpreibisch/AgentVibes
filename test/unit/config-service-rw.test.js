@@ -286,13 +286,15 @@ describe('ConfigService — getGlobalConfigPath / getLocalConfigPath / hasLocalC
   });
 
   test('getGlobalConfigPath returns path inside homeDir', () => {
-    const svc = new ConfigService({ homeDir: '/home/test', projectRoot: '/proj' });
-    assert.strictEqual(svc.getGlobalConfigPath(), '/home/test/.agentvibes/config.json');
+    const homeDir = path.resolve('/home/test');
+    const svc = new ConfigService({ homeDir, projectRoot: path.resolve('/proj') });
+    assert.strictEqual(svc.getGlobalConfigPath(), path.join(homeDir, '.agentvibes', 'config.json'));
   });
 
   test('getLocalConfigPath returns path inside projectRoot', () => {
-    const svc = new ConfigService({ homeDir: '/home/test', projectRoot: '/proj' });
-    assert.strictEqual(svc.getLocalConfigPath(), '/proj/.agentvibes/config.json');
+    const projectRoot = path.resolve('/proj');
+    const svc = new ConfigService({ homeDir: path.resolve('/home/test'), projectRoot });
+    assert.strictEqual(svc.getLocalConfigPath(), path.join(projectRoot, '.agentvibes', 'config.json'));
   });
 
   test('hasLocalConfig returns false when no local config file exists', () => {

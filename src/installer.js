@@ -201,9 +201,9 @@ function supportsEmoji() {
 
   const isModernTerminal = modernTerminals.some(t => term.toLowerCase().includes(t));
 
-  // Windows Terminal always supports emoji
+  // Windows Terminal always supports emoji — coerce to boolean to avoid returning WT_SESSION UUID
   const isWindowsTerminal = process.platform === 'win32' &&
-                            (process.env.WT_SESSION || process.env.WT_PROFILE_ID);
+                            !!(process.env.WT_SESSION || process.env.WT_PROFILE_ID);
 
   // macOS Terminal and iTerm2
   const isMacOS = process.platform === 'darwin';

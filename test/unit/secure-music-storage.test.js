@@ -68,7 +68,8 @@ test('Copy: File stored in correct directory structure', async () => {
     const result = await copyToSecureStorage(sourceFile, env.claudeDir);
 
     assert(result.success, 'Copy should succeed');
-    assert(result.storagePath.includes('audio/custom-music/tracks'), 'Should be in correct directory structure');
+    const expectedSubpath = path.join('audio', 'custom-music', 'tracks');
+    assert(result.storagePath.includes(expectedSubpath), 'Should be in correct directory structure');
   } finally {
     env.cleanup();
   }
@@ -94,7 +95,7 @@ test('Copy: Permissions set correctly on stored file (600)', async () => {
   }
 });
 
-test('Copy: Directories created with secure permissions (700)', async () => {
+test('Copy: Directories created with secure permissions (700)', { skip: process.platform === 'win32' }, async () => {
   const env = createTestEnv();
   try {
     const sourceFile = createTestAudioFile(env.tempDir);

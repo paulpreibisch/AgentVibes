@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   PIPER_VOICES_DIR, COL_NAME_W, COL_GENDER_W, SAMPLE_PHRASES,
@@ -457,7 +458,7 @@ export function createSettingsTab(screen, services) {
   // processedWav is non-null only when a processed file was created successfully.
   function _applyReverbToWav(tempWav, preset) {
     if (!preset || preset === 'off') return { wavToPlay: tempWav, processedWav: null };
-    const processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
+    const processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${randomUUID()}.wav`);
     if (_IS_WINDOWS) {
       const FFMPEG_REVERB = {
         light:     'aecho=0.8:0.88:60:0.4',
@@ -519,7 +520,7 @@ export function createSettingsTab(screen, services) {
       if (!_testActive) return;
 
       const provider  = providerService.getActiveProvider();  // re-read (may have changed)
-      const tempWav   = path.join(os.tmpdir(), `agentvibes-test-${Date.now()}.wav`);
+      const tempWav   = path.join(os.tmpdir(), `agentvibes-test-${randomUUID()}.wav`);
       const ttsInput  = phraseOverride ?? _buildPreviewPhrase();
 
       let synthProc;
@@ -691,11 +692,18 @@ export function createSettingsTab(screen, services) {
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     if (_IS_WINDOWS) {
-      const _clampedVol2 = Math.max(10, Math.min(100, vol));
-      _musicTestProc = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(_clampedVol2), trackPath], _spawnOpts(_testEnv));
-      _musicTestProc.on('error', () => { _killMusicTest(); musicTestBtn.setContent('▶ Preview'); screen.render(); });
+      const _mp3P2 = detectMp3Player(_testEnv);
+      _musicTestProc = _mp3P2
+        ? spawn(_mp3P2.bin, _mp3P2.args(trackPath), _spawnOpts(_testEnv))
+        : null;
     } else {
       _musicTestProc = spawn('sh', ['-c', cmd], _spawnOpts(_testEnv));
+    }
+    if (!_musicTestProc) {
+      _musicTestActive = false;
+      musicTestBtn.setContent(_t('previewBtn'));
+      screen.render();
+      return;
     }
     _musicTestProc.unref();
     musicTestBtn.setContent('■ Stop');
@@ -704,13 +712,13 @@ export function createSettingsTab(screen, services) {
     _musicTestProc.on('exit', () => {
       if (_musicTestActive) {
         _killMusicTest();
-        musicTestBtn.setContent('▶ Preview');
+        musicTestBtn.setContent(_t('previewBtn'));
         _focusButton(musicTestBtn);
       }
     });
     _musicTestProc.on('error', () => {
       _killMusicTest();
-      musicTestBtn.setContent('▶ Preview');
+      musicTestBtn.setContent(_t('previewBtn'));
       _focusButton(musicTestBtn);
     });
   }
@@ -938,7 +946,7 @@ export function createSettingsTab(screen, services) {
     let phrase = `${_testGreeting()}. Agent Vibes here. I am ${provider === 'soprano' ? 'Soprano' : (_msPlay.isMultiSpeaker ? _msPlay.speakerName : _rawPlay)}`;
     if (_hasPersonality) phrase += `, with ${_activePers} personality`;
     phrase += '.';
-    const tempWav  = path.join(os.tmpdir(), `agentvibes-sample-${Date.now()}.wav`);
+    const tempWav  = path.join(os.tmpdir(), `agentvibes-sample-${randomUUID()}.wav`);
 
     _samplePlaying = true;
 
@@ -3085,12 +3093,17 @@ function _openVolumePicker(screen, configService, onSelect, onClose) {
     ].join(' 2>/dev/null || ') + ' 2>/dev/null';
 
     if (_IS_WINDOWS) {
-      const _clampedVol3 = Math.max(10, Math.min(100, vol));
-      _previewProcess = spawn('ffplay', ['-nodisp', '-t', '10', '-loglevel', 'quiet', '-volume', String(_clampedVol3), trackPath], _spawnOpts(_previewEnv));
-      _previewProcess.on('error', () => { _previewProcess = null; _previewVol = null; _refreshList(); });
+      const _mp3P3 = detectMp3Player(_previewEnv);
+      _previewProcess = _mp3P3
+        ? spawn(_mp3P3.bin, _mp3P3.args(trackPath), _spawnOpts(_previewEnv))
+        : null;
+      if (_previewProcess) {
+        _previewProcess.on('error', () => { _previewProcess = null; _previewVol = null; _refreshList(); });
+      }
     } else {
       _previewProcess = spawn('sh', ['-c', cmd], _spawnOpts(_previewEnv));
     }
+    if (!_previewProcess) { _previewVol = null; return; }
     _previewProcess.unref();
     _refreshList();
 
@@ -3809,7 +3822,7 @@ function _openVoiceBrowserModal(screen, providerService, configService, navigati
     const safeBase  = path.resolve(PIPER_VOICES_DIR);
     if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
-    const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
+    const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${randomUUID()}.wav`);
     const phrase  = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
     const _IS_WINDOWS = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;

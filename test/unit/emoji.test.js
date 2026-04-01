@@ -47,9 +47,9 @@ function supportsEmoji() {
 
   const isModernTerminal = modernTerminals.some(t => term.toLowerCase().includes(t));
 
-  // Windows Terminal
+  // Windows Terminal — coerce to boolean to avoid returning WT_SESSION UUID
   const isWindowsTerminal = process.platform === 'win32' &&
-                            (process.env.WT_SESSION || process.env.WT_PROFILE_ID);
+                            !!(process.env.WT_SESSION || process.env.WT_PROFILE_ID);
 
   // macOS
   const isMacOS = process.platform === 'darwin';

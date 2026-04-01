@@ -145,15 +145,20 @@ test('Provider: switch to invalid provider fails or warns', { skip: !isWindows }
 });
 
 test('Provider: switch then get round-trips correctly', { skip: !isWindows }, async () => {
-  // Get current provider for restoration
-  const before = await runPowerShell(['-File', providerScript, 'get']);
-  const originalProvider = before.stdout.trim();
+  const { readFileSync: rfSync, writeFileSync: wfSync, existsSync: exSync } = await import('node:fs');
+  const { join: pJoin, resolve: pResolve, dirname: pDirname } = await import('node:path');
+  const { fileURLToPath: fURLToPath } = await import('node:url');
+  const pRoot = pResolve(pDirname(fURLToPath(import.meta.url)), '..', '..');
+  const providerFile = pJoin(pRoot, '.claude', 'tts-provider.txt');
+
+  // Save current provider file content for exact restoration
+  const originalContent = exSync(providerFile) ? rfSync(providerFile, 'utf-8') : null;
 
   try {
-    // Switch to windows-sapi (always available on Windows)
-    const switchResult = await runPowerShell(['-File', providerScript, 'switch', 'windows-sapi']);
+    // Switch to sapi (always available on Windows)
+    const switchResult = await runPowerShell(['-File', providerScript, 'switch', 'sapi']);
     if (switchResult.exitCode !== 0) {
-      console.log('  Skipping: could not switch to windows-sapi');
+      console.log('  Skipping: could not switch to sapi');
       return;
     }
 
@@ -161,13 +166,13 @@ test('Provider: switch then get round-trips correctly', { skip: !isWindows }, as
     const after = await runPowerShell(['-File', providerScript, 'get']);
     const newProvider = after.stdout.trim();
     assert.ok(
-      newProvider.includes('sapi') || newProvider.includes('windows-sapi'),
-      `After switching to windows-sapi, get should return sapi variant, got: ${newProvider}`
+      newProvider.includes('sapi'),
+      `After switching to sapi, get should return sapi, got: ${newProvider}`
     );
   } finally {
-    // Restore original provider
-    if (originalProvider) {
-      await runPowerShell(['-File', providerScript, 'switch', originalProvider]);
+    // Restore original file content exactly
+    if (originalContent !== null) {
+      wfSync(providerFile, originalContent);
     }
   }
 });
