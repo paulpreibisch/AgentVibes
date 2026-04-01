@@ -8,6 +8,8 @@
  * Features: keyboard shortcuts reference, two sections, [/] search.
  */
 
+import { t } from '../../i18n/strings.js';
+
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
 let blessed;
@@ -28,64 +30,59 @@ const COLORS = {
   footerBg:   '#607d8b',  // Gray — Help tab footer
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Scroll  [/] Search  [PgUp/PgDn] Page  [S/V/M/A/R] Tab  [Q] Quit';
-
 // ---------------------------------------------------------------------------
-// Keyboard shortcuts data
-
-const SHORTCUT_SECTIONS = Object.freeze([
-  {
-    title: 'Global Shortcuts',
-    shortcuts: [
-      { key: 'Q',         desc: 'Quit the console' },
-      { key: 'Ctrl+C',    desc: 'Force quit' },
-      { key: 'S',         desc: 'Switch to Settings tab' },
-      { key: 'V',         desc: 'Switch to Voices tab' },
-      { key: 'M',         desc: 'Switch to Music tab' },
-      { key: 'R',         desc: 'Switch to Readme tab' },
-      { key: 'H',         desc: 'Switch to Help tab' },
-      { key: 'I',         desc: 'Switch to Install tab' },
-      { key: 'Esc',       desc: 'Close modal / go back' },
-    ],
-  },
-  {
-    title: 'Navigation Shortcuts',
-    shortcuts: [
-      { key: '↑↓ / j k',  desc: 'Navigate lists' },
-      { key: 'Enter',      desc: 'Select / activate' },
-      { key: 'Space',      desc: 'Toggle / preview' },
-      { key: 'Tab',        desc: 'Next button' },
-      { key: 'Shift+Tab',  desc: 'Previous button' },
-      { key: '/',          desc: 'Open search/filter' },
-      { key: 'F',          desc: 'Toggle favorites filter (Voices/Music)' },
-      { key: '*',          desc: 'Toggle favorite (Music tab)' },
-      { key: 'M',          desc: 'Toggle music on/off (Music tab)' },
-
-    ],
-  },
-  {
-    title: 'Tab Color Guide',
-    shortcuts: [
-      { key: 'Blue   (#2196f3)',  desc: 'Settings tab footer' },
-      { key: 'Teal   (#00695c)',  desc: 'Voices tab footer' },
-      { key: 'Orange (#ff9800)',  desc: 'Music tab footer' },
-
-      { key: 'Dark   (#455a64)',  desc: 'Readme tab footer' },
-      { key: 'Gray   (#607d8b)',  desc: 'Help tab footer' },
-      { key: 'Indigo (#3f51b5)',  desc: 'Install tab footer' },
-    ],
-  },
-]);
 
 /**
  * Return all shortcut sections.
  * @returns {{ title: string, shortcuts: { key: string, desc: string }[] }[]}
  */
 export function getShortcutSections() {
-  return [...SHORTCUT_SECTIONS];
+  return [
+    {
+      title: 'Global Shortcuts',
+      shortcuts: [
+        { key: 'Q',   desc: 'Quit the console' },
+        { key: 'Ctrl+C', desc: 'Force quit' },
+        { key: 'S',   desc: 'Switch to Settings tab' },
+        { key: 'V',   desc: 'Switch to Voices tab' },
+        { key: 'M',   desc: 'Switch to Music tab' },
+        { key: 'R',   desc: 'Switch to Readme tab' },
+        { key: 'H',   desc: 'Switch to Help tab' },
+        { key: 'I',   desc: 'Switch to Install tab' },
+        { key: 'Esc', desc: 'Close modal / go back' },
+      ],
+    },
+    {
+      title: 'Navigation Shortcuts',
+      shortcuts: [
+        { key: '↑↓ / j k', desc: 'Navigate lists' },
+        { key: 'Enter',     desc: 'Select / activate' },
+        { key: 'Space',     desc: 'Toggle / preview' },
+        { key: 'Tab',       desc: 'Next button' },
+        { key: 'Shift+Tab', desc: 'Previous button' },
+        { key: '/',         desc: 'Open search/filter' },
+        { key: 'F',         desc: 'Toggle favorites filter (Voices/Music)' },
+        { key: '*',         desc: 'Toggle favorite (Music tab)' },
+        { key: 'M',         desc: 'Toggle music on/off (Music tab)' },
+      ],
+    },
+    {
+      title: 'Tab Color Guide',
+      shortcuts: [
+        { key: 'Blue   (#2196f3)', desc: 'Settings tab footer' },
+        { key: 'Teal   (#00695c)', desc: 'Voices tab footer' },
+        { key: 'Orange (#ff9800)', desc: 'Music tab footer' },
+        { key: 'Dark   (#455a64)', desc: 'Readme tab footer' },
+        { key: 'Gray   (#607d8b)', desc: 'Help tab footer' },
+        { key: 'Indigo (#3f51b5)', desc: 'Install tab footer' },
+      ],
+    },
+  ];
 }
 
 // ---------------------------------------------------------------------------
+
+const _FOOTER_TEXT_EN = '[↑↓/jk] Scroll  [/] Search  [PgUp/PgDn] Page  [S/V/M/A/R] Tab  [Q] Quit';
 
 function createTestStub() {
   return {
@@ -94,7 +91,7 @@ function createTestStub() {
     hide: () => {},
     onFocus: () => {},
     onBlur: () => {},
-    getFooterText: () => FOOTER_TEXT,
+    getFooterText: () => _FOOTER_TEXT_EN,
     getFooterColor: () => COLORS.footerBg,
   };
 }
@@ -111,7 +108,52 @@ function createTestStub() {
 export function createHelpTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { focusMainTabBar } = services;
+  const { focusMainTabBar, languageService } = services;
+  const _tl = (key) => languageService ? languageService.t(key) : t('en', key);
+
+  function _buildSections() {
+    return [
+      {
+        title: _tl('helpSectionGlobal'),
+        shortcuts: [
+          { key: 'Q',         desc: _tl('helpQuit') },
+          { key: 'Ctrl+C',    desc: _tl('helpForceQuit') },
+          { key: 'S',         desc: _tl('helpSwitchSettings') },
+          { key: 'V',         desc: _tl('helpSwitchVoices') },
+          { key: 'M',         desc: _tl('helpSwitchMusic') },
+          { key: 'R',         desc: _tl('helpSwitchReadme') },
+          { key: 'H',         desc: _tl('helpSwitchHelp') },
+          { key: 'I',         desc: _tl('helpSwitchInstall') },
+          { key: 'Esc',       desc: _tl('helpCloseModal') },
+        ],
+      },
+      {
+        title: _tl('helpSectionNavigation'),
+        shortcuts: [
+          { key: '↑↓ / j k',  desc: _tl('helpNavigateLists') },
+          { key: 'Enter',      desc: _tl('helpSelectActivate') },
+          { key: 'Space',      desc: _tl('helpTogglePreview') },
+          { key: 'Tab',        desc: _tl('helpNextButton') },
+          { key: 'Shift+Tab',  desc: _tl('helpPrevButton') },
+          { key: '/',          desc: _tl('helpOpenSearch') },
+          { key: 'F',          desc: _tl('helpToggleFavFilter') },
+          { key: '*',          desc: _tl('helpToggleFav') },
+          { key: 'M',          desc: _tl('helpToggleMusic') },
+        ],
+      },
+      {
+        title: _tl('helpSectionColors'),
+        shortcuts: [
+          { key: 'Blue   (#2196f3)', desc: _tl('helpColorSettings') },
+          { key: 'Teal   (#00695c)', desc: _tl('helpColorVoices') },
+          { key: 'Orange (#ff9800)', desc: _tl('helpColorMusic') },
+          { key: 'Dark   (#455a64)', desc: _tl('helpColorReadme') },
+          { key: 'Gray   (#607d8b)', desc: _tl('helpColorHelp') },
+          { key: 'Indigo (#3f51b5)', desc: _tl('helpColorInstall') },
+        ],
+      },
+    ];
+  }
 
   // -------------------------------------------------------------------------
   // Container
@@ -133,7 +175,7 @@ export function createHelpTab(screen, services) {
 
   function _buildContent(filterText) {
     const lines = [];
-    for (const section of SHORTCUT_SECTIONS) {
+    for (const section of _buildSections()) {
       lines.push(`{bold}{#546e7a-fg}── ${section.title} ${'─'.repeat(Math.max(0, 60 - section.title.length))}{/#546e7a-fg}{/bold}`);
       for (const { key, desc } of section.shortcuts) {
         const displayKey = key.padEnd(20);
@@ -183,11 +225,11 @@ export function createHelpTab(screen, services) {
     style: { fg: COLORS.keyFg, bg: '#1a3a5c', focus: { bg: '#245a80' } },
   });
 
-  blessed.text({
+  const searchLabel = blessed.text({
     parent: box,
     bottom: 2,
     left: 2,
-    content: 'Search:',
+    content: _tl('helpSearchLabel'),
     style: { fg: COLORS.descFg, bg: COLORS.contentBg },
   });
 
@@ -227,6 +269,17 @@ export function createHelpTab(screen, services) {
   });
 
   // -------------------------------------------------------------------------
+  // Language change handler
+
+  if (languageService) {
+    languageService.onChange(() => {
+      scrollBox.setContent(_buildContent(''));
+      searchLabel.setContent(_tl('helpSearchLabel'));
+      screen.render();
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Tab Component Contract
 
   return {
@@ -251,7 +304,7 @@ export function createHelpTab(screen, services) {
     onBlur() {},
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('helpFooter');
     },
 
     getFooterColor() {

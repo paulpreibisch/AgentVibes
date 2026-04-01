@@ -19,6 +19,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
 import { buildAudioEnv } from '../audio-env.js';
+import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
 import {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
@@ -140,7 +141,7 @@ function createTestStub() {
     hide: () => {},
     onFocus: () => {},
     onBlur: () => {},
-    getFooterText: () => FOOTER_TEXT,
+    getFooterText: () => t('en', 'footerText'),
     getFooterColor: () => COLORS.footerBg,
   };
 }
@@ -158,7 +159,7 @@ function createTestStub() {
 export function createInstallTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, navigationService, focusMainTabBar } = services;
+  const { configService, providerService, navigationService, focusMainTabBar, languageService } = services;
 
   // -------------------------------------------------------------------------
   // Container
@@ -178,8 +179,13 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Wizard state
 
-  let _screen = 1;
-  let _lastScreen = 0;
+  let _screen = 0;
+  let _lastScreen = -1;
+  // _lang is now owned by languageService; keep a local helper for convenience
+  // and a local _langIdx for the language-picker UI (Screen 0).
+  const _getLang = () => languageService?.getLang() ?? 'en';
+  const _tl = (key) => languageService?.t(key) ?? t('en', key);
+  let _langIdx = 0;
   let _deps = null;
   let _checking = false;
   let _selectedProvider = null;
@@ -525,8 +531,8 @@ export function createInstallTab(screen, services) {
     return btn;
   }
 
-  const _editBtn   = _createInstallBtn('Edit',               '#1565c0', _doEdit);
-  const _acceptBtn = _createInstallBtn('✓ Accept & Install', COLORS.btnDefault, _doAccept);
+  const _editBtn   = _createInstallBtn(_tl('editInstallBtn'),  '#1565c0', _doEdit);
+  const _acceptBtn = _createInstallBtn(_tl('acceptInstallBtn'), COLORS.btnDefault, _doAccept);
 
   // Edit sits inline with the intro text row; Accept & Install is below
   _editBtn.top   = 8;  _editBtn.left   = 36;
@@ -540,11 +546,11 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 1 buttons — Begin (cyan) and Exit (grey)
 
-  const _s1BeginBtn = _createInstallBtn('▶  Begin', '#00838f', () => {
+  const _s1BeginBtn = _createInstallBtn(_tl('beginBtn'), '#00838f', () => {
     _screen++;
     _showCurrentScreen();
   });
-  const _s1ExitBtn = _createInstallBtn('✗  Exit', '#546e7a', () => {
+  const _s1ExitBtn = _createInstallBtn(_tl('exitBtn'), '#546e7a', () => {
     box.hide();
     screen.render();
     if (typeof focusMainTabBar === 'function') focusMainTabBar();
@@ -562,7 +568,7 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 2 button — Continue (shown after deps check passes)
 
-  const _s2ContinueBtn = _createInstallBtn('Continue →', '#1565c0', () => {
+  const _s2ContinueBtn = _createInstallBtn(_tl('continueArrowBtn'), '#1565c0', () => {
     _screen++;
     _showCurrentScreen();
   });
@@ -575,7 +581,7 @@ export function createInstallTab(screen, services) {
   // -------------------------------------------------------------------------
   // Screen 5 button — OK (summary page only, config already saved on screen 4)
 
-  const _s5OkBtn = _createInstallBtn('✓  OK — Done', '#1565c0', () => {
+  const _s5OkBtn = _createInstallBtn(_tl('okDoneBtn'), '#1565c0', () => {
     _dismissCompletionModal();
   });
   _s5OkBtn.bottom = 3; _s5OkBtn.left = 4;  // bottom-anchored: sits above hintLine (bottom:2)
@@ -586,15 +592,35 @@ export function createInstallTab(screen, services) {
   const _HDR = (emoji, label) =>
     `{${COLORS.sectionHdr}-fg}${emoji}  ${label} ${'─'.repeat(100)}{/${COLORS.sectionHdr}-fg}`;
 
-  function _renderScreen1() {
-    contentBox.setContent(_c([
-      _HDR('🔧', 'Setup Wizard'),
+  function _renderScreen0() {
+    const lines = [
+      _HDR('🌐', 'Language / Idioma / Langue / Sprache / 言語 / भाषा / 语言 / 언어'),
       '',
-      `  {${COLORS.noticeFg}-fg}TTS for AI assistants with personality.{/${COLORS.noticeFg}-fg}`,
+      '  Select your language:',
+      '',
+      ...SUPPORTED_LANGUAGES.map((l, i) =>
+        i === _langIdx
+          ? `  {green-fg}► ${l.name}{/green-fg}`
+          : `    ${l.name}`
+      ),
+    ];
+    contentBox.setContent(_c(lines));
+    hintLine.setContent('  Screen 0: Language  |  [↑/↓] Select  |  [Enter] Apply & Continue  |  [→] Skip (English)');
+    screen.render();
+  }
+
+  function _renderScreen1() {
+    // Update button labels to current language before focus triggers the decorator
+    _s1BeginBtn.setContent(t(_getLang(), 'beginBtn'));
+    _s1ExitBtn.setContent(t(_getLang(), 'exitBtn'));
+    contentBox.setContent(_c([
+      _HDR('🔧', t(_getLang(), 'setupWizard')),
+      '',
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'setupWizardSubtitle')}{/${COLORS.noticeFg}-fg}`,
       '',
       '',  // ← [▶ Begin] [✗ Exit] buttons here (box row 5)
     ]));
-    hintLine.setContent('  Screen 1/5: Welcome  |  [←/→] Navigate  |  [Enter] Begin  |  [Esc] Exit');
+    hintLine.setContent(`  ${t(_getLang(), 'screen1Hint')}`);
     _s1BeginBtn.focus();
     screen.render();
   }
@@ -606,19 +632,19 @@ export function createInstallTab(screen, services) {
     _s2ContinueBtn.hide();  // hidden during spinner
 
     contentBox.setContent(_c([
-      _HDR('🔍', 'Dependency Check'),
+      _HDR('🔍', t(_getLang(), 'dependencyCheck')),
       '',
-      `  {${COLORS.noticeFg}-fg}${frames[0]}  Checking dependencies...{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${frames[0]}  ${t(_getLang(), 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
     ]));
-    hintLine.setContent('  Screen 2/5: Dependencies  |  [←] Back  |  [Enter] Next');
+    hintLine.setContent(`  ${t(_getLang(), 'screen2Hint')}`);
     screen.render();
 
     const spinInterval = setInterval(() => {
       frameIdx = (frameIdx + 1) % frames.length;
       contentBox.setContent(_c([
-        _HDR('🔍', 'Dependency Check'),
+        _HDR('🔍', t(_getLang(), 'dependencyCheck')),
         '',
-        `  {${COLORS.noticeFg}-fg}${frames[frameIdx]}  Checking dependencies...{/${COLORS.noticeFg}-fg}`,
+        `  {${COLORS.noticeFg}-fg}${frames[frameIdx]}  ${t(_getLang(), 'checkingDependencies')}{/${COLORS.noticeFg}-fg}`,
       ]));
       screen.render();
     }, 100);
@@ -630,28 +656,29 @@ export function createInstallTab(screen, services) {
       _checking = false;
     }
 
-    const ok  = () => `{${COLORS.successFg}-fg}✅  Installed{/${COLORS.successFg}-fg}`;
-    const bad = () => `{${COLORS.errorFg}-fg}❌  Not found{/${COLORS.errorFg}-fg}`;
+    const ok  = () => `{${COLORS.successFg}-fg}✅  ${t(_getLang(), 'installed')}{/${COLORS.successFg}-fg}`;
+    const bad = () => `{${COLORS.errorFg}-fg}❌  ${t(_getLang(), 'notFound')}{/${COLORS.errorFg}-fg}`;
 
     const ttsOk = _deps.piper || _deps.soprano;
     contentBox.setContent(_c([
-      _HDR('🔍', 'Dependency Check'),
+      _HDR('🔍', t(_getLang(), 'dependencyCheck')),
       '',
-      `  {${COLORS.noticeFg}-fg}${'Dependency'.padEnd(14)}Status{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'depColumn').padEnd(14)}${t(_getLang(), 'statusColumn')}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.noticeFg}-fg}${'─'.repeat(78)}{/${COLORS.noticeFg}-fg}`,
       `  {${COLORS.labelFg}-fg}${'Node.js'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.node    ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'npm'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.npm     ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Piper TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.piper   ? ok() : bad()}`,
       `  {${COLORS.labelFg}-fg}${'Soprano TTS'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.soprano ? ok() : bad()}`,
-      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  Not found (needed for background music){/${COLORS.errorFg}-fg}`}`,
+      `  {${COLORS.labelFg}-fg}${'ffmpeg'.padEnd(14)}{/${COLORS.labelFg}-fg}${_deps.ffmpeg  ? ok() : `{${COLORS.errorFg}-fg}⚠  ${t(_getLang(), 'ffmpegMissing')}{/${COLORS.errorFg}-fg}`}`,
       '',
       ttsOk
-        ? `  {${COLORS.successFg}-fg}✅  TTS Providers Detected{/${COLORS.successFg}-fg}`
-        : `  {${COLORS.errorFg}-fg}⚠   No TTS provider found. Install Piper or Soprano first.{/${COLORS.errorFg}-fg}`,
+        ? `  {${COLORS.successFg}-fg}✅  ${t(_getLang(), 'ttsDetected')}{/${COLORS.successFg}-fg}`
+        : `  {${COLORS.errorFg}-fg}⚠   ${t(_getLang(), 'noTtsFound')}{/${COLORS.errorFg}-fg}`,
       '',  // blank separator
       '',  // ← [Continue →] button here (box row 12) when TTS detected
     ]));
     if (ttsOk) {
+      _s2ContinueBtn.setContent(_tl('continueArrowBtn'));
       _s2ContinueBtn.show();
       _s2ContinueBtn.focus();
     }
@@ -685,14 +712,14 @@ export function createInstallTab(screen, services) {
     const _blank = ' '.repeat(120);
     const _trail = Array(12).fill(_blank);
     contentBox.setContent(_c([
-      _HDR('🎤', 'Provider Selection'),
+      _HDR('🎤', t(_getLang(), 'providerSelection')),
       '',
-      `  {${COLORS.noticeFg}-fg}${'Available TTS providers:'.padEnd(94)}{/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'availableProviders').padEnd(94)}{/${COLORS.noticeFg}-fg}`,
       '',
       ...paddedItems.map(i => `  ${i}`),
       ..._trail,
     ]));
-    hintLine.setContent('  Screen 3/5: Provider  |  [←] Back  |  [↑↓] Choose  |  [Enter/→] Confirm & Continue');
+    hintLine.setContent(`  ${t(_getLang(), 'screen3Hint')}`);
     box.focus();
     screen.render();
   }
@@ -705,36 +732,38 @@ export function createInstallTab(screen, services) {
     const voiceId = providerService?.getActiveVoiceId?.() ?? 'en_US-amy-medium';
 
     contentBox.setContent(_c([
-      _HDR('🎤', 'Provider & Voice'),
+      _HDR('🎤', t(_getLang(), 'providerAndVoice')),
       '',
-      `  {${COLORS.labelFg}-fg}${'Provider:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
-      `  {${COLORS.labelFg}-fg}${'Voice:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}(after installation, you can change in Settings){/${COLORS.noticeFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_getLang(), 'providerLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${provider}{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_getLang(), 'voiceLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${voiceId}{/${COLORS.valueFg}-fg}  {${COLORS.noticeFg}-fg}${t(_getLang(), 'voiceChangeHint')}{/${COLORS.noticeFg}-fg}`,
       '',
-      _HDR('✍️', 'Intro Text'),
+      _HDR('✍️', t(_getLang(), 'introText')),
       '',
-      `  {${COLORS.labelFg}-fg}${'Intro text:'.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || '(none)'}{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.labelFg}-fg}${`${t(_getLang(), 'introTextLabel')}:`.padEnd(14)}{/${COLORS.labelFg}-fg}{${COLORS.valueFg}-fg}${intro || `(${t(_getLang(), 'none')})`}{/${COLORS.valueFg}-fg}`,
       // ↑ [Edit] button rendered inline at box row 8, left=36
       '',
-      `  {${COLORS.noticeFg}-fg}Example:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
+      `  {${COLORS.noticeFg}-fg}${t(_getLang(), 'example')}:{/${COLORS.noticeFg}-fg}  {${COLORS.valueFg}-fg}"${example}"{/${COLORS.valueFg}-fg}`,
       '',
       '',
       '',  // ← [✓ Accept & Install] button rendered as real widget here (box row 13)
     ]));
-    hintLine.setContent('  Screen 4/5: Config  |  [Esc] Back  |  [E] Edit  |  [↓] Accept & Install');
+    hintLine.setContent(`  ${t(_getLang(), 'screen4Hint')}`);
+    _editBtn.setContent(_tl('editInstallBtn'));
+    _acceptBtn.setContent(_tl('acceptInstallBtn'));
     _acceptBtn.focus();
     screen.render();
   }
 
   function _renderScreen5() {
     const header = _installError
-      ? _HDR('❌', 'Installation Failed')
+      ? _HDR('❌', t(_getLang(), 'installationFailed'))
       : _installComplete
-        ? _HDR('✅', 'Installation Complete')
-        : _HDR('⚙️', 'Installing AgentVibes...');
+        ? _HDR('✅', t(_getLang(), 'installComplete'))
+        : _HDR('⚙️', t(_getLang(), 'installing'));
 
     const hint = (_installComplete || _installError)
-      ? '  Screen 5/5: Complete  |  [Enter] OK — Done'
-      : '  Screen 5/5: Installing...  |  Please wait';
+      ? `  ${t(_getLang(), 'screen5HintDone')}`
+      : `  ${t(_getLang(), 'screen5HintWait')}`;
 
     // Show last 18 log lines so content fits in the box
     const MAX_LINES = 18;
@@ -778,7 +807,7 @@ export function createInstallTab(screen, services) {
       _completionModalBox = null;
     }
     _completionModalOpen = false;
-    _screen = 1;
+    _screen = 0;
     box.hide();
     _showInstallNotice('Installation Complete — Settings Saved');
     screen.render();
@@ -792,6 +821,8 @@ export function createInstallTab(screen, services) {
     } else {
       _s1BeginBtn.hide(); _s1ExitBtn.hide();
     }
+
+    // Screen 0 has no button widgets — nav is handled via key handlers
 
     // Screen 2 continue button: hidden on other screens; _renderScreen2 manages show/focus
     if (_screen !== 2) _s2ContinueBtn.hide();
@@ -842,6 +873,7 @@ export function createInstallTab(screen, services) {
       setTimeout(() => {
         if (_screen !== targetScreen) return;
         switch (_screen) {
+          case 0: _renderScreen0(); break;
           case 1: _renderScreen1(); break;
           case 2: _renderScreen2(); break;
           case 3: _renderScreen3(); break;
@@ -852,6 +884,7 @@ export function createInstallTab(screen, services) {
       return;
     }
     switch (_screen) {
+      case 0: _renderScreen0(); break;
       case 1: _renderScreen1(); break;
       case 2: _renderScreen2(); break;
       case 3: _renderScreen3(); break;
@@ -870,6 +903,12 @@ export function createInstallTab(screen, services) {
   screen.key(['enter'], () => {
     if (box.hidden || _checking) return;
     if (_completionModalOpen) { _dismissCompletionModal(); return; }  // always first
+    if (_screen === 0) {  // Screen 0: apply selected language and advance
+      if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
+      _screen = 1;
+      _showCurrentScreen();
+      return;
+    }
     if (_screen === 1) return;  // Screen 1: Enter handled by Begin/Exit buttons
     if (_screen === 2) return;  // Screen 2: Enter handled by Continue button
     if (_screen === 4) return;  // Screen 4: Enter handled by the focused button
@@ -883,7 +922,7 @@ export function createInstallTab(screen, services) {
   screen.key(['escape'], () => {
     if (box.hidden || _checking) return;
     if (_completionModalOpen) { _dismissCompletionModal(); return; }
-    if (_screen > 1) {
+    if (_screen > 0) {
       _screen--;
       _showCurrentScreen();
     } else {
@@ -899,6 +938,11 @@ export function createInstallTab(screen, services) {
 
   screen.key(['up'], () => {
     if (box.hidden) return;
+    if (_screen === 0) {
+      _langIdx = Math.max(0, _langIdx - 1);
+      _renderScreen0();
+      return;
+    }
     if (_screen === 3 && _deps) {
       const providers = [];
       if (_deps.piper)   providers.push('piper');
@@ -914,16 +958,23 @@ export function createInstallTab(screen, services) {
   screen.key(['left'], () => {
     if (box.hidden || _checking) return;
     if (_screen === 4) return;
-    if (_screen > 1) {
+    if (_screen > 0) {
       _screen--;
       _showCurrentScreen();
     }
   });
 
   // Right arrow = go forward (same logic as Enter, without save/finish side-effects)
+  // Screen 0: → skips language selection (keeps English)
   // Screen 1: right arrow handled by button ←/→ navigation
   screen.key(['right'], () => {
     if (box.hidden || _checking) return;
+    if (_screen === 0) {  // → skips: keep current _lang (default 'en') and advance
+      if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
+      _screen = 1;
+      _showCurrentScreen();
+      return;
+    }
     if (_screen === 1) return;
     if (_screen === 2) return;  // Screen 2: → handled by Continue button
     if (_screen === 3) { _screen++; _showCurrentScreen(); return; }  // → confirms provider and advances
@@ -931,10 +982,15 @@ export function createInstallTab(screen, services) {
     if (_screen === 5) return;  // Screen 5: → handled by button nav
   });
 
-  // Down arrow: Screen 3 provider nav; Screen 1 ↓ is handled by button key handlers
+  // Down arrow: Screen 0 language nav; Screen 3 provider nav; Screen 1 ↓ is handled by button key handlers
   // (tab bar's el.key(['down']) → onFocus() focuses Begin, then button ↓ → Exit)
   screen.key(['down'], () => {
     if (box.hidden) return;
+    if (_screen === 0) {
+      _langIdx = Math.min(SUPPORTED_LANGUAGES.length - 1, _langIdx + 1);
+      _renderScreen0();
+      return;
+    }
     if (_screen === 3 && _deps) {
       const providers = [];
       if (_deps.piper)   providers.push('piper');
@@ -961,7 +1017,9 @@ export function createInstallTab(screen, services) {
     box,
 
     show() {
-      _screen = 1;
+      _screen = 0;
+      _langIdx = 0;
+      // _lang now lives in languageService — don't reset it here
       _screen5Announced = false;
       _installLog      = [];
       _installRunning  = false;
@@ -982,7 +1040,9 @@ export function createInstallTab(screen, services) {
 
     onFocus() {
       // Focus the active interactive element, not just the box container
-      if (_screen === 1) {
+      if (_screen === 0) {
+        box.focus();  // Screen 0 uses key handlers, no button widgets
+      } else if (_screen === 1) {
         _s1BeginBtn.focus();
       } else if (_screen === 4) {
         _editBtn.focus();
@@ -997,7 +1057,7 @@ export function createInstallTab(screen, services) {
     onBlur() {},
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('footerText');
     },
 
     getFooterColor() {

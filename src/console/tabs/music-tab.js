@@ -14,6 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
+import { t } from '../../i18n/strings.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -266,7 +267,8 @@ function _getCustomTracks(configService) {
 export function createMusicTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, focusMainTabBar, updateHeaderStatus } = services;
+  const { configService, focusMainTabBar, updateHeaderStatus, languageService } = services;
+  const _tl = (key) => languageService ? languageService.t(key) : t('en', key);
 
   // -------------------------------------------------------------------------
   // Container
@@ -286,11 +288,11 @@ export function createMusicTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section headers
 
-  blessed.text({
+  const builtInHdr = blessed.text({
     parent: box,
     top: 1,
     left: 2,
-    content: `{${COLORS.sectionHdr}-fg}── Built-in Tracks ${'─'.repeat(48)}{/${COLORS.sectionHdr}-fg}`,
+    content: `{${COLORS.sectionHdr}-fg}${_tl('musicBuiltInHeader')}${'─'.repeat(48)}{/${COLORS.sectionHdr}-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -333,11 +335,11 @@ export function createMusicTab(screen, services) {
   // -------------------------------------------------------------------------
   // Status panel
 
-  blessed.text({
+  const musicStatusHdr = blessed.text({
     parent: box,
     top: '64%',
     left: 2,
-    content: `{${COLORS.sectionHdr}-fg}── Music Status ${'─'.repeat(52)}{/${COLORS.sectionHdr}-fg}`,
+    content: `{${COLORS.sectionHdr}-fg}${_tl('musicStatusHeader')}${'─'.repeat(52)}{/${COLORS.sectionHdr}-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -406,7 +408,7 @@ export function createMusicTab(screen, services) {
     return btn;
   }
 
-  const toggleBtn = _createBtn('[Toggle Music]', () => {
+  const toggleBtn = _createBtn(_tl('musicToggleBtn'), () => {
     const { enabled } = _getMusic(configService);
     _setMusic(configService, { enabled: !enabled });
     refreshDisplay();
@@ -414,7 +416,7 @@ export function createMusicTab(screen, services) {
   toggleBtn.bottom = 4;
   toggleBtn.left = 4;
 
-  const addCustomTrackBtn = _createBtn('[Add Custom Track]', () => {
+  const addCustomTrackBtn = _createBtn(_tl('musicAddCustomBtn'), () => {
     const modal = blessed.box({
       parent: screen,
       top: 'center',
@@ -446,14 +448,15 @@ export function createMusicTab(screen, services) {
   addCustomTrackBtn.left = 26;
 
   // -------------------------------------------------------------------------
-  // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] set as background track  [*] favorite{/${COLORS.dimFg}-fg}`;
+  // Hint text shown in previewLine when the list has focus and nothing is playing.
+  // Getter functions so they re-translate when language changes.
+  const _hintText   = () => `{${COLORS.dimFg}-fg}${_tl('musicHintText')}{/${COLORS.dimFg}-fg}`;
+  const _rowHint    = () => `  {bright-black-fg}${_tl('musicRowHint')}{/bright-black-fg}`;
   let _listFocused = false;
 
   // Inline selection hint appended to the currently highlighted track row.
   // _hintBase stores the item's clean content (no hint, no █) so we never need
   // a sentinel character — PUA chars like U+E000 render as Nerd Font icons.
-  const _ROW_HINT = `  {bright-black-fg}[Space] Play  [Enter] Select  [*] Favorite{/bright-black-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
@@ -474,7 +477,7 @@ export function createMusicTab(screen, services) {
       const hasBlink = c.endsWith(' █');
       if (hasBlink) c = c.slice(0, -2);
       _hintBase = c;
-      items[idx].setContent(c + _ROW_HINT + (hasBlink ? ' █' : ''));
+      items[idx].setContent(c + _rowHint() + (hasBlink ? ' █' : ''));
     } else {
       _hintBase = '';
     }
@@ -530,7 +533,7 @@ export function createMusicTab(screen, services) {
     if (_playingTrackId === trackId) {
       _killPlayingProcess();
       _playingTrackId = null;
-      previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      previewLine.setContent(_listFocused ? _hintText() : '');
       screen.render();
       return;
     }
@@ -545,7 +548,7 @@ export function createMusicTab(screen, services) {
         : 'No MP3 player found. Install ffmpeg: sudo apt install ffmpeg';
       previewLine.setContent(`{red-fg}${installHint}{/red-fg}`);
       screen.render();
-      setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 5000);
+      setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 5000);
       return;
     }
 
@@ -564,7 +567,7 @@ export function createMusicTab(screen, services) {
       if (_playingTrackId === trackId) {
         _playingTrackId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? HINT_TEXT : '');
+        previewLine.setContent(_listFocused ? _hintText() : '');
         refreshDisplay(); // clears (playing) label
       }
     });
@@ -574,7 +577,7 @@ export function createMusicTab(screen, services) {
         _killPlayingProcess();
         _playingTrackId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? HINT_TEXT : '');
+        previewLine.setContent(_listFocused ? _hintText() : '');
       }
     });
   }
@@ -645,7 +648,7 @@ export function createMusicTab(screen, services) {
     }
 
     statusLine.setContent(
-      `  Music: ${formatMusicStatus(enabled)}  |  Active Track: ${activeLabel}  |  Filter: ${_showFavoritesOnly ? 'Favorites' : 'All'}`
+      `  ${_tl('musicStatusLabel')} ${formatMusicStatus(enabled)}  |  ${_tl('musicActiveTrack')} ${activeLabel}  |  ${_tl('musicFilterLabel')} ${_showFavoritesOnly ? _tl('musicFilterFavs') : _tl('musicFilterAll')}`
     );
 
     // Update "Currently Selected" header
@@ -706,7 +709,7 @@ export function createMusicTab(screen, services) {
     function _close() {
       _killPlayingProcess();
       _playingTrackId = null;
-      previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      previewLine.setContent(_listFocused ? _hintText() : '');
       modal.destroy();
       trackList.focus();
       screen.render();
@@ -909,7 +912,7 @@ export function createMusicTab(screen, services) {
     _updateHint(_tlBlink.sel);
     const items = trackList.items;
     if (items[_tlBlink.sel]) items[_tlBlink.sel].setContent((items[_tlBlink.sel].content ?? '') + ' █');
-    if (!_playingTrackId) previewLine.setContent(HINT_TEXT);
+    if (!_playingTrackId) previewLine.setContent(_hintText());
     screen.render();
     _tlBlink.interval = setInterval(_tlTick, 500);
   });
@@ -940,7 +943,7 @@ export function createMusicTab(screen, services) {
     const activeTrack = _allTracks.find(t => t.id === activeTrackId);
     const activeLabel = (activeTrack?.label ?? formatTrackLabel(activeTrackId ?? '')) || 'None';
     statusLine.setContent(
-      `  Music: ${formatMusicStatus(enabled)}  |  Active Track: ${activeLabel}  |  Filter: ${_showFavoritesOnly ? 'Favorites' : 'All'}`
+      `  ${_tl('musicStatusLabel')} ${formatMusicStatus(enabled)}  |  ${_tl('musicActiveTrack')} ${activeLabel}  |  ${_tl('musicFilterLabel')} ${_showFavoritesOnly ? _tl('musicFilterFavs') : _tl('musicFilterAll')}`
     );
     screen.render();
   });
@@ -969,6 +972,21 @@ export function createMusicTab(screen, services) {
   });
 
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Language refresh
+
+  function refreshMusicLabels() {
+    builtInHdr.setContent(`{${COLORS.sectionHdr}-fg}${_tl('musicBuiltInHeader')}${'─'.repeat(48)}{/${COLORS.sectionHdr}-fg}`);
+    musicStatusHdr.setContent(`{${COLORS.sectionHdr}-fg}${_tl('musicStatusHeader')}${'─'.repeat(52)}{/${COLORS.sectionHdr}-fg}`);
+    toggleBtn.setContent(_tl('musicToggleBtn'));
+    addCustomTrackBtn.setContent(_tl('musicAddCustomBtn'));
+    refreshDisplay();
+  }
+
+  if (languageService) {
+    languageService.onChange(() => { refreshMusicLabels(); screen.render(); });
+  }
+
   // Tab Component Contract
 
   return {
@@ -1001,11 +1019,12 @@ export function createMusicTab(screen, services) {
     },
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('musicFooter');
     },
 
     getFooterColor() {
       return COLORS.footerBg;
     },
   };
+
 }

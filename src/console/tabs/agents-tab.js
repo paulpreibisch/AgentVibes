@@ -21,6 +21,7 @@ import {
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
+import { t } from '../../i18n/strings.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -57,8 +58,8 @@ const COLORS = {
   linkFg:     'bright-cyan',
 };
 
-const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
-const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
+const _FOOTER_BMAD_EN   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
+const _FOOTER_NOBMAD_EN = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
@@ -85,43 +86,10 @@ function createTestStub() {
     hide: () => {},
     onFocus: () => {},
     onBlur: () => {},
-    getFooterText: () => FOOTER_TEXT_BMAD,
+    getFooterText: () => _FOOTER_BMAD_EN,
     getFooterColor: () => COLORS.footerBg,
   };
 }
-
-// ---------------------------------------------------------------------------
-// No-BMAD onboarding content
-
-const ONBOARDING_TEXT = `{bold}{#ce93d8-fg}🧙 BMAD Agents{/#ce93d8-fg}{/bold}
-
-{bold}What is BMAD?{/bold}
-
-The BMad Method (Build More Architect Dreams) is an AI-driven development
-framework module within the BMad Method Ecosystem that helps you build
-software through the whole process from ideation and planning all the way
-through agentic implementation. It provides specialized AI agents, guided
-workflows, and intelligent planning that adapts to your project's
-complexity, whether you're fixing a bug or building an enterprise platform.
-
-If you're comfortable working with AI coding assistants like Claude,
-Cursor, or GitHub Copilot, you're ready to get started.
-
-
-{bold}Install BMAD in your project:{/bold}
-
-  {bright-cyan-fg}npx bmad-method install{/bright-cyan-fg}
-
-
-{bold}Learn more:{/bold}
-
-  {bright-cyan-fg}https://docs.bmad-method.org/{/bright-cyan-fg}
-  {bright-cyan-fg}https://github.com/bmad-code-org/BMAD-METHOD{/bright-cyan-fg}
-
-
-{#90a4ae-fg}Once BMAD is installed, this tab will show all your agents and let you
-customize each agent's voice, pretext, reverb, personality, and background
-music independently.{/#90a4ae-fg}`;
 
 // ---------------------------------------------------------------------------
 
@@ -131,7 +99,30 @@ music independently.{/#90a4ae-fg}`;
 export function createAgentsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, focusMainTabBar, navigationService } = services;
+  const { configService, providerService, focusMainTabBar, navigationService, languageService } = services;
+  const _tl = (key) => languageService ? languageService.t(key) : t('en', key);
+
+  function _buildOnboardingText() {
+    return `{bold}{#ce93d8-fg}${_tl('bmadTitle')}{/#ce93d8-fg}{/bold}
+
+{bold}${_tl('bmadWhatIsHeader')}{/bold}
+
+${_tl('bmadDesc')}
+
+
+{bold}${_tl('bmadInstallHeader')}{/bold}
+
+  {bright-cyan-fg}npx bmad-method install{/bright-cyan-fg}
+
+
+{bold}${_tl('bmadLearnMoreHeader')}{/bold}
+
+  {bright-cyan-fg}https://docs.bmad-method.org/{/bright-cyan-fg}
+  {bright-cyan-fg}https://github.com/bmad-code-org/BMAD-METHOD{/bright-cyan-fg}
+
+
+{#90a4ae-fg}${_tl('bmadInstalledNote')}{/#90a4ae-fg}`;
+  }
   const voiceStore = new AgentVoiceStore();
 
   // Capture cwd once at construction (L1 fix)
@@ -183,8 +174,12 @@ export function createAgentsTab(screen, services) {
     keys: true,
     vi: true,
     mouse: true,
-    content: ONBOARDING_TEXT,
+    content: _buildOnboardingText(),
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  onboardingBox.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
   // -------------------------------------------------------------------------
@@ -1634,6 +1629,16 @@ export function createAgentsTab(screen, services) {
   });
 
   // -------------------------------------------------------------------------
+  // Language change handler
+
+  if (languageService) {
+    languageService.onChange(() => {
+      onboardingBox.setContent(_buildOnboardingText());
+      screen.render();
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Tab Component Contract
 
   return {
@@ -1665,7 +1670,7 @@ export function createAgentsTab(screen, services) {
     },
 
     getFooterText() {
-      return _bmadDetected ? FOOTER_TEXT_BMAD : FOOTER_TEXT_NOBMAD;
+      return _bmadDetected ? _tl('bmadFooterBmad') : _tl('bmadFooterNobmad');
     },
 
     getFooterColor() {

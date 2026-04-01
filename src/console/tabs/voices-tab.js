@@ -452,7 +452,8 @@ export function getVoiceMeta(voiceId) {
 export function createVoicesTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { configService, providerService, focusMainTabBar, updateHeaderStatus } = services;
+  const { configService, providerService, focusMainTabBar, updateHeaderStatus, languageService } = services;
+  const _tl = (key) => languageService ? languageService.t(key) : key;
 
   // -------------------------------------------------------------------------
   // Container
@@ -472,11 +473,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Section header
 
-  blessed.text({
+  const voicesSectionHdr = blessed.text({
     parent: box,
     top: 1,
     left: 2,
-    content: `{#00897b-fg}── Voices ${'─'.repeat(58)}{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesHeader')}${'─'.repeat(58)}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -495,11 +496,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Search input
 
-  blessed.text({
+  const searchLabelText = blessed.text({
     parent: box,
     top: 3,
     left: 4,
-    content: 'Search:',
+    content: _tl('searchLabel'),
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
@@ -521,11 +522,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Column header row (sits between search and voice list border)
 
-  blessed.text({
+  const colHeaderText = blessed.text({
     parent: box,
     top: 4,
     left: 6,
-    content: `{#00897b-fg}${'Name'.padEnd(COL_NAME_W)}${'Gender'.padEnd(COL_GENDER_W)}Provider{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}${_tl('voicesColGender').padEnd(COL_GENDER_W)}${_tl('voicesColProvider')}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -557,11 +558,11 @@ export function createVoicesTab(screen, services) {
   // -------------------------------------------------------------------------
   // Info panel
 
-  blessed.text({
+  const voiceInfoHdr = blessed.text({
     parent: box,
     top: '60%',
     left: 2,
-    content: `{#00897b-fg}── Voice Info ${'─'.repeat(54)}{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesInfoHeader')}${'─'.repeat(54)}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -591,8 +592,9 @@ export function createVoicesTab(screen, services) {
 
   // Inline selection hint appended to the currently highlighted voice row.
   // _hintBase stores the item's clean content (no hint, no █) — no sentinel needed.
-  const _ROW_HINT_INSTALLED   = `  {bright-black-fg}[Space] Preview  [Enter] Select  [*] Favorite{/bright-black-fg}`;
-  const _ROW_HINT_UNINSTALLED = `  {bright-yellow-fg}[Enter] Download & Install{/bright-yellow-fg}`;
+  // Use getter functions so hints re-translate when language changes.
+  const _rowHintInstalled   = () => `  {bright-black-fg}${_tl('voicesRowHintInstalled')}{/bright-black-fg}`;
+  const _rowHintUninstalled = () => `  {bright-yellow-fg}${_tl('voicesRowHintUninstalled')}{/bright-yellow-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
@@ -600,8 +602,15 @@ export function createVoicesTab(screen, services) {
   function _getRowHint(idx) {
     const voices = _getFilteredVoices();
     const voiceId = voices[idx];
-    if (!voiceId) return _ROW_HINT_INSTALLED;
-    return _isInstalled(voiceId) ? _ROW_HINT_INSTALLED : _ROW_HINT_UNINSTALLED;
+    if (!voiceId) return _rowHintInstalled();
+    return _isInstalled(voiceId) ? _rowHintInstalled() : _rowHintUninstalled();
+  }
+
+  // Translate gender value at display time
+  function _tGender(g) {
+    if (g === 'Female') return _tl('genderFemale');
+    if (g === 'Male')   return _tl('genderMale');
+    return g;
   }
 
   // Known limitation: blink (' █') and hint text can briefly interleave when
@@ -840,7 +849,7 @@ export function createVoicesTab(screen, services) {
     return btn;
   }
 
-  const switchBtn = _createBtn('[Switch Voice]', () => {
+  const switchBtn = _createBtn(_tl('voicesSwitchBtn'), () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -851,7 +860,7 @@ export function createVoicesTab(screen, services) {
   switchBtn.bottom = 4;
   switchBtn.left = 4;
 
-  const favoriteBtn = _createBtn('[★ Favorite]', () => {
+  const favoriteBtn = _createBtn(_tl('voicesFavoriteBtn'), () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -862,7 +871,7 @@ export function createVoicesTab(screen, services) {
   favoriteBtn.bottom = 4;
   favoriteBtn.left = 22;
 
-  const installBtn = _createBtn('[Download Voice]', () => {
+  const installBtn = _createBtn(_tl('voicesDownloadBtn'), () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (!selected) return;
@@ -1312,9 +1321,9 @@ export function createVoicesTab(screen, services) {
 
       if (!installed) {
         // Greyed-out row for uninstalled catalog voices
-        return `{bright-black-fg} ${star}  ${name}${gender.padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
+        return `{bright-black-fg} ${star}  ${name}${_tGender(gender).padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
       }
-      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}${isPrev ? ' (playing)' : ''}{/${COLORS.labelFg}-fg}`;
+      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}${_tGender(gender).padEnd(COL_GENDER_W)}${provider}${isPrev ? ` ${_tl('voicePlaying')}` : ''}{/${COLORS.labelFg}-fg}`;
     });
   }
 
@@ -1328,29 +1337,29 @@ export function createVoicesTab(screen, services) {
       const name = cat?.displayName ?? voiceId;
       const gender = cat?.gender ?? '—';
       const model = cat?.type === 'libritts' ? 'LibriTTS High (multi-speaker)' : (cat?.model ?? voiceId);
-      return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
-             `{${Y}-fg}Gender:{/${Y}-fg} ${gender}  ` +
-             `{${Y}-fg}Model:{/${Y}-fg} ${model}  ` +
-             `{bright-yellow-fg}⬇ Press [Enter] to download and install{/bright-yellow-fg}`;
+      return `{${Y}-fg}${_tl('voiceInfoVoice')}{/${Y}-fg} ${name}  ` +
+             `{${Y}-fg}${_tl('voiceInfoGender')}{/${Y}-fg} ${_tGender(gender)}  ` +
+             `{${Y}-fg}${_tl('voiceInfoModel')}{/${Y}-fg} ${model}  ` +
+             `{bright-yellow-fg}${_tl('voiceInfoDownload')}{/bright-yellow-fg}`;
     }
 
     const ms = parseMultiSpeaker(voiceId);
     if (ms.isMultiSpeaker) {
       const name = ms.speakerName.replace(/_/g, ' ');
-      return `{${Y}-fg}Speaker:{/${Y}-fg} ${name}  ` +
-             `{${Y}-fg}Model:{/${Y}-fg} ${ms.model}  ` +
-             `{${Y}-fg}Speaker ID:{/${Y}-fg} ${ms.speakerId ?? '?'}  ` +
-             `{${Y}-fg}Provider:{/${Y}-fg} Piper`;
+      return `{${Y}-fg}${_tl('voiceInfoSpeaker')}{/${Y}-fg} ${name}  ` +
+             `{${Y}-fg}${_tl('voiceInfoModel')}{/${Y}-fg} ${ms.model}  ` +
+             `{${Y}-fg}${_tl('voiceInfoSpeakerId')}{/${Y}-fg} ${ms.speakerId ?? '?'}  ` +
+             `{${Y}-fg}${_tl('voiceInfoProvider')}{/${Y}-fg} Piper`;
     }
     const { lang, name, quality } = parseVoiceId(voiceId);
     if (lang === 'unknown') {
-      return `{${Y}-fg}Voice:{/${Y}-fg} ${voiceId}  {${Y}-fg}Provider:{/${Y}-fg} Piper`;
+      return `{${Y}-fg}${_tl('voiceInfoVoice')}{/${Y}-fg} ${voiceId}  {${Y}-fg}${_tl('voiceInfoProvider')}{/${Y}-fg} Piper`;
     }
-    return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
-           `{${Y}-fg}Language:{/${Y}-fg} ${lang}  ` +
-           `{${Y}-fg}Quality:{/${Y}-fg} ${quality}  ` +
-           `{${Y}-fg}Provider:{/${Y}-fg} Piper  ` +
-           `{${Y}-fg}ID:{/${Y}-fg} ${voiceId}`;
+    return `{${Y}-fg}${_tl('voiceInfoVoice')}{/${Y}-fg} ${name}  ` +
+           `{${Y}-fg}${_tl('voiceInfoLanguage')}{/${Y}-fg} ${lang}  ` +
+           `{${Y}-fg}${_tl('voiceInfoQuality')}{/${Y}-fg} ${quality}  ` +
+           `{${Y}-fg}${_tl('voiceInfoProvider')}{/${Y}-fg} Piper  ` +
+           `{${Y}-fg}${_tl('voiceInfoId')}{/${Y}-fg} ${voiceId}`;
   }
 
   function refreshDisplay() {
@@ -1611,6 +1620,24 @@ export function createVoicesTab(screen, services) {
   installBtn.key(['up', 'escape'],  () => { voiceList.focus(); screen.render(); });
 
   // -------------------------------------------------------------------------
+  // Language refresh
+
+  function refreshVoicesLabels() {
+    voicesSectionHdr.setContent(`{#00897b-fg}${_tl('voicesHeader')}${'─'.repeat(58)}{/#00897b-fg}`);
+    searchLabelText.setContent(_tl('searchLabel'));
+    colHeaderText.setContent(`{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}${_tl('voicesColGender').padEnd(COL_GENDER_W)}${_tl('voicesColProvider')}{/#00897b-fg}`);
+    voiceInfoHdr.setContent(`{#00897b-fg}${_tl('voicesInfoHeader')}${'─'.repeat(54)}{/#00897b-fg}`);
+    switchBtn.setContent(_tl('voicesSwitchBtn'));
+    favoriteBtn.setContent(_tl('voicesFavoriteBtn'));
+    installBtn.setContent(_tl('voicesDownloadBtn'));
+    screen.render();
+  }
+
+  if (languageService) {
+    languageService.onChange(() => refreshVoicesLabels());
+  }
+
+  // -------------------------------------------------------------------------
   // Tab Component Contract
 
   return {
@@ -1643,7 +1670,7 @@ export function createVoicesTab(screen, services) {
     },
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('voicesFooter');
     },
 
     getFooterColor() {

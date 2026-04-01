@@ -14,6 +14,7 @@ import { execSync, spawnSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { t } from '../../i18n/strings.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -767,6 +768,9 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
 export function createReceiverTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
+  const { languageService, focusMainTabBar } = services || {};
+  const _tl = (key) => languageService ? languageService.t(key) : t('en', key);
+
   const AGENTVIBES_DIR = path.join(homedir(), '.agentvibes');
   const RECEIVER_SCRIPT = path.join(AGENTVIBES_DIR, 'play-remote.sh');
   const RECEIVER_ALIAS = 'my-receiver';
@@ -791,21 +795,18 @@ export function createReceiverTab(screen, services) {
     width: '100%',
     bottom: 2,
     hidden: true,
+    keys: true,
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
     border: { type: 'line' },
     borderStyle: { fg: COLORS.borderFg },
   });
 
+  box.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+  });
+
   // -------------------------------------------------------------------------
   // Description text (collapsible)
-  const DESC_TEXT = [
-    'SSH Receiver lets your remote servers speak through this machine.',
-    'When an AI assistant on a remote server (VPS, cloud, dev box) needs',
-    'to play TTS audio, it sends the text over SSH to this machine, which',
-    'generates and plays the audio through your speakers locally.',
-    '',
-    'Remote AI  ──[SSH]──►  This Machine  ──[piper+sox+ffmpeg]──►  Your Speakers',
-  ].join('\n');
 
   const descBox = blessed.box({
     parent: box,
@@ -816,7 +817,7 @@ export function createReceiverTab(screen, services) {
     tags: true,
     hidden: true,
     border: { type: 'line' },
-    label: ` {bold}What is SSH Receiver?{/bold} `,
+    label: ` {bold}${_tl('receiverWhatIsTitle')}{/bold} `,
     style: {
       fg: COLORS.labelFg,
       bg: '#111827',
@@ -824,12 +825,12 @@ export function createReceiverTab(screen, services) {
     },
   });
 
-  blessed.text({
+  const descText = blessed.text({
     parent: descBox,
     top: 0,
     left: 1,
     tags: true,
-    content: DESC_TEXT,
+    content: _tl('receiverDesc'),
     style: { fg: '#b0bec5', bg: '#111827' },
   });
 
@@ -1451,6 +1452,16 @@ export function createReceiverTab(screen, services) {
   });
 
   // -------------------------------------------------------------------------
+  // Language change handler
+
+  if (languageService) {
+    languageService.onChange(() => {
+      descBox.setLabel(` {bold}${_tl('receiverWhatIsTitle')}{/bold} `);
+      descText.setContent(_tl('receiverDesc'));
+      screen.render();
+    });
+  }
+
   // Tab Component Contract
 
   return {
@@ -1466,7 +1477,7 @@ export function createReceiverTab(screen, services) {
     },
     onFocus() { box.focus(); },
     onBlur() {},
-    getFooterText: () => FOOTER_TEXT,
+    getFooterText: () => _tl('receiverFooter'),
     getFooterColor: () => COLORS.footerBg,
   };
 }
