@@ -113,6 +113,8 @@ export default {
   continueArrowBtn: "Continue →",
   acceptInstallBtn: "✓ Accept & Install",
   okDoneBtn: "✓  OK — Done",
+  doneCustomizeBtn: "✓  Done - Customize More",
+  doneQuitBtn: "✕  Done - Quit",
   editInstallBtn: "Edit",
   musicDisabledMsg: "Music is disabled. Enable it now?",
   settingsFooter: "[↑↓] Group  [←→] Sibling/Sub-tab  [Enter/Space] Activate  [Tab] Switch Tab  [Q] Quit",

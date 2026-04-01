@@ -113,6 +113,8 @@ export default {
   continueArrowBtn: "जारी रखें →",
   acceptInstallBtn: "✓ स्वीकार करें और स्थापित करें",
   okDoneBtn: "✓  OK — हो गया",
+  doneCustomizeBtn: "✓  हो गया - और अनुकूलित करें",
+  doneQuitBtn: "✕  हो गया - बाहर निकलें",
   editInstallBtn: "संपादित करें",
   musicDisabledMsg: "संगीत अक्षम है। अभी सक्षम करें?",
   settingsFooter: "[↑↓] समूह  [←→] सहोदर/उप-टैब  [Enter/Space] सक्रिय करें  [Tab] टैब बदलें  [Q] बाहर",

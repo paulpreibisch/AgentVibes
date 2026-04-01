@@ -113,6 +113,8 @@ export default {
   continueArrowBtn: "続ける →",
   acceptInstallBtn: "✓ 承認してインストール",
   okDoneBtn: "✓  OK — 終了",
+  doneCustomizeBtn: "✓  終了 - さらにカスタマイズ",
+  doneQuitBtn: "✕  終了 - 終了する",
   editInstallBtn: "編集",
   musicDisabledMsg: "音楽が無効です。今すぐ有効にしますか？",
   settingsFooter: "[↑↓] グループ  [←→] 兄弟/サブタブ  [Enter/Space] 実行  [Tab] タブ切替  [Q] 終了",

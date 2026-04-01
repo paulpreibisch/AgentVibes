@@ -443,9 +443,10 @@ export function createInstallTab(screen, services) {
 
     _renderScreen5();
 
-    // Show OK button now that install is done (success or error)
-    _s5OkBtn.show();
-    _s5OkBtn.focus();
+    // Show buttons now that install is done (success or error)
+    _s5QuitBtn.show();
+    _s5CustomizeBtn.show();
+    _s5QuitBtn.focus();
     screen.render();
 
     // Play TTS greeting on success
@@ -579,12 +580,22 @@ export function createInstallTab(screen, services) {
   // Screen 3: no Continue button — Enter/→ on the list confirms selection and advances
 
   // -------------------------------------------------------------------------
-  // Screen 5 button — OK (summary page only, config already saved on screen 4)
+  // Screen 5 buttons — Quit (default) + Customize More (summary page only, config saved on screen 4)
 
-  const _s5OkBtn = _createInstallBtn(_tl('okDoneBtn'), '#1565c0', () => {
+  const _s5QuitBtn = _createInstallBtn(_tl('doneQuitBtn'), '#b71c1c', () => {
+    screen.destroy();
+    process.exit(0);
+  });
+  _s5QuitBtn.bottom = 3; _s5QuitBtn.left = 4;
+
+  const _s5CustomizeBtn = _createInstallBtn(_tl('doneCustomizeBtn'), '#1565c0', () => {
     _dismissCompletionModal();
   });
-  _s5OkBtn.bottom = 3; _s5OkBtn.left = 4;  // bottom-anchored: sits above hintLine (bottom:2)
+  _s5CustomizeBtn.bottom = 3; _s5CustomizeBtn.left = 4 + _tl('doneQuitBtn').length + 4;
+
+  // Tab/arrow navigation between the two screen-5 buttons
+  _s5QuitBtn.key(['tab', 'right'], () => { _s5CustomizeBtn.focus(); screen.render(); });
+  _s5CustomizeBtn.key(['tab', 'right', 'left', 'S-tab'], () => { _s5QuitBtn.focus(); screen.render(); });
 
   // -------------------------------------------------------------------------
   // Screen renderers
@@ -827,11 +838,13 @@ export function createInstallTab(screen, services) {
     // Screen 2 continue button: hidden on other screens; _renderScreen2 manages show/focus
     if (_screen !== 2) _s2ContinueBtn.hide();
 
-    // Screen 5 OK button: hidden during active install, shown by _runInstall() on completion
+    // Screen 5 buttons: hidden during active install, shown by _runInstall() on completion
     if (_screen === 5 && (_installComplete || _installError)) {
-      _s5OkBtn.show();
+      _s5QuitBtn.show();
+      _s5CustomizeBtn.show();
     } else {
-      _s5OkBtn.hide();
+      _s5QuitBtn.hide();
+      _s5CustomizeBtn.hide();
     }
 
     // Show Screen 4 action buttons only on screen 4
@@ -1047,7 +1060,7 @@ export function createInstallTab(screen, services) {
       } else if (_screen === 4) {
         _editBtn.focus();
       } else if (_screen === 5 && (_installComplete || _installError)) {
-        _s5OkBtn.focus();
+        _s5QuitBtn.focus();
       } else {
         box.focus();
       }

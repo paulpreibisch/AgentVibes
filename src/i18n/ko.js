@@ -113,6 +113,8 @@ export default {
   continueArrowBtn: "계속 →",
   acceptInstallBtn: "✓ 수락 및 설치",
   okDoneBtn: "✓  OK — 완료",
+  doneCustomizeBtn: "✓  완료 - 더 맞춤 설정",
+  doneQuitBtn: "✕  완료 - 종료",
   editInstallBtn: "편집",
   musicDisabledMsg: "음악이 비활성화되어 있습니다. 지금 활성화하겠습니까?",
   settingsFooter: "[↑↓] 그룹  [←→] 형제/서브탭  [Enter/Space] 활성화  [Tab] 탭 전환  [Q] 나가기",

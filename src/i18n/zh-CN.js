@@ -113,6 +113,8 @@ export default {
   continueArrowBtn: "继续 →",
   acceptInstallBtn: "✓ 接受并安装",
   okDoneBtn: "✓  OK — 完成",
+  doneCustomizeBtn: "✓  完成 - 更多自定义",
+  doneQuitBtn: "✕  完成 - 退出",
   editInstallBtn: "编辑",
   musicDisabledMsg: "音乐已禁用。现在启用？",
   settingsFooter: "[↑↓] 组  [←→] 兄弟/子标签  [Enter/Space] 激活  [Tab] 切换标签  [Q] 退出",
