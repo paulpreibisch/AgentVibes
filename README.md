@@ -4,14 +4,14 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, **Warp Terminal**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
+> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.4
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.5
 
 ---
 
@@ -36,11 +36,41 @@
 
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
-Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Terminal, or running OpenClaw - AgentVibes brings AI to life with professional voices and personalities.
+Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
 
 ---
 
-## 🌟 NEW IN v4.4 — Full Platform Parity Release
+## 🌟 NEW IN v4.5 — "Speak Every Language" Release
+
+### 🌍 Multilingual TUI — 9 Languages
+
+Every screen, button, and label in `npx agentvibes` is now fully translated:
+
+- **English, Spanish, French, German, Portuguese, Japanese, Korean, Chinese (Simplified), Italian**
+- Language selection on first launch — pick your language before anything else
+- Language sub-tab in Settings — switch live, no restart needed
+- All tab labels, buttons, footer hints, status messages, and BMAD/Receiver tabs translated
+- Per-language i18n files (`src/i18n/en.js`, `es.js`, `fr.js`, ...) with English fallback
+
+### 🪟 Windows Security Hardening
+
+- **Unpredictable temp files** — `randomUUID()` replaces `Date.now()` in all temp filenames (JS + PowerShell)
+- **No shell injection** — `spawnSync` replaces `execSync(..., { shell: true })` for `which` lookups
+- **Smart music player detection** — `detectMp3Player()` replaces hardcoded `ffplay` on Windows
+- **Boolean fix** — `isWindowsTerminal` now returns `true/false`, not the `WT_SESSION` UUID string
+
+### 🎙️ Cross-Platform BMAD Speak
+
+BMAD (Build More Architect Dreams) is an AI multi-agent framework where specialized agents — Architect, PM, Developer, QA, and Analyst — collaborate to build software. With this release, every agent in a BMAD party mode session now speaks aloud with their own unique voice, personality, and music on Windows — making each role instantly recognizable.
+
+- `bmad-speak.js` — cross-platform entry point; auto-routes to PowerShell on Windows or bash on Mac/Linux
+- `bmad-speak.ps1` — native Windows BMAD speak with per-agent personality routing
+
+### 🧪 600 Tests, Zero Failures
+
+---
+
+## 🌟 v4.4 — Full Platform Parity Release
 
 ### 🪟 Windows MCP Parity — 27/27 Tools Working
 
@@ -294,7 +324,7 @@ Configure via: `npx agentvibes` → Music tab
 - 🎭 **Multi-Provider Support** - Soprano (neural), Piper TTS (50+ free voices), macOS Say (100+ built-in), or Windows SAPI
 - 🎙️ **27+ Professional AI Voices** - Character voices, accents, and unique personalities
 - 🎙️ **Verbosity Control** - Choose how much Claude speaks (LOW, MEDIUM, HIGH)
-- 🎙️ **AgentVibes MCP** - Natural language control ("Switch to Aria voice") for Claude Code, Desktop & Warp
+- 🎙️ **AgentVibes MCP** - Natural language control ("Switch to Aria voice") for Claude Code & Desktop
 - 🔊 **SSH Audio Optimization** - Auto-detects remote sessions and eliminates static (VS Code Remote SSH, cloud dev)
 
 **🎭 Personalization:**
@@ -345,7 +375,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 ### AgentVibes MCP (Natural Language Control)
 - [🎙️ AgentVibes MCP Overview](#%EF%B8%8F-agentvibes-mcp) - **Easiest way** - Natural language commands
   - [For Claude Desktop](docs/mcp-setup.md#for-claude-desktop) - Windows/WSL setup, Python requirements
-  - [For Warp Terminal](docs/mcp-setup.md#for-warp-terminal) - Warp configuration
+
   - [For Claude Code](docs/mcp-setup.md#for-claude-code) - Project-specific setup
 
 ### Core Features
@@ -473,9 +503,9 @@ We've now enhanced this capability by adding an MCP (Model Context Protocol) ser
 
 Setting it up is straightforward: just add the MCP server to your Claude Code configuration files.
 
-But the convenience doesn't stop there. With the MCP server in place, Claude Desktop can now use Agent Vibes too! We've even tested it successfully with Warp, an AI assistant that helps you navigate Windows and other operating systems.
+But the convenience doesn't stop there. With the MCP server in place, Claude Desktop can now use Agent Vibes too!
 
-We're thrilled about this expansion because it means Claude Desktop and Warp can finally talk back as well!
+We're thrilled about this expansion because it means Claude Desktop can finally talk back as well!
 
 If you decide to use the MCP server on Claude Desktop, after configuration, give Claude Desktop this command: "every time i give you a command, speak the acknowledgement using agentvibes and the confirmation about what you completed, when done"—and watch the magic happen!
 
@@ -483,7 +513,7 @@ If you decide to use the MCP server on Claude Desktop, after configuration, give
 
 Just say "Switch to Aria voice" or "Speak in Spanish" instead of typing commands.
 
-**Works in:** Claude Desktop, Claude Code, Warp Terminal
+**Works in:** Claude Desktop, Claude Code
 
 **[→ View Complete MCP Setup Guide](docs/mcp-setup.md)** - Full setup for all platforms, configuration examples, available tools, and MCP vs slash commands comparison
 

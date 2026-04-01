@@ -27,6 +27,8 @@ Every screen, tab, button, and label in the `npx agentvibes` TUI is now fully tr
 
 ### 🎙️ Cross-Platform BMAD Speak
 
+BMAD (Build More Architect Dreams) is an AI multi-agent framework where specialized agents — Architect, PM, Developer, QA, and Analyst — collaborate to build software. With this release, every agent in a BMAD party mode session now speaks aloud with their own unique voice, personality, and music on Windows — making each role instantly recognizable.
+
 - `bin/bmad-speak.js` — cross-platform entry point for BMAD agent speech
 - `.claude/hooks-windows/bmad-speak.ps1` — native Windows BMAD speak with per-agent personality routing
 
