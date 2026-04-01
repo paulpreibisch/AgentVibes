@@ -10,6 +10,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { t } from '../../i18n/strings.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -34,7 +35,7 @@ const COLORS = {
   footerBg:   '#455a64',  // Dark gray — Readme tab footer
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Scroll  [PgUp/PgDn] Page  [/] Search  [S/V/M/A/R] Tab  [Q] Quit';
+const _FOOTER_TEXT_EN = '[↑↓/jk] Scroll  [PgUp/PgDn] Page  [/] Search  [S/V/M/A/R] Tab  [Q] Quit';
 
 // ---------------------------------------------------------------------------
 // Markdown renderer (story 13.2)
@@ -106,7 +107,7 @@ function createTestStub() {
     hide: () => {},
     onFocus: () => {},
     onBlur: () => {},
-    getFooterText: () => FOOTER_TEXT,
+    getFooterText: () => _FOOTER_TEXT_EN,
     getFooterColor: () => COLORS.footerBg,
   };
 }
@@ -123,7 +124,8 @@ function createTestStub() {
 export function createReadmeTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { focusMainTabBar } = services;
+  const { focusMainTabBar, languageService } = services;
+  const _tl = (key) => languageService ? languageService.t(key) : t('en', key);
 
   // -------------------------------------------------------------------------
   // Container
@@ -157,7 +159,7 @@ export function createReadmeTab(screen, services) {
         }
       }
     }
-    return '# README\n\n*(No README.md found in current directory)*';
+    return `# README\n\n${_tl('readmeNotFound')}`;
   }
 
   // -------------------------------------------------------------------------
@@ -197,7 +199,7 @@ export function createReadmeTab(screen, services) {
     const markdown = _loadReadme();
     const rendered = renderMarkdown(markdown);
     scrollBox.setContent(rendered);
-    scrollIndicator.setContent('{#607d8b-fg}↓ Scroll for more content ↓{/#607d8b-fg}');
+    scrollIndicator.setContent(`{#607d8b-fg}${_tl('readmeScrollMore')}{/#607d8b-fg}`);
     screen.render();
   }
 
@@ -205,7 +207,7 @@ export function createReadmeTab(screen, services) {
   scrollBox.on('scroll', () => {
     const atBottom = scrollBox.getScrollPerc() >= 99;
     scrollIndicator.setContent(
-      atBottom ? '' : '{#607d8b-fg}↓ Scroll for more content ↓{/#607d8b-fg}'
+      atBottom ? '' : `{#607d8b-fg}${_tl('readmeScrollMore')}{/#607d8b-fg}`
     );
     screen.render();
   });
@@ -257,7 +259,7 @@ export function createReadmeTab(screen, services) {
     onBlur() {},
 
     getFooterText() {
-      return FOOTER_TEXT;
+      return _tl('readmeFooter');
     },
 
     getFooterColor() {
