@@ -187,6 +187,14 @@ export const strings = {
     voiceInfoSpeakerId:       'Speaker ID:',
     voiceInfoDownload:        '⬇ Press [Enter] to download and install',
     voicePlaying:             '(playing)',
+    bmadTitle:                '🧙 BMAD Agents',
+    bmadWhatIsHeader:         'What is BMAD?',
+    bmadDesc:                 'The BMad Method (Build More Architect Dreams) is an AI-driven development\nframework module within the BMad Method Ecosystem that helps you build\nsoftware through the whole process from ideation and planning all the way\nthrough agentic implementation. It provides specialized AI agents, guided\nworkflows, and intelligent planning that adapts to your project\'s\ncomplexity, whether you\'re fixing a bug or building an enterprise platform.\n\nIf you\'re comfortable working with AI coding assistants like Claude,\nCursor, or GitHub Copilot, you\'re ready to get started.',
+    bmadInstallHeader:        'Install BMAD in your project:',
+    bmadLearnMoreHeader:      'Learn more:',
+    bmadInstalledNote:        'Once BMAD is installed, this tab will show all your agents and let you\ncustomize each agent\'s voice, pretext, reverb, personality, and background\nmusic independently.',
+    receiverWhatIsTitle:      'What is SSH Receiver?',
+    receiverDesc:             'SSH Receiver lets your remote servers speak through this machine.\nWhen an AI assistant on a remote server (VPS, cloud, dev box) needs\nto play TTS audio, it sends the text over SSH to this machine, which\ngenerates and plays the audio through your speakers locally.\n\nRemote AI  ──[SSH]──►  This Machine  ──[piper+sox+ffmpeg]──►  Your Speakers',
   },
 
   es: {
@@ -349,6 +357,14 @@ export const strings = {
     voiceInfoSpeakerId:       'ID Hablante:',
     voiceInfoDownload:        '⬇ Presionar [Enter] para descargar e instalar',
     voicePlaying:             '(reproduciendo)',
+    bmadTitle:                '🧙 Agentes BMAD',
+    bmadWhatIsHeader:         '¿Qué es BMAD?',
+    bmadDesc:                 'El Método BMad (Build More Architect Dreams) es un módulo de framework\nde desarrollo impulsado por IA dentro del Ecosistema del Método BMad que\nte ayuda a construir software a través de todo el proceso desde la ideación\ny planificación hasta la implementación agéntica. Proporciona agentes de IA\nespecializados, flujos de trabajo guiados y planificación inteligente que\nse adapta a la complejidad de tu proyecto, ya sea que estés corrigiendo\nun error o construyendo una plataforma empresarial.\n\nSi te sientes cómodo trabajando con asistentes de codificación de IA como\nClaude, Cursor o GitHub Copilot, estás listo para comenzar.',
+    bmadInstallHeader:        'Instalar BMAD en tu proyecto:',
+    bmadLearnMoreHeader:      'Más información:',
+    bmadInstalledNote:        'Una vez instalado BMAD, esta pestaña mostrará todos tus agentes y te\npermitirá personalizar la voz, pretexto, reverb, personalidad y música\nde fondo de cada agente de forma independiente.',
+    receiverWhatIsTitle:      '¿Qué es el Receptor SSH?',
+    receiverDesc:             'El Receptor SSH permite que tus servidores remotos hablen a través de\nesta máquina. Cuando un asistente de IA en un servidor remoto (VPS,\nnube, equipo de desarrollo) necesita reproducir audio TTS, envía el\ntexto por SSH a esta máquina, que genera y reproduce el audio a través\nde tus altavoces localmente.\n\nIA Remota  ──[SSH]──►  Esta Máquina  ──[piper+sox+ffmpeg]──►  Tus Altavoces',
   },
 
   fr: {
@@ -511,6 +527,14 @@ export const strings = {
     voiceInfoSpeakerId:       'ID Locuteur:',
     voiceInfoDownload:        '⬇ Appuyer sur [Enter] pour télécharger et installer',
     voicePlaying:             '(lecture en cours)',
+    bmadTitle:                '🧙 Agents BMAD',
+    bmadWhatIsHeader:         'Qu\'est-ce que BMAD?',
+    bmadDesc:                 'La Méthode BMad (Build More Architect Dreams) est un module de framework\nde développement piloté par l\'IA qui vous aide à construire des logiciels\nde l\'idéation à l\'implémentation agentique. Il fournit des agents IA\nspécialisés, des flux de travail guidés et une planification intelligente\nadaptée à la complexité de votre projet.\n\nSi vous êtes à l\'aise avec les assistants de codage IA comme Claude,\nCursor ou GitHub Copilot, vous êtes prêt à commencer.',
+    bmadInstallHeader:        'Installer BMAD dans votre projet:',
+    bmadLearnMoreHeader:      'En savoir plus:',
+    bmadInstalledNote:        'Une fois BMAD installé, cet onglet affichera tous vos agents et vous\npermetttra de personnaliser la voix, le prétexte, la réverbération,\nla personnalité et la musique de fond de chaque agent indépendamment.',
+    receiverWhatIsTitle:      'Qu\'est-ce que le Récepteur SSH?',
+    receiverDesc:             'Le Récepteur SSH permet à vos serveurs distants de parler via cette\nmachine. Quand un assistant IA sur un serveur distant a besoin de jouer\nde l\'audio TTS, il envoie le texte par SSH à cette machine, qui génère\net joue l\'audio via vos haut-parleurs localement.\n\nIA Distante  ──[SSH]──►  Cette Machine  ──[piper+sox+ffmpeg]──►  Vos Haut-Parleurs',
   },
 
   de: {
@@ -673,6 +697,14 @@ export const strings = {
     voiceInfoSpeakerId:       'Sprecher-ID:',
     voiceInfoDownload:        '⬇ [Enter] drücken zum Herunterladen und Installieren',
     voicePlaying:             '(wird abgespielt)',
+    bmadTitle:                '🧙 BMAD-Agenten',
+    bmadWhatIsHeader:         'Was ist BMAD?',
+    bmadDesc:                 'Die BMad-Methode (Build More Architect Dreams) ist ein KI-gesteuertes\nEntwicklungs-Framework-Modul, das Ihnen hilft, Software von der Ideenfindung\nbis zur agentischen Implementierung zu entwickeln. Es bietet spezialisierte\nKI-Agenten, geführte Workflows und intelligente Planung.\n\nWenn Sie mit KI-Codierassistenten wie Claude, Cursor oder GitHub Copilot\nvertraut sind, können Sie sofort loslegen.',
+    bmadInstallHeader:        'BMAD in Ihrem Projekt installieren:',
+    bmadLearnMoreHeader:      'Mehr erfahren:',
+    bmadInstalledNote:        'Sobald BMAD installiert ist, zeigt dieser Tab alle Ihre Agenten an und\nermöglicht es Ihnen, Stimme, Prätext, Nachhall, Persönlichkeit und\nHintergrundmusik jedes Agenten unabhängig anzupassen.',
+    receiverWhatIsTitle:      'Was ist SSH-Empfänger?',
+    receiverDesc:             'Der SSH-Empfänger ermöglicht es Ihren Remote-Servern, über diese Maschine\nzu sprechen. Wenn ein KI-Assistent auf einem Remote-Server TTS-Audio\nabspielen muss, sendet er den Text per SSH an diese Maschine, die das\nAudio generiert und über Ihre Lautsprecher abspielt.\n\nEntfernter KI  ──[SSH]──►  Diese Maschine  ──[piper+sox+ffmpeg]──►  Ihre Lautsprecher',
   },
 
   pt: {
@@ -835,6 +867,14 @@ export const strings = {
     voiceInfoSpeakerId:       'ID do Locutor:',
     voiceInfoDownload:        '⬇ Pressionar [Enter] para baixar e instalar',
     voicePlaying:             '(reproduzindo)',
+    bmadTitle:                '🧙 Agentes BMAD',
+    bmadWhatIsHeader:         'O que é BMAD?',
+    bmadDesc:                 'O Método BMad (Build More Architect Dreams) é um módulo de framework\nde desenvolvimento orientado por IA que ajuda você a construir software\nde ponta a ponta, da ideação à implementação agêntica. Fornece agentes IA\nespecializados, fluxos de trabalho guiados e planejamento inteligente.\n\nSe você está confortável trabalhando com assistentes de codificação IA\ncomo Claude, Cursor ou GitHub Copilot, você está pronto para começar.',
+    bmadInstallHeader:        'Instalar BMAD no seu projeto:',
+    bmadLearnMoreHeader:      'Saiba mais:',
+    bmadInstalledNote:        'Uma vez que o BMAD estiver instalado, esta aba mostrará todos os seus\nagentes e permitirá personalizar a voz, pretexto, reverb, personalidade\ne música de fundo de cada agente independentemente.',
+    receiverWhatIsTitle:      'O que é o Receptor SSH?',
+    receiverDesc:             'O Receptor SSH permite que seus servidores remotos falem através desta\nmáquina. Quando um assistente de IA em um servidor remoto precisa\nreproduzir áudio TTS, ele envia o texto via SSH para esta máquina, que\ngera e reproduz o áudio pelos seus alto-falantes localmente.\n\nIA Remota  ──[SSH]──►  Esta Máquina  ──[piper+sox+ffmpeg]──►  Seus Alto-falantes',
   },
 
   ja: {
@@ -997,6 +1037,14 @@ export const strings = {
     voiceInfoSpeakerId:       'スピーカーID:',
     voiceInfoDownload:        '⬇ [Enter]を押してダウンロードしてインストール',
     voicePlaying:             '(再生中)',
+    bmadTitle:                '🧙 BMADエージェント',
+    bmadWhatIsHeader:         'BMADとは？',
+    bmadDesc:                 'BMadメソッド（Build More Architect Dreams）は、AIを活用した開発\nフレームワークモジュールで、アイデア出しから計画、エージェント実装まで\nソフトウェア開発の全工程をサポートします。専門のAIエージェント、ガイド付き\nワークフロー、インテリジェントな計画機能を提供します。\n\nClaude、Cursor、GitHub CopilotなどのAIコーディングアシスタントに\n慣れているなら、すぐに始められます。',
+    bmadInstallHeader:        'プロジェクトにBMADをインストール:',
+    bmadLearnMoreHeader:      '詳細:',
+    bmadInstalledNote:        'BMADがインストールされると、このタブにすべてのエージェントが表示され、\n各エージェントの音声、前文、リバーブ、個性、バックグラウンドミュージックを\n個別にカスタマイズできます。',
+    receiverWhatIsTitle:      'SSHレシーバーとは？',
+    receiverDesc:             'SSHレシーバーを使うと、リモートサーバーがこのマシンを通じて話せるように\nなります。リモートサーバー上のAIアシスタントがTTSオーディオを再生する\n必要がある場合、SSHでこのマシンにテキストを送信し、ローカルのスピーカーから\nオーディオを生成・再生します。\n\nリモートAI  ──[SSH]──►  このマシン  ──[piper+sox+ffmpeg]──►  スピーカー',
   },
 
   hi: {
@@ -1159,6 +1207,14 @@ export const strings = {
     voiceInfoSpeakerId:       'वक्ता आईडी:',
     voiceInfoDownload:        '⬇ डाउनलोड और इंस्टॉल के लिए [Enter] दबाएं',
     voicePlaying:             '(चल रहा है)',
+    bmadTitle:                '🧙 BMAD एजेंट',
+    bmadWhatIsHeader:         'BMAD क्या है?',
+    bmadDesc:                 'BMad विधि (Build More Architect Dreams) एक AI-संचालित विकास\nफ्रेमवर्क मॉड्यूल है जो आपको विचार-मंथन से लेकर एजेंटिक कार्यान्वयन तक\nसॉफ़्टवेयर बनाने में मदद करता है। यह विशेष AI एजेंट, निर्देशित\nवर्कफ़्लो और बुद्धिमान योजना प्रदान करता है।\n\nयदि आप Claude, Cursor, या GitHub Copilot जैसे AI कोडिंग सहायकों के\nसाथ काम करने में सहज हैं, तो आप शुरू करने के लिए तैयार हैं।',
+    bmadInstallHeader:        'अपने प्रोजेक्ट में BMAD इंस्टॉल करें:',
+    bmadLearnMoreHeader:      'अधिक जानें:',
+    bmadInstalledNote:        'BMAD इंस्टॉल होने के बाद, यह टैब आपके सभी एजेंट दिखाएगा और आपको\nप्रत्येक एजेंट की आवाज़, प्रीटेक्स्ट, रीवर्ब, व्यक्तित्व और\nबैकग्राउंड म्यूजिक को अलग से कस्टमाइज़ करने देगा।',
+    receiverWhatIsTitle:      'SSH रिसीवर क्या है?',
+    receiverDesc:             'SSH रिसीवर आपके रिमोट सर्वर को इस मशीन के माध्यम से बोलने देता है।\nजब किसी रिमोट सर्वर पर AI सहायक को TTS ऑडियो चलाना हो, तो वह\nSSH के माध्यम से इस मशीन को टेक्स्ट भेजता है, जो आपके स्पीकर\nसे ऑडियो उत्पन्न और चलाता है।\n\nरिमोट AI  ──[SSH]──►  यह मशीन  ──[piper+sox+ffmpeg]──►  आपके स्पीकर',
   },
 
   'zh-CN': {
@@ -1321,6 +1377,14 @@ export const strings = {
     voiceInfoSpeakerId:       '说话者ID:',
     voiceInfoDownload:        '⬇ 按[Enter]下载并安装',
     voicePlaying:             '(播放中)',
+    bmadTitle:                '🧙 BMAD代理',
+    bmadWhatIsHeader:         '什么是BMAD？',
+    bmadDesc:                 'BMad方法（Build More Architect Dreams）是一个AI驱动的开发框架模块，\n帮助您完成从构思规划到智能实现的整个软件开发过程。提供专业AI代理、\n引导式工作流程和智能规划。\n\n如果您习惯使用Claude、Cursor或GitHub Copilot等AI编程助手，\n您已经准备好开始了。',
+    bmadInstallHeader:        '在您的项目中安装BMAD:',
+    bmadLearnMoreHeader:      '了解更多:',
+    bmadInstalledNote:        'BMAD安装后，此标签页将显示您所有的代理，并允许您独立自定义每个代理\n的语音、前置文本、混响、个性和背景音乐。',
+    receiverWhatIsTitle:      '什么是SSH接收器？',
+    receiverDesc:             'SSH接收器让您的远程服务器通过这台机器发声。当远程服务器上的AI助手\n需要播放TTS音频时，它通过SSH将文本发送到这台机器，由这台机器生成\n并通过本地扬声器播放音频。\n\n远程AI  ──[SSH]──►  这台机器  ──[piper+sox+ffmpeg]──►  您的扬声器',
   },
 
   ko: {
@@ -1483,6 +1547,14 @@ export const strings = {
     voiceInfoSpeakerId:       '화자 ID:',
     voiceInfoDownload:        '⬇ [Enter] 눌러 다운로드 및 설치',
     voicePlaying:             '(재생 중)',
+    bmadTitle:                '🧙 BMAD 에이전트',
+    bmadWhatIsHeader:         'BMAD란?',
+    bmadDesc:                 'BMad 방법(Build More Architect Dreams)은 AI 기반 개발 프레임워크\n모듈로, 아이디어 구상부터 에이전틱 구현까지 전체 소프트웨어 개발\n과정을 지원합니다. 전문 AI 에이전트, 안내된 워크플로우 및 지능적인\n계획을 제공합니다.\n\nClaude, Cursor 또는 GitHub Copilot과 같은 AI 코딩 어시스턴트에 익숙하다면\n시작할 준비가 된 것입니다.',
+    bmadInstallHeader:        '프로젝트에 BMAD 설치:',
+    bmadLearnMoreHeader:      '자세히 알아보기:',
+    bmadInstalledNote:        'BMAD가 설치되면 이 탭에 모든 에이전트가 표시되고 각 에이전트의\n음성, 전문, 리버브, 개성 및 배경 음악을 독립적으로 커스터마이즈할\n수 있습니다.',
+    receiverWhatIsTitle:      'SSH 수신기란?',
+    receiverDesc:             'SSH 수신기를 사용하면 원격 서버가 이 기기를 통해 말할 수 있습니다.\n원격 서버의 AI 어시스턴트가 TTS 오디오를 재생해야 할 때 SSH를 통해\n이 기기에 텍스트를 전송하면, 이 기기가 오디오를 생성하여 로컬\n스피커로 재생합니다.\n\n원격 AI  ──[SSH]──►  이 기기  ──[piper+sox+ffmpeg]──►  스피커',
   },
 };
 
