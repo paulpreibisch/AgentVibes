@@ -319,7 +319,7 @@ ${_tl('bmadDesc')}
   }
 
   const resetBtn = _createBtn('[X] Reset', () => {
-    const agent = _agents[agentList.selected];
+    const agent = _agents[agentList.selected ?? 0];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
       refreshDisplay();
@@ -1504,7 +1504,7 @@ ${_tl('bmadDesc')}
   // Key bindings
 
   agentList.key(['x', 'X'], () => {
-    const agent = _agents[agentList.selected];
+    const agent = _agents[agentList.selected ?? 0];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
       refreshDisplay();
@@ -1513,12 +1513,12 @@ ${_tl('bmadDesc')}
 
 
   agentList.key(['enter'], () => {
-    const agent = _agents[agentList.selected];
+    const agent = _agents[agentList.selected ?? 0];
     if (agent) _openAgentDetailPanel(agent);
   });
 
   agentList.key(['space'], () => {
-    const agent = _agents[agentList.selected];
+    const agent = _agents[agentList.selected ?? 0];
     if (agent) _sampleAgent(agent);
   });
 
