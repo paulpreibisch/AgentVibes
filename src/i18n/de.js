@@ -196,4 +196,6 @@ export default {
   helpSearchLabel: "Suche:",
   readmeScrollMore: "↓ Scrollen für mehr Inhalt ↓",
   readmeNotFound: "*(Keine README.md im aktuellen Verzeichnis gefunden)*",
+  bmadFooterNobmad: "[Tab] Tab wechseln  [Q] Beenden",
+  bmadFooterBmad: "[↑↓/jk] Navigieren  [Space] Vorschau  [Enter] Konfigurieren  [A] Auto-zuweisen  [B] Stapel  [X] Zurücksetzen  [Q] Beenden",
 };

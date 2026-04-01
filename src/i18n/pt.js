@@ -196,4 +196,6 @@ export default {
   helpSearchLabel: "Buscar:",
   readmeScrollMore: "↓ Role para mais conteúdo ↓",
   readmeNotFound: "*(Nenhum README.md encontrado no diretório atual)*",
+  bmadFooterNobmad: "[Tab] Mudar Aba  [Q] Sair",
+  bmadFooterBmad: "[↑↓/jk] Navegar  [Space] Visualizar  [Enter] Configurar  [A] Auto-atribuir  [B] Lote  [X] Redefinir  [Q] Sair",
 };

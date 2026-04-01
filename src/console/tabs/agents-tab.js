@@ -58,8 +58,8 @@ const COLORS = {
   linkFg:     'bright-cyan',
 };
 
-const FOOTER_TEXT_BMAD   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
-const FOOTER_TEXT_NOBMAD = '[Tab] Switch Tab  [Q] Quit';
+const _FOOTER_BMAD_EN   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
+const _FOOTER_NOBMAD_EN = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
@@ -86,7 +86,7 @@ function createTestStub() {
     hide: () => {},
     onFocus: () => {},
     onBlur: () => {},
-    getFooterText: () => FOOTER_TEXT_BMAD,
+    getFooterText: () => _FOOTER_BMAD_EN,
     getFooterColor: () => COLORS.footerBg,
   };
 }
@@ -1670,7 +1670,7 @@ ${_tl('bmadDesc')}
     },
 
     getFooterText() {
-      return _bmadDetected ? FOOTER_TEXT_BMAD : FOOTER_TEXT_NOBMAD;
+      return _bmadDetected ? _tl('bmadFooterBmad') : _tl('bmadFooterNobmad');
     },
 
     getFooterColor() {
