@@ -53,9 +53,8 @@ if (-not (Test-Path $AudioDir)) {
     New-Item -ItemType Directory -Path $AudioDir -Force | Out-Null
 }
 
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$random = Get-Random -Maximum 9999
-$TempFile = Join-Path $AudioDir "tts-$timestamp-$random.wav"
+# SECURITY: use random name instead of predictable timestamp (#130)
+$TempFile = Join-Path $AudioDir "tts-$([System.IO.Path]::GetRandomFileName() -replace '\..*').wav"
 
 # Check WebUI server
 function Test-WebUI {

@@ -3,7 +3,6 @@
  * Validates TTS provider availability at installation, switch, and runtime
  */
 
-import { execSync } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path'; // For safe path operations and traversal prevention
 import fs from 'node:fs'; // For checking file/directory existence
@@ -15,16 +14,12 @@ import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
  * @returns {boolean} True if command exists in PATH
  */
 function commandExistsInPath(command) {
-  try {
-    execSync(`which "${command}" 2>/dev/null`, {
-      encoding: 'utf8',
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  // SECURITY: Use spawnSync instead of execSync+shell to prevent command injection (#126)
+  const result = spawnSync('which', [command], {
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  return result.status === 0;
 }
 
 /**
@@ -180,11 +175,12 @@ export async function validateMacOSProvider() {
   }
 
   try {
-    execSync('which say 2>/dev/null', {
+    // SECURITY: Use spawnSync instead of execSync+shell to prevent command injection (#126)
+    const result = spawnSync('which', ['say'], {
       encoding: 'utf8',
-      shell: true,
       stdio: ['pipe', 'pipe', 'pipe']
     });
+    if (result.status !== 0) throw new Error('say not found');
     return { installed: true, message: 'macOS Say detected' };
   } catch (error) {
     // say command not found

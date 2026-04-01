@@ -162,9 +162,8 @@ $Text = $Text -replace '[{}<>|`~^;]', ''
 $Text = $Text -replace '\s+', ' '
 $Text = $Text.Trim()
 
-# Create audio file path
-$Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss-ffff'
-$AudioFile = "$AudioDir\tts-$Timestamp.wav"
+# Create audio file path — SECURITY: use random name instead of predictable timestamp (#130)
+$AudioFile = "$AudioDir\tts-$([System.IO.Path]::GetRandomFileName() -replace '\..*').wav"
 
 # Synthesize with Piper
 try {

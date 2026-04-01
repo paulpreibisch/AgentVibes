@@ -73,9 +73,8 @@ $Text = $Text.Trim()
 # Get actual voice name (after selection or default)
 $ActualVoice = $synth.Voice.Name
 
-# Create audio file path
-$Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss-ffff'
-$AudioFile = "$AudioDir\tts-$Timestamp.wav"
+# Create audio file path — SECURITY: use random name instead of predictable timestamp (#130)
+$AudioFile = "$AudioDir\tts-$([System.IO.Path]::GetRandomFileName() -replace '\..*').wav"
 
 # Save to WAV file with proper resource cleanup
 $player = $null
