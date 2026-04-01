@@ -8,6 +8,10 @@
 
 AgentVibes is a Text-to-Speech system for AI assistants with personality support.
 
+### Time Estimates
+
+Always estimate in **AI time** — Paul does not write code, that's Claude's job. "30 minutes" means 30 human minutes; the AI equivalent is seconds to a few minutes. When giving estimates, say things like "~10 minutes of AI work" or "quick — a few minutes tops."
+
 ### Project Uses BMAD Methodology
 
 This project follows **BMAD (BMM - Business Model Methodology)** for all story development:

@@ -74,7 +74,7 @@ Generate authentic responses for each selected agent:
 
 "[Icon Emoji] **[Agent Name]**: [Authentic in-character response]
 
-[Bash: .claude/hooks/bmad-speak.sh \"[Agent Name]\" \"[Their response]\"]"
+[Bash: node bin/bmad-speak.js \"[Agent Name]\" \"[Their response]\"]"
 
 ### 4. Natural Cross-Talk Integration
 

@@ -55,7 +55,7 @@ For each selected agent:
 
 "[Icon Emoji] **[Agent Name]**: [Characteristic farewell reflecting their personality, communication style, and role. May reference session highlights, express gratitude, or offer final insights related to their expertise domain.]
 
-[Bash: .claude/hooks/bmad-speak.sh \"[Agent Name]\" \"[Their farewell message]\"]"
+[Bash: node bin/bmad-speak.js \"[Agent Name]\" \"[Their farewell message]\"]"
 
 **Example Farewells:**
 
