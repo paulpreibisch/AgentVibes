@@ -825,7 +825,11 @@ export class AgentVibesConsole {
     });
 
     // Register global key bindings (S/V/M/A/R/H/I/T/Esc)
-    setupNavigation(this.screen, this.navigationService, services.focusMainTabBar);
+    setupNavigation(this.screen, this.navigationService, () => {
+      const id = this.navigationService.getActiveTab();
+      const item = this._tabItems?.[id];
+      if (item) item.focus();
+    });
   }
 
   // ---------------------------------------------------------------------------
