@@ -12,9 +12,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
 import { t } from '../../i18n/strings.js';
+
+// Package-relative tracks dir — used as fallback when cwd has no .claude/audio/tracks/
+const _PKG_TRACKS_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..', '..', '..', '.claude', 'audio', 'tracks'
+);
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -157,7 +164,9 @@ function createTestStub() {
  * @returns {string}
  */
 function _getTracksDir() {
-  return path.join(process.cwd(), '.claude', 'audio', 'tracks');
+  const cwdTracks = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+  // Fall back to package-bundled tracks if cwd doesn't have any
+  return fs.existsSync(cwdTracks) ? cwdTracks : _PKG_TRACKS_DIR;
 }
 
 /**
