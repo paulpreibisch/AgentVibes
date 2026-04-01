@@ -580,22 +580,25 @@ export function createInstallTab(screen, services) {
   // Screen 3: no Continue button — Enter/→ on the list confirms selection and advances
 
   // -------------------------------------------------------------------------
-  // Screen 5 buttons — Quit (default) + Customize More (summary page only, config saved on screen 4)
+  // Screen 5 buttons — Customize More (left) + Done - Quit (right, default focused)
+  // Layout: [  Customize More  ]   [  Done - Quit  ]
+  // Button width = label + 2 padding chars; gap between buttons = 3 chars
+
+  const _s5CustomizeBtn = _createInstallBtn(_tl('doneCustomizeBtn'), '#1565c0', () => {
+    _dismissCompletionModal();
+  });
+  _s5CustomizeBtn.bottom = 3; _s5CustomizeBtn.left = 4;
 
   const _s5QuitBtn = _createInstallBtn(_tl('doneQuitBtn'), '#b71c1c', () => {
     screen.destroy();
     process.exit(0);
   });
-  _s5QuitBtn.bottom = 3; _s5QuitBtn.left = 4;
+  // left = start(4) + customizeLabel + 2 padding + 3 gap
+  _s5QuitBtn.bottom = 3; _s5QuitBtn.left = 4 + _tl('doneCustomizeBtn').length + 2 + 3;
 
-  const _s5CustomizeBtn = _createInstallBtn(_tl('doneCustomizeBtn'), '#1565c0', () => {
-    _dismissCompletionModal();
-  });
-  _s5CustomizeBtn.bottom = 3; _s5CustomizeBtn.left = 4 + _tl('doneQuitBtn').length + 4;
-
-  // Tab/arrow navigation between the two screen-5 buttons
-  _s5QuitBtn.key(['tab', 'right'], () => { _s5CustomizeBtn.focus(); screen.render(); });
-  _s5CustomizeBtn.key(['tab', 'right', 'left', 'S-tab'], () => { _s5QuitBtn.focus(); screen.render(); });
+  // Arrow/Tab navigation between the two buttons
+  _s5CustomizeBtn.key(['tab', 'right'], () => { _s5QuitBtn.focus(); screen.render(); });
+  _s5QuitBtn.key(['tab', 'left', 'S-tab'], () => { _s5CustomizeBtn.focus(); screen.render(); });
 
   // -------------------------------------------------------------------------
   // Screen renderers
