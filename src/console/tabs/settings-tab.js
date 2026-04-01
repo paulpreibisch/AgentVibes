@@ -415,6 +415,65 @@ export function createSettingsTab(screen, services) {
     return parts.join(' ');
   }
 
+  // Spawn background music loop for Full Preview; stores proc in _testMusicProc.
+  function _startTestMusic(musicCfg) {
+    const trackId   = musicCfg.track ?? 'agentvibes_soft_flamenco_loop.mp3';
+    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
+    const trackPath = path.resolve(tracksDir, trackId);
+    const safeMusic = path.resolve(tracksDir);
+    const inSafeDir = trackPath.startsWith(safeMusic + path.sep) || trackPath === safeMusic;
+    let accessible  = false;
+    try { fs.accessSync(trackPath); accessible = true; } catch {}
+    if (!inSafeDir || !accessible) return;
+
+    const vol         = musicCfg.volume ?? MUSIC_DEFAULTS.volume;
+    const volFraction = (Math.max(10, Math.min(100, vol)) / 100).toFixed(2);
+    if (_IS_WINDOWS) {
+      const _clampedVol = Math.max(10, Math.min(100, vol));
+      _testMusicProc = spawn('ffplay', ['-nodisp', '-loop', '0', '-loglevel', 'quiet', '-volume', String(_clampedVol), trackPath], _spawnOpts(_testEnv));
+      _testMusicProc.on('error', () => { _testMusicProc = null; });
+    } else {
+      const musicCmd = [
+        `ffplay -nodisp -loop 0 -loglevel quiet -volume ${vol} "${trackPath}"`,
+        `play "${trackPath}" repeat 9999 vol ${volFraction}`,
+        `mpg123 -q --loop -1 "${trackPath}"`,
+      ].join(' 2>/dev/null || ') + ' 2>/dev/null';
+      _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
+    }
+    _testMusicProc?.unref();
+  }
+
+  // Apply reverb preset to tempWav; returns { wavToPlay, processedWav }.
+  // processedWav is non-null only when a processed file was created successfully.
+  function _applyReverbToWav(tempWav, preset) {
+    if (!preset || preset === 'off') return { wavToPlay: tempWav, processedWav: null };
+    const processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
+    if (_IS_WINDOWS) {
+      const FFMPEG_REVERB = {
+        light:     'aecho=0.8:0.88:60:0.4',
+        medium:    'aecho=0.8:0.88:60|120:0.4|0.3',
+        heavy:     'aecho=0.8:0.88:60|120|180:0.4|0.3|0.2',
+        cathedral: 'aecho=0.8:0.88:100|200|300|400:0.3|0.25|0.2|0.15',
+      };
+      const filter = FFMPEG_REVERB[preset];
+      if (filter) spawnSync('ffmpeg', ['-y', '-i', tempWav, '-af', filter, processedWav], { stdio: 'ignore', timeout: 5000, env: _testEnv });
+    } else {
+      const SOX_REVERB = {
+        light:    'reverb 20 50 50',
+        medium:   'reverb 40 50 70',
+        heavy:    'reverb 70 50 100',
+        cathedral: 'reverb 90 30 100',
+      };
+      const soxFx = SOX_REVERB[preset];
+      if (soxFx) spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], { stdio: 'ignore', timeout: 5000, env: _testEnv });
+    }
+    try {
+      if (fs.statSync(processedWav).size > 0) return { wavToPlay: processedWav, processedWav };
+      fs.unlinkSync(processedWav);
+    } catch {}
+    return { wavToPlay: tempWav, processedWav: null };
+  }
+
   // withMusic=true → Full Preview (voice + reverb + background track)
   // withMusic=false → Reverb Test (voice + reverb only, no background music)
   // phraseOverride → speak this text instead of the full _buildPreviewPhrase() summary
@@ -429,33 +488,9 @@ export function createSettingsTab(screen, services) {
     const musicCfg = configService.getConfig().backgroundMusic
       ?? configService.getConfig().music
       ?? {};
-    const trackId   = musicCfg.track ?? 'agentvibes_soft_flamenco_loop.mp3';
-    const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
-    const trackPath = path.resolve(tracksDir, trackId);
-    const safeMusic = path.resolve(tracksDir);
 
     // Start background music loop (Full Preview only — not reverb Test)
-    if (withMusic) {
-      const trackExists = (trackPath.startsWith(safeMusic + path.sep) || trackPath === safeMusic)
-        && (() => { try { fs.accessSync(trackPath); return true; } catch { return false; } })();
-      if (trackExists) {
-        const vol         = musicCfg.volume ?? MUSIC_DEFAULTS.volume;
-        const volFraction = (Math.max(10, Math.min(100, vol)) / 100).toFixed(2);
-        const musicCmd = [
-          `ffplay -nodisp -loop 0 -loglevel quiet -volume ${vol} "${trackPath}"`,
-          `play "${trackPath}" repeat 9999 vol ${volFraction}`,
-          `mpg123 -q --loop -1 "${trackPath}"`,
-        ].join(' 2>/dev/null || ') + ' 2>/dev/null';
-        if (_IS_WINDOWS) {
-          const _clampedVol = Math.max(10, Math.min(100, vol));
-          _testMusicProc = spawn('ffplay', ['-nodisp', '-loop', '0', '-loglevel', 'quiet', '-volume', String(_clampedVol), trackPath], _spawnOpts(_testEnv));
-          _testMusicProc.on('error', () => { _testMusicProc = null; });
-        } else {
-          _testMusicProc = spawn('sh', ['-c', musicCmd], _spawnOpts(_testEnv));
-        }
-        _testMusicProc?.unref();
-      }
-    }
+    if (withMusic) _startTestMusic(musicCfg);
 
     // Lead-in before voice synthesis.
     // Soprano CLI loads the neural model fresh each call (cold-start: 5–120s depending on hardware).
@@ -531,54 +566,7 @@ export function createSettingsTab(screen, services) {
 
         // Apply reverb based on current preset (read from config)
         const preset = configService.getConfig().effects?.reverbPreset ?? EFFECTS_DEFAULTS.reverbPreset;
-
-        let wavToPlay = tempWav;
-        let processedWav = null;
-
-        if (preset && preset !== 'off') {
-          processedWav = path.join(os.tmpdir(), `agentvibes-test-fx-${Date.now()}.wav`);
-          if (_IS_WINDOWS) {
-            // Windows: use ffmpeg aecho (same filter as play-tts.ps1)
-            const FFMPEG_REVERB = {
-              light:     'aecho=0.8:0.88:60:0.4',
-              medium:    'aecho=0.8:0.88:60|120:0.4|0.3',
-              heavy:     'aecho=0.8:0.88:60|120|180:0.4|0.3|0.2',
-              cathedral: 'aecho=0.8:0.88:100|200|300|400:0.3|0.25|0.2|0.15',
-            };
-            const filter = FFMPEG_REVERB[preset];
-            if (filter) {
-              spawnSync('ffmpeg', ['-y', '-i', tempWav, '-af', filter, processedWav], {
-                stdio: 'ignore', timeout: 5000, env: _testEnv,
-              });
-            }
-          } else {
-            // Linux/macOS: use sox
-            const SOX_REVERB = {
-              light:    'reverb 20 50 50',
-              medium:   'reverb 40 50 70',
-              heavy:    'reverb 70 50 100',
-              cathedral: 'reverb 90 30 100',
-            };
-            const soxFx = SOX_REVERB[preset];
-            if (soxFx) {
-              spawnSync('sox', [tempWav, processedWav, ...soxFx.split(' ')], {
-                stdio: 'ignore', timeout: 5000, env: _testEnv,
-              });
-            }
-          }
-          // Use processed wav only if effect succeeded and file has content
-          try {
-            const _stat = fs.statSync(processedWav);
-            if (_stat.size > 0) {
-              wavToPlay = processedWav;
-            } else {
-              fs.unlinkSync(processedWav);
-              processedWav = null;
-            }
-          } catch {
-            processedWav = null;
-          }
-        }
+        const { wavToPlay, processedWav } = _applyReverbToWav(tempWav, preset);
 
         _stopTestSpinner();
         _setTestBtnsLabel('■ Stop');
