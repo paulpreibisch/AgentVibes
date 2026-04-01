@@ -178,6 +178,10 @@ ${_tl('bmadDesc')}
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
 
+  onboardingBox.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+  });
+
   // -------------------------------------------------------------------------
   // BMAD state — section header
 

@@ -768,7 +768,7 @@ function _buildDetailedInstructions(receiverAlias, receiverScript, networkInfo) 
 export function createReceiverTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
-  const { languageService } = services || {};
+  const { languageService, focusMainTabBar } = services || {};
   const _tl = (key) => languageService ? languageService.t(key) : t('en', key);
 
   const AGENTVIBES_DIR = path.join(homedir(), '.agentvibes');
@@ -795,9 +795,14 @@ export function createReceiverTab(screen, services) {
     width: '100%',
     bottom: 2,
     hidden: true,
+    keys: true,
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
     border: { type: 'line' },
     borderStyle: { fg: COLORS.borderFg },
+  });
+
+  box.key(['escape'], () => {
+    if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
   // -------------------------------------------------------------------------
@@ -1472,7 +1477,7 @@ export function createReceiverTab(screen, services) {
     },
     onFocus() { box.focus(); },
     onBlur() {},
-    getFooterText: () => FOOTER_TEXT,
+    getFooterText: () => _tl('receiverFooter'),
     getFooterColor: () => COLORS.footerBg,
   };
 }
