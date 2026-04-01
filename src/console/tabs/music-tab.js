@@ -448,14 +448,15 @@ export function createMusicTab(screen, services) {
   addCustomTrackBtn.left = 26;
 
   // -------------------------------------------------------------------------
-  // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] set as background track  [*] favorite{/${COLORS.dimFg}-fg}`;
+  // Hint text shown in previewLine when the list has focus and nothing is playing.
+  // Getter functions so they re-translate when language changes.
+  const _hintText   = () => `{${COLORS.dimFg}-fg}${_tl('musicHintText')}{/${COLORS.dimFg}-fg}`;
+  const _rowHint    = () => `  {bright-black-fg}${_tl('musicRowHint')}{/bright-black-fg}`;
   let _listFocused = false;
 
   // Inline selection hint appended to the currently highlighted track row.
   // _hintBase stores the item's clean content (no hint, no █) so we never need
   // a sentinel character — PUA chars like U+E000 render as Nerd Font icons.
-  const _ROW_HINT = `  {bright-black-fg}[Space] Play  [Enter] Select  [*] Favorite{/bright-black-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
@@ -476,7 +477,7 @@ export function createMusicTab(screen, services) {
       const hasBlink = c.endsWith(' █');
       if (hasBlink) c = c.slice(0, -2);
       _hintBase = c;
-      items[idx].setContent(c + _ROW_HINT + (hasBlink ? ' █' : ''));
+      items[idx].setContent(c + _rowHint() + (hasBlink ? ' █' : ''));
     } else {
       _hintBase = '';
     }
@@ -532,7 +533,7 @@ export function createMusicTab(screen, services) {
     if (_playingTrackId === trackId) {
       _killPlayingProcess();
       _playingTrackId = null;
-      previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      previewLine.setContent(_listFocused ? _hintText() : '');
       screen.render();
       return;
     }
@@ -547,7 +548,7 @@ export function createMusicTab(screen, services) {
         : 'No MP3 player found. Install ffmpeg: sudo apt install ffmpeg';
       previewLine.setContent(`{red-fg}${installHint}{/red-fg}`);
       screen.render();
-      setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 5000);
+      setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 5000);
       return;
     }
 
@@ -566,7 +567,7 @@ export function createMusicTab(screen, services) {
       if (_playingTrackId === trackId) {
         _playingTrackId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? HINT_TEXT : '');
+        previewLine.setContent(_listFocused ? _hintText() : '');
         refreshDisplay(); // clears (playing) label
       }
     });
@@ -576,7 +577,7 @@ export function createMusicTab(screen, services) {
         _killPlayingProcess();
         _playingTrackId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? HINT_TEXT : '');
+        previewLine.setContent(_listFocused ? _hintText() : '');
       }
     });
   }
@@ -708,7 +709,7 @@ export function createMusicTab(screen, services) {
     function _close() {
       _killPlayingProcess();
       _playingTrackId = null;
-      previewLine.setContent(_listFocused ? HINT_TEXT : '');
+      previewLine.setContent(_listFocused ? _hintText() : '');
       modal.destroy();
       trackList.focus();
       screen.render();
@@ -911,7 +912,7 @@ export function createMusicTab(screen, services) {
     _updateHint(_tlBlink.sel);
     const items = trackList.items;
     if (items[_tlBlink.sel]) items[_tlBlink.sel].setContent((items[_tlBlink.sel].content ?? '') + ' █');
-    if (!_playingTrackId) previewLine.setContent(HINT_TEXT);
+    if (!_playingTrackId) previewLine.setContent(_hintText());
     screen.render();
     _tlBlink.interval = setInterval(_tlTick, 500);
   });

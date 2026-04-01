@@ -592,8 +592,9 @@ export function createVoicesTab(screen, services) {
 
   // Inline selection hint appended to the currently highlighted voice row.
   // _hintBase stores the item's clean content (no hint, no █) — no sentinel needed.
-  const _ROW_HINT_INSTALLED   = `  {bright-black-fg}[Space] Preview  [Enter] Select  [*] Favorite{/bright-black-fg}`;
-  const _ROW_HINT_UNINSTALLED = `  {bright-yellow-fg}[Enter] Download & Install{/bright-yellow-fg}`;
+  // Use getter functions so hints re-translate when language changes.
+  const _rowHintInstalled   = () => `  {bright-black-fg}${_tl('voicesRowHintInstalled')}{/bright-black-fg}`;
+  const _rowHintUninstalled = () => `  {bright-yellow-fg}${_tl('voicesRowHintUninstalled')}{/bright-yellow-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
@@ -601,8 +602,15 @@ export function createVoicesTab(screen, services) {
   function _getRowHint(idx) {
     const voices = _getFilteredVoices();
     const voiceId = voices[idx];
-    if (!voiceId) return _ROW_HINT_INSTALLED;
-    return _isInstalled(voiceId) ? _ROW_HINT_INSTALLED : _ROW_HINT_UNINSTALLED;
+    if (!voiceId) return _rowHintInstalled();
+    return _isInstalled(voiceId) ? _rowHintInstalled() : _rowHintUninstalled();
+  }
+
+  // Translate gender value at display time
+  function _tGender(g) {
+    if (g === 'Female') return _tl('genderFemale');
+    if (g === 'Male')   return _tl('genderMale');
+    return g;
   }
 
   // Known limitation: blink (' █') and hint text can briefly interleave when
@@ -1313,9 +1321,9 @@ export function createVoicesTab(screen, services) {
 
       if (!installed) {
         // Greyed-out row for uninstalled catalog voices
-        return `{bright-black-fg} ${star}  ${name}${gender.padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
+        return `{bright-black-fg} ${star}  ${name}${_tGender(gender).padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
       }
-      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}${gender.padEnd(COL_GENDER_W)}${provider}${isPrev ? ' (playing)' : ''}{/${COLORS.labelFg}-fg}`;
+      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}${_tGender(gender).padEnd(COL_GENDER_W)}${provider}${isPrev ? ` ${_tl('voicePlaying')}` : ''}{/${COLORS.labelFg}-fg}`;
     });
   }
 
@@ -1329,29 +1337,29 @@ export function createVoicesTab(screen, services) {
       const name = cat?.displayName ?? voiceId;
       const gender = cat?.gender ?? '—';
       const model = cat?.type === 'libritts' ? 'LibriTTS High (multi-speaker)' : (cat?.model ?? voiceId);
-      return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
-             `{${Y}-fg}Gender:{/${Y}-fg} ${gender}  ` +
-             `{${Y}-fg}Model:{/${Y}-fg} ${model}  ` +
-             `{bright-yellow-fg}⬇ Press [Enter] to download and install{/bright-yellow-fg}`;
+      return `{${Y}-fg}${_tl('voiceInfoVoice')}{/${Y}-fg} ${name}  ` +
+             `{${Y}-fg}${_tl('voiceInfoGender')}{/${Y}-fg} ${_tGender(gender)}  ` +
+             `{${Y}-fg}${_tl('voiceInfoModel')}{/${Y}-fg} ${model}  ` +
+             `{bright-yellow-fg}${_tl('voiceInfoDownload')}{/bright-yellow-fg}`;
     }
 
     const ms = parseMultiSpeaker(voiceId);
     if (ms.isMultiSpeaker) {
       const name = ms.speakerName.replace(/_/g, ' ');
-      return `{${Y}-fg}Speaker:{/${Y}-fg} ${name}  ` +
-             `{${Y}-fg}Model:{/${Y}-fg} ${ms.model}  ` +
-             `{${Y}-fg}Speaker ID:{/${Y}-fg} ${ms.speakerId ?? '?'}  ` +
-             `{${Y}-fg}Provider:{/${Y}-fg} Piper`;
+      return `{${Y}-fg}${_tl('voiceInfoSpeaker')}{/${Y}-fg} ${name}  ` +
+             `{${Y}-fg}${_tl('voiceInfoModel')}{/${Y}-fg} ${ms.model}  ` +
+             `{${Y}-fg}${_tl('voiceInfoSpeakerId')}{/${Y}-fg} ${ms.speakerId ?? '?'}  ` +
+             `{${Y}-fg}${_tl('voiceInfoProvider')}{/${Y}-fg} Piper`;
     }
     const { lang, name, quality } = parseVoiceId(voiceId);
     if (lang === 'unknown') {
-      return `{${Y}-fg}Voice:{/${Y}-fg} ${voiceId}  {${Y}-fg}Provider:{/${Y}-fg} Piper`;
+      return `{${Y}-fg}${_tl('voiceInfoVoice')}{/${Y}-fg} ${voiceId}  {${Y}-fg}${_tl('voiceInfoProvider')}{/${Y}-fg} Piper`;
     }
-    return `{${Y}-fg}Voice:{/${Y}-fg} ${name}  ` +
-           `{${Y}-fg}Language:{/${Y}-fg} ${lang}  ` +
-           `{${Y}-fg}Quality:{/${Y}-fg} ${quality}  ` +
-           `{${Y}-fg}Provider:{/${Y}-fg} Piper  ` +
-           `{${Y}-fg}ID:{/${Y}-fg} ${voiceId}`;
+    return `{${Y}-fg}${_tl('voiceInfoVoice')}{/${Y}-fg} ${name}  ` +
+           `{${Y}-fg}${_tl('voiceInfoLanguage')}{/${Y}-fg} ${lang}  ` +
+           `{${Y}-fg}${_tl('voiceInfoQuality')}{/${Y}-fg} ${quality}  ` +
+           `{${Y}-fg}${_tl('voiceInfoProvider')}{/${Y}-fg} Piper  ` +
+           `{${Y}-fg}${_tl('voiceInfoId')}{/${Y}-fg} ${voiceId}`;
   }
 
   function refreshDisplay() {
