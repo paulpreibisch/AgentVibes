@@ -3823,6 +3823,76 @@ async function configureSessionStartHook(targetDir, spinner) {
 }
 
 /**
+ * Configure BMAD party mode PostToolUse hook in the global ~/.claude/settings.json.
+ * Copies bmad-party-speak script to ~/.claude/hooks/ (or hooks-windows/ on Windows)
+ * and registers the PostToolUse hook so party mode TTS works in any BMAD project.
+ * @param {string} targetDir - Target installation directory (used to locate source scripts)
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function configurePartyModeHook(targetDir, spinner) {
+  spinner.start('Configuring BMAD party mode TTS hook...');
+  const homeDir = os.homedir();
+  const globalClaudeDir = path.join(homeDir, '.claude');
+  const globalSettingsPath = path.join(globalClaudeDir, 'settings.json');
+
+  try {
+    // Determine platform-specific paths
+    const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
+    const scriptName = isNativeWindows() ? 'bmad-party-speak.ps1' : 'bmad-party-speak.sh';
+    const globalHooksDir = path.join(globalClaudeDir, hooksSubdir);
+    const srcScript = path.join(__dirname, '..', '.claude', hooksSubdir, scriptName);
+    const destScript = path.join(globalHooksDir, scriptName);
+
+    // Copy script to global hooks dir (create dir if needed)
+    await fs.mkdir(globalHooksDir, { recursive: true });
+    await fs.copyFile(srcScript, destScript);
+    if (!isNativeWindows()) {
+      await fs.chmod(destScript, 0o750);
+    }
+
+    // Build the PostToolUse hook command
+    const hookCommand = isNativeWindows()
+      ? `powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\bmad-party-speak.ps1"`
+      : `bash "$HOME/.claude/hooks/bmad-party-speak.sh"`;
+
+    // Read/create global settings.json
+    let settings = {};
+    try {
+      const content = await fs.readFile(globalSettingsPath, 'utf8');
+      settings = JSON.parse(content);
+    } catch {
+      // File missing or invalid — start fresh
+    }
+
+    if (!settings.hooks) settings.hooks = {};
+
+    // Check if PostToolUse hook already registered
+    const existing = settings.hooks.PostToolUse;
+    const alreadyRegistered = Array.isArray(existing) &&
+      existing.some(entry =>
+        Array.isArray(entry.hooks) &&
+        entry.hooks.some(h => h.command && h.command.includes('bmad-party-speak'))
+      );
+
+    if (!alreadyRegistered) {
+      if (!Array.isArray(settings.hooks.PostToolUse)) {
+        settings.hooks.PostToolUse = [];
+      }
+      settings.hooks.PostToolUse.push({
+        hooks: [{ type: 'command', command: hookCommand }]
+      });
+      await fs.writeFile(globalSettingsPath, JSON.stringify(settings, null, 2));
+      spinner.succeed(chalk.green('BMAD party mode TTS hook configured!\n'));
+    } else {
+      // Script still updated above — just note settings unchanged
+      spinner.succeed(chalk.green('BMAD party mode TTS hook up to date\n'));
+    }
+  } catch (error) {
+    spinner.warn(chalk.yellow(`BMAD party mode hook setup skipped: ${error.message}\n`));
+  }
+}
+
+/**
  * Ensure target directory is a git repo (required for Claude Code hook context injection)
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -4781,7 +4851,8 @@ async function updateCommandFiles(targetDir, spinner) {
  * These hooks contain bug fixes (e.g. markdown stripping) that must propagate
  * on every `npx agentvibes update` regardless of target directory.
  */
-const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'session-start-tts.sh'];
+const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
+const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1'];
 
 /**
  * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.
@@ -4811,6 +4882,27 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
       // file not in global dir or src missing — skip silently
     }
   }
+
+  // Also update Windows global hooks-windows dir if present
+  const globalHooksWindowsDir = path.join(homeDirOverride || os.homedir(), '.claude', 'hooks-windows');
+  const srcHooksWindowsDir = path.join(path.dirname(srcHooksDir), 'hooks-windows');
+  try {
+    await fs.access(globalHooksWindowsDir);
+    for (const hook of CRITICAL_HOOKS_WINDOWS) {
+      const destPath = path.join(globalHooksWindowsDir, hook);
+      const srcPath = path.join(srcHooksWindowsDir, hook);
+      try {
+        await fs.access(destPath); // only update if already installed
+        await fs.copyFile(srcPath, destPath);
+        updated++;
+      } catch {
+        // file not in global dir or src missing — skip silently
+      }
+    }
+  } catch {
+    // hooks-windows dir not present — nothing to do
+  }
+
   return updated;
 }
 
@@ -4873,6 +4965,7 @@ async function performUpdateOperations(targetDir, spinner) {
   // Update settings.json
   spinner.text = 'Updating AgentVibes hook configuration...';
   await configureSessionStartHook(targetDir, silentSpinner);
+  await configurePartyModeHook(targetDir, silentSpinner);
   await ensureGitRepo(targetDir, silentSpinner);
 
   // Detect and migrate old configuration
@@ -5050,6 +5143,7 @@ async function install(options = {}) {
     await copyBackgroundMusicFiles(targetDir, silentSpinner);
     await copyConfigFiles(targetDir, silentSpinner);
     await configureSessionStartHook(targetDir, silentSpinner);
+    await configurePartyModeHook(targetDir, silentSpinner);
     await installPluginManifest(targetDir, silentSpinner);
     await ensureGitRepo(targetDir, silentSpinner);
 
@@ -5943,7 +6037,7 @@ export {
   isTermux, isNativeWindows, detectAndNotifyTermux,
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
-  copyConfigFiles, configureSessionStartHook, ensureGitRepo,
+  copyConfigFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
   installPluginManifest, checkAndInstallPiper,
-  updateGlobalHooks, CRITICAL_HOOKS,
+  updateGlobalHooks, CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
 };
