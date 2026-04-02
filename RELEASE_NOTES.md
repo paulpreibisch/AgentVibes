@@ -1,5 +1,30 @@
 # AgentVibes Release Notes
 
+## 🐛 v4.5.7 — Patch Release
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **Background music volume default** — All volume defaults lowered from 70% to 20% across the UI (settings tab, agents tab, music tab, track picker). New installs and newly configured agents will default to a much more reasonable background music level.
+- **bmad-speak volume inheritance** — `bmad-speak.sh` and `bmad-speak.ps1` now read the global `background-music-volume.txt` config file as the fallback volume instead of a hardcoded value. Per-agent background music volume now correctly inherits the global setting when no explicit per-agent override is saved.
+
+---
+
+## 🐛 v4.5.1 — Patch Release
+
+**Release Date:** April 2026
+
+### Bug Fix
+
+- **Music tab preview** — Pressing Space on a track in the Music tab now plays correctly
+  when running `npx agentvibes` from a fresh directory. Previously, if `.claude/audio/tracks/`
+  didn't exist in the current working directory, the track list showed built-in tracks but
+  Space did nothing (the player was spawned against a non-existent path). Now falls back to
+  the package-bundled tracks directory automatically.
+
+---
+
 ## 🌍 v4.5.0 — "Speak Every Language" Release
 
 **Release Date:** April 2026
@@ -28,6 +53,20 @@ Every screen, tab, button, and label in the `npx agentvibes` TUI is now fully tr
 ### 🎙️ Cross-Platform BMAD Speak
 
 BMAD (Build More Architect Dreams) is an AI multi-agent framework where specialized agents — Architect, PM, Developer, QA, and Analyst — collaborate to build software. With this release, every agent in a BMAD party mode session now speaks aloud with their own unique voice, personality, and music on Windows — making each role instantly recognizable.
+
+## 🐛 v4.5.1 — Patch Release
+
+**Release Date:** April 2026
+
+### Bug Fix
+
+- **Music tab preview** — Pressing Space on a track in the Music tab now plays correctly
+  when running `npx agentvibes` from a fresh directory. Previously, if `.claude/audio/tracks/`
+  didn't exist in the current working directory, the track list showed built-in tracks but
+  Space did nothing (the player was spawned against a non-existent path). Now falls back to
+  the package-bundled tracks directory automatically.
+
+---
 
 - `bin/bmad-speak.js` — cross-platform entry point for BMAD agent speech
 - `.claude/hooks-windows/bmad-speak.ps1` — native Windows BMAD speak with per-agent personality routing
