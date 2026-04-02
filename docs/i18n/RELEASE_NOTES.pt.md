@@ -32,3 +32,17 @@ Cada tela, aba, botão e rótulo na TUI do `npx agentvibes` está agora completa
 ### 🧪 Suite de Testes
 
 - 600 testes, 0 falhas
+
+---
+
+## 🐛 v4.5.1 — Lançamento de Correção
+
+**Data de lançamento:** Abril de 2026
+
+### Correção de Bug
+
+- **Pré-visualização da aba Música** — Pressionar Espaço em uma faixa na aba Música agora reproduz corretamente
+  ao executar `npx agentvibes` a partir de um diretório novo. Anteriormente, se `.claude/audio/tracks/`
+  não existia no diretório de trabalho atual, a lista de faixas mostrava as faixas integradas mas
+  Espaço não fazia nada (o player era iniciado contra um caminho inexistente). Agora recorre
+  automaticamente ao diretório de faixas incluído no pacote.

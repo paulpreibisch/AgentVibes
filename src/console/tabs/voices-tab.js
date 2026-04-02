@@ -190,12 +190,13 @@ export const COL_GENDER_W = 10;
 
 // Well-known piper dataset → gender
 const GENDER_MAP = {
+  // Single-speaker datasets
   amy: 'Female', kristin: 'Female', jenny: 'Female', cori: 'Female',
   aria: 'Female', glados: 'Female', litvyak: 'Female', hfc_female: 'Female',
   ljspeech: 'Female',
   alan: 'Male', joe: 'Male', john: 'Male', ryan: 'Male', lessac: 'Male',
   kusal: 'Male', hfc_male: 'Male', danny: 'Male', arctic: 'Male',
-  l2arctic: 'Male', libritts: 'Male', libritts_r: 'Male',
+  l2arctic: 'Male',
   // 16Speakers multi-speaker model (names from speaker_id_map)
   cori_samuel: 'Female', kara_shallenberg: 'Female', kristin_hughes: 'Female',
   maria_kasper: 'Female', rose_ibex: 'Female', owlivia: 'Female',
@@ -203,6 +204,21 @@ const GENDER_MAP = {
   mike_pelton: 'Male', mark_nelson: 'Male', michael_scherer: 'Male',
   james_k_white: 'Male', progressingamerica: 'Male', steve_c: 'Male',
   paul_hampton: 'Male', martin_clifton: 'Male',
+  // LibriTTS / common first names used as multi-speaker speaker IDs
+  anna: 'Female', bella: 'Female', chloe: 'Female', donna: 'Female',
+  ella: 'Female', faith: 'Female', gina: 'Female', holly: 'Female',
+  ivy: 'Female', jane: 'Female', kelly: 'Female', laura: 'Female',
+  mary: 'Female', nina: 'Female', olivia: 'Female', penny: 'Female',
+  rachel: 'Female', sarah: 'Female', tara: 'Female', uma: 'Female',
+  vera: 'Female', wendy: 'Female', yara: 'Female', zoe: 'Female',
+  betty: 'Female', cindy: 'Female', debra: 'Female', erica: 'Female',
+  faye: 'Female', gloria: 'Female', quinn: 'Female',
+  alex: 'Male', ben: 'Male', carl: 'Male', dan: 'Male', evan: 'Male',
+  frank: 'Male', greg: 'Male', hank: 'Male', ivan: 'Male', jake: 'Male',
+  kevin: 'Male', leo: 'Male', mike: 'Male', nathan: 'Male', oscar: 'Male',
+  paul: 'Male', rick: 'Male', sam: 'Male', tom: 'Male', victor: 'Male',
+  will: 'Male', xavier: 'Male', zach: 'Male', adam: 'Male', brad: 'Male',
+  colin: 'Male', derek: 'Male', ethan: 'Male', felix: 'Male',
 };
 
 // Well-known piper dataset → nice display name
@@ -229,9 +245,15 @@ export function inferGender(voiceId, dataset) {
   // Explicit in name
   if (id.includes('_female') || ds.includes('female')) return 'Female';
   if (id.includes('_male')   || ds.includes('male'))   return 'Male';
-  // Lookup by dataset, name segment, or full id (for multi-speaker names)
-  const key = ds || (id.split('-')[1] ?? '');
-  return GENDER_MAP[key] ?? GENDER_MAP[id] ?? '—';
+  // Dataset lookup first
+  if (ds && GENDER_MAP[ds]) return GENDER_MAP[ds];
+  // For multi-speaker speaker names like "Anna-9", strip trailing "-N" suffix
+  // then look up the base name (e.g. "anna")
+  const baseName = id.replace(/-\d+$/, '');
+  if (GENDER_MAP[baseName]) return GENDER_MAP[baseName];
+  // Fall back to middle segment of voice ID (e.g. "ryan" from "en_US-ryan-high")
+  const segment = id.split('-')[1] ?? '';
+  return GENDER_MAP[segment] ?? GENDER_MAP[id] ?? '—';
 }
 
 /**

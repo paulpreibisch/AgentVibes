@@ -42,30 +42,48 @@ export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 38,
-    height: 8,
+    width: 44,
+    height: 11,
     border: { type: 'line' },
     tags: true,
     label: _modalTitle('Music Volume'),
     style: { border: { fg: 'bright-cyan' } },
   });
 
-  const barText = blessed.text({
+  blessed.text({
     parent: box,
     top: 1,
     left: 2,
-    width: 32,
+    width: 38,
+    tags: true,
+    content: '{cyan-fg}Use ← → arrow keys to adjust volume{/cyan-fg}',
+  });
+
+  const barText = blessed.text({
+    parent: box,
+    top: 3,
+    left: 2,
+    width: 38,
     tags: true,
     content: '',
   });
 
-  const hint = blessed.text({
+  blessed.text({
     parent: box,
     top: 5,
-    left: 1,
-    width: 34,
+    left: 2,
+    width: 38,
     tags: true,
-    content: '{#455a64-fg}[←→] ±5  [1-9] type  [Enter] OK  [Esc] Cancel{/#455a64-fg}',
+    content: '{white-fg}[← →] ±5  [0-9] number  [Esc] Cancel{/white-fg}',
+  });
+
+  blessed.text({
+    parent: box,
+    top: 7,
+    left: 2,
+    width: 38,
+    tags: true,
+    content: '{white-fg}[Enter] Confirm  then {bold}{cyan-fg}[Tab]{/cyan-fg}{/bold} → Save{/white-fg}',
   });
 
   function _renderBar() {
@@ -73,10 +91,13 @@ export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
     const empty = 20 - filled;
     const bar = '{bright-cyan-fg}' + '█'.repeat(filled) + '{/bright-cyan-fg}' +
                 '{#263238-fg}' + '░'.repeat(empty) + '{/#263238-fg}';
-    barText.setContent(`{#90a4ae-fg}Volume:{/#90a4ae-fg} ${bar} {bold}${vol}%{/bold}`);
+    barText.setContent(`{white-fg}Volume:{/white-fg} ${bar} {bold}${vol}%{/bold}`);
     screen.render();
   }
   _renderBar();
+  // Take focus so fieldList's key handlers don't fire while this dialog is open
+  box.focus();
+  screen.render();
 
   // Capture keypress directly on screen to avoid input mode issues
   let _digits = '';
@@ -99,8 +120,12 @@ export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
     screen.removeListener('keypress', _onKey);
     box.destroy();
     screen.render();
-    if (confirm && onConfirm) onConfirm(vol);
-    if (onClose) onClose();
+    // Defer callbacks so the Enter keypress finishes propagating before fieldList
+    // regains focus — otherwise the same Enter event re-opens the track picker.
+    setTimeout(() => {
+      if (confirm && onConfirm) onConfirm(vol);
+      if (onClose) onClose();
+    }, 0);
   }
 }
 
@@ -121,7 +146,7 @@ const BUILT_IN_TRACKS = [
  * @param {Function} onSelect      - called with (trackFile, volume)
  * @param {Function} [onClose]     - called after modal fully closes
  */
-export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, onClose) {
+export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, onClose, options = {}) {
   const tracksDir = path.join(process.cwd(), '.claude', 'audio', 'tracks');
   let tracks;
   try {
@@ -271,17 +296,24 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     if (selected) _previewTrack(selected.file);
   });
 
-  // Enter = select track, then prompt for volume
+  // Enter = select track; if skipVolume, return track only, otherwise prompt for volume
   list.key(['enter'], () => {
     const selected = tracks[list.selected];
     if (!selected) return;
-    // Close the track list first (without firing onClose yet), then open volume input
     _killPreview();
     if (list._label2) list._label2.destroy();
-    destroyList(list, screen, null);
-    openVolumeInput(screen, currentVolume ?? 20, (volume) => {
-      onSelect(selected.file, volume);
-    }, onClose);
+    if (options.skipVolume) {
+      destroyList(list, screen, null);
+      setTimeout(() => {
+        onSelect(selected.file);
+        if (onClose) onClose();
+      }, 0);
+    } else {
+      destroyList(list, screen, null);
+      openVolumeInput(screen, currentVolume ?? 20, (volume) => {
+        onSelect(selected.file, volume);
+      }, onClose);
+    }
   });
 
   list.key(['escape', 'q'], () => {

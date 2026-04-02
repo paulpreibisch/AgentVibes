@@ -32,3 +32,17 @@ Chaque écran, onglet, bouton et étiquette dans la TUI `npx agentvibes` est mai
 ### 🧪 Suite de Tests
 
 - 600 tests, 0 échec
+
+---
+
+## 🐛 v4.5.1 — Version Corrective
+
+**Date de sortie :** Avril 2026
+
+### Correction de Bug
+
+- **Aperçu de l'onglet Musique** — Appuyer sur Espace sur une piste dans l'onglet Musique fonctionne maintenant correctement
+  lors de l'exécution de `npx agentvibes` depuis un répertoire vierge. Auparavant, si `.claude/audio/tracks/`
+  n'existait pas dans le répertoire de travail actuel, la liste des pistes affichait les pistes intégrées mais
+  Espace ne faisait rien (le lecteur était lancé contre un chemin inexistant). Maintenant, il se replie
+  automatiquement sur le répertoire de pistes inclus dans le paquet.

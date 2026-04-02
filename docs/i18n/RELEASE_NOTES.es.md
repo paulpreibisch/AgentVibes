@@ -32,3 +32,17 @@ Cada pantalla, pestaña, botón y etiqueta en la TUI de `npx agentvibes` está a
 ### 🧪 Suite de Pruebas
 
 - 600 pruebas, 0 fallos
+
+---
+
+## 🐛 v4.5.1 — Lanzamiento de Parche
+
+**Fecha de lanzamiento:** Abril 2026
+
+### Corrección de Error
+
+- **Vista previa de la pestaña Música** — Presionar Espacio en una pista en la pestaña Música ahora reproduce correctamente
+  al ejecutar `npx agentvibes` desde un directorio nuevo. Anteriormente, si `.claude/audio/tracks/`
+  no existía en el directorio de trabajo actual, la lista de pistas mostraba las pistas integradas pero
+  Espacio no hacía nada (el reproductor se iniciaba contra una ruta inexistente). Ahora recurre
+  automáticamente al directorio de pistas incluido en el paquete.

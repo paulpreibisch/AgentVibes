@@ -32,3 +32,17 @@ Jeder Bildschirm, Tab, Schaltfläche und Beschriftung in der `npx agentvibes` TU
 ### 🧪 Test-Suite
 
 - 600 Tests, 0 Fehler
+
+---
+
+## 🐛 v4.5.1 — Patch-Release
+
+**Veröffentlichungsdatum:** April 2026
+
+### Fehlerbehebung
+
+- **Vorschau im Musik-Tab** — Das Drücken der Leertaste auf einem Track im Musik-Tab funktioniert jetzt korrekt,
+  wenn `npx agentvibes` aus einem leeren Verzeichnis gestartet wird. Bisher wurden die eingebauten Tracks
+  in der Trackliste angezeigt, wenn `.claude/audio/tracks/` im aktuellen Arbeitsverzeichnis nicht vorhanden war,
+  aber die Leertaste hatte keine Wirkung (der Player wurde gegen einen nicht existierenden Pfad gestartet).
+  Jetzt wird automatisch auf das im Paket enthaltene Tracks-Verzeichnis zurückgegriffen.

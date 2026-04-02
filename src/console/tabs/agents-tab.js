@@ -31,6 +31,84 @@ import { spawn } from 'node:child_process';
 // Max pretext length to prevent excessively long TTS utterances
 const MAX_PRETEXT_LENGTH = 200;
 
+/**
+ * Attach a blinking █ cursor to a set of blessed buttons.
+ * Works alongside existing focus/blur handlers (e.g. ►..◄ indicators).
+ * While a spinner is active on a button, blink is paused for that button.
+ * Returns { cleanup, startSpinner(btn, screen), stopSpinner(btn, screen) }.
+ */
+export function attachBtnBlink(btns, screen) {
+  let _interval = null;
+  let _on = true;
+  let _active = null;
+  let _spinning = null;  // button currently showing a spinner
+
+  const _SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  let _spinIdx = 0;
+  let _spinInterval = null;
+
+  // Store original label on each button at attach time — never derive from current content
+  btns.forEach(btn => { btn._blinkBase = btn.content; });
+
+  // Focused with indicator ch right after ►  e.g. ►█Preview◄ / ► Preview◄ (same width)
+  function _focused(base, ch) { return `►${ch}${base}◄`; }
+
+  function _tick() {
+    if (!_active || _active === _spinning) return;
+    _on = !_on;
+    _active.setContent(_focused(_active._blinkBase, _on ? '█' : ' '));
+    screen.render();
+  }
+
+  btns.forEach(btn => {
+    btn.on('focus', () => {
+      _active = btn;
+      _on = true;
+      if (btn !== _spinning) {
+        btn.setContent(_focused(btn._blinkBase, '█'));
+        screen.render();
+      }
+      if (!_interval) _interval = setInterval(_tick, 500);
+    });
+    btn.on('blur', () => {
+      if (_active !== btn) return;
+      _active = null;
+      if (_interval) { clearInterval(_interval); _interval = null; _on = true; }
+      if (btn !== _spinning) {
+        btn.setContent(btn._blinkBase);
+        screen.render();
+      }
+    });
+  });
+
+  function startSpinner(btn) {
+    _spinning = btn;
+    _spinIdx = 0;
+    if (_spinInterval) clearInterval(_spinInterval);
+    _spinInterval = setInterval(() => {
+      _spinIdx = (_spinIdx + 1) % _SPIN.length;
+      btn.setContent(_active === btn
+        ? _focused(btn._blinkBase, _SPIN[_spinIdx])
+        : `${_SPIN[_spinIdx]}${btn._blinkBase}`);
+      screen.render();
+    }, 80);
+  }
+
+  function stopSpinner(btn) {
+    if (_spinInterval) { clearInterval(_spinInterval); _spinInterval = null; }
+    _spinning = null;
+    btn.setContent(_active === btn ? _focused(btn._blinkBase, '█') : btn._blinkBase);
+    screen.render();
+  }
+
+  function cleanup() {
+    if (_interval)    { clearInterval(_interval);    _interval    = null; }
+    if (_spinInterval){ clearInterval(_spinInterval); _spinInterval = null; }
+  }
+
+  return { cleanup, startSpinner, stopSpinner };
+}
+
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
 let blessed;
@@ -547,7 +625,7 @@ ${_tl('bmadDesc')}
       top: 'center',
       left: 'center',
       width: 72,
-      height: 18,
+      height: 19,
       border: { type: 'line' },
       tags: true,
       label: _modalTitle(`${agent.icon || '🧙'} ${agent.displayName} (${agent.title || 'Agent'})`),
@@ -569,9 +647,13 @@ ${_tl('bmadDesc')}
         const emoji = PERSONALITY_EMOJIS[p] || '';
         return `${emoji} ${p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1)}`;
       }},
-      { key: 'music',        label: 'Music',       getValue: () => {
+      { key: 'musicTrack',   label: 'Music Track', getValue: () => {
         if (!draft.backgroundMusic.enabled) return '(disabled)';
-        return `${formatTrackName(draft.backgroundMusic.track)} Vol:${draft.backgroundMusic.volume}%`;
+        return formatTrackName(draft.backgroundMusic.track) || '(none)';
+      }},
+      { key: 'musicVol',    label: 'Music Vol',   getValue: () => {
+        if (!draft.backgroundMusic.enabled) return '(disabled)';
+        return `${draft.backgroundMusic.volume ?? 20}%`;
       }},
     ];
 
@@ -612,7 +694,7 @@ ${_tl('bmadDesc')}
       left: 2,
       right: 2,
       tags: true,
-      content: '{#455a64-fg}[↑↓] Navigate fields  [Enter] Edit field  [Space] Sample  [Esc] Cancel{/#455a64-fg}',
+      content: '{white-fg}[↑↓] Navigate  [Enter] Edit  [Tab] → Preview/Save  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -634,22 +716,20 @@ ${_tl('bmadDesc')}
           hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         },
       });
-      btn.on('focus', () => {
-        const raw = btn.content.replace(/[►◄]/g, '').trim();
-        btn.setContent(`►${raw}◄`);
-        screen.render();
-      });
-      btn.on('blur', () => {
-        const raw = btn.content.replace(/[►◄]/g, '').trim();
-        btn.setContent(raw);
-        screen.render();
-      });
+      // Focus indicator handled by attachBtnBlink
       btn.key(['enter', 'space'], () => onClick());
       btn.on('click', () => onClick());
       return btn;
     }
 
-    const saveBtn = _modalBtn('Save', 4, () => {
+    const previewBtn = _modalBtn('Preview', 4, () => {
+      _sampleAgentWithDraft({ ...agent }, draft, () => {
+        btnBlink.stopSpinner(previewBtn);
+      });
+      btnBlink.startSpinner(previewBtn);
+    });
+
+    const saveBtn = _modalBtn('Save', 18, () => {
       // Only save fields that differ from global
       const toSave = {};
       if (draft.voice && draft.voice !== globalCfg.voice) toSave.voice = draft.voice;
@@ -668,20 +748,26 @@ ${_tl('bmadDesc')}
       _showSavedToast(agent.displayName);
     });
 
-    const resetAllBtn = _modalBtn('Reset to Defaults', 14, () => {
+    const resetAllBtn = _modalBtn('Reset to Defaults', 26, () => {
       voiceStore.resetAgentProfile(agent.id);
       _closeModal();
       refreshDisplay();
     });
 
-    const cancelBtn = _modalBtn('Cancel', 38, _closeModal);
+    const cancelBtn = _modalBtn('Cancel', 50, _closeModal);
+
+    // Blinking █ cursor + preview spinner — reusable across all modal buttons
+    const btnBlink = attachBtnBlink([previewBtn, saveBtn, resetAllBtn, cancelBtn], screen);
 
     function _closeModal() {
       if (_closed) return;
       _closed = true;
       _killPreview();
+      btnBlink.cleanup();
       navigationService?.closeModal();
       destroyList(modal, screen);
+      agentList.focus();
+      screen.render();
     }
 
     // Field editing via Enter
@@ -735,11 +821,24 @@ ${_tl('bmadDesc')}
           });
           break;
 
-        case 'music':
-          openTrackPicker(screen, draft.backgroundMusic.track, draft.backgroundMusic.volume, (track, volume) => {
+        case 'musicTrack':
+          openTrackPicker(screen, draft.backgroundMusic.track, draft.backgroundMusic.volume, (track) => {
             draft.backgroundMusic.track = track;
-            draft.backgroundMusic.volume = volume;
             draft.backgroundMusic.enabled = true;
+            fieldList.setItems(_fieldItems());
+            fieldList.select(idx);
+            fieldList.focus();
+            screen.render();
+          }, () => {
+            fieldList.focus();
+            screen.render();
+          }, { skipVolume: true });
+          break;
+
+        case 'musicVol':
+          openVolumeInput(screen, draft.backgroundMusic.volume, (volume) => {
+            draft.backgroundMusic.volume = volume;
+            if (draft.backgroundMusic.track) draft.backgroundMusic.enabled = true;
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -761,15 +860,50 @@ ${_tl('bmadDesc')}
 
     // Escape = close
     fieldList.key(['escape', 'q'], _closeModal);
+    previewBtn.key(['escape'], _closeModal);
     saveBtn.key(['escape'], _closeModal);
     resetAllBtn.key(['escape'], _closeModal);
     cancelBtn.key(['escape'], _closeModal);
 
-    // Tab navigation within modal
-    fieldList.key(['tab'], () => { saveBtn.focus(); screen.render(); });
-    saveBtn.key(['tab'], () => { resetAllBtn.focus(); screen.render(); });
-    resetAllBtn.key(['tab'], () => { cancelBtn.focus(); screen.render(); });
-    cancelBtn.key(['tab'], () => { fieldList.focus(); screen.render(); });
+    // Tab + arrow navigation within modal
+    fieldList.key(['tab'], () => { previewBtn.focus(); screen.render(); });
+
+    // Wrap: down on last field → focus first button; up on first field → focus first button
+    // One extra arrow press at boundary moves to button row.
+    // Track previous selection so arriving at boundary doesn't immediately jump.
+    let _prevFieldSel = 0;
+    fieldList.key(['down'], () => {
+      const cur = fieldList.selected ?? 0;
+      if (cur === FIELDS.length - 1 && _prevFieldSel === FIELDS.length - 1) {
+        previewBtn.focus(); screen.render();
+      }
+      _prevFieldSel = cur;
+    });
+    fieldList.key(['up'], () => {
+      const cur = fieldList.selected ?? 0;
+      if (cur === 0 && _prevFieldSel === 0) {
+        previewBtn.focus(); screen.render();
+      }
+      _prevFieldSel = cur;
+    });
+
+    // Wrap: up on buttons → back to field list (last/first field respectively)
+    previewBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+    saveBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+    resetAllBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+    cancelBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+
+    previewBtn.key(['tab', 'right'], () => { saveBtn.focus(); screen.render(); });
+    previewBtn.key(['left'], () => { cancelBtn.focus(); screen.render(); });
+
+    saveBtn.key(['tab', 'right'], () => { resetAllBtn.focus(); screen.render(); });
+    saveBtn.key(['left'], () => { previewBtn.focus(); screen.render(); });
+
+    resetAllBtn.key(['tab', 'right'], () => { cancelBtn.focus(); screen.render(); });
+    resetAllBtn.key(['left'], () => { saveBtn.focus(); screen.render(); });
+
+    cancelBtn.key(['tab', 'right'], () => { fieldList.focus(); screen.render(); });
+    cancelBtn.key(['left'], () => { resetAllBtn.focus(); screen.render(); });
 
     fieldList.focus();
     screen.render();
@@ -1047,8 +1181,8 @@ ${_tl('bmadDesc')}
   // -------------------------------------------------------------------------
   // Sample agent with a draft profile (no save) — same full pipeline
 
-  function _sampleAgentWithDraft(agent, draft) {
-    _sampleWithFullProfile(agent, draft);
+  function _sampleAgentWithDraft(agent, draft, onComplete) {
+    _sampleWithFullProfile(agent, draft, onComplete);
   }
 
   // -------------------------------------------------------------------------
@@ -1056,7 +1190,7 @@ ${_tl('bmadDesc')}
   // Writes a temp agent profile JSON, then calls the enhanced TTS pipeline
   // which applies voice + reverb + background music.
 
-  function _sampleWithFullProfile(agent, profile) {
+  function _sampleWithFullProfile(agent, profile, onComplete) {
     _killPreview();
     const gen = ++_playGeneration;
 
@@ -1071,9 +1205,9 @@ ${_tl('bmadDesc')}
     const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
 
     if (isWindows) {
-      // On Windows, synthesize with piper.exe directly then play the wav,
-      // avoiding bash/wsl.exe which opens a visible console window.
-      _sampleWithPiperDirect(gen, voiceId, phrase);
+      // On Windows, call play-tts.ps1 via PowerShell with draft settings patched
+      // in so reverb, background music, and personality are applied.
+      _sampleWithFullEffectsWindows(gen, agent, profile, phrase, onComplete);
     } else {
       // On Linux/macOS/WSL, use play-tts.sh
       const _spawnEnv = buildAudioEnv();
@@ -1178,6 +1312,77 @@ ${_tl('bmadDesc')}
     });
   }
 
+  /** Windows full-effects preview: temporarily patches config files then calls play-tts.ps1 */
+  function _sampleWithFullEffectsWindows(gen, agent, profile, phrase, onComplete) {
+    const _spawnEnv = buildAudioEnv();
+    const homeDir = process.env.USERPROFILE || os.homedir();
+    // Use project-local .claude if it exists, else global ~/.claude
+    const claudeDir = fs.existsSync(path.join(_projectRoot, '.claude'))
+      ? path.join(_projectRoot, '.claude')
+      : path.join(homeDir, '.claude');
+    const configDir  = path.join(claudeDir, 'config');
+    const hooksDir   = path.join(claudeDir, 'hooks-windows');
+    const playTts    = path.join(hooksDir, 'play-tts.ps1');
+    if (!fs.existsSync(playTts)) { _sampleWithPiperDirect(gen, profile.voice || '', phrase); return; }
+
+    // Files to temporarily patch
+    const personalityFile  = path.join(configDir, 'personality.txt');
+    const reverbFile       = path.join(configDir, 'reverb-level.txt');
+    const bgEnabledFile    = path.join(configDir, 'background-music-enabled.txt');
+    const audioEffectsCfg  = path.join(configDir, 'audio-effects.cfg');
+
+    // Save originals
+    const _read = f => { try { return fs.readFileSync(f, 'utf8'); } catch { return null; } };
+    const origPersonality = _read(personalityFile);
+    const origReverb      = _read(reverbFile);
+    const origBgEnabled   = _read(bgEnabledFile);
+    const origAudioEffects = _read(audioEffectsCfg);
+
+    const bgMusic   = profile.backgroundMusic;
+    let tempCfgLine = '';
+
+    try {
+      if (profile.personality && profile.personality !== 'none')
+        fs.writeFileSync(personalityFile, profile.personality);
+      if (profile.reverbPreset)
+        fs.writeFileSync(reverbFile, profile.reverbPreset);
+      if (bgMusic?.enabled && bgMusic?.track) {
+        fs.writeFileSync(bgEnabledFile, 'true');
+        const vol = ((bgMusic.volume ?? 20) / 100).toFixed(2);
+        tempCfgLine = `${agent.id}||${bgMusic.track}|${vol}`;
+        fs.writeFileSync(audioEffectsCfg, `${tempCfgLine}\n${origAudioEffects || ''}`);
+      }
+    } catch { /* degrade gracefully */ }
+
+    const voiceId = profile.voice || '';
+    const psArgs  = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase];
+    if (voiceId) psArgs.push(voiceId);
+
+    const proc = spawn('powershell', psArgs, {
+      stdio: 'ignore', detached: false, windowsHide: true,
+      // CLAUDE_PROJECT_DIR tells play-tts.ps1 to use the project's .claude/config
+      // rather than falling back to ~/.claude where our patches don't exist.
+      env: { ..._spawnEnv, AGENTVIBES_AGENT_NAME: agent.id, CLAUDE_PROJECT_DIR: _projectRoot },
+    });
+    _playingProcess = proc;
+
+    function _restore() {
+      try {
+        if (origPersonality !== null) fs.writeFileSync(personalityFile, origPersonality);
+        else try { fs.unlinkSync(personalityFile); } catch {}
+        if (origReverb !== null) fs.writeFileSync(reverbFile, origReverb);
+        if (bgMusic?.enabled && bgMusic?.track) {
+          if (origBgEnabled !== null) fs.writeFileSync(bgEnabledFile, origBgEnabled);
+          else try { fs.unlinkSync(bgEnabledFile); } catch {}
+          if (origAudioEffects !== null) fs.writeFileSync(audioEffectsCfg, origAudioEffects);
+        }
+      } catch {}
+    }
+
+    proc.on('exit', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });
+    proc.on('error', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });
+  }
+
   // -------------------------------------------------------------------------
   // Auto-assign helpers
 
@@ -1199,9 +1404,10 @@ ${_tl('bmadDesc')}
     grace: 'Female', heather: 'Female', ivy: 'Female', jane: 'Female',
     jenny: 'Female', julia: 'Female', kate: 'Female', laura: 'Female',
     lily: 'Female', maria: 'Female', mary: 'Female', nina: 'Female',
-    olivia: 'Female', paige: 'Female', rachel: 'Female', sally: 'Female',
-    sara: 'Female', sarah: 'Female', sophie: 'Female', tina: 'Female',
-    wendy: 'Female', zoe: 'Female',
+    olivia: 'Female', paige: 'Female', quinn: 'Female', rachel: 'Female',
+    sally: 'Female', sara: 'Female', sarah: 'Female', sophie: 'Female',
+    tina: 'Female', wendy: 'Female', zoe: 'Female',
+    freya: 'Female', saga: 'Female',
     // Male
     alan: 'Male', barry: 'Male', bob: 'Male', carl: 'Male',
     charlie: 'Male', dan: 'Male', david: 'Male', eric: 'Male',

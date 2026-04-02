@@ -441,7 +441,7 @@ if [[ -n "$BG_FILE" ]] && command -v ffmpeg &>/dev/null; then
       TOTAL_DUR=$(awk "BEGIN {printf \"%.2f\", $DURATION + 2}")
       FADE_OUT=$(awk "BEGIN {printf \"%.2f\", $DURATION}")
       timeout 20 ffmpeg -y -i "$PLAY_FILE" -stream_loop -1 -i "$BG_PATH" \
-        -filter_complex "[1:a]volume=${BG_VOLUME},afade=t=in:st=0:d=0.3,afade=t=out:st=${FADE_OUT}:d=2[bg];[0:a]adelay=2000|2000[v];[v][bg]amix=inputs=2:duration=longest[out]" \
+        -filter_complex "[1:a]volume=${BG_VOLUME},afade=t=in:st=0:d=0.3,afade=t=out:st=${FADE_OUT}:d=2[bg];[0:a]adelay=1000|1000,volume=1.5[v];[v][bg]amix=inputs=2:duration=longest:normalize=0[out]" \
         -map "[out]" -t "$TOTAL_DUR" "$FINAL_WAV" </dev/null 2>/dev/null && PLAY_FILE="$FINAL_WAV"
     fi
   fi

@@ -128,58 +128,85 @@ if ($BgEnabled -or $HasReverb) {
     }
 }
 
+# Check for pre-synthesized WAV (party mode optimization — synthesis done before mutex acquisition)
+$PreSynthWav = $env:AGENTVIBES_PRESYNTHESIZED_WAV
+$UsePreSynth = $PreSynthWav -and (Test-Path $PreSynthWav) -and
+    (Get-Item $PreSynthWav -ErrorAction SilentlyContinue).Length -gt 0
+
 # If background music or reverb enabled and ffmpeg available, tell provider to skip playback
 if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     $env:AGENTVIBES_NO_PLAY = "1"
 }
 
-# Call the provider script
+# Call the provider script (skip if using pre-synthesized audio)
 # When post-processing (reverb/music), capture output preserving InformationRecord colors.
 # Otherwise call directly so Write-Host colors pass through to the terminal.
 $NeedsPostProcess = ($BgEnabled -or $HasReverb) -and $HasFfmpeg
-try {
-    if ($NeedsPostProcess) {
-        if ($VoiceOverride) {
-            $providerOutput = & $ProviderScript $Text $VoiceOverride 6>&1 2>&1
-        } else {
-            $providerOutput = & $ProviderScript $Text 6>&1 2>&1
+if ($UsePreSynth) {
+    Write-Host "[SYNTH] Using pre-synthesized audio..." -ForegroundColor Cyan
+    # If no post-processing needed, play the pre-synth file directly and exit
+    if (-not $NeedsPostProcess) {
+        $player = $null
+        try {
+            $player = New-Object System.Media.SoundPlayer $PreSynthWav
+            $player.PlaySync()
+        } catch {
+            Write-Host "[WARNING] Pre-synth playback failed: $_" -ForegroundColor Yellow
+        } finally {
+            if ($player) { $player.Dispose() }
         }
-        # Re-emit preserving colors from InformationRecords (Write-Host output)
-        foreach ($item in $providerOutput) {
-            if ($item -is [System.Management.Automation.InformationRecord]) {
-                $msg = $item.MessageData
-                if ($msg -is [System.Management.Automation.HostInformationMessage]) {
-                    Write-Host $msg.Message -ForegroundColor $msg.ForegroundColor -NoNewline:$msg.NoNewLine
-                    if (-not $msg.NoNewLine) { Write-Host }
+        Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
+        exit 0
+    }
+} else {
+    try {
+        if ($NeedsPostProcess) {
+            if ($VoiceOverride) {
+                $providerOutput = & $ProviderScript $Text $VoiceOverride 6>&1 2>&1
+            } else {
+                $providerOutput = & $ProviderScript $Text 6>&1 2>&1
+            }
+            # Re-emit preserving colors from InformationRecords (Write-Host output)
+            foreach ($item in $providerOutput) {
+                if ($item -is [System.Management.Automation.InformationRecord]) {
+                    $msg = $item.MessageData
+                    if ($msg -is [System.Management.Automation.HostInformationMessage]) {
+                        Write-Host $msg.Message -ForegroundColor $msg.ForegroundColor -NoNewline:$msg.NoNewLine
+                        if (-not $msg.NoNewLine) { Write-Host }
+                    } else {
+                        Write-Host "$item"
+                    }
                 } else {
                     Write-Host "$item"
                 }
+            }
+        } else {
+            if ($VoiceOverride) {
+                & $ProviderScript $Text $VoiceOverride
             } else {
-                Write-Host "$item"
+                & $ProviderScript $Text
             }
         }
-    } else {
-        if ($VoiceOverride) {
-            & $ProviderScript $Text $VoiceOverride
-        } else {
-            & $ProviderScript $Text
-        }
     }
-}
-catch {
-    Write-Host "[ERROR] TTS Error: $_" -ForegroundColor Red
-    Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
-    exit 1
+    catch {
+        Write-Host "[ERROR] TTS Error: $_" -ForegroundColor Red
+        Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
+        exit 1
+    }
 }
 
 # Apply reverb and/or mix with background music
 if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
 
-    # Find the most recent TTS wav file
+    # Find the WAV to post-process: use pre-synthesized file if available, else most recent
     $AudioDir = "$ClaudeDir\audio"
-    $RecentWav = Get-ChildItem -Path $AudioDir -Filter "tts-*.wav" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $RecentWav = if ($UsePreSynth) {
+        Get-Item $PreSynthWav -ErrorAction SilentlyContinue
+    } else {
+        Get-ChildItem -Path $AudioDir -Filter "tts-*.wav" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    }
 
     if ($RecentWav -and $RecentWav.Length -gt 0) {
         $voicePath = $RecentWav.FullName
@@ -282,7 +309,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                     $fadeOutStart = $totalDuration - 2
 
                     # Filter: music fades in 0.5s, voice delayed 2s, music fades out last 2s
-                    $filter = "[0:a]volume=${BgVolume},afade=t=in:d=0.5,afade=t=out:st=${fadeOutStart}:d=2[bg];[1:a]adelay=2000|2000,apad=pad_dur=2[voice];[bg][voice]amix=inputs=2:duration=longest:dropout_transition=2[out]"
+                    $filter = "[0:a]volume=${BgVolume},afade=t=in:d=0.5,afade=t=out:st=${fadeOutStart}:d=2[bg];[1:a]adelay=1000|1000,volume=1.5,apad=pad_dur=2[voice];[bg][voice]amix=inputs=2:duration=longest:dropout_transition=2:normalize=0[out]"
 
                     # Run ffmpeg - use Start-Process to avoid stderr issues with $ErrorActionPreference
                     $ffmpegArgs = "-y -stream_loop -1 -i `"$BgTrackPath`" -i `"$voicePath`" -filter_complex `"$filter`" -map `"[out]`" -t $totalDuration `"$MixedFile`""

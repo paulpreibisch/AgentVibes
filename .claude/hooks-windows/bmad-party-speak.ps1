@@ -108,6 +108,66 @@ try {
         # "high" = full text
     }
 
+    # --- Pre-synthesize WAV before acquiring mutex so synthesis overlaps with previous agent's playback ---
+    $PreSynthWav = $null
+    try {
+        # Resolve agent voice from voice map
+        $VoiceMapLocal  = if ($ProjectRoot) { Join-Path $ProjectRoot ".agentvibes\bmad-voice-map.json" } else { $null }
+        $VoiceMapGlobal = Join-Path $env:USERPROFILE ".agentvibes\bmad-voice-map.json"
+        $VoiceMapFile   = if ($VoiceMapLocal -and (Test-Path $VoiceMapLocal)) { $VoiceMapLocal }
+                          elseif (Test-Path $VoiceMapGlobal) { $VoiceMapGlobal }
+                          else { $null }
+
+        $AgentVoiceName = $null
+        $SpeakerId      = $null
+        if ($VoiceMapFile) {
+            $vm = Get-Content $VoiceMapFile -Raw | ConvertFrom-Json
+            $profile = $vm.agents.$AgentId
+            if ($profile -and $profile.voice) {
+                $raw = $profile.voice
+                if ($raw -match '::') {
+                    $parts = $raw -split '::'
+                    $AgentVoiceName = $parts[0]
+                    if ($parts[1] -match '-(\d+)$') { $SpeakerId = $Matches[1] }
+                } else {
+                    $AgentVoiceName = $raw
+                }
+            }
+        }
+
+        # Locate piper
+        $PiperExe = "$env:LOCALAPPDATA\Programs\Piper\piper.exe"
+        if (-not (Test-Path $PiperExe)) {
+            $found = Get-Command piper.exe -ErrorAction SilentlyContinue
+            if ($found) { $PiperExe = $found.Source }
+        }
+
+        if (Test-Path $PiperExe) {
+            $VoicesDir = "$env:USERPROFILE\.claude\piper-voices"
+            # Fall back to first available voice if agent voice not found
+            if (-not $AgentVoiceName) {
+                $first = Get-ChildItem $VoicesDir -Filter "*.onnx" -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($first) { $AgentVoiceName = $first.BaseName }
+            }
+            if ($AgentVoiceName -and ($AgentVoiceName -match '^[a-zA-Z0-9_\-\.]+$')) {
+                $VoiceModel = Join-Path $VoicesDir "$AgentVoiceName.onnx"
+                if (Test-Path $VoiceModel) {
+                    $AudioDir = "$env:USERPROFILE\.claude\audio"
+                    if (-not (Test-Path $AudioDir)) { New-Item -ItemType Directory -Path $AudioDir -Force | Out-Null }
+                    $PreSynthWav = Join-Path $AudioDir "tts-presynth-$([System.IO.Path]::GetRandomFileName() -replace '\..*').wav"
+                    $piperArgs = @("--model", $VoiceModel, "--output-file", $PreSynthWav)
+                    if ($SpeakerId) { $piperArgs += @("--speaker", $SpeakerId) }
+                    $ResponseText | & $PiperExe @piperArgs 2>$null
+                    if (-not (Test-Path $PreSynthWav) -or (Get-Item $PreSynthWav).Length -eq 0) {
+                        $PreSynthWav = $null
+                    }
+                }
+            }
+        }
+    } catch {
+        $PreSynthWav = $null  # degrade gracefully — will synthesize inside mutex instead
+    }
+
     # --- Speak with queue serialization (named mutex, cross-process) ---
     $mutex = New-Object System.Threading.Mutex($false, "AgentVibesPartyModeTTSQueue")
     try {
@@ -122,9 +182,15 @@ try {
 
         if ($acquired) {
             try {
+                # Pass pre-synthesized WAV path so play-tts.ps1 skips synthesis (reduces gap between agents)
+                if ($PreSynthWav) { $env:AGENTVIBES_PRESYNTHESIZED_WAV = $PreSynthWav }
                 # Pass positional args directly after -File (spaces handled by quoting via array)
                 & powershell -NoProfile -ExecutionPolicy Bypass -File $BmadSpeak $AgentId $ResponseText
             } finally {
+                $env:AGENTVIBES_PRESYNTHESIZED_WAV = ""
+                if ($PreSynthWav -and (Test-Path $PreSynthWav)) {
+                    Remove-Item $PreSynthWav -Force -ErrorAction SilentlyContinue
+                }
                 $mutex.ReleaseMutex()
             }
         } else {

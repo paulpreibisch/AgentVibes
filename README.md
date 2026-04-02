@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.1
 
 ---
 
@@ -37,6 +37,37 @@
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
 Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🌟 NEW IN v4.6.1 — Party Mode Voice Clarity + Agent Config UI Polish
+
+### 🔊 Voice Volume Fixed in Party Mode
+
+- **`normalize=0`** added to ffmpeg `amix` — prevents voices being silenced to 50% when mixed with background music
+- **Voice boost `volume=1.5`** applied to every TTS stream — agents are now loud and clear
+- **Music intro reduced to 1 second** (`adelay=1000`) — less dead air before each agent speaks
+- **Pre-synthesis gap reduction** — WAV files are generated *before* acquiring the mutex, so synthesis overlaps with the previous agent's playback (gap drops from ~4–6s to ~1s)
+
+### 🎛️ BMAD Agent Config — Preview + Split Fields
+
+- **Music Track** and **Music Vol** are now separate fields in the agent editor — each opens its own dialog
+- **Preview button** plays the selected voice with full effects: personality, reverb, background music track and volume
+- **Blinking indicator** (`►█`) highlights the focused button — reuses the shared `attachBtnBlink` utility
+- **Preview spinner** animates while audio is playing
+- **Tab→Save hint** shown in the volume input dialog
+
+### 🚻 Voice Gender Auto-Assign Fixed
+
+- `inferGender` now strips the numeric suffix from LibriTTS speaker names (e.g. `anna-9` → `anna`) before looking up gender
+- Expanded `GENDER_MAP` with 60+ first names covering all bundled voices
+- `libritts` blanket-male override removed — LibriTTS voices are now inferred per-name
+
+### 🐛 Other Fixes
+
+- Volume dialog text now uses `cyan`/`white` — no more invisible-on-dark-background instructions
+- After saving agent settings, focus correctly returns to the agent list (Enter re-opens the agent)
+- Boundary navigation in agent fields no longer jumps to buttons prematurely
 
 ---
 

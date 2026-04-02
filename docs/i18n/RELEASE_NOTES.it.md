@@ -32,3 +32,17 @@ Ogni schermata, tab, pulsante ed etichetta nella TUI di `npx agentvibes` è ora 
 ### 🧪 Suite di Test
 
 - 600 test, 0 fallimenti
+
+---
+
+## 🐛 v4.5.1 — Rilascio Patch
+
+**Data di rilascio:** Aprile 2026
+
+### Correzione di Bug
+
+- **Anteprima del tab Musica** — Premere Spazio su una traccia nel tab Musica ora riproduce correttamente
+  quando si esegue `npx agentvibes` da una directory vuota. In precedenza, se `.claude/audio/tracks/`
+  non esisteva nella directory di lavoro corrente, l'elenco delle tracce mostrava le tracce integrate ma
+  Spazio non faceva nulla (il player veniva avviato contro un percorso inesistente). Ora ricade
+  automaticamente sulla directory delle tracce inclusa nel pacchetto.
