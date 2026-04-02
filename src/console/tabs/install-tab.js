@@ -974,6 +974,7 @@ export function createInstallTab(screen, services) {
   screen.key(['left'], () => {
     if (box.hidden || _checking) return;
     if (_screen === 4) return;
+    if (_screen === 5) return;  // Screen 5: ← handled by button nav
     if (_screen > 0) {
       _screen--;
       _showCurrentScreen();

@@ -99,3 +99,29 @@ describe('createInstallTab — Tab Component Contract', () => {
     assert.strictEqual(tab.getFooterColor(), '#5c6bc0');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: screen 5 left arrow must not jump back to screen 4
+// ---------------------------------------------------------------------------
+
+describe('install-tab screen 5 left arrow guard (regression)', () => {
+  test('source has screen 5 guard in left-arrow handler', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join, dirname } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const __f = fileURLToPath(import.meta.url);
+    const src = readFileSync(join(dirname(__f), '../../src/console/tabs/install-tab.js'), 'utf8');
+
+    // Find the screen.key(['left'], ...) registration line index
+    const lines = src.split('\n');
+    const leftKeyIdx = lines.findIndex(l => l.includes("screen.key(['left']"));
+    assert.ok(leftKeyIdx >= 0, "screen.key(['left']) handler must exist");
+
+    // Grab the next ~10 lines of the handler body
+    const handlerBody = lines.slice(leftKeyIdx, leftKeyIdx + 12).join('\n');
+    assert.ok(
+      handlerBody.includes("_screen === 5") && handlerBody.includes("return"),
+      "left-arrow handler must guard screen 5 with early return to prevent jumping back from completion screen"
+    );
+  });
+});
