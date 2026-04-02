@@ -50,6 +50,7 @@ $VoiceMapGlobal = Join-Path $env:USERPROFILE ".agentvibes\bmad-voice-map.json"
 $VoiceMapFile   = if (Test-Path $VoiceMapLocal) { $VoiceMapLocal } else { $VoiceMapGlobal }
 
 $AgentVoice     = ""
+$AgentPretext   = ""
 $AgentPersonality = ""
 $AgentBgEnabled = $false
 $AgentBgTrack   = ""
@@ -72,24 +73,35 @@ if (Test-Path $_BgVolFile) {
     $AgentBgVolume = "0.20"
 }
 
-if (Test-Path $VoiceMapFile) {
-    try {
-        $VoiceMap = Get-Content $VoiceMapFile -Raw | ConvertFrom-Json
+# Resolve agent ID and display name/title from manifest (needed for default pretext)
+$AgentDisplayName = ""
+$AgentTitle       = ""
 
-        # Resolve agent ID: match canonical ID or display name prefix
+if (Test-Path $ManifestFile) {
+    try {
         $ManifestRows = Import-Csv $ManifestFile -Encoding UTF8
         foreach ($row in $ManifestRows) {
             $id      = ($row.PSObject.Properties | Select-Object -First 1).Value -replace '^"|"$', ''
             $display = ($row.PSObject.Properties | Select-Object -Skip 1 -First 1).Value -replace '^"|"$', ''
+            $title   = ($row.PSObject.Properties | Select-Object -Skip 2 -First 1).Value -replace '^"|"$', ''
             if ($id -ieq $AgentNameOrId -or $display -like "$AgentNameOrId*") {
-                $AgentId = $id
+                $AgentId          = $id
+                $AgentDisplayName = $display
+                $AgentTitle       = $title
                 break
             }
         }
+    } catch { }
+}
+
+if (Test-Path $VoiceMapFile) {
+    try {
+        $VoiceMap = Get-Content $VoiceMapFile -Raw | ConvertFrom-Json
 
         if ($AgentId -and $VoiceMap.agents.$AgentId) {
             $Profile = $VoiceMap.agents.$AgentId
             if ($Profile.voice)       { $AgentVoice       = $Profile.voice }
+            if ($Profile.pretext)     { $AgentPretext     = $Profile.pretext }
             if ($Profile.personality) { $AgentPersonality = $Profile.personality }
             if ($Profile.backgroundMusic) {
                 $AgentBgEnabled = [bool]$Profile.backgroundMusic.enabled
@@ -102,6 +114,16 @@ if (Test-Path $VoiceMapFile) {
         }
     } catch {
         # Silently degrade — TTS will still play with global settings
+    }
+}
+
+# Fall back to default pretext if none stored: "DisplayName, Title here."
+# Matches AgentVoiceStore.getDefaultPretext() in agent-voice-store.js
+if (-not $AgentPretext -and $AgentDisplayName) {
+    if ($AgentTitle) {
+        $AgentPretext = "$AgentDisplayName, $AgentTitle here."
+    } else {
+        $AgentPretext = "$AgentDisplayName here."
     }
 }
 
@@ -163,11 +185,14 @@ if ($AgentBgEnabled -and $AgentBgTrack) {
 }
 
 try {
+    # Prepend pretext if configured (e.g. "As your UX designer")
+    $SpeakText = if ($AgentPretext) { "$AgentPretext. $Dialogue" } else { $Dialogue }
+
     # Speak with agent's voice (or global voice if none configured)
     if ($AgentVoice) {
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $PlayTtsScript $Dialogue $AgentVoice
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $PlayTtsScript $SpeakText $AgentVoice
     } else {
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $PlayTtsScript $Dialogue
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $PlayTtsScript $SpeakText
     }
 } finally {
     # Restore personality

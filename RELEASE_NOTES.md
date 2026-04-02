@@ -1,5 +1,27 @@
 # AgentVibes Release Notes
 
+## 🐛 v4.6.2 — Patch Release
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **BMAD party mode: agents now speak with their unique voices** — The party mode `SKILL.md` was missing TTS wiring entirely. It now creates `.bmad-agent-context` on activation, calls `bmad-speak.ps1` sequentially per agent after each round, and cleans up on exit. When BMAD and AgentVibes are both installed, AgentVibes' skill now correctly overrides the BMAD version.
+
+- **LibriTTS speaker IDs resolved correctly on Windows** — `play-tts-piper.ps1` was extracting the speaker index via a regex on the voice name suffix (e.g. `Holly-7` → `7`). That suffix is a disambiguation counter, not the Piper speaker index. `Holly-7` is actually speaker 322. The script now looks up the real index from `voice-assignments.json`, with a fallback to the patched `.onnx.json`.
+
+- **LibriTTS `parseMultiSpeaker` fallback for unpatched models** — `voices-tab.js` now falls back to `voice-assignments.json` when the `.onnx.json` speaker map hasn't been patched yet with friendly names, preventing silent fallback to speaker 0 (often male) on fresh installs.
+
+- **Agent pretext spoken on Windows** — `bmad-speak.ps1` never read or applied the agent's configured pretext. It now reads `pretext` from the voice map profile, and falls back to the default `"DisplayName, Title here."` computed from the agent manifest — matching the behaviour of `bmad-speak.sh` and `AgentVoiceStore.getDefaultPretext()`.
+
+### User Impact
+
+- Party mode agents will introduce themselves by role before speaking and use their individually configured voices throughout the conversation
+- LibriTTS multi-speaker voices now reliably map to the correct speaker on first install (no manual patching required)
+- No breaking changes — all fixes are silent fallbacks or missing behaviours being added
+
+---
+
 ## ✨ v4.6.0 — Minor Release
 
 **Release Date:** April 2026

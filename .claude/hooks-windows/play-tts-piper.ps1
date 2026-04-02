@@ -70,15 +70,52 @@ elseif (Test-Path $VoiceFile) {
     $VoiceName = (Get-Content $VoiceFile -Raw).Trim()
 }
 
-# Strip display name suffix (e.g. "en_US-libritts-high::Bella-9" -> "en_US-libritts-high")
-# and extract speaker ID if present (works for both override and file)
+# Strip display name suffix (e.g. "en_US-libritts-high::Holly-7" -> "en_US-libritts-high")
+# and resolve the real Piper speaker index.
+# IMPORTANT: The trailing number in a speaker name (e.g. "Holly-7") is a disambiguation
+# suffix, NOT the speaker index. Real index must be looked up from voice-assignments.json.
 if ($VoiceName -match '::') {
     $parts = $VoiceName -split '::'
     $VoiceName = $parts[0]
-    if ($parts.Length -ge 2 -and $parts[1] -match '-(\d+)$') {
-        $env:PIPER_SPEAKER = $Matches[1]
-    } else {
-        Remove-Item env:PIPER_SPEAKER -ErrorAction SilentlyContinue
+    $SpeakerName = if ($parts.Length -ge 2) { $parts[1] } else { "" }
+    Remove-Item env:PIPER_SPEAKER -ErrorAction SilentlyContinue
+
+    if ($SpeakerName) {
+        # Primary: look up in voice-assignments.json catalog (libritts_speakers keyed by speaker index)
+        # Derive project root from this script's location: .claude/hooks-windows/ -> project root
+        $PiperScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+        $PiperProjectRoot = Split-Path -Parent (Split-Path -Parent $PiperScriptRoot)
+        $VoiceAssignmentsPath = Join-Path $PiperProjectRoot "voice-assignments.json"
+        # Fallback: global AgentVibes install if not found in project
+        if (-not (Test-Path $VoiceAssignmentsPath)) {
+            $VoiceAssignmentsPath = Join-Path $env:USERPROFILE "AgentVibes\voice-assignments.json"
+        }
+        $SpeakerResolved = $false
+        if (Test-Path $VoiceAssignmentsPath) {
+            try {
+                $vaData = Get-Content $VoiceAssignmentsPath -Raw | ConvertFrom-Json
+                foreach ($prop in $vaData.libritts_speakers.PSObject.Properties) {
+                    if ($prop.Value.voice_name -eq $SpeakerName) {
+                        $env:PIPER_SPEAKER = $prop.Name
+                        $SpeakerResolved = $true
+                        break
+                    }
+                }
+            } catch { }
+        }
+        # Fallback: check patched speaker_id_map in the .onnx.json
+        if (-not $SpeakerResolved) {
+            $OnnxJsonPath = "$VoicesDir\$VoiceName.onnx.json"
+            if (Test-Path $OnnxJsonPath) {
+                try {
+                    $onnxData = Get-Content $OnnxJsonPath -Raw | ConvertFrom-Json
+                    $speakerIdMap = $onnxData.speaker_id_map
+                    if ($speakerIdMap -and $speakerIdMap.PSObject.Properties[$SpeakerName]) {
+                        $env:PIPER_SPEAKER = [string]$speakerIdMap.PSObject.Properties[$SpeakerName].Value
+                    }
+                } catch { }
+            }
+        }
     }
 } else {
     # No multi-speaker syntax — clear any stale speaker env var

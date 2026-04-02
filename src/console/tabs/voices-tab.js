@@ -343,7 +343,18 @@ export function parseMultiSpeaker(voiceId) {
     const jsonPath = path.join(PIPER_VOICES_DIR, model + '.onnx.json');
     try {
       const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-      const speakerId = data.speaker_id_map?.[speakerName] ?? null;
+      let speakerId = data.speaker_id_map?.[speakerName] ?? null;
+      // Fallback: if the .onnx.json still has raw p-names (not yet patched),
+      // look up the numeric speaker ID from voice-assignments.json catalog.
+      if (speakerId == null && model === 'en_US-libritts-high') {
+        try {
+          const catalogPath = path.resolve(__dirname, '..', '..', '..', 'voice-assignments.json');
+          const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+          const speakers = catalog.libritts_speakers ?? {};
+          const entry = Object.entries(speakers).find(([, e]) => e.voice_name === speakerName);
+          if (entry) speakerId = parseInt(entry[0], 10);
+        } catch { /* non-fatal */ }
+      }
       return { model, speakerId, speakerName, isMultiSpeaker: true };
     } catch {
       return { model, speakerId: null, speakerName, isMultiSpeaker: true };
