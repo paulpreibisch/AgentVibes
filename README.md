@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.5
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6
 
 ---
 
@@ -40,7 +40,29 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or running Ope
 
 ---
 
-## 🌟 NEW IN v4.5 — "Speak Every Language" Release
+## 🌟 NEW IN v4.6 — Party Mode Auto-Install + Volume Fix
+
+### 🎉 BMAD Party Mode TTS — Zero Setup
+
+Every agent now speaks automatically in any BMAD project — no manual hook configuration needed:
+
+- Installer copies `bmad-party-speak.sh` (Linux/macOS/WSL) or `bmad-party-speak.ps1` (Windows) to `~/.claude/hooks/`
+- `PostToolUse` hook registered in `~/.claude/settings.json` automatically
+- `npx agentvibes update` keeps the scripts fresh across all platforms
+
+### 🔊 Background Music Volume Default: 20%
+
+All volume defaults lowered from 70% to 20% — new installs and agents start at a sensible level. `bmad-speak` scripts now inherit the global volume setting instead of ignoring it.
+
+### 🐛 Installer Navigation Fix
+
+Pressing ← on the completion screen no longer jumps back to the installation step.
+
+### 🧪 628 Tests, Zero Failures
+
+---
+
+## 🌟 v4.5 — "Speak Every Language" Release
 
 ### 🌍 Multilingual TUI — 9 Languages
 
