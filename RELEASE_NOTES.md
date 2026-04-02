@@ -1,5 +1,25 @@
 # AgentVibes Release Notes
 
+## ✨ v4.6.0 — Minor Release
+
+**Release Date:** April 2026
+
+### New Features
+
+- **BMAD party mode TTS auto-installs for all platforms** — The installer now automatically copies `bmad-party-speak.sh` (Linux/macOS/WSL) or `bmad-party-speak.ps1` (Windows) to `~/.claude/hooks/` and registers a `PostToolUse` hook in `~/.claude/settings.json`. Party mode agents now speak out of the box in any BMAD project without manual setup. Both scripts are included in critical hooks so `npx agentvibes update` keeps them fresh.
+
+### Bug Fixes
+
+- **Background music volume default** — All volume defaults lowered from 70% to 20% across the UI (settings tab, agents tab, music tab, track picker) and scripts (`audio-processor.sh`, `bmad-speak.sh`, `bmad-speak.ps1`). New installs and newly configured agents default to a much more reasonable level.
+- **bmad-speak volume inheritance** — `bmad-speak.sh` and `bmad-speak.ps1` now read the global `background-music-volume.txt` config file as the fallback volume instead of a hardcoded value.
+- **Installer wizard left arrow** — Pressing ← on the completion screen (screen 5) to move from Done-Quit to Done-Customize More no longer jumps back to the installation step.
+
+### Tests
+
+- 29 new tests: volume default regression guards across all affected files, `configurePartyModeHook` installer coverage (idempotency, settings.json registration, script copying, hook preservation), and a regression test for the screen 5 navigation fix.
+
+---
+
 ## 🐛 v4.5.7 — Patch Release
 
 **Release Date:** April 2026
