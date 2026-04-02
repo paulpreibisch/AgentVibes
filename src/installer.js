@@ -3829,9 +3829,9 @@ async function configureSessionStartHook(targetDir, spinner) {
  * @param {string} targetDir - Target installation directory (used to locate source scripts)
  * @param {Object} spinner - Ora spinner instance
  */
-async function configurePartyModeHook(targetDir, spinner) {
+async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
   spinner.start('Configuring BMAD party mode TTS hook...');
-  const homeDir = os.homedir();
+  const homeDir = homeDirOverride || os.homedir();
   const globalClaudeDir = path.join(homeDir, '.claude');
   const globalSettingsPath = path.join(globalClaudeDir, 'settings.json');
 
