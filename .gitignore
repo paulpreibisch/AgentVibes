@@ -166,3 +166,47 @@ docs/personality-preview-phrases.md
 # Test infrastructure (not part of core package)
 test/installer/
 fix-ssh-keys*.ps1
+
+# One-time migration/utility scripts
+fix-receiver-port.ps1
+fix-*.ps1
+
+# BMAD skills (belong to BMAD package, not AgentVibes)
+# AgentVibes only owns the skills it explicitly provides (e.g. bmad-party-mode)
+.claude/skills/bmad-agent-*/
+.claude/skills/bmad-advanced-elicitation/methods.csv
+.claude/skills/bmad-builder-setup/
+.claude/skills/bmad-check-implementation-readiness/steps/
+.claude/skills/bmad-check-implementation-readiness/templates/
+.claude/skills/bmad-check-implementation-readiness/workflow.md
+.claude/skills/bmad-code-review/steps/
+.claude/skills/bmad-code-review/workflow.md
+.claude/skills/bmad-correct-course/checklist.md
+.claude/skills/bmad-correct-course/workflow.md
+.claude/skills/bmad-create-architecture/
+.claude/skills/bmad-create-epics-and-stories/
+.claude/skills/bmad-create-prd/
+.claude/skills/bmad-create-story/
+.claude/skills/bmad-create-ux-design/
+.claude/skills/bmad-dev-story/
+.claude/skills/bmad-distillator/
+.claude/skills/bmad-document-project/
+.claude/skills/bmad-domain-research/
+.claude/skills/bmad-edit-prd/
+.claude/skills/bmad-generate-project-context/
+.claude/skills/bmad-init/
+.claude/skills/bmad-market-research/
+.claude/skills/bmad-module-builder/
+.claude/skills/bmad-product-brief/
+.claude/skills/bmad-qa-generate-e2e-tests/
+.claude/skills/bmad-quick-dev/
+.claude/skills/bmad-retrospective/
+.claude/skills/bmad-sprint-planning/
+.claude/skills/bmad-sprint-status/
+.claude/skills/bmad-tea/
+.claude/skills/bmad-teach-me-testing/
+.claude/skills/bmad-technical-research/
+.claude/skills/bmad-testarch-*/
+.claude/skills/bmad-validate-prd/
+.claude/skills/bmad-workflow-builder/
+.claude/skills/wds-*/
