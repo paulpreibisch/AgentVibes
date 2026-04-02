@@ -343,7 +343,7 @@ main() {
             if [[ "$_prof_vol" =~ ^[0-9]+$ ]]; then
                 bg_volume=$(awk "BEGIN{printf \"%.2f\", ${_prof_vol}/100}")
             else
-                bg_volume="0.70"
+                bg_volume="0.20"
             fi
         fi
     fi

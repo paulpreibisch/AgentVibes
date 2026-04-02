@@ -200,7 +200,7 @@ function _getMusic(configService) {
   return {
     enabled: music.enabled ?? false,
     track:   music.track ?? BUILT_IN_TRACK_CATALOG[0].id,
-    volume:  music.volume ?? 70,
+    volume:  music.volume ?? 20,
   };
 }
 

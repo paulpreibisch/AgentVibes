@@ -177,6 +177,20 @@ if [[ -n "$AGENT_ID" ]] && [[ -f "$VOICE_MAP_FILE" ]]; then
   IFS='|' read -r PROFILE_VOICE PROFILE_PRETEXT PROFILE_REVERB PROFILE_PERSONALITY PROFILE_MUSIC_TRACK PROFILE_MUSIC_VOLUME PROFILE_MUSIC_ENABLED <<< "$_ALL_FIELDS"
 fi
 
+# Read global background music volume as fallback (stored as 0.0-1.0, convert to 0-100 integer)
+_BG_VOL_FILE="${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}/.claude/config/background-music-volume.txt"
+if [[ ! -f "$_BG_VOL_FILE" ]]; then
+  _BG_VOL_FILE="$HOME/.claude/config/background-music-volume.txt"
+fi
+if [[ -f "$_BG_VOL_FILE" ]]; then
+  GLOBAL_BG_VOLUME=$(_BG_VOL_RAW=$(cat "$_BG_VOL_FILE") node -e "
+    const v = parseFloat(process.env._BG_VOL_RAW);
+    process.stdout.write(isNaN(v) ? '20' : String(Math.round(v * 100)));
+  " 2>/dev/null || echo "20")
+else
+  GLOBAL_BG_VOLUME=20
+fi
+
 # Fallback to bmad-voice-manager.sh if no profile voice found
 AGENT_VOICE="$PROFILE_VOICE"
 AGENT_INTRO="$PROFILE_PRETEXT"
@@ -203,7 +217,7 @@ if [[ -n "$PROFILE_REVERB" ]] || [[ -n "$PROFILE_PERSONALITY" ]] || [[ -n "$PROF
   # Write profile as JSON for reliable parsing downstream
   # SECURITY: Pass values via env vars to prevent shell injection
   _P_REVERB="$PROFILE_REVERB" _P_PERSONALITY="$PROFILE_PERSONALITY" \
-  _P_MUSIC_TRACK="$PROFILE_MUSIC_TRACK" _P_MUSIC_VOL="${PROFILE_MUSIC_VOLUME:-70}" \
+  _P_MUSIC_TRACK="$PROFILE_MUSIC_TRACK" _P_MUSIC_VOL="${PROFILE_MUSIC_VOLUME:-$GLOBAL_BG_VOLUME}" \
   _P_MUSIC_ENABLED="$PROFILE_MUSIC_ENABLED" \
   _P_OUTFILE="$TEMP_PROFILE" node -e "
     const p = {};
@@ -211,7 +225,7 @@ if [[ -n "$PROFILE_REVERB" ]] || [[ -n "$PROFILE_PERSONALITY" ]] || [[ -n "$PROF
     if (process.env._P_PERSONALITY) p.personality = process.env._P_PERSONALITY;
     if (process.env._P_MUSIC_TRACK) p.backgroundMusic = {
       track: process.env._P_MUSIC_TRACK,
-      volume: parseInt(process.env._P_MUSIC_VOL) || 70,
+      volume: parseInt(process.env._P_MUSIC_VOL) || 20,
       enabled: process.env._P_MUSIC_ENABLED === 'true'
     };
     require('fs').writeFileSync(process.env._P_OUTFILE, JSON.stringify(p), { mode: 0o600 });

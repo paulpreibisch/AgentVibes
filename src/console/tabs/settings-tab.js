@@ -108,7 +108,7 @@ const FOOTER_TEXT =
 const EFFECTS_DEFAULTS = Object.freeze({ reverbPreset: 'light' });
 
 // Default background music config
-const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3', volume: 70 });
+const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3', volume: 20 });
 
 // Verbosity display labels
 const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', minimal: 'Minimal', custom: 'Custom' });

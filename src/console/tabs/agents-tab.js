@@ -374,7 +374,7 @@ ${_tl('bmadDesc')}
         ? formatTrackName(profile.backgroundMusic.track)
         : '(global)')).padEnd(COL_MUSIC).slice(0, COL_MUSIC);
       const vol = profile.backgroundMusic?.enabled
-        ? ` ${profile.backgroundMusic.volume ?? 70}%`.padEnd(COL_VOL)
+        ? ` ${profile.backgroundMusic.volume ?? 20}%`.padEnd(COL_VOL)
         : '  —  ';
       const pretext = ' ' + (profile.pretext || '(default)').slice(0, COL_PRETEXT - 1);
       return ` ${icon}${name}${voice}${gender}${provider}${reverb}${music}${vol}  ${pretext}`;
@@ -513,7 +513,7 @@ ${_tl('bmadDesc')}
       personality:     profile.personality   || globalCfg.personality || 'none',
       backgroundMusic: {
         track:   profile.backgroundMusic?.track   || globalCfg.backgroundMusic?.track || '',
-        volume:  profile.backgroundMusic?.volume  ?? globalCfg.backgroundMusic?.volume ?? 70,
+        volume:  profile.backgroundMusic?.volume  ?? globalCfg.backgroundMusic?.volume ?? 20,
         enabled: profile.backgroundMusic?.enabled ?? globalCfg.backgroundMusic?.enabled ?? false,
       },
     });
@@ -534,7 +534,7 @@ ${_tl('bmadDesc')}
       personality:     profile.personality   || globalCfg.personality || 'none',
       backgroundMusic: {
         track:   profile.backgroundMusic?.track   || globalCfg.backgroundMusic?.track || '',
-        volume:  profile.backgroundMusic?.volume  ?? globalCfg.backgroundMusic?.volume ?? 70,
+        volume:  profile.backgroundMusic?.volume  ?? globalCfg.backgroundMusic?.volume ?? 20,
         enabled: profile.backgroundMusic?.enabled ?? globalCfg.backgroundMusic?.enabled ?? false,
       },
     };
@@ -657,7 +657,7 @@ ${_tl('bmadDesc')}
       if (draft.reverbPreset !== (globalCfg.effects?.reverbPreset || 'light')) toSave.reverbPreset = draft.reverbPreset;
       if (draft.personality !== (globalCfg.personality || 'none')) toSave.personality = draft.personality;
       if (draft.backgroundMusic.track !== (globalCfg.backgroundMusic?.track || '') ||
-          draft.backgroundMusic.volume !== (globalCfg.backgroundMusic?.volume ?? 70) ||
+          draft.backgroundMusic.volume !== (globalCfg.backgroundMusic?.volume ?? 20) ||
           draft.backgroundMusic.enabled !== (globalCfg.backgroundMusic?.enabled ?? false)) {
         toSave.backgroundMusic = draft.backgroundMusic;
       }
@@ -1275,7 +1275,7 @@ ${_tl('bmadDesc')}
       const track = shuffled[i % shuffled.length];
       const existing = voiceStore.getAgentProfile(agent.id);
       voiceStore.setAgentProfile(agent.id, {
-        backgroundMusic: { track, volume: existing.backgroundMusic?.volume ?? 70, enabled: true },
+        backgroundMusic: { track, volume: existing.backgroundMusic?.volume ?? 20, enabled: true },
       });
     });
     return true;
@@ -1373,7 +1373,7 @@ ${_tl('bmadDesc')}
 
         case 'setMusic':
           _closeMenu(() => {
-            openTrackPicker(screen, '', 70, (track, volume) => {
+            openTrackPicker(screen, '', 20, (track, volume) => {
               _agents.forEach(agent => {
                 const p = voiceStore.getAgentProfile(agent.id);
                 voiceStore.setAgentProfile(agent.id, {
@@ -1389,7 +1389,7 @@ ${_tl('bmadDesc')}
 
         case 'setVolume':
           _closeMenu(() => {
-            const curVol = voiceStore.getAgentProfile(_agents[0]?.id)?.backgroundMusic?.volume ?? 70;
+            const curVol = voiceStore.getAgentProfile(_agents[0]?.id)?.backgroundMusic?.volume ?? 20;
             openVolumeInput(screen, curVol, (volume) => {
               _agents.forEach(agent => {
                 const p = voiceStore.getAgentProfile(agent.id);

@@ -53,8 +53,24 @@ $AgentVoice     = ""
 $AgentPersonality = ""
 $AgentBgEnabled = $false
 $AgentBgTrack   = ""
-$AgentBgVolume  = "0.25"
 $AgentId        = $null
+
+# Read global background music volume (stored as 0.0-1.0 float)
+$_BgVolFile = Join-Path $ProjectRoot ".claude\config\background-music-volume.txt"
+if (-not (Test-Path $_BgVolFile)) {
+    $_BgVolFile = Join-Path $env:USERPROFILE ".claude\config\background-music-volume.txt"
+}
+if (Test-Path $_BgVolFile) {
+    $_BgVolRaw = (Get-Content $_BgVolFile -Raw -ErrorAction SilentlyContinue).Trim()
+    $_BgVolParsed = 0.0
+    if ([double]::TryParse($_BgVolRaw, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$_BgVolParsed)) {
+        $AgentBgVolume = "{0:F2}" -f $_BgVolParsed
+    } else {
+        $AgentBgVolume = "0.20"
+    }
+} else {
+    $AgentBgVolume = "0.20"
+}
 
 if (Test-Path $VoiceMapFile) {
     try {

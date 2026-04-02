@@ -279,7 +279,7 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     _killPreview();
     if (list._label2) list._label2.destroy();
     destroyList(list, screen, null);
-    openVolumeInput(screen, currentVolume ?? 70, (volume) => {
+    openVolumeInput(screen, currentVolume ?? 20, (volume) => {
       onSelect(selected.file, volume);
     }, onClose);
   });
