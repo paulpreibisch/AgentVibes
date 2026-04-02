@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.2
 
 ---
 
@@ -37,6 +37,15 @@
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
 Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🐛 NEW IN v4.6.2 — Party Mode Voices, LibriTTS Speaker Fix, Agent Pretext
+
+- **Party mode agents now speak in their unique voices** — SKILL.md wired to `bmad-speak.ps1` per agent
+- **LibriTTS speaker IDs resolved correctly** — `Holly-7` is speaker 322, not 7
+- **Agent pretext spoken on Windows** — "Mary, Business Analyst here." before every response
+- **`parseMultiSpeaker` fallback** — works on fresh installs before `.onnx.json` is patched
 
 ---
 
