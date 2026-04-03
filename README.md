@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.4
 
 ---
 
@@ -37,6 +37,14 @@
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
 Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🐛 NEW IN v4.6.4 — CI & macOS Fixes
+
+- **macOS `mktemp` fixed** — 12 calls now use BSD-compatible syntax (XXXXXX at end, then rename to add extension)
+- **CI test suite green** — macOS path symlink, execute permission, and parallel mktemp race all fixed
+- **Party mode voices** — agents use their correct configured voices (v4.6.3 fix also included)
 
 ---
 

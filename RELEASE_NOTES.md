@@ -1,5 +1,23 @@
 # AgentVibes Release Notes
 
+## 🐛 v4.6.4 — Patch Release
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **CI green on macOS** — `mktemp` with a file extension suffix (e.g. `tts-XXXXXX.wav`) works on Linux (GNU mktemp) but silently fails on macOS (BSD mktemp), which requires `XXXXXX` to be at the very end of the template. Fixed all 12 occurrences across `play-tts-piper.sh`, `play-tts-soprano.sh`, `play-tts-macos.sh`, and `audio-processor.sh` by creating the temp file without extension then renaming to add `.wav`/`.aiff`.
+
+- **macOS path symlink in test 213** — macOS transparently resolves `/var/folders/...` to `/private/var/folders/...` via a symlink. The voice-manager replay test was comparing against the unresolved path and failing. Fixed by using `cd && pwd` to get the real path before asserting.
+
+- **`bmad-party-speak.sh` execute permission** — The bash hook lost its `+x` bit, causing `party mode scripts ship with the package` CI test to fail. Restored `100755` mode via `git update-index`.
+
+### User Impact
+
+- No user-facing changes — CI infrastructure fixes only
+
+---
+
 ## 🐛 v4.6.3 — Patch Release
 
 **Release Date:** April 2026
