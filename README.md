@@ -44,7 +44,6 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or running Ope
 
 - **`.gitattributes`** — enforces `LF` for shell scripts/JS/JSON/markdown, `CRLF` for PowerShell; stops `bin/` files showing as modified on Windows
 - **TUI non-interactive hint** — installer header now shows a two-tone hint on row 2: `Skip this UI?` (dim) + `npx agentvibes install --non-interactive` (brighter), matching the `[piper] [en_US-ryan-high]` footer aesthetic
-- **Release process** — mandatory human approval + privacy scan checkpoint before any `git push` or `npm publish`
 
 ---
 
@@ -500,7 +499,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 **[v4.6.5 - Patch Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.5)**
 
-Infrastructure and tooling improvements: consistent line endings via `.gitattributes`, `bin/` execute bits preserved, and a standardized release process with mandatory human approval and privacy scan checkpoints before any push.
+Infrastructure and tooling improvements: consistent line endings via `.gitattributes`, `bin/` execute bits preserved, non-interactive install routing, and TUI header improvements.
 
 ### 🐛 Recent Fixes (v4.6.3 / v4.6.4)
 

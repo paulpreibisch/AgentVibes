@@ -16,7 +16,6 @@
 
 - **`bin/` execute bits restored** — Re-indexed `bin/agent-vibes`, `bin/agentvibes-voice-browser.js`, `bin/mcp-server.js`, and `bin/test-bmad-pr` to ensure consistent line endings; verified all four retain `chmod +x` (`100755` mode).
 
-- **Standardized release process** — `/release` command now documents a privacy scan checkpoint: confirm no API keys, no personal info (email, phone, personal port numbers), before committing. CI must be green before releasing.
 
 ### User Impact
 
