@@ -379,8 +379,8 @@ main() {
     # SECURITY: Use mktemp for unpredictable filenames
     local temp_effects
     local temp_final
-    temp_effects=$(mktemp "$TEMP_DIR/effects-XXXXXX.wav")
-    temp_final=$(mktemp "$TEMP_DIR/final-XXXXXX.wav")
+    _tmp=$(mktemp "$TEMP_DIR/effects-XXXXXX"); temp_effects="${_tmp}.wav"; mv "$_tmp" "$temp_effects"
+    _tmp=$(mktemp "$TEMP_DIR/final-XXXXXX"); temp_final="${_tmp}.wav"; mv "$_tmp" "$temp_final"
 
     # Clean up on exit - use a cleanup function to avoid trap injection
     _cleanup_effects="$temp_effects"

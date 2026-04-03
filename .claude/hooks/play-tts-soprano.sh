@@ -136,7 +136,7 @@ fi
 
 mkdir -p "$AUDIO_DIR"
 # SECURITY: Use mktemp for unpredictable filenames (#130)
-TEMP_FILE=$(mktemp "$AUDIO_DIR/tts-XXXXXX.wav")
+_tmp=$(mktemp "$AUDIO_DIR/tts-XXXXXX"); TEMP_FILE="${_tmp}.wav"; mv "$_tmp" "$TEMP_FILE"
 
 # @function synthesize_speech
 # @intent Generate speech using best available Soprano mode
@@ -187,7 +187,7 @@ fi
 # @intent Compress TTS audio for remote sessions (SSH/RDP)
 # @why Reduces bandwidth and prevents choppy playback
 if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &>/dev/null; then
-  COMPRESSED_FILE=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX.wav")
+  _tmp=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX"); COMPRESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$COMPRESSED_FILE"
   ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
   if [[ -f "$COMPRESSED_FILE" ]]; then
     rm -f "$TEMP_FILE"
@@ -199,7 +199,7 @@ fi
 # @intent Add silence to prevent WSL audio static
 # @why WSL audio subsystem cuts off first ~200ms
 if command -v ffmpeg &>/dev/null; then
-  PADDED_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.wav")
+  _tmp=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX"); PADDED_FILE="${_tmp}.wav"; mv "$_tmp" "$PADDED_FILE"
   ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
     -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
     -map "[out]" -y "$PADDED_FILE" 2>/dev/null

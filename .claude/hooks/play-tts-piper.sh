@@ -282,7 +282,7 @@ else
 fi
 
 mkdir -p "$AUDIO_DIR"
-TEMP_FILE=$(mktemp "$AUDIO_DIR/tts-XXXXXX.wav")
+_tmp=$(mktemp "$AUDIO_DIR/tts-XXXXXX"); TEMP_FILE="${_tmp}.wav"; mv "$_tmp" "$TEMP_FILE"
 
 # @function get_speech_rate
 # @intent Determine speech rate for Piper synthesis
@@ -397,7 +397,7 @@ fi
 # @returns Updates $TEMP_FILE to compressed version
 # @sideeffects Converts to mono 22kHz for lower bandwidth
 if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &> /dev/null; then
-  COMPRESSED_FILE=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX.wav")
+  _tmp=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX"); COMPRESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$COMPRESSED_FILE"
   _CLEANUP_FILES+=("$COMPRESSED_FILE")
   # Convert to mono, 22kHz, 64kbps for remote sessions
   ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
@@ -416,7 +416,7 @@ fi
 # @sideeffects Modifies audio file
 # AI NOTE: Use ffmpeg if available, otherwise skip padding (degraded experience)
 if command -v ffmpeg &> /dev/null; then
-  PADDED_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.wav")
+  _tmp=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX"); PADDED_FILE="${_tmp}.wav"; mv "$_tmp" "$PADDED_FILE"
   _CLEANUP_FILES+=("$PADDED_FILE")
   # Add 200ms of silence at the beginning
   ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
@@ -436,7 +436,7 @@ fi
 # @sideeffects Applies audio effects and background music
 BACKGROUND_MUSIC=""
 if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
-  PROCESSED_FILE=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX.wav")
+  _tmp=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX"); PROCESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$PROCESSED_FILE"
   _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
   PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {

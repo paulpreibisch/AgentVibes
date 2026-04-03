@@ -180,8 +180,8 @@ fi
 mkdir -p "$AUDIO_DIR"
 
 # SECURITY: Use mktemp for unpredictable filenames (#130)
-TEMP_FILE=$(mktemp "$AUDIO_DIR/tts-XXXXXX.aiff")
-FINAL_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.wav")
+_tmp=$(mktemp "$AUDIO_DIR/tts-XXXXXX"); TEMP_FILE="${_tmp}.aiff"; mv "$_tmp" "$TEMP_FILE"
+_tmp=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX"); FINAL_FILE="${_tmp}.wav"; mv "$_tmp" "$FINAL_FILE"
 
 # @function get_speech_rate
 # @intent Determine speech rate for synthesis
@@ -236,7 +236,7 @@ if command -v ffmpeg &> /dev/null; then
   fi
 else
   # No ffmpeg - use AIFF directly (rename for consistency)
-  FINAL_FILE=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX.aiff")
+  _tmp=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX"); FINAL_FILE="${_tmp}.aiff"; mv "$_tmp" "$FINAL_FILE"
   mv "$TEMP_FILE" "$FINAL_FILE"
   TEMP_FILE="$FINAL_FILE"
 fi
