@@ -267,7 +267,9 @@ with intuitive 0.5x-3.0x scaling."
 
 - **Test suite must pass** before proceeding - prevents broken releases
 - **Sonar quality gates must pass** - prevents security issues and poor code quality
-- **Human approval required** before any git operations
+- **Privacy scan must pass** - no API keys, tokens, or personal info in release artifacts
+- **CI must be green** - check GitHub Actions before pushing; if CI is red, fix it first
+- **Human approval required** before any git operations (review README + RELEASE_NOTES.md)
 - **Dry-run preview** of all changes
 - **Rollback support** via git tags
 - **Git status check**: Won't run with uncommitted changes
@@ -306,7 +308,14 @@ When executing this command, Claude MUST follow these steps in order:
    - Example output: "🛡️ Validating quality gates... ✅ All Sonar requirements met"
    - **Note**: Document any known minor issues (like missing strict mode in legacy scripts) if they existed before this release
 
-3. **Analyze Changes**: Git log since last tag, examine diffs
+3. **Privacy Scan** (MANDATORY THIRD STEP):
+   - Scan all changed files for API keys, tokens, or hardcoded passwords
+   - Verify no personal info: real email addresses, phone numbers, personal port numbers (e.g. use `8080` not someone's home server port)
+   - Check README and RELEASE_NOTES.md for any accidental personal info leak
+   - If ANY privacy issue found, STOP and ask the user before proceeding
+   - Example output: "🔒 Privacy scan... ✅ No API keys, tokens, or personal info found"
+
+4. **Analyze Changes**: Git log since last tag, examine diffs
 4. **Generate RELEASE_NOTES.md**: AI-generated summary with categorized changes
 5. **Human Review Checkpoint 1**: Wait for approval of RELEASE_NOTES.md
 6. **Update src/installer.js**:

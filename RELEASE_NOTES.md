@@ -1,5 +1,23 @@
 # AgentVibes Release Notes
 
+## 🔧 v4.6.5 — Patch Release
+
+**Release Date:** April 2026
+
+### Improvements
+
+- **Consistent line endings via `.gitattributes`** — Added `.gitattributes` to enforce `LF` for shell scripts, JS, JSON, and markdown, and `CRLF` for PowerShell scripts. Prevents spurious `bin/` file modifications showing as dirty on Windows due to CRLF noise.
+
+- **`bin/` execute bits restored** — Re-indexed `bin/agent-vibes`, `bin/agentvibes-voice-browser.js`, `bin/mcp-server.js`, and `bin/test-bmad-pr` to ensure consistent line endings; verified all four retain `chmod +x` (`100755` mode).
+
+- **Standardized release process** — `/release` command now documents a privacy scan checkpoint: confirm no API keys, no personal info (email, phone, personal port numbers), before committing. CI must be green before releasing.
+
+### User Impact
+
+- No functional changes — infrastructure and tooling improvements only
+
+---
+
 ## 🐛 v4.6.4 — Patch Release
 
 **Release Date:** April 2026
