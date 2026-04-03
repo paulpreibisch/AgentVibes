@@ -124,7 +124,7 @@ const COLORS = {
   sectionHdr: '#7b1fa2',
   labelFg:    '#e3f2fd',
   valueFg:    '#ffff00',
-  activeFg:   '#ce93d8',
+
   btnDefault: '#6a1b9a',
   btnFocus:   '#2e7d32',  // Green — focused/selected
   btnFocusFg: '#ffffff',
@@ -304,7 +304,7 @@ ${_tl('bmadDesc')}
       fg: COLORS.labelFg,
       bg: COLORS.contentBg,
       border: { fg: COLORS.borderFg },
-      selected: { bg: '#4a148c', fg: COLORS.activeFg, bold: true },
+      selected: { bg: 'blue', fg: 'yellow' },
       item: { fg: COLORS.labelFg },
     },
   });
@@ -681,7 +681,7 @@ ${_tl('bmadDesc')}
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
         border: { fg: '#4a148c' },
-        selected: { bg: '#4a148c', fg: COLORS.activeFg, bold: true },
+        selected: { bg: 'blue', fg: 'yellow' },
         item: { fg: COLORS.labelFg },
       },
     });
@@ -1529,7 +1529,7 @@ ${_tl('bmadDesc')}
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
         border: { fg: COLORS.btnFocus },
-        selected: { bg: '#4a148c', fg: COLORS.activeFg, bold: true },
+        selected: { bg: 'blue', fg: 'yellow' },
         item: { fg: COLORS.labelFg },
       },
     });

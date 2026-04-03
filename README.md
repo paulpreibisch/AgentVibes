@@ -41,15 +41,9 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or running Ope
 
 ---
 
-## 🧭 NEW IN v4.6.6 — TUI Navigation & UX Polish
+## 🧭 NEW IN v4.6.6 — Natural TUI Navigation
 
-- **Settings fully keyboard-navigable** — All sub-tabs (Voice, Effects, Personality, Output, Language) now work correctly with Up/Down navigation
-- **Language selector fixed** — Language list is now a proper focusable list; Up/Down scrolls, Enter applies, boundary keys exit to footer
-- **Down stays within current tab** — Removed cross-tab auto-jump; Down from last content row goes to footer (Full Preview → Save buttons), not next tab
-- **Up from content returns to active sub-tab** — No longer always jumps back to "Voice"
-- **Footer navigation** — Left/Right moves between Full Preview / Save Globally / Save Locally / Cancel Changes
-- **Readme tab fallback** — Shows AgentVibes package README when no project README found
-- **Install tab Escape fixed** — No longer gets stuck in a focus loop
+The Settings TUI now flows the way you'd expect. Down moves top-to-bottom through header → sub-tabs → content → footer. Left/Right switches sub-tabs and moves between footer buttons. Up from content returns to the active sub-tab — not always Voice. The Language tab has a proper scrollable list. Readme falls back to the AgentVibes package README when no local one exists. Escape from the installer no longer gets stuck.
 
 ---
 
@@ -510,9 +504,9 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v4.6.6 - TUI Navigation & UX Polish](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.6)**
+**[v4.6.6 - Natural TUI Navigation](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.6)**
 
-Full keyboard navigation overhaul for the Settings TUI: language selector now works correctly, Down stays within the current sub-tab instead of jumping tabs, Up from content returns to the active sub-tab bar item, footer uses Left/Right, and the Readme tab falls back to the AgentVibes package README.
+The Settings TUI now navigates the way you'd expect — arrow keys flow naturally through the interface, the Language tab has a proper scrollable list, and the Readme tab always has something useful to show.
 
 ### 🐛 Recent Fixes (v4.6.3 / v4.6.4)
 
