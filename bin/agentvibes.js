@@ -67,6 +67,11 @@ export function resolveStartTab(args, configService) {
   const cmd = args[0];
 
   if (cmd === 'install') {
+    // Non-interactive flags → delegate to CLI installer (src/installer.js), not TUI
+    const isNonInteractive = args.includes('--non-interactive') || args.includes('--yes') || args.includes('-y');
+    if (isNonInteractive) {
+      return { cliInstall: true, args: args.slice(1) };
+    }
     return { startTab: 'install' };
   }
 
@@ -137,6 +142,16 @@ if (_argv1 === _thisFile) {
   if (result.error) {
     process.stderr.write(result.error + '\n');
     process.exit(1);
+  }
+
+  if (result.cliInstall) {
+    // Route to CLI installer for non-interactive installs
+    const installerPath = path.resolve(__dirname, '..', 'src', 'installer.js');
+    execFileSync(process.execPath, [installerPath, 'install', ...result.args], {
+      stdio: 'inherit',
+      shell: false,
+    });
+    process.exit(0);
   }
 
   launchConsole({ startTab: result.startTab }).catch(err => {

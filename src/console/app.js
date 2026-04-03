@@ -151,7 +151,7 @@ export class AgentVibesConsole {
       top: 0,
       left: 0,
       width: '100%',
-      height: 3,
+      height: 4,
       tags: false,
       wrap: false,
       scrollable: false,
@@ -189,6 +189,28 @@ export class AgentVibesConsole {
       shrink: true,
       tags: true,
       content: `{#ef9a9a-fg}[Q] Quit{/#ef9a9a-fg}`,
+      style: { bg: COLORS.headerBg },
+    });
+
+    // Row 2: non-interactive mode hint — direct screen child (like tab items) so tags render correctly
+    blessed.text({
+      parent: this.screen,
+      top: 2,
+      left: 2,
+      shrink: true,
+      tags: true,
+      content: `{white-fg}Skip this TUI?{/white-fg}  {yellow-fg}npx agentvibes install --non-interactive{/yellow-fg}`,
+      style: { bg: COLORS.headerBg },
+    });
+
+    // Row 2 (right): sponsor message
+    blessed.text({
+      parent: this.screen,
+      top: 2,
+      right: 2,
+      shrink: true,
+      tags: true,
+      content: `{magenta-fg}\u2661{/magenta-fg} {white-fg}Sponsor this Developer{/white-fg}  {magenta-fg}github.com/sponsors/paulpreibisch{/magenta-fg}`,
       style: { bg: COLORS.headerBg },
     });
 
@@ -281,17 +303,17 @@ export class AgentVibesConsole {
     // Background strip — screen child so blessed uses absolute coordinates directly.
     // Tab items are ALSO screen children (not children of tabBarBox) to avoid the
     // WSL/Windows Terminal parent-relative positioning bug that renders them 1 row
-    // too high (at row 2 instead of row 3), producing a ghost duplicate tab bar.
+    // too high (at row 3 instead of row 4), producing a ghost duplicate tab bar.
     this.tabBarBox = blessed.box({
       parent: this.screen,
-      top: 3,
+      top: 4,
       left: 0,
       width: '100%',
       height: 1,
       style: { bg: COLORS.tabBarBg },
     });
 
-    // One box per tab — direct screen children at absolute top:3. No tag parsing, no wrapping.
+    // One box per tab — direct screen children at absolute top:4. No tag parsing, no wrapping.
     this._tabItems = {};
     this._tabItemXOffsets = {};  // track x positions for label refresh
     let xOffset = 1;
@@ -302,7 +324,7 @@ export class AgentVibesConsole {
       const text = ` [${shortcutKey}] ${label} `;
       const el = blessed.box({
         parent: this.screen,
-        top: 3,
+        top: 4,
         left: xOffset,
         width: text.length,
         height: 1,
@@ -318,14 +340,14 @@ export class AgentVibesConsole {
       xOffset += text.length + 1; // 1-space gap between tabs
     }
 
-    // Right-aligned Quit item — direct screen child at absolute top:3
+    // Right-aligned Quit item — direct screen child at absolute top:4
     const _quitText  = ' [Q] Quit ';
     const _quitBase  = _quitText;
     const _quitBlock = _quitText.slice(0, -1) + '█';
     let _quitInterval = null;
     this._quitItem = blessed.box({
       parent: this.screen,
-      top: 3,
+      top: 4,
       right: 1,
       width: _quitText.length,
       height: 1,
@@ -532,12 +554,12 @@ export class AgentVibesConsole {
   }
 
   // ---------------------------------------------------------------------------
-  // Private: Content area (rows 4..N-1) — tab components mount here
+  // Private: Content area (rows 5..N-1) — tab components mount here
 
   _createContentArea() {
     // bottom: 2 reserves 2 rows at the bottom: context footer (story 6.3) + GitHub footer
     this.contentArea = blessed.box({
-      top: 4,
+      top: 5,
       left: 0,
       width: '100%',
       bottom: 2,
@@ -747,18 +769,18 @@ export class AgentVibesConsole {
       this.screen.render = () => {};
 
       try {
-        // Nuclear clear: wipe the content area (row 4+) to remove stale cell content
-        // from the previous tab. Start at row 4 — header (0-2) and tab bar (3) are
+        // Nuclear clear: wipe the content area (row 5+) to remove stale cell content
+        // from the previous tab. Start at row 5 — header (0-3) and tab bar (4) are
         // static widgets that don't need clearing; wiping them causes the double
-        // tab bar artifact (row 2 of header shows tab bar ghost from prior render).
+        // tab bar artifact (row 3 of header shows tab bar ghost from prior render).
         // blessed's render loop never resets the `lines` buffer before rendering
         // (see: blessed/lib/widgets/screen.js line 733, commented-out clear).
-        this.screen.clearRegion(0, this.screen.cols, 4, this.screen.rows - 2);
+        this.screen.clearRegion(0, this.screen.cols, 5, this.screen.rows - 2);
 
         // Force-invalidate olines for the entire visible area (rows 0..rows-3).
-        // Includes header rows 0-1 so the branded header is always redrawn on
+        // Includes header rows 0-3 so the branded header is always redrawn on
         // tab switches — prevents corruption from persisting across tabs.
-        // Row 2 (header bottom), row 3 (tab bar) and content rows accumulate
+        // Row 3 (header bottom), row 4 (tab bar) and content rows accumulate
         // ghost rendering artifacts — draw() skips them when lines==olines even
         // though the terminal still shows stale chars from earlier renders.
         // Setting attr=-1 is impossible for any real cell, so draw() is forced
@@ -772,13 +794,13 @@ export class AgentVibesConsole {
           orow.dirty = true;
         }
 
-        // Row 2 (header bottom) is never dirty after draw 1 — its content (headerBg+
+        // Row 3 (header bottom) is never dirty after draw 1 — its content (headerBg+
         // spaces) never changes so element.render() never marks it dirty.  The olines
-        // invalidation above sets olines[2][c][0]=-1, but draw() only compares cells
+        // invalidation above sets olines[3][c][0]=-1, but draw() only compares cells
         // when lines[r].dirty is true; a false dirty flag skips the entire row without
         // ever consulting olines.  Force-mark it dirty so draw() emits the explicit
-        // cup(3,1)+headerBg+spaces sequence and overwrites any ghost terminal content.
-        if (this.screen.lines?.[2]) this.screen.lines[2].dirty = true;
+        // cup(4,1)+headerBg+spaces sequence and overwrites any ghost terminal content.
+        if (this.screen.lines?.[3]) this.screen.lines[3].dirty = true;
 
         // Update tab bar, footer, and header status inside suppression — no intermediate render.
         this._updateTabBar(tabId);

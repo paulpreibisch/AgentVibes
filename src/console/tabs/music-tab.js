@@ -284,7 +284,7 @@ export function createMusicTab(screen, services) {
 
   const box = blessed.box({
     parent: screen,
-    top: 4,
+    top: 5,
     left: 0,
     width: '100%',
     bottom: 2,

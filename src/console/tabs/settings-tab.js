@@ -751,7 +751,7 @@ export function createSettingsTab(screen, services) {
 
   const box = blessed.box({
     parent: screen,
-    top: 4,       // Below header (row 0-2) + tab bar (row 3)
+    top: 5,       // Below header (rows 0-3) + tab bar (row 4)
     left: 0,
     width: '100%',
     bottom: 2,    // Above context footer + GitHub footer

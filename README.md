@@ -40,11 +40,24 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or running Ope
 
 ---
 
+## 🔧 NEW IN v4.6.5 — Line Endings, TUI Non-Interactive Hint, Release Process
+
+- **`.gitattributes`** — enforces `LF` for shell scripts/JS/JSON/markdown, `CRLF` for PowerShell; stops `bin/` files showing as modified on Windows
+- **TUI non-interactive hint** — installer header now shows a two-tone hint on row 2: `Skip this UI?` (dim) + `npx agentvibes install --non-interactive` (brighter), matching the `[piper] [en_US-ryan-high]` footer aesthetic
+- **Release process** — mandatory human approval + privacy scan checkpoint before any `git push` or `npm publish`
+
+---
+
 ## 🐛 NEW IN v4.6.4 — CI & macOS Fixes
 
 - **macOS `mktemp` fixed** — 12 calls now use BSD-compatible syntax (XXXXXX at end, then rename to add extension)
-- **CI test suite green** — macOS path symlink, execute permission, and parallel mktemp race all fixed
-- **Party mode voices** — agents use their correct configured voices (v4.6.3 fix also included)
+- **CI test suite green** — macOS path symlink, execute permission, and parallel mktesk race all fixed
+
+---
+
+## 🐛 NEW IN v4.6.3 — Party Mode Correct Voices
+
+- **Party mode agents speak with their configured voices** — `bmad-party-speak.ps1` was extracting the trailing number from the speaker display name suffix (e.g. `14` from `Yara-14`) and passing it as the Piper `--speaker` index. That number is a human-readable disambiguator, not the model index — `Yara-14` is actually speaker 860. Fixed to look up the full name in `speaker_id_map` from the `.onnx.json` file, matching what `play-tts-piper.ps1` already did. Every configured agent was silently playing a different voice.
 
 ---
 
@@ -439,7 +452,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [🖥️ SSH Receiver](#️-agentvibes-receiver--remote-audio-streaming) - Stream audio from headless servers
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v4.3 "Windows Parity" — background music, voice selection, ffmpeg auto-install on Windows
+- [📰 Latest Release](#-latest-release) - v4.6.5 — gitattributes, party mode voice fix, macOS CI fixes
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -485,9 +498,15 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v4.3 - "Windows Parity" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.3)** 🎉
+**[v4.6.5 - Patch Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.5)**
 
-This is the biggest AgentVibes release since the TUI launched in v4.0. Two headline features: **BMAD Party Mode** gives every agent their own voice and music, and the **SSH Receiver** lets you hear your headless server speak on your local machine.
+Infrastructure and tooling improvements: consistent line endings via `.gitattributes`, `bin/` execute bits preserved, and a standardized release process with mandatory human approval and privacy scan checkpoints before any push.
+
+### 🐛 Recent Fixes (v4.6.3 / v4.6.4)
+
+- **Party mode correct voices** — agents now speak with their individually configured voices. `bmad-party-speak.ps1` was extracting the trailing number from the display name suffix (e.g. `14` from `Yara-14`) as the Piper speaker index — wrong. Fixed to look up the full speaker name in `speaker_id_map` from the `.onnx.json` file.
+- **macOS CI green** — `mktemp` with extension suffix (e.g. `tts-XXXXXX.wav`) silently fails on BSD mktemp. Fixed all 12 occurrences across the TTS pipeline scripts.
+- **macOS path symlink test fix** — `/var/folders/...` resolved to `/private/var/folders/...` in test assertions.
 
 ### 🎭 BMAD Party Mode — Multi-Agent Voice Conversations
 

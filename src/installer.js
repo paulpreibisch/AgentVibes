@@ -2669,25 +2669,54 @@ function showWelcome() {
 
 /**
  * Display latest release information box
- * Shown during install and update commands
+ * Reads the first section from RELEASE_NOTES.md so it's always current.
+ * Falls back to a minimal static string if the file is missing.
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v4.0.0 - Interactive Console & Voice Explorer\n\n') +
-    chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('Major release with a full interactive TUI console, voice browser with 914+ voices,\n') +
-    chalk.cyan('and comprehensive platform support. Includes 58 security fixes, reliable TTS hooks,\n') +
-    chalk.cyan('and support for Windows, macOS, Android/Termux, and SSH-remote audio.\n\n') +
-    chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🖥️  Interactive TUI Console - Settings, Voices, Music tabs with live preview\n') +
-    chalk.gray('   🎤 Voice Browser - Browse and preview 914+ Piper TTS voices\n') +
-    chalk.gray('   🔧 Reliable TTS Hooks - JSON context injection, auto git-init\n') +
-    chalk.gray('   🌍 Multi-Platform - Windows, macOS, Android/Termux, SSH-remote\n') +
-    chalk.gray('   🔐 Security Hardened - 58 issues fixed, 180+ security tests\n\n') +
-    chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
-    chalk.gray('🌐 Website: https://agentvibes.org\n') +
-    chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
-    chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-    chalk.gray('Copyright © 2026 Paul Preibisch | Apache-2.0 License');
+  try {
+    const notesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+    const raw = fsSync.readFileSync(notesPath, 'utf8');
+    const lines = raw.split('\n');
+
+    // Find the first ## heading (latest release section)
+    const startIdx = lines.findIndex(l => l.startsWith('## '));
+    if (startIdx < 0) return '';
+
+    // Collect lines until the next ## heading (or end of file)
+    const sectionLines = [];
+    for (let i = startIdx; i < lines.length; i++) {
+      if (i !== startIdx && lines[i].startsWith('## ')) break;
+      sectionLines.push(lines[i]);
+    }
+
+    // Strip markdown syntax from a line for plain display
+    const stripMd = (s) => s
+      .replace(/^#{1,6}\s*/, '')           // ## headings
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+      .replace(/`([^`]+)`/g, '$1')        // `code`
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // [text](url)
+
+    // Render: heading in cyan, bullets as gray, skip blank/hr lines at end
+    return sectionLines
+      .map((line, i) => {
+        if (i === 0) return chalk.cyan.bold(stripMd(line));
+        if (line.startsWith('### ')) return chalk.green.bold(stripMd(line));
+        if (line.startsWith('- ')) return chalk.gray('  ' + stripMd(line));
+        if (line === '---') return '';
+        return chalk.gray(stripMd(line));
+      })
+      .join('\n')
+      .trimEnd() + '\n\n' +
+      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
+      chalk.gray('🌐 Website: https://agentvibes.org\n') +
+      chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
+      chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
+      chalk.gray('Copyright © 2026 Paul Preibisch | Apache-2.0 License');
+  } catch {
+    return chalk.cyan.bold(`📦 AgentVibes v${VERSION}\n`) +
+      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
+      chalk.gray('🌐 Website: https://agentvibes.org');
+  }
 }
 
 /**
@@ -4126,6 +4155,12 @@ async function checkAndInstallPiperWindows(targetDir, options) {
     return;
   }
 
+  // Also check PATH — piper may be installed outside the standard location
+  if (isPiperInstalled()) {
+    console.log(chalk.green('✓ Piper TTS is already available in PATH\n'));
+    return;
+  }
+
   spinner.start('Downloading Piper TTS for Windows...');
   try {
     await fs.mkdir(piperDir, { recursive: true });
@@ -4237,7 +4272,7 @@ async function handleMcpConfiguration(targetDir, options) {
         chalk.white('to your ') + chalk.cyan('mcpServers') + chalk.white(' section:'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 1, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'yellow',
         }
@@ -4260,7 +4295,7 @@ async function handleMcpConfiguration(targetDir, options) {
         chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 1, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'cyan',
         }
@@ -4280,7 +4315,7 @@ async function handleMcpConfiguration(targetDir, options) {
       chalk.white('No ') + chalk.cyan('.mcp.json') + chalk.white(' found in this project.'),
       {
         padding: 1,
-        margin: 1,
+        margin: { top: 1, bottom: 1, left: 0, right: 0 },
         borderStyle: 'round',
         borderColor: 'cyan',
       }
@@ -4315,12 +4350,15 @@ async function handleMcpConfiguration(targetDir, options) {
           chalk.green('The MCP server is now installed and ready to use!'),
           {
             padding: 1,
-            margin: 1,
+            margin: { top: 1, bottom: 1, left: 0, right: 0 },
             borderStyle: 'double',
             borderColor: 'green',
           }
         )
       );
+
+      // Show the installed JSON so users can see exactly what was written
+      console.log(chalk.gray(JSON.stringify(mcpConfig, null, 2)) + '\n');
     } catch (error) {
       console.log(chalk.red(`\n✗ Failed to create .mcp.json: ${error.message}`));
       console.log(chalk.gray('   You can create it manually with the config shown below.\n'));
@@ -4337,7 +4375,7 @@ async function handleMcpConfiguration(targetDir, options) {
         chalk.white('Create a ') + chalk.cyan('.mcp.json') + chalk.white(' file in your project with:'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 1, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'cyan',
         }
@@ -4366,7 +4404,7 @@ async function handleMcpConfiguration(targetDir, options) {
         chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
         {
           padding: 1,
-          margin: 1,
+          margin: { top: 1, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
           borderColor: 'cyan',
         }
@@ -5344,12 +5382,17 @@ Troubleshooting:
     await createDefaultBmadVoiceAssignmentsProactive(targetDir);
     await handleBmadIntegration(targetDir, { ...options, yes: true });
 
-    spinner.succeed(chalk.green('AgentVibes installed successfully!'));
-
     if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
-      console.log(`[AV] Installation complete`);
       console.log(`[AV] Provider: ${selectedProvider} | Location: ${targetDir}/.claude/ | Version: ${VERSION}`);
-    } else {
+    }
+
+    console.log('');
+    spinner.succeed(chalk.green('AgentVibes installed successfully!'));
+    console.log('');
+    console.log(chalk.magenta('  \u2661  Sponsor this Developer  github.com/sponsors/paulpreibisch'));
+    console.log('');
+
+    if (!(options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1')) {
       // Clean final summary
       console.log('');
       console.log(chalk.green.bold('  ✅ Installation Complete'));
