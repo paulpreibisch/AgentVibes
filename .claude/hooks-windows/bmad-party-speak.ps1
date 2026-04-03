@@ -128,7 +128,22 @@ try {
                 if ($raw -match '::') {
                     $parts = $raw -split '::'
                     $AgentVoiceName = $parts[0]
-                    if ($parts[1] -match '-(\d+)$') { $SpeakerId = $Matches[1] }
+                    $SpeakerName = if ($parts.Length -ge 2) { $parts[1] } else { "" }
+                    # NOTE: The suffix number (e.g. "14" in "Yara-14") is a display disambiguator,
+                    # NOT the piper speaker index. Must look up real index from speaker_id_map.
+                    if ($SpeakerName) {
+                        $VoicesDir = "$env:USERPROFILE\.claude\piper-voices"
+                        $OnnxJsonPath = "$VoicesDir\$AgentVoiceName.onnx.json"
+                        if (Test-Path $OnnxJsonPath) {
+                            try {
+                                $onnxData = Get-Content $OnnxJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                                $speakerIdMap = $onnxData.speaker_id_map
+                                if ($speakerIdMap -and $speakerIdMap.PSObject.Properties[$SpeakerName]) {
+                                    $SpeakerId = [string]$speakerIdMap.PSObject.Properties[$SpeakerName].Value
+                                }
+                            } catch { }
+                        }
+                    }
                 } else {
                     $AgentVoiceName = $raw
                 }

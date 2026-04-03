@@ -1,5 +1,24 @@
 # AgentVibes Release Notes
 
+## 🐛 v4.6.3 — Patch Release
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **Party mode pre-synthesis uses wrong speaker for every agent** — `bmad-party-speak.ps1` extracted the trailing number from the display name suffix (e.g. `14` from `Yara-14`) and passed it directly as the piper `--speaker` index. The display suffix is a human-readable disambiguator, not the model index. `Yara-14` is speaker 860, but the bug caused piper to speak as speaker 14 ("Ivy") instead. Every configured agent was silently playing a completely different voice. The fix looks up the full speaker name in `speaker_id_map` from the `.onnx.json` file, matching what `play-tts-piper.ps1` already does correctly. Fixes [#165](https://github.com/paulpreibisch/AgentVibes/issues/165).
+
+### Testing
+
+- **New cross-platform test: `bmad-party-speak-speaker-id.test.js`** — 15 tests covering correct `speaker_id_map` lookup for all 8 configured agents, plain names without suffixes (e.g. `Evan`), missing model graceful degradation, and a regression suite that verifies the correct index disagrees with the naive suffix extraction for every agent.
+
+### User Impact
+
+- Party mode agents now speak with their correct configured voices (the voices shown in the BMAD Agents tab)
+- No configuration changes needed — the fix is automatic
+
+---
+
 ## 🐛 v4.6.2 — Patch Release
 
 **Release Date:** April 2026
