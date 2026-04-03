@@ -39,6 +39,18 @@ For changes outside story development:
 3. Test locally before pushing
 4. Exception: Changes made by `/dev-story` auto-commit
 
+### 🚫 RELEASE: MANDATORY HUMAN APPROVAL BEFORE ANY PUSH
+
+**NEVER run `git push`, `git push --follow-tags`, or `npm publish` during a release without first stopping and showing the user:**
+
+1. The full content of `RELEASE_NOTES.md` for that release
+2. The updated section of `README.md`
+3. Explicitly asking: **"Please review — type 'approve' to push, or request changes."**
+
+**Wait for explicit approval. Do NOT push speculatively.** It doesn't matter how clean the content is. The human-in-the-loop checkpoint is non-negotiable.
+
+This rule was added after Claude pushed v4.6.5 without pausing for review.
+
 ## Security Requirements (SonarCloud Compliance)
 
 ### Core Security Rules (NO EXCEPTIONS)
