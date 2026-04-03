@@ -10,6 +10,8 @@
 
 - **`--non-interactive` routing fix** — `npx agentvibes install --non-interactive` (and `--yes`/`-y`) now correctly bypasses the TUI and routes directly to the CLI installer. Previously the TUI would still launch.
 
+- **Sponsor link in TUI header** — Row 2 of the header now shows a `♡ Sponsor this Developer  github.com/sponsors/paulpreibisch` link on the right side, alongside the non-interactive hint on the left.
+
 - **Consistent line endings via `.gitattributes`** — Added `.gitattributes` to enforce `LF` for shell scripts, JS, JSON, and markdown, and `CRLF` for PowerShell scripts. Prevents spurious `bin/` file modifications showing as dirty on Windows due to CRLF noise.
 
 - **`bin/` execute bits restored** — Re-indexed `bin/agent-vibes`, `bin/agentvibes-voice-browser.js`, `bin/mcp-server.js`, and `bin/test-bmad-pr` to ensure consistent line endings; verified all four retain `chmod +x` (`100755` mode).
