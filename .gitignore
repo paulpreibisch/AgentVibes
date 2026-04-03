@@ -36,6 +36,7 @@ yarn-error.log*
 # User's actual config (don't overwrite customizations)
 .claude/config/audio-effects.cfg
 .claude/settings.local.json
+CLAUDE.md
 .agentvibes/
 .claude/piper-voices/
 .claude/piper-voices-dir.txt
