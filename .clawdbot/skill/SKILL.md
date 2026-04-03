@@ -1,57 +1,20 @@
 ---
 name: agentvibes
-description: 🎤 AgentVibes Voice Management - Manage your text-to-speech voices across multiple providers (Piper TTS, Piper, macOS Say). Switch voices, preview audio, manage providers, add custom voices, and control TTS output.
+description: 🎤 AgentVibes TTS for Claude Code & OpenClaw — Switch voices, set personality, control speed, background music, language learning mode, reverb/effects, and more. Free offline TTS with 914+ Piper voices across 30+ languages. Works on Windows (SAPI/Piper), macOS (Say/Piper), Linux, and Android/Termux. No account or API key required.
 ---
 
 # 🎤 AgentVibes Voice Management
 
-Manage your text-to-speech voices across multiple providers (Piper TTS, Piper, macOS Say).
+Professional text-to-speech for Claude Code and OpenClaw. Free, offline, no account required.
+
+**Providers:** Piper TTS (914+ voices, all platforms) · macOS Say (built-in) · Windows SAPI (zero setup) · Soprano (neural)
 
 ---
 
-## Available Commands
+## Voice Commands
 
-### Voice Control
-
-#### /agent-vibes:mute
-Mute all TTS output (persists across sessions)
-
-- Creates a mute flag that silences all voice output
-- Shows 🔇 indicator when TTS would have played
-
-```bash
-/agent-vibes:mute
-```
-
-#### /agent-vibes:unmute
-Unmute TTS output
-
-- Removes mute flag and restores voice output
-
-```bash
-/agent-vibes:unmute
-```
-
-#### /agent-vibes:list [first|last] [N]
-List all available voices, with optional filtering
-
-```bash
-/agent-vibes:list                    # Show all voices
-/agent-vibes:list first 5            # Show first 5 voices
-/agent-vibes:list last 3             # Show last 3 voices
-```
-
-#### /agent-vibes:preview [first|last] [N]
-Preview voices by playing audio samples
-
-```bash
-/agent-vibes:preview                 # Preview first 3 voices
-/agent-vibes:preview 5               # Preview first 5 voices
-/agent-vibes:preview last 5          # Preview last 5 voices
-```
-
-#### /agent-vibes:switch <voice_name>
-Switch to a different default voice
+### /agent-vibes:switch \<voice_name\>
+Switch to a different voice.
 
 ```bash
 /agent-vibes:switch en_US-amy-medium
@@ -59,183 +22,216 @@ Switch to a different default voice
 /agent-vibes:switch fr_FR-siwis-medium
 ```
 
-#### /agent-vibes:get
-Display the currently selected voice
+### /agent-vibes:list [first|last] [N]
+List available voices.
 
 ```bash
-/agent-vibes:get
+/agent-vibes:list                    # Show all voices
+/agent-vibes:list first 5            # Show first 5
+/agent-vibes:list last 3             # Show last 3
 ```
 
-#### /agent-vibes:add <name> <voice_id>
-Add a new custom voice from your Piper TTS account
+### /agent-vibes:preview [first|last] [N]
+Preview voices with audio samples.
 
 ```bash
-/agent-vibes:add "My Voice" abc123xyz456
+/agent-vibes:preview                 # Preview first 3 voices
+/agent-vibes:preview 5               # Preview first 5
+/agent-vibes:preview last 5          # Preview last 5
 ```
 
-See [Getting Voice IDs](#getting-voice-ids-piper-tts) section below.
-
-#### /agent-vibes:replay [N]
-Replay recently played TTS audio
+### /agent-vibes:sample \<voice_name\>
+Play a sample of a specific voice.
 
 ```bash
-/agent-vibes:replay                  # Replay last audio
-/agent-vibes:replay 1                # Replay most recent
-/agent-vibes:replay 2                # Replay second-to-last
-/agent-vibes:replay 3                # Replay third-to-last
+/agent-vibes:sample en_US-ryan-high
 ```
 
-Keeps last 10 audio files in history.
+### /agent-vibes:get
+Show the currently active voice.
 
-#### /agent-vibes:set-pretext <word>
-Set a prefix word/phrase for all TTS messages
+### /agent-vibes:set-favorite-voice
+Mark current voice as your favorite.
+
+---
+
+## Personality & Style
+
+### /agent-vibes:personality [name|list|add|edit|get|reset]
+Set a personality style for TTS output.
 
 ```bash
-/agent-vibes:set-pretext AgentVibes  # All TTS starts with "AgentVibes:"
-/agent-vibes:set-pretext "Project Alpha" # Custom phrase
-/agent-vibes:set-pretext ""          # Clear pretext
+/agent-vibes:personality list          # Show available personalities
+/agent-vibes:personality sarcastic     # Switch to sarcastic style
+/agent-vibes:personality dramatic      # Switch to dramatic style
+/agent-vibes:personality reset         # Back to default
 ```
 
-Saved locally in `.agentvibes/config/agentvibes.json`
+### /agent-vibes:set-pretext \<phrase\>
+Add a spoken prefix before every TTS message.
+
+```bash
+/agent-vibes:set-pretext "AgentVibes"   # Speaks "AgentVibes: ..." before each message
+/agent-vibes:set-pretext ""              # Clear pretext
+```
+
+---
+
+## Speed & Effects
+
+### /agent-vibes:set-speed \<speed\>
+Control speech rate (0.5x – 3.0x).
+
+```bash
+/agent-vibes:set-speed 1.0             # Normal speed
+/agent-vibes:set-speed 1.5             # 50% faster
+/agent-vibes:set-speed 0.8             # Slower
+```
+
+### /agent-vibes:effects [reverb|echo|pitch|eq|reset]
+Configure voice effects.
+
+```bash
+/agent-vibes:effects reverb hall       # Hall reverb
+/agent-vibes:effects reverb none       # No reverb
+/agent-vibes:effects reset             # Clear all effects
+```
+
+---
+
+## Background Music
+
+### /agent-vibes:background-music [on|off|status|list|switch]
+Toggle or change background music played under TTS.
+
+```bash
+/agent-vibes:background-music on       # Enable background music
+/agent-vibes:background-music off      # Disable
+/agent-vibes:background-music list     # Show available tracks
+/agent-vibes:background-music switch jazz  # Switch to jazz track
+```
+
+---
+
+## Verbosity
+
+### /agent-vibes:verbosity [low|medium|high]
+Control how much Claude speaks while working.
+
+```bash
+/agent-vibes:verbosity low             # Brief acknowledgments only
+/agent-vibes:verbosity medium          # Key decisions (default)
+/agent-vibes:verbosity high            # Full reasoning
+```
+
+---
+
+## Mute / Replay
+
+### /agent-vibes:mute / /agent-vibes:unmute
+Silence or restore TTS output (persists across sessions).
+
+### /agent-vibes:replay [N]
+Replay recent audio (last 10 kept).
+
+```bash
+/agent-vibes:replay                    # Replay last audio
+/agent-vibes:replay 2                  # Replay second-to-last
+```
+
+---
+
+## Language & Learning
+
+### /agent-vibes:language \<lang\>
+Set your native language.
+
+```bash
+/agent-vibes:language english
+/agent-vibes:language japanese
+```
+
+### /agent-vibes:learn [on|off]
+Enable language learning mode — Claude speaks in both your native and target language.
+
+```bash
+/agent-vibes:learn on
+/agent-vibes:learn off
+```
+
+### /agent-vibes:translate \<text\>
+Translate and speak text in the target language.
 
 ---
 
 ## Provider Management
 
-#### /agent-vibes:provider list
-Show all available TTS providers
+### /agent-vibes:provider [list|switch|info]
 
 ```bash
 /agent-vibes:provider list
-```
-
-#### /agent-vibes:provider switch <name>
-Switch between providers
-
-```bash
-/agent-vibes:provider switch piper    # Piper TTS - Free, offline, 50+ voices
-/agent-vibes:provider switch macos    # macOS Say - Native macOS voices (Mac only)
-```
-
-#### /agent-vibes:provider info <name>
-Get details about a specific provider
-
-```bash
-/agent-vibes:provider info piper
-/agent-vibes:provider info macos
+/agent-vibes:provider switch piper     # Piper TTS (free, offline, 914+ voices)
+/agent-vibes:provider switch macos     # macOS Say (Mac only)
+/agent-vibes:provider switch sapi      # Windows SAPI (Windows only, zero setup)
+/agent-vibes:provider switch soprano   # Soprano (neural)
 ```
 
 ---
 
 ## Providers
 
-| Provider | Platform | Cost | Voices | Quality |
-|----------|----------|------|--------|---------|
-| **Piper TTS** | All platforms (Linux, macOS, WSL) | Free | 50+ in 30+ languages | ⭐⭐⭐⭐ |
-| **macOS Say** | macOS only | Free (built-in) | 100+ system voices | ⭐⭐⭐⭐ |
-
-**On macOS**, the native `say` provider is automatically detected and recommended!
-
----
-
-## Getting Voice IDs (Piper TTS)
-
-To add your own custom Piper TTS voices:
-
-1. Go to https://piper.io/app/voice-library
-2. Select or create a voice
-3. Copy the voice ID (15-30 character alphanumeric string)
-4. Use `/agent-vibes:add` to add it:
-
-```bash
-/agent-vibes:add "My Custom Voice" xyz789abc123def456
-```
+| Provider | Platform | Cost | Voices |
+|----------|----------|------|--------|
+| **Piper TTS** | All platforms | Free, offline | 914+ in 30+ languages |
+| **macOS Say** | macOS only | Free (built-in) | 100+ system voices |
+| **Windows SAPI** | Windows only | Free (built-in) | System voices, zero setup |
+| **Soprano** | All platforms | Free | Neural voices |
 
 ---
 
-## Default Voices
+## Miscellaneous
 
-### Piper TTS (Free & Offline)
+### /agent-vibes:whoami
+Show current AgentVibes configuration.
 
-**English (US):**
-- en_US-lessac-medium (default male voice)
-- en_US-amy-medium (friendly female)
-- en_US-ryan-high (high quality male)
-- en_US-libritts-high (multiple speakers)
+### /agent-vibes:version
+Show installed version.
 
-**English (UK):**
-- en_GB-alan-medium (British male)
-- en_GB-jenny_dioco-medium (British female)
+### /agent-vibes:update
+Update AgentVibes to the latest version.
 
-**Romance Languages:**
-- es_ES-davefx-medium (Spanish - Spain)
-- es_MX-claude-high (Spanish - Mexico)
-- fr_FR-siwis-medium (French female)
-- fr_FR-gilles-low (French male)
-- it_IT-riccardo-x_low (Italian male)
-- pt_BR-faber-medium (Portuguese - Brazilian)
+### /agent-vibes:show / /agent-vibes:hide
+Show or hide the AgentVibes status indicator.
 
-**Germanic Languages:**
-- de_DE-thorsten-medium (German male)
-- de_DE-eva_k-x_low (German female)
-
-**Asian Languages:**
-- ja_JP-ayanami-medium (Japanese female)
-- zh_CN-huayan-x_low (Chinese female)
-- ko_KR-kss-medium (Korean female)
-
-### macOS Say (100+ Built-in)
-- Samantha
-- Alex
-- Daniel
-- Victoria
-- Karen
-- Moira
-- And 100+ more system voices
+### /agent-vibes:cleanup / /agent-vibes:clean
+Remove cached audio files.
 
 ---
 
-## Quick Examples
+## Default Voices (Piper TTS — Free & Offline)
 
-### Switch to a different voice
-```bash
-/agent-vibes:switch en_US-lessac-medium    # Clear male voice
-/agent-vibes:switch en_US-ryan-high        # High quality male
-/agent-vibes:switch en_GB-alan-medium      # British male
-```
+**English (US):** en_US-lessac-medium · en_US-amy-medium · en_US-ryan-high · en_US-libritts-high (914 speakers)
 
-### Preview before choosing
-```bash
-/agent-vibes:preview 5                     # Preview first 5 voices
-/agent-vibes:preview last 3                # Preview last 3 voices
-```
+**English (UK):** en_GB-alan-medium · en_GB-jenny_dioco-medium
 
-### Add your custom Piper voice
-```bash
-/agent-vibes:add "My Voice" abc123xyz456
-/agent-vibes:switch My Voice
-```
+**French:** fr_FR-siwis-medium · fr_FR-gilles-low
 
-### Switch providers
-```bash
-/agent-vibes:provider switch macos    # Use native macOS voices
-/agent-vibes:provider switch piper    # Switch back to Piper
-```
+**German:** de_DE-thorsten-medium · de_DE-eva_k-x_low
 
-### Mute/Unmute
-```bash
-/agent-vibes:mute                     # Silent mode
-/agent-vibes:unmute                   # Restore voice
-```
+**Spanish:** es_ES-davefx-medium · es_MX-claude-high
+
+**Japanese:** ja_JP-ayanami-medium · **Chinese:** zh_CN-huayan-x_low · **Korean:** ko_KR-kss-medium
+
+**+ 900 more** across 30+ languages. All voices are downloaded from [HuggingFace](https://huggingface.co/rhasspy/piper-voices) — no account required.
 
 ---
 
-## Tips & Tricks
+## Tips
 
-- **Preview first**: Always use `/agent-vibes:preview` before switching to a new voice
-- **Provider switching**: Some voices are only available on specific providers
-- **Voice history**: Use `/agent-vibes:replay` to hear the last 10 TTS messages
-- **Custom pretext**: Set a pretext to brand all your responses (e.g., "AgentVibes:")
-- **Mute for focus**: Use `/agent-vibes:mute` during intensive work sessions
+- **Preview first**: Use `/agent-vibes:preview` before committing to a voice
+- **Verbosity**: Set to `low` for focused work, `high` for full narration
+- **BMAD party mode**: Each agent gets their own voice, music, and personality
+- **Replay**: Use `/agent-vibes:replay` to re-hear the last 10 responses
+- **Speed**: Combine with personality for a fully custom TTS character
 
 Enjoy your TTS experience! 🎵

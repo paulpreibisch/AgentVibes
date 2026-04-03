@@ -5352,6 +5352,12 @@ Troubleshooting:
       await fs.writeFile(langConfigPath, lang, { mode: 0o600 });
     }
 
+    // Default translation to auto: syncs with BMAD communication_language if set, otherwise no translation
+    const translateFile = path.join(claudeDir, 'tts-translate-to.txt');
+    try { await fs.access(translateFile); } catch {
+      await fs.writeFile(translateFile, 'auto', { mode: 0o600 });
+    }
+
     // Apply verbosity, personality, pretext
     await fs.writeFile(path.join(claudeDir, 'tts-verbosity.txt'), userConfig.verbosity);
     if (userConfig.personality && userConfig.personality !== 'none') {

@@ -1760,37 +1760,57 @@ export function createSettingsTab(screen, services) {
     style: { fg: COLORS.valueFg, bg: COLORS.contentBg },
   });
 
-  let _langListIdx = 0;
+  // Visible list height — cap at 10 rows (fits standard 24-row terminals with headers)
+  const LANG_LIST_HEIGHT = Math.min(SUPPORTED_LANGUAGES.length, 10);
 
-  const languageList = blessed.box({
+  // blessed.list: natively focusable, handles selection highlight, scrolling.
+  // keys:true needed so keypress events propagate to the element (keyable=true).
+  // We immediately removeAllListeners('keypress') to strip blessed's built-in up/down nav —
+  // our manual .key() handlers (registered on 'key down'/'key up') are the sole navigators.
+  const languageList = blessed.list({
     parent: box,
     top: 7,
     left: 4,
-    width: 40,
-    height: Math.min(SUPPORTED_LANGUAGES.length + 2, 12),
+    width: 44,
+    height: LANG_LIST_HEIGHT + 2,  // +2 for border
+    keys: true,
+    mouse: true,
+    tags: false,
+    items: SUPPORTED_LANGUAGES.map(l => l.name),
+    style: {
+      selected: { bg: 'green', fg: 'white', bold: true },
+      item: { fg: 'white' },
+      border: { fg: 'cyan' },
+      focus: { border: { fg: 'yellow' } },
+    },
+    border: { type: 'line' },
+    scrollable: true,
+    scrollbar: { style: { bg: 'blue' } },
+  });
+  // Strip blessed's built-in keypress nav (up/down/j/k/etc.) — our .key() handlers take over.
+  // .key() registers on 'key <name>' events (not 'keypress'), so they survive this removal.
+  languageList.removeAllListeners('keypress');
+
+  // Hint shown below the list
+  const langHint = blessed.text({
+    parent: box,
+    top: 7 + LANG_LIST_HEIGHT + 3,
+    left: 4,
+    content: '{gray-fg}↑↓ navigate · Enter to apply{/gray-fg}',
     tags: true,
-    content: '',
-    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+    style: { bg: COLORS.contentBg },
   });
 
-  function _renderLangList() {
-    const lines = SUPPORTED_LANGUAGES.map((l, i) =>
-      i === _langListIdx
-        ? `{green-fg}► ${l.name}{/green-fg}`
-        : `  ${l.name}`
-    );
-    languageList.setContent(lines.join('\n'));
-  }
-
+  // Apply button — kept for mouse users; keyboard users just press Enter on the list
   const langApplyBtn = _createButton(box, screen, '✓ Apply Language', COLORS, () => {
-    const selected = SUPPORTED_LANGUAGES[_langListIdx];
+    const selected = SUPPORTED_LANGUAGES[languageList.selected ?? 0];
     if (selected && services.languageService) {
       services.languageService.setLang(selected.value);
       refreshLanguageDisplay();
       _showNotice(screen, `Language: ${selected.name}`);
     }
   }, { bg: '#2e7d32' });
-  langApplyBtn.top = 7 + Math.min(SUPPORTED_LANGUAGES.length + 2, 12) + 1;
+  langApplyBtn.top = 7 + LANG_LIST_HEIGHT + 5;
   langApplyBtn.left = 4;
 
   function refreshLanguageDisplay() {
@@ -1798,19 +1818,11 @@ export function createSettingsTab(screen, services) {
     const found = SUPPORTED_LANGUAGES.find(l => l.value === currentLang);
     languageCurrentValue.setContent(found ? found.name : currentLang);
     const idx = SUPPORTED_LANGUAGES.findIndex(l => l.value === currentLang);
-    if (idx >= 0) _langListIdx = idx;
-    _renderLangList();
+    if (idx >= 0) languageList.select(idx);
     screen.render();
   }
 
-  // Key navigation for language list
-  box.key(['up', 'down'], (ch, key) => {
-    if (_activeSubTab !== 'language') return;
-    if (key.name === 'up') _langListIdx = Math.max(0, _langListIdx - 1);
-    if (key.name === 'down') _langListIdx = Math.min(SUPPORTED_LANGUAGES.length - 1, _langListIdx + 1);
-    _renderLangList();
-    screen.render();
-  });
+  // Key navigation wired after _navigateRow is defined (see below)
 
   // -------------------------------------------------------------------------
   // Display state + button-level focus navigation (story 7.6)
@@ -1847,8 +1859,7 @@ export function createSettingsTab(screen, services) {
     language: [
       languageSectionHeader,
       languageCurrentLabel, languageCurrentValue,
-      languageList,
-      langApplyBtn,
+      languageList, langHint, langApplyBtn,
     ],
   };
 
@@ -1858,7 +1869,7 @@ export function createSettingsTab(screen, services) {
     effects:     [[reverbChangeBtn, reverbTestBtn], [trackChangeBtn, musicToggleBtn, musicTestBtn], [volumeChangeBtn]],
     personality: [[verbosityChangeBtn], [personalityChangeBtn, personalityTestBtn], [introEditBtn, introClearBtn]],
     output:      [[audioDstChangeBtn], [audioSshEditBtn, audioStreamModeBtn]],
-    language:    [[langApplyBtn]],
+    language:    [[languageList], [langApplyBtn]],
   };
 
   const _subTabItemsArray = SUB_TABS.map(id => _subTabItemsMap[id]);
@@ -1906,7 +1917,7 @@ export function createSettingsTab(screen, services) {
 
   const _buttons = [
     _subTabItemsMap.voice, _subTabItemsMap.effects,
-    _subTabItemsMap.personality, _subTabItemsMap.output,
+    _subTabItemsMap.personality, _subTabItemsMap.output, _subTabItemsMap.language,
     switchBtn, changeBtn, playBtn,
     reverbChangeBtn, reverbTestBtn,
     trackChangeBtn, musicToggleBtn, musicTestBtn,
@@ -1914,6 +1925,7 @@ export function createSettingsTab(screen, services) {
     verbosityChangeBtn, personalityChangeBtn, personalityTestBtn,
     introEditBtn, introClearBtn,
     audioDstChangeBtn, audioSshEditBtn, audioStreamModeBtn,
+    languageList, langApplyBtn,
     fullPreviewBtn,
     saveGloballyBtn, saveLocallyBtn, cancelChangesBtn,
   ];
@@ -2030,74 +2042,6 @@ export function createSettingsTab(screen, services) {
       return;
     }
 
-    // _rows layout: [0]=sub-tab bar, [1..lastContent]=per-tab rows, then 3 shared bottom rows
-    const BOTTOM_ROWS = 2; // [fullPreviewBtn], [saveGlobally+saveLocally+cancelChanges]
-    const lastContentIdx = _rows.length - BOTTOM_ROWS - 1;
-
-    // Cross-tab forward: ↓ from the effective last visible content row → jump to next sub-tab
-    if (delta > 0 && rowIdx >= 1 && rowIdx <= lastContentIdx) {
-      let isEffectiveLast = true;
-      for (let r = rowIdx + 1; r <= lastContentIdx; r++) {
-        if (_isRowVisible(_rows[r])) { isEffectiveLast = false; break; }
-      }
-      if (isEffectiveLast) {
-        const tabIdx = SUB_TABS.indexOf(_activeSubTab);
-        if (tabIdx < SUB_TABS.length - 1) {
-          const nextTab = SUB_TABS[tabIdx + 1];
-          _showSubTab(nextTab, true);
-          const firstRow = _rowsBySubTab[nextTab].find(row => _isRowVisible(row));
-          if (firstRow) {
-            const btn = _firstVisibleBtn(firstRow);
-            _currentIdx = _buttons.indexOf(btn);
-            _focusButton(btn);
-            return;
-          }
-        }
-        // On the last sub-tab: fall through to normal (go to fullPreviewBtn)
-      }
-    }
-
-    // Cross-tab backward: ↑ from first content row (row 1) → jump to previous sub-tab's last row
-    if (delta < 0 && rowIdx === 1) {
-      const tabIdx = SUB_TABS.indexOf(_activeSubTab);
-      if (tabIdx > 0) {
-        const prevTab = SUB_TABS[tabIdx - 1];
-        _showSubTab(prevTab, true);
-        const prevRows = _rowsBySubTab[prevTab];
-        let lastRow = null;
-        for (let i = prevRows.length - 1; i >= 0; i--) {
-          if (_isRowVisible(prevRows[i])) { lastRow = prevRows[i]; break; }
-        }
-        if (lastRow) {
-          const btn = _firstVisibleBtn(lastRow);
-          _currentIdx = _buttons.indexOf(btn);
-          _focusButton(btn);
-          return;
-        }
-      }
-      // First sub-tab: fall through (goes to sub-tab bar at row 0)
-    }
-
-    // In the bottom save row: ↓ navigates to the next visible sibling within the row
-    // rather than wrapping to row 0 (sub-tab bar) via modulo.
-    const lastRowIdx = _rows.length - 1;
-    if (delta > 0 && rowIdx === lastRowIdx) {
-      const row = _rows[lastRowIdx];
-      const posInRow = row.indexOf(focused);
-      for (let i = posInRow + 1; i < row.length; i++) {
-        if (!row[i].hidden) {
-          _currentIdx = _buttons.indexOf(row[i]);
-          _focusButton(row[i]);
-          return;
-        }
-      }
-      // Last sibling in the row — wrap up to sub-tab bar (row 0)
-      const topBtn = _firstVisibleBtn(_rows[0]);
-      _currentIdx = _buttons.indexOf(topBtn);
-      _focusButton(topBtn);
-      return;
-    }
-
     // Skip rows where ALL buttons are hidden (e.g. SSH alias row when destination is local).
     // Use _firstVisibleBtn so we land on the first visible button in a mixed row.
     let attempts = 0;
@@ -2105,16 +2049,55 @@ export function createSettingsTab(screen, services) {
       rowIdx = (rowIdx + delta + _rows.length) % _rows.length;
       attempts++;
     } while (!_isRowVisible(_rows[rowIdx]) && attempts < _rows.length);
-    const btn = _firstVisibleBtn(_rows[rowIdx]);
+    // When landing on the sub-tab bar (row 0), focus the ACTIVE sub-tab item, not the first one
+    const btn = rowIdx === 0
+      ? (_subTabItemsMap[_activeSubTab] ?? _firstVisibleBtn(_rows[0]))
+      : _firstVisibleBtn(_rows[rowIdx]);
     _currentIdx = _buttons.indexOf(btn);
     _focusButton(btn);
   }
 
   for (const btn of _buttons) {
-    btn.key(['down'],   () => _navigateRow(1));
-    btn.key(['up'],     () => _navigateRow(-1));
+    btn.key(['down'], () => {
+      if (btn === languageList) return;  // languageList has its own boundary-aware down handler
+      _navigateRow(1);
+    });
+    btn.key(['up'], () => {
+      if (btn === languageList) return;  // languageList has its own boundary-aware up handler
+      _navigateRow(-1);
+    });
     btn.key(['escape'], () => { if (typeof focusMainTabBar === 'function') setTimeout(() => focusMainTabBar(), 0); });
   }
+
+  // Language list — fully manual navigation (keys:false on the list disables blessed's built-in
+  // so only our handlers run, giving us clean boundary detection without double-move issues).
+  languageList.key(['down'], () => {
+    const cur = languageList.selected ?? 0;
+    if (cur >= SUPPORTED_LANGUAGES.length - 1) {
+      _navigateRow(1);  // past last item → Apply button
+    } else {
+      languageList.select(cur + 1);
+      screen.render();
+    }
+  });
+  languageList.key(['up'], () => {
+    const cur = languageList.selected ?? 0;
+    if (cur <= 0) {
+      _navigateRow(-1);  // past first item → sub-tab bar
+    } else {
+      languageList.select(cur - 1);
+      screen.render();
+    }
+  });
+  languageList.key(['enter', 'return', 'space'], () => {
+    const selected = SUPPORTED_LANGUAGES[languageList.selected ?? 0];
+    if (selected && services.languageService) {
+      services.languageService.setLang(selected.value);
+      refreshLanguageDisplay();
+      _showNotice(screen, `Language: ${selected.name}`);
+    }
+  });
+  languageList.key(['escape'], () => { if (typeof focusMainTabBar === 'function') setTimeout(() => focusMainTabBar(), 0); });
 
   // ← / → within content rows — uses _buttonGroups (static); sub-tab bar has its own wiring
   const _rows = [];  // populated dynamically by _showSubTab()
@@ -2129,8 +2112,9 @@ export function createSettingsTab(screen, services) {
     [introEditBtn, introClearBtn],
     [audioDstChangeBtn],
     [audioSshEditBtn, audioStreamModeBtn],
-    [fullPreviewBtn],
-    [saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
+    [languageList],
+    [langApplyBtn],
+    [fullPreviewBtn, saveGloballyBtn, saveLocallyBtn, cancelChangesBtn],
   ];
 
   for (const row of _buttonGroups) {
@@ -2425,9 +2409,12 @@ export function createSettingsTab(screen, services) {
     },
 
     onFocus() {
+      // Land on the active sub-tab bar item so the user can ↑↓ from there.
       // Use _focusButton (not raw .focus()) so olines get invalidated before render,
       // preventing the ghost-duplicate-row artifact on initial tab activation.
-      _focusButton(_buttons[_currentIdx]);
+      const activeSubTabItem = _subTabItemsMap[_activeSubTab];
+      _currentIdx = _buttons.indexOf(activeSubTabItem);
+      _focusButton(activeSubTabItem);
     },
 
     onBlur() {

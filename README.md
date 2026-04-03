@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.5
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.6
 
 ---
 
@@ -28,6 +28,7 @@
 | **Use with OpenClaw** | [OpenClaw Integration](#-openclaw-integration) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
+| **Configure BMAD Party Mode** (agents with unique voices) | [BMAD Plugin & Party Mode](#-bmad-plugin) |
 | **Fix issues** (git-lfs? MCP tokens? Read this!) | [Troubleshooting](docs/troubleshooting.md) & [FAQ](#-frequently-asked-questions-faq) |
 
 ---
@@ -37,6 +38,18 @@
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
 Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🧭 NEW IN v4.6.6 — TUI Navigation & UX Polish
+
+- **Settings fully keyboard-navigable** — All sub-tabs (Voice, Effects, Personality, Output, Language) now work correctly with Up/Down navigation
+- **Language selector fixed** — Language list is now a proper focusable list; Up/Down scrolls, Enter applies, boundary keys exit to footer
+- **Down stays within current tab** — Removed cross-tab auto-jump; Down from last content row goes to footer (Full Preview → Save buttons), not next tab
+- **Up from content returns to active sub-tab** — No longer always jumps back to "Voice"
+- **Footer navigation** — Left/Right moves between Full Preview / Save Globally / Save Locally / Cancel Changes
+- **Readme tab fallback** — Shows AgentVibes package README when no project README found
+- **Install tab Escape fixed** — No longer gets stuck in a focus loop
 
 ---
 
@@ -451,7 +464,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [🖥️ SSH Receiver](#️-agentvibes-receiver--remote-audio-streaming) - Stream audio from headless servers
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v4.6.5 — gitattributes, party mode voice fix, macOS CI fixes
+- [📰 Latest Release](#-latest-release) - v4.6.6 — TUI navigation & UX polish
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -497,9 +510,9 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v4.6.5 - Patch Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.5)**
+**[v4.6.6 - TUI Navigation & UX Polish](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.6)**
 
-Infrastructure and tooling improvements: consistent line endings via `.gitattributes`, `bin/` execute bits preserved, non-interactive install routing, and TUI header improvements.
+Full keyboard navigation overhaul for the Settings TUI: language selector now works correctly, Down stays within the current sub-tab instead of jumping tabs, Up from content returns to the active sub-tab bar item, footer uses Left/Right, and the Readme tab falls back to the AgentVibes package README.
 
 ### 🐛 Recent Fixes (v4.6.3 / v4.6.4)
 
@@ -1172,6 +1185,14 @@ AgentVibes includes professional AI voices from Piper TTS and macOS Say with mul
 The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`) and automatically uses the assigned voice for that role.
 
 **Version Support**: AgentVibes supports both BMAD v4 and v6-alpha installations. Version detection is automatic - just install BMAD and AgentVibes will detect and configure itself correctly!
+
+### 🎭 Party Mode — Screenshots
+
+Open the **BMad** tab in the AgentVibes TUI (`npx agentvibes`) to configure which voice each agent uses:
+
+![BMAD Party Mode Tab](docs/installation-screenshots/screenshot-bmad-party-mode.png)
+
+> 📸 **Don't have a screenshot yet?** Run `npx agentvibes`, switch to the **BMad** tab, and take a screenshot — then save it as `docs/installation-screenshots/screenshot-bmad-party-mode.png`.
 
 ### 🔊 TTS Injection: How It Works
 

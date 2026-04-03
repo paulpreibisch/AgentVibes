@@ -1,5 +1,38 @@
 # AgentVibes Release Notes
 
+## 🧭 v4.6.6 — TUI Navigation & UX Polish
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **Settings: Language sub-tab fully functional** — Language list is now a proper focusable `blessed.list` widget. Down arrow from the Language sub-tab bar enters the list with green selection highlight; Up/Down navigates languages one at a time; Enter applies; Down past the last language exits to the Apply button and footer. Fixed root cause: `_subTabItemsMap.language` was missing from the `_buttons` array, so no key handlers were ever registered on the Language tab bar item.
+
+- **Settings: Pressing Down from main header lands on sub-tab bar** — `onFocus()` now focuses the active sub-tab bar item (e.g. "Personality") instead of the last-focused content button. Pressing Down from the main header is now a consistent two-step: header → sub-tab bar → content.
+
+- **Settings: Up from first content row returns to the active sub-tab** — Previously always jumped back to "Voice" regardless of which sub-tab was active. Now returns focus to the correct sub-tab bar item.
+
+- **Settings: Sub-tab content no longer jumps to next tab on Down** — Removed cross-tab auto-jump logic that caused pressing Down on the last content row of a sub-tab (e.g. Personality) to jump to the next sub-tab (Output). Down now moves to the footer (Full Preview → Save buttons). Use Left/Right in the sub-tab bar to switch tabs.
+
+- **Settings: Footer navigation uses Left/Right, not Down** — Removed the special-case that used Down to cycle through Save Globally → Save Locally → Cancel Changes. Left/Right now correctly moves between all footer buttons including Full Preview.
+
+- **Settings: Install tab Escape no longer gets stuck** — Pressing Escape from the installer's first screen now switches directly to the Settings tab via `navigationService.switchTab()` instead of calling `focusMainTabBar()` which triggered a stuck focus loop.
+
+- **Readme tab: Shows AgentVibes README as fallback** — When run in a project folder with no `README.md`, the Readme tab now falls back to the AgentVibes package README instead of showing "(No README.md found)".
+
+- **Language list: No double-move on arrow keys** — Removed blessed.list's built-in `keypress` navigation handler (`removeAllListeners('keypress')`) so only our manual handlers run, eliminating the two-items-at-a-time skip.
+
+- **OpenClaw SKILL.md updated** — Accurate description, all new commands (personality, set-speed, background-music, verbosity, learn, language, translate, sample), all four providers, HuggingFace link, no fake URLs.
+
+### User Impact
+
+- Settings TUI is now fully keyboard-navigable across all sub-tabs
+- Language selection works correctly end-to-end
+- Escape from installer no longer gets stuck
+- Readme tab always shows useful content
+
+---
+
 ## 🔧 v4.6.5 — Patch Release
 
 **Release Date:** April 2026

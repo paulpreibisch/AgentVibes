@@ -942,13 +942,10 @@ export function createInstallTab(screen, services) {
       _screen--;
       _showCurrentScreen();
     } else {
-      box.hide();
-      screen.render();
-      // Defer so the escape keypress event finishes propagating before focus changes.
-      // Calling focusMainTabBar() synchronously here would set focus to the tab bar
-      // item mid-event, causing its own key(['escape']) handler to fire in the same
-      // emission and call onFocus() → re-focus a button inside the now-hidden box.
-      if (typeof focusMainTabBar === 'function') setTimeout(() => focusMainTabBar(), 0);
+      // User pressed Escape at the first screen — they want out of the installer.
+      // Switch to Settings so they can configure without being stuck on the install tab.
+      // (focusMainTabBar would re-focus the install tab item, which loops back here.)
+      setTimeout(() => navigationService?.switchTab('settings'), 0);
     }
   });
 

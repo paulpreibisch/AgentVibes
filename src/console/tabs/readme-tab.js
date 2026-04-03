@@ -146,9 +146,12 @@ export function createReadmeTab(screen, services) {
   // Load README.md
 
   function _loadReadme() {
+    // Package root — works whether installed globally (node_modules/.bin) or run from source
+    const pkgRoot = path.resolve(new URL(import.meta.url).pathname, '..', '..', '..', '..');
     const candidates = [
       path.resolve(process.cwd(), 'README.md'),
       path.resolve(process.cwd(), 'readme.md'),
+      path.resolve(pkgRoot, 'README.md'),  // AgentVibes package README fallback
     ];
     for (const p of candidates) {
       if (fs.existsSync(p)) {
