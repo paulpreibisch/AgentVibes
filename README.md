@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.7
 
 ---
 
@@ -38,6 +38,15 @@
 **AgentVibes adds lively voice narration to your Claude AI sessions!**
 
 Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🎙️ NEW IN v4.6.7 — Party Mode TTS Fixes
+
+- **Agent pretexts now spoken in party mode** — "John, Product Manager here" was being silently dropped due to a pre-synthesis timing bug. Fixed.
+- **No more spoken asterisks** — markdown stripped before TTS in party mode
+- **Windows session start TTS fixed** — hook now outputs proper JSON so TTS activates reliably on session start
+- **PreToolUse hook no longer errors** on grep/regex commands
 
 ---
 
@@ -458,7 +467,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [🖥️ SSH Receiver](#️-agentvibes-receiver--remote-audio-streaming) - Stream audio from headless servers
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v4.6.6 — TUI navigation & UX polish
+- [📰 Latest Release](#-latest-release) - v4.6.7 — Party mode TTS fixes
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -504,9 +513,9 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v4.6.6 - Natural TUI Navigation](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.6)**
+**[v4.6.7 - Party Mode TTS Fixes](https://github.com/paulpreibisch/AgentVibes/releases/tag/v4.6.7)**
 
-The Settings TUI now navigates the way you'd expect — arrow keys flow naturally through the interface, the Language tab has a proper scrollable list, and the Readme tab always has something useful to show.
+Agent pretexts now spoken in party mode, markdown stripped before TTS, Windows session-start hook fixed to inject context reliably, and PreToolUse hook no longer errors on grep commands.
 
 ### 🐛 Recent Fixes (v4.6.3 / v4.6.4)
 

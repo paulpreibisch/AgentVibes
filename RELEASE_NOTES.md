@@ -1,5 +1,27 @@
 # AgentVibes Release Notes
 
+## 🎙️ v4.6.7 — Party Mode TTS Fixes
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **Party mode pretext now spoken** — Agent pretexts (e.g. "John, Product Manager here") were silently dropped. The pre-synthesis step ran on the response text only; when `bmad-speak.ps1` later prepended the pretext, `play-tts.ps1` skipped synthesis because a pre-synthesized WAV was already set. Pre-synthesis now includes the pretext so it's always spoken.
+
+- **Markdown stripped in party mode** — Agents were speaking asterisks, hashes, and backticks literally. `bmad-party-speak.ps1` now strips bold, italic, headings, inline code, links, and bullet markers before TTS — consistent with `bmad-speak.ps1`.
+
+- **Session start hook outputs proper JSON + BMAD routing (Windows)** — `session-start-tts.ps1` was using plain `Write-Output` text which isn't reliably injected as `additionalContext`. Now outputs `hookSpecificOutput` JSON (matching the bash version) and includes BMAD agent voice routing instructions so party mode / single agent mode TTS works correctly on Windows.
+
+- **PreToolUse hook no longer errors on grep/regex commands** — The git-push guard hook used `-match` (regex) which crashed on commands containing `\*`, `\|`, etc. Switched to `-like` wildcard and wrapped in `try/catch` so it exits silently on any non-matching command.
+
+### User Impact
+
+- Party mode agents speak their configured pretext introductions
+- No more spoken asterisks or markdown syntax in party mode
+- Windows TTS now reliably activates on session start
+
+---
+
 ## 🧭 v4.6.6 — Natural TUI Navigation
 
 **Release Date:** April 2026
