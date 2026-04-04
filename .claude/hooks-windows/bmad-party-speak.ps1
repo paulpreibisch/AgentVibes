@@ -131,11 +131,13 @@ try {
                           elseif (Test-Path $VoiceMapGlobal) { $VoiceMapGlobal }
                           else { $null }
 
-        $AgentVoiceName = $null
-        $SpeakerId      = $null
+        $AgentVoiceName  = $null
+        $SpeakerId       = $null
+        $AgentPretext    = $null
         if ($VoiceMapFile) {
             $vm = Get-Content $VoiceMapFile -Raw | ConvertFrom-Json
             $profile = $vm.agents.$AgentId
+            if ($profile -and $profile.pretext) { $AgentPretext = $profile.pretext }
             if ($profile -and $profile.voice) {
                 $raw = $profile.voice
                 if ($raw -match '::') {
@@ -185,7 +187,10 @@ try {
                     $PreSynthWav = Join-Path $AudioDir "tts-presynth-$([System.IO.Path]::GetRandomFileName() -replace '\..*').wav"
                     $piperArgs = @("--model", $VoiceModel, "--output-file", $PreSynthWav)
                     if ($SpeakerId) { $piperArgs += @("--speaker", $SpeakerId) }
-                    $ResponseText | & $PiperExe @piperArgs 2>$null
+                    # Include pretext in pre-synthesis so it's spoken — bmad-speak.ps1 will
+                    # skip synthesis (AGENTVIBES_PRESYNTHESIZED_WAV set) so pretext must be here.
+                    $PreSynthText = if ($AgentPretext) { "$AgentPretext. $ResponseText" } else { $ResponseText }
+                    $PreSynthText | & $PiperExe @piperArgs 2>$null
                     if (-not (Test-Path $PreSynthWav) -or (Get-Item $PreSynthWav).Length -eq 0) {
                         $PreSynthWav = $null
                     }
