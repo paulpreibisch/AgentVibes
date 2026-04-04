@@ -338,6 +338,7 @@ export const MS_SEP = '::';
  * @returns {{ model: string, speakerId: number|null, speakerName: string|null, isMultiSpeaker: boolean }}
  */
 export function parseMultiSpeaker(voiceId) {
+  if (!voiceId) return { model: voiceId ?? '', speakerId: null, speakerName: null, isMultiSpeaker: false };
   if (voiceId.includes(MS_SEP)) {
     const [model, speakerName] = voiceId.split(MS_SEP, 2);
     const jsonPath = path.join(PIPER_VOICES_DIR, model + '.onnx.json');
