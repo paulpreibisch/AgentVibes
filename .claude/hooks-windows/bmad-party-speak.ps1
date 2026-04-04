@@ -47,6 +47,19 @@ try {
     $ResponseText = $ResponseText.Trim()
     if (-not $ResponseText) { exit 0 }
 
+    # Strip markdown so TTS doesn't speak asterisks, hashes, backticks, etc.
+    $ResponseText = $ResponseText -replace '\*\*', ''      # bold
+    $ResponseText = $ResponseText -replace '\*', ''        # italic
+    $ResponseText = $ResponseText -replace '`{1,3}[^`]*`{1,3}', ''  # inline code / code blocks
+    $ResponseText = $ResponseText -replace '#{1,6}\s*', '' # headings
+    $ResponseText = $ResponseText -replace '__', ''        # underline/bold alt
+    $ResponseText = $ResponseText -replace '_', ''         # italic alt
+    $ResponseText = $ResponseText -replace '\[([^\]]+)\]\([^)]+\)', '$1'  # links → label only
+    $ResponseText = $ResponseText -replace '!\[[^\]]*\]\([^)]+\)', ''     # images
+    $ResponseText = $ResponseText -replace '^\s*[-*+]\s+', ''             # bullet list markers
+    $ResponseText = $ResponseText.Trim()
+    if (-not $ResponseText) { exit 0 }
+
     # --- Resolve paths ---
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $ProjectRoot = $env:CLAUDE_PROJECT_DIR
