@@ -1,10 +1,9 @@
 #
 # File: .claude/hooks-windows/session-start-tts.ps1
 #
-# AgentVibes SessionStart Hook for Windows - Optimized (Issue #80, Phase 1)
-# Token target: ~250 (down from ~500)
-#
-# Prints TTS protocol instructions to stdout so Claude knows to use TTS.
+# AgentVibes SessionStart Hook for Windows
+# Outputs JSON with hookSpecificOutput.additionalContext for reliable context injection.
+# Mirrors session-start-tts.sh — keep both in sync.
 #
 
 $ErrorActionPreference = "Stop"
@@ -14,7 +13,6 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Check if AgentVibes is installed
 if (-not (Test-Path (Join-Path $ScriptDir "play-tts.ps1"))) {
-    # AgentVibes not installed, don't inject anything
     exit 0
 }
 
@@ -27,8 +25,8 @@ $Sentiment = ""
 $sentimentPaths = @("$ProjectClaudeDir\tts-sentiment.txt", "$env:USERPROFILE\.claude\tts-sentiment.txt")
 foreach ($p in $sentimentPaths) {
     if (Test-Path $p) {
-        $Sentiment = (Get-Content $p -Raw -ErrorAction SilentlyContinue).Trim()
-        if ($Sentiment) { break }
+        $val = (Get-Content $p -Raw -ErrorAction SilentlyContinue).Trim()
+        if ($val) { $Sentiment = $val; break }
     }
 }
 
@@ -41,14 +39,9 @@ foreach ($p in $personalityPaths) {
     }
 }
 
-# Determine style
-if ($Sentiment) {
-    $Style = $Sentiment
-} else {
-    $Style = $Personality
-}
+$Style = if ($Sentiment) { $Sentiment } else { $Personality }
 
-# Get verbosity level (Issue #32)
+# Get verbosity level
 $Verbosity = "low"
 $verbosityPaths = @("$ProjectClaudeDir\tts-verbosity.txt", "$env:USERPROFILE\.claude\tts-verbosity.txt")
 foreach ($p in $verbosityPaths) {
@@ -58,9 +51,16 @@ foreach ($p in $verbosityPaths) {
     }
 }
 
-# Output optimized TTS protocol
-Write-Output @"
+# Build verbosity section
+$VerbositySection = switch ($Verbosity) {
+    "low"    { "## Verbosity: LOW`n- Acknowledgment: Action only`n- Completion: Result + errors only`n- Skip: Reasoning, decisions" }
+    "medium" { "## Verbosity: MEDIUM`n- Acknowledgment: Action + key approach`n- Completion: Result + important decisions`n- Include: Major choices only" }
+    "high"   { "## Verbosity: HIGH`n- Acknowledgment: Action + approach + why`n- Completion: Result + decisions + trade-offs`n- Include: Full reasoning, alternatives" }
+    default  { "## Verbosity: LOW`n- Acknowledgment: Action only`n- Completion: Result + errors only" }
+}
 
+# Build full context string
+$Context = @"
 # AgentVibes TTS Protocol
 
 **CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
@@ -75,41 +75,8 @@ Write-Output @"
 [Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Repository is clean, no changes"]
 ``````
 
-"@
+$VerbositySection
 
-# Add verbosity-specific protocol (Issue #32)
-switch ($Verbosity) {
-    "low" {
-        Write-Output @"
-## Verbosity: LOW
-- Acknowledgment: Action only
-- Completion: Result + errors only
-- Skip: Reasoning, decisions
-
-"@
-    }
-    "medium" {
-        Write-Output @"
-## Verbosity: MEDIUM
-- Acknowledgment: Action + key approach
-- Completion: Result + important decisions
-- Include: Major choices only
-
-"@
-    }
-    "high" {
-        Write-Output @"
-## Verbosity: HIGH
-- Acknowledgment: Action + approach + why
-- Completion: Result + decisions + trade-offs
-- Include: Full reasoning, alternatives
-
-"@
-    }
-}
-
-# Add style info and rules
-Write-Output @"
 ## Style: $Style
 
 ## Rules
@@ -121,4 +88,27 @@ Write-Output @"
 
 Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning
 
+## BMAD Agent Voice Routing
+If ``.bmad-agent-context`` exists, check its content:
+
+**Single agent mode** (content is an agent ID like "analyst"):
+Use ``bmad-speak.ps1`` instead of ``play-tts.ps1``:
+
+
+**Party mode** (content is "party-mode"):
+Each agent speaks via ``bmad-speak.ps1`` with their display name. The queue system ensures sequential playback — agents speak one at a time, not overlapping:
+
+IMPORTANT: In party mode, do NOT use ``play-tts.ps1``. Always use ``bmad-speak.ps1`` with the agent's display name. Do NOT call multiple bmad-speak.ps1 in parallel — call them sequentially so the queue processes them in order.
+
+If ``.bmad-agent-context`` does NOT exist, use ``play-tts.ps1`` as normal.
 "@
+
+# Build JSON via hashtable so ConvertTo-Json handles all escaping (Unicode, backslashes, quotes)
+$Output = @{
+    hookSpecificOutput = @{
+        hookEventName   = "SessionStart"
+        additionalContext = $Context
+    }
+}
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Write-Output ($Output | ConvertTo-Json -Compress -Depth 5)
