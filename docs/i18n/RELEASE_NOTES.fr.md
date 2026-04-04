@@ -1,5 +1,24 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐛 v4.6.8 — Correction du Plantage lors d'une Installation Neuve
+
+**Date de sortie :** Avril 2026
+
+### Corrections de Bugs
+
+- **L'onglet Paramètres ne plante plus lors d'une installation neuve** — `parseMultiSpeaker()` appelait `.includes()` sur un voice ID nul lorsqu'aucune voix n'était encore configurée. Un garde nul a été ajouté pour renvoyer un objet par défaut sûr. Signalé par un utilisateur qui a rencontré ce problème immédiatement après avoir terminé l'assistant d'installation.
+
+- **Lien symbolique macOS /var dans le test de relecture** — Correction d'une assertion de test qui échouait sur macOS où `/var` est un lien symbolique vers `/private/var`, provoquant l'échec des comparaisons de chemins de relecture.
+
+- **Analyse du pretext dans BMAD voices** — Les lignes de pretext dans `bmad-voices.md` sont maintenant correctement analysées et le markdown est supprimé de manière plus approfondie avant la synthèse TTS.
+
+### Impact Utilisateur
+
+- Les nouveaux utilisateurs ne subissent plus de plantage en naviguant vers Paramètres après une installation neuve
+- La suite de tests fonctionne correctement sur macOS
+
+---
+
 ## 🌍 v4.5.0 — Version "Parlez Toutes les Langues"
 
 **Date de sortie :** Avril 2026

@@ -1,5 +1,24 @@
 # AgentVibes Release Notes
 
+## 🐛 v4.6.8 — Fresh Install Crash Fix
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **Settings tab no longer crashes on fresh install** — `parseMultiSpeaker()` called `.includes()` on a null voice ID when no voice was configured yet. Added a null guard that returns a safe default object. Reported by a user hitting this immediately after the install wizard completed.
+
+- **macOS /var symlink in replay test** — Fixed test assertion that failed on macOS where `/var` is a symlink to `/private/var`, causing replay path comparisons to break.
+
+- **BMAD voices pretext parsing** — `bmad-voices.md` pretext lines are now correctly parsed and markdown is stripped more thoroughly before TTS synthesis.
+
+### User Impact
+
+- New users no longer crash when navigating to Settings after a fresh install
+- Test suite passes reliably on macOS
+
+---
+
 ## 🎙️ v4.6.7 — Party Mode TTS Fixes
 
 **Release Date:** April 2026

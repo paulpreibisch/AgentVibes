@@ -1,6 +1,33 @@
 > 🌐 [English version](../../README.md)
 
-## 🌟 NEU IN v4.5 — Release "Sprich Jede Sprache"
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.8
+
+---
+
+## 🐛 NEU IN v4.6.8 — Crash-Fix bei Neuinstallation
+
+- **Crash im Einstellungen-Tab behoben** — stürzt nicht mehr ab beim Navigieren zu Einstellungen bei einer Neuinstallation ohne konfigurierte Stimme
+- **macOS-Test-Fix** — die Replay-Pfad-Assertion behandelt den Symlink `/var` → `/private/var`
+- **BMAD-Pretext-Parsing verbessert** — Stimmen-Pretext wird korrekt aus `bmad-voices.md` extrahiert
+
+---
+
+## 🎙️ v4.6.7 — Party-Modus TTS-Korrekturen
+
+- **Agenten-Pretexte werden jetzt im Party-Modus gesprochen** — "John, Product Manager here" wurde wegen eines Pre-Synthese-Timing-Bugs stillschweigend verworfen. Behoben.
+- **Keine gesprochenen Sternchen mehr** — Markdown wird vor dem TTS im Party-Modus entfernt
+- **Windows-Sitzungsstart-TTS behoben** — der Hook gibt jetzt korrektes JSON aus, damit TTS beim Sitzungsstart zuverlässig aktiviert wird
+- **PreToolUse-Hook erzeugt keinen Fehler mehr** bei grep/regex-Befehlen
+
+---
+
+## 🧭 v4.6.6 — Natürliche TUI-Navigation
+
+Die Einstellungen-TUI funktioniert jetzt wie erwartet. Runter bewegt sich von oben nach unten durch Kopfzeile → Unter-Tabs → Inhalt → Fußzeile. Links/Rechts wechselt Unter-Tabs und bewegt sich zwischen Fußzeilen-Buttons. Hoch vom Inhalt kehrt zum aktiven Unter-Tab zurück — nicht immer zu Stimme. Der Sprach-Tab hat eine ordentliche scrollbare Liste. Das Readme greift auf das AgentVibes-Paket-README zurück, wenn kein lokales existiert. Escape vom Installer bleibt nicht mehr hängen.
+
+---
+
+## 🌟 v4.5 — Release "Sprich Jede Sprache"
 
 ### 🌍 Mehrsprachige TUI — 9 Sprachen
 

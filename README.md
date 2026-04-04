@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.7
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.8
 
 ---
 
@@ -41,7 +41,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or running Ope
 
 ---
 
-## 🎙️ NEW IN v4.6.7 — Party Mode TTS Fixes
+## 🐛 NEW IN v4.6.8 — Fresh Install Crash Fix
+
+- **Settings tab crash fixed** — no longer crashes when navigating to Settings on a fresh install with no voice configured
+- **macOS test fix** — replay path assertion handles `/var` → `/private/var` symlink
+- **BMAD pretext parsing improved** — voices pretext extracted correctly from `bmad-voices.md`
+
+---
+
+## 🎙️ v4.6.7 — Party Mode TTS Fixes
 
 - **Agent pretexts now spoken in party mode** — "John, Product Manager here" was being silently dropped due to a pre-synthesis timing bug. Fixed.
 - **No more spoken asterisks** — markdown stripped before TTS in party mode
@@ -50,7 +58,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, or running Ope
 
 ---
 
-## 🧭 NEW IN v4.6.6 — Natural TUI Navigation
+## 🧭 v4.6.6 — Natural TUI Navigation
 
 The Settings TUI now flows the way you'd expect. Down moves top-to-bottom through header → sub-tabs → content → footer. Left/Right switches sub-tabs and moves between footer buttons. Up from content returns to the active sub-tab — not always Voice. The Language tab has a proper scrollable list. Readme falls back to the AgentVibes package README when no local one exists. Escape from the installer no longer gets stuck.
 

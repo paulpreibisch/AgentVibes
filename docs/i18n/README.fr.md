@@ -1,6 +1,33 @@
 > 🌐 [English version](../../README.md)
 
-## 🌟 NOUVEAU DANS v4.5 — Version "Parlez Toutes les Langues"
+**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v4.6.8
+
+---
+
+## 🐛 NOUVEAU DANS v4.6.8 — Correction du Crash sur Installation Neuve
+
+- **Crash de l'onglet Paramètres corrigé** — ne plante plus lors de la navigation vers Paramètres sur une installation neuve sans voix configurée
+- **Correction de test macOS** — l'assertion du chemin de relecture gère le symlink `/var` → `/private/var`
+- **Analyse du pretext BMAD améliorée** — le pretext des voix est correctement extrait de `bmad-voices.md`
+
+---
+
+## 🎙️ v4.6.7 — Corrections TTS du Mode Fête
+
+- **Les pretexts des agents sont maintenant prononcés en mode fête** — "John, Product Manager here" était silencieusement ignoré à cause d'un bug de synchronisation de pré-synthèse. Corrigé.
+- **Plus d'astérisques prononcés** — le markdown est supprimé avant le TTS en mode fête
+- **TTS de démarrage de session Windows corrigé** — le hook émet maintenant du JSON correct pour que le TTS s'active de manière fiable au démarrage de session
+- **Le hook PreToolUse ne génère plus d'erreur** sur les commandes grep/regex
+
+---
+
+## 🧭 v4.6.6 — Navigation Naturelle dans le TUI
+
+Le TUI des Paramètres fonctionne maintenant comme vous l'attendez. Bas se déplace de haut en bas à travers en-tête → sous-onglets → contenu → pied de page. Gauche/Droite change de sous-onglet et se déplace entre les boutons du pied de page. Haut depuis le contenu retourne au sous-onglet actif — pas toujours Voix. L'onglet Langue a une liste déroulante appropriée. Le Readme se rabat sur le README du paquet AgentVibes quand aucun local n'existe. Échap depuis l'installateur ne reste plus bloqué.
+
+---
+
+## 🌟 v4.5 — Version "Parlez Toutes les Langues"
 
 ### 🌍 TUI Multilingue — 9 Langues
 

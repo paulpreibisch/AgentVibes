@@ -1,5 +1,24 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐛 v4.6.8 — Absturzfix bei Neuinstallation
+
+**Veröffentlichungsdatum:** April 2026
+
+### Fehlerbehebungen
+
+- **Der Einstellungen-Tab stürzt bei einer Neuinstallation nicht mehr ab** — `parseMultiSpeaker()` rief `.includes()` auf einer null Voice-ID auf, wenn noch keine Stimme konfiguriert war. Ein Null-Guard wurde hinzugefügt, der ein sicheres Standardobjekt zurückgibt. Gemeldet von einem Benutzer, der diesen Fehler unmittelbar nach Abschluss des Installationsassistenten erlebte.
+
+- **macOS /var-Symlink im Wiedergabetest** — Eine Test-Assertion wurde korrigiert, die unter macOS fehlschlug, wo `/var` ein Symlink zu `/private/var` ist, was dazu führte, dass Pfadvergleiche bei der Wiedergabe fehlschlugen.
+
+- **BMAD voices Pretext-Analyse** — Pretext-Zeilen in `bmad-voices.md` werden jetzt korrekt geparst und Markdown wird vor der TTS-Synthese gründlicher entfernt.
+
+### Auswirkung auf Benutzer
+
+- Neue Benutzer erleben keinen Absturz mehr, wenn sie nach einer Neuinstallation zu den Einstellungen navigieren
+- Die Testsuite läuft zuverlässig unter macOS
+
+---
+
 ## 🌍 v4.5.0 — Release "Sprich Jede Sprache"
 
 **Veröffentlichungsdatum:** April 2026

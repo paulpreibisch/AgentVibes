@@ -1,5 +1,24 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐛 v4.6.8 — Correzione Crash su Installazione Pulita
+
+**Data di rilascio:** Aprile 2026
+
+### Correzioni di Bug
+
+- **La scheda Impostazioni non si blocca più su un'installazione pulita** — `parseMultiSpeaker()` chiamava `.includes()` su un ID voce null quando nessuna voce era ancora configurata. Aggiunto un controllo null che restituisce un oggetto predefinito sicuro. Segnalato da un utente che ha riscontrato il problema subito dopo il completamento della procedura guidata di installazione.
+
+- **Symlink macOS /var nel test di replay** — Corretta l'asserzione del test che falliva su macOS dove `/var` è un symlink a `/private/var`, causando il fallimento dei confronti dei percorsi di replay.
+
+- **Parsing pretext delle voci BMAD** — Le righe pretext di `bmad-voices.md` vengono ora analizzate correttamente e il markdown viene rimosso in modo più accurato prima della sintesi TTS.
+
+### Impatto sugli Utenti
+
+- I nuovi utenti non subiscono più crash navigando nelle Impostazioni dopo un'installazione pulita
+- La suite di test passa in modo affidabile su macOS
+
+---
+
 ## 🌍 v4.5.0 — Release "Parla Ogni Lingua"
 
 **Data di rilascio:** Aprile 2026

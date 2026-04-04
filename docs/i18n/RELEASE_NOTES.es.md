@@ -1,5 +1,24 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐛 v4.6.8 — Corrección de Fallo en Instalación Limpia
+
+**Fecha de lanzamiento:** Abril 2026
+
+### Corrección de Errores
+
+- **La pestaña de Configuración ya no falla en una instalación limpia** — `parseMultiSpeaker()` llamaba a `.includes()` sobre un voice ID nulo cuando no se había configurado ninguna voz todavía. Se añadió una protección contra nulos que devuelve un objeto predeterminado seguro. Reportado por un usuario que experimentó este fallo inmediatamente después de completar el asistente de instalación.
+
+- **Enlace simbólico de macOS /var en prueba de reproducción** — Se corrigió una aserción de prueba que fallaba en macOS donde `/var` es un enlace simbólico a `/private/var`, causando que las comparaciones de rutas de reproducción fallaran.
+
+- **Análisis de pretext en BMAD voices** — Las líneas de pretext en `bmad-voices.md` ahora se analizan correctamente y el markdown se elimina más exhaustivamente antes de la síntesis TTS.
+
+### Impacto para el Usuario
+
+- Los usuarios nuevos ya no experimentan un fallo al navegar a Configuración después de una instalación limpia
+- La suite de pruebas funciona correctamente en macOS
+
+---
+
 ## 🌍 v4.5.0 — Lanzamiento "Habla Todos los Idiomas"
 
 **Fecha de lanzamiento:** Abril 2026
