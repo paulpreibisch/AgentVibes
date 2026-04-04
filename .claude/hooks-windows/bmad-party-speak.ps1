@@ -48,15 +48,15 @@ try {
     if (-not $ResponseText) { exit 0 }
 
     # Strip markdown so TTS doesn't speak asterisks, hashes, backticks, etc.
-    $ResponseText = $ResponseText -replace '\*\*', ''      # bold
-    $ResponseText = $ResponseText -replace '\*', ''        # italic
-    $ResponseText = $ResponseText -replace '`{1,3}[^`]*`{1,3}', ''  # inline code / code blocks
-    $ResponseText = $ResponseText -replace '#{1,6}\s*', '' # headings
-    $ResponseText = $ResponseText -replace '__', ''        # underline/bold alt
-    $ResponseText = $ResponseText -replace '_', ''         # italic alt
-    $ResponseText = $ResponseText -replace '\[([^\]]+)\]\([^)]+\)', '$1'  # links → label only
-    $ResponseText = $ResponseText -replace '!\[[^\]]*\]\([^)]+\)', ''     # images
-    $ResponseText = $ResponseText -replace '^\s*[-*+]\s+', ''             # bullet list markers
+    $ResponseText = $ResponseText -replace '\*{1,3}', ''                    # bold, italic, bold-italic
+    $ResponseText = $ResponseText -replace '`{1,3}[^`]*`{1,3}', ''         # inline code / code blocks
+    $ResponseText = $ResponseText -replace '#{1,6}\s*', ''                  # headings
+    $ResponseText = $ResponseText -replace '_{1,2}', ''                     # underline/italic alt
+    $ResponseText = $ResponseText -replace '\[([^\]]+)\]\([^)]+\)', '$1'    # links → label only
+    $ResponseText = $ResponseText -replace '!\[[^\]]*\]\([^)]+\)', ''       # images
+    $ResponseText = $ResponseText -replace '(?m)^\s*[-*+]\s+', ''           # bullet list markers (multiline)
+    $ResponseText = $ResponseText -replace '(?m)^\s*\d+\.\s+', ''           # numbered list markers
+    $ResponseText = $ResponseText -replace '\\([!$*_`\\])', '$1'            # escaped markdown chars
     $ResponseText = $ResponseText.Trim()
     if (-not $ResponseText) { exit 0 }
 
@@ -162,6 +162,40 @@ try {
                 } else {
                     $AgentVoiceName = $raw
                 }
+            }
+        }
+
+        # Fallback: parse bmad-voices.md markdown table if no JSON voice map found
+        if (-not $AgentPretext -and $ProjectRoot) {
+            $VoicesMdPaths = @(
+                (Join-Path $ProjectRoot ".agentvibes\bmad\bmad-voices.md"),
+                (Join-Path $env:USERPROFILE ".agentvibes\bmad\bmad-voices.md")
+            )
+            foreach ($mdPath in $VoicesMdPaths) {
+                if (-not (Test-Path $mdPath)) { continue }
+                $mdLines = Get-Content $mdPath -Encoding UTF8
+                # Strip bmad-agent- prefix for matching (manifest uses bmad-agent-pm, table uses pm)
+                $shortId = $AgentId -replace '^bmad-agent-', ''
+                foreach ($mdLine in $mdLines) {
+                    if ($mdLine -notmatch '^\|') { continue }
+                    if ($mdLine -match '^\|-') { continue }  # separator row
+                    if ($mdLine -match 'Agent ID') { continue }  # header row
+                    $cols = $mdLine -split '\|' | ForEach-Object { $_.Trim() }
+                    # cols: [0]=empty, [1]=Agent ID, [2]=Agent Name, [3]=Intro, [4]=Piper TTS Voice, [5]=Piper Voice, [6]=Personality
+                    if ($cols.Count -lt 6) { continue }
+                    $tableId = $cols[1]
+                    $tableName = $cols[2]
+                    if ($tableId -ieq $shortId -or $tableId -ieq $AgentId -or $tableName -like "*$DisplayName*") {
+                        if ($cols[3]) { $AgentPretext = $cols[3] }
+                        # Use Piper Voice column (index 5) for piper provider
+                        if (-not $AgentVoiceName -and $cols[5]) { $AgentVoiceName = $cols[5] }
+                        if ($cols.Count -ge 7 -and $cols[6] -and $cols[6] -ine 'normal') {
+                            # personality available for bmad-speak.ps1 downstream
+                        }
+                        break
+                    }
+                }
+                if ($AgentPretext) { break }
             }
         }
 

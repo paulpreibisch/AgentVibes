@@ -27,8 +27,15 @@ if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\_bmad")) {
 }
 
 # Strip markdown formatting — prevent SAPI/Piper from speaking asterisks literally
-$Dialogue = $Dialogue -replace '\*\*', '' -replace '\*', '' -replace '`', ''
-$Dialogue = $Dialogue -replace '\\!', '!' -replace '\\\$', '$'
+$Dialogue = $Dialogue -replace '\*{1,3}', ''                              # bold, italic, bold-italic
+$Dialogue = $Dialogue -replace '`{1,3}[^`]*`{1,3}', ''                    # inline code / code blocks
+$Dialogue = $Dialogue -replace '#{1,6}\s*', ''                             # headings
+$Dialogue = $Dialogue -replace '_{1,2}', ''                                # underline/italic alt
+$Dialogue = $Dialogue -replace '\[([^\]]+)\]\([^)]+\)', '$1'               # links → label only
+$Dialogue = $Dialogue -replace '!\[[^\]]*\]\([^)]+\)', ''                  # images
+$Dialogue = $Dialogue -replace '(?m)^\s*[-*+]\s+', ''                      # bullet list markers (multiline)
+$Dialogue = $Dialogue -replace '(?m)^\s*\d+\.\s+', ''                      # numbered list markers
+$Dialogue = $Dialogue -replace '\\([!$*_`\\])', '$1'                       # escaped markdown chars
 
 # Check if party mode is disabled
 $PartyModeDisabledFlag = Join-Path $ProjectRoot ".agentvibes\bmad\bmad-party-mode-disabled.flag"
@@ -117,13 +124,45 @@ if (Test-Path $VoiceMapFile) {
     }
 }
 
+# Fallback: parse bmad-voices.md markdown table if JSON voice map had no data
+if ((-not $AgentPretext -or -not $AgentVoice) -and $AgentId) {
+    $VoicesMdPaths = @(
+        (Join-Path $ProjectRoot ".agentvibes\bmad\bmad-voices.md"),
+        (Join-Path $env:USERPROFILE ".agentvibes\bmad\bmad-voices.md")
+    )
+    $shortId = $AgentId -replace '^bmad-agent-', ''
+    foreach ($mdPath in $VoicesMdPaths) {
+        if (-not (Test-Path $mdPath)) { continue }
+        $mdLines = Get-Content $mdPath -Encoding UTF8
+        foreach ($mdLine in $mdLines) {
+            if ($mdLine -notmatch '^\|') { continue }
+            if ($mdLine -match '^\|-') { continue }
+            if ($mdLine -match 'Agent ID') { continue }
+            $cols = $mdLine -split '\|' | ForEach-Object { $_.Trim() }
+            if ($cols.Count -lt 6) { continue }
+            $tableId = $cols[1]
+            if ($tableId -ieq $shortId -or $tableId -ieq $AgentId -or $tableId -ieq $AgentNameOrId) {
+                if (-not $AgentPretext -and $cols[3]) { $AgentPretext = $cols[3] }
+                if (-not $AgentVoice -and $cols[5]) { $AgentVoice = $cols[5] }
+                if (-not $AgentPersonality -and $cols.Count -ge 7 -and $cols[6] -and $cols[6] -ine 'normal') {
+                    $AgentPersonality = $cols[6]
+                }
+                break
+            }
+        }
+        if ($AgentPretext) { break }
+    }
+}
+
 # Fall back to default pretext if none stored: "DisplayName, Title here."
 # Matches AgentVoiceStore.getDefaultPretext() in agent-voice-store.js
-if (-not $AgentPretext -and $AgentDisplayName) {
-    if ($AgentTitle) {
+if (-not $AgentPretext) {
+    if ($AgentDisplayName -and $AgentTitle) {
         $AgentPretext = "$AgentDisplayName, $AgentTitle here."
-    } else {
+    } elseif ($AgentDisplayName) {
         $AgentPretext = "$AgentDisplayName here."
+    } elseif ($AgentNameOrId) {
+        $AgentPretext = "$AgentNameOrId here."
     }
 }
 

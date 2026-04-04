@@ -30,7 +30,14 @@ DIALOGUE="${DIALOGUE//\\\$/\$}"
 
 # Strip markdown formatting — prevent Piper from speaking "asterisk asterisk" literally.
 # play-tts-piper.sh also strips via perl, but do it here early as defense-in-depth.
-DIALOGUE=$(printf '%s' "$DIALOGUE" | sed 's/\*\*//g; s/\*//g; s/`//g; s/^[[:space:]]*#\+[[:space:]]*//')
+DIALOGUE=$(printf '%s' "$DIALOGUE" | sed \
+  -e 's/\*\{1,3\}//g' \
+  -e 's/`\{1,3\}[^`]*`\{1,3\}//g' \
+  -e 's/^[[:space:]]*#\{1,6\}[[:space:]]*//g' \
+  -e 's/__//g' -e 's/_//g' \
+  -e 's/\[([^]]*)\]([^)]*)//g' \
+  -e 's/^[[:space:]]*[-*+] //g' \
+  -e 's/^[[:space:]]*[0-9]\+\. //g')
 
 # Check if party mode is enabled
 if [[ -f "$PROJECT_ROOT/.agentvibes/bmad/bmad-party-mode-disabled.flag" ]]; then
