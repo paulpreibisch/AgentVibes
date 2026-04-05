@@ -36,10 +36,10 @@ VERBOSITY=$(cat .claude/tts-verbosity.txt 2>/dev/null || cat ~/.claude/tts-verbo
 # Build context string
 CONTEXT="# AgentVibes TTS Protocol\n\n"
 CONTEXT+="**CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**\n\n"
-CONTEXT+="1. **Acknowledgment** - Start of task: \`Bash: .claude/hooks/play-tts.sh \"[action]\"\`\n"
-CONTEXT+="2. **Completion** - End of task: \`Bash: .claude/hooks/play-tts.sh \"[result + key details]\"\`\n\n"
-CONTEXT+="**Example:**\n\`\`\`\n[Bash: .claude/hooks/play-tts.sh \"Checking git status\"]\n[work...]\n"
-CONTEXT+="[Bash: .claude/hooks/play-tts.sh \"Repository is clean, no changes\"]\n\`\`\`\n\n"
+CONTEXT+="1. **Acknowledgment** - Start of task: \`Bash: .claude/hooks/play-tts.sh \"[action]\" --llm claude-code\`\n"
+CONTEXT+="2. **Completion** - End of task: \`Bash: .claude/hooks/play-tts.sh \"[result + key details]\" --llm claude-code\`\n\n"
+CONTEXT+="**Example:**\n\`\`\`\n[Bash: .claude/hooks/play-tts.sh \"Checking git status\" --llm claude-code]\n[work...]\n"
+CONTEXT+="[Bash: .claude/hooks/play-tts.sh \"Repository is clean, no changes\" --llm claude-code]\n\`\`\`\n\n"
 
 # Add verbosity-specific protocol
 case "$VERBOSITY" in

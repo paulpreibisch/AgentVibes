@@ -77,9 +77,34 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   exit 0
 fi
 
-TEXT="${1:-}"
-VOICE_OVERRIDE="${2:-}"      # Optional: voice name or ID
-AGENT_PROFILE_FILE="${3:-}"  # Optional: path to per-agent profile JSON (from bmad-speak.sh)
+# Parse arguments: positional + optional --llm <provider>
+TEXT=""
+VOICE_OVERRIDE=""
+AGENT_PROFILE_FILE=""
+LLM_PROVIDER=""
+
+_positional=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --llm)
+      LLM_PROVIDER="${2:-}"
+      # Security: Validate LLM provider name (alphanumeric, hyphens, underscores only)
+      if [[ -n "$LLM_PROVIDER" ]] && [[ ! "$LLM_PROVIDER" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "Error: Invalid LLM provider name" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    *)
+      _positional+=("$1")
+      shift
+      ;;
+  esac
+done
+
+TEXT="${_positional[0]:-}"
+VOICE_OVERRIDE="${_positional[1]:-}"
+AGENT_PROFILE_FILE="${_positional[2]:-}"
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then
@@ -101,15 +126,62 @@ TEXT="${TEXT//\\?/?}"        # Remove \?
 TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 
-# Prepend intro text (pretext) if configured
-# Check project-local first, then global
-_PRETEXT_FILE="$PROJECT_ROOT/.claude/config/intro-text.txt"
-[[ -f "$_PRETEXT_FILE" ]] || _PRETEXT_FILE="$HOME/.claude/config/intro-text.txt"
-if [[ -f "$_PRETEXT_FILE" ]]; then
-  _PRETEXT="$(head -1 "$_PRETEXT_FILE" 2>/dev/null || true)"
-  if [[ -n "$_PRETEXT" ]]; then
-    TEXT="${_PRETEXT} ${TEXT}"
+# Per-LLM config lookup: if --llm is passed, look up llm:<name> in audio-effects.cfg
+# Format: llm:<name>|REVERB_PRESET|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT
+_LLM_VOICE=""
+_LLM_PRETEXT=""
+_LLM_REVERB=""
+if [[ -n "$LLM_PROVIDER" ]]; then
+  _llm_key="llm:${LLM_PROVIDER}"
+  for _cfg in \
+    "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
+    "$HOME/.claude/config/audio-effects.cfg"; do
+    if [[ -z "$_LLM_VOICE" && -z "$_LLM_PRETEXT" && -f "$_cfg" ]]; then
+      while IFS='|' read -r _key _reverb _bgfile _bgvol _voice _pretext _rest; do
+        if [[ "$_key" == "$_llm_key" ]]; then
+          _reverb="${_reverb## }"; _reverb="${_reverb%% }"
+          _voice="${_voice## }"; _voice="${_voice%% }"
+          _pretext="${_pretext## }"; _pretext="${_pretext%% }"
+          [[ -n "$_reverb" ]] && _LLM_REVERB="$_reverb"
+          [[ -n "$_voice" ]] && _LLM_VOICE="$_voice"
+          [[ -n "$_pretext" ]] && _LLM_PRETEXT="$_pretext"
+          break
+        fi
+      done < "$_cfg"
+    fi
+  done
+  # Apply LLM voice (only if no explicit voice override)
+  if [[ -n "$_LLM_VOICE" && -z "$VOICE_OVERRIDE" ]]; then
+    VOICE_OVERRIDE="$_LLM_VOICE"
   fi
+  # Export LLM key for child scripts (process-local, not system-wide)
+  export AGENTVIBES_LLM_KEY="llm:${LLM_PROVIDER}"
+fi
+
+# Prepend intro text (pretext) if configured
+# Priority: LLM-specific pretext → project .agentvibes/config.json → project .claude/config
+#           → global ~/.agentvibes/config.json → global ~/.claude/config
+_PRETEXT="$_LLM_PRETEXT"
+if [[ -z "$_PRETEXT" ]]; then
+  for _src in \
+    "$PROJECT_ROOT/.agentvibes/config.json" \
+    "$PROJECT_ROOT/.claude/config/tts-pretext.txt" \
+    "$PROJECT_ROOT/.claude/config/intro-text.txt" \
+    "$HOME/.agentvibes/config.json" \
+    "$HOME/.claude/config/tts-pretext.txt" \
+    "$HOME/.claude/config/intro-text.txt"; do
+    if [[ -z "$_PRETEXT" && -f "$_src" ]]; then
+      if [[ "$_src" == *.json ]]; then
+        # Extract pretext from JSON (lightweight — no jq dependency)
+        _PRETEXT="$(sed -n 's/.*"pretext"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$_src" 2>/dev/null | head -1)"
+      else
+        _PRETEXT="$(head -1 "$_src" 2>/dev/null || true)"
+      fi
+    fi
+  done
+fi
+if [[ -n "$_PRETEXT" ]]; then
+  TEXT="${_PRETEXT}, ${TEXT}"
 fi
 
 # Source provider manager to get active provider

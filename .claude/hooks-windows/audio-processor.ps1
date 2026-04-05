@@ -13,10 +13,7 @@ param(
     [string]$AgentName = "default",
 
     [Parameter(Position = 2)]
-    [string]$OutputFile = "",
-
-    [Parameter(Position = 3)]
-    [string]$AgentProfileFile = ""
+    [string]$OutputFile = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -32,10 +29,22 @@ if (-not $OutputFile) {
     $OutputFile = $InputFile -replace '\.wav$', '-processed.wav'
 }
 
-# Configuration paths
+# Configuration paths - prefer local project over global
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ConfigDir = Join-Path (Split-Path -Parent $ScriptDir) "config"
-$ConfigFile = Join-Path $ConfigDir "audio-effects.cfg"
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+
+# Resolve project-local config (if project-based)
+$ProjectConfigDir = Join-Path $ProjectRoot ".claude\config"
+$ProjectConfigFile = Join-Path $ProjectConfigDir "audio-effects.cfg"
+
+# Global fallback
+$GlobalConfigDir = Join-Path (Split-Path -Parent $ScriptDir) "config"
+$GlobalConfigFile = Join-Path $GlobalConfigDir "audio-effects.cfg"
+
+# Use project config if it exists, else fall back to global
+$ConfigFile = if (Test-Path $ProjectConfigFile) { $ProjectConfigFile } else { $GlobalConfigFile }
+$ConfigDir = Split-Path -Parent $ConfigFile
+
 $EnabledFile = Join-Path $ConfigDir "background-music-enabled.txt"
 $GlobalEnabledFile = "$env:USERPROFILE\.claude\config\background-music-enabled.txt"
 $BackgroundDir = Join-Path (Split-Path -Parent $ScriptDir) "audio\tracks"
@@ -104,7 +113,11 @@ $NeedsCleanup = $false
 if ($SoxAvailable -and $effects.reverb) {
     $TempFile = "$InputFile.tmp.wav"
     try {
-        $soxArgs = @($InputFile) + ($effects.reverb -split ' ') + @($TempFile)
+        # Validate reverb params: only allow known sox reverb tokens (numbers, "reverb", "gain", etc.)
+        $reverbTokens = $effects.reverb -split ' ' | Where-Object {
+            $_ -match '^-?[0-9]+(\.[0-9]+)?$' -or $_ -match '^(reverb|gain|vol|norm|pad|trim|rate|channels)$'
+        }
+        $soxArgs = @($InputFile) + $reverbTokens + @($TempFile)
         & sox @soxArgs 2>$null
         if (Test-Path $TempFile) {
             $CurrentFile = $TempFile
@@ -136,7 +149,7 @@ if ($BgMusicEnabled -and $FfmpegAvailable -and $effects.bgFile) {
                 $MixedFile
             )
             & ffmpeg @ffArgs 2>$null
-            if (Test-Path $MixedFile -and (Get-Item $MixedFile).Length -gt 0) {
+            if ((Test-Path $MixedFile) -and (Get-Item $MixedFile).Length -gt 0) {
                 if ($NeedsCleanup -and (Test-Path $CurrentFile) -and $CurrentFile -ne $InputFile) {
                     Remove-Item -Path $CurrentFile -Force -ErrorAction SilentlyContinue
                 }

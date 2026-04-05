@@ -56,6 +56,6 @@ Use `text_to_speech` with the agent's voice/personality for all speech.
 Each BMAD agent should speak using `text_to_speech` with their display name as the personality.
 When multiple agents respond in a roundtable discussion, call `text_to_speech` sequentially (not in parallel) so agents speak one at a time.
 
-The BMAD agent manifest is at `_bmad/_config/agent-manifest.csv` — read it to discover available agents, their display names, icons, and communication styles.
+If `_bmad/_config/agent-manifest.csv` exists, read it to discover available agents, their display names, icons, and communication styles. If the file does not exist, use default agent names.
 
 If `.bmad-agent-context` does NOT exist, use `text_to_speech` as normal with default voice.

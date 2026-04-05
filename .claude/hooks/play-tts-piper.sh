@@ -439,7 +439,9 @@ if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   _tmp=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX"); PROCESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$PROCESSED_FILE"
   _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
-  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
+  # Lookup order: LLM key (from --llm) → default
+  _AGENT_KEY="${AGENTVIBES_LLM_KEY:-default}"
+  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "$_AGENT_KEY" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
     PROCESSED_FILE="$TEMP_FILE"
     PROCESSOR_OUTPUT="$TEMP_FILE|"

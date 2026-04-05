@@ -16,8 +16,12 @@ if (-not (Test-Path $AgentVibesDir)) {
     New-Item -ItemType Directory -Path $AgentVibesDir -Force | Out-Null
 }
 
-# Log session start
+# Log session start (rotate if >1MB to prevent unbounded growth)
 $LogFile = Join-Path $AgentVibesDir "copilot-sessions.log"
+if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt 1048576) {
+    $tail = Get-Content $LogFile -Tail 100
+    Set-Content -Path $LogFile -Value $tail
+}
 $Timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 Add-Content -Path $LogFile -Value "[AgentVibes] Copilot session initialized at $Timestamp"
 

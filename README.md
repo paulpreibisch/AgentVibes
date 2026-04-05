@@ -4,7 +4,7 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **Claude Desktop**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
+> Professional text-to-speech for **Claude Code**, **GitHub Copilot**, **Claude Desktop**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
@@ -25,6 +25,7 @@
 | **Understand what I need** | [Prerequisites](#-prerequisites) |
 | **Set up on Windows (Native)** | [Windows Native Setup](WINDOWS-SETUP.md) |
 | **Set up on Windows (Claude Desktop/WSL)** | [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md) |
+| **Use with GitHub Copilot** | [Copilot Integration](#-github-copilot-integration) |
 | **Use with OpenClaw** | [OpenClaw Integration](#-openclaw-integration) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
@@ -493,6 +494,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [🎙️ AgentVibes Receiver - NEW!](#%EF%B8%8F-agentvibes-receiver-remote-audio-streaming-from-voiceless-servers) - Remote audio streaming from voiceless servers
 
 ### Integrations & Platforms
+- [🤝 GitHub Copilot Integration](#-github-copilot-integration) - Use AgentVibes TTS with GitHub Copilot CLI
 - [🤖 OpenClaw Integration](#-openclaw-integration) - Use AgentVibes with OpenClaw messaging platform
   - [🎙️ AgentVibes Skill for OpenClaw](#-agentvibes-skill-for-openclaw---what-you-get) - 50+ voices, effects, personalities for OpenClaw
   - [📱 AgentVibes Receiver](#-agentvibes-receiver-local-phone-) - Remote audio on phones/local machines
@@ -1243,6 +1245,85 @@ BMAD uses a **loosely-coupled injection system** for voice integration. BMAD sou
 This design means **any TTS provider** can integrate with BMAD by replacing these markers with their own instructions!
 
 **[→ View Complete BMAD Documentation](docs/bmad-plugin.md)** - All agent mappings, language support, TTS injection details, plugin management, and customization
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🤝 GitHub Copilot Integration
+
+**Use AgentVibes with GitHub Copilot in VS Code — same voices, same personalities, same MCP tools!**
+
+Copilot discovers AgentVibes through two mechanisms:
+
+1. **`.github/copilot-instructions.md`** — VS Code automatically reads this file and tells Copilot *how* to speak (acknowledge at start, summarize at end, match verbosity, stay under 150 chars)
+2. **`.vscode/mcp.json`** — registers the AgentVibes MCP server so Copilot can call `text_to_speech`, `set_voice`, and other tools
+
+### Setup
+
+**Step 1: Install AgentVibes** (if you haven't already)
+
+```bash
+npx agentvibes install
+```
+
+**Step 2: Configure VS Code MCP**
+
+Open the AgentVibes console and go to the **LLM** tab (press `L`):
+
+```bash
+npx agentvibes
+```
+
+Select **GitHub Copilot** and press Enter to install. This creates `.vscode/mcp.json` with the AgentVibes MCP server config and copies `.github/copilot-instructions.md` with the TTS protocol.
+
+You can also create `.vscode/mcp.json` manually in your project root:
+
+```json
+{
+  "servers": {
+    "agentvibes": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]
+    }
+  }
+}
+```
+
+VS Code starts the MCP server automatically when Copilot needs it — no manual server launch required.
+
+**Step 3: Verify**
+
+Open Copilot Chat in VS Code (Ctrl+Shift+I) and ask it to do something. You should hear an acknowledgment when Copilot starts working and a summary when it finishes.
+
+### What Copilot Can Do
+
+Through the MCP tools, Copilot has the same voice capabilities as Claude Code:
+
+| Tool | What it does |
+|------|-------------|
+| `text_to_speech` | Speak text aloud |
+| `set_voice` | Switch voices (e.g., "ryan", "katherine") |
+| `set_personality` | Change personality (sarcastic, pirate, zen) |
+| `set_speed` | Adjust speech rate |
+| `set_verbosity` | Control detail level (low/medium/high) |
+| `mute` / `unmute` | Toggle audio |
+| `get_config` | Read current settings |
+
+### BMAD Party Mode
+
+Copilot respects BMAD party mode. If `.bmad-agent-context` contains `party-mode`, each BMAD agent speaks with its own voice — the same per-agent routing that works in Claude Code.
+
+### Differences from Claude Code
+
+| Feature | Claude Code | Copilot in VS Code |
+|---------|------------|-------------|
+| TTS Protocol | Injected via session-start hook | Read from `.github/copilot-instructions.md` |
+| MCP config | `.mcp.json` (project root) | `.vscode/mcp.json` |
+| Server lifecycle | Managed by Claude Code | Managed by VS Code (auto-start) |
+| MCP tools | Same | Same |
+| BMAD party mode | Supported | Supported |
 
 [↑ Back to top](#-table-of-contents)
 

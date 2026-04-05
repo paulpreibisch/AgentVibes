@@ -65,14 +65,14 @@ $Context = @"
 
 **CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
 
-1. **Acknowledgment** - Start of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "[action]"``
-2. **Completion** - End of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "[result + key details]"``
+1. **Acknowledgment** - Start of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "[action]" -llm claude-code``
+2. **Completion** - End of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "[result + key details]" -llm claude-code``
 
 **Example:**
 ``````
-[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Checking git status"]
+[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Checking git status" -llm claude-code]
 [work...]
-[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Repository is clean, no changes"]
+[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Repository is clean, no changes" -llm claude-code]
 ``````
 
 $VerbositySection

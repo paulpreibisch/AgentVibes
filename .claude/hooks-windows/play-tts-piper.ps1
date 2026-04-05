@@ -229,21 +229,29 @@ try {
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
     Write-Host "[VOICE] Voice used: $VoiceName (Piper)" -ForegroundColor Green
 
-    # Play the audio using built-in Windows audio player (skip if AGENTVIBES_NO_PLAY is set)
-    if (-not $env:AGENTVIBES_NO_PLAY) {
-        $player = $null
+    # Apply audio effects (reverb, background music) if processor script exists
+    $ProcessorScript = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "audio-processor.ps1"
+    $ProcessedFile = $AudioFile
+    if (Test-Path $ProcessorScript) {
+        # Lookup order: agent name → LLM key (from --llm) → default
+        $AgentName = if ($env:AGENTVIBES_AGENT_NAME) { $env:AGENTVIBES_AGENT_NAME } elseif ($env:AGENTVIBES_LLM_KEY) { $env:AGENTVIBES_LLM_KEY } else { "default" }
+        $EffectedFile = "$AudioFile.effected.wav"
         try {
-            $player = New-Object System.Media.SoundPlayer $AudioFile
-            $player.PlaySync()
+            & $ProcessorScript $AudioFile $AgentName $EffectedFile
+            if ((Test-Path $EffectedFile) -and (Get-Item $EffectedFile).Length -gt 0) {
+                $ProcessedFile = $EffectedFile
+                Write-Host "[EFFECTS] Audio effects applied" -ForegroundColor Cyan
+            }
         }
         catch {
-            Write-Host "[WARNING] Could not play audio (SoundPlayer unavailable)" -ForegroundColor Yellow
-            Write-Host "Audio saved to: $AudioFile" -ForegroundColor Gray
-        }
-        finally {
-            if ($player) { $player.Dispose() }
+            Write-Host "[WARNING] Audio effects processing skipped: $_" -ForegroundColor Yellow
         }
     }
+
+    # Return path to processed audio file for parent (play-tts.ps1) to handle playback
+    # This allows play-tts.ps1 to apply additional post-processing (reverb, background music)
+    # DO NOT play here - let play-tts.ps1 coordinate all audio playback
+    Write-Host "[OUTPUT] Processed audio: $ProcessedFile" -ForegroundColor Gray
 }
 catch {
     Write-Host "[ERROR] Error running Piper: $_" -ForegroundColor Red

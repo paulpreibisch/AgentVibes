@@ -12,6 +12,7 @@ const KEY_TO_TAB = {
   'v': 'voices',   'V': 'voices',
   'm': 'music',    'M': 'music',
   'b': 'agents',   'B': 'agents',
+  'l': 'llm-providers', 'L': 'llm-providers',
   'x': 'receiver', 'X': 'receiver',
   'r': 'readme',   'R': 'readme',
   'h': 'help',     'H': 'help',

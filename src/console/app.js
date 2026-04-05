@@ -28,6 +28,7 @@ import { createHelpTab } from './tabs/help-tab.js';
 import { createReadmeTab } from './tabs/readme-tab.js';
 import { createReceiverTab } from './tabs/receiver-tab.js';
 import { createAgentsTab } from './tabs/agents-tab.js';
+import { createLlmProvidersTab } from './tabs/llm-providers-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -736,6 +737,13 @@ export class AgentVibesConsole {
       agentsPlaceholder.destroy();
     }
     this.tabs['agents'] = createAgentsTab(this.screen, services);
+
+    // Destroy llm-providers placeholder and mount real tab
+    const llmPlaceholder = this.tabs['llm-providers'];
+    if (llmPlaceholder && typeof llmPlaceholder.destroy === 'function') {
+      llmPlaceholder.destroy();
+    }
+    this.tabs['llm-providers'] = createLlmProvidersTab(this.screen, services);
 
     // Destroy receiver placeholder and mount real receiver tab
     const receiverPlaceholder = this.tabs['receiver'];

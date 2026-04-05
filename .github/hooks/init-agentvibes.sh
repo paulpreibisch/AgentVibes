@@ -18,8 +18,12 @@ if [[ ! -d "$AGENTVIBES_DIR" ]]; then
   mkdir -p "$AGENTVIBES_DIR"
 fi
 
-# Log session start
-echo "[AgentVibes] Copilot session initialized at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$AGENTVIBES_DIR/copilot-sessions.log"
+# Log session start (rotate if >1MB to prevent unbounded growth)
+LOG_FILE="$AGENTVIBES_DIR/copilot-sessions.log"
+if [[ -f "$LOG_FILE" ]] && [[ $(stat -c '%s' "$LOG_FILE" 2>/dev/null || stat -f '%z' "$LOG_FILE" 2>/dev/null) -gt 1048576 ]]; then
+  tail -n 100 "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
+fi
+echo "[AgentVibes] Copilot session initialized at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$LOG_FILE"
 
 # Check for BMAD party mode
 if [[ -f "$PROJECT_ROOT/.bmad-agent-context" ]]; then

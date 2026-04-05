@@ -10,21 +10,25 @@ param(
     [string]$Text,
 
     [Parameter(Mandatory = $false, Position = 1)]
-    [string]$VoiceOverride
+    [string]$VoiceOverride,
+
+    [Parameter(Mandatory = $false)]
+    [string]$llm = ""
 )
 
 # Configuration paths
 # Priority: CLAUDE_PROJECT_DIR env var → script's parent project → user profile
+# Local project settings ALWAYS override global (~/.claude)
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) {
     $ClaudeDir = "$env:CLAUDE_PROJECT_DIR\.claude"
 } else {
     $PackageClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptPath)) ".claude"
-    if (Test-Path "$env:USERPROFILE\.claude\tts-provider.txt") {
-        $ClaudeDir = "$env:USERPROFILE\.claude"
-    } elseif (Test-Path $PackageClaudeDir) {
+    if (Test-Path $PackageClaudeDir) {
         $ClaudeDir = $PackageClaudeDir
+    } elseif (Test-Path "$env:USERPROFILE\.claude\tts-provider.txt") {
+        $ClaudeDir = "$env:USERPROFILE\.claude"
     } else {
         $ClaudeDir = "$env:USERPROFILE\.claude"
     }
@@ -40,6 +44,78 @@ if (Test-Path $MuteFile) {
     if ($muteStatus.Trim() -eq "true") {
         exit 0
     }
+}
+
+# Per-LLM config lookup: if --llm is passed, look up llm:<name> in audio-effects.cfg
+# Format: llm:<name>|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT
+$LlmVoice = ""
+$LlmPretext = ""
+$LlmReverb = ""
+$ProjectRoot = Split-Path -Parent $ClaudeDir
+$ConfigDir = "$ClaudeDir\config"
+
+if ($llm) {
+    $llmKey = "llm:$llm"
+    # Check project-local audio-effects.cfg first, then global
+    $cfgPaths = @(
+        "$ConfigDir\audio-effects.cfg",
+        "$env:USERPROFILE\.claude\config\audio-effects.cfg"
+    )
+    foreach ($cfgPath in $cfgPaths) {
+        if (-not $LlmVoice -and -not $LlmPretext -and (Test-Path $cfgPath)) {
+            foreach ($line in (Get-Content $cfgPath)) {
+                if ($line -match "^$([regex]::Escape($llmKey))\|") {
+                    $parts = $line -split '\|'
+                    # parts: [0]=key [1]=reverb_preset [2]=bg_file [3]=bg_vol [4]=voice [5]=pretext
+                    if ($parts.Length -ge 2 -and $parts[1].Trim()) {
+                        $LlmReverb = $parts[1].Trim()
+                    }
+                    if ($parts.Length -ge 5 -and $parts[4].Trim()) {
+                        $LlmVoice = $parts[4].Trim()
+                    }
+                    if ($parts.Length -ge 6 -and $parts[5].Trim()) {
+                        $LlmPretext = $parts[5].Trim()
+                    }
+                    break
+                }
+            }
+        }
+    }
+    # Apply LLM voice override (only if no explicit VoiceOverride was passed)
+    if ($LlmVoice -and -not $VoiceOverride) {
+        $VoiceOverride = $LlmVoice
+    }
+    # Export LLM key for child scripts (process-local, not system-wide)
+    $env:AGENTVIBES_LLM_KEY = "llm:$llm"
+}
+
+# Prepend pretext if configured
+# Priority: LLM-specific pretext → project .agentvibes/config.json → project .claude/config/tts-pretext.txt
+#           → global ~/.agentvibes/config.json → global ~/.claude/config/tts-pretext.txt
+$Pretext = $LlmPretext
+if (-not $Pretext) {
+    $PretextSources = @(
+        (Join-Path $ProjectRoot ".agentvibes\config.json"),
+        "$ClaudeDir\config\tts-pretext.txt",
+        "$env:USERPROFILE\.agentvibes\config.json",
+        "$env:USERPROFILE\.claude\config\tts-pretext.txt"
+    )
+    foreach ($src in $PretextSources) {
+        if (-not $Pretext -and (Test-Path $src)) {
+            if ($src -match '\.json$') {
+                try {
+                    $avCfg = Get-Content $src -Raw | ConvertFrom-Json
+                    if ($avCfg.pretext) { $Pretext = $avCfg.pretext.Trim() }
+                } catch { }
+            } else {
+                $val = (Get-Content $src -Raw).Trim()
+                if ($val) { $Pretext = $val }
+            }
+        }
+    }
+}
+if ($Pretext) {
+    $Text = "$Pretext, $Text"
 }
 
 # Determine active provider
@@ -101,12 +177,17 @@ if (Test-Path $AgentVibesConfig) {
 }
 
 # Check if reverb is enabled (allowlist validation)
+# LLM-specific reverb overrides global setting
 $ReverbLevel = "off"
-$ReverbFile = "$ConfigDir\reverb-level.txt"
-if (Test-Path $ReverbFile) {
-    $reverbVal = (Get-Content $ReverbFile -Raw).Trim()
-    if ($reverbVal -in @("off", "light", "medium", "heavy", "cathedral")) {
-        $ReverbLevel = $reverbVal
+if ($LlmReverb -and $LlmReverb -in @("off", "light", "medium", "heavy", "cathedral")) {
+    $ReverbLevel = $LlmReverb
+} else {
+    $ReverbFile = "$ConfigDir\reverb-level.txt"
+    if (Test-Path $ReverbFile) {
+        $reverbVal = (Get-Content $ReverbFile -Raw).Trim()
+        if ($reverbVal -in @("off", "light", "medium", "heavy", "cathedral")) {
+            $ReverbLevel = $reverbVal
+        }
     }
 }
 $HasReverb = $ReverbLevel -ne "off"
@@ -241,6 +322,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
             if (Test-Path $AudioEffectsCfg) {
                 # Try agent-specific config first, then fall back to default
                 # Format: AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME
+                # Lookup order: agent name → llm:<name> → default
                 $agentName = $env:AGENTVIBES_AGENT_NAME
                 $configLine = $null
 
@@ -248,6 +330,16 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                 if ($agentName) {
                     foreach ($line in $cfgLines) {
                         if ($line -match "^$([regex]::Escape($agentName))\|") {
+                            $configLine = $line
+                            break
+                        }
+                    }
+                }
+                # Try LLM-specific config (--llm parameter)
+                if (-not $configLine -and $llm) {
+                    $llmBgKey = "llm:$llm"
+                    foreach ($line in $cfgLines) {
+                        if ($line -match "^$([regex]::Escape($llmBgKey))\|") {
                             $configLine = $line
                             break
                         }

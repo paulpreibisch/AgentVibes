@@ -4429,12 +4429,12 @@ async function processBmadTtsInjections(bmadPath, targetDir) {
   const partyModeMarker = '<!-- TTS_INJECTION:party-mode -->';
   const agentTtsMarker = '<!-- TTS_INJECTION:agent-tts -->';
 
-  const partyModeReplacement = `<critical>IMPORTANT: Always use PROJECT hooks (.claude/hooks/), NEVER global hooks (~/.claude/hooks/)</critical>
+  const partyModeReplacement = `<critical>IMPORTANT: Always use the project BMAD speech entry point, never a global hook path.</critical>
 
-If AgentVibes party mode is enabled, immediately trigger TTS with agent's voice:
-         - Use Bash tool: \`.claude/hooks/bmad-speak.sh '[Agent Name]' '[dialogue]'\`
-         - This speaks the dialogue with the agent's unique voice
-         - Run in background (&) to not block next agent`;
+If AgentVibes party mode is enabled, immediately trigger TTS with the agent's voice:
+         - Use Bash tool: \`node bin/bmad-speak.js '[Agent Name]' '[dialogue]'\`
+         - This speaks the dialogue with the agent's unique voice via the platform-specific bmad-speak script
+         - Run each agent sequentially; do NOT background with & and do NOT run party mode TTS in parallel`;
 
   const agentTtsReplacement = `- When responding to user messages, speak your responses using TTS:
    Call: \`.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'\` after each response

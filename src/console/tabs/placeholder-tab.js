@@ -37,20 +37,22 @@ export function createPlaceholderTab(contentArea, label) {
 
 /** Map of tabId → display label for all tabs */
 export const TAB_DISPLAY_LABELS = {
-  settings: 'Settings',
-  voices:   'Voices',
-  music:    'Music',
-  agents:   'BMad',
-  receiver: 'Receiver',
-  readme:   'Readme',
-  help:     'Help',
-  install:  'Install',
+  settings:        'Settings',
+  voices:          'Voices',
+  music:           'Music',
+  agents:          'BMad',
+  'llm-providers': 'LLM',
+  receiver:        'Receiver',
+  readme:          'Readme',
+  help:            'Help',
+  install:         'Install',
 };
 
 /** Override shortcut key for tabs where first letter conflicts */
 export const TAB_SHORTCUT_KEYS = {
-  agents:   'B',
-  receiver: 'X',
+  agents:          'B',
+  'llm-providers': 'L',
+  receiver:        'X',
 };
 
 /**
@@ -63,14 +65,15 @@ export const TAB_SHORTCUT_KEYS = {
  */
 export function getTabLabel(id, lang = 'en') {
   const keyMap = {
-    install:  'tabInstall',
-    settings: 'tabSettings',
-    voices:   'tabVoices',
-    music:    'tabMusic',
-    agents:   'tabBmad',
-    receiver: 'tabReceiver',
-    readme:   'tabReadme',
-    help:     'tabHelp',
+    install:         'tabInstall',
+    settings:        'tabSettings',
+    voices:          'tabVoices',
+    music:           'tabMusic',
+    agents:          'tabBmad',
+    'llm-providers': 'tabLlmProviders',
+    receiver:        'tabReceiver',
+    readme:          'tabReadme',
+    help:            'tabHelp',
   };
   const key = keyMap[id];
   if (!key) return TAB_DISPLAY_LABELS[id] ?? id;

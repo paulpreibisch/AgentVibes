@@ -100,11 +100,11 @@ The format is simple: each agent's response one after another, separated by a bl
 After all agent responses are presented in full, you may optionally add a brief **Orchestrator Note** — flagging a disagreement worth exploring, or suggesting an agent to bring in next round. Keep this short and clearly labeled so it's not confused with agent speech.
 
 **Speak each response via TTS in the agent's unique voice.**
-After presenting all responses in text, call `bmad-speak.ps1` (Windows) sequentially — one agent at a time, do NOT run in parallel:
+After presenting all responses in text, call the cross-platform BMAD speech entry point sequentially — one agent at a time, do NOT run in parallel:
 ```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\bmad-speak.ps1" "{displayName}" "{their response text — truncate to ~300 chars for TTS}"
+node bin/bmad-speak.js "{displayName}" "{their response text — truncate to ~300 chars for TTS}"
 ```
-On Linux/Mac use `.claude/hooks/bmad-speak.sh` instead. Each call blocks until playback completes before the next agent speaks.
+This delegates to `.claude/hooks-windows/bmad-speak.ps1` on Windows and `.claude/hooks/bmad-speak.sh` elsewhere. Each call blocks until playback completes before the next agent speaks.
 
 ### 4. Handle Follow-ups
 

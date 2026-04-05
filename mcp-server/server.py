@@ -198,15 +198,18 @@ class AgentVibesServer:
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
             if self.is_windows:
-                args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text]
+                args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text, "-llm", "copilot"]
                 if voice:
                     args.extend(["-VoiceOverride", voice])
             else:
                 args = ["bash", str(play_tts), text]
                 if voice:
                     args.append(voice)
+                args.extend(["--llm", "copilot"])
 
             env = self._build_script_env()
+            # Set agent name for audio effects lookup (audio-effects.cfg, background music config)
+            env["AGENTVIBES_AGENT_NAME"] = "default"
 
             result = await asyncio.create_subprocess_exec(
                 *args,
