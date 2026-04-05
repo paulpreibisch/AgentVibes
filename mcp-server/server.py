@@ -220,13 +220,17 @@ class AgentVibesServer:
                 if result.returncode == 0:
                     output = stdout.decode().strip()
                     # Extract file path from output
+                    audio_file_path = None
                     for line in output.split("\n"):
                         if "Saved to:" in line:
-                            file_path = line.split("Saved to:")[1].strip()
-                            truncated = (
-                                f"{text[:50]}..." if len(text) > 50 else text
-                            )
-                            return f"✅ Spoke: {truncated}\n📁 Audio saved: {file_path}"
+                            audio_file_path = line.split("Saved to:")[1].strip()
+                            break
+
+                    if audio_file_path:
+                        truncated = (
+                            f"{text[:50]}..." if len(text) > 50 else text
+                        )
+                        return f"✅ Spoke: {truncated}\n📁 Audio saved: {audio_file_path}"
 
                     return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
                 else:
@@ -319,10 +323,10 @@ class AgentVibesServer:
         resolved_name = self._resolve_friendly_name(voice_name)
 
         result = await self._run_script(
-            self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name, "--silent"]
+            self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name]
         )
 
-        if result and "✅" in result:
+        if result and ("[OK]" in result or "✅" in result):
             if original_name.lower() != resolved_name.lower():
                 return f"✅ Voice switched to: {original_name} ({resolved_name})"
             return f"✅ Voice switched to: {voice_name}"

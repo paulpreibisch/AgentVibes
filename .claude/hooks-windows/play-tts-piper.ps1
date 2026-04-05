@@ -74,11 +74,12 @@ elseif (Test-Path $VoiceFile) {
 # and resolve the real Piper speaker index.
 # IMPORTANT: The trailing number in a speaker name (e.g. "Holly-7") is a disambiguation
 # suffix, NOT the speaker index. Real index must be looked up from voice-assignments.json.
+$SpeakerId = $null
+
 if ($VoiceName -match '::') {
     $parts = $VoiceName -split '::'
     $VoiceName = $parts[0]
     $SpeakerName = if ($parts.Length -ge 2) { $parts[1] } else { "" }
-    Remove-Item env:PIPER_SPEAKER -ErrorAction SilentlyContinue
 
     if ($SpeakerName) {
         # Primary: look up in voice-assignments.json catalog (libritts_speakers keyed by speaker index)
@@ -90,36 +91,41 @@ if ($VoiceName -match '::') {
         if (-not (Test-Path $VoiceAssignmentsPath)) {
             $VoiceAssignmentsPath = Join-Path $env:USERPROFILE "AgentVibes\voice-assignments.json"
         }
-        $SpeakerResolved = $false
         if (Test-Path $VoiceAssignmentsPath) {
             try {
                 $vaData = Get-Content $VoiceAssignmentsPath -Raw | ConvertFrom-Json
+                # First pass: try exact match
                 foreach ($prop in $vaData.libritts_speakers.PSObject.Properties) {
                     if ($prop.Value.voice_name -eq $SpeakerName) {
-                        $env:PIPER_SPEAKER = $prop.Name
-                        $SpeakerResolved = $true
+                        $SpeakerId = $prop.Name
                         break
+                    }
+                }
+                # If no exact match, try substring match as fallback
+                if (-not $SpeakerId) {
+                    foreach ($prop in $vaData.libritts_speakers.PSObject.Properties) {
+                        if ($prop.Value.voice_name -like "$SpeakerName*") {
+                            $SpeakerId = $prop.Name
+                            break
+                        }
                     }
                 }
             } catch { }
         }
         # Fallback: check patched speaker_id_map in the .onnx.json
-        if (-not $SpeakerResolved) {
+        if (-not $SpeakerId) {
             $OnnxJsonPath = "$VoicesDir\$VoiceName.onnx.json"
             if (Test-Path $OnnxJsonPath) {
                 try {
                     $onnxData = Get-Content $OnnxJsonPath -Raw | ConvertFrom-Json
                     $speakerIdMap = $onnxData.speaker_id_map
                     if ($speakerIdMap -and $speakerIdMap.PSObject.Properties[$SpeakerName]) {
-                        $env:PIPER_SPEAKER = [string]$speakerIdMap.PSObject.Properties[$SpeakerName].Value
+                        $SpeakerId = [string]$speakerIdMap.PSObject.Properties[$SpeakerName].Value
                     }
                 } catch { }
             }
         }
     }
-} else {
-    # No multi-speaker syntax — clear any stale speaker env var
-    Remove-Item env:PIPER_SPEAKER -ErrorAction SilentlyContinue
 }
 
 # Default voice if not specified
@@ -207,10 +213,10 @@ try {
     Write-Host "[SYNTH] Synthesizing with Piper..." -ForegroundColor Cyan
 
     # Run Piper with text input
-    # Add --speaker for multi-speaker models (e.g. libritts-high with speaker 9)
+    # Add --speaker for multi-speaker models (e.g. libritts-high with speaker 66 for Derek)
     $piperArgs = @("--model", $VoiceModelFile, "--output-file", $AudioFile)
-    if ($env:PIPER_SPEAKER) {
-        $piperArgs += @("--speaker", $env:PIPER_SPEAKER)
+    if ($SpeakerId) {
+        $piperArgs += @("--speaker", $SpeakerId)
     }
     $Text | & $PiperExe @piperArgs 2>$null
 

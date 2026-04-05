@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "bash .github/hooks/init-agentvibes.sh",
+        "powershell": "powershell -NoProfile -ExecutionPolicy Bypass -File .github/hooks/init-agentvibes.ps1",
+        "timeoutSec": 10,
+        "comment": "Initialize AgentVibes TTS for Copilot session"
+      }
+    ]
+  }
+}
