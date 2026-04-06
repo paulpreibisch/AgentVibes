@@ -3799,6 +3799,60 @@ async function copyConfigFiles(targetDir, spinner) {
 }
 
 /**
+ * Copy Codex integration files (.codex/AGENTS.md, .codex/hooks/, .codex/config.toml template)
+ * These are template files so Codex CLI and VS Code extension can discover AgentVibes.
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function copyCodexFiles(targetDir, spinner) {
+  spinner.start('Installing Codex integration files...');
+  const srcCodexDir = path.join(__dirname, '..', '.codex');
+  const destCodexDir = path.join(targetDir, '.codex');
+
+  let copiedFiles = [];
+  try {
+    await fs.mkdir(destCodexDir, { recursive: true });
+    await fs.mkdir(path.join(destCodexDir, 'hooks'), { recursive: true });
+
+    // Copy AGENTS.md
+    const agentsSrc = path.join(srcCodexDir, 'AGENTS.md');
+    try {
+      const content = await fs.readFile(agentsSrc, 'utf8');
+      await fs.writeFile(path.join(destCodexDir, 'AGENTS.md'), content);
+      copiedFiles.push('.codex/AGENTS.md');
+    } catch { /* source not found */ }
+
+    // Copy hook scripts
+    for (const hookFile of ['init-agentvibes.sh', 'init-agentvibes.ps1']) {
+      const hookSrc = path.join(srcCodexDir, 'hooks', hookFile);
+      try {
+        const content = await fs.readFile(hookSrc, 'utf8');
+        const destPath = path.join(destCodexDir, 'hooks', hookFile);
+        await fs.writeFile(destPath, content);
+        if (hookFile.endsWith('.sh')) {
+          try { await fs.chmod(destPath, 0o750); } catch { /* Windows */ }
+        }
+        copiedFiles.push(`.codex/hooks/${hookFile}`);
+      } catch { /* source not found */ }
+    }
+
+    if (copiedFiles.length > 0) {
+      spinner.succeed(chalk.green(`Installed ${copiedFiles.length} Codex file${copiedFiles.length === 1 ? '' : 's'}!\n`));
+      copiedFiles.forEach(file => {
+        console.log(chalk.gray(`   ✓ ${file}`));
+      });
+      console.log('');
+    } else {
+      spinner.info(chalk.gray('Codex files not found in package (optional)\n'));
+    }
+  } catch (error) {
+    spinner.info(chalk.yellow('Codex integration files skipped (optional)\n'));
+  }
+
+  return copiedFiles.length;
+}
+
+/**
  * Configure SessionStart hook in settings.json
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -5180,6 +5234,7 @@ async function install(options = {}) {
     await copyBmadConfigFiles(targetDir, silentSpinner);
     await copyBackgroundMusicFiles(targetDir, silentSpinner);
     await copyConfigFiles(targetDir, silentSpinner);
+    await copyCodexFiles(targetDir, silentSpinner);
     await configureSessionStartHook(targetDir, silentSpinner);
     await configurePartyModeHook(targetDir, silentSpinner);
     await installPluginManifest(targetDir, silentSpinner);
@@ -6086,7 +6141,7 @@ export {
   isTermux, isNativeWindows, detectAndNotifyTermux,
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
-  copyConfigFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
+  copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
   installPluginManifest, checkAndInstallPiper,
   updateGlobalHooks, CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
 };

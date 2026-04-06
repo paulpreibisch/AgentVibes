@@ -33,20 +33,28 @@ function resolveScript(relPath) {
   return null;
 }
 
+function hasProjectBmadManifest() {
+  return fs.existsSync(path.join(process.cwd(), '_bmad', '_config', 'agent-manifest.csv'));
+}
+
 let result;
 
 if (IS_WINDOWS) {
-  const script = resolveScript('.claude/hooks-windows/bmad-speak.ps1');
+  const script = hasProjectBmadManifest()
+    ? resolveScript('.claude/hooks-windows/bmad-speak.ps1')
+    : resolveScript('.claude/hooks-windows/play-tts.ps1');
   if (!script) process.exit(0);
-  result = spawnSync(
-    'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, agentName, dialogue],
-    { stdio: 'inherit' }
-  );
+  const args = hasProjectBmadManifest()
+    ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, agentName, dialogue]
+    : ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, dialogue];
+  result = spawnSync('powershell', args, { stdio: 'inherit' });
 } else {
-  const script = resolveScript('.claude/hooks/bmad-speak.sh');
+  const script = hasProjectBmadManifest()
+    ? resolveScript('.claude/hooks/bmad-speak.sh')
+    : resolveScript('.claude/hooks/play-tts.sh');
   if (!script) process.exit(0);
-  result = spawnSync('bash', [script, agentName, dialogue], { stdio: 'inherit' });
+  const args = hasProjectBmadManifest() ? [script, agentName, dialogue] : [script, dialogue];
+  result = spawnSync('bash', args, { stdio: 'inherit' });
 }
 
 process.exit(result.status ?? 0);

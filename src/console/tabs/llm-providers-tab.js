@@ -56,6 +56,12 @@ const PROVIDERS = [
     desc: 'VS Code Copilot Chat — .vscode/mcp.json + instructions',
     checkInstalled: (targetDir) => checkCopilotInstalled(targetDir),
   },
+  {
+    id: 'openai-codex',
+    name: 'OpenAI Codex',
+    desc: 'OpenAI CLI agent — .codex/config.toml + AGENTS.md',
+    checkInstalled: (targetDir) => checkCodexInstalled(targetDir),
+  },
 ];
 
 // ── Provider checks ──────────────────────────────────────────────────────────
@@ -148,6 +154,139 @@ async function removeCopilotInstructions(targetDir) {
   try {
     await fs.unlink(path.join(targetDir, '.github', 'copilot-instructions.md'));
   } catch { /* already gone */ }
+}
+
+// ── Codex helpers ────────────────────────────────────────────────────────────
+
+async function checkCodexInstalled(targetDir) {
+  try {
+    const content = await fs.readFile(path.join(targetDir, '.codex', 'config.toml'), 'utf8');
+    return content.includes('[mcp_servers.agentvibes]');
+  } catch {
+    return false;
+  }
+}
+
+function buildCodexToml(existingContent = '') {
+  const serverBlock = [
+    '[mcp_servers.agentvibes]',
+    'command = "npx"',
+    'args = ["-y", "--package=agentvibes", "agentvibes-mcp-server"]',
+  ].join('\n');
+
+  if (!existingContent.trim()) return serverBlock + '\n';
+
+  // Remove existing agentvibes block if present, then append fresh
+  const lines = existingContent.split('\n');
+  const filtered = [];
+  let skipping = false;
+  for (const line of lines) {
+    if (line.trim() === '[mcp_servers.agentvibes]') {
+      skipping = true;
+      continue;
+    }
+    if (skipping && line.startsWith('[')) {
+      skipping = false;
+    }
+    if (!skipping) filtered.push(line);
+  }
+
+  let result = filtered.join('\n').trimEnd();
+  if (result.length) result += '\n\n';
+  return result + serverBlock + '\n';
+}
+
+async function installCodexMcp(targetDir) {
+  const codexDir = path.join(targetDir, '.codex');
+  const tomlPath = path.join(codexDir, 'config.toml');
+
+  try {
+    await fs.mkdir(codexDir, { recursive: true });
+    let existing = '';
+    try { existing = await fs.readFile(tomlPath, 'utf8'); } catch { /* new file */ }
+    const content = buildCodexToml(existing);
+    await fs.writeFile(tomlPath, content);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function removeCodexMcp(targetDir) {
+  const tomlPath = path.join(targetDir, '.codex', 'config.toml');
+  try {
+    const content = await fs.readFile(tomlPath, 'utf8');
+    const lines = content.split('\n');
+    const filtered = [];
+    let skipping = false;
+    for (const line of lines) {
+      if (line.trim() === '[mcp_servers.agentvibes]') {
+        skipping = true;
+        continue;
+      }
+      if (skipping && line.startsWith('[')) {
+        skipping = false;
+      }
+      if (!skipping) filtered.push(line);
+    }
+    const result = filtered.join('\n').trim();
+    if (!result) {
+      await fs.unlink(tomlPath);
+    } else {
+      await fs.writeFile(tomlPath, result + '\n');
+    }
+    return { success: true };
+  } catch {
+    return { success: true }; // Already gone
+  }
+}
+
+async function installCodexInstructions(targetDir, packageDir) {
+  const srcPath = path.join(packageDir, '.codex', 'AGENTS.md');
+  try {
+    const content = await fs.readFile(srcPath, 'utf8');
+    // Write to .codex/AGENTS.md (source template)
+    await fs.mkdir(path.join(targetDir, '.codex'), { recursive: true });
+    await fs.writeFile(path.join(targetDir, '.codex', 'AGENTS.md'), content);
+    // Also write to project root AGENTS.md (Codex CLI reads from here)
+    await fs.writeFile(path.join(targetDir, 'AGENTS.md'), content);
+  } catch { /* best effort */ }
+}
+
+async function installCodexHooks(targetDir, packageDir) {
+  const destDir = path.join(targetDir, '.codex', 'hooks');
+  const srcDir = path.join(packageDir, '.codex', 'hooks');
+  try {
+    await fs.mkdir(destDir, { recursive: true });
+    for (const file of ['init-agentvibes.sh', 'init-agentvibes.ps1']) {
+      try {
+        const content = await fs.readFile(path.join(srcDir, file), 'utf8');
+        await fs.writeFile(path.join(destDir, file), content);
+      } catch { /* best effort */ }
+    }
+  } catch { /* best effort */ }
+}
+
+async function removeCodexInstructions(targetDir) {
+  try {
+    await fs.unlink(path.join(targetDir, '.codex', 'AGENTS.md'));
+  } catch { /* already gone */ }
+  try {
+    await fs.unlink(path.join(targetDir, 'AGENTS.md'));
+  } catch { /* already gone */ }
+}
+
+async function removeCodexHooks(targetDir) {
+  const hooksDir = path.join(targetDir, '.codex', 'hooks');
+  try {
+    await fs.unlink(path.join(hooksDir, 'init-agentvibes.sh'));
+  } catch { /* already gone */ }
+  try {
+    await fs.unlink(path.join(hooksDir, 'init-agentvibes.ps1'));
+  } catch { /* already gone */ }
+  try {
+    await fs.rmdir(hooksDir);
+  } catch { /* not empty or gone */ }
 }
 
 // ── Test stub ────────────────────────────────────────────────────────────────
@@ -364,6 +503,17 @@ export function createLlmProvidersTab(screen, services) {
       await refreshInstalledState();
       showCopilotInfo(result, wasInstalled);
     }
+
+    if (provider.id === 'openai-codex') {
+      const wasInstalled = installedState[provider.id];
+      const result = await installCodexMcp(targetDir);
+      // Also write .vscode/mcp.json — VS Code Codex extension reads this, not config.toml
+      await installCopilotMcp(targetDir);
+      await installCodexInstructions(targetDir, packageDir);
+      await installCodexHooks(targetDir, packageDir);
+      await refreshInstalledState();
+      showCodexInfo(result, wasInstalled);
+    }
   }
 
   async function handleRemove(provider) {
@@ -379,12 +529,26 @@ export function createLlmProvidersTab(screen, services) {
       await refreshInstalledState();
       showRemoveInfo('github-copilot');
     }
+
+    if (provider.id === 'openai-codex') {
+      await removeCodexMcp(targetDir);
+      await removeCopilotMcp(targetDir);  // Also clean .vscode/mcp.json
+      await removeCodexInstructions(targetDir);
+      await removeCodexHooks(targetDir);
+      await refreshInstalledState();
+      showRemoveInfo('openai-codex');
+    }
   }
 
   // ── Configure handler ────────────────────────────────────────────────────
 
   async function handleConfigure(provider) {
-    const llmKey = provider.id === 'github-copilot' ? 'copilot' : 'claude-code';
+    const llmKeyMap = {
+      'claude-code': 'claude-code',
+      'github-copilot': 'copilot',
+      'openai-codex': 'codex',
+    };
+    const llmKey = llmKeyMap[provider.id] || provider.id;
     const config = loadLlmConfigSync(llmKey);
     _openLlmConfigModal(provider, llmKey, config);
   }
@@ -998,6 +1162,75 @@ export function createLlmProvidersTab(screen, services) {
     screen.render();
   }
 
+  function showCodexInfo(result, wasInstalled = false) {
+    currentView = 'info';
+    hideAllRows();
+
+    const tomlPath = path.join(targetDir, '.codex', 'config.toml');
+    const verb = wasInstalled ? 'reinstalled' : 'installed';
+
+    const lines = [];
+    lines.push('{bold}{cyan-fg}OpenAI Codex — AgentVibes Integration{/cyan-fg}{/bold}');
+    lines.push('');
+
+    if (result.success) {
+      lines.push(`{green-fg}AgentVibes for Codex ${verb}!{/green-fg}`);
+    } else {
+      lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    }
+
+    lines.push('');
+    lines.push(`{bold}{cyan-fg}What got ${verb}:{/cyan-fg}{/bold}`);
+    lines.push('');
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.codex/config.toml{/bold} (Codex CLI)');
+    lines.push(`     Location: ${tomlPath}`);
+    lines.push('     Registers the AgentVibes MCP server for the Codex CLI.');
+    lines.push('');
+    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.vscode/mcp.json{/bold} (VS Code Codex extension)');
+    lines.push('     Also registers the MCP server for VS Code — the Codex');
+    lines.push('     extension reads .vscode/mcp.json, not .codex/config.toml.');
+    lines.push('');
+    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}AGENTS.md{/bold} (project root + .codex/)');
+    lines.push('     Custom instructions that tell Codex the TTS protocol:');
+    lines.push('     speak an acknowledgment at the start and a summary at the end.');
+    lines.push('');
+    lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.codex/hooks/{/bold} (future use)');
+    lines.push('     Session-start hooks for when Codex hook support stabilizes.');
+    lines.push('     Currently experimental — Windows hooks temporarily disabled.');
+    lines.push('');
+    lines.push('{bold}{cyan-fg}How to use:{/cyan-fg}{/bold}');
+    lines.push('');
+    lines.push('  {bold}Codex CLI:{/bold}');
+    lines.push('  1. Run {yellow-fg}codex{/yellow-fg} in your project directory');
+    lines.push('  2. Codex reads AGENTS.md + config.toml and calls MCP tools');
+    lines.push('');
+    lines.push('  {bold}VS Code Codex:{/bold}');
+    lines.push('  1. Open this project in VS Code');
+    lines.push('  2. Open Codex Chat');
+    lines.push('  3. The MCP server starts automatically via .vscode/mcp.json');
+    lines.push('');
+    lines.push('{bold}{cyan-fg}Available MCP tools:{/cyan-fg}{/bold}');
+    lines.push('');
+    lines.push('  {yellow-fg}text_to_speech{/yellow-fg}    Speak text aloud');
+    lines.push('  {yellow-fg}set_voice{/yellow-fg}         Switch voices (ryan, katherine, etc.)');
+    lines.push('  {yellow-fg}set_personality{/yellow-fg}    Change personality (sarcastic, pirate, zen)');
+    lines.push('  {yellow-fg}set_speed{/yellow-fg}         Adjust speech rate');
+    lines.push('  {yellow-fg}set_verbosity{/yellow-fg}     Control detail level (low/medium/high)');
+    lines.push('  {yellow-fg}mute / unmute{/yellow-fg}     Toggle audio');
+    lines.push('  {yellow-fg}get_config{/yellow-fg}        Read current settings');
+    lines.push('');
+    lines.push('{bold}{yellow-fg}Note:{/yellow-fg}{/bold} Codex hooks are experimental. On Windows, hooks are');
+    lines.push('temporarily disabled. The MCP + AGENTS.md path works everywhere.');
+    lines.push('');
+    lines.push('{white-fg}Press {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+
+    infoBox.setContent(lines.join('\n'));
+    infoBox.show();
+    infoBox.focus();
+    infoBox.scrollTo(0);
+    screen.render();
+  }
+
   function showRemoveInfo(providerId) {
     currentView = 'info';
     hideAllRows();
@@ -1025,6 +1258,23 @@ export function createLlmProvidersTab(screen, services) {
       lines.push('  {yellow-fg}2.{/yellow-fg} Removed .github/copilot-instructions.md');
       lines.push('');
       lines.push('Copilot will no longer use AgentVibes TTS. You can re-install anytime.');
+    } else if (providerId === 'openai-codex') {
+      lines.push('{bold}{cyan-fg}OpenAI Codex — Removed{/cyan-fg}{/bold}');
+      lines.push('');
+      lines.push('{green-fg}Successfully removed!{/green-fg}');
+      lines.push('');
+      lines.push('The following were cleaned up:');
+      lines.push('');
+      lines.push('  {yellow-fg}1.{/yellow-fg} Removed {bold}agentvibes{/bold} server from .codex/config.toml');
+      lines.push('     (file deleted if no other config remained)');
+      lines.push('');
+      lines.push('  {yellow-fg}2.{/yellow-fg} Removed {bold}agentvibes{/bold} server from .vscode/mcp.json');
+      lines.push('');
+      lines.push('  {yellow-fg}3.{/yellow-fg} Removed AGENTS.md (project root + .codex/)');
+      lines.push('');
+      lines.push('  {yellow-fg}4.{/yellow-fg} Removed .codex/hooks/ session scripts');
+      lines.push('');
+      lines.push('Codex will no longer use AgentVibes TTS. You can re-install anytime.');
     }
 
     lines.push('');
