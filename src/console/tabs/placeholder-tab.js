@@ -41,17 +41,16 @@ export const TAB_DISPLAY_LABELS = {
   voices:          'Voices',
   music:           'Music',
   agents:          'BMad',
-  'llm-providers': 'LLM',
   receiver:        'Receiver',
   readme:          'Readme',
   help:            'Help',
-  install:         'Install',
+  setup:           'Setup',
 };
 
 /** Override shortcut key for tabs where first letter conflicts */
 export const TAB_SHORTCUT_KEYS = {
+  setup:           'I',
   agents:          'B',
-  'llm-providers': 'L',
   receiver:        'X',
 };
 
@@ -65,12 +64,11 @@ export const TAB_SHORTCUT_KEYS = {
  */
 export function getTabLabel(id, lang = 'en') {
   const keyMap = {
-    install:         'tabInstall',
+    setup:           'tabSetup',
     settings:        'tabSettings',
     voices:          'tabVoices',
     music:           'tabMusic',
     agents:          'tabBmad',
-    'llm-providers': 'tabLlmProviders',
     receiver:        'tabReceiver',
     readme:          'tabReadme',
     help:            'tabHelp',

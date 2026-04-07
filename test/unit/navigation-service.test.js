@@ -21,7 +21,7 @@ describe('NavigationService - Module Structure', () => {
 
   test('TAB_ORDER contains all required tab IDs', async () => {
     const { TAB_ORDER } = await import('../../src/services/navigation-service.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'install'];
+    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
     for (const id of required) {
       assert.ok(TAB_ORDER.includes(id), `TAB_ORDER must include '${id}'`);
     }
@@ -141,11 +141,11 @@ describe('NavigationService - cycleTab', () => {
     assert.strictEqual(nav.getActiveTab(), 'voices');
   });
 
-  test('cycleTab wraps from last tab (install) to first (settings)', async () => {
+  test('cycleTab wraps from last tab (help) to first (setup)', async () => {
     const { NavigationService } = await import('../../src/services/navigation-service.js');
-    const nav = new NavigationService('install');
+    const nav = new NavigationService('help');
     nav.cycleTab();
-    assert.strictEqual(nav.getActiveTab(), 'settings');
+    assert.strictEqual(nav.getActiveTab(), 'setup');
   });
 
   test('cycleTab fires onSwitch callback', async () => {

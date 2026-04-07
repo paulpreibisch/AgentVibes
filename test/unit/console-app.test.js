@@ -73,8 +73,8 @@ describe('AgentVibesConsole - Module Structure', () => {
     // Use _testMode: true to prevent blessed from entering interactive event loop
     const instance = await launchConsole({ startTab: 'install', _testMode: true });
     assert.ok(instance, 'launchConsole must return an instance');
-    assert.strictEqual(instance.startTab, 'install',
-      'returned instance must have startTab from opts');
+    assert.strictEqual(instance.startTab, 'setup',
+      'returned instance must map legacy install to setup');
     assert.ok(instance.tabBarBox !== null && instance.tabBarBox !== undefined,
       'returned instance must have tabBarBox set after init');
     assert.ok(instance.contentArea !== null && instance.contentArea !== undefined,
@@ -202,10 +202,16 @@ describe('AgentVibesConsole - Directory Structure', () => {
 });
 
 describe('AgentVibesConsole - startTab Options', () => {
-  test('startTab "install" is stored correctly', async () => {
+  test('startTab "install" maps to "setup" (backward compat)', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ startTab: 'install' });
-    assert.strictEqual(instance.startTab, 'install');
+    assert.strictEqual(instance.startTab, 'setup');
+  });
+
+  test('startTab "setup" is stored correctly', async () => {
+    const { AgentVibesConsole } = await import('../../src/console/app.js');
+    const instance = new AgentVibesConsole({ startTab: 'setup' });
+    assert.strictEqual(instance.startTab, 'setup');
   });
 
   test('startTab "music" is stored correctly', async () => {

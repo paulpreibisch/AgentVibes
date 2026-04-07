@@ -1,6 +1,6 @@
 /**
  * Epic 12: Installer Wizard (5-Screen Flow)
- * Tests for install-tab.js pure exports and Tab Component Contract
+ * Tests for setup-tab.js pure exports and Tab Component Contract
  */
 
 process.env.AGENTVIBES_TEST_MODE = 'true';
@@ -13,7 +13,7 @@ import assert from 'node:assert';
 describe('formatGreeting', () => {
   let formatGreeting;
   before(async () => {
-    const mod = await import('../../src/console/tabs/install-tab.js');
+    const mod = await import('../../src/console/tabs/setup-tab.js');
     formatGreeting = mod.formatGreeting;
   });
 
@@ -42,7 +42,7 @@ describe('formatGreeting', () => {
 describe('getIntroDefault', () => {
   let getIntroDefault;
   before(async () => {
-    const mod = await import('../../src/console/tabs/install-tab.js');
+    const mod = await import('../../src/console/tabs/setup-tab.js');
     getIntroDefault = mod.getIntroDefault;
   });
 
@@ -63,15 +63,15 @@ describe('getIntroDefault', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('createInstallTab — Tab Component Contract', () => {
-  let createInstallTab;
+describe('createSetupTab — Tab Component Contract', () => {
+  let createSetupTab;
   before(async () => {
-    const mod = await import('../../src/console/tabs/install-tab.js');
-    createInstallTab = mod.createInstallTab;
+    const mod = await import('../../src/console/tabs/setup-tab.js');
+    createSetupTab = mod.createSetupTab;
   });
 
   test('exported as named function', () => {
-    assert.strictEqual(typeof createInstallTab, 'function');
+    assert.strictEqual(typeof createSetupTab, 'function');
   });
 
   test('returns Tab Component Contract with all 7 properties', () => {
@@ -80,7 +80,7 @@ describe('createInstallTab — Tab Component Contract', () => {
       configService: { getConfig: () => ({}), set: () => {}, isInstalled: () => false },
       providerService: { getActiveVoiceId: () => '', setActiveVoice: () => {}, getProvider: () => 'piper' },
     };
-    const tab = createInstallTab(mockScreen, mockServices);
+    const tab = createSetupTab(mockScreen, mockServices);
     assert.ok('box' in tab);
     assert.strictEqual(typeof tab.show, 'function');
     assert.strictEqual(typeof tab.hide, 'function');
@@ -90,13 +90,13 @@ describe('createInstallTab — Tab Component Contract', () => {
     assert.strictEqual(typeof tab.getFooterColor, 'function');
   });
 
-  test('getFooterColor() returns indigo #3f51b5', () => {
+  test('getFooterColor() returns named color blue', () => {
     const mockScreen = { append: () => {}, key: () => {}, on: () => {}, render: () => {}, destroy: () => {} };
-    const tab = createInstallTab(mockScreen, {
+    const tab = createSetupTab(mockScreen, {
       configService: { getConfig: () => ({}), set: () => {}, isInstalled: () => false },
       providerService: { getActiveVoiceId: () => '', setActiveVoice: () => {}, getProvider: () => 'piper' },
     });
-    assert.strictEqual(tab.getFooterColor(), '#5c6bc0');
+    assert.strictEqual(tab.getFooterColor(), 'blue');
   });
 });
 
@@ -104,13 +104,13 @@ describe('createInstallTab — Tab Component Contract', () => {
 // Regression: screen 5 left arrow must not jump back to screen 4
 // ---------------------------------------------------------------------------
 
-describe('install-tab screen 5 left arrow guard (regression)', () => {
-  test('source has screen 5 guard in left-arrow handler', async () => {
+describe('setup-tab screen 3 left arrow guard (regression)', () => {
+  test('source has screen 3 guard in left-arrow handler', async () => {
     const { readFileSync } = await import('node:fs');
     const { join, dirname } = await import('node:path');
     const { fileURLToPath } = await import('node:url');
     const __f = fileURLToPath(import.meta.url);
-    const src = readFileSync(join(dirname(__f), '../../src/console/tabs/install-tab.js'), 'utf8');
+    const src = readFileSync(join(dirname(__f), '../../src/console/tabs/setup-tab.js'), 'utf8');
 
     // Find the screen.key(['left'], ...) registration line index
     const lines = src.split('\n');
@@ -120,8 +120,8 @@ describe('install-tab screen 5 left arrow guard (regression)', () => {
     // Grab the next ~10 lines of the handler body
     const handlerBody = lines.slice(leftKeyIdx, leftKeyIdx + 12).join('\n');
     assert.ok(
-      handlerBody.includes("_screen === 5") && handlerBody.includes("return"),
-      "left-arrow handler must guard screen 5 with early return to prevent jumping back from completion screen"
+      handlerBody.includes("_screen === 3") && handlerBody.includes("return"),
+      "left-arrow handler must guard screen 3 with early return to prevent jumping back from provider screen"
     );
   });
 });

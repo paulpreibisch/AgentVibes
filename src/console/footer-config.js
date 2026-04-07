@@ -39,15 +39,11 @@ export const FOOTER_CONFIG = {
     color: '#9c27b0',
     text: ` ${key('↑↓')} Navigate  ${key('Enter')} Edit Agent  ${key('Space')} Sample  ${key('R')} Reset`,
   },
-  'llm-providers': {
-    color: '#0097a7',
-    text: ` ${key('Enter')} Install/Configure  ${key('Esc')} Tab Bar  ${key('↑↓')} Navigate`,
-  },
   receiver: {
     color: '#00897b',
     text: ` ${key('E')} Enable  ${key('P')} Test  ${key('D')} Details  ${key('C')} Clear Log`,
   },
-  install: {
+  setup: {
     color: '#1a237e',
     text: ` ${key('↑↓')} Navigate  ${key('Enter')} Select  ${key('Esc')} Back`,
   },

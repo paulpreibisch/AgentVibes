@@ -23,12 +23,11 @@ import { BRAND_PINK } from './brand-colors.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
 import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
-import { createInstallTab } from './tabs/install-tab.js';
+import { createSetupTab } from './tabs/setup-tab.js';
 import { createHelpTab } from './tabs/help-tab.js';
 import { createReadmeTab } from './tabs/readme-tab.js';
 import { createReceiverTab } from './tabs/receiver-tab.js';
 import { createAgentsTab } from './tabs/agents-tab.js';
-import { createLlmProvidersTab } from './tabs/llm-providers-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
 
@@ -50,7 +49,9 @@ const COLORS = {
 export class AgentVibesConsole {
   constructor(opts = {}) {
     // opts.startTab is stored for use by story 6.5 (command routing)
-    this.startTab = opts.startTab ?? 'settings';
+    // Map legacy 'install' tab ID to 'setup' for backward compat
+    const rawTab = opts.startTab ?? 'settings';
+    this.startTab = rawTab === 'install' ? 'setup' : rawTab;
     this._testMode = opts._testMode ?? false;
 
     this.screen = null;
@@ -717,12 +718,12 @@ export class AgentVibesConsole {
     }
     this.tabs['music'] = createMusicTab(this.screen, services);
 
-    // Destroy install placeholder and mount real install wizard
-    const installPlaceholder = this.tabs['install'];
-    if (installPlaceholder && typeof installPlaceholder.destroy === 'function') {
-      installPlaceholder.destroy();
+    // Destroy setup placeholder and mount real setup wizard
+    const setupPlaceholder = this.tabs['setup'];
+    if (setupPlaceholder && typeof setupPlaceholder.destroy === 'function') {
+      setupPlaceholder.destroy();
     }
-    this.tabs['install'] = createInstallTab(this.screen, services);
+    this.tabs['setup'] = createSetupTab(this.screen, services);
 
     // Destroy help/readme placeholders and mount real tabs
     const helpPlaceholder = this.tabs['help'];
@@ -737,13 +738,6 @@ export class AgentVibesConsole {
       agentsPlaceholder.destroy();
     }
     this.tabs['agents'] = createAgentsTab(this.screen, services);
-
-    // Destroy llm-providers placeholder and mount real tab
-    const llmPlaceholder = this.tabs['llm-providers'];
-    if (llmPlaceholder && typeof llmPlaceholder.destroy === 'function') {
-      llmPlaceholder.destroy();
-    }
-    this.tabs['llm-providers'] = createLlmProvidersTab(this.screen, services);
 
     // Destroy receiver placeholder and mount real receiver tab
     const receiverPlaceholder = this.tabs['receiver'];

@@ -25,7 +25,7 @@ describe('footer-config.js - Module Structure', () => {
 describe('footer-config.js - All 8 tabs covered', () => {
   test('FOOTER_CONFIG has entries for all 8 tab IDs', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'install'];
+    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
     for (const tabId of required) {
       assert.ok(Object.hasOwn(FOOTER_CONFIG, tabId),
         `FOOTER_CONFIG must have an entry for tab '${tabId}'`);
@@ -80,9 +80,9 @@ describe('footer-config.js - Correct colors per tab (AC#2)', () => {
     assert.strictEqual(FOOTER_CONFIG.readme.color, '#455a64');
   });
 
-  test('Install footer color is #1a237e (dark navy)', async () => {
+  test('Setup footer color is #1a237e (dark navy)', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    assert.strictEqual(FOOTER_CONFIG.install.color, '#1a237e');
+    assert.strictEqual(FOOTER_CONFIG.setup.color, '#1a237e');
   });
 });
 
@@ -138,15 +138,15 @@ describe('footer-config.js - Text content per tab (AC#3)', () => {
       'Help footer must mention Quit/Q');
   });
 
-  test('Install footer text includes Navigate, Select, and Back shortcuts', async () => {
+  test('Setup footer text includes Navigate, Select, and Back shortcuts', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    assert.ok(FOOTER_CONFIG.install.text.includes('Navigate') ||
-              FOOTER_CONFIG.install.text.includes('↑↓'),
-      'Install footer must mention Navigate');
-    assert.ok(FOOTER_CONFIG.install.text.includes('Select'), 'Install footer must mention Select');
-    assert.ok(FOOTER_CONFIG.install.text.includes('Back') ||
-              FOOTER_CONFIG.install.text.includes('Esc'),
-      'Install footer must mention Back/Esc');
+    assert.ok(FOOTER_CONFIG.setup.text.includes('Navigate') ||
+              FOOTER_CONFIG.setup.text.includes('↑↓'),
+      'Setup footer must mention Navigate');
+    assert.ok(FOOTER_CONFIG.setup.text.includes('Select'), 'Setup footer must mention Select');
+    assert.ok(FOOTER_CONFIG.setup.text.includes('Back') ||
+              FOOTER_CONFIG.setup.text.includes('Esc'),
+      'Setup footer must mention Back/Esc');
   });
 
   test('Footer text entries are non-empty', async () => {
