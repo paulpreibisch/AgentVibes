@@ -23,6 +23,7 @@ import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
 import {
   PROVIDERS,
   checkClaudeInstalled, checkCopilotInstalled, checkCodexInstalled,
+  installClaudeMcp, removeClaudeMcp,
   installCopilotMcp, removeCopilotMcp,
   installCopilotInstructions, removeCopilotInstructions,
   installCodexMcp, removeCodexMcp,
@@ -37,8 +38,12 @@ import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
+import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { spawn } from 'node:child_process';
+import os from 'node:os';
+import crypto from 'node:crypto';
 
 const _execFileAsync = promisify(execFile);
 
@@ -109,8 +114,12 @@ export function formatGreeting(introText, projectName) {
 async function _commandExistsAsync(cmd) {
   try {
     const opts = { stdio: 'pipe', timeout: 5000 };
-    if (process.platform === 'win32') opts.shell = true;
-    await _execFileAsync(cmd, ['--version'], opts);
+    if (process.platform === 'win32') {
+      opts.shell = true;
+      await _execFileAsync(`${cmd} --version`, [], opts);
+    } else {
+      await _execFileAsync(cmd, ['--version'], opts);
+    }
     return true;
   } catch (err) {
     if (err.code === 'ENOENT') return false;
@@ -251,18 +260,16 @@ export function createSetupTab(screen, services) {
     });
 
     let _blinkInterval = null;
+    const _origLabel = label;
     btn.on('focus', () => {
       btn.style.bg = COLORS.btnFocus;
       btn.style.fg = COLORS.btnFocusFg;
-      const raw = btn.content.replace(/[>\u25ba\u25c4\u2588]/g, '').trim();
-      btn.setContent(`>${raw}< `);
+      btn.setContent(`\u25ba ${_origLabel} \u25c4`);
       let _on = true;
       screen.render();
       _blinkInterval = setInterval(() => {
         _on = !_on;
-        if (!btn.content.includes('>')) return;
-        const r = btn.content.replace(/[>\u25ba\u25c4\u2588]/g, '').trim();
-        btn.setContent(_on ? `>${r}< ` : `>${r}<`);
+        btn.setContent(_on ? `\u25ba ${_origLabel} \u25c4` : `  ${_origLabel}  `);
         screen.render();
       }, 500);
     });
@@ -270,8 +277,7 @@ export function createSetupTab(screen, services) {
       if (_blinkInterval) { clearInterval(_blinkInterval); _blinkInterval = null; }
       btn.style.bg = bg;
       btn.style.fg = textColor;
-      const raw = btn.content.replace(/[>\u25ba\u25c4\u2588]/g, '').trim();
-      btn.setContent(raw);
+      btn.setContent(_origLabel);
       screen.render();
     });
 
@@ -309,7 +315,129 @@ export function createSetupTab(screen, services) {
   // SCREEN 2: TTS Engine selection (new)
   // =========================================================================
 
-  // Engine cards are built dynamically in _renderScreen2
+  // TTS engine install buttons — created once, shown/hidden per screen
+  const _ttsEngineRows = [];
+  const _ttsFocusableItems = [];
+  let _ttsFocusIndex = 0;
+
+  const _ttsEngines = getAvailableEngines();
+  for (let i = 0; i < _ttsEngines.length; i++) {
+    const engine = _ttsEngines[i];
+    const yOff = 5 + (i * 3);
+
+    const nameLabel = blessed.text({
+      parent: box, top: yOff, left: 2, tags: true, hidden: true,
+      content: '', style: { bg: COLORS.contentBg },
+    });
+
+    const statusLabel = blessed.text({
+      parent: box, top: yOff, left: 22, tags: true, hidden: true,
+      content: '', style: { bg: COLORS.contentBg },
+    });
+
+    const descLabel = blessed.text({
+      parent: box, top: yOff + 1, left: 4, tags: true, hidden: true,
+      content: `{cyan-fg}${engine.desc}{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const installBtn = blessed.button({
+      parent: box, top: yOff, left: 40, width: 14, height: 1,
+      content: '  Install  ', tags: true, mouse: true, keys: true, hidden: true,
+      style: {
+        fg: COLORS.btnFg, bg: COLORS.btnBg,
+        focus: { fg: 'black', bg: COLORS.btnFocusBg },
+      },
+    });
+
+    installBtn.on('press', () => _handleTtsInstall(engine));
+    installBtn.key(['enter', 'space'], () => _handleTtsInstall(engine));
+    installBtn.key(['tab', 'down'], () => _cycleTtsFocus(1));
+    installBtn.key(['S-tab', 'up'], () => _cycleTtsFocus(-1));
+    installBtn.key(['escape'], () => {
+      if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+    });
+
+    _ttsEngineRows.push({ engine, nameLabel, statusLabel, descLabel, installBtn });
+    if (!engine.native) _ttsFocusableItems.push(installBtn);
+  }
+
+  function _cycleTtsFocus(dir) {
+    const items = _ttsFocusableItems.filter(b => !b.hidden);
+    if (!items.length) return;
+    _ttsFocusIndex = (_ttsFocusIndex + dir + items.length) % items.length;
+    items[_ttsFocusIndex].focus();
+    screen.render();
+  }
+
+  function _showTtsEngineRows() {
+    for (const row of _ttsEngineRows) {
+      const installed = checkEngineInstalled(row.engine.id);
+      row.nameLabel.setContent(`{bold}{white-fg}${row.engine.name}{/white-fg}{/bold}`);
+      row.statusLabel.setContent(installed
+        ? '{green-fg}[Installed]{/green-fg}'
+        : '{yellow-fg}[Not Found]{/yellow-fg}');
+      row.nameLabel.show();
+      row.statusLabel.show();
+      row.descLabel.show();
+      if (!installed && !row.engine.native) {
+        row.installBtn.show();
+      } else {
+        row.installBtn.hide();
+      }
+    }
+  }
+
+  function _hideTtsEngineRows() {
+    for (const row of _ttsEngineRows) {
+      row.nameLabel.hide();
+      row.statusLabel.hide();
+      row.descLabel.hide();
+      row.installBtn.hide();
+    }
+  }
+
+  async function _handleTtsInstall(engine) {
+    if (!engine.installCmd) return;
+
+    // Show installing status
+    const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
+    if (row) {
+      row.statusLabel.setContent('{yellow-fg}[Installing...]{/yellow-fg}');
+      screen.render();
+    }
+
+    try {
+      const opts = { stdio: 'pipe', timeout: 120000 };
+      if (process.platform === 'win32') {
+        opts.shell = true;
+        await _execFileAsync(engine.installCmd, [], opts);
+      } else {
+        const parts = engine.installCmd.split(' ');
+        await _execFileAsync(parts[0], parts.slice(1), opts);
+      }
+
+      // Re-check and update status
+      const installed = checkEngineInstalled(engine.id);
+      if (row) {
+        row.statusLabel.setContent(installed
+          ? '{green-fg}[Installed]{/green-fg}'
+          : '{red-fg}[Install Failed]{/red-fg}');
+        if (installed) row.installBtn.hide();
+      }
+    } catch (err) {
+      if (row) {
+        row.statusLabel.setContent(`{red-fg}[Failed]{/red-fg}`);
+      }
+    }
+    screen.render();
+  }
+
+  // Continue button for Screen 2
+  const _s2ContinueBtn = _createBtn('Continue  ->', 'blue', () => {
+    if (_screen < 3) { _screen++; _showCurrentScreen(); }
+  });
+  _s2ContinueBtn.hidden = true;
 
   // =========================================================================
   // SCREEN 3: LLM Providers (new — from llm-providers-tab)
@@ -491,7 +619,10 @@ export function createSetupTab(screen, services) {
 
   async function handleProviderInstall(provider) {
     if (provider.id === 'claude-code') {
-      showClaudeCodeInfo();
+      const wasInstalled = installedState[provider.id];
+      const result = await installClaudeMcp(targetDir, packageDir);
+      await refreshInstalledState();
+      showClaudeCodeInfo(result, wasInstalled);
       return;
     }
 
@@ -516,6 +647,8 @@ export function createSetupTab(screen, services) {
 
   async function handleProviderRemove(provider) {
     if (provider.id === 'claude-code') {
+      await removeClaudeMcp(targetDir);
+      await refreshInstalledState();
       showRemoveInfo('claude-code');
       return;
     }
@@ -756,6 +889,37 @@ export function createSetupTab(screen, services) {
     });
 
     fieldList.key(['escape'], _closeModal);
+
+    // Remove selection highlight when field list loses focus
+    fieldList.on('blur', () => {
+      fieldList.style.selected = { bg: COLORS.contentBg, fg: COLORS.labelFg };
+      fieldList.setItems(_fieldItems());
+      screen.render();
+    });
+    fieldList.on('focus', () => {
+      fieldList.style.selected = { bg: 'blue', fg: 'yellow' };
+      fieldList.setItems(_fieldItems());
+      screen.render();
+    });
+
+    // Wrap: down on last field → focus Save; up on first field → focus Save
+    // One extra arrow press at boundary moves to button row.
+    // Track previous selection so arriving at boundary doesn't immediately jump.
+    let _prevFieldSel = 0;
+    fieldList.key(['down'], () => {
+      const cur = fieldList.selected ?? 0;
+      if (cur === FIELDS.length - 1 && _prevFieldSel === FIELDS.length - 1) {
+        allBtns[0].focus(); screen.render();
+      }
+      _prevFieldSel = cur;
+    });
+    fieldList.key(['up'], () => {
+      const cur = fieldList.selected ?? 0;
+      if (cur === 0 && _prevFieldSel === 0) {
+        allBtns[0].focus(); screen.render();
+      }
+      _prevFieldSel = cur;
+    });
     fieldList.key(['tab'], () => {
       allBtns[0].focus();
       screen.render();
@@ -840,17 +1004,52 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
-  // ── Voice picker for LLM config ───────────────────────────────────────────
+  // ── Voice picker for LLM config (matches agents-tab pattern) ──────────────
+
+  function _secureTempWav(prefix) {
+    const baseDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
+    const dir = path.join(baseDir, `agentvibes-${process.getuid?.() ?? 'u'}`);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(dir, 0o700); } catch {}
+    return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
+  }
 
   function _openVoicePickerForLlm(draft, onDone) {
     navigationService?.openModal();
 
+    let _allVoices = [];
+    let _filterText = '';
+    let _previewProc = null;
+    let _previewVoiceId = null;
+    let _vpClosed = false;
+
+    const _spawnEnv = buildAudioEnv();
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
+    function _killVP() {
+      if (_previewProc) {
+        try {
+          if (_isWin) { _previewProc.kill(); } else { process.kill(-_previewProc.pid, 'SIGTERM'); }
+        } catch {}
+        _previewProc = null;
+      }
+      _previewVoiceId = null;
+    }
+
+    function _closeVP() {
+      if (_vpClosed) return;
+      _vpClosed = true;
+      _killVP();
+      navigationService?.closeModal();
+      destroyList(vpModal, screen, onDone);
+    }
+
     const vpModal = blessed.box({
       parent: screen,
-      top: 'center',
-      left: 'center',
-      width: '90%',
-      height: '85%',
+      top: '6%',
+      left: '3%',
+      width: '94%',
+      height: '88%',
       border: { type: 'line' },
       tags: true,
       label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
@@ -858,34 +1057,28 @@ export function createSetupTab(screen, services) {
     });
     vpModal.setFront();
 
-    let allVoices = [];
-    try {
-      const installed = scanInstalledVoices();
-      for (const voiceId of installed) {
-        const meta = getVoiceMeta(voiceId);
-        allVoices.push({
-          display: meta.displayName || voiceId,
-          value: voiceId,
-        });
-      }
-    } catch { /* no voices */ }
-
-    let filtered = [...allVoices];
-
+    // Search
     blessed.text({
-      parent: vpModal, top: 1, left: 2, tags: true,
-      content: '{yellow-fg}Search:{/yellow-fg}',
-      style: { bg: COLORS.contentBg },
+      parent: vpModal, top: 1, left: 2,
+      content: 'Search:', style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
     });
-
     const vpSearch = blessed.textbox({
       parent: vpModal, top: 1, left: 11, width: 40, height: 1,
       inputOnFocus: true, keys: true,
-      style: { fg: 'white', bg: 'blue', focus: { bg: 'cyan' } },
+      style: { fg: COLORS.valueFg, bg: 'blue', focus: { bg: 'cyan' } },
+    });
+
+    // Column header
+    const COL_N = 28;
+    const COL_G = 10;
+    blessed.text({
+      parent: vpModal, top: 2, left: 6, tags: true,
+      content: `{cyan-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
     });
 
     const vpList = blessed.list({
-      parent: vpModal, top: 3, left: 2, right: 2, bottom: 3,
+      parent: vpModal, top: 3, left: 2, right: 2, bottom: 5,
       keys: true, vi: true, mouse: true,
       border: { type: 'line' },
       scrollbar: { ch: '|', style: { fg: 'cyan' } },
@@ -893,46 +1086,135 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'blue' },
-        selected: { bg: 'blue', fg: 'yellow' },
+        selected: { bg: 'green', fg: 'white', bold: true },
         item: { fg: COLORS.labelFg },
       },
     });
 
+    const vpPreviewLine = blessed.text({
+      parent: vpModal, bottom: 3, left: 2, right: 2, tags: true,
+      content: '', style: { fg: 'cyan', bg: COLORS.contentBg },
+    });
+
     blessed.text({
-      parent: vpModal, bottom: 1, left: 2, tags: true,
-      content: '{white-fg}[Enter] Select  [/] Search  [Esc] Cancel{/white-fg}',
+      parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
+      content: '{white-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [/] Search  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
-    function _refresh() {
-      const term = (vpSearch.getValue() || '').toLowerCase().trim();
-      filtered = term
-        ? allVoices.filter(v => v.display.toLowerCase().includes(term))
-        : [...allVoices];
-      vpList.setItems(filtered.map(v => `  ${v.display}`));
-      vpList.select(0);
+    function _getFiltered() {
+      if (!_filterText) return _allVoices;
+      const f = _filterText.toLowerCase();
+      return _allVoices.filter(v => v.toLowerCase().includes(f));
+    }
+
+    function _buildVoiceItems(voices) {
+      return voices.map(v => {
+        const isActive = v === draft.voice;
+        const isPrev = v === _previewVoiceId;
+        const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
+        const meta = getVoiceMeta(v);
+        const name = meta.displayName.length > COL_N
+          ? meta.displayName.slice(0, COL_N - 1) + '…'
+          : meta.displayName.padEnd(COL_N);
+        return ` ${dot} ${name}${meta.gender.padEnd(COL_G)}${meta.provider}`;
+      });
+    }
+
+    function _refreshVP() {
+      if (_vpClosed) return;
+      const savedIdx = vpList.selected ?? 0;
+      const savedScroll = vpList.childBase ?? 0;
+      _allVoices = scanInstalledVoices();
+      const filtered = _getFiltered();
+      const items = _buildVoiceItems(filtered);
+      vpList.setItems(items.length > 0 ? items : [' (no voices found)']);
+      vpList.select(Math.min(savedIdx, items.length - 1));
+      vpList.childBase = Math.min(savedScroll, Math.max(0, items.length - (vpList.height - 2)));
       screen.render();
     }
-    _refresh();
 
-    vpSearch.on('keypress', () => setTimeout(_refresh, 0));
-    vpSearch.key(['escape'], () => { vpList.focus(); screen.render(); });
-    vpSearch.key(['enter'], () => { vpList.focus(); screen.render(); });
+    function _previewVoice(voiceId) {
+      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
+      _killVP();
 
-    vpList.key(['/'], () => { vpSearch.focus(); vpSearch.readInput(() => {}); screen.render(); });
-    vpList.key(['enter'], () => {
-      const sel = filtered[vpList.selected];
-      if (sel) draft.voice = sel.value;
-      _closeVP();
-      onDone();
-    });
-    vpList.key(['escape'], () => { _closeVP(); onDone(); });
+      const _ms = parseMultiSpeaker(voiceId);
+      const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
+      const safeBase = path.resolve(PIPER_VOICES_DIR);
+      if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
-    function _closeVP() {
-      navigationService?.closeModal();
-      destroyList(vpModal, screen);
+      const tempWav = _secureTempWav('vp');
+      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+
+      let _piperBin = 'piper';
+      if (_isWin) {
+        const _lad = process.env.LOCALAPPDATA ||
+          (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+        if (_lad) {
+          const _ep = path.join(_lad, 'Programs', 'Piper', 'piper.exe');
+          if (fs.existsSync(_ep)) _piperBin = _ep;
+        }
+      }
+
+      const args = ['--model', voicePath, '--output_file', tempWav];
+      if (_ms.speakerId != null) args.push('--speaker', String(_ms.speakerId));
+      const piper = spawn(_piperBin, args, {
+        stdio: ['pipe', 'ignore', 'ignore'],
+        detached: !_isWin,
+        windowsHide: true,
+        env: _spawnEnv,
+      });
+      piper.stdin.write(phrase + '\n');
+      piper.stdin.end();
+      _previewProc = piper;
+      _previewVoiceId = voiceId;
+
+      if (!_vpClosed) {
+        vpPreviewLine.setContent(`{cyan-fg}♪ Synthesizing: ${voiceId}...{/cyan-fg}`);
+        _refreshVP();
+      }
+
+      piper.on('exit', (code) => {
+        if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
+        if (code !== 0) { _previewProc = null; _previewVoiceId = null; return; }
+        const wp = detectWavPlayer(_spawnEnv);
+        if (!wp) return;
+        const pp = spawn(wp.bin, wp.args(tempWav), {
+          stdio: 'ignore',
+          detached: !_isWin,
+          windowsHide: true,
+          env: _spawnEnv,
+        });
+        _previewProc = pp;
+        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
+        pp.on('exit', () => {
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+          try { fs.unlinkSync(tempWav); } catch {}
+        });
+      });
+      piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
     }
 
+    vpSearch.on('keypress', () => {
+      setTimeout(() => { _filterText = vpSearch.getValue().trim(); _refreshVP(); }, 0);
+    });
+    vpSearch.key(['escape'], () => { vpList.focus(); screen.render(); });
+    vpList.key(['/'], () => { vpSearch.clearValue(); vpSearch.focus(); screen.render(); });
+    vpList.key(['enter'], () => {
+      const filtered = _getFiltered();
+      const sel = filtered[vpList.selected];
+      if (sel) { draft.voice = sel; _closeVP(); }
+    });
+    vpList.key(['space'], () => {
+      const filtered = _getFiltered();
+      const sel = filtered[vpList.selected];
+      if (sel) _previewVoice(sel);
+    });
+    vpList.key(['escape', 'q'], _closeVP);
+
+    _refreshVP();
+    const activeIdx = _getFiltered().indexOf(draft.voice);
+    if (activeIdx >= 0) vpList.select(activeIdx);
     vpList.focus();
     screen.render();
   }
@@ -1031,7 +1313,7 @@ export function createSetupTab(screen, services) {
     }
   }
 
-  function showClaudeCodeInfo() {
+  function showClaudeCodeInfo(result = null, wasInstalled = false) {
     providerView = 'info';
     hideAllProviderRows();
     contentBox.hide();
@@ -1039,15 +1321,24 @@ export function createSetupTab(screen, services) {
     const mcpPath = path.join(targetDir, '.mcp.json');
     const hooksDir = path.join(targetDir, '.claude', process.platform === 'win32' ? 'hooks-windows' : 'hooks');
     const installed = installedState['claude-code'];
+    const verb = wasInstalled ? 'reinstalled' : 'installed';
 
     const lines = [];
     lines.push('{bold}{cyan-fg}Claude Code -- AgentVibes Integration{/cyan-fg}{/bold}');
     lines.push('');
-    lines.push(installed
-      ? '{green-fg}Installed{/green-fg}'
-      : '{yellow-fg}Not installed -- use Install tab to set up{/yellow-fg}');
+
+    if (result) {
+      lines.push(result.success
+        ? `{green-fg}AgentVibes for Claude Code ${verb}!{/green-fg}`
+        : `{red-fg}Installation failed{/red-fg}`);
+    } else {
+      lines.push(installed
+        ? '{green-fg}Installed{/green-fg}'
+        : '{yellow-fg}Not installed{/yellow-fg}');
+    }
+
     lines.push('');
-    lines.push('{bold}{cyan-fg}What gets installed:{/cyan-fg}{/bold}');
+    lines.push(`{bold}{cyan-fg}What ${result ? `got ${verb}` : 'gets installed'}:{/cyan-fg}{/bold}`);
     lines.push('');
     lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.mcp.json{/bold} (project root)');
     lines.push(`     Location: ${mcpPath}`);
@@ -1059,9 +1350,6 @@ export function createSetupTab(screen, services) {
     lines.push('  {yellow-fg}3.{/yellow-fg} {bold}.claude/commands/{/bold} (slash commands)');
     lines.push('');
     lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
-    lines.push('');
-    lines.push('{bold}{cyan-fg}To install or re-install:{/cyan-fg}{/bold}');
-    lines.push('  Run: {yellow-fg}npx agentvibes install{/yellow-fg}');
     lines.push('');
     lines.push('{white-fg}Press {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 
@@ -1276,35 +1564,39 @@ export function createSetupTab(screen, services) {
   }
 
   function _renderScreen2() {
-    const engines = getEngineStatuses();
-
     const lines = [
       _HDR('', 'TTS Engine Selection'),
       '',
       '  {white-fg}Select which TTS engines to use with AgentVibes:{/white-fg}',
-      '',
     ];
 
-    for (const engine of engines) {
-      const status = engine.installed
-        ? '{green-fg}[Installed]{/green-fg}'
-        : '{yellow-fg}[Not Found]{/yellow-fg}';
-      lines.push(`  {bold}{white-fg}${engine.name}{/white-fg}{/bold}  ${status}`);
-      lines.push(`    {cyan-fg}${engine.desc}{/cyan-fg}`);
-      lines.push('');
-    }
-
-    lines.push('');
-    lines.push('  {white-fg}TTS engines can be configured per-provider on the next screen.{/white-fg}');
-    lines.push('  {white-fg}Press [Enter] or [->] to continue to LLM Providers.{/white-fg}');
-
     contentBox.setContent(_c(lines));
-    hintLine.setContent('  Screen 2: TTS Engines  |  [Enter/->] Continue  |  [Esc/<-] Back');
-    box.focus();
+
+    _showTtsEngineRows();
+
+    // Position continue button below engine rows
+    const btnY = 5 + (_ttsEngines.length * 3) + 1;
+    _s2ContinueBtn.top = btnY;
+    _s2ContinueBtn.left = 4;
+    _s2ContinueBtn.show();
+
+    hintLine.setContent('  Screen 2: TTS Engines  |  [Tab] Install  |  [Enter/->] Continue  |  [Esc/<-] Back');
+
+    // Focus first visible install button or continue button
+    const visibleBtns = _ttsFocusableItems.filter(b => !b.hidden);
+    if (visibleBtns.length) {
+      _ttsFocusIndex = 0;
+      visibleBtns[0].focus();
+    } else {
+      _s2ContinueBtn.focus();
+    }
     screen.render();
   }
 
   function _renderScreen3() {
+    // Mark setup as completed once user reaches the providers screen
+    try { configService.set('setupCompleted', true); } catch {}
+
     // Show provider rows instead of contentBox
     contentBox.hide();
     hintLine.setContent('  Screen 3: LLM Providers  |  [Enter] Action  |  [Tab] Next button  |  [Esc] Tab bar');
@@ -1321,6 +1613,12 @@ export function createSetupTab(screen, services) {
   function _showCurrentScreen() {
     // Hide Screen 1 continue button on other screens
     if (_screen !== 1) _s1ContinueBtn.hide();
+
+    // Hide Screen 2 TTS engine rows on other screens
+    if (_screen !== 2) {
+      _hideTtsEngineRows();
+      _s2ContinueBtn.hide();
+    }
 
     // Hide provider rows on non-provider screens
     if (_screen !== 3) {
@@ -1387,11 +1685,7 @@ export function createSetupTab(screen, services) {
       return;
     }
     if (_screen === 1) return;  // Enter handled by Continue button
-    if (_screen === 2) {
-      _screen++;
-      _showCurrentScreen();
-      return;
-    }
+    if (_screen === 2) return;  // Enter handled by Continue button and install buttons
     if (_screen === 3) return;  // Enter handled by provider buttons
   });
 
@@ -1436,7 +1730,7 @@ export function createSetupTab(screen, services) {
       return;
     }
     if (_screen === 1) return;  // Right handled by Continue button
-    if (_screen === 2) { _screen++; _showCurrentScreen(); return; }
+    if (_screen === 2) { if (_screen < 3) { _screen++; _showCurrentScreen(); } return; }
     if (_screen === 3) return;  // Right handled by button nav
   });
 

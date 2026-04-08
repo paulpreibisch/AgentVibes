@@ -64,6 +64,76 @@ export async function checkCodexInstalled(targetDir) {
   }
 }
 
+// ── Claude Code install ────────────────────────────────────────────────────
+
+/**
+ * Create .mcp.json in target directory if it doesn't exist.
+ * Also copies hooks, commands, config, personality, plugin, and bmad config files.
+ */
+export async function installClaudeMcp(targetDir, packageDir) {
+  const mcpConfigPath = path.join(targetDir, '.mcp.json');
+
+  const mcpConfig = {
+    mcpServers: {
+      agentvibes: {
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+      },
+    },
+  };
+
+  let mcpCreated = false;
+  try {
+    await fs.access(mcpConfigPath);
+    // Already exists — merge agentvibes key if missing
+    try {
+      const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
+      if (!existing.mcpServers?.agentvibes) {
+        existing.mcpServers = existing.mcpServers || {};
+        existing.mcpServers.agentvibes = mcpConfig.mcpServers.agentvibes;
+        await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+        mcpCreated = true;
+      }
+    } catch { /* parse error — don't corrupt */ }
+  } catch {
+    // File doesn't exist — create it
+    await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+    mcpCreated = true;
+  }
+
+  // Copy hooks, commands, config, personality, plugin, bmad config files
+  const silentSpinner = { start: () => {}, succeed: () => {}, fail: () => {} };
+  try {
+    const installer = await import('../installer.js');
+    await installer.copyHookFiles(targetDir, silentSpinner);
+    await installer.copyCommandFiles(targetDir, silentSpinner);
+    await installer.copyConfigFiles(targetDir, silentSpinner);
+    await installer.copyPersonalityFiles(targetDir, silentSpinner);
+    await installer.copyPluginFiles(targetDir, silentSpinner);
+    await installer.copyBmadConfigFiles(targetDir, silentSpinner);
+    await installer.copyBackgroundMusicFiles(targetDir, silentSpinner);
+  } catch { /* non-fatal — files may already exist */ }
+
+  return { success: true, mcpCreated };
+}
+
+export async function removeClaudeMcp(targetDir) {
+  const mcpConfigPath = path.join(targetDir, '.mcp.json');
+  try {
+    const content = await fs.readFile(mcpConfigPath, 'utf8');
+    const parsed = JSON.parse(content);
+    if (parsed.mcpServers?.agentvibes) {
+      delete parsed.mcpServers.agentvibes;
+      if (Object.keys(parsed.mcpServers).length === 0) {
+        await fs.unlink(mcpConfigPath);
+      } else {
+        await fs.writeFile(mcpConfigPath, JSON.stringify(parsed, null, 2) + '\n');
+      }
+    }
+  } catch { /* file doesn't exist or can't parse — nothing to remove */ }
+  return { success: true };
+}
+
 // ── Copilot install/remove ──────────────────────────────────────────────────
 
 export async function installCopilotMcp(targetDir) {

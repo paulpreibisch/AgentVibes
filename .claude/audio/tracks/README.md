@@ -41,7 +41,6 @@ This folder contains background music tracks that play behind TTS voice output.
 
 ## Included Tracks
 
-- `dreamy-house.mp3` - Upbeat electronic for energetic agents
 - `agent-vibes-dark-chill-step.mp3` - Atmospheric ambient for party mode
 
 ## Commands

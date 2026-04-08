@@ -651,9 +651,10 @@ export function createVoicesTab(screen, services) {
   // _vlTick fires between stripping and re-appending the hint. Accepted as cosmetic.
   function _updateHint(idx) {
     const items = voiceList.items;
+    const _pad = ' '.repeat(60);
     if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
       const hadBlink = (items[_hintIdx].content ?? '').endsWith(' █');
-      items[_hintIdx].setContent(hadBlink ? _hintBase + ' █' : _hintBase);
+      items[_hintIdx].setContent((hadBlink ? _hintBase + ' █' : _hintBase) + _pad);
     }
     if (idx >= 0 && items[idx]) {
       let c = items[idx].content ?? '';
@@ -1399,6 +1400,7 @@ export function createVoicesTab(screen, services) {
   function refreshDisplay() {
     _refreshing = true;
     const savedIdx = voiceList.selected ?? 0;
+    const savedScroll = voiceList.childBase ?? 0;
 
     // Load catalog on first refresh and patch speaker names (once)
     if (!_catalogLoaded) {
@@ -1425,6 +1427,7 @@ export function createVoicesTab(screen, services) {
     voiceList.setItems(items.length > 0 ? items : [' (no voices found — install piper first)']);
     const maxIdx = Math.max(0, (items.length > 0 ? items.length : 1) - 1);
     voiceList.select(Math.min(savedIdx, maxIdx));
+    voiceList.childBase = Math.min(savedScroll, Math.max(0, (items.length > 0 ? items.length : 1) - (voiceList.height - 2)));
 
     // Re-apply inline hint if list is focused
     if (_listFocused) {
@@ -1491,12 +1494,15 @@ export function createVoicesTab(screen, services) {
   });
 
   // ↑ at the top of the list → jump to main header tab bar
+  // [↑] at top of list → jump to main header tab bar (second press)
+  let _prevVoiceSel = -1;
   voiceList.key(['up'], () => {
-    if (voiceList.selected === 0 && typeof focusMainTabBar === 'function') {
+    const cur = voiceList.selected ?? 0;
+    if (cur === 0 && _prevVoiceSel === 0 && typeof focusMainTabBar === 'function') {
       focusMainTabBar();
-      // Reset selection to 0 after built-in handler potentially wraps to end
       setTimeout(() => { voiceList.select(0); screen.render(); }, 0);
     }
+    _prevVoiceSel = cur;
   });
 
   // Escape at the list level → return to header tab bar

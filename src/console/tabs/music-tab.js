@@ -475,10 +475,11 @@ export function createMusicTab(screen, services) {
   // cases but is not a complete fix. Acceptable for a TUI animation.
   function _updateHint(idx) {
     const items = trackList.items;
-    // Restore previously hinted row using its saved base content
+    // Restore previously hinted row — pad with spaces to overwrite ghost hint text
+    const _pad = ' '.repeat(60);
     if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
       const hadBlink = (items[_hintIdx].content ?? '').endsWith(' █');
-      items[_hintIdx].setContent(hadBlink ? _hintBase + ' █' : _hintBase);
+      items[_hintIdx].setContent((hadBlink ? _hintBase + ' █' : _hintBase) + _pad);
     }
     // Add hint to the new row, saving its clean base first
     if (idx >= 0 && items[idx]) {
@@ -861,12 +862,15 @@ export function createMusicTab(screen, services) {
     refreshDisplay();
   });
 
-  // [↑] at top of list → jump to main header tab bar
+  // [↑] at top of list → jump to main header tab bar (second press)
+  let _prevTrackSel = -1;
   trackList.key(['up'], () => {
-    if (trackList.selected === 0 && typeof focusMainTabBar === 'function') {
+    const cur = trackList.selected ?? 0;
+    if (cur === 0 && _prevTrackSel === 0 && typeof focusMainTabBar === 'function') {
       focusMainTabBar();
       setTimeout(() => { trackList.select(0); screen.render(); }, 0);
     }
+    _prevTrackSel = cur;
   });
 
   // Escape at the list level → return to header tab bar
@@ -875,14 +879,17 @@ export function createMusicTab(screen, services) {
   });
 
   // ↓ at the last item → descend into the button row (Toggle Music gets focus first)
-  // Note: Tab is NOT used here — navigation.js registers screen.key(['tab']) to cycle tabs,
-  // so element.key(['tab']) + screen.key(['tab']) both fire, causing a simultaneous tab-cycle.
+  // Track previous selection so arriving at last item doesn't immediately jump
+  let _prevTrackSelDown = -1;
   trackList.key(['down'], () => {
     const visible = _getVisibleTracks();
-    if (trackList.selected >= visible.length - 1) {
+    const cur = trackList.selected ?? 0;
+    const lastIdx = visible.length - 1;
+    if (cur >= lastIdx && _prevTrackSelDown >= lastIdx) {
       toggleBtn.focus();
       screen.render();
     }
+    _prevTrackSelDown = cur;
   });
 
   // ←/→ navigate between the two buttons

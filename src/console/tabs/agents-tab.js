@@ -1029,10 +1029,14 @@ ${_tl('bmadDesc')}
 
     function _refreshVP() {
       if (_vpClosed) return;
+      const savedIdx = vpList.selected ?? 0;
+      const savedScroll = vpList.childBase ?? 0;
       _allVoices = scanInstalledVoices();
       const filtered = _getFiltered();
       const items = _buildVoiceItems(filtered);
       vpList.setItems(items.length > 0 ? items : [' (no voices found)']);
+      vpList.select(Math.min(savedIdx, items.length - 1));
+      vpList.childBase = Math.min(savedScroll, Math.max(0, items.length - (vpList.height - 2)));
       screen.render();
     }
 
@@ -1759,9 +1763,11 @@ ${_tl('bmadDesc')}
 
   function _updateHint(idx) {
     const items = agentList.items;
+    // Pad with spaces to overwrite ghost hint text from previous render
+    const _pad = ' '.repeat(60);
     if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
       const hadBlink = (items[_hintIdx].content ?? '').endsWith('  █');
-      items[_hintIdx].setContent(hadBlink ? _hintBase + '  █' : _hintBase);
+      items[_hintIdx].setContent((hadBlink ? _hintBase + '  █' : _hintBase) + _pad);
     }
     if (idx >= 0 && items[idx]) {
       let c = items[idx].content ?? '';
@@ -1824,11 +1830,15 @@ ${_tl('bmadDesc')}
   });
 
   // Navigation: up at top → tab bar, escape → tab bar
+  // Track previous selection so arriving at index 0 doesn't immediately jump
+  let _prevAgentSel = -1;
   agentList.key(['up'], () => {
-    if (agentList.selected === 0 && typeof focusMainTabBar === 'function') {
+    const cur = agentList.selected ?? 0;
+    if (cur === 0 && _prevAgentSel === 0 && typeof focusMainTabBar === 'function') {
       focusMainTabBar();
       setTimeout(() => { agentList.select(0); screen.render(); }, 0);
     }
+    _prevAgentSel = cur;
   });
   agentList.key(['escape'], () => {
     if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
