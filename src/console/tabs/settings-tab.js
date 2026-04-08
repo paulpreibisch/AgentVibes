@@ -685,7 +685,7 @@ export function createSettingsTab(screen, services) {
 
       piper.on('exit', (code) => {
         if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-        if (code !== 0) { _previewProc = null; _previewVoiceId = null; return; }
+        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
         const wp = detectWavPlayer(_spawnEnv);
         if (!wp) return;
         const pp = spawn(wp.bin, wp.args(tempWav), {
@@ -858,6 +858,7 @@ export function createSettingsTab(screen, services) {
   }
 
   function _promptSshAlias() {
+    navigationService?.openModal();
     const aliases = _detectSshAliases();
     const detectedAliases = aliases.length > 0 ? ` (detected: ${aliases.join(', ')})` : '';
     const prompt = blessed.prompt({
@@ -871,6 +872,7 @@ export function createSettingsTab(screen, services) {
       aliases[0] ?? '',
       (err, val) => {
         prompt.destroy();
+        navigationService?.closeModal();
         if (!err && val && val.trim()) {
           const trimmed = val.trim();
           if (/[;&|`$(){}\\<>]/.test(trimmed)) {

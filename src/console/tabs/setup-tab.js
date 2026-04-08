@@ -397,8 +397,10 @@ export function createSetupTab(screen, services) {
     }
   }
 
+  let _ttsInstalling = false;
   async function _handleTtsInstall(engine) {
-    if (!engine.installCmd) return;
+    if (!engine.installCmd || _ttsInstalling) return;
+    _ttsInstalling = true;
 
     // Show installing status
     const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
@@ -430,6 +432,7 @@ export function createSetupTab(screen, services) {
         row.statusLabel.setContent(`{red-fg}[Failed]{/red-fg}`);
       }
     }
+    _ttsInstalling = false;
     screen.render();
   }
 
@@ -620,7 +623,7 @@ export function createSetupTab(screen, services) {
   async function handleProviderInstall(provider) {
     if (provider.id === 'claude-code') {
       const wasInstalled = installedState[provider.id];
-      const result = await installClaudeMcp(targetDir, packageDir);
+      const result = await installClaudeMcp(targetDir);
       await refreshInstalledState();
       showClaudeCodeInfo(result, wasInstalled);
       return;
@@ -1176,7 +1179,7 @@ export function createSetupTab(screen, services) {
 
       piper.on('exit', (code) => {
         if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-        if (code !== 0) { _previewProc = null; _previewVoiceId = null; return; }
+        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
         const wp = detectWavPlayer(_spawnEnv);
         if (!wp) return;
         const pp = spawn(wp.bin, wp.args(tempWav), {

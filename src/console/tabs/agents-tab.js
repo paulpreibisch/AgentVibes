@@ -1085,7 +1085,7 @@ ${_tl('bmadDesc')}
 
       piper.on('exit', (code) => {
         if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-        if (code !== 0) { _previewProc = null; _previewVoiceId = null; return; }
+        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
         const wp = detectWavPlayer(_spawnEnv);
         if (!wp) return;
         const pp = spawn(wp.bin, wp.args(tempWav), {

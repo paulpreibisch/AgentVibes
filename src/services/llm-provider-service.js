@@ -70,7 +70,7 @@ export async function checkCodexInstalled(targetDir) {
  * Create .mcp.json in target directory if it doesn't exist.
  * Also copies hooks, commands, config, personality, plugin, and bmad config files.
  */
-export async function installClaudeMcp(targetDir, packageDir) {
+export async function installClaudeMcp(targetDir) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
   const mcpConfig = {
@@ -82,28 +82,28 @@ export async function installClaudeMcp(targetDir, packageDir) {
     },
   };
 
-  let mcpCreated = false;
   try {
-    await fs.access(mcpConfigPath);
-    // Already exists — merge agentvibes key if missing
+    let mcpCreated = false;
     try {
-      const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
-      if (!existing.mcpServers?.agentvibes) {
-        existing.mcpServers = existing.mcpServers || {};
-        existing.mcpServers.agentvibes = mcpConfig.mcpServers.agentvibes;
-        await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
-        mcpCreated = true;
-      }
-    } catch { /* parse error — don't corrupt */ }
-  } catch {
-    // File doesn't exist — create it
-    await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
-    mcpCreated = true;
-  }
+      await fs.access(mcpConfigPath);
+      // Already exists — merge agentvibes key if missing
+      try {
+        const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
+        if (!existing.mcpServers?.agentvibes) {
+          existing.mcpServers = existing.mcpServers || {};
+          existing.mcpServers.agentvibes = mcpConfig.mcpServers.agentvibes;
+          await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+          mcpCreated = true;
+        }
+      } catch { /* parse error — don't corrupt */ }
+    } catch {
+      // File doesn't exist — create it
+      await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+      mcpCreated = true;
+    }
 
-  // Copy hooks, commands, config, personality, plugin, bmad config files
-  const silentSpinner = { start: () => {}, succeed: () => {}, fail: () => {} };
-  try {
+    // Copy hooks, commands, config, personality, plugin, bmad config files
+    const silentSpinner = { start: () => {}, succeed: () => {}, fail: () => {} };
     const installer = await import('../installer.js');
     await installer.copyHookFiles(targetDir, silentSpinner);
     await installer.copyCommandFiles(targetDir, silentSpinner);
@@ -112,9 +112,11 @@ export async function installClaudeMcp(targetDir, packageDir) {
     await installer.copyPluginFiles(targetDir, silentSpinner);
     await installer.copyBmadConfigFiles(targetDir, silentSpinner);
     await installer.copyBackgroundMusicFiles(targetDir, silentSpinner);
-  } catch { /* non-fatal — files may already exist */ }
 
-  return { success: true, mcpCreated };
+    return { success: true, mcpCreated };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 }
 
 export async function removeClaudeMcp(targetDir) {
@@ -124,7 +126,10 @@ export async function removeClaudeMcp(targetDir) {
     const parsed = JSON.parse(content);
     if (parsed.mcpServers?.agentvibes) {
       delete parsed.mcpServers.agentvibes;
-      if (Object.keys(parsed.mcpServers).length === 0) {
+      // Only delete file if mcpServers is empty AND no other top-level keys
+      const noServers = Object.keys(parsed.mcpServers).length === 0;
+      const noOtherKeys = Object.keys(parsed).length === 1;
+      if (noServers && noOtherKeys) {
         await fs.unlink(mcpConfigPath);
       } else {
         await fs.writeFile(mcpConfigPath, JSON.stringify(parsed, null, 2) + '\n');
