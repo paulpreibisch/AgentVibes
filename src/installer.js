@@ -3582,7 +3582,6 @@ async function copyPluginFiles(targetDir, spinner) {
         pluginFiles.push(file);
         const destPath = path.join(destPluginsDir, file);
         await fs.copyFile(srcPath, destPath);
-        console.log(chalk.gray(`   ✓ ${file}`));
       }
     }
     spinner.succeed(chalk.green('Installed BMAD plugin files!\n'));
@@ -3616,7 +3615,6 @@ async function copyBmadConfigFiles(targetDir, spinner) {
     await fs.access(srcPath);
     const destPath = path.join(destBmadDir, bmadVoicesFile);
     await fs.copyFile(srcPath, destPath);
-    console.log(chalk.gray(`   ✓ ${bmadVoicesFile}`));
     fileCount++;
     spinner.succeed(chalk.green('Installed BMAD config files!\n'));
   } catch (error) {
@@ -3784,10 +3782,6 @@ async function copyConfigFiles(targetDir, spinner) {
 
     if (copiedFiles.length > 0) {
       spinner.succeed(chalk.green(`Installed ${copiedFiles.length} config file${copiedFiles.length === 1 ? '' : 's'}!\n`));
-      copiedFiles.forEach(file => {
-        console.log(chalk.gray(`   ✓ ${file}`));
-      });
-      console.log(''); // Add blank line for spacing
     } else {
       spinner.info(chalk.gray('Config files already exist, skipping\n'));
     }

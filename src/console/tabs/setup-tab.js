@@ -23,13 +23,13 @@ import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
 import {
   PROVIDERS,
   checkClaudeInstalled, checkCopilotInstalled, checkCodexInstalled,
-  installClaudeMcp, removeClaudeMcp,
+  installClaudeMcp, removeClaudeMcp, uninstallClaude,
   installCopilotMcp, removeCopilotMcp,
   installCopilotInstructions, removeCopilotInstructions,
   installCodexMcp, removeCodexMcp,
   installCodexInstructions, installCodexHooks,
   removeCodexInstructions, removeCodexHooks,
-  loadLlmConfigSync, saveLlmConfigSync,
+  loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
 } from '../../services/llm-provider-service.js';
 import {
   getAvailableEngines, getEngineStatuses, checkEngineInstalled,
@@ -38,7 +38,7 @@ import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, toggleFavorite } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { spawn } from 'node:child_process';
@@ -201,7 +201,9 @@ export function createSetupTab(screen, services) {
   // Wizard state
 
   let _screen = 0;
-  let _lastScreen = -1;
+  let _lastScreen = -2;
+  let _pendingGlobalCfg = null;  // Set when global config detected on first run
+  let _globalChoiceIdx = 0;      // 0 = Load Global, 1 = Start Fresh
   const _getLang = () => languageService?.getLang() ?? 'en';
   const _tl = (key) => languageService?.t(key) ?? t('en', key);
   let _langIdx = 0;
@@ -458,10 +460,10 @@ export function createSetupTab(screen, services) {
   // Info box for provider details
   const infoBox = blessed.box({
     parent: box,
-    top: 1,
-    left: 2,
-    width: '96%',
-    bottom: 1,
+    top: 0,
+    left: 0,
+    width: '100%',
+    bottom: 0,
     hidden: true,
     scrollable: true,
     alwaysScroll: true,
@@ -469,6 +471,7 @@ export function createSetupTab(screen, services) {
     keys: true,
     vi: true,
     mouse: true,
+    valign: 'top',
     scrollbar: { ch: '|', style: { fg: 'cyan' } },
     style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
   });
@@ -650,9 +653,9 @@ export function createSetupTab(screen, services) {
 
   async function handleProviderRemove(provider) {
     if (provider.id === 'claude-code') {
-      await removeClaudeMcp(targetDir);
+      const result = await uninstallClaude(targetDir);
       await refreshInstalledState();
-      showRemoveInfo('claude-code');
+      showRemoveInfo('claude-code', result.removed || []);
       return;
     }
 
@@ -694,10 +697,20 @@ export function createSetupTab(screen, services) {
     let _closed = false;
     navigationService?.openModal();
 
+    const defaultPretext = {
+      'claude-code': 'Claude Code here',
+      'copilot': 'Copilot here',
+      'codex': 'Codex here',
+    };
+
+    // Read global defaults for display
+    const globalEngine = providerService?.getActiveProvider?.() || 'piper';
+    const globalVoice = providerService?.getActiveVoiceId?.() || 'none';
+
     const draft = {
       ttsEngine:    config.ttsEngine || '',
       voice:        config.voice || '',
-      pretext:      config.pretext || '',
+      pretext:      config.pretext || defaultPretext[llmKey] || '',
       reverbPreset: config.effects || 'off',
       bgTrack:      config.bgTrack || '',
       bgVolume:     config.bgVolume || '0.15',
@@ -708,7 +721,7 @@ export function createSetupTab(screen, services) {
       top: 'center',
       left: 'center',
       width: 72,
-      height: 21,
+      height: 22,
       border: { type: 'line' },
       tags: true,
       label: ` {bold}{cyan-fg} ${provider.name} -- Audio Config {/cyan-fg}{/bold} `,
@@ -722,8 +735,8 @@ export function createSetupTab(screen, services) {
 
     // Field definitions
     const FIELDS = [
-      { key: 'ttsEngine', label: 'TTS Engine',  getValue: () => draft.ttsEngine || '(global default)' },
-      { key: 'voice',     label: 'Voice',        getValue: () => draft.voice || '(global default)' },
+      { key: 'ttsEngine', label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
+      { key: 'voice',     label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
       { key: 'pretext',   label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
       { key: 'reverb',    label: 'Reverb',        getValue: () => {
         const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
@@ -770,7 +783,7 @@ export function createSetupTab(screen, services) {
       left: 2,
       right: 2,
       tags: true,
-      content: '{white-fg}[Up/Down] Navigate  [Enter] Edit  [Tab] Save/Cancel  [Esc] Cancel{/white-fg}',
+      content: '{white-fg}[Up/Down] Navigate  [Enter] Edit  [Tab] Buttons  [Esc] Close{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -797,40 +810,139 @@ export function createSetupTab(screen, services) {
       return btn;
     }
 
-    const saveBtn = _modalBtn('Save', 4, () => {
+    // Preview status line
+    const previewLine = blessed.text({
+      parent: modal,
+      bottom: 1,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: '',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _previewModalProc = null;
+    function _killPreview() {
+      if (_previewModalProc) {
+        try { _previewModalProc.kill(); } catch {}
+        _previewModalProc = null;
+      }
+    }
+
+    function _playPreview() {
+      _killPreview();
+      previewLine.setContent('{cyan-fg}♪ Previewing...{/cyan-fg}');
+      screen.render();
+
+      // Save first so play-tts picks up current settings
+      _autoSave(true);
+
+      // Temporarily enable background music for preview if a track is configured
+      const hasBgTrack = !!draft.bgTrack;
+      let _bgRestore = null;
+      if (hasBgTrack) {
+        const avCfgPath = path.join(targetDir, '.agentvibes', 'config.json');
+        try {
+          const raw = fs.readFileSync(avCfgPath, 'utf8');
+          const cfg = JSON.parse(raw);
+          if (cfg.backgroundMusic && !cfg.backgroundMusic.enabled) {
+            cfg.backgroundMusic.enabled = true;
+            fs.writeFileSync(avCfgPath, JSON.stringify(cfg, null, 2) + '\n');
+            _bgRestore = () => { cfg.backgroundMusic.enabled = false; fs.writeFileSync(avCfgPath, JSON.stringify(cfg, null, 2) + '\n'); };
+          }
+        } catch {
+          // No .agentvibes/config.json — use legacy txt fallback
+          const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
+          let bgWas = false;
+          try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
+          if (!bgWas) {
+            try { fs.writeFileSync(bgEnabledFile, 'true', 'utf8'); } catch {}
+            _bgRestore = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
+          }
+        }
+      }
+
+      const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
+      const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      // Don't include pretext — play-tts already prepends it from the config
+      const sampleText = 'Here is a preview of your audio settings.';
+
+      let cmd, args;
+      if (isWin) {
+        const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.ps1');
+        cmd = 'powershell';
+        args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
+      } else {
+        const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.sh');
+        cmd = 'bash';
+        args = [script, sampleText, '', '--llm', llmKey];
+      }
+
+      const proc = spawn(cmd, args, {
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+      });
+      _previewModalProc = proc;
+
+      const _restoreBg = () => { if (_bgRestore) _bgRestore(); };
+
+      proc.on('exit', () => {
+        _previewModalProc = null;
+        _restoreBg();
+        if (!_closed) { previewLine.setContent(''); screen.render(); }
+      });
+      proc.on('error', () => {
+        _previewModalProc = null;
+        _restoreBg();
+        if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
+      });
+    }
+
+    // Auto-save: persist draft to config immediately on any change
+    function _autoSave(silent) {
+      // Infer engine from voice — voice picker only shows Piper voices,
+      // so if a voice is set but no engine chosen, default to piper
+      const engine = draft.ttsEngine || (draft.voice ? 'piper' : '');
       saveLlmConfigSync(llmKey, {
         voice: draft.voice,
         pretext: draft.pretext,
         effects: draft.reverbPreset === 'off' ? '' : draft.reverbPreset,
         bgTrack: draft.bgTrack,
         bgVolume: draft.bgVolume,
-        ttsEngine: draft.ttsEngine,
+        ttsEngine: engine,
         sourcePath: config.sourcePath,
       }, targetDir);
-      _closeModal();
-      _showSavedToast(provider.name);
-    });
+      if (!silent) {
+        const cfgPath = config.sourcePath || resolveCfgPath(targetDir);
+        _showSavedToast('Settings', cfgPath);
+      }
+    }
 
-    const resetBtn = _modalBtn('Reset', 16, () => {
+    const previewBtn = _modalBtn('Preview', 4, _playPreview);
+
+    const resetBtn = _modalBtn('Reset', 18, () => {
       draft.ttsEngine = '';
       draft.voice = '';
-      draft.pretext = '';
+      draft.pretext = defaultPretext[llmKey] || '';
       draft.reverbPreset = 'off';
       draft.bgTrack = '';
       draft.bgVolume = '0.15';
+      _autoSave();
       fieldList.setItems(_fieldItems());
       fieldList.focus();
       screen.render();
     });
 
-    const cancelBtn = _modalBtn('Cancel', 30, _closeModal);
+    const closeBtn = _modalBtn('Close', 30, _closeModal);
 
-    const allBtns = [saveBtn, resetBtn, cancelBtn];
+    const allBtns = [previewBtn, resetBtn, closeBtn];
     const btnBlink = attachBtnBlink(allBtns, screen);
 
     function _closeModal() {
       if (_closed) return;
       _closed = true;
+      _killPreview();
       btnBlink.cleanup();
       navigationService?.closeModal();
       destroyList(modal, screen);
@@ -845,6 +957,7 @@ export function createSetupTab(screen, services) {
       if (!field) return;
 
       const _refreshField = () => {
+        _autoSave();
         fieldList.setItems(_fieldItems());
         fieldList.select(idx);
         fieldList.focus();
@@ -1101,7 +1214,7 @@ export function createSetupTab(screen, services) {
 
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{white-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [/] Search  [Esc] Cancel{/white-fg}',
+      content: '{white-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [F] Favorite  [/] Search  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -1112,15 +1225,18 @@ export function createSetupTab(screen, services) {
     }
 
     function _buildVoiceItems(voices) {
+      const favs = getFavorites(configService);
       return voices.map(v => {
         const isActive = v === draft.voice;
         const isPrev = v === _previewVoiceId;
+        const isFav = favs.includes(v);
         const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
+        const star = isFav ? '{yellow-fg}★{/yellow-fg}' : ' ';
         const meta = getVoiceMeta(v);
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
           : meta.displayName.padEnd(COL_N);
-        return ` ${dot} ${name}${meta.gender.padEnd(COL_G)}${meta.provider}`;
+        return ` ${dot}${star} ${name}${meta.gender.padEnd(COL_G)}${meta.provider}`;
       });
     }
 
@@ -1213,6 +1329,11 @@ export function createSetupTab(screen, services) {
       const sel = filtered[vpList.selected];
       if (sel) _previewVoice(sel);
     });
+    vpList.key(['f', '*'], () => {
+      const filtered = _getFiltered();
+      const sel = filtered[vpList.selected];
+      if (sel) { toggleFavorite(configService, sel); _refreshVP(); }
+    });
     vpList.key(['escape', 'q'], _closeVP);
 
     _refreshVP();
@@ -1272,16 +1393,19 @@ export function createSetupTab(screen, services) {
 
   // ── Saved toast ───────────────────────────────────────────────────────────
 
-  function _showSavedToast(name) {
+  function _showSavedToast(name, filePath) {
+    const lines = [`{center}{green-fg}{bold}${name} saved!{/bold}{/green-fg}{/center}`];
+    if (filePath) lines.push(`{center}{white-fg}${filePath}{/white-fg}{/center}`);
+    const w = filePath ? Math.min(Math.max(filePath.length + 6, 30), 70) : 30;
     const toast = blessed.box({
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 30,
-      height: 3,
+      width: w,
+      height: filePath ? 4 : 3,
       border: { type: 'line' },
       tags: true,
-      content: `{center}{green-fg}{bold}${name} saved!{/bold}{/green-fg}{/center}`,
+      content: lines.join('\n'),
       style: { bg: COLORS.contentBg, border: { fg: 'green' } },
     });
     toast.setFront();
@@ -1354,10 +1478,11 @@ export function createSetupTab(screen, services) {
     lines.push('');
     lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
     lines.push('');
-    lines.push('{white-fg}Press {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 
     infoBox.setContent(lines.join('\n'));
     infoBox.show();
+    infoBox.setFront();
     infoBox.focus();
     infoBox.scrollTo(0);
     screen.render();
@@ -1382,10 +1507,11 @@ export function createSetupTab(screen, services) {
     lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.vscode/mcp.json{/bold}');
     lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.github/copilot-instructions.md{/bold}');
     lines.push('');
-    lines.push('{white-fg}Press {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 
     infoBox.setContent(lines.join('\n'));
     infoBox.show();
+    infoBox.setFront();
     infoBox.focus();
     infoBox.scrollTo(0);
     screen.render();
@@ -1412,27 +1538,35 @@ export function createSetupTab(screen, services) {
     lines.push('  {yellow-fg}3.{/yellow-fg} {bold}AGENTS.md{/bold}');
     lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.codex/hooks/{/bold}');
     lines.push('');
-    lines.push('{white-fg}Press {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 
     infoBox.setContent(lines.join('\n'));
     infoBox.show();
+    infoBox.setFront();
     infoBox.focus();
     infoBox.scrollTo(0);
     screen.render();
   }
 
-  function showRemoveInfo(providerId) {
+  function showRemoveInfo(providerId, removedItems) {
     providerView = 'info';
     hideAllProviderRows();
     contentBox.hide();
 
     const lines = [];
     if (providerId === 'claude-code') {
-      lines.push('{bold}{cyan-fg}Claude Code -- Removed{/cyan-fg}{/bold}');
+      lines.push('{bold}{cyan-fg}Claude Code -- Uninstalled{/cyan-fg}{/bold}');
       lines.push('');
-      lines.push('{green-fg}AgentVibes MCP entry removed from .mcp.json{/green-fg}');
+      lines.push('{green-fg}AgentVibes fully removed from this project!{/green-fg}');
       lines.push('');
-      lines.push('{white-fg}To fully remove hooks and config files, delete the .claude/ directory.{/white-fg}');
+      if (removedItems && removedItems.length > 0) {
+        lines.push('{bold}{cyan-fg}Removed:{/cyan-fg}{/bold}');
+        for (const item of removedItems) {
+          lines.push(`  {yellow-fg}•{/yellow-fg} ${item}`);
+        }
+        lines.push('');
+      }
+      lines.push('{white-fg}Re-install anytime with the Install button.{/white-fg}');
     } else if (providerId === 'github-copilot') {
       lines.push('{bold}{cyan-fg}GitHub Copilot -- Removed{/cyan-fg}{/bold}');
       lines.push('');
@@ -1443,10 +1577,11 @@ export function createSetupTab(screen, services) {
       lines.push('{green-fg}Successfully removed!{/green-fg}');
     }
     lines.push('');
-    lines.push('{white-fg}Press {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 
     infoBox.setContent(lines.join('\n'));
     infoBox.show();
+    infoBox.setFront();
     infoBox.focus();
     infoBox.scrollTo(0);
     screen.render();
@@ -1462,7 +1597,7 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
-  infoBox.key(['escape'], () => {
+  infoBox.key(['escape', 'enter'], () => {
     showProviderListView();
   });
 
@@ -1661,6 +1796,7 @@ export function createSetupTab(screen, services) {
       setTimeout(() => {
         if (_screen !== targetScreen) return;
         switch (_screen) {
+          case -1: _renderScreenGlobal(); break;
           case 0: _renderScreen0(); break;
           case 1: _renderScreen1(); break;
           case 2: _renderScreen2(); break;
@@ -1670,6 +1806,7 @@ export function createSetupTab(screen, services) {
       return;
     }
     switch (_screen) {
+      case -1: _renderScreenGlobal(); break;
       case 0: _renderScreen0(); break;
       case 1: _renderScreen1(); break;
       case 2: _renderScreen2(); break;
@@ -1682,7 +1819,20 @@ export function createSetupTab(screen, services) {
   // =========================================================================
 
   screen.key(['enter'], () => {
-    if (box.hidden || _checking) return;
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      // Global config choice screen
+      if (_globalChoiceIdx === 0) {
+        try { configService.saveAllToLocal(_pendingGlobalCfg); } catch {}
+        _screen = 3;
+      } else {
+        _screen = 0;
+        _langIdx = 0;
+      }
+      _pendingGlobalCfg = null;
+      _showCurrentScreen();
+      return;
+    }
     if (_screen === 0) {
       if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
       _screen = 1;
@@ -1695,7 +1845,11 @@ export function createSetupTab(screen, services) {
   });
 
   screen.key(['escape'], () => {
-    if (box.hidden || _checking) return;
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      setTimeout(() => navigationService?.switchTab('settings'), 0);
+      return;
+    }
     if (_screen === 3 && providerView === 'info') {
       showProviderListView();
       return;
@@ -1709,7 +1863,12 @@ export function createSetupTab(screen, services) {
   });
 
   screen.key(['up'], () => {
-    if (box.hidden) return;
+    if (box.hidden || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      _globalChoiceIdx = 0;
+      _renderScreenGlobal();
+      return;
+    }
     if (_screen === 0) {
       _langIdx = Math.max(0, _langIdx - 1);
       _renderScreen0();
@@ -1718,7 +1877,8 @@ export function createSetupTab(screen, services) {
   });
 
   screen.key(['left'], () => {
-    if (box.hidden || _checking) return;
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) return;
     if (_screen === 3) return;  // Left handled by button nav
     if (_screen > 0) {
       _screen--;
@@ -1727,7 +1887,8 @@ export function createSetupTab(screen, services) {
   });
 
   screen.key(['right'], () => {
-    if (box.hidden || _checking) return;
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) return;
     if (_screen === 0) {
       if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
       _screen = 1;
@@ -1740,13 +1901,61 @@ export function createSetupTab(screen, services) {
   });
 
   screen.key(['down'], () => {
-    if (box.hidden) return;
+    if (box.hidden || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      _globalChoiceIdx = 1;
+      _renderScreenGlobal();
+      return;
+    }
     if (_screen === 0) {
       _langIdx = Math.min(SUPPORTED_LANGUAGES.length - 1, _langIdx + 1);
       _renderScreen0();
       return;
     }
   });
+
+  // =========================================================================
+  // Screen -1: Global Config Detection (pre-wizard)
+  // =========================================================================
+
+  function _renderScreenGlobal() {
+    const cfg = _pendingGlobalCfg || {};
+    const cfgPath = configService?.getGlobalConfigPath?.() || '~/.agentvibes/config.json';
+
+    // Build settings preview
+    const voice = cfg.voice || '(default)';
+    const lang = cfg.language || 'en';
+    const ttsEngine = cfg.ttsEngine || '(auto)';
+    const verbosity = cfg.verbosity || 'high';
+    const personality = cfg.personality || 'none';
+
+    const sel0 = _globalChoiceIdx === 0;
+    const sel1 = _globalChoiceIdx === 1;
+    const hi = '{magenta-bg}{white-fg}';
+    const lo = '{/white-fg}{/magenta-bg}';
+
+    const lines = [
+      _HDR('', 'Global Settings Found'),
+      '',
+      `  {white-fg}Location:{/white-fg} {yellow-fg}${cfgPath}{/yellow-fg}`,
+      '',
+      `  {cyan-fg}Voice:{/cyan-fg}       {yellow-fg}${voice}{/yellow-fg}`,
+      `  {cyan-fg}Language:{/cyan-fg}    {yellow-fg}${lang}{/yellow-fg}`,
+      `  {cyan-fg}TTS Engine:{/cyan-fg} {yellow-fg}${ttsEngine}{/yellow-fg}`,
+      `  {cyan-fg}Verbosity:{/cyan-fg}  {yellow-fg}${verbosity}{/yellow-fg}`,
+      `  {cyan-fg}Personality:{/cyan-fg}{yellow-fg} ${personality}{/yellow-fg}`,
+      '',
+      '  {white-fg}What would you like to do for this project?{/white-fg}',
+      '',
+      `  ${sel0 ? hi : ''}> Load Global Settings${sel0 ? lo : ''}  {white-fg}— use these settings for this project{/white-fg}`,
+      `  ${sel1 ? hi : ''}> Start Fresh${sel1 ? lo : ''}          {white-fg}— run the full setup wizard from scratch{/white-fg}`,
+      '',
+    ];
+    contentBox.setContent(_c(lines));
+    hintLine.setContent('  [Up/Down] Choose  |  [Enter] Select');
+    box.focus();
+    screen.render();
+  }
 
   // =========================================================================
   // Tab Component Contract
@@ -1756,6 +1965,21 @@ export function createSetupTab(screen, services) {
     box,
 
     show() {
+      _lastScreen = -1;
+      providerView = 'list';
+      box.show();
+
+      // Check: no local config but global exists with setupCompleted
+      const hasLocal = configService?.hasLocalConfig?.();
+      const globalCfg = configService?.getGlobalConfig?.() ?? {};
+      if (!hasLocal && globalCfg.setupCompleted) {
+        _pendingGlobalCfg = globalCfg;
+        _screen = -1;
+        _showCurrentScreen();
+        screen.render();
+        return;
+      }
+
       // If not first run, skip directly to Screen 3 (providers)
       if (!_isFirstRun()) {
         _screen = 3;
@@ -1763,9 +1987,6 @@ export function createSetupTab(screen, services) {
         _screen = 0;
         _langIdx = 0;
       }
-      _lastScreen = -1;
-      providerView = 'list';
-      box.show();
       _showCurrentScreen();
       screen.render();
     },

@@ -139,6 +139,85 @@ export async function removeClaudeMcp(targetDir) {
   return { success: true };
 }
 
+/**
+ * Full uninstall: remove MCP entry + all AgentVibes files from the project.
+ * Does NOT touch user's own .claude/ settings (settings.json, CLAUDE.md etc.).
+ */
+export async function uninstallClaude(targetDir) {
+  const removed = [];
+
+  // 1. Remove MCP entry
+  await removeClaudeMcp(targetDir);
+  removed.push('.mcp.json (agentvibes entry)');
+
+  // 2. Remove AgentVibes directories
+  const dirs = [
+    ['.claude', 'commands', 'agent-vibes'],
+    ['.claude', 'hooks'],
+    ['.claude', 'hooks-windows'],
+    ['.claude', 'personalities'],
+    ['.claude', 'output-styles'],
+    ['.claude', 'plugins'],
+    ['.claude', 'audio'],
+    ['.claude', 'config'],
+    ['.agentvibes'],
+  ];
+
+  for (const parts of dirs) {
+    const dirPath = path.join(targetDir, ...parts);
+    try {
+      await fs.rm(dirPath, { recursive: true, force: true });
+      removed.push(parts.join('/'));
+    } catch { /* doesn't exist */ }
+  }
+
+  // 3. Remove AgentVibes config files from .claude/
+  const configFiles = [
+    'tts-voice.txt', 'tts-provider.txt', 'tts-personality.txt',
+    'tts-verbosity.txt', 'tts-translate.txt', 'tts-target-voice.txt',
+    'tts-target-language.txt', 'tts-language.txt', 'tts-speech-rate.txt',
+    'tts-target-speech-rate.txt', 'piper-speech-rate.txt',
+    'piper-target-speech-rate.txt', 'personalities.json',
+    'github-star-reminder.txt', 'piper-voices-dir.txt',
+    'verbosity.txt', 'personality.txt', 'intro-text.txt',
+    'reverb-level.txt', 'background-music-enabled.txt',
+    'background-music-volume.txt',
+  ];
+
+  for (const file of configFiles) {
+    try {
+      await fs.unlink(path.join(targetDir, '.claude', file));
+    } catch { /* doesn't exist */ }
+  }
+
+  // 4. Remove settings.json hook entries if present
+  const settingsPath = path.join(targetDir, '.claude', 'settings.json');
+  try {
+    const content = await fs.readFile(settingsPath, 'utf8');
+    const settings = JSON.parse(content);
+    let changed = false;
+    if (settings.hooks) {
+      for (const hookKey of Object.keys(settings.hooks)) {
+        const hooks = settings.hooks[hookKey];
+        if (Array.isArray(hooks)) {
+          const filtered = hooks.filter(h =>
+            !(h.command && (h.command.includes('agentvibes') || h.command.includes('play-tts') || h.command.includes('bmad-speak'))));
+          if (filtered.length !== hooks.length) {
+            settings.hooks[hookKey] = filtered;
+            changed = true;
+          }
+        }
+      }
+    }
+    if (changed) {
+      await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+      removed.push('.claude/settings.json (hooks cleaned)');
+    }
+  } catch { /* no settings or parse error */ }
+
+  return { success: true, removed };
+}
+
 // ── Copilot install/remove ──────────────────────────────────────────────────
 
 export async function installCopilotMcp(targetDir) {

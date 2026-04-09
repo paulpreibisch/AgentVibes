@@ -131,20 +131,23 @@ TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 _LLM_VOICE=""
 _LLM_PRETEXT=""
 _LLM_REVERB=""
+_LLM_ENGINE=""
 if [[ -n "$LLM_PROVIDER" ]]; then
   _llm_key="llm:${LLM_PROVIDER}"
   for _cfg in \
     "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
     "$HOME/.claude/config/audio-effects.cfg"; do
     if [[ -z "$_LLM_VOICE" && -z "$_LLM_PRETEXT" && -f "$_cfg" ]]; then
-      while IFS='|' read -r _key _reverb _bgfile _bgvol _voice _pretext _rest; do
+      while IFS='|' read -r _key _reverb _bgfile _bgvol _voice _pretext _engine _rest; do
         if [[ "$_key" == "$_llm_key" ]]; then
           _reverb="${_reverb## }"; _reverb="${_reverb%% }"
           _voice="${_voice## }"; _voice="${_voice%% }"
           _pretext="${_pretext## }"; _pretext="${_pretext%% }"
+          _engine="${_engine## }"; _engine="${_engine%% }"
           [[ -n "$_reverb" ]] && _LLM_REVERB="$_reverb"
           [[ -n "$_voice" ]] && _LLM_VOICE="$_voice"
           [[ -n "$_pretext" ]] && _LLM_PRETEXT="$_pretext"
+          [[ -n "$_engine" ]] && _LLM_ENGINE="$_engine"
           break
         fi
       done < "$_cfg"
@@ -187,8 +190,12 @@ fi
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
 
-# Get active provider
-ACTIVE_PROVIDER=$(get_active_provider)
+# Get active provider (LLM-specific engine overrides global)
+if [[ -n "$_LLM_ENGINE" ]]; then
+  ACTIVE_PROVIDER="$_LLM_ENGINE"
+else
+  ACTIVE_PROVIDER=$(get_active_provider)
+fi
 
 # Show GitHub star reminder (once per day)
 "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true

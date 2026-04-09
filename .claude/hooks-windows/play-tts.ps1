@@ -51,6 +51,7 @@ if (Test-Path $MuteFile) {
 $LlmVoice = ""
 $LlmPretext = ""
 $LlmReverb = ""
+$LlmEngine = ""
 $ProjectRoot = Split-Path -Parent $ClaudeDir
 $ConfigDir = "$ClaudeDir\config"
 
@@ -75,6 +76,9 @@ if ($llm) {
                     }
                     if ($parts.Length -ge 6 -and $parts[5].Trim()) {
                         $LlmPretext = $parts[5].Trim()
+                    }
+                    if ($parts.Length -ge 7 -and $parts[6].Trim()) {
+                        $LlmEngine = $parts[6].Trim()
                     }
                     break
                 }
@@ -119,8 +123,11 @@ if ($Pretext) {
 }
 
 # Determine active provider
+# LLM-specific engine overrides global provider
 $ActiveProvider = "sapi"
-if (Test-Path $ProviderFile) {
+if ($LlmEngine) {
+    $ActiveProvider = $LlmEngine
+} elseif (Test-Path $ProviderFile) {
     $ActiveProvider = (Get-Content $ProviderFile -Raw).Trim()
 }
 

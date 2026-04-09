@@ -621,7 +621,7 @@ export function createVoicesTab(screen, services) {
 
   // -------------------------------------------------------------------------
   // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = `{${COLORS.dimFg}-fg}[Space] preview  [Enter] select as default voice{/${COLORS.dimFg}-fg}`;
+  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select as default voice{/white-fg}';
   let _listFocused = false;
 
   // Inline selection hint appended to the currently highlighted voice row.
@@ -1008,7 +1008,7 @@ export function createVoicesTab(screen, services) {
       left: 2,
       right: 2,
       tags: true,
-      content: `{${COLORS.dimFg}-fg}Press Preview to audition this voice{/${COLORS.dimFg}-fg}`,
+      content: '{white-fg}Press Preview to audition this voice{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -1079,7 +1079,7 @@ export function createVoicesTab(screen, services) {
       const isPlaying = _playingVoiceId === voiceId;
       _previewVoice(voiceId);
       modalStatus.setContent(isPlaying
-        ? `{${COLORS.dimFg}-fg}Stopped.{/${COLORS.dimFg}-fg}`
+        ? '{white-fg}Stopped.{/white-fg}'
         : `{${COLORS.activeFg}-fg}♪ Playing: ${displayName}…{/${COLORS.activeFg}-fg}`
       );
       screen.render();
