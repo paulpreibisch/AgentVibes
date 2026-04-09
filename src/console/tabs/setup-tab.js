@@ -1428,9 +1428,11 @@ export function createSetupTab(screen, services) {
 
     const lines = [];
     if (providerId === 'claude-code') {
-      lines.push('{bold}{cyan-fg}Remove Claude Code Integration{/cyan-fg}{/bold}');
+      lines.push('{bold}{cyan-fg}Claude Code -- Removed{/cyan-fg}{/bold}');
       lines.push('');
-      lines.push('To remove, run: {yellow-fg}npx agentvibes uninstall{/yellow-fg}');
+      lines.push('{green-fg}AgentVibes MCP entry removed from .mcp.json{/green-fg}');
+      lines.push('');
+      lines.push('{white-fg}To fully remove hooks and config files, delete the .claude/ directory.{/white-fg}');
     } else if (providerId === 'github-copilot') {
       lines.push('{bold}{cyan-fg}GitHub Copilot -- Removed{/cyan-fg}{/bold}');
       lines.push('');
