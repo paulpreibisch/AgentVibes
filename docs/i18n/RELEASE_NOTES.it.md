@@ -1,5 +1,40 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🚀 v5.0.0 — Supporto Multi-Provider: Claude Code + Copilot + Codex
+
+**Data di rilascio:** Aprile 2026
+
+### Nuove Funzionalita
+
+- **Supporto GitHub Copilot in VS Code** — Installa e configura AgentVibes per GitHub Copilot direttamente dalla TUI. Crea `.vscode/mcp.json` e `.github/copilot-instructions.md`.
+
+- **Supporto OpenAI Codex in VS Code** — Integrazione completa di Codex con `.codex/config.toml`, protocollo TTS in `AGENTS.md` e hook di inizializzazione.
+
+- **Scheda di Configurazione Unificata** — La vecchia procedura guidata di installazione a 5 schermate e la scheda separata Provider LLM sono state unite in un'unica scheda Configurazione. Il primo avvio mostra una procedura guidata in 4 passaggi (Lingua → Dipendenze → Motore TTS → Provider); gli utenti abituali passano direttamente alla schermata Provider.
+
+- **Configurazione Audio per Provider** — Ogni provider LLM (Claude Code, Copilot, Codex) ottiene il proprio Motore TTS, Voce, Riverbero, Musica di Sottofondo e Pretext tramite un modale di Configurazione.
+
+- **Schermata di Selezione Motore TTS** — Un nuovo passaggio della procedura guidata mostra un elenco di motori adattato al sistema operativo (Piper, Soprano, Windows SAPI, macOS Say) con pulsanti Installa per i motori mancanti.
+
+- **Scheda Impostazioni Riprogettata** — Il layout a 5 sotto-schede e stato sostituito con un elenco piatto e pulito: Lingua dell'Interfaccia, Motore TTS Predefinito, Voce Predefinita, Verbosita, Destinazione Audio, Archiviazione Configurazione e Riesegui Procedura Guidata di Configurazione.
+
+### Miglioramenti
+
+- **Selettore vocale migliorato ovunque** — Visualizzazione a 3 colonne (Nome, Genere, Provider), anteprima con barra spaziatrice tramite sintesi e riproduzione, posizione di scorrimento preservata durante l'anteprima.
+
+- **Artefatti del testo suggerimento corretti** — Spostarsi tra le righe nelle schede Agenti e Musica non lascia piu testo fantasma sulle righe precedenti.
+
+- **Instradamento vocale di Codex corretto** — `AGENTS.md` ora istruisce Codex a usare `play-tts` per il parlato normale e `bmad-speak` solo durante la modalita festa BMAD.
+
+### Impatto per l'Utente
+
+- AgentVibes ora funziona con Claude Code, GitHub Copilot E OpenAI Codex
+- Esperienza di configurazione semplificata — una sola scheda per tutta la gestione dei provider
+- Personalizzazione vocale per provider senza modificare file di configurazione
+- La pagina delle impostazioni e drasticamente piu semplice e veloce da navigare
+
+---
+
 ## 🐛 v4.6.8 — Correzione Crash su Installazione Pulita
 
 **Data di rilascio:** Aprile 2026

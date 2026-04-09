@@ -1,14 +1,16 @@
 > 🌐 [English version](../../README.md)
 
-**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v4.6.8
+**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.0.0
 
 ---
 
-## 🐛 NOUVEAU DANS v4.6.8 — Correction du Crash sur Installation Neuve
+## 🚀 NOUVEAU DANS v5.0.0 — Support Multi-Fournisseur : Claude Code + Copilot + Codex
 
-- **Crash de l'onglet Paramètres corrigé** — ne plante plus lors de la navigation vers Paramètres sur une installation neuve sans voix configurée
-- **Correction de test macOS** — l'assertion du chemin de relecture gère le symlink `/var` → `/private/var`
-- **Analyse du pretext BMAD améliorée** — le pretext des voix est correctement extrait de `bmad-voices.md`
+- **GitHub Copilot + OpenAI Codex dans VS Code** — AgentVibes prend désormais en charge les trois principaux assistants de codage IA. Installez et configurez chacun depuis le TUI.
+- **Un seul onglet Configuration** — assistant en 4 étapes (Langue → Dépendances → Moteur TTS → Fournisseurs) remplace les anciens onglets installateur + LLM. Les utilisateurs existants passent directement aux Fournisseurs.
+- **Configuration audio par fournisseur** — chaque LLM a sa propre Voix, Moteur TTS, Réverbération, Musique et Pretexte via le modal Configurer.
+- **Paramètres repensés** — liste plate et épurée : Langue, Moteur TTS, Voix, Verbosité, Destination Audio, Stockage de Configuration, Relancer l'Assistant.
+- **Sélecteur de voix amélioré** — affichage en 3 colonnes, prévisualisation avec la barre espace, le défilement reste en place.
 
 ---
 

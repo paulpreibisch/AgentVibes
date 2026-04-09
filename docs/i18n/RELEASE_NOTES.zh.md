@@ -1,5 +1,40 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🚀 v5.0.0 — 多供应商支持: Claude Code + Copilot + Codex
+
+**发布日期:** 2026年4月
+
+### 新功能
+
+- **VS Code 中的 GitHub Copilot 支持** — 直接从 TUI 为 GitHub Copilot 安装和配置 AgentVibes。创建 `.vscode/mcp.json` 和 `.github/copilot-instructions.md`。
+
+- **VS Code 中的 OpenAI Codex 支持** — 完整的 Codex 集成，包括 `.codex/config.toml`、`AGENTS.md` TTS 协议和初始化钩子。
+
+- **统一设置标签页** — 旧的 5 屏安装向导和独立的 LLM 供应商标签页合并为单一的设置标签页。首次运行显示 4 步向导（语言 → 依赖项 → TTS 引擎 → 供应商）；回访用户直接跳转到供应商界面。
+
+- **按供应商配置音频** — 每个 LLM 供应商（Claude Code、Copilot、Codex）通过配置弹窗获得独立的 TTS 引擎、语音、混响、背景音乐和 Pretext。
+
+- **TTS 引擎选择界面** — 新的向导步骤显示适配操作系统的引擎列表（Piper、Soprano、Windows SAPI、macOS Say），并为缺失的引擎提供安装按钮。
+
+- **设置标签页重新设计** — 5 个子标签页布局被替换为简洁的扁平列表：界面语言、默认 TTS 引擎、默认语音、详细程度、音频输出目标、配置存储和重新运行设置向导。
+
+### 改进
+
+- **语音选择器全面升级** — 3 列显示（名称、性别、供应商），空格键预览支持合成与播放，预览期间保留滚动位置。
+
+- **提示文本残影修复** — 在代理和音乐标签页中切换行时，不再在之前的行上留下残影文字。
+
+- **Codex 语音路由修正** — `AGENTS.md` 现在指示 Codex 使用 `play-tts` 进行正常语音播报，仅在 BMAD 派对模式期间使用 `bmad-speak`。
+
+### 用户影响
+
+- AgentVibes 现在可与 Claude Code、GitHub Copilot 和 OpenAI Codex 配合使用
+- 简化的设置体验 — 一个标签页管理所有供应商
+- 无需编辑配置文件即可按供应商自定义语音
+- 设置页面显著更简洁，导航更快速
+
+---
+
 ## 🐛 v4.6.8 — 全新安装崩溃修复
 
 **发布日期：** 2026年4月

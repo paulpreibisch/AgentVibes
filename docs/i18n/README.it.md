@@ -1,14 +1,16 @@
 > 🌐 [English version](../../README.md)
 
-**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v4.6.8
+**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.0.0
 
 ---
 
-## 🐛 NEW IN v4.6.8 — Correzione Crash su Installazione Pulita
+## 🚀 NOVITÀ IN v5.0.0 — Supporto Multi-Provider: Claude Code + Copilot + Codex
 
-- **Crash scheda Impostazioni risolto** — non crasha più quando si naviga nelle Impostazioni su un'installazione pulita senza voce configurata
-- **Correzione test macOS** — l'asserzione del percorso di riproduzione gestisce il symlink `/var` → `/private/var`
-- **Parsing BMAD pretext migliorato** — il pretext delle voci viene estratto correttamente da `bmad-voices.md`
+- **GitHub Copilot + OpenAI Codex in VS Code** — AgentVibes ora supporta tutti e tre i principali assistenti di codifica AI. Installa e configura ciascuno dalla TUI.
+- **Una sola scheda di Configurazione** — procedura guidata in 4 passaggi (Lingua → Dipendenze → Motore TTS → Provider) sostituisce le vecchie schede installatore + LLM. Gli utenti esistenti saltano direttamente ai Provider.
+- **Configurazione audio per provider** — ogni LLM ha la propria Voce, Motore TTS, Riverbero, Musica e Pretesto tramite il modale Configura.
+- **Impostazioni ridisegnate** — lista piatta e pulita: Lingua, Motore TTS, Voce, Verbosità, Destinazione Audio, Archiviazione Configurazione, Riesegui Procedura Guidata.
+- **Selettore vocale migliorato** — visualizzazione a 3 colonne, anteprima con barra spaziatrice, lo scorrimento resta in posizione.
 
 ---
 

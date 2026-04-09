@@ -1,14 +1,16 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v4.6.8
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.0.0
 
 ---
 
-## 🐛 NEW IN v4.6.8 — 全新安装崩溃修复
+## 🚀 NEW IN v5.0.0 — 多供应商支持: Claude Code + Copilot + Codex
 
-- **设置选项卡崩溃修复** — 在未配置语音的全新安装中导航到设置时不再崩溃
-- **macOS 测试修复** — 回放路径断言处理 `/var` → `/private/var` 符号链接
-- **BMAD 预文本解析改进** — 从 `bmad-voices.md` 正确提取语音预文本
+- **GitHub Copilot + OpenAI Codex（VS Code）** — AgentVibes 现已支持三大 AI 编程助手。通过 TUI 安装和配置每个供应商。
+- **统一设置选项卡** — 4 步向导（语言 → 依赖项 → TTS 引擎 → 供应商）取代旧的安装程序 + LLM 选项卡。老用户直接跳转到供应商。
+- **按供应商配置音频** — 每个 LLM 通过配置模态框拥有独立的语音、TTS 引擎、混响、音乐和预文本。
+- **设置重新设计** — 简洁的平面列表：语言、TTS 引擎、语音、详细程度、音频输出、配置存储、重新运行向导。
+- **语音选择器升级** — 3 列显示，空格键预览，滚动位置保持不变。
 
 ---
 

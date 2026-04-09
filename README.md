@@ -4,14 +4,14 @@
 >
 > 🌐 **[agentvibes.org](https://agentvibes.org)**
 >
-> Professional text-to-speech for **Claude Code**, **GitHub Copilot**, **Claude Desktop**, and **OpenClaw** - **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
+> Professional text-to-speech for **Claude Code**, **GitHub Copilot**, **OpenAI Codex**, **Claude Desktop**, and **OpenClaw**. Using popular open-source TTS engines: **Soprano** (Neural), **Piper TTS** (Free!), **macOS Say** (Built-in!), or **Windows SAPI** (Zero Setup!)
 
 [![npm version](https://img.shields.io/npm/v/agentvibes)](https://www.npmjs.com/package/agentvibes)
 [![Test Suite](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/test.yml)
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v4.6.8
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.0.0
 
 ---
 
@@ -20,12 +20,13 @@
 | I want to... | Go here |
 |--------------|---------|
 | **Install AgentVibes** (just `npx`, no git!) | [Quick Start Guide](docs/quick-start.md) |
-| **Run Claude Code on Android** | [Android/Termux Setup](#-android--termux) |
+| **Play agent audio using your phone as remote speakers** | [Android/Termux Setup](#-android--termux) |
 | **Secure OpenClaw on Remote Server** | [Security Hardening Guide](docs/security-hardening-guide.md) ⚠️ |
 | **Understand what I need** | [Prerequisites](#-prerequisites) |
 | **Set up on Windows (Native)** | [Windows Native Setup](WINDOWS-SETUP.md) |
 | **Set up on Windows (Claude Desktop/WSL)** | [Windows WSL Guide](mcp-server/WINDOWS_SETUP.md) |
 | **Use with GitHub Copilot** | [Copilot Integration](#-github-copilot-integration) |
+| **Use with OpenAI Codex** | [Codex Integration](#-openai-codex-integration) |
 | **Use with OpenClaw** | [OpenClaw Integration](#-openclaw-integration) |
 | **Use natural language** | [MCP Setup](docs/mcp-setup.md) |
 | **Switch voices** | [Voice Library](docs/voice-library.md) |
@@ -36,13 +37,23 @@
 
 ## ✨ What is AgentVibes?
 
-**AgentVibes adds lively voice narration to your Claude AI sessions!**
+**AgentVibes adds lively voice narration to your AI coding sessions!**
 
-Whether you're coding in Claude Code, chatting in Claude Desktop, or running OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, or OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
 
 ---
 
-## 🐛 NEW IN v4.6.8 — Fresh Install Crash Fix
+## 🚀 NEW IN v5.0.0 — Multi-Provider Support: Claude Code + Copilot + Codex
+
+- **GitHub Copilot + OpenAI Codex in VS Code** — AgentVibes now supports all three major AI coding assistants. Install and configure each from the TUI.
+- **One Setup tab** — 4-step wizard (Language → Deps → TTS Engine → Providers) replaces old installer + LLM tabs. Returning users skip to Providers.
+- **Per-provider audio config** — Each LLM gets its own Voice, TTS Engine, Reverb, Music, and Pretext via Configure modal.
+- **Settings redesigned** — Clean flat list: Language, TTS Engine, Voice, Verbosity, Audio Destination, Config Storage, Re-run Wizard.
+- **Voice picker upgraded** — 3-column display, Space bar preview, scroll stays in place.
+
+---
+
+## 🐛 v4.6.8 — Fresh Install Crash Fix
 
 - **Settings tab crash fixed** — no longer crashes when navigating to Settings on a fresh install with no voice configured
 - **macOS test fix** — replay path assertion handles `/var` → `/private/var` symlink

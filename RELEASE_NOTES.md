@@ -1,5 +1,40 @@
 # AgentVibes Release Notes
 
+## 🚀 v5.0.0 — Multi-Provider Support: Claude Code + Copilot + Codex
+
+**Release Date:** April 2026
+
+### New Features
+
+- **GitHub Copilot Support in VS Code** — Install and configure AgentVibes for GitHub Copilot directly from the TUI. Creates `.vscode/mcp.json` and `.github/copilot-instructions.md`.
+
+- **OpenAI Codex Support in VS Code** — Full Codex integration with `.codex/config.toml`, `AGENTS.md` TTS protocol, and init hooks.
+
+- **Unified Setup Tab** — The old 5-screen Install wizard and separate LLM Providers tab are merged into a single Setup tab. First-run shows a 4-step wizard (Language → Dependencies → TTS Engine → Providers); returning users skip straight to the Providers screen.
+
+- **Per-Provider Audio Config** — Each LLM provider (Claude Code, Copilot, Codex) gets its own TTS Engine, Voice, Reverb, Background Music, and Pretext via a Configure modal.
+
+- **TTS Engine Selection Screen** — New wizard step shows OS-aware engine list (Piper, Soprano, Windows SAPI, macOS Say) with Install buttons for missing engines.
+
+- **Settings Tab Redesigned** — Replaced the 5-sub-tab layout with a clean flat list: Interface Language, Default TTS Engine, Default Voice, Verbosity, Audio Destination, Config Storage, and Re-run Setup Wizard.
+
+### Improvements
+
+- **Voice picker upgraded everywhere** — 3-column display (Name, Gender, Provider), Space bar preview with synthesis + playback, scroll position preserved during preview.
+
+- **Hint text artifacts fixed** — Moving between rows in Agents and Music tabs no longer leaves ghost text on previous rows.
+
+- **Codex voice routing corrected** — `AGENTS.md` now instructs Codex to use `play-tts` for normal speech and `bmad-speak` only during BMAD party mode.
+
+### User Impact
+
+- AgentVibes now works with Claude Code, GitHub Copilot, AND OpenAI Codex
+- Streamlined setup experience — one tab for all provider management
+- Per-provider voice customization without editing config files
+- Settings page is dramatically simpler and faster to navigate
+
+---
+
 ## 🐛 v4.6.8 — Fresh Install Crash Fix
 
 **Release Date:** April 2026
