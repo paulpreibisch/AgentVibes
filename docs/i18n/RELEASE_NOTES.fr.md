@@ -1,5 +1,53 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎙️ v5.1.0 — Refonte du Sélecteur de Voix + Sauvegarde Automatique de l'Agent
+
+**Date de sortie :** Avril 2026
+
+### Nouvelles Fonctionnalités
+
+- **Sauvegarde automatique dans le modal d'édition d'agent** — Les changements par agent de voix/personnalité/musique/réverbération/pretexte sont désormais enregistrés automatiquement pendant que vous les modifiez. Le bouton Enregistrer explicite a disparu ; un bref message « ✓ Enregistré ! » confirme chaque changement. Annuler et Réinitialiser aux Valeurs par Défaut fonctionnent toujours comme avant.
+
+- **Noms uniques pour les locuteurs LibriTTS** — Les 904 locuteurs LibriTTS ne s'affichent plus comme « Anna », « Anna-2 », « Anna-3 », … « Anna-16 ». Chacun obtient un nom de famille déterministe d'un pool de 16 noms : **Anna Bell**, **Anna Carter**, **Anna Davis**, …, **Anna Quinn**. Les ID de voix sous-jacents ne changent pas, donc les configurations utilisateur existantes continuent de fonctionner.
+
+- **Symboles de genre rose/bleu** — Les voix féminines affichent **♀** en rose (magenta), les voix masculines **♂** en bleu clair (bright-cyan), inconnu affiche `—`. La colonne `Gender` de l'en-tête est remplacée par `♀/♂` coloré (10 → 4 caractères de large), libérant de l'espace pour les noms longs. Appliqué à l'onglet Voix principal ET aux 3 modaux du sélecteur de voix (Configuration, Agents, Paramètres).
+
+- **Saut rapide par première lettre dans les sélecteurs de voix** — Appuyez sur n'importe quelle lettre `a`–`z` pour sauter à la première voix commençant par cette lettre. Les touches réservées (`q`, `j`, `k`, `g`, `h`, `l`) sont bloquées pour conserver leur signification d'annulation / navigation vi.
+
+- **Navigation par page dans les sélecteurs de voix** — `PgUp`, `PgDn`, `Home`, `End` fonctionnent désormais dans tous les modaux du sélecteur de voix.
+
+- **3 nouvelles pistes de musique de fond** — `Late Night Hip Hop Groove`, `Drifting Down the Hall` (ambiance années 90), et `Midnight Charleston Stomp` (swing). Le nombre de pistes passe de 15 à 18.
+
+### Améliorations
+
+- **Barre de recherche du sélecteur de voix supprimée** — Remplacée par le saut par première lettre. L'ancien champ de recherche avait des problèmes de focus qui avalaient les touches de navigation. Le saut est plus rapide pour le cas typique « trouver la voix X ».
+
+- **Tri de la liste des pistes corrigé** — Les pistes avec préfixes emoji (par ex. `🎤 Late Night Hip Hop Groove`) sont maintenant triées selon la partie alphabétique du nom, pas le code de l'emoji. L'ordre est cohérent entre les versions de Node/ICU.
+
+- **La touche favori est désormais `*` uniquement** — Suppression du raccourci `f` dupliqué pour marquer les favoris dans les sélecteurs de voix et l'onglet Voix principal. `f` est maintenant libre pour le saut par première lettre (par ex. sauter à Frank ou Felix). Le marqueur `*` reste la façon canonique de basculer les favoris.
+
+### Corrections de Bugs
+
+- **Les lignes non installées de l'onglet Voix ne se corrompent plus** — Sélectionner une voix non installée supprimait visuellement sa colonne Fournisseur en raison d'une regex qui matchait trop largement le wrapper `bright-black-fg` de la ligne. Remplacée par un ancrage de hint précis qui ne supprime que le texte exact du hint.
+
+- **Artefacts de clignotement éliminés dans les onglets Musique + Voix** — Les curseurs `█` ne laissent plus de blocs résiduels lors d'un défilement rapide dans la liste. Les deux onglets utilisent maintenant un helper précis pour supprimer le clignotement au lieu du fragile slicer basé sur la position.
+
+- **L'onglet Configuration n'échoue plus silencieusement** — `_renderScreen3` enveloppait tout le bloc d'écriture `setupCompleted` dans un seul `try/catch {}` vide. Les fichiers de configuration locaux corrompus sont maintenant sauvegardés vers `config.json.bak` et réécrits, avec les erreurs loguées dans stderr — fini le « bloqué à répéter la configuration » sans explication.
+
+- **L'annulation `q` du sélecteur de voix fonctionne maintenant** — Le nouveau saut par première lettre avalait `q` (et d'autres touches de navigation vi). Liste de blocage des touches réservées ajoutée.
+
+- **Tri insensible à la casse du sélecteur de pistes** — Les nouvelles pistes avec des noms en Title Case (`Late Night Hip Hop Groove.mp3`) ne sautent plus en haut de la liste au-dessus des pistes en minuscules `agent_vibes_*`.
+
+### Impact Utilisateur
+
+- Modifier la voix ou les paramètres d'un agent est maintenant plus rapide — plus besoin de penser à cliquer sur Enregistrer
+- Le sélecteur de voix est nettement moins encombré avec les 904 locuteurs LibriTTS ayant tous des noms uniques et amicaux
+- Genre en un coup d'œil grâce aux symboles colorés
+- Trois nouvelles pistes musicales pour la variété
+- Artefacts de clignotement/défilement éliminés dans les onglets Voix et Musique
+
+---
+
 ## 🚀 v5.0.0 — Support Multi-Fournisseur : Claude Code + Copilot + Codex
 
 **Date de sortie :** Avril 2026

@@ -16,7 +16,7 @@ import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatReverbState, formatTrackName, formatVoiceName } from '../widgets/format-utils.js';
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
-  parseMultiSpeaker, scanInstalledVoices, getVoiceMeta,
+  parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, genderIconTag,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { destroyList } from '../widgets/destroy-list.js';
@@ -729,8 +729,10 @@ ${_tl('bmadDesc')}
       btnBlink.startSpinner(previewBtn);
     });
 
-    const saveBtn = _modalBtn('Save', 18, () => {
-      // Only save fields that differ from global
+    // Auto-save the current draft (called after every field change).
+    // Only persists fields that differ from the global defaults — same logic
+    // the explicit Save button used to use, just triggered automatically.
+    function _autoSaveAgent() {
       const toSave = {};
       if (draft.voice && draft.voice !== globalCfg.voice) toSave.voice = draft.voice;
       if (draft.pretext !== AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title)) toSave.pretext = draft.pretext;
@@ -742,22 +744,20 @@ ${_tl('bmadDesc')}
         toSave.backgroundMusic = draft.backgroundMusic;
       }
       voiceStore.setAgentProfile(agent.id, toSave);
-      _closeModal();
       refreshDisplay();
-      // Show temporary "Saved!" toast
       _showSavedToast(agent.displayName);
-    });
+    }
 
-    const resetAllBtn = _modalBtn('Reset to Defaults', 26, () => {
+    const resetBtn = _modalBtn('Reset to Defaults', 18, () => {
       voiceStore.resetAgentProfile(agent.id);
       _closeModal();
       refreshDisplay();
     });
 
-    const cancelBtn = _modalBtn('Cancel', 50, _closeModal);
+    const closeBtn = _modalBtn('Cancel', 42, _closeModal);
 
     // Blinking █ cursor + preview spinner — reusable across all modal buttons
-    const btnBlink = attachBtnBlink([previewBtn, saveBtn, resetAllBtn, cancelBtn], screen);
+    const btnBlink = attachBtnBlink([previewBtn, resetBtn, closeBtn], screen);
 
     function _closeModal() {
       if (_closed) return;
@@ -779,6 +779,7 @@ ${_tl('bmadDesc')}
       switch (field.key) {
         case 'voice':
           _openVoicePickerForAgent(agent, draft, () => {
+            _autoSaveAgent();
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -788,6 +789,7 @@ ${_tl('bmadDesc')}
 
         case 'pretext':
           _openPretextEditor(modal, draft, () => {
+            _autoSaveAgent();
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -798,6 +800,7 @@ ${_tl('bmadDesc')}
         case 'reverbPreset':
           openReverbPicker(screen, draft.reverbPreset, (val) => {
             draft.reverbPreset = val;
+            _autoSaveAgent();
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -811,6 +814,7 @@ ${_tl('bmadDesc')}
         case 'personality':
           openPersonalityPicker(screen, draft.personality, (val) => {
             draft.personality = val;
+            _autoSaveAgent();
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -825,6 +829,7 @@ ${_tl('bmadDesc')}
           openTrackPicker(screen, draft.backgroundMusic.track, draft.backgroundMusic.volume, (track) => {
             draft.backgroundMusic.track = track;
             draft.backgroundMusic.enabled = true;
+            _autoSaveAgent();
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -839,6 +844,7 @@ ${_tl('bmadDesc')}
           openVolumeInput(screen, draft.backgroundMusic.volume, (volume) => {
             draft.backgroundMusic.volume = volume;
             if (draft.backgroundMusic.track) draft.backgroundMusic.enabled = true;
+            _autoSaveAgent();
             fieldList.setItems(_fieldItems());
             fieldList.select(idx);
             fieldList.focus();
@@ -861,9 +867,8 @@ ${_tl('bmadDesc')}
     // Escape = close
     fieldList.key(['escape', 'q'], _closeModal);
     previewBtn.key(['escape'], _closeModal);
-    saveBtn.key(['escape'], _closeModal);
-    resetAllBtn.key(['escape'], _closeModal);
-    cancelBtn.key(['escape'], _closeModal);
+    resetBtn.key(['escape'], _closeModal);
+    closeBtn.key(['escape'], _closeModal);
 
     // Tab + arrow navigation within modal
     fieldList.key(['tab'], () => { previewBtn.focus(); screen.render(); });
@@ -887,23 +892,19 @@ ${_tl('bmadDesc')}
       _prevFieldSel = cur;
     });
 
-    // Wrap: up on buttons → back to field list (last/first field respectively)
+    // Wrap: up on buttons → back to field list
     previewBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
-    saveBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
-    resetAllBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
-    cancelBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+    resetBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+    closeBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
 
-    previewBtn.key(['tab', 'right'], () => { saveBtn.focus(); screen.render(); });
-    previewBtn.key(['left'], () => { cancelBtn.focus(); screen.render(); });
+    previewBtn.key(['tab', 'right'], () => { resetBtn.focus(); screen.render(); });
+    previewBtn.key(['left'], () => { closeBtn.focus(); screen.render(); });
 
-    saveBtn.key(['tab', 'right'], () => { resetAllBtn.focus(); screen.render(); });
-    saveBtn.key(['left'], () => { previewBtn.focus(); screen.render(); });
+    resetBtn.key(['tab', 'right'], () => { closeBtn.focus(); screen.render(); });
+    resetBtn.key(['left'], () => { previewBtn.focus(); screen.render(); });
 
-    resetAllBtn.key(['tab', 'right'], () => { cancelBtn.focus(); screen.render(); });
-    resetAllBtn.key(['left'], () => { saveBtn.focus(); screen.render(); });
-
-    cancelBtn.key(['tab', 'right'], () => { fieldList.focus(); screen.render(); });
-    cancelBtn.key(['left'], () => { resetAllBtn.focus(); screen.render(); });
+    closeBtn.key(['tab', 'right'], () => { fieldList.focus(); screen.render(); });
+    closeBtn.key(['left'], () => { resetBtn.focus(); screen.render(); });
 
     fieldList.focus();
     screen.render();
@@ -914,7 +915,6 @@ ${_tl('bmadDesc')}
 
   function _openVoicePickerForAgent(agent, draft, onDone) {
     let _allVoices = [];
-    let _filterText = '';
     let _previewProc = null;
     let _previewVoiceId = null;
     let _vpClosed = false;
@@ -959,29 +959,19 @@ ${_tl('bmadDesc')}
     });
     vpModal.setFront();
 
-    // Search
-    blessed.text({
-      parent: vpModal, top: 1, left: 2,
-      content: 'Search:', style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-    });
-    const vpSearch = blessed.textbox({
-      parent: vpModal, top: 1, left: 11, width: 40, height: 1,
-      inputOnFocus: true, keys: true,
-      style: { fg: COLORS.valueFg, bg: '#1a3a5c', focus: { bg: '#245a80' } },
-    });
-
     // Column header
-    const COL_N = 28;
-    const COL_G = 10;
+    const COL_N = 30;
+    const COL_G = 4;
     blessed.text({
-      parent: vpModal, top: 2, left: 6, tags: true,
-      content: `{bright-cyan-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/bright-cyan-fg}`,
+      parent: vpModal, top: 1, left: 6, tags: true,
+      content: `{bright-cyan-fg}${'Name'.padEnd(COL_N)}{/bright-cyan-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {bright-cyan-fg}Provider{/bright-cyan-fg}`,
       style: { bg: COLORS.contentBg },
     });
 
     const vpList = blessed.list({
-      parent: vpModal, top: 3, left: 2, right: 2, bottom: 5,
+      parent: vpModal, top: 2, left: 2, right: 2, bottom: 5,
       keys: true, vi: true, mouse: true,
+      tags: true,
       border: { type: 'line' },
       scrollbar: { ch: '│', style: { fg: COLORS.borderFg } },
       style: {
@@ -1004,15 +994,9 @@ ${_tl('bmadDesc')}
 
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{#455a64-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [/] Search  [Esc] Cancel{/#455a64-fg}',
+      content: '{#455a64-fg}[↑↓] Nav  [PgUp/PgDn] Page  [Home/End]  [a-z] Jump  [Enter] Select  [Space] Preview  [Esc] Cancel{/#455a64-fg}',
       style: { bg: COLORS.contentBg },
     });
-
-    function _getFiltered() {
-      if (!_filterText) return _allVoices;
-      const f = _filterText.toLowerCase();
-      return _allVoices.filter(v => v.toLowerCase().includes(f));
-    }
 
     function _buildVoiceItems(voices) {
       return voices.map(v => {
@@ -1023,7 +1007,8 @@ ${_tl('bmadDesc')}
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
           : meta.displayName.padEnd(COL_N);
-        return ` ${dot} ${name}${meta.gender.padEnd(COL_G)}${meta.provider}`;
+        // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
+        return ` ${dot} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
       });
     }
 
@@ -1032,8 +1017,10 @@ ${_tl('bmadDesc')}
       const savedIdx = vpList.selected ?? 0;
       const savedScroll = vpList.childBase ?? 0;
       _allVoices = scanInstalledVoices();
-      const filtered = _getFiltered();
-      const items = _buildVoiceItems(filtered);
+      // Sort by display name so the first-letter quick jump is intuitive
+      _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
+        getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
+      const items = _buildVoiceItems(_allVoices);
       vpList.setItems(items.length > 0 ? items : [' (no voices found)']);
       vpList.select(Math.min(savedIdx, items.length - 1));
       vpList.childBase = Math.min(savedScroll, Math.max(0, items.length - (vpList.height - 2)));
@@ -1104,25 +1091,41 @@ ${_tl('bmadDesc')}
       piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
     }
 
-    vpSearch.on('keypress', () => {
-      setTimeout(() => { _filterText = vpSearch.getValue().trim(); _refreshVP(); }, 0);
-    });
-    vpSearch.key(['escape'], () => { vpList.focus(); screen.render(); });
-    vpList.key(['/'], () => { vpSearch.clearValue(); vpSearch.focus(); screen.render(); });
     vpList.key(['enter'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+      const sel = _allVoices[vpList.selected];
       if (sel) { draft.voice = sel; _closeVP(); }
     });
     vpList.key(['space'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+      const sel = _allVoices[vpList.selected];
       if (sel) _previewVoice(sel);
     });
     vpList.key(['escape', 'q'], _closeVP);
 
+    // PageUp / PageDown / Home / End navigation
+    const _pageSize = () => Math.max(1, (vpList.height ?? 10) - 2);
+    vpList.key(['pageup'],   () => { vpList.up(_pageSize());   screen.render(); });
+    vpList.key(['pagedown'], () => { vpList.down(_pageSize()); screen.render(); });
+    vpList.key(['home'],     () => { vpList.select(0); screen.render(); });
+    vpList.key(['end'],      () => { vpList.select(Math.max(0, _allVoices.length - 1)); screen.render(); });
+
+    // First-letter quick jump: typing 'a' jumps to the first voice starting
+    // with A. Block keys reserved by the list widget (vi nav, cancel) so
+    // they don't get swallowed: q (cancel), j/k/g/h/l (vi navigation).
+    const _vpJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'q']);
+    vpList.on('keypress', (ch, key) => {
+      if (!ch || key?.ctrl || key?.meta) return;
+      if (!/^[a-zA-Z]$/.test(ch)) return;
+      const target = ch.toLowerCase();
+      if (_vpJumpBlocked.has(target)) return;
+      const idx = _allVoices.findIndex(v => {
+        const name = getVoiceMeta(v).displayName.toLowerCase();
+        return name.startsWith(target);
+      });
+      if (idx >= 0) { vpList.select(idx); screen.render(); }
+    });
+
     _refreshVP();
-    const activeIdx = _getFiltered().indexOf(draft.voice);
+    const activeIdx = _allVoices.indexOf(draft.voice);
     if (activeIdx >= 0) vpList.select(activeIdx);
     vpList.focus();
     screen.render();

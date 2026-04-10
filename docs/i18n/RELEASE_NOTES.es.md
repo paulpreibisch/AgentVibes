@@ -1,5 +1,53 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎙️ v5.1.0 — Renovación del Selector de Voz + Guardado Automático en el Modal de Agente
+
+**Fecha de lanzamiento:** Abril 2026
+
+### Nuevas Funcionalidades
+
+- **Guardado automático en el modal de edición de agente** — Los cambios por agente de voz/personalidad/música/reverb/pretexto ahora se guardan automáticamente mientras los editas. El botón Guardar explícito ya no existe; un breve aviso "✓ ¡Guardado!" confirma cada cambio. Cancelar y Restablecer Predeterminados siguen funcionando igual.
+
+- **Nombres únicos para hablantes de LibriTTS** — Los 904 hablantes de LibriTTS ya no se muestran como "Anna", "Anna-2", "Anna-3", … "Anna-16". Cada uno obtiene un apellido determinista de un conjunto de 16 nombres: **Anna Bell**, **Anna Carter**, **Anna Davis**, …, **Anna Quinn**. Los ID de voz subyacentes no cambian, por lo que las configuraciones de usuario existentes siguen resolviéndose.
+
+- **Símbolos de género rosa/azul** — Las voces femeninas muestran **♀** en rosa (magenta), las masculinas muestran **♂** en azul claro (bright-cyan), desconocido muestra `—`. La columna `Gender` del encabezado se reemplaza por `♀/♂` coloreado (de 10 a 4 caracteres de ancho), dando espacio a nombres más largos. Aplicado a la pestaña principal de Voces Y a los 3 modales del selector de voz (Configuración, Agentes, Ajustes).
+
+- **Salto rápido por letra inicial en selectores de voz** — Pulsa cualquier letra `a`–`z` para saltar a la primera voz que empiece por esa letra. Las teclas reservadas (`q`, `j`, `k`, `g`, `h`, `l`) están bloqueadas para mantener su significado de cancelar / navegación vi.
+
+- **Navegación por páginas en selectores de voz** — `PgUp`, `PgDn`, `Home`, `End` ahora funcionan en todos los modales del selector de voz.
+
+- **3 nuevas pistas de música de fondo** — `Late Night Hip Hop Groove`, `Drifting Down the Hall` (ambiente años 90) y `Midnight Charleston Stomp` (swing). El conteo de pistas pasa de 15 a 18.
+
+### Mejoras
+
+- **Barra de búsqueda del selector de voz eliminada** — Reemplazada por el salto por letra inicial. El antiguo cuadro de búsqueda tenía problemas de foco que se tragaban las teclas de navegación. El salto es más rápido para el caso típico "buscar voz X".
+
+- **Orden de la lista de pistas corregido** — Las pistas con prefijos emoji (p. ej. `🎤 Late Night Hip Hop Groove`) ahora se ordenan por la parte alfabética del nombre, no por el código del emoji. El orden es consistente entre versiones de Node/ICU.
+
+- **Tecla de favoritos ahora es solo `*`** — Eliminado el enlace duplicado `f` para marcar favoritos en selectores de voz y en la pestaña principal de Voces. `f` queda libre para el salto por letra inicial (p. ej. saltar a Frank o Felix). El marcador `*` sigue siendo la forma canónica de alternar favoritos.
+
+### Correcciones de Errores
+
+- **Las filas no instaladas de la pestaña Voces ya no se corrompen** — Seleccionar una voz no instalada borraba visualmente su columna Proveedor debido a una expresión regular que coincidía demasiado con el envoltorio `bright-black-fg` de la fila. Reemplazada por un anclaje de sugerencia preciso que solo elimina el texto exacto de la sugerencia.
+
+- **Artefactos de parpadeo eliminados en pestañas Música + Voces** — Los cursores `█` ya no dejan bloques residuales al desplazarse rápidamente por la lista. Ambas pestañas usan ahora un ayudante preciso para eliminar el parpadeo en lugar del frágil cortador basado en posición.
+
+- **La pestaña Configuración ya no falla silenciosamente** — `_renderScreen3` envolvía todo el bloque de escritura de `setupCompleted` en un único `try/catch {}` vacío. Los archivos de configuración locales corruptos ahora se respaldan a `config.json.bak` y se reescriben desde cero, con errores registrados en stderr — no más "atascado repitiendo la configuración" sin explicación.
+
+- **La cancelación `q` del selector de voz ahora funciona** — El nuevo salto por letra inicial se tragaba `q` (y otras teclas de navegación vi). Se agregó una lista de bloqueo de teclas reservadas.
+
+- **Ordenación insensible a mayúsculas del selector de pistas** — Las pistas nuevas con nombres en Title Case (`Late Night Hip Hop Groove.mp3`) ya no saltan al principio de la lista por encima de las pistas en minúsculas `agent_vibes_*`.
+
+### Impacto al Usuario
+
+- Editar la voz o los ajustes de un agente ahora es más rápido — no hace falta recordar pulsar Guardar
+- El selector de voz está mucho menos saturado con los 904 hablantes de LibriTTS teniendo todos nombres únicos y amigables
+- Género de un vistazo mediante símbolos de color
+- Tres nuevas pistas musicales para variar
+- Artefactos de parpadeo/desplazamiento eliminados en las pestañas Voces y Música
+
+---
+
 ## 🚀 v5.0.0 — Soporte Multi-Proveedor: Claude Code + Copilot + Codex
 
 **Fecha de lanzamiento:** Abril 2026

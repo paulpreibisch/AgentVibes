@@ -1,5 +1,53 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎙️ v5.1.0 — Revisione del Selettore Vocale + Salvataggio Automatico del Modale Agente
+
+**Data di rilascio:** Aprile 2026
+
+### Nuove Funzionalità
+
+- **Salvataggio automatico nel modale di modifica agente** — Le modifiche per agente di voce/personalità/musica/riverbero/pretesto si salvano ora automaticamente mentre le modifichi. Il pulsante Salva esplicito è scomparso; un breve avviso "✓ Salvato!" conferma ogni modifica. Annulla e Ripristina Predefiniti continuano a comportarsi come prima.
+
+- **Nomi univoci per gli speaker LibriTTS** — I 904 speaker LibriTTS non vengono più mostrati come "Anna", "Anna-2", "Anna-3", … "Anna-16". Ognuno riceve un cognome deterministico da un pool di 16 nomi: **Anna Bell**, **Anna Carter**, **Anna Davis**, …, **Anna Quinn**. Gli ID vocali sottostanti non cambiano, quindi le configurazioni utente esistenti continuano a risolversi.
+
+- **Simboli di genere rosa/azzurro** — Le voci femminili mostrano **♀** in rosa (magenta), le voci maschili mostrano **♂** in azzurro chiaro (bright-cyan), sconosciuto mostra `—`. La colonna `Gender` dell'intestazione viene sostituita con `♀/♂` colorato (10 → 4 caratteri di larghezza), liberando spazio per nomi più lunghi. Applicato alla scheda Voci principale E a tutti e 3 i modali del selettore vocale (Setup, Agenti, Impostazioni).
+
+- **Salto rapido per prima lettera nei selettori vocali** — Premi qualsiasi lettera `a`–`z` per saltare alla prima voce che inizia con quella lettera. I tasti riservati (`q`, `j`, `k`, `g`, `h`, `l`) sono bloccati per mantenere il loro significato di annulla / navigazione vi.
+
+- **Navigazione di pagina nei selettori vocali** — `PgUp`, `PgDn`, `Home`, `End` ora funzionano in tutti i modali del selettore vocale.
+
+- **3 nuove tracce di musica di sottofondo** — `Late Night Hip Hop Groove`, `Drifting Down the Hall` (vibes anni '90), e `Midnight Charleston Stomp` (swing). Il numero di tracce passa da 15 a 18.
+
+### Miglioramenti
+
+- **Barra di ricerca del selettore vocale rimossa** — Sostituita dal salto per prima lettera. La vecchia casella di ricerca aveva problemi di focus che ingoiavano i tasti di navigazione. Il salto è più veloce per il caso tipico "trova voce X".
+
+- **Ordinamento della lista tracce corretto** — Le tracce con prefissi emoji (es. `🎤 Late Night Hip Hop Groove`) sono ora ordinate in base alla parte alfabetica del nome, non al codepoint dell'emoji. L'ordine è coerente tra le versioni di Node/ICU.
+
+- **Tasto di scelta rapida preferiti ora è solo `*`** — Rimosso il binding duplicato `f` per contrassegnare i preferiti nei selettori vocali e nella scheda Voci principale. `f` è ora libero per il salto per prima lettera (es. saltare a Frank o Felix). Il marcatore `*` rimane il modo canonico per attivare/disattivare i preferiti.
+
+### Correzioni di Bug
+
+- **Le righe non installate della scheda Voci non si corrompono più** — Selezionare una voce non installata stava cancellando visivamente la sua colonna Provider a causa di una regex strip che corrispondeva troppo ampiamente al wrapper `bright-black-fg` della riga. Sostituita con un ancoraggio hint preciso che rimuove solo il testo hint esatto.
+
+- **Artefatti di lampeggiamento eliminati nelle schede Musica + Voci** — I cursori `█` non lasciano più blocchi residui quando si scorre rapidamente nell'elenco. Entrambe le schede ora utilizzano un helper preciso per la rimozione del lampeggiamento invece del fragile slicer basato sulla posizione.
+
+- **La scheda Setup non fallisce più silenziosamente** — `_renderScreen3` avvolgeva l'intero blocco di scrittura `setupCompleted` in un singolo `try/catch {}` vuoto. I file di configurazione locali corrotti ora vengono salvati come backup in `config.json.bak` e riscritti, con gli errori loggati su stderr — non più "bloccato a ripetere il setup" senza spiegazione.
+
+- **L'annullamento `q` del selettore vocale ora funziona** — Il nuovo salto per prima lettera ingoiava `q` (e altri tasti di navigazione vi). Aggiunta la blocklist dei tasti riservati.
+
+- **Ordinamento case-insensitive del selettore di tracce** — Le nuove tracce con nomi in Title Case (`Late Night Hip Hop Groove.mp3`) non saltano più in cima alla lista sopra le tracce minuscole `agent_vibes_*`.
+
+### Impatto sull'Utente
+
+- Modificare la voce o le impostazioni di un agente è ora più veloce — non c'è bisogno di ricordarsi di cliccare Salva
+- Il selettore vocale è notevolmente meno affollato con tutti i 904 speaker LibriTTS che hanno nomi unici e amichevoli
+- Genere a colpo d'occhio tramite simboli colorati
+- Tre nuove tracce musicali per varietà
+- Artefatti di lampeggiamento/scorrimento eliminati nelle schede Voci e Musica
+
+---
+
 ## 🚀 v5.0.0 — Supporto Multi-Provider: Claude Code + Copilot + Codex
 
 **Data di rilascio:** Aprile 2026

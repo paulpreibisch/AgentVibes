@@ -1,10 +1,24 @@
 > 🌐 [English version](../../README.md)
 
-**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.0.0
+**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.1.0
 
 ---
 
-## 🚀 NOVITÀ IN v5.0.0 — Supporto Multi-Provider: Claude Code + Copilot + Codex
+## 🎙️ NOVITÀ IN v5.1.0 — Revisione del Selettore Vocale + Salvataggio Automatico del Modale Agente
+
+- **Salvataggio automatico nel modale agente** — Le modifiche a voce/personalità/musica/riverbero/pretesto si salvano automaticamente mentre le modifichi. Un breve avviso "✓ Salvato!" conferma ogni modifica.
+- **Nomi univoci per LibriTTS** — 904 speaker ricevono cognomi deterministici: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. Niente più duplicati "Anna-2", "Anna-3".
+- **Simboli di genere rosa ♀ / azzurro ♂** — Indicatori di genere colorati nella scheda Voci e in tutti i modali del selettore vocale.
+- **Salto rapido per prima lettera** — Premi `a`–`z` in qualsiasi selettore vocale per saltare a quella lettera. `q`, `j`, `k`, `g`, `h`, `l` sono riservati per navigazione/annulla.
+- **PgUp / PgDn / Home / End** nei selettori vocali
+- **3 nuove tracce di musica di sottofondo** — Late Night Hip Hop Groove, Drifting Down the Hall, Midnight Charleston Stomp
+- **Barra di ricerca rimossa dai selettori vocali** — sostituita dal salto per prima lettera (più veloce, senza problemi di focus)
+- **Correzione corruzione nella scheda Voci** — le righe non installate non perdono più la colonna Provider durante la navigazione
+- **Artefatti di lampeggiamento eliminati nelle schede Musica + Voci**
+
+---
+
+## 🚀 v5.0.0 — Supporto Multi-Provider: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex in VS Code** — AgentVibes ora supporta tutti e tre i principali assistenti di codifica AI. Installa e configura ciascuno dalla TUI.
 - **Una sola scheda di Configurazione** — procedura guidata in 4 passaggi (Lingua → Dipendenze → Motore TTS → Provider) sostituisce le vecchie schede installatore + LLM. Gli utenti esistenti saltano direttamente ai Provider.

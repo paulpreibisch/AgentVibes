@@ -1,10 +1,24 @@
 > 🌐 [English version](../../README.md)
 
-**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.0.0
+**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.1.0
 
 ---
 
-## 🚀 NEW IN v5.0.0 — 멀티 프로바이더 지원: Claude Code + Copilot + Codex
+## 🎙️ NEW IN v5.1.0 — 음성 선택기 개편 + 에이전트 모달 자동 저장
+
+- **에이전트 모달 자동 저장** — 음성/성격/음악/리버브/프리텍스트 변경이 편집 중에 자동으로 저장됩니다. 짧은 "✓ 저장됨!" 토스트가 각 변경을 확인합니다.
+- **LibriTTS 고유 이름** — 904명의 화자가 결정적 성(姓)을 받습니다: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. "Anna-2", "Anna-3" 중복이 사라졌습니다.
+- **핑크 ♀ / 하늘색 ♂ 성별 기호** — 메인 Voices 탭과 모든 음성 선택기 모달에서 컬러 성별 표시.
+- **첫 글자 빠른 점프** — 음성 선택기에서 `a`–`z`를 눌러 해당 글자로 점프. `q`, `j`, `k`, `g`, `h`, `l`은 내비게이션/취소용으로 예약됨.
+- 음성 선택기에서 **PgUp / PgDn / Home / End** 작동
+- **3개의 새 배경 음악 트랙** — Late Night Hip Hop Groove, Drifting Down the Hall, Midnight Charleston Stomp
+- **음성 선택기에서 검색 바 제거** — 첫 글자 점프로 대체 (더 빠르고 포커스 문제 없음)
+- **Voices 탭 손상 수정** — 설치되지 않은 행으로 이동할 때 더 이상 프로바이더 열을 잃지 않음
+- **Music + Voices 탭의 깜박임 아티팩트 해소**
+
+---
+
+## 🚀 v5.0.0 — 멀티 프로바이더 지원: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex (VS Code)** — AgentVibes가 이제 세 가지 주요 AI 코딩 어시스턴트를 모두 지원합니다. TUI에서 각 프로바이더를 설치하고 설정하세요.
 - **하나의 설정 탭** — 4단계 마법사(언어 → 의존성 → TTS 엔진 → 프로바이더)가 기존 설치 프로그램 + LLM 탭을 대체합니다. 기존 사용자는 프로바이더로 바로 건너뜁니다.

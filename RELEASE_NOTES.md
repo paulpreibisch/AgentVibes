@@ -1,5 +1,53 @@
 # AgentVibes Release Notes
 
+## 🎙️ v5.1.0 — Voice Picker Overhaul + Auto-Save Agent Modal
+
+**Release Date:** April 2026
+
+### New Features
+
+- **Auto-save in agent edit modal** — Per-agent voice/personality/music/reverb/pretext changes now save automatically as you edit them. The explicit Save button is gone; a brief "✓ Saved!" toast confirms each change. Cancel and Reset to Defaults still behave as before.
+
+- **Unique LibriTTS speaker names** — The 904 LibriTTS speakers no longer show as "Anna", "Anna-2", "Anna-3", … "Anna-16". Each gets a deterministic surname from a 16-name pool: **Anna Bell**, **Anna Carter**, **Anna Davis**, …, **Anna Quinn**. Underlying voice IDs are unchanged so existing user configs still resolve.
+
+- **Pink/blue gender symbols** — Female voices show **♀** in pink (magenta), male voices show **♂** in light blue (bright-cyan), unknown shows `—`. Header `Gender` column replaced with colored `♀/♂` (10 → 4 chars wide), freeing room for longer names. Applied to the main Voices tab AND all 3 voice picker modals (Setup, Agents, Settings).
+
+- **First-letter quick jump in voice pickers** — Press any letter `a`–`z` to jump to the first voice starting with that letter. Reserved keys (`q`, `j`, `k`, `g`, `h`, `l`) are blocked so they keep their cancel / vi-nav meanings.
+
+- **Page navigation in voice pickers** — `PgUp`, `PgDn`, `Home`, `End` now work in all voice picker modals.
+
+- **3 new background music tracks** — `Late Night Hip Hop Groove`, `Drifting Down the Hall` (90s vibes), and `Midnight Charleston Stomp` (swing). Track count goes from 15 → 18.
+
+### Improvements
+
+- **Voice picker search bar removed** — Replaced with first-letter quick jump. The old search textbox had focus issues that swallowed nav keys. The jump is faster for typical "find voice X" use.
+
+- **Track list sorting fixed** — Tracks with emoji prefixes (e.g. `🎤 Late Night Hip Hop Groove`) now sort by the alphabetic part of the name, not the emoji codepoint. Order is consistent across Node/ICU versions.
+
+- **Favorite hotkey is now `*` only** — Removed the duplicate `f` binding for marking favorites in voice pickers and the main Voices tab. `f` is now free for first-letter jump (e.g. jumping to Frank or Felix). The `*` marker remains the canonical way to toggle favorites.
+
+### Bug Fixes
+
+- **Voices tab uninstalled rows no longer corrupt** — Selecting an uninstalled voice was visually deleting its Provider column due to a regex strip that over-matched the row's `bright-black-fg` wrapper. Replaced with a precise hint anchor that only strips the exact hint text.
+
+- **Music tab + Voices tab blink artifacts gone** — `█` cursors no longer leave stray blocks behind when scrolling rapidly through the list. Both tabs now use a precise blink-strip helper instead of the fragile position-based slicer.
+
+- **Setup tab no longer silently fails** — `_renderScreen3` was wrapping the entire `setupCompleted` write block in a single empty `try/catch {}`. Corrupt local config files are now backed up to `config.json.bak` and rewritten fresh, with errors logged to stderr — no more "stuck repeating setup" with no explanation.
+
+- **Voice picker `q` cancel now works** — The new first-letter jump was swallowing `q` (and other vi nav keys). Reserved key blocklist added.
+
+- **Track picker case-insensitive sort** — New tracks with Title Case names (`Late Night Hip Hop Groove.mp3`) no longer jump to the top of the list above the lowercase `agent_vibes_*` tracks.
+
+### User Impact
+
+- Editing an agent's voice or settings is now faster — no need to remember to click Save
+- The voice picker is dramatically less cluttered with 904 LibriTTS speakers all having unique, friendly names
+- Gender at a glance via colored symbols
+- Three new music tracks for variety
+- Blink/scroll artifacts gone in both Voices and Music tabs
+
+---
+
 ## 🚀 v5.0.0 — Multi-Provider Support: Claude Code + Copilot + Codex
 
 **Release Date:** April 2026

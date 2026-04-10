@@ -75,6 +75,9 @@ const TRACK_DISPLAY = Object.freeze({
   'agent_vibes_japanese_city_pop_v1_loop.mp3':         '🌆 Japanese City Pop',
   'agent_vibes_salsa_v2_loop.mp3':                     '💃 Salsa',
   'agent_vibes_tabla_dream_pop_v1_loop.mp3':           '🥁 Tabla Dream Pop',
+  'Late Night Hip Hop Groove.mp3':                     '🎤 Late Night Hip Hop Groove',
+  'Drifting Down the Hall.mp3':                        '🌃 Drifting Down the Hall',
+  'Midnight Charleston Stomp.mp3':                     '🎩 Midnight Charleston Stomp',
 });
 
 const BUILT_IN_TRACK_CATALOG = Object.freeze([
@@ -93,6 +96,9 @@ const BUILT_IN_TRACK_CATALOG = Object.freeze([
   { id: 'agent_vibes_japanese_city_pop_v1_loop.mp3',         label: '🌆 Japanese City Pop' },
   { id: 'agent_vibes_salsa_v2_loop.mp3',                     label: '💃 Salsa' },
   { id: 'agent_vibes_tabla_dream_pop_v1_loop.mp3',           label: '🥁 Tabla Dream Pop' },
+  { id: 'Late Night Hip Hop Groove.mp3',                     label: '🎤 Late Night Hip Hop Groove' },
+  { id: 'Drifting Down the Hall.mp3',                        label: '🌃 Drifting Down the Hall' },
+  { id: 'Midnight Charleston Stomp.mp3',                     label: '🎩 Midnight Charleston Stomp' },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -180,10 +186,13 @@ export function scanTracks() {
   try {
     const files = fs.readdirSync(tracksDir);
     const builtInIds = new Set(BUILT_IN_TRACK_CATALOG.map(t => t.id));
+    // Sort by the alphabetic part of the label (skip leading emoji/symbols)
+    // so the order reflects the track NAME, not the emoji codepoint.
+    const _sortKey = (s) => s.replace(/^[^a-zA-Z]+/, '');
     return files
       .filter(f => /\.mp3$/i.test(f))
-      .sort()
-      .map(f => ({ id: f, label: formatTrackLabel(f), isBuiltIn: builtInIds.has(f) }));
+      .map(f => ({ id: f, label: formatTrackLabel(f), isBuiltIn: builtInIds.has(f) }))
+      .sort((a, b) => _sortKey(a.label).localeCompare(_sortKey(b.label), undefined, { sensitivity: 'base' }));
   } catch {
     // Directory not found or unreadable — use the static catalog
     return BUILT_IN_TRACK_CATALOG.map(t => ({ ...t, isBuiltIn: true }));
@@ -470,24 +479,36 @@ export function createMusicTab(screen, services) {
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended
   let _refreshing = false;
 
-  // Known limitation: _updateHint and _tlTick (blink) can interleave,
-  // causing brief visual glitches. The _refreshing guard prevents the worst
-  // cases but is not a complete fix. Acceptable for a TUI animation.
+  // Decoration helpers — strip blink cursor and (optionally) hint text from
+  // a list item's content. We strip hint by anchoring on the EXACT text from
+  // _rowHint() rather than a generic regex, so we cannot accidentally erase
+  // unrelated content that happens to contain similar tags.
+  const _BLINK_RE = / █/g;
+  function _stripBlink(raw) {
+    return (raw ?? '').replace(_BLINK_RE, '');
+  }
+  function _stripHint(raw) {
+    const hint = _rowHint();
+    if (!hint) return raw;
+    const noBlink = (raw ?? '').replace(_BLINK_RE, '');
+    if (noBlink.endsWith(hint)) return noBlink.slice(0, -hint.length);
+    return noBlink;
+  }
+  function _stripDecorations(raw) {
+    return _stripHint(_stripBlink(raw));
+  }
+
   function _updateHint(idx) {
     const items = trackList.items;
     // Restore previously hinted row — pad with spaces to overwrite ghost hint text
     const _pad = ' '.repeat(60);
     if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
-      const hadBlink = (items[_hintIdx].content ?? '').endsWith(' █');
-      items[_hintIdx].setContent((hadBlink ? _hintBase + ' █' : _hintBase) + _pad);
+      items[_hintIdx].setContent(_hintBase + _pad);
     }
     // Add hint to the new row, saving its clean base first
     if (idx >= 0 && items[idx]) {
-      let c = items[idx].content ?? '';
-      const hasBlink = c.endsWith(' █');
-      if (hasBlink) c = c.slice(0, -2);
-      _hintBase = c;
-      items[idx].setContent(c + _rowHint() + (hasBlink ? ' █' : ''));
+      _hintBase = _stripDecorations(items[idx].content);
+      items[idx].setContent(_hintBase + _rowHint());
     } else {
       _hintBase = '';
     }
@@ -909,13 +930,14 @@ export function createMusicTab(screen, services) {
     _tlBlink.on = !_tlBlink.on;
     const items = trackList.items;
     const cur = trackList.selected ?? 0;
+    // Clean old row — only strip blink (hint, if any, is preserved)
     if (_tlBlink.sel !== cur && _tlBlink.sel >= 0 && items[_tlBlink.sel]) {
-      items[_tlBlink.sel].setContent((items[_tlBlink.sel].content ?? '').replace(/ █$/, ''));
+      items[_tlBlink.sel].setContent(_stripBlink(items[_tlBlink.sel].content));
     }
     _tlBlink.sel = cur;
     if (items[cur]) {
-      const base = (items[cur].content ?? '').replace(/ █$/, '');
-      items[cur].setContent(_tlBlink.on ? `${base} █` : base);
+      const raw = _stripBlink(items[cur].content);
+      items[cur].setContent(_tlBlink.on ? `${raw} █` : raw);
     }
     screen.render();
   }
@@ -927,7 +949,11 @@ export function createMusicTab(screen, services) {
     _hintBase = '';
     _updateHint(_tlBlink.sel);
     const items = trackList.items;
-    if (items[_tlBlink.sel]) items[_tlBlink.sel].setContent((items[_tlBlink.sel].content ?? '') + ' █');
+    // Append blink cursor — content already has hint from _updateHint
+    if (items[_tlBlink.sel]) {
+      const raw = _stripBlink(items[_tlBlink.sel].content);
+      items[_tlBlink.sel].setContent(raw + ' █');
+    }
     if (!_playingTrackId) previewLine.setContent(_hintText());
     screen.render();
     _tlBlink.interval = setInterval(_tlTick, 500);
@@ -937,13 +963,17 @@ export function createMusicTab(screen, services) {
     if (!_playingTrackId) previewLine.setContent('');
     if (_tlBlink.interval) { clearInterval(_tlBlink.interval); _tlBlink.interval = null; }
     const items = trackList.items;
+    // Strip blink from selected row, strip both from the hinted row
     const sel = trackList.selected ?? 0;
     if (items[sel]) {
-      // Restore the hinted item to its clean base; for non-hinted items just strip █
-      items[sel].setContent(sel === _hintIdx ? _hintBase : (items[sel].content ?? '').replace(/ █$/, ''));
+      if (sel === _hintIdx) {
+        items[sel].setContent(_stripDecorations(items[sel].content));
+      } else {
+        items[sel].setContent(_stripBlink(items[sel].content));
+      }
     }
     if (_hintIdx >= 0 && _hintIdx !== sel && items[_hintIdx]) {
-      items[_hintIdx].setContent(_hintBase);
+      items[_hintIdx].setContent(_stripDecorations(items[_hintIdx].content));
     }
     _hintIdx = -1;
     _hintBase = '';

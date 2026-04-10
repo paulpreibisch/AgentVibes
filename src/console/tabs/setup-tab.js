@@ -38,7 +38,7 @@ import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, toggleFavorite } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, toggleFavorite } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { spawn } from 'node:child_process';
@@ -1134,7 +1134,6 @@ export function createSetupTab(screen, services) {
     navigationService?.openModal();
 
     let _allVoices = [];
-    let _filterText = '';
     let _previewProc = null;
     let _previewVoiceId = null;
     let _vpClosed = false;
@@ -1173,28 +1172,17 @@ export function createSetupTab(screen, services) {
     });
     vpModal.setFront();
 
-    // Search
-    blessed.text({
-      parent: vpModal, top: 1, left: 2,
-      content: 'Search:', style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-    });
-    const vpSearch = blessed.textbox({
-      parent: vpModal, top: 1, left: 11, width: 40, height: 1,
-      inputOnFocus: true, keys: true,
-      style: { fg: COLORS.valueFg, bg: 'blue', focus: { bg: 'cyan' } },
-    });
-
     // Column header
-    const COL_N = 28;
-    const COL_G = 10;
+    const COL_N = 30;
+    const COL_G = 4;
     blessed.text({
-      parent: vpModal, top: 2, left: 6, tags: true,
-      content: `{cyan-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/cyan-fg}`,
+      parent: vpModal, top: 1, left: 6, tags: true,
+      content: `{cyan-fg}${'Name'.padEnd(COL_N)}{/cyan-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {cyan-fg}Provider{/cyan-fg}`,
       style: { bg: COLORS.contentBg },
     });
 
     const vpList = blessed.list({
-      parent: vpModal, top: 3, left: 2, right: 2, bottom: 5,
+      parent: vpModal, top: 2, left: 2, right: 2, bottom: 5,
       keys: true, vi: true, mouse: true,
       border: { type: 'line' },
       scrollbar: { ch: '|', style: { fg: 'cyan' } },
@@ -1214,15 +1202,9 @@ export function createSetupTab(screen, services) {
 
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{white-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [F] Favorite  [/] Search  [Esc] Cancel{/white-fg}',
+      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [Home/End]  [a-z] Jump  [Enter] Select  [Space] Preview  [*] Fav  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
-
-    function _getFiltered() {
-      if (!_filterText) return _allVoices;
-      const f = _filterText.toLowerCase();
-      return _allVoices.filter(v => v.toLowerCase().includes(f));
-    }
 
     function _buildVoiceItems(voices) {
       const favs = getFavorites(configService);
@@ -1236,7 +1218,8 @@ export function createSetupTab(screen, services) {
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
           : meta.displayName.padEnd(COL_N);
-        return ` ${dot}${star} ${name}${meta.gender.padEnd(COL_G)}${meta.provider}`;
+        // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
+        return ` ${dot}${star} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
       });
     }
 
@@ -1245,8 +1228,10 @@ export function createSetupTab(screen, services) {
       const savedIdx = vpList.selected ?? 0;
       const savedScroll = vpList.childBase ?? 0;
       _allVoices = scanInstalledVoices();
-      const filtered = _getFiltered();
-      const items = _buildVoiceItems(filtered);
+      // Sort by display name so the first-letter quick jump is intuitive
+      _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
+        getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
+      const items = _buildVoiceItems(_allVoices);
       vpList.setItems(items.length > 0 ? items : [' (no voices found)']);
       vpList.select(Math.min(savedIdx, items.length - 1));
       vpList.childBase = Math.min(savedScroll, Math.max(0, items.length - (vpList.height - 2)));
@@ -1314,30 +1299,45 @@ export function createSetupTab(screen, services) {
       piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
     }
 
-    vpSearch.on('keypress', () => {
-      setTimeout(() => { _filterText = vpSearch.getValue().trim(); _refreshVP(); }, 0);
-    });
-    vpSearch.key(['escape'], () => { vpList.focus(); screen.render(); });
-    vpList.key(['/'], () => { vpSearch.clearValue(); vpSearch.focus(); screen.render(); });
     vpList.key(['enter'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+      const sel = _allVoices[vpList.selected];
       if (sel) { draft.voice = sel; _closeVP(); }
     });
     vpList.key(['space'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+      const sel = _allVoices[vpList.selected];
       if (sel) _previewVoice(sel);
     });
-    vpList.key(['f', '*'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+    vpList.key(['*'], () => {
+      const sel = _allVoices[vpList.selected];
       if (sel) { toggleFavorite(configService, sel); _refreshVP(); }
     });
     vpList.key(['escape', 'q'], _closeVP);
 
+    // PageUp / PageDown / Home / End navigation
+    const _pageSize = () => Math.max(1, (vpList.height ?? 10) - 2);
+    vpList.key(['pageup'],   () => { vpList.up(_pageSize());   screen.render(); });
+    vpList.key(['pagedown'], () => { vpList.down(_pageSize()); screen.render(); });
+    vpList.key(['home'],     () => { vpList.select(0); screen.render(); });
+    vpList.key(['end'],      () => { vpList.select(Math.max(0, _allVoices.length - 1)); screen.render(); });
+
+    // First-letter quick jump: typing 'a' jumps to the first voice starting
+    // with A. Block keys reserved by the list widget (vi nav, cancel) so
+    // they don't get swallowed: q (cancel), j/k/g/h/l (vi navigation).
+    const _vpJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'q']);
+    vpList.on('keypress', (ch, key) => {
+      if (!ch || key?.ctrl || key?.meta) return;
+      if (!/^[a-zA-Z]$/.test(ch)) return;
+      const target = ch.toLowerCase();
+      if (_vpJumpBlocked.has(target)) return;
+      const idx = _allVoices.findIndex(v => {
+        const name = getVoiceMeta(v).displayName.toLowerCase();
+        return name.startsWith(target);
+      });
+      if (idx >= 0) { vpList.select(idx); screen.render(); }
+    });
+
     _refreshVP();
-    const activeIdx = _getFiltered().indexOf(draft.voice);
+    const activeIdx = _allVoices.indexOf(draft.voice);
     if (activeIdx >= 0) vpList.select(activeIdx);
     vpList.focus();
     screen.render();
@@ -1734,8 +1734,41 @@ export function createSetupTab(screen, services) {
   }
 
   function _renderScreen3() {
-    // Mark setup as completed once user reaches the providers screen
-    try { configService.set('setupCompleted', true); } catch {}
+    // Mark setup as completed — write to targetDir in case configService
+    // has a different projectRoot (e.g. npm link resolves differently).
+    // Each step is wrapped individually so a partial failure (e.g. corrupt
+    // local config file) does not block the others — and errors are logged
+    // to stderr so the user can see why setup keeps re-running.
+    try { configService.set('setupCompleted', true); }
+    catch (e) { console.error('setupCompleted (project): ' + e.message); }
+    try { configService.setGlobal?.('setupCompleted', true); }
+    catch (e) { console.error('setupCompleted (global): ' + e.message); }
+
+    try {
+      const localCfgDir = path.join(targetDir, '.agentvibes');
+      const localCfgPath = path.join(localCfgDir, 'config.json');
+      if (!fs.existsSync(localCfgPath)) {
+        fs.mkdirSync(localCfgDir, { recursive: true });
+        fs.writeFileSync(localCfgPath, JSON.stringify({ setupCompleted: true }, null, 2));
+      } else {
+        let existing = {};
+        try {
+          existing = JSON.parse(fs.readFileSync(localCfgPath, 'utf8'));
+        } catch (e) {
+          // Corrupt JSON — back up the old file and start fresh so the user
+          // doesn't get stuck in an endless setup loop.
+          console.error(`setupCompleted: ${localCfgPath} is corrupt (${e.message}); rewriting`);
+          try { fs.renameSync(localCfgPath, localCfgPath + '.bak'); } catch {}
+          existing = {};
+        }
+        if (!existing.setupCompleted) {
+          existing.setupCompleted = true;
+          fs.writeFileSync(localCfgPath, JSON.stringify(existing, null, 2));
+        }
+      }
+    } catch (e) {
+      console.error('setupCompleted (local file): ' + e.message);
+    }
 
     // Show provider rows instead of contentBox
     contentBox.hide();
@@ -1969,10 +2002,14 @@ export function createSetupTab(screen, services) {
       providerView = 'list';
       box.show();
 
+      // Detect if AgentVibes is already installed in the target directory
+      // (e.g. user ran install, closed TUI, came back)
+      const alreadyInstalled = fs.existsSync(path.join(targetDir, '.claude', 'commands', 'agent-vibes'));
+
       // Check: no local config but global exists with setupCompleted
       const hasLocal = configService?.hasLocalConfig?.();
       const globalCfg = configService?.getGlobalConfig?.() ?? {};
-      if (!hasLocal && globalCfg.setupCompleted) {
+      if (!alreadyInstalled && !hasLocal && globalCfg.setupCompleted) {
         _pendingGlobalCfg = globalCfg;
         _screen = -1;
         _showCurrentScreen();
@@ -1980,8 +2017,8 @@ export function createSetupTab(screen, services) {
         return;
       }
 
-      // If not first run, skip directly to Screen 3 (providers)
-      if (!_isFirstRun()) {
+      // If already installed or not first run, skip directly to Screen 3 (providers)
+      if (alreadyInstalled || !_isFirstRun()) {
         _screen = 3;
       } else {
         _screen = 0;

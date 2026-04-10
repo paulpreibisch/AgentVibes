@@ -1,10 +1,24 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.0.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.1.0
 
 ---
 
-## 🚀 NOVO NO v5.0.0 — Suporte Multi-Provedor: Claude Code + Copilot + Codex
+## 🎙️ NOVO NO v5.1.0 — Reformulação do Seletor de Voz + Salvamento Automático no Modal do Agente
+
+- **Salvamento automático no modal do agente** — Alterações de voz/personalidade/música/reverb/pretexto são salvas automaticamente enquanto você edita. Um breve aviso "✓ Salvo!" confirma cada alteração.
+- **Nomes únicos para LibriTTS** — 904 falantes recebem sobrenomes determinísticos: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. Sem mais duplicatas "Anna-2", "Anna-3".
+- **Símbolos de gênero rosa ♀ / azul ♂** — Indicadores de gênero coloridos na aba Vozes e em todos os modais do seletor de voz.
+- **Salto rápido por primeira letra** — Pressione `a`–`z` em qualquer seletor de voz para saltar para aquela letra. `q`, `j`, `k`, `g`, `h`, `l` reservados para navegação/cancelar.
+- **PgUp / PgDn / Home / End** nos seletores de voz
+- **3 novas faixas de música de fundo** — Late Night Hip Hop Groove, Drifting Down the Hall, Midnight Charleston Stomp
+- **Barra de pesquisa removida dos seletores de voz** — substituída pelo salto por primeira letra (mais rápido, sem problemas de foco)
+- **Correção de corrupção na aba Vozes** — linhas não instaladas não perdem mais a coluna Provedor ao navegar sobre elas
+- **Artefatos de piscada eliminados nas abas Música + Vozes**
+
+---
+
+## 🚀 v5.0.0 — Suporte Multi-Provedor: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex no VS Code** — AgentVibes agora suporta os três principais assistentes de codificação com IA. Instale e configure cada um pela TUI.
 - **Uma aba de Configuração** — assistente de 4 passos (Idioma → Dependências → Motor TTS → Provedores) substitui as antigas abas de instalador + LLM. Usuários existentes pulam direto para Provedores.

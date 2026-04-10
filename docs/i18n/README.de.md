@@ -1,10 +1,24 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.0.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.0
 
 ---
 
-## 🚀 NEU IN v5.0.0 — Multi-Anbieter-Unterstützung: Claude Code + Copilot + Codex
+## 🎙️ NEU IN v5.1.0 — Überarbeiteter Stimmwähler + Automatisches Speichern im Agent-Modal
+
+- **Automatisches Speichern im Agent-Modal** — Änderungen an Stimme/Persönlichkeit/Musik/Reverb/Pretext werden automatisch gespeichert, während Sie sie bearbeiten. Ein kurzer "✓ Gespeichert!"-Hinweis bestätigt jede Änderung.
+- **Eindeutige LibriTTS-Namen** — 904 Sprecher erhalten deterministische Nachnamen: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. Keine "Anna-2"-, "Anna-3"-Duplikate mehr.
+- **Rosa ♀ / blaue ♂ Gendersymbole** — Farbige Genderanzeigen im Haupt-Stimmen-Tab und in allen Stimmwähler-Modalen.
+- **Schnellsprung nach erstem Buchstaben** — Drücken Sie `a`–`z` in jedem Stimmwähler, um zu diesem Buchstaben zu springen. `q`, `j`, `k`, `g`, `h`, `l` sind für Navigation/Abbruch reserviert.
+- **PgUp / PgDn / Home / End** in Stimmwählern
+- **3 neue Hintergrundmusik-Tracks** — Late Night Hip Hop Groove, Drifting Down the Hall, Midnight Charleston Stomp
+- **Suchleiste aus Stimmwählern entfernt** — ersetzt durch Schnellsprung (schneller, keine Fokus-Probleme)
+- **Korruptionsfehler im Stimmen-Tab behoben** — nicht installierte Zeilen verlieren ihre Anbieter-Spalte beim Navigieren nicht mehr
+- **Blink-Artefakte in Musik + Stimmen-Tabs beseitigt**
+
+---
+
+## 🚀 v5.0.0 — Multi-Anbieter-Unterstützung: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex in VS Code** — AgentVibes unterstützt jetzt alle drei großen KI-Programmierassistenten. Installation und Konfiguration jeweils direkt über die TUI.
 - **Ein Einrichtungs-Tab** — 4-Schritte-Assistent (Sprache → Abhängigkeiten → TTS-Engine → Anbieter) ersetzt die alten Installer- + LLM-Tabs. Bestehende Nutzer springen direkt zu Anbieter.

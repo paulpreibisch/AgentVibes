@@ -44,7 +44,7 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [F] Favorite  [/] Search';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [*] Favorite  [/] Search';
 /**
  * Resolve the Piper voice storage directory using the same precedence as the
  * shell-side get_voice_storage_dir() in piper-voice-manager.sh:
@@ -106,8 +106,10 @@ function loadCatalog() {
     const libritts = data.libritts_speakers ?? {};
     for (const [id, entry] of Object.entries(libritts)) {
       _catalogEntries.push({
+        // voiceId stays raw so existing user configs continue to resolve
         voiceId: `en_US-libritts-high${MS_SEP}${entry.voice_name}`,
-        displayName: entry.voice_name,
+        // displayName gets a deterministic surname so every speaker is unique
+        displayName: uniquifyVoiceName(entry.voice_name),
         gender: (entry.gender ?? '').charAt(0).toUpperCase() + (entry.gender ?? '').slice(1),
         model: 'en_US-libritts-high',
         type: 'libritts',
@@ -183,7 +185,77 @@ function patchLibriTTSSpeakerNames() {
 
 // Column widths for the multi-column voice list
 export const COL_NAME_W   = 26;
-export const COL_GENDER_W = 10;
+export const COL_GENDER_W = 4;
+
+// Surname pool used to convert "Anna-2" → "Anna Carter" so every speaker
+// in the LibriTTS catalog gets a unique, friendly display name.  Indexed by
+// the trailing -N suffix (1-based: no suffix → idx 0, "-2" → idx 1, ...).
+const SURNAME_POOL = [
+  'Bell', 'Carter', 'Davis', 'Ellis', 'Foster', 'Gray', 'Hayes', 'Irving',
+  'Jones', 'Knox', 'Lane', 'Mason', 'Nash', 'Owens', 'Pierce', 'Quinn',
+];
+
+/**
+ * Convert a raw catalog speaker name like "Anna" or "Anna-2" into a unique
+ * friendly display name by appending a deterministic surname.
+ *   "Anna"        → "Anna Bell"
+ *   "Anna-2"      → "Anna Carter"
+ *   "Anna-16"     → "Anna Quinn"
+ *   "Cori Samuel" → "Cori Samuel"   (already full name — left alone)
+ *
+ * @param {string} rawName
+ * @returns {string}
+ */
+export function uniquifyVoiceName(rawName) {
+  if (!rawName) return rawName;
+  const m = rawName.match(/^(.+)-(\d+)$/);
+  if (m) {
+    const base = m[1];
+    const n    = parseInt(m[2], 10);
+    // Only treat -N as a duplicate counter when N >= 2 (catalog convention).
+    // -0 / -1 would otherwise produce collisions or undefined surnames.
+    if (n >= 2) {
+      const idx = (n - 1) % SURNAME_POOL.length;
+      return `${base} ${SURNAME_POOL[idx]}`;
+    }
+  }
+  // Only append a surname if the name is a single word — otherwise it's
+  // already a full name (e.g. "Cori Samuel") and we leave it alone.
+  if (/\s/.test(rawName)) return rawName;
+  return `${rawName} ${SURNAME_POOL[0]}`;
+}
+
+/**
+ * Map a gender string to a single-character icon for compact display.
+ *   "Female" → "♀"
+ *   "Male"   → "♂"
+ *   anything else → "—"
+ *
+ * @param {string} gender
+ * @returns {string}
+ */
+export function genderIcon(gender) {
+  if (gender === 'Female') return '♀';
+  if (gender === 'Male')   return '♂';
+  return '—';
+}
+
+/**
+ * Same as genderIcon but wrapped in blessed color tags:
+ *   Female → pink (magenta)
+ *   Male   → light blue (bright-cyan)
+ *   other  → no color
+ * The returned string is 1 visible char wide but contains color tags;
+ * callers should add padding spaces separately rather than using padEnd().
+ *
+ * @param {string} gender
+ * @returns {string}
+ */
+export function genderIconTag(gender) {
+  if (gender === 'Female') return '{magenta-fg}♀{/magenta-fg}';
+  if (gender === 'Male')   return '{bright-cyan-fg}♂{/bright-cyan-fg}';
+  return '—';
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers — exported for testability
@@ -439,6 +511,9 @@ const _metaCache = new Map();
 export function getVoiceMeta(voiceId) {
   if (_metaCache.has(voiceId)) return _metaCache.get(voiceId);
 
+  // Lazy-load the catalog so callers from any tab get uniquified names
+  loadCatalog();
+
   const ms = parseMultiSpeaker(voiceId);
   if (ms.isMultiSpeaker) {
     if (!ms.speakerName) {
@@ -446,7 +521,19 @@ export function getVoiceMeta(voiceId) {
       _metaCache.set(voiceId, result);
       return result;
     }
-    const displayName = ms.speakerName.replace(/_/g, ' ');
+    // Prefer the catalog entry (which has the uniquified name + gender)
+    const cat = _catalogMap.get(voiceId);
+    if (cat) {
+      const result = {
+        displayName: cat.displayName,
+        gender: cat.gender || inferGender(ms.speakerName, null),
+        provider: `Piper (${ms.model})`,
+      };
+      _metaCache.set(voiceId, result);
+      return result;
+    }
+    // Fallback for speakers not in the catalog (e.g. 16Speakers model)
+    const displayName = uniquifyVoiceName(ms.speakerName.replace(/_/g, ' '));
     const result = {
       displayName,
       gender: inferGender(ms.speakerName, null),
@@ -560,7 +647,7 @@ export function createVoicesTab(screen, services) {
     parent: box,
     top: 4,
     left: 6,
-    content: `{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}${_tl('voicesColGender').padEnd(COL_GENDER_W)}${_tl('voicesColProvider')}{/#00897b-fg}`,
+    content: `{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}{/#00897b-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {#00897b-fg}${_tl('voicesColProvider')}{/#00897b-fg}`,
     tags: true,
     style: { bg: COLORS.contentBg },
   });
@@ -647,21 +734,42 @@ export function createVoicesTab(screen, services) {
     return g;
   }
 
-  // Known limitation: blink (' █') and hint text can briefly interleave when
-  // _vlTick fires between stripping and re-appending the hint. Accepted as cosmetic.
+  // Decoration helpers — strip blink cursor and (optionally) hint text from
+  // a list item's content.  We use a precise approach instead of a generic
+  // regex over `bright-black-fg` blocks because uninstalled rows wrap their
+  // PROVIDER column in `bright-black-fg` too — a generic strip would erase it.
+  //
+  // _stripBlink(): only removes ` █` markers (safe to call on any row).
+  // _stripHint():  removes hint by anchoring to the exact hint text from
+  //                _getRowHint(idx). Only safe on rows we know are hinted.
+  const _BLINK_RE = / █/g;
+  function _stripBlink(raw) {
+    return (raw ?? '').replace(_BLINK_RE, '');
+  }
+  function _stripHint(raw, idx) {
+    const hint = _getRowHint(idx);
+    if (!hint) return raw;
+    // The hint is appended to the end (possibly followed by blink); remove it.
+    const noBlink = (raw ?? '').replace(_BLINK_RE, '');
+    if (noBlink.endsWith(hint)) return noBlink.slice(0, -hint.length);
+    return noBlink;
+  }
+  function _stripDecorations(raw, idx) {
+    return _stripHint(_stripBlink(raw), idx);
+  }
+
   function _updateHint(idx) {
     const items = voiceList.items;
     const _pad = ' '.repeat(60);
+    // Restore previously hinted row to its clean base
     if (_hintIdx >= 0 && _hintIdx !== idx && items[_hintIdx]) {
-      const hadBlink = (items[_hintIdx].content ?? '').endsWith(' █');
-      items[_hintIdx].setContent((hadBlink ? _hintBase + ' █' : _hintBase) + _pad);
+      items[_hintIdx].setContent(_hintBase + _pad);
     }
     if (idx >= 0 && items[idx]) {
-      let c = items[idx].content ?? '';
-      const hasBlink = c.endsWith(' █');
-      if (hasBlink) c = c.slice(0, -2);
-      _hintBase = c;
-      items[idx].setContent(c + _getRowHint(idx) + (hasBlink ? ' █' : ''));
+      // The row may already have a hint (from a prior _updateHint cycle)
+      // and/or a blink — strip both before capturing the clean base.
+      _hintBase = _stripDecorations(items[idx].content, idx);
+      items[idx].setContent(_hintBase + _getRowHint(idx));
     } else {
       _hintBase = '';
     }
@@ -1354,11 +1462,13 @@ export function createVoicesTab(screen, services) {
         ? displayName.slice(0, COL_NAME_W - 1) + '…'
         : displayName.padEnd(COL_NAME_W);
 
+      // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
+      const gIcon = genderIconTag(gender);
       if (!installed) {
-        // Greyed-out row for uninstalled catalog voices
-        return `{bright-black-fg} ${star}  ${name}${_tGender(gender).padEnd(COL_GENDER_W)}${provider}{/bright-black-fg}`;
+        // Greyed-out row for uninstalled catalog voices — close grey wrap around the icon so its colors show
+        return `{bright-black-fg} ${star}  ${name}{/bright-black-fg}${gIcon}   {bright-black-fg}${provider}{/bright-black-fg}`;
       }
-      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}${_tGender(gender).padEnd(COL_GENDER_W)}${provider}${isPrev ? ` ${_tl('voicePlaying')}` : ''}{/${COLORS.labelFg}-fg}`;
+      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}{/${COLORS.labelFg}-fg}${gIcon}   {${COLORS.labelFg}-fg}${provider}${isPrev ? ` ${_tl('voicePlaying')}` : ''}{/${COLORS.labelFg}-fg}`;
     });
   }
 
@@ -1511,7 +1621,7 @@ export function createVoicesTab(screen, services) {
   });
 
   // 'f' or '*' in voiceList toggles favorite
-  voiceList.key(['f', '*'], () => {
+  voiceList.key(['*'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
@@ -1560,13 +1670,16 @@ export function createVoicesTab(screen, services) {
     _vlBlink.on = !_vlBlink.on;
     const items = voiceList.items;
     const cur = voiceList.selected ?? 0;
+    // Clean old row — only strip blink (it's not the hinted row anymore,
+    // and we don't want to accidentally erase its provider column).
     if (_vlBlink.sel !== cur && _vlBlink.sel >= 0 && items[_vlBlink.sel]) {
-      items[_vlBlink.sel].setContent((items[_vlBlink.sel].content ?? '').replace(/ █$/, ''));
+      items[_vlBlink.sel].setContent(_stripBlink(items[_vlBlink.sel].content));
     }
     _vlBlink.sel = cur;
     if (items[cur]) {
-      const base = (items[cur].content ?? '').replace(/ █$/, '');
-      items[cur].setContent(_vlBlink.on ? `${base} █` : base);
+      // Get content without blink but preserve hint
+      const raw = _stripBlink(items[cur].content);
+      items[cur].setContent(_vlBlink.on ? `${raw} █` : raw);
     }
     screen.render();
   }
@@ -1578,7 +1691,10 @@ export function createVoicesTab(screen, services) {
     _hintBase = '';
     _updateHint(_vlBlink.sel);
     const items = voiceList.items;
-    if (items[_vlBlink.sel]) items[_vlBlink.sel].setContent((items[_vlBlink.sel].content ?? '') + ' █');
+    if (items[_vlBlink.sel]) {
+      const raw = _stripBlink(items[_vlBlink.sel].content);
+      items[_vlBlink.sel].setContent(raw + ' █');
+    }
     if (!_playingVoiceId) previewLine.setContent(HINT_TEXT);
     screen.render();
     _vlBlink.interval = setInterval(_vlTick, 500);
@@ -1588,12 +1704,19 @@ export function createVoicesTab(screen, services) {
     if (!_playingVoiceId) previewLine.setContent('');
     if (_vlBlink.interval) { clearInterval(_vlBlink.interval); _vlBlink.interval = null; }
     const items = voiceList.items;
+    // Clean up: strip blink from selected row, strip hint from hinted row.
+    // Only the hinted row knows what its hint text was — use _stripDecorations
+    // there. For other rows, only strip blink.
     const sel = voiceList.selected ?? 0;
     if (items[sel]) {
-      items[sel].setContent(sel === _hintIdx ? _hintBase : (items[sel].content ?? '').replace(/ █$/, ''));
+      if (sel === _hintIdx) {
+        items[sel].setContent(_stripDecorations(items[sel].content, sel));
+      } else {
+        items[sel].setContent(_stripBlink(items[sel].content));
+      }
     }
     if (_hintIdx >= 0 && _hintIdx !== sel && items[_hintIdx]) {
-      items[_hintIdx].setContent(_hintBase);
+      items[_hintIdx].setContent(_stripDecorations(items[_hintIdx].content, _hintIdx));
     }
     _hintIdx = -1;
     _hintBase = '';
@@ -1612,7 +1735,7 @@ export function createVoicesTab(screen, services) {
   });
 
   // Type-to-jump: press a letter to jump to first voice whose display name starts with it
-  const _voiceJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u', 'f']);
+  const _voiceJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'd', 'u']);
   voiceList.on('keypress', (ch, key) => {
     if (!ch || key.ctrl || key.meta) return;
     const lower = ch.toLowerCase();
@@ -1665,7 +1788,7 @@ export function createVoicesTab(screen, services) {
   function refreshVoicesLabels() {
     voicesSectionHdr.setContent(`{#00897b-fg}${_tl('voicesHeader')}${'─'.repeat(58)}{/#00897b-fg}`);
     searchLabelText.setContent(_tl('searchLabel'));
-    colHeaderText.setContent(`{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}${_tl('voicesColGender').padEnd(COL_GENDER_W)}${_tl('voicesColProvider')}{/#00897b-fg}`);
+    colHeaderText.setContent(`{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}{/#00897b-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {#00897b-fg}${_tl('voicesColProvider')}{/#00897b-fg}`);
     voiceInfoHdr.setContent(`{#00897b-fg}${_tl('voicesInfoHeader')}${'─'.repeat(54)}{/#00897b-fg}`);
     switchBtn.setContent(_tl('voicesSwitchBtn'));
     favoriteBtn.setContent(_tl('voicesFavoriteBtn'));

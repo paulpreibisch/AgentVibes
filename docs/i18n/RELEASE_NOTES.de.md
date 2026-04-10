@@ -1,5 +1,53 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎙️ v5.1.0 — Überarbeiteter Stimmwähler + Automatisches Speichern im Agent-Modal
+
+**Veröffentlichungsdatum:** April 2026
+
+### Neue Funktionen
+
+- **Automatisches Speichern im Agent-Bearbeitungs-Modal** — Änderungen pro Agent an Stimme/Persönlichkeit/Musik/Reverb/Pretext werden jetzt automatisch gespeichert, während Sie sie bearbeiten. Die explizite Speichern-Schaltfläche ist verschwunden; ein kurzer "✓ Gespeichert!"-Hinweis bestätigt jede Änderung. Abbrechen und Auf Standard zurücksetzen verhalten sich weiterhin wie zuvor.
+
+- **Eindeutige LibriTTS-Sprechernamen** — Die 904 LibriTTS-Sprecher werden nicht mehr als "Anna", "Anna-2", "Anna-3", … "Anna-16" angezeigt. Jeder erhält einen deterministischen Nachnamen aus einem Pool von 16 Namen: **Anna Bell**, **Anna Carter**, **Anna Davis**, …, **Anna Quinn**. Die zugrunde liegenden Stimm-IDs sind unverändert, sodass bestehende Benutzerkonfigurationen weiterhin funktionieren.
+
+- **Rosa/blaue Gendersymbole** — Weibliche Stimmen zeigen **♀** in Rosa (Magenta), männliche Stimmen zeigen **♂** in Hellblau (bright-cyan), unbekannt zeigt `—`. Die `Gender`-Spalte im Header wird durch farbiges `♀/♂` ersetzt (10 → 4 Zeichen breit), was Platz für längere Namen schafft. Angewandt auf den Haupt-Stimmen-Tab UND alle 3 Stimmwähler-Modale (Setup, Agenten, Einstellungen).
+
+- **Schnellsprung nach erstem Buchstaben in Stimmwählern** — Drücken Sie einen beliebigen Buchstaben `a`–`z`, um zur ersten Stimme zu springen, die mit diesem Buchstaben beginnt. Reservierte Tasten (`q`, `j`, `k`, `g`, `h`, `l`) sind blockiert, damit sie ihre Abbruch-/Vi-Navigationsbedeutung behalten.
+
+- **Seitennavigation in Stimmwählern** — `PgUp`, `PgDn`, `Home`, `End` funktionieren jetzt in allen Stimmwähler-Modalen.
+
+- **3 neue Hintergrundmusik-Tracks** — `Late Night Hip Hop Groove`, `Drifting Down the Hall` (90er-Vibes) und `Midnight Charleston Stomp` (Swing). Anzahl der Tracks steigt von 15 auf 18.
+
+### Verbesserungen
+
+- **Suchleiste im Stimmwähler entfernt** — Ersetzt durch Schnellsprung nach erstem Buchstaben. Das alte Suchtextfeld hatte Fokusprobleme, die Navigationstasten verschluckten. Der Sprung ist schneller für den typischen "Stimme X finden"-Anwendungsfall.
+
+- **Track-Listen-Sortierung korrigiert** — Tracks mit Emoji-Präfixen (z. B. `🎤 Late Night Hip Hop Groove`) werden jetzt nach dem alphabetischen Teil des Namens sortiert, nicht nach dem Emoji-Codepoint. Die Reihenfolge ist konsistent über Node/ICU-Versionen hinweg.
+
+- **Favoriten-Hotkey ist jetzt nur `*`** — Die doppelte `f`-Bindung zum Markieren von Favoriten in Stimmwählern und im Haupt-Stimmen-Tab wurde entfernt. `f` ist jetzt frei für den Schnellsprung nach erstem Buchstaben (z. B. zu Frank oder Felix springen). Der `*`-Marker bleibt der kanonische Weg, Favoriten umzuschalten.
+
+### Fehlerbehebungen
+
+- **Nicht installierte Zeilen im Stimmen-Tab werden nicht mehr beschädigt** — Das Auswählen einer nicht installierten Stimme löschte visuell ihre Anbieter-Spalte aufgrund eines Regex-Strips, der den `bright-black-fg`-Wrapper der Zeile zu weit fasste. Ersetzt durch einen präzisen Hint-Anker, der nur den exakten Hint-Text entfernt.
+
+- **Blink-Artefakte in Musik- + Stimmen-Tabs verschwunden** — `█`-Cursor lassen beim schnellen Scrollen durch die Liste keine Streublöcke mehr zurück. Beide Tabs verwenden jetzt einen präzisen Blink-Strip-Helfer anstelle des fragilen positionsbasierten Slicers.
+
+- **Setup-Tab schlägt nicht mehr stillschweigend fehl** — `_renderScreen3` umschloss den gesamten `setupCompleted`-Schreibblock in einem einzigen leeren `try/catch {}`. Beschädigte lokale Konfigurationsdateien werden jetzt nach `config.json.bak` gesichert und neu geschrieben, wobei Fehler in stderr protokolliert werden — kein "stuck repeating setup" ohne Erklärung mehr.
+
+- **Stimmwähler `q`-Abbruch funktioniert jetzt** — Der neue Schnellsprung nach erstem Buchstaben verschluckte `q` (und andere Vi-Navigationstasten). Reservierte Tasten-Blocklist hinzugefügt.
+
+- **Track-Picker case-insensitive Sortierung** — Neue Tracks mit Title-Case-Namen (`Late Night Hip Hop Groove.mp3`) springen nicht mehr an den Anfang der Liste über die Kleinbuchstaben-`agent_vibes_*`-Tracks.
+
+### Auswirkungen für Benutzer
+
+- Das Bearbeiten der Stimme oder Einstellungen eines Agenten ist jetzt schneller — kein Klicken auf Speichern mehr nötig
+- Der Stimmwähler ist deutlich übersichtlicher, da alle 904 LibriTTS-Sprecher eindeutige, freundliche Namen haben
+- Geschlecht auf einen Blick durch farbige Symbole
+- Drei neue Musiktracks für Abwechslung
+- Blink-/Scroll-Artefakte in Stimmen- und Musik-Tabs verschwunden
+
+---
+
 ## 🚀 v5.0.0 — Multi-Anbieter-Unterstutzung: Claude Code + Copilot + Codex
 
 **Veroffentlichungsdatum:** April 2026

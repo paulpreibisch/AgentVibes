@@ -2437,7 +2437,10 @@ async function collectConfiguration(options = {}) {
           { name: '🌺 Hawaiian Slack Key Guitar ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
           { name: '🏜️  Arabic Oud (Middle Eastern) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_arabic_v2_loop.mp3' },
           { name: '🪘 Gnawa Ambient (North African) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
-          { name: '🥁 Tabla Dream Pop (Indian percussion) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
+          { name: '🥁 Tabla Dream Pop (Indian percussion) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' },
+          { name: '🎤 Late Night Hip Hop Groove ' + chalk.gray('[SPACE to preview]'), value: 'Late Night Hip Hop Groove.mp3' },
+          { name: '🌃 Drifting Down the Hall (90s Vibes) ' + chalk.gray('[SPACE to preview]'), value: 'Drifting Down the Hall.mp3' },
+          { name: '🎩 Midnight Charleston Stomp (Swing) ' + chalk.gray('[SPACE to preview]'), value: 'Midnight Charleston Stomp.mp3' }
         ];
 
         // Add custom tracks separator and options if any exist
@@ -3703,7 +3706,10 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
       'agentvibes_funk_loop.mp3': '🕺',
       'agentvibes_reggae_loop.mp3': '🌴',
       'agentvibes_blues_loop.mp3': '🎸',
-      'agentvibes_classical_loop.mp3': '🎻'
+      'agentvibes_classical_loop.mp3': '🎻',
+      'Late Night Hip Hop Groove.mp3': '🎤',
+      'Drifting Down the Hall.mp3': '🌃',
+      'Midnight Charleston Stomp.mp3': '🎩'
     };
 
     const tracks = musicFiles.map(track => ({

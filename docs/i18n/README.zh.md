@@ -1,10 +1,24 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.0.0
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.1.0
 
 ---
 
-## 🚀 NEW IN v5.0.0 — 多供应商支持: Claude Code + Copilot + Codex
+## 🎙️ NEW IN v5.1.0 — 语音选择器重做 + 代理模态框自动保存
+
+- **代理模态框自动保存** — 语音/人格/音乐/混响/预文本更改在编辑时自动保存。简短的"✓ 已保存!"提示确认每次更改。
+- **LibriTTS 独特姓名** — 904 位说话者获得确定性的姓氏：**Anna Bell**、**Anna Carter**、…、**Anna Quinn**。不再有"Anna-2"、"Anna-3"重复。
+- **粉色 ♀ / 浅蓝 ♂ 性别符号** — 主 Voices 选项卡和所有语音选择器模态框中的彩色性别指示器。
+- **首字母快速跳转** — 在任何语音选择器中按 `a`–`z` 跳转到该字母。`q`、`j`、`k`、`g`、`h`、`l` 为导航/取消保留。
+- 语音选择器中的 **PgUp / PgDn / Home / End**
+- **3 首新背景音乐** — Late Night Hip Hop Groove、Drifting Down the Hall、Midnight Charleston Stomp
+- **从语音选择器中删除搜索栏** — 替换为首字母跳转（更快、无焦点问题）
+- **Voices 选项卡损坏修复** — 导航到未安装行时不再丢失其供应商列
+- **Music + Voices 选项卡闪烁伪影消除**
+
+---
+
+## 🚀 v5.0.0 — 多供应商支持: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex（VS Code）** — AgentVibes 现已支持三大 AI 编程助手。通过 TUI 安装和配置每个供应商。
 - **统一设置选项卡** — 4 步向导（语言 → 依赖项 → TTS 引擎 → 供应商）取代旧的安装程序 + LLM 选项卡。老用户直接跳转到供应商。

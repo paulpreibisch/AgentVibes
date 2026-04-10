@@ -21,9 +21,9 @@ describe('getBuiltInTracks', () => {
     assert.strictEqual(typeof getBuiltInTracks, 'function');
   });
 
-  test('returns array of 15 built-in tracks', () => {
+  test('returns array of 18 built-in tracks', () => {
     const tracks = getBuiltInTracks();
-    assert.strictEqual(tracks.length, 15);
+    assert.strictEqual(tracks.length, 18);
   });
 
   test('each track has id and label', () => {

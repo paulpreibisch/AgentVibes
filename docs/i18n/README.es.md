@@ -1,10 +1,24 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.0.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.1.0
 
 ---
 
-## 🚀 NUEVO EN v5.0.0 — Soporte Multi-Proveedor: Claude Code + Copilot + Codex
+## 🎙️ NUEVO EN v5.1.0 — Renovación del Selector de Voz + Guardado Automático en el Modal de Agente
+
+- **Guardado automático en el modal de agente** — Los cambios de voz/personalidad/música/reverb/pretexto se guardan automáticamente mientras los editas. Un breve aviso "✓ ¡Guardado!" confirma cada cambio.
+- **Nombres únicos para LibriTTS** — 904 hablantes obtienen apellidos deterministas: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. Se acabaron los duplicados "Anna-2", "Anna-3".
+- **Símbolos de género rosa ♀ / azul ♂** — Indicadores de género en color en la pestaña Voces y en todos los modales del selector de voz.
+- **Salto rápido por letra inicial** — Pulsa `a`–`z` en cualquier selector de voz para saltar a esa letra. `q`, `j`, `k`, `g`, `h`, `l` se reservan para navegación/cancelar.
+- **PgUp / PgDn / Home / End** en selectores de voz
+- **3 nuevas pistas de música de fondo** — Late Night Hip Hop Groove, Drifting Down the Hall, Midnight Charleston Stomp
+- **Barra de búsqueda eliminada de los selectores de voz** — reemplazada por salto por letra inicial (más rápido, sin problemas de foco)
+- **Corrección de corrupción en la pestaña Voces** — las filas no instaladas ya no pierden su columna de Proveedor al navegar sobre ellas
+- **Artefactos de parpadeo eliminados en las pestañas Música + Voces**
+
+---
+
+## 🚀 v5.0.0 — Soporte Multi-Proveedor: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex en VS Code** — AgentVibes ahora soporta los tres principales asistentes de codificación con IA. Instala y configura cada uno desde la TUI.
 - **Una sola pestaña de Configuración** — asistente de 4 pasos (Idioma → Dependencias → Motor TTS → Proveedores) reemplaza las antiguas pestañas de instalador + LLM. Los usuarios existentes saltan directamente a Proveedores.

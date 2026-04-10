@@ -151,10 +151,13 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
   let tracks;
   try {
     const files = fs.readdirSync(tracksDir);
+    // Sort by the alphabetic part of the label (skip leading emoji/symbols)
+    // so the order reflects the track NAME, not the emoji codepoint.
+    const _sortKey = (s) => s.replace(/^[^a-zA-Z]+/, '');
     tracks = files
       .filter(f => /\.mp3$/i.test(f))
-      .sort()
-      .map(f => ({ file: f, label: formatTrackName(f) }));
+      .map(f => ({ file: f, label: formatTrackName(f) }))
+      .sort((a, b) => _sortKey(a.label).localeCompare(_sortKey(b.label), undefined, { sensitivity: 'base' }));
   } catch {
     tracks = BUILT_IN_TRACKS;
   }

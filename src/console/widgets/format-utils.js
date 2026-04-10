@@ -21,6 +21,9 @@ const TRACK_NAMES = Object.freeze({
   'agent_vibes_arabic_v2_loop.mp3':                    '🎵 Arabic Oud',
   'agent_vibes_ganawa_ambient_v2_loop.mp3':            '🪘 Gnawa Ambient',
   'agent_vibes_tabla_dream_pop_v1_loop.mp3':           '🥁 Tabla Dream Pop',
+  'Late Night Hip Hop Groove.mp3':                     '🎤 Late Night Hip Hop Groove',
+  'Drifting Down the Hall.mp3':                        '🌃 Drifting Down the Hall',
+  'Midnight Charleston Stomp.mp3':                     '🎩 Midnight Charleston Stomp',
 });
 
 /**

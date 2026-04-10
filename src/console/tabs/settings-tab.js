@@ -20,7 +20,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import {
-  scanInstalledVoices, getVoiceMeta, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker,
+  scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker,
 } from './voices-tab.js';
 import { LanguageService } from '../../services/language-service.js';
 import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
@@ -525,7 +525,6 @@ export function createSettingsTab(screen, services) {
     navigationService?.openModal();
 
     let _allVoices = [];
-    let _filterText = '';
     let _previewProc = null;
     let _previewVoiceId = null;
     let _vpClosed = false;
@@ -567,26 +566,16 @@ export function createSettingsTab(screen, services) {
     });
     vpModal.setFront();
 
+    const COL_N = 30;
+    const COL_G = 4;
     blessed.text({
-      parent: vpModal, top: 1, left: 2,
-      content: 'Search:', style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-    });
-    const vpSearch = blessed.textbox({
-      parent: vpModal, top: 1, left: 11, width: 40, height: 1,
-      inputOnFocus: true, keys: true,
-      style: { fg: COLORS.valueFg, bg: 'blue', focus: { bg: 'cyan' } },
-    });
-
-    const COL_N = 28;
-    const COL_G = 10;
-    blessed.text({
-      parent: vpModal, top: 2, left: 6, tags: true,
-      content: `{cyan-fg}${'Name'.padEnd(COL_N)}${'Gender'.padEnd(COL_G)}Provider{/cyan-fg}`,
+      parent: vpModal, top: 1, left: 6, tags: true,
+      content: `{cyan-fg}${'Name'.padEnd(COL_N)}{/cyan-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {cyan-fg}Provider{/cyan-fg}`,
       style: { bg: COLORS.contentBg },
     });
 
     const vpList = blessed.list({
-      parent: vpModal, top: 3, left: 2, right: 2, bottom: 5,
+      parent: vpModal, top: 2, left: 2, right: 2, bottom: 5,
       keys: true, vi: true, mouse: true,
       border: { type: 'line' },
       scrollbar: { ch: '|', style: { fg: 'cyan' } },
@@ -606,15 +595,9 @@ export function createSettingsTab(screen, services) {
 
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{white-fg}[↑↓/jk] Navigate  [Enter] Select  [Space] Preview  [/] Search  [Esc] Cancel{/white-fg}',
+      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [Home/End]  [a-z] Jump  [Enter] Select  [Space] Preview  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
-
-    function _getFiltered() {
-      if (!_filterText) return _allVoices;
-      const f = _filterText.toLowerCase();
-      return _allVoices.filter(v => v.toLowerCase().includes(f));
-    }
 
     function _buildItems(voices) {
       const currentVoice = providerService?.getActiveVoiceId() ?? '';
@@ -626,7 +609,8 @@ export function createSettingsTab(screen, services) {
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
           : meta.displayName.padEnd(COL_N);
-        return ` ${dot} ${name}${meta.gender.padEnd(COL_G)}${meta.provider}`;
+        // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
+        return ` ${dot} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
       });
     }
 
@@ -635,8 +619,10 @@ export function createSettingsTab(screen, services) {
       const savedIdx = vpList.selected ?? 0;
       const savedScroll = vpList.childBase ?? 0;
       _allVoices = scanInstalledVoices();
-      const filtered = _getFiltered();
-      const items = _buildItems(filtered);
+      // Sort by display name so the first-letter quick jump is intuitive
+      _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
+        getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
+      const items = _buildItems(_allVoices);
       vpList.setItems(items.length > 0 ? items : [' (no voices found)']);
       vpList.select(Math.min(savedIdx, items.length - 1));
       vpList.childBase = Math.min(savedScroll, Math.max(0, items.length - (vpList.height - 2)));
@@ -704,14 +690,8 @@ export function createSettingsTab(screen, services) {
       piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
     }
 
-    vpSearch.on('keypress', () => {
-      setTimeout(() => { _filterText = vpSearch.getValue().trim(); _refreshVP(); }, 0);
-    });
-    vpSearch.key(['escape'], () => { vpList.focus(); screen.render(); });
-    vpList.key(['/'], () => { vpSearch.clearValue(); vpSearch.focus(); screen.render(); });
     vpList.key(['enter'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+      const sel = _allVoices[vpList.selected];
       if (sel) {
         if (providerService) providerService.setActiveVoice(sel);
         else configService.set('voice', sel);
@@ -719,15 +699,37 @@ export function createSettingsTab(screen, services) {
       _closeVP();
     });
     vpList.key(['space'], () => {
-      const filtered = _getFiltered();
-      const sel = filtered[vpList.selected];
+      const sel = _allVoices[vpList.selected];
       if (sel) _previewVoice(sel);
     });
     vpList.key(['escape', 'q'], _closeVP);
 
+    // PageUp / PageDown / Home / End navigation
+    const _pageSize = () => Math.max(1, (vpList.height ?? 10) - 2);
+    vpList.key(['pageup'],   () => { vpList.up(_pageSize());   screen.render(); });
+    vpList.key(['pagedown'], () => { vpList.down(_pageSize()); screen.render(); });
+    vpList.key(['home'],     () => { vpList.select(0); screen.render(); });
+    vpList.key(['end'],      () => { vpList.select(Math.max(0, _allVoices.length - 1)); screen.render(); });
+
+    // First-letter quick jump: typing 'a' jumps to the first voice starting
+    // with A. Block keys reserved by the list widget (vi nav, cancel) so
+    // they don't get swallowed: q (cancel), j/k/g/h/l (vi navigation).
+    const _vpJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'q']);
+    vpList.on('keypress', (ch, key) => {
+      if (!ch || key?.ctrl || key?.meta) return;
+      if (!/^[a-zA-Z]$/.test(ch)) return;
+      const target = ch.toLowerCase();
+      if (_vpJumpBlocked.has(target)) return;
+      const idx = _allVoices.findIndex(v => {
+        const name = getVoiceMeta(v).displayName.toLowerCase();
+        return name.startsWith(target);
+      });
+      if (idx >= 0) { vpList.select(idx); screen.render(); }
+    });
+
     _refreshVP();
     const currentVoice = providerService?.getActiveVoiceId() ?? '';
-    const activeIdx = _getFiltered().indexOf(currentVoice);
+    const activeIdx = _allVoices.indexOf(currentVoice);
     if (activeIdx >= 0) vpList.select(activeIdx);
     vpList.focus();
     screen.render();

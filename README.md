@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.0.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.0
 
 ---
 
@@ -43,7 +43,21 @@ Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, 
 
 ---
 
-## 🚀 NEW IN v5.0.0 — Multi-Provider Support: Claude Code + Copilot + Codex
+## 🎙️ NEW IN v5.1.0 — Voice Picker Overhaul + Auto-Save Agent Modal
+
+- **Auto-save in agent modal** — Voice/personality/music/reverb/pretext changes save automatically as you edit them. Brief "✓ Saved!" toast confirms each change.
+- **Unique LibriTTS names** — 904 speakers get deterministic surnames: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. No more "Anna-2", "Anna-3" duplicates.
+- **Pink ♀ / blue ♂ gender symbols** — Colored gender indicators in the main Voices tab and all voice picker modals.
+- **First-letter quick jump** — Press `a`–`z` in any voice picker to jump to that letter. `q`, `j`, `k`, `g`, `h`, `l` reserved for nav/cancel.
+- **PgUp / PgDn / Home / End** in voice pickers
+- **3 new background music tracks** — Late Night Hip Hop Groove, Drifting Down the Hall, Midnight Charleston Stomp
+- **Search bar removed from voice pickers** — replaced by first-letter jump (faster, no focus issues)
+- **Voices tab corruption fix** — uninstalled rows no longer lose their Provider column when navigated onto
+- **Music + Voices tab blink artifacts gone**
+
+---
+
+## 🚀 v5.0.0 — Multi-Provider Support: Claude Code + Copilot + Codex
 
 - **GitHub Copilot + OpenAI Codex in VS Code** — AgentVibes now supports all three major AI coding assistants. Install and configure each from the TUI.
 - **One Setup tab** — 4-step wizard (Language → Deps → TTS Engine → Providers) replaces old installer + LLM tabs. Returning users skip to Providers.
