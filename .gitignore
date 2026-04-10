@@ -157,8 +157,11 @@ docs/installation-screenshots/
 scripts/generate-*.sh
 scripts/regenerate-*.sh
 
-# Local project state files
+# Local project state files (mute marker files — created at runtime, never shipped)
 .agentvibes-unmuted
+.agentvibes-muted
+.claude/agentvibes-unmuted
+.claude/agentvibes-muted
 .claude/hooks/post-response.sh
 .claude/story-workflow.sh
 bin/ensure-soprano-running.sh

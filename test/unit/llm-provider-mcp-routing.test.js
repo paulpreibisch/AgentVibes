@@ -84,16 +84,37 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
 
   // ── Claude Code (.mcp.json via installer.js) ─────────────────────────────
   describe('Claude Code .mcp.json (installer.js)', () => {
-    test('installer mcpConfig template has env.AGENTVIBES_LLM = "claude-code"', () => {
-      const src = readFileSync(
+    let installerSrc;
+    before(() => {
+      installerSrc = readFileSync(
         path.join(PROJECT_ROOT, 'src', 'installer.js'),
         'utf8'
       );
+    });
+
+    test('installer mcpConfig template has env.AGENTVIBES_LLM = "claude-code"', () => {
       // Find the mcpConfig literal inside handleMcpConfiguration
-      const m = src.match(/handleMcpConfiguration[\s\S]*?const mcpConfig = \{[\s\S]*?\};/);
+      const m = installerSrc.match(/handleMcpConfiguration[\s\S]*?const mcpConfig = \{[\s\S]*?\};/);
       assert.ok(m, 'installer.js must declare mcpConfig in handleMcpConfiguration');
       assert.match(m[0], /AGENTVIBES_LLM:\s*['"]claude-code['"]/,
         '.mcp.json template must set env.AGENTVIBES_LLM = "claude-code"');
+    });
+
+    test('installer migrates EXISTING .mcp.json instead of just printing instructions', () => {
+      // The v5.1.2 review found that the original `if (mcpExists)` branch
+      // returned without modifying the file, leaving v5.1.0/v5.1.1 users
+      // broken on upgrade.  v5.1.3 must auto-merge the AGENTVIBES_LLM env
+      // var into existing .mcp.json files.
+      assert.match(installerSrc, /if\s*\(mcpExists\)/,
+        'installer must still detect existing .mcp.json');
+      // The new migration block should write to the file inside the
+      // mcpExists branch, not just call console.log and return.
+      const block = installerSrc.match(/if\s*\(mcpExists\)\s*\{[\s\S]*?\n  \}/);
+      assert.ok(block, 'mcpExists branch must be present');
+      assert.match(block[0], /writeFile\(\s*mcpConfigPath/,
+        'mcpExists branch must call fs.writeFile to migrate the existing config');
+      assert.match(block[0], /AGENTVIBES_LLM/,
+        'migration block must set AGENTVIBES_LLM in the merged config');
     });
   });
 });
@@ -128,6 +149,32 @@ describe('mcp-server/server.py routes AGENTVIBES_LLM env var to play-tts', () =>
     // args.extend / args.append call with -llm or --llm.
     assert.match(serverSrc, /if\s+llm_key\s*:[\s\S]{0,200}["']-?-llm["']/,
       'server.py must guard the -llm flag behind `if llm_key:`');
+  });
+
+  test('validates AGENTVIBES_LLM format before forwarding', () => {
+    // The env value must be checked against the same regex play-tts.sh
+    // uses (^[a-zA-Z0-9_-]+$) so weird/malicious values can't poison
+    // child scripts or the audio-effects.cfg lookup.
+    assert.match(serverSrc, /\^\[a-zA-Z0-9_-\]\+\$/,
+      'server.py must validate AGENTVIBES_LLM against ^[a-zA-Z0-9_-]+$');
+  });
+});
+
+describe('play-tts.ps1 validates $llm parameter format', () => {
+  // The PowerShell script must mirror play-tts.sh's validation so the
+  // cross-platform contract is symmetric and weird values can't poison
+  // the audio-effects.cfg lookup or AGENTVIBES_LLM_KEY env var.
+  let psSrc;
+  before(() => {
+    psSrc = readFileSync(
+      path.join(PROJECT_ROOT, '.claude', 'hooks-windows', 'play-tts.ps1'),
+      'utf8'
+    );
+  });
+
+  test('rejects invalid $llm values with regex check', () => {
+    assert.match(psSrc, /\$llm\s+-notmatch\s+'\^\[a-zA-Z0-9_-\]\+\$'/,
+      'play-tts.ps1 must validate $llm against ^[a-zA-Z0-9_-]+$');
   });
 });
 

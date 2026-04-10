@@ -16,6 +16,17 @@ param(
     [string]$llm = ""
 )
 
+# Security: Validate LLM provider name (alphanumeric, hyphens, underscores
+# only) — mirrors play-tts.sh line 92.  This prevents weird values from
+# poisoning the audio-effects.cfg lookup or the AGENTVIBES_LLM_KEY env var
+# we export to child scripts.  An invalid value is treated as unset rather
+# than aborting, so the script falls back to the default config and the
+# rest of TTS still works.
+if ($llm -and $llm -notmatch '^[a-zA-Z0-9_-]+$') {
+    Write-Error "Invalid LLM provider name: '$llm' — must match ^[a-zA-Z0-9_-]+$. Falling back to default config."
+    $llm = ""
+}
+
 # Configuration paths
 # Priority: CLAUDE_PROJECT_DIR env var → script's parent project → user profile
 # Local project settings ALWAYS override global (~/.claude)

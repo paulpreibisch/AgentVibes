@@ -4320,18 +4320,75 @@ async function handleMcpConfiguration(targetDir, options) {
   }
 
   if (mcpExists) {
-    // Scenario 3: Config already exists - show manual instructions
+    // Existing config: try to migrate it in-place so users upgrading from
+    // v5.1.x get the AGENTVIBES_LLM env var added without manual editing.
+    // This is the v5.1.2 follow-up fix — the prior version returned here
+    // and only printed instructions, leaving existing users broken.
+    let migrated = false;
+    let migrationError = null;
+    try {
+      const existingRaw = await fs.readFile(mcpConfigPath, 'utf8');
+      const existingCfg = JSON.parse(existingRaw);
+      if (existingCfg && typeof existingCfg === 'object') {
+        if (!existingCfg.mcpServers || typeof existingCfg.mcpServers !== 'object') {
+          existingCfg.mcpServers = {};
+        }
+        const current = existingCfg.mcpServers.agentvibes;
+        const wantEnv = { AGENTVIBES_LLM: 'claude-code' };
+        // Decide whether we need to write — only if the agentvibes entry
+        // is missing OR its env doesn't include the AGENTVIBES_LLM key.
+        const needsWrite =
+          !current ||
+          !current.env ||
+          current.env.AGENTVIBES_LLM !== 'claude-code';
+        if (needsWrite) {
+          existingCfg.mcpServers.agentvibes = {
+            command: 'npx',
+            args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+            // Preserve any other env keys the user added manually.
+            env: { ...(current?.env ?? {}), ...wantEnv },
+          };
+          await fs.writeFile(mcpConfigPath, JSON.stringify(existingCfg, null, 2) + '\n');
+          migrated = true;
+        }
+      }
+    } catch (err) {
+      migrationError = err;
+    }
+
+    if (migrated) {
+      console.log(
+        boxen(
+          chalk.green.bold('✅ MCP Configuration Updated\n\n') +
+          chalk.white('Your existing ') + chalk.cyan('.mcp.json') + chalk.white(' has been updated\n') +
+          chalk.white('with the AgentVibes MCP server entry, including the\n') +
+          chalk.cyan('AGENTVIBES_LLM=claude-code') + chalk.white(' env var for per-LLM routing.'),
+          {
+            padding: 1,
+            margin: { top: 1, bottom: 1, left: 0, right: 0 },
+            borderStyle: 'double',
+            borderColor: 'green',
+          }
+        )
+      );
+      return;
+    }
+
+    // Migration was not needed (already correct) or failed — fall through
+    // to the manual-instructions box.
     console.log(
       boxen(
         chalk.yellow.bold('ℹ️  MCP Configuration Already Exists\n\n') +
         chalk.white('An ') + chalk.cyan('.mcp.json') + chalk.white(' file already exists in this project.\n\n') +
-        chalk.white('To add AgentVibes MCP server manually, add this\n') +
-        chalk.white('to your ') + chalk.cyan('mcpServers') + chalk.white(' section:'),
+        (migrationError
+          ? chalk.red('Could not auto-update it: ' + migrationError.message + '\n\n')
+          : chalk.gray('It already has the correct AgentVibes entry.\n\n')) +
+        chalk.white('To add or fix the AgentVibes MCP server manually, use:'),
         {
           padding: 1,
           margin: { top: 1, bottom: 1, left: 0, right: 0 },
           borderStyle: 'round',
-          borderColor: 'yellow',
+          borderColor: migrationError ? 'red' : 'yellow',
         }
       )
     );

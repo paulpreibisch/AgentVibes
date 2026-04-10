@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.3
 
 ---
 
@@ -40,6 +40,14 @@
 **AgentVibes adds lively voice narration to your AI coding sessions!**
 
 Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, or OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🛡️ v5.1.3 — Hardening Pass (Adversarial Review Followup)
+
+- **Existing `.mcp.json` is now auto-migrated** — v5.1.2's installer detected an existing `.mcp.json` and printed instructions instead of fixing it, leaving v5.1.0/v5.1.1 users still broken after upgrade. v5.1.3 merges the `AGENTVIBES_LLM` env var into existing configs in-place.
+- **`AGENTVIBES_LLM` is now validated** in both `mcp-server/server.py` (Python regex) and `play-tts.ps1` (PowerShell regex), matching `play-tts.sh`'s `^[a-zA-Z0-9_-]+$` check. Cross-platform contract is now symmetric.
+- **`npm pack` content guard hardened**: hard-fails (not silent-passes) when `npm pack` errors; uses `git status --porcelain` to catch UNTRACKED publishable files (the v5.1.0 disaster also could've happened with a stray new file); has explicit 60s timeout to prevent CI hangs.
 
 ---
 

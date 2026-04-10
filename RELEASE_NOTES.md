@@ -1,5 +1,40 @@
 # AgentVibes Release Notes
 
+## 🛡️ v5.1.3 — Hardening Pass (Adversarial Review Followup)
+
+**Release Date:** April 2026
+
+This release addresses HIGH/MEDIUM findings from a parallel adversarial review (Blind Hunter + Edge Case Hunter) of the v5.1.2 hotfix.
+
+### Bug Fixes
+
+- **Existing `.mcp.json` is now auto-migrated** — v5.1.2's installer detected an existing `.mcp.json` and printed instructions to fix it manually. Result: anyone upgrading from v5.1.0/v5.1.1 was still broken after `npm i -g agentvibes@5.1.2`. v5.1.3 detects an existing config, merges the `AGENTVIBES_LLM` env var (and the rest of the agentvibes server entry) in-place, and shows a green "✅ MCP Configuration Updated" message. Existing user `env` keys are preserved.
+
+- **`AGENTVIBES_LLM` is now validated** before being forwarded to the child shell. The bash version of `play-tts.sh` already validated `^[a-zA-Z0-9_-]+$` and rejected weird values; the Python `mcp-server/server.py` and the Windows `play-tts.ps1` did not. Now all three do, with the same regex. Invalid values are logged to stderr and treated as "unset" so TTS still works (falls back to default config).
+
+### Testing & Hardening
+
+- **`npm pack` content guard now hard-fails on `packError`** instead of silently returning early. The previous v5.1.2 implementation had `if (packError) return;` in 6 of 8 tests, which meant a real `npm pack` failure surfaced as one failed test and SIX false-greens — defeating the entire purpose of the publish guard.
+
+- **Dirty-tree check now uses `git status --porcelain`** instead of `git diff HEAD`. The previous implementation only caught modified-but-uncommitted tracked files; it missed brand-new untracked files in publishable directories (e.g. a `play-tts.ps1.new` someone forgot to delete). The v5.1.0 disaster could just as easily have shipped via an untracked stray file.
+
+- **`npm pack` exec timeout** — added explicit 60-second timeout with `SIGKILL` so the publish guard can't hang CI on a stuck registry call.
+
+- **`git status` failures hard-fail** instead of silently skipping. A missing git binary in CI was previously treated as "no findings" — that's exactly the opposite of what a security guard should do. Now it fails loudly with a message explaining the guard requires git.
+
+- **3 new regression tests** for the new validations and migration logic.
+
+### How to Update
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.3
+```
+
+If you upgraded from v5.1.0 or v5.1.1, **re-run the AgentVibes installer once** so the new in-place migration touches your existing `.mcp.json` / `.codex/config.toml` / `.vscode/mcp.json`.
+
+---
+
 ## 🔀 v5.1.2 — MCP Per-LLM Routing Hotfix
 
 **Release Date:** April 2026

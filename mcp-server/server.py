@@ -203,10 +203,22 @@ class AgentVibesServer:
             # this env var (e.g. .codex/config.toml [mcp_servers.agentvibes]
             # env = { AGENTVIBES_LLM = "codex" }).
             #
-            # If unset, no -llm flag is passed and play-tts falls back to
-            # the project / global default config — which is the correct
-            # behavior for ad-hoc / unconfigured callers.
+            # If unset OR invalid, no -llm flag is passed and play-tts falls
+            # back to the project / global default config.  Validation
+            # mirrors play-tts.sh line 92 — alphanumeric / hyphen /
+            # underscore only.  This prevents weird values from poisoning
+            # the audio-effects.cfg lookup or being forwarded as ambiguous
+            # arguments to the child shell.
+            import re as _re
             llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
+            if llm_key and not _re.match(r"^[a-zA-Z0-9_-]+$", llm_key):
+                # Invalid value — log to stderr and treat as unset
+                print(
+                    f"[AgentVibes] WARN: Ignoring invalid AGENTVIBES_LLM='{llm_key}' "
+                    "(must match ^[a-zA-Z0-9_-]+$); falling back to default config",
+                    file=__import__('sys').stderr,
+                )
+                llm_key = ""
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
             if self.is_windows:
