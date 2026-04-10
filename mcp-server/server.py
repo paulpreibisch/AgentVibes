@@ -194,18 +194,33 @@ class AgentVibesServer:
                 original_language = await self._get_language()
                 await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
 
-            # Call the TTS script via appropriate shell
+            # Call the TTS script via appropriate shell.
+            #
+            # The LLM key is read from the AGENTVIBES_LLM env var so each
+            # caller (Claude Code, GitHub Copilot, OpenAI Codex) gets routed
+            # to its own per-LLM voice / pretext / music / effects config.
+            # The MCP launcher in each provider's config file should set
+            # this env var (e.g. .codex/config.toml [mcp_servers.agentvibes]
+            # env = { AGENTVIBES_LLM = "codex" }).
+            #
+            # If unset, no -llm flag is passed and play-tts falls back to
+            # the project / global default config — which is the correct
+            # behavior for ad-hoc / unconfigured callers.
+            llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
             if self.is_windows:
-                args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text, "-llm", "copilot"]
+                args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text]
                 if voice:
                     args.extend(["-VoiceOverride", voice])
+                if llm_key:
+                    args.extend(["-llm", llm_key])
             else:
                 args = ["bash", str(play_tts), text]
                 if voice:
                     args.append(voice)
-                args.extend(["--llm", "copilot"])
+                if llm_key:
+                    args.extend(["--llm", llm_key])
 
             env = self._build_script_env()
             # Set agent name for audio effects lookup (audio-effects.cfg, background music config)

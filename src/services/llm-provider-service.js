@@ -228,6 +228,9 @@ export async function installCopilotMcp(targetDir) {
     type: 'stdio',
     command: 'npx',
     args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+    // Tells the MCP server which LLM is calling so per-LLM voice / pretext
+    // / music / effects routing in audio-effects.cfg works correctly.
+    env: { AGENTVIBES_LLM: 'copilot' },
   };
 
   try {
@@ -337,6 +340,9 @@ export function buildCodexToml(existingContent = '') {
     '[mcp_servers.agentvibes]',
     'command = "npx"',
     'args = ["-y", "--package=agentvibes", "agentvibes-mcp-server"]',
+    // Tells the MCP server which LLM is calling so per-LLM voice / pretext
+    // / music / effects routing in audio-effects.cfg works correctly.
+    'env = { AGENTVIBES_LLM = "codex" }',
   ].join('\n');
 
   if (!existingContent.trim()) return serverBlock + '\n';

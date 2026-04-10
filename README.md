@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.2
 
 ---
 
@@ -40,6 +40,16 @@
 **AgentVibes adds lively voice narration to your AI coding sessions!**
 
 Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, or OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🔀 v5.1.2 — MCP Per-LLM Routing Hotfix
+
+- **MCP server now reads `AGENTVIBES_LLM` env var** instead of hardcoding `copilot` — Codex / Copilot / Claude Code each get routed to their own per-LLM voice / pretext / music / effects config from `audio-effects.cfg`.
+- **MCP launcher templates set the env var** automatically — `.codex/config.toml`, `.vscode/mcp.json`, and `.mcp.json` all include `AGENTVIBES_LLM` for the right provider.
+- **24 new regression tests** prevent this class of bug from shipping again, including a `npm pack` content guard that fails the test suite if the working tree has uncommitted changes (the v5.1.0 disaster guard).
+
+If you already have AgentVibes installed, re-run the per-provider configure step or add `"env": { "AGENTVIBES_LLM": "<your-llm>" }` manually to your MCP config.
 
 ---
 

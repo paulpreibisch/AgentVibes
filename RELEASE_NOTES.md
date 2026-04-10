@@ -1,5 +1,42 @@
 # AgentVibes Release Notes
 
+## 🔀 v5.1.2 — MCP Per-LLM Routing Hotfix
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **MCP server no longer hardcodes `-llm copilot`** — `mcp-server/server.py` was passing `-llm copilot` for every caller, regardless of whether the actual client was Codex, Copilot, or Claude Code. This meant per-LLM voice/pretext/music routing in `audio-effects.cfg` was effectively broken: all three providers fell through to the same `llm:copilot` lookup (or worse, the global default config). The server now reads `AGENTVIBES_LLM` from the environment and forwards that as the `-llm` value, falling back to no `-llm` flag if unset.
+
+- **MCP launcher templates set `AGENTVIBES_LLM`** — Each provider's MCP config now sets the env var so the server knows which LLM is calling:
+  - Codex: `.codex/config.toml` → `env = { AGENTVIBES_LLM = "codex" }`
+  - Copilot: `.vscode/mcp.json` → `"env": { "AGENTVIBES_LLM": "copilot" }`
+  - Claude Code: `.mcp.json` → `"env": { "AGENTVIBES_LLM": "claude-code" }`
+
+  Both freshly-installed configs and the manual-instruction snippets shown by the installer include the env var.
+
+### Testing & Hardening
+
+- **24 new regression tests** in `test/unit/llm-provider-mcp-routing.test.js` and `test/unit/npm-pack-contents.test.js` enforce the contract end-to-end:
+  - Each MCP launcher template MUST set `AGENTVIBES_LLM` to the correct value
+  - `mcp-server/server.py` MUST read `AGENTVIBES_LLM` from env and MUST NOT hardcode `-llm copilot`
+  - `play-tts.ps1` MUST declare its `$llm` parameter, contain per-LLM lookup logic, export `AGENTVIBES_LLM_KEY`, and be at least 400 lines (catches the v5.1.0 mass-deletion regression)
+  - `play-tts.sh` MUST parse `--llm` and do per-LLM lookup against `audio-effects.cfg`
+  - **Working tree must be clean** before publishing (the v5.1.0 disaster guard — `npm publish` packs the working tree, not the git tag, so any uncommitted local edits get shipped)
+
+- The contract tests are **mutation-tested**: temporarily replacing `play-tts.ps1` with a broken stub fires 4 assertions with clear messages, proving the exact v5.1.0 regression would now block publish.
+
+### How to Update
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.2
+```
+
+If you already have AgentVibes installed for one or more providers, re-run the installer's per-provider configure step (or manually add `"env": { "AGENTVIBES_LLM": "<your-llm>" }` to your `.mcp.json` / `.vscode/mcp.json` / `.codex/config.toml`).
+
+---
+
 ## 🩹 v5.1.1 — Windows TTS Hook Hotfix
 
 **Release Date:** April 2026

@@ -4297,12 +4297,15 @@ function isPathSafe(targetPath, basePath) {
 async function handleMcpConfiguration(targetDir, options) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
-  // MCP server configuration for AgentVibes
+  // MCP server configuration for AgentVibes.
+  // The AGENTVIBES_LLM env var tells the MCP server which LLM is calling
+  // so per-LLM voice / pretext / music / effects routing works correctly.
   const mcpConfig = {
     mcpServers: {
       agentvibes: {
         command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: { AGENTVIBES_LLM: 'claude-code' }
       }
     }
   };
@@ -4337,7 +4340,8 @@ async function handleMcpConfiguration(targetDir, options) {
     console.log(
       '\n"agentvibes": {\n' +
       '  "command": "npx",\n' +
-      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
+      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"],\n' +
+      '  "env": { "AGENTVIBES_LLM": "claude-code" }\n' +
       '}\n'
     );
 
@@ -4442,7 +4446,8 @@ async function handleMcpConfiguration(targetDir, options) {
       '  "mcpServers": {\n' +
       '    "agentvibes": {\n' +
       '      "command": "npx",\n' +
-      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
+      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"],\n' +
+      '      "env": { "AGENTVIBES_LLM": "claude-code" }\n' +
       '    }\n' +
       '  }\n' +
       '}\n'
