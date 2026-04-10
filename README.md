@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.1
 
 ---
 
@@ -40,6 +40,12 @@
 **AgentVibes adds lively voice narration to your AI coding sessions!**
 
 Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, or OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🩹 v5.1.1 — Windows TTS Hook Hotfix
+
+- **`play-tts.ps1 -llm` parameter restored** — npm-published v5.1.0 shipped a regressed copy without `-llm` support, breaking the Setup tab Preview button and the agentvibes MCP `text_to_speech` tool on Windows. Fixed in v5.1.1. If you hit the error, clear your npx cache: `npm cache clean --force` then reinstall.
 
 ---
 

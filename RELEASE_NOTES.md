@@ -1,5 +1,33 @@
 # AgentVibes Release Notes
 
+## 🩹 v5.1.1 — Windows TTS Hook Hotfix
+
+**Release Date:** April 2026
+
+### Bug Fixes
+
+- **Windows `play-tts.ps1` `-llm` parameter restored** — A regression caused the npm-published v5.1.0 package to ship a `play-tts.ps1` that lacked the `-llm` parameter and the per-LLM config lookup. Per-LLM TTS routing on Windows failed with `A parameter cannot be found that matches parameter name 'llm'`. This affected:
+  - **Setup tab Preview button** for any provider configured with per-LLM voice/effects
+  - **agentvibes MCP `text_to_speech` tool** when called from Codex / Copilot / Claude Code
+  - Any code path that invokes `play-tts.ps1 ... -llm <provider>`
+
+  The git tag `v5.1.0` had the correct file all along — only the npm tarball was affected, because `npm publish` packs the working tree (which contained an uncommitted local regression) instead of the git tag.
+
+### How to Update
+
+If you installed v5.1.0 from npm and hit the `-llm` error, clear your npx cache and reinstall:
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.1
+```
+
+### Note for Maintainers
+
+To prevent this kind of working-tree-vs-tag drift in future releases, the release workflow should run `npm publish` from a freshly checked-out clone of the tag, not from the development working directory.
+
+---
+
 ## 🎙️ v5.1.0 — Voice Picker Overhaul + Auto-Save Agent Modal
 
 **Release Date:** April 2026
