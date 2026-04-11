@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.1.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.1.4
+
+---
+
+## 🛡️ NOVO NO v5.1.4 — Reformulação de Resiliência TTS + Provedor LLM Padrão
+
+- **Provedor LLM Padrão** — Nova entrada de fallback na parte inferior de Configuração → Provedores. Apenas config; abre o modal Configurar padrão. Usado quando uma ferramenta chama TTS sem identificar seu LLM.
+- **Música de fundo por LLM ativa automaticamente** — Definir uma faixa de fundo no modal Configurar por LLM agora realmente a reproduz (sem precisar também ativar a música global).
+- **Suporte ao Copilot CLI** — `installCopilotMcp` agora escreve tanto `.vscode/mcp.json` (Copilot Chat) quanto `~/.copilot/mcp-config.json` (Copilot CLI — produto diferente, caminho de configuração diferente).
+- **Arquitetura de roteamento por cliente** — `.mcp.json` não define mais `AGENTVIBES_LLM`. Claude Code é auto-detectado via variável `CLAUDECODE=1`. Copilot CLI lê sua própria configuração global. Sem mais conflitos de configuração entre clientes.
+- **Mutex TTS auto-reparável** — Quando um processo `play-tts.ps1` travado bloqueia a fila de reprodução, o próximo chamador o mata automaticamente (sem `taskkill` manual). Watchdog de 25 segundos garante progresso.
+- **Sem mais reprodução de áudio velho** — `play-tts.ps1` captura o nome exato do arquivo de saída a partir do stdout do provedor em vez de adivinhar "`tts-*.wav` mais recente". Reprodução silenciosa de áudio antigo acabou.
+- **Voz por LLM vence sobre `VoiceOverride` explícito** — LLMs devolvem resultados de `get_config` em cada chamada, o que sobrescrevia o roteamento por LLM. Corrigido.
+- **`lessac-medium` → `lessac-high`** padrão para codex — Contorno de falha silenciosa de síntese.
+- **Renomeação de arquivos scratch + codificação apenas ASCII** — Elimina arquivos de áudio compostos acumulados e erros de parsing CP1252 no Windows.
+- **Confirmação de Configuração → Instalar** agora avança o foco para a próxima linha de provedor (fluxo Instalar → Instalar → Instalar).
 
 ---
 

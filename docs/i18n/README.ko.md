@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.1.0
+**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.1.4
+
+---
+
+## 🛡️ NEW IN v5.1.4 — TTS 복원력 전면 개편 + 기본 LLM 프로바이더
+
+- **기본 LLM 프로바이더** — Setup → 프로바이더 화면 하단의 새로운 폴백 항목. 구성 전용.
+- **LLM별 배경 음악이 자동으로 활성화** — LLM별 구성 모달에서 배경 트랙을 설정하면 실제로 재생됩니다.
+- **Copilot CLI 지원** — `installCopilotMcp` 는 이제 `.vscode/mcp.json` 와 `~/.copilot/mcp-config.json` 를 모두 기록합니다.
+- **클라이언트별 라우팅 아키텍처** — `.mcp.json` 은 더 이상 `AGENTVIBES_LLM` 을 설정하지 않습니다. Claude Code 는 `CLAUDECODE=1` 로 자동 감지됩니다.
+- **자가 치유 TTS 뮤텍스** — 멈춘 `play-tts.ps1` 프로세스는 다음 호출자가 자동으로 종료합니다. 25초 워치독이 진행을 보장합니다.
+- **오래된 오디오 재생이 더 이상 없음** — `play-tts.ps1` 은 프로바이더 stdout 에서 정확한 파일 이름을 캡처합니다.
+- **LLM별 음성이 명시적 `VoiceOverride` 보다 우선** — 수정됨.
+- **`lessac-medium` → `lessac-high`** codex 기본값.
+- **스크래치 파일 이름 변경 + ASCII 전용 인코딩**.
+- **Setup → 설치 확인** 이 이제 다음 프로바이더 행으로 포커스를 진행합니다.
 
 ---
 

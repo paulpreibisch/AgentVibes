@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.1.0
+**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.1.4
+
+---
+
+## 🛡️ NOUVEAU DANS v5.1.4 — Refonte de Résilience TTS + Fournisseur LLM par Défaut
+
+- **Fournisseur LLM par Défaut** — Nouvelle entrée de repli en bas de Configuration → Fournisseurs. Configuration uniquement ; ouvre le modal Configurer standard.
+- **Musique de fond par LLM s activate automatiquement** — Définir une piste de fond sur le modal Configurer par LLM la joue maintenant réellement.
+- **Support Copilot CLI** — `installCopilotMcp` écrit désormais à la fois `.vscode/mcp.json` (Copilot Chat) ET `~/.copilot/mcp-config.json` (Copilot CLI).
+- **Architecture de routage par client** — `.mcp.json` ne définit plus `AGENTVIBES_LLM`. Claude Code est auto-détecté via la variable `CLAUDECODE=1`.
+- **Mutex TTS auto-réparateur** — Les processus `play-tts.ps1` bloqués sont tués automatiquement par l appelant suivant. Watchdog de 25 secondes garantit la progression.
+- **Plus de rejeu d audio périmé** — `play-tts.ps1` capture le nom de fichier exact depuis le stdout du fournisseur.
+- **La voix par LLM l emporte sur `VoiceOverride` explicite** — Corrigé.
+- **`lessac-medium` → `lessac-high`** par défaut pour codex.
+- **Renommage des fichiers scratch + encodage ASCII uniquement**.
+- **La confirmation Configuration → Installer** avance maintenant le focus vers la ligne de fournisseur suivante.
 
 ---
 

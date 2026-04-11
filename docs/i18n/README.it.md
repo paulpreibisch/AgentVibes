@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.1.0
+**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.1.4
+
+---
+
+## 🛡️ NOVITÀ IN v5.1.4 — Revisione della Resilienza TTS + Provider LLM Predefinito
+
+- **Provider LLM Predefinito** — Nuova voce di fallback in fondo a Configurazione → Provider. Solo configurazione; apre il modale Configura standard. Utilizzato quando uno strumento chiama TTS senza identificare il suo LLM.
+- **La musica di sottofondo per LLM si attiva automaticamente** — Impostare una traccia di sottofondo nel modale Configura per LLM ora la riproduce effettivamente (senza bisogno di attivare anche la musica globale).
+- **Supporto Copilot CLI** — `installCopilotMcp` ora scrive sia `.vscode/mcp.json` (Copilot Chat) SIA `~/.copilot/mcp-config.json` (Copilot CLI — prodotto diverso, percorso di configurazione diverso).
+- **Architettura di routing per client** — `.mcp.json` non imposta più `AGENTVIBES_LLM`. Claude Code viene rilevato automaticamente tramite la variabile `CLAUDECODE=1`. Copilot CLI legge la propria configurazione globale. Niente più conflitti di configurazione tra client.
+- **Mutex TTS auto-riparante** — Quando un processo `play-tts.ps1` bloccato congela la coda di riproduzione, il chiamante successivo lo termina automaticamente (nessun `taskkill` manuale). Watchdog di 25 secondi garantisce il progresso.
+- **Niente più riproduzione di audio stantio** — `play-tts.ps1` cattura il nome esatto del file di output dal stdout del provider invece di indovinare "il `tts-*.wav` più recente". Fine della riproduzione silenziosa di audio vecchio.
+- **La voce per LLM vince sul `VoiceOverride` esplicito** — Gli LLM restituiscono i risultati di `get_config` ad ogni chiamata, che sovrascriveva il routing per LLM. Corretto.
+- **`lessac-medium` → `lessac-high`** predefinito per codex — Aggiramento del fallimento silenzioso di sintesi.
+- **Rinomina dei file scratch + codifica solo ASCII** — Elimina file audio composti accumulati ed errori di parsing CP1252 su Windows.
+- **Conferma Configurazione → Installa** ora avanza il focus alla riga del provider successiva (flusso Installa → Installa → Installa).
 
 ---
 

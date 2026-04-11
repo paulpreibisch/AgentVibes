@@ -1,10 +1,25 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.1.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.1.4
 
 ---
 
-## 🎙️ NUEVO EN v5.1.0 — Renovación del Selector de Voz + Guardado Automático en el Modal de Agente
+## 🛡️ NUEVO EN v5.1.4 — Renovación de Resiliencia TTS + Proveedor LLM por Defecto
+
+- **Proveedor LLM por Defecto** — Nueva entrada de reserva al final de Configuración → Proveedores. Solo configurable; abre el modal Configurar estándar. Se usa cuando una herramienta llama a TTS sin identificar su LLM.
+- **Música de fondo por LLM se activa automáticamente** — Configurar una pista de fondo en el modal Configurar ahora la reproduce realmente (ya no hace falta activar además la música global).
+- **Soporte para Copilot CLI** — `installCopilotMcp` ahora escribe tanto `.vscode/mcp.json` (Copilot Chat) como `~/.copilot/mcp-config.json` (Copilot CLI — producto distinto, ruta de configuración distinta).
+- **Arquitectura de enrutamiento por cliente** — `.mcp.json` ya no establece `AGENTVIBES_LLM`. Claude Code se detecta automáticamente vía la variable `CLAUDECODE=1`. Copilot CLI lee su propia configuración global. Sin más conflictos de configuración entre clientes.
+- **Mutex TTS auto-reparable** — Cuando un proceso `play-tts.ps1` bloqueado detiene la cola de reproducción, el siguiente intento lo mata automáticamente (no hace falta `taskkill` manual). Watchdog de 25 segundos garantiza el progreso.
+- **Se acabó la reproducción de audio rancio** — `play-tts.ps1` captura el nombre de archivo exacto desde el stdout del proveedor en lugar de adivinar "el `tts-*.wav` más reciente". Se acabó la reproducción silenciosa de audio antiguo.
+- **La voz por LLM gana sobre `VoiceOverride` explícito** — Los LLMs devuelven los resultados de `get_config` en cada llamada, lo que estaba sobrescribiendo el enrutamiento por LLM. Corregido.
+- **`lessac-medium` → `lessac-high`** por defecto para codex — Solución al fallo silencioso de síntesis.
+- **Renombrado de archivos scratch + codificación ASCII** — Elimina archivos de audio compuestos acumulados y errores de parseo CP1252 en Windows.
+- **Confirmación de Configuración → Instalar** ahora avanza el foco a la siguiente fila de proveedor (flujo Instalar → Instalar → Instalar).
+
+---
+
+## 🎙️ v5.1.0 — Renovación del Selector de Voz + Guardado Automático en el Modal de Agente
 
 - **Guardado automático en el modal de agente** — Los cambios de voz/personalidad/música/reverb/pretexto se guardan automáticamente mientras los editas. Un breve aviso "✓ ¡Guardado!" confirma cada cambio.
 - **Nombres únicos para LibriTTS** — 904 hablantes obtienen apellidos deterministas: **Anna Bell**, **Anna Carter**, …, **Anna Quinn**. Se acabaron los duplicados "Anna-2", "Anna-3".

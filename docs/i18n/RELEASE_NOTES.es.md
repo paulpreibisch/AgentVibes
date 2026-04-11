@@ -1,5 +1,75 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.1.4 — Renovación de Resiliencia TTS + Proveedor LLM por Defecto + Enrutamiento por Cliente
+
+**Fecha de lanzamiento:** Abril 2026
+
+Esta versión cierra un largo grupo de errores alrededor del enrutamiento TTS por LLM, reproducción de audio paralelo, bloqueos por procesos atascados y reproducción de audio rancio. También añade una nueva entrada de "Por Defecto" en la pestaña de Configuración para audio de reserva, y cambia a un esquema de configuración por cliente que enruta correctamente Claude Code, GitHub Copilot (Chat + CLI) y OpenAI Codex a sus propias voces y pretextos.
+
+### Nuevas Funciones
+
+- **Proveedor LLM por Defecto** — Nueva entrada al final de Configuración → Proveedores. Solo configurable (sin botones de instalar/eliminar) con un botón Configurar que abre el modal estándar por LLM. Cuando cualquier herramienta llama a TTS sin identificar su LLM, la fila `llm:default` en `audio-effects.cfg` proporciona la voz, pretexto, música, reverberación y motor de reserva. Pretexto vacío por defecto — los usuarios optan por configurarlo.
+
+- **La música de fondo por LLM se activa automáticamente** — Configurar un `bg_track` en cualquier modal Configurar por LLM ahora reproduce realmente esa pista. Antes también tenías que activar el indicador global `backgroundMusic.enabled`, lo que hacía que el campo de pista de fondo por LLM fuera silenciosamente inoperante.
+
+- **Soporte para Copilot CLI** — `installCopilotMcp` ahora escribe TANTO `.vscode/mcp.json` (para VS Code Copilot Chat) COMO `~/.copilot/mcp-config.json` (para el CLI independiente `copilot`, que es un producto diferente). Las instalaciones nuevas soportan ambas herramientas automáticamente.
+
+### Arquitectura de Enrutamiento por Cliente
+
+Anteriormente `AGENTVIBES_LLM=claude-code` se establecía en `.mcp.json`, lo que rompía Copilot CLI porque Copilot CLI también lee `.mcp.json` con precedencia sobre su propio `~/.copilot/mcp-config.json` — por lo que adoptaba el entorno de Claude Code y se enrutaba mal.
+
+La nueva arquitectura divide la identificación por LLM por cliente:
+
+- `.mcp.json` (proyecto) **no tiene bloque `AGENTVIBES_LLM`**
+- `~/.copilot/mcp-config.json` establece `AGENTVIBES_LLM=copilot` para GitHub Copilot CLI
+- `~/.codex/config.toml` establece `AGENTVIBES_LLM=codex` para OpenAI Codex
+- El servidor MCP (`mcp-server/server.py`) **detecta automáticamente Claude Code** vía la variable `CLAUDECODE=1` que Claude Code establece en cada subproceso que genera. Copilot CLI y Codex no establecen esta variable, por lo que cada cliente se enruta de forma fiable a su propia configuración.
+
+Ruta de actualización: vuelve a ejecutar el instalador de AgentVibes en cualquier proyecto existente. El nuevo `installClaudeMcp` elimina automáticamente cualquier bloque de entorno `AGENTVIBES_LLM` rancio de los archivos `.mcp.json` existentes para que Copilot CLI deje de enrutarse mal.
+
+### Renovación de Resiliencia TTS (`play-tts.ps1`)
+
+- **Mutex de reproducción entre procesos** — `AgentVibesPlaybackLock` (mutex con nombre) serializa la reproducción entre todos los llamadores: hooks de Claude Code, `text_to_speech` de MCP, CLI directo, modo party. Se acabaron las superposiciones o el audio paralelo cuando varios LLMs se ejecutan en el mismo proyecto.
+
+- **Auto-reparación en timeout del mutex** — Cuando la adquisición del mutex de 15 segundos falla, el nuevo código consulta `Win32_Process` buscando cualquier proceso `play-tts.ps1` atascado con más de 20 segundos, llama a `Stop-Process -Force` en cada uno y registra el kill en stderr. La siguiente llamada TTS tiene éxito inmediatamente — no hace falta `taskkill` manual.
+
+- **Watchdog de script de 25 segundos** — Un trabajo hermano de PowerShell mata forzosamente `play-tts.ps1` después de 25 segundos sin importar dónde esté atascado (deadlock de SoundPlayer, dispositivo de audio bloqueado, ffmpeg zombie). Garantiza el progreso.
+
+- **Error duro en timeout del mutex** — Sustituye el antiguo fallback "reproducir de todos modos" que solo apilaba más procesos atascados detrás del primero. Ahora sale limpiamente con código 2 y un mensaje diagnóstico.
+
+- **Captura del nombre de archivo exacto desde stdout del proveedor** — `play-tts.ps1` analiza la línea `[OK] Saved to: <ruta>` de `play-tts-piper.ps1` y usa ese archivo exacto. Sustituye la antigua heurística "seleccionar el `tts-*.wav` más reciente en el directorio de audio" que reproducía silenciosamente audio rancio de sesiones anteriores cuando la síntesis fallaba. Causa raíz del error "Codex habla con el audio de Claude Code".
+
+- **Error duro en fallo de síntesis** — Cuando el proveedor no produce un archivo de salida, `play-tts.ps1` sale con código 3 y un error fuerte en lugar de recurrir a cualquier archivo antiguo en la caché.
+
+- **Renombrado de archivos scratch** — Post-procesamiento de reverberación ahora escribe en `av-reverbed-scratch.wav` y el mezclado en `av-mixed-scratch.wav`. Nombres fijos fuera del espacio de nombres aleatorio `tts-XXXXXXXX` para que la búsqueda de archivos nunca pueda elegirlos como entrada de síntesis.
+
+- **La voz por LLM anula `VoiceOverride` explícito** — Los LLMs llaman a `get_config` al inicio de la sesión y devuelven la voz en cada llamada `text_to_speech` como parámetro MCP explícito. Con la antigua prioridad "explícito gana", esa voz global anulaba el enrutamiento por LLM. Ahora la fila de voz `llm:<clave>` siempre gana cuando `-llm` está establecido.
+
+- **`$LlmBgTrack` y `$LlmBgVolume` ahora se analizan** desde los campos 2 y 3 de la fila `llm:<clave>` (la versión bash ya lo hacía).
+
+- **Codificación solo ASCII** — Eliminado em-dash `—` y flecha derecha `→` de `play-tts.ps1`. PowerShell en algunas configuraciones regionales de Windows carga scripts en CP1252 y se atragantaba con los bytes UTF-8.
+
+- **`lessac-medium` → `lessac-high` por defecto para codex** — `en_US-lessac-medium` falla silenciosamente al sintetizar en algunas instalaciones de Piper en Windows. `lessac-high` funciona de forma fiable.
+
+### Mejoras de UX
+
+- **Confirmación de Configuración → Instalar** — Al pulsar Enter para descartar la página de confirmación post-instalación, el foco ahora avanza al botón de la misma columna de la SIGUIENTE fila del proveedor (Instalar → Instalar, Configurar → Configurar). Instalar los tres proveedores es ahora un flujo natural Enter-Enter-Enter.
+
+### Pruebas y Robustez
+
+- **30 pruebas de regresión nuevas/actualizadas** cubriendo forma del config del proveedor por defecto, auto-detección de `CLAUDECODE`, plantilla `.mcp.json` sin `AGENTVIBES_LLM`, escritor de `~/.copilot/mcp-config.json`, y análisis PowerShell de `play-tts.ps1`.
+
+### Cómo Actualizar
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+Si tienes algún proyecto existente con AgentVibes instalado, vuelve a ejecutar el instalador una vez allí para que la migración del config por cliente surta efecto.
+
+---
+
 ## 🎙️ v5.1.0 — Renovación del Selector de Voz + Guardado Automático en el Modal de Agente
 
 **Fecha de lanzamiento:** Abril 2026

@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.1.0
+**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.1.4
+
+---
+
+## 🛡️ NEW IN v5.1.4 — TTS回復力の全面刷新 + デフォルトLLMプロバイダー
+
+- **デフォルトLLMプロバイダー** — Setup → プロバイダー画面の下部にある新しいフォールバックエントリー。設定のみ。
+- **LLMごとのBGMが自動で有効化** — LLM毎のConfigureモーダルでBGトラックを設定すると実際に再生されるようになりました。
+- **Copilot CLI サポート** — `installCopilotMcp` は現在 `.vscode/mcp.json` と `~/.copilot/mcp-config.json` の両方を書き込みます。
+- **クライアント別ルーティング アーキテクチャ** — `.mcp.json` は `AGENTVIBES_LLM` を設定しなくなりました。Claude Code は `CLAUDECODE=1` で自動検出されます。
+- **自己修復型TTSミューテックス** — 詰まった `play-tts.ps1` プロセスは次の呼び出し元が自動的に強制終了します。25秒のウォッチドッグで進行を保証します。
+- **古い音声の再生はもうありません** — `play-tts.ps1` はプロバイダーの stdout から正確な出力ファイル名をキャプチャします。
+- **LLM毎のボイスが明示的な `VoiceOverride` に優先** — 修正済み。
+- **`lessac-medium` → `lessac-high`** がcodexのデフォルトに。
+- **スクラッチファイルの改名 + ASCII専用エンコーディング**。
+- **Setup → Install 確認** は次のプロバイダー行にフォーカスを進めるようになりました。
 
 ---
 

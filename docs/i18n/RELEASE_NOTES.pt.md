@@ -1,5 +1,46 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.1.4 — Reformulação de Resiliência TTS + Provedor LLM Padrão + Roteamento por Cliente
+
+**Data de lançamento:** Abril 2026
+
+Esta versão fecha um longo grupo de bugs em torno do roteamento TTS por LLM, reprodução de áudio paralelo, bloqueios por processos travados e reprodução de áudio antigo. Também adiciona uma nova entrada "Padrão" na aba de Configuração para áudio de fallback, e muda para um esquema de configuração por cliente que roteia corretamente Claude Code, GitHub Copilot (Chat + CLI) e OpenAI Codex para suas próprias vozes e pretextos.
+
+### Novas Funcionalidades
+
+- **Provedor LLM Padrão** — Nova entrada na parte inferior de Configuração → Provedores. Apenas config (sem botões de instalar/remover). Usado quando uma ferramenta chama TTS sem identificar seu LLM.
+- **Música de fundo por LLM ativa automaticamente** — Definir uma `bg_track` em qualquer modal Configurar por LLM agora realmente a reproduz.
+- **Suporte ao Copilot CLI** — `installCopilotMcp` agora escreve tanto `.vscode/mcp.json` (Copilot Chat) quanto `~/.copilot/mcp-config.json` (Copilot CLI — produto diferente).
+
+### Arquitetura de Roteamento por Cliente
+
+`.mcp.json` não define mais `AGENTVIBES_LLM`. O servidor MCP detecta automaticamente Claude Code via variável `CLAUDECODE=1`. Copilot CLI lê sua própria config global com `AGENTVIBES_LLM=copilot`. Codex lê `~/.codex/config.toml` com `AGENTVIBES_LLM=codex`. Sem mais conflitos de config entre clientes.
+
+### Resiliência TTS (`play-tts.ps1`)
+
+- **Mutex de reprodução entre processos** (`AgentVibesPlaybackLock`) serializa toda a reprodução de áudio.
+- **Auto-reparação no timeout do mutex** — Mata automaticamente processos `play-tts.ps1` travados.
+- **Watchdog de 25 segundos** garante progresso.
+- **Captura exata do nome de arquivo** do stdout do provedor — sem mais reprodução de áudio antigo.
+- **Voz por LLM vence sobre `VoiceOverride` explícito** de parâmetros MCP.
+- **`lessac-medium` → `lessac-high`** padrão para codex (contorno de falha silenciosa de síntese).
+- **Renomeação de arquivos scratch + codificação apenas ASCII** — Elimina arquivos compostos acumulados.
+
+### Melhorias de UX
+
+- **Confirmação de Configuração → Instalar** agora avança o foco para a próxima linha de provedor (fluxo Instalar → Instalar → Instalar).
+
+### Como Atualizar
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+Re-execute o instalador em qualquer projeto existente para que a migração da config por cliente entre em vigor.
+
+---
+
 ## 🎙️ v5.1.0 — Reformulação do Seletor de Voz + Salvamento Automático no Modal do Agente
 
 **Data de lançamento:** Abril 2026

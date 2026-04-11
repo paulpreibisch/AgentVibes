@@ -1,5 +1,82 @@
 # AgentVibes Release Notes
 
+## 🛡️ v5.1.4 — TTS Resilience Overhaul + Default LLM Provider + Per-Client Routing
+
+**Release Date:** April 2026
+
+This release closes a long-running cluster of bugs around per-LLM TTS routing, parallel audio playback, stuck-process deadlocks, and stale-audio replay. It also adds a new "Default" provider slot in the Setup tab for fallback audio configuration, and switches to a per-client config scheme that correctly routes Claude Code, GitHub Copilot (Chat + CLI), and OpenAI Codex to their own voices and pretexts.
+
+### New Features
+
+- **Default LLM provider** — New entry at the bottom of Setup → Providers. Config-only (no install/remove buttons) with a Configure button that opens the standard per-LLM audio modal. When any tool calls TTS without identifying its LLM, the `llm:default` row in `audio-effects.cfg` provides the fallback voice, pretext, music, reverb, and engine. Empty pretext by default — users opt in.
+
+- **Per-LLM background music now auto-enables** — Setting a `bg_track` on any per-LLM Configure modal now actually plays that track. Previously you also had to toggle the global `backgroundMusic.enabled` flag, which made the per-LLM bg track field silently dead.
+
+- **Copilot CLI support** — `installCopilotMcp` now writes BOTH `.vscode/mcp.json` (for VS Code Copilot Chat) AND `~/.copilot/mcp-config.json` (for the standalone `copilot` CLI, which is a different product). Fresh installs support both tools automatically.
+
+### Per-Client Routing Architecture
+
+Previously `AGENTVIBES_LLM=claude-code` was set in `.mcp.json`, which broke Copilot CLI because Copilot CLI also reads `.mcp.json` with precedence over its own `~/.copilot/mcp-config.json` — so it adopted Claude Code's env and mis-routed.
+
+The new architecture splits per-LLM identification per-client:
+
+- `.mcp.json` (project) has **no `AGENTVIBES_LLM` env block**
+- `~/.copilot/mcp-config.json` sets `AGENTVIBES_LLM=copilot` for GitHub Copilot CLI
+- `~/.codex/config.toml` sets `AGENTVIBES_LLM=codex` for OpenAI Codex
+- The MCP server (`mcp-server/server.py`) **auto-detects Claude Code** via the `CLAUDECODE=1` env var that Claude Code sets on every subprocess it spawns. Copilot CLI and Codex don't set this var, so each client reliably routes to its own config.
+
+Upgrade path: re-run the AgentVibes installer in any existing project. The new `installClaudeMcp` auto-strips any stale `AGENTVIBES_LLM` env block from existing `.mcp.json` files so Copilot CLI stops mis-routing.
+
+### TTS Resilience Overhaul (`play-tts.ps1`)
+
+- **Cross-process playback mutex** — `AgentVibesPlaybackLock` (named mutex) serializes playback across all callers: Claude Code hooks, MCP `text_to_speech`, direct CLI, party mode. No more overlapping or parallel audio when multiple LLMs run in the same project.
+
+- **Self-healing on mutex timeout** — When the 15-second mutex acquisition fails, the new code queries `Win32_Process` for any stuck `play-tts.ps1` process older than 20 seconds, calls `Stop-Process -Force` on each, and logs the kill to stderr. The next TTS call succeeds immediately — no manual `taskkill` needed.
+
+- **25-second script watchdog** — A sibling PowerShell job force-kills `play-tts.ps1` after 25 seconds regardless of where it's stuck (SoundPlayer deadlock, locked audio device, zombie ffmpeg). Guarantees forward progress.
+
+- **Hard error on mutex timeout** — Replaces the old "play anyway" fallback which just stacked more stuck processes behind the first. Now exits cleanly with code 2 and a diagnostic message.
+
+- **Exact filename capture from provider stdout** — `play-tts.ps1` parses the `[OK] Saved to: <path>` line from `play-tts-piper.ps1` and uses that exact file. Replaces the old "pick most recent `tts-*.wav` in the audio dir" heuristic which silently replayed stale audio from earlier sessions whenever synthesis failed. Root cause of the "Codex speaks Claude Code's audio" bug.
+
+- **Synthesis-failure hard error** — When the provider doesn't produce an output file, `play-tts.ps1` exits with code 3 and a loud error instead of falling back to any older file in the cache.
+
+- **Scratch file rename** — Reverb post-processing now writes to `av-reverbed-scratch.wav` and mix post-processing writes to `av-mixed-scratch.wav`. Fixed names outside the `tts-XXXXXXXX` random namespace so the file lookup can never pick them up as a synth input. Eliminates the compound `tts-xxx.wav.effected-mixed-mixed-mixed-mixed.wav` chain that accumulated on every run.
+
+- **Per-LLM voice overrides explicit `VoiceOverride`** — LLMs call `get_config` at session start and echo the returned voice back on every `text_to_speech` call as an explicit MCP parameter. With the old "explicit wins" priority, that global voice overrode per-LLM routing. Now the `llm:<key>` voice row always wins when `-llm` is set.
+
+- **`$LlmBgTrack` and `$LlmBgVolume` parsed from cfg row** — Previously fields 2 and 3 of the `llm:<key>` line were ignored in the PowerShell version (the bash version already parsed them).
+
+- **Per-LLM `bg_track` force-enables `$BgEnabled`** — When a per-LLM row specifies a background track, it's auto-enabled regardless of the global `backgroundMusic.enabled` flag.
+
+- **ASCII-only encoding** — Removed em-dash `—` and right-arrow `→` from `play-tts.ps1`. PowerShell on some Windows locales loads scripts in CP1252 and choked on the UTF-8 bytes with a misleading "Missing closing `}`" parse error.
+
+- **`lessac-medium` → `lessac-high` default for codex** — `en_US-lessac-medium` silently fails to synthesize on some Windows Piper installs (loads the model, exits with empty output). `lessac-high` works reliably and is the new default in `DEFAULT_LLM_CONFIGS.codex` and the packaged `audio-effects.cfg`.
+
+### UX Improvements
+
+- **Setup → Providers Install confirmation** — Pressing Enter to dismiss the post-install confirmation page now advances focus to the NEXT provider row's same-column button (Install → Install, Configure → Configure), instead of snapping back to Claude Code's Install. Installing all three providers is now a natural Enter-Enter-Enter flow.
+
+### Testing & Hardening
+
+- **30 new/updated regression tests** in `test/unit/llm-provider-mcp-routing.test.js` and `test/unit/windows-tts.test.js` covering:
+  - Default LLM provider config shape + setup-tab wiring
+  - `CLAUDECODE` auto-detection in `server.py`
+  - `.mcp.json` template MUST NOT contain `AGENTVIBES_LLM`
+  - `~/.copilot/mcp-config.json` writer in `installCopilotMcp`
+  - `play-tts.ps1` PowerShell-parseable (catches em-dash / encoding regressions via `[System.Management.Automation.Language.Parser]`)
+
+### How to Update
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+If you have any existing project with AgentVibes installed, re-run the installer there once so the per-client config migration takes effect. The `.mcp.json` in each project will be auto-upgraded to strip the stale `AGENTVIBES_LLM` env block, and `~/.copilot/mcp-config.json` will be created if you have the Copilot provider enabled.
+
+---
+
 ## 🛡️ v5.1.3 — Hardening Pass (Adversarial Review Followup)
 
 **Release Date:** April 2026

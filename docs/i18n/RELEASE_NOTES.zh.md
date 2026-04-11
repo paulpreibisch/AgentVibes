@@ -1,5 +1,46 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.1.4 — TTS 弹性全面改造 + 默认 LLM 提供商 + 每客户端路由
+
+**发布日期:** 2026年4月
+
+此版本解决了围绕每个 LLM 的 TTS 路由、并行音频播放、进程死锁和过期音频重播的一系列长期存在的 bug。它还在 Setup 标签中添加了一个新的"默认"条目用于备用音频,并切换到每客户端的配置方案,正确地将 Claude Code、GitHub Copilot (Chat + CLI) 和 OpenAI Codex 路由到它们自己的声音和前缀。
+
+### 新功能
+
+- **默认 LLM 提供商** — Setup → 提供商页面底部的新条目。仅配置（无安装/删除按钮）。当工具调用 TTS 但未识别其 LLM 时使用。
+- **每个 LLM 的背景音乐自动启用** — 在每个 LLM 的 Configure 模态中设置 `bg_track` 现在会真正播放。
+- **Copilot CLI 支持** — `installCopilotMcp` 现在同时写入 `.vscode/mcp.json` (Copilot Chat) 和 `~/.copilot/mcp-config.json` (Copilot CLI — 不同产品)。
+
+### 每客户端路由架构
+
+`.mcp.json` 不再设置 `AGENTVIBES_LLM`。MCP 服务器通过 `CLAUDECODE=1` 环境变量自动检测 Claude Code。Copilot CLI 读取其自己的全局配置（带 `AGENTVIBES_LLM=copilot`）。Codex 读取 `~/.codex/config.toml`（带 `AGENTVIBES_LLM=codex`）。不再有客户端配置冲突。
+
+### TTS 弹性 (`play-tts.ps1`)
+
+- **跨进程播放互斥锁** (`AgentVibesPlaybackLock`) 序列化所有音频播放。
+- **互斥锁超时时的自愈** — 自动终止卡住的 `play-tts.ps1` 进程。
+- **25 秒看门狗** 保证前进。
+- **从提供商 stdout 精确捕获文件名** — 不再有过期音频重播。
+- **每个 LLM 语音优先于 MCP 参数中的显式 `VoiceOverride`**。
+- **codex 默认 `lessac-medium` → `lessac-high`** (静默合成失败的解决方法)。
+- **暂存文件重命名 + 仅 ASCII 编码** — 消除累积的复合文件。
+
+### UX 改进
+
+- **Setup → 安装确认** 现在将焦点推进到下一个提供商行 (安装 → 安装 → 安装流程)。
+
+### 如何更新
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+在任何现有项目中重新运行安装程序,以使每客户端配置迁移生效。
+
+---
+
 ## 🎙️ v5.1.0 — 语音选择器重做 + 代理模态框自动保存
 
 **发布日期:** 2026年4月

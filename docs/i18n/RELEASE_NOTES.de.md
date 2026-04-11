@@ -1,5 +1,46 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.1.4 — TTS-Resilienz-Überholung + Standard-LLM-Anbieter + Pro-Client-Routing
+
+**Veröffentlichungsdatum:** April 2026
+
+Diese Version schließt eine lange Liste von Bugs rund um Pro-LLM-TTS-Routing, parallele Audiowiedergabe, festgefahrene Prozesse und veraltete Audiowiedergabe. Sie fügt außerdem einen neuen "Standard"-Anbieter-Eintrag im Setup-Tab für Fallback-Audio hinzu und wechselt zu einem Pro-Client-Konfigurationsschema, das Claude Code, GitHub Copilot (Chat + CLI) und OpenAI Codex korrekt zu ihren eigenen Stimmen und Pretexten routet.
+
+### Neue Funktionen
+
+- **Standard-LLM-Anbieter** — Neuer Eintrag am unteren Rand von Setup → Anbieter. Nur-Konfiguration (keine Installieren/Entfernen-Buttons). Wird verwendet, wenn ein Tool TTS aufruft, ohne seinen LLM zu identifizieren.
+- **Pro-LLM-Hintergrundmusik aktiviert sich automatisch** — Das Setzen eines `bg_track` im Pro-LLM Konfigurations-Modal spielt ihn jetzt tatsächlich ab.
+- **Copilot-CLI-Unterstützung** — `installCopilotMcp` schreibt jetzt sowohl `.vscode/mcp.json` (Copilot Chat) ALS AUCH `~/.copilot/mcp-config.json` (Copilot CLI — anderes Produkt).
+
+### Pro-Client-Routing-Architektur
+
+`.mcp.json` setzt `AGENTVIBES_LLM` nicht mehr. Der MCP-Server erkennt Claude Code automatisch via `CLAUDECODE=1` Umgebungsvariable. Copilot CLI liest seine eigene globale Config mit `AGENTVIBES_LLM=copilot`. Codex liest `~/.codex/config.toml` mit `AGENTVIBES_LLM=codex`. Keine Client-Config-Konflikte mehr.
+
+### TTS-Resilienz (`play-tts.ps1`)
+
+- **Cross-Process Playback Mutex** (`AgentVibesPlaybackLock`) serialisiert die gesamte Audiowiedergabe.
+- **Selbstheilung bei Mutex-Timeout** — Tötet festgefahrene `play-tts.ps1`-Prozesse automatisch.
+- **25-Sekunden-Watchdog** garantiert Fortschritt.
+- **Exakte Dateinamen-Erfassung** aus dem Provider-stdout — keine veraltete Audiowiedergabe mehr.
+- **Pro-LLM-Stimme gewinnt über explizites `VoiceOverride`** von MCP-Parametern.
+- **`lessac-medium` → `lessac-high`** Standard für codex (Workaround für stille Synthese-Fehlschläge).
+- **Scratch-Datei-Umbenennung + Nur-ASCII-Kodierung** — Eliminiert akkumulierende zusammengesetzte Dateien.
+
+### UX-Verbesserungen
+
+- **Setup → Installieren-Bestätigung** schiebt Fokus jetzt zur nächsten Anbieterzeile vor (Installieren → Installieren → Installieren Flow).
+
+### Wie Aktualisieren
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+Starten Sie den Installer in jedem existierenden Projekt neu, damit die Pro-Client-Config-Migration wirksam wird.
+
+---
+
 ## 🎙️ v5.1.0 — Überarbeiteter Stimmwähler + Automatisches Speichern im Agent-Modal
 
 **Veröffentlichungsdatum:** April 2026

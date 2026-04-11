@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.3
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.4
 
 ---
 
@@ -40,6 +40,21 @@
 **AgentVibes adds lively voice narration to your AI coding sessions!**
 
 Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, or OpenClaw — AgentVibes brings AI to life with professional voices and personalities.
+
+---
+
+## 🛡️ NEW IN v5.1.4 — TTS Resilience Overhaul + Default LLM Provider
+
+- **Default LLM provider** — New fallback entry at the bottom of Setup → Providers. Config-only; opens the standard Configure modal. Used when a tool calls TTS without identifying its LLM.
+- **Per-LLM background music auto-enables** — Setting a bg track on the per-LLM Configure modal actually plays it now (no need to also toggle global bg music).
+- **Copilot CLI support** — `installCopilotMcp` now writes both `.vscode/mcp.json` (Copilot Chat) AND `~/.copilot/mcp-config.json` (Copilot CLI — different product, different config path).
+- **Per-client routing architecture** — `.mcp.json` no longer sets `AGENTVIBES_LLM`. Claude Code is auto-detected via `CLAUDECODE=1` env var. Copilot CLI reads its own global config. No more client config conflicts.
+- **Self-healing TTS mutex** — When a stuck `play-tts.ps1` process blocks the playback queue, the next caller auto-kills it (no manual `taskkill` needed). 25-second watchdog guarantees forward progress.
+- **No more stale audio replay** — `play-tts.ps1` captures the exact synth output filename from provider stdout instead of guessing "most recent `tts-*.wav`". Silent replay of old audio is gone.
+- **Per-LLM voice wins over explicit `VoiceOverride`** — LLMs echo back `get_config` results on every call, which was overriding per-LLM routing. Fixed.
+- **`lessac-medium` → `lessac-high`** default for codex — Silent synthesis failure workaround.
+- **Scratch file rename + ASCII-only encoding** — Eliminates accumulating compound audio files and CP1252 parse errors on Windows.
+- **Setup → Install confirmation** now advances focus to the next provider row (Install → Install → Install flow).
 
 ---
 

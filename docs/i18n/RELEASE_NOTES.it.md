@@ -1,5 +1,46 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.1.4 — Revisione della Resilienza TTS + Provider LLM Predefinito + Routing per Client
+
+**Data di rilascio:** Aprile 2026
+
+Questa versione chiude un lungo gruppo di bug legati al routing TTS per LLM, alla riproduzione audio parallela, ai blocchi di processi e alla riproduzione di audio stantio. Aggiunge inoltre una nuova voce "Predefinito" nella scheda Configurazione per l'audio di fallback, e passa a uno schema di configurazione per client che instrada correttamente Claude Code, GitHub Copilot (Chat + CLI) e OpenAI Codex verso le proprie voci e pretesti.
+
+### Nuove Funzionalità
+
+- **Provider LLM Predefinito** — Nuova voce in fondo a Configurazione → Provider. Solo configurazione (nessun pulsante installa/rimuovi). Utilizzato quando uno strumento chiama TTS senza identificare il suo LLM.
+- **Musica di sottofondo per LLM si attiva automaticamente** — Impostare un `bg_track` in qualsiasi modale Configura per LLM ora la riproduce effettivamente.
+- **Supporto Copilot CLI** — `installCopilotMcp` ora scrive sia `.vscode/mcp.json` (Copilot Chat) SIA `~/.copilot/mcp-config.json` (Copilot CLI — prodotto diverso).
+
+### Architettura di Routing per Client
+
+`.mcp.json` non imposta più `AGENTVIBES_LLM`. Il server MCP rileva automaticamente Claude Code tramite la variabile `CLAUDECODE=1`. Copilot CLI legge la propria configurazione globale con `AGENTVIBES_LLM=copilot`. Codex legge `~/.codex/config.toml` con `AGENTVIBES_LLM=codex`. Niente più conflitti di configurazione tra client.
+
+### Resilienza TTS (`play-tts.ps1`)
+
+- **Mutex di riproduzione inter-processo** (`AgentVibesPlaybackLock`) serializza tutta la riproduzione audio.
+- **Auto-riparazione al timeout del mutex** — Termina automaticamente i processi `play-tts.ps1` bloccati.
+- **Watchdog di 25 secondi** garantisce il progresso.
+- **Cattura del nome file esatto** dallo stdout del provider — niente più riproduzione di audio stantio.
+- **La voce per LLM vince sul `VoiceOverride` esplicito** dei parametri MCP.
+- **`lessac-medium` → `lessac-high`** predefinito per codex (aggiramento del fallimento silenzioso di sintesi).
+- **Rinomina dei file scratch + codifica solo ASCII** — Elimina file compositi accumulati.
+
+### Miglioramenti UX
+
+- **Conferma Configurazione → Installa** ora avanza il focus alla riga del provider successiva (flusso Installa → Installa → Installa).
+
+### Come Aggiornare
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+Riesegui l'installer in qualsiasi progetto esistente affinché la migrazione della configurazione per client abbia effetto.
+
+---
+
 ## 🎙️ v5.1.0 — Revisione del Selettore Vocale + Salvataggio Automatico del Modale Agente
 
 **Data di rilascio:** Aprile 2026

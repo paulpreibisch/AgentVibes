@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.4
+
+---
+
+## 🛡️ NEU IN v5.1.4 — TTS-Resilienz-Uberholung + Standard-LLM-Anbieter
+
+- **Standard-LLM-Anbieter** — Neuer Fallback-Eintrag am unteren Rand von Setup → Anbieter. Nur-Konfiguration; offnet den Standard-Konfigurations-Modal.
+- **Pro-LLM-Hintergrundmusik aktiviert sich automatisch** — Das Setzen eines Hintergrundtracks im Pro-LLM Konfigurations-Modal spielt ihn jetzt tatsachlich ab.
+- **Copilot-CLI-Unterstutzung** — `installCopilotMcp` schreibt jetzt sowohl `.vscode/mcp.json` (Copilot Chat) ALS AUCH `~/.copilot/mcp-config.json` (Copilot CLI).
+- **Pro-Client-Routing-Architektur** — `.mcp.json` setzt `AGENTVIBES_LLM` nicht mehr. Claude Code wird via `CLAUDECODE=1` Umgebungsvariable automatisch erkannt.
+- **Selbstheilender TTS-Mutex** — Festgefahrene `play-tts.ps1`-Prozesse werden vom nachsten Aufrufer automatisch getotet. 25-Sekunden-Watchdog garantiert Fortschritt.
+- **Keine abgestandene Audiowiedergabe mehr** — `play-tts.ps1` erfasst den exakten Dateinamen aus dem Provider-stdout.
+- **Pro-LLM-Stimme gewinnt uber explizites `VoiceOverride`** — Behoben.
+- **`lessac-medium` → `lessac-high`** Standard fur codex.
+- **Scratch-Datei-Umbenennung + Nur-ASCII-Kodierung**.
+- **Setup → Installieren-Bestatigung** schiebt Fokus jetzt zur nachsten Anbieterzeile vor.
 
 ---
 

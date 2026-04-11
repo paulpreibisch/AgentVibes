@@ -1,6 +1,21 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.1.0
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.1.4
+
+---
+
+## 🛡️ NEW IN v5.1.4 — TTS 弹性全面改造 + 默认 LLM 提供商
+
+- **默认 LLM 提供商** — Setup → 提供商页面底部的新备用条目。仅配置。
+- **每个 LLM 的背景音乐自动启用** — 在每个 LLM 的 Configure 模态中设置背景音轨现在会真正播放。
+- **Copilot CLI 支持** — `installCopilotMcp` 现在同时写入 `.vscode/mcp.json` 和 `~/.copilot/mcp-config.json`。
+- **每客户端路由架构** — `.mcp.json` 不再设置 `AGENTVIBES_LLM`。Claude Code 通过 `CLAUDECODE=1` 环境变量自动检测。
+- **自愈 TTS 互斥锁** — 卡住的 `play-tts.ps1` 进程会被下一个调用者自动终止。25 秒看门狗保证前进。
+- **不再有过期音频重播** — `play-tts.ps1` 从提供商 stdout 捕获确切的输出文件名。
+- **每个 LLM 语音优先于显式 `VoiceOverride`** — 已修复。
+- **codex 默认 `lessac-medium` → `lessac-high`**。
+- **暂存文件重命名 + 仅 ASCII 编码**。
+- **Setup → 安装确认** 现在将焦点推进到下一个提供商行。
 
 ---
 

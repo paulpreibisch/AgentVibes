@@ -1,5 +1,46 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.1.4 — TTS回復力の全面刷新 + デフォルトLLMプロバイダー + クライアント別ルーティング
+
+**リリース日:** 2026年4月
+
+このリリースは、LLMごとのTTSルーティング、並列音声再生、プロセスのデッドロック、古い音声の再生に関する長年のバグの集まりを解決します。また、Setupタブにフォールバック音声設定用の新しい「デフォルト」エントリーを追加し、Claude Code、GitHub Copilot（Chat + CLI）、OpenAI Codexをそれぞれの音声とプリテキストに正しくルーティングするクライアント別の設定スキームに切り替えます。
+
+### 新機能
+
+- **デフォルトLLMプロバイダー** — Setup → プロバイダー画面の下部にある新しいエントリー。設定のみ（インストール/削除ボタンなし）。ツールがLLMを識別せずにTTSを呼び出したときに使用されます。
+- **LLMごとのBGMが自動で有効化** — LLM毎のConfigureモーダルで `bg_track` を設定すると実際に再生されるようになりました。
+- **Copilot CLI サポート** — `installCopilotMcp` は現在 `.vscode/mcp.json`（Copilot Chat用）と `~/.copilot/mcp-config.json`（Copilot CLI用、別製品）の両方を書き込みます。
+
+### クライアント別ルーティング アーキテクチャ
+
+`.mcp.json` は `AGENTVIBES_LLM` を設定しなくなりました。MCPサーバーは `CLAUDECODE=1` 環境変数でClaude Codeを自動検出します。Copilot CLI は `AGENTVIBES_LLM=copilot` を持つ独自のグローバル設定を読みます。Codex は `AGENTVIBES_LLM=codex` で `~/.codex/config.toml` を読みます。クライアント間の設定競合はもうありません。
+
+### TTS回復力 (`play-tts.ps1`)
+
+- **プロセス間再生ミューテックス** (`AgentVibesPlaybackLock`) が全ての音声再生をシリアライズします。
+- **ミューテックスタイムアウト時の自己修復** — 詰まった `play-tts.ps1` プロセスを自動的に強制終了します。
+- **25秒のウォッチドッグ** が進行を保証します。
+- **プロバイダーstdoutからの正確なファイル名キャプチャ** — 古い音声の再生はもうありません。
+- **LLM毎のボイスがMCPパラメータの明示的 `VoiceOverride` に優先**。
+- **codexのデフォルトが `lessac-medium` → `lessac-high`** に（静かな合成失敗の回避）。
+- **スクラッチファイルの改名 + ASCII専用エンコーディング** — 蓄積する複合ファイルを排除。
+
+### UX改善
+
+- **Setup → Install 確認** は次のプロバイダー行にフォーカスを進めるようになりました（Install → Install → Install フロー）。
+
+### アップデート方法
+
+```
+npm cache clean --force
+npx --yes agentvibes@5.1.4
+```
+
+既存のプロジェクトでインストーラーを再実行すると、クライアント別設定の移行が有効になります。
+
+---
+
 ## 🎙️ v5.1.0 — ボイスピッカー刷新 + エージェントモーダルの自動保存
 
 **リリース日:** 2026年4月
