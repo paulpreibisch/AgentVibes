@@ -126,6 +126,16 @@ TEXT="${TEXT//\\?/?}"        # Remove \?
 TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 
+# When no --llm is supplied, route through the "default" pseudo-LLM so the
+# user-managed `llm:default` row in audio-effects.cfg becomes the global
+# fallback for voice / pretext / music / effects.  This is configured via
+# Setup → Default → Configure in the TUI.  If `llm:default` doesn't exist,
+# the lookup returns empty and the script falls through to the legacy
+# global config chain (project / user .agentvibes/config.json).
+if [[ -z "$LLM_PROVIDER" ]]; then
+  LLM_PROVIDER="default"
+fi
+
 # Per-LLM config lookup: if --llm is passed, look up llm:<name> in audio-effects.cfg
 # Format: llm:<name>|REVERB_PRESET|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT
 _LLM_VOICE=""

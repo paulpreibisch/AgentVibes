@@ -565,6 +565,13 @@ export function createSetupTab(screen, services) {
       },
     });
 
+    // The "default" provider is config-only — it has no install/remove
+    // semantics.  Hide those buttons and only show Configure.
+    if (provider.isDefault) {
+      installBtn.hide();
+      removeBtn.hide();
+    }
+
     // Wire actions
     installBtn.on('press', async () => { await handleProviderInstall(provider); });
     installBtn.key(['enter', 'space'], async () => { await handleProviderInstall(provider); });
@@ -575,8 +582,10 @@ export function createSetupTab(screen, services) {
     configBtn.on('press', async () => { await handleProviderConfigure(provider); });
     configBtn.key(['enter', 'space'], async () => { await handleProviderConfigure(provider); });
 
-    // Navigation on each button
-    for (const btn of [installBtn, removeBtn, configBtn]) {
+    // Navigation on each button — for the default provider, only Configure
+    // is focusable since install/remove are hidden.
+    const navButtons = provider.isDefault ? [configBtn] : [installBtn, removeBtn, configBtn];
+    for (const btn of navButtons) {
       btn.key(['tab', 'right'], () => { cycleFocus(1); });
       btn.key(['S-tab', 'left'], () => { cycleFocus(-1); });
       btn.key(['escape'], () => {
@@ -609,10 +618,17 @@ export function createSetupTab(screen, services) {
     return { installBtn, removeBtn, configBtn };
   }
 
-  // Build all provider rows
+  // Build all provider rows.
+  // For the default provider, install/remove are hidden — push configBtn
+  // three times so the row-of-3 arrow-nav arithmetic still works (every
+  // "slot" in the default row lands on Configure, the only visible button).
   for (let i = 0; i < PROVIDERS.length; i++) {
     const { installBtn, removeBtn, configBtn } = createProviderRow(PROVIDERS[i], i);
-    providerFocusableItems.push(installBtn, removeBtn, configBtn);
+    if (PROVIDERS[i].isDefault) {
+      providerFocusableItems.push(configBtn, configBtn, configBtn);
+    } else {
+      providerFocusableItems.push(installBtn, removeBtn, configBtn);
+    }
   }
 
   function cycleFocus(dir) {
@@ -624,6 +640,10 @@ export function createSetupTab(screen, services) {
   // ── Provider install/remove handlers ──────────────────────────────────────
 
   async function handleProviderInstall(provider) {
+    // Remember which button the user was on so we can advance focus to
+    // the NEXT row (same column) after they dismiss the info page.
+    _preInfoFocusIndex = providerFocusIndex;
+
     if (provider.id === 'claude-code') {
       const wasInstalled = installedState[provider.id];
       const result = await installClaudeMcp(targetDir);
@@ -643,7 +663,6 @@ export function createSetupTab(screen, services) {
     if (provider.id === 'openai-codex') {
       const wasInstalled = installedState[provider.id];
       const result = await installCodexMcp(targetDir);
-      await installCopilotMcp(targetDir);
       await installCodexInstructions(targetDir, packageDir);
       await installCodexHooks(targetDir, packageDir);
       await refreshInstalledState();
@@ -652,6 +671,10 @@ export function createSetupTab(screen, services) {
   }
 
   async function handleProviderRemove(provider) {
+    // Remember which button the user was on so we can advance focus to
+    // the NEXT row (same column) after they dismiss the info page.
+    _preInfoFocusIndex = providerFocusIndex;
+
     if (provider.id === 'claude-code') {
       const result = await uninstallClaude(targetDir);
       await refreshInstalledState();
@@ -668,7 +691,6 @@ export function createSetupTab(screen, services) {
 
     if (provider.id === 'openai-codex') {
       await removeCodexMcp(targetDir);
-      await removeCopilotMcp(targetDir);
       await removeCodexInstructions(targetDir);
       await removeCodexHooks(targetDir);
       await refreshInstalledState();
@@ -683,6 +705,7 @@ export function createSetupTab(screen, services) {
       'claude-code': 'claude-code',
       'github-copilot': 'copilot',
       'openai-codex': 'codex',
+      'default': 'default',
     };
     const llmKey = llmKeyMap[provider.id] || provider.id;
     const config = loadLlmConfigSync(llmKey, targetDir);
@@ -701,6 +724,7 @@ export function createSetupTab(screen, services) {
       'claude-code': 'Claude Code here',
       'copilot': 'Copilot here',
       'codex': 'Codex here',
+      'default': '',  // empty by default — user sets via Configure
     };
 
     // Read global defaults for display
@@ -1432,10 +1456,18 @@ export function createSetupTab(screen, services) {
   function showAllProviderRows() {
     providerHeader.show();
     for (const row of providerRows) {
+      const provider = PROVIDERS.find(p => p.id === row.id);
       row.label.show();
       row.statusText.show();
-      row.installBtn.show();
-      row.removeBtn.show();
+      // The "default" provider has no install/remove semantics — keep its
+      // install/remove buttons hidden so only Configure shows.
+      if (provider?.isDefault) {
+        row.installBtn.hide();
+        row.removeBtn.hide();
+      } else {
+        row.installBtn.show();
+        row.removeBtn.show();
+      }
       row.configBtn.show();
     }
   }
@@ -1587,28 +1619,53 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
-  function showProviderListView() {
+  function showProviderListView(targetIdx = 0) {
     providerView = 'list';
     infoBox.hide();
     contentBox.hide();
     showAllProviderRows();
-    providerFocusIndex = 0;
-    if (providerFocusableItems.length) providerFocusableItems[0].focus();
+    const max = providerFocusableItems.length;
+    if (max > 0) {
+      providerFocusIndex = ((targetIdx % max) + max) % max;
+      providerFocusableItems[providerFocusIndex].focus();
+    }
     screen.render();
   }
 
   infoBox.key(['escape', 'enter'], () => {
-    showProviderListView();
+    // After dismissing the install/remove info page, advance focus to the
+    // NEXT provider row but keep the same column (Install stays on Install,
+    // Remove stays on Remove, Configure stays on Configure).  Each row has
+    // 3 focusable slots so +3 moves one full row down with wraparound.
+    const max = providerFocusableItems.length;
+    const nextIdx = max > 0 ? (_preInfoFocusIndex + 3) % max : 0;
+    showProviderListView(nextIdx);
   });
+
+  // Captured by handleProviderInstall/Remove right before showing info.
+  // Defaults to 0 so the first-time flow still lands on Claude Code Install.
+  let _preInfoFocusIndex = 0;
 
   async function refreshInstalledState() {
     for (const p of PROVIDERS) {
+      // The "default" provider is config-only — always treat as available.
+      if (p.isDefault) {
+        installedState[p.id] = true;
+        continue;
+      }
       const checkFn = p.id === 'claude-code' ? checkClaudeInstalled
         : p.id === 'github-copilot' ? checkCopilotInstalled
         : checkCodexInstalled;
       installedState[p.id] = await checkFn(targetDir);
     }
     for (const row of providerRows) {
+      const provider = PROVIDERS.find(p => p.id === row.id);
+      // The default provider has no install state to display — show its
+      // config-only nature instead.
+      if (provider?.isDefault) {
+        row.statusText.setContent('{cyan-fg}[Config Only]{/cyan-fg}');
+        continue;
+      }
       const installed = installedState[row.id];
       row.statusText.setContent(
         installed

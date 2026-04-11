@@ -4298,14 +4298,17 @@ async function handleMcpConfiguration(targetDir, options) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
   // MCP server configuration for AgentVibes.
-  // The AGENTVIBES_LLM env var tells the MCP server which LLM is calling
-  // so per-LLM voice / pretext / music / effects routing works correctly.
+  //
+  // No `env.AGENTVIBES_LLM` block: GitHub Copilot CLI also reads project
+  // `.mcp.json` with precedence over its own `~/.copilot/mcp-config.json`,
+  // so setting `claude-code` here would mis-route Copilot CLI too.
+  // Instead, the MCP server auto-detects Claude Code via the `CLAUDECODE=1`
+  // env var that Claude Code sets on every subprocess it spawns.
   const mcpConfig = {
     mcpServers: {
       agentvibes: {
         command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-        env: { AGENTVIBES_LLM: 'claude-code' }
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
       }
     }
   };
@@ -4320,10 +4323,13 @@ async function handleMcpConfiguration(targetDir, options) {
   }
 
   if (mcpExists) {
-    // Existing config: try to migrate it in-place so users upgrading from
-    // v5.1.x get the AGENTVIBES_LLM env var added without manual editing.
-    // This is the v5.1.2 follow-up fix — the prior version returned here
-    // and only printed instructions, leaving existing users broken.
+    // Existing config: upgrade it in-place.  Two jobs:
+    //   1. Ensure the agentvibes server entry exists.
+    //   2. STRIP any stale `env.AGENTVIBES_LLM` from earlier versions
+    //      (v5.1.2..v5.1.4) — setting it in `.mcp.json` broke Copilot CLI
+    //      routing because Copilot CLI also reads `.mcp.json` and would
+    //      adopt claude-code's env.  Claude Code is now auto-detected
+    //      downstream via the CLAUDECODE=1 env var.
     let migrated = false;
     let migrationError = null;
     try {
@@ -4334,20 +4340,21 @@ async function handleMcpConfiguration(targetDir, options) {
           existingCfg.mcpServers = {};
         }
         const current = existingCfg.mcpServers.agentvibes;
-        const wantEnv = { AGENTVIBES_LLM: 'claude-code' };
-        // Decide whether we need to write — only if the agentvibes entry
-        // is missing OR its env doesn't include the AGENTVIBES_LLM key.
-        const needsWrite =
-          !current ||
-          !current.env ||
-          current.env.AGENTVIBES_LLM !== 'claude-code';
+        const hasStaleEnv = current?.env?.AGENTVIBES_LLM !== undefined;
+        const needsWrite = !current || hasStaleEnv;
         if (needsWrite) {
-          existingCfg.mcpServers.agentvibes = {
+          // Preserve any OTHER env keys the user added manually (rare) but
+          // drop AGENTVIBES_LLM so Copilot CLI doesn't mis-route.
+          const cleanEnv = { ...(current?.env ?? {}) };
+          delete cleanEnv.AGENTVIBES_LLM;
+          const newEntry = {
             command: 'npx',
             args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-            // Preserve any other env keys the user added manually.
-            env: { ...(current?.env ?? {}), ...wantEnv },
           };
+          if (Object.keys(cleanEnv).length > 0) {
+            newEntry.env = cleanEnv;
+          }
+          existingCfg.mcpServers.agentvibes = newEntry;
           await fs.writeFile(mcpConfigPath, JSON.stringify(existingCfg, null, 2) + '\n');
           migrated = true;
         }
@@ -4360,9 +4367,8 @@ async function handleMcpConfiguration(targetDir, options) {
       console.log(
         boxen(
           chalk.green.bold('✅ MCP Configuration Updated\n\n') +
-          chalk.white('Your existing ') + chalk.cyan('.mcp.json') + chalk.white(' has been updated\n') +
-          chalk.white('with the AgentVibes MCP server entry, including the\n') +
-          chalk.cyan('AGENTVIBES_LLM=claude-code') + chalk.white(' env var for per-LLM routing.'),
+          chalk.white('Your existing ') + chalk.cyan('.mcp.json') + chalk.white(' has been updated.\n') +
+          chalk.white('Claude Code is auto-detected via ') + chalk.cyan('CLAUDECODE=1') + chalk.white(' at runtime.'),
           {
             padding: 1,
             margin: { top: 1, bottom: 1, left: 0, right: 0 },
@@ -4397,8 +4403,7 @@ async function handleMcpConfiguration(targetDir, options) {
     console.log(
       '\n"agentvibes": {\n' +
       '  "command": "npx",\n' +
-      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"],\n' +
-      '  "env": { "AGENTVIBES_LLM": "claude-code" }\n' +
+      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
       '}\n'
     );
 
@@ -4503,8 +4508,7 @@ async function handleMcpConfiguration(targetDir, options) {
       '  "mcpServers": {\n' +
       '    "agentvibes": {\n' +
       '      "command": "npx",\n' +
-      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"],\n' +
-      '      "env": { "AGENTVIBES_LLM": "claude-code" }\n' +
+      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
       '    }\n' +
       '  }\n' +
       '}\n'

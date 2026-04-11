@@ -27,7 +27,65 @@ export const PROVIDERS = [
     name: 'OpenAI Codex',
     desc: 'OpenAI CLI agent — .codex/config.toml + AGENTS.md',
   },
+  {
+    id: 'default',
+    name: 'Default (Fallback)',
+    desc: 'Used when any tool calls TTS without identifying its LLM',
+    // No install/uninstall — this is a config-only entry
+    isDefault: true,
+  },
 ];
+
+const DEFAULT_LLM_CONFIGS = {
+  // Fallback used when play-tts is invoked with no -llm flag.  Pretext is
+  // empty by default — users edit it via Setup → Default → Configure.  When
+  // empty, no prefix is prepended at all.
+  default: {
+    effects: 'light',
+    bgTrack: '',
+    bgVolume: '0.15',
+    voice: 'en_US-lessac-high',
+    pretext: '',
+    ttsEngine: 'piper',
+  },
+  'claude-code': {
+    effects: 'light',
+    bgTrack: 'agent_vibes_chillwave_v2_loop.mp3',
+    bgVolume: '0.15',
+    voice: 'en_US-lessac-high',
+    pretext: 'Claude Code here',
+    ttsEngine: 'piper',
+  },
+  copilot: {
+    effects: 'light',
+    bgTrack: 'agent_vibes_bossa_nova_v2_loop.mp3',
+    bgVolume: '0.15',
+    voice: 'en_US-libritts-high::Anna-11',
+    pretext: 'Copilot here',
+    ttsEngine: 'piper',
+  },
+  codex: {
+    effects: 'light',
+    bgTrack: 'agent_vibes_chillwave_v2_loop.mp3',
+    bgVolume: '0.15',
+    // NOTE: lessac-medium appears to silently fail to synthesize on some
+    // Windows Piper installs (loads the model, exits with no output).
+    // lessac-high works reliably, so use it as the default for codex.
+    voice: 'en_US-lessac-high',
+    pretext: 'Codex here',
+    ttsEngine: 'piper',
+  },
+};
+
+function ensureDefaultLlmConfigSync(llmKey, targetDir) {
+  const existing = loadLlmConfigSync(llmKey, targetDir);
+  if (existing.sourcePath) return;
+
+  const defaults = DEFAULT_LLM_CONFIGS[llmKey];
+  if (!defaults) return;
+
+  saveLlmConfigSync(llmKey, defaults, targetDir);
+}
 
 // ── Provider install-checks ─────────────────────────────────────────────────
 
@@ -73,12 +131,24 @@ export async function checkCodexInstalled(targetDir) {
 export async function installClaudeMcp(targetDir) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
+  // The agentvibes server entry for Claude Code's .mcp.json.
+  //
+  // IMPORTANT: no `env.AGENTVIBES_LLM` block here.  GitHub Copilot CLI
+  // also reads project-level `.mcp.json` with precedence over its own
+  // `~/.copilot/mcp-config.json` — so if we set `AGENTVIBES_LLM=claude-code`
+  // in `.mcp.json`, Copilot CLI picks up that value too and mis-routes.
+  // Instead, the MCP server (mcp-server/server.py) auto-detects Claude
+  // Code via the `CLAUDECODE=1` env var that Claude Code sets on every
+  // subprocess it spawns.  Copilot CLI does NOT set that var, so its
+  // spawned MCP server correctly falls back to its own config.
+  const agentvibesServer = {
+    command: 'npx',
+    args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+  };
+
   const mcpConfig = {
     mcpServers: {
-      agentvibes: {
-        command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-      },
+      agentvibes: agentvibesServer,
     },
   };
 
@@ -86,15 +156,15 @@ export async function installClaudeMcp(targetDir) {
     let mcpCreated = false;
     try {
       await fs.access(mcpConfigPath);
-      // Already exists — merge agentvibes key if missing
+      // Already exists — merge / upgrade the agentvibes entry.  This also
+      // STRIPS any stale AGENTVIBES_LLM env block left over from v5.1.2..4
+      // so Copilot CLI stops mis-routing.
       try {
         const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
-        if (!existing.mcpServers?.agentvibes) {
-          existing.mcpServers = existing.mcpServers || {};
-          existing.mcpServers.agentvibes = mcpConfig.mcpServers.agentvibes;
-          await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
-          mcpCreated = true;
-        }
+        existing.mcpServers = existing.mcpServers || {};
+        existing.mcpServers.agentvibes = { ...agentvibesServer };
+        await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+        mcpCreated = true;
       } catch { /* parse error — don't corrupt */ }
     } catch {
       // File doesn't exist — create it
@@ -112,6 +182,7 @@ export async function installClaudeMcp(targetDir) {
     await installer.copyPluginFiles(targetDir, silentSpinner);
     await installer.copyBmadConfigFiles(targetDir, silentSpinner);
     await installer.copyBackgroundMusicFiles(targetDir, silentSpinner);
+    ensureDefaultLlmConfigSync('claude-code', targetDir);
 
     return { success: true, mcpCreated };
   } catch (err) {
@@ -247,6 +318,37 @@ export async function installCopilotMcp(targetDir) {
 
     mcpConfig.servers.agentvibes = agentvibesServer;
     await fs.writeFile(mcpJsonPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+
+    // Also write ~/.copilot/mcp-config.json so the GitHub Copilot CLI
+    // (different product from VS Code Copilot Chat!) can find the
+    // agentvibes MCP server.  VS Code reads .vscode/mcp.json, but the
+    // CLI reads ONLY from ~/.copilot/mcp-config.json per docs:
+    // https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
+    try {
+      const copilotHome = process.env.COPILOT_HOME ||
+        path.join(process.env.USERPROFILE || process.env.HOME || '', '.copilot');
+      const copilotMcpPath = path.join(copilotHome, 'mcp-config.json');
+      await fs.mkdir(copilotHome, { recursive: true });
+      let cliConfig = { mcpServers: {} };
+      try {
+        const existingCli = await fs.readFile(copilotMcpPath, 'utf8');
+        const parsedCli = JSON.parse(existingCli);
+        if (parsedCli && typeof parsedCli === 'object') {
+          cliConfig = parsedCli;
+          if (!cliConfig.mcpServers) cliConfig.mcpServers = {};
+        }
+      } catch { /* new file */ }
+      cliConfig.mcpServers.agentvibes = {
+        type: 'local',
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: { AGENTVIBES_LLM: 'copilot' },
+        tools: ['*'],
+      };
+      await fs.writeFile(copilotMcpPath, JSON.stringify(cliConfig, null, 2) + '\n');
+    } catch { /* best effort — CLI might not be installed */ }
+
+    ensureDefaultLlmConfigSync('copilot', targetDir);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -300,6 +402,7 @@ export async function installCodexMcp(targetDir) {
     try { existing = await fs.readFile(tomlPath, 'utf8'); } catch { /* new file */ }
     const content = buildCodexToml(existing);
     await fs.writeFile(tomlPath, content);
+    ensureDefaultLlmConfigSync('codex', targetDir);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };

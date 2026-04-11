@@ -51,8 +51,6 @@ from typing import Optional
 from mcp.server import Server
 from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 import mcp.server.stdio
-
-
 class AgentVibesServer:
     """MCP Server for AgentVibes TTS functionality"""
 
@@ -196,29 +194,38 @@ class AgentVibesServer:
 
             # Call the TTS script via appropriate shell.
             #
-            # The LLM key is read from the AGENTVIBES_LLM env var so each
-            # caller (Claude Code, GitHub Copilot, OpenAI Codex) gets routed
-            # to its own per-LLM voice / pretext / music / effects config.
-            # The MCP launcher in each provider's config file should set
-            # this env var (e.g. .codex/config.toml [mcp_servers.agentvibes]
-            # env = { AGENTVIBES_LLM = "codex" }).
+            # The LLM key is determined with the following priority:
             #
-            # If unset OR invalid, no -llm flag is passed and play-tts falls
-            # back to the project / global default config.  Validation
-            # mirrors play-tts.sh line 92 — alphanumeric / hyphen /
-            # underscore only.  This prevents weird values from poisoning
-            # the audio-effects.cfg lookup or being forwarded as ambiguous
-            # arguments to the child shell.
+            # 1. AGENTVIBES_LLM env var (explicit — wins over everything).
+            #    Set in each provider's MCP launcher config:
+            #      ~/.codex/config.toml         -> "codex"
+            #      ~/.copilot/mcp-config.json   -> "copilot"
+            #
+            # 2. Auto-detection via CLAUDECODE=1 env var (Claude Code sets
+            #    this automatically when it spawns any subprocess).  This
+            #    lets project-level .mcp.json files omit the env block —
+            #    which is critical because GitHub Copilot CLI also reads
+            #    .mcp.json and would otherwise pick up claude-code's env.
+            #
+            # 3. Unset — play-tts falls back to llm:default or global config.
+            #
+            # Validation mirrors play-tts.sh line 92 — alphanumeric /
+            # hyphen / underscore only.  Prevents weird values from
+            # poisoning the audio-effects.cfg lookup or child-shell args.
             import re as _re
             llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
             if llm_key and not _re.match(r"^[a-zA-Z0-9_-]+$", llm_key):
-                # Invalid value — log to stderr and treat as unset
                 print(
                     f"[AgentVibes] WARN: Ignoring invalid AGENTVIBES_LLM='{llm_key}' "
-                    "(must match ^[a-zA-Z0-9_-]+$); falling back to default config",
+                    "(must match ^[a-zA-Z0-9_-]+$); falling back to auto-detect",
                     file=__import__('sys').stderr,
                 )
                 llm_key = ""
+            # Claude Code sets CLAUDECODE=1 when it spawns subprocesses.
+            # Use that as a fallback identifier when no explicit env var
+            # was provided.  Copilot CLI and Codex do NOT set this.
+            if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
+                llm_key = "claude-code"
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
             if self.is_windows:

@@ -95,6 +95,19 @@ test('Hook Scripts Source - TTS scripts have param($Text)', () => {
   }
 });
 
+test('Hook Scripts Source - play-tts.ps1 parses in PowerShell', { skip: process.platform !== 'win32' }, async () => {
+  const scriptPath = join(hooksDir, 'play-tts.ps1');
+  const result = await runPowerShell(
+    [
+      '-Command',
+      '$errors = @(); $tokens = @(); [System.Management.Automation.Language.Parser]::ParseFile($env:SCRIPT_PATH, [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }'
+    ],
+    { env: { SCRIPT_PATH: scriptPath } }
+  );
+
+  assert.strictEqual(result.exitCode, 0, result.stderr || result.stdout);
+});
+
 test('Hook Scripts Source - manager scripts have param($Command)', () => {
   const managerScripts = [
     'provider-manager.ps1',
