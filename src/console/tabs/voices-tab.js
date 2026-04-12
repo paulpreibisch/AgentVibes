@@ -764,7 +764,7 @@ export function createVoicesTab(screen, services) {
 
   // -------------------------------------------------------------------------
   // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select as default voice{/white-fg}';
+  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select  [+] thumbs up  [-] thumbs down{/white-fg}';
   let _listFocused = false;
 
   // Inline selection hint appended to the currently highlighted voice row.
@@ -1547,7 +1547,7 @@ export function createVoicesTab(screen, services) {
       const isDown   = thumbsDown.includes(v);
       const isActive = v === active;
       const isPrev   = v === _playingVoiceId;
-      const star = isUp ? '{green-fg}+{/green-fg}' : (isDown ? '{red-fg}-{/red-fg}' : ' ');
+      const star = isUp ? '{green-fg}👍{/green-fg}' : (isDown ? '{red-fg}👎{/red-fg}' : '  ');
       const dot  = isPrev ? '♪' : (isActive ? '{green-fg}✓{/green-fg}' : ' ');
 
       let displayName, gender, provider;

@@ -889,7 +889,7 @@ export function createSetupTab(screen, services) {
       const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       // Don't include pretext — play-tts already prepends it from the config
-      const sampleText = 'Here is a preview of your audio settings.';
+      const sampleText = 'This is how your audio settings sound right now.';
 
       let cmd, args;
       if (isWin) {
@@ -1226,7 +1226,7 @@ export function createSetupTab(screen, services) {
 
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [Home/End]  [a-z] Jump  [Enter] Select  [Space] Preview  [*] Fav  [Esc] Cancel{/white-fg}',
+      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump  [Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -1239,7 +1239,7 @@ export function createSetupTab(screen, services) {
         const isUp = favs.includes(v);
         const isDown = td.includes(v);
         const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
-        const star = isUp ? '{green-fg}+{/green-fg}' : (isDown ? '{red-fg}-{/red-fg}' : ' ');
+        const star = isUp ? '{green-fg}👍{/green-fg}' : (isDown ? '{red-fg}👎{/red-fg}' : '  ');
         const meta = getVoiceMeta(v);
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
@@ -1268,13 +1268,52 @@ export function createSetupTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
+      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+
+      // Route through remote provider if active
+      const _remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
+      let _activeProvider = '';
+      try {
+        const _projectRoot = path.resolve(__dirname, '..', '..');
+        const _provPaths = [
+          path.join(_projectRoot, '.claude', 'tts-provider.txt'),
+          path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+        ];
+        for (const p of _provPaths) {
+          if (fs.existsSync(p)) { _activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
+        }
+      } catch {}
+
+      if (_remoteProviders.includes(_activeProvider)) {
+        const _projectRoot = path.resolve(__dirname, '..', '..');
+        let rProc;
+        if (_isWin) {
+          const _playTts = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+          rProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _playTts, phrase, voiceId], {
+            stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
+          });
+        } else {
+          const _playTts = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+          rProc = spawn('bash', [_playTts, phrase, voiceId], {
+            stdio: 'ignore', detached: true, env: _spawnEnv,
+          });
+        }
+        _previewProc = rProc;
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing (remote): ${voiceId}{/cyan-fg}`); screen.render(); }
+        rProc.on('exit', () => {
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+        });
+        rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        return;
+      }
+
       const _ms = parseMultiSpeaker(voiceId);
       const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
       const safeBase = path.resolve(PIPER_VOICES_DIR);
       if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
 
       const tempWav = _secureTempWav('vp');
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
       let _piperBin = 'piper';
       if (_isWin) {
