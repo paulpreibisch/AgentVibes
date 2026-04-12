@@ -52,8 +52,9 @@ if [[ "$SSH_HOST" == -* ]]; then
   exit 1
 fi
 
-# SECURITY: Validate VOICE to prevent injection (alphanumeric, hyphens, underscores only)
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+# SECURITY: Validate VOICE (allow :: for multi-speaker, . for locale, space for names)
+_voice_re='^[a-zA-Z0-9_.:  -]+$'
+if [[ ! "$VOICE" =~ $_voice_re ]]; then
   echo "❌ Invalid voice format: $VOICE" >&2
   exit 1
 fi
@@ -66,8 +67,14 @@ fi
 
 # SECURITY: Encode text and agent name as base64 to prevent command injection
 # The receiver will decode these safely
-ENCODED_TEXT=$(printf '%s' "$TEXT" | base64 -w 0)
-ENCODED_AGENT=$(printf '%s' "$AGENT_NAME" | base64 -w 0)
+# Probe for GNU base64 (-w 0), fall back to BSD (-b 0), then tr
+if printf '' | base64 -w 0 >/dev/null 2>&1; then
+  ENCODED_TEXT=$(printf '%s' "$TEXT" | base64 -w 0)
+  ENCODED_AGENT=$(printf '%s' "$AGENT_NAME" | base64 -w 0)
+else
+  ENCODED_TEXT=$(printf '%s' "$TEXT" | base64 -b 0 2>/dev/null || printf '%s' "$TEXT" | base64 | tr -d '\n')
+  ENCODED_AGENT=$(printf '%s' "$AGENT_NAME" | base64 -b 0 2>/dev/null || printf '%s' "$AGENT_NAME" | base64 | tr -d '\n')
+fi
 
 # Send text to remote for local AgentVibes playback
 echo "📱 Sending to $SSH_HOST for local playback..." >&2

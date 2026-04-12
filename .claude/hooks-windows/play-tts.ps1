@@ -553,7 +553,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                     if ($parts.Length -ge 3 -and $parts[2]) {
                         $trackName = $parts[2].Trim()
                         # Validate: filename only, no path separators or traversal
-                        if ($trackName -match '^[a-zA-Z0-9_\-\.]+$') {
+                        if ($trackName -match '^[a-zA-Z0-9_\-\. ]+$') {
                             $DefaultTrack = $trackName
                         }
                     }
@@ -635,3 +635,9 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
 } else {
     Remove-Item env:AGENTVIBES_NO_PLAY -ErrorAction SilentlyContinue
 }
+
+# Explicit exit 0 so that $LASTEXITCODE from native commands (piper.exe,
+# ffmpeg, sox, etc.) doesn't leak through as the process exit code.
+# Without this, bash/Claude Code sees whatever random exit code the last
+# native command returned (e.g. 127) and treats it as a TTS failure.
+exit 0

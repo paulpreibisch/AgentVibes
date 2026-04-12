@@ -65,16 +65,31 @@ function _getNetworkInfo() {
   let tailscaleIp = '';
   let localIp = '';
   let sshPort = '22';
+  const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
   try {
-    tailscaleIp = execSync('tailscale ip -4 2>/dev/null', { timeout: 3000 }).toString().trim();
+    tailscaleIp = execSync(isWin ? 'tailscale ip -4' : 'tailscale ip -4 2>/dev/null',
+      { timeout: 3000, stdio: 'pipe' }).toString().trim();
   } catch { /* tailscale not installed */ }
   try {
-    localIp = execSync("hostname -I 2>/dev/null | awk '{print $1}'", { timeout: 3000 }).toString().trim();
+    if (isWin) {
+      // Use PowerShell to get local IP on Windows
+      localIp = execSync('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch \'Loopback\' } | Select-Object -First 1).IPAddress"',
+        { timeout: 5000, stdio: 'pipe' }).toString().trim();
+    } else {
+      localIp = execSync("hostname -I 2>/dev/null | awk '{print $1}'", { timeout: 3000, stdio: 'pipe' }).toString().trim();
+    }
   } catch { /* ignore */ }
   try {
-    const portLine = execSync("grep -E '^Port ' /etc/ssh/sshd_config 2>/dev/null || echo 'Port 22'", { timeout: 3000 }).toString().trim();
-    const m = portLine.match(/^Port\s+(\d+)/);
-    if (m) sshPort = m[1];
+    if (isWin) {
+      // Windows SSH port from sshd_config
+      const sshdConf = readFileSync('C:\\ProgramData\\ssh\\sshd_config', 'utf-8');
+      const m = sshdConf.match(/^Port\s+(\d+)/m);
+      if (m) sshPort = m[1];
+    } else {
+      const portLine = execSync("grep -E '^Port ' /etc/ssh/sshd_config 2>/dev/null || echo 'Port 22'", { timeout: 3000, stdio: 'pipe' }).toString().trim();
+      const m = portLine.match(/^Port\s+(\d+)/);
+      if (m) sshPort = m[1];
+    }
   } catch { /* default 22 */ }
   return { tailscaleIp, localIp, sshPort };
 }
@@ -930,7 +945,7 @@ export function createReceiverTab(screen, services) {
 
   let _messages = [];
   let _watchActive = false;
-  let _showDetails = false;
+  let _showDetails = null;  // null = auto (based on receiver state), true/false = manual override
   let _showDescription = true;  // Show description on first visit
 
   // -------------------------------------------------------------------------
@@ -1118,9 +1133,10 @@ export function createReceiverTab(screen, services) {
 
   function _getToolChecks() {
     const checks = [];
+    const _isWinCheck = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     const cmdCheck = (cmd) => {
       try {
-        execSync(`command -v ${cmd}`, { stdio: 'pipe' });
+        execSync(_isWinCheck ? `where ${cmd}` : `command -v ${cmd}`, { stdio: 'pipe', timeout: 3000 });
         return true;
       } catch {
         return false;
@@ -1196,21 +1212,25 @@ export function createReceiverTab(screen, services) {
     sectionLabel.top = offset + 5;
     contentBox.top = offset + 7;
 
+    // Auto-show instructions when receiver isn't set up; manual toggle overrides
+    const showingDetails = _showDetails !== null ? _showDetails : !enabled;
+
     // Actions row — each action a different color
     const enableLabel = enabled
       ? '{#ef5350-fg}{bold}[E]{/bold} Turn Off{/#ef5350-fg}'
       : '{#66bb6a-fg}{bold}[E]{/bold} Turn On{/#66bb6a-fg}';
     const speakerKey = '{#ce93d8-fg}{bold}[O]{/bold} Speaker{/#ce93d8-fg}';
-    const detailLabel = _showDetails
+    const detailLabel = showingDetails
       ? '{#4fc3f7-fg}{bold}[D]{/bold} Messages{/#4fc3f7-fg}'
       : '{#4fc3f7-fg}{bold}[D]{/bold} Setup Guide{/#4fc3f7-fg}';
     const testKey = '{#ffd54f-fg}{bold}[P]{/bold} Test{/#ffd54f-fg}';
     const clearKey = '{#ffb74d-fg}{bold}[C]{/bold} Clear Log{/#ffb74d-fg}';
-    const copyKey = '{#a5d6a7-fg}{bold}[A]{/bold} Copy{/#a5d6a7-fg}';
+    const copyKey = showingDetails ? '{#a5d6a7-fg}{bold}[A]{/bold} Copy Setup{/#a5d6a7-fg}' : '';
     const descLabel = _showDescription
       ? '{#90a4ae-fg}{bold}[?]{/bold} Hide Info{/#90a4ae-fg}'
       : '{#90a4ae-fg}{bold}[?]{/bold} What is this?{/#90a4ae-fg}';
-    actionsLine.setContent(`  ${enableLabel}    ${speakerKey}    ${testKey}    ${detailLabel}    ${clearKey}    ${copyKey}    ${descLabel}`);
+    const actions = [enableLabel, speakerKey, testKey, detailLabel, clearKey, copyKey, descLabel].filter(Boolean);
+    actionsLine.setContent('  ' + actions.join('    '));
 
     // Status + Speaker
     const statusIcon = enabled ? '{green-fg}● ON{/green-fg}' : '{yellow-fg}● OFF{/yellow-fg}';
@@ -1230,9 +1250,10 @@ export function createReceiverTab(screen, services) {
     // Main content
     _messages = _parseLogFile();
 
-    if (_showDetails) {
+    if (showingDetails) {
       sectionLabel.setContent(`{${COLORS.sectionHdr}-fg} Setup Instructions {/${COLORS.sectionHdr}-fg}`);
-      contentBox.setContent(_buildDetailedInstructions(RECEIVER_ALIAS, RECEIVER_SCRIPT, _networkInfo));
+      const copyHint = '{#a5d6a7-fg}Press {bold}[A]{/bold} to copy these instructions to clipboard{/#a5d6a7-fg}\n';
+      contentBox.setContent(copyHint + _buildDetailedInstructions(RECEIVER_ALIAS, RECEIVER_SCRIPT, _networkInfo));
     } else {
       sectionLabel.setContent(`{${COLORS.sectionHdr}-fg} Messages {/${COLORS.sectionHdr}-fg}`);
 
@@ -1325,25 +1346,49 @@ export function createReceiverTab(screen, services) {
   });
 
   box.key(['d', 'D'], () => {
-    _showDetails = !_showDetails;
+    // Manual override: toggle between instructions and messages
+    const currentlyShowing = _showDetails !== null ? _showDetails : !_isReceiverEnabled();
+    _showDetails = !currentlyShowing;
     refreshDisplay();
   });
 
   box.key(['a', 'A'], () => {
-    // Copy all visible content to clipboard — strip blessed markup tags
-    const text = contentBox.getContent().replace(/\{[^}]*\}/g, '');
+    // Copy setup instructions to clipboard (only available when instructions are shown)
+    const _currentlyShowingDetails = _showDetails !== null ? _showDetails : !_isReceiverEnabled();
+    if (!_currentlyShowingDetails) {
+      _showFeedback('{yellow-fg}Nothing to copy — setup instructions not shown{/yellow-fg}');
+      return;
+    }
+    _refreshCachedInfo();
+    const text = _buildDetailedInstructions(RECEIVER_ALIAS, RECEIVER_SCRIPT, _networkInfo)
+      .replace(/\{[^}]*\}/g, '')
+      // eslint-disable-next-line no-control-regex
+      .replace(/\x1b\[[0-9;]*m/g, '');
     // Try platform-appropriate clipboard command
     const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-    const clipCmds = _isWin
-      ? [['clip', []]]
-      : [['xclip', ['-selection', 'clipboard']], ['xsel', ['--clipboard', '--input']], ['wl-copy', []], ['pbcopy', []]];
     let copied = false;
-    for (const [cmd, args] of clipCmds) {
-      const r = spawnSync(cmd, args, { input: text, timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] });
-      if (r.status === 0) {
-        _showFeedback('{green-fg}Copied to clipboard!{/green-fg}');
-        copied = true;
-        break;
+    if (_isWin) {
+      // Windows clip.exe mangles UTF-8 — use temp file + PowerShell with explicit encoding
+      const tmpFile = path.join(AGENTVIBES_DIR, 'clip-tmp.txt');
+      try {
+        mkdirSync(AGENTVIBES_DIR, { recursive: true });
+        writeFileSync(tmpFile, '\ufeff' + text, 'utf-8');
+        const psCmd = `Get-Content -Path "${tmpFile.replace(/\\/g, '/')}" -Encoding UTF8 -Raw | Set-Clipboard; Remove-Item "${tmpFile.replace(/\\/g, '/')}"`;
+        const r = spawnSync('powershell', ['-NoProfile', '-Command', psCmd], { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] });
+        if (r.status === 0) {
+          _showFeedback('{green-fg}Copied to clipboard!{/green-fg}');
+          copied = true;
+        }
+      } catch { /* fall through to file fallback */ }
+    } else {
+      const clipCmds = [['xclip', ['-selection', 'clipboard']], ['xsel', ['--clipboard', '--input']], ['wl-copy', []], ['pbcopy', []]];
+      for (const [cmd, args] of clipCmds) {
+        const r = spawnSync(cmd, args, { input: text, timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] });
+        if (r.status === 0) {
+          _showFeedback('{green-fg}Copied to clipboard!{/green-fg}');
+          copied = true;
+          break;
+        }
       }
     }
     if (!copied) {
@@ -1446,7 +1491,6 @@ export function createReceiverTab(screen, services) {
 
   box.key(['c', 'C'], () => {
     try { writeFileSync(LOG_FILE, ''); } catch { /* ignore */ }
-    _showDetails = false;
     _showFeedback('{green-fg}Log cleared{/green-fg}');
     refreshDisplay();
   });

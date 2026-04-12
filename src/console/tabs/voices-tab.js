@@ -867,6 +867,55 @@ export function createVoicesTab(screen, services) {
     _killPlayingProcess();
     _playingVoiceId = null;
 
+    // Check if we should route through remote provider (ssh-remote / agentvibes-receiver)
+    const projectRoot = path.resolve(__dirname, '..', '..');
+    const remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
+    let activeProvider = '';
+    try {
+      const providerPaths = [
+        path.join(projectRoot, '.claude', 'tts-provider.txt'),
+        path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+      ];
+      for (const p of providerPaths) {
+        if (fs.existsSync(p)) { activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
+      }
+    } catch {}
+
+    if (remoteProviders.includes(activeProvider)) {
+      const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      let proc;
+      if (isWindows) {
+        const playTts = path.join(projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId], {
+          stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
+        });
+      } else {
+        const playTts = path.join(projectRoot, '.claude', 'hooks', 'play-tts.sh');
+        proc = spawn('bash', [playTts, phrase, voiceId], {
+          stdio: 'ignore', detached: true, env: _spawnEnv,
+        });
+      }
+      _playingProcess = proc;
+      _playingVoiceId = voiceId;
+      previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing (remote): ${voiceId}{/${COLORS.activeFg}-fg}`);
+      screen.render();
+      proc.on('exit', () => {
+        if (_playingVoiceId === voiceId) {
+          _playingVoiceId = null; _playingProcess = null;
+          previewLine.setContent(_listFocused ? HINT_TEXT : '');
+          refreshDisplay();
+        }
+      });
+      proc.on('error', () => {
+        _playingVoiceId = null; _playingProcess = null;
+        previewLine.setContent(`{red-fg}Remote preview failed{/red-fg}`);
+        screen.render();
+        setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 4000);
+      });
+      return;
+    }
+
     // Resolve model path (may be multi-speaker)
     const ms = parseMultiSpeaker(voiceId);
     const voicePath = path.resolve(PIPER_VOICES_DIR, ms.model + '.onnx');

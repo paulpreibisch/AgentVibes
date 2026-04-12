@@ -116,7 +116,7 @@ if (-not $script:Text) {
 }
 
 # Validate voice format
-if ($script:Voice -notmatch '^[a-zA-Z0-9_\-\.]+$' -and $script:Voice -notmatch '^[a-zA-Z0-9_\-\.]+::[a-zA-Z0-9_\-\.]+$') {
+if ($script:Voice -notmatch '^[a-zA-Z0-9_\-\. ]+$' -and $script:Voice -notmatch '^[a-zA-Z0-9_\-\. ]+::[a-zA-Z0-9_\-\. ]+$') {
     $script:Voice = "en_US-lessac-medium"
 }
 

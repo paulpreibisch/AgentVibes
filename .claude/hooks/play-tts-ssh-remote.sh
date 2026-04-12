@@ -50,8 +50,9 @@ if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
   exit 1
 fi
 
-# SECURITY: Validate VOICE
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+# SECURITY: Validate VOICE (allow :: for multi-speaker, . for locale, space for names)
+_voice_re='^[a-zA-Z0-9_.:  -]+$'
+if [[ ! "$VOICE" =~ $_voice_re ]]; then
   echo "Invalid voice format: $VOICE" >&2
   exit 1
 fi

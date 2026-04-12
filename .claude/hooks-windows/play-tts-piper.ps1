@@ -229,10 +229,15 @@ try {
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
     Write-Host "[VOICE] Voice used: $VoiceName (Piper)" -ForegroundColor Green
 
-    # Apply audio effects (reverb, background music) if processor script exists
+    # Apply audio effects (reverb, background music) if processor script exists.
+    # SKIP when AGENTVIBES_NO_PLAY is set — that means the parent play-tts.ps1
+    # will handle reverb/bg-music post-processing itself.  Running audio-processor
+    # here AND letting the parent do its own effects causes double-processing:
+    # this creates .effected.wav which the parent ignores, then the parent applies
+    # effects to the original wav again.
     $ProcessorScript = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "audio-processor.ps1"
     $ProcessedFile = $AudioFile
-    if (Test-Path $ProcessorScript) {
+    if (-not $env:AGENTVIBES_NO_PLAY -and (Test-Path $ProcessorScript)) {
         # Lookup order: agent name → LLM key (from --llm) → default
         $AgentName = if ($env:AGENTVIBES_AGENT_NAME) { $env:AGENTVIBES_AGENT_NAME } elseif ($env:AGENTVIBES_LLM_KEY) { $env:AGENTVIBES_LLM_KEY } else { "default" }
         $EffectedFile = "$AudioFile.effected.wav"

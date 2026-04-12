@@ -258,6 +258,12 @@ speak_text() {
     termux-ssh)
       "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
+    ssh-remote)
+      "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice"
+      ;;
+    agentvibes-receiver)
+      "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
+      ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
       return 1
@@ -381,6 +387,12 @@ case "$ACTIVE_PROVIDER" in
     ;;
   termux-ssh)
     exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  ssh-remote)
+    exec "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  agentvibes-receiver)
+    exec "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2

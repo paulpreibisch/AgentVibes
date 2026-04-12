@@ -1484,6 +1484,23 @@ class AgentVibesVoiceBrowser {
     this.screen.render();
   }
 
+  _getActiveProvider() {
+    const remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
+    try {
+      const providerPaths = [
+        path.join(process.cwd(), '.claude', 'tts-provider.txt'),
+        path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+      ];
+      for (const p of providerPaths) {
+        if (fsSync.existsSync(p)) {
+          const provider = fsSync.readFileSync(p, 'utf8').trim();
+          if (provider) return { provider, isRemote: remoteProviders.includes(provider) };
+        }
+      }
+    } catch {}
+    return { provider: 'piper', isRemote: false };
+  }
+
   async playSample(row) {
     if (this.currentAudioProcess) {
       try {
@@ -1500,6 +1517,12 @@ class AgentVibesVoiceBrowser {
     // Use voice-specific sample text
     const sampleText = row.sampleText || this.sampleText;
 
+    // Route through remote provider if active
+    const { isRemote } = this._getActiveProvider();
+    if (isRemote) {
+      return await this._playRemote(row, sampleText);
+    }
+
     // Handle different providers
     switch (row.type) {
       case 'macos':
@@ -1510,6 +1533,52 @@ class AgentVibesVoiceBrowser {
         return await this.playSopranoVoice(row, sampleText);
       default:
         return await this.playPiperVoice(row, sampleText);
+    }
+  }
+
+  async _playRemote(row, sampleText) {
+    // Build voice ID for play-tts.sh
+    let voiceId;
+    if (row.type === 'curated') {
+      voiceId = row.piperVoiceId || row.model;
+    } else {
+      // LibriTTS multi-speaker: pass as model::SpeakerName-ID
+      voiceId = `en_US-libritts-high::${row.name}-${row.id}`;
+    }
+
+    const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+    try {
+      let proc;
+      if (isWindows) {
+        const playTts = path.join(__dirname, '..', '.claude', 'hooks-windows', 'play-tts.ps1');
+        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, sampleText, voiceId], {
+          stdio: 'ignore', detached: false, windowsHide: true,
+        });
+      } else {
+        const playTts = path.join(__dirname, '..', '.claude', 'hooks', 'play-tts.sh');
+        proc = spawn('bash', [playTts, sampleText, voiceId], {
+          stdio: 'ignore', detached: true,
+        });
+      }
+      this.currentAudioProcess = proc;
+
+      this.statusBar.setContent(`{cyan-fg}Playing ${row.name} (remote)...{/cyan-fg}`);
+      this.screen.render();
+
+      proc.on('close', () => {
+        if (this.currentAudioProcess === proc) this.currentAudioProcess = null;
+        this.statusBar.setContent(`{green-fg}✓ Played ${row.name}{/green-fg}`);
+        this.screen.render();
+      });
+
+      proc.on('error', () => {
+        if (this.currentAudioProcess === proc) this.currentAudioProcess = null;
+        this.statusBar.setContent(`{red-fg}✗ Remote preview failed{/red-fg}`);
+        this.screen.render();
+      });
+    } catch (error) {
+      this.statusBar.setContent(`{red-fg}✗ Error: ${error.message}{/red-fg}`);
+      this.screen.render();
     }
   }
 
