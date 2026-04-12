@@ -167,6 +167,14 @@ for voice in "${NEED_DOWNLOAD[@]}"; do
   fi
 done
 
+# Patch LibriTTS speaker names for any libritts models (existing or just downloaded)
+VOICE_DIR=$(get_voice_storage_dir)
+for voice in "${COMMON_VOICES[@]}"; do
+  if [[ "$voice" == *libritts* ]] && [[ -f "$VOICE_DIR/${voice}.onnx.json" ]]; then
+    patch_libritts_speaker_names "$VOICE_DIR" "$voice"
+  fi
+done
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 Download Summary:"

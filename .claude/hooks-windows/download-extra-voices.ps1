@@ -158,6 +158,64 @@ foreach ($voice in $needDownload) {
     }
 }
 
+# Patch LibriTTS speaker names for any libritts models (existing or just downloaded)
+foreach ($voice in $ExtraVoices) {
+    $voiceName = $voice.name
+    $jsonFile = "$VoiceDir\$voiceName.onnx.json"
+    if ((Test-Path $jsonFile)) {
+        try {
+            $data = Get-Content $jsonFile -Raw | ConvertFrom-Json
+            $sidMap = $data.speaker_id_map
+            if ($sidMap -and ($data.num_speakers -gt 1)) {
+                # Check if already patched (first key doesn't start with 'p' + digits)
+                $firstKey = ($sidMap.PSObject.Properties | Select-Object -First 1).Name
+                if ($firstKey -match '^p\d+$') {
+                    # Find voice-assignments.json
+                    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+                    $ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+                    $CatalogPath = Join-Path $ProjectRoot "voice-assignments.json"
+                    if (-not (Test-Path $CatalogPath)) {
+                        # Try npm global install location
+                        $npmRoot = & npm root -g 2>$null
+                        if ($npmRoot) {
+                            $CatalogPath = Join-Path $npmRoot "agentvibes\voice-assignments.json"
+                        }
+                    }
+                    if (Test-Path $CatalogPath) {
+                        $catalog = Get-Content $CatalogPath -Raw | ConvertFrom-Json
+                        $speakers = $catalog.libritts_speakers
+
+                        # Build reverse map: index -> p-name
+                        $indexToP = @{}
+                        foreach ($prop in $sidMap.PSObject.Properties) {
+                            $indexToP[$prop.Value] = $prop.Name
+                        }
+
+                        # Rebuild with friendly names
+                        $newMap = [ordered]@{}
+                        foreach ($entry in $indexToP.GetEnumerator() | Sort-Object Key) {
+                            $idx = [string]$entry.Key
+                            $pname = $entry.Value
+                            $friendly = $speakers.$idx.voice_name
+                            if ($friendly) {
+                                $newMap[$friendly] = [int]$idx
+                            } else {
+                                $newMap[$pname] = [int]$idx
+                            }
+                        }
+
+                        $data.speaker_id_map = $newMap
+                        $data | ConvertTo-Json -Depth 10 | Set-Content $jsonFile -Encoding UTF8
+                        Write-Host "   Patched LibriTTS speaker names to friendly names: $voiceName" -ForegroundColor Green
+                    }
+                }
+            }
+        } catch {
+            # Non-fatal — patching is best-effort
+        }
+    }
+}
+
 Write-Host ""
 Write-Host ("=" * 40) -ForegroundColor Cyan
 Write-Host "Download Summary:" -ForegroundColor Cyan
