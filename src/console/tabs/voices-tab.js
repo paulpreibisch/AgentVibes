@@ -471,29 +471,85 @@ export function scanInstalledVoices() {
 }
 
 /**
- * Get favorites array from config.
+ * Get favorites (thumbs-up) array from config.
  * @param {object} configService
  * @returns {string[]}
  */
 export function getFavorites(configService) {
-  const favs = configService.getConfig().favorites;
+  const cfg = configService.getConfig();
+  // Prefer thumbsUp if present, fall back to legacy favorites
+  const favs = cfg.thumbsUp ?? cfg.favorites;
   return Array.isArray(favs) ? favs : [];
 }
 
 /**
- * Toggle a voice in the favorites list.
+ * Get thumbs-down array from config.
+ * @param {object} configService
+ * @returns {string[]}
+ */
+export function getThumbsDown(configService) {
+  const td = configService.getConfig().thumbsDown;
+  return Array.isArray(td) ? td : [];
+}
+
+/**
+ * Toggle thumbs-up on a voice. Clears thumbs-down if set.
+ * @param {object} configService
+ * @param {string} voiceId
+ * @returns {'added'|'removed'}
+ */
+export function toggleThumbsUp(configService, voiceId) {
+  const favs = getFavorites(configService);
+  const idx = favs.indexOf(voiceId);
+  let result;
+  if (idx >= 0) {
+    favs.splice(idx, 1);
+    result = 'removed';
+  } else {
+    favs.push(voiceId);
+    // Remove from thumbs-down
+    const td = getThumbsDown(configService);
+    const tdIdx = td.indexOf(voiceId);
+    if (tdIdx >= 0) { td.splice(tdIdx, 1); configService.set('thumbsDown', td); }
+    result = 'added';
+  }
+  configService.set('thumbsUp', favs);
+  configService.set('favorites', favs); // backward compat
+  return result;
+}
+
+/**
+ * Toggle thumbs-down on a voice. Clears thumbs-up if set.
+ * @param {object} configService
+ * @param {string} voiceId
+ * @returns {'added'|'removed'}
+ */
+export function toggleThumbsDown(configService, voiceId) {
+  const td = getThumbsDown(configService);
+  const idx = td.indexOf(voiceId);
+  let result;
+  if (idx >= 0) {
+    td.splice(idx, 1);
+    result = 'removed';
+  } else {
+    td.push(voiceId);
+    // Remove from thumbs-up / favorites
+    const favs = getFavorites(configService);
+    const fIdx = favs.indexOf(voiceId);
+    if (fIdx >= 0) { favs.splice(fIdx, 1); configService.set('thumbsUp', favs); configService.set('favorites', favs); }
+    result = 'added';
+  }
+  configService.set('thumbsDown', td);
+  return result;
+}
+
+/**
+ * Toggle a voice in the favorites list (legacy compat — calls toggleThumbsUp).
  * @param {object} configService
  * @param {string} voiceId
  */
 export function toggleFavorite(configService, voiceId) {
-  const favs = getFavorites(configService);
-  const idx = favs.indexOf(voiceId);
-  if (idx >= 0) {
-    favs.splice(idx, 1);
-  } else {
-    favs.push(voiceId);
-  }
-  configService.set('favorites', favs);
+  toggleThumbsUp(configService, voiceId);
 }
 
 // ---------------------------------------------------------------------------
@@ -1435,13 +1491,14 @@ export function createVoicesTab(screen, services) {
     return _installedSet.has(voiceId);
   }
 
-  function _buildListItems(voices, active, favorites) {
+  function _buildListItems(voices, active, favorites, thumbsDown) {
     return voices.map(v => {
       const installed = _isInstalled(v);
-      const isFav    = favorites.includes(v);
+      const isUp     = favorites.includes(v);
+      const isDown   = thumbsDown.includes(v);
       const isActive = v === active;
       const isPrev   = v === _playingVoiceId;
-      const star = isFav  ? '★' : ' ';
+      const star = isUp ? '{green-fg}+{/green-fg}' : (isDown ? '{red-fg}-{/red-fg}' : ' ');
       const dot  = isPrev ? '♪' : (isActive ? '{green-fg}✓{/green-fg}' : ' ');
 
       let displayName, gender, provider;
@@ -1531,8 +1588,9 @@ export function createVoicesTab(screen, services) {
 
     const active = providerService.getActiveVoiceId();
     const favorites = getFavorites(configService);
+    const thumbsDown = getThumbsDown(configService);
     const filtered = _getFilteredVoices();
-    const items = _buildListItems(filtered, active, favorites);
+    const items = _buildListItems(filtered, active, favorites, thumbsDown);
 
     voiceList.setItems(items.length > 0 ? items : [' (no voices found — install piper first)']);
     const maxIdx = Math.max(0, (items.length > 0 ? items.length : 1) - 1);
@@ -1620,12 +1678,22 @@ export function createVoicesTab(screen, services) {
     if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
-  // 'f' or '*' in voiceList toggles favorite
-  voiceList.key(['*'], () => {
+  // '*' or '+' in voiceList toggles thumbs-up
+  voiceList.key(['*', '+'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
-      toggleFavorite(configService, selected);
+      toggleThumbsUp(configService, selected);
+      refreshDisplay();
+    }
+  });
+
+  // '-' in voiceList toggles thumbs-down
+  voiceList.key(['-'], () => {
+    const voices = _getFilteredVoices();
+    const selected = voices[voiceList.selected];
+    if (selected) {
+      toggleThumbsDown(configService, selected);
       refreshDisplay();
     }
   });

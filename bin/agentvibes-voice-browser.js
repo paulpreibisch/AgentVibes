@@ -56,8 +56,10 @@ class AgentVibesVoiceBrowser {
     this.sortColumn = 'id';
     this.sortAsc = true;
     this.searchTerm = '';
-    this.favorites = new Set();
-    this.favoritesOnly = false; // Filter to show only favorites
+    this.favorites = new Set();       // backward compat — migrated to thumbsUp on load
+    this.thumbsUp = new Set();
+    this.thumbsDown = new Set();
+    this.favoritesOnly = false; // Filter to show only thumbs-up voices
     this.providerFilter = null; // Filter by provider (null = all)
     this.sampleText = CONFIG.SAMPLE_TEXT;
     this.playing = false;
@@ -99,7 +101,13 @@ class AgentVibesVoiceBrowser {
   async loadProgress() {
     try {
       const data = JSON.parse(await fs.readFile(CONFIG.PROGRESS_FILE, 'utf8'));
-      this.favorites = new Set(data.favorites || []);
+      this.thumbsUp = new Set(data.thumbsUp || []);
+      this.thumbsDown = new Set(data.thumbsDown || []);
+      // Migrate legacy favorites → thumbsUp
+      if (data.favorites && data.favorites.length && !data.thumbsUp) {
+        for (const f of data.favorites) this.thumbsUp.add(f);
+      }
+      this.favorites = this.thumbsUp; // backward compat alias
       this.musicFavorites = new Set(data.musicFavorites || []);
       this.sampleText = data.sampleText || CONFIG.SAMPLE_TEXT;
       this.sortColumn = data.sortColumn || 'id';
@@ -111,7 +119,9 @@ class AgentVibesVoiceBrowser {
 
   async saveProgress() {
     await fs.writeFile(CONFIG.PROGRESS_FILE, JSON.stringify({
-      favorites: Array.from(this.favorites),
+      thumbsUp: Array.from(this.thumbsUp),
+      thumbsDown: Array.from(this.thumbsDown),
+      favorites: Array.from(this.thumbsUp), // backward compat
       musicFavorites: Array.from(this.musicFavorites),
       sampleText: this.sampleText,
       sortColumn: this.sortColumn,
@@ -443,9 +453,9 @@ class AgentVibesVoiceBrowser {
   }
 
   applyFilter() {
-    // Start with all voices or favorites only
+    // Start with all voices or thumbs-up only
     let data = this.favoritesOnly
-      ? this.tableData.filter(row => this.favorites.has(row.id))
+      ? this.tableData.filter(row => this.thumbsUp.has(row.id))
       : [...this.tableData];
 
     // Apply provider filter
@@ -481,7 +491,7 @@ class AgentVibesVoiceBrowser {
   }
 
   formatRow(row) {
-    const fav = this.favorites.has(row.id) ? '*' : ' ';
+    const fav = this.thumbsUp.has(row.id) ? '{green-fg}+{/green-fg}' : (this.thumbsDown.has(row.id) ? '{red-fg}-{/red-fg}' : ' ');
     const genderIcon = row.gender === 'male' ? '♂' : (row.gender === 'female' ? '♀' : '-');
     const genderColor = row.gender === 'male' ? 'blue-fg' : (row.gender === 'female' ? 'magenta-fg' : 'gray-fg');
     const gender = `{${genderColor}}${genderIcon}{/${genderColor}}`;
@@ -512,7 +522,7 @@ class AgentVibesVoiceBrowser {
       top: 1,
       height: 4,
       width: '100%',
-      content: `{center}{gray-fg}github.com/paulpreibisch/agentvibes{/gray-fg} {white-fg}www.agentvibes.org{/white-fg}{/center}\n{center}{red-fg}[T]{/red-fg}Tabs {cyan-fg}[1-6]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[P]{/cyan-fg}Prompt {cyan-fg}[L]{/cyan-fg}Filter {cyan-fg}[F/X]{/cyan-fg}Fav {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[*]{/cyan-fg}★ {cyan-fg}[I]{/cyan-fg}Install{/center}`,
+      content: `{center}{gray-fg}github.com/paulpreibisch/agentvibes{/gray-fg} {white-fg}www.agentvibes.org{/white-fg}{/center}\n{center}{red-fg}[T]{/red-fg}Tabs {cyan-fg}[1-6]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[P]{/cyan-fg}Prompt {cyan-fg}[L]{/cyan-fg}Filter {cyan-fg}[F/X]{/cyan-fg}Fav {cyan-fg}[Space]{/cyan-fg}Play {green-fg}[+/*]{/green-fg}Up {red-fg}[-]{/red-fg}Down {cyan-fg}[I]{/cyan-fg}Install{/center}`,
       tags: true,
       padding: 0,
       border: { type: 'line', fg: 'gray' },
@@ -656,7 +666,7 @@ class AgentVibesVoiceBrowser {
       bottom: 1,
       height: 3,
       width: '100%',
-      content: '{cyan-fg}[1-6]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[P]{/cyan-fg}Prompt {cyan-fg}[L]{/cyan-fg}Filter {cyan-fg}[F/X]{/cyan-fg}Fav {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[R]{/cyan-fg}Reverb {cyan-fg}[*]{/cyan-fg}★ {cyan-fg}[I]{/cyan-fg}Install {cyan-fg}[Nav]{/cyan-fg}Keys',
+      content: '{cyan-fg}[1-6]{/cyan-fg}Sort {cyan-fg}[/]{/cyan-fg}Search {cyan-fg}[P]{/cyan-fg}Prompt {cyan-fg}[L]{/cyan-fg}Filter {cyan-fg}[F/X]{/cyan-fg}Fav {cyan-fg}[Space]{/cyan-fg}Play {cyan-fg}[R]{/cyan-fg}Reverb {green-fg}[+/*]{/green-fg}Up {red-fg}[-]{/red-fg}Down {cyan-fg}[I]{/cyan-fg}Install',
       tags: true,
       padding: 0,
       border: { type: 'line', fg: 'gray' },
@@ -699,7 +709,7 @@ class AgentVibesVoiceBrowser {
     this.list.setItems(items);
     this.list.select(Math.min(this.currentRow, items.length - 1));
 
-    const modeLabel = this.favoritesOnly ? ' * Favorites ' : ' Voices ';
+    const modeLabel = this.favoritesOnly ? ' + Thumbs Up ' : ' Voices ';
     this.list.setLabel(`${modeLabel}(${this.filteredData.length}) - Model (${this.uniqueModels}) - Sort: ${this.sortColumn} ${this.sortAsc ? '↑' : '↓'} `);
     this.updateInfo();
   }
@@ -711,7 +721,8 @@ class AgentVibesVoiceBrowser {
     const row = this.filteredData[idx];
     let info = `{bold}${row.type === 'curated' ? row.name : 'Speaker ' + row.id}{/bold}\n`;
     info += `{gray-fg}${'─'.repeat(20)}{/gray-fg}\n\n`;
-    if (this.favorites.has(row.id)) info += '{yellow-fg}* Favorite{/yellow-fg}\n\n';
+    if (this.thumbsUp.has(row.id)) info += '{green-fg}+ Thumbs Up{/green-fg}\n\n';
+    else if (this.thumbsDown.has(row.id)) info += '{red-fg}- Thumbs Down{/red-fg}\n\n';
     info += `{cyan-fg}ID:{/cyan-fg} ${row.id}\n`;
 
     // Color gender value: blue for male, pink for female
@@ -734,7 +745,7 @@ class AgentVibesVoiceBrowser {
     info += `\n{gray-fg}Sample:{/gray-fg}\n{green-fg}"${voiceSample}"{/green-fg}\n`;
 
     info += `\n{cyan-fg}Position:{/cyan-fg} ${idx + 1}/${this.filteredData.length}\n`;
-    info += `{cyan-fg}Favorites:{/cyan-fg} ${this.favorites.size}\n\n`;
+    info += `{green-fg}Thumbs Up:{/green-fg} ${this.thumbsUp.size}  {red-fg}Thumbs Down:{/red-fg} ${this.thumbsDown.size}\n\n`;
     info += `{green-fg}[I]{/green-fg} Install voice  {cyan-fg}[P]{/cyan-fg} Copy prompt`;
 
     this.infoPanel.setContent(info);
@@ -776,7 +787,7 @@ class AgentVibesVoiceBrowser {
       const isFavorite = this.musicFavorites.has(track.file);
       const isEnabled = this.musicEnabled ? '🔊' : '🔇';
       const marker = isCurrent ? `{cyan-fg}▶{/cyan-fg}` : ' ';
-      const favMarker = isFavorite ? '*' : ' ';
+      const favMarker = isFavorite ? '+' : ' ';
       return `${marker}${favMarker} ${track.name}  ${isCurrent ? isEnabled : ''}`;
     });
 
@@ -922,16 +933,34 @@ class AgentVibesVoiceBrowser {
       }
     });
 
-    // Favorite
-    this.list.key(['*', '8'], async () => {
+    // Thumbs up (* or +) — toggle, clears thumbs down
+    this.list.key(['*', '+'], async () => {
       const row = this.filteredData[this.list.selected];
       if (row) {
-        if (this.favorites.has(row.id)) {
-          this.favorites.delete(row.id);
-          this.statusBar.setContent('{yellow-fg}Removed from favorites{/yellow-fg}');
+        if (this.thumbsUp.has(row.id)) {
+          this.thumbsUp.delete(row.id);
+          this.statusBar.setContent('{yellow-fg}Removed thumbs up{/yellow-fg}');
         } else {
-          this.favorites.add(row.id);
-          this.statusBar.setContent('{yellow-fg}Added to favorites *{/yellow-fg}');
+          this.thumbsUp.add(row.id);
+          this.thumbsDown.delete(row.id);
+          this.statusBar.setContent('{green-fg}Thumbs up +{/green-fg}');
+        }
+        await this.saveProgress();
+        this.updateList();
+      }
+    });
+
+    // Thumbs down (-) — toggle, clears thumbs up
+    this.list.key(['-'], async () => {
+      const row = this.filteredData[this.list.selected];
+      if (row) {
+        if (this.thumbsDown.has(row.id)) {
+          this.thumbsDown.delete(row.id);
+          this.statusBar.setContent('{yellow-fg}Removed thumbs down{/yellow-fg}');
+        } else {
+          this.thumbsDown.add(row.id);
+          this.thumbsUp.delete(row.id);
+          this.statusBar.setContent('{red-fg}Thumbs down -{/red-fg}');
         }
         await this.saveProgress();
         this.updateList();
@@ -948,9 +977,9 @@ class AgentVibesVoiceBrowser {
       this.updateList();
 
       if (this.favoritesOnly) {
-        this.statusBar.setContent(`{yellow-fg}* Showing ${this.filteredData.length} favorites - Press [F] or [X] to show all{/yellow-fg}`);
+        this.statusBar.setContent(`{green-fg}+ Showing ${this.filteredData.length} thumbs-up voices - Press [F] or [X] to show all{/green-fg}`);
       } else {
-        this.statusBar.setContent(`{cyan-fg}Showing all voices - Press [F] to filter favorites{/cyan-fg}`);
+        this.statusBar.setContent(`{cyan-fg}Showing all voices - Press [F] to filter thumbs-up{/cyan-fg}`);
       }
       this.screen.render();
     });
@@ -961,7 +990,7 @@ class AgentVibesVoiceBrowser {
         this.favoritesOnly = false;
         this.applyFilter();
         this.updateList();
-        this.statusBar.setContent(`{cyan-fg}Showing all voices - Press [F] to filter favorites{/cyan-fg}`);
+        this.statusBar.setContent(`{cyan-fg}Showing all voices - Press [F] to filter thumbs-up{/cyan-fg}`);
         this.screen.render();
       }
     });
@@ -1040,8 +1069,8 @@ class AgentVibesVoiceBrowser {
       await this.toggleReverb();
     });
 
-    // Favorite music track
-    this.musicList.key(['f', 'F', '*', '8'], async () => {
+    // Favorite music track (thumbs up)
+    this.musicList.key(['f', 'F', '*', '+'], async () => {
       if (this.currentTab !== 'music') return;
       const selected = this.musicList.selected;
       if (selected >= 0 && selected < this.musicTracks.length) {
@@ -1051,7 +1080,7 @@ class AgentVibesVoiceBrowser {
           this.statusBar.setContent('{yellow-fg}Removed from favorites{/yellow-fg}');
         } else {
           this.musicFavorites.add(track.file);
-          this.statusBar.setContent('{yellow-fg}Added to favorites *{/yellow-fg}');
+          this.statusBar.setContent('{green-fg}Thumbs up +{/green-fg}');
         }
         await this.saveProgress();
         this.updateMusicList();
@@ -1823,10 +1852,11 @@ class AgentVibesVoiceBrowser {
   }
 
   async exportFavorites() {
-    const favData = this.tableData.filter(row => this.favorites.has(row.id));
+    const upData = this.tableData.filter(row => this.thumbsUp.has(row.id));
+    const downData = this.tableData.filter(row => this.thumbsDown.has(row.id));
     const exportFile = path.join(os.homedir(), 'agentvibes-favorites.json');
-    await fs.writeFile(exportFile, JSON.stringify(favData, null, 2));
-    this.statusBar.setContent(`{green-fg}✓ Exported ${favData.length} favorites to ${exportFile}{/green-fg}`);
+    await fs.writeFile(exportFile, JSON.stringify({ thumbsUp: upData, thumbsDown: downData }, null, 2));
+    this.statusBar.setContent(`{green-fg}✓ Exported ${upData.length} thumbs-up, ${downData.length} thumbs-down to ${exportFile}{/green-fg}`);
     this.screen.render();
   }
 

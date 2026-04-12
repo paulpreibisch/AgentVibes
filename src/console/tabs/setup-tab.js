@@ -38,7 +38,7 @@ import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, toggleFavorite } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { spawn } from 'node:child_process';
@@ -1232,12 +1232,14 @@ export function createSetupTab(screen, services) {
 
     function _buildVoiceItems(voices) {
       const favs = getFavorites(configService);
+      const td = getThumbsDown(configService);
       return voices.map(v => {
         const isActive = v === draft.voice;
         const isPrev = v === _previewVoiceId;
-        const isFav = favs.includes(v);
+        const isUp = favs.includes(v);
+        const isDown = td.includes(v);
         const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
-        const star = isFav ? '{yellow-fg}★{/yellow-fg}' : ' ';
+        const star = isUp ? '{green-fg}+{/green-fg}' : (isDown ? '{red-fg}-{/red-fg}' : ' ');
         const meta = getVoiceMeta(v);
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
@@ -1331,9 +1333,13 @@ export function createSetupTab(screen, services) {
       const sel = _allVoices[vpList.selected];
       if (sel) _previewVoice(sel);
     });
-    vpList.key(['*'], () => {
+    vpList.key(['*', '+'], () => {
       const sel = _allVoices[vpList.selected];
-      if (sel) { toggleFavorite(configService, sel); _refreshVP(); }
+      if (sel) { toggleThumbsUp(configService, sel); _refreshVP(); }
+    });
+    vpList.key(['-'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) { toggleThumbsDown(configService, sel); _refreshVP(); }
     });
     vpList.key(['escape', 'q'], _closeVP);
 
