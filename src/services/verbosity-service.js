@@ -15,7 +15,7 @@
  * Ordered verbosity levels from quietest to most verbose.
  * @type {string[]}
  */
-export const VERBOSITY_LEVELS = Object.freeze(['minimal', 'low', 'medium', 'high', 'custom']);
+export const VERBOSITY_LEVELS = Object.freeze(['minimal', 'low', 'medium', 'high', 'caveman', 'custom']);
 
 // Per-level shouldSpeak configuration (fixed levels only; custom reads from config)
 const LEVEL_SPEAK = Object.freeze({
@@ -23,6 +23,7 @@ const LEVEL_SPEAK = Object.freeze({
   low:     { 'prompt-submit': false, 'response-complete': true },
   medium:  { 'prompt-submit': true,  'response-complete': true },
   high:    { 'prompt-submit': true,  'response-complete': true },
+  caveman: { 'prompt-submit': true,  'response-complete': true },
 });
 
 // Per-level static messages (null = use hook default message)
@@ -37,6 +38,7 @@ const LEVEL_MESSAGES = Object.freeze({
   },
   medium:  { 'prompt-submit': null, 'response-complete': null },
   high:    { 'prompt-submit': null, 'response-complete': null },
+  caveman: { 'prompt-submit': null, 'response-complete': null },
 });
 
 // ---------------------------------------------------------------------------
@@ -86,7 +88,7 @@ export class VerbosityService {
    */
   getMessage(hookType, context) {
     const level = this.getLevel();
-    if (level === 'high' || level === 'medium') return null;
+    if (level === 'high' || level === 'medium' || level === 'caveman') return null;
 
     if (level === 'low' && hookType === 'response-complete') {
       const summary = context?.summary ?? '';

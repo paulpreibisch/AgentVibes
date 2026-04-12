@@ -86,9 +86,9 @@ set_verbosity() {
   local level="$1"
 
   # Validate input
-  if [[ ! "$level" =~ ^(low|medium|high)$ ]]; then
+  if [[ ! "$level" =~ ^(low|medium|high|caveman)$ ]]; then
     echo "❌ Invalid verbosity level: $level"
-    echo "Valid options: low, medium, high"
+    echo "Valid options: low, medium, high, caveman"
     return 1
   fi
 
@@ -107,6 +107,7 @@ set_verbosity() {
   echo "   • LOW: Acknowledgments + Completions only"
   echo "   • MEDIUM: + Major decisions and findings"
   echo "   • HIGH: All reasoning (maximum transparency)"
+  echo "   • CAVEMAN: Ultra-terse fragments, max token savings"
   echo ""
   echo "⚠️  Restart Claude Code for changes to take effect"
 
@@ -149,9 +150,15 @@ show_info() {
   echo "  ✓ All findings"
   echo "  ✅ Completions"
   echo ""
+  echo "CAVEMAN (Ultra-Terse)"
+  echo "  ⚡ Fragments only, no filler"
+  echo "  📉 65-75% fewer output tokens"
+  echo "  🔤 Abbreviations (DB/auth/config/fn/impl)"
+  echo "  ➡️  Arrows instead of prose (X -> Y)"
+  echo ""
   echo "Usage:"
   echo "  $0 get                # Show current level"
-  echo "  $0 set low|medium|high # Change level"
+  echo "  $0 set low|medium|high|caveman # Change level"
 }
 
 # Main execution
@@ -162,7 +169,7 @@ case "$1" in
   set)
     if [[ -z "$2" ]]; then
       echo "❌ Error: Missing verbosity level"
-      echo "Usage: $0 set low|medium|high"
+      echo "Usage: $0 set low|medium|high|caveman"
       exit 1
     fi
     set_verbosity "$2"

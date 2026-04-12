@@ -1,5 +1,5 @@
 ---
-description: Get or set AgentVibes verbosity level (low/medium/high)
+description: Get or set AgentVibes verbosity level (low/medium/high/caveman)
 tags: [user]
 ---
 
@@ -11,6 +11,7 @@ Get or set the AgentVibes verbosity level to control how much Claude speaks whil
 - `/agent-vibes:verbosity low` - Set to LOW (minimal)
 - `/agent-vibes:verbosity medium` - Set to MEDIUM (balanced)
 - `/agent-vibes:verbosity high` - Set to HIGH (maximum transparency)
+- `/agent-vibes:verbosity caveman` - Set to CAVEMAN (ultra-terse, max token savings)
 
 ## Verbosity Levels
 
@@ -34,6 +35,14 @@ Get or set the AgentVibes verbosity level to control how much Claude speaks whil
 - ✓ All findings ("Found it at line 1323")
 - ✅ Completions
 - Perfect for: Full transparency, learning mode, debugging complex tasks
+
+### CAVEMAN (Ultra-Terse)
+- ⚡ Fragments only — no articles, filler, or hedging
+- 🔤 Abbreviations (DB/auth/config/fn/impl)
+- ➡️ Arrows instead of prose (X -> Y)
+- 📉 65-75% fewer output tokens
+- Perfect for: Maximum token savings, cost-conscious sessions
+- Inspired by [caveman](https://github.com/JuliusBrussee/caveman) (MIT)
 
 ## How It Works
 

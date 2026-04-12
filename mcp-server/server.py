@@ -912,17 +912,58 @@ class AgentVibesServer:
         return "✅ TTS banner: **enabled**\n\nSay: \"Turn off banner\" to disable"
 
     # Helper methods
+    def _resolve_project_dir(self) -> Optional[Path]:
+        # Returns the nearest directory containing .claude/, or None.
+        # Checked in order: explicit CLAUDE_PROJECT_DIR, npm's INIT_CWD,
+        # shell PWD, os.getcwd() and its parents. Required because MCP
+        # clients (VS Code Copilot, Codex, Warp, etc.) don't agree on
+        # what cwd to spawn the server from, so relying on os.getcwd()
+        # alone silently falls back to package config — which breaks
+        # project-local per-LLM routing in audio-effects.cfg.
+        candidates: list[Path] = []
+        for var in ("CLAUDE_PROJECT_DIR", "INIT_CWD", "PWD"):
+            val = os.environ.get(var, "").strip()
+            if val:
+                try:
+                    candidates.append(Path(val).resolve())
+                except (OSError, ValueError):
+                    pass
+        try:
+            cwd = Path.cwd().resolve()
+            candidates.append(cwd)
+            candidates.extend(cwd.parents)
+        except (OSError, ValueError):
+            pass
+
+        try:
+            agentvibes_root = self.agentvibes_root.resolve()
+        except (OSError, ValueError):
+            agentvibes_root = self.agentvibes_root
+
+        seen: set[Path] = set()
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            if candidate == agentvibes_root:
+                continue
+            try:
+                if (candidate / ".claude").is_dir():
+                    return candidate
+            except OSError:
+                continue
+        return None
+
     def _build_script_env(self) -> dict:
         """Build environment dict for script execution (shared by all script runners)"""
         env = os.environ.copy()
 
-        # Determine where to save settings based on context:
-        # 1. If cwd has .claude/ → Use cwd (real Claude Code project)
-        # 2. Otherwise → Use global ~/.claude/ (Claude Desktop, Warp, etc.)
-        # Note: Hooks are ALWAYS from package .claude/ (self.claude_dir)
-        cwd = Path.cwd()
-        if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
-            env["CLAUDE_PROJECT_DIR"] = str(cwd)
+        # Export CLAUDE_PROJECT_DIR so play-tts.{ps1,sh} reads the
+        # project's .claude/config/audio-effects.cfg (per-LLM routing,
+        # pretext, effects) instead of the package's bundled copy.
+        project_dir = self._resolve_project_dir()
+        if project_dir is not None:
+            env["CLAUDE_PROJECT_DIR"] = str(project_dir)
 
         # Add common locations for piper to PATH (Unix only)
         if not self.is_windows:
@@ -1237,7 +1278,7 @@ Examples:
         ),
         Tool(
             name="get_verbosity",
-            description="Get current AgentVibes verbosity level (low/medium/high). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken).",
+            description="Get current AgentVibes verbosity level (low/medium/high/caveman). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken) to caveman (ultra-terse fragments, max token savings).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
@@ -1248,11 +1289,13 @@ Verbosity Levels:
 - LOW: Only acknowledgments (start) and completions (end). Minimal interruption.
 - MEDIUM: + Major decisions and key findings. Balanced transparency.
 - HIGH: All reasoning, decisions, and findings. Maximum transparency.
+- CAVEMAN: Ultra-terse fragments. Drops articles, filler, hedging. Abbreviates heavily. 65-75% fewer output tokens.
 
 Perfect for:
 - LOW: Quiet work sessions, minimal distraction
 - MEDIUM: Understanding major decisions without full narration
 - HIGH: Full transparency, learning mode, debugging complex tasks
+- CAVEMAN: Maximum token savings, minimal prose
 
 Note: Changes take effect on next Claude Code session restart.""",
             inputSchema={
@@ -1261,7 +1304,7 @@ Note: Changes take effect on next Claude Code session restart.""",
                     "level": {
                         "type": "string",
                         "description": "Verbosity level to set",
-                        "enum": ["low", "medium", "high"]
+                        "enum": ["low", "medium", "high", "caveman"]
                     }
                 },
                 "required": ["level"],

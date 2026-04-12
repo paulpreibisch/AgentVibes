@@ -64,7 +64,7 @@ const FOOTER_TEXT =
   '[↑↓] Navigate  [Enter] Edit  [Esc] Tab Bar';
 
 const MUSIC_DEFAULTS = Object.freeze({ enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3', volume: 20 });
-const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', minimal: 'Minimal', custom: 'Custom' });
+const VERBOSITY_LABELS = Object.freeze({ high: 'High', medium: 'Medium', low: 'Low', caveman: 'Caveman', minimal: 'Minimal', custom: 'Custom' });
 
 // ---------------------------------------------------------------------------
 // Exported format helpers (pure functions — used by tests and UI)
@@ -740,7 +740,7 @@ export function createSettingsTab(screen, services) {
   function _editVerbosity() {
     navigationService?.openModal();
 
-    const levels = ['high', 'medium', 'low'];
+    const levels = ['high', 'medium', 'low', 'caveman'];
     const modal = blessed.list({
       parent: screen,
       top: 'center',

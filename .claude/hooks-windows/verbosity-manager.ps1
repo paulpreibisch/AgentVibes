@@ -39,9 +39,9 @@ function Get-Verbosity {
 function Set-Verbosity {
     param([string]$Level)
 
-    if ($Level -notmatch '^(low|medium|high)$') {
+    if ($Level -notmatch '^(low|medium|high|caveman)$') {
         Write-Output "Invalid verbosity level: $Level"
-        Write-Output "Valid options: low, medium, high"
+        Write-Output "Valid options: low, medium, high, caveman"
         exit 1
     }
 
@@ -60,6 +60,7 @@ function Set-Verbosity {
     Write-Output "   LOW: Acknowledgments + Completions only"
     Write-Output "   MEDIUM: + Major decisions and findings"
     Write-Output "   HIGH: All reasoning (maximum transparency)"
+    Write-Output "   CAVEMAN: Ultra-terse fragments, max token savings"
     Write-Output ""
     Write-Output "Restart Claude Code for changes to take effect"
 }
@@ -91,9 +92,15 @@ function Show-Info {
     Write-Output "  All findings"
     Write-Output "  Completions"
     Write-Output ""
+    Write-Output "CAVEMAN (Ultra-Terse)"
+    Write-Output "  Fragments only, no filler"
+    Write-Output "  65-75% fewer output tokens"
+    Write-Output "  Abbreviations (DB/auth/config/fn/impl)"
+    Write-Output "  Arrows instead of prose (X -> Y)"
+    Write-Output ""
     Write-Output "Usage:"
     Write-Output "  verbosity-manager.ps1 get              Show current level"
-    Write-Output "  verbosity-manager.ps1 set low|medium|high  Change level"
+    Write-Output "  verbosity-manager.ps1 set low|medium|high|caveman  Change level"
 }
 
 switch ($Command) {
@@ -103,7 +110,7 @@ switch ($Command) {
     "set" {
         if (-not $Arg1) {
             Write-Output "Error: Missing verbosity level"
-            Write-Output "Usage: verbosity-manager.ps1 set low|medium|high"
+            Write-Output "Usage: verbosity-manager.ps1 set low|medium|high|caveman"
             exit 1
         }
         Set-Verbosity $Arg1

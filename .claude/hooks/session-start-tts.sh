@@ -52,6 +52,9 @@ case "$VERBOSITY" in
   high)
     CONTEXT+="## Verbosity: HIGH\n- Acknowledgment: Action + approach + why\n- Completion: Result + decisions + trade-offs\n- Include: Full reasoning, alternatives\n\n"
     ;;
+  caveman)
+    CONTEXT+="## Verbosity: CAVEMAN\n- Respond terse. All technical substance stays. Only fluff dies.\n- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging\n- Abbreviate: DB/auth/config/req/res/fn/impl. Use arrows (X -> Y). Strip conjunctions.\n- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.\n- Pattern: [thing] [action] [reason]. [next step].\n- TTS: Ultra-short. Max 60 chars.\n\n"
+    ;;
 esac
 
 # Add style info and rules
@@ -62,7 +65,7 @@ CONTEXT+="2. Never skip completion TTS\n"
 CONTEXT+="3. Match verbosity level\n"
 CONTEXT+="4. Keep under 150 chars\n"
 CONTEXT+="5. Always include errors\n\n"
-CONTEXT+="Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning"
+CONTEXT+="Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning | caveman=ultra-terse fragments"
 
 # Add BMAD agent voice routing instructions
 CONTEXT+="\n\n## BMAD Agent Voice Routing\n"

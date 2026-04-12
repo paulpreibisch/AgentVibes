@@ -56,6 +56,7 @@ $VerbositySection = switch ($Verbosity) {
     "low"    { "## Verbosity: LOW`n- Acknowledgment: Action only`n- Completion: Result + errors only`n- Skip: Reasoning, decisions" }
     "medium" { "## Verbosity: MEDIUM`n- Acknowledgment: Action + key approach`n- Completion: Result + important decisions`n- Include: Major choices only" }
     "high"   { "## Verbosity: HIGH`n- Acknowledgment: Action + approach + why`n- Completion: Result + decisions + trade-offs`n- Include: Full reasoning, alternatives" }
+    "caveman" { "## Verbosity: CAVEMAN`n- Respond terse. All technical substance stays. Only fluff dies.`n- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging`n- Abbreviate: DB/auth/config/req/res/fn/impl. Use arrows (X -> Y). Strip conjunctions.`n- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.`n- Pattern: [thing] [action] [reason]. [next step].`n- TTS: Ultra-short. Max 60 chars." }
     default  { "## Verbosity: LOW`n- Acknowledgment: Action only`n- Completion: Result + errors only" }
 }
 
@@ -86,7 +87,7 @@ $VerbositySection
 4. Keep under 150 chars
 5. Always include errors
 
-Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning
+Quick Ref: low=action+result | medium=+key decisions | high=+full reasoning | caveman=ultra-terse fragments
 
 ## BMAD Agent Voice Routing
 If ``.bmad-agent-context`` exists, check its content:

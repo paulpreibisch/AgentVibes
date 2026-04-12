@@ -19,8 +19,8 @@ describe('VERBOSITY_LEVELS', () => {
     assert.ok(Array.isArray(VERBOSITY_LEVELS));
   });
 
-  test('contains 5 levels in order', () => {
-    assert.deepStrictEqual(VERBOSITY_LEVELS, ['minimal', 'low', 'medium', 'high', 'custom']);
+  test('contains 6 levels in order', () => {
+    assert.deepStrictEqual(VERBOSITY_LEVELS, ['minimal', 'low', 'medium', 'high', 'caveman', 'custom']);
   });
 });
 

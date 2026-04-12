@@ -232,18 +232,29 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && ! verify_voice "$VOICE_MO
   echo "   File size: ~25MB"
   echo "   Preview: https://huggingface.co/rhasspy/piper-voices"
   echo ""
-  read -p "   Download this voice model? [y/N]: " -n 1 -r
-  echo
 
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
+  # Auto-download when non-interactive (e.g. called from a hook)
+  if [[ ! -t 0 ]]; then
+    echo "   Auto-downloading (non-interactive mode)..."
     if ! download_voice "$VOICE_MODEL"; then
       echo "❌ Failed to download voice model"
       echo "Fix: Download manually or choose different voice"
       exit 3
     fi
   else
-    echo "❌ Voice download cancelled"
-    exit 3
+    read -p "   Download this voice model? [y/N]: " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      if ! download_voice "$VOICE_MODEL"; then
+        echo "❌ Failed to download voice model"
+        echo "Fix: Download manually or choose different voice"
+        exit 3
+      fi
+    else
+      echo "❌ Voice download cancelled"
+      exit 3
+    fi
   fi
 fi
 
