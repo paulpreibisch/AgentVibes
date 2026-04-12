@@ -1,189 +1,28 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
-## 🛡️ v5.1.4 — TTS 弹性全面改造 + 默认 LLM 提供商 + 每客户端路由
+## 🎯 v5.2.0 — 远程语音预览 + 穴居人模式 + 语音评分
 
-**发布日期:** 2026年4月
+**发布日期:** 2026 年 4 月
 
-此版本解决了围绕每个 LLM 的 TTS 路由、并行音频播放、进程死锁和过期音频重播的一系列长期存在的 bug。它还在 Setup 标签中添加了一个新的"默认"条目用于备用音频,并切换到每客户端的配置方案,正确地将 Claude Code、GitHub Copilot (Chat + CLI) 和 OpenAI Codex 路由到它们自己的声音和前缀。
-
-### 新功能
-
-- **默认 LLM 提供商** — Setup → 提供商页面底部的新条目。仅配置（无安装/删除按钮）。当工具调用 TTS 但未识别其 LLM 时使用。
-- **每个 LLM 的背景音乐自动启用** — 在每个 LLM 的 Configure 模态中设置 `bg_track` 现在会真正播放。
-- **Copilot CLI 支持** — `installCopilotMcp` 现在同时写入 `.vscode/mcp.json` (Copilot Chat) 和 `~/.copilot/mcp-config.json` (Copilot CLI — 不同产品)。
-
-### 每客户端路由架构
-
-`.mcp.json` 不再设置 `AGENTVIBES_LLM`。MCP 服务器通过 `CLAUDECODE=1` 环境变量自动检测 Claude Code。Copilot CLI 读取其自己的全局配置（带 `AGENTVIBES_LLM=copilot`）。Codex 读取 `~/.codex/config.toml`（带 `AGENTVIBES_LLM=codex`）。不再有客户端配置冲突。
-
-### TTS 弹性 (`play-tts.ps1`)
-
-- **跨进程播放互斥锁** (`AgentVibesPlaybackLock`) 序列化所有音频播放。
-- **互斥锁超时时的自愈** — 自动终止卡住的 `play-tts.ps1` 进程。
-- **25 秒看门狗** 保证前进。
-- **从提供商 stdout 精确捕获文件名** — 不再有过期音频重播。
-- **每个 LLM 语音优先于 MCP 参数中的显式 `VoiceOverride`**。
-- **codex 默认 `lessac-medium` → `lessac-high`** (静默合成失败的解决方法)。
-- **暂存文件重命名 + 仅 ASCII 编码** — 消除累积的复合文件。
-
-### UX 改进
-
-- **Setup → 安装确认** 现在将焦点推进到下一个提供商行 (安装 → 安装 → 安装流程)。
-
-### 如何更新
-
-```
-npm cache clean --force
-npx --yes agentvibes@5.1.4
-```
-
-在任何现有项目中重新运行安装程序,以使每客户端配置迁移生效。
-
----
-
-## 🎙️ v5.1.0 — 语音选择器重做 + 代理模态框自动保存
-
-**发布日期:** 2026年4月
+此版本新增了远程 TTS 预览支持、全新的超简洁详细度模式，以及 TUI 全局的点赞/差评语音评分功能。
 
 ### 新功能
 
-- **代理编辑模态框中的自动保存** — 每个代理的语音/人格/音乐/混响/预文本更改现在在编辑时自动保存。明确的保存按钮已消失；简短的"✓ 已保存!"提示确认每次更改。取消和恢复默认值仍然像以前一样工作。
+- **穴居人详细度模式** — 用于超简洁 TTS 输出的全新 `caveman` 详细度级别。输出片段而非完整句子。可通过 `/agent-vibes:verbosity caveman` 或 MCP `set_verbosity` 工具进行设置。若新安装后没有可用语音，则自动下载。
 
-- **LibriTTS 说话者的独特名称** — 904 个 LibriTTS 说话者不再显示为"Anna"、"Anna-2"、"Anna-3"、…"Anna-16"。每个都从 16 个名字的池中获得确定性的姓氏：**Anna Bell**、**Anna Carter**、**Anna Davis**、…、**Anna Quinn**。底层语音 ID 不变，因此现有用户配置仍然可以解析。
+- **点赞/差评语音评分** — 用 👍/👎 评分取代旧的星标收藏。在 Voices 选项卡和语音选择器（Setup 选项卡）中均可按 `+` 点赞、按 `-` 差评。评分跨会话持久保存，并在所有语音选择界面之间共享。
 
-- **粉色/浅蓝色性别符号** — 女性语音显示粉色（洋红色）的 **♀**，男性语音显示浅蓝色（bright-cyan）的 **♂**，未知显示 `—`。标题 `Gender` 列被替换为彩色 `♀/♂`（10 → 4 字符宽），为更长的名称腾出空间。应用于主 Voices 选项卡和所有 3 个语音选择器模态框（Setup、Agents、Settings）。
+- **远程语音预览** — TUI Voices 选项卡、语音选择器和语音浏览器中的语音预览现在可在无头服务器上运行。当活跃提供商为 `ssh-remote` 或 `agentvibes-receiver` 时，预览通过 `play-tts.sh` 路由，在远程接收器上播放音频，无需本地 Piper + 音频播放器。平台感知：Windows 使用 PowerShell，Linux 使用 bash。
 
-- **语音选择器中的首字母快速跳转** — 按任意字母 `a`–`z` 跳转到以该字母开头的第一个语音。保留键（`q`、`j`、`k`、`g`、`h`、`l`）被阻止以保留其取消/vi 导航含义。
+- **SSH 接收器提供商路由** — `ssh-remote` 和 `agentvibes-receiver` 现已成为 `play-tts.sh` 的一级提供商。`speak_text()` 函数和主路由 case 语句均支持它们，消除了"Unknown provider"错误。
 
-- **语音选择器中的页面导航** — `PgUp`、`PgDn`、`Home`、`End` 现在在所有语音选择器模态框中都能工作。
+### 修复
 
-- **3 首新背景音乐曲目** — `Late Night Hip Hop Groove`、`Drifting Down the Hall`（90 年代氛围）和 `Midnight Charleston Stomp`（摇摆乐）。曲目数量从 15 增加到 18。
-
-### 改进
-
-- **从语音选择器中删除搜索栏** — 替换为首字母快速跳转。旧的搜索文本框存在吞噬导航键的焦点问题。跳转对于典型的"查找语音 X"用例更快。
-
-- **曲目列表排序修复** — 带有表情符号前缀的曲目（例如 `🎤 Late Night Hip Hop Groove`）现在按名称的字母部分排序，而不是表情符号代码点。顺序在 Node/ICU 版本之间一致。
-
-- **收藏热键现在仅为 `*`** — 移除了在语音选择器和主 Voices 选项卡中标记收藏的重复 `f` 绑定。`f` 现在可用于首字母跳转（例如跳转到 Frank 或 Felix）。`*` 标记仍然是切换收藏的规范方式。
-
-### 错误修复
-
-- **Voices 选项卡中未安装的行不再损坏** — 选择未安装的语音由于过度匹配该行 `bright-black-fg` 包装器的正则表达式而在视觉上删除了其 Provider 列。已替换为仅删除确切提示文本的精确提示锚点。
-
-- **Music + Voices 选项卡闪烁伪影消除** — 在列表中快速滚动时，`█` 光标不再留下散落的块。两个选项卡现在都使用精确的闪烁剥离助手，而不是脆弱的基于位置的切片器。
-
-- **Setup 选项卡不再静默失败** — `_renderScreen3` 将整个 `setupCompleted` 写入块包装在单个空 `try/catch {}` 中。损坏的本地配置文件现在备份到 `config.json.bak` 并重新写入，错误记录到 stderr — 不再有"卡在重复设置"而没有解释。
-
-- **语音选择器 `q` 取消现在可用** — 新的首字母跳转吞噬了 `q`（和其他 vi 导航键）。已添加保留键阻止列表。
-
-- **曲目选择器不区分大小写排序** — Title Case 名称的新曲目（`Late Night Hip Hop Groove.mp3`）不再跳到列表顶部小写 `agent_vibes_*` 曲目之上。
-
-### 用户影响
-
-- 编辑代理的语音或设置现在更快 — 无需记得点击保存
-- 由于所有 904 个 LibriTTS 说话者都有独特友好的名称，语音选择器变得不那么杂乱
-- 通过彩色符号一目了然地看到性别
-- 三首新音乐曲目增加多样性
-- Voices 和 Music 选项卡中的闪烁/滚动伪影消除
-
----
-
-## 🚀 v5.0.0 — 多供应商支持: Claude Code + Copilot + Codex
-
-**发布日期:** 2026年4月
-
-### 新功能
-
-- **VS Code 中的 GitHub Copilot 支持** — 直接从 TUI 为 GitHub Copilot 安装和配置 AgentVibes。创建 `.vscode/mcp.json` 和 `.github/copilot-instructions.md`。
-
-- **VS Code 中的 OpenAI Codex 支持** — 完整的 Codex 集成，包括 `.codex/config.toml`、`AGENTS.md` TTS 协议和初始化钩子。
-
-- **统一设置标签页** — 旧的 5 屏安装向导和独立的 LLM 供应商标签页合并为单一的设置标签页。首次运行显示 4 步向导（语言 → 依赖项 → TTS 引擎 → 供应商）；回访用户直接跳转到供应商界面。
-
-- **按供应商配置音频** — 每个 LLM 供应商（Claude Code、Copilot、Codex）通过配置弹窗获得独立的 TTS 引擎、语音、混响、背景音乐和 Pretext。
-
-- **TTS 引擎选择界面** — 新的向导步骤显示适配操作系统的引擎列表（Piper、Soprano、Windows SAPI、macOS Say），并为缺失的引擎提供安装按钮。
-
-- **设置标签页重新设计** — 5 个子标签页布局被替换为简洁的扁平列表：界面语言、默认 TTS 引擎、默认语音、详细程度、音频输出目标、配置存储和重新运行设置向导。
-
-### 改进
-
-- **语音选择器全面升级** — 3 列显示（名称、性别、供应商），空格键预览支持合成与播放，预览期间保留滚动位置。
-
-- **提示文本残影修复** — 在代理和音乐标签页中切换行时，不再在之前的行上留下残影文字。
-
-- **Codex 语音路由修正** — `AGENTS.md` 现在指示 Codex 使用 `play-tts` 进行正常语音播报，仅在 BMAD 派对模式期间使用 `bmad-speak`。
-
-### 用户影响
-
-- AgentVibes 现在可与 Claude Code、GitHub Copilot 和 OpenAI Codex 配合使用
-- 简化的设置体验 — 一个标签页管理所有供应商
-- 无需编辑配置文件即可按供应商自定义语音
-- 设置页面显著更简洁，导航更快速
-
----
-
-## 🐛 v4.6.8 — 全新安装崩溃修复
-
-**发布日期：** 2026年4月
-
-### 错误修复
-
-- **设置选项卡在全新安装时不再崩溃** — 当尚未配置语音时，`parseMultiSpeaker()` 对 null 的语音 ID 调用了 `.includes()`。已添加 null 守卫，返回安全的默认对象。此问题由一位在安装向导完成后立即遇到此问题的用户报告。
-
-- **macOS /var 符号链接导致的回放测试问题** — 修复了在 macOS 上由于 `/var` 是指向 `/private/var` 的符号链接，导致回放路径比较失败的测试断言。
-
-- **BMAD 语音 pretext 解析** — `bmad-voices.md` 的 pretext 行现在可以正确解析，TTS 合成前的 Markdown 去除也更加彻底。
-
-### 用户影响
-
-- 新用户在全新安装后导航到设置时不再崩溃
-- 测试套件在 macOS 上可靠通过
-
----
-
-## 🌍 v4.5.0 — "畅言万语"发布版
-
-**发布日期：** 2026年4月
-
-全面支持9种语言的多语言 TUI，完整的 Windows 安全加固，以及零测试失败。
-
-### 🌍 多语言 TUI — 9 种语言
-
-`npx agentvibes` TUI 中的每个界面、选项卡、按钮和标签现已完全翻译：
-
-- **英语、西班牙语、法语、德语、葡萄牙语、日语、韩语、中文（简体）、意大利语**
-- 首次启动时选择语言（安装向导的第 0 屏）
-- 设置中的语言子选项卡 — 无需重启即可实时切换语言
-- 所有选项卡栏标签、按钮文字、底部提示和状态消息均已翻译
-- BMAD 选项卡和 SSH Receiver 选项卡完全本地化
-- 每种语言的 i18n 文件，提供英语回退
-
-### 🪟 Windows 安全与错误修复
-
-- **临时文件名** — 所有 `Date.now()` 临时文件名替换为 `randomUUID()`（不可预测，防止临时文件劫持）
-- **Shell 注入** — `execSync('which ...', { shell: true })` 替换为 `spawnSync`
-- **音乐播放器** — Windows 上硬编码的 `ffplay` 替换为 `detectMp3Player()`
-- **布尔值强制转换** — `isWindowsTerminal` 现在正确返回 `true/false`，而不是泄露 `WT_SESSION` UUID 字符串
-
-### 🎙️ 跨平台 BMAD Speak
-
-- `bin/bmad-speak.js` — BMAD 代理语音的跨平台入口点
-- `.claude/hooks-windows/bmad-speak.ps1` — 具有按代理人格路由的原生 Windows BMAD Speak
-
-### 🧪 测试套件
-
-- 600 个测试，0 个失败
-
----
-
-## 🐛 v4.5.1 — 补丁发布
-
-**发布日期：** 2026年4月
-
-### 错误修复
-
-- **音乐选项卡预览** — 在全新目录中运行 `npx agentvibes` 时，在音乐选项卡中对某首曲目按下空格键现在
-  可以正确播放。此前，如果当前工作目录中不存在 `.claude/audio/tracks/`，曲目列表会显示内置曲目，但
-  按空格键没有任何反应（播放器针对一个不存在的路径启动）。现在会自动回退到软件包自带的曲目目录。
+- **自动修补 LibriTTS 说话者名称** — 语音下载时现在自动修补 LibriTTS 说话者名称，使多说话者语音开箱即用。
+- **语音验证正则表达式加固** — `play-tts-ssh-remote.sh` 和 `play-tts-agentvibes-receiver.sh` 中的 VOICE 参数正则表达式现在允许 `::`（多说话者）、`.`（区域）和空格（说话者名称），同时拒绝反斜杠（注入风险）。Linux 和 Windows 接收器模板已同步更新。
+- **`base64` 跨平台兼容性** — `play-tts-agentvibes-receiver.sh` 现在会探测 GNU `base64 -w 0`，回退到 BSD `-b 0`，再回退到 `tr -d '\n'`。修复了 macOS/BSD 系统上的脚本中止问题。
+- **音频效果重复处理修复** — 设置 `AGENTVIBES_NO_PLAY` 时，`play-tts-piper.ps1` 会跳过自身的音频处理器调用，防止混响/音乐被应用两次。
+- **退出代码泄漏修复** — `play-tts.ps1` 现在明确以代码 0 退出，防止原生命令退出代码（piper、ffmpeg、sox）泄漏并导致误报 TTS 失败。
+- **Windows 接收器选项卡平台支持** — Tailscale IP 检测、通过 PowerShell 获取本地 IP、读取 sshd_config 以及复制到剪贴板现在均可在 Windows 上原生工作。
+- **`llm:default` 音频效果行** — `audio-effects.cfg` 中的新默认行确保即使没有每 LLM 配置条目，远程接收器也能获得混响、音乐和前置文本。
+- **预览示例文本** — 为避免 Piper 对"preview"一词的发音故障已作更改。

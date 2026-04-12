@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.1.4
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.2.0
 
 ---
 
-## 🛡️ NOVO NO v5.1.4 — Reformulação de Resiliência TTS + Provedor LLM Padrão
+## 🎯 NOVO NO v5.2.0 — Pré-visualização de Voz Remota + Modo Homem das Cavernas + Avaliações de Voz
+
+- **Modo de verbosidade homem das cavernas** — Fragmentos TTS ultra-concisos. Configure via `/agent-vibes:verbosity caveman`.
+- **👍/👎 avaliações de voz** — Pressione `+` para polegar para cima, `-` para polegar para baixo em qualquer lista de vozes. Substitui os favoritos com estrelas.
+- **Pré-visualização de voz remota** — A pré-visualização de voz na TUI funciona em servidores headless via receptor SSH. Sem necessidade de áudio local.
+- **Roteamento do receptor SSH** — `ssh-remote` e `agentvibes-receiver` são agora provedores de primeira classe.
+- **Validação de vozes reforçada** — Formato multi-falante `::`, base64 multiplataforma, sem injeção de barra invertida.
+
+---
+
+## 🛡️ v5.1.4 — Reformulação de Resiliência TTS + Provedor LLM Padrão
 
 - **Provedor LLM Padrão** — Nova entrada de fallback na parte inferior de Configuração → Provedores. Apenas config; abre o modal Configurar padrão. Usado quando uma ferramenta chama TTS sem identificar seu LLM.
 - **Música de fundo por LLM ativa automaticamente** — Definir uma faixa de fundo no modal Configurar por LLM agora realmente a reproduz (sem precisar também ativar a música global).

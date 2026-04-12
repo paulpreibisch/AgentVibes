@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.4
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.0
 
 ---
 
-## 🛡️ NEU IN v5.1.4 — TTS-Resilienz-Uberholung + Standard-LLM-Anbieter
+## 🎯 NEU IN v5.2.0 — Remote-Stimmvorschau + Höhlenmensch-Modus + Stimmbewertungen
+
+- **Höhlenmensch-Verbositätsmodus** — Ultra-knappe TTS-Fragmente. Konfigurieren mit `/agent-vibes:verbosity caveman`.
+- **👍/👎 Stimmbewertungen** — Drücken Sie `+` für Daumen hoch, `-` für Daumen runter in jeder Stimmliste. Ersetzt Stern-Favoriten.
+- **Remote-Stimmvorschau** — TUI-Stimmvorschau funktioniert auf Headless-Servern über SSH-Empfänger. Kein lokales Audio benötigt.
+- **SSH-Empfänger-Routing** — `ssh-remote` und `agentvibes-receiver` sind jetzt erstklassige Anbieter.
+- **Stimm-Validierung gehärtet** — Multi-Sprecher-Format `::`, plattformübergreifendes base64, keine Backslash-Injection.
+
+---
+
+## 🛡️ v5.1.4 — TTS-Resilienz-Uberholung + Standard-LLM-Anbieter
 
 - **Standard-LLM-Anbieter** — Neuer Fallback-Eintrag am unteren Rand von Setup → Anbieter. Nur-Konfiguration; offnet den Standard-Konfigurations-Modal.
 - **Pro-LLM-Hintergrundmusik aktiviert sich automatisch** — Das Setzen eines Hintergrundtracks im Pro-LLM Konfigurations-Modal spielt ihn jetzt tatsachlich ab.

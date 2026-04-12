@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.1.4
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.2.0
 
 ---
 
-## 🛡️ NEW IN v5.1.4 — TTS 弹性全面改造 + 默认 LLM 提供商
+## 🎯 NEW IN v5.2.0 — 远程语音预览 + 穴居人模式 + 语音评分
+
+- **穴居人详细度模式** — 超简洁 TTS 片段输出。通过 `/agent-vibes:verbosity caveman` 设置。
+- **👍/👎 语音评分** — 在任意语音列表中按 `+` 点赞、`-` 差评。取代星标收藏。
+- **远程语音预览** — TUI 语音预览通过 SSH 接收器在无头服务器上工作。无需本地音频。
+- **SSH 接收器路由** — `ssh-remote` 和 `agentvibes-receiver` 现已成为一级提供商。
+- **语音验证加固** — 多说话者 `::` 格式、跨平台 base64、无反斜杠注入。
+
+---
+
+## 🛡️ v5.1.4 — TTS 弹性全面改造 + 默认 LLM 提供商
 
 - **默认 LLM 提供商** — Setup → 提供商页面底部的新备用条目。仅配置。
 - **每个 LLM 的背景音乐自动启用** — 在每个 LLM 的 Configure 模态中设置背景音轨现在会真正播放。

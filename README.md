@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.1.4
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.0
 
 ---
 
@@ -43,7 +43,15 @@ Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, 
 
 ---
 
-## 🛡️ NEW IN v5.1.4 — TTS Resilience Overhaul + Default LLM Provider
+## 🎯 NEW IN v5.2.0 — Remote Voice Preview + Caveman Mode + Voice Ratings
+
+- **Caveman verbosity mode** — Ultra-terse TTS fragments. Set via `/agent-vibes:verbosity caveman`.
+- **👍/👎 voice ratings** — Press `+` to thumbs up, `-` to thumbs down in any voice list. Replaces star favorites.
+- **Remote voice preview** — TUI voice preview works on headless servers via SSH receiver. No local audio needed.
+- **SSH receiver routing** — `ssh-remote` and `agentvibes-receiver` are now first-class providers.
+- **Voice validation hardened** — Multi-speaker `::` format, cross-platform base64, no backslash injection.
+
+## 🛡️ v5.1.4 — TTS Resilience Overhaul + Default LLM Provider
 
 - **Default LLM provider** — New fallback entry at the bottom of Setup → Providers. Config-only; opens the standard Configure modal. Used when a tool calls TTS without identifying its LLM.
 - **Per-LLM background music auto-enables** — Setting a bg track on the per-LLM Configure modal actually plays it now (no need to also toggle global bg music).

@@ -1,5 +1,41 @@
 # AgentVibes Release Notes
 
+## 🎯 v5.2.0 — Remote Voice Preview + Caveman Mode + Voice Ratings
+
+**Release Date:** April 2026
+
+This release adds remote TTS preview support, a new ultra-terse verbosity mode, and thumbs up/down voice ratings across the TUI.
+
+### New Features
+
+- **Caveman verbosity mode** — New `caveman` verbosity level for ultra-terse TTS output. Fragments instead of sentences. Set via `/agent-vibes:verbosity caveman` or the MCP `set_verbosity` tool. Auto-downloads a voice on fresh install if none are present.
+
+- **Thumbs up/down voice ratings** — Replace the old star favorites with 👍/👎 ratings. Press `+` to thumbs up, `-` to thumbs down in both the Voices tab and the voice picker (Setup tab). Ratings persist across sessions and are shared between all voice selection UIs.
+
+- **Remote voice preview** — Voice preview in the TUI Voices tab, voice picker, and voice browser now works on headless servers. When the active provider is `ssh-remote` or `agentvibes-receiver`, preview routes through `play-tts.sh` to play audio on the remote receiver instead of requiring local Piper + audio player. Platform-aware: uses PowerShell on Windows, bash on Linux.
+
+- **SSH receiver provider routing** — `ssh-remote` and `agentvibes-receiver` are now first-class providers in `play-tts.sh`. Both the `speak_text()` function and the main routing case statement support them, eliminating "Unknown provider" errors.
+
+### Fixes
+
+- **Auto-patch LibriTTS speaker names** — Voice download now auto-patches LibriTTS speaker names so multi-speaker voices work correctly out of the box.
+
+- **Voice validation regex hardened** — The VOICE parameter regex in `play-tts-ssh-remote.sh` and `play-tts-agentvibes-receiver.sh` now allows `::` (multi-speaker), `.` (locale), and spaces (speaker names) without accepting backslash (injection risk). Linux and Windows receiver templates updated to match.
+
+- **`base64` cross-platform compatibility** — `play-tts-agentvibes-receiver.sh` now probes for GNU `base64 -w 0`, falls back to BSD `-b 0`, then `tr -d '\n'`. Fixes script abort on macOS/BSD systems.
+
+- **Audio effects double-processing fix** — `play-tts-piper.ps1` skips its own audio-processor call when `AGENTVIBES_NO_PLAY` is set, preventing reverb/music from being applied twice.
+
+- **Exit code leak fix** — `play-tts.ps1` now exits with code 0 explicitly, preventing native command exit codes (piper, ffmpeg, sox) from leaking through and causing false TTS failure reports.
+
+- **Windows receiver-tab platform support** — Tailscale IP detection, local IP via PowerShell, sshd_config reading, and clipboard copy all work natively on Windows now.
+
+- **`llm:default` audio effects row** — New default row in `audio-effects.cfg` ensures remote receivers get reverb, music, and pretext even without a per-LLM config entry.
+
+- **Preview sample text** — Changed from "Here is a preview of your audio settings" to avoid Piper pronunciation glitch on the word "preview".
+
+---
+
 ## 🛡️ v5.1.4 — TTS Resilience Overhaul + Default LLM Provider + Per-Client Routing
 
 **Release Date:** April 2026

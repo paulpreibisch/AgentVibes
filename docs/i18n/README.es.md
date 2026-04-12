@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.1.4
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.2.0
 
 ---
 
-## 🛡️ NUEVO EN v5.1.4 — Renovación de Resiliencia TTS + Proveedor LLM por Defecto
+## 🎯 NUEVO EN v5.2.0 — Vista Previa de Voz Remota + Modo Cavernícola + Valoraciones de Voz
+
+- **Modo de verbosidad cavernícola** — Fragmentos TTS ultra-concisos. Configura con `/agent-vibes:verbosity caveman`.
+- **👍/👎 valoraciones de voz** — Pulsa `+` para pulgar arriba, `-` para pulgar abajo en cualquier lista de voces. Sustituye los favoritos con estrellas.
+- **Vista previa de voz remota** — La vista previa de voz en la TUI funciona en servidores sin cabeza mediante receptor SSH. No se necesita audio local.
+- **Enrutamiento del receptor SSH** — `ssh-remote` y `agentvibes-receiver` son ahora proveedores de primera clase.
+- **Validación de voces reforzada** — Formato multi-hablante `::`, base64 multiplataforma, sin inyección de barra invertida.
+
+---
+
+## 🛡️ v5.1.4 — Renovación de Resiliencia TTS + Proveedor LLM por Defecto
 
 - **Proveedor LLM por Defecto** — Nueva entrada de reserva al final de Configuración → Proveedores. Solo configurable; abre el modal Configurar estándar. Se usa cuando una herramienta llama a TTS sin identificar su LLM.
 - **Música de fondo por LLM se activa automáticamente** — Configurar una pista de fondo en el modal Configurar ahora la reproduce realmente (ya no hace falta activar además la música global).
