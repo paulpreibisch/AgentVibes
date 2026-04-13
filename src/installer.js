@@ -4308,34 +4308,20 @@ function isPathSafe(targetPath, basePath) {
  * @param {Object} options - Installation options (includes 'yes' for auto-confirm)
  */
 async function handleMcpConfiguration(targetDir, options) {
+  // Claude Code does NOT need an MCP config.  It works entirely via hooks
+  // (.claude/hooks-windows/) and slash commands (.claude/commands/).
+  // The MCP server is auto-detected via CLAUDECODE=1 env var at runtime.
+  //
+  // We do NOT write .mcp.json because Copilot reads it with precedence
+  // over .vscode/mcp.json, causing LLM identity collisions.
+  //
+  // Each tool has its own project-local config:
+  //   .vscode/mcp.json   → VS Code Copilot (AGENTVIBES_LLM = "copilot")
+  //   ~/.copilot/mcp-config.json → Copilot CLI (AGENTVIBES_LLM = "copilot")
+  //   .codex/config.toml → Codex           (AGENTVIBES_LLM = "codex")
+
+  // Migrate: remove stale agentvibes entry from .mcp.json if present
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
-
-  // MCP server configuration for AgentVibes.
-  //
-  // Claude Code's MCP config goes in ~/.claude.json (user-scope, project-specific)
-  // to avoid collisions with Copilot which reads .mcp.json with precedence.
-  //
-  // Each tool has its own config with an explicit AGENTVIBES_LLM env var:
-  //   ~/.claude.json (project) → Claude Code  (AGENTVIBES_LLM = "claude-code")
-  //   .vscode/mcp.json         → VS Code Copilot (AGENTVIBES_LLM = "copilot")
-  //   ~/.copilot/mcp-config    → Copilot CLI  (AGENTVIBES_LLM = "copilot")
-  //   .codex/config.toml       → Codex        (AGENTVIBES_LLM = "codex")
-  const agentvibesServer = {
-    command: 'npx',
-    args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-    env: { AGENTVIBES_LLM: 'claude-code' },
-  };
-
-  const claudeJsonPath = path.join(
-    process.env.USERPROFILE || process.env.HOME || '',
-    '.claude.json'
-  );
-  const absTarget = path.resolve(targetDir);
-
-  let configured = false;
-  let configError = null;
-
-  // Migrate: remove agentvibes from .mcp.json if present (legacy)
   try {
     const raw = await fs.readFile(mcpConfigPath, 'utf8');
     const parsed = JSON.parse(raw);
@@ -4351,65 +4337,22 @@ async function handleMcpConfiguration(targetDir, options) {
     }
   } catch { /* no .mcp.json or can't parse — fine */ }
 
-  // Write to ~/.claude.json
-  try {
-    let claudeJson = {};
-    try {
-      claudeJson = JSON.parse(await fs.readFile(claudeJsonPath, 'utf8'));
-    } catch { /* new or unparseable */ }
-    if (!claudeJson.projects || typeof claudeJson.projects !== 'object') {
-      claudeJson.projects = {};
-    }
-    if (!claudeJson.projects[absTarget]) {
-      claudeJson.projects[absTarget] = {};
-    }
-    if (!claudeJson.projects[absTarget].mcpServers) {
-      claudeJson.projects[absTarget].mcpServers = {};
-    }
-    claudeJson.projects[absTarget].mcpServers.agentvibes = agentvibesServer;
-    await fs.writeFile(claudeJsonPath, JSON.stringify(claudeJson, null, 2) + '\n');
-    configured = true;
-  } catch (err) {
-    configError = err;
-  }
-
-  if (configured) {
-    console.log(
-      boxen(
-        chalk.green.bold('✅ Claude Code MCP Configured!\n\n') +
-        chalk.white('AgentVibes MCP server registered in ') + chalk.cyan('~/.claude.json') + chalk.white('.\n') +
-        chalk.gray('(Project: ' + absTarget + ')'),
-        {
-          padding: 1,
-          margin: { top: 1, bottom: 1, left: 0, right: 0 },
-          borderStyle: 'double',
-          borderColor: 'green',
-        }
-      )
-    );
-    return;
-  }
-
-  // Failed to write ~/.claude.json — show manual instructions
   console.log(
     boxen(
-      chalk.yellow.bold('ℹ️  MCP Configuration\n\n') +
-      (configError
-        ? chalk.red('Could not write ~/.claude.json: ' + configError.message + '\n\n')
-        : '') +
-      chalk.white('To register AgentVibes MCP server for Claude Code, run:\n') +
-      chalk.cyan.bold('   claude mcp add agentvibes npx -y --package=agentvibes agentvibes-mcp-server\n\n') +
-      chalk.cyan('📖 Full Guide:\n') +
-      chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
+      chalk.green.bold('✅ Claude Code Ready!\n\n') +
+      chalk.white('AgentVibes hooks and slash commands installed.\n') +
+      chalk.white('Claude Code auto-detects AgentVibes at runtime.\n\n') +
+      chalk.gray('Hooks:    .claude/hooks-windows/ (or .claude/hooks/)\n') +
+      chalk.gray('Commands: .claude/commands/agent-vibes/\n') +
+      chalk.gray('Config:   .claude/config/'),
       {
         padding: 1,
         margin: { top: 1, bottom: 1, left: 0, right: 0 },
-        borderStyle: 'round',
-        borderColor: configError ? 'red' : 'yellow',
+        borderStyle: 'double',
+        borderColor: 'green',
       }
     )
   );
-
 }
 
 /**

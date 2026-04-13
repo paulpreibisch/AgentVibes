@@ -1522,7 +1522,6 @@ export function createSetupTab(screen, services) {
     hideAllProviderRows();
     contentBox.hide();
 
-    const claudeJsonPath = path.join(process.env.USERPROFILE || process.env.HOME || '', '.claude.json');
     const hooksDir = path.join(targetDir, '.claude', process.platform === 'win32' ? 'hooks-windows' : 'hooks');
     const installed = installedState['claude-code'];
     const verb = wasInstalled ? 'reinstalled' : 'installed';
@@ -1535,7 +1534,7 @@ export function createSetupTab(screen, services) {
       if (result.success) {
         lines.push(`{green-fg}AgentVibes for Claude Code ${verb}!{/green-fg}`);
         if (result.mcpError) {
-          lines.push(`{yellow-fg}MCP config failed:{/yellow-fg} ${result.mcpError}`);
+          lines.push(`{yellow-fg}Warning:{/yellow-fg} ${result.mcpError}`);
         }
       } else {
         lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
@@ -1548,17 +1547,12 @@ export function createSetupTab(screen, services) {
 
     lines.push('');
     lines.push(`{bold}{cyan-fg}What ${result ? `got ${verb}` : 'gets installed'}:{/cyan-fg}{/bold}`);
-    lines.push('');
-    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}~/.claude.json{/bold} (MCP server registration)');
-    lines.push(`     Location: ${claudeJsonPath}`);
-    lines.push('     Registers the AgentVibes MCP server for Claude Code.');
-    lines.push('');
-    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.claude/hooks/{/bold} (session-start + pre-tool hooks)');
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.claude/hooks/{/bold} (session-start + pre-tool hooks)');
     lines.push(`     Location: ${hooksDir}`);
     lines.push('');
-    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}.claude/commands/{/bold} (slash commands)');
+    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.claude/commands/{/bold} (slash commands)');
     lines.push('');
-    lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
+    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
     lines.push('');
     lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 

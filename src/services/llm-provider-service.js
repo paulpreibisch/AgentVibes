@@ -125,76 +125,38 @@ export async function checkCodexInstalled(targetDir) {
 // ── Claude Code install ────────────────────────────────────────────────────
 
 /**
- * Register AgentVibes MCP server for Claude Code via ~/.claude.json (user-scope,
- * project-specific).  This avoids writing .mcp.json which Copilot also reads
- * with precedence — causing LLM identity collisions.
+ * Install AgentVibes for Claude Code.
  *
- * Also copies hooks, commands, config, personality, plugin, and bmad config files.
+ * Does NOT write any MCP config (.mcp.json or ~/.claude.json).  Claude Code
+ * works entirely via hooks (.claude/hooks-windows/) and slash commands
+ * (.claude/commands/).  The MCP server is auto-detected via CLAUDECODE=1.
+ *
+ * Copilot reads .mcp.json with precedence over .vscode/mcp.json — writing
+ * an agentvibes entry in .mcp.json causes Copilot to lose its LLM identity.
+ * So we don't touch .mcp.json at all.
+ *
+ * Copies: hooks, commands, config, personality, plugin, and bmad config files.
  */
 export async function installClaudeMcp(targetDir) {
-  // Each tool gets its own MCP config with an explicit AGENTVIBES_LLM:
-  //   ~/.claude.json (project scope) → Claude Code  ("claude-code")
-  //   .vscode/mcp.json               → VS Code Copilot ("copilot")
-  //   ~/.copilot/mcp-config.json     → Copilot CLI  ("copilot")
-  //   .codex/config.toml             → Codex        ("codex")
-  //
-  // Claude Code reads ~/.claude.json for user-scope project MCP servers.
-  // Copilot and Codex do NOT read this file, so no identity collision.
-  const agentvibesServer = {
-    command: 'npx',
-    args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-    env: { AGENTVIBES_LLM: 'claude-code' },
-  };
-
-  // MCP config and file copies are independent — report partial success
-  // when one succeeds but the other fails.
-  let mcpCreated = false;
   let mcpError = null;
-  try {
-    const claudeJsonPath = path.join(
-      process.env.USERPROFILE || process.env.HOME || '',
-      '.claude.json'
-    );
-    // Resolve absolute project path for the ~/.claude.json projects key.
-    const absTarget = path.resolve(targetDir);
-    let claudeJson = {};
-    try {
-      claudeJson = JSON.parse(await fs.readFile(claudeJsonPath, 'utf8'));
-    } catch { /* new or unparseable — start fresh */ }
-    if (!claudeJson.projects || typeof claudeJson.projects !== 'object') {
-      claudeJson.projects = {};
-    }
-    if (!claudeJson.projects[absTarget]) {
-      claudeJson.projects[absTarget] = {};
-    }
-    if (!claudeJson.projects[absTarget].mcpServers) {
-      claudeJson.projects[absTarget].mcpServers = {};
-    }
-    claudeJson.projects[absTarget].mcpServers.agentvibes = agentvibesServer;
-    await fs.writeFile(claudeJsonPath, JSON.stringify(claudeJson, null, 2) + '\n');
-    mcpCreated = true;
 
-    // Also clean up any stale .mcp.json agentvibes entry left from older
-    // versions — Copilot reads .mcp.json with precedence and it causes
-    // LLM identity collisions.
-    try {
-      const mcpJsonPath = path.join(targetDir, '.mcp.json');
-      const raw = await fs.readFile(mcpJsonPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (parsed?.mcpServers?.agentvibes) {
-        delete parsed.mcpServers.agentvibes;
-        const noServers = Object.keys(parsed.mcpServers).length === 0;
-        const noOtherKeys = Object.keys(parsed).length === 1;
-        if (noServers && noOtherKeys) {
-          await fs.unlink(mcpJsonPath);
-        } else {
-          await fs.writeFile(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n');
-        }
+  // Clean up any stale .mcp.json agentvibes entry from older versions.
+  // Copilot reads .mcp.json with precedence and it causes identity collisions.
+  try {
+    const mcpJsonPath = path.join(targetDir, '.mcp.json');
+    const raw = await fs.readFile(mcpJsonPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed?.mcpServers?.agentvibes) {
+      delete parsed.mcpServers.agentvibes;
+      const noServers = Object.keys(parsed.mcpServers).length === 0;
+      const noOtherKeys = Object.keys(parsed).length === 1;
+      if (noServers && noOtherKeys) {
+        await fs.unlink(mcpJsonPath);
+      } else {
+        await fs.writeFile(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n');
       }
-    } catch { /* .mcp.json doesn't exist or can't parse — fine */ }
-  } catch (err) {
-    mcpError = err.message;
-  }
+    }
+  } catch { /* .mcp.json doesn't exist or can't parse — fine */ }
 
   try {
     // Copy hooks, commands, config, personality, plugin, bmad config files
@@ -209,35 +171,14 @@ export async function installClaudeMcp(targetDir) {
     await installer.copyBackgroundMusicFiles(targetDir, silentSpinner);
     ensureDefaultLlmConfigSync('claude-code', targetDir);
 
-    return { success: true, mcpCreated, mcpError };
+    return { success: true, mcpCreated: false, mcpError };
   } catch (err) {
     return { success: false, error: err.message, mcpError };
   }
 }
 
 export async function removeClaudeMcp(targetDir) {
-  // Remove from ~/.claude.json (new location)
-  try {
-    const claudeJsonPath = path.join(
-      process.env.USERPROFILE || process.env.HOME || '',
-      '.claude.json'
-    );
-    const absTarget = path.resolve(targetDir);
-    const claudeJson = JSON.parse(await fs.readFile(claudeJsonPath, 'utf8'));
-    if (claudeJson.projects?.[absTarget]?.mcpServers?.agentvibes) {
-      delete claudeJson.projects[absTarget].mcpServers.agentvibes;
-      // Clean up empty nesting
-      if (Object.keys(claudeJson.projects[absTarget].mcpServers).length === 0) {
-        delete claudeJson.projects[absTarget].mcpServers;
-      }
-      if (Object.keys(claudeJson.projects[absTarget]).length === 0) {
-        delete claudeJson.projects[absTarget];
-      }
-      await fs.writeFile(claudeJsonPath, JSON.stringify(claudeJson, null, 2) + '\n');
-    }
-  } catch { /* file doesn't exist or can't parse */ }
-
-  // Also clean up legacy .mcp.json entry from older versions
+  // Clean up .mcp.json agentvibes entry (legacy from older versions)
   try {
     const mcpConfigPath = path.join(targetDir, '.mcp.json');
     const content = await fs.readFile(mcpConfigPath, 'utf8');
@@ -253,7 +194,6 @@ export async function removeClaudeMcp(targetDir) {
       }
     }
   } catch { /* file doesn't exist or can't parse — nothing to remove */ }
-
   return { success: true };
 }
 
@@ -264,9 +204,9 @@ export async function removeClaudeMcp(targetDir) {
 export async function uninstallClaude(targetDir) {
   const removed = [];
 
-  // 1. Remove MCP entry from ~/.claude.json and legacy .mcp.json
+  // 1. Remove legacy .mcp.json agentvibes entry if present
   await removeClaudeMcp(targetDir);
-  removed.push('MCP config (agentvibes entry)');
+  removed.push('.mcp.json agentvibes entry (if present)');
 
   // 2. Remove AgentVibes directories
   const dirs = [
