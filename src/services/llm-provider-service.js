@@ -133,17 +133,15 @@ export async function installClaudeMcp(targetDir) {
 
   // The agentvibes server entry for Claude Code's .mcp.json.
   //
-  // IMPORTANT: no `env.AGENTVIBES_LLM` block here.  GitHub Copilot CLI
-  // also reads project-level `.mcp.json` with precedence over its own
-  // `~/.copilot/mcp-config.json` — so if we set `AGENTVIBES_LLM=claude-code`
-  // in `.mcp.json`, Copilot CLI picks up that value too and mis-routes.
-  // Instead, the MCP server (mcp-server/server.py) auto-detects Claude
-  // Code via the `CLAUDECODE=1` env var that Claude Code sets on every
-  // subprocess it spawns.  Copilot CLI does NOT set that var, so its
-  // spawned MCP server correctly falls back to its own config.
+  // Each tool gets its own MCP config with an explicit AGENTVIBES_LLM:
+  //   .mcp.json             → Claude Code  ("claude-code")
+  //   .vscode/mcp.json      → VS Code Copilot ("copilot")
+  //   ~/.copilot/mcp-config → Copilot CLI  ("copilot")
+  //   .codex/config.toml    → Codex        ("codex")
   const agentvibesServer = {
     command: 'npx',
     args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+    env: { AGENTVIBES_LLM: 'claude-code' },
   };
 
   const mcpConfig = {
@@ -156,9 +154,7 @@ export async function installClaudeMcp(targetDir) {
     let mcpCreated = false;
     try {
       await fs.access(mcpConfigPath);
-      // Already exists — merge / upgrade the agentvibes entry.  This also
-      // STRIPS any stale AGENTVIBES_LLM env block left over from v5.1.2..4
-      // so Copilot CLI stops mis-routing.
+      // Already exists — merge / upgrade the agentvibes entry.
       try {
         const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
         existing.mcpServers = existing.mcpServers || {};

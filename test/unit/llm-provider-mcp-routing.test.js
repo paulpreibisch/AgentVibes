@@ -113,32 +113,32 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
       );
     });
 
-    test('installer .mcp.json template does NOT contain env.AGENTVIBES_LLM', () => {
-      // IMPORTANT architectural rule: `.mcp.json` must NOT set AGENTVIBES_LLM.
-      // GitHub Copilot CLI also reads project-local `.mcp.json` with
-      // precedence over its own `~/.copilot/mcp-config.json`, so setting
-      // `claude-code` here would mis-route Copilot CLI too.  Claude Code
-      // is auto-detected downstream via the CLAUDECODE=1 env var.
-      //
-      // We check the mcpConfig literal INNER body (strip comments first)
-      // so a comment that MENTIONS AGENTVIBES_LLM doesn't false-positive.
+    test('installer .mcp.json template sets AGENTVIBES_LLM = "claude-code"', () => {
+      // Each tool gets its own MCP config with an explicit AGENTVIBES_LLM.
+      // .mcp.json is Claude Code's project-level config.
       const m = installerSrc.match(/const mcpConfig = \{([\s\S]*?)\};/);
       assert.ok(m, 'installer.js must declare mcpConfig');
-      // Strip // line comments before checking the object body
       const body = m[1].replace(/\/\/.*$/gm, '');
-      assert.doesNotMatch(body, /AGENTVIBES_LLM/,
-        '.mcp.json template must NOT set AGENTVIBES_LLM ' +
-        '(Copilot CLI reads .mcp.json too and would mis-route). ' +
-        'Use CLAUDECODE auto-detection in mcp-server/server.py instead.');
+      assert.match(body, /AGENTVIBES_LLM.*claude-code/,
+        '.mcp.json template must set AGENTVIBES_LLM = "claude-code"');
     });
 
-    test('mcp-server/server.py auto-detects Claude Code via CLAUDECODE env var', () => {
-      // The replacement for setting AGENTVIBES_LLM=claude-code in .mcp.json.
-      // Claude Code sets CLAUDECODE=1 on every subprocess it spawns.
+    test('llm-provider-service installClaudeMcp sets AGENTVIBES_LLM = "claude-code"', () => {
+      const src = readFileSync(
+        path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
+        'utf8'
+      );
+      const m = src.match(/installClaudeMcp[\s\S]*?const agentvibesServer = \{[\s\S]*?\};/);
+      assert.ok(m, 'installClaudeMcp must declare agentvibesServer');
+      assert.match(m[0], /AGENTVIBES_LLM:\s*['"]claude-code['"]/,
+        'installClaudeMcp must set env.AGENTVIBES_LLM = "claude-code"');
+    });
+
+    test('mcp-server/server.py still supports CLAUDECODE env var as fallback', () => {
+      // CLAUDECODE=1 auto-detect remains as a fallback for edge cases
+      // where .mcp.json doesn't have the env block.
       assert.match(serverPySrc, /os\.environ\.get\(['"]CLAUDECODE['"]/,
-        'server.py must read CLAUDECODE env var for Claude Code auto-detection');
-      assert.match(serverPySrc, /llm_key\s*=\s*["']claude-code["']/,
-        'server.py must set llm_key to "claude-code" when CLAUDECODE=1');
+        'server.py must read CLAUDECODE env var as fallback detection');
     });
   });
 });
@@ -241,9 +241,12 @@ describe('packaged per-LLM defaults cover all supported LLMs', () => {
   });
 
   test('includes Claude Code, Copilot, and Codex rows', () => {
-    assert.match(audioEffects, /^llm:claude-code\|.*\|Claude Code here\|piper$/m);
-    assert.match(audioEffects, /^llm:copilot\|.*\|Copilot here\|piper$/m);
-    assert.match(audioEffects, /^llm:codex\|.*\|Codex here\|piper$/m);
+    assert.match(audioEffects, /^llm:claude-code\|.*\|piper$/m,
+      'audio-effects.cfg must have an llm:claude-code row with piper engine');
+    assert.match(audioEffects, /^llm:copilot\|.*\|piper$/m,
+      'audio-effects.cfg must have an llm:copilot row with piper engine');
+    assert.match(audioEffects, /^llm:codex\|.*\|piper$/m,
+      'audio-effects.cfg must have an llm:codex row with piper engine');
   });
 
   test('Codex setup does not install or remove Copilot MCP config', () => {

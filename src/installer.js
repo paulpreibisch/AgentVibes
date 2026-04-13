@@ -4312,16 +4312,18 @@ async function handleMcpConfiguration(targetDir, options) {
 
   // MCP server configuration for AgentVibes.
   //
-  // No `env.AGENTVIBES_LLM` block: GitHub Copilot CLI also reads project
-  // `.mcp.json` with precedence over its own `~/.copilot/mcp-config.json`,
-  // so setting `claude-code` here would mis-route Copilot CLI too.
-  // Instead, the MCP server auto-detects Claude Code via the `CLAUDECODE=1`
-  // env var that Claude Code sets on every subprocess it spawns.
+  // `.mcp.json` is Claude Code's project-level MCP config.  Each tool has
+  // its own config with an explicit AGENTVIBES_LLM env var:
+  //   .mcp.json             → Claude Code  (AGENTVIBES_LLM = "claude-code")
+  //   .vscode/mcp.json      → VS Code Copilot (AGENTVIBES_LLM = "copilot")
+  //   ~/.copilot/mcp-config → Copilot CLI  (AGENTVIBES_LLM = "copilot")
+  //   .codex/config.toml    → Codex        (AGENTVIBES_LLM = "codex")
   const mcpConfig = {
     mcpServers: {
       agentvibes: {
         command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: { AGENTVIBES_LLM: 'claude-code' }
       }
     }
   };
@@ -4336,13 +4338,9 @@ async function handleMcpConfiguration(targetDir, options) {
   }
 
   if (mcpExists) {
-    // Existing config: upgrade it in-place.  Two jobs:
+    // Existing config: upgrade it in-place.
     //   1. Ensure the agentvibes server entry exists.
-    //   2. STRIP any stale `env.AGENTVIBES_LLM` from earlier versions
-    //      (v5.1.2..v5.1.4) — setting it in `.mcp.json` broke Copilot CLI
-    //      routing because Copilot CLI also reads `.mcp.json` and would
-    //      adopt claude-code's env.  Claude Code is now auto-detected
-    //      downstream via the CLAUDECODE=1 env var.
+    //   2. Ensure env.AGENTVIBES_LLM is set to "claude-code".
     let migrated = false;
     let migrationError = null;
     try {
@@ -4353,20 +4351,17 @@ async function handleMcpConfiguration(targetDir, options) {
           existingCfg.mcpServers = {};
         }
         const current = existingCfg.mcpServers.agentvibes;
-        const hasStaleEnv = current?.env?.AGENTVIBES_LLM !== undefined;
-        const needsWrite = !current || hasStaleEnv;
+        const wrongLlm = current?.env?.AGENTVIBES_LLM !== 'claude-code';
+        const needsWrite = !current || wrongLlm;
         if (needsWrite) {
-          // Preserve any OTHER env keys the user added manually (rare) but
-          // drop AGENTVIBES_LLM so Copilot CLI doesn't mis-route.
-          const cleanEnv = { ...(current?.env ?? {}) };
-          delete cleanEnv.AGENTVIBES_LLM;
+          // Preserve any OTHER env keys the user added manually (rare) and
+          // ensure AGENTVIBES_LLM is set to "claude-code".
+          const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_LLM: 'claude-code' };
           const newEntry = {
             command: 'npx',
             args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+            env: mergedEnv,
           };
-          if (Object.keys(cleanEnv).length > 0) {
-            newEntry.env = cleanEnv;
-          }
           existingCfg.mcpServers.agentvibes = newEntry;
           await fs.writeFile(mcpConfigPath, JSON.stringify(existingCfg, null, 2) + '\n');
           migrated = true;
