@@ -113,17 +113,16 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
       );
     });
 
-    test('installer .mcp.json template sets AGENTVIBES_LLM = "claude-code"', () => {
-      // Each tool gets its own MCP config with an explicit AGENTVIBES_LLM.
-      // .mcp.json is Claude Code's project-level config.
-      const m = installerSrc.match(/const mcpConfig = \{([\s\S]*?)\};/);
-      assert.ok(m, 'installer.js must declare mcpConfig');
-      const body = m[1].replace(/\/\/.*$/gm, '');
-      assert.match(body, /AGENTVIBES_LLM.*claude-code/,
-        '.mcp.json template must set AGENTVIBES_LLM = "claude-code"');
+    test('installer writes Claude Code MCP to ~/.claude.json, NOT .mcp.json', () => {
+      // Claude Code's MCP config goes in ~/.claude.json (user-scope) to
+      // avoid collisions with Copilot which reads .mcp.json with precedence.
+      assert.match(installerSrc, /\.claude\.json/,
+        'installer must reference ~/.claude.json for Claude Code MCP config');
+      assert.match(installerSrc, /AGENTVIBES_LLM.*claude-code/,
+        'installer must set AGENTVIBES_LLM = "claude-code"');
     });
 
-    test('llm-provider-service installClaudeMcp sets AGENTVIBES_LLM = "claude-code"', () => {
+    test('llm-provider-service installClaudeMcp writes to ~/.claude.json', () => {
       const src = readFileSync(
         path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
         'utf8'
@@ -132,11 +131,12 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
       assert.ok(m, 'installClaudeMcp must declare agentvibesServer');
       assert.match(m[0], /AGENTVIBES_LLM:\s*['"]claude-code['"]/,
         'installClaudeMcp must set env.AGENTVIBES_LLM = "claude-code"');
+      // Must write to ~/.claude.json, not .mcp.json
+      assert.match(src, /installClaudeMcp[\s\S]*?\.claude\.json/,
+        'installClaudeMcp must write to ~/.claude.json');
     });
 
     test('mcp-server/server.py still supports CLAUDECODE env var as fallback', () => {
-      // CLAUDECODE=1 auto-detect remains as a fallback for edge cases
-      // where .mcp.json doesn't have the env block.
       assert.match(serverPySrc, /os\.environ\.get\(['"]CLAUDECODE['"]/,
         'server.py must read CLAUDECODE env var as fallback detection');
     });

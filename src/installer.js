@@ -4312,233 +4312,104 @@ async function handleMcpConfiguration(targetDir, options) {
 
   // MCP server configuration for AgentVibes.
   //
-  // `.mcp.json` is Claude Code's project-level MCP config.  Each tool has
-  // its own config with an explicit AGENTVIBES_LLM env var:
-  //   .mcp.json             → Claude Code  (AGENTVIBES_LLM = "claude-code")
-  //   .vscode/mcp.json      → VS Code Copilot (AGENTVIBES_LLM = "copilot")
-  //   ~/.copilot/mcp-config → Copilot CLI  (AGENTVIBES_LLM = "copilot")
-  //   .codex/config.toml    → Codex        (AGENTVIBES_LLM = "codex")
-  const mcpConfig = {
-    mcpServers: {
-      agentvibes: {
-        command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-        env: { AGENTVIBES_LLM: 'claude-code' }
-      }
-    }
+  // Claude Code's MCP config goes in ~/.claude.json (user-scope, project-specific)
+  // to avoid collisions with Copilot which reads .mcp.json with precedence.
+  //
+  // Each tool has its own config with an explicit AGENTVIBES_LLM env var:
+  //   ~/.claude.json (project) → Claude Code  (AGENTVIBES_LLM = "claude-code")
+  //   .vscode/mcp.json         → VS Code Copilot (AGENTVIBES_LLM = "copilot")
+  //   ~/.copilot/mcp-config    → Copilot CLI  (AGENTVIBES_LLM = "copilot")
+  //   .codex/config.toml       → Codex        (AGENTVIBES_LLM = "codex")
+  const agentvibesServer = {
+    command: 'npx',
+    args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+    env: { AGENTVIBES_LLM: 'claude-code' },
   };
 
-  // Check if .mcp.json already exists
-  let mcpExists = false;
+  const claudeJsonPath = path.join(
+    process.env.USERPROFILE || process.env.HOME || '',
+    '.claude.json'
+  );
+  const absTarget = path.resolve(targetDir);
+
+  let configured = false;
+  let configError = null;
+
+  // Migrate: remove agentvibes from .mcp.json if present (legacy)
   try {
-    await fs.access(mcpConfigPath);
-    mcpExists = true;
-  } catch {
-    // File doesn't exist
+    const raw = await fs.readFile(mcpConfigPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed?.mcpServers?.agentvibes) {
+      delete parsed.mcpServers.agentvibes;
+      const noServers = Object.keys(parsed.mcpServers).length === 0;
+      const noOtherKeys = Object.keys(parsed).length === 1;
+      if (noServers && noOtherKeys) {
+        await fs.unlink(mcpConfigPath);
+      } else {
+        await fs.writeFile(mcpConfigPath, JSON.stringify(parsed, null, 2) + '\n');
+      }
+    }
+  } catch { /* no .mcp.json or can't parse — fine */ }
+
+  // Write to ~/.claude.json
+  try {
+    let claudeJson = {};
+    try {
+      claudeJson = JSON.parse(await fs.readFile(claudeJsonPath, 'utf8'));
+    } catch { /* new or unparseable */ }
+    if (!claudeJson.projects || typeof claudeJson.projects !== 'object') {
+      claudeJson.projects = {};
+    }
+    if (!claudeJson.projects[absTarget]) {
+      claudeJson.projects[absTarget] = {};
+    }
+    if (!claudeJson.projects[absTarget].mcpServers) {
+      claudeJson.projects[absTarget].mcpServers = {};
+    }
+    claudeJson.projects[absTarget].mcpServers.agentvibes = agentvibesServer;
+    await fs.writeFile(claudeJsonPath, JSON.stringify(claudeJson, null, 2) + '\n');
+    configured = true;
+  } catch (err) {
+    configError = err;
   }
 
-  if (mcpExists) {
-    // Existing config: upgrade it in-place.
-    //   1. Ensure the agentvibes server entry exists.
-    //   2. Ensure env.AGENTVIBES_LLM is set to "claude-code".
-    let migrated = false;
-    let migrationError = null;
-    try {
-      const existingRaw = await fs.readFile(mcpConfigPath, 'utf8');
-      const existingCfg = JSON.parse(existingRaw);
-      if (existingCfg && typeof existingCfg === 'object') {
-        if (!existingCfg.mcpServers || typeof existingCfg.mcpServers !== 'object') {
-          existingCfg.mcpServers = {};
-        }
-        const current = existingCfg.mcpServers.agentvibes;
-        const wrongLlm = current?.env?.AGENTVIBES_LLM !== 'claude-code';
-        const needsWrite = !current || wrongLlm;
-        if (needsWrite) {
-          // Preserve any OTHER env keys the user added manually (rare) and
-          // ensure AGENTVIBES_LLM is set to "claude-code".
-          const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_LLM: 'claude-code' };
-          const newEntry = {
-            command: 'npx',
-            args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-            env: mergedEnv,
-          };
-          existingCfg.mcpServers.agentvibes = newEntry;
-          await fs.writeFile(mcpConfigPath, JSON.stringify(existingCfg, null, 2) + '\n');
-          migrated = true;
-        }
-      }
-    } catch (err) {
-      migrationError = err;
-    }
-
-    if (migrated) {
-      console.log(
-        boxen(
-          chalk.green.bold('✅ MCP Configuration Updated\n\n') +
-          chalk.white('Your existing ') + chalk.cyan('.mcp.json') + chalk.white(' has been updated.\n') +
-          chalk.white('Claude Code is auto-detected via ') + chalk.cyan('CLAUDECODE=1') + chalk.white(' at runtime.'),
-          {
-            padding: 1,
-            margin: { top: 1, bottom: 1, left: 0, right: 0 },
-            borderStyle: 'double',
-            borderColor: 'green',
-          }
-        )
-      );
-      return;
-    }
-
-    // Migration was not needed (already correct) or failed — fall through
-    // to the manual-instructions box.
+  if (configured) {
     console.log(
       boxen(
-        chalk.yellow.bold('ℹ️  MCP Configuration Already Exists\n\n') +
-        chalk.white('An ') + chalk.cyan('.mcp.json') + chalk.white(' file already exists in this project.\n\n') +
-        (migrationError
-          ? chalk.red('Could not auto-update it: ' + migrationError.message + '\n\n')
-          : chalk.gray('It already has the correct AgentVibes entry.\n\n')) +
-        chalk.white('To add or fix the AgentVibes MCP server manually, use:'),
+        chalk.green.bold('✅ Claude Code MCP Configured!\n\n') +
+        chalk.white('AgentVibes MCP server registered in ') + chalk.cyan('~/.claude.json') + chalk.white('.\n') +
+        chalk.gray('(Project: ' + absTarget + ')'),
         {
           padding: 1,
           margin: { top: 1, bottom: 1, left: 0, right: 0 },
-          borderStyle: 'round',
-          borderColor: migrationError ? 'red' : 'yellow',
-        }
-      )
-    );
-
-    // Display the snippet to add
-    console.log(
-      '\n"agentvibes": {\n' +
-      '  "command": "npx",\n' +
-      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
-      '}\n'
-    );
-
-    console.log(
-      boxen(
-        chalk.cyan('To use with Claude Code:\n') +
-        chalk.white('   claude --mcp-config .mcp.json\n\n') +
-        chalk.cyan('📖 Full Guide:\n') +
-        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
-        {
-          padding: 1,
-          margin: { top: 1, bottom: 1, left: 0, right: 0 },
-          borderStyle: 'round',
-          borderColor: 'cyan',
+          borderStyle: 'double',
+          borderColor: 'green',
         }
       )
     );
     return;
   }
 
-  // Scenario 1 & 2: Config doesn't exist - offer to create
+  // Failed to write ~/.claude.json — show manual instructions
   console.log(
     boxen(
-      chalk.cyan.bold('🎙️ MCP Server Configuration\n\n') +
-      chalk.white.bold('AgentVibes MCP Server - Control TTS with Natural Language!\n\n') +
-      chalk.gray('Use natural language instead of slash commands:\n') +
-      chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
-      chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
-      chalk.white('No ') + chalk.cyan('.mcp.json') + chalk.white(' found in this project.'),
+      chalk.yellow.bold('ℹ️  MCP Configuration\n\n') +
+      (configError
+        ? chalk.red('Could not write ~/.claude.json: ' + configError.message + '\n\n')
+        : '') +
+      chalk.white('To register AgentVibes MCP server for Claude Code, run:\n') +
+      chalk.cyan.bold('   claude mcp add agentvibes npx -y --package=agentvibes agentvibes-mcp-server\n\n') +
+      chalk.cyan('📖 Full Guide:\n') +
+      chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
       {
         padding: 1,
         margin: { top: 1, bottom: 1, left: 0, right: 0 },
         borderStyle: 'round',
-        borderColor: 'cyan',
+        borderColor: configError ? 'red' : 'yellow',
       }
     )
   );
 
-  let createConfig = options.yes; // Auto-create if --yes flag
-
-  if (!options.yes) {
-    const { confirmCreate } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirmCreate',
-        message: chalk.cyan('Would you like to create .mcp.json for this project?'),
-        default: true,
-      },
-    ]);
-    createConfig = confirmCreate;
-  }
-
-  if (createConfig) {
-    // Scenario 1: User says YES - create the config
-    try {
-      await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
-
-      console.log(
-        boxen(
-          chalk.green.bold('✅ MCP Configuration Created!\n\n') +
-          chalk.white('Your ') + chalk.cyan('.mcp.json') + chalk.white(' has been created in this project.\n\n') +
-          chalk.white('To use AgentVibes MCP server with Claude, run:\n') +
-          chalk.cyan.bold('   claude --mcp-config .mcp.json\n\n') +
-          chalk.green('The MCP server is now installed and ready to use!'),
-          {
-            padding: 1,
-            margin: { top: 1, bottom: 1, left: 0, right: 0 },
-            borderStyle: 'double',
-            borderColor: 'green',
-          }
-        )
-      );
-
-      // Show the installed JSON so users can see exactly what was written
-      console.log(chalk.gray(JSON.stringify(mcpConfig, null, 2)) + '\n');
-    } catch (error) {
-      console.log(chalk.red(`\n✗ Failed to create .mcp.json: ${error.message}`));
-      console.log(chalk.gray('   You can create it manually with the config shown below.\n'));
-      // Fall through to show manual instructions
-      createConfig = false;
-    }
-  }
-
-  if (!createConfig) {
-    // Scenario 2: User says NO - show manual instructions
-    console.log(
-      boxen(
-        chalk.cyan.bold('📋 Manual MCP Configuration\n\n') +
-        chalk.white('Create a ') + chalk.cyan('.mcp.json') + chalk.white(' file in your project with:'),
-        {
-          padding: 1,
-          margin: { top: 1, bottom: 1, left: 0, right: 0 },
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
-
-    // Display JSON config
-    console.log(
-      '\n{\n' +
-      '  "mcpServers": {\n' +
-      '    "agentvibes": {\n' +
-      '      "command": "npx",\n' +
-      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
-      '    }\n' +
-      '  }\n' +
-      '}\n'
-    );
-
-    console.log(
-      boxen(
-        chalk.cyan('To use with Claude Code:\n') +
-        chalk.white('   claude --mcp-config .mcp.json\n\n') +
-        chalk.cyan('📱 Claude Desktop / Warp Terminal:\n') +
-        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop\n\n') +
-        chalk.cyan('📖 Full Guide:\n') +
-        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
-        {
-          padding: 1,
-          margin: { top: 1, bottom: 1, left: 0, right: 0 },
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
-  }
 }
 
 /**

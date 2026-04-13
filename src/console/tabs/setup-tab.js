@@ -1522,7 +1522,7 @@ export function createSetupTab(screen, services) {
     hideAllProviderRows();
     contentBox.hide();
 
-    const mcpPath = path.join(targetDir, '.mcp.json');
+    const claudeJsonPath = path.join(process.env.USERPROFILE || process.env.HOME || '', '.claude.json');
     const hooksDir = path.join(targetDir, '.claude', process.platform === 'win32' ? 'hooks-windows' : 'hooks');
     const installed = installedState['claude-code'];
     const verb = wasInstalled ? 'reinstalled' : 'installed';
@@ -1532,9 +1532,14 @@ export function createSetupTab(screen, services) {
     lines.push('');
 
     if (result) {
-      lines.push(result.success
-        ? `{green-fg}AgentVibes for Claude Code ${verb}!{/green-fg}`
-        : `{red-fg}Installation failed{/red-fg}`);
+      if (result.success) {
+        lines.push(`{green-fg}AgentVibes for Claude Code ${verb}!{/green-fg}`);
+        if (result.mcpError) {
+          lines.push(`{yellow-fg}MCP config failed:{/yellow-fg} ${result.mcpError}`);
+        }
+      } else {
+        lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+      }
     } else {
       lines.push(installed
         ? '{green-fg}Installed{/green-fg}'
@@ -1544,8 +1549,8 @@ export function createSetupTab(screen, services) {
     lines.push('');
     lines.push(`{bold}{cyan-fg}What ${result ? `got ${verb}` : 'gets installed'}:{/cyan-fg}{/bold}`);
     lines.push('');
-    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.mcp.json{/bold} (project root)');
-    lines.push(`     Location: ${mcpPath}`);
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}~/.claude.json{/bold} (MCP server registration)');
+    lines.push(`     Location: ${claudeJsonPath}`);
     lines.push('     Registers the AgentVibes MCP server for Claude Code.');
     lines.push('');
     lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.claude/hooks/{/bold} (session-start + pre-tool hooks)');
@@ -1575,9 +1580,14 @@ export function createSetupTab(screen, services) {
     const lines = [];
     lines.push('{bold}{cyan-fg}GitHub Copilot -- AgentVibes Integration{/cyan-fg}{/bold}');
     lines.push('');
-    lines.push(result.success
-      ? `{green-fg}AgentVibes for Copilot ${verb}!{/green-fg}`
-      : `{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    if (result.success) {
+      lines.push(`{green-fg}AgentVibes for Copilot ${verb}!{/green-fg}`);
+      if (result.mcpError) {
+        lines.push(`{yellow-fg}MCP config failed:{/yellow-fg} ${result.mcpError}`);
+      }
+    } else {
+      lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    }
     lines.push('');
     lines.push(`{bold}{cyan-fg}What got ${verb}:{/cyan-fg}{/bold}`);
     lines.push('');
@@ -1604,9 +1614,14 @@ export function createSetupTab(screen, services) {
     const lines = [];
     lines.push('{bold}{cyan-fg}OpenAI Codex -- AgentVibes Integration{/cyan-fg}{/bold}');
     lines.push('');
-    lines.push(result.success
-      ? `{green-fg}AgentVibes for Codex ${verb}!{/green-fg}`
-      : `{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    if (result.success) {
+      lines.push(`{green-fg}AgentVibes for Codex ${verb}!{/green-fg}`);
+      if (result.mcpError) {
+        lines.push(`{yellow-fg}MCP config failed:{/yellow-fg} ${result.mcpError}`);
+      }
+    } else {
+      lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    }
     lines.push('');
     lines.push(`{bold}{cyan-fg}What got ${verb}:{/cyan-fg}{/bold}`);
     lines.push('');
