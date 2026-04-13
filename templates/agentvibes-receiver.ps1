@@ -23,6 +23,10 @@ param(
 # This is necessary because sshd runs the ForceCommand as the SSH user
 # (e.g. agentvibes-receiver), whose $env:USERPROFILE is a different directory.
 $OwnerHome = "__OWNER_HOME__"
+if ($OwnerHome -eq "__OWNER_HOME__") {
+    Write-Output "Error: Receiver not installed properly — run setup-ssh-receiver.ps1"
+    exit 1
+}
 $AgentVibesDir = "$OwnerHome\.agentvibes"
 $ClaudeDir = "$OwnerHome\.claude"
 $HooksDir = "$ClaudeDir\hooks-windows"

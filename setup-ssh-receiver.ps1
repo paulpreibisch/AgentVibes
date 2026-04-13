@@ -74,16 +74,48 @@ Write-Host "[5/8] Granting agentvibes-receiver permissions..." -ForegroundColor 
 $ReceiverUser = "agentvibes-receiver"
 $userExists = Get-LocalUser -Name $ReceiverUser -ErrorAction SilentlyContinue
 if ($userExists) {
-    # Read+Execute on .agentvibes (plus Modify on tts-queue and receiver.log for writes)
+    # Read+Execute on .agentvibes
     icacls "$agentvibesDir" /grant "${ReceiverUser}:(OI)(CI)RX" /T /Q 2>$null
-    icacls "$agentvibesDir\tts-queue" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
-    if (Test-Path "$agentvibesDir\receiver.log") {
-        icacls "$agentvibesDir\receiver.log" /grant "${ReceiverUser}:M" /Q 2>$null
+    # Modify on tts-queue (receiver writes request files) — create if absent
+    $queueDir = "$agentvibesDir\tts-queue"
+    if (-not (Test-Path $queueDir)) {
+        New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
     }
-    # Read+Modify on .claude (hooks, config, voice files, audio output)
+    icacls "$queueDir" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
+    # Modify on receiver.log — touch if absent so icacls can target it
+    $logFile = "$agentvibesDir\receiver.log"
+    if (-not (Test-Path $logFile)) {
+        New-Item -ItemType File -Path $logFile -Force | Out-Null
+    }
+    icacls "$logFile" /grant "${ReceiverUser}:M" /Q 2>$null
+    # Targeted permissions on .claude subdirectories (not blanket Modify on all of .claude)
     $claudeDir = "$env:USERPROFILE\.claude"
     if (Test-Path $claudeDir) {
-        icacls "$claudeDir" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
+        # RX on .claude root (needed for Test-Path checks)
+        icacls "$claudeDir" /grant "${ReceiverUser}:RX" /Q 2>$null
+        # RX on hooks (read + execute scripts)
+        $hooksDir = "$claudeDir\hooks-windows"
+        if (Test-Path $hooksDir) {
+            icacls "$hooksDir" /grant "${ReceiverUser}:(OI)(CI)RX" /T /Q 2>$null
+        }
+        # Modify on config (receiver writes voice, speed, music settings)
+        $configDir = "$claudeDir\config"
+        if (Test-Path $configDir) {
+            icacls "$configDir" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
+        }
+        # Modify on audio output dir (receiver writes WAV files)
+        $audioDir = "$claudeDir\audio"
+        if (-not (Test-Path $audioDir)) {
+            New-Item -ItemType Directory -Path $audioDir -Force | Out-Null
+        }
+        icacls "$audioDir" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
+        # Modify on tts-voice.txt and tts-provider.txt (receiver reads/writes these)
+        foreach ($txt in @("tts-voice.txt", "tts-provider.txt")) {
+            $f = "$claudeDir\$txt"
+            if (Test-Path $f) {
+                icacls "$f" /grant "${ReceiverUser}:M" /Q 2>$null
+            }
+        }
     }
     # Read+Execute on Piper install
     $piperDir = "$env:LOCALAPPDATA\Programs\Piper"

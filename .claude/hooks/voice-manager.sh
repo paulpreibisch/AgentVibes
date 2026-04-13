@@ -251,8 +251,8 @@ case "$1" in
         echo "  ... (use /agent-vibes:list to see all)"
         exit 1
       fi
-    elif [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
-      # Piper voice lookup: Scan voice directory for .onnx files
+    elif [[ "$ACTIVE_PROVIDER" == "piper" || "$ACTIVE_PROVIDER" == "ssh-remote" || "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
+      # Piper voice lookup (also used by transport providers — receiver uses piper)
       source "$SCRIPT_DIR/piper-voice-manager.sh"
       VOICE_DIR=$(get_voice_storage_dir)
 
@@ -391,8 +391,12 @@ case "$1" in
 
     if [ -f "$PROVIDER_FILE" ]; then
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
-      if [[ "$ACTIVE_PROVIDER" == "piper" || "$ACTIVE_PROVIDER" == "ssh-remote" || "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
+      if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
         echo "Provider: Piper TTS (Free, Offline)"
+      elif [[ "$ACTIVE_PROVIDER" == "ssh-remote" ]]; then
+        echo "Provider: Piper TTS (via SSH Remote)"
+      elif [[ "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
+        echo "Provider: Piper TTS (via AgentVibes Receiver)"
       elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
         echo "Provider: macOS Say (Built-in, Free)"
       else
