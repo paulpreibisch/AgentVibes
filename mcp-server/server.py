@@ -222,10 +222,14 @@ class AgentVibesServer:
                 )
                 llm_key = ""
             # Claude Code sets CLAUDECODE=1 when it spawns subprocesses.
-            # Use that as a fallback identifier when no explicit env var
-            # was provided.  Copilot CLI and Codex do NOT set this.
             if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
                 llm_key = "claude-code"
+            # VS Code Copilot: if running inside VS Code (VSCODE_PID set)
+            # but NOT Claude Code (no CLAUDECODE), assume Copilot.
+            # This handles the case where Copilot reads .mcp.json (which
+            # has no AGENTVIBES_LLM) instead of .vscode/mcp.json.
+            if not llm_key and os.environ.get("VSCODE_PID", ""):
+                llm_key = "copilot"
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
             if self.is_windows:
@@ -410,12 +414,14 @@ class AgentVibesServer:
         provider = await self._get_provider()
 
         # Resolve the LLM key using the same priority as text_to_speech:
-        # 1. AGENTVIBES_LLM env var  2. CLAUDECODE=1 auto-detect  3. "default"
+        # 1. AGENTVIBES_LLM env var  2. CLAUDECODE=1  3. VSCODE_PID  4. "default"
         llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
         if llm_key and not _re.match(r"^[a-zA-Z0-9_-]+$", llm_key):
             llm_key = ""
         if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
             llm_key = "claude-code"
+        if not llm_key and os.environ.get("VSCODE_PID", ""):
+            llm_key = "copilot"
         if not llm_key:
             llm_key = "default"
 
