@@ -321,7 +321,13 @@ export async function installCopilotMcp(targetDir) {
       }
     } catch { /* new file */ }
 
-    mcpConfig.servers.agentvibes = agentvibesServer;
+    // Use "agentvibes-copilot" as the server name so it doesn't collide
+    // with the "agentvibes" entry in .mcp.json (which Copilot reads with
+    // precedence).  Different name = Copilot uses THIS config with the
+    // correct AGENTVIBES_LLM env var.
+    // Also clean up any old "agentvibes" entry from previous installs.
+    delete mcpConfig.servers.agentvibes;
+    mcpConfig.servers['agentvibes-copilot'] = agentvibesServer;
     await fs.writeFile(mcpJsonPath, JSON.stringify(mcpConfig, null, 2) + '\n');
 
     // Also write ~/.copilot/mcp-config.json so the GitHub Copilot CLI
@@ -365,13 +371,13 @@ export async function removeCopilotMcp(targetDir) {
   try {
     const content = await fs.readFile(mcpJsonPath, 'utf8');
     const parsed = JSON.parse(content);
-    if (parsed?.servers?.agentvibes) {
-      delete parsed.servers.agentvibes;
-      if (Object.keys(parsed.servers).length === 0) {
-        await fs.unlink(mcpJsonPath);
-      } else {
-        await fs.writeFile(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n');
-      }
+    // Remove both old ("agentvibes") and new ("agentvibes-copilot") names
+    delete parsed?.servers?.agentvibes;
+    delete parsed?.servers?.['agentvibes-copilot'];
+    if (parsed?.servers && Object.keys(parsed.servers).length === 0) {
+      await fs.unlink(mcpJsonPath);
+    } else if (parsed?.servers) {
+      await fs.writeFile(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n');
     }
     return { success: true };
   } catch {

@@ -68,17 +68,28 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
   // testing the writer's source code is the authoritative check.
   describe('Copilot .vscode/mcp.json', () => {
     test('installCopilotMcp writer produces env.AGENTVIBES_LLM = "copilot"', async () => {
-      // Read the source of installCopilotMcp / agentvibesServer literal to
-      // confirm the env field is hard-wired without actually touching disk.
       const src = readFileSync(
         path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
         'utf8'
       );
-      // Find the agentvibesServer block inside installCopilotMcp
       const m = src.match(/installCopilotMcp[\s\S]*?const agentvibesServer = \{[\s\S]*?\};/);
       assert.ok(m, 'installCopilotMcp must declare agentvibesServer');
       assert.match(m[0], /AGENTVIBES_LLM:\s*['"]copilot['"]/,
         'installCopilotMcp must set env.AGENTVIBES_LLM = "copilot"');
+    });
+
+    test('installCopilotMcp uses "agentvibes-copilot" server name to avoid .mcp.json collision', () => {
+      // Copilot reads .mcp.json with precedence.  Using a different server
+      // name ("agentvibes-copilot") ensures Copilot uses .vscode/mcp.json
+      // with the correct AGENTVIBES_LLM env var.
+      const src = readFileSync(
+        path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
+        'utf8'
+      );
+      const fn = src.match(/export async function installCopilotMcp[\s\S]*?^}/m);
+      assert.ok(fn, 'installCopilotMcp must exist');
+      assert.match(fn[0], /agentvibes-copilot/,
+        'installCopilotMcp must use "agentvibes-copilot" server name');
     });
 
     test('installCopilotMcp also writes ~/.copilot/mcp-config.json for GitHub Copilot CLI', () => {
