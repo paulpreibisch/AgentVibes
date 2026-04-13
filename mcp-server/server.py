@@ -401,15 +401,27 @@ class AgentVibesServer:
         Get current AgentVibes configuration.
 
         Returns:
-            Current voice, personality, language, and provider settings
+            Current voice, personality, language, provider, and LLM settings
         """
+        import re as _re
         voice = await self._get_current_voice()
         personality = await self._get_personality()
         language = await self._get_language()
         provider = await self._get_provider()
 
+        # Resolve the LLM key using the same priority as text_to_speech:
+        # 1. AGENTVIBES_LLM env var  2. CLAUDECODE=1 auto-detect  3. "default"
+        llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
+        if llm_key and not _re.match(r"^[a-zA-Z0-9_-]+$", llm_key):
+            llm_key = ""
+        if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
+            llm_key = "claude-code"
+        if not llm_key:
+            llm_key = "default"
+
         output = "🎤 Current AgentVibes Configuration\n"
         output += f"{self.SEPARATOR}\n"
+        output += f"LLM: {llm_key}\n"
         output += f"Provider: {provider}\n"
         output += f"Voice: {voice}\n"
         output += f"Personality: {personality}\n"
