@@ -138,11 +138,14 @@ export async function checkCodexInstalled(targetDir) {
 export async function installClaudeMcp(targetDir) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
-  // No AGENTVIBES_LLM here — Copilot reads .mcp.json with precedence over
-  // .vscode/mcp.json.  Claude Code is auto-detected via CLAUDECODE=1.
+  // AGENTVIBES_MCP_FALLBACK=copilot is the fallback identity for non-Claude-Code
+  // tools reading .mcp.json (primarily VS Code Copilot, which reads .mcp.json
+  // with precedence over .vscode/mcp.json).  Claude Code auto-detects via
+  // CLAUDECODE=1 which takes priority over the fallback in server.py.
   const agentvibesServer = {
     command: 'npx',
     args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+    env: { AGENTVIBES_MCP_FALLBACK: 'copilot' },
   };
 
   // MCP config and file copies are independent — report partial success
@@ -157,15 +160,16 @@ export async function installClaudeMcp(targetDir) {
 
     if (existing && typeof existing === 'object') {
       existing.mcpServers = existing.mcpServers || {};
-      // Strip any stale AGENTVIBES_LLM from older versions
       const current = existing.mcpServers.agentvibes;
-      if (current?.env?.AGENTVIBES_LLM) {
-        delete current.env.AGENTVIBES_LLM;
-        if (current.env && Object.keys(current.env).length === 0) {
-          delete current.env;
-        }
-      }
-      existing.mcpServers.agentvibes = { ...agentvibesServer, ...(current?.env ? { env: current.env } : {}) };
+      // Strip any stale AGENTVIBES_LLM (from older versions — causes collisions)
+      if (current?.env?.AGENTVIBES_LLM) delete current.env.AGENTVIBES_LLM;
+      // Preserve user's other env keys, ensure AGENTVIBES_MCP_FALLBACK is set
+      const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_MCP_FALLBACK: 'copilot' };
+      existing.mcpServers.agentvibes = {
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: mergedEnv,
+      };
       await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
     } else {
       await fs.writeFile(mcpConfigPath, JSON.stringify({ mcpServers: { agentvibes: agentvibesServer } }, null, 2) + '\n');
@@ -321,13 +325,9 @@ export async function installCopilotMcp(targetDir) {
       }
     } catch { /* new file */ }
 
-    // Use "agentvibes-copilot" as the server name so it doesn't collide
-    // with the "agentvibes" entry in .mcp.json (which Copilot reads with
-    // precedence).  Different name = Copilot uses THIS config with the
-    // correct AGENTVIBES_LLM env var.
-    // Also clean up any old "agentvibes" entry from previous installs.
-    delete mcpConfig.servers.agentvibes;
-    mcpConfig.servers['agentvibes-copilot'] = agentvibesServer;
+    // Clean up any old "agentvibes-copilot" entry from a prior attempt.
+    delete mcpConfig.servers['agentvibes-copilot'];
+    mcpConfig.servers.agentvibes = agentvibesServer;
     await fs.writeFile(mcpJsonPath, JSON.stringify(mcpConfig, null, 2) + '\n');
 
     // Also write ~/.copilot/mcp-config.json so the GitHub Copilot CLI

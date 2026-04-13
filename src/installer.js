@@ -4313,13 +4313,16 @@ async function handleMcpConfiguration(targetDir, options) {
   // .mcp.json registers the AgentVibes MCP server for Claude Code, enabling
   // natural language control (text_to_speech, get_config, set_voice, etc.).
   //
-  // No AGENTVIBES_LLM env var — Copilot also reads .mcp.json.  Claude Code
-  // is auto-detected via CLAUDECODE=1 env var at runtime.
+  // AGENTVIBES_MCP_FALLBACK=copilot is the identity for non-Claude-Code tools
+  // that read .mcp.json (primarily VS Code Copilot, which reads .mcp.json
+  // with precedence over its own .vscode/mcp.json).  Claude Code is
+  // auto-detected via CLAUDECODE=1 which takes priority over the fallback.
   const mcpConfig = {
     mcpServers: {
       agentvibes: {
         command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: { AGENTVIBES_MCP_FALLBACK: 'copilot' }
       }
     }
   };
@@ -4331,20 +4334,23 @@ async function handleMcpConfiguration(targetDir, options) {
   } catch { /* doesn't exist */ }
 
   if (mcpExists) {
-    // Upgrade: ensure agentvibes entry exists and strip any stale AGENTVIBES_LLM
+    // Upgrade: ensure agentvibes entry exists with fallback env
     try {
       const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
       if (existing && typeof existing === 'object') {
         existing.mcpServers = existing.mcpServers || {};
         const current = existing.mcpServers.agentvibes;
-        // Strip AGENTVIBES_LLM if present (causes Copilot identity collisions)
+        // Strip AGENTVIBES_LLM if present (causes identity collisions)
         if (current?.env?.AGENTVIBES_LLM) {
           delete current.env.AGENTVIBES_LLM;
-          if (Object.keys(current.env).length === 0) delete current.env;
         }
-        if (!current) {
-          existing.mcpServers.agentvibes = mcpConfig.mcpServers.agentvibes;
-        }
+        // Ensure fallback is set
+        const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_MCP_FALLBACK: 'copilot' };
+        existing.mcpServers.agentvibes = {
+          command: 'npx',
+          args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+          env: mergedEnv,
+        };
         await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
       }
     } catch { /* parse error — don't corrupt */ }

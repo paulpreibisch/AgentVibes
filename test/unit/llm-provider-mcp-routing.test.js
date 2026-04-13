@@ -78,18 +78,15 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
         'installCopilotMcp must set env.AGENTVIBES_LLM = "copilot"');
     });
 
-    test('installCopilotMcp uses "agentvibes-copilot" server name to avoid .mcp.json collision', () => {
-      // Copilot reads .mcp.json with precedence.  Using a different server
-      // name ("agentvibes-copilot") ensures Copilot uses .vscode/mcp.json
-      // with the correct AGENTVIBES_LLM env var.
+    test('installCopilotMcp uses "agentvibes" server name', () => {
       const src = readFileSync(
         path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
         'utf8'
       );
       const fn = src.match(/export async function installCopilotMcp[\s\S]*?^}/m);
       assert.ok(fn, 'installCopilotMcp must exist');
-      assert.match(fn[0], /agentvibes-copilot/,
-        'installCopilotMcp must use "agentvibes-copilot" server name');
+      assert.match(fn[0], /mcpConfig\.servers\.agentvibes\s*=/,
+        'installCopilotMcp must use "agentvibes" server name');
     });
 
     test('installCopilotMcp also writes ~/.copilot/mcp-config.json for GitHub Copilot CLI', () => {
@@ -124,34 +121,38 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
       );
     });
 
-    test('.mcp.json does NOT set AGENTVIBES_LLM (Copilot reads it too)', () => {
-      // .mcp.json registers the MCP server for Claude Code but must NOT
-      // set AGENTVIBES_LLM because Copilot reads .mcp.json with precedence
-      // over .vscode/mcp.json.  Claude Code is auto-detected via CLAUDECODE=1.
+    test('.mcp.json sets AGENTVIBES_MCP_FALLBACK=copilot (not AGENTVIBES_LLM)', () => {
+      // .mcp.json is read by both Claude Code AND Copilot.  It uses
+      // AGENTVIBES_MCP_FALLBACK (not AGENTVIBES_LLM) as the identity for
+      // non-Claude-Code readers.  Claude Code hits CLAUDECODE=1 first so
+      // it ignores the fallback.
       const fn = installerSrc.match(/async function handleMcpConfiguration[\s\S]*?^}/m);
       assert.ok(fn, 'handleMcpConfiguration must exist');
-      // The mcpConfig template must not contain AGENTVIBES_LLM
       const m = fn[0].match(/const mcpConfig = \{([\s\S]*?)\};/);
       assert.ok(m, 'must declare mcpConfig');
       const body = m[1].replace(/\/\/.*$/gm, '');
       assert.doesNotMatch(body, /AGENTVIBES_LLM/,
-        '.mcp.json template must NOT set AGENTVIBES_LLM');
+        '.mcp.json template must NOT set AGENTVIBES_LLM (use AGENTVIBES_MCP_FALLBACK)');
+      assert.match(body, /AGENTVIBES_MCP_FALLBACK.*copilot/,
+        '.mcp.json template must set AGENTVIBES_MCP_FALLBACK = "copilot"');
     });
 
-    test('installClaudeMcp strips stale AGENTVIBES_LLM from .mcp.json', () => {
+    test('installClaudeMcp writes AGENTVIBES_MCP_FALLBACK in .mcp.json', () => {
       const src = readFileSync(
         path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
         'utf8'
       );
       const fn = src.match(/export async function installClaudeMcp[\s\S]*?^}/m);
       assert.ok(fn, 'installClaudeMcp must exist');
-      assert.match(fn[0], /delete.*AGENTVIBES_LLM/,
-        'installClaudeMcp must strip stale AGENTVIBES_LLM from .mcp.json');
+      assert.match(fn[0], /AGENTVIBES_MCP_FALLBACK.*copilot/,
+        'installClaudeMcp must set AGENTVIBES_MCP_FALLBACK = "copilot"');
     });
 
-    test('mcp-server/server.py auto-detects Claude Code via CLAUDECODE env var', () => {
+    test('server.py reads AGENTVIBES_MCP_FALLBACK as priority 3', () => {
+      assert.match(serverPySrc, /AGENTVIBES_MCP_FALLBACK/,
+        'server.py must check AGENTVIBES_MCP_FALLBACK env var');
       assert.match(serverPySrc, /os\.environ\.get\(['"]CLAUDECODE['"]/,
-        'server.py must read CLAUDECODE env var for Claude Code auto-detection');
+        'server.py must check CLAUDECODE first (takes priority over fallback)');
     });
   });
 });
