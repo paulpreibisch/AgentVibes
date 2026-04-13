@@ -1547,12 +1547,14 @@ export function createSetupTab(screen, services) {
 
     lines.push('');
     lines.push(`{bold}{cyan-fg}What ${result ? `got ${verb}` : 'gets installed'}:{/cyan-fg}{/bold}`);
-    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.claude/hooks/{/bold} (session-start + pre-tool hooks)');
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.mcp.json{/bold} (MCP server — natural language voice control)');
+    lines.push('');
+    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.claude/hooks/{/bold} (session-start + pre-tool hooks)');
     lines.push(`     Location: ${hooksDir}`);
     lines.push('');
-    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.claude/commands/{/bold} (slash commands)');
+    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}.claude/commands/{/bold} (slash commands)');
     lines.push('');
-    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
+    lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
     lines.push('');
     lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
 

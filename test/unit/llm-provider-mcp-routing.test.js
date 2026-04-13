@@ -113,29 +113,29 @@ describe('MCP launcher templates set AGENTVIBES_LLM env var', () => {
       );
     });
 
-    test('installer does NOT create agentvibes entry in .mcp.json', () => {
-      // Claude Code works via hooks and slash commands — no MCP config needed.
-      // .mcp.json must NOT have agentvibes written because Copilot reads it
-      // with precedence over .vscode/mcp.json, causing LLM identity collisions.
-      // The function may write to .mcp.json to REMOVE stale entries, but must
-      // never ADD agentvibes.
+    test('.mcp.json does NOT set AGENTVIBES_LLM (Copilot reads it too)', () => {
+      // .mcp.json registers the MCP server for Claude Code but must NOT
+      // set AGENTVIBES_LLM because Copilot reads .mcp.json with precedence
+      // over .vscode/mcp.json.  Claude Code is auto-detected via CLAUDECODE=1.
       const fn = installerSrc.match(/async function handleMcpConfiguration[\s\S]*?^}/m);
       assert.ok(fn, 'handleMcpConfiguration must exist');
-      assert.doesNotMatch(fn[0], /mcpServers\.agentvibes\s*=/,
-        'handleMcpConfiguration must NOT assign mcpServers.agentvibes');
+      // The mcpConfig template must not contain AGENTVIBES_LLM
+      const m = fn[0].match(/const mcpConfig = \{([\s\S]*?)\};/);
+      assert.ok(m, 'must declare mcpConfig');
+      const body = m[1].replace(/\/\/.*$/gm, '');
+      assert.doesNotMatch(body, /AGENTVIBES_LLM/,
+        '.mcp.json template must NOT set AGENTVIBES_LLM');
     });
 
-    test('installClaudeMcp does NOT write .mcp.json or ~/.claude.json', () => {
+    test('installClaudeMcp strips stale AGENTVIBES_LLM from .mcp.json', () => {
       const src = readFileSync(
         path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
         'utf8'
       );
-      // installClaudeMcp should only copy hooks/commands/config files.
-      // It cleans up stale .mcp.json entries but does NOT create new ones.
       const fn = src.match(/export async function installClaudeMcp[\s\S]*?^}/m);
       assert.ok(fn, 'installClaudeMcp must exist');
-      assert.doesNotMatch(fn[0], /\.claude\.json/,
-        'installClaudeMcp must NOT write to ~/.claude.json');
+      assert.match(fn[0], /delete.*AGENTVIBES_LLM/,
+        'installClaudeMcp must strip stale AGENTVIBES_LLM from .mcp.json');
     });
 
     test('mcp-server/server.py auto-detects Claude Code via CLAUDECODE env var', () => {

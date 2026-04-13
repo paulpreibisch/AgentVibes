@@ -4308,51 +4308,73 @@ function isPathSafe(targetPath, basePath) {
  * @param {Object} options - Installation options (includes 'yes' for auto-confirm)
  */
 async function handleMcpConfiguration(targetDir, options) {
-  // Claude Code does NOT need an MCP config.  It works entirely via hooks
-  // (.claude/hooks-windows/) and slash commands (.claude/commands/).
-  // The MCP server is auto-detected via CLAUDECODE=1 env var at runtime.
-  //
-  // We do NOT write .mcp.json because Copilot reads it with precedence
-  // over .vscode/mcp.json, causing LLM identity collisions.
-  //
-  // Each tool has its own project-local config:
-  //   .vscode/mcp.json   → VS Code Copilot (AGENTVIBES_LLM = "copilot")
-  //   ~/.copilot/mcp-config.json → Copilot CLI (AGENTVIBES_LLM = "copilot")
-  //   .codex/config.toml → Codex           (AGENTVIBES_LLM = "codex")
-
-  // Migrate: remove stale agentvibes entry from .mcp.json if present
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
-  try {
-    const raw = await fs.readFile(mcpConfigPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed?.mcpServers?.agentvibes) {
-      delete parsed.mcpServers.agentvibes;
-      const noServers = Object.keys(parsed.mcpServers).length === 0;
-      const noOtherKeys = Object.keys(parsed).length === 1;
-      if (noServers && noOtherKeys) {
-        await fs.unlink(mcpConfigPath);
-      } else {
-        await fs.writeFile(mcpConfigPath, JSON.stringify(parsed, null, 2) + '\n');
+
+  // .mcp.json registers the AgentVibes MCP server for Claude Code, enabling
+  // natural language control (text_to_speech, get_config, set_voice, etc.).
+  //
+  // No AGENTVIBES_LLM env var — Copilot also reads .mcp.json.  Claude Code
+  // is auto-detected via CLAUDECODE=1 env var at runtime.
+  const mcpConfig = {
+    mcpServers: {
+      agentvibes: {
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
       }
     }
-  } catch { /* no .mcp.json or can't parse — fine */ }
+  };
 
-  console.log(
-    boxen(
-      chalk.green.bold('✅ Claude Code Ready!\n\n') +
-      chalk.white('AgentVibes hooks and slash commands installed.\n') +
-      chalk.white('Claude Code auto-detects AgentVibes at runtime.\n\n') +
-      chalk.gray('Hooks:    .claude/hooks-windows/ (or .claude/hooks/)\n') +
-      chalk.gray('Commands: .claude/commands/agent-vibes/\n') +
-      chalk.gray('Config:   .claude/config/'),
-      {
-        padding: 1,
-        margin: { top: 1, bottom: 1, left: 0, right: 0 },
-        borderStyle: 'double',
-        borderColor: 'green',
+  let mcpExists = false;
+  try {
+    await fs.access(mcpConfigPath);
+    mcpExists = true;
+  } catch { /* doesn't exist */ }
+
+  if (mcpExists) {
+    // Upgrade: ensure agentvibes entry exists and strip any stale AGENTVIBES_LLM
+    try {
+      const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
+      if (existing && typeof existing === 'object') {
+        existing.mcpServers = existing.mcpServers || {};
+        const current = existing.mcpServers.agentvibes;
+        // Strip AGENTVIBES_LLM if present (causes Copilot identity collisions)
+        if (current?.env?.AGENTVIBES_LLM) {
+          delete current.env.AGENTVIBES_LLM;
+          if (Object.keys(current.env).length === 0) delete current.env;
+        }
+        if (!current) {
+          existing.mcpServers.agentvibes = mcpConfig.mcpServers.agentvibes;
+        }
+        await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
       }
-    )
-  );
+    } catch { /* parse error — don't corrupt */ }
+    return;
+  }
+
+  // New install — create .mcp.json
+  if (!options.yes) {
+    const { confirmCreate } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirmCreate',
+      message: chalk.cyan('Create .mcp.json for AgentVibes MCP server? (enables natural language voice control)'),
+      default: true,
+    }]);
+    if (!confirmCreate) return;
+  }
+
+  try {
+    await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+    console.log(
+      boxen(
+        chalk.green.bold('✅ MCP Configuration Created!\n\n') +
+        chalk.white('AgentVibes MCP server registered in ') + chalk.cyan('.mcp.json') + chalk.white('.\n') +
+        chalk.green('Natural language voice control is ready!'),
+        { padding: 1, margin: { top: 1, bottom: 1 }, borderStyle: 'double', borderColor: 'green' }
+      )
+    );
+  } catch (err) {
+    console.log(chalk.red(`\n✗ Failed to create .mcp.json: ${err.message}`));
+  }
 }
 
 /**

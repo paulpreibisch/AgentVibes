@@ -127,36 +127,53 @@ export async function checkCodexInstalled(targetDir) {
 /**
  * Install AgentVibes for Claude Code.
  *
- * Does NOT write any MCP config (.mcp.json or ~/.claude.json).  Claude Code
- * works entirely via hooks (.claude/hooks-windows/) and slash commands
- * (.claude/commands/).  The MCP server is auto-detected via CLAUDECODE=1.
+ * Writes .mcp.json to register the AgentVibes MCP server (enables natural
+ * language control: text_to_speech, get_config, set_voice, etc.).
  *
- * Copilot reads .mcp.json with precedence over .vscode/mcp.json — writing
- * an agentvibes entry in .mcp.json causes Copilot to lose its LLM identity.
- * So we don't touch .mcp.json at all.
+ * .mcp.json does NOT set AGENTVIBES_LLM because Copilot also reads it.
+ * Claude Code is auto-detected via CLAUDECODE=1 env var at runtime.
  *
- * Copies: hooks, commands, config, personality, plugin, and bmad config files.
+ * Also copies hooks, commands, config, personality, plugin, and bmad config files.
  */
 export async function installClaudeMcp(targetDir) {
-  let mcpError = null;
+  const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
-  // Clean up any stale .mcp.json agentvibes entry from older versions.
-  // Copilot reads .mcp.json with precedence and it causes identity collisions.
+  // No AGENTVIBES_LLM here — Copilot reads .mcp.json with precedence over
+  // .vscode/mcp.json.  Claude Code is auto-detected via CLAUDECODE=1.
+  const agentvibesServer = {
+    command: 'npx',
+    args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+  };
+
+  // MCP config and file copies are independent — report partial success
+  // when one succeeds but the other fails.
+  let mcpCreated = false;
+  let mcpError = null;
   try {
-    const mcpJsonPath = path.join(targetDir, '.mcp.json');
-    const raw = await fs.readFile(mcpJsonPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed?.mcpServers?.agentvibes) {
-      delete parsed.mcpServers.agentvibes;
-      const noServers = Object.keys(parsed.mcpServers).length === 0;
-      const noOtherKeys = Object.keys(parsed).length === 1;
-      if (noServers && noOtherKeys) {
-        await fs.unlink(mcpJsonPath);
-      } else {
-        await fs.writeFile(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n');
+    let existing = null;
+    try {
+      existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
+    } catch { /* new file */ }
+
+    if (existing && typeof existing === 'object') {
+      existing.mcpServers = existing.mcpServers || {};
+      // Strip any stale AGENTVIBES_LLM from older versions
+      const current = existing.mcpServers.agentvibes;
+      if (current?.env?.AGENTVIBES_LLM) {
+        delete current.env.AGENTVIBES_LLM;
+        if (current.env && Object.keys(current.env).length === 0) {
+          delete current.env;
+        }
       }
+      existing.mcpServers.agentvibes = { ...agentvibesServer, ...(current?.env ? { env: current.env } : {}) };
+      await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+    } else {
+      await fs.writeFile(mcpConfigPath, JSON.stringify({ mcpServers: { agentvibes: agentvibesServer } }, null, 2) + '\n');
     }
-  } catch { /* .mcp.json doesn't exist or can't parse — fine */ }
+    mcpCreated = true;
+  } catch (err) {
+    mcpError = err.message;
+  }
 
   try {
     // Copy hooks, commands, config, personality, plugin, bmad config files
@@ -171,7 +188,7 @@ export async function installClaudeMcp(targetDir) {
     await installer.copyBackgroundMusicFiles(targetDir, silentSpinner);
     ensureDefaultLlmConfigSync('claude-code', targetDir);
 
-    return { success: true, mcpCreated: false, mcpError };
+    return { success: true, mcpCreated, mcpError };
   } catch (err) {
     return { success: false, error: err.message, mcpError };
   }
