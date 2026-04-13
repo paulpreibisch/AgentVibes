@@ -112,7 +112,7 @@ case "$1" in
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
     FORMATTER="$PROJECT_ROOT/src/cli/list-voices.js"
 
-    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+    if [[ "$ACTIVE_PROVIDER" == "piper" || "$ACTIVE_PROVIDER" == "ssh-remote" || "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
       # Get voice directory for Piper
       if [[ -f "$SCRIPT_DIR/piper-voice-manager.sh" ]]; then
         source "$SCRIPT_DIR/piper-voice-manager.sh"
@@ -391,7 +391,7 @@ case "$1" in
 
     if [ -f "$PROVIDER_FILE" ]; then
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
-      if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+      if [[ "$ACTIVE_PROVIDER" == "piper" || "$ACTIVE_PROVIDER" == "ssh-remote" || "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
         echo "Provider: Piper TTS (Free, Offline)"
       elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
         echo "Provider: macOS Say (Built-in, Free)"
@@ -443,7 +443,7 @@ case "$1" in
       ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
     fi
 
-    if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
+    if [[ "$ACTIVE_PROVIDER" == "piper" || "$ACTIVE_PROVIDER" == "ssh-remote" || "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
       # List downloaded Piper voices
       if [[ -f "$SCRIPT_DIR/piper-voice-manager.sh" ]]; then
         source "$SCRIPT_DIR/piper-voice-manager.sh"

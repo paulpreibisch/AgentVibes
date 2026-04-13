@@ -64,7 +64,7 @@ export AGENTVIBES_WAV_OUTPATH="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-last-wav-$$.t
 
 # Cleanup temp outpath file on exit
 trap 'rm -f "$AGENTVIBES_WAV_OUTPATH"' EXIT
-"$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE"
+bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE_OVERRIDE"
 
 # Read the generated file path (written by play-tts-piper.sh via AGENTVIBES_WAV_OUTPATH)
 GENERATED_FILE=""

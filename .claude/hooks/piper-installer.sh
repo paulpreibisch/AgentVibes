@@ -67,7 +67,7 @@ if [[ -d "/data/data/com.termux" ]]; then
   echo ""
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   if [[ -f "$SCRIPT_DIR/termux-installer.sh" ]]; then
-    exec "$SCRIPT_DIR/termux-installer.sh" "$@"
+    exec bash "$SCRIPT_DIR/termux-installer.sh" "$@"
   else
     echo "❌ Error: termux-installer.sh not found"
     echo "   Please download it from the AgentVibes repository"

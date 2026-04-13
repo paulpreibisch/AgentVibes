@@ -3771,18 +3771,31 @@ async function copyConfigFiles(targetDir, spinner) {
       const stat = await fs.stat(srcPath);
 
       if (stat.isFile()) {
-        // Don't overwrite existing config files (except audio-effects.cfg which is required)
-        try {
-          await fs.access(destPath);
-          if (file !== 'audio-effects.cfg') {
-            continue; // Skip if file exists and it's not audio-effects.cfg
+        // For .sample files: copy as the real config name if it doesn't exist yet
+        // e.g. audio-effects.cfg.sample → audio-effects.cfg (only if absent)
+        let finalDest = destPath;
+        let finalName = file;
+        if (file.endsWith('.sample')) {
+          finalName = file.replace(/\.sample$/, '');
+          finalDest = path.join(destConfigDir, finalName);
+          try {
+            await fs.access(finalDest);
+            continue; // Real config already exists, don't overwrite
+          } catch {
+            // Real config doesn't exist, install from sample
           }
-        } catch {
-          // File doesn't exist, proceed with copy
+        } else {
+          // Non-sample files: skip if already exists
+          try {
+            await fs.access(destPath);
+            continue;
+          } catch {
+            // File doesn't exist, proceed with copy
+          }
         }
 
-        await fs.copyFile(srcPath, destPath);
-        copiedFiles.push(file);
+        await fs.copyFile(srcPath, finalDest);
+        copiedFiles.push(finalName);
       }
     }
 

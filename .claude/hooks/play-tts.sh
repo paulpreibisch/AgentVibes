@@ -208,7 +208,7 @@ else
 fi
 
 # Show GitHub star reminder (once per day)
-"$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
+bash "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
 
 # @function detect_voice_provider
 # @intent Auto-detect provider from voice name (for mixed-provider support)
@@ -226,11 +226,20 @@ detect_voice_provider() {
 }
 
 # Override provider if voice indicates different provider (mixed-provider mode)
+# But never override transport providers (ssh-remote, agentvibes-receiver, termux-ssh)
+# — those are transport layers, not synth engines. The receiver picks its own engine.
 if [[ -n "$VOICE_OVERRIDE" ]]; then
-  DETECTED_PROVIDER=$(detect_voice_provider "$VOICE_OVERRIDE")
-  if [[ "$DETECTED_PROVIDER" != "$ACTIVE_PROVIDER" ]]; then
-    ACTIVE_PROVIDER="$DETECTED_PROVIDER"
-  fi
+  case "$ACTIVE_PROVIDER" in
+    ssh-remote|agentvibes-receiver|termux-ssh)
+      # Transport provider — don't override, voice info is forwarded to receiver
+      ;;
+    *)
+      DETECTED_PROVIDER=$(detect_voice_provider "$VOICE_OVERRIDE")
+      if [[ "$DETECTED_PROVIDER" != "$ACTIVE_PROVIDER" ]]; then
+        ACTIVE_PROVIDER="$DETECTED_PROVIDER"
+      fi
+      ;;
+  esac
 fi
 
 # @function speak_text
@@ -247,22 +256,22 @@ speak_text() {
 
   case "$provider" in
     piper)
-      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice" "$profile_file"
+      bash "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice" "$profile_file"
       ;;
     soprano)
-      "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
       ;;
     macos)
-      "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
       ;;
     termux-ssh)
-      "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
     ssh-remote)
-      "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice"
       ;;
     agentvibes-receiver)
-      "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
       ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
@@ -377,22 +386,22 @@ fi
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   piper)
-    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "$AGENT_PROFILE_FILE"
+    exec bash "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "$AGENT_PROFILE_FILE"
     ;;
   soprano)
-    exec "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   macos)
-    exec "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   termux-ssh)
-    exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   ssh-remote)
-    exec "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   agentvibes-receiver)
-    exec "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2

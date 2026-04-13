@@ -79,6 +79,6 @@ if [[ -f "$BMAD_CONTEXT" ]] && [[ -f "$BMAD_SPEAK" ]]; then
 fi
 
 # Default: speak with global voice (run in background so we don't block Claude)
-"$SCRIPT_DIR/play-tts.sh" "$MESSAGE" &
+bash "$SCRIPT_DIR/play-tts.sh" "$MESSAGE" &
 
 exit 0

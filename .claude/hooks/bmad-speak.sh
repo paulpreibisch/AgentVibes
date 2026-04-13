@@ -203,11 +203,11 @@ AGENT_VOICE="$PROFILE_VOICE"
 AGENT_INTRO="$PROFILE_PRETEXT"
 
 if [[ -z "$AGENT_VOICE" ]] && [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
-  AGENT_VOICE=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null || true)
+  AGENT_VOICE=$(cd "$PROJECT_ROOT" && bash "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null || true)
 fi
 
 if [[ -z "$AGENT_INTRO" ]] && [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
-  AGENT_INTRO=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null || true)
+  AGENT_INTRO=$(cd "$PROJECT_ROOT" && bash "$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null || true)
 fi
 
 # ---------------------------------------------------------------------------

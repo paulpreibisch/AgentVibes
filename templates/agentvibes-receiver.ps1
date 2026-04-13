@@ -18,9 +18,13 @@ param(
     [string]$EncodedPayload = ""
 )
 
-# Paths
-$AgentVibesDir = "$env:USERPROFILE\.agentvibes"
-$ClaudeDir = "$env:USERPROFILE\.claude"
+# Paths — __OWNER_HOME__ is replaced at install time by setup-ssh-receiver.ps1
+# with the installing user's home directory (e.g. C:\Users\Paul).
+# This is necessary because sshd runs the ForceCommand as the SSH user
+# (e.g. agentvibes-receiver), whose $env:USERPROFILE is a different directory.
+$OwnerHome = "__OWNER_HOME__"
+$AgentVibesDir = "$OwnerHome\.agentvibes"
+$ClaudeDir = "$OwnerHome\.claude"
 $HooksDir = "$ClaudeDir\hooks-windows"
 $ConfigDir = "$ClaudeDir\config"
 $LogFile = "$AgentVibesDir\receiver.log"
@@ -195,6 +199,13 @@ if (-not (Test-Path $PlayTtsScript)) {
 }
 
 Write-Log "PLAYING" "voice=$($script:Voice)"
+
+# Override env vars so ALL downstream scripts resolve paths under the owner's
+# home, not the SSH user's home. Covers USERPROFILE, APPDATA, LOCALAPPDATA.
+$env:USERPROFILE = $OwnerHome
+$env:APPDATA = "$OwnerHome\AppData\Roaming"
+$env:LOCALAPPDATA = "$OwnerHome\AppData\Local"
+$env:CLAUDE_PROJECT_DIR = $OwnerHome
 
 try {
     & $PlayTtsScript $script:Text $script:Voice
