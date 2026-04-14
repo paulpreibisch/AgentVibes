@@ -1,8 +1,17 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.2.0
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.2.1
 
 ---
+
+## 🎯 NEW IN v5.2.1 — 多 LLM 身份识别与安装优化
+
+- **Copilot 拥有自己的语音 + 前缀 + 音乐** — 博萨诺瓦节奏中的 "Copilot here"，与 Claude Code 和 Codex 完全区分。
+- **每工具的 MCP 配置都带有明确的身份** — `.vscode/mcp.json`、`.codex/config.toml`、`~/.copilot/mcp-config.json` 各自设置自己的 `AGENTVIBES_LLM`。
+- **MCP 工具 `get_config` 返回检测到的 LLM** — 助手可以确认其路由并用正确的声音响应。
+- **设置导航：安装 → 安装 → 安装 → 配置 → 配置 → 配置** — 键盘流程在到达默认项之前依次走完三个配置。
+- **Claude Code 的默认背景音乐**设置为 Chillwave。
+- **Linux 兼容性优化** — CRLF、权限、传输提供程序覆盖。
 
 ## 🎯 NEW IN v5.2.0 — 远程语音预览 + 穴居人模式 + 语音评分
 

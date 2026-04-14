@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.1
 
 ---
 
@@ -43,7 +43,16 @@ Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, 
 
 ---
 
-## 🎯 NEW IN v5.2.0 — Remote Voice Preview + Caveman Mode + Voice Ratings
+## 🎯 NEW IN v5.2.1 — Multi-LLM Identity & Install Polish
+
+- **Copilot gets its own voice + pretext + music** — "Copilot here" with bossa nova, fully distinct from Claude Code and Codex.
+- **Per-tool MCP configs with explicit identity** — `.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json` each set their own `AGENTVIBES_LLM`.
+- **`get_config` MCP tool returns detected LLM** — calling assistants can confirm their routing and respond with the right voice.
+- **Setup nav: Install → Install → Install → Configure → Configure → Configure** — keyboard flow walks all three providers' Configures before landing on Default.
+- **Claude Code default background music** set to Chillwave.
+- **Linux compatibility refinements** — CRLF, permissions, transport provider override.
+
+## 🎯 v5.2.0 — Remote Voice Preview + Caveman Mode + Voice Ratings
 
 - **Caveman verbosity mode** — Ultra-terse TTS fragments. Set via `/agent-vibes:verbosity caveman`.
 - **👍/👎 voice ratings** — Press `+` to thumbs up, `-` to thumbs down in any voice list. Replaces star favorites.

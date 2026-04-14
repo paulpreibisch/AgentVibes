@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.2.1 — Identità Multi-LLM e Rifinitura dell'Installazione
+
+**Data di rilascio:** Aprile 2026
+
+Routing LLM rifinito per Copilot/Codex ed esperienza di configurazione migliorata.
+
+### ✨ Novità
+
+#### Routing Identità Multi-LLM
+
+- **GitHub Copilot ora ha la propria voce, pretext e musica di sottofondo** — completamente distinto da Claude Code e Codex. Saluta con "Copilot here" al ritmo della bossa nova.
+
+- **Config MCP per ogni strumento con identità esplicita** — ogni strumento AI (`.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json`) imposta il proprio `AGENTVIBES_LLM` per un routing deterministico.
+
+- **Lo strumento MCP `get_config` ora restituisce il LLM rilevato** — così l'assistente chiamante può confermare il proprio routing e rispondere con la voce giusta fin dall'inizio.
+
+- **Rifiniture di compatibilità Linux** — fine riga CRLF, permessi e gestione dell'override del provider di trasporto.
+
+#### Miglioramenti al Flusso di Setup
+
+- **Flusso di navigazione da tastiera** — premendo Invio sui pulsanti Installa (Claude → Copilot → Codex), ora salta a **Configura Claude**, permettendoti di percorrere tutte e tre le Configurazioni prima di atterrare su Predefinito.
+
+- **La freccia giù salta la riga Predefinito** dalle colonne Installa/Rimuovi.
+
+- **Messaggi di successo parziale dell'installazione** — se le copie dei file hanno successo ma la config MCP ha bisogno di una spinta, vedrai un chiaro avviso invece di un fallimento generico.
+
+#### Predefiniti
+
+- **Musica di sottofondo predefinita di Claude Code** impostata su Chillwave (`agent_vibes_chillwave_v2_loop.mp3`).
+
+#### Sotto il Cofano
+
+- Validazione chiave LLM rafforzata per una gestione più sicura delle variabili d'ambiente.
+- Logging errori migliorato per casi limite nelle scritture di config Copilot CLI.
+- Limitazione nota documentata: se lanci VS Code da un terminale avviato da Claude Code, `CLAUDECODE=1` può trapelare — la soluzione è `unset CLAUDECODE` prima.
+
+---
+
 ## 🎯 v5.2.0 — Anteprima Voce Remota + Modalità Caveman + Valutazioni Vocali
 
 **Data di rilascio:** Aprile 2026

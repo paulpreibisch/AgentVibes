@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.2.1 — Multi-LLM-Identität & Installations-Feinschliff
+
+**Veröffentlichungsdatum:** April 2026
+
+Verfeinertes LLM-Routing für Copilot/Codex und eine aufpolierte Setup-Erfahrung.
+
+### ✨ Was ist neu
+
+#### Multi-LLM-Identitäts-Routing
+
+- **GitHub Copilot hat jetzt eine eigene Stimme, eigenes Pretext und eigene Hintergrundmusik** — vollständig unterscheidbar von Claude Code und Codex. Sag Hallo zu "Copilot here" mit Bossa Nova im Gepäck.
+
+- **Pro-Tool-MCP-Configs mit expliziter Identität** — jedes KI-Tool (`.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json`) setzt sein eigenes `AGENTVIBES_LLM`, damit das Routing deterministisch ist.
+
+- **Das MCP-Tool `get_config` gibt jetzt das erkannte LLM zurück** — so kann der aufrufende Assistent sein Routing bestätigen und von Anfang an mit der richtigen Stimme antworten.
+
+- **Linux-Kompatibilitätsverfeinerungen** — CRLF-Zeilenenden, Berechtigungen und Transport-Provider-Override-Behandlung.
+
+#### Setup-Flow-Verbesserungen
+
+- **Tastaturnavigationsfluss** — beim Drücken von Enter durch die Installations-Buttons (Claude → Copilot → Codex) springt der Fokus jetzt zu **Claude konfigurieren**, sodass du alle drei Konfigurationen durchläufst, bevor du bei Standard landest.
+
+- **Pfeiltaste nach unten überspringt die Standard-Zeile** aus den Installieren/Entfernen-Spalten.
+
+- **Teilweise Install-Erfolgsmeldungen** — wenn Dateikopien gelingen, aber die MCP-Config einen Schubs braucht, siehst du eine klare Warnung statt eines generischen Fehlers.
+
+#### Standardwerte
+
+- **Claude Codes Standard-Hintergrundmusik** auf Chillwave gesetzt (`agent_vibes_chillwave_v2_loop.mp3`).
+
+#### Unter der Haube
+
+- LLM-Schlüsselvalidierung verschärft für sicheres Env-Var-Handling.
+- Verbesserte Fehlerprotokollierung für Edge Cases bei Copilot-CLI-Config-Schreibvorgängen.
+- Bekannte Einschränkung dokumentiert: wenn du VS Code aus einem Claude-Code-gestarteten Terminal startest, kann `CLAUDECODE=1` durchsickern — Workaround ist zuerst `unset CLAUDECODE`.
+
+---
+
 ## 🎯 v5.2.0 — Remote-Stimmvorschau + Höhlenmensch-Modus + Stimmbewertungen
 
 **Veröffentlichungsdatum:** April 2026

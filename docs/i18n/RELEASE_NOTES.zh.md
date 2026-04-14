@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.2.1 — 多 LLM 身份识别与安装优化
+
+**发布日期：** 2026 年 4 月
+
+为 Copilot/Codex 精心打磨的 LLM 路由和更加精致的设置体验。
+
+### ✨ 新功能
+
+#### 多 LLM 身份路由
+
+- **GitHub Copilot 现在拥有自己的语音、前缀和背景音乐** — 与 Claude Code 和 Codex 完全区分开。在博萨诺瓦的节奏中说"Copilot here"问好。
+
+- **每工具的 MCP 配置都带有明确的身份** — 每个 AI 工具 (`.vscode/mcp.json`、`.codex/config.toml`、`~/.copilot/mcp-config.json`) 都设置自己的 `AGENTVIBES_LLM`,使路由具有确定性。
+
+- **MCP 工具 `get_config` 现在会返回检测到的 LLM** — 调用方助手可以确认其路由并从一开始就用正确的声音响应。
+
+- **Linux 兼容性优化** — CRLF 行尾、权限和传输提供程序覆盖处理。
+
+#### 安装流程改进
+
+- **键盘导航流程** — 在安装按钮 (Claude → Copilot → Codex) 上按 Enter 后,现在会跳转到 **Claude 配置**,让你依次通过三个配置后再到达默认项。
+
+- **向下箭头跳过默认行** — 从安装/删除列。
+
+- **部分安装成功消息** — 如果文件复制成功但 MCP 配置需要小调整,你会看到明确的警告而不是通用的失败。
+
+#### 默认值
+
+- **Claude Code 的默认背景音乐**设置为 Chillwave (`agent_vibes_chillwave_v2_loop.mp3`)。
+
+#### 底层改动
+
+- 强化 LLM 密钥验证,让环境变量处理更安全。
+- 改进了 Copilot CLI 配置写入极端情况的错误日志记录。
+- 已记录的已知限制:如果你从 Claude Code 启动的终端启动 VS Code,`CLAUDECODE=1` 可能会泄漏 — 解决方法是先执行 `unset CLAUDECODE`。
+
+---
+
 ## 🎯 v5.2.0 — 远程语音预览 + 穴居人模式 + 语音评分
 
 **发布日期:** 2026 年 4 月

@@ -1,5 +1,43 @@
 # AgentVibes Release Notes
 
+## 🎯 v5.2.1 — Multi-LLM Identity & Install Polish
+
+**Release Date:** April 2026
+
+Polished LLM routing for Copilot/Codex and refined the setup experience.
+
+### ✨ What's New
+
+#### Multi-LLM Identity Routing
+
+- **GitHub Copilot now gets its own voice, pretext, and background music** — fully distinct from Claude Code and Codex. Say hello to "Copilot here" with bossa nova on the way in.
+
+- **Per-tool MCP configs with explicit identity** — each AI tool (`.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json`) sets its own `AGENTVIBES_LLM` so routing is deterministic.
+
+- **`get_config` MCP tool now returns the detected LLM** — so the calling assistant can confirm its routing and respond with the right voice out of the gate.
+
+- **Linux compatibility refinements** — CRLF line endings, permissions, and transport provider override handling.
+
+#### Setup Flow Improvements
+
+- **Keyboard navigation flow** — pressing Enter through the Install buttons (Claude → Copilot → Codex) now jumps to **Claude Configure** next, letting you walk all three Configures in order before landing on Default.
+
+- **Down-arrow skips the Default row** from Install/Remove columns (consistent with info-box dismiss nav).
+
+- **Partial install success messaging** — if file copies succeed but MCP config needs a nudge, you'll see a clear warning instead of a generic failure.
+
+#### Defaults
+
+- **Claude Code default background music** set to Chillwave (`agent_vibes_chillwave_v2_loop.mp3`).
+
+#### Under the Hood
+
+- LLM key validation tightened for safer env var handling.
+- Improved error logging for edge cases in Copilot CLI config writes.
+- Known limitation documented: if you launch VS Code from a Claude-Code-started terminal, `CLAUDECODE=1` can leak — workaround is to `unset CLAUDECODE` first.
+
+---
+
 ## 🎯 v5.2.0 — Remote Voice Preview + Caveman Mode + Voice Ratings
 
 **Release Date:** April 2026

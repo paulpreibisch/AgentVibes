@@ -1,10 +1,19 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.2.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.2.1
 
 ---
 
-## 🎯 NUEVO EN v5.2.0 — Vista Previa de Voz Remota + Modo Cavernícola + Valoraciones de Voz
+## 🎯 NUEVO EN v5.2.1 — Identidad Multi-LLM y Pulido de Instalación
+
+- **Copilot obtiene su propia voz + pretexto + música** — "Copilot here" con bossa nova, totalmente distinto de Claude Code y Codex.
+- **Configs MCP por herramienta con identidad explícita** — `.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json` cada uno establece su propio `AGENTVIBES_LLM`.
+- **La herramienta MCP `get_config` devuelve el LLM detectado** — los asistentes pueden confirmar su enrutamiento y responder con la voz correcta.
+- **Navegación de Setup: Instalar → Instalar → Instalar → Configurar → Configurar → Configurar** — el flujo de teclado recorre las tres configuraciones antes de llegar a Por Defecto.
+- **Música de fondo por defecto de Claude Code** configurada en Chillwave.
+- **Refinamientos de compatibilidad con Linux** — CRLF, permisos, anulación del proveedor de transporte.
+
+## 🎯 v5.2.0 — Vista Previa de Voz Remota + Modo Cavernícola + Valoraciones de Voz
 
 - **Modo de verbosidad cavernícola** — Fragmentos TTS ultra-concisos. Configura con `/agent-vibes:verbosity caveman`.
 - **👍/👎 valoraciones de voz** — Pulsa `+` para pulgar arriba, `-` para pulgar abajo en cualquier lista de voces. Sustituye los favoritos con estrellas.

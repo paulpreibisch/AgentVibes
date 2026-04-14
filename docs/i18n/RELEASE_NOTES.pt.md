@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.2.1 — Identidade Multi-LLM e Polimento de Instalação
+
+**Data de Lançamento:** Abril 2026
+
+Roteamento LLM polido para Copilot/Codex e experiência de configuração refinada.
+
+### ✨ Novidades
+
+#### Roteamento de Identidade Multi-LLM
+
+- **GitHub Copilot agora tem sua própria voz, pretexto e música de fundo** — totalmente distinto de Claude Code e Codex. Diga olá ao "Copilot here" ao som de bossa nova.
+
+- **Configs MCP por ferramenta com identidade explícita** — cada ferramenta de IA (`.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json`) define seu próprio `AGENTVIBES_LLM` para roteamento determinístico.
+
+- **A ferramenta MCP `get_config` agora retorna o LLM detectado** — o assistente chamador pode confirmar seu roteamento e responder com a voz certa desde o início.
+
+- **Refinamentos de compatibilidade com Linux** — finais de linha CRLF, permissões e manuseio de override de provedor de transporte.
+
+#### Melhorias no Fluxo de Setup
+
+- **Fluxo de navegação por teclado** — pressionar Enter nos botões Instalar (Claude → Copilot → Codex) agora salta para **Configurar Claude**, permitindo percorrer as três opções de Configurar antes de chegar em Padrão.
+
+- **A seta para baixo pula a linha Padrão** nas colunas Instalar/Remover.
+
+- **Mensagens de sucesso parcial de instalação** — se as cópias de arquivo tiverem sucesso mas a config MCP precisar de um empurrão, você verá um aviso claro em vez de uma falha genérica.
+
+#### Padrões
+
+- **Música de fundo padrão do Claude Code** definida como Chillwave (`agent_vibes_chillwave_v2_loop.mp3`).
+
+#### Por Baixo do Capô
+
+- Validação de chave LLM reforçada para manuseio mais seguro de variáveis de ambiente.
+- Registro de erros melhorado para casos extremos de gravação de config Copilot CLI.
+- Limitação conhecida documentada: se você iniciar o VS Code a partir de um terminal iniciado pelo Claude Code, `CLAUDECODE=1` pode vazar — a solução é `unset CLAUDECODE` primeiro.
+
+---
+
 ## 🎯 v5.2.0 — Pré-visualização de Voz Remota + Modo Homem das Cavernas + Avaliações de Voz
 
 **Data de lançamento:** Abril 2026

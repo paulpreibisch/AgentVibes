@@ -1,8 +1,17 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.1
 
 ---
+
+## 🎯 NEU IN v5.2.1 — Multi-LLM-Identität & Installations-Feinschliff
+
+- **Copilot erhält eigene Stimme + Pretext + Musik** — "Copilot here" mit Bossa Nova, völlig unterscheidbar von Claude Code und Codex.
+- **Pro-Tool-MCP-Configs mit expliziter Identität** — `.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json` setzen jeweils ihr eigenes `AGENTVIBES_LLM`.
+- **Das MCP-Tool `get_config` gibt das erkannte LLM zurück** — Assistenten können ihr Routing bestätigen und mit der richtigen Stimme antworten.
+- **Setup-Navigation: Installieren → Installieren → Installieren → Konfigurieren → Konfigurieren → Konfigurieren** — der Tastaturfluss geht alle drei Konfigurationen durch, bevor er bei Standard landet.
+- **Claude Codes Standard-Hintergrundmusik** auf Chillwave gesetzt.
+- **Linux-Kompatibilitätsverfeinerungen** — CRLF, Berechtigungen, Transport-Provider-Override.
 
 ## 🎯 NEU IN v5.2.0 — Remote-Stimmvorschau + Höhlenmensch-Modus + Stimmbewertungen
 

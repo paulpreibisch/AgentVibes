@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.2.1 — Identidad Multi-LLM y Pulido de Instalación
+
+**Fecha de lanzamiento:** Abril 2026
+
+Enrutamiento LLM pulido para Copilot/Codex y experiencia de configuración refinada.
+
+### ✨ Novedades
+
+#### Enrutamiento de Identidad Multi-LLM
+
+- **GitHub Copilot ahora tiene su propia voz, pretexto y música de fondo** — totalmente distinto de Claude Code y Codex. Saluda con "Copilot here" al ritmo de bossa nova.
+
+- **Configs MCP por herramienta con identidad explícita** — cada herramienta de IA (`.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json`) establece su propio `AGENTVIBES_LLM` para que el enrutamiento sea determinista.
+
+- **La herramienta MCP `get_config` ahora devuelve el LLM detectado** — para que el asistente pueda confirmar su enrutamiento y responder con la voz correcta desde el principio.
+
+- **Refinamientos de compatibilidad con Linux** — finales de línea CRLF, permisos y manejo de anulación del proveedor de transporte.
+
+#### Mejoras del Flujo de Configuración
+
+- **Flujo de navegación por teclado** — al presionar Enter en los botones de Instalar (Claude → Copilot → Codex), ahora salta a **Configurar Claude**, permitiéndote recorrer las tres opciones de Configurar antes de aterrizar en Por Defecto.
+
+- **La flecha abajo omite la fila Por Defecto** desde las columnas Instalar/Eliminar.
+
+- **Mensajes de éxito parcial de instalación** — si las copias de archivos tienen éxito pero el MCP config necesita un empujón, verás una advertencia clara en lugar de un fallo genérico.
+
+#### Valores Predeterminados
+
+- **Música de fondo por defecto de Claude Code** configurada en Chillwave (`agent_vibes_chillwave_v2_loop.mp3`).
+
+#### Internamente
+
+- Validación de clave LLM endurecida para un manejo más seguro de variables de entorno.
+- Registro de errores mejorado para casos límite en escrituras de configuración de Copilot CLI.
+- Limitación conocida documentada: si lanzas VS Code desde una terminal iniciada por Claude Code, `CLAUDECODE=1` puede filtrarse — la solución es hacer `unset CLAUDECODE` primero.
+
+---
+
 ## 🎯 v5.2.0 — Vista Previa de Voz Remota + Modo Cavernícola + Valoraciones de Voz
 
 **Fecha de lanzamiento:** Abril 2026

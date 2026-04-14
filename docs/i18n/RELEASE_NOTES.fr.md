@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.2.1 — Identité Multi-LLM & Polish d'Installation
+
+**Date de sortie :** Avril 2026
+
+Routage LLM affiné pour Copilot/Codex et expérience de configuration améliorée.
+
+### ✨ Nouveautés
+
+#### Routage d'Identité Multi-LLM
+
+- **GitHub Copilot a maintenant sa propre voix, son pré-texte et sa musique de fond** — totalement distinct de Claude Code et Codex. Dites bonjour à "Copilot here" au rythme d'une bossa nova.
+
+- **Configs MCP par outil avec identité explicite** — chaque outil IA (`.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json`) définit son propre `AGENTVIBES_LLM` pour un routage déterministe.
+
+- **L'outil MCP `get_config` retourne maintenant le LLM détecté** — l'assistant peut confirmer son routage et répondre avec la bonne voix dès le départ.
+
+- **Affinements de compatibilité Linux** — fins de ligne CRLF, permissions et gestion de l'override du provider de transport.
+
+#### Améliorations du Flux d'Installation
+
+- **Flux de navigation clavier** — en appuyant sur Entrée à travers les boutons Installer (Claude → Copilot → Codex), on saute maintenant à **Configurer Claude**, permettant de parcourir les trois Configurer avant d'atterrir sur Par Défaut.
+
+- **La flèche bas ignore la ligne Par Défaut** depuis les colonnes Installer/Supprimer.
+
+- **Messages de succès partiel d'installation** — si les copies de fichiers réussissent mais la config MCP a besoin d'un coup de pouce, vous verrez un avertissement clair au lieu d'un échec générique.
+
+#### Valeurs par Défaut
+
+- **Musique de fond par défaut de Claude Code** définie sur Chillwave (`agent_vibes_chillwave_v2_loop.mp3`).
+
+#### Sous le Capot
+
+- Validation de clé LLM renforcée pour une gestion plus sûre des variables d'environnement.
+- Journalisation améliorée des erreurs pour les cas limites d'écriture de config Copilot CLI.
+- Limitation connue documentée : si vous lancez VS Code depuis un terminal démarré par Claude Code, `CLAUDECODE=1` peut fuiter — la solution est de faire `unset CLAUDECODE` en premier.
+
+---
+
 ## 🎯 v5.2.0 — Prévisualisation de Voix à Distance + Mode Homme des Cavernes + Évaluations de Voix
 
 **Date de sortie :** Avril 2026

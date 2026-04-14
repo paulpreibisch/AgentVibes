@@ -1,8 +1,17 @@
 > 🌐 [English version](../../README.md)
 
-**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.2.0
+**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.2.1
 
 ---
+
+## 🎯 NEW IN v5.2.1 — マルチLLMアイデンティティ & インストール磨き上げ
+
+- **Copilot に独自のボイス + プリテキスト + BGM** — ボサノバに乗せた "Copilot here"、Claude Code や Codex とは完全に区別されます。
+- **明示的なアイデンティティを持つツールごとの MCP 設定** — `.vscode/mcp.json`、`.codex/config.toml`、`~/.copilot/mcp-config.json` がそれぞれ独自の `AGENTVIBES_LLM` を設定。
+- **MCP ツール `get_config` が検出された LLM を返す** — アシスタントがルーティングを確認し、正しいボイスで応答できます。
+- **セットアップのナビゲーション: インストール → インストール → インストール → 設定 → 設定 → 設定** — キーボードフローが 3 つの設定を順に通ってからデフォルトに到達。
+- **Claude Code のデフォルト BGM** を Chillwave に設定。
+- **Linux 互換性のリファイン** — CRLF、パーミッション、トランスポートプロバイダーのオーバーライド。
 
 ## 🎯 NEW IN v5.2.0 — リモートボイスプレビュー + ケーブマンモード + ボイスレーティング
 
