@@ -1690,11 +1690,27 @@ export function createSetupTab(screen, services) {
 
   infoBox.key(['escape', 'enter'], () => {
     // After dismissing the install/remove info page, advance focus to the
-    // NEXT provider row but keep the same column (Install stays on Install,
-    // Remove stays on Remove, Configure stays on Configure).  Each row has
-    // 3 focusable slots so +3 moves one full row down with wraparound.
+    // NEXT provider row but keep the same column (Install/Remove/Configure).
+    // Each row has 3 focusable slots, so +3 moves one full row down.
+    //
+    // Special case: when leaving the LAST installable provider (Codex) from
+    // Install or Remove column, skip the Default row (it has no Install or
+    // Remove) and wrap to the FIRST Configure button (Claude Code Configure).
+    // This lets the user cleanly walk all three installs, then all three
+    // Configures, ending on Default Configure.
     const max = providerFocusableItems.length;
-    const nextIdx = max > 0 ? (_preInfoFocusIndex + 3) % max : 0;
+    if (max === 0) { showProviderListView(0); return; }
+    const col = _preInfoFocusIndex % 3;   // 0=Install, 1=Remove, 2=Configure
+    const row = Math.floor(_preInfoFocusIndex / 3);
+    const nextRow = PROVIDERS[row + 1];
+    const nextRowIsDefault = nextRow && nextRow.isDefault;
+    let nextIdx;
+    if (col < 2 && nextRowIsDefault) {
+      // Last Install/Remove → jump to Claude Code Configure (row 0, col 2)
+      nextIdx = 2;
+    } else {
+      nextIdx = (_preInfoFocusIndex + 3) % max;
+    }
     showProviderListView(nextIdx);
   });
 
