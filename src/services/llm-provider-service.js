@@ -154,12 +154,29 @@ export async function installClaudeMcp(targetDir) {
   let mcpError = null;
   try {
     let existing = null;
+    let parseError = null;
     try {
-      existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
-    } catch { /* new file */ }
+      const raw = await fs.readFile(mcpConfigPath, 'utf8');
+      existing = JSON.parse(raw);
+    } catch (err) {
+      // ENOENT = new file (fine); anything else = malformed (report to caller)
+      if (err.code !== 'ENOENT') parseError = err;
+    }
 
-    if (existing && typeof existing === 'object') {
-      existing.mcpServers = existing.mcpServers || {};
+    if (parseError) {
+      throw new Error(`Existing ${mcpConfigPath} is malformed: ${parseError.message}`);
+    }
+
+    // Guard: non-object root
+    if (existing && (typeof existing !== 'object' || Array.isArray(existing))) {
+      throw new Error(`${mcpConfigPath} has a non-object root — please fix manually.`);
+    }
+
+    if (existing) {
+      // Guard: mcpServers must be a plain object
+      if (!existing.mcpServers || typeof existing.mcpServers !== 'object' || Array.isArray(existing.mcpServers)) {
+        existing.mcpServers = {};
+      }
       const current = existing.mcpServers.agentvibes;
       // Strip any stale AGENTVIBES_LLM (from older versions — causes collisions)
       if (current?.env?.AGENTVIBES_LLM) delete current.env.AGENTVIBES_LLM;
@@ -336,28 +353,39 @@ export async function installCopilotMcp(targetDir) {
     // CLI reads ONLY from ~/.copilot/mcp-config.json per docs:
     // https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers
     try {
-      const copilotHome = process.env.COPILOT_HOME ||
-        path.join(process.env.USERPROFILE || process.env.HOME || '', '.copilot');
-      const copilotMcpPath = path.join(copilotHome, 'mcp-config.json');
-      await fs.mkdir(copilotHome, { recursive: true });
-      let cliConfig = { mcpServers: {} };
-      try {
-        const existingCli = await fs.readFile(copilotMcpPath, 'utf8');
-        const parsedCli = JSON.parse(existingCli);
-        if (parsedCli && typeof parsedCli === 'object') {
-          cliConfig = parsedCli;
-          if (!cliConfig.mcpServers) cliConfig.mcpServers = {};
-        }
-      } catch { /* new file */ }
-      cliConfig.mcpServers.agentvibes = {
-        type: 'local',
-        command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-        env: { AGENTVIBES_LLM: 'copilot' },
-        tools: ['*'],
-      };
-      await fs.writeFile(copilotMcpPath, JSON.stringify(cliConfig, null, 2) + '\n');
-    } catch { /* best effort — CLI might not be installed */ }
+      // If neither USERPROFILE nor HOME is set, skip — writing to a
+      // relative `.copilot/` path would pollute the project dir.
+      const home = process.env.COPILOT_HOME ||
+        process.env.USERPROFILE || process.env.HOME;
+      if (home) {
+        const copilotHome = process.env.COPILOT_HOME || path.join(home, '.copilot');
+        const copilotMcpPath = path.join(copilotHome, 'mcp-config.json');
+        await fs.mkdir(copilotHome, { recursive: true });
+        let cliConfig = { mcpServers: {} };
+        try {
+          const existingCli = await fs.readFile(copilotMcpPath, 'utf8');
+          const parsedCli = JSON.parse(existingCli);
+          if (parsedCli && typeof parsedCli === 'object' && !Array.isArray(parsedCli)) {
+            cliConfig = parsedCli;
+            if (!cliConfig.mcpServers || typeof cliConfig.mcpServers !== 'object' || Array.isArray(cliConfig.mcpServers)) {
+              cliConfig.mcpServers = {};
+            }
+          }
+        } catch { /* new file or malformed — start fresh */ }
+        cliConfig.mcpServers.agentvibes = {
+          type: 'local',
+          command: 'npx',
+          args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+          env: { AGENTVIBES_LLM: 'copilot' },
+          tools: ['*'],
+        };
+        await fs.writeFile(copilotMcpPath, JSON.stringify(cliConfig, null, 2) + '\n');
+      }
+    } catch (err) {
+      // Best effort — CLI might not be installed.  Log to stderr so users
+      // with COPILOT_HOME set but write failures (EACCES) can diagnose.
+      console.error(`[agentvibes] Warning: could not write ~/.copilot/mcp-config.json: ${err.message}`);
+    }
   } catch (err) {
     mcpError = err.message;
   }
@@ -371,12 +399,22 @@ export async function removeCopilotMcp(targetDir) {
   try {
     const content = await fs.readFile(mcpJsonPath, 'utf8');
     const parsed = JSON.parse(content);
+    // Guard against non-object root or non-object servers (malformed config)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { success: true };
+    }
+    const servers = parsed.servers;
+    if (!servers || typeof servers !== 'object' || Array.isArray(servers)) {
+      return { success: true };
+    }
     // Remove both old ("agentvibes") and new ("agentvibes-copilot") names
-    delete parsed?.servers?.agentvibes;
-    delete parsed?.servers?.['agentvibes-copilot'];
-    if (parsed?.servers && Object.keys(parsed.servers).length === 0) {
+    delete servers.agentvibes;
+    delete servers['agentvibes-copilot'];
+    const noServers = Object.keys(servers).length === 0;
+    const noOtherKeys = Object.keys(parsed).length === 1;  // only "servers"
+    if (noServers && noOtherKeys) {
       await fs.unlink(mcpJsonPath);
-    } else if (parsed?.servers) {
+    } else {
       await fs.writeFile(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n');
     }
     return { success: true };

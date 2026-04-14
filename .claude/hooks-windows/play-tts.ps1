@@ -22,8 +22,8 @@ param(
 # we export to child scripts.  An invalid value is treated as unset rather
 # than aborting, so the script falls back to the default config and the
 # rest of TTS still works.
-if ($llm -and $llm -notmatch '^[a-zA-Z0-9_-]+$') {
-    Write-Error ("Invalid LLM provider name: '{0}' - must match {1}. Falling back to default config." -f $llm, '^[a-zA-Z0-9_-]+$')
+if ($llm -and $llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+    Write-Error ("Invalid LLM provider name: '{0}' - must match {1}. Falling back to default config." -f $llm, '^[a-zA-Z0-9][a-zA-Z0-9_-]*$')
     $llm = ""
 }
 

@@ -332,11 +332,10 @@ describe('mcp-server/server.py routes AGENTVIBES_LLM env var to play-tts', () =>
   });
 
   test('validates AGENTVIBES_LLM format before forwarding', () => {
-    // The env value must be checked against the same regex play-tts.sh
-    // uses (^[a-zA-Z0-9_-]+$) so weird/malicious values can't poison
-    // child scripts or the audio-effects.cfg lookup.
-    assert.match(serverSrc, /\^\[a-zA-Z0-9_-\]\+\$/,
-      'server.py must validate AGENTVIBES_LLM against ^[a-zA-Z0-9_-]+$');
+    // The env value must match ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ — leading char
+    // must be alphanumeric to prevent argument-injection (e.g. "-rf").
+    assert.match(serverSrc, /\^\[a-zA-Z0-9\]\[a-zA-Z0-9_-\]\*\$/,
+      'server.py must validate AGENTVIBES_LLM against ^[a-zA-Z0-9][a-zA-Z0-9_-]*$');
   });
 });
 
@@ -353,8 +352,8 @@ describe('play-tts.ps1 validates $llm parameter format', () => {
   });
 
   test('rejects invalid $llm values with regex check', () => {
-    assert.match(psSrc, /\$llm\s+-notmatch\s+'\^\[a-zA-Z0-9_-\]\+\$'/,
-      'play-tts.ps1 must validate $llm against ^[a-zA-Z0-9_-]+$');
+    assert.match(psSrc, /\$llm\s+-notmatch\s+'\^\[a-zA-Z0-9\]\[a-zA-Z0-9_-\]\*\$'/,
+      'play-tts.ps1 must validate $llm against ^[a-zA-Z0-9][a-zA-Z0-9_-]*$');
   });
 });
 

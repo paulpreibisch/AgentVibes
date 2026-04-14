@@ -605,12 +605,19 @@ export function createSetupTab(screen, services) {
         }
       });
       btn.key(['down'], () => {
+        // Column-preserving down nav.  If pressing down from Install/Remove
+        // would land on the Default row (which has no Install/Remove — all
+        // three slots are configBtn duplicates), don't move.  Configure
+        // column navigates normally into Default row's Configure.
+        const col = providerFocusIndex % 3;
         const nextIdx = providerFocusIndex + 3;
-        if (nextIdx < providerFocusableItems.length) {
-          providerFocusIndex = nextIdx;
-          providerFocusableItems[providerFocusIndex].focus();
-          screen.render();
-        }
+        if (nextIdx >= providerFocusableItems.length) return;
+        const nextRowIdx = Math.floor(nextIdx / 3);
+        const nextRow = PROVIDERS[nextRowIdx];
+        if (col < 2 && nextRow && nextRow.isDefault) return; // skip Default from Install/Remove
+        providerFocusIndex = nextIdx;
+        providerFocusableItems[providerFocusIndex].focus();
+        screen.render();
       });
     }
 
@@ -1706,8 +1713,10 @@ export function createSetupTab(screen, services) {
     const nextRowIsDefault = nextRow && nextRow.isDefault;
     let nextIdx;
     if (col < 2 && nextRowIsDefault) {
-      // Last Install/Remove → jump to Claude Code Configure (row 0, col 2)
-      nextIdx = 2;
+      // Last Install/Remove → jump to the FIRST non-default provider's
+      // Configure column (dynamic: don't hardcode PROVIDERS[0]).
+      const firstInstallableIdx = PROVIDERS.findIndex(p => !p.isDefault);
+      nextIdx = firstInstallableIdx >= 0 ? firstInstallableIdx * 3 + 2 : (_preInfoFocusIndex + 3) % max;
     } else {
       nextIdx = (_preInfoFocusIndex + 3) % max;
     }

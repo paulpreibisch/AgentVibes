@@ -148,7 +148,7 @@ class AgentVibesServer:
                         break
 
             # SECURITY: Validate resolved ID matches safe pattern
-            if resolved_id and re.match(r'^[a-zA-Z0-9_-]+$', resolved_id):
+            if resolved_id and re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', resolved_id):
                 return resolved_id
 
         except (json.JSONDecodeError, KeyError, IOError, TypeError):
@@ -214,14 +214,20 @@ class AgentVibesServer:
             # poisoning the audio-effects.cfg lookup or child-shell args.
             import re as _re
             llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
-            if llm_key and not _re.match(r"^[a-zA-Z0-9_-]+$", llm_key):
+            if llm_key and not _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", llm_key):
                 print(
                     f"[AgentVibes] WARN: Ignoring invalid AGENTVIBES_LLM='{llm_key}' "
-                    "(must match ^[a-zA-Z0-9_-]+$); falling back to auto-detect",
+                    "(must match ^[a-zA-Z0-9][a-zA-Z0-9_-]*$); falling back to auto-detect",
                     file=__import__('sys').stderr,
                 )
                 llm_key = ""
             # Claude Code sets CLAUDECODE=1 when it spawns subprocesses.
+            #
+            # KNOWN LIMITATION: CLAUDECODE=1 can leak from a parent terminal.
+            # If the user launches VS Code from a Claude-Code-started shell,
+            # Copilot inherits CLAUDECODE=1 and its MCP server will be
+            # identified as "claude-code" instead of "copilot".  Workaround:
+            # `unset CLAUDECODE` before launching VS Code.
             if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
                 llm_key = "claude-code"
             # AGENTVIBES_MCP_FALLBACK is set in .mcp.json.  It's the fallback
@@ -231,7 +237,7 @@ class AgentVibesServer:
             # check above first so it's not affected.
             if not llm_key:
                 fallback = os.environ.get("AGENTVIBES_MCP_FALLBACK", "").strip()
-                if fallback and _re.match(r"^[a-zA-Z0-9_-]+$", fallback):
+                if fallback and _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", fallback):
                     llm_key = fallback
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
@@ -419,13 +425,13 @@ class AgentVibesServer:
         # Resolve the LLM key using the same priority as text_to_speech:
         # 1. AGENTVIBES_LLM    2. CLAUDECODE=1    3. AGENTVIBES_MCP_FALLBACK    4. "default"
         llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
-        if llm_key and not _re.match(r"^[a-zA-Z0-9_-]+$", llm_key):
+        if llm_key and not _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", llm_key):
             llm_key = ""
         if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
             llm_key = "claude-code"
         if not llm_key:
             fallback = os.environ.get("AGENTVIBES_MCP_FALLBACK", "").strip()
-            if fallback and _re.match(r"^[a-zA-Z0-9_-]+$", fallback):
+            if fallback and _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", fallback):
                 llm_key = fallback
         if not llm_key:
             llm_key = "default"

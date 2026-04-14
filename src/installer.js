@@ -4335,25 +4335,41 @@ async function handleMcpConfiguration(targetDir, options) {
 
   if (mcpExists) {
     // Upgrade: ensure agentvibes entry exists with fallback env
+    let parseFailed = false;
     try {
       const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
-      if (existing && typeof existing === 'object') {
-        existing.mcpServers = existing.mcpServers || {};
-        const current = existing.mcpServers.agentvibes;
-        // Strip AGENTVIBES_LLM if present (causes identity collisions)
-        if (current?.env?.AGENTVIBES_LLM) {
-          delete current.env.AGENTVIBES_LLM;
-        }
-        // Ensure fallback is set
-        const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_MCP_FALLBACK: 'copilot' };
-        existing.mcpServers.agentvibes = {
-          command: 'npx',
-          args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
-          env: mergedEnv,
-        };
-        await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+      // Guard: non-object root (arrays/primitives are valid JSON but wrong shape)
+      if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+        console.log(chalk.yellow(
+          `⚠️  ${mcpConfigPath} has a non-object root — skipping MCP registration. Fix the file manually and re-run.`
+        ));
+        return;
       }
-    } catch { /* parse error — don't corrupt */ }
+      // Guard: mcpServers must be a plain object
+      if (!existing.mcpServers || typeof existing.mcpServers !== 'object' || Array.isArray(existing.mcpServers)) {
+        existing.mcpServers = {};
+      }
+      const current = existing.mcpServers.agentvibes;
+      // Strip AGENTVIBES_LLM if present (causes identity collisions)
+      if (current?.env?.AGENTVIBES_LLM) {
+        delete current.env.AGENTVIBES_LLM;
+      }
+      // Ensure fallback is set
+      const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_MCP_FALLBACK: 'copilot' };
+      existing.mcpServers.agentvibes = {
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: mergedEnv,
+      };
+      await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+    } catch (err) {
+      parseFailed = true;
+      console.log(chalk.yellow(
+        `⚠️  Could not update ${mcpConfigPath}: ${err.message}\n` +
+        `   AgentVibes MCP server was NOT registered. Fix the file manually and re-run.`
+      ));
+    }
+    if (!parseFailed) return;
     return;
   }
 

@@ -89,7 +89,7 @@ while [[ $# -gt 0 ]]; do
     --llm)
       LLM_PROVIDER="${2:-}"
       # Security: Validate LLM provider name (alphanumeric, hyphens, underscores only)
-      if [[ -n "$LLM_PROVIDER" ]] && [[ ! "$LLM_PROVIDER" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      if [[ -n "$LLM_PROVIDER" ]] && [[ ! "$LLM_PROVIDER" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
         echo "Error: Invalid LLM provider name" >&2
         exit 1
       fi
