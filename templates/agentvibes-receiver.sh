@@ -220,7 +220,7 @@ fi
 
 # SECURITY: Validate provider format (known providers only)
 case "$PROVIDER" in
-  piper|soprano|macos|windows-sapi) ;;
+  piper|soprano|macos|windows-sapi|text-only) ;;
   *) PROVIDER="piper" ;;
 esac
 
@@ -254,6 +254,13 @@ log_message() {
 }
 
 log_message "RECEIVED" "provider=${PROVIDER} effects=${SOX_EFFECTS:-none} music=${BG_FILE:-none}"
+
+# Text-only mode — display in receiver tab, no audio synthesis
+if [[ "$PROVIDER" == "text-only" ]]; then
+  echo "$TEXT"
+  log_message "DONE" "text-only"
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Temp files with cleanup

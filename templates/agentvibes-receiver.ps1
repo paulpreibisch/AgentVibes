@@ -129,7 +129,7 @@ if ($script:Voice -notmatch '^[a-zA-Z0-9_\-\. ]+$' -and $script:Voice -notmatch 
 }
 
 # Validate provider
-if ($Provider -notin @("piper", "soprano", "windows-sapi", "windows-piper", "macos")) {
+if ($Provider -notin @("piper", "soprano", "windows-sapi", "windows-piper", "macos", "text-only")) {
     $Provider = "piper"
 }
 
@@ -144,6 +144,17 @@ if ($Pretext) {
 }
 
 Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile"
+
+# ---------------------------------------------------------------------------
+# Text-only mode — display in receiver tab, no audio synthesis
+# ---------------------------------------------------------------------------
+
+if ($Provider -eq "text-only") {
+    $displayText = if ($script:Text.Length -gt 500) { $script:Text.Substring(0, 500) + "..." } else { $script:Text }
+    Write-Output $displayText
+    Write-Log "DONE" "text-only"
+    exit 0
+}
 
 # ---------------------------------------------------------------------------
 # Configure voice for play-tts.ps1

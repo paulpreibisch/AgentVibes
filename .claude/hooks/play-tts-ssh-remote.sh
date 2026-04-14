@@ -111,7 +111,7 @@ if [[ -z "$PROVIDER" ]]; then
 fi
 # Validate — only known TTS providers (not transport providers like ssh-remote)
 case "${PROVIDER:-}" in
-  piper|soprano|macos|windows-sapi) ;;
+  piper|soprano|macos|windows-sapi|text-only) ;;
   *) PROVIDER="piper" ;;
 esac
 
