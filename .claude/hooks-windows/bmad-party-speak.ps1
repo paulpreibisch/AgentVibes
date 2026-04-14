@@ -242,7 +242,9 @@ try {
         try {
             # WaitOne throws AbandonedMutexException if prior process crashed while holding it.
             # That exception means we DID acquire the mutex — treat it as success (fixes M2).
-            $acquired = $mutex.WaitOne(60000)
+            # 120s timeout matches play-tts.ps1 watchdog — long agent turns
+            # (30-60s of speech) can hold the queue longer than the old 60s.
+            $acquired = $mutex.WaitOne(120000)
         } catch [System.Threading.AbandonedMutexException] {
             $acquired = $true  # abandoned = we now own it
         }

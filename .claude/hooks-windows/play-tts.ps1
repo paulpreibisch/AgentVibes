@@ -55,29 +55,24 @@ $_PlaybackMutex = New-Object System.Threading.Mutex($false, "AgentVibesPlaybackL
 
 # --- Script-level watchdog ---
 # If anything in this script hangs (SoundPlayer deadlock, audio device
-# locked, ffmpeg stuck, etc.), a sibling PowerShell job waits 25 seconds
+# locked, ffmpeg stuck, etc.), a sibling PowerShell job waits 120 seconds
 # and force-kills this process.  Without this, a stuck play-tts.ps1 holds
 # the playback mutex forever and silently blocks every subsequent TTS
 # call across all LLMs.  The watchdog guarantees forward progress.
 #
-# 25s is chosen to be LONGER than the mutex timeout (15s) but SHORT
-# enough that a stuck process clears before the user's next turn.  If
-# you fire two calls per turn and the first is stuck, the watchdog kills
-# it before the second turn arrives so the audio subsystem recovers
-# without manual intervention.  Long legitimate messages (>25s of speech)
-# are rare at default verbosity levels; when they do occur the watchdog
-# kills playback mid-sentence, which is acceptable degradation vs. a
-# deadlocked queue.
+# 120s covers the longest realistic TTS messages (round-robin / party-mode
+# turns can produce 30-60s of speech).  Previously 25s, which killed long
+# messages mid-playback when the next call came in.
 $_WatchdogJob = $null
 try {
     $_WatchdogJob = Start-Job -ArgumentList $PID -ScriptBlock {
         param($parentPid)
-        Start-Sleep -Seconds 25
+        Start-Sleep -Seconds 120
         try {
             # Only kill if still alive -- harmless if already exited
             $p = Get-Process -Id $parentPid -ErrorAction SilentlyContinue
             if ($p) {
-                [Console]::Error.WriteLine("[AgentVibes] play-tts.ps1 watchdog fired -- force-killing pid $parentPid after 25s")
+                [Console]::Error.WriteLine("[AgentVibes] play-tts.ps1 watchdog fired -- force-killing pid $parentPid after 120s")
                 Stop-Process -Id $parentPid -Force -ErrorAction SilentlyContinue
             }
         } catch { }
@@ -93,23 +88,24 @@ function Invoke-SerializedPlay {
     $acquired = $false
     try {
         try {
-            # 15s timeout to acquire the playback mutex.  If we can't get
-            # it in 15s, the holder is almost certainly a stuck/crashed
-            # prior run.  AbandonedMutexException means the holder's
-            # process actually died -- we inherit ownership.
-            $acquired = $_PlaybackMutex.WaitOne(15000)
+            # 120s timeout to acquire the playback mutex.  Matches the
+            # watchdog timeout: if the holder is still alive after 120s,
+            # our own watchdog will have killed it by then.  So waiting
+            # 120s means we only proceed to self-heal if watchdog failed.
+            # AbandonedMutexException means the holder's process actually
+            # died -- we inherit ownership.
+            $acquired = $_PlaybackMutex.WaitOne(120000)
         } catch [System.Threading.AbandonedMutexException] {
             $acquired = $true
         }
         if (-not $acquired) {
             # Self-heal: kill any stuck play-tts.ps1 processes (other than
-            # ourselves) that have been alive longer than 20 seconds.  This
-            # frees the mutex so the NEXT call can succeed without the user
-            # running taskkill manually.  We still exit with code 2 because
-            # this call's audio is lost, but the queue recovers immediately.
+            # ourselves) that have been alive longer than 150 seconds.
+            # Past the 120s watchdog, so only truly stuck/abandoned
+            # processes (where the watchdog job itself failed) get killed.
             try {
                 $myPid = $PID
-                $cutoff = (Get-Date).AddSeconds(-20)
+                $cutoff = (Get-Date).AddSeconds(-150)
                 $stuck = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
                     Where-Object {
                         $_.Name -eq 'powershell.exe' -and
@@ -122,7 +118,7 @@ function Invoke-SerializedPlay {
                     Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
                 }
             } catch { }
-            [Console]::Error.WriteLine("[AgentVibes] ERROR: play-tts.ps1 could not acquire playback mutex within 15s. A prior play-tts.ps1 process was stuck holding it and has been killed; the next TTS call should succeed.")
+            [Console]::Error.WriteLine("[AgentVibes] ERROR: play-tts.ps1 could not acquire playback mutex within 120s. A prior play-tts.ps1 process was stuck holding it and has been killed; the next TTS call should succeed.")
             exit 2
         }
         $player = $null
