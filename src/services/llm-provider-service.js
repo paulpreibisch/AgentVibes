@@ -209,6 +209,19 @@ export async function installClaudeMcp(targetDir) {
     await installer.copyBackgroundMusicFiles(targetDir, silentSpinner);
     ensureDefaultLlmConfigSync('claude-code', targetDir);
 
+    // Explicitly write tts-provider.txt so `get_active_provider()` in
+    // provider-manager.sh doesn't silently fall back to "piper".  Without
+    // this, headless servers with no audio device hit a confusing failure
+    // mode where TTS tries to synth locally and fails silently.  Users
+    // can still change the provider via the Setup TUI or slash command.
+    const ttsProviderPath = path.join(targetDir, '.claude', 'tts-provider.txt');
+    try {
+      await fs.access(ttsProviderPath);
+      // Already exists — user has explicitly set a provider, don't clobber
+    } catch {
+      await fs.writeFile(ttsProviderPath, 'piper\n');
+    }
+
     return { success: true, mcpCreated, mcpError };
   } catch (err) {
     return { success: false, error: err.message, mcpError };
