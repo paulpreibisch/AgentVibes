@@ -200,12 +200,23 @@ fi
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
 
-# Get active provider (LLM-specific engine overrides global)
-if [[ -n "$_LLM_ENGINE" ]]; then
-  ACTIVE_PROVIDER="$_LLM_ENGINE"
-else
-  ACTIVE_PROVIDER=$(get_active_provider)
-fi
+# Get active provider.
+# Per-LLM engine (from audio-effects.cfg `llm:<key>` row column 7) overrides
+# the global tts-provider.txt — UNLESS the global is a transport provider
+# (ssh-remote, agentvibes-receiver, termux-ssh).  Transport providers
+# forward TTS to a remote receiver which picks its OWN engine; overriding
+# them with a local engine like piper would synthesize on the wrong host.
+ACTIVE_PROVIDER=$(get_active_provider)
+case "$ACTIVE_PROVIDER" in
+  ssh-remote|agentvibes-receiver|termux-ssh)
+    # Transport — keep it.  The receiver's audio-effects.cfg picks the engine.
+    ;;
+  *)
+    if [[ -n "$_LLM_ENGINE" ]]; then
+      ACTIVE_PROVIDER="$_LLM_ENGINE"
+    fi
+    ;;
+esac
 
 # Show GitHub star reminder (once per day)
 bash "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
