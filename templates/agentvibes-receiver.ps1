@@ -193,29 +193,37 @@ if ($Speed -and $Speed -match '^\d+\.?\d*$') {
 }
 
 # ---------------------------------------------------------------------------
-# Delegate to play-tts.ps1
+# Drop into queue for the user-session watcher to play
 # ---------------------------------------------------------------------------
+#
+# CRITICAL: SSH receiver runs in Windows session 0 (sshd service), which has
+# NO access to audio devices.  Calling play-tts.ps1 directly here would run
+# silently — synthesis succeeds, but PlaySync writes to a null audio sink.
+#
+# Instead, write a JSON request to ~/.agentvibes/tts-queue/.  The watcher
+# (tts-watcher.ps1, started by start-watcher.vbs in the user session via the
+# Startup folder shortcut) polls this dir and runs play-tts.ps1 with audio
+# device access.
 
-if (-not (Test-Path $PlayTtsScript)) {
-    Write-Output "Error: play-tts.ps1 not found at $PlayTtsScript"
-    Write-Log "ERROR" "play-tts.ps1 not found"
-    exit 1
+$QueueDir = "$OwnerHome\.agentvibes\tts-queue"
+if (-not (Test-Path $QueueDir)) {
+    New-Item -ItemType Directory -Path $QueueDir -Force | Out-Null
 }
 
-Write-Log "PLAYING" "voice=$($script:Voice)"
-
-# Override env vars so ALL downstream scripts resolve paths under the owner's
-# home, not the SSH user's home. Covers USERPROFILE, APPDATA, LOCALAPPDATA.
-$env:USERPROFILE = $OwnerHome
-$env:APPDATA = "$OwnerHome\AppData\Roaming"
-$env:LOCALAPPDATA = "$OwnerHome\AppData\Local"
-$env:CLAUDE_PROJECT_DIR = $OwnerHome
+$ReqId = [Guid]::NewGuid().ToString().Substring(0, 8)
+$ReqFile = "$QueueDir\req-$ReqId.json"
+$ReqJson = @{
+    id    = $ReqId
+    text  = $script:Text
+    voice = $script:Voice
+} | ConvertTo-Json -Compress
 
 try {
-    & $PlayTtsScript $script:Text $script:Voice
-    Write-Log "DONE" "success"
+    [System.IO.File]::WriteAllText($ReqFile, $ReqJson, [System.Text.UTF8Encoding]::new($false))
+    Write-Log "QUEUED" "id=$ReqId voice=$($script:Voice)"
+    Write-Output "Queued for playback: $ReqId"
 } catch {
-    Write-Log "ERROR" "$_"
-    Write-Output "Error: TTS playback failed: $_"
+    Write-Log "ERROR" "Queue write failed: $_"
+    Write-Output "Error: failed to queue TTS request: $_"
     exit 1
 }

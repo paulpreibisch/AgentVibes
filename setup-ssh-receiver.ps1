@@ -153,6 +153,47 @@ if (-not (Test-Path $adminKeysFile)) {
 } else {
     cmd /c "icacls `"$adminKeysFile`" /inheritance:r /grant `"SYSTEM:F`" /grant `"BUILTIN\Administrators:F`"" 2>$null
 }
+# Step 7.5: Install user-session watcher (audio device access)
+# CRITICAL: SSH receiver runs in session 0 (no audio).  The receiver writes
+# to ~/.agentvibes/tts-queue/, and a watcher running in the user's
+# interactive session picks up requests and plays audio.
+Write-Host "[7.5/8] Installing user-session watcher..." -ForegroundColor Yellow
+$watcherScript = @'
+# AgentVibes TTS Queue Watcher - runs in user session for audio access
+$QueueDir = "$env:USERPROFILE\.agentvibes\tts-queue"
+$PlayTts  = "$env:USERPROFILE\.claude\hooks-windows\play-tts.ps1"
+if (-not (Test-Path $QueueDir)) { New-Item -ItemType Directory -Path $QueueDir -Force | Out-Null }
+while ($true) {
+    $files = Get-ChildItem "$QueueDir\*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
+    foreach ($f in $files) {
+        try {
+            $req = Get-Content $f.FullName -Raw | ConvertFrom-Json
+            Remove-Item $f.FullName -Force
+            $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
+            & $PlayTts $req.text $req.voice
+        } catch {
+            Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Start-Sleep -Milliseconds 200
+}
+'@
+Set-Content -Path "$env:USERPROFILE\.agentvibes\tts-watcher.ps1" -Value $watcherScript -Encoding UTF8
+
+$vbsLauncher = @'
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & WshShell.ExpandEnvironmentStrings("%USERPROFILE%") & "\.agentvibes\tts-watcher.ps1""", 0, False
+'@
+Set-Content -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Value $vbsLauncher -Encoding ASCII
+
+# Install autostart shortcut in Startup folder
+$startupDir = [Environment]::GetFolderPath('Startup')
+Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Destination "$startupDir\agentvibes-watcher.vbs" -Force
+
+# Launch it now so streaming works without requiring logout/login
+Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -WindowStyle Hidden
+Write-Host "       Watcher: installed + started + autostart enabled" -ForegroundColor Green
+
 # Step 8: Start sshd
 Write-Host "[8/8] Starting sshd..." -ForegroundColor Yellow
 Start-Service sshd
