@@ -53,59 +53,42 @@ if (-not $llm) {
 # process's playback.
 $_PlaybackMutex = New-Object System.Threading.Mutex($false, "AgentVibesPlaybackLock")
 
-# --- Script-level watchdog ---
-# If anything in this script hangs (SoundPlayer deadlock, audio device
-# locked, ffmpeg stuck, etc.), a sibling PowerShell job waits 120 seconds
-# and force-kills this process.  Without this, a stuck play-tts.ps1 holds
-# the playback mutex forever and silently blocks every subsequent TTS
-# call across all LLMs.  The watchdog guarantees forward progress.
+# --- Playback watchdog ---
+# If playback itself hangs (SoundPlayer deadlock, audio device locked,
+# etc.), a sibling PowerShell job waits 120 seconds from the moment
+# playback STARTS and force-kills this process.  Without this, a stuck
+# play-tts.ps1 holds the playback mutex forever and silently blocks every
+# subsequent TTS call across all LLMs.
 #
-# 120s covers the longest realistic TTS messages (round-robin / party-mode
-# turns can produce 30-60s of speech).  Previously 25s, which killed long
-# messages mid-playback when the next call came in.
-$_WatchdogJob = $null
-try {
-    $_WatchdogJob = Start-Job -ArgumentList $PID -ScriptBlock {
-        param($parentPid)
-        Start-Sleep -Seconds 120
-        try {
-            # Only kill if still alive -- harmless if already exited
-            $p = Get-Process -Id $parentPid -ErrorAction SilentlyContinue
-            if ($p) {
-                [Console]::Error.WriteLine("[AgentVibes] play-tts.ps1 watchdog fired -- force-killing pid $parentPid after 120s")
-                Stop-Process -Id $parentPid -Force -ErrorAction SilentlyContinue
-            }
-        } catch { }
-    }
-} catch {
-    # If Start-Job fails (rare), just continue without the watchdog -- no
-    # regression from pre-watchdog behavior.
-    $_WatchdogJob = $null
-}
+# IMPORTANT: the watchdog is started AFTER mutex acquisition (inside
+# Invoke-SerializedPlay), not at script entry.  Starting it at script
+# entry caused round-robin / party-mode cut-offs: when 9 agents fire
+# text_to_speech in quick succession, later calls spend most of their
+# 120s budget waiting for the mutex, then get killed mid-playback.
+# The mutex WaitOne() bounds queue waiting separately.
 
 function Invoke-SerializedPlay {
     param([Parameter(Mandatory)][string]$WavPath)
     $acquired = $false
+    $watchdogJob = $null
     try {
         try {
-            # 120s timeout to acquire the playback mutex.  Matches the
-            # watchdog timeout: if the holder is still alive after 120s,
-            # our own watchdog will have killed it by then.  So waiting
-            # 120s means we only proceed to self-heal if watchdog failed.
+            # 600s timeout to acquire the playback mutex.  Covers worst-case
+            # queue depth (round-robin with 9 agents x ~60s of playback each).
             # AbandonedMutexException means the holder's process actually
             # died -- we inherit ownership.
-            $acquired = $_PlaybackMutex.WaitOne(120000)
+            $acquired = $_PlaybackMutex.WaitOne(600000)
         } catch [System.Threading.AbandonedMutexException] {
             $acquired = $true
         }
         if (-not $acquired) {
             # Self-heal: kill any stuck play-tts.ps1 processes (other than
-            # ourselves) that have been alive longer than 150 seconds.
-            # Past the 120s watchdog, so only truly stuck/abandoned
-            # processes (where the watchdog job itself failed) get killed.
+            # ourselves) that have been alive longer than 10 minutes.  Past
+            # any legitimate playback window, so only truly stuck processes
+            # get killed.
             try {
                 $myPid = $PID
-                $cutoff = (Get-Date).AddSeconds(-150)
+                $cutoff = (Get-Date).AddSeconds(-600)
                 $stuck = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
                     Where-Object {
                         $_.Name -eq 'powershell.exe' -and
@@ -118,9 +101,28 @@ function Invoke-SerializedPlay {
                     Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
                 }
             } catch { }
-            [Console]::Error.WriteLine("[AgentVibes] ERROR: play-tts.ps1 could not acquire playback mutex within 120s. A prior play-tts.ps1 process was stuck holding it and has been killed; the next TTS call should succeed.")
+            [Console]::Error.WriteLine("[AgentVibes] ERROR: play-tts.ps1 could not acquire playback mutex within 600s. A prior play-tts.ps1 process was stuck holding it and has been killed; the next TTS call should succeed.")
             exit 2
         }
+
+        # Start the watchdog NOW (after mutex acquisition) so its 120s
+        # budget covers only the playback itself, not time spent queued.
+        try {
+            $watchdogJob = Start-Job -ArgumentList $PID -ScriptBlock {
+                param($parentPid)
+                Start-Sleep -Seconds 120
+                try {
+                    $p = Get-Process -Id $parentPid -ErrorAction SilentlyContinue
+                    if ($p) {
+                        [Console]::Error.WriteLine("[AgentVibes] play-tts.ps1 playback watchdog fired -- force-killing pid $parentPid after 120s of playback")
+                        Stop-Process -Id $parentPid -Force -ErrorAction SilentlyContinue
+                    }
+                } catch { }
+            }
+        } catch {
+            $watchdogJob = $null
+        }
+
         $player = $null
         try {
             $player = New-Object System.Media.SoundPlayer $WavPath
@@ -129,22 +131,17 @@ function Invoke-SerializedPlay {
             if ($player) { $player.Dispose() }
         }
     } finally {
+        if ($watchdogJob) {
+            try {
+                Stop-Job -Job $watchdogJob -ErrorAction SilentlyContinue
+                Remove-Job -Job $watchdogJob -Force -ErrorAction SilentlyContinue
+            } catch { }
+        }
         if ($acquired) {
             try { $_PlaybackMutex.ReleaseMutex() } catch { }
         }
     }
 }
-
-# Register an exit handler that stops the watchdog job on normal exit so
-# it doesn't fire on successful short runs.
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
-    try {
-        if ($_WatchdogJob) {
-            Stop-Job -Job $_WatchdogJob -ErrorAction SilentlyContinue
-            Remove-Job -Job $_WatchdogJob -Force -ErrorAction SilentlyContinue
-        }
-    } catch { }
-} | Out-Null
 
 # Configuration paths
 # Priority: CLAUDE_PROJECT_DIR env var -> script's parent project -> user profile
@@ -244,6 +241,14 @@ if ($llm) {
     # Export LLM key for child scripts (process-local, not system-wide)
     $env:AGENTVIBES_LLM_KEY = "llm:$llm"
 }
+
+# ---------------------------------------------------------------------------
+# Per-call env-var overrides (set by the SSH watcher from queue JSON).
+# These win over audio-effects.cfg lookup results for this call only.
+# ---------------------------------------------------------------------------
+if ($env:AGENTVIBES_OVERRIDE_MUSIC)   { $LlmBgTrack  = $env:AGENTVIBES_OVERRIDE_MUSIC }
+if ($env:AGENTVIBES_OVERRIDE_VOLUME)  { $LlmBgVolume = $env:AGENTVIBES_OVERRIDE_VOLUME }
+if ($env:AGENTVIBES_OVERRIDE_EFFECTS) { $LlmReverb   = $env:AGENTVIBES_OVERRIDE_EFFECTS }
 
 # Prepend pretext if configured
 # Priority: LLM-specific pretext -> project .agentvibes/config.json -> project .claude/config/tts-pretext.txt
@@ -570,6 +575,16 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
             # Fallback if no track found in config
             if (-not $DefaultTrack) {
                 $DefaultTrack = "agent_vibes_celtic_harp_v1_loop.mp3"
+            }
+
+            # Per-call env-var overrides (set by SSH watcher from queue JSON).
+            # Win over audio-effects.cfg lookup above.  Validate filename to
+            # prevent path traversal before accepting.
+            if ($env:AGENTVIBES_OVERRIDE_MUSIC -and $env:AGENTVIBES_OVERRIDE_MUSIC -match '^[a-zA-Z0-9_\-\. ]+$') {
+                $DefaultTrack = $env:AGENTVIBES_OVERRIDE_MUSIC
+            }
+            if ($env:AGENTVIBES_OVERRIDE_VOLUME -and $env:AGENTVIBES_OVERRIDE_VOLUME -match '^\d+\.?\d*$') {
+                $BgVolume = $env:AGENTVIBES_OVERRIDE_VOLUME
             }
 
             $BgTrackPath = Join-Path $TracksDir $DefaultTrack

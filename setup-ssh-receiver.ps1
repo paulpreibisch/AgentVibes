@@ -173,6 +173,10 @@ while ($true) {
             # Server already prepended its pretext before sending —
             # don't add the local default pretext on top.
             $env:AGENTVIBES_NO_PRETEXT = "1"
+            # Forward per-call overrides from queue JSON via env vars
+            if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }   else { $env:AGENTVIBES_OVERRIDE_MUSIC   = $null }
+            if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }  else { $env:AGENTVIBES_OVERRIDE_VOLUME  = $null }
+            if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
             # Spawn as child process so play-tts.ps1's 120s watchdog kills its
             # own PID, not the watcher's.  Dot-sourcing would kill the watcher.
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts $req.text $req.voice

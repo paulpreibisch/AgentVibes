@@ -14,13 +14,63 @@
 
 set -euo pipefail
 
-TEXT="${1:-}"
-VOICE="${2:-en_US-lessac-medium}"
-AGENT_NAME="${3:-default}"
+# ---------------------------------------------------------------------------
+# Argument parsing — supports both positional (backward compat) and flags.
+#
+# Positional (legacy):
+#   play-tts-ssh-remote.sh "text" [voice] [agent_name]
+#
+# Flag-based (full per-call control):
+#   play-tts-ssh-remote.sh --text "hello" --voice "en_US-ryan-high" \
+#                          --pretext "Winston here" --music "track.mp3" \
+#                          --volume 0.25 --effects "reverb 40 60 80" \
+#                          --speed 1.1 --provider piper --agent "winston"
+#
+# Flags override config-file values.  Any flag omitted → falls back to config.
+# --pretext "" (empty string) explicitly suppresses pretext (no fallback).
+# ---------------------------------------------------------------------------
+
+TEXT=""
+VOICE=""
+AGENT_NAME=""
+PRETEXT_OVERRIDE=""
+PRETEXT_SET=0           # whether --pretext was explicitly provided
+MUSIC_OVERRIDE=""
+VOLUME_OVERRIDE=""
+EFFECTS_OVERRIDE=""
+SPEED_OVERRIDE=""
+PROVIDER_OVERRIDE=""
+
+# Detect flag-based vs positional usage: if first arg starts with --, use flags.
+if [[ "${1:-}" == --* ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --text)     TEXT="${2:-}"; shift 2 ;;
+      --voice)    VOICE="${2:-}"; shift 2 ;;
+      --agent)    AGENT_NAME="${2:-}"; shift 2 ;;
+      --pretext)  PRETEXT_OVERRIDE="${2:-}"; PRETEXT_SET=1; shift 2 ;;
+      --music)    MUSIC_OVERRIDE="${2:-}"; shift 2 ;;
+      --volume)   VOLUME_OVERRIDE="${2:-}"; shift 2 ;;
+      --effects)  EFFECTS_OVERRIDE="${2:-}"; shift 2 ;;
+      --speed)    SPEED_OVERRIDE="${2:-}"; shift 2 ;;
+      --provider) PROVIDER_OVERRIDE="${2:-}"; shift 2 ;;
+      *)          echo "Unknown flag: $1" >&2; exit 1 ;;
+    esac
+  done
+else
+  TEXT="${1:-}"
+  VOICE="${2:-}"
+  AGENT_NAME="${3:-}"
+fi
+
+# Defaults for still-empty values
+VOICE="${VOICE:-en_US-lessac-medium}"
+AGENT_NAME="${AGENT_NAME:-default}"
 
 # Validate required input
 if [[ -z "$TEXT" ]]; then
-  echo "Usage: $0 <text> [voice] [agent_name]" >&2
+  echo "Usage (positional): $0 <text> [voice] [agent_name]" >&2
+  echo "Usage (flags):      $0 --text <text> [--voice X --pretext Y --music Z --volume N --effects E --speed S --provider P --agent A]" >&2
   exit 1
 fi
 
@@ -114,6 +164,41 @@ case "${PROVIDER:-}" in
   piper|soprano|macos|windows-sapi) ;;
   *) PROVIDER="piper" ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Apply CLI flag overrides (flags win over config files)
+# ---------------------------------------------------------------------------
+[[ -n "$EFFECTS_OVERRIDE"  ]] && SOX_EFFECTS="$EFFECTS_OVERRIDE"
+[[ -n "$MUSIC_OVERRIDE"    ]] && BG_FILE="$MUSIC_OVERRIDE"
+[[ -n "$VOLUME_OVERRIDE"   ]] && BG_VOLUME="$VOLUME_OVERRIDE"
+[[ -n "$SPEED_OVERRIDE"    ]] && SPEED="$SPEED_OVERRIDE"
+[[ -n "$PROVIDER_OVERRIDE" ]] && PROVIDER="$PROVIDER_OVERRIDE"
+# Pretext: explicit --pretext wins even when empty string (suppresses pretext)
+if [[ "$PRETEXT_SET" == "1" ]]; then
+  PRETEXT="$PRETEXT_OVERRIDE"
+fi
+
+# Re-validate provider after override (in case user passed bad value)
+case "${PROVIDER:-}" in
+  piper|soprano|macos|windows-sapi) ;;
+  *) PROVIDER="piper" ;;
+esac
+# Validate music filename (prevent path injection through JSON → receiver)
+# Allows spaces in track names like "Late Night Hip Hop Groove.mp3"
+if [[ -n "$BG_FILE" && ! "$BG_FILE" =~ ^[a-zA-Z0-9_\.\ -]+$ ]]; then
+  echo "Invalid music filename format: $BG_FILE (alphanumeric/space/.-_ only)" >&2
+  exit 1
+fi
+# Validate volume
+if [[ -n "$BG_VOLUME" && ! "$BG_VOLUME" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  echo "Invalid volume: $BG_VOLUME (numeric only)" >&2
+  exit 1
+fi
+# Validate speed
+if [[ -n "$SPEED" && ! "$SPEED" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  echo "Invalid speed: $SPEED (numeric only)" >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Build JSON payload

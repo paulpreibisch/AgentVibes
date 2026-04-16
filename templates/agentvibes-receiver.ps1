@@ -212,10 +212,15 @@ if (-not (Test-Path $QueueDir)) {
 
 $ReqId = [Guid]::NewGuid().ToString().Substring(0, 8)
 $ReqFile = "$QueueDir\req-$ReqId.json"
+# Pass ALL per-call overrides through the queue so the watcher applies
+# them without mutating audio-effects.cfg (avoids race conditions).
 $ReqJson = @{
-    id    = $ReqId
-    text  = $script:Text
-    voice = $script:Voice
+    id      = $ReqId
+    text    = $script:Text
+    voice   = $script:Voice
+    music   = $BgFile
+    volume  = $BgVolume
+    effects = $SoxEffects
 } | ConvertTo-Json -Compress
 
 try {
