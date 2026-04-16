@@ -248,8 +248,15 @@ if ($llm) {
 # Prepend pretext if configured
 # Priority: LLM-specific pretext -> project .agentvibes/config.json -> project .claude/config/tts-pretext.txt
 #           -> global ~/.agentvibes/config.json -> global ~/.claude/config/tts-pretext.txt
-$Pretext = $LlmPretext
-if (-not $Pretext) {
+#
+# Honor AGENTVIBES_NO_PRETEXT=1 for callers that already prepended a pretext
+# (e.g., the SSH receiver watcher — server already added its own pretext
+# before sending; double-prepending here would say "AgentVibes here, server-pretext, message").
+$Pretext = ""
+if ($env:AGENTVIBES_NO_PRETEXT -ne "1") {
+    $Pretext = $LlmPretext
+}
+if (-not $Pretext -and $env:AGENTVIBES_NO_PRETEXT -ne "1") {
     $PretextSources = @(
         (Join-Path $ProjectRoot ".agentvibes\config.json"),
         "$ClaudeDir\config\tts-pretext.txt",

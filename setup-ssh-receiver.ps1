@@ -170,7 +170,12 @@ while ($true) {
             $req = Get-Content $f.FullName -Raw | ConvertFrom-Json
             Remove-Item $f.FullName -Force
             $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
-            & $PlayTts $req.text $req.voice
+            # Server already prepended its pretext before sending —
+            # don't add the local default pretext on top.
+            $env:AGENTVIBES_NO_PRETEXT = "1"
+            # Spawn as child process so play-tts.ps1's 120s watchdog kills its
+            # own PID, not the watcher's.  Dot-sourcing would kill the watcher.
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts $req.text $req.voice
         } catch {
             Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
         }
