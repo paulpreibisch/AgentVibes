@@ -48,7 +48,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
   "mcpServers": {
     "agentvibes": {
       "command": "npx",
-      "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"]
+      "args": ["-y", "-p", "agentvibes@beta", "agentvibes-mcp-server"]
     }
   }
 }
@@ -63,7 +63,7 @@ Add to `~/.warp/mcp.json`:
 {
   "agentvibes": {
     "command": "npx",
-    "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"],
+    "args": ["-y", "-p", "agentvibes@beta", "agentvibes-mcp-server"],
     "env": {
     }
   }
@@ -79,7 +79,7 @@ Add to `.mcp-minimal.json` in your project:
   "mcpServers": {
     "agentvibes": {
       "command": "npx",
-      "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"],
+      "args": ["-y", "-p", "agentvibes@beta", "agentvibes-mcp-server"],
       "env": {
       }
     }
