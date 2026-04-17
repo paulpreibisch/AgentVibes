@@ -1278,29 +1278,32 @@ export function createSetupTab(screen, services) {
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
 
       // Route through remote provider if active
+      // Search order: CLAUDE_PROJECT_DIR → cwd → package root → home
       const _remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
       let _activeProvider = '';
       try {
-        const _projectRoot = path.resolve(__dirname, '..', '..');
+        const _pkgRoot = path.resolve(__dirname, '..', '..');
         const _provPaths = [
-          path.join(_projectRoot, '.claude', 'tts-provider.txt'),
+          process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
+          path.join(process.cwd(), '.claude', 'tts-provider.txt'),
+          path.join(_pkgRoot, '.claude', 'tts-provider.txt'),
           path.join(os.homedir(), '.claude', 'tts-provider.txt'),
-        ];
+        ].filter(Boolean);
         for (const p of _provPaths) {
           if (fs.existsSync(p)) { _activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
         }
       } catch {}
 
       if (_remoteProviders.includes(_activeProvider)) {
-        const _projectRoot = path.resolve(__dirname, '..', '..');
+        const _hooksBase = process.env.CLAUDE_PROJECT_DIR || process.cwd();
         let rProc;
         if (_isWin) {
-          const _playTts = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+          const _playTts = path.join(_hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
           rProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _playTts, phrase, voiceId], {
             stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
           });
         } else {
-          const _playTts = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+          const _playTts = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
           rProc = spawn('bash', [_playTts, phrase, voiceId], {
             stdio: 'ignore', detached: true, env: _spawnEnv,
           });

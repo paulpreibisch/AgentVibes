@@ -154,38 +154,9 @@ Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile"
 $voiceFile = "$ClaudeDir\tts-voice.txt"
 Set-Content -Path $voiceFile -Value $script:Voice -NoNewline -ErrorAction SilentlyContinue
 
-# Configure background music if specified
-if ($BgFile) {
-    # Validate music filename (no path separators)
-    if ($BgFile -match '^[a-zA-Z0-9_\-\.]+$') {
-        # Update the default line in audio-effects.cfg
-        $cfgFile = "$ConfigDir\audio-effects.cfg"
-        if (Test-Path $cfgFile) {
-            $lines = Get-Content $cfgFile
-            $newLines = @()
-            $found = $false
-            foreach ($line in $lines) {
-                if ($line -match '^default\|') {
-                    $parts = $line -split '\|'
-                    if ($parts.Length -ge 4) {
-                        $newLines += "$($parts[0])|$($parts[1])|$BgFile|$BgVolume"
-                    } else {
-                        $newLines += "default||$BgFile|$BgVolume"
-                    }
-                    $found = $true
-                } else {
-                    $newLines += $line
-                }
-            }
-            if (-not $found) {
-                $newLines += "default||$BgFile|$BgVolume"
-            }
-            Set-Content -Path $cfgFile -Value ($newLines -join "`n") -ErrorAction SilentlyContinue
-        }
-        # Ensure background music is enabled
-        Set-Content -Path "$ConfigDir\background-music-enabled.txt" -Value "true" -NoNewline -ErrorAction SilentlyContinue
-    }
-}
+# Background music and effects are now forwarded through the queue JSON
+# (music/volume/effects fields) and applied via AGENTVIBES_OVERRIDE_*
+# env vars in the watcher.  No need to mutate audio-effects.cfg here.
 
 # Set speed if specified
 if ($Speed -and $Speed -match '^\d+\.?\d*$') {
@@ -215,12 +186,14 @@ $ReqFile = "$QueueDir\req-$ReqId.json"
 # Pass ALL per-call overrides through the queue so the watcher applies
 # them without mutating audio-effects.cfg (avoids race conditions).
 $ReqJson = @{
-    id      = $ReqId
-    text    = $script:Text
-    voice   = $script:Voice
-    music   = $BgFile
-    volume  = $BgVolume
-    effects = $SoxEffects
+    id       = $ReqId
+    text     = $script:Text
+    voice    = $script:Voice
+    music    = $BgFile
+    volume   = $BgVolume
+    effects  = $SoxEffects
+    speed    = $Speed
+    provider = $Provider
 } | ConvertTo-Json -Compress
 
 try {

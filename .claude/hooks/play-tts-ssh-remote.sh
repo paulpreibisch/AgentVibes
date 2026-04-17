@@ -168,7 +168,15 @@ esac
 # ---------------------------------------------------------------------------
 # Apply CLI flag overrides (flags win over config files)
 # ---------------------------------------------------------------------------
-[[ -n "$EFFECTS_OVERRIDE"  ]] && SOX_EFFECTS="$EFFECTS_OVERRIDE"
+# Validate effects (prevent injection — only alphanumeric, spaces, dots, hyphens)
+if [[ -n "$EFFECTS_OVERRIDE" ]]; then
+  if [[ "$EFFECTS_OVERRIDE" =~ ^[a-zA-Z0-9\ ._-]+$ ]]; then
+    SOX_EFFECTS="$EFFECTS_OVERRIDE"
+  else
+    echo "Invalid effects format: $EFFECTS_OVERRIDE (alphanumeric/space/.-_ only)" >&2
+    exit 1
+  fi
+fi
 [[ -n "$MUSIC_OVERRIDE"    ]] && BG_FILE="$MUSIC_OVERRIDE"
 [[ -n "$VOLUME_OVERRIDE"   ]] && BG_VOLUME="$VOLUME_OVERRIDE"
 [[ -n "$SPEED_OVERRIDE"    ]] && SPEED="$SPEED_OVERRIDE"
@@ -219,13 +227,14 @@ build_json_payload() {
       --arg provider "$PROVIDER" \
       '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider}'
   else
-    # Manual JSON — escape double quotes and backslashes in text
-    local escaped_text
-    escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')
-    local escaped_pretext
-    escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    # Manual JSON — escape all interpolated fields (backslash, double-quote, newline, tab)
+    _esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' '; }
+    local e_text e_voice e_effects e_music e_vol e_proj e_pre e_spd e_prov
+    e_text=$(_esc "$TEXT"); e_voice=$(_esc "$VOICE"); e_effects=$(_esc "$SOX_EFFECTS")
+    e_music=$(_esc "$BG_FILE"); e_vol=$(_esc "$BG_VOLUME"); e_proj=$(_esc "$PROJECT_NAME")
+    e_pre=$(_esc "$PRETEXT"); e_spd=$(_esc "$SPEED"); e_prov=$(_esc "$PROVIDER")
     printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER"
+      "$e_text" "$e_voice" "$e_effects" "$e_music" "$e_vol" "$e_proj" "$e_pre" "$e_spd" "$e_prov"
   fi
 }
 

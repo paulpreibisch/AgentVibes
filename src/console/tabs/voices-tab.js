@@ -868,14 +868,17 @@ export function createVoicesTab(screen, services) {
     _playingVoiceId = null;
 
     // Check if we should route through remote provider (ssh-remote / agentvibes-receiver)
+    // Search order: CLAUDE_PROJECT_DIR (actual project) → cwd → package root → home
     const projectRoot = path.resolve(__dirname, '..', '..');
     const remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
     let activeProvider = '';
     try {
       const providerPaths = [
+        process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
+        path.join(process.cwd(), '.claude', 'tts-provider.txt'),
         path.join(projectRoot, '.claude', 'tts-provider.txt'),
         path.join(os.homedir(), '.claude', 'tts-provider.txt'),
-      ];
+      ].filter(Boolean);
       for (const p of providerPaths) {
         if (fs.existsSync(p)) { activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
       }
@@ -884,14 +887,17 @@ export function createVoicesTab(screen, services) {
     if (remoteProviders.includes(activeProvider)) {
       const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      // Resolve play-tts from the actual project (CLAUDE_PROJECT_DIR / cwd),
+      // not the npm package root — hooks live in the user's project dir.
+      const hooksBase = process.env.CLAUDE_PROJECT_DIR || process.cwd();
       let proc;
       if (isWindows) {
-        const playTts = path.join(projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        const playTts = path.join(hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
         proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId], {
           stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
         });
       } else {
-        const playTts = path.join(projectRoot, '.claude', 'hooks', 'play-tts.sh');
+        const playTts = path.join(hooksBase, '.claude', 'hooks', 'play-tts.sh');
         proc = spawn('bash', [playTts, phrase, voiceId], {
           stdio: 'ignore', detached: true, env: _spawnEnv,
         });
