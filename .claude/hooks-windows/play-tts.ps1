@@ -16,6 +16,20 @@ param(
     [string]$llm = ""
 )
 
+# Text-file handoff: Windows command-line arg passing mangles text with
+# quotes, newlines, or non-ASCII characters. The SSH receiver watcher
+# (setup-ssh-receiver.ps1) writes long/special-char text to a UTF-8 temp
+# file and passes the sentinel "__from_file__" + AGENTVIBES_TEXT_FILE env
+# var. Load the real text here before any validation or synthesis.
+if ($Text -eq "__from_file__" -and $env:AGENTVIBES_TEXT_FILE) {
+    if (Test-Path $env:AGENTVIBES_TEXT_FILE) {
+        $Text = [System.IO.File]::ReadAllText($env:AGENTVIBES_TEXT_FILE, [System.Text.UTF8Encoding]::new($false))
+    } else {
+        Write-Error "AGENTVIBES_TEXT_FILE set to missing path: $($env:AGENTVIBES_TEXT_FILE)"
+        exit 1
+    }
+}
+
 # Security: Validate LLM provider name (alphanumeric, hyphens, underscores
 # only) -- mirrors play-tts.sh line 92.  This prevents weird values from
 # poisoning the audio-effects.cfg lookup or the AGENTVIBES_LLM_KEY env var

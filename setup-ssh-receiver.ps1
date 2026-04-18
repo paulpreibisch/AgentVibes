@@ -179,7 +179,17 @@ while ($true) {
             if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
             # Spawn as child process so play-tts.ps1's 120s watchdog kills its
             # own PID, not the watcher's.  Dot-sourcing would kill the watcher.
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts $req.text $req.voice
+            # Pass text via temp file — command-line args get truncated/mangled
+            # by Windows process creation for text with quotes or special chars.
+            $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
+            try {
+                [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
+                $env:AGENTVIBES_TEXT_FILE = $tempText
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice
+            } finally {
+                $env:AGENTVIBES_TEXT_FILE = $null
+                Remove-Item $tempText -Force -ErrorAction SilentlyContinue
+            }
         } catch {
             Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
         }
