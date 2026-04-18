@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.2.1
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.3.0
 
 ---
 
-## 🎯 NEW IN v5.2.1 — 多 LLM 身份识别与安装优化
+## 🎯 NEW IN v5.3.0 — 掌控远程语音
+
+- **每条远程通知都可单独定制** — 在命令行上传入 `--voice`、`--pretext`、`--music`、`--volume`、`--effects`、`--speed`、`--provider`，仅对这一条消息生效。不再需要改配置文件然后再改回来。
+- **按需跳过前缀短语** — `--pretext ""` 可针对单条消息禁用前缀。
+- **Windows 上长消息和特殊字符正确处理** — 带引号、撇号、表情符号或多行内容的文本在送往语音引擎时不再被截断。
+- **无显示器的 Windows 服务器上语音播放可正常工作** — 一个后台小助手运行在你的用户会话中，从队列中取出通知，即使是无头 SSH 登录也能播放音频。
+- **远程服务器的语音预览正确流式传输到目标设备** — 在没有扬声器的机器上，TUI 预览不再回退到本地音频。
+- **不再出现双重前缀短语** — 当发送端和接收端都配置了前缀时。
+- **55 个新测试** — 覆盖 BMAD 派对模式的语音分配与代理隔离。
+
+## 🎯 v5.2.1 — 多 LLM 身份识别与安装优化
 
 - **Copilot 拥有自己的语音 + 前缀 + 音乐** — 博萨诺瓦节奏中的 "Copilot here"，与 Claude Code 和 Codex 完全区分。
 - **每工具的 MCP 配置都带有明确的身份** — `.vscode/mcp.json`、`.codex/config.toml`、`~/.copilot/mcp-config.json` 各自设置自己的 `AGENTVIBES_LLM`。

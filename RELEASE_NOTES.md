@@ -1,5 +1,97 @@
 # AgentVibes Release Notes
 
+## 🎯 v5.3.0 — Take Control of Remote Voices
+
+**Release Date:** April 2026
+
+If you're using AgentVibes to send voice announcements from a server to
+your phone, laptop, or another machine, this release puts you in the
+driver's seat. Every call can now pick its own voice, background music,
+intro phrase, reverb, volume, and speed — right from the command line,
+for just that one message.
+
+### ✨ What's New
+
+#### You can now customize every announcement individually
+
+Before, if you wanted a different voice or music for one specific
+message, you had to change a config file (and remember to change it
+back). Now you just add a flag to the command.
+
+Want Winston to speak in his British accent with jazz playing for this
+one deploy notification? Easy:
+
+```bash
+bash .claude/hooks/play-tts-ssh-remote.sh \
+  --text "Deploy complete" \
+  --voice "en_US-ryan-high" \
+  --pretext "Winston here" \
+  --music "Late Night Hip Hop Groove.mp3" \
+  --volume 0.25
+```
+
+Anything you don't specify falls back to your normal settings. Want to
+skip the intro phrase just this once? Pass `--pretext ""` and it stays
+silent before the message.
+
+**Available flags:**
+- `--voice` — which Piper voice to use
+- `--pretext` — the intro phrase before the message (pass `""` to skip it)
+- `--music` — background music track (filenames with spaces now work!)
+- `--volume` — how loud the background music is (0.0 to 1.0)
+- `--effects` — sound effects chain like reverb
+- `--speed` — how fast the voice speaks
+- `--provider` — which TTS engine to use
+- `--agent` — which agent personality to use
+
+The old way of calling the script still works, so nothing you've already
+set up will break.
+
+### 🛠 Reliability Fixes
+
+- **Long messages and special characters no longer get cut off.** On
+  Windows, long announcements or text with quotes, apostrophes, or
+  emoji were getting mangled before they reached the voice engine.
+  Fixed — your message now arrives exactly as you sent it, no matter
+  how long or weird.
+
+- **Voice announcements now work on Windows servers with no monitor.**
+  Windows refuses to play audio in the "service" session that SSH
+  normally uses. A small background helper now runs in your regular
+  user session and picks up announcements from a queue, so audio plays
+  correctly even on headless servers.
+
+- **Voice preview in the TUI works on remote servers.** Before, if you
+  previewed a voice from a server with no speakers, it would try to
+  play locally (and fail). Now it correctly streams to whatever remote
+  device you've configured.
+
+- **No more double intro phrases.** If you set a pretext on both the
+  sending server and the receiving machine, you used to hear it twice.
+  The sender's version wins now — the receiver won't add its own on top.
+
+- **Remote streaming settings now actually stick.** A recent change
+  accidentally caused remote-streaming setups (`ssh-remote`,
+  `agentvibes-receiver`) to get overridden and fall back to local
+  playback. Fixed.
+
+- **Long announcements don't get killed mid-sentence.** The safety
+  timeout that stops stuck audio was too aggressive for long messages.
+  It's now generous enough to handle paragraph-length announcements.
+
+- **Cleaner installer state** — when you install AgentVibes for Claude
+  Code, it now writes its TTS provider file explicitly instead of
+  relying on implicit state.
+
+### 🧪 Testing
+
+55 new tests make sure BMAD party mode keeps working: each agent gets
+their unique voice and music, agents don't accidentally share the same
+Piper speaker ID, and the installer always points party mode at the
+cross-platform entry point.
+
+---
+
 ## 🎯 v5.2.1 — Multi-LLM Identity & Install Polish
 
 **Release Date:** April 2026

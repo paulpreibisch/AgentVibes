@@ -1,5 +1,103 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.3.0 — Volle Kontrolle über Remote-Stimmen
+
+**Veröffentlichungsdatum:** April 2026
+
+Wenn du AgentVibes nutzt, um Sprachansagen von einem Server an dein
+Handy, Laptop oder eine andere Maschine zu senden, setzt dich diese
+Version ans Steuer. Jeder Aufruf kann jetzt seine eigene Stimme,
+Hintergrundmusik, Intro-Phrase, seinen eigenen Reverb, seine Lautstärke
+und Geschwindigkeit wählen — direkt von der Kommandozeile, nur für
+diese eine Nachricht.
+
+### ✨ Was ist neu
+
+#### Du kannst jetzt jede Ansage individuell anpassen
+
+Bisher musstest du, wenn du für eine bestimmte Nachricht eine andere
+Stimme oder Musik wolltest, eine Config-Datei ändern (und daran denken,
+sie wieder zurückzusetzen). Jetzt fügst du dem Befehl einfach ein Flag
+hinzu.
+
+Willst du, dass Winston mit seinem britischen Akzent und Jazz im
+Hintergrund diese eine Deploy-Benachrichtigung spricht? Ganz einfach:
+
+```bash
+bash .claude/hooks/play-tts-ssh-remote.sh \
+  --text "Deploy complete" \
+  --voice "en_US-ryan-high" \
+  --pretext "Winston here" \
+  --music "Late Night Hip Hop Groove.mp3" \
+  --volume 0.25
+```
+
+Alles, was du nicht angibst, fällt auf deine normalen Einstellungen
+zurück. Willst du die Intro-Phrase nur dieses eine Mal überspringen?
+Übergib `--pretext ""` und vor der Nachricht bleibt es still.
+
+**Verfügbare Flags:**
+- `--voice` — welche Piper-Stimme verwendet werden soll
+- `--pretext` — die Intro-Phrase vor der Nachricht (`""` übergeben, um sie zu überspringen)
+- `--music` — Hintergrundmusik-Track (Dateinamen mit Leerzeichen funktionieren jetzt!)
+- `--volume` — wie laut die Hintergrundmusik ist (0.0 bis 1.0)
+- `--effects` — Soundeffekt-Kette wie Reverb
+- `--speed` — wie schnell die Stimme spricht
+- `--provider` — welche TTS-Engine verwendet werden soll
+- `--agent` — welche Agent-Persönlichkeit verwendet werden soll
+
+Der alte Weg, das Script aufzurufen, funktioniert weiterhin, sodass
+nichts, was du bereits eingerichtet hast, kaputtgeht.
+
+### 🛠 Zuverlässigkeits-Fixes
+
+- **Lange Nachrichten und Sonderzeichen werden nicht mehr abgeschnitten.**
+  Unter Windows wurden lange Ansagen oder Texte mit Anführungszeichen,
+  Apostrophen oder Emoji verstümmelt, bevor sie die Voice-Engine
+  erreichten. Behoben — deine Nachricht kommt jetzt genau so an, wie du
+  sie gesendet hast, egal wie lang oder ungewöhnlich.
+
+- **Sprachansagen funktionieren jetzt auf Windows-Servern ohne Monitor.**
+  Windows weigert sich, Audio in der "Service"-Session abzuspielen, die
+  SSH normalerweise verwendet. Ein kleiner Hintergrund-Helper läuft
+  jetzt in deiner regulären User-Session und nimmt Ansagen aus einer
+  Queue auf, sodass Audio auch auf Headless-Servern korrekt abgespielt
+  wird.
+
+- **Stimmvorschau in der TUI funktioniert auf Remote-Servern.** Wenn du
+  vorher eine Stimme von einem Server ohne Lautsprecher vorgehört hast,
+  versuchte sie lokal abzuspielen (und scheiterte). Jetzt streamt sie
+  korrekt auf das Remote-Gerät, das du konfiguriert hast.
+
+- **Keine doppelten Intro-Phrasen mehr.** Wenn du ein Pretext sowohl
+  auf dem sendenden Server als auch auf der Empfänger-Maschine gesetzt
+  hattest, hörtest du es zweimal. Die Version des Senders gewinnt
+  jetzt — der Empfänger fügt seine eigene nicht mehr obendrauf hinzu.
+
+- **Remote-Streaming-Einstellungen bleiben jetzt tatsächlich bestehen.**
+  Eine kürzliche Änderung hatte versehentlich dazu geführt, dass
+  Remote-Streaming-Setups (`ssh-remote`, `agentvibes-receiver`)
+  überschrieben wurden und auf lokale Wiedergabe zurückfielen. Behoben.
+
+- **Lange Ansagen werden nicht mitten im Satz abgebrochen.** Das
+  Sicherheits-Timeout, das festgefahrenes Audio stoppt, war für lange
+  Nachrichten zu aggressiv. Es ist jetzt großzügig genug, um
+  Ansagen in Absatzlänge zu verarbeiten.
+
+- **Saubererer Installer-Zustand** — wenn du AgentVibes für Claude Code
+  installierst, schreibt es seine TTS-Provider-Datei jetzt explizit,
+  statt sich auf impliziten Zustand zu verlassen.
+
+### 🧪 Tests
+
+55 neue Tests stellen sicher, dass der BMAD-Party-Mode weiterhin
+funktioniert: jeder Agent erhält seine eindeutige Stimme und Musik,
+Agenten teilen sich nicht versehentlich dieselbe Piper-Sprecher-ID,
+und der Installer verweist Party-Mode immer auf den
+plattformübergreifenden Einstiegspunkt.
+
+---
+
 ## 🎯 v5.2.1 — Multi-LLM-Identität & Installations-Feinschliff
 
 **Veröffentlichungsdatum:** April 2026

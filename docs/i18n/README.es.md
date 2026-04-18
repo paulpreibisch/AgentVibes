@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.2.1
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.3.0
 
 ---
 
-## 🎯 NUEVO EN v5.2.1 — Identidad Multi-LLM y Pulido de Instalación
+## 🎯 NUEVO EN v5.3.0 — Toma el Control de las Voces Remotas
+
+- **Personaliza cada anuncio remoto de forma individual** — pasa `--voice`, `--pretext`, `--music`, `--volume`, `--effects`, `--speed`, `--provider` en la línea de comandos solo para ese mensaje concreto. Se acabó editar archivos de configuración y tener que revertirlos después.
+- **Omite la frase de introducción cuando quieras** — `--pretext ""` suprime el pretexto para un único mensaje.
+- **Los mensajes largos y los caracteres especiales funcionan correctamente en Windows** — el texto con comillas, apóstrofos, emoji o contenido de varias líneas ya no se trunca de camino al motor de voz.
+- **La reproducción de voz funciona en servidores Windows sin monitor** — un asistente en segundo plano corre en tu sesión de usuario y recoge los anuncios desde una cola, así que el audio se reproduce incluso cuando entras por SSH a una máquina sin cabeza.
+- **La vista previa de voz en servidores remotos se emite al dispositivo correcto** — la vista previa de la TUI ya no cae de vuelta al audio local en máquinas sin altavoces.
+- **Se acabaron las frases de introducción duplicadas** cuando tanto emisor como receptor tienen pretexto configurado.
+- **55 nuevas pruebas** para la asignación de voz y el aislamiento de agentes en modo fiesta de BMAD.
+
+## 🎯 v5.2.1 — Identidad Multi-LLM y Pulido de Instalación
 
 - **Copilot obtiene su propia voz + pretexto + música** — "Copilot here" con bossa nova, totalmente distinto de Claude Code y Codex.
 - **Configs MCP por herramienta con identidad explícita** — `.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json` cada uno establece su propio `AGENTVIBES_LLM`.

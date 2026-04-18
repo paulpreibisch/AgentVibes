@@ -1,5 +1,104 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.3.0 — Prenez le Contrôle des Voix à Distance
+
+**Date de sortie :** Avril 2026
+
+Si vous utilisez AgentVibes pour envoyer des annonces vocales depuis un
+serveur vers votre téléphone, votre ordinateur portable ou une autre
+machine, cette version vous met aux commandes. Chaque appel peut
+maintenant choisir sa propre voix, sa musique de fond, sa phrase
+d'intro, sa réverbération, son volume et sa vitesse — directement
+depuis la ligne de commande, pour ce seul message.
+
+### ✨ Nouveautés
+
+#### Vous pouvez maintenant personnaliser chaque annonce individuellement
+
+Avant, si vous vouliez une voix ou une musique différente pour un
+message spécifique, il fallait modifier un fichier de config (et se
+souvenir de le remettre). Maintenant, il suffit d'ajouter un flag à la
+commande.
+
+Vous voulez que Winston parle avec son accent britannique et du jazz en
+fond pour cette notification de déploiement ? Facile :
+
+```bash
+bash .claude/hooks/play-tts-ssh-remote.sh \
+  --text "Deploy complete" \
+  --voice "en_US-ryan-high" \
+  --pretext "Winston here" \
+  --music "Late Night Hip Hop Groove.mp3" \
+  --volume 0.25
+```
+
+Tout ce que vous ne spécifiez pas revient à vos réglages habituels.
+Envie de sauter la phrase d'intro juste cette fois-ci ? Passez
+`--pretext ""` et ça restera silencieux avant le message.
+
+**Flags disponibles :**
+- `--voice` — quelle voix Piper utiliser
+- `--pretext` — la phrase d'intro avant le message (passez `""` pour la sauter)
+- `--music` — piste de musique de fond (les noms de fichiers avec espaces fonctionnent maintenant !)
+- `--volume` — volume de la musique de fond (0.0 à 1.0)
+- `--effects` — chaîne d'effets sonores comme la réverbération
+- `--speed` — vitesse de diction de la voix
+- `--provider` — quel moteur TTS utiliser
+- `--agent` — quelle personnalité d'agent utiliser
+
+L'ancienne façon d'appeler le script fonctionne toujours, donc rien de
+ce que vous avez déjà configuré ne sera cassé.
+
+### 🛠 Corrections de Fiabilité
+
+- **Les messages longs et les caractères spéciaux ne sont plus coupés.**
+  Sous Windows, les annonces longues ou les textes avec guillemets,
+  apostrophes ou emojis étaient massacrés avant d'arriver au moteur
+  vocal. Corrigé — votre message arrive maintenant exactement comme
+  vous l'avez envoyé, peu importe sa longueur ou ses bizarreries.
+
+- **Les annonces vocales fonctionnent maintenant sur les serveurs
+  Windows sans moniteur.** Windows refuse de jouer l'audio dans la
+  session "service" que SSH utilise normalement. Un petit assistant en
+  arrière-plan tourne désormais dans votre session utilisateur normale
+  et récupère les annonces depuis une file d'attente, donc l'audio est
+  joué correctement même sur les serveurs sans interface graphique.
+
+- **La prévisualisation vocale dans la TUI fonctionne sur les serveurs
+  distants.** Avant, si vous prévisualisiez une voix depuis un serveur
+  sans haut-parleurs, elle essayait de jouer en local (et échouait).
+  Maintenant, elle est correctement routée vers le périphérique distant
+  que vous avez configuré.
+
+- **Plus de doubles phrases d'intro.** Si vous aviez configuré un
+  pré-texte à la fois sur le serveur expéditeur et sur la machine
+  réceptrice, vous l'entendiez deux fois. La version de l'expéditeur
+  l'emporte maintenant — le récepteur n'ajoute plus la sienne par-dessus.
+
+- **Les paramètres de streaming distant restent vraiment en place.**
+  Un changement récent faisait accidentellement que les configurations
+  de streaming distant (`ssh-remote`, `agentvibes-receiver`) étaient
+  écrasées et retombaient sur la lecture locale. Corrigé.
+
+- **Les annonces longues ne sont plus tuées en plein milieu de phrase.**
+  Le timeout de sécurité qui arrête l'audio bloqué était trop agressif
+  pour les messages longs. Il est maintenant suffisamment généreux pour
+  gérer des annonces de la longueur d'un paragraphe.
+
+- **État d'installation plus propre** — quand vous installez AgentVibes
+  pour Claude Code, il écrit maintenant son fichier de fournisseur TTS
+  explicitement au lieu de s'appuyer sur un état implicite.
+
+### 🧪 Tests
+
+55 nouveaux tests s'assurent que le mode fête BMAD continue de
+fonctionner : chaque agent obtient sa voix et sa musique uniques, les
+agents ne partagent pas accidentellement le même ID de locuteur Piper,
+et l'installateur dirige toujours le mode fête vers le point d'entrée
+multiplateforme.
+
+---
+
 ## 🎯 v5.2.1 — Identité Multi-LLM & Polish d'Installation
 
 **Date de sortie :** Avril 2026

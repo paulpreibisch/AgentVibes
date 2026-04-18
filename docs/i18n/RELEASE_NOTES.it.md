@@ -1,5 +1,100 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.3.0 — Prendi il Controllo delle Voci Remote
+
+**Data di rilascio:** Aprile 2026
+
+Se stai usando AgentVibes per inviare annunci vocali da un server al tuo
+telefono, laptop o un'altra macchina, questa versione ti mette al posto
+di comando. Ogni chiamata può ora scegliere la propria voce, musica di
+sottofondo, frase introduttiva, riverbero, volume e velocità — direttamente
+dalla riga di comando, solo per quel singolo messaggio.
+
+### ✨ Novità
+
+#### Ora puoi personalizzare ogni annuncio individualmente
+
+Prima, se volevi una voce o una musica diversa per un messaggio
+specifico, dovevi modificare un file di configurazione (e ricordarti di
+rimetterlo com'era). Ora basta aggiungere un flag al comando.
+
+Vuoi che Winston parli con il suo accento britannico mentre suona del
+jazz per questa specifica notifica di deploy? Facile:
+
+```bash
+bash .claude/hooks/play-tts-ssh-remote.sh \
+  --text "Deploy complete" \
+  --voice "en_US-ryan-high" \
+  --pretext "Winston here" \
+  --music "Late Night Hip Hop Groove.mp3" \
+  --volume 0.25
+```
+
+Tutto ciò che non specifichi ricade sulle tue impostazioni normali. Vuoi
+saltare la frase introduttiva solo per questa volta? Passa `--pretext ""`
+e resterà in silenzio prima del messaggio.
+
+**Flag disponibili:**
+- `--voice` — quale voce Piper usare
+- `--pretext` — la frase introduttiva prima del messaggio (passa `""` per saltarla)
+- `--music` — traccia di musica di sottofondo (i nomi di file con spazi ora funzionano!)
+- `--volume` — quanto forte è la musica di sottofondo (0.0 a 1.0)
+- `--effects` — catena di effetti sonori come il riverbero
+- `--speed` — quanto velocemente parla la voce
+- `--provider` — quale motore TTS usare
+- `--agent` — quale personalità di agente usare
+
+Il vecchio modo di chiamare lo script continua a funzionare, quindi nulla
+di ciò che hai già configurato si romperà.
+
+### 🛠 Correzioni di Affidabilità
+
+- **Messaggi lunghi e caratteri speciali non vengono più tagliati.** Su
+  Windows, annunci lunghi o testi con virgolette, apostrofi o emoji
+  venivano rovinati prima di raggiungere il motore vocale. Risolto —
+  il tuo messaggio ora arriva esattamente come l'hai inviato, per quanto
+  lungo o strano possa essere.
+
+- **Gli annunci vocali ora funzionano sui server Windows senza monitor.**
+  Windows si rifiuta di riprodurre audio nella sessione "service" che
+  SSH normalmente usa. Un piccolo helper in background ora gira nella
+  tua normale sessione utente e preleva gli annunci da una coda, così
+  l'audio viene riprodotto correttamente anche sui server headless.
+
+- **L'anteprima vocale nella TUI funziona sui server remoti.** Prima,
+  se facevi l'anteprima di una voce da un server senza altoparlanti,
+  provava a riprodurla localmente (e falliva). Ora viene correttamente
+  trasmessa al dispositivo remoto che hai configurato.
+
+- **Niente più doppie frasi introduttive.** Se avevi impostato un pretext
+  sia sul server mittente che sulla macchina destinataria, prima lo
+  sentivi due volte. Ora vince la versione del mittente — il destinatario
+  non ne aggiungerà una propria sopra.
+
+- **Le impostazioni di streaming remoto ora si mantengono davvero.** Una
+  modifica recente faceva sì che le configurazioni di streaming remoto
+  (`ssh-remote`, `agentvibes-receiver`) venissero accidentalmente
+  sovrascritte e ripiegassero sulla riproduzione locale. Risolto.
+
+- **Gli annunci lunghi non vengono interrotti a metà frase.** Il timeout
+  di sicurezza che ferma l'audio bloccato era troppo aggressivo per i
+  messaggi lunghi. Ora è abbastanza generoso da gestire annunci della
+  lunghezza di un paragrafo.
+
+- **Stato dell'installer più pulito** — quando installi AgentVibes per
+  Claude Code, ora scrive il proprio file del provider TTS in modo
+  esplicito invece di affidarsi a stato implicito.
+
+### 🧪 Testing
+
+55 nuovi test assicurano che la modalità party BMAD continui a
+funzionare: ogni agente ottiene la propria voce e musica univoche, gli
+agenti non condividono accidentalmente lo stesso speaker ID Piper, e
+l'installer punta sempre la modalità party al punto di ingresso
+cross-platform.
+
+---
+
 ## 🎯 v5.2.1 — Identità Multi-LLM e Rifinitura dell'Installazione
 
 **Data di rilascio:** Aprile 2026

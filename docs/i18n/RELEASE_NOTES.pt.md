@@ -1,5 +1,100 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎯 v5.3.0 — Assuma o Controle das Vozes Remotas
+
+**Data de Lançamento:** Abril 2026
+
+Se você usa o AgentVibes para enviar anúncios de voz de um servidor
+para seu celular, laptop ou outra máquina, esta versão coloca você no
+comando. Cada chamada agora pode escolher sua própria voz, música de
+fundo, frase de introdução, reverb, volume e velocidade — direto da
+linha de comando, apenas para aquela mensagem.
+
+### ✨ Novidades
+
+#### Agora você pode personalizar cada anúncio individualmente
+
+Antes, se você quisesse uma voz ou música diferente para uma mensagem
+específica, tinha que alterar um arquivo de configuração (e lembrar de
+voltar tudo como estava). Agora é só adicionar uma flag ao comando.
+
+Quer que o Winston fale com seu sotaque britânico e jazz tocando ao
+fundo para aquela notificação de deploy? Fácil:
+
+```bash
+bash .claude/hooks/play-tts-ssh-remote.sh \
+  --text "Deploy complete" \
+  --voice "en_US-ryan-high" \
+  --pretext "Winston here" \
+  --music "Late Night Hip Hop Groove.mp3" \
+  --volume 0.25
+```
+
+Qualquer coisa que você não especificar cai de volta nas suas
+configurações normais. Quer pular a frase de introdução só dessa vez?
+Passe `--pretext ""` e ele fica silencioso antes da mensagem.
+
+**Flags disponíveis:**
+- `--voice` — qual voz Piper usar
+- `--pretext` — a frase de introdução antes da mensagem (passe `""` para pulá-la)
+- `--music` — faixa de música de fundo (nomes de arquivo com espaços agora funcionam!)
+- `--volume` — quão alta é a música de fundo (0.0 a 1.0)
+- `--effects` — cadeia de efeitos sonoros como reverb
+- `--speed` — quão rápido a voz fala
+- `--provider` — qual motor TTS usar
+- `--agent` — qual personalidade de agente usar
+
+A forma antiga de chamar o script ainda funciona, então nada que você
+já configurou vai quebrar.
+
+### 🛠 Correções de Confiabilidade
+
+- **Mensagens longas e caracteres especiais não são mais cortados.** No
+  Windows, anúncios longos ou textos com aspas, apóstrofos ou emoji
+  estavam ficando distorcidos antes de chegarem ao motor de voz.
+  Corrigido — sua mensagem agora chega exatamente como você enviou,
+  não importa quão longa ou estranha.
+
+- **Anúncios de voz agora funcionam em servidores Windows sem monitor.**
+  O Windows se recusa a tocar áudio na sessão de "serviço" que o SSH
+  normalmente usa. Um pequeno auxiliar em segundo plano agora roda na
+  sua sessão de usuário normal e recolhe anúncios de uma fila, então o
+  áudio toca corretamente mesmo em servidores headless.
+
+- **A pré-visualização de voz na TUI funciona em servidores remotos.**
+  Antes, se você pré-visualizasse uma voz de um servidor sem
+  alto-falantes, ele tentava tocar localmente (e falhava). Agora ele
+  transmite corretamente para qualquer dispositivo remoto que você
+  tenha configurado.
+
+- **Sem mais frases de introdução duplicadas.** Se você configurasse um
+  pretexto tanto no servidor emissor quanto na máquina receptora,
+  costumava ouvi-lo duas vezes. A versão do remetente vence agora — o
+  receptor não adicionará a sua por cima.
+
+- **Configurações de streaming remoto agora realmente permanecem.** Uma
+  mudança recente acidentalmente fez com que configurações de streaming
+  remoto (`ssh-remote`, `agentvibes-receiver`) fossem sobrescritas e
+  caíssem de volta na reprodução local. Corrigido.
+
+- **Anúncios longos não são mais mortos no meio da frase.** O timeout
+  de segurança que para áudios travados era agressivo demais para
+  mensagens longas. Agora está generoso o suficiente para lidar com
+  anúncios do tamanho de um parágrafo.
+
+- **Estado do instalador mais limpo** — quando você instala o
+  AgentVibes para Claude Code, ele agora escreve seu arquivo de
+  provedor TTS explicitamente em vez de depender de estado implícito.
+
+### 🧪 Testes
+
+55 novos testes garantem que o modo festa BMAD continue funcionando:
+cada agente recebe sua voz e música únicas, os agentes não compartilham
+acidentalmente o mesmo ID de falante Piper, e o instalador sempre
+aponta o modo festa para o ponto de entrada multiplataforma.
+
+---
+
 ## 🎯 v5.2.1 — Identidade Multi-LLM e Polimento de Instalação
 
 **Data de Lançamento:** Abril 2026

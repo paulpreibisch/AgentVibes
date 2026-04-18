@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.2.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.3.0
 
 ---
 
@@ -43,7 +43,17 @@ Whether you're using Claude Code, GitHub Copilot, OpenAI Codex, Claude Desktop, 
 
 ---
 
-## 🎯 NEW IN v5.2.1 — Multi-LLM Identity & Install Polish
+## 🎯 NEW IN v5.3.0 — Take Control of Remote Voices
+
+- **Customize every remote announcement individually** — pass `--voice`, `--pretext`, `--music`, `--volume`, `--effects`, `--speed`, `--provider` on the command line for just that one message. No more editing config files and changing them back.
+- **Skip the intro phrase on demand** — `--pretext ""` suppresses the pretext for a single message.
+- **Long messages and special characters work correctly on Windows** — text with quotes, apostrophes, emoji, or multi-line content no longer gets truncated on its way to the voice engine.
+- **Voice playback works on Windows servers with no monitor** — a background helper runs in your user session and picks up announcements from a queue, so audio plays even when SSH'ing in headless.
+- **Voice preview on remote servers streams to the right device** — TUI preview no longer falls back to local audio on machines without speakers.
+- **No more double intro phrases** when both sender and receiver have pretext configured.
+- **55 new tests** for BMAD party mode voice assignment and agent isolation.
+
+## 🎯 v5.2.1 — Multi-LLM Identity & Install Polish
 
 - **Copilot gets its own voice + pretext + music** — "Copilot here" with bossa nova, fully distinct from Claude Code and Codex.
 - **Per-tool MCP configs with explicit identity** — `.vscode/mcp.json`, `.codex/config.toml`, `~/.copilot/mcp-config.json` each set their own `AGENTVIBES_LLM`.
