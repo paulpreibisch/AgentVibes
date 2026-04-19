@@ -133,9 +133,6 @@ export function parseBmadManifest(projectRoot) {
       const cols = _parseCSVLine(lines[i]);
       const module = cols[moduleIdx] ?? '';
 
-      // Filter to core and bmm modules only
-      if (module !== 'core' && module !== 'bmm') continue;
-
       const agentId = cols[nameIdx] ?? '';
       if (!_isValidAgentId(agentId)) continue;
 
