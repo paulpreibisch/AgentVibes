@@ -51,8 +51,6 @@ from typing import Optional
 from mcp.server import Server
 from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 import mcp.server.stdio
-
-
 class AgentVibesServer:
     """MCP Server for AgentVibes TTS functionality"""
 
@@ -220,13 +218,17 @@ class AgentVibesServer:
                 if result.returncode == 0:
                     output = stdout.decode().strip()
                     # Extract file path from output
+                    audio_file_path = None
                     for line in output.split("\n"):
                         if "Saved to:" in line:
-                            file_path = line.split("Saved to:")[1].strip()
-                            truncated = (
-                                f"{text[:50]}..." if len(text) > 50 else text
-                            )
-                            return f"✅ Spoke: {truncated}\n📁 Audio saved: {file_path}"
+                            audio_file_path = line.split("Saved to:")[1].strip()
+                            break
+
+                    if audio_file_path:
+                        truncated = (
+                            f"{text[:50]}..." if len(text) > 50 else text
+                        )
+                        return f"✅ Spoke: {truncated}\n📁 Audio saved: {audio_file_path}"
 
                     return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
                 else:
@@ -360,15 +362,31 @@ class AgentVibesServer:
         Get current AgentVibes configuration.
 
         Returns:
-            Current voice, personality, language, and provider settings
+            Current voice, personality, language, provider, and LLM settings
         """
+        import re as _re
         voice = await self._get_current_voice()
         personality = await self._get_personality()
         language = await self._get_language()
         provider = await self._get_provider()
 
+        # Resolve the LLM key using the same priority as text_to_speech:
+        # 1. AGENTVIBES_LLM    2. CLAUDECODE=1    3. AGENTVIBES_MCP_FALLBACK    4. "default"
+        llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
+        if llm_key and not _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", llm_key):
+            llm_key = ""
+        if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
+            llm_key = "claude-code"
+        if not llm_key:
+            fallback = os.environ.get("AGENTVIBES_MCP_FALLBACK", "").strip()
+            if fallback and _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", fallback):
+                llm_key = fallback
+        if not llm_key:
+            llm_key = "default"
+
         output = "🎤 Current AgentVibes Configuration\n"
         output += f"{self.SEPARATOR}\n"
+        output += f"LLM: {llm_key}\n"
         output += f"Provider: {provider}\n"
         output += f"Voice: {voice}\n"
         output += f"Personality: {personality}\n"
@@ -684,9 +702,9 @@ class AgentVibesServer:
         # Parse track names
         tracks = []
         for line in list_result.split("\n"):
-            match = re.match(r'\s*\d+\.\s+(.+)', line)
+            match = re.match(r'\s*\d+\.\s+(.+)', line.strip())
             if match:
-                tracks.append(match.group(1))
+                tracks.append(match.group(1).strip())
 
         # Try to find a matching track (case-insensitive partial match)
         track_lower = track_name.lower()
@@ -721,7 +739,7 @@ class AgentVibesServer:
             # Set as default
             result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-default", matched_track])
 
-        if result and "✅" in result:
+        if result and ("✅" in result or "[OK]" in result):
             if matched_track.lower() != track_name.lower():
                 return f"{result}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
             return result
@@ -739,6 +757,20 @@ class AgentVibesServer:
         """
         command = "on" if enabled else "off"
         result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, [command])
+        # Sync to .agentvibes/config.json (TUI source of truth)
+        try:
+            import json
+            cfg_path = self.agentvibes_root / ".agentvibes" / "config.json"
+            cfg = {}
+            if cfg_path.exists():
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            if "backgroundMusic" not in cfg:
+                cfg["backgroundMusic"] = {}
+            cfg["backgroundMusic"]["enabled"] = enabled
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            pass  # best-effort sync
         return result if result else f"❌ Failed to {'enable' if enabled else 'disable'} background music"
 
     async def set_background_music_volume(self, volume: float) -> str:
@@ -1148,7 +1180,7 @@ Examples:
         ),
         Tool(
             name="get_verbosity",
-            description="Get current AgentVibes verbosity level (low/medium/high). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken).",
+            description="Get current AgentVibes verbosity level (low/medium/high/caveman). Verbosity controls how much Claude speaks while working - from minimal (acknowledgments only) to maximum transparency (all reasoning spoken) to caveman (ultra-terse fragments, max token savings).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
@@ -1159,11 +1191,13 @@ Verbosity Levels:
 - LOW: Only acknowledgments (start) and completions (end). Minimal interruption.
 - MEDIUM: + Major decisions and key findings. Balanced transparency.
 - HIGH: All reasoning, decisions, and findings. Maximum transparency.
+- CAVEMAN: Ultra-terse fragments. Drops articles, filler, hedging. Abbreviates heavily. 65-75% fewer output tokens.
 
 Perfect for:
 - LOW: Quiet work sessions, minimal distraction
 - MEDIUM: Understanding major decisions without full narration
 - HIGH: Full transparency, learning mode, debugging complex tasks
+- CAVEMAN: Maximum token savings, minimal prose
 
 Note: Changes take effect on next Claude Code session restart.""",
             inputSchema={
@@ -1172,7 +1206,7 @@ Note: Changes take effect on next Claude Code session restart.""",
                     "level": {
                         "type": "string",
                         "description": "Verbosity level to set",
-                        "enum": ["low", "medium", "high"]
+                        "enum": ["low", "medium", "high", "caveman"]
                     }
                 },
                 "required": ["level"],

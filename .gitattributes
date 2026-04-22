@@ -1,0 +1,20 @@
+# Shell scripts must stay LF — CRLF breaks bash on Linux/macOS
+bin/* text eol=lf
+.claude/hooks/*.sh text eol=lf
+.claude/hooks-windows/*.ps1 text eol=crlf
+
+# Standard text files
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.bats text eol=lf
+
+# Binary files — no line ending conversion
+*.wav binary
+*.mp3 binary
+*.aiff binary
+*.onnx binary
+*.png binary
+*.jpg binary

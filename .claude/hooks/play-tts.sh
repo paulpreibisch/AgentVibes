@@ -46,6 +46,8 @@
 
 set -euo pipefail
 
+set -euo pipefail
+
 # Fix locale warnings
 export LC_ALL=C
 
@@ -92,14 +94,14 @@ if [[ -f "$PROJECT_UNMUTE_FILE" ]]; then
 elif [[ -f "$PROJECT_MUTE_FILE" ]]; then
   # Project explicitly muted
   if [[ -f "$GLOBAL_MUTE_FILE" ]]; then
-    echo "🔇 TTS muted (project + global)"
+    echo "🔇 TTS muted (project + global)" >&2
   else
-    echo "🔇 TTS muted (project)"
+    echo "🔇 TTS muted (project)" >&2
   fi
   exit 0
 elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   # Global mute and no project-level override
-  echo "🔇 TTS muted (global)"
+  echo "🔇 TTS muted (global)" >&2
   exit 0
 fi
 
@@ -118,23 +120,108 @@ if [[ -n "$VOICE_OVERRIDE" ]] && [[ "$VOICE_OVERRIDE" =~ [';|&$`<>(){}'] ]]; the
   exit 1
 fi
 
-# Remove backslash escaping that Claude might add for special chars
-# In single quotes these don't need escaping, but Claude sometimes adds backslashes
+# Remove backslash escaping that Claude might add for SAFE special chars only
+# SECURITY: Only unescape punctuation chars that cannot form shell commands (#127)
+# Never unescape $, `, \, or other shell metacharacters
 TEXT="${TEXT//\\!/!}"        # Remove \!
-TEXT="${TEXT//\\\$/\$}"      # Remove \$
 TEXT="${TEXT//\\?/?}"        # Remove \?
 TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
-TEXT="${TEXT//\\\\/\\}"      # Remove \\ (escaped backslash)
+
+# When no --llm is supplied, route through the "default" pseudo-LLM so the
+# user-managed `llm:default` row in audio-effects.cfg becomes the global
+# fallback for voice / pretext / music / effects.  This is configured via
+# Setup → Default → Configure in the TUI.  If `llm:default` doesn't exist,
+# the lookup returns empty and the script falls through to the legacy
+# global config chain (project / user .agentvibes/config.json).
+if [[ -z "$LLM_PROVIDER" ]]; then
+  LLM_PROVIDER="default"
+fi
+
+# Per-LLM config lookup: if --llm is passed, look up llm:<name> in audio-effects.cfg
+# Format: llm:<name>|REVERB_PRESET|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT
+_LLM_VOICE=""
+_LLM_PRETEXT=""
+_LLM_REVERB=""
+_LLM_ENGINE=""
+if [[ -n "$LLM_PROVIDER" ]]; then
+  _llm_key="llm:${LLM_PROVIDER}"
+  for _cfg in \
+    "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
+    "$HOME/.claude/config/audio-effects.cfg"; do
+    if [[ -z "$_LLM_VOICE" && -z "$_LLM_PRETEXT" && -f "$_cfg" ]]; then
+      while IFS='|' read -r _key _reverb _bgfile _bgvol _voice _pretext _engine _rest; do
+        if [[ "$_key" == "$_llm_key" ]]; then
+          _reverb="${_reverb## }"; _reverb="${_reverb%% }"
+          _voice="${_voice## }"; _voice="${_voice%% }"
+          _pretext="${_pretext## }"; _pretext="${_pretext%% }"
+          _engine="${_engine## }"; _engine="${_engine%% }"
+          [[ -n "$_reverb" ]] && _LLM_REVERB="$_reverb"
+          [[ -n "$_voice" ]] && _LLM_VOICE="$_voice"
+          [[ -n "$_pretext" ]] && _LLM_PRETEXT="$_pretext"
+          [[ -n "$_engine" ]] && _LLM_ENGINE="$_engine"
+          break
+        fi
+      done < "$_cfg"
+    fi
+  done
+  # Apply LLM voice (only if no explicit voice override)
+  if [[ -n "$_LLM_VOICE" && -z "$VOICE_OVERRIDE" ]]; then
+    VOICE_OVERRIDE="$_LLM_VOICE"
+  fi
+  # Export LLM key for child scripts (process-local, not system-wide)
+  export AGENTVIBES_LLM_KEY="llm:${LLM_PROVIDER}"
+fi
+
+# Prepend intro text (pretext) if configured
+# Priority: LLM-specific pretext → project .agentvibes/config.json → project .claude/config
+#           → global ~/.agentvibes/config.json → global ~/.claude/config
+_PRETEXT="$_LLM_PRETEXT"
+if [[ -z "$_PRETEXT" ]]; then
+  for _src in \
+    "$PROJECT_ROOT/.agentvibes/config.json" \
+    "$PROJECT_ROOT/.claude/config/tts-pretext.txt" \
+    "$PROJECT_ROOT/.claude/config/intro-text.txt" \
+    "$HOME/.agentvibes/config.json" \
+    "$HOME/.claude/config/tts-pretext.txt" \
+    "$HOME/.claude/config/intro-text.txt"; do
+    if [[ -z "$_PRETEXT" && -f "$_src" ]]; then
+      if [[ "$_src" == *.json ]]; then
+        # Extract pretext from JSON (lightweight — no jq dependency)
+        _PRETEXT="$(sed -n 's/.*"pretext"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$_src" 2>/dev/null | head -1)"
+      else
+        _PRETEXT="$(head -1 "$_src" 2>/dev/null || true)"
+      fi
+    fi
+  done
+fi
+if [[ -n "$_PRETEXT" ]]; then
+  TEXT="${_PRETEXT}, ${TEXT}"
+fi
 
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
 
-# Get active provider
+# Get active provider.
+# Per-LLM engine (from audio-effects.cfg `llm:<key>` row column 7) overrides
+# the global tts-provider.txt — UNLESS the global is a transport provider
+# (ssh-remote, agentvibes-receiver, termux-ssh).  Transport providers
+# forward TTS to a remote receiver which picks its OWN engine; overriding
+# them with a local engine like piper would synthesize on the wrong host.
 ACTIVE_PROVIDER=$(get_active_provider)
+case "$ACTIVE_PROVIDER" in
+  ssh-remote|agentvibes-receiver|termux-ssh)
+    # Transport — keep it.  The receiver's audio-effects.cfg picks the engine.
+    ;;
+  *)
+    if [[ -n "$_LLM_ENGINE" ]]; then
+      ACTIVE_PROVIDER="$_LLM_ENGINE"
+    fi
+    ;;
+esac
 
 # Show GitHub star reminder (once per day)
-"$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
+bash "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
 
 # @function detect_voice_provider
 # @intent Auto-detect provider from voice name (for mixed-provider support)
@@ -152,11 +239,20 @@ detect_voice_provider() {
 }
 
 # Override provider if voice indicates different provider (mixed-provider mode)
+# But never override transport providers (ssh-remote, agentvibes-receiver, termux-ssh)
+# — those are transport layers, not synth engines. The receiver picks its own engine.
 if [[ -n "$VOICE_OVERRIDE" ]]; then
-  DETECTED_PROVIDER=$(detect_voice_provider "$VOICE_OVERRIDE")
-  if [[ "$DETECTED_PROVIDER" != "$ACTIVE_PROVIDER" ]]; then
-    ACTIVE_PROVIDER="$DETECTED_PROVIDER"
-  fi
+  case "$ACTIVE_PROVIDER" in
+    ssh-remote|agentvibes-receiver|termux-ssh)
+      # Transport provider — don't override, voice info is forwarded to receiver
+      ;;
+    *)
+      DETECTED_PROVIDER=$(detect_voice_provider "$VOICE_OVERRIDE")
+      if [[ "$DETECTED_PROVIDER" != "$ACTIVE_PROVIDER" ]]; then
+        ACTIVE_PROVIDER="$DETECTED_PROVIDER"
+      fi
+      ;;
+  esac
 fi
 
 # @function speak_text
@@ -169,16 +265,29 @@ speak_text() {
   local text="$1"
   local voice="${2:-}"
   local provider="${3:-$ACTIVE_PROVIDER}"
+  local profile_file="${4:-$AGENT_PROFILE_FILE}"
 
   case "$provider" in
     piper)
-      "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-piper.sh" "$text" "$voice" "$profile_file"
+      ;;
+    soprano)
+      bash "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
       ;;
     soprano)
       "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
       ;;
     macos)
-      "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
+      ;;
+    termux-ssh)
+      bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
+      ;;
+    ssh-remote)
+      bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice"
+      ;;
+    agentvibes-receiver)
+      bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
       ;;
     termux-ssh)
       "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
@@ -221,7 +330,8 @@ handle_learning_mode() {
 
   # 2. Auto-translate to target language
   local translated
-  translated=$(python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
+  # SECURITY: Add timeout to prevent hanging (#134)
+  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
 
   # Small pause between languages
   sleep 0.5
@@ -256,7 +366,8 @@ handle_translation_mode() {
 
   # Translate text
   local translated
-  translated=$(python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
+  # SECURITY: Add timeout to prevent hanging (#134)
+  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
 
   # Get voice for target language if no override specified
   local voice_to_use="$VOICE_OVERRIDE"
@@ -294,20 +405,32 @@ fi
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   piper)
-    exec "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "$AGENT_PROFILE_FILE"
+    ;;
+  soprano)
+    exec bash "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   soprano)
     exec "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   macos)
-    exec "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  termux-ssh)
+    exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  ssh-remote)
+    exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  agentvibes-receiver)
+    exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   termux-ssh)
     exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
-    echo "❌ Unknown provider: $ACTIVE_PROVIDER"
-    echo "   Run: /agent-vibes:provider list"
+    echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2
+    echo "   Run: /agent-vibes:provider list" >&2
     exit 1
     ;;
 esac

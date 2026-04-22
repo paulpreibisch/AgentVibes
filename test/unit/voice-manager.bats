@@ -132,5 +132,8 @@ teardown() {
 
   [ "$status" -eq 0 ]
   assert_output_contains "File: tts-999999.mp3"
-  assert_output_contains "Path: $CLAUDE_PROJECT_DIR/.claude/audio/tts-999999.mp3"
+  # macOS resolves /var/folders -> /private/var/folders; normalise before comparing
+  local expected_path
+  expected_path=$(cd "$CLAUDE_PROJECT_DIR/.claude/audio" && pwd -P)/tts-999999.mp3
+  assert_output_contains "Path: $expected_path"
 }

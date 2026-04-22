@@ -84,8 +84,10 @@ get_voice_storage_dir() {
       done
 
       # Check global config
-      if [[ -z "$config_file" ]] && [[ -f "$HOME/.claude/piper-voices-dir.txt" ]]; then
-        config_file="$HOME/.claude/piper-voices-dir.txt"
+      # Prefer $USERPROFILE on Windows where $HOME may be a MINGW-internal path
+      local _home="${USERPROFILE:-$HOME}"
+      if [[ -z "$config_file" ]] && [[ -f "$_home/.claude/piper-voices-dir.txt" ]]; then
+        config_file="$_home/.claude/piper-voices-dir.txt"
       fi
     fi
 
@@ -94,9 +96,22 @@ get_voice_storage_dir() {
     fi
   fi
 
+  # Validate the path is reachable — on Windows/MINGW, stale config files may
+  # contain bogus paths like /home/user that map to C:/Program Files/Git/home/
+  if [[ -n "$voice_dir" ]]; then
+    local parent_dir
+    parent_dir=$(dirname "$voice_dir")
+    if ! mkdir -p "$parent_dir" 2>/dev/null; then
+      voice_dir=""
+    fi
+  fi
+
   # Fallback to default global storage
+  # On Windows (MINGW/Git Bash), $HOME may resolve to a bogus Git-internal path;
+  # prefer $USERPROFILE which always points to the real Windows home directory.
   if [[ -z "$voice_dir" ]]; then
-    voice_dir="$HOME/.claude/piper-voices"
+    local home_dir="${USERPROFILE:-$HOME}"
+    voice_dir="$home_dir/.claude/piper-voices"
   fi
 
   mkdir -p "$voice_dir"
@@ -198,6 +213,12 @@ download_voice() {
   local voice_name="$1"
   local lang_code="${2:-}"
 
+  # Security: validate voice name to prevent path traversal
+  if [[ ! "$voice_name" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+    echo "❌ Invalid voice name: $voice_name" >&2
+    return 1
+  fi
+
   local voice_dir
   voice_dir=$(get_voice_storage_dir)
 
@@ -244,8 +265,133 @@ download_voice() {
     return 1
   fi
 
+  # Patch LibriTTS speaker names if this is a libritts model
+  if [[ "$voice_name" == *libritts* ]]; then
+    patch_libritts_speaker_names "$voice_dir" "$voice_name"
+  fi
+
   echo "✅ Voice downloaded successfully: $voice_name"
   echo "   Location: $voice_dir/${voice_name}.onnx"
+}
+
+# @function patch_libritts_speaker_names
+# @intent Replace raw corpus IDs (p3922, p8699) with friendly names (Anna, Bella) in LibriTTS .onnx.json
+# @why Users see cryptic "p100Bell" names instead of friendly names without this patch
+# @param $1 {string} voice_dir - Directory containing the .onnx.json file
+# @param $2 {string} voice_name - Voice model name (e.g., en_US-libritts-high)
+# @returns None
+# @exitcode Always 0 (non-fatal)
+# @sideeffects Rewrites speaker_id_map in .onnx.json with friendly names from voice-assignments.json
+# @calledby download_voice (for libritts models), piper-download-voices.sh (post-download)
+# @calls python3/node (for JSON manipulation)
+patch_libritts_speaker_names() {
+  local voice_dir="$1"
+  local voice_name="$2"
+  local json_file="$voice_dir/${voice_name}.onnx.json"
+
+  if [[ ! -f "$json_file" ]]; then
+    return 0
+  fi
+
+  # Find voice-assignments.json relative to this script (SCRIPT_DIR/../.. = project root)
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local project_root
+  project_root="$(cd "$script_dir/../.." 2>/dev/null && pwd)"
+  local catalog="$project_root/voice-assignments.json"
+
+  # Also check npm global install location
+  if [[ ! -f "$catalog" ]]; then
+    # Try npm root
+    local npm_root
+    npm_root="$(npm root -g 2>/dev/null)/agentvibes" || true
+    if [[ -f "$npm_root/voice-assignments.json" ]]; then
+      catalog="$npm_root/voice-assignments.json"
+    fi
+  fi
+
+  if [[ ! -f "$catalog" ]]; then
+    return 0
+  fi
+
+  # Check if already patched (first key doesn't start with 'p' + digits)
+  if command -v python3 &>/dev/null; then
+    python3 -c "
+import json, sys
+
+json_path = sys.argv[1]
+catalog_path = sys.argv[2]
+
+with open(json_path, 'r') as f:
+    data = json.load(f)
+
+sid_map = data.get('speaker_id_map', {})
+if not sid_map or data.get('num_speakers', 0) <= 1:
+    sys.exit(0)
+
+# Check if already patched
+import re
+first_key = next(iter(sid_map))
+if not re.match(r'^p\d+$', first_key):
+    sys.exit(0)
+
+# Load catalog
+with open(catalog_path, 'r') as f:
+    catalog = json.load(f)
+
+speakers = catalog.get('libritts_speakers', {})
+
+# Build reverse map: index -> p-name
+index_to_p = {v: k for k, v in sid_map.items()}
+
+# Rebuild with friendly names
+new_map = {}
+for idx, pname in index_to_p.items():
+    friendly = speakers.get(str(idx), {}).get('voice_name')
+    new_map[friendly if friendly else pname] = idx
+
+data['speaker_id_map'] = new_map
+
+with open(json_path, 'w') as f:
+    json.dump(data, f, indent=2)
+
+print('   Patched LibriTTS speaker names to friendly names')
+" "$json_file" "$catalog" 2>/dev/null || true
+  elif command -v node &>/dev/null; then
+    node -e "
+const fs = require('fs');
+const path = require('path');
+
+const jsonPath = process.argv[1];
+const catalogPath = process.argv[2];
+
+const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+const sidMap = data.speaker_id_map || {};
+if (!Object.keys(sidMap).length || (data.num_speakers || 0) <= 1) process.exit(0);
+
+// Check if already patched
+const firstKey = Object.keys(sidMap)[0];
+if (!/^p\d+$/.test(firstKey)) process.exit(0);
+
+const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+const speakers = catalog.libritts_speakers || {};
+
+// Build reverse map
+const indexToP = {};
+for (const [pname, idx] of Object.entries(sidMap)) indexToP[idx] = pname;
+
+// Rebuild with friendly names
+const newMap = {};
+for (const [idx, pname] of Object.entries(indexToP)) {
+  const friendly = speakers[String(idx)]?.voice_name;
+  newMap[friendly || pname] = parseInt(idx, 10);
+}
+
+data.speaker_id_map = newMap;
+fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf8');
+console.log('   Patched LibriTTS speaker names to friendly names');
+" "$json_file" "$catalog" 2>/dev/null || true
+  fi
 }
 
 # @function list_downloaded_voices

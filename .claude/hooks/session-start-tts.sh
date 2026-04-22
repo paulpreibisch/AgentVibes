@@ -65,7 +65,6 @@ case "$VERBOSITY" in
 
 EOF
     ;;
-
   medium)
     cat <<'EOF'
 ## Verbosity: MEDIUM
@@ -75,7 +74,6 @@ EOF
 
 EOF
     ;;
-
   high)
     cat <<'EOF'
 ## Verbosity: HIGH

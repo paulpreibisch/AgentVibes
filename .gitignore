@@ -30,12 +30,11 @@ yarn-error.log*
 
 .claude/journal/
 .claude/tts-*.txt
-# Config files (but keep audio-effects sample template)
+# Config files (user-specific — only ship the .sample template)
 .claude/config/*
 !.claude/config/audio-effects.cfg.sample
-# User's actual config (don't overwrite customizations)
-.claude/config/audio-effects.cfg
 .claude/settings.local.json
+CLAUDE.md
 .agentvibes/
 .claude/piper-voices/
 .claude/piper-voices-dir.txt
@@ -89,6 +88,13 @@ personalities
 # Local utility scripts
 fixcolors
 sonar
+scripts/fix-wsl-audio.sh
+scripts/fix-audio-tunnel.sh
+scripts/fix-audio-tunnel-complete.sh
+scripts/check-audio-tunnel.sh
+scripts/check_audio_tunnel.sh
+scripts/health-check-tunnel.sh
+scripts/audio-tunnel.config
 
 # Test state files
 .test-bmad-config

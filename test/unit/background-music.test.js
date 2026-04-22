@@ -25,20 +25,19 @@ test('Background music files are present', () => {
   assert.ok(files.length >= 13, `Should have at least 13 background music files, found ${files.length}`);
 });
 
-test('Background music files use snake_case naming', () => {
+test('Auto-generated background music files use snake_case naming', () => {
   const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   const files = readdirSync(bgDir).filter(f => f.endsWith('.mp3'));
 
-  const invalidFiles = files.filter(f => {
-    // Should be snake_case or all lowercase with underscores
-    // Not PascalCase or spaces
-    return /[A-Z]/.test(f) || /\s/.test(f);
-  });
+  // Only enforce snake_case on auto-generated loop files (e.g. agent_vibes_*).
+  // User-added or curated tracks may use Title Case With Spaces.
+  const autoGen = files.filter(f => /^agent[_-]?vibes_/i.test(f));
+  const invalidFiles = autoGen.filter(f => /[A-Z]/.test(f) || /\s/.test(f));
 
   assert.strictEqual(
     invalidFiles.length,
     0,
-    `All files should use snake_case, but found: ${invalidFiles.join(', ')}`
+    `Auto-generated agent_vibes_* files should use snake_case, but found: ${invalidFiles.join(', ')}`
   );
 });
 

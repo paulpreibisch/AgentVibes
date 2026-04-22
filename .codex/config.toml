@@ -1,0 +1,4 @@
+[mcp_servers.agentvibes]
+command = "npx"
+args = ["-y", "--package=agentvibes", "agentvibes-mcp-server"]
+env = { AGENTVIBES_LLM = "codex" }

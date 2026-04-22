@@ -1,91 +1,99 @@
-# Audio Tunnel Configuration Fix Summary
+# SSH Audio Tunnel Setup Guide
 
-## Problem Identified
+## Overview
 
-Your SSH tunnel was configured incorrectly:
-- **Old config**: `RemoteForward 14713 localhost:4713`
-- **Issue**: Forwarding to port 4713 (wrong port)
-- **Result**: PulseAudio couldn't establish connection
+This guide explains how to forward audio from a remote server back to your local machine over SSH, using PulseAudio and a reverse tunnel. This is useful when running AgentVibes (or any TTS/audio application) on a remote server and wanting to hear audio on your local speakers.
 
-## Changes Made
+## Common Problem
 
-### 1. WSL2 (Local Windows Machine) ✅
+A misconfigured SSH tunnel can prevent audio from reaching your local machine:
+- **Incorrect config**: `RemoteForward 14713 localhost:4713` (wrong local port)
+- **Correct config**: `RemoteForward 14713 localhost:14713` (matching ports)
+- **Result of mismatch**: PulseAudio cannot establish a connection
 
-#### SSH Config Updated
-- **File**: `~/.ssh/config` (WSL) and `C:\Users\Paul\.ssh\config` (Windows)
-- **Change**: `RemoteForward 14713 localhost:4713` → `RemoteForward 14713 localhost:14713`
+## Configuration
 
-#### PulseAudio Config Updated
+### 1. Local Machine (WSL2 on Windows)
+
+#### SSH Config
+- **Files**: `~/.ssh/config` (WSL) and `C:\Users\<your-windows-user>\.ssh\config` (Windows)
+- **Required entry**:
+  ```
+  Host <remote-server>
+      HostName <remote-server-address>
+      RemoteForward 14713 localhost:14713
+  ```
+
+#### PulseAudio Config
 - **File**: `~/.config/pulse/client.conf`
-- **Change**: `tcp:localhost:4713` → `tcp:localhost:14713`
+- **Required setting**: `default-server = tcp:localhost:14713`
 
-#### Shell Environment Updated
-- **Files**: `~/.bashrc` and `~/.zshrc`
-- **Change**: `export PULSE_SERVER=tcp:fire-den-laptop-3000:14713` → `export PULSE_SERVER=tcp:localhost:14713`
+#### Shell Environment
+- **Files**: `~/.bashrc` and/or `~/.zshrc`
+- **Required export**: `export PULSE_SERVER=tcp:localhost:14713`
 
-#### Socat Bridge
-- **Status**: Already configured ✅
+#### Socat Bridge (WSL2 only)
+- **Purpose**: Bridges TCP connections to the WSLg PulseAudio Unix socket
 - **Command**: `socat TCP-LISTEN:14713,fork,reuseaddr UNIX-CONNECT:/mnt/wslg/PulseServer`
-- **Autostart**: Configured in both .bashrc and .zshrc
+- **Tip**: Add this to your shell rc file so it starts automatically
 
-### 2. Remote Server (ubuntu-rdp)
+### 2. Remote Server
 
-#### Setup Script Created
-- **Location**: `/home/fire/claude/AgentVibes/setup-ubuntu-rdp-audio.sh`
-- **Purpose**: Configures PulseAudio on remote server to accept TCP connections on localhost
+#### Setup Script
+Create a setup script on the remote server that:
+1. Installs PulseAudio (if not present)
+2. Loads the `module-native-protocol-tcp` module to accept TCP connections on localhost
+3. Sets `PULSE_SERVER=tcp:localhost:14713` in the shell environment
 
-## How It Works Now
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Architecture                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Remote Server (ubuntu-rdp)                                    │
-│  ┌──────────────────────────────────────────┐                 │
-│  │ PulseAudio Server                        │                 │
-│  │ Listening on: tcp:localhost:4713         │                 │
-│  │ (native-protocol-tcp module)             │                 │
-│  └────────────────┬─────────────────────────┘                 │
-│                   │                                            │
-│                   │ Connection to                              │
-│                   │ tcp:localhost:14713                        │
-│                   │ (via PULSE_SERVER env)                     │
-│                   │                                            │
-│                   ▼                                            │
-│  ┌──────────────────────────────────────────┐                 │
-│  │ SSH Reverse Tunnel                       │                 │
-│  │ RemoteForward 14713 localhost:14713      │                 │
-│  └────────────────┬─────────────────────────┘                 │
-│                   │                                            │
-│                   │ Encrypted SSH Tunnel                       │
-│                   │                                            │
-└───────────────────┼────────────────────────────────────────────┘
+│  Remote Server                                                  │
+│  ┌──────────────────────────────────────────┐                  │
+│  │ PulseAudio Server                        │                  │
+│  │ Listening on: tcp:localhost:4713          │                  │
+│  │ (native-protocol-tcp module)             │                  │
+│  └────────────────┬─────────────────────────┘                  │
+│                   │                                             │
+│                   │ Connection to                               │
+│                   │ tcp:localhost:14713                         │
+│                   │ (via PULSE_SERVER env)                      │
+│                   │                                             │
+│                   ▼                                             │
+│  ┌──────────────────────────────────────────┐                  │
+│  │ SSH Reverse Tunnel                       │                  │
+│  │ RemoteForward 14713 localhost:14713      │                  │
+│  └────────────────┬─────────────────────────┘                  │
+│                   │                                             │
+│                   │ Encrypted SSH Tunnel                        │
+│                   │                                             │
+└───────────────────┼─────────────────────────────────────────────┘
                     │
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Windows Machine (WSL2)                                        │
-│  ┌──────────────────────────────────────────┐                 │
-│  │ Socat Bridge                             │                 │
-│  │ TCP:localhost:14713 → Unix Socket        │                 │
-│  └────────────────┬─────────────────────────┘                 │
-│                   │                                            │
-│                   ▼                                            │
-│  ┌──────────────────────────────────────────┐                 │
-│  │ WSLg PulseAudio                          │                 │
-│  │ /mnt/wslg/PulseServer                    │                 │
-│  └────────────────┬─────────────────────────┘                 │
-│                   │                                            │
-│                   ▼                                            │
-│              Windows Audio                                     │
-│              (Your Speakers)                                   │
-│                                                                │
+│  Local Machine (WSL2)                                           │
+│  ┌──────────────────────────────────────────┐                  │
+│  │ Socat Bridge                             │                  │
+│  │ TCP:localhost:14713 → Unix Socket        │                  │
+│  └────────────────┬─────────────────────────┘                  │
+│                   │                                             │
+│                   ▼                                             │
+│  ┌──────────────────────────────────────────┐                  │
+│  │ WSLg PulseAudio                          │                  │
+│  │ /mnt/wslg/PulseServer                    │                  │
+│  └────────────────┬─────────────────────────┘                  │
+│                   │                                             │
+│                   ▼                                             │
+│              Windows Audio                                      │
+│              (Your Speakers)                                    │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Testing Instructions
+## Setup Steps
 
-### Step 1: Update Your Local Environment
+### Step 1: Configure Your Local Environment
 
 Reload your shell configuration:
 ```bash
@@ -98,7 +106,7 @@ ps aux | grep socat
 # Should show: socat TCP-LISTEN:14713,fork,reuseaddr UNIX-CONNECT:/mnt/wslg/PulseServer
 ```
 
-If socat isn't running, start it:
+If socat is not running, start it:
 ```bash
 socat TCP-LISTEN:14713,fork,reuseaddr UNIX-CONNECT:/mnt/wslg/PulseServer > /dev/null 2>&1 &
 ```
@@ -106,20 +114,20 @@ socat TCP-LISTEN:14713,fork,reuseaddr UNIX-CONNECT:/mnt/wslg/PulseServer > /dev/
 ### Step 2: Copy Setup Script to Remote Server
 
 ```bash
-scp /home/fire/claude/AgentVibes/setup-ubuntu-rdp-audio.sh ubuntu-rdp:~/
+scp setup-remote-audio.sh <remote-server>:~/
 ```
 
 ### Step 3: SSH to Remote Server and Run Setup
 
 ```bash
-ssh ubuntu-rdp
-bash ~/setup-ubuntu-rdp-audio.sh
+ssh <remote-server>
+bash ~/setup-remote-audio.sh
 source ~/.bashrc  # or source ~/.zshrc
 ```
 
 ### Step 4: Test the Connection
 
-While connected via SSH to ubuntu-rdp:
+While connected via SSH to the remote server:
 
 ```bash
 # 1. Verify PulseAudio is running
@@ -137,12 +145,12 @@ speaker-test -t sine -f 1000 -l 1
 paplay /usr/share/sounds/alsa/Front_Center.wav
 
 # 4. If AgentVibes is installed
-.claude/hooks/play-tts.sh "Testing remote audio from ubuntu-rdp"
+.claude/hooks/play-tts.sh "Testing remote audio tunnel"
 ```
 
 ### Step 5: Troubleshooting
 
-If audio doesn't work:
+If audio does not work:
 
 1. **Check SSH tunnel:**
    ```bash
@@ -172,24 +180,23 @@ If audio doesn't work:
 
    # Disconnect and reconnect SSH
    exit
-   ssh ubuntu-rdp
+   ssh <remote-server>
    ```
 
 ## Important Notes
 
-- **Firewall**: Ports 14713 and 4713 are only accessed via localhost/SSH tunnel, no external access needed
-- **Security**: All audio data travels through encrypted SSH tunnel
-- **Persistence**: All configuration is saved and will persist across reboots
-- **Kaspersky**: You can actually close the firewall exceptions for 14713 and 4713 since they're only localhost connections now
+- **Firewall**: Ports 14713 and 4713 are only accessed via localhost/SSH tunnel -- no external firewall rules needed
+- **Security**: All audio data travels through the encrypted SSH tunnel
+- **Persistence**: Shell rc and SSH config changes persist across reboots
+- **Windows firewall**: No inbound exceptions needed since traffic stays on localhost
 
 ## Quick Reference
 
-**Key Files Modified:**
-- `/home/fire/.ssh/config` (WSL)
-- `/mnt/c/Users/Paul/.ssh/config` (Windows)
-- `/home/fire/.config/pulse/client.conf`
-- `/home/fire/.bashrc`
-- `/home/fire/.zshrc`
+**Key Files to Configure:**
+- `~/.ssh/config` (WSL or Linux)
+- `C:\Users\<your-windows-user>\.ssh\config` (Windows, if applicable)
+- `~/.config/pulse/client.conf`
+- `~/.bashrc` / `~/.zshrc`
 
 **Key Commands:**
 ```bash
@@ -212,12 +219,8 @@ socat TCP-LISTEN:14713,fork,reuseaddr UNIX-CONNECT:/mnt/wslg/PulseServer > /dev/
 
 ## Success Indicators
 
-You'll know it's working when:
-1. ✅ `pactl info` on remote shows `Server String: tcp:localhost:14713`
-2. ✅ `speaker-test` plays sound on your Windows speakers
-3. ✅ AgentVibes TTS plays through your Windows speakers
-4. ✅ No "Connection refused" or "Connection terminated" errors
-
----
-
-*Generated by Claude Code on 2025-10-15*
+You will know it is working when:
+1. `pactl info` on the remote server shows `Server String: tcp:localhost:14713`
+2. `speaker-test` plays sound on your local speakers
+3. AgentVibes TTS plays through your local speakers
+4. No "Connection refused" or "Connection terminated" errors

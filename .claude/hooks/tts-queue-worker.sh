@@ -13,7 +13,7 @@ if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -d "$XDG_RUNTIME_DIR" ]]; then
   QUEUE_DIR="$XDG_RUNTIME_DIR/agentvibes-tts-queue"
 else
   # Fallback to user-specific temp directory
-  QUEUE_DIR="/tmp/agentvibes-tts-queue-$USER"
+  QUEUE_DIR="/tmp/agentvibes-tts-queue-$(id -u)"
 fi
 
 # Security: Validate queue directory exists and has correct ownership
@@ -71,42 +71,73 @@ process_queue() {
         exit 0
       fi
 
-      # Wait 1 second and check again
-      sleep 1
+      # Wait for a new queue item — use inotifywait if available to avoid polling
+      # Use a 1-second timeout (-t 1) so the idle counter still advances correctly
+      if command -v inotifywait &>/dev/null; then
+        inotifywait -q -e create -t 1 "$QUEUE_DIR" 2>/dev/null || true
+      else
+        sleep 1
+      fi
       continue
     fi
 
     # Reset idle counter - we have work
     idle_count=0
 
-    # Load TTS request
-    source "$queue_item"
+    # Load queue item — explicit key=value parsing (SECURITY: never source untrusted files)
+    TEXT_FILE=""
+    VOICE=""
+    AGENT=""
+    PROFILE_PATH=""
+    PLAY_WAV=""
+    while IFS='=' read -r _key _val; do
+      case "$_key" in
+        TEXT_FILE)     TEXT_FILE="$_val" ;;
+        VOICE)         VOICE="$_val" ;;
+        AGENT)         AGENT="$_val" ;;
+        PROFILE_PATH)  PROFILE_PATH="$_val" ;;
+        PLAY_WAV)      PLAY_WAV="$_val" ;;
+      esac
+    done < "$queue_item"
 
-    # Decode base64 values
-    TEXT=$(echo -n "$TEXT_B64" | base64 -d)
-    VOICE=$(echo -n "$VOICE_B64" | base64 -d)
-    AGENT=$(echo -n "${AGENT_B64:-}" | base64 -d 2>/dev/null || echo "default")
-
-    # Use enhanced TTS with agent-specific background music if agent is specified
-    # and background music is enabled
-    if [[ -f "$SCRIPT_DIR/play-tts-enhanced.sh" ]] && [[ "$AGENT" != "default" ]] && [[ -n "$AGENT" ]]; then
-      # Party mode: each agent gets their unique background music from audio-effects.cfg
-      bash "$SCRIPT_DIR/play-tts-enhanced.sh" "$TEXT" "$AGENT" "$VOICE" || true
+    # Check if this is a pre-generated WAV playback item
+    if [[ -n "${PLAY_WAV:-}" ]] && [[ -f "$PLAY_WAV" ]]; then
+      # Play the pre-generated WAV directly (synthesis already done by bmad-speak)
+      if command -v paplay &>/dev/null; then
+        paplay "$PLAY_WAV" 2>/dev/null || true
+      elif command -v aplay &>/dev/null; then
+        aplay -q "$PLAY_WAV" 2>/dev/null || true
+      elif command -v ffplay &>/dev/null; then
+        ffplay -nodisp -autoexit -loglevel quiet "$PLAY_WAV" 2>/dev/null || true
+      fi
     else
-      # Standard TTS without background music
-      # Display output to show file location (GitHub Issue #39)
+      # Full TTS request — read text from companion file, use voice/agent directly
+      TEXT=""
+      if [[ -n "${TEXT_FILE:-}" ]] && [[ -f "$TEXT_FILE" ]]; then
+        TEXT=$(cat "$TEXT_FILE")
+        rm -f "$TEXT_FILE"
+      fi
+      AGENT_PROFILE="${PROFILE_PATH:-}"
+
+      export AGENTVIBES_AGENT_PROFILE="$AGENT_PROFILE"
+
       if [[ -n "${VOICE:-}" ]]; then
-        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "$VOICE" || true
+        bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" "${VOICE}" || true
       else
         bash "$SCRIPT_DIR/play-tts.sh" "$TEXT" || true
       fi
+
+      if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
+        rm -f "$AGENT_PROFILE"
+      fi
+      unset AGENTVIBES_AGENT_PROFILE
     fi
 
     # Add configurable pause between speakers for natural conversation flow
     sleep $SPEAKER_DELAY
 
-    # Remove processed item
-    rm -f "$queue_item"
+    # Remove processed item and any companion text file
+    rm -f "$queue_item" "${queue_item%.queue}.txt"
   done
 }
 

@@ -35,11 +35,43 @@
 # @related play-tts.sh, piper-voice-manager.sh, language-manager.sh, GitHub Issue #25
 #
 
+set -eo pipefail
+# Note: -u (nounset) omitted because sourced scripts (piper-voice-manager.sh,
+# language-manager.sh, audio-cache-utils.sh) use unset variables freely.
+# Variables in THIS script use ${VAR:-} defaults for safety.
+
+# Cleanup handler for temp files (preserves final output in $TEMP_FILE)
+_CLEANUP_FILES=()
+cleanup() {
+  local f
+  for f in "${_CLEANUP_FILES[@]+"${_CLEANUP_FILES[@]}"}"; do
+    [[ "$f" == "${TEMP_FILE:-}" ]] && continue
+    rm -f "$f"
+  done
+}
+trap cleanup EXIT
+
 # Fix locale warnings
 export LC_ALL=C
 
-TEXT="$1"
-VOICE_OVERRIDE="$2"  # Optional: voice model name
+TEXT="${1:-}"
+VOICE_OVERRIDE="${2:-}"       # Optional: voice model name
+AGENT_PROFILE_FILE="${3:-}"   # Optional: path to per-agent profile JSON (from bmad-speak.sh)
+
+# Strip emojis, asterisks, and markdown formatting that Piper would speak literally
+TEXT=$(printf '%s' "$TEXT" | perl -CSD -pe '
+  s/[\x{1F300}-\x{1F9FF}]//g;   # emoticons, symbols, pictographs
+  s/[\x{2600}-\x{27BF}]//g;     # misc symbols, dingbats
+  s/[\x{FE00}-\x{FE0F}]//g;     # variation selectors
+  s/[\x{200D}]//g;               # zero-width joiner
+  s/[\x{2500}-\x{257F}]//g;     # box drawing (─━ etc)
+  s/[\x{2580}-\x{259F}]//g;     # block elements
+  s/\*+//g;                       # asterisks (bold/italic markdown)
+  s/#+\s*//g;                     # heading markers
+  s/`//g;                         # backticks
+  s/~+//g;                        # strikethrough
+  s/^\s*[-]\s*//g;                # list dashes
+')
 
 # Source voice manager and language manager
 # Use readlink -f to handle symlinks correctly
@@ -65,8 +97,29 @@ CURRENT_LANGUAGE=$(get_language_code)
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Use override if provided
-  VOICE_MODEL="$VOICE_OVERRIDE"
-  echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  # Handle multi-speaker format: "Model::SpeakerName" → split into model + speaker lookup
+  if [[ "$VOICE_OVERRIDE" == *"::"* ]]; then
+    VOICE_MODEL="${VOICE_OVERRIDE%%::*}"
+    _SPEAKER_NAME="${VOICE_OVERRIDE#*::}"
+    # Look up speaker ID from the model's .onnx.json speaker_id_map
+    voice_dir=$(get_voice_storage_dir)
+    _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+    if [[ -f "$_JSON_FILE" ]]; then
+      # SECURITY: Pass values via env vars to prevent shell injection
+      SPEAKER_ID=$(_JSON="$_JSON_FILE" _SPKR="$_SPEAKER_NAME" node -e "
+        try {
+          const j = JSON.parse(require('fs').readFileSync(process.env._JSON,'utf8'));
+          const map = j.speaker_id_map || {};
+          const id = map[process.env._SPKR];
+          if (id !== undefined) process.stdout.write(String(id));
+        } catch {}
+      " 2>/dev/null || true)
+    fi
+    echo "🎭 Using multi-speaker voice: $VOICE_OVERRIDE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+  else
+    VOICE_MODEL="$VOICE_OVERRIDE"
+    echo "🎤 Using voice: $VOICE_OVERRIDE (session-specific)"
+  fi
 else
   # Try to get voice from voice file (check CLAUDE_PROJECT_DIR first for MCP context)
   VOICE_FILE=""
@@ -76,7 +129,11 @@ else
   # 2. Script location (for direct slash command usage)
   # 3. Global ~/.claude (fallback)
 
-  if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
+  # SECURITY: Canonicalize path to prevent traversal (#128)
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+    CLAUDE_PROJECT_DIR=$(cd "${CLAUDE_PROJECT_DIR}" 2>/dev/null && pwd -P) || CLAUDE_PROJECT_DIR=""
+  fi
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt" ]]; then
     # MCP context: Use the project directory where MCP was invoked
     VOICE_FILE="$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
   elif [[ -f "$SCRIPT_DIR/../tts-voice.txt" ]]; then
@@ -97,13 +154,41 @@ else
     SPEAKER_ID_FILE="$VOICE_DIR/tts-piper-speaker-id.txt"
 
     if [[ -f "$MODEL_FILE" ]] && [[ -f "$SPEAKER_ID_FILE" ]]; then
-      # Multi-speaker voice
+      # Multi-speaker voice config found locally
       VOICE_MODEL=$(cat "$MODEL_FILE" 2>/dev/null)
       SPEAKER_ID=$(cat "$SPEAKER_ID_FILE" 2>/dev/null)
-      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: $SPEAKER_ID)"
-    # Check if it's a standard Piper model name or custom voice (just use as-is)
+      # Validate speaker ID is numeric
+      if [[ -n "$SPEAKER_ID" ]] && ! [[ "$SPEAKER_ID" =~ ^[0-9]+$ ]]; then
+        echo "Warning: Invalid speaker ID '$SPEAKER_ID', ignoring" >&2
+        SPEAKER_ID=""
+      fi
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-none})"
+    # Check if voice uses Model::SpeakerName format (from AgentVibes config)
+    elif [[ -n "$FILE_VOICE" ]] && [[ "$FILE_VOICE" == *"::"* ]]; then
+      VOICE_MODEL="${FILE_VOICE%%::*}"
+      _SPEAKER_NAME="${FILE_VOICE#*::}"
+      voice_dir=$(get_voice_storage_dir)
+      _JSON_FILE="$voice_dir/${VOICE_MODEL}.onnx.json"
+      if [[ -f "$_JSON_FILE" ]]; then
+        # SECURITY: Pass values via env vars to prevent shell injection
+        SPEAKER_ID=$(_JSON="$_JSON_FILE" _SPKR="$_SPEAKER_NAME" node -e "
+          try {
+            const j = JSON.parse(require('fs').readFileSync(process.env._JSON,'utf8'));
+            const map = j.speaker_id_map || {};
+            const id = map[process.env._SPKR];
+            if (id !== undefined) process.stdout.write(String(id));
+          } catch {}
+        " 2>/dev/null || true)
+      fi
+      echo "🎭 Using multi-speaker voice: $FILE_VOICE (Model: $VOICE_MODEL, Speaker ID: ${SPEAKER_ID:-?})"
+    # Standard Piper model name or custom voice (just use as-is)
     elif [[ -n "$FILE_VOICE" ]]; then
-      VOICE_MODEL="$FILE_VOICE"
+      # Strip multi-speaker suffix if present (model::SpeakerName-Label)
+      if [[ "$FILE_VOICE" == *"::"* ]]; then
+        VOICE_MODEL="${FILE_VOICE%%::*}"
+      else
+        VOICE_MODEL="$FILE_VOICE"
+      fi
     fi
   fi
 
@@ -149,18 +234,29 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && ! verify_voice "$VOICE_MO
   echo "   File size: ~25MB"
   echo "   Preview: https://huggingface.co/rhasspy/piper-voices"
   echo ""
-  read -p "   Download this voice model? [y/N]: " -n 1 -r
-  echo
 
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
+  # Auto-download when non-interactive (e.g. called from a hook)
+  if [[ ! -t 0 ]]; then
+    echo "   Auto-downloading (non-interactive mode)..."
     if ! download_voice "$VOICE_MODEL"; then
       echo "❌ Failed to download voice model"
       echo "Fix: Download manually or choose different voice"
       exit 3
     fi
   else
-    echo "❌ Voice download cancelled"
-    exit 3
+    read -p "   Download this voice model? [y/N]: " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      if ! download_voice "$VOICE_MODEL"; then
+        echo "❌ Failed to download voice model"
+        echo "Fix: Download manually or choose different voice"
+        exit 3
+      fi
+    else
+      echo "❌ Voice download cancelled"
+      exit 3
+    fi
   fi
 fi
 
@@ -180,7 +276,7 @@ fi
 # @intent Find appropriate directory for audio file storage
 # @why Supports project-local and global storage
 # @returns Sets $AUDIO_DIR global variable
-if [[ -n "$CLAUDE_PROJECT_DIR" ]]; then
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
   AUDIO_DIR="$CLAUDE_PROJECT_DIR/.claude/audio"
 else
   # Fallback: try to find .claude directory in current path
@@ -193,13 +289,13 @@ else
     CURRENT_DIR=$(dirname "$CURRENT_DIR")
   done
   # Final fallback to global if no project .claude found
-  if [[ -z "$AUDIO_DIR" ]]; then
+  if [[ -z "${AUDIO_DIR:-}" ]]; then
     AUDIO_DIR="$HOME/.claude/audio"
   fi
 fi
 
 mkdir -p "$AUDIO_DIR"
-TEMP_FILE="$AUDIO_DIR/tts-$(date +%s).wav"
+_tmp=$(mktemp "$AUDIO_DIR/tts-XXXXXX"); TEMP_FILE="${_tmp}.wav"; mv "$_tmp" "$TEMP_FILE"
 
 # @function get_speech_rate
 # @intent Determine speech rate for Piper synthesis
@@ -235,6 +331,11 @@ get_speech_rate() {
   # If this is a non-English voice and target config exists, use it
   if [[ "$CURRENT_LANGUAGE" != "english" ]] && [[ -n "$target_config" ]]; then
     local user_speed=$(cat "$target_config" 2>/dev/null)
+    # Validate speed is a positive number
+    if ! [[ "$user_speed" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$user_speed" == "0" ]] || [[ "$user_speed" == "0.0" ]]; then
+      echo "1.0"
+      return
+    fi
     # Convert user speed to Piper length-scale (invert)
     # User: 0.5=slower, 1.0=normal, 2.0=faster
     # Piper: 2.0=slower, 1.0=normal, 0.5=faster
@@ -246,6 +347,11 @@ get_speech_rate() {
   # Otherwise use main config if available
   if [[ -n "$main_config" ]]; then
     local user_speed=$(grep -v '^#' "$main_config" 2>/dev/null | grep -v '^$' | tail -1)
+    # Validate speed is a positive number
+    if ! [[ "$user_speed" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$user_speed" == "0" ]] || [[ "$user_speed" == "0.0" ]]; then
+      echo "1.0"
+      return
+    fi
     echo "scale=2; 1.0 / $user_speed" | bc -l 2>/dev/null || echo "1.0"
     return
   fi
@@ -268,14 +374,13 @@ SPEECH_RATE=$(get_speech_rate)
 # @exitcode 0=success, 4=synthesis error
 # @sideeffects Creates audio file
 # @edgecases Handles piper errors, invalid models, multi-speaker voices
-if [[ -n "$SPEAKER_ID" ]]; then
+if [[ -n "${SPEAKER_ID:-}" ]]; then
   # Multi-speaker voice: Pass speaker ID
-  # Add 2-second pause between sentences for better pacing
-  echo "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  # SECURITY: Use printf instead of echo for pipe safety (#134)
+  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 else
   # Single-speaker voice
-  # Add 2-second pause between sentences for better pacing
-  echo "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
 fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
@@ -305,7 +410,8 @@ fi
 # @returns Updates $TEMP_FILE to compressed version
 # @sideeffects Converts to mono 22kHz for lower bandwidth
 if [[ "${AGENTVIBES_RDP_MODE:-false}" == "true" ]] && command -v ffmpeg &> /dev/null; then
-  COMPRESSED_FILE="$AUDIO_DIR/tts-compressed-$(date +%s).wav"
+  _tmp=$(mktemp "$AUDIO_DIR/tts-compressed-XXXXXX"); COMPRESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$COMPRESSED_FILE"
+  _CLEANUP_FILES+=("$COMPRESSED_FILE")
   # Convert to mono, 22kHz, 64kbps for remote sessions
   ffmpeg -i "$TEMP_FILE" -ac 1 -ar 22050 -b:a 64k -y "$COMPRESSED_FILE" 2>/dev/null
 
@@ -323,7 +429,8 @@ fi
 # @sideeffects Modifies audio file
 # AI NOTE: Use ffmpeg if available, otherwise skip padding (degraded experience)
 if command -v ffmpeg &> /dev/null; then
-  PADDED_FILE="$AUDIO_DIR/tts-padded-$(date +%s).wav"
+  _tmp=$(mktemp "$AUDIO_DIR/tts-padded-XXXXXX"); PADDED_FILE="${_tmp}.wav"; mv "$_tmp" "$PADDED_FILE"
+  _CLEANUP_FILES+=("$PADDED_FILE")
   # Add 200ms of silence at the beginning
   ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo:d=0.2 -i "$TEMP_FILE" \
     -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
@@ -342,9 +449,12 @@ fi
 # @sideeffects Applies audio effects and background music
 BACKGROUND_MUSIC=""
 if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
-  PROCESSED_FILE="$AUDIO_DIR/tts-processed-$(date +%s).wav"
+  _tmp=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX"); PROCESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$PROCESSED_FILE"
+  _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
-  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "default" "$PROCESSED_FILE" 2>/dev/null) || {
+  # Lookup order: LLM key (from --llm) → default
+  _AGENT_KEY="${AGENTVIBES_LLM_KEY:-default}"
+  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "$_AGENT_KEY" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
     PROCESSED_FILE="$TEMP_FILE"
     PROCESSOR_OUTPUT="$TEMP_FILE|"
@@ -365,7 +475,26 @@ fi
 # @why Support multiple audio players and prevent overlapping audio in learning mode
 # @param Uses global: $TEMP_FILE, $CURRENT_LANGUAGE
 # @sideeffects Plays audio with lock mechanism for sequential playback
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
+mkdir -p "$_LOCK_DIR"
+chmod 700 "$_LOCK_DIR"
+LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
+
+# Auto-remove stale lock files (older than 30 seconds) to prevent permanent blocking
+# This handles cases where the background cleanup process was killed mid-playback
+if [ -f "$LOCK_FILE" ]; then
+  _lock_age=0
+  if [[ "$(uname)" == "Darwin" ]]; then
+    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+  else
+    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
+  fi
+  _now=$(date +%s)
+  _lock_age=$((_now - _lock_mtime))
+  if [[ $_lock_age -gt 30 ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
 
 # Wait for previous audio to finish (max 2 seconds to prevent blocking)
 for i in {1..4}; do
@@ -383,7 +512,7 @@ fi
 
 # Track last target language audio for replay command
 if [[ "$CURRENT_LANGUAGE" != "english" ]]; then
-  TARGET_AUDIO_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/last-target-audio.txt"
+  TARGET_AUDIO_FILE="${CLAUDE_PROJECT_DIR:-${HOME}}/.claude/last-target-audio.txt"
   echo "$TEMP_FILE" > "$TARGET_AUDIO_FILE"
 fi
 
@@ -400,8 +529,17 @@ DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wr
 DURATION=${DURATION%.*}  # Round to integer
 DURATION=${DURATION:-1}   # Default to 1 second if detection fails
 
-# Play audio in background (skip if in test mode or no-playback mode)
+# Get audio duration for proper lock timing
+DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null || true)
+DURATION=${DURATION%.*}  # Round to integer
+# SECURITY: Validate duration is numeric (#134)
+if ! [[ "${DURATION:-}" =~ ^[0-9]+$ ]]; then
+  DURATION=1
+fi
+
+# Play audio (skip if in test mode or no-playback mode)
 # AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+PLAYER_PID=""
 if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
   # Detect platform and use appropriate audio player
   if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -493,9 +631,10 @@ fi
 
 # Show status indicators
 GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
-PROJECT_MUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-muted"
-PROJECT_UNMUTE_FILE="$PROJECT_ROOT/.claude/agentvibes-unmuted"
-BACKGROUND_ENABLED_FILE="$PROJECT_ROOT/.claude/config/background-music-enabled.txt"
+PROJECT_MUTE_FILE="${PROJECT_ROOT:-/nonexistent}/.claude/agentvibes-muted"
+PROJECT_UNMUTE_FILE="${PROJECT_ROOT:-/nonexistent}/.claude/agentvibes-unmuted"
+BACKGROUND_ENABLED_FILE="${PROJECT_ROOT:-/nonexistent}/.claude/config/background-music-enabled.txt"
+GLOBAL_BACKGROUND_ENABLED_FILE="$HOME/.claude/config/background-music-enabled.txt"
 
 # Mute status indicator
 if [[ -f "$PROJECT_UNMUTE_FILE" ]] && [[ -f "$GLOBAL_MUTE_FILE" ]]; then
@@ -508,9 +647,17 @@ fi
 
 # Background music status indicator
 if [[ -z "$BACKGROUND_MUSIC" ]]; then
+  _bg_enabled=false
   if [[ -f "$BACKGROUND_ENABLED_FILE" ]] && grep -q "true" "$BACKGROUND_ENABLED_FILE" 2>/dev/null; then
     echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Enabled but not playing (check config)${NC}"
   else
     echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}Disabled${NC}"
   fi
+fi
+
+# Wait for audio player to finish before returning.
+# This keeps the bmad-speak.sh speech lock held until playback is actually done,
+# preventing party-mode agents from talking over each other.
+if [[ -n "$PLAYER_PID" ]]; then
+  wait "$PLAYER_PID" 2>/dev/null || true
 fi

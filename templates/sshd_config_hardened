@@ -1,0 +1,57 @@
+# AgentVibes Hardened SSH Server Configuration
+# Purpose: TTS Receiver ONLY — no shell access, no forwarding
+
+# Non-standard port
+Port 45123
+
+# Listen ONLY on Tailscale interface
+# CHANGE THIS to your Tailscale IP (run: tailscale ip -4)
+ListenAddress 0.0.0.0
+
+# Host keys
+HostKey __PROGRAMDATA__/ssh/ssh_host_ed25519_key
+
+# Security: Key-only authentication
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+GSSAPIAuthentication no
+PermitRootLogin no
+
+# Security: No forwarding of any kind
+AllowTcpForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+GatewayPorts no
+
+# Security: Only allow Paul
+# CHANGE "YourUsername" to your Windows username
+AllowUsers YourUsername
+
+# Security: Tight limits
+MaxAuthTries 3
+MaxSessions 2
+LoginGraceTime 30
+ClientAliveInterval 60
+ClientAliveCountMax 3
+
+# No TTY, no user environment
+PermitTTY no
+PermitUserEnvironment no
+
+# Logging
+SyslogFacility AUTH
+LogLevel INFO
+
+# Authorized keys
+AuthorizedKeysFile .ssh/authorized_keys
+
+# No subsystems (disable sftp)
+# Subsystem sftp sftp-server.exe
+
+# ForceCommand: SSH can ONLY run the receiver script
+# CHANGE "YourUsername" to your Windows username
+Match User YourUsername
+    ForceCommand powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\YourUsername\.agentvibes\play-remote.ps1
+    AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys

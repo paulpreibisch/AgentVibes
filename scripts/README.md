@@ -4,7 +4,7 @@ This directory contains setup scripts to help you configure AgentVibes and relat
 
 ## Remote Audio Setup
 
-These scripts help you set up audio playback from a remote Linux server to your local Windows machine. This is useful when running AgentVibes on a remote server but wanting TTS announcements to play on your local speakers.
+These scripts help you set up audio playback from a remote Linux server to your local machine. This is useful when running AgentVibes on a remote server but wanting TTS announcements to play on your local speakers.
 
 ### Scripts
 
@@ -82,14 +82,14 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 For detailed information about the remote audio setup, see:
 - [Remote Audio Setup Guide](../docs/remote-audio-setup.md)
 
-#### `fix-audio-tunnel.sh` (NEW - WSL or Remote Server)
+#### `fix-audio-tunnel.sh` (WSL or Remote Server)
 
 **The easiest way to fix audio tunnel issues!**
 
 Auto-detects environment and runs appropriate fixes for stale SSH processes, stopped socat bridges, and connection issues.
 
 **Requirements:**
-- Run from WSL (for complete fix) OR ubuntu-rdp (for local fix)
+- Run from WSL (for complete fix) OR from your remote server (for local fix)
 - SSH access configured
 - sudo privileges for killing processes
 
@@ -98,30 +98,30 @@ Auto-detects environment and runs appropriate fixes for stale SSH processes, sto
 # From WSL - runs complete fix
 ./scripts/fix-audio-tunnel.sh
 
-# From ubuntu-rdp - runs local fix
+# From the remote server - runs local fix
 ./scripts/fix-audio-tunnel.sh
 ```
 
 **What it does (when run from WSL):**
-1. ✅ Kills stale SSH processes on ubuntu-rdp holding port 14713
-2. ✅ Restarts socat bridge on WSL if needed
-3. ✅ Kills local stale SSH tunnels
-4. ✅ Creates fresh SSH tunnel to ubuntu-rdp
-5. ✅ Tests audio connection
-6. ✅ Provides clear status and usage instructions
+1. Kills stale SSH processes on the remote server holding port 14713
+2. Restarts socat bridge on WSL if needed
+3. Kills local stale SSH tunnels
+4. Creates fresh SSH tunnel to the remote server
+5. Tests audio connection
+6. Provides clear status and usage instructions
 
-**What it does (when run from ubuntu-rdp):**
-1. ✅ Kills local processes using port 14713
-2. ✅ Waits for tunnel to be re-established
-3. ✅ Tests audio connection
-4. ✅ Plays test tone through Windows speakers
+**What it does (when run from the remote server):**
+1. Kills local processes using port 14713
+2. Waits for tunnel to be re-established
+3. Tests audio connection
+4. Plays test tone through local speakers
 
 **When to use:**
 - Audio stopped working suddenly
 - Getting "Connection refused" errors
 - SSH shows "Warning: remote port forwarding failed"
 - speaker-test fails
-- AgentVibes TTS not playing through Windows speakers
+- AgentVibes TTS not playing through speakers
 
 #### `check-audio-tunnel.sh` (Diagnostic)
 
@@ -177,21 +177,21 @@ wsl ss -tlnp | grep 14713
 # Expected: LISTEN 0 5 *:14713 *:* users:(("socat"...))
 ```
 
-**Check SSH tunnel (ubuntu-rdp):**
+**Check SSH tunnel (remote server):**
 ```bash
-ssh ubuntu-rdp 'netstat -tlnp | grep 14713'
+ssh <remote-server> 'netstat -tlnp | grep 14713'
 # Expected: tcp 0 0 127.0.0.1:14713 0.0.0.0:* LISTEN
 ```
 
 **Find stale processes:**
 ```bash
-ssh ubuntu-rdp 'sudo lsof -i :14713'
+ssh <remote-server> 'sudo lsof -i :14713'
 # Should show only one sshd process
 ```
 
 **Test audio:**
 ```bash
-ssh ubuntu-rdp
+ssh <remote-server>
 export PULSE_SERVER=tcp:localhost:14713
 speaker-test -t sine -f 1000 -l 1
 ```
@@ -203,7 +203,7 @@ speaker-test -t sine -f 1000 -l 1
 **Audio doesn't play:**
 - Ensure WSL is updated: `wsl --update`
 - Restart WSL: `wsl --shutdown`
-- Verify SSH tunnel: `ssh -v your-host`
+- Verify SSH tunnel: `ssh -v <remote-server>`
 
 **Connection refused:**
 - Check SSH config has `RemoteForward 14713 localhost:14713`

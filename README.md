@@ -34,7 +34,7 @@
 
 ## ✨ What is AgentVibes?
 
-**AgentVibes adds lively voice narration to your Claude AI sessions!**
+**AgentVibes adds lively voice narration to your AI coding sessions!**
 
 Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Terminal, or running OpenClaw - AgentVibes brings AI to life with professional voices and personalities.
 
@@ -252,7 +252,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 ### AgentVibes MCP (Natural Language Control)
 - [🎙️ AgentVibes MCP Overview](#%EF%B8%8F-agentvibes-mcp) - **Easiest way** - Natural language commands
   - [For Claude Desktop](docs/mcp-setup.md#for-claude-desktop) - Windows/WSL setup, Python requirements
-  - [For Warp Terminal](docs/mcp-setup.md#for-warp-terminal) - Warp configuration
+
   - [For Claude Code](docs/mcp-setup.md#for-claude-code) - Project-specific setup
 
 ### Core Features
@@ -398,9 +398,9 @@ We've now enhanced this capability by adding an MCP (Model Context Protocol) ser
 
 Setting it up is straightforward: just add the MCP server to your Claude Code configuration files.
 
-But the convenience doesn't stop there. With the MCP server in place, Claude Desktop can now use Agent Vibes too! We've even tested it successfully with Warp, an AI assistant that helps you navigate Windows and other operating systems.
+But the convenience doesn't stop there. With the MCP server in place, Claude Desktop can now use Agent Vibes too!
 
-We're thrilled about this expansion because it means Claude Desktop and Warp can finally talk back as well!
+We're thrilled about this expansion because it means Claude Desktop can finally talk back as well!
 
 If you decide to use the MCP server on Claude Desktop, after configuration, give Claude Desktop this command: "every time i give you a command, speak the acknowledgement using agentvibes and the confirmation about what you completed, when done"—and watch the magic happen!
 
@@ -408,7 +408,7 @@ If you decide to use the MCP server on Claude Desktop, after configuration, give
 
 Just say "Switch to Aria voice" or "Speak in Spanish" instead of typing commands.
 
-**Works in:** Claude Desktop, Claude Code, Warp Terminal
+**Works in:** Claude Desktop, Claude Code
 
 **[→ View Complete MCP Setup Guide](docs/mcp-setup.md)** - Full setup for all platforms, configuration examples, available tools, and MCP vs slash commands comparison
 
@@ -1048,6 +1048,14 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 
 **Version Support**: AgentVibes supports both BMAD v4 and v6-alpha installations. Version detection is automatic - just install BMAD and AgentVibes will detect and configure itself correctly!
 
+### 🎭 Party Mode — Screenshots
+
+Open the **BMad** tab in the AgentVibes TUI (`npx agentvibes`) to configure which voice each agent uses:
+
+![BMAD Party Mode Tab](docs/installation-screenshots/screenshot-bmad-party-mode.png)
+
+> 📸 **Don't have a screenshot yet?** Run `npx agentvibes`, switch to the **BMad** tab, and take a screenshot — then save it as `docs/installation-screenshots/screenshot-bmad-party-mode.png`.
+
 ### 🔊 TTS Injection: How It Works
 
 BMAD uses a **loosely-coupled injection system** for voice integration. BMAD source files contain placeholder markers that AgentVibes replaces with speaking instructions during installation:
@@ -1593,6 +1601,78 @@ AgentVibes supports **custom personalities** and **custom voices**.
 ✅ **No static/clicking** - Clean playback through SSH tunnels
 
 **[→ Remote Audio Setup Guide](docs/remote-audio-setup.md)** - Full PulseAudio configuration details
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
+## 🛠️ Technical Documentation
+
+### Audio Architecture
+
+AgentVibes uses a cross-platform audio module (`src/console/audio-env.js`) that handles player detection and environment configuration for all supported platforms.
+
+#### Platform Audio Support Matrix
+
+| Platform | PulseAudio Config | MP3 Players (preference order) | WAV Players (preference order) |
+|----------|-------------------|-------------------------------|-------------------------------|
+| **Native Linux** | System default (not overridden) | ffplay → play (sox) → mpg123 → cvlc → mpv | aplay → paplay → play → ffplay |
+| **WSL2** | Auto-detects `/mnt/wslg/PulseServer` | Same as Linux | Same as Linux |
+| **macOS** | Not applicable | ffplay → play → mpg123 → cvlc → mpv → afplay | aplay → paplay → play → ffplay → afplay |
+| **Windows** | Not applicable | ffplay → mpv (if installed) | ffplay → mpv → PowerShell SoundPlayer (built-in) |
+
+#### Key Design Decisions
+
+- **Direct spawn, not shell chains**: Audio players are spawned directly via Node's `spawn()` instead of `sh -c 'cmd1 || cmd2'` chains. VLC/cvlc crashes when stderr is redirected inside shell wrappers.
+- **Player detection at startup**: The available player is detected once using `which` and cached. No runtime fallback chains.
+- **PULSE_SERVER safety**: The WSL2 PulseServer path (`/mnt/wslg/PulseServer`) is only set when the socket file actually exists. Hardcoding it on native Linux silently breaks audio output.
+- **Windows WAV fallback**: PowerShell's `System.Media.SoundPlayer` is used as a built-in fallback when no cross-platform player is installed.
+
+#### Multi-Speaker Voice Models
+
+Piper supports multi-speaker ONNX models (e.g., `16Speakers.onnx`) that contain multiple voices in a single file. AgentVibes expands these automatically:
+
+- The `.onnx.json` metadata file contains `num_speakers` and `speaker_id_map`
+- `scanInstalledVoices()` expands multi-speaker models into individual selectable entries (e.g., `16Speakers::Cori_Samuel`)
+- When selected, the system writes `tts-piper-model.txt` and `tts-piper-speaker-id.txt` to `.claude/`
+- `play-tts-piper.sh` reads these files and passes `--speaker <id>` to the piper binary
+
+#### Voice Directory Resolution
+
+Voice storage follows the same precedence chain in both JavaScript and shell:
+
+1. `PIPER_VOICES_DIR` environment variable
+2. Project-local `.claude/piper-voices-dir.txt` (walks up directory tree)
+3. Global `~/.claude/piper-voices-dir.txt`
+4. Default `~/.claude/piper-voices`
+
+#### Voice Catalog System
+
+AgentVibes includes a 914-voice catalog (`voice-assignments.json`) that lets users browse, preview, and install voices directly from the Voices tab:
+
+- **10 Curated Voices** — Hand-picked high-quality voices installed by default
+- **904 LibriTTS Speakers** — Automatically extracted from the `16Speakers` multi-speaker model's `speaker_id_map`, plus the full LibriTTS catalog from Hugging Face
+- **Download on Demand** — Uninstalled voices appear greyed-out in the list; pressing Enter opens a download modal that fetches the voice via `piper-voice-manager.sh`
+- **Catalog Metadata** — Each entry includes `voiceId`, `displayName`, `gender`, `type` (curated/libritts), and download URL
+- **LibriTTS Speaker Names** — Raw numeric IDs are patched at load time using `patchLibriTTSSpeakerNames()` which maps speaker IDs to human-readable names from the registry
+
+The catalog is loaded once at tab initialization by `loadCatalog()`. Installed voices (from disk scan) are shown with full color; catalog-only voices are dimmed until downloaded.
+
+#### Required System Dependencies for Background Music
+
+Background music requires an MP3-capable audio player. The installer detects missing players and offers to install `ffmpeg` automatically. If no player is found, the Music tab displays a clear error message.
+
+```bash
+# Install ffmpeg (recommended — provides ffplay)
+# Ubuntu/Debian/WSL2:
+sudo apt install ffmpeg
+
+# macOS:
+brew install ffmpeg
+
+# Arch Linux:
+sudo pacman -S ffmpeg
+```
 
 [↑ Back to top](#-table-of-contents)
 
