@@ -19,8 +19,8 @@ const isNpxExecution = __dirname.includes('_npx') || __dirname.includes('.npm');
 // Get CLI arguments
 const arguments_ = process.argv.slice(2);
 
-// Use the installer for all commands
-const installerPath = path.join(__dirname, '..', 'src', 'installer.js');
+// Route through the TUI console (agentvibes.js) which handles install/config/etc
+const installerPath = path.join(__dirname, 'agentvibes.js');
 
 if (!fs.existsSync(installerPath)) {
   console.error('Error: Could not find installer.js at', installerPath);
@@ -33,7 +33,7 @@ try {
   // Arguments are passed as array elements, not string interpolation
   execFileSync('node', [installerPath, ...arguments_], {
     stdio: 'inherit',
-    cwd: isNpxExecution ? path.dirname(__dirname) : process.cwd(),
+    cwd: path.dirname(__dirname),
   });
 } catch (error) {
   process.exit(error.status || 1);

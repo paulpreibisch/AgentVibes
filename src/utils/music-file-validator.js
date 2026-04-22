@@ -72,40 +72,19 @@ export function isPathSafe(userPath, userHomeDir = null) {
       };
     }
 
-    // Check if file exists
-    if (!fs.existsSync(resolvedPath)) {
-      return {
-        isValid: false,
-        error: `File not found: ${userPath}`,
-        resolvedPath: null
-      };
-    }
-
-    // Get file stats
-    const stats = fs.statSync(resolvedPath);
-
-    // Check if it's a regular file (not directory, symlink, etc)
-    if (!stats.isFile()) {
-      return {
-        isValid: false,
-        error: `Path must be a regular file, not a ${stats.isDirectory() ? 'directory' : 'special file'}`,
-        resolvedPath: null
-      };
-    }
-
-    // CRITICAL: Verify file ownership (CLAUDE.md requirement)
-    // Prevent other users from planting malicious files
-    const currentUserId = process.getuid ? process.getuid() : null;
-    if (currentUserId !== null && stats.uid !== currentUserId) {
-      return {
-        isValid: false,
-        error: 'Security validation failed: file not owned by current user',
-        resolvedPath: null
-      };
+    // SECURITY: Use lstatSync first to detect symlinks before following them (#131)
+    let lstats;
+    try {
+      lstats = fs.lstatSync(resolvedPath);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        return { isValid: false, error: `File not found: ${userPath}`, resolvedPath: null };
+      }
+      return { isValid: false, error: `Cannot access file: ${err.message}`, resolvedPath: null };
     }
 
     // Check if symlink - if so, verify target is also within home directory
-    if (stats.isSymbolicLink()) {
+    if (lstats.isSymbolicLink()) {
       try {
         const targetPath = fs.realpathSync(resolvedPath);
         const isTargetWithinHome = targetPath === resolvedHome ||
@@ -125,6 +104,37 @@ export function isPathSafe(userPath, userHomeDir = null) {
           resolvedPath: null
         };
       }
+    }
+
+    // Get file stats (follows symlinks for regular file check)
+    const stats = fs.statSync(resolvedPath);
+
+    // Check if it's a regular file (not directory, special file, etc)
+    if (!stats.isFile()) {
+      return {
+        isValid: false,
+        error: `Path must be a regular file, not a ${stats.isDirectory() ? 'directory' : 'special file'}`,
+        resolvedPath: null
+      };
+    }
+
+    // CRITICAL: Verify file ownership (CLAUDE.md requirement)
+    // Prevent other users from planting malicious files
+    // SECURITY: Fail-secure on platforms where getuid is unavailable (#131)
+    const currentUserId = process.getuid ? process.getuid() : null;
+    if (currentUserId === null) {
+      return {
+        isValid: false,
+        error: 'Security validation failed: unable to verify file ownership on this platform',
+        resolvedPath: null
+      };
+    }
+    if (stats.uid !== currentUserId) {
+      return {
+        isValid: false,
+        error: 'Security validation failed: file not owned by current user',
+        resolvedPath: null
+      };
     }
 
     // Check if file is readable

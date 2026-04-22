@@ -1,0 +1,2212 @@
+/**
+ * AgentVibes TUI Console — Setup Tab (Unified Setup Wizard)
+ *
+ * Replaces install-tab.js + llm-providers-tab.js with a single unified tab.
+ *
+ * Implements the Tab Component Contract:
+ *   createSetupTab(screen, services) → { box, show, hide, onFocus, onBlur, getFooterText, getFooterColor }
+ *
+ * 4-screen wizard flow:
+ *   Screen 0: Language picker
+ *   Screen 1: Dependency check
+ *   Screen 2: TTS Engine selection (new)
+ *   Screen 3: LLM Providers (new — install/remove/configure)
+ */
+
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import fs from 'node:fs';
+import { promises as _fsP } from 'node:fs';
+import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
+import {
+  PROVIDERS,
+  checkClaudeInstalled, checkCopilotInstalled, checkCodexInstalled,
+  installClaudeMcp, removeClaudeMcp, uninstallClaude,
+  installCopilotMcp, removeCopilotMcp,
+  installCopilotInstructions, removeCopilotInstructions,
+  installCodexMcp, removeCodexMcp,
+  installCodexInstructions, installCodexHooks,
+  removeCodexInstructions, removeCodexHooks,
+  loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
+} from '../../services/llm-provider-service.js';
+import {
+  getAvailableEngines, getEngineStatuses, checkEngineInstalled,
+} from '../../services/tts-engine-service.js';
+import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
+import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
+import { formatTrackName } from '../widgets/format-utils.js';
+import { destroyList } from '../widgets/destroy-list.js';
+import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
+import { attachBtnBlink } from './agents-tab.js';
+import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { spawn } from 'node:child_process';
+import os from 'node:os';
+import crypto from 'node:crypto';
+
+const _execFileAsync = promisify(execFile);
+
+const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
+
+let blessed;
+if (!IS_TEST) {
+  const { default: b } = await import('blessed');
+  blessed = b;
+}
+
+// ---------------------------------------------------------------------------
+// Named ANSI colors only — hex renders as white on Paul's terminal
+
+const COLORS = {
+  contentBg:  'black',
+  sectionHdr: 'bright-cyan',
+  labelFg:    'white',
+  valueFg:    'yellow',
+  brandPink:  'magenta',
+  successFg:  'green',
+  errorFg:    'red',
+  btnDefault: 'blue',
+  btnFocus:   'green',
+  btnFocusFg: 'white',
+  btnPress:   'magenta',
+  borderFg:   'bright-cyan',
+  footerBg:   'blue',
+  noticeFg:   'white',
+  btnBg:      'blue',
+  btnFg:      'white',
+  btnFocusBg: 'cyan',
+  removeBg:   'red',
+  removeFocusBg: 'magenta',
+  cfgBg:      'green',
+  cfgFocusBg: 'yellow',
+};
+
+const FOOTER_TEXT = '[Enter] Continue  [Esc] Back  [Tab] Next Tab  [Q] Quit';
+
+// ---------------------------------------------------------------------------
+// Exported pure helpers (kept from install-tab for backward compat)
+
+/**
+ * Returns the default intro text suggestion (project folder name).
+ * @param {string} projectDir
+ * @returns {string}
+ */
+export function getIntroDefault(projectDir) {
+  if (!projectDir) return '';
+  return path.basename(projectDir);
+}
+
+/**
+ * Format the TTS greeting message.
+ * @param {string} introText - User's intro text (may be empty)
+ * @param {string} projectName - Project folder name
+ * @returns {string}
+ */
+export function formatGreeting(introText, projectName) {
+  const name = introText || projectName || 'AgentVibes';
+  return `${name} is ready! Welcome to AgentVibes. Love AgentVibes? We'd really appreciate it if you could give us a star on GitHub.`;
+}
+
+// ---------------------------------------------------------------------------
+// Dependency detection helpers
+
+async function _commandExistsAsync(cmd) {
+  try {
+    const opts = { stdio: 'pipe', timeout: 5000 };
+    if (process.platform === 'win32') {
+      opts.shell = true;
+      await _execFileAsync(`${cmd} --version`, [], opts);
+    } else {
+      await _execFileAsync(cmd, ['--version'], opts);
+    }
+    return true;
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;
+    return true;
+  }
+}
+
+async function _checkDependenciesAsync() {
+  const [node, npm, piperCmd, sopranoTts, sopranoWebui, ffmpeg] = await Promise.all([
+    _commandExistsAsync('node'),
+    _commandExistsAsync('npm'),
+    _commandExistsAsync('piper'),
+    _commandExistsAsync('soprano-tts'),
+    _commandExistsAsync('soprano-webui'),
+    _commandExistsAsync('ffmpeg'),
+  ]);
+
+  let piper = piperCmd;
+  if (!piper && process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA ||
+      (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+    if (localAppData) {
+      piper = fs.existsSync(path.join(localAppData, 'Programs', 'Piper', 'piper.exe'));
+    }
+  }
+
+  return { node, npm, piper, soprano: sopranoTts || sopranoWebui, ffmpeg };
+}
+
+// ---------------------------------------------------------------------------
+// Test stub
+
+function createTestStub() {
+  return {
+    box: {},
+    show: () => {},
+    hide: () => {},
+    onFocus: () => {},
+    onBlur: () => {},
+    getFooterText: () => t('en', 'footerText'),
+    getFooterColor: () => COLORS.footerBg,
+  };
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Create the Setup tab component (unified install + provider configuration).
+ *
+ * @param {object} screen   - Blessed screen instance (or test stub)
+ * @param {object} services
+ * @returns {{ box, show, hide, onFocus, onBlur, getFooterText, getFooterColor }}
+ */
+export function createSetupTab(screen, services) {
+  if (IS_TEST) return createTestStub();
+
+  const { configService, providerService, navigationService, focusMainTabBar, languageService } = services;
+
+  const targetDir = process.env.INIT_CWD || process.cwd();
+  const _thisFile = fileURLToPath(import.meta.url);
+  const packageDir = path.resolve(path.dirname(_thisFile), '..', '..', '..');
+
+  // -------------------------------------------------------------------------
+  // Container
+
+  const box = blessed.box({
+    parent: screen,
+    top: 5,
+    left: 0,
+    width: '100%',
+    bottom: 2,
+    hidden: true,
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+    border: { type: 'line' },
+    borderStyle: { fg: COLORS.borderFg },
+  });
+
+  // -------------------------------------------------------------------------
+  // Wizard state
+
+  let _screen = 0;
+  let _lastScreen = -2;
+  let _pendingGlobalCfg = null;  // Set when global config detected on first run
+  let _globalChoiceIdx = 0;      // 0 = Load Global, 1 = Start Fresh
+  const _getLang = () => languageService?.getLang() ?? 'en';
+  const _tl = (key) => languageService?.t(key) ?? t('en', key);
+  let _langIdx = 0;
+  let _deps = null;
+  let _checking = false;
+
+  // First-run detection: evaluated at show() time so async config init is complete
+  function _isFirstRun() {
+    return !(configService?.getConfig?.()?.setupCompleted);
+  }
+
+  // -------------------------------------------------------------------------
+  // Content area
+
+  const contentBox = blessed.box({
+    parent: box,
+    top: 1,
+    left: 2,
+    width: '96%',
+    bottom: 5,
+    tags: true,
+    wrap: false,
+    scrollable: false,
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  const hintLine = blessed.text({
+    parent: box,
+    bottom: 2,
+    left: 2,
+    right: 2,
+    tags: true,
+    content: '',
+    style: { fg: COLORS.noticeFg, bg: COLORS.contentBg },
+  });
+
+  function _c(lines) { return lines.join('\n'); }
+
+  // -------------------------------------------------------------------------
+  // Shared button factory
+
+  function _createBtn(label, bg, onClick, textColor = 'white') {
+    const btn = blessed.button({
+      parent: box,
+      content: label,
+      mouse: true,
+      keys: true,
+      shrink: true,
+      hidden: true,
+      padding: { left: 1, right: 1 },
+      style: {
+        bg,
+        fg: textColor,
+        focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
+      },
+    });
+
+    let _blinkInterval = null;
+    const _origLabel = label;
+    btn.on('focus', () => {
+      btn.style.bg = COLORS.btnFocus;
+      btn.style.fg = COLORS.btnFocusFg;
+      btn.setContent(`\u25ba ${_origLabel} \u25c4`);
+      let _on = true;
+      screen.render();
+      _blinkInterval = setInterval(() => {
+        _on = !_on;
+        btn.setContent(_on ? `\u25ba ${_origLabel} \u25c4` : `  ${_origLabel}  `);
+        screen.render();
+      }, 500);
+    });
+    btn.on('blur', () => {
+      if (_blinkInterval) { clearInterval(_blinkInterval); _blinkInterval = null; }
+      btn.style.bg = bg;
+      btn.style.fg = textColor;
+      btn.setContent(_origLabel);
+      screen.render();
+    });
+
+    btn.key(['enter', 'space'], () => {
+      btn.style.bg = COLORS.btnPress;
+      btn.style.fg = 'white';
+      screen.render();
+      setTimeout(() => {
+        btn.style.bg = bg;
+        btn.style.fg = textColor;
+        screen.render();
+        onClick();
+      }, 150);
+    });
+    btn.on('click', () => btn.press());
+    return btn;
+  }
+
+  // =========================================================================
+  // SCREEN 0: Language picker (kept as-is)
+  // =========================================================================
+
+  // =========================================================================
+  // SCREEN 1: Dependency check (was Screen 2, renumbered)
+  // =========================================================================
+
+  const _s1ContinueBtn = _createBtn('Continue  ->', 'blue', () => {
+    _screen++;
+    _showCurrentScreen();
+  });
+  _s1ContinueBtn.top = 12; _s1ContinueBtn.left = 4;
+  _s1ContinueBtn.key(['right'], () => { _screen++; _showCurrentScreen(); });
+
+  // =========================================================================
+  // SCREEN 2: TTS Engine selection (new)
+  // =========================================================================
+
+  // TTS engine install buttons — created once, shown/hidden per screen
+  const _ttsEngineRows = [];
+  const _ttsFocusableItems = [];
+  let _ttsFocusIndex = 0;
+
+  const _ttsEngines = getAvailableEngines();
+  for (let i = 0; i < _ttsEngines.length; i++) {
+    const engine = _ttsEngines[i];
+    const yOff = 5 + (i * 3);
+
+    const nameLabel = blessed.text({
+      parent: box, top: yOff, left: 2, tags: true, hidden: true,
+      content: '', style: { bg: COLORS.contentBg },
+    });
+
+    const statusLabel = blessed.text({
+      parent: box, top: yOff, left: 22, tags: true, hidden: true,
+      content: '', style: { bg: COLORS.contentBg },
+    });
+
+    const descLabel = blessed.text({
+      parent: box, top: yOff + 1, left: 4, tags: true, hidden: true,
+      content: `{cyan-fg}${engine.desc}{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const installBtn = blessed.button({
+      parent: box, top: yOff, left: 40, width: 14, height: 1,
+      content: '  Install  ', tags: true, mouse: true, keys: true, hidden: true,
+      style: {
+        fg: COLORS.btnFg, bg: COLORS.btnBg,
+        focus: { fg: 'black', bg: COLORS.btnFocusBg },
+      },
+    });
+
+    installBtn.on('press', () => _handleTtsInstall(engine));
+    installBtn.key(['enter', 'space'], () => _handleTtsInstall(engine));
+    installBtn.key(['tab', 'down'], () => _cycleTtsFocus(1));
+    installBtn.key(['S-tab', 'up'], () => _cycleTtsFocus(-1));
+    installBtn.key(['escape'], () => {
+      if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+    });
+
+    _ttsEngineRows.push({ engine, nameLabel, statusLabel, descLabel, installBtn });
+    if (!engine.native) _ttsFocusableItems.push(installBtn);
+  }
+
+  function _cycleTtsFocus(dir) {
+    const items = _ttsFocusableItems.filter(b => !b.hidden);
+    if (!items.length) return;
+    _ttsFocusIndex = (_ttsFocusIndex + dir + items.length) % items.length;
+    items[_ttsFocusIndex].focus();
+    screen.render();
+  }
+
+  function _showTtsEngineRows() {
+    for (const row of _ttsEngineRows) {
+      const installed = checkEngineInstalled(row.engine.id);
+      row.nameLabel.setContent(`{bold}{white-fg}${row.engine.name}{/white-fg}{/bold}`);
+      row.statusLabel.setContent(installed
+        ? '{green-fg}[Installed]{/green-fg}'
+        : '{yellow-fg}[Not Found]{/yellow-fg}');
+      row.nameLabel.show();
+      row.statusLabel.show();
+      row.descLabel.show();
+      if (!installed && !row.engine.native) {
+        row.installBtn.show();
+      } else {
+        row.installBtn.hide();
+      }
+    }
+  }
+
+  function _hideTtsEngineRows() {
+    for (const row of _ttsEngineRows) {
+      row.nameLabel.hide();
+      row.statusLabel.hide();
+      row.descLabel.hide();
+      row.installBtn.hide();
+    }
+  }
+
+  let _ttsInstalling = false;
+  async function _handleTtsInstall(engine) {
+    if (!engine.installCmd || _ttsInstalling) return;
+    _ttsInstalling = true;
+
+    // Show installing status
+    const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
+    if (row) {
+      row.statusLabel.setContent('{yellow-fg}[Installing...]{/yellow-fg}');
+      screen.render();
+    }
+
+    try {
+      const opts = { stdio: 'pipe', timeout: 120000 };
+      if (process.platform === 'win32') {
+        opts.shell = true;
+        await _execFileAsync(engine.installCmd, [], opts);
+      } else {
+        const parts = engine.installCmd.split(' ');
+        await _execFileAsync(parts[0], parts.slice(1), opts);
+      }
+
+      // Re-check and update status
+      const installed = checkEngineInstalled(engine.id);
+      if (row) {
+        row.statusLabel.setContent(installed
+          ? '{green-fg}[Installed]{/green-fg}'
+          : '{red-fg}[Install Failed]{/red-fg}');
+        if (installed) row.installBtn.hide();
+      }
+    } catch (err) {
+      if (row) {
+        row.statusLabel.setContent(`{red-fg}[Failed]{/red-fg}`);
+      }
+    }
+    _ttsInstalling = false;
+    screen.render();
+  }
+
+  // Continue button for Screen 2
+  const _s2ContinueBtn = _createBtn('Continue  ->', 'blue', () => {
+    if (_screen < 3) { _screen++; _showCurrentScreen(); }
+  });
+  _s2ContinueBtn.hidden = true;
+
+  // =========================================================================
+  // SCREEN 3: LLM Providers (new — from llm-providers-tab)
+  // =========================================================================
+
+  let installedState = {};
+  let providerFocusableItems = [];
+  let providerFocusIndex = 0;
+  let providerView = 'list'; // 'list' or 'info'
+
+  // Provider row widgets (created once)
+  const providerRows = [];
+  const providerStatusTexts = [];
+
+  // Info box for provider details
+  const infoBox = blessed.box({
+    parent: box,
+    top: 0,
+    left: 0,
+    width: '100%',
+    bottom: 0,
+    hidden: true,
+    scrollable: true,
+    alwaysScroll: true,
+    tags: true,
+    keys: true,
+    vi: true,
+    mouse: true,
+    valign: 'top',
+    scrollbar: { ch: '|', style: { fg: 'cyan' } },
+    style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+  });
+
+  // Provider header
+  const providerHeader = blessed.text({
+    parent: box,
+    top: 0,
+    left: 2,
+    tags: true,
+    hidden: true,
+    content: '{bold}{cyan-fg}LLM Providers{/cyan-fg}{/bold}  Configure AgentVibes for your AI assistant:',
+    style: { bg: COLORS.contentBg },
+  });
+
+  function createProviderRow(provider, rowIndex) {
+    const yOffset = 2 + (rowIndex * 3);
+
+    const label = blessed.text({
+      parent: box,
+      top: yOffset,
+      left: 2,
+      tags: true,
+      hidden: true,
+      content: `{bold}{white-fg}${provider.name}{/white-fg}{/bold}  {cyan-fg}${provider.desc}{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const statusText = blessed.text({
+      parent: box,
+      top: yOffset + 1,
+      left: 4,
+      tags: true,
+      hidden: true,
+      content: '{yellow-fg}Checking...{/yellow-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+    providerStatusTexts.push({ id: provider.id, widget: statusText });
+
+    const installBtn = blessed.button({
+      parent: box,
+      top: yOffset + 1,
+      left: 30,
+      width: 14,
+      height: 1,
+      content: '  Install  ',
+      tags: true,
+      mouse: true,
+      keys: true,
+      hidden: true,
+      style: {
+        fg: COLORS.btnFg,
+        bg: COLORS.btnBg,
+        focus: { fg: 'black', bg: COLORS.btnFocusBg },
+      },
+    });
+
+    const removeBtn = blessed.button({
+      parent: box,
+      top: yOffset + 1,
+      left: 46,
+      width: 12,
+      height: 1,
+      content: '  Remove  ',
+      tags: true,
+      mouse: true,
+      keys: true,
+      hidden: true,
+      style: {
+        fg: COLORS.btnFg,
+        bg: COLORS.removeBg,
+        focus: { fg: 'black', bg: COLORS.removeFocusBg },
+      },
+    });
+
+    const configBtn = blessed.button({
+      parent: box,
+      top: yOffset + 1,
+      left: 60,
+      width: 14,
+      height: 1,
+      content: ' Configure ',
+      tags: true,
+      mouse: true,
+      keys: true,
+      hidden: true,
+      style: {
+        fg: 'black',
+        bg: COLORS.cfgBg,
+        focus: { fg: 'black', bg: COLORS.cfgFocusBg },
+      },
+    });
+
+    // The "default" provider is config-only — it has no install/remove
+    // semantics.  Hide those buttons and only show Configure.
+    if (provider.isDefault) {
+      installBtn.hide();
+      removeBtn.hide();
+    }
+
+    // Wire actions
+    installBtn.on('press', async () => { await handleProviderInstall(provider); });
+    installBtn.key(['enter', 'space'], async () => { await handleProviderInstall(provider); });
+
+    removeBtn.on('press', async () => { await handleProviderRemove(provider); });
+    removeBtn.key(['enter', 'space'], async () => { await handleProviderRemove(provider); });
+
+    configBtn.on('press', async () => { await handleProviderConfigure(provider); });
+    configBtn.key(['enter', 'space'], async () => { await handleProviderConfigure(provider); });
+
+    // Navigation on each button — for the default provider, only Configure
+    // is focusable since install/remove are hidden.
+    const navButtons = provider.isDefault ? [configBtn] : [installBtn, removeBtn, configBtn];
+    for (const btn of navButtons) {
+      btn.key(['tab', 'right'], () => { cycleFocus(1); });
+      btn.key(['S-tab', 'left'], () => { cycleFocus(-1); });
+      btn.key(['escape'], () => {
+        if (typeof focusMainTabBar === 'function') {
+          focusMainTabBar();
+          screen.render();
+        }
+      });
+      btn.key(['up'], () => {
+        const prevIdx = providerFocusIndex - 3;
+        if (prevIdx >= 0) {
+          providerFocusIndex = prevIdx;
+          providerFocusableItems[providerFocusIndex].focus();
+          screen.render();
+        } else if (typeof focusMainTabBar === 'function') {
+          focusMainTabBar();
+        }
+      });
+      btn.key(['down'], () => {
+        // Column-preserving down nav.  If pressing down from Install/Remove
+        // would land on the Default row (which has no Install/Remove — all
+        // three slots are configBtn duplicates), don't move.  Configure
+        // column navigates normally into Default row's Configure.
+        const col = providerFocusIndex % 3;
+        const nextIdx = providerFocusIndex + 3;
+        if (nextIdx >= providerFocusableItems.length) return;
+        const nextRowIdx = Math.floor(nextIdx / 3);
+        const nextRow = PROVIDERS[nextRowIdx];
+        if (col < 2 && nextRow && nextRow.isDefault) return; // skip Default from Install/Remove
+        providerFocusIndex = nextIdx;
+        providerFocusableItems[providerFocusIndex].focus();
+        screen.render();
+      });
+    }
+
+    providerRows.push({ id: provider.id, label, statusText, installBtn, removeBtn, configBtn });
+    return { installBtn, removeBtn, configBtn };
+  }
+
+  // Build all provider rows.
+  // For the default provider, install/remove are hidden — push configBtn
+  // three times so the row-of-3 arrow-nav arithmetic still works (every
+  // "slot" in the default row lands on Configure, the only visible button).
+  for (let i = 0; i < PROVIDERS.length; i++) {
+    const { installBtn, removeBtn, configBtn } = createProviderRow(PROVIDERS[i], i);
+    if (PROVIDERS[i].isDefault) {
+      providerFocusableItems.push(configBtn, configBtn, configBtn);
+    } else {
+      providerFocusableItems.push(installBtn, removeBtn, configBtn);
+    }
+  }
+
+  function cycleFocus(dir) {
+    providerFocusIndex = (providerFocusIndex + dir + providerFocusableItems.length) % providerFocusableItems.length;
+    providerFocusableItems[providerFocusIndex].focus();
+    screen.render();
+  }
+
+  // ── Provider install/remove handlers ──────────────────────────────────────
+
+  async function handleProviderInstall(provider) {
+    // Remember which button the user was on so we can advance focus to
+    // the NEXT row (same column) after they dismiss the info page.
+    _preInfoFocusIndex = providerFocusIndex;
+
+    if (provider.id === 'claude-code') {
+      const wasInstalled = installedState[provider.id];
+      const result = await installClaudeMcp(targetDir);
+      await refreshInstalledState();
+      showClaudeCodeInfo(result, wasInstalled);
+      return;
+    }
+
+    if (provider.id === 'github-copilot') {
+      const wasInstalled = installedState[provider.id];
+      const result = await installCopilotMcp(targetDir);
+      await installCopilotInstructions(targetDir, packageDir);
+      await refreshInstalledState();
+      showCopilotInfo(result, wasInstalled);
+    }
+
+    if (provider.id === 'openai-codex') {
+      const wasInstalled = installedState[provider.id];
+      const result = await installCodexMcp(targetDir);
+      await installCodexInstructions(targetDir, packageDir);
+      await installCodexHooks(targetDir, packageDir);
+      await refreshInstalledState();
+      showCodexInfo(result, wasInstalled);
+    }
+  }
+
+  async function handleProviderRemove(provider) {
+    // Remember which button the user was on so we can advance focus to
+    // the NEXT row (same column) after they dismiss the info page.
+    _preInfoFocusIndex = providerFocusIndex;
+
+    if (provider.id === 'claude-code') {
+      const result = await uninstallClaude(targetDir);
+      await refreshInstalledState();
+      showRemoveInfo('claude-code', result.removed || []);
+      return;
+    }
+
+    if (provider.id === 'github-copilot') {
+      await removeCopilotMcp(targetDir);
+      await removeCopilotInstructions(targetDir);
+      await refreshInstalledState();
+      showRemoveInfo('github-copilot');
+    }
+
+    if (provider.id === 'openai-codex') {
+      await removeCodexMcp(targetDir);
+      await removeCodexInstructions(targetDir);
+      await removeCodexHooks(targetDir);
+      await refreshInstalledState();
+      showRemoveInfo('openai-codex');
+    }
+  }
+
+  // ── Provider configure handler ────────────────────────────────────────────
+
+  async function handleProviderConfigure(provider) {
+    const llmKeyMap = {
+      'claude-code': 'claude-code',
+      'github-copilot': 'copilot',
+      'openai-codex': 'codex',
+      'default': 'default',
+    };
+    const llmKey = llmKeyMap[provider.id] || provider.id;
+    const config = loadLlmConfigSync(llmKey, targetDir);
+    _openLlmConfigModal(provider, llmKey, config);
+  }
+
+  // ── LLM Config Modal ─────────────────────────────────────────────────────
+
+  function _openLlmConfigModal(provider, llmKey, config) {
+    // Guard against double-open (key repeat, double-click)
+    if (navigationService?.isModalOpen()) return;
+    let _closed = false;
+    navigationService?.openModal();
+
+    const defaultPretext = {
+      'claude-code': 'Claude Code here',
+      'copilot': 'Copilot here',
+      'codex': 'Codex here',
+      'default': '',  // empty by default — user sets via Configure
+    };
+
+    // Read global defaults for display
+    const globalEngine = providerService?.getActiveProvider?.() || 'piper';
+    const globalVoice = providerService?.getActiveVoiceId?.() || 'none';
+
+    const draft = {
+      ttsEngine:    config.ttsEngine || '',
+      voice:        config.voice || '',
+      pretext:      config.pretext || defaultPretext[llmKey] || '',
+      reverbPreset: config.effects || 'off',
+      bgTrack:      config.bgTrack || '',
+      bgVolume:     config.bgVolume || '0.15',
+    };
+
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 72,
+      height: 22,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {bold}{cyan-fg} ${provider.name} -- Audio Config {/cyan-fg}{/bold} `,
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+      },
+    });
+    modal.setFront();
+
+    // Field definitions
+    const FIELDS = [
+      { key: 'ttsEngine', label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
+      { key: 'voice',     label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+      { key: 'pretext',   label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
+      { key: 'reverb',    label: 'Reverb',        getValue: () => {
+        const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
+        return p ? p.label : draft.reverbPreset || 'Off';
+      }},
+      { key: 'bgTrack',   label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
+      { key: 'bgVolume',  label: 'Music Vol',    getValue: () => {
+        const pct = Math.round(parseFloat(draft.bgVolume) * 100);
+        return `${pct}%`;
+      }},
+    ];
+
+    function _fieldItems() {
+      return FIELDS.map(f => {
+        const label = f.label.padEnd(14);
+        return `  ${label} ${f.getValue()}`;
+      });
+    }
+
+    const fieldList = blessed.list({
+      parent: modal,
+      top: 1,
+      left: 2,
+      right: 2,
+      height: FIELDS.length + 2,
+      keys: true,
+      vi: false,
+      mouse: true,
+      border: { type: 'line' },
+      tags: true,
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        border: { fg: 'blue' },
+        selected: { bg: 'blue', fg: 'yellow' },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+    fieldList.setItems(_fieldItems());
+
+    blessed.text({
+      parent: modal,
+      bottom: 4,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: '{white-fg}[Up/Down] Navigate  [Enter] Edit  [Tab] Buttons  [Esc] Close{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    // Buttons
+    function _modalBtn(label, leftPos, onClick) {
+      const btn = blessed.button({
+        parent: modal,
+        content: label,
+        bottom: 2,
+        left: leftPos,
+        mouse: true,
+        keys: true,
+        shrink: true,
+        padding: { left: 1, right: 1 },
+        style: {
+          bg: 'blue',
+          fg: 'white',
+          focus: { bg: 'cyan', fg: 'black', bold: true },
+          hover: { bg: 'cyan', fg: 'black', bold: true },
+        },
+      });
+      btn.key(['enter', 'space'], () => onClick());
+      btn.on('click', () => onClick());
+      return btn;
+    }
+
+    // Preview status line
+    const previewLine = blessed.text({
+      parent: modal,
+      bottom: 1,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: '',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _previewModalProc = null;
+    function _killPreview() {
+      if (_previewModalProc) {
+        try { _previewModalProc.kill(); } catch {}
+        _previewModalProc = null;
+      }
+    }
+
+    function _playPreview() {
+      _killPreview();
+      previewLine.setContent('{cyan-fg}♪ Previewing...{/cyan-fg}');
+      screen.render();
+
+      // Save first so play-tts picks up current settings
+      _autoSave(true);
+
+      // Temporarily enable background music for preview if a track is configured
+      const hasBgTrack = !!draft.bgTrack;
+      let _bgRestore = null;
+      if (hasBgTrack) {
+        const avCfgPath = path.join(targetDir, '.agentvibes', 'config.json');
+        try {
+          const raw = fs.readFileSync(avCfgPath, 'utf8');
+          const cfg = JSON.parse(raw);
+          if (cfg.backgroundMusic && !cfg.backgroundMusic.enabled) {
+            cfg.backgroundMusic.enabled = true;
+            fs.writeFileSync(avCfgPath, JSON.stringify(cfg, null, 2) + '\n');
+            _bgRestore = () => { cfg.backgroundMusic.enabled = false; fs.writeFileSync(avCfgPath, JSON.stringify(cfg, null, 2) + '\n'); };
+          }
+        } catch {
+          // No .agentvibes/config.json — use legacy txt fallback
+          const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
+          let bgWas = false;
+          try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
+          if (!bgWas) {
+            try { fs.writeFileSync(bgEnabledFile, 'true', 'utf8'); } catch {}
+            _bgRestore = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
+          }
+        }
+      }
+
+      const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
+      const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      // Don't include pretext — play-tts already prepends it from the config
+      const sampleText = 'This is how your audio settings sound right now.';
+
+      let cmd, args;
+      if (isWin) {
+        const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.ps1');
+        cmd = 'powershell';
+        args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
+      } else {
+        const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.sh');
+        cmd = 'bash';
+        args = [script, sampleText, '', '--llm', llmKey];
+      }
+
+      const proc = spawn(cmd, args, {
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+      });
+      _previewModalProc = proc;
+
+      const _restoreBg = () => { if (_bgRestore) _bgRestore(); };
+
+      proc.on('exit', () => {
+        _previewModalProc = null;
+        _restoreBg();
+        if (!_closed) { previewLine.setContent(''); screen.render(); }
+      });
+      proc.on('error', () => {
+        _previewModalProc = null;
+        _restoreBg();
+        if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
+      });
+    }
+
+    // Auto-save: persist draft to config immediately on any change
+    function _autoSave(silent) {
+      // Infer engine from voice — voice picker only shows Piper voices,
+      // so if a voice is set but no engine chosen, default to piper
+      const engine = draft.ttsEngine || (draft.voice ? 'piper' : '');
+      saveLlmConfigSync(llmKey, {
+        voice: draft.voice,
+        pretext: draft.pretext,
+        effects: draft.reverbPreset === 'off' ? '' : draft.reverbPreset,
+        bgTrack: draft.bgTrack,
+        bgVolume: draft.bgVolume,
+        ttsEngine: engine,
+        sourcePath: config.sourcePath,
+      }, targetDir);
+      if (!silent) {
+        const cfgPath = config.sourcePath || resolveCfgPath(targetDir);
+        _showSavedToast('Settings', cfgPath);
+      }
+    }
+
+    const previewBtn = _modalBtn('Preview', 4, _playPreview);
+
+    const resetBtn = _modalBtn('Reset', 18, () => {
+      draft.ttsEngine = '';
+      draft.voice = '';
+      draft.pretext = defaultPretext[llmKey] || '';
+      draft.reverbPreset = 'off';
+      draft.bgTrack = '';
+      draft.bgVolume = '0.15';
+      _autoSave();
+      fieldList.setItems(_fieldItems());
+      fieldList.focus();
+      screen.render();
+    });
+
+    const closeBtn = _modalBtn('Close', 30, _closeModal);
+
+    const allBtns = [previewBtn, resetBtn, closeBtn];
+    const btnBlink = attachBtnBlink(allBtns, screen);
+
+    function _closeModal() {
+      if (_closed) return;
+      _closed = true;
+      _killPreview();
+      btnBlink.cleanup();
+      navigationService?.closeModal();
+      destroyList(modal, screen);
+      if (providerFocusableItems.length) providerFocusableItems[providerFocusIndex]?.focus();
+      screen.render();
+    }
+
+    // Field editing via Enter
+    fieldList.key(['enter'], () => {
+      const idx = fieldList.selected;
+      const field = FIELDS[idx];
+      if (!field) return;
+
+      const _refreshField = () => {
+        _autoSave();
+        fieldList.setItems(_fieldItems());
+        fieldList.select(idx);
+        fieldList.focus();
+        screen.render();
+      };
+      const _cancelField = () => {
+        fieldList.focus();
+        screen.render();
+      };
+
+      switch (field.key) {
+        case 'ttsEngine':
+          _openTtsEnginePicker(draft, _refreshField);
+          break;
+
+        case 'voice':
+          _openVoicePickerForLlm(draft, _refreshField);
+          break;
+
+        case 'pretext':
+          _openPretextEditor(modal, draft, _refreshField);
+          break;
+
+        case 'reverb':
+          openReverbPicker(screen, draft.reverbPreset, (val) => {
+            draft.reverbPreset = val;
+            _refreshField();
+          }, _cancelField, { applyToEffectsManager: false });
+          break;
+
+        case 'bgTrack':
+          openTrackPicker(screen, draft.bgTrack, Math.round(parseFloat(draft.bgVolume) * 100), (track) => {
+            draft.bgTrack = track;
+            _refreshField();
+          }, _cancelField, { skipVolume: true });
+          break;
+
+        case 'bgVolume':
+          openVolumeInput(screen, Math.round(parseFloat(draft.bgVolume) * 100), (volume) => {
+            draft.bgVolume = (volume / 100).toFixed(2);
+            _refreshField();
+          }, _cancelField);
+          break;
+      }
+    });
+
+    fieldList.key(['escape'], _closeModal);
+
+    // Remove selection highlight when field list loses focus
+    fieldList.on('blur', () => {
+      fieldList.style.selected = { bg: COLORS.contentBg, fg: COLORS.labelFg };
+      fieldList.setItems(_fieldItems());
+      screen.render();
+    });
+    fieldList.on('focus', () => {
+      fieldList.style.selected = { bg: 'blue', fg: 'yellow' };
+      fieldList.setItems(_fieldItems());
+      screen.render();
+    });
+
+    // Wrap: down on last field → focus Save; up on first field → focus Save
+    // One extra arrow press at boundary moves to button row.
+    // Track previous selection so arriving at boundary doesn't immediately jump.
+    let _prevFieldSel = 0;
+    fieldList.key(['down'], () => {
+      const cur = fieldList.selected ?? 0;
+      if (cur === FIELDS.length - 1 && _prevFieldSel === FIELDS.length - 1) {
+        allBtns[0].focus(); screen.render();
+      }
+      _prevFieldSel = cur;
+    });
+    fieldList.key(['up'], () => {
+      const cur = fieldList.selected ?? 0;
+      if (cur === 0 && _prevFieldSel === 0) {
+        allBtns[0].focus(); screen.render();
+      }
+      _prevFieldSel = cur;
+    });
+    fieldList.key(['tab'], () => {
+      allBtns[0].focus();
+      screen.render();
+    });
+
+    for (let i = 0; i < allBtns.length; i++) {
+      allBtns[i].key(['tab', 'right'], () => {
+        allBtns[(i + 1) % allBtns.length].focus();
+        screen.render();
+      });
+      allBtns[i].key(['S-tab', 'left'], () => {
+        allBtns[(i - 1 + allBtns.length) % allBtns.length].focus();
+        screen.render();
+      });
+      allBtns[i].key(['escape'], _closeModal);
+      allBtns[i].key(['up'], () => {
+        fieldList.focus();
+        screen.render();
+      });
+    }
+
+    modal.key(['escape'], _closeModal);
+    fieldList.focus();
+    screen.render();
+  }
+
+  // ── TTS Engine picker (for config modal) ──────────────────────────────────
+
+  function _openTtsEnginePicker(draft, onDone) {
+    navigationService?.openModal();
+
+    const engines = getEngineStatuses();
+    const items = engines.map(e => {
+      const status = e.installed ? '{green-fg}[OK]{/green-fg}' : '{yellow-fg}[Not Found]{/yellow-fg}';
+      return `  ${e.name.padEnd(20)} ${status}  ${e.desc}`;
+    });
+    // Add "(global default)" option at top
+    items.unshift('  (global default)');
+
+    const picker = blessed.list({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 70,
+      height: Math.min(items.length + 4, 16),
+      border: { type: 'line' },
+      tags: true,
+      label: ' {bold}{cyan-fg} Select TTS Engine {/cyan-fg}{/bold} ',
+      keys: true,
+      vi: false,
+      mouse: true,
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'yellow' },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+    picker.setFront();
+    picker.setItems(items);
+
+    picker.key(['enter'], () => {
+      const idx = picker.selected;
+      if (idx === 0) {
+        draft.ttsEngine = '';
+      } else {
+        draft.ttsEngine = engines[idx - 1].id;
+      }
+      navigationService?.closeModal();
+      destroyList(picker, screen);
+      onDone();
+    });
+
+    picker.key(['escape'], () => {
+      navigationService?.closeModal();
+      destroyList(picker, screen);
+      onDone();
+    });
+
+    picker.focus();
+    screen.render();
+  }
+
+  // ── Voice picker for LLM config (matches agents-tab pattern) ──────────────
+
+  function _secureTempWav(prefix) {
+    const baseDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
+    const dir = path.join(baseDir, `agentvibes-${process.getuid?.() ?? 'u'}`);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(dir, 0o700); } catch {}
+    return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
+  }
+
+  function _openVoicePickerForLlm(draft, onDone) {
+    navigationService?.openModal();
+
+    let _allVoices = [];
+    let _previewProc = null;
+    let _previewVoiceId = null;
+    let _vpClosed = false;
+
+    const _spawnEnv = buildAudioEnv();
+    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
+    function _killVP() {
+      if (_previewProc) {
+        try {
+          if (_isWin) { _previewProc.kill(); } else { process.kill(-_previewProc.pid, 'SIGTERM'); }
+        } catch {}
+        _previewProc = null;
+      }
+      _previewVoiceId = null;
+    }
+
+    function _closeVP() {
+      if (_vpClosed) return;
+      _vpClosed = true;
+      _killVP();
+      navigationService?.closeModal();
+      destroyList(vpModal, screen, onDone);
+    }
+
+    const vpModal = blessed.box({
+      parent: screen,
+      top: '6%',
+      left: '3%',
+      width: '94%',
+      height: '88%',
+      border: { type: 'line' },
+      tags: true,
+      label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    vpModal.setFront();
+
+    // Column header
+    const COL_N = 30;
+    const COL_G = 4;
+    blessed.text({
+      parent: vpModal, top: 1, left: 6, tags: true,
+      content: `{cyan-fg}${'Name'.padEnd(COL_N)}{/cyan-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {cyan-fg}Provider{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const vpList = blessed.list({
+      parent: vpModal, top: 2, left: 2, right: 2, bottom: 5,
+      keys: true, vi: true, mouse: true,
+      border: { type: 'line' },
+      scrollbar: { ch: '|', style: { fg: 'cyan' } },
+      tags: true,
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'blue' },
+        selected: { bg: 'green', fg: 'white', bold: true },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+
+    const vpPreviewLine = blessed.text({
+      parent: vpModal, bottom: 3, left: 2, right: 2, tags: true,
+      content: '', style: { fg: 'cyan', bg: COLORS.contentBg },
+    });
+
+    blessed.text({
+      parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
+      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump  [Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    function _buildVoiceItems(voices) {
+      const favs = getFavorites(configService);
+      const td = getThumbsDown(configService);
+      return voices.map(v => {
+        const isActive = v === draft.voice;
+        const isPrev = v === _previewVoiceId;
+        const isUp = favs.includes(v);
+        const isDown = td.includes(v);
+        const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
+        const star = isUp ? '{green-fg}👍{/green-fg}' : (isDown ? '{red-fg}👎{/red-fg}' : '  ');
+        const meta = getVoiceMeta(v);
+        const name = meta.displayName.length > COL_N
+          ? meta.displayName.slice(0, COL_N - 1) + '…'
+          : meta.displayName.padEnd(COL_N);
+        // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
+        return ` ${dot}${star} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
+      });
+    }
+
+    function _refreshVP() {
+      if (_vpClosed) return;
+      const savedIdx = vpList.selected ?? 0;
+      const savedScroll = vpList.childBase ?? 0;
+      _allVoices = scanInstalledVoices();
+      // Sort by display name so the first-letter quick jump is intuitive
+      _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
+        getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
+      const items = _buildVoiceItems(_allVoices);
+      vpList.setItems(items.length > 0 ? items : [' (no voices found)']);
+      vpList.select(Math.min(savedIdx, items.length - 1));
+      vpList.childBase = Math.min(savedScroll, Math.max(0, items.length - (vpList.height - 2)));
+      screen.render();
+    }
+
+    function _previewVoice(voiceId) {
+      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
+      _killVP();
+
+      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+
+      // Route through remote provider if active
+      // Search order: CLAUDE_PROJECT_DIR → cwd → package root → home
+      const _remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
+      let _activeProvider = '';
+      try {
+        const _pkgRoot = path.resolve(__dirname, '..', '..');
+        const _provPaths = [
+          process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
+          path.join(process.cwd(), '.claude', 'tts-provider.txt'),
+          path.join(_pkgRoot, '.claude', 'tts-provider.txt'),
+          path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+        ].filter(Boolean);
+        for (const p of _provPaths) {
+          if (fs.existsSync(p)) { _activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
+        }
+      } catch {}
+
+      if (_remoteProviders.includes(_activeProvider)) {
+        const _hooksBase = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+        let rProc;
+        if (_isWin) {
+          const _playTts = path.join(_hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
+          rProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _playTts, phrase, voiceId], {
+            stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
+          });
+        } else {
+          const _playTts = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
+          rProc = spawn('bash', [_playTts, phrase, voiceId], {
+            stdio: 'ignore', detached: true, env: _spawnEnv,
+          });
+        }
+        _previewProc = rProc;
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing (remote): ${voiceId}{/cyan-fg}`); screen.render(); }
+        rProc.on('exit', () => {
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+        });
+        rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        return;
+      }
+
+      const _ms = parseMultiSpeaker(voiceId);
+      const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
+      const safeBase = path.resolve(PIPER_VOICES_DIR);
+      if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
+
+      const tempWav = _secureTempWav('vp');
+
+      let _piperBin = 'piper';
+      if (_isWin) {
+        const _lad = process.env.LOCALAPPDATA ||
+          (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+        if (_lad) {
+          const _ep = path.join(_lad, 'Programs', 'Piper', 'piper.exe');
+          if (fs.existsSync(_ep)) _piperBin = _ep;
+        }
+      }
+
+      const args = ['--model', voicePath, '--output_file', tempWav];
+      if (_ms.speakerId != null) args.push('--speaker', String(_ms.speakerId));
+      const piper = spawn(_piperBin, args, {
+        stdio: ['pipe', 'ignore', 'ignore'],
+        detached: !_isWin,
+        windowsHide: true,
+        env: _spawnEnv,
+      });
+      piper.stdin.write(phrase + '\n');
+      piper.stdin.end();
+      _previewProc = piper;
+      _previewVoiceId = voiceId;
+
+      if (!_vpClosed) {
+        vpPreviewLine.setContent(`{cyan-fg}♪ Synthesizing: ${voiceId}...{/cyan-fg}`);
+        _refreshVP();
+      }
+
+      piper.on('exit', (code) => {
+        if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
+        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
+        const wp = detectWavPlayer(_spawnEnv);
+        if (!wp) return;
+        const pp = spawn(wp.bin, wp.args(tempWav), {
+          stdio: 'ignore',
+          detached: !_isWin,
+          windowsHide: true,
+          env: _spawnEnv,
+        });
+        _previewProc = pp;
+        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
+        pp.on('exit', () => {
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+          try { fs.unlinkSync(tempWav); } catch {}
+        });
+      });
+      piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+    }
+
+    vpList.key(['enter'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) { draft.voice = sel; _closeVP(); }
+    });
+    vpList.key(['space'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) _previewVoice(sel);
+    });
+    vpList.key(['*', '+'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) { toggleThumbsUp(configService, sel); _refreshVP(); }
+    });
+    vpList.key(['-'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) { toggleThumbsDown(configService, sel); _refreshVP(); }
+    });
+    vpList.key(['escape', 'q'], _closeVP);
+
+    // PageUp / PageDown / Home / End navigation
+    const _pageSize = () => Math.max(1, (vpList.height ?? 10) - 2);
+    vpList.key(['pageup'],   () => { vpList.up(_pageSize());   screen.render(); });
+    vpList.key(['pagedown'], () => { vpList.down(_pageSize()); screen.render(); });
+    vpList.key(['home'],     () => { vpList.select(0); screen.render(); });
+    vpList.key(['end'],      () => { vpList.select(Math.max(0, _allVoices.length - 1)); screen.render(); });
+
+    // First-letter quick jump: typing 'a' jumps to the first voice starting
+    // with A. Block keys reserved by the list widget (vi nav, cancel) so
+    // they don't get swallowed: q (cancel), j/k/g/h/l (vi navigation).
+    const _vpJumpBlocked = new Set(['j', 'k', 'g', 'h', 'l', 'q']);
+    vpList.on('keypress', (ch, key) => {
+      if (!ch || key?.ctrl || key?.meta) return;
+      if (!/^[a-zA-Z]$/.test(ch)) return;
+      const target = ch.toLowerCase();
+      if (_vpJumpBlocked.has(target)) return;
+      const idx = _allVoices.findIndex(v => {
+        const name = getVoiceMeta(v).displayName.toLowerCase();
+        return name.startsWith(target);
+      });
+      if (idx >= 0) { vpList.select(idx); screen.render(); }
+    });
+
+    _refreshVP();
+    const activeIdx = _allVoices.indexOf(draft.voice);
+    if (activeIdx >= 0) vpList.select(activeIdx);
+    vpList.focus();
+    screen.render();
+  }
+
+  // ── Pretext editor ────────────────────────────────────────────────────────
+
+  function _openPretextEditor(parentModal, draft, onDone) {
+    const editModal = blessed.box({
+      parent: screen, top: 'center', left: 'center',
+      width: 60, height: 8,
+      border: { type: 'line' },
+      tags: true,
+      label: ' {bold}{cyan-fg} Edit Pretext {/cyan-fg}{/bold} ',
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    editModal.setFront();
+
+    blessed.text({
+      parent: editModal, top: 1, left: 2, tags: true,
+      content: '{white-fg}Spoken before every TTS message (max 200 chars):{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    const inputBox = blessed.textbox({
+      parent: editModal, top: 3, left: 2, right: 2, height: 3,
+      border: { type: 'line' },
+      inputOnFocus: true,
+      value: draft.pretext,
+      style: {
+        fg: 'white', bg: 'black',
+        border: { fg: 'blue' },
+        focus: { border: { fg: 'cyan' } },
+      },
+    });
+
+    function _closeEdit(save) {
+      if (save) {
+        const val = (inputBox.getValue() || '').trim().slice(0, 200);
+        draft.pretext = val;
+      }
+      destroyList(editModal, screen);
+      onDone();
+    }
+
+    inputBox.key(['enter'], () => _closeEdit(true));
+    inputBox.key(['escape'], () => _closeEdit(false));
+
+    inputBox.focus();
+    inputBox.readInput(() => {});
+    screen.render();
+  }
+
+  // ── Saved toast ───────────────────────────────────────────────────────────
+
+  function _showSavedToast(name, filePath) {
+    const lines = [`{center}{green-fg}{bold}${name} saved!{/bold}{/green-fg}{/center}`];
+    if (filePath) lines.push(`{center}{white-fg}${filePath}{/white-fg}{/center}`);
+    const w = filePath ? Math.min(Math.max(filePath.length + 6, 30), 70) : 30;
+    const toast = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: w,
+      height: filePath ? 4 : 3,
+      border: { type: 'line' },
+      tags: true,
+      content: lines.join('\n'),
+      style: { bg: COLORS.contentBg, border: { fg: 'green' } },
+    });
+    toast.setFront();
+    screen.render();
+    setTimeout(() => {
+      toast.destroy();
+      screen.render();
+    }, 1500);
+  }
+
+  // ── Provider info panels ──────────────────────────────────────────────────
+
+  function hideAllProviderRows() {
+    providerHeader.hide();
+    for (const row of providerRows) {
+      row.label.hide();
+      row.statusText.hide();
+      row.installBtn.hide();
+      row.removeBtn.hide();
+      row.configBtn.hide();
+    }
+  }
+
+  function showAllProviderRows() {
+    providerHeader.show();
+    for (const row of providerRows) {
+      const provider = PROVIDERS.find(p => p.id === row.id);
+      row.label.show();
+      row.statusText.show();
+      // The "default" provider has no install/remove semantics — keep its
+      // install/remove buttons hidden so only Configure shows.
+      if (provider?.isDefault) {
+        row.installBtn.hide();
+        row.removeBtn.hide();
+      } else {
+        row.installBtn.show();
+        row.removeBtn.show();
+      }
+      row.configBtn.show();
+    }
+  }
+
+  function showClaudeCodeInfo(result = null, wasInstalled = false) {
+    providerView = 'info';
+    hideAllProviderRows();
+    contentBox.hide();
+
+    const hooksDir = path.join(targetDir, '.claude', process.platform === 'win32' ? 'hooks-windows' : 'hooks');
+    const installed = installedState['claude-code'];
+    const verb = wasInstalled ? 'reinstalled' : 'installed';
+
+    const lines = [];
+    lines.push('{bold}{cyan-fg}Claude Code -- AgentVibes Integration{/cyan-fg}{/bold}');
+    lines.push('');
+
+    if (result) {
+      if (result.success) {
+        lines.push(`{green-fg}AgentVibes for Claude Code ${verb}!{/green-fg}`);
+        if (result.mcpError) {
+          lines.push(`{yellow-fg}Warning:{/yellow-fg} ${result.mcpError}`);
+        }
+      } else {
+        lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+      }
+    } else {
+      lines.push(installed
+        ? '{green-fg}Installed{/green-fg}'
+        : '{yellow-fg}Not installed{/yellow-fg}');
+    }
+
+    lines.push('');
+    lines.push(`{bold}{cyan-fg}What ${result ? `got ${verb}` : 'gets installed'}:{/cyan-fg}{/bold}`);
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.mcp.json{/bold} (MCP server — natural language voice control)');
+    lines.push('');
+    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.claude/hooks/{/bold} (session-start + pre-tool hooks)');
+    lines.push(`     Location: ${hooksDir}`);
+    lines.push('');
+    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}.claude/commands/{/bold} (slash commands)');
+    lines.push('');
+    lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.claude/config/{/bold} (personality, verbosity, voice settings)');
+    lines.push('');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+
+    infoBox.setContent(lines.join('\n'));
+    infoBox.show();
+    infoBox.setFront();
+    infoBox.focus();
+    infoBox.scrollTo(0);
+    screen.render();
+  }
+
+  function showCopilotInfo(result, wasInstalled = false) {
+    providerView = 'info';
+    hideAllProviderRows();
+    contentBox.hide();
+
+    const verb = wasInstalled ? 'reinstalled' : 'installed';
+
+    const lines = [];
+    lines.push('{bold}{cyan-fg}GitHub Copilot -- AgentVibes Integration{/cyan-fg}{/bold}');
+    lines.push('');
+    if (result.success) {
+      lines.push(`{green-fg}AgentVibes for Copilot ${verb}!{/green-fg}`);
+      if (result.mcpError) {
+        lines.push(`{yellow-fg}MCP config failed:{/yellow-fg} ${result.mcpError}`);
+      }
+    } else {
+      lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    }
+    lines.push('');
+    lines.push(`{bold}{cyan-fg}What got ${verb}:{/cyan-fg}{/bold}`);
+    lines.push('');
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.vscode/mcp.json{/bold}');
+    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.github/copilot-instructions.md{/bold}');
+    lines.push('');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+
+    infoBox.setContent(lines.join('\n'));
+    infoBox.show();
+    infoBox.setFront();
+    infoBox.focus();
+    infoBox.scrollTo(0);
+    screen.render();
+  }
+
+  function showCodexInfo(result, wasInstalled = false) {
+    providerView = 'info';
+    hideAllProviderRows();
+    contentBox.hide();
+
+    const verb = wasInstalled ? 'reinstalled' : 'installed';
+
+    const lines = [];
+    lines.push('{bold}{cyan-fg}OpenAI Codex -- AgentVibes Integration{/cyan-fg}{/bold}');
+    lines.push('');
+    if (result.success) {
+      lines.push(`{green-fg}AgentVibes for Codex ${verb}!{/green-fg}`);
+      if (result.mcpError) {
+        lines.push(`{yellow-fg}MCP config failed:{/yellow-fg} ${result.mcpError}`);
+      }
+    } else {
+      lines.push(`{red-fg}Installation failed:{/red-fg} ${result.error || 'Unknown error'}`);
+    }
+    lines.push('');
+    lines.push(`{bold}{cyan-fg}What got ${verb}:{/cyan-fg}{/bold}`);
+    lines.push('');
+    lines.push('  {yellow-fg}1.{/yellow-fg} {bold}.codex/config.toml{/bold}');
+    lines.push('  {yellow-fg}2.{/yellow-fg} {bold}.vscode/mcp.json{/bold}');
+    lines.push('  {yellow-fg}3.{/yellow-fg} {bold}AGENTS.md{/bold}');
+    lines.push('  {yellow-fg}4.{/yellow-fg} {bold}.codex/hooks/{/bold}');
+    lines.push('');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+
+    infoBox.setContent(lines.join('\n'));
+    infoBox.show();
+    infoBox.setFront();
+    infoBox.focus();
+    infoBox.scrollTo(0);
+    screen.render();
+  }
+
+  function showRemoveInfo(providerId, removedItems) {
+    providerView = 'info';
+    hideAllProviderRows();
+    contentBox.hide();
+
+    const lines = [];
+    if (providerId === 'claude-code') {
+      lines.push('{bold}{cyan-fg}Claude Code -- Uninstalled{/cyan-fg}{/bold}');
+      lines.push('');
+      lines.push('{green-fg}AgentVibes fully removed from this project!{/green-fg}');
+      lines.push('');
+      if (removedItems && removedItems.length > 0) {
+        lines.push('{bold}{cyan-fg}Removed:{/cyan-fg}{/bold}');
+        for (const item of removedItems) {
+          lines.push(`  {yellow-fg}•{/yellow-fg} ${item}`);
+        }
+        lines.push('');
+      }
+      lines.push('{white-fg}Re-install anytime with the Install button.{/white-fg}');
+    } else if (providerId === 'github-copilot') {
+      lines.push('{bold}{cyan-fg}GitHub Copilot -- Removed{/cyan-fg}{/bold}');
+      lines.push('');
+      lines.push('{green-fg}Successfully removed!{/green-fg}');
+    } else if (providerId === 'openai-codex') {
+      lines.push('{bold}{cyan-fg}OpenAI Codex -- Removed{/cyan-fg}{/bold}');
+      lines.push('');
+      lines.push('{green-fg}Successfully removed!{/green-fg}');
+    }
+    lines.push('');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+
+    infoBox.setContent(lines.join('\n'));
+    infoBox.show();
+    infoBox.setFront();
+    infoBox.focus();
+    infoBox.scrollTo(0);
+    screen.render();
+  }
+
+  function showProviderListView(targetIdx = 0) {
+    providerView = 'list';
+    infoBox.hide();
+    contentBox.hide();
+    showAllProviderRows();
+    const max = providerFocusableItems.length;
+    if (max > 0) {
+      providerFocusIndex = ((targetIdx % max) + max) % max;
+      providerFocusableItems[providerFocusIndex].focus();
+    }
+    screen.render();
+  }
+
+  infoBox.key(['escape', 'enter'], () => {
+    // After dismissing the install/remove info page, advance focus to the
+    // NEXT provider row but keep the same column (Install/Remove/Configure).
+    // Each row has 3 focusable slots, so +3 moves one full row down.
+    //
+    // Special case: when leaving the LAST installable provider (Codex) from
+    // Install or Remove column, skip the Default row (it has no Install or
+    // Remove) and wrap to the FIRST Configure button (Claude Code Configure).
+    // This lets the user cleanly walk all three installs, then all three
+    // Configures, ending on Default Configure.
+    const max = providerFocusableItems.length;
+    if (max === 0) { showProviderListView(0); return; }
+    const col = _preInfoFocusIndex % 3;   // 0=Install, 1=Remove, 2=Configure
+    const row = Math.floor(_preInfoFocusIndex / 3);
+    const nextRow = PROVIDERS[row + 1];
+    const nextRowIsDefault = nextRow && nextRow.isDefault;
+    let nextIdx;
+    if (col < 2 && nextRowIsDefault) {
+      // Last Install/Remove → jump to the FIRST non-default provider's
+      // Configure column (dynamic: don't hardcode PROVIDERS[0]).
+      const firstInstallableIdx = PROVIDERS.findIndex(p => !p.isDefault);
+      nextIdx = firstInstallableIdx >= 0 ? firstInstallableIdx * 3 + 2 : (_preInfoFocusIndex + 3) % max;
+    } else {
+      nextIdx = (_preInfoFocusIndex + 3) % max;
+    }
+    showProviderListView(nextIdx);
+  });
+
+  // Captured by handleProviderInstall/Remove right before showing info.
+  // Defaults to 0 so the first-time flow still lands on Claude Code Install.
+  let _preInfoFocusIndex = 0;
+
+  async function refreshInstalledState() {
+    for (const p of PROVIDERS) {
+      // The "default" provider is config-only — always treat as available.
+      if (p.isDefault) {
+        installedState[p.id] = true;
+        continue;
+      }
+      const checkFn = p.id === 'claude-code' ? checkClaudeInstalled
+        : p.id === 'github-copilot' ? checkCopilotInstalled
+        : checkCodexInstalled;
+      installedState[p.id] = await checkFn(targetDir);
+    }
+    for (const row of providerRows) {
+      const provider = PROVIDERS.find(p => p.id === row.id);
+      // The default provider has no install state to display — show its
+      // config-only nature instead.
+      if (provider?.isDefault) {
+        row.statusText.setContent('{cyan-fg}[Config Only]{/cyan-fg}');
+        continue;
+      }
+      const installed = installedState[row.id];
+      row.statusText.setContent(
+        installed
+          ? '{green-fg}[Installed]{/green-fg}'
+          : '{yellow-fg}[Not Installed]{/yellow-fg}'
+      );
+      row.installBtn.setContent(installed ? ' Re-install ' : '  Install   ');
+    }
+  }
+
+  // =========================================================================
+  // Screen renderers
+  // =========================================================================
+
+  const _HDR = (emoji, label) =>
+    `{${COLORS.sectionHdr}-fg}${emoji}  ${label} ${'--'.repeat(50)}{/${COLORS.sectionHdr}-fg}`;
+
+  function _renderScreen0() {
+    const lines = [
+      _HDR('', 'Language / Idioma / Langue / Sprache'),
+      '',
+      '  Select your language:',
+      '',
+      ...SUPPORTED_LANGUAGES.map((l, i) =>
+        i === _langIdx
+          ? `  {green-fg}> ${l.name}{/green-fg}`
+          : `    ${l.name}`
+      ),
+    ];
+    contentBox.setContent(_c(lines));
+    hintLine.setContent('  Screen 0: Language  |  [Up/Down] Select  |  [Enter] Apply & Continue  |  [->] Skip (English)');
+    screen.render();
+  }
+
+  async function _renderScreen1() {
+    const frames = ['|','/','-','\\'];
+    let frameIdx = 0;
+    _checking = true;
+    _s1ContinueBtn.hide();
+
+    contentBox.setContent(_c([
+      _HDR('', t(_getLang(), 'dependencyCheck')),
+      '',
+      `  {white-fg}${frames[0]}  ${t(_getLang(), 'checkingDependencies')}{/white-fg}`,
+    ]));
+    hintLine.setContent(`  ${t(_getLang(), 'screen2Hint')}`);
+    screen.render();
+
+    const spinInterval = setInterval(() => {
+      frameIdx = (frameIdx + 1) % frames.length;
+      contentBox.setContent(_c([
+        _HDR('', t(_getLang(), 'dependencyCheck')),
+        '',
+        `  {white-fg}${frames[frameIdx]}  ${t(_getLang(), 'checkingDependencies')}{/white-fg}`,
+      ]));
+      screen.render();
+    }, 100);
+
+    try {
+      _deps = await _checkDependenciesAsync();
+    } finally {
+      clearInterval(spinInterval);
+      _checking = false;
+    }
+
+    const ok  = () => `{green-fg}OK  ${t(_getLang(), 'installed')}{/green-fg}`;
+    const bad = () => `{red-fg}X  ${t(_getLang(), 'notFound')}{/red-fg}`;
+
+    const ttsOk = _deps.piper || _deps.soprano;
+    contentBox.setContent(_c([
+      _HDR('', t(_getLang(), 'dependencyCheck')),
+      '',
+      `  {white-fg}${'Dependency'.padEnd(14)}${'Status'}{/white-fg}`,
+      `  {white-fg}${'---'.repeat(26)}{/white-fg}`,
+      `  {white-fg}${'Node.js'.padEnd(14)}{/white-fg}${_deps.node    ? ok() : bad()}`,
+      `  {white-fg}${'npm'.padEnd(14)}{/white-fg}${_deps.npm     ? ok() : bad()}`,
+      `  {white-fg}${'Piper TTS'.padEnd(14)}{/white-fg}${_deps.piper   ? ok() : bad()}`,
+      `  {white-fg}${'Soprano TTS'.padEnd(14)}{/white-fg}${_deps.soprano ? ok() : bad()}`,
+      `  {white-fg}${'ffmpeg'.padEnd(14)}{/white-fg}${_deps.ffmpeg  ? ok() : `{red-fg}!  ${t(_getLang(), 'ffmpegMissing')}{/red-fg}`}`,
+      '',
+      ttsOk
+        ? `  {green-fg}OK  ${t(_getLang(), 'ttsDetected')}{/green-fg}`
+        : `  {red-fg}!  ${t(_getLang(), 'noTtsFound')}{/red-fg}`,
+      '',
+      '',
+    ]));
+    if (ttsOk) {
+      _s1ContinueBtn.setContent(_tl('continueArrowBtn'));
+      _s1ContinueBtn.show();
+      _s1ContinueBtn.focus();
+    }
+    screen.render();
+  }
+
+  function _renderScreen2() {
+    const lines = [
+      _HDR('', 'TTS Engine Selection'),
+      '',
+      '  {white-fg}Select which TTS engines to use with AgentVibes:{/white-fg}',
+    ];
+
+    contentBox.setContent(_c(lines));
+
+    _showTtsEngineRows();
+
+    // Position continue button below engine rows
+    const btnY = 5 + (_ttsEngines.length * 3) + 1;
+    _s2ContinueBtn.top = btnY;
+    _s2ContinueBtn.left = 4;
+    _s2ContinueBtn.show();
+
+    hintLine.setContent('  Screen 2: TTS Engines  |  [Tab] Install  |  [Enter/->] Continue  |  [Esc/<-] Back');
+
+    // Focus first visible install button or continue button
+    const visibleBtns = _ttsFocusableItems.filter(b => !b.hidden);
+    if (visibleBtns.length) {
+      _ttsFocusIndex = 0;
+      visibleBtns[0].focus();
+    } else {
+      _s2ContinueBtn.focus();
+    }
+    screen.render();
+  }
+
+  function _renderScreen3() {
+    // Mark setup as completed — write to targetDir in case configService
+    // has a different projectRoot (e.g. npm link resolves differently).
+    // Each step is wrapped individually so a partial failure (e.g. corrupt
+    // local config file) does not block the others — and errors are logged
+    // to stderr so the user can see why setup keeps re-running.
+    try { configService.set('setupCompleted', true); }
+    catch (e) { console.error('setupCompleted (project): ' + e.message); }
+    try { configService.setGlobal?.('setupCompleted', true); }
+    catch (e) { console.error('setupCompleted (global): ' + e.message); }
+
+    try {
+      const localCfgDir = path.join(targetDir, '.agentvibes');
+      const localCfgPath = path.join(localCfgDir, 'config.json');
+      if (!fs.existsSync(localCfgPath)) {
+        fs.mkdirSync(localCfgDir, { recursive: true });
+        fs.writeFileSync(localCfgPath, JSON.stringify({ setupCompleted: true }, null, 2));
+      } else {
+        let existing = {};
+        try {
+          existing = JSON.parse(fs.readFileSync(localCfgPath, 'utf8'));
+        } catch (e) {
+          // Corrupt JSON — back up the old file and start fresh so the user
+          // doesn't get stuck in an endless setup loop.
+          console.error(`setupCompleted: ${localCfgPath} is corrupt (${e.message}); rewriting`);
+          try { fs.renameSync(localCfgPath, localCfgPath + '.bak'); } catch {}
+          existing = {};
+        }
+        if (!existing.setupCompleted) {
+          existing.setupCompleted = true;
+          fs.writeFileSync(localCfgPath, JSON.stringify(existing, null, 2));
+        }
+      }
+    } catch (e) {
+      console.error('setupCompleted (local file): ' + e.message);
+    }
+
+    // Show provider rows instead of contentBox
+    contentBox.hide();
+    hintLine.setContent('  Screen 3: LLM Providers  |  [Enter] Action  |  [Tab] Next button  |  [Esc] Tab bar');
+    showAllProviderRows();
+    refreshInstalledState().then(() => {
+      if (providerFocusableItems.length) {
+        providerFocusIndex = 0;
+        providerFocusableItems[0].focus();
+      }
+      screen.render();
+    });
+  }
+
+  function _showCurrentScreen() {
+    // Hide Screen 1 continue button on other screens
+    if (_screen !== 1) _s1ContinueBtn.hide();
+
+    // Hide Screen 2 TTS engine rows on other screens
+    if (_screen !== 2) {
+      _hideTtsEngineRows();
+      _s2ContinueBtn.hide();
+    }
+
+    // Hide provider rows on non-provider screens
+    if (_screen !== 3) {
+      hideAllProviderRows();
+      infoBox.hide();
+      providerView = 'list';
+    }
+
+    // Show contentBox on screens 0-2
+    if (_screen <= 2) {
+      contentBox.show();
+    }
+
+    if (_screen !== _lastScreen) {
+      // Nuclear clear
+      try {
+        for (let r = 0; r < screen.height; r++) {
+          const orow = screen.olines?.[r];
+          if (!orow) continue;
+          for (let c = 0; c < screen.width; c++) {
+            if (orow[c]) orow[c][0] = -1;
+          }
+        }
+        if (screen.lines?.[2]) screen.lines[2].dirty = true;
+      } catch {}
+
+      const _clearLine = ' '.repeat(150);
+      const _clearPage = Array(25).fill(_clearLine).join('\n');
+      contentBox.setContent(_clearPage);
+      hintLine.setContent(_clearLine);
+      screen.render();
+
+      const targetScreen = _screen;
+      _lastScreen = _screen;
+      setTimeout(() => {
+        if (_screen !== targetScreen) return;
+        switch (_screen) {
+          case -1: _renderScreenGlobal(); break;
+          case 0: _renderScreen0(); break;
+          case 1: _renderScreen1(); break;
+          case 2: _renderScreen2(); break;
+          case 3: _renderScreen3(); break;
+        }
+      }, 50);
+      return;
+    }
+    switch (_screen) {
+      case -1: _renderScreenGlobal(); break;
+      case 0: _renderScreen0(); break;
+      case 1: _renderScreen1(); break;
+      case 2: _renderScreen2(); break;
+      case 3: _renderScreen3(); break;
+    }
+  }
+
+  // =========================================================================
+  // Navigation (key handlers)
+  // =========================================================================
+
+  screen.key(['enter'], () => {
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      // Global config choice screen
+      if (_globalChoiceIdx === 0) {
+        try { configService.saveAllToLocal(_pendingGlobalCfg); } catch {}
+        _screen = 3;
+      } else {
+        _screen = 0;
+        _langIdx = 0;
+      }
+      _pendingGlobalCfg = null;
+      _showCurrentScreen();
+      return;
+    }
+    if (_screen === 0) {
+      if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
+      _screen = 1;
+      _showCurrentScreen();
+      return;
+    }
+    if (_screen === 1) return;  // Enter handled by Continue button
+    if (_screen === 2) return;  // Enter handled by Continue button and install buttons
+    if (_screen === 3) return;  // Enter handled by provider buttons
+  });
+
+  screen.key(['escape'], () => {
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      setTimeout(() => navigationService?.switchTab('settings'), 0);
+      return;
+    }
+    if (_screen === 3 && providerView === 'info') {
+      showProviderListView();
+      return;
+    }
+    if (_screen > 0) {
+      _screen--;
+      _showCurrentScreen();
+    } else {
+      setTimeout(() => navigationService?.switchTab('settings'), 0);
+    }
+  });
+
+  screen.key(['up'], () => {
+    if (box.hidden || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      _globalChoiceIdx = 0;
+      _renderScreenGlobal();
+      return;
+    }
+    if (_screen === 0) {
+      _langIdx = Math.max(0, _langIdx - 1);
+      _renderScreen0();
+      return;
+    }
+  });
+
+  screen.key(['left'], () => {
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) return;
+    if (_screen === 3) return;  // Left handled by button nav
+    if (_screen > 0) {
+      _screen--;
+      _showCurrentScreen();
+    }
+  });
+
+  screen.key(['right'], () => {
+    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (_screen === -1) return;
+    if (_screen === 0) {
+      if (languageService) languageService.setLang(SUPPORTED_LANGUAGES[_langIdx].value);
+      _screen = 1;
+      _showCurrentScreen();
+      return;
+    }
+    if (_screen === 1) return;  // Right handled by Continue button
+    if (_screen === 2) { if (_screen < 3) { _screen++; _showCurrentScreen(); } return; }
+    if (_screen === 3) return;  // Right handled by button nav
+  });
+
+  screen.key(['down'], () => {
+    if (box.hidden || navigationService?.isModalOpen()) return;
+    if (_screen === -1) {
+      _globalChoiceIdx = 1;
+      _renderScreenGlobal();
+      return;
+    }
+    if (_screen === 0) {
+      _langIdx = Math.min(SUPPORTED_LANGUAGES.length - 1, _langIdx + 1);
+      _renderScreen0();
+      return;
+    }
+  });
+
+  // =========================================================================
+  // Screen -1: Global Config Detection (pre-wizard)
+  // =========================================================================
+
+  function _renderScreenGlobal() {
+    const cfg = _pendingGlobalCfg || {};
+    const cfgPath = configService?.getGlobalConfigPath?.() || '~/.agentvibes/config.json';
+
+    // Build settings preview
+    const voice = cfg.voice || '(default)';
+    const lang = cfg.language || 'en';
+    const ttsEngine = cfg.ttsEngine || '(auto)';
+    const verbosity = cfg.verbosity || 'high';
+    const personality = cfg.personality || 'none';
+
+    const sel0 = _globalChoiceIdx === 0;
+    const sel1 = _globalChoiceIdx === 1;
+    const hi = '{magenta-bg}{white-fg}';
+    const lo = '{/white-fg}{/magenta-bg}';
+
+    const lines = [
+      _HDR('', 'Global Settings Found'),
+      '',
+      `  {white-fg}Location:{/white-fg} {yellow-fg}${cfgPath}{/yellow-fg}`,
+      '',
+      `  {cyan-fg}Voice:{/cyan-fg}       {yellow-fg}${voice}{/yellow-fg}`,
+      `  {cyan-fg}Language:{/cyan-fg}    {yellow-fg}${lang}{/yellow-fg}`,
+      `  {cyan-fg}TTS Engine:{/cyan-fg} {yellow-fg}${ttsEngine}{/yellow-fg}`,
+      `  {cyan-fg}Verbosity:{/cyan-fg}  {yellow-fg}${verbosity}{/yellow-fg}`,
+      `  {cyan-fg}Personality:{/cyan-fg}{yellow-fg} ${personality}{/yellow-fg}`,
+      '',
+      '  {white-fg}What would you like to do for this project?{/white-fg}',
+      '',
+      `  ${sel0 ? hi : ''}> Load Global Settings${sel0 ? lo : ''}  {white-fg}— use these settings for this project{/white-fg}`,
+      `  ${sel1 ? hi : ''}> Start Fresh${sel1 ? lo : ''}          {white-fg}— run the full setup wizard from scratch{/white-fg}`,
+      '',
+    ];
+    contentBox.setContent(_c(lines));
+    hintLine.setContent('  [Up/Down] Choose  |  [Enter] Select');
+    box.focus();
+    screen.render();
+  }
+
+  // =========================================================================
+  // Tab Component Contract
+  // =========================================================================
+
+  return {
+    box,
+
+    show() {
+      _lastScreen = -1;
+      providerView = 'list';
+      box.show();
+
+      // Detect if AgentVibes is already installed in the target directory
+      // (e.g. user ran install, closed TUI, came back)
+      const alreadyInstalled = fs.existsSync(path.join(targetDir, '.claude', 'commands', 'agent-vibes'));
+
+      // Check: no local config but global exists with setupCompleted
+      const hasLocal = configService?.hasLocalConfig?.();
+      const globalCfg = configService?.getGlobalConfig?.() ?? {};
+      if (!alreadyInstalled && !hasLocal && globalCfg.setupCompleted) {
+        _pendingGlobalCfg = globalCfg;
+        _screen = -1;
+        _showCurrentScreen();
+        screen.render();
+        return;
+      }
+
+      // If already installed or not first run, skip directly to Screen 3 (providers)
+      if (alreadyInstalled || !_isFirstRun()) {
+        _screen = 3;
+      } else {
+        _screen = 0;
+        _langIdx = 0;
+      }
+      _showCurrentScreen();
+      screen.render();
+    },
+
+    hide() {
+      box.hide();
+      hideAllProviderRows();
+      infoBox.hide();
+      providerView = 'list';
+      screen.render();
+    },
+
+    onFocus() {
+      if (_screen === 0) {
+        box.focus();
+      } else if (_screen === 3) {
+        if (providerView === 'list') {
+          providerFocusIndex = 0;
+          if (providerFocusableItems.length) providerFocusableItems[0].focus();
+        } else {
+          infoBox.focus();
+        }
+      } else {
+        box.focus();
+      }
+      screen.render();
+    },
+
+    onBlur() {},
+
+    getFooterText() {
+      if (_screen === 3) {
+        if (providerView === 'info') {
+          return '[Esc] Back to list  [Up/Down] Scroll';
+        }
+        return '[Enter] Action  [Tab] Next button  [Esc] Tab bar';
+      }
+      return _tl('footerText');
+    },
+
+    getFooterColor() {
+      return COLORS.footerBg;
+    },
+  };
+}

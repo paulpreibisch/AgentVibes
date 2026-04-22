@@ -45,7 +45,9 @@ import { program } from 'commander';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { execSync, execFileSync, spawn } from 'node:child_process';
+import { execSync, execFileSync, spawn, spawnSync } from 'node:child_process';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import search from '@inquirer/search';
@@ -68,6 +70,10 @@ import {
   getProviderDisplayName,
   attemptProviderInstallation,
 } from './utils/provider-validator.js';
+import { promptForCustomMusic } from './installer/music-file-input.js';
+import { createPreviewListPrompt } from './utils/preview-list-prompt.js';
+import { selectLanguage } from './installer/language-screen.js';
+import { t } from './i18n/strings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,6 +133,53 @@ function isNativeWindows() {
 }
 
 /**
+ * Wrap an ora spinner with safe fallbacks for all methods.
+ * Ensures compatibility across platforms (Windows, WSL, macOS, Linux) and ora versions.
+ * @param {Object} spinner - An ora spinner instance (or any spinner-like object)
+ * @returns {Object} A spinner proxy with guaranteed methods
+ */
+function createRobustSpinner(spinner) {
+  const safe = (method, fallback) => (...args) => {
+    if (typeof spinner[method] === 'function') {
+      try { spinner[method](...args); } catch { fallback?.(...args); }
+    } else {
+      fallback?.(...args);
+    }
+    return proxy;
+  };
+  const proxy = {
+    start:          safe('start'),
+    stop:           safe('stop'),
+    succeed:        safe('succeed', (t) => { if (t) process.stdout.write(`✓ ${t}\n`); }),
+    fail:           safe('fail',    (t) => { if (t) process.stderr.write(`✗ ${t}\n`); }),
+    warn:           safe('warn',    (t) => { if (t) process.stdout.write(`⚠ ${t}\n`); }),
+    info:           safe('info',    (t) => { if (t) process.stdout.write(`ℹ ${t}\n`); }),
+    stopAndPersist: safe('stopAndPersist'),
+    get text()      { return spinner.text ?? ''; },
+    set text(t)     { try { spinner.text = t; } catch { /* non-TTY */ } },
+    get isSpinning(){ return spinner.isSpinning ?? false; },
+  };
+  return proxy;
+}
+
+/**
+ * Get the Piper provider name (always 'piper' on all platforms)
+ * @returns {string} The piper provider identifier
+ */
+function getPiperProvider() {
+  return 'piper';
+}
+
+/**
+ * Check if a provider is piper (accepts legacy 'windows-piper' for backwards compat)
+ * @param {string} provider - The provider name to check
+ * @returns {boolean} True if the provider is a piper variant
+ */
+function isPiperProvider(provider) {
+  return provider === 'piper' || provider === 'windows-piper';
+}
+
+/**
  * Detect if running on Android/Termux and display message
  * @returns {boolean} True if running on Termux/Android
  */
@@ -178,9 +231,9 @@ function supportsEmoji() {
 
   const isModernTerminal = modernTerminals.some(t => term.toLowerCase().includes(t));
 
-  // Windows Terminal always supports emoji
+  // Windows Terminal always supports emoji — coerce to boolean to avoid returning WT_SESSION UUID
   const isWindowsTerminal = process.platform === 'win32' &&
-                            (process.env.WT_SESSION || process.env.WT_PROFILE_ID);
+                            !!(process.env.WT_SESSION || process.env.WT_PROFILE_ID);
 
   // macOS Terminal and iTerm2
   const isMacOS = process.platform === 'darwin';
@@ -219,14 +272,201 @@ function getPersonalityIcon(personality, emojiSupported) {
 }
 
 /**
+ * Check if Piper TTS is installed
+ * @returns {boolean} True if piper command exists
+ */
+function isPiperInstalled() {
+  // On Windows, check standard install location then PATH
+  if (isNativeWindows()) {
+    const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
+    if (localAppData) {
+      const piperExe = path.join(localAppData, 'Programs', 'Piper', 'piper.exe');
+      if (fsSync.existsSync(piperExe)) return true;
+    }
+    // Also check PATH (e.g. pip-installed piper)
+    try {
+      execSync('where piper.exe', { stdio: 'pipe', timeout: 3000 });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  try {
+    execSync('which piper', {
+      stdio: 'pipe',
+      timeout: 3000
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Check if Soprano TTS is installed
+ * @returns {boolean} True if soprano-tts or soprano-webui command exists
+ */
+function isSopranoInstalled() {
+  try {
+    execSync('which soprano-tts || which soprano-webui', {
+      stdio: 'pipe',
+      timeout: 3000
+    });
+    return true;
+  } catch (e) {
+    // On Windows, 'which' may not find Python scripts; try 'py -m pip show' as fallback
+    if (isNativeWindows()) {
+      try {
+        const result = spawnSync('py', ['-m', 'pip', 'show', 'soprano-tts'], {
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 10000
+        });
+        return result.status === 0 && result.stdout && result.stdout.includes('Name:');
+      } catch (e2) {
+        return false;
+      }
+    }
+    return false;
+  }
+}
+
+/**
+ * Play voice sample for preview during voice selection
+ * @param {string} voiceName - Name of the voice (e.g., 'en_US-lessac-medium', 'soprano-default')
+ * @param {string} provider - TTS provider ('piper' or 'soprano')
+ * @returns {Promise<boolean>} True if sample played successfully
+ */
+async function playVoiceSample(voiceName, provider) {
+  try {
+    const samplesDir = path.join(__dirname, '..', '.claude', 'audio', 'voice-samples', provider);
+
+    // Try friendly name first (e.g., "ryan.wav")
+    let sampleFile = path.join(samplesDir, `${voiceName}.wav`);
+
+    // If not found and looks like a Piper ID, try that too
+    if (!fsSync.existsSync(sampleFile) && voiceName.includes('-')) {
+      sampleFile = path.join(samplesDir, `${voiceName}.wav`);
+    }
+
+    // Check if pre-recorded sample exists
+    if (fsSync.existsSync(sampleFile)) {
+      console.log(chalk.cyan('  🔊 Playing voice sample...'));
+
+      // Play using sox/aplay - use spawn for non-blocking playback
+      try {
+        // Play using aplay directly (no shell interpolation — prevents command injection)
+        const player = spawn('aplay', [sampleFile], {
+          detached: false,
+          stdio: 'ignore'
+        });
+
+        // Return the process so it can be killed
+        return player;
+      } catch (e) {
+        // Fallback: generate on-the-fly if provider is available
+      }
+    }
+
+    // Generate sample on-the-fly if provider is running
+    if (isPiperProvider(provider) && isPiperInstalled()) {
+      const text = `Hi, I'm ${voiceName.split('-')[1] || 'Piper'}`;
+      // Use bash -c with positional args to prevent command injection via text/voiceName
+      spawnSync('bash', ['-c', 'echo "$1" | piper --model "$2" --output_raw | aplay -r 22050 -f S16_LE -t raw -', '_', text, voiceName], {
+        stdio: 'inherit',
+        timeout: 15000
+      });
+      return true;
+    } else if (provider === 'soprano' && await isSopranoRunning()) {
+      // Generate via Soprano API
+      const text = "Hi, I'm Soprano";
+      const response = await fetch('http://localhost:7860/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: 'soprano-default' }),
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (response.ok) {
+        const audio = await response.arrayBuffer();
+        // Save temporarily and play
+        const tempFile = path.join(os.tmpdir(), `soprano-sample-${crypto.randomBytes(8).toString('hex')}.wav`);
+        fsSync.writeFileSync(tempFile, Buffer.from(audio));
+        try {
+          // Use spawnSync with argument array to prevent command injection
+          spawnSync('aplay', [tempFile], { stdio: 'pipe', timeout: 5000 });
+        } finally {
+          fsSync.unlinkSync(tempFile);
+        }
+        return true;
+      }
+    }
+
+    return false;
+  } catch (e) {
+    console.log(chalk.gray('  (Preview not available)'));
+    return false;
+  }
+}
+
+/**
+ * Check if Soprano server is running on port 7860
+ * @returns {Promise<boolean>} True if server responds to health check
+ */
+async function isSopranoRunning() {
+  try {
+    const response = await fetch('http://localhost:7860/health', {
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Start Soprano TTS server in background
+ * @returns {Promise<boolean>} True if successfully started
+ */
+async function startSopranoServer() {
+  try {
+    console.log(chalk.gray('🚀 Starting Soprano TTS server...'));
+
+    // Start soprano-webui in background
+    const sopranoProcess = spawn('soprano-webui', ['--port', '7860'], {
+      detached: true,
+      stdio: 'ignore'
+    });
+
+    sopranoProcess.unref(); // Allow parent to exit independently
+
+    // Wait up to 10 seconds for server to be ready
+    for (let i = 0; i < 20; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      if (await isSopranoRunning()) {
+        console.log(chalk.green('✓ Soprano TTS server started successfully\n'));
+        return true;
+      }
+    }
+
+    console.log(chalk.yellow('⚠️  Soprano server started but not responding yet\n'));
+    return false;
+  } catch (e) {
+    console.log(chalk.yellow('⚠️  Failed to start Soprano server:', e.message, '\n'));
+    return false;
+  }
+}
+
+/**
  * Detect system capabilities for smart provider recommendations
- * @returns {Promise<Object>} System info including GPU, memory, platform
+ * @returns {Promise<Object>} System info including GPU, memory, platform, Soprano availability
  */
 async function detectSystemCapabilities() {
   const isMacOS = process.platform === 'darwin';
   const isAndroid = isTermux();
   let hasGPU = false;
   let totalRAM = 0;
+  let sopranoAvailable = false;
 
   try {
     // Detect NVIDIA GPU
@@ -279,12 +519,24 @@ async function detectSystemCapabilities() {
     totalRAM = 4096;
   }
 
+  // Detect and auto-start Soprano if installed
+  if (isSopranoInstalled()) {
+    const isRunning = await isSopranoRunning();
+    if (isRunning) {
+      sopranoAvailable = true;
+    } else {
+      // Soprano installed but not running - try to start it
+      sopranoAvailable = await startSopranoServer();
+    }
+  }
+
   return {
     hasGPU,
     lowMemory: totalRAM < 4096,
     totalRAM,
     isMacOS,
-    isAndroid
+    isAndroid,
+    sopranoAvailable
   };
 }
 
@@ -493,7 +745,8 @@ async function showPaginatedContent(pages, options = {}) {
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: '', // Hide the "Use arrow keys" message
+      message: chalk.cyan('💡 Try these AgentVibes commands in Claude Code terminal'),
+      prefix: '',
       choices,
       default: currentPage < pages.length - 1 ? 'next' : 'continue'
     }]);
@@ -521,11 +774,12 @@ async function showPaginatedContent(pages, options = {}) {
 function getPageTitle(pageNum) {
   const titles = {
     0: '🔧 System Dependencies',
-    1: '🎙️ TTS Provider Configuration',
+    1: '🔌 TTS Provider Configuration',
     2: '🎤 Voice Selection',
     3: '😎 Personality Selection',
-    4: '💧 Audio Settings',
-    5: '🔊 Verbosity Settings'
+    4: '🎛️ Reverb Settings',
+    5: '🎵 Background Music',
+    6: '🔊 Verbosity Settings'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -538,8 +792,8 @@ async function handleSystemDependenciesPage() {
   const { checkDependencies, getInstallCommands } = await import('./utils/dependency-checker.js');
   const depResults = checkDependencies();
 
-  let depContent = chalk.gray('System dependencies are tools AgentVibes needs to function properly.\n');
-  depContent += chalk.gray('Required tools must be installed, optional tools enable extra features.\n\n');
+  let depContent = chalk.gray('System dependencies detected and already installed.\n');
+  depContent += chalk.gray('These tools enable AgentVibes features and functionality.\n\n');
 
   // Satisfied dependencies
   if (depResults.core.node?.isCompatible) {
@@ -573,6 +827,39 @@ async function handleSystemDependenciesPage() {
     depContent += chalk.green('✓ audio player (paplay/aplay/mpv)\n');
   }
 
+  // Check TTS providers
+  const piperInstalled = isPiperInstalled();
+  const sopranoInstalled = isSopranoInstalled();
+
+  if (piperInstalled || sopranoInstalled) {
+    depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
+    depContent += chalk.cyan.bold('TTS Providers Already Installed:\n\n');
+
+    if (piperInstalled) {
+      try {
+        const piperPath = execSync('which piper 2>/dev/null', { encoding: 'utf8' }).trim();
+        depContent += chalk.green('✓ Piper TTS (offline voice synthesis)\n');
+        depContent += chalk.gray(`  ${piperPath}\n`);
+      } catch (e) {
+        depContent += chalk.green('✓ Piper TTS (offline voice synthesis)\n');
+      }
+    }
+    if (sopranoInstalled) {
+      try {
+        let sopranoPath = '';
+        try {
+          sopranoPath = execSync('which soprano-tts 2>/dev/null', { encoding: 'utf8' }).trim();
+        } catch (e) {
+          sopranoPath = execSync('which soprano-webui 2>/dev/null', { encoding: 'utf8' }).trim();
+        }
+        depContent += chalk.green('✓ Soprano TTS (premium quality)\n');
+        depContent += chalk.gray(`  ${sopranoPath}\n`);
+      } catch (e) {
+        depContent += chalk.green('✓ Soprano TTS (premium quality)\n');
+      }
+    }
+  }
+
   // Missing dependencies
   if (Object.keys(depResults.missing).length > 0) {
     depContent += '\n' + chalk.gray('─'.repeat(50)) + '\n\n';
@@ -588,8 +875,7 @@ async function handleSystemDependenciesPage() {
 
     depContent += '\n' + chalk.gray('TTS will still work without optional tools');
 
-    // Add install commands
-    const os = await import('os');
+    // Add install commands (os imported at top level)
     const platform = os.platform();
     const installCmds = getInstallCommands(depResults.missing, platform);
 
@@ -613,6 +899,12 @@ async function handleSystemDependenciesPage() {
   });
 
   console.log(depsBoxen);
+
+  // Return status for navigation message
+  return {
+    allMet: Object.keys(depResults.missing).length === 0,
+    missingCount: Object.keys(depResults.missing).length
+  };
 }
 
 /**
@@ -640,7 +932,7 @@ async function handleCustomMusicTrack(userFilePath, tracksDir) {
     }
 
     // Verify file is within expected directory (prevent path traversal)
-    if (!resolvedPath.startsWith(path.resolve(process.env.HOME || process.env.USERPROFILE))) {
+    if (!resolvedPath.startsWith(path.resolve(os.homedir()))) {
       console.error(chalk.red('✗ File must be in your home directory or subdirectories.'));
       return null;
     }
@@ -695,6 +987,9 @@ async function saveCustomTracks(tracks) {
   }
 }
 
+// Track currently playing audio preview to prevent overlaps
+let currentAudioPreview = null;
+
 /**
  * Preview audio track using available audio player
  * @param {string} trackName - Name of the track file to preview
@@ -702,6 +997,12 @@ async function saveCustomTracks(tracks) {
  * @returns {Promise<boolean>} True if preview was attempted, false if no audio tools available
  */
 async function previewAudioTrack(trackName, tracksDir) {
+  // Stop any currently playing preview
+  if (currentAudioPreview && !currentAudioPreview.killed) {
+    currentAudioPreview.kill('SIGTERM');
+    currentAudioPreview = null;
+  }
+
   const trackPath = path.join(tracksDir, trackName);
 
   // Verify track exists
@@ -731,11 +1032,13 @@ async function previewAudioTrack(trackName, tracksDir) {
         playerArgs = ['--no-video', '--duration=10', '--volume=30', trackPath];
       }
 
-      // Spawn player process with safety timeout
+      // Spawn player process (manual setTimeout below handles the safety kill)
       const audioProcess = spawn(player, playerArgs, {
-        stdio: ['ignore', 'ignore', 'ignore'],
-        timeout: 12000 // 12 second timeout for safety
+        stdio: ['ignore', 'ignore', 'ignore']
       });
+
+      // Store reference to current preview
+      currentAudioPreview = audioProcess;
 
       // Handle process completion
       return new Promise((resolve) => {
@@ -743,16 +1046,25 @@ async function previewAudioTrack(trackName, tracksDir) {
           if (audioProcess && !audioProcess.killed) {
             audioProcess.kill('SIGTERM');
           }
+          if (currentAudioPreview === audioProcess) {
+            currentAudioPreview = null;
+          }
           resolve(true);
         }, 11000); // 11 second timeout
 
         audioProcess.on('close', () => {
           clearTimeout(timeoutHandle);
+          if (currentAudioPreview === audioProcess) {
+            currentAudioPreview = null;
+          }
           resolve(true);
         });
 
         audioProcess.on('error', () => {
           clearTimeout(timeoutHandle);
+          if (currentAudioPreview === audioProcess) {
+            currentAudioPreview = null;
+          }
           resolve(true);
         });
       });
@@ -827,7 +1139,7 @@ async function collectConfiguration(options = {}) {
       config.defaultVoice = 'en_US-lessac-medium';
       config.isTermux = true;
     } else if (isNativeWindows()) {
-      config.provider = 'windows-piper';
+      config.provider = 'piper';
       config.defaultVoice = 'en_US-ryan-high';
     } else {
       config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
@@ -835,11 +1147,14 @@ async function collectConfiguration(options = {}) {
     }
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
+    // AI agent / non-interactive defaults: no reverb, no background music
+    config.reverb = 'none';
+    config.backgroundMusic = { enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' };
     return config;
   }
 
   let currentPage = 0;
-  const sectionPages = 6; // System Dependencies, Provider, Voice Selection, Personality Selection, Audio Settings, Verbosity
+  const sectionPages = 7; // System Dependencies, Provider, Voice Selection, Personality Selection, Reverb, Background Music, Verbosity
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -859,8 +1174,10 @@ async function collectConfiguration(options = {}) {
     const { header, footer } = createPageHeaderFooter(pageTitle, currentPage, totalPages, pageOffset);
     console.log(header);
 
+    let pageStatus = null; // Track page completion status for navigation message
+
     if (currentPage === 0) {
-      await handleSystemDependenciesPage();
+      pageStatus = await handleSystemDependenciesPage();
     } else if (currentPage === 1) {
       // Page 2: TTS Provider & Voice Storage
 
@@ -1045,7 +1362,7 @@ async function collectConfiguration(options = {}) {
       else if (isNativeWindows()) {
         providerChoices.push({
           name: chalk.green('🎵 Windows Piper TTS (Recommended)') + chalk.gray(' - High quality neural voices'),
-          value: 'windows-piper'
+          value: 'piper'
         });
         providerChoices.push({
           name: chalk.magenta('⚡ Soprano TTS') + chalk.gray(' - Ultra-fast neural, 1 premium voice'),
@@ -1053,7 +1370,7 @@ async function collectConfiguration(options = {}) {
         });
         providerChoices.push({
           name: chalk.blue('🔊 Windows SAPI (Built-in)') + chalk.gray(' - Basic quality, zero setup'),
-          value: 'windows-sapi'
+          value: 'sapi'
         });
       }
       // DESKTOP: Smart provider ordering
@@ -1136,7 +1453,7 @@ async function collectConfiguration(options = {}) {
           name: 'provider',
           message: chalk.yellow('Select TTS provider:'),
           choices: providerChoices,
-          default: config.provider || (isNativeWindows() ? 'windows-piper' : (isMacOS ? 'macos' : 'piper'))
+          default: config.provider || (isMacOS ? 'macos' : 'piper')
         }]);
 
         // Check if user wants to go back to previous page
@@ -1146,6 +1463,57 @@ async function collectConfiguration(options = {}) {
 
         // Validate provider installation before accepting selection
         console.log(chalk.gray(`\n   Checking for ${getProviderDisplayName(provider)}...`));
+
+        // Special handling for Soprano - check if running, auto-start if installed
+        if (provider === 'soprano') {
+          const sopranoInstalled = isSopranoInstalled();
+          const sopranoRunning = await isSopranoRunning();
+
+          if (sopranoInstalled && !sopranoRunning) {
+            // Soprano installed but not running - offer to start it
+            console.log(chalk.yellow('\n⚠️  Soprano TTS is installed but server is not running'));
+
+            const { startAction } = await inquirer.prompt([{
+              type: 'list',
+              name: 'startAction',
+              message: 'What would you like to do?',
+              choices: [
+                { name: chalk.green('Start Soprano server now (recommended)'), value: 'start' },
+                { name: 'I\'ll start it myself', value: 'manual' },
+                { name: 'Choose a different provider', value: 'back' }
+              ]
+            }]);
+
+            if (startAction === 'start') {
+              const started = await startSopranoServer();
+              if (started) {
+                config.provider = provider;
+                providerSelected = true;
+                continue;
+              } else {
+                console.log(chalk.yellow('\n⚠️  Failed to start Soprano automatically'));
+                console.log(chalk.cyan('   Try starting manually:'));
+                console.log(chalk.gray('   $ soprano-webui --port 7860\n'));
+                continue;
+              }
+            } else if (startAction === 'manual') {
+              console.log(chalk.cyan('\n📝 To start Soprano manually, run:'));
+              console.log(chalk.gray('   $ soprano-webui --port 7860\n'));
+              continue;
+            } else {
+              // User chose to go back
+              continue;
+            }
+          } else if (sopranoInstalled && sopranoRunning) {
+            // Soprano installed and running - all good!
+            console.log(chalk.green('\n✓ Soprano TTS detected and running!\n'));
+            config.provider = provider;
+            providerSelected = true;
+            continue;
+          }
+          // If not installed, fall through to normal validation below
+        }
+
         const validation = await validateProvider(provider);
 
         if (!validation.installed) {
@@ -1222,24 +1590,27 @@ async function collectConfiguration(options = {}) {
           console.log(chalk.green(`\n✓ ${displayName} Detected and selected!\n`));
           config.provider = provider;
           providerSelected = true; // Exit provider selection loop
+
+          // Auto-advance flag for navigation
+          config._autoAdvance = true;
         }
       }
 
       // Handle special receiver mode for Termux
       if (config.provider === 'piper-receiver') {
-        config.provider = 'piper';
+        config.provider = getPiperProvider();
         config.isReceiver = true;
       }
 
       // Handle silent mode (voiceless servers that don't want audio)
       if (config.provider === 'silent') {
         // Silent mode uses piper but won't actually play audio
-        config.provider = 'piper';
+        config.provider = getPiperProvider();
         config.isSilent = true;
       }
 
       // If Piper selected, ask for voice storage location
-      if (config.provider === 'piper' || config.provider === 'windows-piper' || config.isReceiver) {
+      if (isPiperProvider(config.provider) || config.isReceiver) {
         const homeDir = process.env.HOME || process.env.USERPROFILE;
         const defaultPiperPath = path.join(homeDir, '.claude', 'piper-voices');
 
@@ -1388,7 +1759,7 @@ async function collectConfiguration(options = {}) {
         voiceIntroMessage = chalk.white('Soprano Voice Configuration\n\n') +
                            chalk.gray('Soprano has a single premium neural voice.\n') +
                            chalk.gray('Voice details and specifications shown below.');
-      } else if (config.provider === 'piper') {
+      } else if (isPiperProvider(config.provider)) {
         voiceIntroMessage = chalk.white('Choose a default voice for your AgentVibes.\n\n') +
                            chalk.gray('Piper offers 50+ voices in 18+ languages.\n') +
                            chalk.gray('You can change this anytime with: ') + chalk.cyan('/agent-vibes:voice switch <name>');
@@ -1413,37 +1784,106 @@ async function collectConfiguration(options = {}) {
         }
       ));
 
-      if (config.provider === 'piper') {
-        // Piper voices - popular selections
-        const piperVoices = [
-          { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)'), value: 'en_US-ryan-high' },
-          { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)'), value: 'en_US-amy-medium' },
-          { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)'), value: 'en_US-joe-medium' },
-          { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)'), value: 'en_US-lessac-medium' },
-          { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)'), value: 'en_GB-alan-medium' },
-          { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)'), value: 'en_GB-southern_english_female-medium' },
+      if (isPiperProvider(config.provider)) {
+        // Check if Piper is installed for voice previews
+        const piperAvailable = isPiperInstalled();
+
+        // Load voice metadata for friendly names
+        let voiceMetadata;
+        try {
+          const metadataPath = path.join(__dirname, '..', '.agentvibes', 'config', 'voice-metadata.json');
+          voiceMetadata = JSON.parse(await fs.readFile(metadataPath, 'utf-8'));
+        } catch (e) {
+          voiceMetadata = null;
+        }
+
+        // Build voice choices
+        const previewHint = piperAvailable ? ' ' + chalk.gray('[SPACE to preview]') : '';
+        let piperVoices;
+
+        if (voiceMetadata && voiceMetadata.installerVoices) {
+          // Use voice metadata system - all 10 voices with friendly names
+          piperVoices = voiceMetadata.installerVoices.map(friendlyName => {
+            const voice = voiceMetadata.voices[friendlyName];
+            const isMale = voice.gender === 'male';
+            const color = isMale ? chalk.cyan : chalk.hex('#FF69B4'); // Lighter pink for females
+
+            return {
+              name: color(voice.displayName) + chalk.gray(` (${voice.gender}, ${voice.accent}, ${voice.quality})`) + previewHint,
+              value: friendlyName  // Store friendly name
+            };
+          });
+        } else {
+          // Fallback to old hardcoded list
+          piperVoices = [
+            { name: chalk.cyan('en_US-ryan-high') + chalk.gray(' (Male, American, High Quality)') + previewHint, value: 'en_US-ryan-high' },
+            { name: chalk.magenta('en_US-amy-medium') + chalk.gray(' (Female, American, Clear)') + previewHint, value: 'en_US-amy-medium' },
+            { name: chalk.cyan('en_US-joe-medium') + chalk.gray(' (Male, American, Warm)') + previewHint, value: 'en_US-joe-medium' },
+            { name: chalk.magenta('en_US-lessac-medium') + chalk.gray(' (Female, American, Professional)') + previewHint, value: 'en_US-lessac-medium' },
+            { name: chalk.cyan('en_GB-alan-medium') + chalk.gray(' (Male, British, Refined)') + previewHint, value: 'en_GB-alan-medium' },
+            { name: chalk.magenta('en_GB-southern_english_female-medium') + chalk.gray(' (Female, British)') + previewHint, value: 'en_GB-southern_english_female-medium' }
+          ];
+        }
+
+        piperVoices.push(
           new inquirer.Separator(),
           { name: chalk.yellow('Skip - I\'ll set this later'), value: '__skip__' },
           { name: chalk.magentaBright('← Back to Provider Selection'), value: '__back__' }
-        ];
+        );
 
-        const { selectedVoice } = await inquirer.prompt([{
-          type: 'list',
-          name: 'selectedVoice',
-          message: chalk.yellow('Select your default Piper voice:'),
-          choices: piperVoices,
-          default: 'en_US-ryan-high',
-          pageSize: 12
-        }]);
+        let selectedVoice;
+        if (piperAvailable) {
+          const result = await createPreviewListPrompt(inquirer, {
+            name: 'selectedVoice',
+            message: chalk.yellow('Select your default Piper voice:'),
+            choices: piperVoices,
+            default: 'en_US-ryan-high',
+            pageSize: 12,
+            onPreview: async (voiceName) => {
+              await playVoiceSample(voiceName, 'piper');
+            }
+          });
+          selectedVoice = result.selectedVoice;
+        } else {
+          const result = await inquirer.prompt([{
+            type: 'list',
+            name: 'selectedVoice',
+            message: chalk.yellow('Select your default Piper voice:'),
+            choices: piperVoices,
+            default: 'en_US-ryan-high',
+            pageSize: 12
+          }]);
+          selectedVoice = result.selectedVoice;
+        }
 
         if (selectedVoice === '__back__') {
           return null;
         }
 
         if (selectedVoice !== '__skip__') {
-          config.defaultVoice = selectedVoice;
+          // Convert friendly name to Piper ID if using metadata
+          if (voiceMetadata && voiceMetadata.voices[selectedVoice]) {
+            config.defaultVoice = voiceMetadata.voices[selectedVoice].id;
+            console.log(chalk.green(`\n✓ Voice selected: ${voiceMetadata.voices[selectedVoice].displayName} (${config.defaultVoice})\n`));
+          } else {
+            config.defaultVoice = selectedVoice;
+            console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+          }
+
+          // Show hint about voice browser
+          console.log(boxen(
+            chalk.cyan('💡 Want to explore 914+ voices?\n\n') +
+            chalk.white('Run: ') + chalk.yellow('npx agentvibes-voice-browser') + chalk.gray('\n\nBrowse all LibriTTS voices with preview, search, and install.'),
+            {
+              padding: { top: 0, bottom: 0, left: 1, right: 1 },
+              margin: { top: 0, bottom: 1, left: 0, right: 0 },
+              borderStyle: 'round',
+              borderColor: 'cyan',
+              dimBorder: true
+            }
+          ));
+
           // Auto-advance to next page after selection
-          console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
           currentPage++; // Skip to next page immediately
           continue; // Skip navigation and go to next iteration
         } else {
@@ -1481,9 +1921,24 @@ async function collectConfiguration(options = {}) {
         }
 
         if (selectedVoice !== '__skip__') {
+          // macOS voices use their name directly (no piper metadata conversion needed)
           config.defaultVoice = selectedVoice;
-          // Auto-advance to next page after selection
           console.log(chalk.green(`\n✓ Voice selected: ${selectedVoice}\n`));
+
+          // Show hint about voice browser
+          console.log(boxen(
+            chalk.cyan('💡 Want to explore 914+ voices?\n\n') +
+            chalk.white('Run: ') + chalk.yellow('npx agentvibes-voice-browser') + chalk.gray('\n\nBrowse all LibriTTS voices with preview, search, and install.'),
+            {
+              padding: { top: 0, bottom: 0, left: 1, right: 1 },
+              margin: { top: 0, bottom: 1, left: 0, right: 0 },
+              borderStyle: 'round',
+              borderColor: 'cyan',
+              dimBorder: true
+            }
+          ));
+
+          // Auto-advance to next page after selection
           currentPage++; // Skip to next page immediately
           continue; // Skip navigation and go to next iteration
         } else {
@@ -1523,7 +1978,7 @@ async function collectConfiguration(options = {}) {
         currentPage++;
         continue;
 
-      } else if (config.provider === 'windows-sapi') {
+      } else if (config.provider === 'sapi' || config.provider === 'windows-sapi') {
         const sapiVoices = [
           { name: chalk.cyan('Microsoft David Desktop') + chalk.gray(' (Male, American)'), value: 'Microsoft David Desktop' },
           { name: chalk.magenta('Microsoft Zira Desktop') + chalk.gray(' (Female, American)'), value: 'Microsoft Zira Desktop' },
@@ -1662,6 +2117,9 @@ async function collectConfiguration(options = {}) {
       const personalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
       let personalityChoices = [];
 
+      // Story 2.3 & 2.4: Check emoji support once, pass to all personality icons (performance fix)
+      const emojiSupported = supportsEmoji();
+
       try {
         const personalityFiles = await fs.readdir(personalitiesDir);
         const personalities = [];
@@ -1685,9 +2143,6 @@ async function collectConfiguration(options = {}) {
 
         // Sort alphabetically
         personalities.sort((a, b) => a.name.localeCompare(b.name));
-
-        // Story 2.3 & 2.4: Check emoji support once, pass to all personality icons (performance fix)
-        const emojiSupported = supportsEmoji();
 
         // Add "none" as first option (default)
         const noneIcon = getPersonalityIcon('none', emojiSupported);
@@ -1834,15 +2289,45 @@ async function collectConfiguration(options = {}) {
           { name: 'Light (Small room) - Recommended', value: 'light' },
           { name: 'Medium (Conference room)', value: 'medium' },
           { name: 'Heavy (Large hall)', value: 'heavy' },
-          { name: 'Cathedral (Epic space)', value: 'cathedral' }
+          { name: 'Cathedral (Epic space)', value: 'cathedral' },
+          new inquirer.Separator(),
+          { name: chalk.magentaBright('← Previous'), value: '__back__' }
         ],
         default: config.reverb || 'light'
       }]);
 
+      if (reverbLevel === '__back__') {
+        currentPage--;
+        continue;
+      }
+
       config.reverb = reverbLevel;
 
-      // Add spacing before next question
-      console.log('');
+      console.log(chalk.green('\n✓ Reverb level set\n'));
+      currentPage++;
+      continue;
+
+    } else if (currentPage === 5) {
+      // Page 6: Background Music Settings
+
+      // Skip for termux-ssh - background music doesn't work with SSH text-only TTS
+      if (config.provider === 'termux-ssh' || config.provider === 'ssh-pulseaudio') {
+        console.log(boxen(
+          chalk.white('SSH-Remote: Audio Effects Apply on Android\n\n') +
+          chalk.green('✅ Background music works:\n') +
+          chalk.gray('   • Music plays on Android device\n') +
+          chalk.gray('   • All settings configured below will apply\n\n') +
+          chalk.cyan('Configure background music below!'),
+          {
+            padding: 1,
+            margin: { top: 0, bottom: 0, left: 0, right: 0 },
+            borderStyle: 'round',
+            borderColor: 'green',
+            width: 80
+          }
+        ));
+        console.log('');
+      }
 
       // Background music
       console.log(chalk.gray('🎵 Background music plays ambient tracks during TTS for a more engaging experience.'));
@@ -1857,6 +2342,105 @@ async function collectConfiguration(options = {}) {
       config.backgroundMusic.enabled = enableMusic;
 
       if (enableMusic) {
+        // Check if ffmpeg is available; offer to install if not
+        const { execSync: _execSync } = await import('child_process');
+        const _osPlatform = process.platform;
+        let _hasFfmpeg = false;
+        try {
+          if (_osPlatform === 'win32') {
+            _execSync('where ffmpeg', { stdio: 'pipe' });
+          } else {
+            _execSync('which ffmpeg', { stdio: 'pipe' });
+          }
+          _hasFfmpeg = true;
+        } catch {}
+
+        if (!_hasFfmpeg) {
+          console.log('');
+          console.log(chalk.yellow('⚠️  ffmpeg not found — required for background music mixing.'));
+          console.log(chalk.gray('   ffmpeg mixes background music with TTS voice output.\n'));
+
+          let _installCmd;
+          if (_osPlatform === 'win32') {
+            _installCmd = 'winget install --id Gyan.FFmpeg -e --source winget';
+          } else if (_osPlatform === 'darwin') {
+            _installCmd = 'brew install ffmpeg';
+          } else {
+            // Prefer pkexec (GUI password dialog) when available — works in
+            // environments where sudo lacks a tty (e.g., AI assistant terminals).
+            // Fall back to sudo for headless/SSH setups.
+            let _hasPkexec = false;
+            try { _execSync('which pkexec', { stdio: 'pipe' }); _hasPkexec = true; } catch {}
+            _installCmd = _hasPkexec
+              ? 'pkexec apt-get install -y ffmpeg'
+              : 'sudo apt-get install -y ffmpeg';
+          }
+
+          if (!options.yes) {
+            const { installFfmpeg } = await inquirer.prompt([{
+              type: 'confirm',
+              name: 'installFfmpeg',
+              message: chalk.yellow(`Install ffmpeg now? (${_installCmd})`),
+              default: true,
+            }]);
+            if (installFfmpeg) {
+              try {
+                console.log(chalk.cyan(`\n📦 Running: ${_installCmd}\n`));
+                const { execSync: _exec } = await import('child_process');
+                _exec(_installCmd, { stdio: 'inherit', timeout: 300000 });
+                console.log(chalk.green('\n✅ ffmpeg installed successfully!\n'));
+              } catch {
+                console.log(chalk.yellow('\n⚠️  ffmpeg installation failed. You can install it manually:'));
+                console.log(chalk.cyan(`   ${_installCmd}\n`));
+              }
+            } else {
+              console.log(chalk.gray(`   Install later with: ${_installCmd}\n`));
+            }
+          }
+        }
+
+        // Check for sox — required to mix background music into TTS audio
+        let _hasSox = false;
+        try { _execSync('which sox', { stdio: 'pipe' }); _hasSox = true; } catch {}
+        if (!_hasSox) {
+          console.log('');
+          console.log(chalk.yellow('⚠️  sox not found — required to mix background music into voice audio.'));
+          console.log(chalk.gray('   Without sox, you\'ll hear voice only, no background music.\n'));
+
+          const _osPlatform2 = process.platform;
+          let _soxCmd;
+          if (_osPlatform2 === 'darwin') {
+            _soxCmd = 'brew install sox';
+          } else {
+            let _hasPkexec2 = false;
+            try { _execSync('which pkexec', { stdio: 'pipe' }); _hasPkexec2 = true; } catch {}
+            _soxCmd = _hasPkexec2
+              ? 'pkexec apt-get install -y sox libsox-fmt-mp3'
+              : 'sudo apt-get install -y sox libsox-fmt-mp3';
+          }
+
+          if (!options.yes) {
+            const { installSox } = await inquirer.prompt([{
+              type: 'confirm',
+              name: 'installSox',
+              message: chalk.yellow(`Install sox now? (${_soxCmd})`),
+              default: true,
+            }]);
+            if (installSox) {
+              try {
+                console.log(chalk.cyan(`\n📦 Running: ${_soxCmd}\n`));
+                _execSync(_soxCmd, { stdio: 'inherit', timeout: 120000 });
+                console.log(chalk.green('\n✅ sox installed successfully!\n'));
+              } catch {
+                console.log(chalk.yellow('\n⚠️  sox installation failed. You can install it manually:'));
+                console.log(chalk.cyan(`   ${_soxCmd}\n`));
+              }
+            } else {
+              console.log(chalk.gray(`   Install later with: ${_soxCmd}\n`));
+            }
+          }
+        }
+
         // Add spacing before track selection
         console.log('');
         console.log(chalk.gray('🎼 Choose your default background music genre (you can change this anytime).'));
@@ -1864,27 +2448,29 @@ async function collectConfiguration(options = {}) {
         // Load custom tracks from registry
         const customTracks = await loadCustomTracks();
         const customTrackChoices = customTracks.map(track => ({
-          name: `📁 ${track.name}`,
+          name: `📁 ${track.name} ` + chalk.gray('[SPACE to preview]'),
           value: track.filename
         }));
 
         const trackChoices = [
-          { name: '🎻 Soft Flamenco (Spanish guitar)', value: 'agentvibes_soft_flamenco_loop.mp3' },
-          { name: '🎺 Bachata (Latin - Romantic guitar & bongos)', value: 'agent_vibes_bachata_v1_loop.mp3' },
-          { name: '💃 Salsa (Latin - Upbeat brass & percussion)', value: 'agent_vibes_salsa_v2_loop.mp3' },
-          { name: '🎸 Cumbia (Latin - Accordion & drums)', value: 'agent_vibes_cumbia_v1_loop.mp3' },
-          { name: '🌸 Bossa Nova (Brazilian jazz)', value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
-          { name: '🏙️  Japanese City Pop (80s synth)', value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
-          { name: '🌊 Chillwave (Electronic ambient)', value: 'agent_vibes_chillwave_v2_loop.mp3' },
-          { name: '🎹 Dreamy House (Electronic dance)', value: 'dreamy_house_loop.mp3' },
-          { name: '🌙 Dark Chill Step (Electronic bass)', value: 'agent_vibes_dark_chill_step_loop.mp3' },
-          { name: '🕉️  Goa Trance (Psychedelic electronic)', value: 'agent_vibes_goa_trance_v2_loop.mp3' },
-          { name: '🎼 Harpsichord (Baroque classical)', value: 'agent_vibes_harpsichord_v2_loop.mp3' },
-          { name: '🎻 Celtic Harp (Irish traditional)', value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
-          { name: '🌺 Hawaiian Slack Key Guitar', value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
-          { name: '🏜️  Arabic Oud (Middle Eastern)', value: 'agent_vibes_arabic_v2_loop.mp3' },
-          { name: '🪘 Gnawa Ambient (North African)', value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
-          { name: '🥁 Tabla Dream Pop (Indian percussion)', value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' }
+          { name: '🎻 Soft Flamenco (Spanish guitar) ' + chalk.gray('[SPACE to preview]'), value: 'agentvibes_soft_flamenco_loop.mp3' },
+          { name: '🎺 Bachata (Latin - Romantic guitar & bongos) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_bachata_v1_loop.mp3' },
+          { name: '💃 Salsa (Latin - Upbeat brass & percussion) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_salsa_v2_loop.mp3' },
+          { name: '🎸 Cumbia (Latin - Accordion & drums) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_cumbia_v1_loop.mp3' },
+          { name: '🌸 Bossa Nova (Brazilian jazz) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_bossa_nova_v2_loop.mp3' },
+          { name: '🏙️  Japanese City Pop (80s synth) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_japanese_city_pop_v1_loop.mp3' },
+          { name: '🌊 Chillwave (Electronic ambient) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_chillwave_v2_loop.mp3' },
+          { name: '🌙 Dark Chill Step (Electronic bass) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_dark_chill_step_loop.mp3' },
+          { name: '🕉️  Goa Trance (Psychedelic electronic) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_goa_trance_v2_loop.mp3' },
+          { name: '🎼 Harpsichord (Baroque classical) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_harpsichord_v2_loop.mp3' },
+          { name: '🎻 Celtic Harp (Irish traditional) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_celtic_harp_v1_loop.mp3' },
+          { name: '🌺 Hawaiian Slack Key Guitar ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3' },
+          { name: '🏜️  Arabic Oud (Middle Eastern) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_arabic_v2_loop.mp3' },
+          { name: '🪘 Gnawa Ambient (North African) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_ganawa_ambient_v2_loop.mp3' },
+          { name: '🥁 Tabla Dream Pop (Indian percussion) ' + chalk.gray('[SPACE to preview]'), value: 'agent_vibes_tabla_dream_pop_v1_loop.mp3' },
+          { name: '🎤 Late Night Hip Hop Groove ' + chalk.gray('[SPACE to preview]'), value: 'Late Night Hip Hop Groove.mp3' },
+          { name: '🌃 Drifting Down the Hall (90s Vibes) ' + chalk.gray('[SPACE to preview]'), value: 'Drifting Down the Hall.mp3' },
+          { name: '🎩 Midnight Charleston Stomp (Swing) ' + chalk.gray('[SPACE to preview]'), value: 'Midnight Charleston Stomp.mp3' }
         ];
 
         // Add custom tracks separator and options if any exist
@@ -1901,76 +2487,60 @@ async function collectConfiguration(options = {}) {
           { name: '➕ Add Custom Track...', value: '__custom__' }
         );
 
-        const { selectedTrack } = await inquirer.prompt([{
-          type: 'list',
+        // Interactive track selection - Enter=Select, Spacebar=Preview
+        const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
+
+        const result = await createPreviewListPrompt(inquirer, {
           name: 'selectedTrack',
-          message: chalk.yellow('Choose default background music track:'),
+          message: chalk.yellow('Choose background music:'),
           choices: trackChoices,
           default: config.backgroundMusic.track || 'agentvibes_soft_flamenco_loop.mp3',
-          pageSize: 18
-        }]);
+          pageSize: 18,
+          loop: false,
+          onPreview: async (trackFile) => {
+            console.log(chalk.cyan('\n  🔊 Playing preview...\n'));
+            await previewAudioTrack(trackFile, tracksDir);
+          }
+        });
+        const selectedTrack = result.selectedTrack;
 
         // Handle custom track selection
         if (selectedTrack === '__custom__') {
-          const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
-          const { customTrackPath } = await inquirer.prompt([{
-            type: 'input',
-            name: 'customTrackPath',
-            message: chalk.yellow('Enter the full path to your audio file:'),
-            validate: (input) => {
-              const resolvedPath = path.resolve(input.trim());
-              if (!fsSync.existsSync(resolvedPath)) return 'File not found';
-              const ext = path.extname(resolvedPath).toLowerCase();
-              if (!['.mp3', '.wav', '.ogg', '.m4a'].includes(ext))
-                return 'Unsupported format (use .mp3, .wav, .ogg, or .m4a)';
-              return true;
-            }
-          }]);
+          console.log('');
+          const result = await promptForCustomMusic(claudeDir);
 
-          const copiedFilename = await handleCustomMusicTrack(customTrackPath, tracksDir);
-          if (copiedFilename) {
-            config.backgroundMusic.track = copiedFilename;
-            console.log(chalk.green(`✓ Custom track added: ${copiedFilename}`));
+          if (result.success && result.filename) {
+            config.backgroundMusic.track = result.filename;
 
-            // Update registry with new custom track
-            const trackName = path.basename(customTrackPath, path.extname(customTrackPath));
+            // Update registry
             const allCustomTracks = await loadCustomTracks();
-            if (!allCustomTracks.some(t => t.filename === copiedFilename)) {
-              allCustomTracks.push({ name: trackName, filename: copiedFilename });
+            if (!allCustomTracks.some(t => t.filename === result.filename)) {
+              const trackName = path.basename(result.filename, path.extname(result.filename));
+              allCustomTracks.push({ name: trackName, filename: result.filename });
               await saveCustomTracks(allCustomTracks);
             }
           } else {
-            // Fall back to default if custom track fails
+            // Fallback to default
             config.backgroundMusic.track = 'agentvibes_soft_flamenco_loop.mp3';
+            if (result.error) {
+              console.log(chalk.yellow(`⚠️  ${result.error}`));
+            }
             console.log(chalk.yellow('⚠️  Using default track'));
           }
         } else {
           config.backgroundMusic.track = selectedTrack;
         }
 
-        // Offer preview of selected track
-        const tracksDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
-        const { previewTrack } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'previewTrack',
-          message: chalk.cyan('Preview this track before continuing?'),
-          default: false
-        }]);
-
-        if (previewTrack) {
-          console.log('');
-          await previewAudioTrack(config.backgroundMusic.track, tracksDir);
-          console.log('');
-        }
+        console.log(chalk.green(`\n✓ Selected: ${config.backgroundMusic.track}\n`));
       }
 
       // Auto-advance to next page after audio settings
-      console.log(chalk.green('✓ Audio settings configured\n'));
+      console.log(chalk.green('✓ Background music configured\n'));
       currentPage++;
       continue;
 
-    } else if (currentPage === 5) {
-      // Page 6: Verbosity Settings
+    } else if (currentPage === 6) {
+      // Page 7: Verbosity Settings
       console.log(boxen(
         chalk.white('Choose how much Claude speaks during interactions.\n\n') +
         chalk.yellow('🔊 High:\n') +
@@ -2001,23 +2571,39 @@ async function collectConfiguration(options = {}) {
         choices: [
           { name: '🔊 High - Maximum transparency', value: 'high' },
           { name: '🔉 Medium - Balanced', value: 'medium' },
-          { name: '🔈 Low - Minimal', value: 'low' }
+          { name: '🔈 Low - Minimal', value: 'low' },
+          new inquirer.Separator(),
+          { name: chalk.magentaBright('← Previous'), value: '__back__' }
         ],
         default: config.verbosity || 'high'
       }]);
 
+      if (verbosity === '__back__') {
+        currentPage--;
+        continue;
+      }
+
       config.verbosity = verbosity;
 
-      // Auto-advance - verbosity is the last page, so we're done
+      // Show confirmation and auto-advance to next page
       console.log(chalk.green('\n✓ Verbosity level set\n'));
       currentPage++;
       continue;
     }
 
-    // Navigation
+    // Auto-advance if provider was just detected (skip navigation prompt)
+    if (config._autoAdvance) {
+      delete config._autoAdvance;
+      await new Promise(resolve => setTimeout(resolve, 800)); // Brief pause
+      currentPage++;
+      continue;
+    }
+
+    // Navigation with page titles
     const navChoices = [];
     if (currentPage < totalPages - 1) {
-      navChoices.push({ name: chalk.green('Next →'), value: 'next' });
+      const nextPageTitle = getPageTitle(currentPage + 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      navChoices.push({ name: chalk.green('Next →') + chalk.gray(` (${nextPageTitle})`), value: 'next' });
     } else {
       navChoices.push({ name: chalk.cyan('✓ Continue to Installation'), value: 'continue' });
     }
@@ -2026,13 +2612,23 @@ async function collectConfiguration(options = {}) {
     if (currentPage === 0) {
       navChoices.push({ name: chalk.magentaBright('← Back to Welcome'), value: 'back' });
     } else {
-      navChoices.push({ name: chalk.magentaBright('← Previous'), value: 'prev' });
+      const prevPageTitle = getPageTitle(currentPage - 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      navChoices.push({ name: chalk.magentaBright('← Previous') + chalk.gray(` (${prevPageTitle})`), value: 'prev' });
+    }
+
+    // Set navigation message based on page status
+    let navMessage = '';
+    if (currentPage === 0 && pageStatus) {
+      navMessage = pageStatus.allMet
+        ? chalk.green('✓') + chalk.cyan(' All system dependencies met')
+        : chalk.yellow('⚠') + chalk.cyan(` ${pageStatus.missingCount} optional tool${pageStatus.missingCount > 1 ? 's' : ''} missing`);
     }
 
     const { action } = await inquirer.prompt([{
       type: 'list',
       name: 'action',
-      message: '',
+      message: navMessage,
+      prefix: '',
       choices: navChoices,
       default: 'next'
     }]);
@@ -2106,25 +2702,54 @@ function showWelcome() {
 
 /**
  * Display latest release information box
- * Shown during install and update commands
+ * Reads the first section from RELEASE_NOTES.md so it's always current.
+ * Falls back to a minimal static string if the file is missing.
  */
 function getReleaseInfoBoxen() {
-  return chalk.cyan.bold('📦 AgentVibes v3.5.8 - Provider Validation Security & UX Improvements\n\n') +
-    chalk.green.bold('🎙️ WHAT\'S NEW:\n\n') +
-    chalk.cyan('Critical security and reliability update for provider detection. Fixes command injection\n') +
-    chalk.cyan('vulnerabilities, prevents HOME directory injection attacks, and improves UX with explicit\n') +
-    chalk.cyan('provider detection messaging. Soprano TTS installed via pipx now correctly detected.\n\n') +
-    chalk.green.bold('✨ KEY HIGHLIGHTS:\n\n') +
-    chalk.gray('   🔐 Security Fixes - Fixed command injection, HOME injection prevention, path traversal\n') +
-    chalk.gray('   ✅ Provider Detection - Soprano via pipx now correctly detected\n') +
-    chalk.gray('   💬 Better Messaging - Explicit detection confirmation, detailed error messages\n') +
-    chalk.gray('   🧪 Enhanced Tests - Verification of actual detection values\n') +
-    chalk.gray('   🐛 Debug Support - Added logging for troubleshooting\n\n') +
-    chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
-    chalk.gray('🌐 Website: https://agentvibes.org\n') +
-    chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
-    chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
-    chalk.gray('Copyright © 2025 Paul Preibisch | Apache-2.0 License');
+  try {
+    const notesPath = path.join(__dirname, '..', 'RELEASE_NOTES.md');
+    const raw = fsSync.readFileSync(notesPath, 'utf8');
+    const lines = raw.split('\n');
+
+    // Find the first ## heading (latest release section)
+    const startIdx = lines.findIndex(l => l.startsWith('## '));
+    if (startIdx < 0) return '';
+
+    // Collect lines until the next ## heading (or end of file)
+    const sectionLines = [];
+    for (let i = startIdx; i < lines.length; i++) {
+      if (i !== startIdx && lines[i].startsWith('## ')) break;
+      sectionLines.push(lines[i]);
+    }
+
+    // Strip markdown syntax from a line for plain display
+    const stripMd = (s) => s
+      .replace(/^#{1,6}\s*/, '')           // ## headings
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+      .replace(/`([^`]+)`/g, '$1')        // `code`
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // [text](url)
+
+    // Render: heading in cyan, bullets as gray, skip blank/hr lines at end
+    return sectionLines
+      .map((line, i) => {
+        if (i === 0) return chalk.cyan.bold(stripMd(line));
+        if (line.startsWith('### ')) return chalk.green.bold(stripMd(line));
+        if (line.startsWith('- ')) return chalk.gray('  ' + stripMd(line));
+        if (line === '---') return '';
+        return chalk.gray(stripMd(line));
+      })
+      .join('\n')
+      .trimEnd() + '\n\n' +
+      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
+      chalk.gray('🌐 Website: https://agentvibes.org\n') +
+      chalk.gray('📦 Repository: https://github.com/paulpreibisch/AgentVibes\n\n') +
+      chalk.gray('Co-created by Paul Preibisch with Claude AI\n') +
+      chalk.gray('Copyright © 2026 Paul Preibisch | Apache-2.0 License');
+  } catch {
+    return chalk.cyan.bold(`📦 AgentVibes v${VERSION}\n`) +
+      chalk.gray('📖 Full Release Notes: RELEASE_NOTES.md\n') +
+      chalk.gray('🌐 Website: https://agentvibes.org');
+  }
 }
 
 /**
@@ -2990,7 +3615,6 @@ async function copyPluginFiles(targetDir, spinner) {
         pluginFiles.push(file);
         const destPath = path.join(destPluginsDir, file);
         await fs.copyFile(srcPath, destPath);
-        console.log(chalk.gray(`   ✓ ${file}`));
       }
     }
     spinner.succeed(chalk.green('Installed BMAD plugin files!\n'));
@@ -3024,7 +3648,6 @@ async function copyBmadConfigFiles(targetDir, spinner) {
     await fs.access(srcPath);
     const destPath = path.join(destBmadDir, bmadVoicesFile);
     await fs.copyFile(srcPath, destPath);
-    console.log(chalk.gray(`   ✓ ${bmadVoicesFile}`));
     fileCount++;
     spinner.succeed(chalk.green('Installed BMAD config files!\n'));
   } catch (error) {
@@ -3113,7 +3736,10 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
       'agentvibes_funk_loop.mp3': '🕺',
       'agentvibes_reggae_loop.mp3': '🌴',
       'agentvibes_blues_loop.mp3': '🎸',
-      'agentvibes_classical_loop.mp3': '🎻'
+      'agentvibes_classical_loop.mp3': '🎻',
+      'Late Night Hip Hop Groove.mp3': '🎤',
+      'Drifting Down the Hall.mp3': '🌃',
+      'Midnight Charleston Stomp.mp3': '🎩'
     };
 
     const tracks = musicFiles.map(track => ({
@@ -3175,32 +3801,95 @@ async function copyConfigFiles(targetDir, spinner) {
       const stat = await fs.stat(srcPath);
 
       if (stat.isFile()) {
-        // Don't overwrite existing config files (except audio-effects.cfg which is required)
-        try {
-          await fs.access(destPath);
-          if (file !== 'audio-effects.cfg') {
-            continue; // Skip if file exists and it's not audio-effects.cfg
+        // For .sample files: copy as the real config name if it doesn't exist yet
+        // e.g. audio-effects.cfg.sample → audio-effects.cfg (only if absent)
+        let finalDest = destPath;
+        let finalName = file;
+        if (file.endsWith('.sample')) {
+          finalName = file.replace(/\.sample$/, '');
+          finalDest = path.join(destConfigDir, finalName);
+          try {
+            await fs.access(finalDest);
+            continue; // Real config already exists, don't overwrite
+          } catch {
+            // Real config doesn't exist, install from sample
           }
-        } catch {
-          // File doesn't exist, proceed with copy
+        } else {
+          // Non-sample files: skip if already exists
+          try {
+            await fs.access(destPath);
+            continue;
+          } catch {
+            // File doesn't exist, proceed with copy
+          }
         }
 
-        await fs.copyFile(srcPath, destPath);
-        copiedFiles.push(file);
+        await fs.copyFile(srcPath, finalDest);
+        copiedFiles.push(finalName);
       }
     }
 
     if (copiedFiles.length > 0) {
       spinner.succeed(chalk.green(`Installed ${copiedFiles.length} config file${copiedFiles.length === 1 ? '' : 's'}!\n`));
-      copiedFiles.forEach(file => {
-        console.log(chalk.gray(`   ✓ ${file}`));
-      });
-      console.log(''); // Add blank line for spacing
     } else {
       spinner.info(chalk.gray('Config files already exist, skipping\n'));
     }
   } catch (error) {
     spinner.info(chalk.yellow('No config files found (optional)\n'));
+  }
+
+  return copiedFiles.length;
+}
+
+/**
+ * Copy Codex integration files (.codex/AGENTS.md, .codex/hooks/, .codex/config.toml template)
+ * These are template files so Codex CLI and VS Code extension can discover AgentVibes.
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function copyCodexFiles(targetDir, spinner) {
+  spinner.start('Installing Codex integration files...');
+  const srcCodexDir = path.join(__dirname, '..', '.codex');
+  const destCodexDir = path.join(targetDir, '.codex');
+
+  let copiedFiles = [];
+  try {
+    await fs.mkdir(destCodexDir, { recursive: true });
+    await fs.mkdir(path.join(destCodexDir, 'hooks'), { recursive: true });
+
+    // Copy AGENTS.md
+    const agentsSrc = path.join(srcCodexDir, 'AGENTS.md');
+    try {
+      const content = await fs.readFile(agentsSrc, 'utf8');
+      await fs.writeFile(path.join(destCodexDir, 'AGENTS.md'), content);
+      copiedFiles.push('.codex/AGENTS.md');
+    } catch { /* source not found */ }
+
+    // Copy hook scripts
+    for (const hookFile of ['init-agentvibes.sh', 'init-agentvibes.ps1']) {
+      const hookSrc = path.join(srcCodexDir, 'hooks', hookFile);
+      try {
+        const content = await fs.readFile(hookSrc, 'utf8');
+        const destPath = path.join(destCodexDir, 'hooks', hookFile);
+        await fs.writeFile(destPath, content);
+        if (hookFile.endsWith('.sh')) {
+          try { await fs.chmod(destPath, 0o750); } catch { /* Windows */ }
+        }
+        copiedFiles.push(`.codex/hooks/${hookFile}`);
+      } catch { /* source not found */ }
+    }
+
+    if (copiedFiles.length > 0) {
+      spinner.succeed(chalk.green(`Installed ${copiedFiles.length} Codex file${copiedFiles.length === 1 ? '' : 's'}!\n`));
+      copiedFiles.forEach(file => {
+        console.log(chalk.gray(`   ✓ ${file}`));
+      });
+      console.log('');
+    } else {
+      spinner.info(chalk.gray('Codex files not found in package (optional)\n'));
+    }
+  } catch (error) {
+    spinner.info(chalk.yellow('Codex integration files skipped (optional)\n'));
   }
 
   return copiedFiles.length;
@@ -3256,6 +3945,101 @@ async function configureSessionStartHook(targetDir, spinner) {
     }
   } catch (error) {
     spinner.fail(chalk.red('Failed to configure hook: ' + error.message + '\n'));
+  }
+}
+
+/**
+ * Configure BMAD party mode PostToolUse hook in the global ~/.claude/settings.json.
+ * Copies bmad-party-speak script to ~/.claude/hooks/ (or hooks-windows/ on Windows)
+ * and registers the PostToolUse hook so party mode TTS works in any BMAD project.
+ * @param {string} targetDir - Target installation directory (used to locate source scripts)
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
+  spinner.start('Configuring BMAD party mode TTS hook...');
+  const homeDir = homeDirOverride || os.homedir();
+  const globalClaudeDir = path.join(homeDir, '.claude');
+  const globalSettingsPath = path.join(globalClaudeDir, 'settings.json');
+
+  try {
+    // Determine platform-specific paths
+    const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
+    const scriptName = isNativeWindows() ? 'bmad-party-speak.ps1' : 'bmad-party-speak.sh';
+    const globalHooksDir = path.join(globalClaudeDir, hooksSubdir);
+    const srcScript = path.join(__dirname, '..', '.claude', hooksSubdir, scriptName);
+    const destScript = path.join(globalHooksDir, scriptName);
+
+    // Copy script to global hooks dir (create dir if needed)
+    await fs.mkdir(globalHooksDir, { recursive: true });
+    await fs.copyFile(srcScript, destScript);
+    if (!isNativeWindows()) {
+      await fs.chmod(destScript, 0o750);
+    }
+
+    // Build the PostToolUse hook command
+    const hookCommand = isNativeWindows()
+      ? `powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\bmad-party-speak.ps1"`
+      : `bash "$HOME/.claude/hooks/bmad-party-speak.sh"`;
+
+    // Read/create global settings.json
+    let settings = {};
+    try {
+      const content = await fs.readFile(globalSettingsPath, 'utf8');
+      settings = JSON.parse(content);
+    } catch {
+      // File missing or invalid — start fresh
+    }
+
+    if (!settings.hooks) settings.hooks = {};
+
+    // Check if PostToolUse hook already registered
+    const existing = settings.hooks.PostToolUse;
+    const alreadyRegistered = Array.isArray(existing) &&
+      existing.some(entry =>
+        Array.isArray(entry.hooks) &&
+        entry.hooks.some(h => h.command && h.command.includes('bmad-party-speak'))
+      );
+
+    if (!alreadyRegistered) {
+      if (!Array.isArray(settings.hooks.PostToolUse)) {
+        settings.hooks.PostToolUse = [];
+      }
+      settings.hooks.PostToolUse.push({
+        hooks: [{ type: 'command', command: hookCommand }]
+      });
+      await fs.writeFile(globalSettingsPath, JSON.stringify(settings, null, 2));
+      spinner.succeed(chalk.green('BMAD party mode TTS hook configured!\n'));
+    } else {
+      // Script still updated above — just note settings unchanged
+      spinner.succeed(chalk.green('BMAD party mode TTS hook up to date\n'));
+    }
+  } catch (error) {
+    spinner.warn(chalk.yellow(`BMAD party mode hook setup skipped: ${error.message}\n`));
+  }
+}
+
+/**
+ * Ensure target directory is a git repo (required for Claude Code hook context injection)
+ * @param {string} targetDir - Target installation directory
+ * @param {Object} spinner - Ora spinner instance
+ */
+async function ensureGitRepo(targetDir, spinner) {
+  const gitDir = path.join(targetDir, '.git');
+  try {
+    await fs.access(gitDir);
+    // Already a git repo
+  } catch {
+    console.log(chalk.cyan('\n🔧 Initializing git repository (required for Claude Code hooks)...'));
+    try {
+      const { execSync: execSyncLocal } = await import('child_process');
+      execSyncLocal('git init', { cwd: targetDir, stdio: 'pipe' });
+      // Stage only files that exist
+      execSyncLocal('git add .', { cwd: targetDir, stdio: 'pipe' });
+      execSyncLocal('git commit -m "chore: initialize AgentVibes"', { cwd: targetDir, stdio: 'pipe' });
+      console.log(chalk.green('✓ Git repository initialized (required for TTS hooks)'));
+    } catch (error) {
+      console.log(chalk.yellow(`⚠ Could not initialize git repo - TTS hooks may not work: ${error.message}`));
+    }
   }
 }
 
@@ -3327,7 +4111,7 @@ async function checkAndInstallPiper(targetDir, options) {
       try {
         if (fsSync.existsSync(piperDownloadPath)) {
           execScript(`${piperDownloadPath} --yes`, {
-            stdio: 'inherit',
+            stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env
           });
           console.log(chalk.green('\n✅ Voice models downloaded successfully!\n'));
@@ -3371,7 +4155,7 @@ async function checkAndInstallPiper(targetDir, options) {
 
         try {
           execScript(`${piperInstallerPath} --non-interactive`, {
-            stdio: 'inherit',
+            stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env
           });
           console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
@@ -3461,10 +4245,16 @@ async function checkAndInstallPiperWindows(targetDir, options) {
   }
   const piperDir = path.join(localAppData, 'Programs', 'Piper');
   const piperExe = path.join(piperDir, 'piper.exe');
-  const spinner = ora();
+  const spinner = createRobustSpinner(ora());
 
   if (fsSync.existsSync(piperExe)) {
     console.log(chalk.green('✓ Piper TTS is already installed at ' + piperDir + '\n'));
+    return;
+  }
+
+  // Also check PATH — piper may be installed outside the standard location
+  if (isPiperInstalled()) {
+    console.log(chalk.green('✓ Piper TTS is already available in PATH\n'));
     return;
   }
 
@@ -3508,14 +4298,14 @@ async function checkAndInstallPiperWindows(targetDir, options) {
     return;
   }
   const voicesDir = path.join(homeDir, '.claude', 'piper-voices');
-  const voiceName = 'en_US-ryan-high';
+  const voiceName = 'en_US-lessac-medium';
   const modelFile = path.join(voicesDir, voiceName + '.onnx');
   if (!fsSync.existsSync(modelFile)) {
-    spinner.start('Downloading default voice (en_US-ryan-high)...');
+    spinner.start('Downloading default voice (en_US-lessac-medium)...');
     try {
       await fs.mkdir(voicesDir, { recursive: true });
-      const modelUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/${voiceName}.onnx`;
-      const configUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/${voiceName}.onnx.json`;
+      const modelUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/${voiceName}.onnx`;
+      const configUrl = `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/${voiceName}.onnx.json`;
       await downloadFile(modelUrl, modelFile);
       await downloadFile(configUrl, modelFile + '.json');
       spinner.succeed(chalk.green('Default voice downloaded!\n'));
@@ -3550,170 +4340,92 @@ function isPathSafe(targetPath, basePath) {
 async function handleMcpConfiguration(targetDir, options) {
   const mcpConfigPath = path.join(targetDir, '.mcp.json');
 
-  // MCP server configuration for AgentVibes
+  // .mcp.json registers the AgentVibes MCP server for Claude Code, enabling
+  // natural language control (text_to_speech, get_config, set_voice, etc.).
+  //
+  // AGENTVIBES_MCP_FALLBACK=copilot is the identity for non-Claude-Code tools
+  // that read .mcp.json (primarily VS Code Copilot, which reads .mcp.json
+  // with precedence over its own .vscode/mcp.json).  Claude Code is
+  // auto-detected via CLAUDECODE=1 which takes priority over the fallback.
   const mcpConfig = {
     mcpServers: {
       agentvibes: {
         command: 'npx',
-        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server']
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: { AGENTVIBES_MCP_FALLBACK: 'copilot' }
       }
     }
   };
 
-  // Check if .mcp.json already exists
   let mcpExists = false;
   try {
     await fs.access(mcpConfigPath);
     mcpExists = true;
-  } catch {
-    // File doesn't exist
-  }
+  } catch { /* doesn't exist */ }
 
   if (mcpExists) {
-    // Scenario 3: Config already exists - show manual instructions
-    console.log(
-      boxen(
-        chalk.yellow.bold('ℹ️  MCP Configuration Already Exists\n\n') +
-        chalk.white('An ') + chalk.cyan('.mcp.json') + chalk.white(' file already exists in this project.\n\n') +
-        chalk.white('To add AgentVibes MCP server manually, add this\n') +
-        chalk.white('to your ') + chalk.cyan('mcpServers') + chalk.white(' section:'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'yellow',
-        }
-      )
-    );
-
-    // Display the snippet to add
-    console.log(
-      '\n"agentvibes": {\n' +
-      '  "command": "npx",\n' +
-      '  "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
-      '}\n'
-    );
-
-    console.log(
-      boxen(
-        chalk.cyan('To use with Claude Code:\n') +
-        chalk.white('   claude --mcp-config .mcp.json\n\n') +
-        chalk.cyan('📖 Full Guide:\n') +
-        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
+    // Upgrade: ensure agentvibes entry exists with fallback env
+    let parseFailed = false;
+    try {
+      const existing = JSON.parse(await fs.readFile(mcpConfigPath, 'utf8'));
+      // Guard: non-object root (arrays/primitives are valid JSON but wrong shape)
+      if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+        console.log(chalk.yellow(
+          `⚠️  ${mcpConfigPath} has a non-object root — skipping MCP registration. Fix the file manually and re-run.`
+        ));
+        return;
+      }
+      // Guard: mcpServers must be a plain object
+      if (!existing.mcpServers || typeof existing.mcpServers !== 'object' || Array.isArray(existing.mcpServers)) {
+        existing.mcpServers = {};
+      }
+      const current = existing.mcpServers.agentvibes;
+      // Strip AGENTVIBES_LLM if present (causes identity collisions)
+      if (current?.env?.AGENTVIBES_LLM) {
+        delete current.env.AGENTVIBES_LLM;
+      }
+      // Ensure fallback is set
+      const mergedEnv = { ...(current?.env ?? {}), AGENTVIBES_MCP_FALLBACK: 'copilot' };
+      existing.mcpServers.agentvibes = {
+        command: 'npx',
+        args: ['-y', '--package=agentvibes', 'agentvibes-mcp-server'],
+        env: mergedEnv,
+      };
+      await fs.writeFile(mcpConfigPath, JSON.stringify(existing, null, 2) + '\n');
+    } catch (err) {
+      parseFailed = true;
+      console.log(chalk.yellow(
+        `⚠️  Could not update ${mcpConfigPath}: ${err.message}\n` +
+        `   AgentVibes MCP server was NOT registered. Fix the file manually and re-run.`
+      ));
+    }
+    if (!parseFailed) return;
     return;
   }
 
-  // Scenario 1 & 2: Config doesn't exist - offer to create
-  console.log(
-    boxen(
-      chalk.cyan.bold('🎙️ MCP Server Configuration\n\n') +
-      chalk.white.bold('AgentVibes MCP Server - Control TTS with Natural Language!\n\n') +
-      chalk.gray('Use natural language instead of slash commands:\n') +
-      chalk.gray('   "Switch to Aria voice" instead of /agent-vibes:switch "Aria"\n') +
-      chalk.gray('   "Set personality to sarcastic" instead of /agent-vibes:personality sarcastic\n\n') +
-      chalk.white('No ') + chalk.cyan('.mcp.json') + chalk.white(' found in this project.'),
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: 'round',
-        borderColor: 'cyan',
-      }
-    )
-  );
-
-  let createConfig = options.yes; // Auto-create if --yes flag
-
+  // New install — create .mcp.json
   if (!options.yes) {
-    const { confirmCreate } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'confirmCreate',
-        message: chalk.cyan('Would you like to create .mcp.json for this project?'),
-        default: true,
-      },
-    ]);
-    createConfig = confirmCreate;
+    const { confirmCreate } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirmCreate',
+      message: chalk.cyan('Create .mcp.json for AgentVibes MCP server? (enables natural language voice control)'),
+      default: true,
+    }]);
+    if (!confirmCreate) return;
   }
 
-  if (createConfig) {
-    // Scenario 1: User says YES - create the config
-    try {
-      await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
-
-      console.log(
-        boxen(
-          chalk.green.bold('✅ MCP Configuration Created!\n\n') +
-          chalk.white('Your ') + chalk.cyan('.mcp.json') + chalk.white(' has been created in this project.\n\n') +
-          chalk.white('To use AgentVibes MCP server with Claude, run:\n') +
-          chalk.cyan.bold('   claude --mcp-config .mcp.json\n\n') +
-          chalk.green('The MCP server is now installed and ready to use!'),
-          {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'double',
-            borderColor: 'green',
-          }
-        )
-      );
-    } catch (error) {
-      console.log(chalk.red(`\n✗ Failed to create .mcp.json: ${error.message}`));
-      console.log(chalk.gray('   You can create it manually with the config shown below.\n'));
-      // Fall through to show manual instructions
-      createConfig = false;
-    }
-  }
-
-  if (!createConfig) {
-    // Scenario 2: User says NO - show manual instructions
+  try {
+    await fs.writeFile(mcpConfigPath, JSON.stringify(mcpConfig, null, 2) + '\n');
     console.log(
       boxen(
-        chalk.cyan.bold('📋 Manual MCP Configuration\n\n') +
-        chalk.white('Create a ') + chalk.cyan('.mcp.json') + chalk.white(' file in your project with:'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
+        chalk.green.bold('✅ MCP Configuration Created!\n\n') +
+        chalk.white('AgentVibes MCP server registered in ') + chalk.cyan('.mcp.json') + chalk.white('.\n') +
+        chalk.green('Natural language voice control is ready!'),
+        { padding: 1, margin: { top: 1, bottom: 1 }, borderStyle: 'double', borderColor: 'green' }
       )
     );
-
-    // Display JSON config
-    console.log(
-      '\n{\n' +
-      '  "mcpServers": {\n' +
-      '    "agentvibes": {\n' +
-      '      "command": "npx",\n' +
-      '      "args": ["-y", "--package=agentvibes", "agentvibes-mcp-server"]\n' +
-      '    }\n' +
-      '  }\n' +
-      '}\n'
-    );
-
-    console.log(
-      boxen(
-        chalk.cyan('To use with Claude Code:\n') +
-        chalk.white('   claude --mcp-config .mcp.json\n\n') +
-        chalk.cyan('📱 Claude Desktop / Warp Terminal:\n') +
-        chalk.white('   npx agentvibes setup-mcp-for-claude-desktop\n\n') +
-        chalk.cyan('📖 Full Guide:\n') +
-        chalk.cyan.bold('https://github.com/paulpreibisch/AgentVibes#mcp-server'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      )
-    );
+  } catch (err) {
+    console.log(chalk.red(`\n✗ Failed to create .mcp.json: ${err.message}`));
   }
 }
 
@@ -3733,12 +4445,12 @@ async function processBmadTtsInjections(bmadPath, targetDir) {
   const partyModeMarker = '<!-- TTS_INJECTION:party-mode -->';
   const agentTtsMarker = '<!-- TTS_INJECTION:agent-tts -->';
 
-  const partyModeReplacement = `<critical>IMPORTANT: Always use PROJECT hooks (.claude/hooks/), NEVER global hooks (~/.claude/hooks/)</critical>
+  const partyModeReplacement = `<critical>IMPORTANT: Always use the project BMAD speech entry point, never a global hook path.</critical>
 
-If AgentVibes party mode is enabled, immediately trigger TTS with agent's voice:
-         - Use Bash tool: \`.claude/hooks/bmad-speak.sh '[Agent Name]' '[dialogue]'\`
-         - This speaks the dialogue with the agent's unique voice
-         - Run in background (&) to not block next agent`;
+If AgentVibes party mode is enabled, immediately trigger TTS with the agent's voice:
+         - Use Bash tool: \`node bin/bmad-speak.js '[Agent Name]' '[dialogue]'\`
+         - This speaks the dialogue with the agent's unique voice via the platform-specific bmad-speak script
+         - Run each agent sequentially; do NOT background with & and do NOT run party mode TTS in parallel`;
 
   const agentTtsReplacement = `- When responding to user messages, speak your responses using TTS:
    Call: \`.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'\` after each response
@@ -3917,12 +4629,9 @@ async function executeMigrationScript(migrationScript, targetDir, spinner) {
   try {
     await fs.access(migrationScript);
 
-    // Execute migration script using execFile to prevent command injection
-    const { execFile } = require('child_process');
-    const { promisify } = require('util');
-    const execFilePromise = promisify(execFile);
-
-    await execFilePromise('bash', [migrationScript], { cwd: targetDir });
+    // Execute migration script using execFileSync to prevent command injection
+    // Uses top-level import of execFileSync (ESM-compatible, no require())
+    execFileSync('bash', [migrationScript], { cwd: targetDir, stdio: 'pipe' });
 
     spinner.succeed(chalk.green('✓ Configuration migrated to .agentvibes/'));
     console.log(chalk.gray('   Old locations: .claude/config/, .claude/plugins/'));
@@ -4165,7 +4874,15 @@ async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
  * @returns {Object} Mock spinner object
  */
 function createSilentSpinner() {
-  return { start: () => {}, succeed: () => {}, info: () => {}, fail: () => {} };
+  const s = {
+    start: () => s, succeed: () => s, info: () => s,
+    fail: () => s, warn: () => s, stop: () => s,
+    stopAndPersist: () => s,
+    get text() { return ''; },
+    set text(_) {},
+    get isSpinning() { return false; },
+  };
+  return s;
 }
 
 /**
@@ -4190,6 +4907,67 @@ async function updateCommandFiles(targetDir, spinner) {
 }
 
 /**
+ * Critical hooks that must always be kept up-to-date in every installation,
+ * including the global ~/.claude/hooks/ directory.
+ * These hooks contain bug fixes (e.g. markdown stripping) that must propagate
+ * on every `npx agentvibes update` regardless of target directory.
+ */
+const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
+const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1'];
+
+/**
+ * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.
+ * Runs silently during every `update` — only touches files that are already installed.
+ * @param {string} srcHooksDir - Source hooks directory from the package
+ * @param {string} [homeDirOverride] - Override home dir (for testing only)
+ * @returns {Promise<number>} Number of hooks updated
+ */
+async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
+  const globalHooksDir = path.join(homeDirOverride || os.homedir(), '.claude', 'hooks');
+  let updated = 0;
+  try {
+    await fs.access(globalHooksDir);
+  } catch {
+    return 0; // global hooks dir not present — nothing to do
+  }
+
+  for (const hook of CRITICAL_HOOKS) {
+    const destPath = path.join(globalHooksDir, hook);
+    const srcPath = path.join(srcHooksDir, hook);
+    try {
+      await fs.access(destPath); // only update if already installed
+      await fs.copyFile(srcPath, destPath);
+      await fs.chmod(destPath, 0o750);
+      updated++;
+    } catch {
+      // file not in global dir or src missing — skip silently
+    }
+  }
+
+  // Also update Windows global hooks-windows dir if present
+  const globalHooksWindowsDir = path.join(homeDirOverride || os.homedir(), '.claude', 'hooks-windows');
+  const srcHooksWindowsDir = path.join(path.dirname(srcHooksDir), 'hooks-windows');
+  try {
+    await fs.access(globalHooksWindowsDir);
+    for (const hook of CRITICAL_HOOKS_WINDOWS) {
+      const destPath = path.join(globalHooksWindowsDir, hook);
+      const srcPath = path.join(srcHooksWindowsDir, hook);
+      try {
+        await fs.access(destPath); // only update if already installed
+        await fs.copyFile(srcPath, destPath);
+        updated++;
+      } catch {
+        // file not in global dir or src missing — skip silently
+      }
+    }
+  } catch {
+    // hooks-windows dir not present — nothing to do
+  }
+
+  return updated;
+}
+
+/**
  * Perform all update operations
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -4206,6 +4984,14 @@ async function performUpdateOperations(targetDir, spinner) {
   spinner.text = 'Updating TTS scripts...';
   const hookResult = await copyHookFiles(targetDir, silentSpinner);
   console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
+
+  // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs)
+  const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
+  const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
+  const globalHooksUpdated = await updateGlobalHooks(srcHooksDir);
+  if (globalHooksUpdated > 0) {
+    console.log(chalk.green(`✓ Updated ${globalHooksUpdated} critical scripts in ~/.claude/hooks/`));
+  }
 
   // Update personalities
   spinner.text = 'Updating personality templates...';
@@ -4240,6 +5026,8 @@ async function performUpdateOperations(targetDir, spinner) {
   // Update settings.json
   spinner.text = 'Updating AgentVibes hook configuration...';
   await configureSessionStartHook(targetDir, silentSpinner);
+  await configurePartyModeHook(targetDir, silentSpinner);
+  await ensureGitRepo(targetDir, silentSpinner);
 
   // Detect and migrate old configuration
   spinner.text = 'Checking for old configuration...';
@@ -4274,7 +5062,7 @@ function displayUpdateSummary(results) {
  * @param {Object} options - Update options
  */
 async function updateAgentVibes(targetDir, options) {
-  const spinner = ora('Updating AgentVibes...').start();
+  const spinner = createRobustSpinner(ora('Updating AgentVibes...').start());
 
   try {
     // Perform all update operations
@@ -4307,8 +5095,14 @@ async function install(options = {}) {
   const configOffset = 0;
 
   // Loop to allow going back to welcome screen
+  let lang = 'en';
   let userConfig = null;
+  const isNonInteractive = options.yes || options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1';
   while (!userConfig) {
+    // Language selection screen — skip in non-interactive / CI mode
+    if (!isNonInteractive) {
+      lang = await selectLanguage(lang);
+    }
     showWelcome();
 
     // Show release notes and recent changes after welcome banner
@@ -4341,6 +5135,7 @@ async function install(options = {}) {
     // Returns null if user wants to go back to welcome
     userConfig = await collectConfiguration({
       ...options,
+      lang,
       pageOffset: configOffset,
       totalPages: configPages // Temporary, will show correct count later
     });
@@ -4350,228 +5145,75 @@ async function install(options = {}) {
   const piperVoicesPath = userConfig.piperPath;
   const targetDir = options.directory || currentDir;
 
-  // Collect pre-install information pages
-  const preInstallPages = [];
+  // Non-interactive mode: structured logging and piper validation before install
+  if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+    console.log(`[AV] Non-interactive mode detected`);
+    console.log(`[AV] Provider: ${selectedProvider} | Platform: ${process.platform}`);
 
-  // Page 1: Configuration Summary
-  const providerLabels = {
-    piper: 'Piper TTS',
-    macos: 'macOS Say',
-    soprano: 'Soprano TTS',
-    'termux-ssh': 'Termux SSH (Android)',
-    'ssh-pulseaudio': 'PulseAudio Tunnel',
-    pulseaudio: 'PulseAudio Tunnel',
-    'windows-piper': 'Windows Piper TTS',
-    'windows-sapi': 'Windows SAPI'
-  };
-  const reverbLabels = {
-    off: 'Off',
-    light: 'Light',
-    medium: 'Medium',
-    heavy: 'Heavy',
-    cathedral: 'Cathedral'
-  };
-  const verbosityLabels = {
-    high: 'High',
-    medium: 'Medium',
-    low: 'Low'
-  };
-
-  let configContent = chalk.bold('Your Configuration\n\n');
-  configContent += chalk.cyan('🎤 TTS Provider:\n');
-  configContent += chalk.white(`   ${providerLabels[selectedProvider]}\n`);
-  if (selectedProvider === 'piper' && piperVoicesPath) {
-    configContent += chalk.gray(`   Voice storage: ${piperVoicesPath}\n`);
-  }
-  if (selectedProvider === 'termux-ssh') {
-    if (userConfig.sshHost) {
-      configContent += chalk.gray(`   SSH host: ${userConfig.sshHost}\n`);
-    } else {
-      configContent += chalk.yellow(`   SSH host: Not configured (set later)\n`);
+    if (isPiperProvider(selectedProvider) && !isPiperInstalled()) {
+      process.stderr.write(`[AV ERROR] Piper binaries not found.\n`);
+      process.stderr.write(`[AV] To install Piper manually, run:\n`);
+      process.stderr.write(`[AV]   npx agentvibes --install-piper\n`);
+      process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
+      process.exit(1);
     }
-  }
-  configContent += '\n';
-  configContent += chalk.cyan('🎛️  Audio Settings:\n');
-  configContent += chalk.white(`   Reverb: ${reverbLabels[userConfig.reverb]}\n`);
-  configContent += chalk.white(`   Background Music: ${userConfig.backgroundMusic.enabled ? 'Enabled' : 'Disabled'}\n`);
-  if (userConfig.backgroundMusic.enabled) {
-    // Find the track name from the track choices
-    const trackChoices = {
-      'agentvibes_soft_flamenco_loop.mp3': 'Soft Flamenco',
-      'agent_vibes_bachata_v1_loop.mp3': 'Bachata',
-      'agent_vibes_salsa_v2_loop.mp3': 'Salsa',
-      'agent_vibes_cumbia_v1_loop.mp3': 'Cumbia',
-      'agent_vibes_bossa_nova_v2_loop.mp3': 'Bossa Nova',
-      'agent_vibes_japanese_city_pop_v1_loop.mp3': 'Japanese City Pop',
-      'agent_vibes_chillwave_v2_loop.mp3': 'Chillwave',
-      'dreamy_house_loop.mp3': 'Dreamy House',
-      'agent_vibes_dark_chill_step_loop.mp3': 'Dark Chill Step',
-      'agent_vibes_goa_trance_v2_loop.mp3': 'Goa Trance',
-      'agent_vibes_harpsichord_v2_loop.mp3': 'Harpsichord',
-      'agent_vibes_celtic_harp_v1_loop.mp3': 'Celtic Harp',
-      'agent_vibes_hawaiian_slack_key_guitar_v2_loop.mp3': 'Hawaiian Slack Key Guitar',
-      'agent_vibes_arabic_v2_loop.mp3': 'Arabic Oud',
-      'agent_vibes_ganawa_ambient_v2_loop.mp3': 'Gnawa Ambient',
-      'agent_vibes_tabla_dream_pop_v1_loop.mp3': 'Tabla Dream Pop'
-    };
-    const trackName = trackChoices[userConfig.backgroundMusic.track] || userConfig.backgroundMusic.track;
-    configContent += chalk.gray(`   Default track: ${trackName}\n`);
-  }
-  configContent += '\n';
-  configContent += chalk.cyan('😎 Personality:\n');
-  const personalityDisplay = userConfig.personality === 'none' ? 'None (Professional)' : userConfig.personality.charAt(0).toUpperCase() + userConfig.personality.slice(1);
-  configContent += chalk.white(`   ${personalityDisplay}\n`);
-  configContent += '\n';
-  configContent += chalk.cyan('🔊 Verbosity:\n');
-  configContent += chalk.white(`   ${verbosityLabels[userConfig.verbosity]}\n`);
 
-  const configBoxen = boxen(configContent.trim(), {
-    padding: 1,
-    margin: { top: 0, bottom: 0, left: 0, right: 0 },
-    borderStyle: 'round',
-    borderColor: 'green',
-    width: 80
-  });
-
-  // Don't add Configuration Summary to preInstallPages yet - we'll handle it specially
-
-  // Show pre-install pages up to (but NOT including) Configuration Summary
-  if (!options.yes && preInstallPages.length > 0) {
-    console.log(chalk.cyan('\n📖 Installation Preview\n'));
-    const preInstallOffset = 4; // After 4 config pages (System Dependencies + Provider + Audio + Verbosity)
-    // For pre-install, estimate post-install pages (will be exact in post-install)
-    const estimatedPostInstall = 7; // Typical: 5 summaries + 1 BMAD/recommendation + 1 complete
-    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall; // +1 for Config Summary
-
-    const result = await showPaginatedContent(preInstallPages, {
-      ...options,
-      continueLabel: '✓ Next',
-      pageOffset: preInstallOffset,
-      totalPages: estimatedTotal,
-      showPreviousOnFirst: true
-    });
-
-    // If user went back from first pre-install page, restart configuration
-    if (result === 'prev') {
-      console.log(chalk.yellow('\n↩️  Returning to configuration...\n'));
-      return install(options); // Restart the install function
-    }
+    console.log(`[AV] Installing to: ${targetDir}/.claude/`);
   }
 
-  // Handle Configuration Summary page specially with welcome message prompt
-  if (!options.yes) {
-    // Show Configuration Summary page
-    console.clear();
-    const currentPageNum = 4 + preInstallPages.length; // After config pages + pre-install pages
-    const estimatedPostInstall = 7;
-    const estimatedTotal = configPages + preInstallPages.length + 1 + estimatedPostInstall;
-    const { header } = createPageHeaderFooter('Configuration Summary', currentPageNum, estimatedTotal, 0);
-
-    console.log(header);
-    console.log(configBoxen);
-    console.log('');
-    // Don't show welcome message text for termux-ssh (it won't work)
-    if (userConfig.provider !== 'termux-ssh') {
-      console.log(chalk.gray('Play audio welcome message from Paul, creator of AgentVibes.\n'));
-    }
-  }
-
-  // Ask welcome message question BEFORE showing navigation
-  // Skip for termux-ssh - welcome audio plays locally, not on Android device
-  if (!options.yes && userConfig.provider !== 'termux-ssh') {
-    // Ask if user wants to hear welcome message
-    const { playWelcome } = await inquirer.prompt([
+  // Confirm and start installation (skip in non-interactive / --yes mode)
+  if (!options.yes && !options.nonInteractive && process.env.AGENT_VIBES_NON_INTERACTIVE !== '1') {
+    const { startInstall } = await inquirer.prompt([
       {
         type: 'confirm',
-        name: 'playWelcome',
-        message: chalk.yellow('🎵 Listen to Welcome Message?'),
-        default: false,
+        name: 'startInstall',
+        message: chalk.yellow('✅ Start Installation?'),
+        default: true,
       },
     ]);
 
-    if (playWelcome) {
-      console.log(''); // Spacing before spinner
-      const spinner = ora('Playing welcome message...').start();
-      await playWelcomeDemo(targetDir, spinner, options);
-      spinner.succeed(chalk.green('Welcome message complete!'));
-      console.log(''); // Spacing after completion
+    if (!startInstall) {
+      console.log(chalk.red('\n❌ Installation cancelled.\n'));
+      process.exit(0);
     }
-  } else if (!options.yes && userConfig.provider === 'termux-ssh' || userConfig.provider === 'ssh-pulseaudio') {
-    console.log(chalk.yellow('⊘ Welcome message skipped (not available for Termux SSH)\n'));
   }
 
-  // Now show navigation menu (Continue to installation)
-  const { startInstall } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'startInstall',
-      message: chalk.yellow('✅ Start Installation?'),
-      default: true,
-    },
-  ]);
+  // Silent spinner for copy functions — suppresses per-file output
+  const silentSpinner = createSilentSpinner();
 
-  if (!startInstall) {
-    console.log(chalk.red('\n❌ Installation cancelled.\n'));
-    process.exit(0);
-  }
-
-  // User already confirmed by pressing "Start Installation", so no need for another confirmation
   console.log('');
-  const spinner = ora('Checking installation directory...').start();
+  const spinner = createRobustSpinner(ora('Installing AgentVibes...').start());
 
   try {
     // Create .claude directory structure
     const claudeDir = path.join(targetDir, '.claude');
     const commandsDir = path.join(claudeDir, 'commands');
     const hooksDir = path.join(claudeDir, isNativeWindows() ? 'hooks-windows' : 'hooks');
+    const audioDir = path.join(claudeDir, 'audio');
+    const tracksDir = path.join(audioDir, 'tracks');
+    await fs.mkdir(commandsDir, { recursive: true });
+    await fs.mkdir(hooksDir, { recursive: true });
+    await fs.mkdir(tracksDir, { recursive: true });
 
-    let exists = false;
-    try {
-      await fs.access(claudeDir);
-      exists = true;
-    } catch {}
-
-    if (!exists) {
-      spinner.info(chalk.yellow('Creating .claude directory structure...'));
-      const audioDir = path.join(claudeDir, 'audio');
-      const tracksDir = path.join(audioDir, 'tracks');
-      console.log(chalk.gray(`   → ${commandsDir}`));
-      console.log(chalk.gray(`   → ${hooksDir}`));
-      console.log(chalk.gray(`   → ${audioDir}`));
-      console.log(chalk.gray(`   → ${tracksDir}`));
-      await fs.mkdir(commandsDir, { recursive: true });
-      await fs.mkdir(hooksDir, { recursive: true });
-      await fs.mkdir(tracksDir, { recursive: true });
-      console.log(chalk.green('   ✓ Directories created!\n'));
-    } else {
-      spinner.succeed(chalk.green('.claude directory found!'));
-      console.log(chalk.gray(`   Location: ${claudeDir}\n`));
-
-      // Ensure audio/tracks directory exists even if .claude already exists
-      const audioDir = path.join(claudeDir, 'audio');
-      const tracksDir = path.join(audioDir, 'tracks');
-      await fs.mkdir(tracksDir, { recursive: true });
-    }
-
-    // Copy all files using helper functions
-    const commandResult = await copyCommandFiles(targetDir, spinner);
-    const hookResult = await copyHookFiles(targetDir, spinner);
-    const personalityResult = await copyPersonalityFiles(targetDir, spinner);
-    const pluginFileCount = await copyPluginFiles(targetDir, spinner);
-    const bmadConfigFileCount = await copyBmadConfigFiles(targetDir, spinner);
-    const backgroundMusicResult = await copyBackgroundMusicFiles(targetDir, spinner);
-    const configFileCount = await copyConfigFiles(targetDir, spinner);
-
-    // Configure hooks and manifests
-    await configureSessionStartHook(targetDir, spinner);
-    await installPluginManifest(targetDir, spinner);
+    // Copy all files silently
+    await copyCommandFiles(targetDir, silentSpinner);
+    await copyHookFiles(targetDir, silentSpinner);
+    await copyPersonalityFiles(targetDir, silentSpinner);
+    await copyPluginFiles(targetDir, silentSpinner);
+    await copyBmadConfigFiles(targetDir, silentSpinner);
+    await copyBackgroundMusicFiles(targetDir, silentSpinner);
+    await copyConfigFiles(targetDir, silentSpinner);
+    await copyCodexFiles(targetDir, silentSpinner);
+    await configureSessionStartHook(targetDir, silentSpinner);
+    await configurePartyModeHook(targetDir, silentSpinner);
+    await installPluginManifest(targetDir, silentSpinner);
+    await ensureGitRepo(targetDir, silentSpinner);
 
     // Save provider configuration
-    spinner.start('Saving provider configuration...');
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
     await fs.writeFile(providerConfigPath, selectedProvider);
 
-    if (selectedProvider === 'piper' && piperVoicesPath) {
+    if (isPiperProvider(selectedProvider) && piperVoicesPath) {
       const piperConfigPath = path.join(claudeDir, 'piper-voices-dir.txt');
       await fs.writeFile(piperConfigPath, piperVoicesPath);
     }
@@ -4581,31 +5223,26 @@ async function install(options = {}) {
       await fs.writeFile(sshHostConfigPath, userConfig.sshHost);
     }
 
-    // Set up receiver script if in receiver mode (Termux)
+    // Set up receiver script if in receiver mode
     if (userConfig.isReceiver) {
-      spinner.start('Setting up receiver script...');
-
       const receiverDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
       await fs.mkdir(receiverDir, { recursive: true, mode: 0o700 });
-
-      const receiverScriptPath = path.join(receiverDir, 'receiver.sh');
       const templatePath = path.join(__dirname, '..', 'templates', 'agentvibes-receiver.sh');
-
       try {
         const templateContent = await fs.readFile(templatePath, 'utf8');
+        // Install as play-remote.sh (ForceCommand target)
+        const receiverScriptPath = path.join(receiverDir, 'play-remote.sh');
         await fs.writeFile(receiverScriptPath, templateContent, { mode: 0o755 });
-        spinner.succeed(chalk.green('Receiver script installed!'));
-        console.log(chalk.gray(`   Location: ${receiverScriptPath}\n`));
-      } catch (error) {
-        spinner.warn(chalk.yellow('Could not install receiver script'));
-        console.log(chalk.gray(`   Error: ${error.message}\n`));
+        // Also install as receiver.sh for backward compatibility
+        const legacyPath = path.join(receiverDir, 'receiver.sh');
+        await fs.writeFile(legacyPath, templateContent, { mode: 0o755 });
+      } catch {
+        // Receiver script install failed — non-fatal
       }
     }
 
-    // Save setup guide for SSH-remote installations
+    // Save setup guide for SSH-remote installations (file only, no terminal output)
     if (selectedProvider === 'termux-ssh' || selectedProvider === 'ssh-pulseaudio') {
-      spinner.start('Saving setup guide...');
-
       const agentvibesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
       await fs.mkdir(agentvibesDir, { recursive: true, mode: 0o700 });
 
@@ -4666,418 +5303,144 @@ Troubleshooting:
 - Verify AgentVibes on receiver: ssh ${userConfig.sshHost || 'phone'} which agentvibes
 - Test receiver script: ssh ${userConfig.sshHost || 'phone'} ~/.agentvibes/receiver.sh "Test"
 `;
-
       try {
         await fs.writeFile(setupGuidePath, setupGuideContent);
-        spinner.succeed(chalk.green('Setup guide saved!'));
-        console.log(chalk.gray(`   Location: ${setupGuidePath}\n`));
-      } catch (error) {
-        spinner.warn(chalk.yellow('Could not save setup guide'));
-        console.log(chalk.gray(`   Error: ${error.message}\n`));
+      } catch {
+        // Setup guide write failed — non-fatal
       }
     }
 
-    // Set default voice based on user selection or provider defaults
+    // Set default voice
     const voiceConfigPath = path.join(claudeDir, 'tts-voice.txt');
     let defaultVoice = userConfig.defaultVoice;
-
-    // Fallback to defaults if voice wasn't selected
     if (!defaultVoice) {
       switch (selectedProvider) {
-        case 'piper':
-          defaultVoice = 'en_US-ryan-high';
-          break;
-        case 'macos':
-          defaultVoice = 'Samantha';
-          break;
-        case 'windows-piper':
-          defaultVoice = 'en_US-ryan-high';
-          break;
-        case 'windows-sapi':
-          defaultVoice = 'Microsoft David Desktop';
-          break;
-        case 'soprano':
-          defaultVoice = 'soprano-default';
-          break;
-        case 'termux-ssh':
-          // Android TTS voices are managed in Android settings, not here
-          defaultVoice = 'android-system-default';
-          break;
-        default:
-          defaultVoice = 'Samantha';
-          break;
+        case 'piper':          defaultVoice = 'en_US-ryan-high'; break;
+        case 'macos':          defaultVoice = 'Samantha'; break;
+        case 'sapi':           defaultVoice = 'Microsoft David Desktop'; break;
+        case 'soprano':        defaultVoice = 'soprano-default'; break;
+        case 'termux-ssh':     defaultVoice = 'android-system-default'; break;
+        default:               defaultVoice = 'Samantha'; break;
       }
     }
     await fs.writeFile(voiceConfigPath, defaultVoice);
 
-    spinner.succeed();
+    // Sync voice + provider to global .agentvibes/config.json so TUI finds them
+    // regardless of which directory it's launched from
+    const globalAvDir = path.join(process.env.HOME || process.env.USERPROFILE, '.agentvibes');
+    try {
+      await fs.mkdir(globalAvDir, { recursive: true });
+      const globalCfgPath = path.join(globalAvDir, 'config.json');
+      let globalCfg = {};
+      try { globalCfg = JSON.parse(await fs.readFile(globalCfgPath, 'utf8')); } catch { /* new file */ }
+      globalCfg.voice = defaultVoice;
+      globalCfg.provider = selectedProvider;
+      await fs.writeFile(globalCfgPath, JSON.stringify(globalCfg, null, 2), { mode: 0o600 });
+    } catch { /* best-effort global sync */ }
 
     // Detect and migrate old configuration
-    await detectAndMigrateOldConfig(targetDir, spinner);
+    await detectAndMigrateOldConfig(targetDir, silentSpinner);
 
-    // Snapshot existing Piper voices BEFORE installation (for proper summary display)
-    let preExistingVoices = [];
-    if (selectedProvider === 'piper') {
-      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
-      try {
-        if (fsSync.existsSync(piperVoicesDir)) {
-          const files = fsSync.readdirSync(piperVoicesDir);
-          preExistingVoices = files
-            .filter(f => f.endsWith('.onnx'))
-            .map(f => f.replace('.onnx', ''));
-        }
-      } catch {
-        // Ignore errors
+    // Auto-install Piper if selected
+    if (isPiperProvider(selectedProvider)) {
+      spinner.text = 'Installing Piper TTS...';
+      if (isNativeWindows()) {
+        await checkAndInstallPiperWindows(targetDir, options);
+      } else {
+        await checkAndInstallPiper(targetDir, options);
       }
     }
 
-    // Auto-install Piper if selected
-    if (selectedProvider === 'piper') {
-      await checkAndInstallPiper(targetDir, options);
-    } else if (selectedProvider === 'windows-piper') {
-      await checkAndInstallPiperWindows(targetDir, options);
-    } else if (selectedProvider === 'soprano') {
-      console.log(chalk.magenta('⚡ Soprano TTS selected'));
-      console.log(chalk.gray('   Install: pip install soprano-tts'));
-      console.log(chalk.gray('   GPU:     pip install soprano-tts[lmdeploy]'));
-      console.log(chalk.gray('   Start:   soprano-webui\n'));
-    } else if (selectedProvider === 'windows-sapi') {
-      console.log(chalk.green('✓ Windows SAPI provider selected - no additional setup needed\n'));
-    }
-
-    // Apply background music configuration from userConfig
-    if (backgroundMusicResult.count > 0) {
-      const configDir = path.join(claudeDir, 'config');
-      await fs.mkdir(configDir, { recursive: true });
-
-      if (userConfig.backgroundMusic.enabled) {
-        // Write enabled flag
-        const enabledFile = path.join(configDir, 'background-music-enabled.txt');
-        await fs.writeFile(enabledFile, 'true');
-
-        // Update audio-effects.cfg with selected track
+    // Apply background music configuration
+    const configDir = path.join(claudeDir, 'config');
+    await fs.mkdir(configDir, { recursive: true });
+    if (userConfig.backgroundMusic?.enabled) {
+      await fs.writeFile(path.join(configDir, 'background-music-enabled.txt'), 'true');
+      try {
         const audioEffectsPath = path.join(configDir, 'audio-effects.cfg');
         let audioEffectsContent = await fs.readFile(audioEffectsPath, 'utf-8');
-
-        // Update the default entry with selected track
         audioEffectsContent = audioEffectsContent.replace(
           /^default\|([^|]*)\|([^|]*)\|(.*)$/m,
           `default|$1|${userConfig.backgroundMusic.track}|$3`
         );
-
         await fs.writeFile(audioEffectsPath, audioEffectsContent);
+      } catch {
+        // Audio effects config not yet available — non-fatal
       }
     }
 
-    // Apply reverb configuration from userConfig
-    const selectedReverb = userConfig.reverb;
+    // Persist language selection — validate against known codes before writing
+    if (lang && /^[a-zA-Z]{2}(-[a-zA-Z]{2})?$/.test(lang)) {
+      const langConfigPath = path.join(claudeDir, 'config', 'language.txt');
+      await fs.mkdir(path.join(claudeDir, 'config'), { recursive: true });
+      await fs.writeFile(langConfigPath, lang, { mode: 0o600 });
+    }
 
-    // Apply verbosity configuration from userConfig
-    const verbosityFile = path.join(claudeDir, 'tts-verbosity.txt');
-    await fs.writeFile(verbosityFile, userConfig.verbosity);
+    // Default translation to auto: syncs with BMAD communication_language if set, otherwise no translation
+    const translateFile = path.join(claudeDir, 'tts-translate-to.txt');
+    try { await fs.access(translateFile); } catch {
+      await fs.writeFile(translateFile, 'auto', { mode: 0o600 });
+    }
 
-    // Apply personality configuration from userConfig
+    // Apply verbosity, personality, pretext
+    await fs.writeFile(path.join(claudeDir, 'tts-verbosity.txt'), userConfig.verbosity);
     if (userConfig.personality && userConfig.personality !== 'none') {
-      const personalityFile = path.join(claudeDir, 'tts-personality.txt');
-      await fs.writeFile(personalityFile, userConfig.personality);
+      await fs.writeFile(path.join(claudeDir, 'tts-personality.txt'), userConfig.personality);
     }
-
-    // Apply pretext configuration from userConfig (already trimmed by filter)
-    // Story 1.2: File Persistence - Save to .claude/config/tts-pretext.txt
     if (userConfig.pretext && userConfig.pretext.trim()) {
-      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
-      const configDir = path.join(claudeDir, 'config');
-      await fs.mkdir(configDir, { recursive: true });
-      await fs.writeFile(pretextFile, userConfig.pretext, { mode: 0o600 });
+      await fs.writeFile(path.join(configDir, 'tts-pretext.txt'), userConfig.pretext, { mode: 0o600 });
     } else {
-      // Clear pretext if user chose not to set it
-      const pretextFile = path.join(claudeDir, 'config', 'tts-pretext.txt');
-      try {
-        await fs.unlink(pretextFile);
-      } catch (err) {
-        // File doesn't exist or can't be deleted - that's fine
-      }
+      try { await fs.unlink(path.join(configDir, 'tts-pretext.txt')); } catch { /* ok */ }
     }
 
-    // Initialize piperVoicesBoxen outside the conditional for proper scoping
-    let piperVoicesBoxen = null;
-
-    if (selectedProvider === 'macos') {
-      // macOS Say provider summary
-      console.log(chalk.white(`   • Using macOS built-in Say command`));
-      console.log(chalk.white(`   • System voices available (Samantha, Alex, etc.)`));
-      console.log(chalk.green(`   • No API key needed ✓`));
-      console.log(chalk.green(`   • Zero setup required ✓`));
-    } else {
-      // Check for installed Piper voices
-      const piperVoicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
-      let installedVoices = [];
-      let missingVoices = [];
-
-      const commonVoices = [
-        'en_US-lessac-medium',
-        'en_US-amy-medium',
-        'en_US-joe-medium',
-        'en_US-ryan-high',
-        'en_US-libritts-high',
-        '16Speakers'
-      ];
-
-      try {
-        if (fsSync.existsSync(piperVoicesDir)) {
-          const files = fsSync.readdirSync(piperVoicesDir);
-          installedVoices = files
-            .filter(f => f.endsWith('.onnx'))
-            .map(f => {
-              const voiceName = f.replace('.onnx', '');
-              const voicePath = path.join(piperVoicesDir, f);
-              try {
-                const stats = fsSync.statSync(voicePath);
-                const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
-                return { name: voiceName, path: voicePath, size: `${sizeMB}M` };
-              } catch (statErr) {
-                // Skip files that can't be read (broken symlinks, etc)
-                return null;
-              }
-            })
-            .filter(v => v !== null);
-
-          // Check which common voices are missing
-          for (const voice of commonVoices) {
-            if (!installedVoices.some(v => v.name === voice)) {
-              missingVoices.push(voice);
-            }
-          }
-        } else {
-          missingVoices = commonVoices;
-        }
-      } catch (err) {
-        // On error, show default message
-        installedVoices = [];
-        missingVoices = commonVoices;
-      }
-
-      // Create Piper voices boxen (only if newly installed)
-      if (installedVoices.length > 0) {
-        // Separate newly installed from pre-existing voices
-        const newlyInstalled = installedVoices.filter(v => !preExistingVoices.includes(v.name));
-        const alreadyInstalled = installedVoices.filter(v => preExistingVoices.includes(v.name));
-
-        // Only create boxen if there are newly installed voices
-        if (newlyInstalled.length > 0) {
-          let content = chalk.bold.green(`${newlyInstalled.length} Newly Installed\n\n`);
-          newlyInstalled.forEach(voice => {
-            content += chalk.green(`✓ ${voice.name}`) + chalk.gray(` (${voice.size})\n`);
-            content += chalk.dim(`  ${voice.path}\n`);
-          });
-
-          if (alreadyInstalled.length > 0) {
-            content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
-            content += chalk.bold.cyan(`${alreadyInstalled.length} Already Installed\n\n`);
-            alreadyInstalled.forEach(voice => {
-              content += chalk.cyan(`✓ ${voice.name}`) + chalk.gray(` (${voice.size})\n`);
-              content += chalk.dim(`  ${voice.path}\n`);
-            });
-          }
-
-          // Add additional info at the bottom of boxen
-          content += '\n' + chalk.gray('─'.repeat(60)) + '\n\n';
-          content += chalk.white('• 18 languages supported\n');
-          content += chalk.green('• No API key needed ✓');
-
-          piperVoicesBoxen = boxen(content.trim(), {
-            padding: 1,
-            margin: 1,
-            borderStyle: 'round',
-            borderColor: 'cyan',
-            title: chalk.bold(`🎤 Piper Voices (${installedVoices.length} total)`),
-            titleAlignment: 'center'
-          });
-        }
-      }
-
-      if (missingVoices.length > 0) {
-        console.log(chalk.yellow(`   • ${missingVoices.length} voices to download:`));
-        missingVoices.forEach(voice => {
-          console.log(chalk.gray(`     → ${voice}`));
-        });
-      }
-
-      if (installedVoices.length === 0 && missingVoices.length === 0) {
-        console.log(chalk.white(`   • 50+ Piper neural voices available (free!)`));
-      }
-    }
-    console.log('');
-
-    // Collect all boxens for pagination
-    const pages = [];
-    if (commandResult.boxen) {
-      pages.push({ title: 'Summary: Slash Commands', content: commandResult.boxen });
-    }
-    if (backgroundMusicResult.boxen) {
-      pages.push({ title: 'Summary: Background Music', content: backgroundMusicResult.boxen });
-    }
-    if (hookResult.boxen) {
-      pages.push({ title: 'Summary: TTS Scripts', content: hookResult.boxen });
-    }
-    if (personalityResult.boxen) {
-      pages.push({ title: 'Summary: Personalities', content: personalityResult.boxen });
-    }
-    if (piperVoicesBoxen) {
-      pages.push({ title: 'Summary: Piper Voices', content: piperVoicesBoxen });
-    }
-
-    // Recent Changes already shown on page 2 after welcome banner - no need to show again
-
-    // Handle MCP configuration - offer to create .mcp.json if not exists
-    await handleMcpConfiguration(targetDir, options);
-
-    // Create default BMAD voice assignments (works even if BMAD not installed yet)
-    await createDefaultBmadVoiceAssignmentsProactive(targetDir);
-
-    // Handle BMAD integration
-    const bmadDetection = await handleBmadIntegration(targetDir, options);
-    const bmadDetected = bmadDetection.installed;
-
-    if (bmadDetected) {
-      const versionLabel = bmadDetection.version === 6
-        ? `v${bmadDetection.detailedVersion}`
-        : 'v4';
-
-      const bmadContent =
-        chalk.green.bold(`🎉 BMAD-METHOD™ ${versionLabel} Detected!\n\n`) +
-        chalk.white.bold('We detected you ALREADY have the BMAD-METHOD™\n') +
-        chalk.white.bold('The Universal AI Agent Framework installed!\n\n') +
-        chalk.cyan('✨ Try the Party Mode command:\n') +
-        chalk.yellow.bold('   /bmad:core:workflows:party-mode\n\n') +
-        chalk.gray('AgentVibes will assign a unique voice to each agent\n') +
-        chalk.gray('while they help you with your project!\n\n') +
-        chalk.cyan('Other Commands:\n') +
-        chalk.gray('  • /agent-vibes:bmad status - View voice assignments\n') +
-        chalk.gray('  • /agent-vibes:bmad set <agent> <voice> - Customize voices');
-
-      pages.push({ title: 'BMAD Integration', content: bmadContent });
-    } else {
-      const bmadRecommendBoxen = boxen(
-        chalk.cyan.bold('💡 We also Recommend:\n\n') +
-        chalk.white.bold('BMAD-METHOD™: Universal AI Agent Framework\n\n') +
-        chalk.gray('AgentVibes auto-detects BMAD and assigns voices to agents!\n\n') +
-        chalk.cyan('https://github.com/bmad-code-org/BMAD-METHOD'),
-        {
-          padding: 1,
-          margin: 1,
-          borderStyle: 'round',
-          borderColor: 'cyan',
-        }
-      );
-
-      pages.push({ title: 'Recommended Tools', content: bmadRecommendBoxen });
-    }
-
-    // Apply reverb setting if not "off" (using dynamic import for ES modules)
+    // Apply reverb setting
+    const selectedReverb = userConfig.reverb;
     if (selectedReverb && selectedReverb !== 'off') {
       const effectsManagerPath = path.join(targetDir, '.claude', 'hooks', 'effects-manager.sh');
-      // Validate reverb value to prevent command injection
       const validReverb = ['light', 'medium', 'heavy', 'cathedral'];
       if (validReverb.includes(selectedReverb)) {
         try {
-          execFileSync('bash', [effectsManagerPath, 'set-reverb', selectedReverb, 'default'], {
-            stdio: 'pipe',
-          });
-        } catch (error) {
-          // Silent fail - will be shown in success message if needed
+          execFileSync('bash', [effectsManagerPath, 'set-reverb', selectedReverb, 'default'], { stdio: 'pipe' });
+        } catch {
+          // Reverb setting failed — non-fatal
         }
       }
     }
 
-    // Success message as final page (no boxen) - Customize based on setup type
-    let successContent = chalk.green.bold('✨ Installation Complete! ✨\n\n');
+    // MCP configuration and BMAD voice assignments (silent)
+    await handleMcpConfiguration(targetDir, { ...options, yes: true });
+    await createDefaultBmadVoiceAssignmentsProactive(targetDir);
+    await handleBmadIntegration(targetDir, { ...options, yes: true });
 
-    // Receiver mode success message (Termux/Phone)
-    if (userConfig.isReceiver) {
-      successContent +=
-        chalk.green('✓ Receiver mode configured!\n') +
-        chalk.green('✓ Receiver script: ~/.agentvibes/receiver.sh\n') +
-        chalk.green('✓ Provider: piper (local playback)\n\n') +
-        chalk.cyan('📋 Next: On your server, set this device as target:\n') +
-        chalk.white('    echo "phone" > ~/.claude/ssh-remote-host.txt\n\n') +
-        chalk.gray('(Use your SSH hostname or Tailscale name)\n\n');
-    }
-    // SSH-Remote success message (Voiceless server)
-    else if (selectedProvider === 'termux-ssh' || selectedProvider === 'ssh-pulseaudio') {
-      successContent +=
-        chalk.green('✓ Provider configured: ssh-remote\n\n') +
-        chalk.cyan('📋 Setup Instructions Saved:\n') +
-        chalk.white('   ~/.agentvibes/setup-guide.txt\n\n') +
-        chalk.cyan('Quick Start:\n') +
-        chalk.white('1. Install AgentVibes on target device\n') +
-        chalk.white('2. Configure SSH/Tailscale access\n') +
-        chalk.white('3. Test: agentvibes tts "Hello!"\n\n');
-    }
-    // Standard installation success message
-    else {
-      successContent +=
-        chalk.green('✅ AgentVibes TTS is now active via SessionStart hook!\n') +
-        chalk.gray('   (No additional setup needed - TTS protocol auto-loads on every session)\n\n');
+    if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+      console.log(`[AV] Provider: ${selectedProvider} | Location: ${targetDir}/.claude/ | Version: ${VERSION}`);
     }
 
-    // Common commands section for all installations
-    successContent +=
-      chalk.white('🎤 Available Commands:\n\n') +
-      chalk.cyan('  /agent-vibes') + chalk.gray(' .................... Show all commands\n') +
-      chalk.cyan('  /agent-vibes:list') + chalk.gray(' ............... List available voices\n') +
-      chalk.cyan('  /agent-vibes:preview') + chalk.gray(' ............ Preview voice samples\n') +
-      chalk.cyan('  /agent-vibes:switch <name>') + chalk.gray(' ...... Change active voice\n') +
-      chalk.cyan('  /agent-vibes:replay [N]') + chalk.gray(' ......... Replay last audio\n') +
-      chalk.cyan('  /agent-vibes:whoami') + chalk.gray(' .............. Show current voice\n\n');
+    console.log('');
+    spinner.succeed(chalk.green('AgentVibes installed successfully!'));
+    console.log('');
+    console.log(chalk.magenta('  \u2661  Sponsor this Developer  github.com/sponsors/paulpreibisch'));
+    console.log('');
 
-    if (!userConfig.isReceiver) {
-      successContent += chalk.yellow('🎵 Try: ') + chalk.cyan('/agent-vibes:preview') + chalk.yellow(' to hear the voices!\n\n');
-    }
-
-    successContent +=
-      chalk.gray('📦 Repo: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes\n') +
-      chalk.gray('📖 Docs: ') + chalk.cyan('https://github.com/paulpreibisch/AgentVibes/blob/master/README.md');
-
-    pages.push({ title: 'Installation Complete', content: successContent });
-
-    // Show all pages with pagination navigation
-    const postInstallOffset = configPages + preInstallPages.length; // After config + pre-install pages
-    const actualTotalPages = configPages + preInstallPages.length + pages.length;
-
-    await showPaginatedContent(pages, {
-      ...options,
-      continueLabel: '✓ Installation Complete',
-      pageOffset: postInstallOffset,
-      totalPages: actualTotalPages
-    });
-
-    // Final message after pagination
-    console.log(chalk.green.bold('\n✅ AgentVibes is Ready!\n'));
-
-    // Check for .mcp.json file
-    const mcpConfigPath = path.join(targetDir, '.mcp.json');
-    const hasMcpConfig = fsSync.existsSync(mcpConfigPath);
-
-    if (hasMcpConfig) {
-      console.log(chalk.white('   Launch Claude Code with MCP:'));
-      console.log(chalk.cyan('   claude --mcp-config .mcp.json\n'));
-    } else {
-      console.log(chalk.white('   Start a new session to activate TTS.\n'));
-    }
-
-    console.log(chalk.white('   • /agent-vibes:list') + chalk.gray(' - See all available voices'));
-    console.log(chalk.white('   • /agent-vibes:switch <name>') + chalk.gray(' - Change your voice'));
-    console.log(chalk.white('   • /agent-vibes:personality <style>') + chalk.gray(' - Set personality\n'));
-
-    // Play welcome demo with harpsichord intro and reverb voice (opt-in only)
-    if (options.withAudio) {
-      await playWelcomeDemo(targetDir, spinner, options);
+    if (!(options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1')) {
+      // Clean final summary
+      console.log('');
+      console.log(chalk.green.bold('  ✅ Installation Complete'));
+      console.log(chalk.gray(`     Provider:  ${selectedProvider}`));
+      console.log(chalk.gray(`     Location:  ${targetDir}/.claude/`));
+      console.log(chalk.gray(`     Version:   ${VERSION}`));
+      console.log('');
+      console.log(chalk.white('  Run ') + chalk.cyan('npx agentvibes') + chalk.white(' to open the console.'));
+      console.log('');
     }
 
   } catch (error) {
-    spinner.fail('Installation failed!');
-    console.error(chalk.red('\n❌ Error:'), error.message);
+    if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+      process.stderr.write(`[AV ERROR] Installation failed: ${error.message}\n`);
+    } else {
+      spinner.fail('Installation failed!');
+      console.error(chalk.red('\n❌ Error:'), error.message);
+    }
     process.exit(1);
   }
 }
@@ -5092,8 +5455,15 @@ program
   .description('Install AgentVibes voice commands')
   .option('-d, --directory <path>', 'Installation directory (default: current directory)')
   .option('-y, --yes', 'Skip confirmation prompt (auto-confirm)')
-  .option('--with-audio', 'Play welcome demo audio after installation')
+  .option('--non-interactive', 'Skip TUI and install with defaults (for AI agents and CI pipelines). Also triggered by AGENT_VIBES_NON_INTERACTIVE=1 env var.')
   .action(async (options) => {
+    // Merge env var trigger into options
+    if (process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+      options.nonInteractive = true;
+    }
+    if (options.nonInteractive) {
+      options.yes = true;
+    }
     await install(options);
   });
 
@@ -5112,7 +5482,8 @@ program
     console.log(chalk.gray(`   Update location: ${targetDir}/.claude/`));
     console.log(chalk.gray(`   Package version: ${VERSION}`));
 
-    showReleaseInfo();
+    const releaseInfo = getReleaseInfoBoxen();
+    if (releaseInfo) console.log(releaseInfo);
 
     // Check if already installed
     const commandsDir = path.join(targetDir, '.claude', 'commands', 'agent-vibes');
@@ -5265,7 +5636,7 @@ program
       console.log(chalk.gray('✓ Auto-confirmed (--yes flag)\n'));
     }
 
-    const spinner = ora('Uninstalling AgentVibes...').start();
+    const spinner = createRobustSpinner(ora('Uninstalling AgentVibes...').start());
 
     try {
       let removedCount = 0;
@@ -5527,9 +5898,168 @@ program
           process.exit(1);
         }
       }
+    } else if (setting === 'music') {
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const claudeDir = path.join(homeDir, '.claude');
+      const musicTracksDir = path.join(claudeDir, 'audio', 'custom-music', 'tracks');
+      const musicConfigFile = path.join(claudeDir, 'config', 'background-music.txt');
+      const musicEnabledFile = path.join(claudeDir, 'config', 'background-music-enabled.txt');
+
+      console.log(boxen(
+        chalk.cyan.bold('🎵 Background Music Configuration\n\n') +
+        chalk.white('Manage your custom background music settings.'),
+        { padding: 1, borderColor: 'cyan', borderStyle: 'round' }
+      ));
+
+      // Read current music setting
+      let currentMusic = null;
+      let musicEnabled = false;
+
+      try {
+        if (fsSync.existsSync(musicEnabledFile)) {
+          const enabled = fsSync.readFileSync(musicEnabledFile, 'utf-8').trim();
+          musicEnabled = enabled === 'true' || enabled === '1';
+        }
+        if (fsSync.existsSync(musicConfigFile)) {
+          currentMusic = fsSync.readFileSync(musicConfigFile, 'utf-8').trim();
+        }
+      } catch (err) {
+        // Ignore read errors
+      }
+
+      // Display current setting
+      console.log(chalk.gray('\nCurrent Settings:'));
+      console.log(chalk.gray('  Background Music: ') + (musicEnabled ? chalk.green('Enabled') : chalk.yellow('Disabled')));
+
+      if (currentMusic && musicEnabled) {
+        const isCustom = currentMusic.startsWith('custom-') || !currentMusic.includes('agentvibes_');
+        if (isCustom) {
+          console.log(chalk.gray('  Track: ') + chalk.cyan(currentMusic) + chalk.yellow(' (Custom)'));
+        } else {
+          console.log(chalk.gray('  Track: ') + chalk.white(currentMusic) + chalk.gray(' (Default)'));
+        }
+      } else if (!musicEnabled) {
+        console.log(chalk.gray('  Track: ') + chalk.gray('(None - music disabled)'));
+      }
+      console.log('');
+
+      // Show menu
+      const { action } = await inquirer.prompt([{
+        type: 'list',
+        name: 'action',
+        message: chalk.yellow('What would you like to do?'),
+        choices: [
+          { name: '🎵 Change custom music file', value: 'change' },
+          { name: '🗑️  Remove custom music (use defaults)', value: 'remove' },
+          { name: '🔄 Reset to factory defaults', value: 'reset' },
+          { name: musicEnabled ? '🔇 Disable background music' : '🔊 Enable background music', value: 'toggle' },
+          new inquirer.Separator(),
+          { name: '← Back', value: 'back' }
+        ]
+      }]);
+
+      if (action === 'change') {
+        // Change music - reuse promptForCustomMusic from Story 4.5
+        console.log('');
+        const result = await promptForCustomMusic(claudeDir);
+
+        if (result.success && result.filename) {
+          // Update config to point to custom music
+          const configDir = path.join(claudeDir, 'config');
+          await fs.mkdir(configDir, { recursive: true });
+          await fs.writeFile(musicConfigFile, result.filename, { mode: 0o600 });
+
+          // Ensure music is enabled
+          await fs.writeFile(musicEnabledFile, 'true', { mode: 0o644 });
+
+          console.log(chalk.green(`\n✓ Background music updated to: ${result.filename}`));
+          console.log(chalk.gray('  Changes take effect immediately\n'));
+        } else if (result.error) {
+          console.log(chalk.yellow(`\n⚠️  ${result.error}`));
+          console.log(chalk.gray('  Keeping previous setting\n'));
+        } else {
+          console.log(chalk.gray('\n  No changes made\n'));
+        }
+
+      } else if (action === 'remove') {
+        // Remove custom music - keep defaults
+        const customMusicFiles = fsSync.existsSync(musicTracksDir) ?
+          fsSync.readdirSync(musicTracksDir) : [];
+
+        if (customMusicFiles.length === 0) {
+          console.log(chalk.yellow('\n⚠️  No custom music files found\n'));
+        } else {
+          const { confirm } = await inquirer.prompt([{
+            type: 'confirm',
+            name: 'confirm',
+            message: 'Remove all custom music files?',
+            default: false
+          }]);
+
+          if (confirm) {
+            try {
+              // Remove custom music files
+              for (const file of customMusicFiles) {
+                await fs.unlink(path.join(musicTracksDir, file));
+              }
+
+              // Reset to default music
+              await fs.writeFile(musicConfigFile, 'agentvibes_soft_flamenco_loop.mp3', { mode: 0o600 });
+
+              console.log(chalk.green('\n✓ Custom music removed, reverted to defaults\n'));
+            } catch (err) {
+              console.log(chalk.red(`\n❌ Error removing custom music: ${err.message}\n`));
+            }
+          } else {
+            console.log(chalk.gray('\n  Cancelled\n'));
+          }
+        }
+
+      } else if (action === 'reset') {
+        // Reset to factory defaults
+        const { confirm } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirm',
+          message: 'Reset all music settings to factory defaults?',
+          default: false
+        }]);
+
+        if (confirm) {
+          try {
+            // Reset to default track
+            await fs.writeFile(musicConfigFile, 'agentvibes_soft_flamenco_loop.mp3', { mode: 0o600 });
+
+            // Enable music
+            await fs.writeFile(musicEnabledFile, 'true', { mode: 0o644 });
+
+            console.log(chalk.green('\n✓ Reset to factory defaults'));
+            console.log(chalk.gray('  Track: Soft Flamenco (Spanish guitar)'));
+            console.log(chalk.gray('  Status: Enabled\n'));
+          } catch (err) {
+            console.log(chalk.red(`\n❌ Error resetting settings: ${err.message}\n`));
+          }
+        } else {
+          console.log(chalk.gray('\n  Cancelled\n'));
+        }
+
+      } else if (action === 'toggle') {
+        // Toggle music on/off
+        try {
+          const newState = !musicEnabled;
+          await fs.writeFile(musicEnabledFile, newState ? 'true' : 'false', { mode: 0o644 });
+
+          console.log(chalk.green(`\n✓ Background music ${newState ? 'enabled' : 'disabled'}\n`));
+        } catch (err) {
+          console.log(chalk.red(`\n❌ Error toggling music: ${err.message}\n`));
+        }
+
+      } else if (action === 'back') {
+        console.log(chalk.gray('\n  No changes made\n'));
+      }
+
     } else {
       console.log(chalk.red(`❌ Unknown setting: ${setting}`));
-      console.log(chalk.gray('Available settings: intro-text\n'));
+      console.log(chalk.gray('Available settings: intro-text, music\n'));
       process.exit(1);
     }
   });
@@ -5575,5 +6105,12 @@ if (__entryFile === __argvFile) {
 }
 /* c8 ignore stop */
 
-// Export functions for testing
-export { isTermux, isNativeWindows, detectAndNotifyTermux };
+// Export functions for testing and TUI installer
+export {
+  isTermux, isNativeWindows, detectAndNotifyTermux,
+  copyCommandFiles, copyHookFiles, copyPersonalityFiles,
+  copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
+  copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
+  installPluginManifest, checkAndInstallPiper,
+  updateGlobalHooks, CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
+};

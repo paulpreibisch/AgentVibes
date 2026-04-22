@@ -250,9 +250,9 @@ function checkIsNetworkMount(filePath) {
 
   if (process.platform === 'win32') {
     // Windows: check for UNC paths (\\server\share) or mapped drives
-    // Also check for paths under %APPDATA% or similar which might be network-synced
+    // Coerce to boolean — match() returns array|null, not boolean
     return resolvedPath.startsWith('\\\\') ||
-           resolvedPath.match(/^[A-Z]:\\[^\\]*\\netshare/i);
+           !!resolvedPath.match(/^[A-Z]:\\[^\\]*\\netshare/i);
   } else {
     // Unix: check for common network mount prefixes
     // /mnt, /media, NFS mount points
