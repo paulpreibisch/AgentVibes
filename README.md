@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v3.6.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.4.0
 
 ---
 
@@ -177,15 +177,14 @@ Configure now: `npx agentvibes config music`
 
 ### 🎯 Key Features
 
-**🌟 NEW IN v3.6.0 — Voice Explorer Release:**
-- 🎤 **Voice Browser** - Browse, sample, and install 914 voices interactively
-- 🏷️ **Friendly Voice Names** - "Ryan" instead of "en_US-libritts_r-medium-speaker-123"
-- 💬 **Intro Text (Pretext)** - Custom prefix for all TTS ("FireBot: Starting...")
-- 🎵 **Custom Background Music** - Upload your own audio files with battle-tested security
-- 🎨 **Interactive Installer** - Preview voices and music during installation
-- 🛡️ **Security Hardening** - 180+ attack variations tested, 100% blocked, OWASP compliant
+**🎛️ NEW IN v5.4.0 — TUI Installer & Fixes:**
+- 🖥️ **TUI Installer** - Interactive terminal UI: browse voices, configure providers, enable BMAD party mode
+- 🔧 **Spinner Fix** - Resolved `spinner.info is not a function` crash on WSL/Linux
+- 🐛 **Circular Dependency Fix** - Removed self-referential `agentvibes@^3.5.9` dep that silently broke installs
+- 🎵 **Background Music Volume Fix** - Restored `bg_volume="0.20"` fallback in `audio-processor.sh`
+- 📂 **PROJECT_ROOT Fix** - `play-tts.sh` now correctly resolves project root for per-project config
 
-**🪟 NEW IN v3.5.5 — Native Windows Support:**
+**🪟 v3.5.5 — Native Windows Support:**
 - 🖥️ **Windows Native TTS** - Soprano, Piper, and Windows SAPI providers. No WSL required!
 - 🎵 **Background Music** - 16 genre tracks mixed under voice
 - 🎛️ **Reverb & Audio Effects** - 5 reverb levels via ffmpeg

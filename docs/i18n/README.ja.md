@@ -1,8 +1,15 @@
 > 🌐 [English version](../../README.md)
 
-**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.3.0
+**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.4.0
 
 ---
+
+**🎛️ v5.4.0 の新機能 — TUI インストーラーと修正:**
+- 🖥️ **TUI インストーラー** - インタラクティブなターミナル UI: ボイスを探し、プロバイダーを設定し、BMAD パーティモードを有効化
+- 🔧 **スピナー修正** - WSL/Linux での `spinner.info is not a function` クラッシュを解決
+- 🐛 **循環依存の修正** - インストールを静かに壊していた自己参照の `agentvibes@^3.5.9` 依存を削除
+- 🎵 **バックグラウンド音楽ボリュームの修正** - `audio-processor.sh` の `bg_volume="0.20"` フォールバックを復元
+- 📂 **PROJECT_ROOT の修正** - `play-tts.sh` がプロジェクト設定のためにプロジェクトルートを正しく解決するように
 
 ## 🎯 NEW IN v5.3.0 — リモートボイスを思いのままに
 

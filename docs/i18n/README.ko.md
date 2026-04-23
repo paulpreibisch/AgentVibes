@@ -1,8 +1,15 @@
 > 🌐 [English version](../../README.md)
 
-**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.3.0
+**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.4.0
 
 ---
+
+**🎛️ v5.4.0 신기능 — TUI 설치 프로그램 및 수정 사항:**
+- 🖥️ **TUI 설치 프로그램** - 대화형 터미널 UI: 보이스 탐색, 프로바이더 구성, BMAD 파티 모드 활성화
+- 🔧 **스피너 수정** - WSL/Linux에서의 `spinner.info is not a function` 충돌 해결
+- 🐛 **순환 의존성 수정** - 설치를 조용히 망가뜨리던 자기 참조 `agentvibes@^3.5.9` 의존성 제거
+- 🎵 **배경 음악 볼륨 수정** - `audio-processor.sh`의 `bg_volume="0.20"` 폴백 복원
+- 📂 **PROJECT_ROOT 수정** - `play-tts.sh`가 이제 프로젝트별 설정을 위한 프로젝트 루트를 올바르게 해석
 
 ## 🎯 NEW IN v5.3.0 — 원격 보이스를 완전히 제어하세요
 

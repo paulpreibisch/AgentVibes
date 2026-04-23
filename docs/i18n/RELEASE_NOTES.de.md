@@ -1,5 +1,23 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎛️ v5.4.0 — TUI-Installer, Spinner-Fix & Abhängigkeitsbereinigung
+
+**Veröffentlicht:** 2026-04-22
+
+### ✨ Neu
+- **TUI-Installer**: Interaktive Terminal-Oberfläche für die geführte Installation — Stimmen durchsuchen, Anbieter konfigurieren, BMAD-Party-Modus aktivieren, alles über eine elegante Terminal-Oberfläche
+- **Plattformübergreifender Spinner-Fix**: Behobener `spinner.info is not a function`-Absturz auf WSL/Linux, der die Installation blockierte
+
+### 🐛 Fehlerbehebungen
+- **Zirkuläre Selbstabhängigkeit entfernt**: `package.json` hing von `agentvibes@^3.5.9` (sich selbst) ab, wodurch npm die fehlerhafte alte Version über die korrigierte schattete — der stille Auslöser des Spinner-Absturzes bei wiederholten Installationen
+- **Lautstärke-Fallback für Hintergrundmusik wiederhergestellt**: Der `bg_volume="0.20"`-Fallback in `audio-processor.sh`, der bei einem Merge verloren ging, wurde wiederhergestellt
+- **PROJECT_ROOT-Erkennung in `play-tts.sh` korrigiert**: Die Aufwärts-Logik ging 2 Ebenen zu weit, wodurch TTS die globale `~/.agentvibes`-Konfiguration statt der Projektkonfiguration verwendete
+
+### 🔧 Technisches
+- 706/738 Tests bestehen
+
+---
+
 ## 🎯 v5.3.0 — Volle Kontrolle über Remote-Stimmen
 
 **Veröffentlichungsdatum:** April 2026

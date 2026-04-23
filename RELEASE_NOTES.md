@@ -1,5 +1,23 @@
 # AgentVibes Release Notes
 
+## 🎛️ v5.4.0 — TUI Installer, Spinner Fix & Dependency Cleanup
+
+**Released:** 2026-04-22
+
+### ✨ New
+- **TUI Installer**: Interactive terminal UI for guided installation — browse voices, configure providers, enable BMAD party mode, all from a beautiful terminal interface
+- **Cross-Platform Spinner Fix**: Resolved `spinner.info is not a function` crash on WSL/Linux that blocked installation
+
+### 🐛 Bug Fixes
+- **Removed circular self-dependency**: `package.json` was depending on `agentvibes@^3.5.9` (itself), causing npm to shadow the fixed binary with the old buggy one — the silent cause of the spinner crash on repeat installs
+- **Restored background music volume fallback**: `audio-processor.sh` `bg_volume="0.20"` fallback lost in merge was restored
+- **Fixed PROJECT_ROOT detection in `play-tts.sh`**: Walk-up logic was going 2 levels too far, causing TTS to use global `~/.agentvibes` config instead of project config
+
+### 🔧 Technical
+- 706/738 tests passing
+
+---
+
 ## ✨ v3.5.10 - Soprano Detection Fixes & Enhanced Installer Features
 
 **Release Date:** February 14, 2026

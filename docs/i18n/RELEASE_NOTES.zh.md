@@ -1,5 +1,23 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎛️ v5.4.0 — TUI 安装程序、Spinner 修复与依赖清理
+
+**发布日期：** 2026-04-22
+
+### ✨ 新功能
+- **TUI 安装程序**：用于引导式安装的交互式终端 UI — 从精美的终端界面浏览语音、配置提供商、启用 BMAD 派对模式
+- **跨平台 Spinner 修复**：解决了 WSL/Linux 上阻止安装的 `spinner.info is not a function` 崩溃问题
+
+### 🐛 Bug 修复
+- **移除循环自依赖**：`package.json` 依赖于 `agentvibes@^3.5.9`（即自身），导致 npm 用旧的有问题的版本覆盖了修复后的二进制文件 — 这是重复安装时 spinner 崩溃的隐性原因
+- **恢复背景音乐音量回退**：恢复了在合并中丢失的 `audio-processor.sh` 中的 `bg_volume="0.20"` 回退值
+- **修复 `play-tts.sh` 中的 PROJECT_ROOT 检测**：向上查找逻辑多走了 2 层，导致 TTS 使用全局 `~/.agentvibes` 配置而非项目配置
+
+### 🔧 技术
+- 706/738 个测试通过
+
+---
+
 ## 🎯 v5.3.0 — 掌控远程语音
 
 **发布日期：** 2026 年 4 月

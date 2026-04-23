@@ -1,8 +1,15 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.3.0
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.4.0
 
 ---
+
+**🎛️ v5.4.0 新功能 — TUI 安装程序与修复：**
+- 🖥️ **TUI 安装程序** - 交互式终端 UI：浏览语音、配置提供商、启用 BMAD 派对模式
+- 🔧 **Spinner 修复** - 解决了 WSL/Linux 上的 `spinner.info is not a function` 崩溃问题
+- 🐛 **循环依赖修复** - 移除了静默破坏安装的自引用 `agentvibes@^3.5.9` 依赖
+- 🎵 **背景音乐音量修复** - 恢复了 `audio-processor.sh` 中的 `bg_volume="0.20"` 回退值
+- 📂 **PROJECT_ROOT 修复** - `play-tts.sh` 现在能正确解析项目根目录以使用项目配置
 
 ## 🎯 NEW IN v5.3.0 — 掌控远程语音
 

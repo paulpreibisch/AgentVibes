@@ -1,8 +1,15 @@
 > 🌐 [English version](../../README.md)
 
-**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.3.0
+**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.4.0
 
 ---
+
+**🎛️ NOUVEAU DANS v5.4.0 — Installateur TUI et Corrections :**
+- 🖥️ **Installateur TUI** - Interface terminal interactive : parcourez les voix, configurez les fournisseurs, activez le mode fête BMAD
+- 🔧 **Correction du Spinner** - Résolution du crash `spinner.info is not a function` sur WSL/Linux
+- 🐛 **Correction de la Dépendance Circulaire** - Suppression de la dépendance auto-référentielle `agentvibes@^3.5.9` qui cassait silencieusement les installations
+- 🎵 **Correction du Volume de Musique de Fond** - Restauration du fallback `bg_volume="0.20"` dans `audio-processor.sh`
+- 📂 **Correction de PROJECT_ROOT** - `play-tts.sh` résout maintenant correctement la racine du projet pour la configuration par projet
 
 ## 🎯 NOUVEAU DANS v5.3.0 — Prenez le Contrôle des Voix à Distance
 
