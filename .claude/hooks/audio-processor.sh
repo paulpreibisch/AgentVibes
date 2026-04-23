@@ -365,6 +365,25 @@ main() {
     # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
+    # Per-agent background music override from bmad-speak.sh profile JSON (takes priority over cfg).
+    # The profile file is a PID-scoped temp file written by bmad-speak.sh; no env var leakage.
+    if [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
+        # SECURITY: Pass profile path via env var to avoid shell injection in node -e string
+        local _prof_track _prof_vol _prof_enabled
+        _prof_track=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(p.backgroundMusic?.track??'')}catch{process.stdout.write('')}" 2>/dev/null || true)
+        _prof_vol=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        _prof_enabled=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.enabled??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+        if [[ "$_prof_enabled" == "true" ]] && [[ -n "$_prof_track" ]]; then
+            background_file="$_prof_track"
+            # Convert percentage volume (0-100) to decimal (0.0-1.0) for ffmpeg
+            if [[ "$_prof_vol" =~ ^[0-9]+$ ]]; then
+                bg_volume=$(awk "BEGIN{printf \"%.2f\", ${_prof_vol}/100}")
+            else
+                bg_volume="0.20"
+            fi
+        fi
+    fi
+
     # SECURITY: Use secure temp directory per CLAUDE.md guidelines
     # Prefer XDG_RUNTIME_DIR (user-owned, restricted permissions)
     # Fall back to user-specific directory in /tmp

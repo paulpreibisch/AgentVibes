@@ -61,9 +61,7 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 PROJECT_ROOT="$SCRIPT_DIR"
 while [[ "$PROJECT_ROOT" != "/" ]]; do
   if [[ -d "$PROJECT_ROOT/.claude/hooks" ]]; then
-    # Found the .claude/hooks directory - PROJECT_ROOT is 2 levels up from hooks
-    PROJECT_ROOT="$(dirname "$(dirname "$PROJECT_ROOT")")"
-    break
+    break  # PROJECT_ROOT is already the project root when its .claude/hooks child exists
   fi
   PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
 done
