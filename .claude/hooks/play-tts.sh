@@ -272,9 +272,6 @@ speak_text() {
     soprano)
       bash "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
       ;;
-    soprano)
-      "$SCRIPT_DIR/play-tts-soprano.sh" "$text" "$voice"
-      ;;
     macos)
       bash "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
       ;;
@@ -286,9 +283,6 @@ speak_text() {
       ;;
     agentvibes-receiver)
       bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
-      ;;
-    termux-ssh)
-      "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
@@ -408,9 +402,6 @@ case "$ACTIVE_PROVIDER" in
   soprano)
     exec bash "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
-  soprano)
-    exec "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
-    ;;
   macos)
     exec bash "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
@@ -422,9 +413,6 @@ case "$ACTIVE_PROVIDER" in
     ;;
   agentvibes-receiver)
     exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
-    ;;
-  termux-ssh)
-    exec "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2
