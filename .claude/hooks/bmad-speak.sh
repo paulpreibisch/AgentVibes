@@ -50,11 +50,15 @@ if [[ ! -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Per-agent profile reader — reads from ~/.agentvibes/bmad-voice-map.json
+# Per-agent profile reader — reads from project .agentvibes/bmad-voice-map.json (falls back to global)
 # Uses node for reliable JSON parsing (jq may not be installed)
 # Returns empty string if field not found or file missing
 
-VOICE_MAP_FILE="$HOME/.agentvibes/bmad-voice-map.json"
+if [[ -f "$PROJECT_ROOT/.agentvibes/bmad-voice-map.json" ]]; then
+  VOICE_MAP_FILE="$PROJECT_ROOT/.agentvibes/bmad-voice-map.json"
+else
+  VOICE_MAP_FILE="$HOME/.agentvibes/bmad-voice-map.json"
+fi
 
 # Read a field from the per-agent profile in bmad-voice-map.json
 # Usage: read_agent_profile <agent_id> <field>

@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.4.0
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.5
 
 ---
 
@@ -40,11 +40,21 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW FEATURE HIGHLIGHTS
+## 🌟 NEW IN v5.5 — Per-LLM Audio Routing
+
+Give **each LLM its own voice, pretext, and music** — Claude Code, Copilot, and Codex can all sound different without touching global settings.
+
+- Add `llm:<name>|...|voice|pretext|engine` rows to `audio-effects.cfg`
+- MCP server auto-detects which LLM is calling and passes `--llm <key>`
+- Configure via **Setup → Default → Configure** in the TUI
+
+Also fixed: Windows installer crash (`spinner.info is not a function`) on **reinstall** with an older global AgentVibes install.
+
+---
+
+## v5.4 — TUI Installer, Spinner Fix & Dependency Cleanup
 
 ### 🎤 Agent Vibes v1.0 Voice Browser
-
-![Voice Browser Banner](docs/installation-screenshots/voice-browser-screenshot.png)
 
 **🎤 Browse, Sample & Install 914 Voices in Real-Time**
 
@@ -297,8 +307,6 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 **Browse and sample 914 voices in real-time!**
 
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
-
 ```bash
 npx agentvibes-voice-browser
 ```
@@ -452,9 +460,6 @@ macOS ships with bash 3.2 (from 2007). After this, everything works perfectly!
 ## 🎤 AgentVibes Voice Browser
 
 **The easiest way to find your perfect voice!**
-
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
-*Browse, sample, and install from 914 voices with real-time audio preview*
 
 ### Launch the Browser
 

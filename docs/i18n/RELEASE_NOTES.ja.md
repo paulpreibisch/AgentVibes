@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎵 v5.5.0 — LLM別オーディオルーティング & Windows インストーラーの堅牢化
+
+**リリース日:** 2026-04-27
+
+### 🆕 LLM別オーディオルーティング
+各 LLM（Claude Code、Copilot、Codex）が独自のボイス、プリテキスト、リバーブ、BGM設定を持てるようになりました。
+MCP サーバーは `--llm <key>` を `play-tts.sh`（Linux/macOS）と `play-tts.ps1`（Windows）の両方に渡し、
+スクリプトは `audio-effects.cfg` の `llm:<key>` 行を参照します。`claude-code`、`copilot`、`codex` 用の
+デフォルト行が同梱されており、TUI の **Setup → Default → Configure** で設定できます。
+
+### 🐛 Windows インストーラークラッシュの修正
+古いグローバルインストールを持つユーザーが Windows で AgentVibes を**再インストール**した際に発生していた
+`spinner.info is not a function` エラーを修正しました。インストーラー内の 10 個のファイルコピー関数がすべて
+`createRobustSpinner()` でスピナーをラップするようになり、どのメソッドを公開しているかに関わらず
+古いコードがクラッシュを引き起こすことはなくなりました。
+
+### 🎶 Windows バックグラウンド音楽のパリティ
+Windows TTS 再生は、低品質の WinMM `SoundPlayer` リサンプラーより `ffplay`（Sinc リサンプリング、アーティファクトなし）を
+優先するようになりました。新しい `Invoke-AudioPlay` ヘルパーがフォールバックを透過的に処理します —
+`ffplay` が利用できない場合は従来通り `SoundPlayer` が使用されます。
+
+### 🎉 パーティモードのクロスプラットフォームエントリポイント
+BMAD パーティモードのステップファイルと Copilot スキルが、一貫して `node bin/bmad-speak.js` を参照するようになりました —
+Windows では `bmad-speak.ps1` に、それ以外では `bmad-speak.sh` に委譲する単一のクロスプラットフォームエントリポイントです。
+
+### 🔧 その他の修正
+- `play-tts.sh` が環境変数 `LLM_PROVIDER` に加えて、名前付きフラグ `--llm <key>` を受け付けるようになりました
+- `mcp-server/server.py` が優先チェーン `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK` でルーティングし、
+  解決されたキーを `-llm`/`--llm` として TTS スクリプトに渡します
+- `audio-effects.cfg` に `llm:claude-code`、`llm:copilot`、`llm:codex` の行を追加
+- `command-routing.test.js` と `ConfigService` のユニットテストを追加
+- npm pack コンテンツガードが追跡されていない公開対象ファイルを検出するようになりました
+
+### 📊 技術
+- 231 テスト通過（失敗 0）
+
+---
+
 ## 🎛️ v5.4.0 — TUI インストーラー、スピナー修正・依存関係クリーンアップ
 
 **リリース日:** 2026-04-22

@@ -75,6 +75,16 @@ export function resolveStartTab(args, configService) {
     return { startTab: 'install' };
   }
 
+  if (cmd === 'update') {
+    // Always route update to CLI installer (src/installer.js)
+    return { cliUpdate: true, args: args.slice(1) };
+  }
+
+  if (cmd === 'uninstall') {
+    // Always route uninstall to CLI installer (src/installer.js)
+    return { cliUninstall: true, args: args.slice(1) };
+  }
+
   if (cmd === 'config' || cmd === 'configure') {
     return { startTab: 'settings' };
   }
@@ -148,6 +158,24 @@ if (_argv1 === _thisFile) {
     // Route to CLI installer for non-interactive installs
     const installerPath = path.resolve(__dirname, '..', 'src', 'installer.js');
     execFileSync(process.execPath, [installerPath, 'install', ...result.args], {
+      stdio: 'inherit',
+      shell: false,
+    });
+    process.exit(0);
+  }
+
+  if (result.cliUpdate) {
+    const installerPath = path.resolve(__dirname, '..', 'src', 'installer.js');
+    execFileSync(process.execPath, [installerPath, 'update', ...result.args], {
+      stdio: 'inherit',
+      shell: false,
+    });
+    process.exit(0);
+  }
+
+  if (result.cliUninstall) {
+    const installerPath = path.resolve(__dirname, '..', 'src', 'installer.js');
+    execFileSync(process.execPath, [installerPath, 'uninstall', ...result.args], {
       stdio: 'inherit',
       shell: false,
     });

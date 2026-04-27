@@ -58,6 +58,21 @@ describe('resolveStartTab', () => {
     assert.deepStrictEqual(result, { startTab: 'install' });
   });
 
+  test('"update" arg → cliUpdate: true', () => {
+    const result = resolveStartTab(['update'], installedStub);
+    assert.deepStrictEqual(result, { cliUpdate: true, args: [] });
+  });
+
+  test('"update" arg with flags → cliUpdate: true, args passed through', () => {
+    const result = resolveStartTab(['update', '--yes'], installedStub);
+    assert.deepStrictEqual(result, { cliUpdate: true, args: ['--yes'] });
+  });
+
+  test('"uninstall" arg → cliUninstall: true', () => {
+    const result = resolveStartTab(['uninstall'], installedStub);
+    assert.deepStrictEqual(result, { cliUninstall: true, args: [] });
+  });
+
   test('unknown command → error object (not startTab)', () => {
     const result = resolveStartTab(['foobar'], notInstalledStub);
     assert.ok('error' in result, 'unknown command must return { error }');

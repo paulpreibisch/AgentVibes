@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎵 v5.5.0 — 每 LLM 音频路由与 Windows 安装程序可靠性增强
+
+**发布日期：** 2026-04-27
+
+### 🆕 每 LLM 音频路由
+每个 LLM（Claude Code、Copilot、Codex）现在可以拥有各自的语音、前缀文本、混响和背景音乐设置。
+MCP 服务器将 `--llm <key>` 同时传给 `play-tts.sh`（Linux/macOS）和 `play-tts.ps1`（Windows），
+脚本在 `audio-effects.cfg` 中查找 `llm:<key>` 行。`claude-code`、`copilot` 和 `codex` 的默认行
+已内置提供；可通过 TUI 的 **Setup → Default → Configure** 进行配置。
+
+### 🐛 Windows 安装程序崩溃修复
+修复了在 Windows 上有旧版全局安装时，AgentVibes **重新安装**时触发的 `spinner.info is not a function` 错误。
+安装程序中所有 10 个文件复制函数现在用 `createRobustSpinner()` 包装其 spinner，无论调用方暴露哪些方法，
+过时的调用者都不会再导致崩溃。
+
+### 🎶 Windows 背景音乐同等支持
+Windows TTS 播放现在优先使用 `ffplay`（sinc 重采样，无杂音）而非低质量的 WinMM `SoundPlayer` 重采样器。
+新的 `Invoke-AudioPlay` 辅助函数透明地处理回退 —— 如果 `ffplay` 不可用，则像以前一样使用 `SoundPlayer`。
+
+### 🎉 派对模式跨平台入口点
+BMAD 派对模式步骤文件和 Copilot skill 现在统一引用 `node bin/bmad-speak.js` ——
+这是唯一的跨平台入口点，在 Windows 上委托给 `bmad-speak.ps1`，在其他系统上委托给 `bmad-speak.sh`。
+
+### 🔧 其他修复
+- `play-tts.sh` 现在除 `LLM_PROVIDER` 环境变量外，还接受命名标志 `--llm <key>`
+- `mcp-server/server.py` 按优先级链 `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK` 路由，
+  并将解析后的键以 `-llm`/`--llm` 形式转发给 TTS 脚本
+- 在 `audio-effects.cfg` 中添加了 `llm:claude-code`、`llm:copilot`、`llm:codex` 行
+- 添加了 `command-routing.test.js` 和 `ConfigService` 单元测试
+- npm pack 内容守卫现在可检测未追踪的可发布文件
+
+### 📊 技术
+- 231 个测试通过（0 个失败）
+
+---
+
 ## 🎛️ v5.4.0 — TUI 安装程序、Spinner 修复与依赖清理
 
 **发布日期：** 2026-04-22

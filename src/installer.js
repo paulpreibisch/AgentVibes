@@ -3249,6 +3249,7 @@ async function handleTermuxSshConfiguration() {
  * @returns {Promise<{count: number, boxen: string}>} Number of files copied and boxen content
  */
 async function copyCommandFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing /agent-vibes slash commands...');
   const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
   const commandsDir = path.join(targetDir, '.claude', 'commands');
@@ -3462,6 +3463,7 @@ function buildHookInstallationBoxen(installedFiles, failedFiles) {
  * @returns {Promise<{count: number, boxen: string|null}>} Number of files copied and boxen content
  */
 async function copyHookFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing TTS helper scripts...');
   const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
   const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
@@ -3516,6 +3518,7 @@ async function copyHookFiles(targetDir, spinner) {
  * @returns {Promise<{count: number, boxen: string|null}>} Number of files copied and boxen content
  */
 async function copyPersonalityFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing personality templates...');
   const srcPersonalitiesDir = path.join(__dirname, '..', '.claude', 'personalities');
   const destPersonalitiesDir = path.join(targetDir, '.claude', 'personalities');
@@ -3598,6 +3601,7 @@ async function copyPersonalityFiles(targetDir, spinner) {
  * @returns {Promise<number>} Number of files copied
  */
 async function copyPluginFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing BMAD plugin files...');
   const srcPluginsDir = path.join(__dirname, '..', '.claude', 'plugins');
   const destPluginsDir = path.join(targetDir, '.claude', 'plugins');
@@ -3632,6 +3636,7 @@ async function copyPluginFiles(targetDir, spinner) {
  * @returns {Promise<number>} Number of files copied
  */
 async function copyBmadConfigFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing BMAD config files...');
   const srcBmadDir = path.join(__dirname, '..', '.agentvibes', 'bmad');
   const destBmadDir = path.join(targetDir, '.agentvibes', 'bmad');
@@ -3664,6 +3669,7 @@ async function copyBmadConfigFiles(targetDir, spinner) {
  * @returns {Promise<{count: number, boxen: string}>} Number of files copied and boxen content
  */
 async function copyBackgroundMusicFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing background music tracks...');
   const srcBackgroundsDir = path.join(__dirname, '..', '.claude', 'audio', 'tracks');
   const destBackgroundsDir = path.join(targetDir, '.claude', 'audio', 'tracks');
@@ -3786,6 +3792,7 @@ async function copyBackgroundMusicFiles(targetDir, spinner) {
  * @returns {Promise<number>} Number of files copied
  */
 async function copyConfigFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing configuration files...');
   const srcConfigDir = path.join(__dirname, '..', '.claude', 'config');
   const destConfigDir = path.join(targetDir, '.claude', 'config');
@@ -3848,6 +3855,7 @@ async function copyConfigFiles(targetDir, spinner) {
  * @param {Object} spinner - Ora spinner instance
  */
 async function copyCodexFiles(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Installing Codex integration files...');
   const srcCodexDir = path.join(__dirname, '..', '.codex');
   const destCodexDir = path.join(targetDir, '.codex');
@@ -3901,6 +3909,7 @@ async function copyCodexFiles(targetDir, spinner) {
  * @param {Object} spinner - Ora spinner instance
  */
 async function configureSessionStartHook(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Configuring AgentVibes hook for automatic TTS...');
   const claudeDir = path.join(targetDir, '.claude');
   const settingsPath = path.join(claudeDir, 'settings.json');
@@ -3956,6 +3965,7 @@ async function configureSessionStartHook(targetDir, spinner) {
  * @param {Object} spinner - Ora spinner instance
  */
 async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
+  spinner = createRobustSpinner(spinner);
   spinner.start('Configuring BMAD party mode TTS hook...');
   const homeDir = homeDirOverride || os.homedir();
   const globalClaudeDir = path.join(homeDir, '.claude');

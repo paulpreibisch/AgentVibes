@@ -1,6 +1,18 @@
 > 🌐 [English version](../../README.md)
 
-**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.4.0
+**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.5.0
+
+---
+
+## 🌟 v5.5 の新機能 — LLM別オーディオルーティング
+
+**各 LLM に独自のボイス、プリテキスト、BGM を設定** — Claude Code、Copilot、Codex をグローバル設定に触れることなく別々のサウンドにできます。
+
+- `llm:<name>|...|voice|pretext|engine` 行を `audio-effects.cfg` に追加する
+- MCP サーバーがどの LLM が呼び出しているかを自動検出し、`--llm <key>` を渡す
+- TUI の **Setup → Default → Configure** で設定する
+
+また修正済み: 古いグローバル AgentVibes インストールがある状態での Windows **再インストール**時のインストーラークラッシュ（`spinner.info is not a function`）。
 
 ---
 

@@ -1,6 +1,18 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.4.0
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.5.0
+
+---
+
+## 🌟 v5.5 新功能 — 每 LLM 音频路由
+
+为**每个 LLM 设置独立的语音、前缀文本和音乐** — Claude Code、Copilot 和 Codex 可以呈现不同的声音，无需修改全局设置。
+
+- 向 `audio-effects.cfg` 添加 `llm:<name>|...|voice|pretext|engine` 行
+- MCP 服务器自动检测哪个 LLM 正在调用，并传递 `--llm <key>`
+- 通过 TUI 的 **Setup → Default → Configure** 进行配置
+
+同时修复：在安装了旧版全局 AgentVibes 的情况下，Windows **重新安装**时的安装程序崩溃（`spinner.info is not a function`）。
 
 ---
 

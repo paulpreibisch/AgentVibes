@@ -10,7 +10,13 @@ param(
     [string]$Text,
 
     [Parameter(Mandatory = $false, Position = 1)]
-    [string]$VoiceOverride
+    [string]$VoiceOverride,
+
+    # LLM identity for per-LLM audio routing (e.g. "claude-code", "copilot", "codex").
+    # When provided, the router looks up an `llm:<name>` row in audio-effects.cfg
+    # to apply LLM-specific voice, pretext, reverb, and engine settings.
+    [Parameter(Mandatory = $false)]
+    [string]$llm = ""
 )
 
 # Configuration paths
@@ -95,6 +101,201 @@ if ($BgEnabled -or $HasReverb) {
         $null = Get-Command ffmpeg -ErrorAction Stop
         $HasFfmpeg = $true
     } catch {}
+}
+
+# ===========================================================================
+# Per-LLM Audio Routing
+# ===========================================================================
+# When mcp-server/server.py invokes play-tts.ps1 on Windows it passes the
+# -llm flag with the active LLM identity (e.g. "claude-code", "copilot",
+# "codex").  The router reads audio-effects.cfg and looks up the row whose
+# key is `llm:<name>`, allowing each LLM to have its own voice, pretext,
+# reverb, and engine without requiring global settings to be reconfigured.
+#
+# Expected audio-effects.cfg row format (pipe-delimited):
+#   llm:<name>|REVERB_PRESET|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT|ENGINE
+#
+# Column descriptions:
+#   1. Key           - Must start with "llm:" followed by the LLM name
+#   2. REVERB_PRESET - One of: off, light, medium, heavy, cathedral (or blank)
+#   3. BACKGROUND_FILE - Filename relative to .claude/audio/tracks/ (or blank)
+#   4. BACKGROUND_VOLUME - Float 0.0-1.0 (or blank for default 0.25)
+#   5. VOICE         - Provider voice name to use (or blank for global default)
+#   6. PRETEXT       - Text prepended to all TTS utterances (or blank)
+#   7. ENGINE        - Windows engine: windows-sapi, windows-piper, soprano (or blank)
+#
+# Example rows:
+#   llm:claude-code|off|||en_US-amy-medium|Agent Vibes Here|windows-piper
+#   llm:copilot|light|||en_US-ryan-low||windows-sapi
+#   llm:codex|off||||Code complete|windows-piper
+#   llm:default|off|||||
+#
+# The "default" key is always looked up when no explicit -llm flag is
+# provided.  Configure it via Setup → Default → Configure in the TUI to
+# apply consistent audio settings across all LLM sessions.
+#
+# Security: The -llm value is validated against an allowlist regex so that
+# injected values like "-rf" or path-traversal strings are rejected before
+# they can appear in lookup keys, environment variables, or file paths.
+
+# --- Validate -llm parameter format ------------------------------------------
+if ($llm -and $llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+    Write-Host "[WARNING] play-tts.ps1: Invalid -llm value '$llm' ignored" `
+        "(must match ^[a-zA-Z0-9][a-zA-Z0-9_-]*`$)" -ForegroundColor Yellow
+    $llm = ""
+}
+
+# --- Default fallback --------------------------------------------------------
+# An empty $llm routes through the "default" pseudo-LLM.  Users who configure
+# an `llm:default` row in audio-effects.cfg get consistent audio settings for
+# every LLM that doesn't pass its own -llm flag — a convenient global override
+# that doesn't require per-LLM configuration.
+if (-not $llm) {
+    $llm = "default"
+}
+
+# --- Export LLM key for child scripts ----------------------------------------
+# Provider scripts (play-tts-windows-*.ps1) and any other downstream tooling
+# can inspect AGENTVIBES_LLM_KEY to identify which LLM is currently speaking.
+# This mirrors the `export AGENTVIBES_LLM_KEY="llm:${LLM_PROVIDER}"` line in
+# the POSIX play-tts.sh so the cross-platform contract is symmetric.
+$env:AGENTVIBES_LLM_KEY = "llm:$llm"
+
+# --- Lookup per-LLM config in audio-effects.cfg ------------------------------
+# Scan project config first, then user-profile config.  Stop at first match.
+# Variables are intentionally prefixed with _ to distinguish LLM-local state
+# from the global session state set earlier in this script.
+$_LlmVoice    = ""
+$_LlmPretext  = ""
+$_LlmReverb   = ""
+$_LlmEngine   = ""
+$_LlmBgFile   = ""
+$_LlmBgVol    = ""
+$_LlmKey      = "llm:$llm"
+
+$_AudioEffectsCfgPaths = @(
+    (Join-Path $ClaudeDir "config\audio-effects.cfg"),
+    (Join-Path $env:USERPROFILE ".claude\config\audio-effects.cfg")
+)
+
+:llmCfgSearch foreach ($_cfgFile in $_AudioEffectsCfgPaths) {
+    if ((-not $_LlmVoice) -and (-not $_LlmPretext) -and (Test-Path $_cfgFile)) {
+        $cfgContent = Get-Content $_cfgFile -ErrorAction SilentlyContinue
+        if ($null -ne $cfgContent) {
+            foreach ($_cfgLine in $cfgContent) {
+                # Skip blank lines and comment / separator lines
+                $stripped = $_cfgLine.Trim()
+                if ($stripped.Length -eq 0 -or $stripped.StartsWith('#')) { continue }
+
+                # Split on pipe; expect at least the key column
+                $_cols = $_cfgLine -split '\|'
+                if ($_cols.Count -ge 1 -and $_cols[0].Trim() -eq $_LlmKey) {
+                    # Unpack columns defensively — missing columns stay empty
+                    if ($_cols.Count -ge 2) { $_LlmReverb  = $_cols[1].Trim() }
+                    if ($_cols.Count -ge 3) { $_LlmBgFile  = $_cols[2].Trim() }
+                    if ($_cols.Count -ge 4) { $_LlmBgVol   = $_cols[3].Trim() }
+                    if ($_cols.Count -ge 5) { $_LlmVoice   = $_cols[4].Trim() }
+                    if ($_cols.Count -ge 6) { $_LlmPretext = $_cols[5].Trim() }
+                    if ($_cols.Count -ge 7) { $_LlmEngine  = $_cols[6].Trim() }
+                    break llmCfgSearch
+                }
+            }
+        }
+    }
+}
+
+# --- Voice priority order (highest wins) -------------------------------------
+# 1. Explicit -VoiceOverride parameter (caller always wins)
+# 2. LLM-specific voice from audio-effects.cfg llm:<key> row
+# 3. BMAD agent voice from bmad-voice-map.json (resolved in provider scripts)
+# 4. Global active voice from tts-provider.txt / active-voice.txt
+
+# Apply LLM-specific voice only when no explicit -VoiceOverride was passed
+if ($_LlmVoice -and -not $VoiceOverride) {
+    $VoiceOverride = $_LlmVoice
+}
+
+# --- Apply LLM-specific pretext ----------------------------------------------
+# Prepend the configured pretext (e.g. "Agent Vibes Here") to the speech
+# text.  Guard against double-prefixing on re-entrant or looped calls by
+# checking whether the text already starts with the pretext string.
+if ($_LlmPretext -and -not $Text.StartsWith($_LlmPretext)) {
+    $Text = "$_LlmPretext, $Text"
+}
+
+# --- Reverb override from per-LLM config -------------------------------------
+# If the llm:<key> row specifies a reverb preset, override the file-based
+# $ReverbLevel that was set from reverb-level.txt earlier.  The allowlist
+# check is repeated here so a malformed config row can't inject arbitrary
+# strings into the ffmpeg filter chain.
+if ($_LlmReverb) {
+    $validReverbLevels = @("off", "light", "medium", "heavy", "cathedral")
+    if ($validReverbLevels -contains $_LlmReverb) {
+        $ReverbLevel = $_LlmReverb
+        $HasReverb = $ReverbLevel -ne "off"
+        # If the LLM config enables reverb and ffmpeg wasn't found yet, retry
+        if ($HasReverb -and -not $HasFfmpeg) {
+            try { $null = Get-Command ffmpeg -ErrorAction Stop; $HasFfmpeg = $true } catch {}
+        }
+    }
+}
+
+# --- Apply LLM-specific engine override --------------------------------------
+# Allowed local Windows engines: windows-sapi, windows-piper, soprano.
+# Transport providers (ssh-remote etc.) are not listed because they forward
+# TTS to a remote host — overriding with a local engine would synthesize on
+# the wrong machine.
+if ($_LlmEngine) {
+    $allowedLocalEngines = @("windows-sapi", "windows-piper", "soprano")
+    if ($allowedLocalEngines -contains $_LlmEngine) {
+        switch ($_LlmEngine) {
+            "windows-sapi"  { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1"  }
+            "windows-piper" { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
+            "soprano"       { $ProviderScript = "$HooksDir\play-tts-soprano.ps1"        }
+        }
+    } else {
+        Write-Host "[INFO] play-tts.ps1: Unrecognised engine '$_LlmEngine' in audio-effects.cfg — keeping default provider" -ForegroundColor DarkGray
+    }
+}
+
+# --- BMAD Party Mode note ----------------------------------------------------
+# When BMAD party mode is active, multiple agents speak in rapid succession.
+# Each agent's voice is resolved from bmad-voice-map.json inside the provider
+# scripts — that BMAD-level routing is independent of this per-LLM system.
+# The -llm flag is still used to set AGENTVIBES_LLM_KEY and can supply a
+# background music track and reverb preset that stays consistent throughout
+# the entire party mode session regardless of which agent is speaking.
+
+# --- Diagnostic output -------------------------------------------------------
+# Set AGENTVIBES_VERBOSE=1 in the shell environment to print routing state.
+if ($env:AGENTVIBES_VERBOSE -eq "1") {
+    Write-Host "[DEBUG] play-tts.ps1 LLM routing: llm=$llm | voice=$VoiceOverride | engine=$_LlmEngine | pretext=$_LlmPretext" -ForegroundColor DarkCyan
+    Write-Host "[DEBUG] play-tts.ps1 LLM routing: reverb=$ReverbLevel | HasFfmpeg=$HasFfmpeg | BgEnabled=$BgEnabled | script=$ProviderScript" -ForegroundColor DarkCyan
+}
+
+# ===========================================================================
+# End of Per-LLM Audio Routing
+# ===========================================================================
+
+# Helper: play a WAV file preferring ffplay over SoundPlayer.
+# SoundPlayer uses WinMM's low-quality resampler (22050 Hz → 48000 Hz is choppy);
+# ffplay uses libswresample with sinc resampling — no artefacts.
+function Invoke-AudioPlay {
+    param([string]$FilePath)
+    $fp = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+    if (-not $fp) {
+        # Watcher sessions may inherit a minimal PATH — refresh from registry
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("Path","User")
+        $fp = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+    }
+    if ($fp) {
+        & $fp -autoexit -nodisp -loglevel quiet $FilePath 2>$null
+    } else {
+        $p = $null
+        try   { $p = New-Object System.Media.SoundPlayer $FilePath; $p.PlaySync() }
+        finally { if ($p) { $p.Dispose() } }
+    }
 }
 
 # If background music or reverb enabled and ffmpeg available, tell provider to skip playback
@@ -204,61 +405,27 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
 
                     if ($proc.ExitCode -eq 0 -and (Test-Path $MixedFile) -and (Get-Item $MixedFile).Length -gt 0) {
                         # Play the mixed audio
-                        $player = $null
                         try {
-                            $player = New-Object System.Media.SoundPlayer $MixedFile
-                            $player.PlaySync()
+                            Invoke-AudioPlay $MixedFile
                         } catch {
                             Write-Host "[WARNING] Mixed playback failed, playing voice only" -ForegroundColor Yellow
-                            $player2 = $null
-                            try {
-                                $player2 = New-Object System.Media.SoundPlayer $voicePath
-                                $player2.PlaySync()
-                            } finally {
-                                if ($player2) { $player2.Dispose() }
-                            }
-                        } finally {
-                            if ($player) { $player.Dispose() }
+                            Invoke-AudioPlay $voicePath
                         }
                     } else {
                         # Mixing failed, play voice only
-                        $player = $null
-                        try {
-                            $player = New-Object System.Media.SoundPlayer $voicePath
-                            $player.PlaySync()
-                        } finally {
-                            if ($player) { $player.Dispose() }
-                        }
+                        Invoke-AudioPlay $voicePath
                     }
                 } catch {
                     # ffmpeg failed, play voice only
-                    $player = $null
-                    try {
-                        $player = New-Object System.Media.SoundPlayer $voicePath
-                        $player.PlaySync()
-                    } finally {
-                        if ($player) { $player.Dispose() }
-                    }
+                    Invoke-AudioPlay $voicePath
                 }
             } else {
                 # No background track found, play voice only
-                $player = $null
-                try {
-                    $player = New-Object System.Media.SoundPlayer $voicePath
-                    $player.PlaySync()
-                } finally {
-                    if ($player) { $player.Dispose() }
-                }
+                Invoke-AudioPlay $voicePath
             }
         } else {
             # No background music, play the (possibly reverbed) voice
-            $player = $null
-            try {
-                $player = New-Object System.Media.SoundPlayer $voicePath
-                $player.PlaySync()
-            } finally {
-                if ($player) { $player.Dispose() }
-            }
+            Invoke-AudioPlay $voicePath
         }
     }
 } else {

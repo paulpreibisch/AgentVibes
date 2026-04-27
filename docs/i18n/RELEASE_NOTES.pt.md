@@ -1,5 +1,45 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎵 v5.5.0 — Roteamento de Áudio por LLM e Resiliência do Instalador Windows
+
+**Lançamento:** 2026-04-27
+
+### 🆕 Roteamento de Áudio por LLM
+Cada LLM (Claude Code, Copilot, Codex) agora pode ter sua própria voz, pretexto, reverb e configurações de
+música de fundo. O servidor MCP passa `--llm <key>` tanto para `play-tts.sh`
+(Linux/macOS) quanto para `play-tts.ps1` (Windows), e os scripts buscam linhas `llm:<key>` em
+`audio-effects.cfg`. Linhas padrão para `claude-code`, `copilot` e `codex` já vêm incluídas;
+configure-as em **Setup → Default → Configure** na TUI.
+
+### 🐛 Correção do Crash do Instalador Windows
+Corrigido o erro `spinner.info is not a function` que fazia o AgentVibes travar em **reinstalações** no Windows
+quando os usuários tinham uma instalação global mais antiga. As 10 funções de cópia de arquivos do instalador agora
+envolvem seu spinner com `createRobustSpinner()` para que chamadores obsoletos nunca possam causar um crash,
+independentemente dos métodos que exponham.
+
+### 🎶 Paridade de Música de Fundo no Windows
+A reprodução TTS do Windows agora prefere `ffplay` (reamostragem sinc, sem artefatos) ao reamostrador
+`SoundPlayer` do WinMM de baixa qualidade. O novo helper `Invoke-AudioPlay` gerencia o fallback de forma
+transparente — se o `ffplay` não estiver disponível, o `SoundPlayer` é usado como antes.
+
+### 🎉 Ponto de Entrada Multiplataforma do Modo Festa
+Os arquivos de etapas do modo festa BMAD e a skill do Copilot agora referenciam de forma consistente
+`node bin/bmad-speak.js` — o único ponto de entrada multiplataforma que delega para
+`bmad-speak.ps1` no Windows e `bmad-speak.sh` nos demais sistemas.
+
+### 🔧 Outras Correções
+- `play-tts.sh` agora aceita um flag nomeado `--llm <key>` além da variável de ambiente `LLM_PROVIDER`
+- `mcp-server/server.py` roteia a cadeia de prioridade `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK`
+  e encaminha a chave resolvida como `-llm`/`--llm` para os scripts TTS
+- Adicionadas linhas em `audio-effects.cfg` para `llm:claude-code`, `llm:copilot`, `llm:codex`
+- Adicionados `command-routing.test.js` e testes unitários do `ConfigService`
+- O guardião de conteúdo do npm pack agora detecta arquivos publicáveis não rastreados
+
+### 📊 Técnico
+- 231 testes passando (0 falhas)
+
+---
+
 ## 🎛️ v5.4.0 — Instalador TUI, Correção do Spinner e Limpeza de Dependências
 
 **Lançamento:** 2026-04-22

@@ -133,6 +133,10 @@ function loadCatalog() {
   // Build lookup map for O(1) access by voiceId
   _catalogMap = new Map();
   for (const c of _catalogEntries) _catalogMap.set(c.voiceId, c);
+
+  // Patch libritts_r onnx.json files so their speaker IDs become friendly names.
+  // Must run after catalog loads so the name mapping is available.
+  patchLibriTTSSpeakerNames();
 }
 
 /**
@@ -142,45 +146,48 @@ function loadCatalog() {
  * Safe to call multiple times — skips if already patched.
  */
 function patchLibriTTSSpeakerNames() {
+  // Load catalog once for all models
+  const catalogPath = path.resolve(__dirname, '..', '..', '..', 'voice-assignments.json');
+  if (!fs.existsSync(catalogPath)) return;
+  let speakers;
   try {
-    const jsonPath = path.join(PIPER_VOICES_DIR, 'en_US-libritts-high.onnx.json');
-    if (!fs.existsSync(jsonPath)) return;
-    const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-    if (!data.speaker_id_map || data.num_speakers <= 1) return;
+    speakers = JSON.parse(fs.readFileSync(catalogPath, 'utf8')).libritts_speakers ?? {};
+  } catch { return; }
 
-    const names = Object.keys(data.speaker_id_map);
-    // Already patched if first name doesn't start with 'p' followed by digits
-    if (names.length > 0 && !/^p\d+$/.test(names[0])) return;
+  // Models to patch and how to detect unpatched keys:
+  //   libritts-high  → raw keys are p-prefixed corpus IDs (p3922, p8699, …)
+  //   libritts_r-*   → raw keys are plain numeric corpus IDs (3922, 8699, …)
+  const MODELS = [
+    { file: 'en_US-libritts-high.onnx.json',   notPatched: (k) => /^p\d+$/.test(k) },
+    { file: 'en_US-libritts_r-medium.onnx.json', notPatched: (k) => /^\d+$/.test(k) },
+    { file: 'en_US-libritts_r-high.onnx.json',   notPatched: (k) => /^\d+$/.test(k) },
+  ];
 
-    // Build index → p-name reverse map
-    const indexToP = {};
-    for (const [pname, idx] of Object.entries(data.speaker_id_map)) {
-      indexToP[idx] = pname;
-    }
+  for (const { file, notPatched } of MODELS) {
+    try {
+      const jsonPath = path.join(PIPER_VOICES_DIR, file);
+      if (!fs.existsSync(jsonPath)) continue;
+      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      if (!data.speaker_id_map || data.num_speakers <= 1) continue;
 
-    // Load friendly names from catalog
-    const catalogPath = path.resolve(__dirname, '..', '..', '..', 'voice-assignments.json');
-    if (!fs.existsSync(catalogPath)) return;
-    const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
-    const speakers = catalog.libritts_speakers ?? {};
+      const names = Object.keys(data.speaker_id_map);
+      // Skip if already patched (first key is a friendly name, not a raw corpus ID)
+      if (names.length === 0 || !notPatched(names[0])) continue;
 
-    // Rebuild speaker_id_map with friendly names
-    const newMap = {};
-    for (const [idx, pname] of Object.entries(indexToP)) {
-      const friendly = speakers[idx]?.voice_name;
-      if (friendly) {
-        newMap[friendly] = parseInt(idx, 10);
-      } else {
-        newMap[pname] = parseInt(idx, 10);
+      // Values are 0-based sequential indices into the model — use as catalog key
+      const newMap = {};
+      for (const [rawKey, idx] of Object.entries(data.speaker_id_map)) {
+        const friendly = speakers[String(idx)]?.voice_name;
+        newMap[friendly ?? rawKey] = idx;
       }
-    }
 
-    data.speaker_id_map = newMap;
-    // Verify file ownership before writing (security: CLAUDE.md)
-    const stat = fs.statSync(jsonPath);
-    if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) return;
-    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf8');
-  } catch { /* non-fatal */ }
+      data.speaker_id_map = newMap;
+      // Verify file ownership before writing (security: CLAUDE.md)
+      const stat = fs.statSync(jsonPath);
+      if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) continue;
+      fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf8');
+    } catch { /* non-fatal — skip this model */ }
+  }
 }
 
 // Column widths for the multi-column voice list
@@ -417,9 +424,9 @@ export function parseMultiSpeaker(voiceId) {
     try {
       const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
       let speakerId = data.speaker_id_map?.[speakerName] ?? null;
-      // Fallback: if the .onnx.json still has raw p-names (not yet patched),
+      // Fallback: if the .onnx.json still has raw corpus IDs (not yet patched),
       // look up the numeric speaker ID from voice-assignments.json catalog.
-      if (speakerId == null && model === 'en_US-libritts-high') {
+      if (speakerId == null && (model === 'en_US-libritts-high' || /^en_US-libritts_r-/.test(model))) {
         try {
           const catalogPath = path.resolve(__dirname, '..', '..', '..', 'voice-assignments.json');
           const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
@@ -443,6 +450,9 @@ export function parseMultiSpeaker(voiceId) {
  * @returns {string[]}
  */
 export function scanInstalledVoices() {
+  // Ensure catalog is loaded and libritts_r onnx.json files are patched
+  // before we read their speaker_id_map keys (otherwise we get raw corpus IDs).
+  loadCatalog();
   try {
     const files = fs.readdirSync(PIPER_VOICES_DIR);
     const onnxFiles = files
@@ -587,6 +597,30 @@ export function getVoiceMeta(voiceId) {
       };
       _metaCache.set(voiceId, result);
       return result;
+    }
+    // libritts_r variants share speaker names with libritts-high after patching
+    if (/^en_US-libritts_r-/.test(ms.model)) {
+      // After patching: speakerName is a friendly name — look up in libritts-high catalog
+      const highCat = _catalogMap.get(`en_US-libritts-high${MS_SEP}${ms.speakerName}`);
+      if (highCat) {
+        const result = { displayName: highCat.displayName, gender: highCat.gender, provider: `Piper (${ms.model})` };
+        _metaCache.set(voiceId, result);
+        return result;
+      }
+      // Before patching: speakerName is a raw numeric corpus ID — resolve via onnx.json value
+      if (/^\d+$/.test(ms.speakerName)) {
+        try {
+          const jsonPath = path.join(PIPER_VOICES_DIR, ms.model + '.onnx.json');
+          const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+          const seqIdx = data.speaker_id_map?.[ms.speakerName];
+          if (seqIdx != null && _catalogEntries[seqIdx]) {
+            const cat = _catalogEntries[seqIdx];
+            const result = { displayName: cat.displayName, gender: cat.gender, provider: `Piper (${ms.model})` };
+            _metaCache.set(voiceId, result);
+            return result;
+          }
+        } catch { /* fall through */ }
+      }
     }
     // Fallback for speakers not in the catalog (e.g. 16Speakers model)
     const displayName = uniquifyVoiceName(ms.speakerName.replace(/_/g, ' '));

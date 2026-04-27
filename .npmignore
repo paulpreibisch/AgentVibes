@@ -1,8 +1,12 @@
 # Development and local files
 .claude/journal/
-.claude/audio/*
-!.claude/audio/tracks/
-!.claude/audio/tracks/*.mp3
+# Exclude TTS cache and generated audio — but keep bundled music tracks
+.claude/audio/tts-*.mp3
+.claude/audio/tts-*.wav
+.claude/audio/tts-padded-*.mp3
+.claude/audio/tts-padded-*.wav
+.claude/audio/bmad-party-mode-recordings/
+.claude/audio/voice-samples/
 .claude/config/
 .claude/settings.local.json
 .claude/tts-*.txt

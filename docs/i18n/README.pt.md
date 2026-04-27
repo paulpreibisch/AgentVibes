@@ -1,6 +1,18 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.4.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versão**: v5.5.0
+
+---
+
+## 🌟 NOVO NO v5.5 — Roteamento de Áudio por LLM
+
+Dê a **cada LLM sua própria voz, pretexto e música** — Claude Code, Copilot e Codex podem soar diferentes sem alterar as configurações globais.
+
+- Adicione linhas `llm:<nome>|...|voice|pretext|engine` ao `audio-effects.cfg`
+- O servidor MCP detecta automaticamente qual LLM está chamando e passa `--llm <key>`
+- Configure em **Setup → Default → Configure** na TUI
+
+Também corrigido: crash do instalador Windows (`spinner.info is not a function`) na **reinstalação** com uma instalação global mais antiga do AgentVibes.
 
 ---
 

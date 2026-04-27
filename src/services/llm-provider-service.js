@@ -198,7 +198,7 @@ export async function installClaudeMcp(targetDir) {
 
   try {
     // Copy hooks, commands, config, personality, plugin, bmad config files
-    const silentSpinner = { start: () => {}, succeed: () => {}, fail: () => {} };
+    const silentSpinner = { start: () => {}, stop: () => {}, succeed: () => {}, fail: () => {}, warn: () => {}, info: () => {}, stopAndPersist: () => {}, get text() { return ''; }, set text(_) {}, get isSpinning() { return false; } };
     const installer = await import('../installer.js');
     await installer.copyHookFiles(targetDir, silentSpinner);
     await installer.copyCommandFiles(targetDir, silentSpinner);

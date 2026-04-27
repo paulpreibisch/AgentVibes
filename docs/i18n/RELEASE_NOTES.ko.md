@@ -1,5 +1,42 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎵 v5.5.0 — LLM별 오디오 라우팅 & Windows 설치 프로그램 복원력
+
+**릴리스:** 2026-04-27
+
+### 🆕 LLM별 오디오 라우팅
+각 LLM(Claude Code, Copilot, Codex)이 이제 자체 보이스, 프리텍스트, 리버브 및 배경 음악 설정을 가질 수 있습니다.
+MCP 서버는 `--llm <key>`를 `play-tts.sh`(Linux/macOS)와 `play-tts.ps1`(Windows) 모두에 전달하며,
+스크립트는 `audio-effects.cfg`에서 `llm:<key>` 행을 조회합니다. `claude-code`, `copilot`, `codex`의
+기본 행이 기본 제공되며, TUI의 **Setup → Default → Configure**를 통해 구성할 수 있습니다.
+
+### 🐛 Windows 설치 프로그램 충돌 수정
+이전 버전의 전역 AgentVibes가 설치된 Windows에서 **재설치** 시 발생하던 `spinner.info is not a function`
+오류를 수정했습니다. 설치 프로그램의 10개 파일 복사 함수 모두 이제 `createRobustSpinner()`로 스피너를 래핑하여,
+노출하는 메서드와 관계없이 오래된 호출자가 충돌을 일으킬 수 없게 됩니다.
+
+### 🎶 Windows 배경 음악 패리티
+Windows TTS 재생이 이제 저품질 WinMM `SoundPlayer` 리샘플러보다 `ffplay`(sinc 리샘플링, 아티팩트 없음)를
+우선합니다. 새로운 `Invoke-AudioPlay` 헬퍼가 폴백을 투명하게 처리합니다 — `ffplay`를 사용할 수 없는 경우
+이전과 같이 `SoundPlayer`가 사용됩니다.
+
+### 🎉 파티 모드 크로스 플랫폼 진입점
+BMAD 파티 모드 단계 파일과 Copilot 스킬이 이제 일관되게 `node bin/bmad-speak.js`를 참조합니다 —
+Windows에서는 `bmad-speak.ps1`로, 다른 곳에서는 `bmad-speak.sh`로 위임하는 단일 크로스 플랫폼 진입점입니다.
+
+### 🔧 기타 수정 사항
+- `play-tts.sh`가 이제 환경 변수 `LLM_PROVIDER` 외에 명명된 `--llm <key>` 플래그도 허용합니다
+- `mcp-server/server.py`가 우선순위 체인 `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK`으로
+  라우팅하고 해결된 키를 `-llm`/`--llm`으로 TTS 스크립트에 전달합니다
+- `audio-effects.cfg`에 `llm:claude-code`, `llm:copilot`, `llm:codex` 행 추가
+- `command-routing.test.js` 및 `ConfigService` 단위 테스트 추가
+- npm pack 콘텐츠 가드가 이제 추적되지 않는 게시 가능 파일을 감지합니다
+
+### 📊 기술 사항
+- 231개 테스트 통과 (실패 0)
+
+---
+
 ## 🎛️ v5.4.0 — TUI 설치 프로그램, 스피너 수정 및 의존성 정리
 
 **릴리스:** 2026-04-22

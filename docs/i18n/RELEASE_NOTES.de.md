@@ -1,5 +1,45 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎵 v5.5.0 — LLM-spezifisches Audio-Routing & Windows-Installer-Resilienz
+
+**Veröffentlicht:** 2026-04-27
+
+### 🆕 LLM-spezifisches Audio-Routing
+Jeder LLM (Claude Code, Copilot, Codex) kann nun eine eigene Stimme, ein eigenes Pretext, eigenen Reverb und eigene
+Hintergrundmusik-Einstellungen haben. Der MCP-Server übergibt `--llm <key>` sowohl an `play-tts.sh`
+(Linux/macOS) als auch an `play-tts.ps1` (Windows), und die Scripts suchen in `audio-effects.cfg` nach
+`llm:<key>`-Zeilen. Standardzeilen für `claude-code`, `copilot` und `codex` sind bereits enthalten;
+konfiguriere sie über **Setup → Standard → Konfigurieren** in der TUI.
+
+### 🐛 Windows-Installer-Absturz behoben
+Behobener `spinner.info is not a function`-Fehler, der AgentVibes-**Neuinstallationen** unter Windows zum Absturz
+brachte, wenn Nutzer eine ältere globale Installation hatten. Alle 10 Dateikopierfunktionen im Installer umschließen
+ihren Spinner nun mit `createRobustSpinner()`, damit veraltete Aufrufer unabhängig von den von ihnen exponierten
+Methoden keinen Absturz verursachen können.
+
+### 🎶 Windows-Hintergrundmusik-Parität
+Die Windows-TTS-Wiedergabe bevorzugt nun `ffplay` (Sinc-Resampling, keine Artefakte) gegenüber dem
+qualitativ minderwertigen WinMM-`SoundPlayer`-Resampler. Der neue `Invoke-AudioPlay`-Helper übernimmt den
+Fallback transparent — ist `ffplay` nicht verfügbar, wird `SoundPlayer` wie zuvor verwendet.
+
+### 🎉 Plattformübergreifender Einstiegspunkt für den Party-Modus
+BMAD-Party-Modus-Schritt-Dateien und die Copilot-Skill referenzieren nun einheitlich
+`node bin/bmad-speak.js` — den einzigen plattformübergreifenden Einstiegspunkt, der auf Windows an
+`bmad-speak.ps1` und andernorts an `bmad-speak.sh` delegiert.
+
+### 🔧 Weitere Korrekturen
+- `play-tts.sh` akzeptiert nun zusätzlich zur `LLM_PROVIDER`-Umgebungsvariable ein benanntes `--llm <key>`-Flag
+- `mcp-server/server.py` verarbeitet die Prioritätskette `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK`
+  und leitet den aufgelösten Schlüssel als `-llm`/`--llm` an TTS-Scripts weiter
+- `audio-effects.cfg`-Zeilen für `llm:claude-code`, `llm:copilot`, `llm:codex` hinzugefügt
+- `command-routing.test.js` und `ConfigService`-Unit-Tests hinzugefügt
+- Der npm-pack-Inhalts-Guard erkennt nun nicht verfolgte veröffentlichbare Dateien
+
+### 📊 Technisches
+- 231 Tests bestehen (0 Fehler)
+
+---
+
 ## 🎛️ v5.4.0 — TUI-Installer, Spinner-Fix & Abhängigkeitsbereinigung
 
 **Veröffentlicht:** 2026-04-22

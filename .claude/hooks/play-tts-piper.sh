@@ -551,8 +551,8 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
     termux-media-player play "$TEMP_FILE" >/dev/null 2>&1 &
     PLAYER_PID=$!
   else
-    # Linux/WSL: Prefer paplay (PulseAudio) for best WSL audio quality
-    (paplay "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay "$TEMP_FILE") >/dev/null 2>&1 &
+    # Linux/WSL: paplay with 500ms latency buffer prevents choppiness over RDP/network audio
+    (paplay --latency-msec=500 "$TEMP_FILE" || mpv "$TEMP_FILE" || aplay -B 2000000 "$TEMP_FILE") >/dev/null 2>&1 &
     PLAYER_PID=$!
   fi
 fi

@@ -1,5 +1,45 @@
 # AgentVibes Release Notes
 
+## 🎵 v5.5.0 — Per-LLM Audio Routing & Windows Installer Resilience
+
+**Released:** 2026-04-27
+
+### 🆕 Per-LLM Audio Routing
+Each LLM (Claude Code, Copilot, Codex) can now have its own voice, pretext, reverb, and
+background-music settings. The MCP server passes `--llm <key>` to both `play-tts.sh`
+(Linux/macOS) and `play-tts.ps1` (Windows), and the scripts look up `llm:<key>` rows in
+`audio-effects.cfg`. Default rows for `claude-code`, `copilot`, and `codex` ship out of the
+box; configure them via **Setup → Default → Configure** in the TUI.
+
+### 🐛 Windows Installer Crash Fix
+Fixed `spinner.info is not a function` error that crashed AgentVibes **reinstalls** on Windows
+when users had an older global install. All 10 file-copy functions in the installer now wrap
+their spinner with `createRobustSpinner()` so stale callers can never cause a crash regardless
+of which methods they expose.
+
+### 🎶 Windows Background Music Parity
+Windows TTS playback now prefers `ffplay` (sinc resampling, no artefacts) over the low-quality
+WinMM `SoundPlayer` resampler. The new `Invoke-AudioPlay` helper handles the fallback
+transparently — if `ffplay` is unavailable, `SoundPlayer` is used as before.
+
+### 🎉 Party Mode Cross-Platform Entry Point
+BMAD party mode step files and the Copilot skill now consistently reference
+`node bin/bmad-speak.js` — the single cross-platform entry point that delegates to
+`bmad-speak.ps1` on Windows and `bmad-speak.sh` elsewhere.
+
+### 🔧 Other Fixes
+- `play-tts.sh` now accepts a named `--llm <key>` flag in addition to the `LLM_PROVIDER` env var
+- `mcp-server/server.py` routes `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK`
+  priority chain and forwards the resolved key as `-llm`/`--llm` to TTS scripts
+- Added `audio-effects.cfg` rows for `llm:claude-code`, `llm:copilot`, `llm:codex`
+- Added `command-routing.test.js` and `ConfigService` unit tests
+- npm pack content guard now catches untracked publishable files
+
+### 📊 Technical
+- 231 tests passing (0 failures)
+
+---
+
 ## 🎛️ v5.4.0 — TUI Installer, Spinner Fix & Dependency Cleanup
 
 **Released:** 2026-04-22

@@ -142,19 +142,33 @@ try {
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
     Write-Host "[VOICE] Voice used: $VoiceName (Piper)" -ForegroundColor Green
 
-    # Play the audio using built-in Windows audio player (skip if AGENTVIBES_NO_PLAY is set)
+    # Play the audio (skip if AGENTVIBES_NO_PLAY is set)
     if (-not $env:AGENTVIBES_NO_PLAY) {
-        $player = $null
-        try {
-            $player = New-Object System.Media.SoundPlayer $AudioFile
-            $player.PlaySync()
+        # Prefer ffplay: handles 22050 Hz → 48000 Hz resampling cleanly (SoundPlayer uses
+        # WinMM's low-quality resampler which produces choppy audio at non-native rates).
+        $ffplayPath = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+        if (-not $ffplayPath) {
+            # SSH/watcher sessions may have a minimal PATH — refresh from registry
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("Path","User")
+            $ffplayPath = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
         }
-        catch {
-            Write-Host "[WARNING] Could not play audio (SoundPlayer unavailable)" -ForegroundColor Yellow
-            Write-Host "Audio saved to: $AudioFile" -ForegroundColor Gray
+        if ($ffplayPath) {
+            & $ffplayPath -autoexit -nodisp -loglevel quiet $AudioFile 2>$null
         }
-        finally {
-            if ($player) { $player.Dispose() }
+        else {
+            $player = $null
+            try {
+                $player = New-Object System.Media.SoundPlayer $AudioFile
+                $player.PlaySync()
+            }
+            catch {
+                Write-Host "[WARNING] Could not play audio (SoundPlayer unavailable)" -ForegroundColor Yellow
+                Write-Host "Audio saved to: $AudioFile" -ForegroundColor Gray
+            }
+            finally {
+                if ($player) { $player.Dispose() }
+            }
         }
     }
 }

@@ -1,6 +1,18 @@
 > 🌐 [English version](../../README.md)
 
-**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.4.0
+**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.5.0
+
+---
+
+## 🌟 v5.5 신기능 — LLM별 오디오 라우팅
+
+**각 LLM에 고유한 보이스, 프리텍스트, 음악을 부여** — Claude Code, Copilot, Codex가 전역 설정을 건드리지 않고도 서로 다른 소리를 낼 수 있습니다.
+
+- `llm:<name>|...|voice|pretext|engine` 행을 `audio-effects.cfg`에 추가
+- MCP 서버가 어떤 LLM이 호출하는지 자동 감지하여 `--llm <key>` 전달
+- TUI의 **Setup → Default → Configure**에서 설정
+
+또한 수정됨: 이전 버전의 전역 AgentVibes가 설치된 상태에서 **재설치** 시 발생하는 Windows 설치 프로그램 충돌(`spinner.info is not a function`).
 
 ---
 

@@ -1,5 +1,45 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎵 v5.5.0 — Routing Audio per LLM e Resilienza dell'Installatore Windows
+
+**Rilascio:** 2026-04-27
+
+### 🆕 Routing Audio per LLM
+Ogni LLM (Claude Code, Copilot, Codex) può ora avere la propria voce, pretext, riverbero e impostazioni di
+musica di sottofondo. Il server MCP passa `--llm <key>` sia a `play-tts.sh`
+(Linux/macOS) che a `play-tts.ps1` (Windows), e gli script cercano le righe `llm:<key>` in
+`audio-effects.cfg`. Le righe predefinite per `claude-code`, `copilot` e `codex` sono incluse
+fin da subito; configurale tramite **Setup → Predefinito → Configura** nel TUI.
+
+### 🐛 Correzione del Crash dell'Installatore Windows
+Corretto l'errore `spinner.info is not a function` che mandava in crash le **reinstallazioni** di AgentVibes su Windows
+quando gli utenti avevano una vecchia installazione globale. Tutte le 10 funzioni di copia file dell'installatore ora
+avvolgono il proprio spinner con `createRobustSpinner()` in modo che i chiamanti obsoleti non possano mai causare
+un crash indipendentemente dai metodi che espongono.
+
+### 🎶 Parità della Musica di Sottofondo su Windows
+La riproduzione TTS su Windows ora preferisce `ffplay` (resampling sinc, nessun artefatto) rispetto al
+resampler `SoundPlayer` di WinMM di bassa qualità. Il nuovo helper `Invoke-AudioPlay` gestisce il fallback
+in modo trasparente — se `ffplay` non è disponibile, viene usato `SoundPlayer` come prima.
+
+### 🎉 Punto di Ingresso Multipiattaforma della Modalità Party
+I file dei passi della modalità party BMAD e la skill di Copilot ora fanno riferimento in modo coerente a
+`node bin/bmad-speak.js` — l'unico punto di ingresso multipiattaforma che delega a
+`bmad-speak.ps1` su Windows e `bmad-speak.sh` altrove.
+
+### 🔧 Altre Correzioni
+- `play-tts.sh` ora accetta un flag nominato `--llm <key>` oltre alla variabile d'ambiente `LLM_PROVIDER`
+- `mcp-server/server.py` gestisce la catena di priorità `AGENTVIBES_LLM` → `CLAUDECODE=1` → `AGENTVIBES_MCP_FALLBACK`
+  e inoltra la chiave risolta come `-llm`/`--llm` agli script TTS
+- Aggiunte righe in `audio-effects.cfg` per `llm:claude-code`, `llm:copilot`, `llm:codex`
+- Aggiunti `command-routing.test.js` e test unitari di `ConfigService`
+- Il guardiano del contenuto npm pack rileva ora i file pubblicabili non tracciati
+
+### 📊 Tecnico
+- 231 test superati (0 fallimenti)
+
+---
+
 ## 🎛️ v5.4.0 — Installatore TUI, Correzione dello Spinner e Pulizia delle Dipendenze
 
 **Rilascio:** 2026-04-22

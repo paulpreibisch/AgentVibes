@@ -192,6 +192,17 @@ class AgentVibesServer:
                 original_language = await self._get_language()
                 await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
 
+            # Resolve LLM key: AGENTVIBES_LLM > CLAUDECODE=1 > AGENTVIBES_MCP_FALLBACK > "default"
+            llm_key = os.environ.get("AGENTVIBES_LLM", "").strip()
+            if llm_key and not _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", llm_key):
+                llm_key = ""
+            if not llm_key and os.environ.get("CLAUDECODE", "").strip() == "1":
+                llm_key = "claude-code"
+            if not llm_key:
+                fallback = os.environ.get("AGENTVIBES_MCP_FALLBACK", "").strip()
+                if fallback and _re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", fallback):
+                    llm_key = fallback
+
             # Call the TTS script via appropriate shell
             tts_script = "play-tts.ps1" if self.is_windows else "play-tts.sh"
             play_tts = self.hooks_dir / tts_script
@@ -199,8 +210,13 @@ class AgentVibesServer:
                 args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(play_tts), text]
                 if voice:
                     args.extend(["-VoiceOverride", voice])
+                if llm_key:
+                    args.extend(["-llm", llm_key])
             else:
-                args = ["bash", str(play_tts), text]
+                args = ["bash", str(play_tts)]
+                if llm_key:
+                    args.extend(["--llm", llm_key])
+                args.append(text)
                 if voice:
                     args.append(voice)
 

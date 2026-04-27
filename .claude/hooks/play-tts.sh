@@ -103,8 +103,29 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   exit 0
 fi
 
+# Parse named flags (e.g. --llm) before positional arguments.
+# This allows callers to pass: play-tts.sh --llm claude-code "text to speak"
+# Named args are extracted; remaining positional args are shifted into $1/$2/$3.
+LLM_PROVIDER="${LLM_PROVIDER:-}"
+_POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --llm)
+      LLM_PROVIDER="${2:-}"
+      shift 2
+      ;;
+    *)
+      _POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${_POSITIONAL_ARGS[@]+"${_POSITIONAL_ARGS[@]}"}"
+unset _POSITIONAL_ARGS
+
 TEXT="${1:-}"
 VOICE_OVERRIDE="${2:-}"  # Optional: voice name or ID
+AGENT_PROFILE_FILE="${3:-}"  # Optional: path to agent profile file
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then
@@ -397,7 +418,7 @@ fi
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   piper)
-    exec bash "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "$AGENT_PROFILE_FILE"
+    exec bash "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "${AGENT_PROFILE_FILE:-}"
     ;;
   soprano)
     exec bash "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"

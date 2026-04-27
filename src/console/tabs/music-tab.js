@@ -185,12 +185,15 @@ export function scanTracks() {
   const tracksDir = _getTracksDir();
   try {
     const files = fs.readdirSync(tracksDir);
+    const mp3s = files.filter(f => /\.mp3$/i.test(f));
+    // If the directory exists but has no mp3s (e.g. empty npm package dir),
+    // fall back to the static catalog so bundled tracks always show.
+    if (mp3s.length === 0) return BUILT_IN_TRACK_CATALOG.map(t => ({ ...t, isBuiltIn: true }));
     const builtInIds = new Set(BUILT_IN_TRACK_CATALOG.map(t => t.id));
     // Sort by the alphabetic part of the label (skip leading emoji/symbols)
     // so the order reflects the track NAME, not the emoji codepoint.
     const _sortKey = (s) => s.replace(/^[^a-zA-Z]+/, '');
-    return files
-      .filter(f => /\.mp3$/i.test(f))
+    return mp3s
       .map(f => ({ id: f, label: formatTrackLabel(f), isBuiltIn: builtInIds.has(f) }))
       .sort((a, b) => _sortKey(a.label).localeCompare(_sortKey(b.label), undefined, { sensitivity: 'base' }));
   } catch {
