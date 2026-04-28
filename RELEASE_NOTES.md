@@ -1,5 +1,28 @@
 # AgentVibes Release Notes
 
+## 📸 v5.6.0 — TUI Screenshots & Documentation Cleanup
+
+**Released:** 2026-04-28
+
+### 📸 TUI Screenshots Added
+
+Added real screenshots of every major TUI tab to the README:
+
+- **Setup tab** — LLM Providers screen (Claude Code, Copilot, Codex, Default)
+- **Configure dialog** — Per-LLM audio config (voice, pretext, reverb, music)
+- **Voice Browser** — Select Voice dialog with alpha-jump, thumbs up/down, 914 voices
+- **Music tab** — Built-in tracks list with preview and toggle
+- **BMad tab** — Agent voice assignment (voice, reverb, music, pretext per agent)
+
+### 🧹 Documentation Cleanup
+
+- Removed all `npx agentvibes-voice-browser` references (tool retired, replaced by TUI)
+- Renamed "Voice Browser" section to reflect TUI-native access via Setup → Configure → Voice
+- All image paths now use absolute GitHub raw URLs (renders correctly on npmjs.com)
+- Fixed BMad section placeholder screenshot replaced with real screenshot
+
+---
+
 ## 🎵 v5.5.0 — Per-LLM Audio Routing & Windows Installer Resilience
 
 **Released:** 2026-04-27

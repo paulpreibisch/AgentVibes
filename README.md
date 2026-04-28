@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.5
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6
 
 ---
 
@@ -46,7 +46,7 @@ Give **each LLM its own voice, pretext, and music** — Claude Code, Copilot, an
 
 - Add `llm:<name>|...|voice|pretext|engine` rows to `audio-effects.cfg`
 - MCP server auto-detects which LLM is calling and passes `--llm <key>`
-- Configure via **Setup → Default → Configure** in the TUI
+- Configure via **Setup tab → Configure** in the TUI
 
 Also fixed: Windows installer crash (`spinner.info is not a function`) on **reinstall** with an older global AgentVibes install.
 
@@ -54,33 +54,19 @@ Also fixed: Windows installer crash (`spinner.info is not a function`) on **rein
 
 ## v5.4 — TUI Installer, Spinner Fix & Dependency Cleanup
 
-### 🎤 Agent Vibes v1.0 Voice Browser
+### 🎤 Voice Browser — Browse, Sample & Install 914 Voices
 
-**🎤 Browse, Sample & Install 914 Voices in Real-Time**
+**Built right into the TUI — accessible via Setup → Configure → Voice**
 
-```bash
-npx agentvibes-voice-browser
-```
-
-The new **AgentVibes Voice Browser** is an interactive console application that lets you:
-
-- 🎧 **Hear Before You Choose** - Real-time audio sampling with one keypress
-- ⭐ **Mark Your Favorites** - Build your personal voice collection
-- 🔍 **Smart Search** - Filter by name, personality, accent, or gender
-- 📦 **One-Click Install** - Press 'I' to instantly switch to any voice
-- 🎨 **Beautiful Interface** - Stunning terminal UI powered by blessed.js
+- 🎧 **Hear Before You Choose** - Press Space to preview any voice instantly
+- ⭐ **Mark Your Favorites** - Thumbs up/down with `+` / `-`
+- 🔍 **Alpha Jump** - Press any letter to jump to names starting with it
+- 📦 **One-Click Select** - Press Enter to set as your voice
+- 🎨 **Beautiful Interface** - Stunning terminal UI built into AgentVibes
 
 **914 Total Voices:**
 - 904 High-Quality Piper TTS Speakers (libritts-high model)
 - 10 Hand-Curated Personality Voices
-
-**Perfect for:**
-- Finding your ideal AI voice
-- Exploring voice characteristics
-- Quick voice switching
-- Building favorite collections
-
-Launch now: `npx agentvibes-voice-browser`
 
 ---
 
@@ -132,8 +118,10 @@ Configure now: `npx agentvibes config intro-text`
 **Upload your own background music with battle-tested security!**
 
 ```bash
-npx agentvibes config music
+npx agentvibes   # press M for Music tab
 ```
+
+![AgentVibes Music Tab](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-music.png)
 
 Replace the default background tracks with your own audio files for complete sonic branding.
 
@@ -252,10 +240,10 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [📋 Prerequisites](#-prerequisites) - What you actually need (Node.js + optional tools)
 - [✨ What is AgentVibes?](#-what-is-agentvibes) - Overview & key features
 - [🌟 NEW FEATURE HIGHLIGHTS](#-new-feature-highlights) - **START HERE!**
-  - [🎤 Voice Browser v1.0](#-agent-vibes-v10-voice-browser) - Browse & sample 914 voices
+  - [🎤 Voices Tab](#-voices-tab) - Browse & sample 914 voices in the TUI
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v3.6.0 "Voice Explorer" with Voice Browser, Friendly Names, Custom Music
+- [📰 Latest Release](#-latest-release) - v5.5.0 with Per-LLM Audio Routing, Windows Installer Resilience
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -265,7 +253,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [For Claude Code](docs/mcp-setup.md#for-claude-code) - Project-specific setup
 
 ### Core Features
-- [🎤 AgentVibes Voice Browser](#-agentvibes-voice-browser) - **Browse and sample 914 voices interactively**
+- [🎤 Voices Tab](#-voices-tab) - **Browse and sample 914 voices in the TUI**
 - [🎤 Commands Reference](#-commands-reference) - All available commands
 - [🎙️ Verbosity Control](#%EF%B8%8F-verbosity-control) - Control how much Claude speaks (low/medium/high)
 - [🎭 Personalities vs Sentiments](#-personalities-vs-sentiments) - Two systems explained
@@ -303,20 +291,17 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 **[v3.6.0 - "Voice Explorer" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.6.0)** 🎉
 
-### 🎤 AgentVibes Voice Browser
+### 🎤 Voices Tab — Browse & Sample 914 Voices
 
-**Browse and sample 914 voices in real-time!**
+**Built into the TUI — launch with `npx agentvibes` then press V**
 
-```bash
-npx agentvibes-voice-browser
-```
+![AgentVibes Voices Tab](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-voices.png)
 
-Interactive console browser with:
-- 🎧 Real-time voice sampling - hear before you choose
+- 🎧 Real-time voice sampling - press Space to hear before you choose
 - ⭐ Favorite system - mark your top voices
 - 🔍 Search & filter - find voices by personality, accent, gender
-- 📦 One-click install - install directly from browser
-- 🎨 Beautiful UI - stunning console interface
+- 📦 One-click select - press Enter to install directly
+- 🎨 Beautiful UI - built into the AgentVibes TUI
 
 **914 Total Voices:**
 - 904 Piper speaker variations (libritts-high)
@@ -379,8 +364,8 @@ npx agentvibes config music
 # Install AgentVibes
 npx agentvibes install
 
-# Launch Voice Browser
-npx agentvibes-voice-browser
+# Browse voices in the TUI
+npx agentvibes  # press V for Voices tab
 ```
 
 **🐞 Bug Fixes in v3.6.0:**
@@ -432,6 +417,12 @@ Just say "Switch to Aria voice" or "Speak in Spanish" instead of typing commands
 npx agentvibes install
 ```
 
+![AgentVibes Setup Tab — LLM Providers](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-setup.png)
+
+Click **Configure** on any LLM to set its voice, pretext, reverb, and music:
+
+![AgentVibes Configure Claude Code Audio](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-configure.png)
+
 ### 2️⃣ Choose Provider (Auto-Detected)
 - **macOS**: Native `say` provider (100+ voices) ✨
 - **Linux/WSL**: Piper TTS (50+ free voices) 🎙️
@@ -457,39 +448,37 @@ macOS ships with bash 3.2 (from 2007). After this, everything works perfectly!
 
 ---
 
-## 🎤 AgentVibes Voice Browser
+## 🎤 Voice Browser
 
-**The easiest way to find your perfect voice!**
-
-### Launch the Browser
+**914 voices — browse, preview, and select right inside the TUI.**
 
 ```bash
-npx agentvibes-voice-browser
+npx agentvibes   # Setup tab → Configure → Voice  (or press V for global voice)
 ```
+
+![AgentVibes Voice Browser](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-voice-browser.png)
 
 ### Features
 
 - **914 Voices** - Browse 904 Piper speakers + 10 curated voices
-- **Real-Time Sampling** - Press ENTER to hear any voice instantly
-- **Favorite System** - Mark favorites for quick access
-- **Smart Search** - Filter by name, personality, accent, or gender
-- **One-Click Install** - Press 'I' to install and switch to a voice
-- **Beautiful UI** - Stunning console interface with blessed.js
+- **Real-Time Sampling** - Press Space to hear any voice instantly
+- **Favorite System** - Thumbs up `+` / thumbs down `-` for quick filtering
+- **Alpha Jump** - Press any letter key to jump to that part of the list
+- **One-Click Select** - Press Enter to install and switch to a voice
+- **Beautiful UI** - Stunning console interface built into AgentVibes
 
 ### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| **ENTER** | Play voice sample |
-| **I** | Install/Select voice for AgentVibes |
-| **F** | Toggle favorite |
-| **/** | Search voices |
-| **ESC** | Clear search / Back |
+| **Space** | Preview voice sample |
+| **Enter** | Select/Install voice |
+| **+** | Thumbs up (favorite) |
+| **-** | Thumbs down |
+| **PgUp / PgDn** | Page through list |
 | **↑/↓** | Navigate list |
-| **G** | Jump to top |
-| **Shift+G** | Jump to bottom |
-| **H** | Show help |
-| **Q** | Quit |
+| **a-z** | Jump to names starting with letter |
+| **Esc** | Cancel / close |
 
 ### Voice Categories
 
@@ -505,13 +494,13 @@ npx agentvibes-voice-browser
 
 ### Finding Your Perfect Voice
 
-1. **Launch browser:** `npx agentvibes-voice-browser`
-2. **Search by trait:** Press `/` and type "friendly" or "professional"
-3. **Sample voices:** Navigate with arrows, press ENTER to hear
-4. **Mark favorites:** Press 'F' on voices you like
-5. **Install:** Press 'I' to set as your AgentVibes voice
+1. **Open voice browser:** Setup tab → Configure → navigate to Voice → Enter
+2. **Jump alphabetically:** Press a letter key to jump to that name
+3. **Sample voices:** Navigate with arrows, press Space to hear
+4. **Mark favorites:** Press `+` on voices you like
+5. **Select:** Press Enter to set as your voice
 
-**Pro Tip:** Use the search to find voices matching your project's mood!
+**Pro Tip:** Use PgUp/PgDn to page quickly through 900+ voices!
 
 [↑ Back to top](#-table-of-contents)
 
@@ -860,17 +849,12 @@ AgentVibes provides **50+ slash commands** and **natural language MCP equivalent
 
 **[→ View Complete Command Reference](docs/commands.md)** - All voice, system, personality, sentiment, language, and BMAD commands with MCP equivalents
 
-### Voice Browser Commands
+### Voices Tab Commands
 
 ```bash
-# Launch voice browser
-npx agentvibes-voice-browser
-
-# Or use global command (if installed globally)
-agentvibes-voice-browser
+# Launch the TUI and open Voices tab
+npx agentvibes  # then press V
 ```
-
-**MCP Equivalent:** Currently CLI-only (no MCP command)
 
 ### Intro Text Commands
 
@@ -1010,7 +994,7 @@ Every task acknowledgment plays **twice** - first in English, then in your targe
 
 ## 🗣️ Voice Library
 
-**NEW in v3.6.0:** Use the **[AgentVibes Voice Browser](#-agentvibes-voice-browser)** to browse, sample, and install from 914 voices! Launch with `npx agentvibes-voice-browser`.
+**Browse voices in the TUI:** Run `npx agentvibes` and press **V** to open the **[Voices Tab](#-voices-tab)** — browse, sample, and install from 914 voices without leaving your terminal.
 
 ### Friendly Voice Names
 
@@ -1052,13 +1036,11 @@ The BMAD plugin detects when you activate a BMAD agent (e.g., `/BMad:agents:pm`)
 
 **Version Support**: AgentVibes supports both BMAD v4 and v6-alpha installations. Version detection is automatic - just install BMAD and AgentVibes will detect and configure itself correctly!
 
-### 🎭 Party Mode — Screenshots
+### 🎭 BMad Tab — Assign a Voice to Every Agent
 
-Open the **BMad** tab in the AgentVibes TUI (`npx agentvibes`) to configure which voice each agent uses:
+Open the **BMad** tab in the AgentVibes TUI (`npx agentvibes` → press **B**) to configure which voice, reverb, and pretext each BMAD agent uses:
 
-![BMAD Party Mode Tab](docs/installation-screenshots/screenshot-bmad-party-mode.png)
-
-> 📸 **Don't have a screenshot yet?** Run `npx agentvibes`, switch to the **BMad** tab, and take a screenshot — then save it as `docs/installation-screenshots/screenshot-bmad-party-mode.png`.
+![AgentVibes BMad Tab](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-bmad.png)
 
 ### 🔊 TTS Injection: How It Works
 
@@ -1882,10 +1864,10 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 - **Optional**: sox (audio effects), ffmpeg (background music, padding)
 - All TTS generation works without optional dependencies - they just enhance the experience
 
-### Voice Browser & New Features
+### Voices Tab & New Features
 
-**Q: How do I use the Voice Browser?**
-**A:** Simply run `npx agentvibes-voice-browser` and you'll see an interactive console with 914 voices. Use arrow keys to navigate, ENTER to sample voices, 'I' to install, 'F' to favorite, and '/' to search.
+**Q: How do I browse and select voices?**
+**A:** Run `npx agentvibes` and press **V** to open the Voices tab. Use arrow keys to navigate, Space to preview voices, Enter to select/install, F to favorite, and / to search.
 
 **Q: What are friendly voice names?**
 **A:** Instead of technical IDs like `en_US-ryan-high`, you can now use simple names like "Ryan" when switching voices. All 904+ voices have friendly names matched to their characteristics.
@@ -1903,7 +1885,7 @@ Both do the exact same thing - MCP is more convenient, slash commands are more t
 **A:** No! You can type "ryan", "Ryan", or "RYAN" - they all work. The voice resolution is case-insensitive.
 
 **Q: Can I favorite voices without installing them?**
-**A:** Yes! In the Voice Browser, press 'F' to mark any voice as a favorite. Favorites are saved and you can filter to show only favorites later.
+**A:** Yes! In the Voices tab, press 'F' to mark any voice as a favorite. Favorites are saved and you can filter to show only favorites later.
 
 **Q: Does custom music work with all TTS providers?**
 **A:** Yes! Custom background music works with Piper TTS, Soprano, macOS Say, and Windows SAPI.
