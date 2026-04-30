@@ -1315,7 +1315,7 @@ export function createVoicesTab(screen, services) {
     okGlobalBtn.key(['left'],           () => { okLocalBtn.focus();  screen.render(); });
     okLocalBtn.key(['left'],            () => { previewBtn.focus();  screen.render(); });
 
-    modal.key(['escape', 'q'], _close);
+    modal.key(['escape', 'q', 'Q'], _close);
 
     modal.setFront();
     okLocalBtn.focus();
@@ -1516,7 +1516,7 @@ export function createVoicesTab(screen, services) {
     dlBtn.key(['left'], () => { cancelBtn.focus(); screen.render(); });
     cancelBtn.key(['left'], () => { dlBtn.focus(); screen.render(); });
 
-    modal.key(['escape', 'q'], () => { if (!_downloading) _close(); });
+    modal.key(['escape', 'q', 'Q'], () => { if (!_downloading) _close(); });
 
     modal.setFront();
     dlBtn.focus();

@@ -91,7 +91,7 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     destroyList(list, screen, onClose);
   });
 
-  list.key(['escape', 'q'], () => {
+  list.key(['escape', 'q', 'Q'], () => {
     destroyList(list, screen, onClose);
   });
 }

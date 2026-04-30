@@ -39,9 +39,13 @@ const KEY_TO_TAB = {
  */
 export function setupNavigation(screen, navigationService, focusMainTabBar) {
   // Tab switching shortcuts — one handler per key (both cases)
+  // When a modal is open, force-close all modals then switch tabs.
   for (const [key, tabId] of Object.entries(KEY_TO_TAB)) {
     screen.key([key], () => {
-      if (!navigationService.isModalOpen()) {
+      if (navigationService.isModalOpen()) {
+        navigationService.forceCloseAll();
+        setTimeout(() => navigationService.switchTab(tabId), 0);
+      } else {
         navigationService.switchTab(tabId);
       }
     });
