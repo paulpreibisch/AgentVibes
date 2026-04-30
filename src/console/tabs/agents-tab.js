@@ -618,7 +618,7 @@ ${_tl('bmadDesc')}
     };
 
     let _closed = false;
-    navigationService?.openModal();
+    navigationService?.openModal(null, _closeModal);
 
     const modal = blessed.box({
       parent: screen,
@@ -865,10 +865,10 @@ ${_tl('bmadDesc')}
     });
 
     // Escape = close
-    fieldList.key(['escape', 'q'], _closeModal);
-    previewBtn.key(['escape'], _closeModal);
-    resetBtn.key(['escape'], _closeModal);
-    closeBtn.key(['escape'], _closeModal);
+    fieldList.key(['escape', 'q', 'Q'], _closeModal);
+    previewBtn.key(['escape', 'q', 'Q'], _closeModal);
+    resetBtn.key(['escape', 'q', 'Q'], _closeModal);
+    closeBtn.key(['escape', 'q', 'Q'], _closeModal);
 
     // Tab + arrow navigation within modal
     fieldList.key(['tab'], () => { previewBtn.focus(); screen.render(); });

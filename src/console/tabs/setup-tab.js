@@ -725,7 +725,7 @@ export function createSetupTab(screen, services) {
     // Guard against double-open (key repeat, double-click)
     if (navigationService?.isModalOpen()) return;
     let _closed = false;
-    navigationService?.openModal();
+    navigationService?.openModal(null, _closeModal);
 
     const defaultPretext = {
       'claude-code': 'Claude Code here',
@@ -1035,7 +1035,7 @@ export function createSetupTab(screen, services) {
       }
     });
 
-    fieldList.key(['escape'], _closeModal);
+    fieldList.key(['escape', 'q', 'Q'], _closeModal);
 
     // Remove selection highlight when field list loses focus
     fieldList.on('blur', () => {
@@ -1081,14 +1081,14 @@ export function createSetupTab(screen, services) {
         allBtns[(i - 1 + allBtns.length) % allBtns.length].focus();
         screen.render();
       });
-      allBtns[i].key(['escape'], _closeModal);
+      allBtns[i].key(['escape', 'q', 'Q'], _closeModal);
       allBtns[i].key(['up'], () => {
         fieldList.focus();
         screen.render();
       });
     }
 
-    modal.key(['escape'], _closeModal);
+    modal.key(['escape', 'q', 'Q'], _closeModal);
     fieldList.focus();
     screen.render();
   }
@@ -1096,7 +1096,12 @@ export function createSetupTab(screen, services) {
   // ── TTS Engine picker (for config modal) ──────────────────────────────────
 
   function _openTtsEnginePicker(draft, onDone) {
-    navigationService?.openModal();
+    function _closePicker() {
+      navigationService?.closeModal();
+      destroyList(picker, screen);
+      onDone();
+    }
+    navigationService?.openModal(null, _closePicker);
 
     const engines = getEngineStatuses();
     const items = engines.map(e => {
@@ -1136,16 +1141,10 @@ export function createSetupTab(screen, services) {
       } else {
         draft.ttsEngine = engines[idx - 1].id;
       }
-      navigationService?.closeModal();
-      destroyList(picker, screen);
-      onDone();
+      _closePicker();
     });
 
-    picker.key(['escape'], () => {
-      navigationService?.closeModal();
-      destroyList(picker, screen);
-      onDone();
-    });
+    picker.key(['escape', 'q', 'Q'], _closePicker);
 
     picker.focus();
     screen.render();
@@ -1162,7 +1161,7 @@ export function createSetupTab(screen, services) {
   }
 
   function _openVoicePickerForLlm(draft, onDone) {
-    navigationService?.openModal();
+    navigationService?.openModal(null, _closeVP);
 
     let _allVoices = [];
     let _previewProc = null;
@@ -1355,7 +1354,16 @@ export function createSetupTab(screen, services) {
 
       piper.on('exit', (code) => {
         if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
+        if (code !== 0) {
+          _previewProc = null; _previewVoiceId = null;
+          if (!_vpClosed) {
+            vpPreviewLine.setContent('{red-fg}♪ Preview failed — is Piper installed?{/red-fg}');
+            screen.render();
+            setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
+          }
+          try { fs.unlinkSync(tempWav); } catch {};
+          return;
+        }
         const wp = detectWavPlayer(_spawnEnv);
         if (!wp) return;
         const pp = spawn(wp.bin, wp.args(tempWav), {
@@ -1371,7 +1379,14 @@ export function createSetupTab(screen, services) {
           try { fs.unlinkSync(tempWav); } catch {}
         });
       });
-      piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+      piper.on('error', () => {
+        _previewProc = null; _previewVoiceId = null;
+        if (!_vpClosed) {
+          vpPreviewLine.setContent('{red-fg}♪ Cannot find Piper — install it first{/red-fg}');
+          screen.render();
+          setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
+        }
+      });
     }
 
     vpList.key(['enter'], () => {
@@ -1390,7 +1405,7 @@ export function createSetupTab(screen, services) {
       const sel = _allVoices[vpList.selected];
       if (sel) { toggleThumbsDown(configService, sel); _refreshVP(); }
     });
-    vpList.key(['escape', 'q'], _closeVP);
+    vpList.key(['escape', 'q', 'Q'], _closeVP);
 
     // PageUp / PageDown / Home / End navigation
     const _pageSize = () => Math.max(1, (vpList.height ?? 10) - 2);

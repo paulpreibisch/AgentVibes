@@ -169,7 +169,7 @@ export class ModalOverlay {
       // Push current focus so we can restore on close
       this._nav.pushFocus(this._screen.focused);
       this._container.focus();
-    });
+    }, () => this.close());
 
     this._updateFooter();
     this._screen.render();

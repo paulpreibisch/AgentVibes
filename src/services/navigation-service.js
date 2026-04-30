@@ -17,7 +17,8 @@ export class NavigationService {
     this._activeTab = TAB_ORDER.includes(initialTab) ? initialTab : 'settings';
     this._switchCallbacks = [];
     this._focusStack = [];
-    this._modalOpen = false;
+    this._modalDepth = 0;
+    this._modalCloseCallbacks = [];
   }
 
   // ---------------------------------------------------------------------------
@@ -79,25 +80,48 @@ export class NavigationService {
   }
 
   // ---------------------------------------------------------------------------
-  // Modal state (story 6.4 will expand this)
+  // Modal state
 
-  /** Returns true if a modal is currently open */
+  /** Returns true if one or more modals are currently open */
   isModalOpen() {
-    return this._modalOpen;
+    return this._modalDepth > 0;
   }
 
   /**
-   * Open a modal. Sets modal-open state and calls the factory fn if provided.
-   * @param {Function|null} fn - Optional factory/callback invoked immediately
+   * Open a modal. Increments depth counter and registers an optional close
+   * callback so nav hotkeys can force-close all open modals.
+   * @param {Function|null} fn       - Optional factory/callback invoked immediately
+   * @param {Function|null} closeFn  - Optional callback to close this modal's UI
    */
-  openModal(fn) {
-    this._modalOpen = true;
+  openModal(fn, closeFn) {
+    this._modalDepth++;
+    this._modalCloseCallbacks.push(closeFn ?? null);
     fn?.();
   }
 
-  /** Close the current modal, restoring modal-closed state */
+  /**
+   * Close the topmost modal, decrementing the depth counter.
+   * Safe to call when depth is already 0.
+   */
   closeModal() {
-    this._modalOpen = false;
+    if (this._modalDepth > 0) this._modalDepth--;
+    if (this._modalCloseCallbacks.length > 0) this._modalCloseCallbacks.pop();
+  }
+
+  /**
+   * Force-close all open modals by calling their registered close callbacks
+   * from innermost to outermost, then reset depth to 0.
+   * Used by nav hotkeys (S/V/M/…) to dismiss modals before switching tabs.
+   */
+  forceCloseAll() {
+    const callbacks = [...this._modalCloseCallbacks].reverse();
+    this._modalDepth = 0;
+    this._modalCloseCallbacks = [];
+    for (const cb of callbacks) {
+      if (typeof cb === 'function') {
+        try { cb(); } catch {}
+      }
+    }
   }
 
 

@@ -319,7 +319,7 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     }
   });
 
-  list.key(['escape', 'q'], () => {
+  list.key(['escape', 'q', 'Q'], () => {
     _close();
   });
 }
