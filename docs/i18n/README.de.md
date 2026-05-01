@@ -1,10 +1,19 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.5.0
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.1
 
 ---
 
-## 🌟 NEU IN v5.5 — LLM-spezifisches Audio-Routing
+## 🌟 NEU IN v5.6.1 — Hermes Agent Integration
+
+AgentVibes spricht jetzt für **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — den selbst gehosteten, selbst verbessernden KI-Assistenten. Zwei produktionsreife Skills sind in `docs/hermes/skills/` enthalten:
+
+- **`hermes-agentvibes-hook`** — Spricht jede Hermes-Antwort automatisch über AgentVibes TTS. Wird bei `agent:end` ausgelöst, entfernt Markdown, begrenzt die Rate und bietet vollständigen SSH-MITM-Schutz
+- **`agentvibes-target`** — Bringt Hermes bei, beliebigen Text auf Abruf an deine Lautsprecher zu senden, mit Windows- und Android-Unterstützung
+
+Außerdem in diesem Release: PS5.1-Kompatibilitätskorrekturen für `play-tts.ps1`, Modal/Hotkey-Reparaturen und der BMAD-Tab zeigt jetzt alle Agenten.
+
+## v5.5 — LLM-spezifisches Audio-Routing
 
 Gib **jedem LLM eine eigene Stimme, ein eigenes Pretext und eigene Musik** — Claude Code, Copilot und Codex können unterschiedlich klingen, ohne die globalen Einstellungen anzufassen.
 

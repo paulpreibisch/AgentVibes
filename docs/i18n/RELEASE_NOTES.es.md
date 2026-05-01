@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🤖 v5.6.1 — Integración con Hermes Agent y Correcciones PS5.1 para Windows
+
+**Lanzamiento:** 2026-05-01
+
+### 🎉 Integración con Hermes Agent (¡Nuevo!)
+
+AgentVibes ahora soporta oficialmente **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — el asistente de IA autohospedado y automejorado. Dos skills de Hermes listas para producción se incluyen en `docs/hermes/skills/`:
+
+**`hermes-agentvibes-hook`** — Habla automáticamente cada respuesta de Hermes vía AgentVibes
+- Se activa en cada evento `agent:end` (Telegram, Discord, CLI, etc.)
+- Elimina markdown, bloques de código y emojis antes de hablar
+- Trunca en límites de palabras, limita la tasa para evitar inundación de la cola
+- SSH seguro contra MITM con `StrictHostKeyChecking=accept-new` + `known_hosts` persistente
+- Registro completo en `tts-hook.log` para depuración
+
+**`agentvibes-target`** — Enseña a Hermes a enviar cualquier texto a tus altavoces bajo demanda
+- Payload JSON en base64 vía SSH (misma arquitectura ForceCommand que el receptor de Windows)
+- Compatible con objetivos Windows y Android
+- Guía de solución de problemas detallada incluida
+
+**Instalación:** Copia la skill a tu directorio home de Hermes y reinicia el gateway:
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Correcciones PS5.1 para Windows
+
+- **Compatibilidad PS5.1 de play-tts.ps1** — Corregidas tres regresiones del rebase de v5.6.0:
+  reemplazado el operador null-condicional de PS7 (`?.`) por if/else compatible con PS5.1, añadido BOM UTF-8
+  para que los guiones largos no se corrompan con CP1252, restaurado el alias del proveedor piper y
+  el centinela `AGENTVIBES_TEXT_FILE` perdidos en la fusión
+- **Correcciones de modal y atajos de teclado** — Tecla escape del modal, atajos de navegación, Q+Bloq Mayús
+  y manejo de errores de vista previa de voz reparados
+- **Pestaña BMAD** — Ahora muestra todos los agentes sin importar el módulo
+
+---
+
 ## 🎵 v5.5.0 — Enrutamiento de Audio por LLM y Resistencia del Instalador de Windows
 
 **Lanzamiento:** 2026-04-27

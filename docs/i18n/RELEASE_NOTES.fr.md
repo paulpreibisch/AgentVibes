@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🤖 v5.6.1 — Intégration Hermes Agent & Corrections PS5.1 Windows
+
+**Sortie :** 2026-05-01
+
+### 🎉 Intégration Hermes Agent (Nouveau !)
+
+AgentVibes prend désormais officiellement en charge **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — l'assistant IA auto-hébergé et auto-améliorant. Deux skills Hermes prêtes pour la production sont incluses dans `docs/hermes/skills/` :
+
+**`hermes-agentvibes-hook`** — Vocalise automatiquement chaque réponse Hermes via AgentVibes
+- Se déclenche à chaque événement `agent:end` (Telegram, Discord, CLI, etc.)
+- Supprime le markdown, les blocs de code et les emojis avant de parler
+- Tronque aux limites des mots, limite le débit pour éviter la saturation de la file
+- SSH sécurisé contre MITM avec `StrictHostKeyChecking=accept-new` + `known_hosts` persistant
+- Journalisation complète dans `tts-hook.log` pour le débogage
+
+**`agentvibes-target`** — Apprend à Hermes à envoyer n'importe quel texte vers vos haut-parleurs à la demande
+- Payload JSON en base64 via SSH (même architecture ForceCommand que le récepteur Windows)
+- Compatible avec les cibles Windows et Android
+- Guide de dépannage détaillé inclus
+
+**Installation :** Copiez la skill dans le répertoire home Hermes et redémarrez le gateway :
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Corrections PS5.1 Windows
+
+- **Compatibilité PS5.1 de play-tts.ps1** — Correction de trois régressions du rebase v5.6.0 :
+  remplacement de l'opérateur null-conditionnel PS7 (`?.`) par if/else compatible PS5.1, ajout du BOM UTF-8
+  pour éviter la corruption des tirets longs avec CP1252, restauration de l'alias du fournisseur piper et
+  du sentinel `AGENTVIBES_TEXT_FILE` perdus lors de la fusion
+- **Corrections modal & raccourcis clavier** — Touche Échap du modal, raccourcis de navigation, Q+Verr Maj
+  et gestion des erreurs de prévisualisation vocale réparés
+- **Onglet BMAD** — Affiche désormais tous les agents quel que soit le module
+
+---
+
 ## 🎵 v5.5.0 — Routage Audio par LLM et Résilience de l'Installateur Windows
 
 **Sortie :** 2026-04-27

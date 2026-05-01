@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🤖 v5.6.1 — Integrazione Hermes Agent & Correzioni PS5.1 Windows
+
+**Rilascio:** 2026-05-01
+
+### 🎉 Integrazione Hermes Agent (Nuovo!)
+
+AgentVibes supporta ora ufficialmente **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — l'assistente AI self-hosted e auto-migliorante. Due skill Hermes pronte per la produzione sono incluse in `docs/hermes/skills/`:
+
+**`hermes-agentvibes-hook`** — Vocalizza automaticamente ogni risposta Hermes tramite AgentVibes
+- Si attiva a ogni evento `agent:end` (Telegram, Discord, CLI, ecc.)
+- Rimuove markdown, blocchi di codice ed emoji prima di parlare
+- Tronca ai confini delle parole, limita la frequenza per evitare sovraccarico della coda
+- SSH sicuro contro MITM con `StrictHostKeyChecking=accept-new` + `known_hosts` persistente
+- Log completo in `tts-hook.log` per il debug
+
+**`agentvibes-target`** — Insegna a Hermes a inviare qualsiasi testo agli altoparlanti su richiesta
+- Payload JSON in base64 via SSH (stessa architettura ForceCommand del ricevitore Windows)
+- Supporta target Windows e Android
+- Guida dettagliata alla risoluzione dei problemi inclusa
+
+**Installazione:** Copia la skill nella home Hermes e riavvia il gateway:
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Correzioni PS5.1 Windows
+
+- **Compatibilità PS5.1 di play-tts.ps1** — Corrette tre regressioni dal rebase v5.6.0:
+  sostituito l'operatore null-condizionale PS7 (`?.`) con if/else compatibile PS5.1, aggiunto BOM UTF-8
+  per evitare la corruzione dei trattini em con CP1252, ripristinato l'alias del provider piper e
+  il sentinel `AGENTVIBES_TEXT_FILE` persi nel merge
+- **Correzioni modal & hotkey** — Tasto Esc del modal, hotkey di navigazione, Q+Bloc Maiusc
+  e gestione degli errori di anteprima vocale tutti riparati
+- **Tab BMAD** — Ora mostra tutti gli agenti indipendentemente dal modulo
+
+---
+
 ## 🎵 v5.5.0 — Routing Audio per LLM e Resilienza dell'Installatore Windows
 
 **Rilascio:** 2026-04-27

@@ -1,5 +1,43 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🤖 v5.6.1 — Hermes Agent 통합 & Windows PS5.1 수정
+
+**릴리스:** 2026-05-01
+
+### 🎉 Hermes Agent 통합 (신규!)
+
+AgentVibes가 이제 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 자체 호스팅, 자기 개선 AI 어시스턴트를 공식 지원합니다. 프로덕션 준비 완료된 Hermes 스킬 2개가 `docs/hermes/skills/`에 포함됩니다:
+
+**`hermes-agentvibes-hook`** — AgentVibes를 통해 모든 Hermes 응답을 자동 음성 출력
+- 모든 `agent:end` 이벤트에서 실행 (Telegram, Discord, CLI 등)
+- 발화 전 Markdown, 코드 블록, 이모지 제거
+- 단어 경계에서 트런케이트, 큐 과부하 방지를 위한 속도 제한
+- `StrictHostKeyChecking=accept-new` + 영구 `known_hosts`로 MITM 안전 SSH
+- 디버깅을 위한 전체 로그를 `tts-hook.log`에 기록
+
+**`agentvibes-target`** — Hermes가 온디맨드로 임의 텍스트를 스피커에 전송하도록 교육
+- SSH를 통한 Base64 JSON 페이로드 (Windows 수신기와 동일한 ForceCommand 아키텍처)
+- Windows 및 Android 타겟 지원
+- 상세 문제 해결 가이드 포함
+
+**설치:** 스킬을 Hermes 홈 디렉토리에 복사하고 게이트웨이 재시작:
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Windows PS5.1 수정
+
+- **play-tts.ps1 PS5.1 호환성** — v5.6.0 리베이스에서 발생한 3가지 회귀 수정:
+  PS7 null 조건부 연산자(`?.`)를 PS5.1 호환 if/else로 대체, CP1252로 em 대시가
+  손상되지 않도록 UTF-8 BOM 추가, 병합 시 손실된 piper 공급자 별칭과
+  `AGENTVIBES_TEXT_FILE` 센티넬 복원
+- **모달 & 단축키 수정** — 모달 이스케이프 키, 내비게이션 단축키, Q+Caps Lock,
+  음성 미리보기 오류 처리 모두 수정
+- **BMAD 탭** — 이제 모듈에 관계없이 모든 에이전트 표시
+
+---
+
 ## 🎵 v5.5.0 — LLM별 오디오 라우팅 & Windows 설치 프로그램 복원력
 
 **릴리스:** 2026-04-27

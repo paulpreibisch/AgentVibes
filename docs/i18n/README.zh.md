@@ -1,10 +1,19 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.5.0
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.6.1
 
 ---
 
-## 🌟 v5.5 新功能 — 每 LLM 音频路由
+## 🌟 v5.6.1 新功能 — Hermes Agent 集成
+
+AgentVibes 现在可以为 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 自托管、自我改进的 AI 助手发声。两个生产就绪的技能包含在 `docs/hermes/skills/` 中：
+
+- **`hermes-agentvibes-hook`** — 通过 AgentVibes TTS 自动播报每条 Hermes 响应。在 `agent:end` 触发，去除 Markdown，限制速率，并提供完整的 SSH MITM 防护
+- **`agentvibes-target`** — 教 Hermes 按需将任意文本发送到您的扬声器，支持 Windows 和 Android
+
+本次发布还包括：`play-tts.ps1` 的 PS5.1 兼容性修复、模态框/快捷键修复、BMAD 选项卡现在显示所有代理。
+
+## v5.5 新功能 — 每 LLM 音频路由
 
 为**每个 LLM 设置独立的语音、前缀文本和音乐** — Claude Code、Copilot 和 Codex 可以呈现不同的声音，无需修改全局设置。
 

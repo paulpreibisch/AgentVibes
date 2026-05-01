@@ -1,5 +1,43 @@
 # AgentVibes Release Notes
 
+## 🤖 v5.6.1 — Hermes Agent Integration & Windows PS5.1 Fixes
+
+**Released:** 2026-05-01
+
+### 🎉 Hermes Agent Integration (New!)
+
+AgentVibes now officially supports **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the self-hosted, self-improving AI assistant. Two production-ready Hermes skills ship in `docs/hermes/skills/`:
+
+**`hermes-agentvibes-hook`** — Auto-speaks every Hermes response via AgentVibes
+- Fires on every `agent:end` event (Telegram, Discord, CLI, etc.)
+- Strips markdown, code blocks, emoji before speaking
+- Truncates at word boundaries, rate-limits to prevent queue flooding
+- MITM-safe SSH with `StrictHostKeyChecking=accept-new` + persistent `known_hosts`
+- Full logging to `tts-hook.log` for debugging
+
+**`agentvibes-target`** — Teaches Hermes to send any text to your speakers on demand
+- Base64 JSON payload over SSH (same ForceCommand architecture as the Windows receiver)
+- Supports Windows and Android targets
+- Detailed troubleshooting guide included
+
+**Install:** Copy the skill to your Hermes home and restart the gateway:
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Windows PS5.1 Bug Fixes
+
+- **play-tts.ps1 PS5.1 compatibility** — Fixed three regressions from v5.6.0 rebase:
+  replaced PS7 null-conditional (`?.`) with PS5.1-compatible if/else, added UTF-8 BOM so
+  em-dash literals aren't mangled by CP1252, restored piper provider alias and
+  `AGENTVIBES_TEXT_FILE` sentinel lost in merge
+- **Modal & hotkey fixes** — Modal escape key, navigation hotkeys, Q+Caps Lock, and voice
+  preview error handling all repaired
+- **BMAD tab** — Now shows all agents regardless of module
+
+---
+
 ## 📸 v5.6.0 — TUI Screenshots & Documentation Cleanup
 
 **Released:** 2026-04-28

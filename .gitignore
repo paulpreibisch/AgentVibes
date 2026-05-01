@@ -39,6 +39,7 @@ CLAUDE.md
 .claude/piper-voices/
 .claude/piper-voices-dir.txt
 .claude/github-star-reminder.txt
+.claude/ssh-remote-host.txt
 .bmad-agent-context
 *.tgz
 *.code-workspace

@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.1
 
 ---
 
@@ -40,7 +40,16 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.5 — Per-LLM Audio Routing
+## 🌟 NEW IN v5.6.1 — Hermes Agent Integration
+
+AgentVibes now speaks for **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the self-hosted, self-improving AI assistant. Two production-ready skills ship in `docs/hermes/skills/`:
+
+- **`hermes-agentvibes-hook`** — Auto-speaks every Hermes response via AgentVibes TTS. Fires on `agent:end`, strips markdown, rate-limits, and ships with full SSH MITM protection
+- **`agentvibes-target`** — Teaches Hermes to send any text to your speakers on demand, supporting laptop and Android targets
+
+Also in this release: Windows PS5.1 compatibility fixes for `play-tts.ps1`, modal/hotkey repairs, and BMAD tab now shows all agents.
+
+## v5.5 — Per-LLM Audio Routing
 
 Give **each LLM its own voice, pretext, and music** — Claude Code, Copilot, and Codex can all sound different without touching global settings.
 
