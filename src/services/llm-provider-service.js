@@ -632,9 +632,10 @@ export function loadLlmConfigSync(llmKey, targetDir) {
  */
 export function saveLlmConfigSync(llmKey, config, targetDir) {
   const cfgKey = `llm:${llmKey}`;
-  // Sanitize pipe chars in user-editable fields to prevent config format corruption
-  const sanitize = (v) => (v || '').replace(/\|/g, '');
-  const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${config.bgVolume}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
+  // Sanitize user-editable fields: strip pipe chars (config delimiter) and newlines
+  // (newlines could inject extra rows into the pipe-delimited config file)
+  const sanitize = (v) => (v || '').replace(/[\|\n\r]/g, '');
+  const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${sanitize(config.bgVolume)}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
   const resolvedTargetDir = targetDir || process.env.INIT_CWD || process.cwd();
   const cfgPath = config.sourcePath || resolveCfgPath(resolvedTargetDir);
 

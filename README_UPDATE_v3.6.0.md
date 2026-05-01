@@ -15,8 +15,6 @@ Add these prominent feature highlight sections right after the main title/badges
 
 ### 🎤 Agent Vibes v1.0 Voice Browser
 
-![Voice Browser Banner](docs/installation-screenshots/voice-browser-screenshot.png)
-
 **🎤 Browse, Sample & Install 914 Voices in Real-Time**
 
 ```bash
@@ -162,8 +160,6 @@ Replace the existing "## 📰 Latest Release" section (around line 143-165) with
 
 **Browse and sample 914 voices in real-time!**
 
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
-
 ```bash
 npx agentvibes-voice-browser
 ```
@@ -259,9 +255,6 @@ Add this new section after "Quick Start" and before "Prerequisites":
 ## 🎤 AgentVibes Voice Browser
 
 **The easiest way to find your perfect voice!**
-
-![AgentVibes Voice Browser](docs/installation-screenshots/voice-browser-screenshot.png)
-*Browse, sample, and install from 914 voices with real-time audio preview*
 
 ### Launch the Browser
 
@@ -576,8 +569,6 @@ Update the version number at the top of the README (around line 14):
 - [ ] Version numbers consistent across files
 
 ### Screenshot Requirements:
-- **Voice Browser Screenshot**: Save `/mnt/c/Users/Paul/Pictures/Screenshots/Screenshot 2026-02-16 032244.png` to `docs/installation-screenshots/voice-browser-screenshot.png`
-- Image shows the voice browser interface with 924 voices, keyboard shortcuts, and voice info panel
 - Caption: "Browse, sample, and install from 914 voices with real-time audio preview"
 
 ### Marketing Points to Emphasize:

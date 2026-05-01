@@ -365,6 +365,30 @@ main() {
     # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
     IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
 
+    # Translate reverb preset names (stored by the console Configure UI) to sox effects strings.
+    # LLM per-agent rows store human-readable names like "light"; sox needs the raw effect string.
+    # Raw sox strings (used by BMAD agent rows) pass through unchanged.
+    case "${sox_effects:-}" in
+        light)     sox_effects="reverb 20 50 50" ;;
+        medium)    sox_effects="reverb 40 50 70" ;;
+        heavy)     sox_effects="reverb 70 50 100" ;;
+        cathedral) sox_effects="reverb 90 30 100" ;;
+        off)       sox_effects="" ;;
+    esac
+
+    # Per-invocation reverb override (set by play-tts-enhanced.sh for profile-based reverb).
+    # Using an env var avoids permanently mutating audio-effects.cfg — process-scoped and race-free.
+    if [[ -n "${AGENTVIBES_REVERB_OVERRIDE:-}" ]]; then
+        case "$AGENTVIBES_REVERB_OVERRIDE" in
+            light)     sox_effects="reverb 20 50 50" ;;
+            medium)    sox_effects="reverb 40 50 70" ;;
+            heavy)     sox_effects="reverb 70 50 100" ;;
+            cathedral) sox_effects="reverb 90 30 100" ;;
+            off)       sox_effects="" ;;
+            *)         sox_effects="$AGENTVIBES_REVERB_OVERRIDE" ;;  # raw sox string passthrough
+        esac
+    fi
+
     # Per-agent background music override from bmad-speak.sh profile JSON (takes priority over cfg).
     # The profile file is a PID-scoped temp file written by bmad-speak.sh; no env var leakage.
     if [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
@@ -440,6 +464,15 @@ main() {
     elif [[ -n "$background_file" ]]; then
         # Fall back to default background music from audio-effects.cfg
         background_path="$BACKGROUNDS_DIR/$background_file"
+        # SECURITY: Validate resolved path stays within BACKGROUNDS_DIR (prevent path traversal
+        # via crafted entries like "../../etc/hostname" in audio-effects.cfg)
+        local _resolved_bg _safe_base
+        _resolved_bg=$(realpath -m "$background_path" 2>/dev/null || echo "$background_path")
+        _safe_base=$(realpath -m "$BACKGROUNDS_DIR" 2>/dev/null || echo "$BACKGROUNDS_DIR")
+        if [[ "$_resolved_bg" != "${_safe_base}/"* ]] && [[ "$_resolved_bg" != "$_safe_base" ]]; then
+            echo "Warning: background_file resolves outside allowed directory, skipping: $background_file" >&2
+            background_path=""
+        fi
     fi
 
     # Per-agent profile enables music independently of the global flag.
