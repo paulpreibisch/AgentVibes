@@ -1,4 +1,4 @@
-#
+﻿#
 # File: .claude/hooks-windows/play-tts.ps1
 #
 # AgentVibes - Windows TTS Router
