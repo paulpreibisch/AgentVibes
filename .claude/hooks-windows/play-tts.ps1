@@ -282,12 +282,14 @@ if ($env:AGENTVIBES_VERBOSE -eq "1") {
 # ffplay uses libswresample with sinc resampling — no artefacts.
 function Invoke-AudioPlay {
     param([string]$FilePath)
-    $fp = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+    $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
+    $fp = if ($ffplayCmd) { $ffplayCmd.Source } else { $null }
     if (-not $fp) {
         # Watcher sessions may inherit a minimal PATH — refresh from registry
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
                     [System.Environment]::GetEnvironmentVariable("Path","User")
-        $fp = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+        $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
+        $fp = if ($ffplayCmd) { $ffplayCmd.Source } else { $null }
     }
     if ($fp) {
         & $fp -autoexit -nodisp -loglevel quiet $FilePath 2>$null
