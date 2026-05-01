@@ -19,6 +19,18 @@ param(
     [string]$llm = ""
 )
 
+# Text-file handoff: the SSH receiver watcher writes long/special-char text to
+# a UTF-8 temp file and passes the sentinel "__from_file__" on the command line
+# to avoid Windows CLI argument mangling. Load the real text here.
+if ($Text -eq "__from_file__" -and $env:AGENTVIBES_TEXT_FILE) {
+    if (Test-Path $env:AGENTVIBES_TEXT_FILE) {
+        $Text = [System.IO.File]::ReadAllText($env:AGENTVIBES_TEXT_FILE, [System.Text.UTF8Encoding]::new($false))
+    } else {
+        Write-Error "AGENTVIBES_TEXT_FILE set to missing path: $($env:AGENTVIBES_TEXT_FILE)"
+        exit 1
+    }
+}
+
 # Configuration paths
 # First check if we're running from a project directory with .claude
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -53,11 +65,13 @@ if (Test-Path $ProviderFile) {
 $ProviderScript = ""
 
 switch ($ActiveProvider) {
-    "windows-sapi" {
-        $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1"
+    { $_ -in "sapi", "windows-sapi" } {
+        $ProviderScript = "$HooksDir\play-tts-sapi.ps1"
+        if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1" }
     }
-    "windows-piper" {
-        $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1"
+    { $_ -in "piper", "windows-piper" } {
+        $ProviderScript = "$HooksDir\play-tts-piper.ps1"
+        if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
     }
     "soprano" {
         $ProviderScript = "$HooksDir\play-tts-soprano.ps1"
