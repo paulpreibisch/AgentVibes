@@ -35,19 +35,57 @@ Two targets are supported:
 
 ## How It Works
 
-The receiver at `$AGENTVIBES_RECEIVER_HOST:$AGENTVIBES_RECEIVER_PORT` is an SSH server that accepts **only base64-encoded TTS payloads** — it does NOT execute shell commands and does NOT read from stdin/pty. You pass the base64 string as a **command-line argument** (not piped or sent via TTY), and it queues the text for TTS playback.
+The receiver at `$AGENTVIBES_RECEIVER_HOST:$AGENTVIBES_RECEIVER_PORT` is an SSH server that accepts **only base64-encoded JSON payloads** — it does NOT execute shell commands and does NOT read from stdin/pty. You pass the base64 string as a **command-line argument** (not piped or sent via TTY), and it queues the text for TTS playback.
 
 **Critical: Do NOT pipe or TTY-send the payload** — the receiver ignores stdin. The base64 string must appear as a plain argument after the user@host.
 
-### Step 1: Encode the message
+### Payload format
+
+The payload is a **base64-encoded JSON object**. All fields except `text` are optional — omit or leave empty to use the receiver's current defaults.
+
+```json
+{
+  "text":     "Words to speak aloud",
+  "voice":    "en_US-libritts-high::Leo-8",
+  "music":    "bachata",
+  "volume":   "0.30",
+  "effects":  "medium",
+  "pretext":  "Hermes here, ",
+  "speed":    "",
+  "provider": "piper",
+  "project":  "hermes"
+}
+```
+
+| Field | What it controls | Examples |
+|-------|-----------------|---------|
+| `text` | Text to speak | Any string |
+| `voice` | Voice model and speaker | `en_US-libritts-high::Leo-8`, `en_US-jenny-medium` |
+| `music` | Background music track | `bachata`, `chillwave`, `dreamy-house`, `""` = use default |
+| `volume` | Background music volume (0.0–1.0) | `"0.25"`, `"0.40"` |
+| `effects` | Reverb preset (Windows) or Sox string (Linux) | `"off"`, `"light"`, `"medium"`, `"heavy"`, `"cathedral"` |
+| `pretext` | Spoken prefix prepended to text | `"Hermes here, "`, `""` = no prefix |
+| `speed` | Speech rate multiplier | `"1.2"` = faster, `""` = default |
+| `provider` | TTS engine | `"piper"` |
+| `project` | Tag shown in receiver log | `"hermes"` |
+
+**To change voice:** set `voice` to any `voiceId` or `voiceId::SpeakerName` string. Ask the user which voice they want, or use `list_voices` if the AgentVibes MCP server is available.
+
+**To change music:** set `music` to a track keyword (`bachata`, `chillwave`, `dreamy-house`) or `""` to inherit the receiver default.
+
+**To remove reverb:** set `effects` to `"off"`.
+
+**To add reverb:** set `effects` to `"light"`, `"medium"`, `"heavy"`, or `"cathedral"`.
+
+### Step 1: Build and encode the payload
 ```bash
-echo -n "Your message here" | base64
+PAYLOAD=$(echo -n '{"text":"Your message here","voice":"","music":"","effects":"","pretext":"Hermes here, ","volume":"","speed":"","provider":"piper","project":"hermes"}' | base64 -w 0)
 ```
 
 ### Step 2: SSH the base64 payload to the receiver
 ```bash
 ssh -i "$AGENTVIBES_SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
-  -p "$AGENTVIBES_RECEIVER_PORT" "$AGENTVIBES_RECEIVER_USER@$AGENTVIBES_RECEIVER_HOST" '<base64-payload>'
+  -p "$AGENTVIBES_RECEIVER_PORT" "$AGENTVIBES_RECEIVER_USER@$AGENTVIBES_RECEIVER_HOST" "$PAYLOAD"
 ```
 
 ### Step 3: Response

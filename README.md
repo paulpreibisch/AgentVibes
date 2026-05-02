@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.1
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.2
 
 ---
 
@@ -40,7 +40,11 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.1 — Hermes Agent Integration
+## 🌟 NEW IN v5.6.2 — Per-Message Audio Control
+
+Remote senders (Hermes, SSH remote provider) can now control **voice, music, reverb, and volume per message** — no persistent config changes needed. Pass any field in the JSON payload and the Windows receiver applies it for that message only.
+
+## v5.6.1 — Hermes Agent Integration
 
 AgentVibes now speaks for **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the self-hosted, self-improving AI assistant. Two production-ready skills ship in `docs/hermes/skills/`:
 

@@ -1,10 +1,10 @@
 > 🌐 [English version](../../README.md)
 
-**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.6.1
+**著者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **バージョン**: v5.6.2
 
 ---
 
-## 🌟 v5.6.1 の新機能 — Hermes Agent 統合
+## 🌟 v5.6.2 の新機能 — Hermes Agent 統合
 
 AgentVibes が **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** のために話せるようになりました — セルフホスト型の自己改善 AI アシスタントです。本番対応のスキルが 2 つ `docs/hermes/skills/` に含まれています：
 

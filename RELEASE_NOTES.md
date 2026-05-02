@@ -1,5 +1,31 @@
 # AgentVibes Release Notes
 
+## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
+
+**Released:** 2026-05-02
+
+### 🎉 Per-Message Override: Voice, Music, Reverb, Volume
+
+Remote senders (Hermes, SSH remote provider) can now control every audio parameter **per message** without touching the receiver's persistent config:
+
+- **Music** — pass `"music": "bachata"` (keyword) or full filename to switch background track for that message
+- **Volume** — pass `"volume": "0.35"` to adjust music volume for that message  
+- **Reverb** — pass `"effects": "medium"` (`off`/`light`/`medium`/`heavy`/`cathedral`) to set reverb per message
+- **Voice** — already worked; now documented with full field reference
+- **Pretext** — pass `"pretext": ""` to suppress the intro prefix for a single message
+
+Previously these fields were parsed by the receiver and queued but **never applied** — `play-tts.ps1` didn't read the `AGENTVIBES_OVERRIDE_*` env vars the watcher set. Fixed.
+
+### 📚 Hermes Skill: Full Payload Field Reference
+
+`agentvibes-target` SKILL.md now documents all 9 JSON payload fields with examples so Hermes (or any AI agent) can say "switch to chillwave", "add reverb", "use a female voice", "remove the intro prefix" — and it just works.
+
+### 🐛 Hermes Hook: handler.py + HOOK.yaml now ship in the package
+
+`docs/hermes/skills/tts/hermes-agentvibes-hook/` was missing `handler.py` and `HOOK.yaml` — only `SKILL.md` was included. Both files now ship. `handler.py` also reads `AGENTVIBES_MUSIC` from the environment so the default background music is configurable without editing the file.
+
+---
+
 ## 🤖 v5.6.1 — Hermes Agent Integration & Windows PS5.1 Fixes
 
 **Released:** 2026-05-01

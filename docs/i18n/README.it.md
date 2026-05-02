@@ -1,10 +1,10 @@
 > 🌐 [English version](../../README.md)
 
-**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.6.1
+**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.6.2
 
 ---
 
-## 🌟 NOVITÀ IN v5.6.1 — Integrazione Hermes Agent
+## 🌟 NOVITÀ IN v5.6.2 — Integrazione Hermes Agent
 
 AgentVibes ora parla per **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — l'assistente AI self-hosted e auto-migliorante. Due skill pronte per la produzione sono incluse in `docs/hermes/skills/`:
 

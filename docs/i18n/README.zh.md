@@ -1,10 +1,10 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.6.1
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.6.2
 
 ---
 
-## 🌟 v5.6.1 新功能 — Hermes Agent 集成
+## 🌟 v5.6.2 新功能 — Hermes Agent 集成
 
 AgentVibes 现在可以为 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 自托管、自我改进的 AI 助手发声。两个生产就绪的技能包含在 `docs/hermes/skills/` 中：
 

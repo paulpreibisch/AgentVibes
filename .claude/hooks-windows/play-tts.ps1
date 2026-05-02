@@ -97,6 +97,16 @@ if (Test-Path $BgEnabledFile) {
     $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
 }
 
+# Per-message overrides from SSH/remote payload (set by the queue watcher).
+# These allow remote senders (Hermes, SSH remote provider) to override music,
+# volume, and effects for a single message without mutating persistent config.
+$OverrideMusic   = if ($env:AGENTVIBES_OVERRIDE_MUSIC)   { $env:AGENTVIBES_OVERRIDE_MUSIC.Trim() }   else { "" }
+$OverrideVolume  = if ($env:AGENTVIBES_OVERRIDE_VOLUME)  { $env:AGENTVIBES_OVERRIDE_VOLUME.Trim() }  else { "" }
+$OverrideEffects = if ($env:AGENTVIBES_OVERRIDE_EFFECTS) { $env:AGENTVIBES_OVERRIDE_EFFECTS.Trim() } else { "" }
+
+# If a music override is set, force background music on for this message
+if ($OverrideMusic -ne "") { $BgEnabled = $true }
+
 # Check if reverb is enabled (allowlist validation)
 $ReverbLevel = "off"
 $ReverbFile = "$ConfigDir\reverb-level.txt"
@@ -105,6 +115,12 @@ if (Test-Path $ReverbFile) {
     if ($reverbVal -in @("off", "light", "medium", "heavy", "cathedral")) {
         $ReverbLevel = $reverbVal
     }
+}
+# Per-message reverb override: AGENTVIBES_OVERRIDE_EFFECTS accepts a preset name
+# ("off", "light", "medium", "heavy", "cathedral") — Sox effect strings are Linux-only
+# and are silently ignored on Windows.
+if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium", "heavy", "cathedral")) {
+    $ReverbLevel = $OverrideEffects
 }
 $HasReverb = $ReverbLevel -ne "off"
 
@@ -380,6 +396,21 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                     $DefaultTrack = $configTrack
                 }
             }
+            # Per-message music override from remote payload (e.g. Hermes, SSH remote)
+            # Accepts full filename (e.g. "agent_vibes_bachata_v1_loop.mp3") or a
+            # keyword (e.g. "bachata") — keyword triggers a glob search in TracksDir.
+            if ($OverrideMusic -ne "") {
+                if ($OverrideMusic -match '^[a-zA-Z0-9_\-\.]+$') {
+                    if ($OverrideMusic -match '\.mp3$') {
+                        # Full filename — use directly
+                        $DefaultTrack = $OverrideMusic
+                    } else {
+                        # Keyword — find first matching track file
+                        $matched = Get-ChildItem -Path $TracksDir -Filter "*$OverrideMusic*" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                        if ($matched) { $DefaultTrack = $matched.Name }
+                    }
+                }
+            }
             $BgTrackPath = Join-Path $TracksDir $DefaultTrack
             # Path containment: verify resolved path stays within tracks directory
             $ResolvedBgTrack = [System.IO.Path]::GetFullPath($BgTrackPath)
@@ -388,12 +419,15 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                 $BgTrackPath = Join-Path $TracksDir "agent_vibes_bachata_v1_loop.mp3"
             }
 
-            # Get volume (default 0.25)
+            # Get volume (default 0.25) — per-message override takes precedence
             $BgVolume = "0.25"
             $VolumeFile = "$ConfigDir\background-music-volume.txt"
             if (Test-Path $VolumeFile) {
                 $vol = (Get-Content $VolumeFile -Raw).Trim()
                 if ($vol -match '^\d+\.?\d*$') { $BgVolume = $vol }
+            }
+            if ($OverrideVolume -ne "" -and $OverrideVolume -match '^\d+\.?\d*$') {
+                $BgVolume = $OverrideVolume
             }
 
             if (Test-Path $BgTrackPath) {

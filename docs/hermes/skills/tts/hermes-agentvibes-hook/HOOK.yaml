@@ -1,0 +1,4 @@
+name: agentvibes-tts
+description: Send agent responses to AgentVibes TTS remotely
+events:
+  - agent:end

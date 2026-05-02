@@ -1,5 +1,12 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
+
+> See [English release notes](../../RELEASE_NOTES.md) for full details.
+
+---
+
+
 ## 🤖 v5.6.1 — Integración con Hermes Agent y Correcciones PS5.1 para Windows
 
 **Lanzamiento:** 2026-05-01

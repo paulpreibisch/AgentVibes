@@ -1,10 +1,10 @@
 > 🌐 [English version](../../README.md)
 
-**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.6.1
+**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.6.2
 
 ---
 
-## 🌟 v5.6.1 신기능 — Hermes Agent 통합
+## 🌟 v5.6.2 신기능 — Hermes Agent 통합
 
 AgentVibes가 이제 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 자체 호스팅, 자기 개선 AI 어시스턴트를 위해 말할 수 있습니다. 프로덕션 준비 완료된 스킬 2개가 `docs/hermes/skills/`에 포함됩니다:
 
