@@ -205,6 +205,9 @@ export function createSetupTab(screen, services) {
   let _screen = 0;
   let _lastScreen = -2;
   let _pendingGlobalCfg = null;  // Set when global config detected on first run
+  // Set to true while a config modal is closing so the wizard Escape handler
+  // does not also step the setup wizard backwards on the same keypress.
+  let _modalClosing = false;
   let _globalChoiceIdx = 0;      // 0 = Load Global, 1 = Start Fresh
   const _getLang = () => languageService?.getLang() ?? 'en';
   const _tl = (key) => languageService?.t(key) ?? t('en', key);
@@ -617,6 +620,7 @@ export function createSetupTab(screen, services) {
         const nextRowIdx = Math.floor(nextIdx / 3);
         const nextRow = PROVIDERS[nextRowIdx];
         if (col < 2 && nextRow && nextRow.isDefault) return; // skip Default from Install/Remove
+        if (providerFocusableItems[nextIdx].hidden) return; // skip hidden (e.g. Config not installed)
         providerFocusIndex = nextIdx;
         providerFocusableItems[providerFocusIndex].focus();
         screen.render();
@@ -641,7 +645,15 @@ export function createSetupTab(screen, services) {
   }
 
   function cycleFocus(dir) {
-    providerFocusIndex = (providerFocusIndex + dir + providerFocusableItems.length) % providerFocusableItems.length;
+    const len = providerFocusableItems.length;
+    let next = (providerFocusIndex + dir + len) % len;
+    // Skip hidden buttons (e.g. Configure when provider not installed)
+    let steps = 0;
+    while (providerFocusableItems[next].hidden && steps < len) {
+      next = (next + dir + len) % len;
+      steps++;
+    }
+    providerFocusIndex = next;
     providerFocusableItems[providerFocusIndex].focus();
     screen.render();
   }
@@ -920,6 +932,11 @@ export function createSetupTab(screen, services) {
     function _closeModal() {
       if (_closed) return;
       _closed = true;
+      // Signal the wizard Escape handler to skip its own logic this keypress.
+      // forceCloseAll() may have already decremented the depth to 0 before
+      // setup-tab's screen.key('escape') handler fires, so we need this flag.
+      _modalClosing = true;
+      Promise.resolve().then(() => { _modalClosing = false; });
       _killPreview();
       btnBlink.cleanup();
       navigationService?.closeModal();
@@ -1065,13 +1082,18 @@ export function createSetupTab(screen, services) {
       if (!field) return;
 
       const _refreshField = () => {
+        if (_closed) return;  // Guard: forceCloseAll may close parent before sub-picker callback fires
         _autoSave(true);
         fieldList.setItems(_fieldItems());
         fieldList.select(idx);
         fieldList.focus();
         screen.render();
       };
-      const _cancelField = () => { fieldList.focus(); screen.render(); };
+      const _cancelField = () => {
+        if (_closed) return;  // Guard: same as above
+        fieldList.focus();
+        screen.render();
+      };
 
       switch (field.key) {
         case 'ttsEngine':   _openTtsEnginePicker(draft, _refreshField);      break;
@@ -1143,7 +1165,7 @@ export function createSetupTab(screen, services) {
       'claude-code': 'Claude Code here',
       'copilot': 'Copilot here',
       'codex': 'Codex here',
-      'default': '',  // empty by default — user sets via Configure
+      'default': path.basename(targetDir),  // default to project folder name
     };
 
     // Read global defaults for display
@@ -1385,6 +1407,8 @@ export function createSetupTab(screen, services) {
     function _closeModal() {
       if (_closed) return;
       _closed = true;
+      _modalClosing = true;
+      Promise.resolve().then(() => { _modalClosing = false; });
       _killPreview();
       btnBlink.cleanup();
       navigationService?.closeModal();
@@ -1400,6 +1424,7 @@ export function createSetupTab(screen, services) {
       if (!field) return;
 
       const _refreshField = () => {
+        if (_closed) return;
         _autoSave();
         fieldList.setItems(_fieldItems());
         fieldList.select(idx);
@@ -1407,6 +1432,7 @@ export function createSetupTab(screen, services) {
         screen.render();
       };
       const _cancelField = () => {
+        if (_closed) return;
         fieldList.focus();
         screen.render();
       };
@@ -1946,11 +1972,14 @@ export function createSetupTab(screen, services) {
       if (provider?.isDefault) {
         row.installBtn.hide();
         row.removeBtn.hide();
+        row.configBtn.show();
       } else {
         row.installBtn.show();
         row.removeBtn.show();
+        // Config is only available once the provider is installed.
+        // refreshInstalledState() will show it if already installed.
+        row.configBtn.hide();
       }
-      row.configBtn.show();
     }
   }
 
@@ -2233,6 +2262,12 @@ export function createSetupTab(screen, services) {
           : '{yellow-fg}[Not Installed]{/yellow-fg}'
       );
       row.installBtn.setContent(installed ? ' Re-install ' : '  Install   ');
+      // Show Configure only when installed; hide it when not.
+      if (installed) {
+        row.configBtn.show();
+      } else {
+        row.configBtn.hide();
+      }
     }
   }
 
@@ -2495,7 +2530,7 @@ export function createSetupTab(screen, services) {
   });
 
   screen.key(['escape'], () => {
-    if (box.hidden || _checking || navigationService?.isModalOpen()) return;
+    if (box.hidden || _checking || navigationService?.isModalOpen() || _modalClosing) return;
     if (_screen === -1) {
       setTimeout(() => navigationService?.switchTab('settings'), 0);
       return;
