@@ -160,9 +160,17 @@ if (-not (Test-Path $adminKeysFile)) {
 Write-Host "[7.5/8] Installing user-session watcher..." -ForegroundColor Yellow
 $watcherScript = @'
 # AgentVibes TTS Queue Watcher - runs in user session for audio access
+# Single-instance guard: exit immediately if another watcher is already running.
+$mutex = New-Object System.Threading.Mutex($false, 'Global\AgentVibesTtsWatcher')
+if (-not $mutex.WaitOne(0)) {
+    $mutex.Dispose()
+    exit 0
+}
+
 $QueueDir = "$env:USERPROFILE\.agentvibes\tts-queue"
 $PlayTts  = "$env:USERPROFILE\.claude\hooks-windows\play-tts.ps1"
 if (-not (Test-Path $QueueDir)) { New-Item -ItemType Directory -Path $QueueDir -Force | Out-Null }
+try {
 while ($true) {
     $files = Get-ChildItem "$QueueDir\*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
     foreach ($f in $files) {
@@ -196,6 +204,10 @@ while ($true) {
     }
     Start-Sleep -Milliseconds 200
 }
+} finally {
+    $mutex.ReleaseMutex()
+    $mutex.Dispose()
+}
 '@
 Set-Content -Path "$env:USERPROFILE\.agentvibes\tts-watcher.ps1" -Value $watcherScript -Encoding UTF8
 
@@ -208,6 +220,15 @@ Set-Content -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Value $vbsLa
 # Install autostart shortcut in Startup folder
 $startupDir = [Environment]::GetFolderPath('Startup')
 Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Destination "$startupDir\agentvibes-watcher.vbs" -Force
+
+# Kill any existing watcher instances before launching — prevents double-playback
+# if setup is run more than once (each run would otherwise add another watcher process).
+$existingWatchers = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher.ps1*" }
+if ($existingWatchers) {
+    $existingWatchers | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Milliseconds 300  # Wait for processes to exit
+    Write-Host "       Stopped $($existingWatchers.Count) existing watcher(s)" -ForegroundColor DarkYellow
+}
 
 # Launch it now so streaming works without requiring logout/login
 Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -WindowStyle Hidden

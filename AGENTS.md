@@ -59,21 +59,3 @@ When multiple agents respond in a roundtable discussion, call `text_to_speech` s
 The BMAD agent manifest is at `_bmad/_config/agent-manifest.csv` — read it to discover available agents, their display names, icons, and communication styles.
 
 If `.bmad-agent-context` does NOT exist, use `text_to_speech` as normal with default voice.
-
-<!-- AgentVibes:CodexVoice:start -->
-## AgentVibes Codex Voice
-
-If you are Codex and terminal command execution is available in this workspace, speak your final responses with AgentVibes.
-
-- Only do this when this AgentVibes Codex block is present in this workspace.
-- After each final response, run a local AgentVibes speech command with a short spoken version of the answer.
-- On Windows, use: `powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "<short spoken summary>"`
-- On macOS/Linux, use: `bash .claude/hooks/play-tts.sh "<short spoken summary>"`
-- Keep the spoken text concise when the written response is long.
-- If the user asks you not to speak, skip it.
-- If speech fails, continue in text and mention it briefly.
-- **BMAD Party Mode:** If `.bmad-agent-context` exists and contains "party-mode", use `bmad-speak` instead:
-  - Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\bmad-speak.ps1" "<agent-name>" "<short spoken summary>"`
-  - macOS/Linux: `bash .claude/hooks/bmad-speak.sh "<agent-name>" "<short spoken summary>"`
-
-<!-- AgentVibes:CodexVoice:end -->
