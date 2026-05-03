@@ -747,217 +747,189 @@ export function createSetupTab(screen, services) {
 
   function _openHermesConfigModal(currentCfg) {
     if (navigationService?.isModalOpen()) return;
-    let _modalClosed = false;
-    navigationService?.openModal(null, () => _doClose(false));
 
-    // ── Draft state ───────────────────────────────────────────────────────
+    // Draft persists across mode switches (modal is rebuilt when mode changes)
     const draft = {
-      mode:   currentCfg.mode   === 'remote' ? 'remote' : 'local',
+      mode:   currentCfg.mode === 'remote' ? 'remote' : 'local',
       sshKey: currentCfg.sshKey || '',
       host:   currentCfg.host   || '',
       port:   currentCfg.port   || '2222',
       voice:  currentCfg.voice  || 'en_US-libritts-high::Leo-8',
     };
 
-    // SSH fields (only used when mode=remote)
-    const SSH_FIELDS = [
-      { key: 'sshKey', label: 'SSH Key Path', hint: 'Absolute path to private key (no ~)', maxLen: 512 },
-      { key: 'host',   label: 'Host / IP',    hint: 'Tailscale IP or hostname of speaker machine', maxLen: 253 },
-      { key: 'port',   label: 'Port',         hint: 'AgentVibes receiver SSH port (e.g. 2222)', maxLen: 10 },
-    ];
+    let _activeModal = null;
+    let _outerClosed = false;
 
-    // ── Modal shell ───────────────────────────────────────────────────────
-    const modal = blessed.box({
-      parent: screen, top: 'center', left: 'center',
-      width: 70, height: 26,
-      border: { type: 'line' }, tags: true,
-      label: ' {bold}{cyan-fg} Hermes — TTS Config {/cyan-fg}{/bold} ',
-      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
-    });
-    modal.setFront();
-
-    // ── Mode toggle row ───────────────────────────────────────────────────
-    blessed.text({
-      parent: modal, top: 1, left: 2, tags: true,
-      content: '{white-fg}{bold}Mode{/bold}{/white-fg}',
-      style: { bg: COLORS.contentBg },
-    });
-    const modeToggle = blessed.list({
-      parent: modal, top: 2, left: 2, right: 2, height: 3,
-      keys: true, vi: false, mouse: true,
-      border: { type: 'line' },
-      tags: true,
-      items: [
-        `{cyan-fg}● Local{/cyan-fg}   — Hermes & speakers on the same machine (no SSH needed)`,
-        `{yellow-fg}● Remote{/yellow-fg}  — Hermes is on a remote server; sends audio over SSH`,
-      ],
-      style: {
-        fg: COLORS.labelFg, bg: COLORS.contentBg,
-        border: { fg: 'blue' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
-        focus: { border: { fg: 'cyan' } },
-      },
-    });
-    modeToggle.select(draft.mode === 'remote' ? 1 : 0);
-
-    // ── SSH section (shown/hidden based on mode) ──────────────────────────
-    const sshSection = blessed.box({
-      parent: modal, top: 5, left: 0, right: 0,
-      height: 13,
-      tags: true,
-      style: { bg: COLORS.contentBg },
+    navigationService?.openModal(null, () => {
+      if (!_outerClosed) {
+        _outerClosed = true;
+        if (_activeModal) { destroyList(_activeModal, screen); _activeModal = null; }
+      }
     });
 
-    const sshHeader = blessed.text({
-      parent: sshSection, top: 0, left: 2, tags: true,
-      content: '{yellow-fg}{bold}Remote SSH Settings{/bold}{/yellow-fg}',
-      style: { bg: COLORS.contentBg },
-    });
+    function _buildModal() {
+      // Destroy previous modal if switching modes
+      if (_activeModal) { destroyList(_activeModal, screen); _activeModal = null; }
 
-    const sshInputs = [];
-    SSH_FIELDS.forEach((f, i) => {
-      const top = 1 + i * 4;
+      const isRemote = draft.mode === 'remote';
+
+      // Layout: mode section always 6 rows (label+list+gap), SSH 13 rows if remote, voice 5 rows, footer 2
+      const SSH_FIELDS = [
+        { key: 'sshKey', label: 'SSH Key Path', hint: 'Absolute path to private key (no ~)', maxLen: 512 },
+        { key: 'host',   label: 'Host / IP',    hint: 'Tailscale IP or hostname of speaker machine', maxLen: 253 },
+        { key: 'port',   label: 'Port',         hint: 'Receiver SSH port (e.g. 2222)', maxLen: 10 },
+      ];
+      const VOICE_TOP = isRemote ? 20 : 7;
+      const MODAL_H   = isRemote ? 27 : 14;
+
+      const modal = blessed.box({
+        parent: screen, top: 'center', left: 'center',
+        width: 70, height: MODAL_H,
+        border: { type: 'line' }, tags: true,
+        label: ' {bold}{cyan-fg} Hermes — TTS Config {/cyan-fg}{/bold} ',
+        style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+      });
+      modal.setFront();
+      _activeModal = modal;
+
+      // ── Mode label + list ─────────────────────────────────────────────
       blessed.text({
-        parent: sshSection, top, left: 2, tags: true,
-        content: `{white-fg}{bold}${f.label}{/bold}{/white-fg}  {gray-fg}${f.hint}{/gray-fg}`,
+        parent: modal, top: 1, left: 2, tags: true,
+        content: '{white-fg}{bold}Mode{/bold}{/white-fg}',
         style: { bg: COLORS.contentBg },
       });
-      const input = blessed.textbox({
-        parent: sshSection, top: top + 1, left: 2, right: 2, height: 3,
-        border: { type: 'line' }, inputOnFocus: true,
-        value: draft[f.key],
+      const modeToggle = blessed.list({
+        parent: modal, top: 2, left: 2, right: 2, height: 4,
+        keys: true, vi: false, mouse: true,
+        border: { type: 'line' }, tags: true,
+        items: [
+          `{cyan-fg}● Local{/cyan-fg}   — Hermes & speakers on same machine (no SSH)`,
+          `{yellow-fg}● Remote{/yellow-fg}  — Hermes on remote server, send audio over SSH`,
+        ],
         style: {
-          fg: 'white', bg: 'black',
+          fg: COLORS.labelFg, bg: COLORS.contentBg,
           border: { fg: 'blue' },
+          selected: { bg: 'blue', fg: 'white', bold: true },
           focus: { border: { fg: 'cyan' } },
         },
       });
-      sshInputs.push({ input, field: f });
-    });
+      modeToggle.select(isRemote ? 1 : 0);
 
-    // ── Voice field (always shown) ────────────────────────────────────────
-    blessed.text({
-      parent: modal, top: 19, left: 2, tags: true,
-      content: '{white-fg}{bold}Voice{/bold}{/white-fg}  {gray-fg}Piper voice model{/gray-fg}',
-      style: { bg: COLORS.contentBg },
-    });
-    const voiceInput = blessed.textbox({
-      parent: modal, top: 20, left: 2, right: 2, height: 3,
-      border: { type: 'line' }, inputOnFocus: true,
-      value: draft.voice,
-      style: {
-        fg: 'white', bg: 'black',
-        border: { fg: 'blue' },
-        focus: { border: { fg: 'cyan' } },
-      },
-    });
-
-    // Footer
-    blessed.text({
-      parent: modal, bottom: 1, left: 2, tags: true,
-      content: '{white-fg}↑↓ mode  Tab next field  Enter save  Escape cancel{/white-fg}',
-      style: { bg: COLORS.contentBg },
-    });
-
-    // ── Show/hide SSH section based on mode ───────────────────────────────
-    function _applyMode() {
-      const isRemote = draft.mode === 'remote';
+      // ── SSH fields (remote only) ──────────────────────────────────────
+      const sshInputs = [];
       if (isRemote) {
-        sshSection.show();
-        sshHeader.show();
-      } else {
-        sshSection.hide();
+        blessed.text({
+          parent: modal, top: 7, left: 2, tags: true,
+          content: '{yellow-fg}{bold}SSH Settings{/bold}{/yellow-fg}',
+          style: { bg: COLORS.contentBg },
+        });
+        SSH_FIELDS.forEach((f, i) => {
+          const top = 8 + i * 4;
+          blessed.text({
+            parent: modal, top, left: 2, tags: true,
+            content: `{white-fg}{bold}${f.label}{/bold}{/white-fg}  {gray-fg}${f.hint}{/gray-fg}`,
+            style: { bg: COLORS.contentBg },
+          });
+          const input = blessed.textbox({
+            parent: modal, top: top + 1, left: 2, right: 2, height: 3,
+            border: { type: 'line' }, inputOnFocus: true,
+            value: draft[f.key],
+            style: { fg: 'white', bg: 'black', border: { fg: 'blue' }, focus: { border: { fg: 'cyan' } } },
+          });
+          sshInputs.push({ input, field: f });
+        });
       }
-      screen.render();
-    }
-    _applyMode();
 
-    // ── Close / save ──────────────────────────────────────────────────────
-    function _doClose(save) {
-      if (_modalClosed) return;
-      _modalClosed = true;
-      navigationService?.closeModal();
-      destroyList(modal, screen);
-      if (save) {
-        const cfg = {
-          mode:   draft.mode,
-          sshKey: (sshInputs[0]?.input.getValue() || draft.sshKey).trim().slice(0, 512),
-          host:   (sshInputs[1]?.input.getValue() || draft.host).trim().slice(0, 253),
-          port:   (sshInputs[2]?.input.getValue() || draft.port).trim().slice(0, 10),
-          voice:  (voiceInput.getValue() || draft.voice).trim().slice(0, 200),
-        };
-        saveHermesConfig(cfg)
-          .then(() => _showSavedToast('Hermes Config', '~/.hermes/hooks/agentvibes-tts/agentvibes-ssh-config.json'))
-          .catch(err => _showSavedToast(`Save failed: ${err.message}`, null));
+      // ── Voice (always shown, position depends on mode) ────────────────
+      blessed.text({
+        parent: modal, top: VOICE_TOP, left: 2, tags: true,
+        content: '{white-fg}{bold}Voice{/bold}{/white-fg}  {gray-fg}Piper voice model{/gray-fg}',
+        style: { bg: COLORS.contentBg },
+      });
+      const voiceInput = blessed.textbox({
+        parent: modal, top: VOICE_TOP + 1, left: 2, right: 2, height: 3,
+        border: { type: 'line' }, inputOnFocus: true,
+        value: draft.voice,
+        style: { fg: 'white', bg: 'black', border: { fg: 'blue' }, focus: { border: { fg: 'cyan' } } },
+      });
+
+      // Footer
+      blessed.text({
+        parent: modal, bottom: 1, left: 2, tags: true,
+        content: '{white-fg}↑↓ select mode  Tab next  Enter save  Escape cancel{/white-fg}',
+        style: { bg: COLORS.contentBg },
+      });
+
+      // Snapshot live input values into draft before closing or switching
+      function _snapshot() {
+        if (sshInputs[0]) draft.sshKey = sshInputs[0].input.getValue().trim() || draft.sshKey;
+        if (sshInputs[1]) draft.host   = sshInputs[1].input.getValue().trim() || draft.host;
+        if (sshInputs[2]) draft.port   = sshInputs[2].input.getValue().trim() || draft.port;
+        const v = voiceInput.getValue().trim();
+        if (v) draft.voice = v;
       }
-      screen.render();
-    }
 
-    // ── Mode toggle key handling ──────────────────────────────────────────
-    modeToggle.key(['enter', 'space'], () => {
-      const sel = modeToggle.selected ?? 0;
-      draft.mode = sel === 0 ? 'local' : 'remote';
-      _applyMode();
-    });
-    modeToggle.on('select item', () => {
-      const sel = modeToggle.selected ?? 0;
-      draft.mode = sel === 0 ? 'local' : 'remote';
-      _applyMode();
-    });
-    modeToggle.key(['tab', 'down'], () => {
-      if (draft.mode === 'remote' && sshInputs.length) {
-        sshInputs[0].input.focus();
-        sshInputs[0].input.readInput(() => {});
-      } else {
-        voiceInput.focus();
-        voiceInput.readInput(() => {});
-      }
-      screen.render();
-    });
-    modeToggle.key(['escape'], () => _doClose(false));
-
-    // ── SSH field key handling ────────────────────────────────────────────
-    sshInputs.forEach(({ input }, i) => {
-      input.key(['tab', 'down'], () => {
-        if (i < sshInputs.length - 1) {
-          sshInputs[i + 1].input.focus();
-          sshInputs[i + 1].input.readInput(() => {});
-        } else {
-          voiceInput.focus();
-          voiceInput.readInput(() => {});
+      function _doClose(save) {
+        if (_outerClosed) return;
+        _outerClosed = true;
+        _snapshot();
+        navigationService?.closeModal();
+        if (_activeModal) { destroyList(_activeModal, screen); _activeModal = null; }
+        if (save) {
+          saveHermesConfig(draft)
+            .then(() => _showSavedToast('Hermes Config', '~/.hermes/hooks/agentvibes-tts/agentvibes-ssh-config.json'))
+            .catch(err => _showSavedToast(`Save failed: ${err.message}`, null));
         }
         screen.render();
-      });
-      input.key(['S-tab', 'up'], () => {
-        if (i > 0) {
-          sshInputs[i - 1].input.focus();
-          sshInputs[i - 1].input.readInput(() => {});
-        } else {
-          modeToggle.focus();
+      }
+
+      // Mode toggle: rebuild modal when selection changes
+      modeToggle.key(['enter', 'space'], () => {
+        const newMode = (modeToggle.selected ?? 0) === 0 ? 'local' : 'remote';
+        if (newMode !== draft.mode) {
+          _snapshot();
+          draft.mode = newMode;
+          _buildModal();
         }
+      });
+      modeToggle.key(['tab', 'down'], () => {
+        const first = isRemote ? sshInputs[0]?.input : voiceInput;
+        first?.focus(); first?.readInput?.(() => {});
         screen.render();
       });
-      input.key(['enter'], () => _doClose(true));
-      input.key(['escape'], () => _doClose(false));
-    });
+      modeToggle.key(['escape'], () => _doClose(false));
 
-    // ── Voice field key handling ──────────────────────────────────────────
-    voiceInput.key(['S-tab', 'up'], () => {
-      if (draft.mode === 'remote' && sshInputs.length) {
-        const last = sshInputs[sshInputs.length - 1].input;
-        last.focus(); last.readInput(() => {});
-      } else {
-        modeToggle.focus();
-      }
+      // SSH field navigation
+      sshInputs.forEach(({ input }, i) => {
+        input.key(['tab', 'down'], () => {
+          const next = i < sshInputs.length - 1 ? sshInputs[i + 1].input : voiceInput;
+          next.focus(); next.readInput(() => {});
+          screen.render();
+        });
+        input.key(['S-tab', 'up'], () => {
+          const prev = i > 0 ? sshInputs[i - 1].input : null;
+          if (prev) { prev.focus(); prev.readInput(() => {}); } else { modeToggle.focus(); }
+          screen.render();
+        });
+        input.key(['enter'], () => _doClose(true));
+        input.key(['escape'], () => _doClose(false));
+      });
+
+      // Voice navigation
+      voiceInput.key(['S-tab', 'up'], () => {
+        const prev = isRemote ? sshInputs[sshInputs.length - 1]?.input : null;
+        if (prev) { prev.focus(); prev.readInput(() => {}); } else { modeToggle.focus(); }
+        screen.render();
+      });
+      voiceInput.key(['tab', 'down'], () => _doClose(true));
+      voiceInput.key(['enter'], () => _doClose(true));
+      voiceInput.key(['escape'], () => _doClose(false));
+
+      modeToggle.focus();
       screen.render();
-    });
-    voiceInput.key(['tab', 'down'], () => _doClose(true));
-    voiceInput.key(['enter'], () => _doClose(true));
-    voiceInput.key(['escape'], () => _doClose(false));
+    }
 
-    // Start focus on mode toggle
-    modeToggle.focus();
-    screen.render();
+    _buildModal();
   }
 
   // ── LLM Config Modal ─────────────────────────────────────────────────────
