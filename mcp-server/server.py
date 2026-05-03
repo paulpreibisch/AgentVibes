@@ -869,6 +869,101 @@ class AgentVibesServer:
         result = await self._run_script("clean-audio-cache.sh", [])
         return result if result else "❌ Failed to clean audio cache"
 
+    # ── Hermes config helpers ────────────────────────────────────────────────
+
+    def _hermes_cfg_path(self) -> Path:
+        hermes_home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+        return hermes_home / "hooks" / "agentvibes-tts" / "agentvibes-ssh-config.json"
+
+    async def get_hermes_config(self) -> str:
+        """
+        Get current Hermes AgentVibes SSH configuration.
+
+        Returns:
+            Current SSH key, host, port, and voice settings
+        """
+        cfg_path = self._hermes_cfg_path()
+        defaults = {
+            "sshKey": "/absolute/path/to/id_ed25519_agentvibes",
+            "host": "your-receiver-tailscale-ip",
+            "port": "2222",
+            "voice": "en_US-libritts-high::Leo-8",
+        }
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            cfg = {}
+        merged = {**defaults, **cfg}
+        installed = cfg_path.exists()
+        out = "🔌 Hermes AgentVibes SSH Configuration\n"
+        out += "─" * 40 + "\n"
+        out += f"Status:   {'✅ Configured' if installed else '⚠️  Not yet installed (run: agentvibes install)'}\n"
+        out += f"SSH Key:  {merged['sshKey']}\n"
+        out += f"Host:     {merged['host']}\n"
+        out += f"Port:     {merged['port']}\n"
+        out += f"Voice:    {merged['voice']}\n"
+        if installed:
+            out += f"\nConfig file: {cfg_path}\n"
+            out += "After changes, run: hermes gateway restart\n"
+        return out
+
+    async def set_hermes_config(
+        self,
+        ssh_key: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[str] = None,
+        voice: Optional[str] = None,
+    ) -> str:
+        """
+        Save Hermes AgentVibes SSH configuration.
+
+        Returns:
+            Success message with saved values
+        """
+        import re as _re
+        cfg_path = self._hermes_cfg_path()
+        defaults = {
+            "sshKey": "/absolute/path/to/id_ed25519_agentvibes",
+            "host": "your-receiver-tailscale-ip",
+            "port": "2222",
+            "voice": "en_US-libritts-high::Leo-8",
+        }
+        try:
+            existing = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing = {}
+        merged = {**defaults, **existing}
+
+        if ssh_key is not None:
+            merged["sshKey"] = str(ssh_key)[:512]
+        if host is not None:
+            merged["host"] = str(host)[:253]
+        if port is not None:
+            p = str(port).strip()
+            if not _re.match(r"^\d{1,5}$", p):
+                return "❌ Invalid port: must be a number (e.g. '2222')"
+            merged["port"] = p
+        if voice is not None:
+            merged["voice"] = str(voice)[:200]
+
+        try:
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_path.chmod(0o700) if cfg_path.parent.exists() else None
+            cfg_path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            cfg_path.chmod(0o600)
+        except Exception as e:
+            return f"❌ Failed to save config: {e}"
+
+        out = "✅ Hermes SSH config saved!\n"
+        out += "─" * 40 + "\n"
+        out += f"SSH Key:  {merged['sshKey']}\n"
+        out += f"Host:     {merged['host']}\n"
+        out += f"Port:     {merged['port']}\n"
+        out += f"Voice:    {merged['voice']}\n"
+        out += f"\nConfig file: {cfg_path}\n"
+        out += "Run: hermes gateway restart\n"
+        return out
+
     # Helper methods
     def _build_script_env(self) -> dict:
         """Build environment dict for script execution (shared by all script runners)"""
@@ -1367,6 +1462,36 @@ Examples:
             description="Clean all TTS audio cache files and report space freed. Non-interactive cleanup that removes all wav/mp3/aiff files while preserving background music tracks.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="get_hermes_config",
+            description="Get current Hermes AgentVibes SSH configuration (SSH key path, host, port, voice). Use this to check what's currently set before changing it.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_hermes_config",
+            description="Configure Hermes AgentVibes SSH settings. Set the SSH key, host IP, port, and voice for the Hermes TTS hook. Omit any field to keep its current value.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "ssh_key": {
+                        "type": "string",
+                        "description": "Absolute path to SSH private key (e.g. /home/user/.ssh/id_ed25519_agentvibes)",
+                    },
+                    "host": {
+                        "type": "string",
+                        "description": "Tailscale IP or hostname of the machine with speakers",
+                    },
+                    "port": {
+                        "type": "string",
+                        "description": "AgentVibes receiver SSH port (e.g. '2222')",
+                    },
+                    "voice": {
+                        "type": "string",
+                        "description": "Piper voice model (e.g. 'en_US-libritts-high::Leo-8')",
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -1444,6 +1569,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.list_audio_effects()
         elif name == "clean_audio_cache":
             result = await agent_vibes.clean_audio_cache()
+        elif name == "get_hermes_config":
+            result = await agent_vibes.get_hermes_config()
+        elif name == "set_hermes_config":
+            result = await agent_vibes.set_hermes_config(
+                ssh_key=arguments.get("ssh_key"),
+                host=arguments.get("host"),
+                port=arguments.get("port"),
+                voice=arguments.get("voice"),
+            )
         else:
             result = f"Unknown tool: {name}"
 

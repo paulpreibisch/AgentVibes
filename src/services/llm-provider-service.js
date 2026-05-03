@@ -28,6 +28,11 @@ export const PROVIDERS = [
     desc: 'OpenAI CLI agent — .codex/config.toml + AGENTS.md',
   },
   {
+    id: 'hermes',
+    name: 'Hermes Agent',
+    desc: 'NousResearch Hermes — SSH hook auto-speaks every response',
+  },
+  {
     id: 'default',
     name: 'Default (Fallback)',
     desc: 'Used when any tool calls TTS without identifying its LLM',
@@ -73,6 +78,14 @@ const DEFAULT_LLM_CONFIGS = {
     // lessac-high works reliably, so use it as the default for codex.
     voice: 'en_US-lessac-high',
     pretext: 'Codex here',
+    ttsEngine: 'piper',
+  },
+  hermes: {
+    effects: 'light',
+    bgTrack: 'agent_vibes_bachata_v1_loop.mp3',
+    bgVolume: '0.15',
+    voice: 'en_US-libritts-high::Leo-8',
+    pretext: 'Hermes here',
     ttsEngine: 'piper',
   },
 };
@@ -578,6 +591,190 @@ export async function removeCodexHooks(targetDir) {
   try {
     await fs.rmdir(hooksDir);
   } catch { /* not empty or gone */ }
+}
+
+// ── Hermes install/check/remove ─────────────────────────────────────────────
+
+function _getHermesHooksDir() {
+  const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
+  return path.join(hermesHome, 'hooks', 'agentvibes-tts');
+}
+
+const HERMES_CONFIG_DEFAULTS = {
+  sshKey: '/absolute/path/to/id_ed25519_agentvibes',
+  host: 'your-receiver-tailscale-ip',
+  port: '2222',
+  voice: 'en_US-libritts-high::Leo-8',
+};
+
+export async function getHermesConfig() {
+  const cfgPath = path.join(_getHermesHooksDir(), 'agentvibes-ssh-config.json');
+  try {
+    const raw = await fs.readFile(cfgPath, 'utf8');
+    return { ...HERMES_CONFIG_DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    return { ...HERMES_CONFIG_DEFAULTS };
+  }
+}
+
+export async function saveHermesConfig(cfg) {
+  const hooksDir = _getHermesHooksDir();
+  const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
+  const resolvedHooksDir = path.resolve(hooksDir);
+  const resolvedHermesHome = path.resolve(hermesHome);
+  if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+    throw new Error('Invalid Hermes hooks path');
+  }
+  await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
+  const safe = {
+    sshKey: String(cfg.sshKey || HERMES_CONFIG_DEFAULTS.sshKey),
+    host:   String(cfg.host   || HERMES_CONFIG_DEFAULTS.host),
+    port:   String(cfg.port   || HERMES_CONFIG_DEFAULTS.port),
+    voice:  String(cfg.voice  || HERMES_CONFIG_DEFAULTS.voice),
+  };
+  await fs.writeFile(
+    path.join(hooksDir, 'agentvibes-ssh-config.json'),
+    JSON.stringify(safe, null, 2),
+    { mode: 0o600 }
+  );
+  return safe;
+}
+
+export async function checkHermesInstalled() {
+  try {
+    await fs.access(path.join(_getHermesHooksDir(), 'HOOK.yaml'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function installHermes() {
+  const hooksDir = _getHermesHooksDir();
+
+  // Validate path stays within hermesHome (no traversal)
+  const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
+  const resolvedHooksDir = path.resolve(hooksDir);
+  const resolvedHermesHome = path.resolve(hermesHome);
+  if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+    throw new Error('Invalid Hermes hooks path');
+  }
+
+  await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
+
+  const hookYaml = `name: agentvibes-tts\ndescription: Send agent responses to AgentVibes TTS remotely\nevents:\n  - agent:end\n`;
+  await fs.writeFile(path.join(hooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 });
+
+  // Write default SSH config only if it doesn't already exist
+  const cfgPath = path.join(hooksDir, 'agentvibes-ssh-config.json');
+  try {
+    await fs.access(cfgPath);
+  } catch {
+    await fs.writeFile(cfgPath, JSON.stringify(HERMES_CONFIG_DEFAULTS, null, 2), { mode: 0o600 });
+  }
+
+  const handlerPy = `"""
+AgentVibes TTS Hook — fires on agent:end to speak the agent's response.
+
+SETUP: Use "agentvibes configure hermes" (TUI) or the MCP set_hermes_config tool,
+       then run: hermes gateway restart
+"""
+
+import asyncio, base64, json, logging, os, re, subprocess, time
+
+# ---------------------------------------------------------------------------
+# Config is read from agentvibes-ssh-config.json in this directory.
+# Edit that file directly or use the AgentVibes TUI / MCP tools.
+# ---------------------------------------------------------------------------
+_CFG_DIR  = os.path.dirname(os.path.abspath(__file__))
+_CFG_PATH = os.path.join(_CFG_DIR, "agentvibes-ssh-config.json")
+try:
+    with open(_CFG_PATH, encoding="utf-8") as _f:
+        _cfg = json.load(_f)
+except Exception:
+    _cfg = {}
+
+AGENTVIBES_SSH_KEY  = _cfg.get("sshKey", "/absolute/path/to/id_ed25519_agentvibes")
+AGENTVIBES_HOST     = _cfg.get("host",   "your-receiver-tailscale-ip")
+AGENTVIBES_PORT     = _cfg.get("port",   "2222")
+AGENTVIBES_VOICE    = _cfg.get("voice",  "en_US-libritts-high::Leo-8")
+AGENTVIBES_USER     = "agentvibes-receiver"
+AGENTVIBES_PROJECT  = "hermes"
+MAX_CONTENT_LEN     = 200
+PREFIX              = "Hermes here, "
+_KNOWN_HOSTS        = os.path.join(_CFG_DIR, "known_hosts")
+_LOG_FILE           = os.path.join(_CFG_DIR, "tts-hook.log")
+
+_log = logging.getLogger("agentvibes-tts")
+if not _log.handlers:
+    try:
+        _h = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+        _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        _log.addHandler(_h)
+    except OSError:
+        _log.addHandler(logging.NullHandler())
+    _log.setLevel(logging.INFO)
+
+_last_sent: float = 0.0
+_MIN_INTERVAL_S: float = 3.0
+
+def _tts_speak(text: str) -> None:
+    global _last_sent
+    if not text or not text.strip():
+        return
+    now = time.monotonic()
+    if now - _last_sent < _MIN_INTERVAL_S:
+        _log.info("rate-limited: %.1fs since last send — skipping", now - _last_sent)
+        return
+    _last_sent = now
+    full_text = PREFIX + text.strip()
+    max_len = len(PREFIX) + MAX_CONTENT_LEN
+    if len(full_text) > max_len:
+        full_text = full_text[:max_len].rsplit(" ", 1)[0] + "..."
+    payload = base64.b64encode(json.dumps({
+        "text": full_text, "voice": AGENTVIBES_VOICE, "project": AGENTVIBES_PROJECT,
+        "provider": "piper", "pretext": "", "effects": "", "music": "", "volume": "", "speed": "",
+    }).encode()).decode()
+    cmd = ["ssh", "-i", AGENTVIBES_SSH_KEY, "-o", "ConnectTimeout=5",
+           "-o", "StrictHostKeyChecking=accept-new", "-o", f"UserKnownHostsFile={_KNOWN_HOSTS}",
+           "-o", "BatchMode=yes", "-p", AGENTVIBES_PORT, f"{AGENTVIBES_USER}@{AGENTVIBES_HOST}", payload]
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        if result.returncode != 0:
+            _log.warning("ssh exit %d: %s", result.returncode, result.stderr.decode(errors="replace").strip())
+        else:
+            _log.info("queued OK: %s", result.stdout.decode(errors="replace").strip())
+    except subprocess.TimeoutExpired:
+        _log.warning("ssh timed out after 15s")
+    except Exception as exc:
+        _log.warning("ssh error: %s", exc)
+
+async def handle(event_type: str, context: dict) -> None:
+    if event_type != "agent:end":
+        return
+    response = (context.get("response") or "").strip()
+    if not response:
+        return
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _tts_speak, _strip_markdown(response))
+
+def _strip_markdown(text: str) -> str:
+    text = re.sub(r"\`\`\`[\\s\\S]*?\`\`\`", "", text)
+    text = re.sub(r"\`([^\`]+)\`", r"\\1", text)
+    text = re.sub(r"\\*{1,2}([^\\*]+)\\*{1,2}", r"\\1", text)
+    text = re.sub(r"\\[([^\\]]+)\\]\\([^\\)]+\\)", r"\\1", text)
+    return re.sub(r"\\s+", " ", text).strip()
+`;
+  await fs.writeFile(path.join(hooksDir, 'handler.py'), handlerPy, { mode: 0o600 });
+
+  return { hooksDir, handlerPath: path.join(hooksDir, 'handler.py'), cfgPath };
+}
+
+export async function removeHermes() {
+  const hooksDir = _getHermesHooksDir();
+  try { await fs.unlink(path.join(hooksDir, 'HOOK.yaml')); } catch { /* already gone */ }
+  try { await fs.unlink(path.join(hooksDir, 'handler.py')); } catch { /* already gone */ }
+  try { await fs.rmdir(hooksDir); } catch { /* not empty or gone */ }
 }
 
 // ── Config path resolution ──────────────────────────────────────────────────

@@ -29,6 +29,8 @@ import {
   installCodexMcp, removeCodexMcp,
   installCodexInstructions, installCodexHooks,
   removeCodexInstructions, removeCodexHooks,
+  checkHermesInstalled, installHermes, removeHermes,
+  getHermesConfig, saveHermesConfig,
   loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
 } from '../../services/llm-provider-service.js';
 import {
@@ -675,6 +677,17 @@ export function createSetupTab(screen, services) {
       await refreshInstalledState();
       showCodexInfo(result, wasInstalled);
     }
+
+    if (provider.id === 'hermes') {
+      const wasInstalled = installedState[provider.id];
+      try {
+        const result = await installHermes();
+        await refreshInstalledState();
+        showHermesInfo(result, wasInstalled);
+      } catch (err) {
+        showHermesInfo({ error: err.message }, wasInstalled);
+      }
+    }
   }
 
   async function handleProviderRemove(provider) {
@@ -703,11 +716,22 @@ export function createSetupTab(screen, services) {
       await refreshInstalledState();
       showRemoveInfo('openai-codex');
     }
+
+    if (provider.id === 'hermes') {
+      await removeHermes();
+      await refreshInstalledState();
+      showRemoveInfo('hermes');
+    }
   }
 
   // ── Provider configure handler ────────────────────────────────────────────
 
   async function handleProviderConfigure(provider) {
+    if (provider.id === 'hermes') {
+      const cfg = await getHermesConfig();
+      _openHermesConfigModal(cfg);
+      return;
+    }
     const llmKeyMap = {
       'claude-code': 'claude-code',
       'github-copilot': 'copilot',
@@ -717,6 +741,108 @@ export function createSetupTab(screen, services) {
     const llmKey = llmKeyMap[provider.id] || provider.id;
     const config = loadLlmConfigSync(llmKey, targetDir);
     _openLlmConfigModal(provider, llmKey, config);
+  }
+
+  // ── Hermes SSH Config Modal ───────────────────────────────────────────────
+
+  function _openHermesConfigModal(currentCfg) {
+    if (navigationService?.isModalOpen()) return;
+    let _closed = false;
+    navigationService?.openModal(null, _closeModal);
+
+    const fields = [
+      { key: 'sshKey', label: 'SSH Key Path', hint: 'Absolute path to private key (no tilde)', maxLen: 512 },
+      { key: 'host',   label: 'Host / IP',    hint: 'Tailscale IP or hostname of speaker machine', maxLen: 253 },
+      { key: 'port',   label: 'Port',         hint: 'AgentVibes receiver SSH port (e.g. 2222)', maxLen: 10 },
+      { key: 'voice',  label: 'Voice',        hint: 'Piper voice model (e.g. en_US-libritts-high::Leo-8)', maxLen: 200 },
+    ];
+    const draft = {};
+    for (const f of fields) draft[f.key] = currentCfg[f.key] || '';
+
+    const MODAL_H = 22;
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 70,
+      height: MODAL_H,
+      border: { type: 'line' },
+      tags: true,
+      label: ' {bold}{cyan-fg} Hermes — SSH Config {/cyan-fg}{/bold} ',
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    modal.setFront();
+
+    let focusIdx = 0;
+    const inputBoxes = [];
+
+    // Render field labels and input boxes
+    fields.forEach((f, i) => {
+      const top = 1 + i * 4;
+      blessed.text({
+        parent: modal, top, left: 2, tags: true,
+        content: `{white-fg}{bold}${f.label}{/bold}{/white-fg}  {gray-fg}${f.hint}{/gray-fg}`,
+        style: { bg: COLORS.contentBg },
+      });
+      const input = blessed.textbox({
+        parent: modal, top: top + 1, left: 2, right: 2, height: 3,
+        border: { type: 'line' },
+        inputOnFocus: true,
+        value: draft[f.key],
+        style: {
+          fg: 'white', bg: 'black',
+          border: { fg: i === focusIdx ? 'cyan' : 'blue' },
+          focus: { border: { fg: 'cyan' } },
+        },
+      });
+      inputBoxes.push(input);
+    });
+
+    // Footer help line
+    blessed.text({
+      parent: modal, bottom: 1, left: 2, tags: true,
+      content: '{white-fg}Tab/↓ next  ↑ prev  Enter save  Escape cancel{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    function _closeModal(save) {
+      if (_closed) return;
+      _closed = true;
+      navigationService?.closeModal();
+      destroyList(modal, screen);
+      if (save) {
+        const cfg = {};
+        fields.forEach((f, i) => {
+          cfg[f.key] = (inputBoxes[i].getValue() || '').trim().slice(0, f.maxLen);
+        });
+        saveHermesConfig(cfg)
+          .then(_saved => {
+            const cfgPath = `~/.hermes/hooks/agentvibes-tts/agentvibes-ssh-config.json`;
+            _showSavedToast('Hermes SSH Config', cfgPath);
+          })
+          .catch(err => {
+            _showSavedToast(`Save failed: ${err.message}`, null);
+          });
+      }
+      screen.render();
+    }
+
+    function _focusField(idx) {
+      focusIdx = ((idx % fields.length) + fields.length) % fields.length;
+      inputBoxes[focusIdx].focus();
+      inputBoxes[focusIdx].readInput(() => {});
+      screen.render();
+    }
+
+    inputBoxes.forEach((input, i) => {
+      input.key(['tab', 'down'], () => _focusField(i + 1));
+      input.key(['S-tab', 'up'], () => _focusField(i - 1));
+      input.key(['enter'], () => _closeModal(true));
+      input.key(['escape'], () => _closeModal(false));
+    });
+
+    _focusField(0);
+    screen.render();
   }
 
   // ── LLM Config Modal ─────────────────────────────────────────────────────
@@ -1661,6 +1787,50 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
+  function showHermesInfo(result, wasInstalled = false) {
+    providerView = 'info';
+    hideAllProviderRows();
+    contentBox.hide();
+
+    const lines = [];
+    lines.push('{bold}{cyan-fg}Hermes Agent -- AgentVibes Integration{/cyan-fg}{/bold}');
+    lines.push('');
+
+    if (result && result.hooksDir) {
+      const verb = wasInstalled ? 'Reinstalled' : 'Installed';
+      lines.push(`{green-fg}${verb}! Hook files written to:{/green-fg}`);
+      lines.push('');
+      lines.push(`  {yellow-fg}•{/yellow-fg} {bold}${result.hooksDir}/HOOK.yaml{/bold}`);
+      lines.push(`  {yellow-fg}•{/yellow-fg} {bold}${result.hooksDir}/handler.py{/bold}`);
+      lines.push('');
+      lines.push('{bold}{yellow-fg}ACTION REQUIRED — Configure SSH settings:{/yellow-fg}{/bold}');
+      lines.push('');
+      lines.push('  Press the {bold}Configure{/bold} button, or use the MCP tool {cyan-fg}set_hermes_config{/cyan-fg}:');
+      lines.push('');
+      lines.push('  {cyan-fg}SSH Key{/cyan-fg}  — absolute path to your SSH private key');
+      lines.push('  {cyan-fg}Host{/cyan-fg}     — Tailscale IP of the machine with speakers');
+      lines.push('  {cyan-fg}Port{/cyan-fg}     — AgentVibes receiver SSH port (not 22)');
+      lines.push('  {cyan-fg}Voice{/cyan-fg}    — voice model (default: en_US-libritts-high::Leo-8)');
+      lines.push('');
+      lines.push('{white-fg}Then restart the Hermes gateway:{/white-fg}');
+      lines.push('');
+      lines.push('  {yellow-fg}hermes gateway restart{/yellow-fg}');
+      lines.push('');
+      lines.push('{white-fg}Check {bold}tts-hook.log{/bold} in the hooks dir after the first agent turn.{/white-fg}');
+    } else {
+      lines.push(`{red-fg}Installation failed: ${result?.error || 'Unknown error'}{/red-fg}`);
+    }
+    lines.push('');
+    lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
+
+    infoBox.setContent(lines.join('\n'));
+    infoBox.show();
+    infoBox.setFront();
+    infoBox.focus();
+    infoBox.scrollTo(0);
+    screen.render();
+  }
+
   function showRemoveInfo(providerId, removedItems) {
     providerView = 'info';
     hideAllProviderRows();
@@ -1688,6 +1858,10 @@ export function createSetupTab(screen, services) {
       lines.push('{bold}{cyan-fg}OpenAI Codex -- Removed{/cyan-fg}{/bold}');
       lines.push('');
       lines.push('{green-fg}Successfully removed!{/green-fg}');
+    } else if (providerId === 'hermes') {
+      lines.push('{bold}{cyan-fg}Hermes Agent -- Removed{/cyan-fg}{/bold}');
+      lines.push('');
+      lines.push('{green-fg}Hook files removed. Run{/green-fg} {yellow-fg}hermes gateway restart{/yellow-fg} {green-fg}to apply.{/green-fg}');
     }
     lines.push('');
     lines.push('{white-fg}Press {bold}Enter{/bold} or {bold}Escape{/bold} to return to the provider list.{/white-fg}');
@@ -1754,6 +1928,7 @@ export function createSetupTab(screen, services) {
       }
       const checkFn = p.id === 'claude-code' ? checkClaudeInstalled
         : p.id === 'github-copilot' ? checkCopilotInstalled
+        : p.id === 'hermes' ? checkHermesInstalled
         : checkCodexInstalled;
       installedState[p.id] = await checkFn(targetDir);
     }

@@ -496,17 +496,17 @@ if [ -f "$LOCK_FILE" ]; then
   fi
 fi
 
-# Wait for previous audio to finish (max 2 seconds to prevent blocking)
-for i in {1..4}; do
+# Wait for previous audio to finish (max 15 seconds to prevent overlapping playback)
+for i in {1..30}; do
   if [ ! -f "$LOCK_FILE" ]; then
     break
   fi
   sleep 0.5
 done
 
-# If still locked after 2 seconds, skip this TTS to prevent blocking Claude
+# If still locked after 15 seconds, skip this TTS to prevent blocking Claude
 if [ -f "$LOCK_FILE" ]; then
-  echo "⏭️  Skipping TTS (previous audio still playing)" >&2
+  echo "⏭️  Skipping TTS (previous audio still playing after 15s)" >&2
   exit 0
 fi
 
