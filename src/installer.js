@@ -779,7 +779,8 @@ function getPageTitle(pageNum) {
     3: '😎 Personality Selection',
     4: '🎛️ Reverb Settings',
     5: '🎵 Background Music',
-    6: '🔊 Verbosity Settings'
+    6: '🔊 Verbosity Settings',
+    7: '🤖 Hermes Integration'
   };
   return titles[pageNum] || 'Configuration';
 }
@@ -1098,7 +1099,8 @@ async function collectConfiguration(options = {}) {
       enabled: true,
       track: 'agentvibes_soft_flamenco_loop.mp3'
     },
-    verbosity: 'high'
+    verbosity: 'high',
+    hermes: { enabled: false, hermesHome: '', sshKeyPath: '', receiverHost: '', receiverPort: '', voice: 'en_US-libritts-high::Leo-8' }
   };
 
   // Load existing pretext from file if it exists (Story 1.2: File Persistence)
@@ -1147,14 +1149,15 @@ async function collectConfiguration(options = {}) {
     }
     const homeDir = process.env.HOME || process.env.USERPROFILE;
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
-    // AI agent / non-interactive defaults: no reverb, no background music
+    // AI agent / non-interactive defaults: no reverb, no background music, no hermes
     config.reverb = 'none';
     config.backgroundMusic = { enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' };
+    config.hermes = { enabled: false };
     return config;
   }
 
   let currentPage = 0;
-  const sectionPages = 7; // System Dependencies, Provider, Voice Selection, Personality Selection, Reverb, Background Music, Verbosity
+  const sectionPages = 8; // System Dependencies, Provider, Voice Selection, Personality Selection, Reverb, Background Music, Verbosity, Hermes Integration
   const pageOffset = options.pageOffset || 0;
   const totalPages = options.totalPages || sectionPages;
 
@@ -2052,7 +2055,7 @@ async function collectConfiguration(options = {}) {
 
       // Pretext input with validation
       let pretextValid = false;
-      let pretext = config.pretext || '';
+      let pretext = config.pretext || (path.basename(process.cwd()) + ' here');
 
       while (!pretextValid) {
         const { pretextInput } = await inquirer.prompt([{
@@ -2587,6 +2590,124 @@ async function collectConfiguration(options = {}) {
 
       // Show confirmation and auto-advance to next page
       console.log(chalk.green('\n✓ Verbosity level set\n'));
+      currentPage++;
+      continue;
+
+    } else if (currentPage === 7) {
+      // Page 8: Hermes Integration (optional)
+      console.log(boxen(
+        chalk.white.bold('Give your Hermes agent a voice!\n\n') +
+        chalk.gray('AgentVibes can auto-speak every Hermes response by installing a\n') +
+        chalk.gray('hook that fires on ') + chalk.cyan('agent:end') + chalk.gray(' events.\n\n') +
+        chalk.white('What gets installed:\n') +
+        chalk.gray('  • ') + chalk.cyan('hooks/agentvibes-tts/HOOK.yaml') + chalk.gray(' — event subscription\n') +
+        chalk.gray('  • ') + chalk.cyan('hooks/agentvibes-tts/handler.py') + chalk.gray(' — SSH sender with rate-limiting\n\n') +
+        chalk.gray('Requires: Hermes installed, AgentVibes receiver running on target machine.\n') +
+        chalk.gray('Change anytime: edit ') + chalk.cyan('handler.py') + chalk.gray(' in your Hermes hooks directory.'),
+        {
+          padding: 1,
+          margin: { top: 0, bottom: 0, left: 0, right: 0 },
+          borderStyle: 'round',
+          borderColor: 'magenta',
+          width: 80
+        }
+      ));
+
+      const { enableHermes } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'enableHermes',
+        message: chalk.yellow('Set up Hermes integration now?'),
+        default: false
+      }]);
+
+      if (!enableHermes) {
+        console.log(chalk.gray('\n⊘ Hermes integration skipped\n'));
+        currentPage++;
+        continue;
+      }
+
+      // Collect Hermes config
+      const defaultHermesHome = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes');
+
+      const hermesAnswers = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'hermesHome',
+          message: chalk.yellow('Hermes home directory:'),
+          default: defaultHermesHome,
+          validate: (input) => {
+            const expanded = input.replace(/^~/, os.homedir());
+            if (!expanded || expanded.trim() === '') return 'Path required';
+            // Prevent path traversal
+            const resolved = path.resolve(expanded);
+            if (!resolved.startsWith(os.homedir()) && !resolved.startsWith('/')) return 'Invalid path';
+            return true;
+          },
+          filter: (input) => input.replace(/^~/, os.homedir()).trim()
+        },
+        {
+          type: 'input',
+          name: 'sshKeyPath',
+          message: chalk.yellow('Absolute path to SSH private key (no ~):'),
+          default: path.join(os.homedir(), '.ssh', 'id_ed25519_agentvibes'),
+          validate: (input) => {
+            if (!input || input.trim() === '') return 'SSH key path required';
+            if (input.startsWith('~')) return 'Use absolute path — tilde (~) not supported in subprocess calls';
+            const resolved = path.resolve(input.trim());
+            if (!resolved.startsWith('/')) return 'Must be an absolute path';
+            return true;
+          },
+          filter: (input) => input.trim()
+        },
+        {
+          type: 'input',
+          name: 'receiverHost',
+          message: chalk.yellow('AgentVibes receiver host (Tailscale IP or hostname):'),
+          validate: (input) => {
+            if (!input || input.trim() === '') return 'Host required';
+            // Basic validation: alphanumeric, dots, hyphens (IP or hostname)
+            if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(input.trim())) return 'Invalid host format';
+            return true;
+          },
+          filter: (input) => input.trim()
+        },
+        {
+          type: 'input',
+          name: 'receiverPort',
+          message: chalk.yellow('AgentVibes receiver SSH port:'),
+          default: '2222',
+          validate: (input) => {
+            const port = parseInt(input.trim(), 10);
+            if (isNaN(port) || port < 1 || port > 65535) return 'Must be a valid port number (1-65535)';
+            return true;
+          },
+          filter: (input) => input.trim()
+        },
+        {
+          type: 'input',
+          name: 'voice',
+          message: chalk.yellow('Voice for Hermes responses:'),
+          default: 'en_US-libritts-high::Leo-8',
+          validate: (input) => {
+            if (!input || input.trim() === '') return 'Voice required';
+            // voiceId or voiceId::SpeakerName format
+            if (!/^[a-zA-Z0-9_-]+(:[a-zA-Z0-9_ -]+)?$/.test(input.trim())) return 'Invalid voice format (e.g. en_US-libritts-high::Leo-8)';
+            return true;
+          },
+          filter: (input) => input.trim()
+        }
+      ]);
+
+      config.hermes = {
+        enabled: true,
+        hermesHome: hermesAnswers.hermesHome,
+        sshKeyPath: hermesAnswers.sshKeyPath,
+        receiverHost: hermesAnswers.receiverHost,
+        receiverPort: hermesAnswers.receiverPort,
+        voice: hermesAnswers.voice
+      };
+
+      console.log(chalk.green('\n✓ Hermes integration configured\n'));
       currentPage++;
       continue;
     }
@@ -5414,6 +5535,169 @@ Troubleshooting:
         } catch {
           // Reverb setting failed — non-fatal
         }
+      }
+    }
+
+    // Install Hermes integration hooks if configured
+    if (userConfig.hermes?.enabled) {
+      try {
+        const hermesHooksDir = path.join(userConfig.hermes.hermesHome, 'hooks', 'agentvibes-tts');
+        // Validate that hermesHome stays within expected bounds (no path traversal)
+        const resolvedHermesHome = path.resolve(userConfig.hermes.hermesHome);
+        const resolvedHooksDir = path.resolve(hermesHooksDir);
+        if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+          throw new Error('Invalid Hermes hooks path — possible path traversal');
+        }
+        await fs.mkdir(hermesHooksDir, { recursive: true, mode: 0o700 });
+
+        // HOOK.yaml
+        const hookYaml = `name: agentvibes-tts\ndescription: Send agent responses to AgentVibes TTS remotely\nevents:\n  - agent:end\n`;
+        await fs.writeFile(path.join(hermesHooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 });
+
+        // handler.py — substitute config values; use JSON.stringify for safe string embedding
+        const safeKeyPath  = JSON.stringify(userConfig.hermes.sshKeyPath);
+        const safeHost     = JSON.stringify(userConfig.hermes.receiverHost);
+        const safePort     = JSON.stringify(userConfig.hermes.receiverPort);
+        const safeVoice    = JSON.stringify(userConfig.hermes.voice);
+        const safeKnownHostsPath = JSON.stringify(path.join(userConfig.hermes.hermesHome, 'hooks', 'agentvibes-tts', 'known_hosts'));
+        const handlerPy = `"""
+AgentVibes TTS Hook — fires on agent:end to speak the agent's response.
+Generated by AgentVibes installer v${VERSION}.
+"""
+
+import asyncio
+import base64
+import json
+import logging
+import os
+import re
+import subprocess
+import time
+
+# ---------------------------------------------------------------------------
+# Configuration — edit these to change receiver target or voice
+# ---------------------------------------------------------------------------
+
+AGENTVIBES_SSH_KEY  = ${safeKeyPath}
+AGENTVIBES_HOST     = ${safeHost}
+AGENTVIBES_PORT     = ${safePort}
+AGENTVIBES_USER     = "agentvibes-receiver"
+AGENTVIBES_VOICE    = ${safeVoice}
+AGENTVIBES_PROJECT  = "hermes"
+MAX_CONTENT_LEN     = 200
+PREFIX              = "Hermes here, "
+_KNOWN_HOSTS        = ${safeKnownHostsPath}
+_LOG_FILE           = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tts-hook.log")
+
+# ---------------------------------------------------------------------------
+# File logger
+# ---------------------------------------------------------------------------
+
+_log = logging.getLogger("agentvibes-tts")
+if not _log.handlers:
+    try:
+        _h = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+        _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        _log.addHandler(_h)
+    except OSError:
+        _log.addHandler(logging.NullHandler())
+    _log.setLevel(logging.INFO)
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+
+_last_sent: float = 0.0
+_MIN_INTERVAL_S: float = 3.0
+
+
+def _tts_speak(text: str) -> None:
+    global _last_sent
+    if not text or not text.strip():
+        return
+    now = time.monotonic()
+    if now - _last_sent < _MIN_INTERVAL_S:
+        _log.info("rate-limited: %.1fs since last send — skipping", now - _last_sent)
+        return
+    _last_sent = now
+
+    full_text = PREFIX + text.strip()
+    max_len = len(PREFIX) + MAX_CONTENT_LEN
+    if len(full_text) > max_len:
+        truncated = full_text[:max_len].rsplit(" ", 1)[0]
+        full_text = truncated + "..."
+
+    payload = base64.b64encode(
+        json.dumps({
+            "text":     full_text,
+            "voice":    AGENTVIBES_VOICE,
+            "project":  AGENTVIBES_PROJECT,
+            "provider": "piper",
+            "pretext":  "",
+            "effects":  "",
+            "music":    "",
+            "volume":   "",
+            "speed":    "",
+        }).encode()
+    ).decode()
+
+    cmd = [
+        "ssh",
+        "-i", AGENTVIBES_SSH_KEY,
+        "-o", "ConnectTimeout=5",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", f"UserKnownHostsFile={_KNOWN_HOSTS}",
+        "-o", "BatchMode=yes",
+        "-p", AGENTVIBES_PORT,
+        f"{AGENTVIBES_USER}@{AGENTVIBES_HOST}",
+        payload,
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        if result.returncode != 0:
+            stderr = result.stderr.decode(errors="replace").strip()
+            _log.warning("ssh exit %d: %s", result.returncode, stderr or "(no stderr)")
+        else:
+            _log.info("queued OK: %s", result.stdout.decode(errors="replace").strip())
+    except subprocess.TimeoutExpired:
+        _log.warning("ssh timed out after 15s to %s:%s", AGENTVIBES_HOST, AGENTVIBES_PORT)
+    except Exception as exc:
+        _log.warning("ssh error: %s", exc)
+
+
+async def handle(event_type: str, context: dict) -> None:
+    if event_type != "agent:end":
+        return
+    response = (context.get("response") or "").strip()
+    if not response:
+        return
+    response = _strip_markdown(response)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _tts_speak, response)
+
+
+def _strip_markdown(text: str) -> str:
+    text = re.sub(r"\`\`\`[\\s\\S]*?\`\`\`", "", text)
+    text = re.sub(r"\`([^\`]+)\`", r"\\1", text)
+    text = re.sub(r"\\*{1,2}([^\\*]+)\\*{1,2}", r"\\1", text)
+    text = re.sub(r"\\[([^\\]]+)\\]\\([^\\)]+\\)", r"\\1", text)
+    text = re.sub(
+        r"[\\U0001F300-\\U0001F9FF\\U00002600-\\U000027FF\\U0000FE00-\\U0000FE0F\\u2022\\u2192\\u2193\\u2191]+",
+        "", text,
+    )
+    text = re.sub(r"\\s+", " ", text).strip()
+    return text
+`;
+        await fs.writeFile(path.join(hermesHooksDir, 'handler.py'), handlerPy, { mode: 0o600 });
+        spinner.succeed(chalk.green('Hermes integration installed!'));
+        console.log(chalk.gray(`   Hooks written to: ${hermesHooksDir}`));
+        console.log(chalk.gray('   Run: hermes gateway restart'));
+        console.log('');
+      } catch (hermesErr) {
+        // Hermes setup failed — non-fatal, report but continue
+        console.log(chalk.yellow(`\n⚠️  Hermes integration setup failed: ${hermesErr.message}`));
+        console.log(chalk.gray('   You can set it up manually — see docs/hermes/README.md\n'));
       }
     }
 

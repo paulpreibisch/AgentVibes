@@ -856,7 +856,7 @@ export function createSetupTab(screen, services) {
       // Footer
       blessed.text({
         parent: modal, bottom: 1, left: 2, tags: true,
-        content: '{white-fg}↑↓ select mode  Tab next  Enter save  Escape cancel{/white-fg}',
+        content: '{white-fg}↑↓ switch mode  Tab next field  Enter save  Escape cancel{/white-fg}',
         style: { bg: COLORS.contentBg },
       });
 
@@ -883,46 +883,80 @@ export function createSetupTab(screen, services) {
         screen.render();
       }
 
-      // Mode toggle: rebuild modal when selection changes
-      modeToggle.key(['enter', 'space'], () => {
-        const newMode = (modeToggle.selected ?? 0) === 0 ? 'local' : 'remote';
-        if (newMode !== draft.mode) {
-          _snapshot();
-          draft.mode = newMode;
-          _buildModal();
+      // Mode toggle key handlers.
+      // NOTE: element.key() registers at screen.program level (global), so all handlers
+      // must guard with a focus check — otherwise they fire regardless of which widget
+      // has focus, and multiple S-tab/up/down handlers clobber each other.
+      //
+      // up/down directly switch modes (immediate rebuild) rather than moving cursor
+      // and waiting for enter — avoids focus-jumping into readInput fields that swallow
+      // subsequent keypresses.
+      modeToggle.key(['down'], () => {
+        if (screen.focused !== modeToggle) return;
+        if (draft.mode === 'local') {
+          _snapshot(); draft.mode = 'remote'; setImmediate(_buildModal);
+        } else {
+          // Already remote: tab into SSH fields
+          const first = sshInputs[0]?.input;
+          if (first) { first.focus(); first.readInput(() => {}); screen.render(); }
         }
       });
-      modeToggle.key(['tab', 'down'], () => {
+      modeToggle.key(['up'], () => {
+        if (screen.focused !== modeToggle) return;
+        if (draft.mode === 'remote') {
+          _snapshot(); draft.mode = 'local'; setImmediate(_buildModal);
+        }
+        // Already local: nothing above to go to
+      });
+      modeToggle.key(['tab'], () => {
+        if (screen.focused !== modeToggle) return;
         const first = isRemote ? sshInputs[0]?.input : voiceInput;
         first?.focus(); first?.readInput?.(() => {});
         screen.render();
+      });
+      modeToggle.key(['enter', 'space'], () => {
+        if (screen.focused !== modeToggle) return;
+        const newMode = isRemote ? 'local' : 'remote';
+        _snapshot(); draft.mode = newMode; setImmediate(_buildModal);
       });
       modeToggle.key(['escape'], () => _doClose(false));
 
       // SSH field navigation
       sshInputs.forEach(({ input }, i) => {
         input.key(['tab', 'down'], () => {
+          if (screen.focused !== input) return;
           const next = i < sshInputs.length - 1 ? sshInputs[i + 1].input : voiceInput;
           next.focus(); next.readInput(() => {});
           screen.render();
         });
         input.key(['S-tab', 'up'], () => {
+          if (screen.focused !== input) return;
           const prev = i > 0 ? sshInputs[i - 1].input : null;
           if (prev) { prev.focus(); prev.readInput(() => {}); } else { modeToggle.focus(); }
           screen.render();
         });
-        input.key(['enter'], () => _doClose(true));
+        input.key(['enter'], () => {
+          if (screen.focused !== input) return;
+          _doClose(true);
+        });
         input.key(['escape'], () => _doClose(false));
       });
 
       // Voice navigation
       voiceInput.key(['S-tab', 'up'], () => {
+        if (screen.focused !== voiceInput) return;
         const prev = isRemote ? sshInputs[sshInputs.length - 1]?.input : null;
         if (prev) { prev.focus(); prev.readInput(() => {}); } else { modeToggle.focus(); }
         screen.render();
       });
-      voiceInput.key(['tab', 'down'], () => _doClose(true));
-      voiceInput.key(['enter'], () => _doClose(true));
+      voiceInput.key(['tab', 'down'], () => {
+        if (screen.focused !== voiceInput) return;
+        _doClose(true);
+      });
+      voiceInput.key(['enter'], () => {
+        if (screen.focused !== voiceInput) return;
+        _doClose(true);
+      });
       voiceInput.key(['escape'], () => _doClose(false));
 
       modeToggle.focus();

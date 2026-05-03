@@ -325,14 +325,27 @@ describe('BMAD Party Mode Audio Characteristic Detection', () => {
 
   describe('Audio Generation Configuration', () => {
     it('background music is globally enabled for audio mixing', async () => {
-      const enabledFile = path.join(
-        PROJECT_ROOT,
-        '.claude',
-        'config',
-        'background-music-enabled.txt',
+      // Support both legacy flag file and newer text config formats
+      const legacyFile = path.join(PROJECT_ROOT, '.claude', 'config', 'background-music-enabled.txt');
+      const newFile    = path.join(PROJECT_ROOT, '.claude', 'config', 'background-music.txt');
+      const cfgFile    = path.join(PROJECT_ROOT, '.claude', 'config', 'background-music.cfg');
+
+      const legacyExists = await fileExists(legacyFile);
+      const newEnabled = await fileExists(newFile).then(async exists => {
+        if (!exists) return false;
+        const content = await fs.readFile(newFile, 'utf8').catch(() => '');
+        return content.trim() === 'enabled';
+      });
+      const cfgEnabled = await fileExists(cfgFile).then(async exists => {
+        if (!exists) return false;
+        const content = await fs.readFile(cfgFile, 'utf8').catch(() => '');
+        return content.trim() === 'enabled';
+      });
+
+      assert.ok(
+        legacyExists || newEnabled || cfgEnabled,
+        'Background music should be enabled globally (checked background-music-enabled.txt, background-music.txt, background-music.cfg)',
       );
-      const exists = await fileExists(enabledFile);
-      assert.ok(exists, 'Background music should be enabled globally');
     });
 
     it('audio effects config maps all agents to background music', async () => {
