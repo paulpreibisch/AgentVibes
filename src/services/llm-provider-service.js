@@ -601,6 +601,7 @@ function _getHermesHooksDir() {
 }
 
 const HERMES_CONFIG_DEFAULTS = {
+  mode: 'local',
   sshKey: '/absolute/path/to/id_ed25519_agentvibes',
   host: 'your-receiver-tailscale-ip',
   port: '2222',
@@ -626,7 +627,9 @@ export async function saveHermesConfig(cfg) {
     throw new Error('Invalid Hermes hooks path');
   }
   await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
+  const rawMode = String(cfg.mode || HERMES_CONFIG_DEFAULTS.mode);
   const safe = {
+    mode:   rawMode === 'local' ? 'local' : 'remote',
     sshKey: String(cfg.sshKey || HERMES_CONFIG_DEFAULTS.sshKey),
     host:   String(cfg.host   || HERMES_CONFIG_DEFAULTS.host),
     port:   String(cfg.port   || HERMES_CONFIG_DEFAULTS.port),
@@ -676,7 +679,11 @@ export async function installHermes() {
   const handlerPy = `"""
 AgentVibes TTS Hook — fires on agent:end to speak the agent's response.
 
-SETUP: Use "agentvibes configure hermes" (TUI) or the MCP set_hermes_config tool,
+Supports two modes (set via agentvibes-ssh-config.json):
+  mode=local   — Hermes and speakers are on the same machine. Calls play-tts.sh directly.
+  mode=remote  — Hermes is on a remote server; sends audio over SSH to a receiver.
+
+SETUP: Use the AgentVibes TUI (Configure button) or: set_hermes_config MCP tool,
        then run: hermes gateway restart
 """
 
@@ -694,6 +701,7 @@ try:
 except Exception:
     _cfg = {}
 
+_MODE               = _cfg.get("mode",   "local")   # "local" or "remote"
 AGENTVIBES_SSH_KEY  = _cfg.get("sshKey", "/absolute/path/to/id_ed25519_agentvibes")
 AGENTVIBES_HOST     = _cfg.get("host",   "your-receiver-tailscale-ip")
 AGENTVIBES_PORT     = _cfg.get("port",   "2222")
@@ -718,21 +726,50 @@ if not _log.handlers:
 _last_sent: float = 0.0
 _MIN_INTERVAL_S: float = 3.0
 
-def _tts_speak(text: str) -> None:
-    global _last_sent
-    if not text or not text.strip():
+
+def _find_play_tts() -> str | None:
+    """Locate the AgentVibes play-tts.sh on this machine (local mode only)."""
+    env_hooks = os.environ.get("AGENTVIBES_HOOKS", "")
+    candidates = []
+    if env_hooks:
+        candidates.append(os.path.join(env_hooks, "play-tts.sh"))
+    candidates += [
+        os.path.expanduser("~/.claude/hooks/play-tts.sh"),
+        os.path.expanduser("~/.npm-global/lib/node_modules/agentvibes/.claude/hooks/play-tts.sh"),
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
+def _tts_speak_local(text: str) -> None:
+    """Local mode: call play-tts.sh directly on this machine."""
+    play_tts = _find_play_tts()
+    if not play_tts:
+        _log.warning("local mode: play-tts.sh not found — set AGENTVIBES_HOOKS or install AgentVibes")
         return
-    now = time.monotonic()
-    if now - _last_sent < _MIN_INTERVAL_S:
-        _log.info("rate-limited: %.1fs since last send — skipping", now - _last_sent)
-        return
-    _last_sent = now
-    full_text = PREFIX + text.strip()
-    max_len = len(PREFIX) + MAX_CONTENT_LEN
-    if len(full_text) > max_len:
-        full_text = full_text[:max_len].rsplit(" ", 1)[0] + "..."
+    env = os.environ.copy()
+    env.setdefault("AGENTVIBES_LLM", AGENTVIBES_PROJECT)
+    try:
+        result = subprocess.run(
+            ["bash", play_tts, text],
+            capture_output=True, timeout=30, env=env,
+        )
+        if result.returncode != 0:
+            _log.warning("play-tts exit %d: %s", result.returncode, result.stderr.decode(errors="replace").strip())
+        else:
+            _log.info("local TTS OK")
+    except subprocess.TimeoutExpired:
+        _log.warning("play-tts timed out after 30s")
+    except Exception as exc:
+        _log.warning("play-tts error: %s", exc)
+
+
+def _tts_speak_remote(text: str) -> None:
+    """Remote mode: send payload over SSH to AgentVibes receiver."""
     payload = base64.b64encode(json.dumps({
-        "text": full_text, "voice": AGENTVIBES_VOICE, "project": AGENTVIBES_PROJECT,
+        "text": text, "voice": AGENTVIBES_VOICE, "project": AGENTVIBES_PROJECT,
         "provider": "piper", "pretext": "", "effects": "", "music": "", "volume": "", "speed": "",
     }).encode()).decode()
     cmd = ["ssh", "-i", AGENTVIBES_SSH_KEY, "-o", "ConnectTimeout=5",
@@ -748,6 +785,25 @@ def _tts_speak(text: str) -> None:
         _log.warning("ssh timed out after 15s")
     except Exception as exc:
         _log.warning("ssh error: %s", exc)
+
+
+def _tts_speak(text: str) -> None:
+    global _last_sent
+    if not text or not text.strip():
+        return
+    now = time.monotonic()
+    if now - _last_sent < _MIN_INTERVAL_S:
+        _log.info("rate-limited: %.1fs since last send — skipping", now - _last_sent)
+        return
+    _last_sent = now
+    full_text = PREFIX + text.strip()
+    max_len = len(PREFIX) + MAX_CONTENT_LEN
+    if len(full_text) > max_len:
+        full_text = full_text[:max_len].rsplit(" ", 1)[0] + "..."
+    if _MODE == "local":
+        _tts_speak_local(full_text)
+    else:
+        _tts_speak_remote(full_text)
 
 async def handle(event_type: str, context: dict) -> None:
     if event_type != "agent:end":

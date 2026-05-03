@@ -884,6 +884,7 @@ class AgentVibesServer:
         """
         cfg_path = self._hermes_cfg_path()
         defaults = {
+            "mode": "local",
             "sshKey": "/absolute/path/to/id_ed25519_agentvibes",
             "host": "your-receiver-tailscale-ip",
             "port": "2222",
@@ -895,13 +896,16 @@ class AgentVibesServer:
             cfg = {}
         merged = {**defaults, **cfg}
         installed = cfg_path.exists()
-        out = "🔌 Hermes AgentVibes SSH Configuration\n"
+        is_local = merged.get("mode", "local") == "local"
+        out = "🔌 Hermes AgentVibes Configuration\n"
         out += "─" * 40 + "\n"
         out += f"Status:   {'✅ Configured' if installed else '⚠️  Not yet installed (run: agentvibes install)'}\n"
-        out += f"SSH Key:  {merged['sshKey']}\n"
-        out += f"Host:     {merged['host']}\n"
-        out += f"Port:     {merged['port']}\n"
+        out += f"Mode:     {'🏠 Local (Hermes & speakers on same machine)' if is_local else '🌐 Remote (SSH to receiver)'}\n"
         out += f"Voice:    {merged['voice']}\n"
+        if not is_local:
+            out += f"SSH Key:  {merged['sshKey']}\n"
+            out += f"Host:     {merged['host']}\n"
+            out += f"Port:     {merged['port']}\n"
         if installed:
             out += f"\nConfig file: {cfg_path}\n"
             out += "After changes, run: hermes gateway restart\n"
@@ -909,6 +913,7 @@ class AgentVibesServer:
 
     async def set_hermes_config(
         self,
+        mode: Optional[str] = None,
         ssh_key: Optional[str] = None,
         host: Optional[str] = None,
         port: Optional[str] = None,
@@ -923,6 +928,7 @@ class AgentVibesServer:
         import re as _re
         cfg_path = self._hermes_cfg_path()
         defaults = {
+            "mode": "local",
             "sshKey": "/absolute/path/to/id_ed25519_agentvibes",
             "host": "your-receiver-tailscale-ip",
             "port": "2222",
@@ -934,6 +940,11 @@ class AgentVibesServer:
             existing = {}
         merged = {**defaults, **existing}
 
+        if mode is not None:
+            m = str(mode).lower().strip()
+            if m not in ("local", "remote"):
+                return "❌ Invalid mode: must be 'local' or 'remote'"
+            merged["mode"] = m
         if ssh_key is not None:
             merged["sshKey"] = str(ssh_key)[:512]
         if host is not None:
@@ -954,12 +965,15 @@ class AgentVibesServer:
         except Exception as e:
             return f"❌ Failed to save config: {e}"
 
-        out = "✅ Hermes SSH config saved!\n"
+        is_local = merged.get("mode", "local") == "local"
+        out = "✅ Hermes config saved!\n"
         out += "─" * 40 + "\n"
-        out += f"SSH Key:  {merged['sshKey']}\n"
-        out += f"Host:     {merged['host']}\n"
-        out += f"Port:     {merged['port']}\n"
+        out += f"Mode:     {'🏠 Local' if is_local else '🌐 Remote (SSH)'}\n"
         out += f"Voice:    {merged['voice']}\n"
+        if not is_local:
+            out += f"SSH Key:  {merged['sshKey']}\n"
+            out += f"Host:     {merged['host']}\n"
+            out += f"Port:     {merged['port']}\n"
         out += f"\nConfig file: {cfg_path}\n"
         out += "Run: hermes gateway restart\n"
         return out
@@ -1469,21 +1483,26 @@ Examples:
         ),
         Tool(
             name="set_hermes_config",
-            description="Configure Hermes AgentVibes SSH settings. Set the SSH key, host IP, port, and voice for the Hermes TTS hook. Omit any field to keep its current value.",
+            description="Configure Hermes AgentVibes TTS settings. Choose 'local' mode when Hermes runs on the same machine as your speakers (no SSH needed), or 'remote' mode to send audio over SSH to a receiver. Omit any field to keep its current value.",
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["local", "remote"],
+                        "description": "'local' = Hermes and speakers on same machine (no SSH). 'remote' = send audio over SSH to a receiver machine.",
+                    },
                     "ssh_key": {
                         "type": "string",
-                        "description": "Absolute path to SSH private key (e.g. /home/user/.ssh/id_ed25519_agentvibes)",
+                        "description": "Absolute path to SSH private key (e.g. /home/user/.ssh/id_ed25519_agentvibes) — only used in remote mode",
                     },
                     "host": {
                         "type": "string",
-                        "description": "Tailscale IP or hostname of the machine with speakers",
+                        "description": "Tailscale IP or hostname of the machine with speakers — only used in remote mode",
                     },
                     "port": {
                         "type": "string",
-                        "description": "AgentVibes receiver SSH port (e.g. '2222')",
+                        "description": "AgentVibes receiver SSH port (e.g. '2222') — only used in remote mode",
                     },
                     "voice": {
                         "type": "string",
@@ -1573,6 +1592,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.get_hermes_config()
         elif name == "set_hermes_config":
             result = await agent_vibes.set_hermes_config(
+                mode=arguments.get("mode"),
                 ssh_key=arguments.get("ssh_key"),
                 host=arguments.get("host"),
                 port=arguments.get("port"),
