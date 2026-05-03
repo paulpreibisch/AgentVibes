@@ -961,6 +961,72 @@ export function createSetupTab(screen, services) {
       screen.render();
     }
 
+    // ── SSH Key picker — reads IdentityFile entries from ~/.ssh/config ────
+    function _openSshKeyPicker(onDone) {
+      // Parse ~/.ssh/config for IdentityFile lines (deduplicated, ~ expanded)
+      const sshConfigPath = path.join(os.homedir(), '.ssh', 'config');
+      let keys = [];
+      try {
+        const raw = fs.readFileSync(sshConfigPath, 'utf8');
+        const seen = new Set();
+        for (const line of raw.split('\n')) {
+          const m = line.match(/^\s*IdentityFile\s+(.+)\s*$/i);
+          if (m) {
+            const expanded = m[1].trim().replace(/^~/, os.homedir());
+            if (!seen.has(expanded)) { seen.add(expanded); keys.push(expanded); }
+          }
+        }
+      } catch { /* no config or unreadable — fall back to text editor */ }
+
+      // If no keys found, fall back to text editor
+      if (!keys.length) {
+        _openSshFieldEditor('sshKey', 'SSH Key Path', 512, onDone);
+        return;
+      }
+
+      // Add "Enter manually…" option at the end
+      const items = [...keys, '  ✏  Enter path manually…'];
+      const pickerH = Math.min(items.length + 4, 16);
+
+      const picker = blessed.list({
+        parent: screen, top: 'center', left: 'center',
+        width: 62, height: pickerH,
+        keys: true, vi: false, mouse: true,
+        border: { type: 'line' }, tags: true,
+        label: ' {bold}{cyan-fg} SSH Key {/cyan-fg}{/bold} ',
+        items,
+        style: {
+          fg: COLORS.labelFg, bg: COLORS.contentBg,
+          border: { fg: 'cyan' },
+          selected: { bg: 'blue', fg: 'white', bold: true },
+        },
+      });
+      picker.setFront();
+
+      // Pre-select the currently configured key if present
+      const curIdx = keys.indexOf(draft.sshKey);
+      if (curIdx >= 0) picker.select(curIdx);
+
+      function _closePicker(save) {
+        if (save) {
+          const idx = picker.selected;
+          if (idx === items.length - 1) {
+            // "Enter manually" — open text editor after closing picker
+            destroyList(picker, screen);
+            _openSshFieldEditor('sshKey', 'SSH Key Path', 512, onDone);
+            return;
+          }
+          draft.sshKey = keys[idx] || draft.sshKey;
+        }
+        destroyList(picker, screen);
+        onDone();
+      }
+      picker.key(['enter'], () => _closePicker(true));
+      picker.key(['escape'], () => _closePicker(false));
+      picker.focus();
+      screen.render();
+    }
+
     // ── Destination picker (Local / Remote) ──────────────────────────────
     function _openDestinationPicker(onDone) {
       const picker = blessed.list({
@@ -1021,7 +1087,7 @@ export function createSetupTab(screen, services) {
           openVolumeInput(screen, Math.round(parseFloat(draft.bgVolume) * 100), (volume) => { draft.bgVolume = (volume / 100).toFixed(2); _refreshField(); }, _cancelField);
           break;
         case 'destination': _openDestinationPicker(_refreshField);           break;
-        case 'sshKey':      if (draft.mode === 'local') break; _openSshFieldEditor('sshKey', 'SSH Key Path', 512, _refreshField); break;
+        case 'sshKey':      if (draft.mode === 'local') break; _openSshKeyPicker(_refreshField); break;
         case 'host':        if (draft.mode === 'local') break; _openSshFieldEditor('host',   'Host / IP',    253, _refreshField); break;
         case 'port':        if (draft.mode === 'local') break; _openSshFieldEditor('port',   'Port',         10,  _refreshField); break;
       }
