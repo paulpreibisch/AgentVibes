@@ -2194,12 +2194,14 @@ export function createSetupTab(screen, services) {
     infoBox.hide();
     contentBox.hide();
     showAllProviderRows();
-    const max = providerFocusableItems.length;
-    if (max > 0) {
-      providerFocusIndex = ((targetIdx % max) + max) % max;
-      providerFocusableItems[providerFocusIndex].focus();
-    }
-    screen.render();
+    refreshInstalledState().then(() => {
+      const max = providerFocusableItems.length;
+      if (max > 0) {
+        providerFocusIndex = ((targetIdx % max) + max) % max;
+        providerFocusableItems[providerFocusIndex].focus();
+      }
+      screen.render();
+    });
   }
 
   infoBox.key(['escape', 'enter'], () => {
