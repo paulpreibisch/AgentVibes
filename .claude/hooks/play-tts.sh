@@ -39,12 +39,10 @@
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
 # @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
 #
-# **CRITICAL: This script MUST ALWAYS be called with `run_in_background: true` in Bash tool**
-# Do NOT wait for TTS playback to complete. Run in background so other tasks continue immediately.
-# Example: Bash (background): .claude/hooks/play-tts.sh "Acknowledging task start"
+# **IMPORTANT: This script should be called inline (NOT in background) in Bash tool**
+# Wait for TTS playback to complete before continuing.
+# Example: Bash: .claude/hooks/play-tts.sh "Acknowledging task start"
 #
-
-set -euo pipefail
 
 set -euo pipefail
 
@@ -238,6 +236,28 @@ case "$ACTIVE_PROVIDER" in
     fi
     ;;
 esac
+
+# Per-LLM SSH override: if the current LLM has mode=remote in transport-config.json,
+# write a one-shot env override so play-tts-ssh-remote.sh uses that LLM's SSH config.
+_TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
+if [[ "$ACTIVE_PROVIDER" != "ssh-remote" && "$ACTIVE_PROVIDER" != "agentvibes-receiver" && "$ACTIVE_PROVIDER" != "termux-ssh" ]] \
+   && [[ -n "$LLM_PROVIDER" && "$LLM_PROVIDER" != "default" ]] \
+   && [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
+  _LLM_SSH_MODE=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('mode','local'))" 2>/dev/null || echo "local")
+  if [[ "$_LLM_SSH_MODE" == "remote" ]]; then
+    # Redirect this LLM's audio through ssh-remote using its own SSH config
+    _LLM_SSH_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('host',''))" 2>/dev/null || echo "")
+    _LLM_SSH_KEY=$(python3  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('sshKey',''))" 2>/dev/null || echo "")
+    _LLM_SSH_PORT=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('port','22'))" 2>/dev/null || echo "22")
+    if [[ -n "$_LLM_SSH_HOST" ]]; then
+      # Override transport config env vars so play-tts-ssh-remote.sh picks up this LLM's SSH settings
+      export AGENTVIBES_SSH_HOST="$_LLM_SSH_HOST"
+      export AGENTVIBES_SSH_KEY="$_LLM_SSH_KEY"
+      export AGENTVIBES_SSH_PORT="$_LLM_SSH_PORT"
+      ACTIVE_PROVIDER="ssh-remote"
+    fi
+  fi
+fi
 
 # Show GitHub star reminder (once per day)
 bash "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true

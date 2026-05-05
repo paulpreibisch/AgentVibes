@@ -32,26 +32,64 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECT_NAME=$(basename "$PROJECT_ROOT")
 
 # ---------------------------------------------------------------------------
-# Get SSH host from config
+# Get SSH connection details from config
+# Prefer ~/.agentvibes/transport-config.json, fall back to legacy host file
 # ---------------------------------------------------------------------------
 
-SSH_HOST=$(cat "$PROJECT_ROOT/.claude/ssh-remote-host.txt" 2>/dev/null || \
-           cat "$HOME/.claude/ssh-remote-host.txt" 2>/dev/null || echo "")
+SSH_HOST=""
+SSH_KEY=""
+SSH_PORT=""
+
+# Priority 1: per-LLM SSH override set by play-tts.sh
+if [[ -n "${AGENTVIBES_SSH_HOST:-}" ]]; then
+  SSH_HOST="$AGENTVIBES_SSH_HOST"
+  SSH_KEY="${AGENTVIBES_SSH_KEY:-}"
+  SSH_PORT="${AGENTVIBES_SSH_PORT:-22}"
+fi
+
+# Priority 2: ~/.agentvibes/transport-config.json (ssh-remote section)
+if [[ -z "$SSH_HOST" ]]; then
+  _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
+  if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
+    SSH_HOST=$(python3 -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+    SSH_KEY=$(python3  -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+    SSH_PORT=$(python3 -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+  fi
+fi
+
+# Priority 3: legacy host file
+if [[ -z "$SSH_HOST" ]]; then
+  SSH_HOST=$(cat "$PROJECT_ROOT/.claude/ssh-remote-host.txt" 2>/dev/null || \
+             cat "$HOME/.claude/ssh-remote-host.txt" 2>/dev/null || echo "")
+fi
 
 if [[ -z "$SSH_HOST" ]]; then
   echo "SSH-Remote host not configured" >&2
-  echo "Set host: echo 'my-host' > .claude/ssh-remote-host.txt" >&2
+  echo "Configure in AgentVibes Setup → Audio Transport → SSH Remote → Configure" >&2
   exit 1
 fi
 
-# SECURITY: Validate SSH_HOST format
+# SECURITY: Validate SSH_HOST format (hostname, IP, or ~/.ssh/config alias)
 if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
   echo "Invalid SSH host format: $SSH_HOST" >&2
   exit 1
 fi
 
+# SECURITY: Validate SSH_KEY path (must be absolute, no shell metacharacters)
+if [[ -n "$SSH_KEY" ]] && [[ ! "$SSH_KEY" =~ ^/ ]]; then
+  SSH_KEY=""  # Reject relative paths
+fi
+
+# SECURITY: Validate SSH_PORT (digits only)
+if [[ -n "$SSH_PORT" ]] && [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]]; then
+  SSH_PORT=""
+fi
+
 # SECURITY: Validate VOICE
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+# Allow letters, digits, underscore, hyphen, period, colon (for :: multi-speaker separator), slash.
+# Voice is passed to the remote via base64-encoded JSON (jq --arg safely escapes it),
+# so shell metacharacters are the only real risk.
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_.:\/-]+$ ]]; then
   echo "Invalid voice format: $VOICE" >&2
   exit 1
 fi
@@ -159,8 +197,13 @@ fi
 
 echo "Sending to $SSH_HOST..." >&2
 
+# Build SSH args — use explicit key/port from config if available, else rely on ~/.ssh/config
+SSH_ARGS=()
+[[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
+[[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
+
 # ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly
-ssh "$SSH_HOST" "$ENCODED_PAYLOAD" &
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD" &
 SSH_PID=$!
 
 echo "Sent to $SSH_HOST (PID: $SSH_PID)" >&2

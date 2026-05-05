@@ -43,7 +43,7 @@ Draft the following and **display all drafts to the user before making any chang
 - Keep the English version in `RELEASE_NOTES.md`
 
 ### 3b. README.md update  
-- Update version badge line (e.g. `**Version**: v4.5`)
+- **Version badge is auto-updated** by `scripts/sync-readme-version.js` via the npm `version` lifecycle hook — do NOT manually edit the `**Version**: vX.X.X` line; `package.json` is the single source of truth
 - Replace the "NEW IN vX.X" section with the new version's highlights
 - Rename the old "NEW IN" section to just "vX.X — [title]"
 
@@ -73,9 +73,11 @@ Draft the following and **display all drafts to the user before making any chang
 
 ## Step 4 — Apply English Changes (after approval)
 
+**Single source of truth:** `package.json` version drives everything. Do NOT manually edit the `**Version**: vX.X.X` badge in README.md — it is updated automatically by the `version` npm lifecycle hook via `scripts/sync-readme-version.js`.
+
 1. Update `RELEASE_NOTES.md` — prepend new section
-2. Update `README.md` — version + new section
-3. Update `package.json` — version bump
+2. Update `README.md` — "NEW IN" content section only (not the version badge line)
+3. Run `npm version patch|minor|major` — this bumps `package.json`, triggers `scripts/sync-readme-version.js` to update the README badge, and stages `README.md` automatically
 
 ---
 
@@ -123,11 +125,21 @@ Offer to display any specific translation on request.
 
 ## Step 6 — Commit, Tag & Push
 
+Stage all content changes first, then let `npm version` create the commit+tag atomically:
+
 ```bash
-git add README.md RELEASE_NOTES.md package.json docs/i18n/
-git commit -m "chore: bump version to vX.X.X for npm publish\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-git tag vX.X.X
+# Stage content files (NOT package.json — npm version handles that)
+git add RELEASE_NOTES.md src/installer.js docs/i18n/
+# README.md content changes should already be staged too
+git add README.md
+
+# npm version bumps package.json, runs scripts/sync-readme-version.js (updates README badge),
+# stages README.md, then creates one atomic commit + tag
+npm version patch   # or minor / major
 ```
+
+> Note: `npm version` requires a clean working tree (no unstaged tracked-file changes).
+> The lifecycle hook stages `README.md` automatically — do not double-stage it.
 
 Show the commit and tag, then ask:
 

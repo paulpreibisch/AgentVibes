@@ -168,8 +168,18 @@ if (-not $mutex.WaitOne(0)) {
 }
 
 $QueueDir = "$env:USERPROFILE\.agentvibes\tts-queue"
+$LogFile  = "$env:USERPROFILE\.agentvibes\watcher.log"
 $PlayTts  = "$env:USERPROFILE\.claude\hooks-windows\play-tts.ps1"
 if (-not (Test-Path $QueueDir)) { New-Item -ItemType Directory -Path $QueueDir -Force | Out-Null }
+
+function Write-WatcherLog {
+    param([string]$Level, [string]$Msg)
+    $ts = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
+    Add-Content -Path $LogFile -Value "$ts [$Level] $Msg" -ErrorAction SilentlyContinue
+}
+
+Write-WatcherLog "INFO" "Watcher started. PlayTts=$PlayTts PlayTtsExists=$(Test-Path $PlayTts)"
+
 try {
 while ($true) {
     $files = Get-ChildItem "$QueueDir\*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
@@ -178,27 +188,33 @@ while ($true) {
             $req = Get-Content $f.FullName -Raw | ConvertFrom-Json
             Remove-Item $f.FullName -Force
             $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
-            # Server already prepended its pretext before sending —
-            # don't add the local default pretext on top.
             $env:AGENTVIBES_NO_PRETEXT = "1"
-            # Forward per-call overrides from queue JSON via env vars
             if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }   else { $env:AGENTVIBES_OVERRIDE_MUSIC   = $null }
             if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }  else { $env:AGENTVIBES_OVERRIDE_VOLUME  = $null }
             if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
-            # Spawn as child process so play-tts.ps1's 120s watchdog kills its
-            # own PID, not the watcher's.  Dot-sourcing would kill the watcher.
-            # Pass text via temp file — command-line args get truncated/mangled
-            # by Windows process creation for text with quotes or special chars.
-            $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
-            try {
-                [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
-                $env:AGENTVIBES_TEXT_FILE = $tempText
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice
-            } finally {
-                $env:AGENTVIBES_TEXT_FILE = $null
-                Remove-Item $tempText -Force -ErrorAction SilentlyContinue
+
+            if (Test-Path $PlayTts) {
+                # Full AgentVibes pipeline: piper / SAPI / etc.
+                $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
+                try {
+                    [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
+                    $env:AGENTVIBES_TEXT_FILE = $tempText
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice)"
+                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice
+                } finally {
+                    $env:AGENTVIBES_TEXT_FILE = $null
+                    Remove-Item $tempText -Force -ErrorAction SilentlyContinue
+                }
+            } else {
+                # Fallback: Windows SAPI (built-in, no installation required)
+                Write-WatcherLog "WARN" "play-tts.ps1 not found — using SAPI fallback for id=$($req.id)"
+                Add-Type -AssemblyName System.Speech
+                $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+                $synth.Speak($req.text)
+                $synth.Dispose()
             }
         } catch {
+            Write-WatcherLog "ERROR" "id=$($req.id) err=$_"
             Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
         }
     }

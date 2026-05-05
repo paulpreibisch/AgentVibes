@@ -268,8 +268,8 @@ case "$1" in
         ' "$METADATA_FILE" 2>/dev/null | head -1)
 
         if [[ -n "$RESOLVED_VOICE" ]]; then
-          # SECURITY: Validate resolved voice matches safe pattern (alphanumeric, dash, underscore only)
-          if [[ "$RESOLVED_VOICE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+          # SECURITY: Validate resolved voice — allow multi-speaker (::) separator and period/colon/slash
+          if [[ "$RESOLVED_VOICE" =~ ^[a-zA-Z0-9_.:\/-]+$ ]]; then
             echo "🔍 Resolved friendly name '$VOICE_NAME' → '$RESOLVED_VOICE'"
             VOICE_NAME="$RESOLVED_VOICE"
           else

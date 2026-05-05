@@ -317,7 +317,7 @@ When executing this command, Claude MUST follow these steps in order:
    - Replace all "KEY HIGHLIGHTS" bullets (extract from RELEASE_NOTES.md)
    - Keep the same format/structure, just update content
 7. **Update README.md** ⚠️ **CRITICAL - Must complete BEFORE npm publish**:
-   - Update version badge in header (line ~14): `**Version**: v2.X.X`
+   - **Version badge is auto-updated** by the `version` npm lifecycle hook via `scripts/sync-readme-version.js` — do NOT manually edit it
    - Update "Latest Release" section (line ~112+):
      - Replace the title and URL: `**[vX.X.X - Release Title](github.com/...)**`
      - Replace the AI summary paragraph (first paragraph after title)

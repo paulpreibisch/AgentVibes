@@ -6,6 +6,7 @@
  */
 
 import path from 'node:path';
+import os from 'node:os';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 
@@ -225,14 +226,25 @@ export async function installClaudeMcp(targetDir) {
     // Explicitly write tts-provider.txt so `get_active_provider()` in
     // provider-manager.sh doesn't silently fall back to "piper".  Without
     // this, headless servers with no audio device hit a confusing failure
-    // mode where TTS tries to synth locally and fails silently.  Users
-    // can still change the provider via the Setup TUI or slash command.
+    // mode where TTS tries to synth locally and fails silently.
+    // Inherit from global ~/.claude/tts-provider.txt if it exists, so users
+    // with ssh-remote or other transport providers configured globally don't
+    // have to reconfigure every new project.  Fall back to "piper" only if
+    // no global setting is found.
     const ttsProviderPath = path.join(targetDir, '.claude', 'tts-provider.txt');
     try {
       await fs.access(ttsProviderPath);
       // Already exists — user has explicitly set a provider, don't clobber
     } catch {
-      await fs.writeFile(ttsProviderPath, 'piper\n');
+      // Read global provider to inherit; default to piper if not configured
+      let globalProvider = 'piper';
+      try {
+        const globalPath = path.join(os.homedir(), '.claude', 'tts-provider.txt');
+        const val = await fs.readFile(globalPath, 'utf8');
+        const trimmed = val.trim();
+        if (trimmed) globalProvider = trimmed;
+      } catch {}
+      await fs.writeFile(ttsProviderPath, globalProvider + '\n');
     }
 
     return { success: true, mcpCreated, mcpError };
@@ -916,4 +928,88 @@ export function saveLlmConfigSync(llmKey, config, targetDir) {
     fsSync.mkdirSync(path.dirname(cfgPath), { recursive: true });
     fsSync.writeFileSync(cfgPath, lines.join('\n'));
   } catch { /* best effort */ }
+}
+
+// ── Transport Provider SSH Config ────────────────────────────────────────────
+
+export const TRANSPORT_PROVIDERS = [
+  {
+    id: 'ssh-remote',
+    name: 'SSH Remote',
+    desc: 'Send text to remote device via SSH for local TTS playback',
+    defaultPort: '22',
+  },
+  {
+    id: 'agentvibes-receiver',
+    name: 'AgentVibes Receiver',
+    desc: 'Send to a device running the AgentVibes receiver app',
+    defaultPort: '2222',
+  },
+  {
+    id: 'termux-ssh',
+    name: 'Termux SSH',
+    desc: 'Play TTS on Android via Termux SSH',
+    defaultPort: '8022',
+  },
+];
+
+const _TRANSPORT_CFG_PATH = path.join(
+  process.env.HOME || process.env.USERPROFILE || '',
+  '.agentvibes', 'transport-config.json'
+);
+
+export async function getTransportConfig(providerId) {
+  const defaultPort = TRANSPORT_PROVIDERS.find(p => p.id === providerId)?.defaultPort ?? '22';
+  const defaults = { mode: 'local', sshKey: '', host: '', port: defaultPort };
+  try {
+    const raw = await fs.readFile(_TRANSPORT_CFG_PATH, 'utf8');
+    const all = JSON.parse(raw);
+    return { ...defaults, ...(all[providerId] || {}) };
+  } catch {
+    return { ...defaults };
+  }
+}
+
+export async function saveTransportConfig(providerId, cfg) {
+  const cfgDir = path.dirname(_TRANSPORT_CFG_PATH);
+  // Validate path stays within .agentvibes home dir
+  const resolvedPath = path.resolve(_TRANSPORT_CFG_PATH);
+  const resolvedDir = path.resolve(cfgDir);
+  if (!resolvedPath.startsWith(resolvedDir + path.sep) && resolvedPath !== resolvedDir) {
+    throw new Error('Invalid transport config path');
+  }
+  await fs.mkdir(cfgDir, { recursive: true, mode: 0o700 });
+
+  let all = {};
+  try {
+    const raw = await fs.readFile(_TRANSPORT_CFG_PATH, 'utf8');
+    all = JSON.parse(raw);
+  } catch {}
+
+  const defaultPort = TRANSPORT_PROVIDERS.find(p => p.id === providerId)?.defaultPort ?? '22';
+  const safe = {
+    mode:   cfg.mode === 'remote' ? 'remote' : 'local',
+    sshKey: String(cfg.sshKey || ''),
+    host:   String(cfg.host   || ''),
+    port:   String(cfg.port   || defaultPort),
+  };
+  all[providerId] = safe;
+
+  await fs.writeFile(_TRANSPORT_CFG_PATH, JSON.stringify(all, null, 2), { mode: 0o600 });
+
+  // Write backward-compat host file so legacy scripts still work
+  const hostFileMap = {
+    'ssh-remote':           'ssh-remote-host.txt',
+    'agentvibes-receiver':  'agentvibes-receiver-host.txt',
+    'termux-ssh':           'termux-ssh-host.txt',
+  };
+  const hostFile = hostFileMap[providerId];
+  if (hostFile && safe.host) {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const claudeDir = path.join(homeDir, '.claude');
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.writeFile(path.join(claudeDir, hostFile), safe.host + '\n', { mode: 0o600 });
+  }
+
+  return safe;
 }

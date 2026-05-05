@@ -31,6 +31,7 @@ import {
   removeCodexInstructions, removeCodexHooks,
   checkHermesInstalled, installHermes, removeHermes,
   getHermesConfig, saveHermesConfig,
+  TRANSPORT_PROVIDERS, getTransportConfig, saveTransportConfig,
   loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
 } from '../../services/llm-provider-service.js';
 import {
@@ -462,6 +463,9 @@ export function createSetupTab(screen, services) {
   const providerRows = [];
   const providerStatusTexts = [];
 
+  // Transport provider row widgets (Configure-only, no Install/Remove)
+  const transportRows = [];
+
   // Info box for provider details
   const infoBox = blessed.box({
     parent: box,
@@ -752,7 +756,8 @@ export function createSetupTab(screen, services) {
     };
     const llmKey = llmKeyMap[provider.id] || provider.id;
     const config = loadLlmConfigSync(llmKey, targetDir);
-    _openLlmConfigModal(provider, llmKey, config);
+    const sshCfg = await getTransportConfig(llmKey);
+    _openLlmConfigModal(provider, llmKey, config, sshCfg);
   }
 
   // ── Hermes Audio Config Modal (issue #185) ───────────────────────────────
@@ -781,6 +786,8 @@ export function createSetupTab(screen, services) {
       host:   currentCfg.host   || '',
       port:   currentCfg.port   || '2222',
     };
+    // alias mode if host is in ~/.ssh/config with no explicit key/port
+    draft.connType = (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
 
     const globalEngine = providerService?.getActiveProvider?.() || 'piper';
     const globalVoice  = providerService?.getActiveVoiceId?.() || 'none';
@@ -794,32 +801,47 @@ export function createSetupTab(screen, services) {
     });
     modal.setFront();
 
-    const FIELDS = [
-      { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-      { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
-      { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-      { key: 'reverb',      label: 'Reverb',       getValue: () => {
-        const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
-        return p ? p.label : draft.reverbPreset || 'Off';
-      }},
-      { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
-      { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
-      { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
-      { key: 'sshKey',      label: 'SSH Key',      getValue: () => draft.mode === 'local' ? '{gray-fg}(local mode — no SSH){/gray-fg}' : (draft.sshKey || '(not set)') },
-      { key: 'host',        label: 'Host / IP',    getValue: () => draft.mode === 'local' ? '{gray-fg}(local mode — no SSH){/gray-fg}' : (draft.host || '(not set)') },
-      { key: 'port',        label: 'Port',         getValue: () => draft.mode === 'local' ? '{gray-fg}(local mode — no SSH){/gray-fg}' : (draft.port || '2222') },
-    ];
+    function _buildFields() {
+      const base = [
+        { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
+        { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+        { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
+        { key: 'reverb',      label: 'Reverb',       getValue: () => {
+          const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
+          return p ? p.label : draft.reverbPreset || 'Off';
+        }},
+        { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
+        { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
+        { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
+      ];
+      if (draft.mode === 'remote') {
+        base.push({ key: 'sshConnection', label: 'SSH Connection', getValue: () => {
+          if (draft.connType === 'alias') return `{cyan-fg}📋 ${draft.host || '(choose alias)'}{/cyan-fg}`;
+          const h = draft.host || '(not set)';
+          const p = draft.port ? `:${draft.port}` : '';
+          const k = draft.sshKey ? '  🔑' : '';
+          return `✏  ${h}${p}${k}`;
+        }});
+        if (draft.connType === 'manual') {
+          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
+          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{gray-fg}(default: 22){/gray-fg}' });
+        }
+      }
+      return base;
+    }
 
     function _fieldItems() {
-      return FIELDS.map(f => {
-        const label = f.label.padEnd(14);
+      const fields = _buildFields();
+      if (fieldList) fieldList.height = fields.length + 2;
+      return fields.map(f => {
+        const label = f.label.padEnd(16);
         return `  ${label} ${f.getValue()}`;
       });
     }
 
     const fieldList = blessed.list({
       parent: modal, top: 1, left: 2, right: 2,
-      height: FIELDS.length + 2,
+      height: 12,
       keys: true, vi: false, mouse: true,
       border: { type: 'line' }, tags: true,
       style: {
@@ -945,160 +967,30 @@ export function createSetupTab(screen, services) {
       screen.render();
     }
 
-    // ── SSH field text editor ─────────────────────────────────────────────
-    function _openSshFieldEditor(fieldKey, label, maxLen, onDone) {
-      const editModal = blessed.box({
-        parent: screen, top: 'center', left: 'center',
-        width: 62, height: 8,
-        border: { type: 'line' }, tags: true,
-        label: ` {bold}{cyan-fg} Edit ${label} {/cyan-fg}{/bold} `,
-        style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
-      });
-      editModal.setFront();
-      blessed.text({
-        parent: editModal, top: 1, left: 2, tags: true,
-        content: `{white-fg}Enter ${label}:{/white-fg}`,
-        style: { bg: COLORS.contentBg },
-      });
-      const inputBox = blessed.textbox({
-        parent: editModal, top: 3, left: 2, right: 2, height: 3,
-        border: { type: 'line' }, inputOnFocus: true,
-        value: draft[fieldKey],
-        style: { fg: 'white', bg: 'black', border: { fg: 'blue' }, focus: { border: { fg: 'cyan' } } },
-      });
-      function _closeEdit(save) {
-        if (save) draft[fieldKey] = (inputBox.getValue() || '').trim().slice(0, maxLen);
-        destroyList(editModal, screen);
-        onDone();
-      }
-      inputBox.key(['enter'], () => _closeEdit(true));
-      inputBox.key(['escape'], () => _closeEdit(false));
-      inputBox.focus();
-      inputBox.readInput(() => {});
-      screen.render();
-    }
-
-    // ── SSH Key picker — reads IdentityFile entries from ~/.ssh/config ────
-    function _openSshKeyPicker(onDone) {
-      // Parse ~/.ssh/config for IdentityFile lines (deduplicated, ~ expanded)
-      const sshConfigPath = path.join(os.homedir(), '.ssh', 'config');
-      let keys = [];
-      try {
-        const raw = fs.readFileSync(sshConfigPath, 'utf8');
-        const seen = new Set();
-        for (const line of raw.split('\n')) {
-          const m = line.match(/^\s*IdentityFile\s+(.+)\s*$/i);
-          if (m) {
-            const expanded = m[1].trim().replace(/^~/, os.homedir());
-            if (!seen.has(expanded)) { seen.add(expanded); keys.push(expanded); }
-          }
-        }
-      } catch { /* no config or unreadable — fall back to text editor */ }
-
-      // If no keys found, fall back to text editor
-      if (!keys.length) {
-        _openSshFieldEditor('sshKey', 'SSH Key Path', 512, onDone);
-        return;
-      }
-
-      // Add "Enter manually…" option at the end
-      const items = [...keys, '  ✏  Enter path manually…'];
-      const pickerH = Math.min(items.length + 4, 16);
-
-      const picker = blessed.list({
-        parent: screen, top: 'center', left: 'center',
-        width: 62, height: pickerH,
-        keys: true, vi: false, mouse: true,
-        border: { type: 'line' }, tags: true,
-        label: ' {bold}{cyan-fg} SSH Key {/cyan-fg}{/bold} ',
-        items,
-        style: {
-          fg: COLORS.labelFg, bg: COLORS.contentBg,
-          border: { fg: 'cyan' },
-          selected: { bg: 'blue', fg: 'white', bold: true },
-        },
-      });
-      picker.setFront();
-
-      // Pre-select the currently configured key if present
-      const curIdx = keys.indexOf(draft.sshKey);
-      if (curIdx >= 0) picker.select(curIdx);
-
-      function _closePicker(save) {
-        if (save) {
-          const idx = picker.selected;
-          if (idx === items.length - 1) {
-            // "Enter manually" — open text editor after closing picker
-            destroyList(picker, screen);
-            _openSshFieldEditor('sshKey', 'SSH Key Path', 512, onDone);
-            return;
-          }
-          draft.sshKey = keys[idx] || draft.sshKey;
-        }
-        destroyList(picker, screen);
-        onDone();
-      }
-      picker.key(['enter'], () => _closePicker(true));
-      picker.key(['escape'], () => _closePicker(false));
-      picker.focus();
-      screen.render();
-    }
-
-    // ── Destination picker (Local / Remote) ──────────────────────────────
-    function _openDestinationPicker(onDone) {
-      const picker = blessed.list({
-        parent: screen, top: 'center', left: 'center',
-        width: 52, height: 6,
-        keys: true, vi: false, mouse: true,
-        border: { type: 'line' }, tags: true,
-        label: ' {bold}{cyan-fg} Destination {/cyan-fg}{/bold} ',
-        items: [
-          '  🏠 Local   — Hermes & speakers on same machine',
-          '  🌐 Remote  — Send audio over SSH to receiver',
-        ],
-        style: {
-          fg: COLORS.labelFg, bg: COLORS.contentBg,
-          border: { fg: 'cyan' },
-          selected: { bg: 'blue', fg: 'white', bold: true },
-        },
-      });
-      picker.setFront();
-      picker.select(draft.mode === 'remote' ? 1 : 0);
-      function _closePicker(save) {
-        if (save) draft.mode = picker.selected === 1 ? 'remote' : 'local';
-        destroyList(picker, screen);
-        onDone();
-      }
-      picker.key(['enter'], () => _closePicker(true));
-      picker.key(['escape'], () => _closePicker(false));
-      picker.focus();
-      screen.render();
-    }
-
     // ── Field editing via Enter ───────────────────────────────────────────
     fieldList.key(['enter'], () => {
       const idx   = fieldList.selected;
-      const field = FIELDS[idx];
+      const field = _buildFields()[idx];
       if (!field) return;
 
       const _refreshField = () => {
-        if (_closed) return;  // Guard: forceCloseAll may close parent before sub-picker callback fires
+        if (_closed) return;
         _autoSave(true);
         fieldList.setItems(_fieldItems());
-        fieldList.select(idx);
+        fieldList.select(Math.min(idx, _buildFields().length - 1));
         fieldList.focus();
         screen.render();
       };
       const _cancelField = () => {
-        if (_closed) return;  // Guard: same as above
+        if (_closed) return;
         fieldList.focus();
         screen.render();
       };
 
       switch (field.key) {
-        case 'ttsEngine':   _openTtsEnginePicker(draft, _refreshField);      break;
-        case 'voice':       _openVoicePickerForLlm(draft, _refreshField);    break;
-        case 'pretext':     _openPretextEditor(modal, draft, _refreshField); break;
+        case 'ttsEngine':      _openTtsEnginePicker(draft, _refreshField);      break;
+        case 'voice':          _openVoicePickerForLlm(draft, _refreshField);    break;
+        case 'pretext':        _openPretextEditor(modal, draft, _refreshField); break;
         case 'reverb':
           openReverbPicker(screen, draft.reverbPreset, (val) => { draft.reverbPreset = val; _refreshField(); }, _cancelField, { applyToEffectsManager: false });
           break;
@@ -1108,10 +1000,10 @@ export function createSetupTab(screen, services) {
         case 'bgVolume':
           openVolumeInput(screen, Math.round(parseFloat(draft.bgVolume) * 100), (volume) => { draft.bgVolume = (volume / 100).toFixed(2); _refreshField(); }, _cancelField);
           break;
-        case 'destination': _openDestinationPicker(_refreshField);           break;
-        case 'sshKey':      if (draft.mode === 'local') break; _openSshKeyPicker(_refreshField); break;
-        case 'host':        if (draft.mode === 'local') break; _openSshFieldEditor('host',   'Host / IP',    253, _refreshField); break;
-        case 'port':        if (draft.mode === 'local') break; _openSshFieldEditor('port',   'Port',         10,  _refreshField); break;
+        case 'destination':    _openDestinationPicker(draft, _refreshField);                                                break;
+        case 'sshConnection':  if (draft.mode === 'local') break; _openSshConnectionPicker(draft, _refreshField);          break;
+        case 'sshKey':         if (draft.connType !== 'manual') break; _openSshKeyPicker(draft, _refreshField);            break;
+        case 'port':           if (draft.connType !== 'manual') break; _openSshPortPicker(draft, _refreshField);           break;
       }
     });
 
@@ -1131,7 +1023,8 @@ export function createSetupTab(screen, services) {
     let _prevFieldSel = 0;
     fieldList.key(['down'], () => {
       const cur = fieldList.selected ?? 0;
-      if (cur === FIELDS.length - 1 && _prevFieldSel === FIELDS.length - 1) { allBtns[0].focus(); screen.render(); }
+      const last = _buildFields().length - 1;
+      if (cur === last && _prevFieldSel === last) { allBtns[0].focus(); screen.render(); }
       _prevFieldSel = cur;
     });
     fieldList.key(['up'], () => {
@@ -1153,9 +1046,568 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
+  // ── Shared SSH helpers (used by Hermes modal and Transport modal) ─────────
+
+  function _openSshFieldEditor(draft, fieldKey, label, maxLen, onDone) {
+    const editModal = blessed.box({
+      parent: screen, top: 'center', left: 'center',
+      width: 62, height: 8,
+      border: { type: 'line' }, tags: true,
+      label: ` {bold}{cyan-fg} Edit ${label} {/cyan-fg}{/bold} `,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    editModal.setFront();
+    blessed.text({
+      parent: editModal, top: 1, left: 2, tags: true,
+      content: `{white-fg}Enter ${label}:{/white-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    const inputBox = blessed.textbox({
+      parent: editModal, top: 3, left: 2, right: 2, height: 3,
+      border: { type: 'line' }, inputOnFocus: true,
+      value: draft[fieldKey],
+      style: { fg: 'white', bg: 'black', border: { fg: 'blue' }, focus: { border: { fg: 'cyan' } } },
+    });
+    function _closeEdit(save) {
+      if (save) draft[fieldKey] = (inputBox.getValue() || '').trim().slice(0, maxLen);
+      destroyList(editModal, screen);
+      onDone();
+    }
+    inputBox.key(['enter'], () => _closeEdit(true));
+    inputBox.key(['escape'], () => _closeEdit(false));
+    inputBox.focus();
+    inputBox.readInput(() => {});
+    screen.render();
+  }
+
+  function _openSshKeyPicker(draft, onDone) {
+    const sshConfigPath = path.join(os.homedir(), '.ssh', 'config');
+    let keys = [];
+    try {
+      const raw = fs.readFileSync(sshConfigPath, 'utf8');
+      const seen = new Set();
+      for (const line of raw.split('\n')) {
+        const m = line.match(/^\s*IdentityFile\s+(.+)\s*$/i);
+        if (m) {
+          const expanded = m[1].trim().replace(/^~/, os.homedir());
+          if (!seen.has(expanded)) { seen.add(expanded); keys.push(expanded); }
+        }
+      }
+    } catch {}
+
+    if (!keys.length) {
+      _openSshFieldEditor(draft, 'sshKey', 'SSH Key Path', 512, onDone);
+      return;
+    }
+
+    const items = [...keys, '  ✏  Enter path manually…'];
+    const pickerH = Math.min(items.length + 4, 16);
+    const picker = blessed.list({
+      parent: screen, top: 'center', left: 'center',
+      width: 62, height: pickerH,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      label: ' {bold}{cyan-fg} SSH Key {/cyan-fg}{/bold} ',
+      items,
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'white', bold: true },
+      },
+    });
+    picker.setFront();
+    const curIdx = keys.indexOf(draft.sshKey);
+    if (curIdx >= 0) picker.select(curIdx);
+    function _closePicker(save) {
+      if (save) {
+        const idx = picker.selected;
+        if (idx === items.length - 1) {
+          destroyList(picker, screen);
+          _openSshFieldEditor(draft, 'sshKey', 'SSH Key Path', 512, onDone);
+          return;
+        }
+        draft.sshKey = keys[idx] || draft.sshKey;
+      }
+      destroyList(picker, screen);
+      onDone();
+    }
+    picker.key(['enter'], () => _closePicker(true));
+    picker.key(['escape'], () => _closePicker(false));
+    picker.focus();
+    screen.render();
+  }
+
+  function _openDestinationPicker(draft, onDone) {
+    const picker = blessed.list({
+      parent: screen, top: 'center', left: 'center',
+      width: 52, height: 6,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      label: ' {bold}{cyan-fg} Destination {/cyan-fg}{/bold} ',
+      items: [
+        '  🏠 Local   — Hermes & speakers on same machine',
+        '  🌐 Remote  — Send audio over SSH to receiver',
+      ],
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'white', bold: true },
+      },
+    });
+    picker.setFront();
+    picker.select(draft.mode === 'remote' ? 1 : 0);
+    function _closePicker(save) {
+      if (save) draft.mode = picker.selected === 1 ? 'remote' : 'local';
+      destroyList(picker, screen);
+      onDone();
+    }
+    picker.key(['enter'], () => _closePicker(true));
+    picker.key(['escape'], () => _closePicker(false));
+    picker.focus();
+    screen.render();
+  }
+
+  // ── Known host / port discovery ──────────────────────────────────────────
+  // Scans all config sources and returns deduplicated known values.
+
+  function _getKnownHosts() {
+    const seen = new Set();
+    const hosts = [];
+    function add(v) {
+      if (v && !seen.has(v)) { seen.add(v); hosts.push(v); }
+    }
+    // transport-config.json — all provider entries
+    try {
+      const raw = fs.readFileSync(path.join(os.homedir(), '.agentvibes', 'transport-config.json'), 'utf8');
+      const all = JSON.parse(raw);
+      for (const cfg of Object.values(all)) { if (cfg?.host) add(cfg.host); }
+    } catch {}
+    // Hermes SSH config
+    try {
+      const hermesHome = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes');
+      const raw = fs.readFileSync(path.join(hermesHome, 'hooks', 'agentvibes-tts', 'agentvibes-ssh-config.json'), 'utf8');
+      add(JSON.parse(raw).host);
+    } catch {}
+    // Legacy host txt files
+    for (const f of ['ssh-remote-host.txt', 'agentvibes-receiver-host.txt', 'termux-ssh-host.txt']) {
+      try { add(fs.readFileSync(path.join(os.homedir(), '.claude', f), 'utf8').trim()); } catch {}
+    }
+    return hosts;
+  }
+
+  function _getKnownPorts() {
+    const seen = new Set();
+    const ports = [];
+    function add(v) {
+      if (v && /^[0-9]+$/.test(String(v)) && !seen.has(String(v))) { seen.add(String(v)); ports.push(String(v)); }
+    }
+    // transport-config.json — all provider entries
+    try {
+      const raw = fs.readFileSync(path.join(os.homedir(), '.agentvibes', 'transport-config.json'), 'utf8');
+      const all = JSON.parse(raw);
+      for (const cfg of Object.values(all)) { if (cfg?.port) add(cfg.port); }
+    } catch {}
+    // Hermes SSH config
+    try {
+      const hermesHome = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes');
+      const raw = fs.readFileSync(path.join(hermesHome, 'hooks', 'agentvibes-tts', 'agentvibes-ssh-config.json'), 'utf8');
+      add(JSON.parse(raw).port);
+    } catch {}
+    // Well-known SSH ports as fallback suggestions
+    for (const p of ['22', '2222', '8022']) add(p);
+    return ports;
+  }
+
+  // Parse ~/.ssh/config for Host aliases (excludes wildcards like *)
+  function _getSshConfigAliases() {
+    const aliases = [];
+    const seen = new Set();
+    try {
+      const lines = fs.readFileSync(path.join(os.homedir(), '.ssh', 'config'), 'utf8').split('\n');
+      for (const line of lines) {
+        const m = line.match(/^\s*[Hh]ost\s+(.+)$/);
+        if (m) {
+          for (const name of m[1].trim().split(/\s+/)) {
+            if (!name.includes('*') && !name.includes('?') && !seen.has(name)) {
+              seen.add(name);
+              aliases.push(name);
+            }
+          }
+        }
+      }
+    } catch {}
+    return aliases;
+  }
+
+  function _openSshHostPicker(draft, onDone) {
+    const aliases = _getSshConfigAliases();
+    const known   = _getKnownHosts().filter(h => !aliases.includes(h));  // avoid duplicates
+
+    // Build display items — aliases first (they carry key/port in ~/.ssh/config)
+    const aliasItems = aliases.map(a => `  📋 ${a}  {gray-fg}(SSH alias){/gray-fg}`);
+    const knownItems = known.map(h => `  ${h}`);
+    const allItems   = [...aliasItems, ...knownItems, '  ✏  Enter manually…'];
+
+    if (allItems.length === 1) {
+      // Nothing configured yet — go straight to manual entry
+      _openSshFieldEditor(draft, 'host', 'SSH Alias / Host / IP', 253, onDone);
+      return;
+    }
+
+    const pickerH = Math.min(allItems.length + 4, 16);
+    const picker = blessed.list({
+      parent: screen, top: 'center', left: 'center',
+      width: 66, height: pickerH,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      label: ' {bold}{cyan-fg} SSH Alias / Host / IP {/cyan-fg}{/bold} ',
+      items: allItems,
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'white', bold: true },
+      },
+    });
+    picker.setFront();
+
+    // Pre-select the current value
+    const curAlias = aliases.indexOf(draft.host);
+    const curKnown = known.indexOf(draft.host);
+    if (curAlias >= 0)      picker.select(curAlias);
+    else if (curKnown >= 0) picker.select(aliases.length + curKnown);
+
+    function _closePicker(save) {
+      if (save) {
+        const idx = picker.selected;
+        if (idx === allItems.length - 1) {
+          // "Enter manually" — open free-form editor
+          destroyList(picker, screen);
+          _openSshFieldEditor(draft, 'host', 'SSH Alias / Host / IP', 253, onDone);
+          return;
+        }
+        if (idx < aliases.length) {
+          // SSH alias — key/port are defined in ~/.ssh/config, clear them so SSH uses the config
+          draft.host   = aliases[idx];
+          draft.sshKey = '';
+          draft.port   = '';
+        } else {
+          // Known IP/hostname — just update host, leave key/port alone
+          draft.host = known[idx - aliases.length] || draft.host;
+        }
+      }
+      destroyList(picker, screen);
+      onDone();
+    }
+    picker.key(['enter'], () => _closePicker(true));
+    picker.key(['escape'], () => _closePicker(false));
+    picker.focus();
+    screen.render();
+  }
+
+  // Two-step SSH connection picker: choose Alias or Manual mode.
+  // Alias:  pick a host from ~/.ssh/config — key/port handled by SSH config.
+  // Manual: sequential entry of host → SSH key → port.
+  function _openSshConnectionPicker(draft, onDone) {
+    const aliases = _getSshConfigAliases();
+    const hasAliases = aliases.length > 0;
+    const picker = blessed.list({
+      parent: screen, top: 'center', left: 'center',
+      width: 64, height: 8,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      label: ' {bold}{cyan-fg} SSH Connection {/cyan-fg}{/bold} ',
+      items: [
+        `  📋 SSH Alias   — pick from ~/.ssh/config${hasAliases ? '' : '  {gray-fg}(none found){/gray-fg}'}`,
+        '  ✏  Manual      — enter host, key, and port',
+      ],
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'white', bold: true },
+      },
+    });
+    picker.setFront();
+    picker.select(draft.connType === 'alias' ? 0 : 1);
+    picker.key(['enter'], () => {
+      const isAlias = picker.selected === 0;
+      destroyList(picker, screen);
+      if (isAlias) {
+        if (!hasAliases) { draft.connType = 'manual'; _openSshFieldEditor(draft, 'host', 'Host / IP', 253, onDone); return; }
+        _openSshAliasPicker(draft, onDone);
+      } else {
+        draft.connType = 'manual';
+        _openSshFieldEditor(draft, 'host', 'Host / IP', 253, () =>
+          _openSshKeyPicker(draft, () =>
+            _openSshPortPicker(draft, onDone)));
+      }
+    });
+    picker.key(['escape'], () => { destroyList(picker, screen); onDone(); });
+    picker.focus();
+    screen.render();
+  }
+
+  function _openSshAliasPicker(draft, onDone) {
+    const aliases = _getSshConfigAliases();
+    if (!aliases.length) { draft.connType = 'manual'; _openSshFieldEditor(draft, 'host', 'Host / IP', 253, onDone); return; }
+    const items = [...aliases.map(a => `  📋 ${a}`), '  ← Back'];
+    const pickerH = Math.min(items.length + 4, 18);
+    const picker = blessed.list({
+      parent: screen, top: 'center', left: 'center',
+      width: 54, height: pickerH,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      label: ' {bold}{cyan-fg} SSH Alias {/cyan-fg}{/bold} ',
+      items,
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'white', bold: true },
+      },
+    });
+    picker.setFront();
+    const cur = aliases.indexOf(draft.host);
+    if (cur >= 0) picker.select(cur);
+    picker.key(['enter'], () => {
+      const idx = picker.selected;
+      destroyList(picker, screen);
+      if (idx === items.length - 1) { _openSshConnectionPicker(draft, onDone); return; }
+      draft.connType = 'alias';
+      draft.host   = aliases[idx];
+      draft.sshKey = '';
+      draft.port   = '';
+      onDone();
+    });
+    picker.key(['escape'], () => { destroyList(picker, screen); _openSshConnectionPicker(draft, onDone); });
+    picker.focus();
+    screen.render();
+  }
+
+  function _openSshPortPicker(draft, onDone) {
+    const known = _getKnownPorts();
+    if (!known.length) { _openSshFieldEditor(draft, 'port', 'Port', 10, onDone); return; }
+    const items = [...known, '  ✏  Enter manually…'];
+    const pickerH = Math.min(items.length + 4, 14);
+    const picker = blessed.list({
+      parent: screen, top: 'center', left: 'center',
+      width: 40, height: pickerH,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      label: ' {bold}{cyan-fg} Port {/cyan-fg}{/bold} ',
+      items,
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'white', bold: true },
+      },
+    });
+    picker.setFront();
+    const curIdx = known.indexOf(draft.port);
+    if (curIdx >= 0) picker.select(curIdx);
+    function _closePicker(save) {
+      if (save) {
+        const idx = picker.selected;
+        if (idx === items.length - 1) { destroyList(picker, screen); _openSshFieldEditor(draft, 'port', 'Port', 10, onDone); return; }
+        draft.port = known[idx] || draft.port;
+      }
+      destroyList(picker, screen);
+      onDone();
+    }
+    picker.key(['enter'], () => _closePicker(true));
+    picker.key(['escape'], () => _closePicker(false));
+    picker.focus();
+    screen.render();
+  }
+
+  // ── Transport SSH Config Modal ────────────────────────────────────────────
+  // Shared by ssh-remote, agentvibes-receiver, termux-ssh.
+  // Shows 3 SSH fields: SSH Key, Host / IP, Port.
+
+  function _openTransportConfigModal(provider, currentCfg) {
+    if (navigationService?.isModalOpen()) return;
+    let _closed = false;
+    navigationService?.openModal(null, _closeModal);
+
+    const draft = {
+      sshKey: currentCfg.sshKey || '',
+      host:   currentCfg.host   || '',
+      port:   currentCfg.port   || provider.defaultPort || '22',
+    };
+    draft.connType = (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
+
+    function _buildFields() {
+      const base = [{ key: 'sshConnection', label: 'SSH Connection', getValue: () => {
+        if (draft.connType === 'alias') return `{cyan-fg}📋 ${draft.host || '(choose alias)'}{/cyan-fg}`;
+        const h = draft.host || '(not set)';
+        const p = draft.port ? `:${draft.port}` : '';
+        const k = draft.sshKey ? '  🔑' : '';
+        return `✏  ${h}${p}${k}`;
+      }}];
+      if (draft.connType === 'manual') {
+        base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
+        base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || provider.defaultPort || '{gray-fg}(default){/gray-fg}' });
+      }
+      return base;
+    }
+
+    function _fieldItems() {
+      const fields = _buildFields();
+      if (fieldList) fieldList.height = fields.length + 2;
+      return fields.map(f => `  ${f.label.padEnd(16)} ${f.getValue()}`);
+    }
+
+    const modal = blessed.box({
+      parent: screen, top: 'center', left: 'center',
+      width: 72, height: 12,
+      border: { type: 'line' }, tags: true,
+      label: ` {bold}{cyan-fg} ${provider.name} — SSH Config {/cyan-fg}{/bold} `,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    modal.setFront();
+
+    const fieldList = blessed.list({
+      parent: modal, top: 1, left: 2, right: 2,
+      height: 5,
+      keys: true, vi: false, mouse: true,
+      border: { type: 'line' }, tags: true,
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        border: { fg: 'blue' },
+        selected: { bg: 'blue', fg: 'yellow' },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+    fieldList.setItems(_fieldItems());
+
+    blessed.text({
+      parent: modal, bottom: 4, left: 2, right: 2, tags: true,
+      content: '{white-fg}[Up/Down] Navigate  [Enter] Edit  [Tab] Buttons  [Esc] Close{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    const previewLine = blessed.text({
+      parent: modal, bottom: 1, left: 2, right: 2, tags: true, content: '',
+      style: { bg: COLORS.contentBg },
+    });
+
+    function _modalBtn(label, leftPos, onClick) {
+      const btn = blessed.button({
+        parent: modal, content: label, bottom: 2, left: leftPos,
+        mouse: true, keys: true, shrink: true,
+        padding: { left: 1, right: 1 },
+        style: {
+          bg: 'blue', fg: 'white',
+          focus: { bg: 'cyan', fg: 'black', bold: true },
+          hover: { bg: 'cyan', fg: 'black', bold: true },
+        },
+      });
+      btn.key(['enter', 'space'], () => onClick());
+      btn.on('click', () => onClick());
+      return btn;
+    }
+
+    function _autoSave(silent) {
+      saveTransportConfig(provider.id, draft).then(() => {
+        // Refresh status text below provider name
+        const row = transportRows.find(r => r.id === provider.id);
+        if (row && draft.host) {
+          row.statusText.setContent(`{gray-fg}→ ${draft.host}:${draft.port}{/gray-fg}`);
+          screen.render();
+        }
+      }).catch(() => {});
+      if (!silent) _showSavedToast(`${provider.name} Config`, `~/.agentvibes/transport-config.json`);
+    }
+
+    let _previewProc = null;
+    function _killPreview() {
+      if (_previewProc) { try { _previewProc.kill(); } catch {} _previewProc = null; }
+    }
+
+    function _playPreview() {
+      _killPreview();
+      previewLine.setContent('{cyan-fg}♪ Previewing...{/cyan-fg}');
+      screen.render();
+      _autoSave(true);
+      const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
+      const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      const sampleText = 'This is how your audio settings sound right now.';
+      const script = path.join(targetDir, '.claude', hooksSubdir, isWin ? 'play-tts.ps1' : 'play-tts.sh');
+      const proc = isWin
+        ? spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText], {
+            stdio: 'ignore', windowsHide: true, env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+          })
+        : spawn('bash', [script, sampleText], {
+            stdio: 'ignore', env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+          });
+      _previewProc = proc;
+      proc.on('exit', () => { _previewProc = null; if (!_closed) { previewLine.setContent(''); screen.render(); } });
+      proc.on('error', () => { _previewProc = null; if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); } });
+    }
+
+    const saveBtn    = _modalBtn('Save',    4,  () => { _autoSave(false); });
+    const previewBtn = _modalBtn('Preview', 12, _playPreview);
+    const closeBtn   = _modalBtn('Close',   22, _closeModal);
+    const allBtns = [saveBtn, previewBtn, closeBtn];
+    const btnBlink = attachBtnBlink(allBtns, screen);
+
+    function _closeModal() {
+      if (_closed) return;
+      _closed = true;
+      _modalClosing = true;
+      Promise.resolve().then(() => { _modalClosing = false; });
+      _killPreview();
+      btnBlink.cleanup();
+      navigationService?.closeModal();
+      destroyList(modal, screen);
+      if (providerFocusableItems.length) providerFocusableItems[providerFocusIndex]?.focus();
+      screen.render();
+    }
+
+    fieldList.key(['enter'], () => {
+      const idx   = fieldList.selected;
+      const field = _buildFields()[idx];
+      if (!field) return;
+      const _refreshField = () => {
+        if (_closed) return;
+        _autoSave(true);
+        fieldList.setItems(_fieldItems());
+        fieldList.select(Math.min(idx, _buildFields().length - 1));
+        fieldList.focus();
+        screen.render();
+      };
+      switch (field.key) {
+        case 'sshConnection': _openSshConnectionPicker(draft, _refreshField); break;
+        case 'sshKey':        if (draft.connType !== 'manual') break; _openSshKeyPicker(draft, _refreshField); break;
+        case 'port':          if (draft.connType !== 'manual') break; _openSshPortPicker(draft, _refreshField); break;
+      }
+    });
+
+    fieldList.key(['escape', 'q', 'Q'], _closeModal);
+    fieldList.on('blur', () => {
+      fieldList.style.selected = { bg: COLORS.contentBg, fg: COLORS.labelFg };
+      fieldList.setItems(_fieldItems());
+      screen.render();
+    });
+    fieldList.on('focus', () => {
+      fieldList.style.selected = { bg: 'blue', fg: 'yellow' };
+      fieldList.setItems(_fieldItems());
+      screen.render();
+    });
+    fieldList.key(['tab'], () => { allBtns[0].focus(); screen.render(); });
+    for (let i = 0; i < allBtns.length; i++) {
+      allBtns[i].key(['tab', 'right'],   () => { allBtns[(i + 1) % allBtns.length].focus(); screen.render(); });
+      allBtns[i].key(['S-tab', 'left'],  () => { allBtns[(i - 1 + allBtns.length) % allBtns.length].focus(); screen.render(); });
+      allBtns[i].key(['escape', 'q', 'Q'], _closeModal);
+      allBtns[i].key(['up'], () => { fieldList.focus(); screen.render(); });
+    }
+
+    modal.key(['escape', 'q', 'Q'], _closeModal);
+    fieldList.focus();
+    screen.render();
+  }
+
   // ── LLM Config Modal ─────────────────────────────────────────────────────
 
-  function _openLlmConfigModal(provider, llmKey, config) {
+  function _openLlmConfigModal(provider, llmKey, config, sshCfg = {}) {
     // Guard against double-open (key repeat, double-click)
     if (navigationService?.isModalOpen()) return;
     let _closed = false;
@@ -1179,17 +1631,23 @@ export function createSetupTab(screen, services) {
       reverbPreset: config.effects || 'off',
       bgTrack:      config.bgTrack || '',
       bgVolume:     config.bgVolume || '0.15',
+      // SSH destination fields
+      mode:   sshCfg.mode === 'remote' ? 'remote' : 'local',
+      sshKey: sshCfg.sshKey || '',
+      host:   sshCfg.host   || '',
+      port:   sshCfg.port   || '22',
     };
+    draft.connType = (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
 
     const modal = blessed.box({
       parent: screen,
       top: 'center',
       left: 'center',
       width: 72,
-      height: 22,
+      height: 26,
       border: { type: 'line' },
       tags: true,
-      label: ` {bold}{cyan-fg} ${provider.name} -- Audio Config {/cyan-fg}{/bold} `,
+      label: ` {bold}{cyan-fg} ${provider.name} — Audio Config {/cyan-fg}{/bold} `,
       style: {
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
@@ -1198,25 +1656,41 @@ export function createSetupTab(screen, services) {
     });
     modal.setFront();
 
-    // Field definitions
-    const FIELDS = [
-      { key: 'ttsEngine', label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-      { key: 'voice',     label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
-      { key: 'pretext',   label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-      { key: 'reverb',    label: 'Reverb',        getValue: () => {
-        const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
-        return p ? p.label : draft.reverbPreset || 'Off';
-      }},
-      { key: 'bgTrack',   label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
-      { key: 'bgVolume',  label: 'Music Vol',    getValue: () => {
-        const pct = Math.round(parseFloat(draft.bgVolume) * 100);
-        return `${pct}%`;
-      }},
-    ];
+    // Field definitions — dynamic based on mode/connType
+    function _buildFields() {
+      const base = [
+        { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
+        { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+        { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
+        { key: 'reverb',      label: 'Reverb',       getValue: () => {
+          const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
+          return p ? p.label : draft.reverbPreset || 'Off';
+        }},
+        { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
+        { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
+        { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
+      ];
+      if (draft.mode === 'remote') {
+        base.push({ key: 'sshConnection', label: 'SSH Connection', getValue: () => {
+          if (draft.connType === 'alias') return `{cyan-fg}📋 ${draft.host || '(choose alias)'}{/cyan-fg}`;
+          const h = draft.host || '(not set)';
+          const p = draft.port ? `:${draft.port}` : '';
+          const k = draft.sshKey ? '  🔑' : '';
+          return `✏  ${h}${p}${k}`;
+        }});
+        if (draft.connType === 'manual') {
+          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
+          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{gray-fg}(default: 22){/gray-fg}' });
+        }
+      }
+      return base;
+    }
 
     function _fieldItems() {
-      return FIELDS.map(f => {
-        const label = f.label.padEnd(14);
+      const fields = _buildFields();
+      if (fieldList) fieldList.height = fields.length + 2;
+      return fields.map(f => {
+        const label = f.label.padEnd(16);
         return `  ${label} ${f.getValue()}`;
       });
     }
@@ -1226,7 +1700,7 @@ export function createSetupTab(screen, services) {
       top: 1,
       left: 2,
       right: 2,
-      height: FIELDS.length + 2,
+      height: 12,
       keys: true,
       vi: false,
       mouse: true,
@@ -1378,6 +1852,13 @@ export function createSetupTab(screen, services) {
         ttsEngine: engine,
         sourcePath: config.sourcePath,
       }, targetDir);
+      // Persist SSH destination config (fire-and-forget)
+      saveTransportConfig(llmKey, {
+        mode:   draft.mode,
+        sshKey: draft.sshKey,
+        host:   draft.host,
+        port:   draft.port,
+      }).catch(() => {});
       if (!silent) {
         const cfgPath = config.sourcePath || resolveCfgPath(targetDir);
         _showSavedToast('Settings', cfgPath);
@@ -1393,6 +1874,11 @@ export function createSetupTab(screen, services) {
       draft.reverbPreset = 'off';
       draft.bgTrack = '';
       draft.bgVolume = '0.15';
+      draft.mode     = 'local';
+      draft.connType = 'manual';
+      draft.sshKey   = '';
+      draft.host     = '';
+      draft.port     = '22';
       _autoSave();
       fieldList.setItems(_fieldItems());
       fieldList.focus();
@@ -1420,14 +1906,14 @@ export function createSetupTab(screen, services) {
     // Field editing via Enter
     fieldList.key(['enter'], () => {
       const idx = fieldList.selected;
-      const field = FIELDS[idx];
+      const field = _buildFields()[idx];
       if (!field) return;
 
       const _refreshField = () => {
         if (_closed) return;
         _autoSave();
         fieldList.setItems(_fieldItems());
-        fieldList.select(idx);
+        fieldList.select(Math.min(idx, _buildFields().length - 1));
         fieldList.focus();
         screen.render();
       };
@@ -1470,6 +1956,11 @@ export function createSetupTab(screen, services) {
             _refreshField();
           }, _cancelField);
           break;
+
+        case 'destination':    _openDestinationPicker(draft, _refreshField);                                               break;
+        case 'sshConnection':  if (draft.mode === 'local') break; _openSshConnectionPicker(draft, _refreshField);       break;
+        case 'sshKey':         if (draft.connType !== 'manual') break; _openSshKeyPicker(draft, _refreshField);         break;
+        case 'port':           if (draft.connType !== 'manual') break; _openSshPortPicker(draft, _refreshField);        break;
       }
     });
 
@@ -1493,7 +1984,8 @@ export function createSetupTab(screen, services) {
     let _prevFieldSel = 0;
     fieldList.key(['down'], () => {
       const cur = fieldList.selected ?? 0;
-      if (cur === FIELDS.length - 1 && _prevFieldSel === FIELDS.length - 1) {
+      const last = _buildFields().length - 1;
+      if (cur === last && _prevFieldSel === last) {
         allBtns[0].focus(); screen.render();
       }
       _prevFieldSel = cur;
@@ -1664,8 +2156,8 @@ export function createSetupTab(screen, services) {
     });
 
     const vpPreviewLine = blessed.text({
-      parent: vpModal, bottom: 3, left: 2, right: 2, tags: true,
-      content: '', style: { fg: 'cyan', bg: COLORS.contentBg },
+      parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
+      content: ' ', style: { fg: 'cyan', bg: COLORS.contentBg },
     });
 
     blessed.text({
@@ -1712,44 +2204,53 @@ export function createSetupTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
 
       // Route through remote provider if active
-      // Search order: CLAUDE_PROJECT_DIR → cwd → package root → home
+      // Search order: targetDir → cwd → package root → home
       const _remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
       let _activeProvider = '';
       try {
-        const _pkgRoot = path.resolve(__dirname, '..', '..');
         const _provPaths = [
-          process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
+          path.join(targetDir, '.claude', 'tts-provider.txt'),
           path.join(process.cwd(), '.claude', 'tts-provider.txt'),
-          path.join(_pkgRoot, '.claude', 'tts-provider.txt'),
+          path.join(packageDir, '.claude', 'tts-provider.txt'),
           path.join(os.homedir(), '.claude', 'tts-provider.txt'),
-        ].filter(Boolean);
+        ];
         for (const p of _provPaths) {
           if (fs.existsSync(p)) { _activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
         }
       } catch {}
 
       if (_remoteProviders.includes(_activeProvider)) {
-        const _hooksBase = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+        const _playTtsName = _isWin
+          ? path.join('.claude', 'hooks-windows', 'play-tts.ps1')
+          : path.join('.claude', 'hooks', 'play-tts.sh');
+        const _hooksBase = fs.existsSync(path.join(packageDir, _playTtsName))
+          ? packageDir
+          : targetDir;
+        const _rEnv = { ..._spawnEnv, CLAUDE_PROJECT_DIR: targetDir };
         let rProc;
         if (_isWin) {
           const _playTts = path.join(_hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
           rProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _playTts, phrase, voiceId], {
-            stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
+            stdio: 'ignore', detached: false, windowsHide: true, env: _rEnv,
           });
         } else {
           const _playTts = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
           rProc = spawn('bash', [_playTts, phrase, voiceId], {
-            stdio: 'ignore', detached: true, env: _spawnEnv,
+            stdio: 'ignore', detached: true, env: _rEnv, cwd: targetDir,
           });
         }
         _previewProc = rProc;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing (remote): ${voiceId}{/cyan-fg}`); screen.render(); }
+        if (!_vpClosed) { _refreshVP(); vpPreviewLine.setContent('{bright-magenta-fg}♪ Synthesizing on remote...{/bright-magenta-fg}'); screen.render(); }
         rProc.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+          if (_previewVoiceId === voiceId) {
+            _previewVoiceId = null; _previewProc = null;
+            // Keep message + ♪ visible for 5s while remote device synthesises and plays
+            setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }, 5000);
+          }
         });
         rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
         return;

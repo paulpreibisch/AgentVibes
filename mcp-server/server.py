@@ -156,6 +156,107 @@ class AgentVibesServer:
 
         return voice_name
 
+    # ── LibriTTS display-name resolution ──────────────────────────────────────
+
+    _SURNAME_POOL = [
+        'Bell', 'Carter', 'Davis', 'Ellis', 'Foster', 'Gray', 'Hayes', 'Irving',
+        'Jones', 'Knox', 'Lane', 'Mason', 'Nash', 'Owens', 'Pierce', 'Quinn',
+    ]
+
+    @classmethod
+    def _uniquify_voice_name(cls, raw_name: str) -> str:
+        """Python port of uniquifyVoiceName from src/utils/voice-names.js"""
+        import re as _re
+        if not raw_name:
+            return raw_name
+        m = _re.match(r'^(.+)-(\d+)$', raw_name)
+        if m:
+            base, n = m.group(1), int(m.group(2))
+            if n >= 2:
+                return f"{base} {cls._SURNAME_POOL[(n - 1) % len(cls._SURNAME_POOL)]}"
+        if ' ' in raw_name:
+            return raw_name
+        return f"{raw_name} {cls._SURNAME_POOL[0]}"
+
+    def _build_libritts_catalog(self) -> dict:
+        """
+        Build a case-insensitive display-name → entry map from voice-assignments.json.
+        Returns dict keyed by lowercased display name / raw name / speaker name.
+        """
+        catalog: dict = {}
+        va_path = self.agentvibes_root / "voice-assignments.json"
+        if not va_path.exists():
+            return catalog
+        try:
+            data = json.loads(va_path.read_text())
+            for id_str, entry in data.get("libritts_speakers", {}).items():
+                speaker_id = int(id_str)
+                raw_name = entry.get("voice_name", "")
+                display_name = self._uniquify_voice_name(raw_name)
+                voice_id = f"en_US-libritts-high::{raw_name}"
+                info = {
+                    "voice_id": voice_id,
+                    "model": "en_US-libritts-high",
+                    "speaker_name": raw_name,
+                    "speaker_id": speaker_id,
+                    "display_name": display_name,
+                    "gender": entry.get("gender", ""),
+                }
+                for key in (display_name.lower(), raw_name.lower(),
+                            raw_name.replace(" ", "_").lower()):
+                    catalog.setdefault(key, info)
+        except (json.JSONDecodeError, KeyError, ValueError, OSError):
+            pass
+        return catalog
+
+    def _resolve_voice_input(self, voice_input: str) -> Optional[dict]:
+        """
+        Resolve a voice display name or ID to a dict with model/speakerId/voiceId.
+        Returns None if unresolvable.
+        Accepts: "Bella Bell", "Bella-2", "en_US-libritts-high::Bella",
+                 "Kristin_Hughes", "en_US-amy-medium"
+        """
+        import re as _re
+        if not voice_input:
+            return None
+        MS_SEP = "::"
+
+        # Already a full voiceId with MS_SEP
+        if MS_SEP in voice_input:
+            parts = voice_input.split(MS_SEP, 1)
+            model, speaker_name = parts[0], parts[1]
+            if not _re.match(r'^[a-zA-Z0-9_-]+$', model):
+                return None
+            catalog = self._build_libritts_catalog()
+            entry = catalog.get(speaker_name.lower())
+            return {
+                "voice_id": voice_input,
+                "model": model,
+                "speaker_name": speaker_name,
+                "speaker_id": entry["speaker_id"] if entry else None,
+                "display_name": entry["display_name"] if entry else speaker_name,
+            }
+
+        # Plain piper model ID (e.g. en_US-amy-medium)
+        if _re.match(r'^en_[A-Z]{2}-[a-zA-Z0-9_]+-[a-z]+$', voice_input):
+            return {
+                "voice_id": voice_input, "model": voice_input,
+                "speaker_name": None, "speaker_id": None, "display_name": voice_input,
+            }
+
+        # LibriTTS display name / raw name lookup
+        catalog = self._build_libritts_catalog()
+        normalised = voice_input.replace("_", " ")
+        entry = catalog.get(normalised.lower()) or catalog.get(voice_input.lower())
+        return entry or None
+
+    def _get_config_dir(self) -> Path:
+        """Return the .claude dir to write voice config files into (project or global)."""
+        cwd = Path.cwd()
+        if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
+            return cwd / ".claude"
+        return self.claude_dir
+
     async def text_to_speech(
         self,
         text: str,
@@ -313,6 +414,28 @@ class AgentVibesServer:
             for voice in voices:
                 marker = " ✓ (current)" if voice == current_voice else ""
                 output += f"  • {voice}{marker}\n"
+
+            # Expand LibriTTS named speakers when en_US-libritts-high is installed
+            piper_voices_dir = Path.home() / ".local" / "share" / "piper-voices"
+            libritts_onnx = piper_voices_dir / "en_US-libritts-high.onnx"
+            if libritts_onnx.exists():
+                catalog = self._build_libritts_catalog()
+                if catalog:
+                    output += f"\n  📖 LibriTTS named speakers (en_US-libritts-high):\n"
+                    # De-duplicate: only one entry per display name
+                    seen: set = set()
+                    for entry in catalog.values():
+                        dn = entry["display_name"]
+                        if dn in seen:
+                            continue
+                        seen.add(dn)
+                        spk = entry["speaker_name"]
+                        sid = entry["speaker_id"]
+                        gender = entry.get("gender", "")
+                        g_icon = "♀" if gender.lower() == "female" else ("♂" if gender.lower() == "male" else "—")
+                        marker = " ✓ (current)" if entry["voice_id"] == current_voice else ""
+                        output += f"  • {dn} ({g_icon} speaker {sid}){marker}\n"
+
             output += f"{self.SEPARATOR}\n"
 
             # Add provider switch hint
@@ -332,19 +455,51 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        # Resolve friendly name to Piper ID
+        # Try new display-name resolver first (handles "Bella Bell", "::" ids, etc.)
+        resolved = self._resolve_voice_input(voice_name)
+
+        if resolved:
+            voice_id     = resolved["voice_id"]
+            display_name = resolved["display_name"]
+            model        = resolved["model"]
+            speaker_id   = resolved["speaker_id"]
+            speaker_name = resolved["speaker_name"]
+
+            # Write the three config files directly (no voice-manager.sh needed)
+            config_dir = self._get_config_dir()
+            try:
+                config_dir.mkdir(parents=True, exist_ok=True)
+                (config_dir / "tts-voice.txt").write_text(display_name + "\n")
+                if speaker_name:
+                    (config_dir / "tts-piper-model.txt").write_text(model + "\n")
+                    if speaker_id is not None:
+                        (config_dir / "tts-piper-speaker-id.txt").write_text(str(speaker_id) + "\n")
+                    else:
+                        # Clear speaker-id so piper uses default
+                        try: (config_dir / "tts-piper-speaker-id.txt").unlink()
+                        except FileNotFoundError: pass
+                else:
+                    # Single-speaker model — clear multi-speaker files
+                    for f in ("tts-piper-model.txt", "tts-piper-speaker-id.txt"):
+                        try: (config_dir / f).unlink()
+                        except FileNotFoundError: pass
+            except OSError as e:
+                return f"❌ Failed to write voice config: {e}"
+
+            detail = f" (speaker {speaker_id}, model {model})" if speaker_id is not None else ""
+            return f"✅ Voice set to: {display_name}{detail}"
+
+        # Fall back to legacy friendly-name resolver (voice-metadata.json)
         original_name = voice_name
         resolved_name = self._resolve_friendly_name(voice_name)
-
         result = await self._run_script(
             self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name, "--silent"]
         )
-
         if result and "✅" in result:
             if original_name.lower() != resolved_name.lower():
                 return f"✅ Voice switched to: {original_name} ({resolved_name})"
             return f"✅ Voice switched to: {voice_name}"
-        return f"❌ Failed to switch voice: {result}"
+        return f"❌ Failed to switch voice — could not resolve '{voice_name}'. Try 'list_voices' to see available names."
 
     async def list_personalities(self) -> str:
         """
