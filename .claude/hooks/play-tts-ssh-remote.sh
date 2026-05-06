@@ -144,11 +144,18 @@ LLM_REVERB=""
 LLM_BG_FILE=""
 LLM_BG_VOLUME=""
 
+# Build config search path: CLAUDE_PROJECT_DIR first (the actual user project,
+# even when hooks run from the package dir), then PROJECT_ROOT (may be the
+# same or the package dir), then global home fallback.
+_llm_cfg_paths=()
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" && "$CLAUDE_PROJECT_DIR" != "$PROJECT_ROOT" ]]; then
+  _llm_cfg_paths+=("$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg")
+fi
+_llm_cfg_paths+=("$PROJECT_ROOT/.claude/config/audio-effects.cfg" "$HOME/.claude/config/audio-effects.cfg")
+
 _llm_key="llm:${LLM_NAME}"
 _llm_row_found=0
-for _cfg in \
-  "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
-  "$HOME/.claude/config/audio-effects.cfg"; do
+for _cfg in "${_llm_cfg_paths[@]}"; do
   if [[ -f "$_cfg" ]]; then
     while IFS='|' read -r _key _reverb _bgfile _bgvol _rest; do
       _key="${_key## }"; _key="${_key%% }"
