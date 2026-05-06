@@ -163,9 +163,15 @@ _LLM_REVERB=""
 _LLM_ENGINE=""
 if [[ -n "$LLM_PROVIDER" ]]; then
   _llm_key="llm:${LLM_PROVIDER}"
-  for _cfg in \
-    "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
-    "$HOME/.claude/config/audio-effects.cfg"; do
+  # Search order: CLAUDE_PROJECT_DIR (actual user project, may differ from
+  # PROJECT_ROOT when hooks run from the package dir), then PROJECT_ROOT,
+  # then global home fallback.
+  _llm_cfg_paths=()
+  if [[ -n "${CLAUDE_PROJECT_DIR:-}" && "$CLAUDE_PROJECT_DIR" != "$PROJECT_ROOT" ]]; then
+    _llm_cfg_paths+=("$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg")
+  fi
+  _llm_cfg_paths+=("$PROJECT_ROOT/.claude/config/audio-effects.cfg" "$HOME/.claude/config/audio-effects.cfg")
+  for _cfg in "${_llm_cfg_paths[@]}"; do
     if [[ -z "$_LLM_VOICE" && -z "$_LLM_PRETEXT" && -f "$_cfg" ]]; then
       while IFS='|' read -r _key _reverb _bgfile _bgvol _voice _pretext _engine _rest; do
         if [[ "$_key" == "$_llm_key" ]]; then
