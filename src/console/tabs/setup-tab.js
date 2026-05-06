@@ -2156,13 +2156,19 @@ export function createSetupTab(screen, services) {
     });
 
     const vpPreviewLine = blessed.text({
-      parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
+      parent: vpModal, bottom: 4, left: 2, right: 2, height: 1, tags: true,
       content: ' ', style: { fg: 'cyan', bg: COLORS.contentBg },
     });
 
+    // Footer split into two fixed-height lines so wrapping never covers vpPreviewLine
     blessed.text({
-      parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump  [Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
+      parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
+      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: vpModal, bottom: 2, left: 2, right: 2, height: 1, tags: true,
+      content: '{white-fg}[Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
