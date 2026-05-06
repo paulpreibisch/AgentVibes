@@ -62,7 +62,7 @@ while ($true) {
                 }
             } else {
                 # Fallback: Windows SAPI (built-in, no installation required)
-                Write-WatcherLog "WARN" "play-tts.ps1 not found — using SAPI fallback for id=$($req.id)"
+                Write-WatcherLog "WARN" "play-tts.ps1 not found - using SAPI fallback for id=$($req.id)"
                 Add-Type -AssemblyName System.Speech
                 $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
                 $synth.Speak($req.text)
