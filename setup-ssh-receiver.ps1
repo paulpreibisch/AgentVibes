@@ -199,7 +199,14 @@ while ($true) {
                 try {
                     [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
                     $env:AGENTVIBES_TEXT_FILE = $tempText
-                    $llmArg = if ($req.llm -and $req.llm -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') { @('-llm', $req.llm) } else { @() }
+                    $llmArg = @()
+                    if ($req.llm) {
+                        if ($req.llm -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+                            $llmArg = @('-llm', $req.llm)
+                        } else {
+                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' — using default"
+                        }
+                    }
                     Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice) llm=$($req.llm)"
                     $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice @llmArg 2>&1
                     if ($LASTEXITCODE -ne 0) {

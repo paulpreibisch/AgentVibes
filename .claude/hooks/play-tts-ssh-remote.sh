@@ -145,6 +145,7 @@ LLM_BG_FILE=""
 LLM_BG_VOLUME=""
 
 _llm_key="llm:${LLM_NAME}"
+_llm_row_found=0
 for _cfg in \
   "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
   "$HOME/.claude/config/audio-effects.cfg"; do
@@ -161,11 +162,12 @@ for _cfg in \
         esac
         [[ -n "$_bgfile" ]] && LLM_BG_FILE="$_bgfile"
         [[ -n "$_bgvol"  ]] && LLM_BG_VOLUME="$_bgvol"
-        break
+        _llm_row_found=1
+        break  # first matching row in this file wins
       fi
     done < "$_cfg"
-    # Stop after first file that has a match
-    [[ -n "$LLM_REVERB" || -n "$LLM_BG_FILE" ]] && break
+    # Stop searching after first file that contains the llm: row
+    [[ $_llm_row_found -eq 1 ]] && break
   fi
 done
 

@@ -1806,13 +1806,19 @@ export function createSetupTab(screen, services) {
       // Don't include pretext — play-tts already prepends it from the config
       const sampleText = 'This is how your audio settings sound right now.';
 
+      // Prefer package hooks (always up-to-date) over project-local copies which
+      // may be stale installs from an older version. Fall back to targetDir if
+      // the package hook doesn't exist (e.g. custom project-only setups).
+      const _playTtsName = path.join('.claude', hooksSubdir, isWin ? 'play-tts.ps1' : 'play-tts.sh');
+      const _hooksBase = fs.existsSync(path.join(packageDir, _playTtsName)) ? packageDir : targetDir;
+
       let cmd, args;
       if (isWin) {
-        const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.ps1');
+        const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
         cmd = 'powershell';
         args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
       } else {
-        const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.sh');
+        const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.sh');
         cmd = 'bash';
         args = [script, sampleText, '', '--llm', llmKey];
       }
@@ -1820,7 +1826,7 @@ export function createSetupTab(screen, services) {
       const proc = spawn(cmd, args, {
         stdio: 'ignore',
         windowsHide: true,
-        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
       });
       _previewModalProc = proc;
 
@@ -1929,7 +1935,7 @@ export function createSetupTab(screen, services) {
           break;
 
         case 'voice':
-          _openVoicePickerForLlm(draft, _refreshField);
+          _openVoicePickerForLlm(draft, _refreshField, llmKey);
           break;
 
         case 'pretext':
@@ -2090,7 +2096,7 @@ export function createSetupTab(screen, services) {
     return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
   }
 
-  function _openVoicePickerForLlm(draft, onDone) {
+  function _openVoicePickerForLlm(draft, onDone, llmKey = '') {
     navigationService?.openModal(null, _closeVP);
 
     let _allVoices = [];
@@ -2235,16 +2241,21 @@ export function createSetupTab(screen, services) {
         const _hooksBase = fs.existsSync(path.join(packageDir, _playTtsName))
           ? packageDir
           : targetDir;
-        const _rEnv = { ..._spawnEnv, CLAUDE_PROJECT_DIR: targetDir };
+        const _rEnv = {
+          ..._spawnEnv, CLAUDE_PROJECT_DIR: targetDir,
+          ...(llmKey ? { AGENTVIBES_LLM_KEY: `llm:${llmKey}` } : {}),
+        };
         let rProc;
         if (_isWin) {
           const _playTts = path.join(_hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
-          rProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _playTts, phrase, voiceId], {
+          const _llmArgs = llmKey ? ['-llm', llmKey] : [];
+          rProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _playTts, phrase, voiceId, ..._llmArgs], {
             stdio: 'ignore', detached: false, windowsHide: true, env: _rEnv,
           });
         } else {
           const _playTts = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
-          rProc = spawn('bash', [_playTts, phrase, voiceId], {
+          const _llmArgs = llmKey ? ['--llm', llmKey] : [];
+          rProc = spawn('bash', [_playTts, phrase, voiceId, ..._llmArgs], {
             stdio: 'ignore', detached: true, env: _rEnv, cwd: targetDir,
           });
         }
