@@ -132,6 +132,48 @@ if [[ -f "$EFFECTS_CFG" ]]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# Override with LLM-specific settings from llm:<name> row
+# Format: llm:<name>|REVERB_PRESET|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT|ENGINE
+# The LLM row takes priority over the agent-name row. This is what the user
+# configures in the TUI under Setup → LLM Providers → Configure, and these
+# settings are forwarded to the remote so it can apply them as overrides —
+# without requiring the remote to have its own audio-effects.cfg configured.
+# ---------------------------------------------------------------------------
+LLM_REVERB=""
+LLM_BG_FILE=""
+LLM_BG_VOLUME=""
+
+_llm_key="llm:${LLM_NAME}"
+for _cfg in \
+  "$PROJECT_ROOT/.claude/config/audio-effects.cfg" \
+  "$HOME/.claude/config/audio-effects.cfg"; do
+  if [[ -f "$_cfg" ]]; then
+    while IFS='|' read -r _key _reverb _bgfile _bgvol _rest; do
+      _key="${_key## }"; _key="${_key%% }"
+      if [[ "$_key" == "$_llm_key" ]]; then
+        _reverb="${_reverb## }"; _reverb="${_reverb%% }"
+        _bgfile="${_bgfile## }"; _bgfile="${_bgfile%% }"
+        _bgvol="${_bgvol## }";   _bgvol="${_bgvol%% }"
+        # Only accept preset names for reverb (cross-platform safe)
+        case "$_reverb" in
+          off|light|medium|heavy|cathedral) LLM_REVERB="$_reverb" ;;
+        esac
+        [[ -n "$_bgfile" ]] && LLM_BG_FILE="$_bgfile"
+        [[ -n "$_bgvol"  ]] && LLM_BG_VOLUME="$_bgvol"
+        break
+      fi
+    done < "$_cfg"
+    # Stop after first file that has a match
+    [[ -n "$LLM_REVERB" || -n "$LLM_BG_FILE" ]] && break
+  fi
+done
+
+# LLM settings win over agent-name settings
+[[ -n "$LLM_REVERB"    ]] && SOX_EFFECTS="$LLM_REVERB"
+[[ -n "$LLM_BG_FILE"   ]] && BG_FILE="$LLM_BG_FILE"
+[[ -n "$LLM_BG_VOLUME" ]] && BG_VOLUME="$LLM_BG_VOLUME"
+
 # Read pretext if configured
 PRETEXT=""
 PRETEXT_FILE="$PROJECT_ROOT/.agentvibes/config/pretext.txt"
