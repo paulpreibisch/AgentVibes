@@ -352,17 +352,26 @@ catch {
     exit 1
 }
 
+# Parse the exact audio file path from provider stdout
+$AudioFilePath = ""
+foreach ($line in $providerOutput) {
+    if ($line -match '^\[OUTPUT\] Processed audio: (.+)$') {
+        $AudioFilePath = $Matches[1].Trim()
+        break
+    }
+}
+
 # Apply reverb and/or mix with background music
 if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     $env:AGENTVIBES_NO_PLAY = $null
 
-    # Find the most recent TTS wav file
-    $AudioDir = "$ClaudeDir\audio"
-    $RecentWav = Get-ChildItem -Path $AudioDir -Filter "tts-*.wav" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $AudioFilePath -or -not (Test-Path $AudioFilePath)) {
+        Write-Host "[ERROR] Provider did not return a valid audio file path" -ForegroundColor Red
+        exit 1
+    }
 
-    if ($RecentWav -and $RecentWav.Length -gt 0) {
-        $voicePath = $RecentWav.FullName
+    if ($true) {
+        $voicePath = $AudioFilePath
 
         # Apply reverb if configured
         if ($HasReverb) {
@@ -431,7 +440,7 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
             }
 
             if (Test-Path $BgTrackPath) {
-                $MixedFile = $RecentWav.FullName -replace '\.wav$', '-mixed.wav'
+                $MixedFile = $AudioFilePath -replace '\.wav$', '-mixed.wav'
 
                 try {
                     # Get voice duration to calculate total length
@@ -480,4 +489,11 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     }
 } else {
     $env:AGENTVIBES_NO_PLAY = $null
+    # No bg music or reverb — play the synthesized file directly
+    if ($AudioFilePath -and (Test-Path $AudioFilePath)) {
+        Invoke-AudioPlay $AudioFilePath
+    } else {
+        Write-Host "[ERROR] No audio file to play (path: '$AudioFilePath')" -ForegroundColor Red
+        exit 1
+    }
 }
