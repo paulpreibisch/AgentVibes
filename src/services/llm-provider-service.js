@@ -960,7 +960,7 @@ const _TRANSPORT_CFG_PATH = path.join(
 
 export async function getTransportConfig(providerId) {
   const defaultPort = TRANSPORT_PROVIDERS.find(p => p.id === providerId)?.defaultPort ?? '22';
-  const defaults = { mode: 'local', sshKey: '', host: '', port: defaultPort };
+  const defaults = { mode: 'local', connType: 'manual', sshKey: '', host: '', port: defaultPort };
   try {
     const raw = await fs.readFile(_TRANSPORT_CFG_PATH, 'utf8');
     const all = JSON.parse(raw);
@@ -987,11 +987,15 @@ export async function saveTransportConfig(providerId, cfg) {
   } catch {}
 
   const defaultPort = TRANSPORT_PROVIDERS.find(p => p.id === providerId)?.defaultPort ?? '22';
+  const isAlias = cfg.connType === 'alias';
   const safe = {
-    mode:   cfg.mode === 'remote' ? 'remote' : 'local',
-    sshKey: String(cfg.sshKey || ''),
-    host:   String(cfg.host   || ''),
-    port:   String(cfg.port   || defaultPort),
+    mode:     cfg.mode === 'remote' ? 'remote' : 'local',
+    connType: isAlias ? 'alias' : 'manual',
+    sshKey:   String(cfg.sshKey || ''),
+    host:     String(cfg.host   || ''),
+    // In alias mode, port is handled by ~/.ssh/config — persist empty string
+    // so alias detection on reload doesn't require port to be absent.
+    port:     isAlias ? '' : String(cfg.port || defaultPort),
   };
   all[providerId] = safe;
 

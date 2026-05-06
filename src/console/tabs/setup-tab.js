@@ -786,8 +786,11 @@ export function createSetupTab(screen, services) {
       host:   currentCfg.host   || '',
       port:   currentCfg.port   || '2222',
     };
-    // alias mode if host is in ~/.ssh/config with no explicit key/port
-    draft.connType = (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
+    // Restore saved connType; fall back to auto-detect for legacy configs that
+    // predate the connType field (host in ~/.ssh/config with no key/port).
+    draft.connType = currentCfg.connType === 'alias' ? 'alias'
+      : currentCfg.connType === 'manual' ? 'manual'
+      : (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
 
     const globalEngine = providerService?.getActiveProvider?.() || 'piper';
     const globalVoice  = providerService?.getActiveVoiceId?.() || 'none';
@@ -1432,7 +1435,9 @@ export function createSetupTab(screen, services) {
       host:   currentCfg.host   || '',
       port:   currentCfg.port   || provider.defaultPort || '22',
     };
-    draft.connType = (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
+    draft.connType = currentCfg.connType === 'alias' ? 'alias'
+      : currentCfg.connType === 'manual' ? 'manual'
+      : (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
 
     function _buildFields() {
       const base = [{ key: 'sshConnection', label: 'SSH Connection', getValue: () => {
@@ -1637,7 +1642,9 @@ export function createSetupTab(screen, services) {
       host:   sshCfg.host   || '',
       port:   sshCfg.port   || '22',
     };
-    draft.connType = (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
+    draft.connType = sshCfg.connType === 'alias' ? 'alias'
+      : sshCfg.connType === 'manual' ? 'manual'
+      : (_getSshConfigAliases().includes(draft.host) && !draft.sshKey && !draft.port) ? 'alias' : 'manual';
 
     const modal = blessed.box({
       parent: screen,
@@ -1860,10 +1867,11 @@ export function createSetupTab(screen, services) {
       }, targetDir);
       // Persist SSH destination config (fire-and-forget)
       saveTransportConfig(llmKey, {
-        mode:   draft.mode,
-        sshKey: draft.sshKey,
-        host:   draft.host,
-        port:   draft.port,
+        mode:     draft.mode,
+        connType: draft.connType,
+        sshKey:   draft.sshKey,
+        host:     draft.host,
+        port:     draft.port,
       }).catch(() => {});
       if (!silent) {
         const cfgPath = config.sourcePath || resolveCfgPath(targetDir);

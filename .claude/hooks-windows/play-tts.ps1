@@ -270,6 +270,34 @@ if ($_LlmReverb) {
     }
 }
 
+# --- Background music from per-LLM config ------------------------------------
+# Apply the LLM-specific music track/volume when no per-message override is
+# set (AGENTVIBES_OVERRIDE_MUSIC takes priority — it comes from the remote
+# sender and represents a more-specific per-message choice).
+if ($_LlmBgFile -and $OverrideMusic -eq "") {
+    $OverrideMusic = $_LlmBgFile
+    $BgEnabled = $true
+}
+if ($_LlmBgVol -and $OverrideVolume -eq "" -and $_LlmBgVol -match '^\d+\.?\d*$') {
+    $OverrideVolume = $_LlmBgVol
+}
+# Ensure ffmpeg check covers newly-enabled background music
+if ($BgEnabled -and -not $HasFfmpeg) {
+    try { $null = Get-Command ffmpeg -ErrorAction Stop; $HasFfmpeg = $true } catch {}
+}
+
+# --- AGENTVIBES_OVERRIDE_EFFECTS final-priority re-apply ---------------------
+# The per-message override env var (set by the SSH-remote watcher) must win
+# over the LLM config row above.  Re-apply it here so a Windows-side
+# audio-effects.cfg llm: row cannot silently cancel a remote sender's choice.
+if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium", "heavy", "cathedral")) {
+    $ReverbLevel = $OverrideEffects
+    $HasReverb = $ReverbLevel -ne "off"
+    if ($HasReverb -and -not $HasFfmpeg) {
+        try { $null = Get-Command ffmpeg -ErrorAction Stop; $HasFfmpeg = $true } catch {}
+    }
+}
+
 # --- Apply LLM-specific engine override --------------------------------------
 # Allowed local Windows engines: windows-sapi, windows-piper, soprano.
 # Transport providers (ssh-remote etc.) are not listed because they forward
