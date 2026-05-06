@@ -18,6 +18,21 @@ TEXT="${1:-}"
 VOICE="${2:-en_US-lessac-medium}"
 AGENT_NAME="${3:-default}"
 
+# LLM identity — forwarded to the remote so it can look up its own
+# audio-effects.cfg llm:<name> row for voice, reverb, music, pretext, engine.
+# AGENTVIBES_LLM_KEY is exported by play-tts.sh before calling this hook
+# (format: "llm:<name>"). Strip the prefix to get the bare name.
+LLM_NAME=""
+if [[ -n "${AGENTVIBES_LLM_KEY:-}" ]]; then
+  LLM_NAME="${AGENTVIBES_LLM_KEY#llm:}"
+  # Validate — only allow safe identifier chars (mirrors play-tts.ps1 check)
+  if [[ ! "$LLM_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
+    LLM_NAME=""
+  fi
+fi
+# Default to "default" so remote always has an LLM key to look up
+LLM_NAME="${LLM_NAME:-default}"
+
 # Validate required input
 if [[ -z "$TEXT" ]]; then
   echo "Usage: $0 <text> [voice] [agent_name]" >&2
@@ -169,15 +184,16 @@ build_json_payload() {
       --arg pretext "$PRETEXT" \
       --arg speed "$SPEED" \
       --arg provider "$PROVIDER" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider}'
+      --arg llm "$LLM_NAME" \
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm}'
   else
     # Manual JSON — escape double quotes and backslashes in text
     local escaped_text
     escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER"
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME"
   fi
 }
 

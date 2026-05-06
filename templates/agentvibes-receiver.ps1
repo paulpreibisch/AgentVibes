@@ -94,6 +94,7 @@ $script:Project = "unknown"
 $Pretext = ""
 $Speed = ""
 $Provider = "piper"
+$Llm = "default"
 
 if ($decoded.TrimStart().StartsWith('{')) {
     # JSON payload
@@ -108,6 +109,7 @@ if ($decoded.TrimStart().StartsWith('{')) {
         if ($json.pretext)  { $Pretext = $json.pretext }
         if ($json.speed)    { $Speed = $json.speed }
         if ($json.provider) { $Provider = $json.provider }
+        if ($json.llm)      { $Llm = $json.llm }
     } catch {
         Write-Output "Error: Failed to parse JSON payload"
         exit 1
@@ -131,6 +133,11 @@ if ($script:Voice -notmatch '^[a-zA-Z0-9_\-\. ]+$' -and $script:Voice -notmatch 
 # Validate provider
 if ($Provider -notin @("piper", "soprano", "windows-sapi", "windows-piper", "macos")) {
     $Provider = "piper"
+}
+
+# Validate LLM name — only safe identifier chars (mirrors play-tts.ps1 check)
+if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+    $Llm = "default"
 }
 
 # Validate volume is numeric
@@ -194,6 +201,7 @@ $ReqJson = @{
     effects  = $SoxEffects
     speed    = $Speed
     provider = $Provider
+    llm      = $Llm
 } | ConvertTo-Json -Compress
 
 try {
