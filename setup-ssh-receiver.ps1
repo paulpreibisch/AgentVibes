@@ -200,7 +200,12 @@ while ($true) {
                     [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
                     $env:AGENTVIBES_TEXT_FILE = $tempText
                     Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice)"
-                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice
+                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice 2>&1
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"
+                    } else {
+                        Write-WatcherLog "INFO" "play-tts ok exit=0 id=$($req.id)"
+                    }
                 } finally {
                     $env:AGENTVIBES_TEXT_FILE = $null
                     Remove-Item $tempText -Force -ErrorAction SilentlyContinue
