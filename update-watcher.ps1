@@ -49,6 +49,18 @@ while ($true) {
             if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
 
             if (Test-Path $PlayTts) {
+                # Play remote arrival prefix sound if configured
+                $prefixSoundFile = "$env:USERPROFILE\.agentvibes\remote-prefix-sound.txt"
+                if (Test-Path $prefixSoundFile) {
+                    $prefixSound = (Get-Content $prefixSoundFile -Raw).Trim()
+                    if ($prefixSound -and (Test-Path $prefixSound)) {
+                        $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
+                        if ($ffplay) {
+                            & $ffplay.Source -autoexit -nodisp -loglevel quiet $prefixSound 2>$null
+                        }
+                    }
+                }
+
                 # Full AgentVibes pipeline: piper / SAPI / etc.
                 $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
                 try {

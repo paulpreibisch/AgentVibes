@@ -352,11 +352,13 @@ catch {
     exit 1
 }
 
-# Parse the exact audio file path from provider stdout
+# Resolve the exact audio file path from provider.
+# Write-Host is not captured by 2>&1 in PS5.1, so we rely on Write-Output (bare .wav path).
 $AudioFilePath = ""
 foreach ($line in $providerOutput) {
-    if ($line -match '^\[OUTPUT\] Processed audio: (.+)$') {
-        $AudioFilePath = $Matches[1].Trim()
+    $lineStr = "$line".Trim()
+    if ($lineStr -match '^.+\.wav$' -and (Test-Path $lineStr)) {
+        $AudioFilePath = $lineStr
         break
     }
 }
@@ -489,11 +491,9 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     }
 } else {
     $env:AGENTVIBES_NO_PLAY = $null
-    # No bg music or reverb — play the synthesized file directly
+    # Play only when provider delegated playback via Write-Output (e.g. Piper).
+    # SAPI plays audio inline itself and emits no path — skip to avoid double-play.
     if ($AudioFilePath -and (Test-Path $AudioFilePath)) {
         Invoke-AudioPlay $AudioFilePath
-    } else {
-        Write-Host "[ERROR] No audio file to play (path: '$AudioFilePath')" -ForegroundColor Red
-        exit 1
     }
 }

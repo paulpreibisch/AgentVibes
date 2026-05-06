@@ -257,6 +257,8 @@ try {
     # This allows play-tts.ps1 to apply additional post-processing (reverb, background music)
     # DO NOT play here - let play-tts.ps1 coordinate all audio playback
     Write-Host "[OUTPUT] Processed audio: $ProcessedFile" -ForegroundColor Gray
+    # Emit via output stream (captured by 2>&1 in parent) for reliable path handoff
+    Write-Output $ProcessedFile
 }
 catch {
     Write-Host "[ERROR] Error running Piper: $_" -ForegroundColor Red
