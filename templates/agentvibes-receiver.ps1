@@ -18,13 +18,13 @@ param(
     [string]$EncodedPayload = ""
 )
 
-# Paths — __OWNER_HOME__ is replaced at install time by setup-ssh-receiver.ps1
+# Paths - __OWNER_HOME__ is replaced at install time by setup-ssh-receiver.ps1
 # with the installing user's home directory (e.g. C:\Users\Paul).
 # This is necessary because sshd runs the ForceCommand as the SSH user
 # (e.g. agentvibes-receiver), whose $env:USERPROFILE is a different directory.
 $OwnerHome = "__OWNER_HOME__"
 if ($OwnerHome -eq "__OWNER_HOME__") {
-    Write-Output "Error: Receiver not installed properly — run setup-ssh-receiver.ps1"
+    Write-Output "Error: Receiver not installed properly - run setup-ssh-receiver.ps1"
     exit 1
 }
 $AgentVibesDir = "$OwnerHome\.agentvibes"
@@ -135,7 +135,7 @@ if ($Provider -notin @("piper", "soprano", "windows-sapi", "windows-piper", "mac
     $Provider = "piper"
 }
 
-# Validate LLM name — only safe identifier chars (mirrors play-tts.ps1 check)
+# Validate LLM name - only safe identifier chars (mirrors play-tts.ps1 check)
 if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
     $Llm = "default"
 }
@@ -176,7 +176,7 @@ if ($Speed -and $Speed -match '^\d+\.?\d*$') {
 #
 # CRITICAL: SSH receiver runs in Windows session 0 (sshd service), which has
 # NO access to audio devices.  Calling play-tts.ps1 directly here would run
-# silently — synthesis succeeds, but PlaySync writes to a null audio sink.
+# silently - synthesis succeeds, but PlaySync writes to a null audio sink.
 #
 # Instead, write a JSON request to ~/.agentvibes/tts-queue/.  The watcher
 # (tts-watcher.ps1, started by start-watcher.vbs in the user session via the

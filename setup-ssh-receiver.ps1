@@ -76,13 +76,13 @@ $userExists = Get-LocalUser -Name $ReceiverUser -ErrorAction SilentlyContinue
 if ($userExists) {
     # Read+Execute on .agentvibes
     icacls "$agentvibesDir" /grant "${ReceiverUser}:(OI)(CI)RX" /T /Q 2>$null
-    # Modify on tts-queue (receiver writes request files) — create if absent
+    # Modify on tts-queue (receiver writes request files) - create if absent
     $queueDir = "$agentvibesDir\tts-queue"
     if (-not (Test-Path $queueDir)) {
         New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
     }
     icacls "$queueDir" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
-    # Modify on receiver.log — touch if absent so icacls can target it
+    # Modify on receiver.log - touch if absent so icacls can target it
     $logFile = "$agentvibesDir\receiver.log"
     if (-not (Test-Path $logFile)) {
         New-Item -ItemType File -Path $logFile -Force | Out-Null
@@ -204,7 +204,7 @@ while ($true) {
                         if ($req.llm -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
                             $llmArg = @('-llm', $req.llm)
                         } else {
-                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' — using default"
+                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
                         }
                     }
                     Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice) llm=$($req.llm)"
@@ -220,7 +220,7 @@ while ($true) {
                 }
             } else {
                 # Fallback: Windows SAPI (built-in, no installation required)
-                Write-WatcherLog "WARN" "play-tts.ps1 not found — using SAPI fallback for id=$($req.id)"
+                Write-WatcherLog "WARN" "play-tts.ps1 not found - using SAPI fallback for id=$($req.id)"
                 Add-Type -AssemblyName System.Speech
                 $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
                 $synth.Speak($req.text)
@@ -250,7 +250,7 @@ Set-Content -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Value $vbsLa
 $startupDir = [Environment]::GetFolderPath('Startup')
 Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Destination "$startupDir\agentvibes-watcher.vbs" -Force
 
-# Kill any existing watcher instances before launching — prevents double-playback
+# Kill any existing watcher instances before launching - prevents double-playback
 # if setup is run more than once (each run would otherwise add another watcher process).
 $existingWatchers = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher.ps1*" }
 if ($existingWatchers) {
