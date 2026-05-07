@@ -249,7 +249,10 @@ if ($_LlmVoice -and -not $VoiceOverride) {
 # Prepend the configured pretext (e.g. "Agent Vibes Here") to the speech
 # text.  Guard against double-prefixing on re-entrant or looped calls by
 # checking whether the text already starts with the pretext string.
-if ($_LlmPretext -and -not $Text.StartsWith($_LlmPretext)) {
+# Skip when AGENTVIBES_NO_PRETEXT=1 — the watcher sets this so that the
+# Linux-side pretext (already embedded in the text by the SSH receiver)
+# is not overwritten by the Windows audio-effects.cfg default pretext.
+if ($_LlmPretext -and -not $Text.StartsWith($_LlmPretext) -and $env:AGENTVIBES_NO_PRETEXT -ne "1") {
     $Text = "$_LlmPretext, $Text"
 }
 
