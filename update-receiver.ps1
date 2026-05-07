@@ -22,13 +22,21 @@ if (-not (Test-Path $ReceiverSrc)) {
 
 # Stamp the owner home so sshd's ForceCommand (running as agentvibes-receiver
 # user in a different home directory) can still find the right config paths.
-$content = Get-Content $ReceiverSrc -Raw
-$content = $content -replace '__OWNER_HOME__', $env:USERPROFILE
+# Use explicit UTF-8 read + literal .Replace() (not -replace regex) so that
+# backslashes in the Windows path are never treated as escape sequences.
+$content = [System.IO.File]::ReadAllText($ReceiverSrc, [System.Text.Encoding]::UTF8)
+$content = $content.Replace('__OWNER_HOME__', $env:USERPROFILE)
+
+Write-Host "  Owner home: $env:USERPROFILE" -ForegroundColor Gray
+if ($content -like '*__OWNER_HOME__*') {
+    Write-Host "  ERROR: __OWNER_HOME__ placeholder was not replaced!" -ForegroundColor Red
+    exit 1
+}
 
 if (-not (Test-Path $AgentVibesDir)) {
     New-Item -ItemType Directory -Path $AgentVibesDir -Force | Out-Null
 }
-Set-Content -Path $ReceiverDest -Value $content -Encoding UTF8
+[System.IO.File]::WriteAllText($ReceiverDest, $content, [System.Text.UTF8Encoding]::new($false))
 Write-Host "  Receiver updated: $ReceiverDest" -ForegroundColor Green
 
 Write-Host "`nDone. The next SSH payload will use the updated receiver." -ForegroundColor Cyan
