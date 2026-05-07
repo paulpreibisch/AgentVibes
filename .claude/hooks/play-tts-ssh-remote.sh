@@ -72,6 +72,32 @@ if [[ -z "$SSH_HOST" ]]; then
   fi
 fi
 
+# Priority 2b: fallback to first mode=remote entry in transport-config.json
+# (config keyed by LLM name rather than 'ssh-remote', e.g. 'claude-code')
+if [[ -z "$SSH_HOST" ]]; then
+  _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
+  if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
+    _remote_data=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open('$_TRANSPORT_CFG'))
+    for v in d.values():
+        if isinstance(v, dict) and v.get('mode') == 'remote' and v.get('host',''):
+            print(v.get('host',''))
+            print(v.get('sshKey',''))
+            print(v.get('port',''))
+            sys.exit(0)
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+    if [[ -n "$_remote_data" ]]; then
+      SSH_HOST=$(echo "$_remote_data" | sed -n '1p')
+      SSH_KEY=$(echo  "$_remote_data" | sed -n '2p')
+      SSH_PORT=$(echo "$_remote_data" | sed -n '3p')
+    fi
+  fi
+fi
+
 # Priority 3: legacy host file
 if [[ -z "$SSH_HOST" ]]; then
   SSH_HOST=$(cat "$PROJECT_ROOT/.claude/ssh-remote-host.txt" 2>/dev/null || \
