@@ -71,7 +71,7 @@ while ($true) {
                         if ($req.llm -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
                             $llmArg = @('-llm', $req.llm)
                         } else {
-                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' — using default"
+                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
                         }
                     }
                     Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice) llm=$($req.llm)"
@@ -116,7 +116,7 @@ if (Test-Path $vbs) {
     Start-Process wscript.exe -ArgumentList $vbs -WindowStyle Hidden
     Write-Host "  Watcher started via start-watcher.vbs" -ForegroundColor Green
 } else {
-    # No VBS launcher yet — start directly (visible window for debugging)
+    # No VBS launcher yet - start directly (visible window for debugging)
     Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$watcherPath`"" -WindowStyle Hidden
     Write-Host "  Watcher started directly (no VBS launcher found)" -ForegroundColor Yellow
 }
