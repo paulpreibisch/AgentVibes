@@ -16,7 +16,7 @@ $ReceiverDest  = "$AgentVibesDir\play-remote.ps1"
 $ReceiverSrc   = Join-Path $PSScriptRoot "templates\agentvibes-receiver.ps1"
 
 if (-not (Test-Path $ReceiverSrc)) {
-    Write-Host "  ERROR: $ReceiverSrc not found — run from the AgentVibes repo root" -ForegroundColor Red
+    Write-Host "  ERROR: $ReceiverSrc not found - run from the AgentVibes repo root" -ForegroundColor Red
     exit 1
 }
 
