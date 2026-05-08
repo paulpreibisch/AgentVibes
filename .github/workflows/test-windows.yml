@@ -1,0 +1,277 @@
+name: Windows Test Suite
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  test-windows:
+    name: Windows / Node ${{ matrix.node-version }}
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['18', '20', '22']
+
+    # Use Git bash for all steps so globs expand and Unix commands work
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: System information
+        run: |
+          echo "=== Node ==="
+          node --version
+          echo "=== npm ==="
+          npm --version
+          echo "=== Bash ==="
+          bash --version | head -1
+          echo "=== PowerShell ==="
+          powershell -NoProfile -Command "Write-Host $PSVersionTable.PSVersion.ToString()"
+          echo "=== ffmpeg (pre-installed) ==="
+          ffmpeg -version 2>&1 | head -1 || echo "ffmpeg not found"
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      # Fix #1: Add sox to GITHUB_PATH so all subsequent steps see it without manual PATH hacks
+      - name: Install sox via Chocolatey
+        shell: powershell
+        run: |
+          choco install sox.portable -y --no-progress
+          # Propagate sox location to subsequent steps via GITHUB_PATH
+          $soxDir = "C:\ProgramData\chocolatey\bin"
+          if (Test-Path "$soxDir\sox.exe") {
+            Write-Host "Adding $soxDir to GITHUB_PATH"
+            "$soxDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            # Fallback: search choco lib for sox tools directory
+            $soxExe = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Recurse -Filter "sox.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($soxExe) {
+              $soxExe.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              Write-Host "Found sox at $($soxExe.FullName)"
+            } else {
+              Write-Warning "sox.exe not found after choco install"
+            }
+          }
+
+      - name: Install BATS
+        run: npm install -g bats
+
+      # ─── JavaScript / Node.js tests ──────────────────────────────────────
+
+      - name: Validate JS syntax
+        run: npm run test:syntax
+
+      - name: Run Node.js unit tests
+        env:
+          ELEVENLABS_API_KEY: test_mock_key
+          AGENTVIBES_TEST_MODE: "true"
+        # Run directly (not via npm) so Git bash expands the glob
+        run: node --test test/unit/*.test.js
+
+      # Fix #12: Use npx c8 instead of ./node_modules/.bin/c8 (fragile on Windows)
+      - name: Run Node.js coverage report
+        env:
+          ELEVENLABS_API_KEY: test_mock_key
+          AGENTVIBES_TEST_MODE: "true"
+        run: npx c8 --reporter=lcov --reporter=text node --test test/unit/*.test.js
+
+      # ─── BATS integration tests via Git bash ─────────────────────────────
+
+      - name: Run BATS integration tests
+        env:
+          ELEVENLABS_API_KEY: test_mock_key
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          echo "sox: $(sox --version 2>&1 | head -1 || echo 'not found')"
+          echo "ffmpeg: $(ffmpeg -version 2>&1 | head -1 || echo 'not found')"
+          AGENTVIBES_TEST_MODE=true bats test/unit/*.bats
+
+      # ─── PowerShell syntax validation ────────────────────────────────────
+
+      - name: Validate PowerShell hooks syntax
+        shell: powershell
+        run: |
+          $failed = $false
+          $searchPaths = @(
+            '.claude\hooks-windows',
+            'scripts',
+            '.'
+          )
+          $scripts = $searchPaths | ForEach-Object {
+            Get-ChildItem -Path $_ -Filter '*.ps1' -ErrorAction SilentlyContinue
+          }
+
+          Write-Host "Checking $($scripts.Count) PowerShell script(s)..."
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile(
+              $script.FullName, [ref]$tokens, [ref]$parseErrors
+            )
+            if ($parseErrors.Count -gt 0) {
+              Write-Host "❌ $($script.Name)"
+              $parseErrors | ForEach-Object { Write-Host "   Line $($_.Extent.StartLineNumber): $_" }
+              $failed = $true
+            } else {
+              Write-Host "✅ $($script.Name)"
+            }
+          }
+
+          if ($failed) {
+            Write-Error "One or more PowerShell scripts have syntax errors."
+            exit 1
+          }
+
+      # ─── Windows SAPI TTS smoke test ─────────────────────────────────────
+
+      # Fix #5: SpMemoryStream.GetData() returns raw PCM (no WAV header). Raise threshold accordingly.
+      - name: Windows SAPI TTS smoke test
+        shell: powershell
+        run: |
+          $sapi = New-Object -ComObject SAPI.SpVoice
+          $stream = New-Object -ComObject SAPI.SpMemoryStream
+          $sapi.AudioOutputStream = $stream
+          $sapi.Speak("AgentVibes Windows test", 0)
+          $data = $stream.GetData()
+
+          # SpMemoryStream returns raw PCM samples (no WAV header).
+          # A single spoken word at SAPI default rate (22kHz/16-bit) produces ~10,000+ bytes.
+          if ($data.Length -gt 1000) {
+            Write-Host "✅ SAPI synthesized $($data.Length) bytes of raw PCM audio"
+          } else {
+            Write-Error "❌ SAPI produced insufficient audio ($($data.Length) bytes — expected >1000)"
+            exit 1
+          }
+
+      - name: List available Windows SAPI voices
+        shell: powershell
+        run: |
+          $sapi = New-Object -ComObject SAPI.SpVoice
+          $voices = $sapi.GetVoices()
+          Write-Host "Found $($voices.Count) Windows SAPI voice(s):"
+          for ($i = 0; $i -lt $voices.Count; $i++) {
+            Write-Host "  [$i] $($voices.Item($i).GetDescription())"
+          }
+
+      - name: Test play-tts-sapi.ps1 can synthesize to file
+        shell: powershell
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          $outFile = "$env:TEMP\agentvibes-ci-test.wav"
+          $sapi = New-Object -ComObject SAPI.SpVoice
+          $stream = New-Object -ComObject SAPI.SpFileStream
+          # SpeechStreamFileMode enum value 3 = SSFMCreateForWrite (create file for writing)
+          # Using numeric literal because SpeechLib interop type is not always registered
+          $stream.Open($outFile, 3, $false)
+          $sapi.AudioOutputStream = $stream
+          $sapi.Speak("CI test", 0)
+          $stream.Close()
+
+          if ((Test-Path $outFile) -and (Get-Item $outFile).Length -gt 44) {
+            Write-Host "✅ play-tts-sapi produced $('{0:N0}' -f (Get-Item $outFile).Length) bytes"
+            Remove-Item $outFile -Force
+          } else {
+            Write-Error "❌ SAPI file output failed or empty"
+            exit 1
+          }
+
+      # ─── Windows hooks integration ────────────────────────────────────────
+
+      # Fix #9: Assert voice-manager output is non-empty (not just "completed")
+      - name: Test voice-manager-windows.ps1 list operation
+        shell: powershell
+        run: |
+          $script = ".claude\hooks-windows\voice-manager-windows.ps1"
+          if (-not (Test-Path $script)) {
+            Write-Error "voice-manager-windows.ps1 not found"
+            exit 1
+          }
+          $result = & powershell -NoProfile -ExecutionPolicy Bypass `
+            -File (Resolve-Path $script).Path list 2>&1
+          Write-Host "Output: $result"
+          $resultStr = $result | Out-String
+          if ([string]::IsNullOrWhiteSpace($resultStr)) {
+            Write-Error "voice-manager-windows.ps1 list returned empty output"
+            exit 1
+          }
+          Write-Host "✅ voice-manager-windows.ps1 list returned $($resultStr.Trim().Split("`n").Count) line(s)"
+
+      - name: Test effects-manager.ps1 get-reverb
+        shell: powershell
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          $script = ".claude\hooks-windows\effects-manager.ps1"
+          if (-not (Test-Path $script)) {
+            Write-Host "⚠️  effects-manager.ps1 not found — skipping"
+            exit 0
+          }
+          $result = & powershell -NoProfile -ExecutionPolicy Bypass `
+            -File (Resolve-Path $script).Path get-reverb 2>&1
+          Write-Host "Output: $result"
+          Write-Host "✅ effects-manager.ps1 get-reverb completed (exit: $LASTEXITCODE)"
+
+      - name: Test provider-manager.ps1 get
+        shell: powershell
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+        run: |
+          $script = ".claude\hooks-windows\provider-manager.ps1"
+          if (-not (Test-Path $script)) {
+            Write-Host "⚠️  provider-manager.ps1 not found — skipping"
+            exit 0
+          }
+          $result = & powershell -NoProfile -ExecutionPolicy Bypass `
+            -File (Resolve-Path $script).Path get 2>&1
+          Write-Host "Output: $result"
+          Write-Host "✅ provider-manager.ps1 get completed (exit: $LASTEXITCODE)"
+
+      # ─── Installer smoke test ─────────────────────────────────────────────
+
+      # Fix #10: Removed || true — real errors must not be silenced
+      - name: Installer smoke test (--help)
+        run: node src/installer.js --help
+
+      - name: MCP server syntax check
+        run: node -c mcp-server/install-deps.js
+
+      # ─── Summary ──────────────────────────────────────────────────────────
+
+      - name: Report test results
+        if: always()
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════╗"
+          echo "║         Windows Test Suite - Summary               ║"
+          echo "╚════════════════════════════════════════════════════╝"
+          echo "  OS: windows-latest"
+          echo "  Node: $(node --version)"
+          echo "  npm: $(npm --version)"
+          echo ""
+
+      # Fix #4: Use runner.temp (native Windows path) instead of /tmp for artifact collection
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-logs-node-${{ matrix.node-version }}
+          path: |
+            coverage/
+            ${{ runner.temp }}/agentvibes-*.log
+          retention-days: 7

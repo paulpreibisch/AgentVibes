@@ -6,7 +6,46 @@ on:
       - 'v*.*.*'  # Triggers on version tags like v1.0.2, v2.1.0, etc.
 
 jobs:
+  test:
+    name: Run tests before publishing (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        node-version: ['18', '20']
+
+    steps:
+      # Fix #14: Check out the exact tagged commit being published, not hardcoded master
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # Fix #7: Use npm ci for reproducible, locked installs
+      - name: Install dependencies
+        run: npm ci
+
+      # Fix #6: Install bats via npm (matches project's own usage); apt bats is an older package
+      - name: Install sox, ffmpeg, and BATS
+        run: |
+          sudo apt-get update && sudo apt-get install -y sox ffmpeg
+          npm install -g bats
+
+      - name: Run tests
+        env:
+          ELEVENLABS_API_KEY: test_mock_key
+          AGENTVIBES_TEST_MODE: "true"
+        run: npm test
+
   publish:
+    needs: test
     runs-on: ubuntu-latest
 
     permissions:

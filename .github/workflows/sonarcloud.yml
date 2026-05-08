@@ -32,8 +32,8 @@ jobs:
       - name: Install BATS
         run: sudo npm install -g bats
 
-      - name: Install sox for audio tests
-        run: sudo apt-get update && sudo apt-get install -y sox
+      - name: Install sox and ffmpeg for audio tests
+        run: sudo apt-get update && sudo apt-get install -y sox ffmpeg
 
       - name: Run BATS tests
         run: npm run test:syntax && AGENTVIBES_TEST_MODE=true bats test/unit/*.bats

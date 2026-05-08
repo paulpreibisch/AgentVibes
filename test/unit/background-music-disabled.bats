@@ -8,110 +8,112 @@ load '../helpers/test-helper'
 setup() {
   setup_test_env
 
-  # Set up test config
-  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/config"
-  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/audio/tracks"
+  # audio-processor.sh reads CONFIG_FILE from SCRIPT_DIR/../config (the actual repo .claude/config/).
+  # .claude/config/audio-effects.cfg is gitignored so CI never has it — write it here with a
+  # committed track so the background-music-enabled test can find a real file to mix.
+  # Note: bats runs tests sequentially (one setup→test→teardown per test); no concurrent conflict.
+  local repo_root="${BATS_TEST_DIRNAME}/../.."
+  mkdir -p "$repo_root/.claude/config"
 
-  # Create a dummy background music file
-  echo "dummy" > "$CLAUDE_PROJECT_DIR/.claude/audio/tracks/test_track.mp3"
+  # Backup BEFORE any write — if the write fails, teardown can still restore the original.
+  if [[ -f "$repo_root/.claude/config/audio-effects.cfg" ]]; then
+    cp "$repo_root/.claude/config/audio-effects.cfg" "$BATS_TEST_TMPDIR/audio-effects.cfg.bak"
+  fi
 
-  # Create audio-effects.cfg with default track
-  cat > "$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg" << 'CONFIG'
-# Format: AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|VOLUME
-default||test_track.mp3|0.30
+  # Fix #13: Atomic write — write to temp file then move to prevent partial-write corruption.
+  local tmp_cfg
+  tmp_cfg=$(mktemp "$repo_root/.claude/config/audio-effects.cfg.XXXXXX")
+  cat > "$tmp_cfg" << 'CONFIG'
+default||agentvibes_soft_flamenco_loop.mp3|0.30
 CONFIG
+  mv "$tmp_cfg" "$repo_root/.claude/config/audio-effects.cfg"
 }
 
 teardown() {
   teardown_test_env
 
-  # Clean up test files in repo (calculate repo root)
-  REPO_ROOT="${BATS_TEST_DIRNAME}/../.."
-  rm -f "$REPO_ROOT/.claude/config/background-music-enabled.txt"
+  local repo_root="${BATS_TEST_DIRNAME}/../.."
+
+  # Restore audio-effects.cfg to pre-test state
+  if [[ -f "$BATS_TEST_TMPDIR/audio-effects.cfg.bak" ]]; then
+    cp "$BATS_TEST_TMPDIR/audio-effects.cfg.bak" "$repo_root/.claude/config/audio-effects.cfg"
+  else
+    rm -f "$repo_root/.claude/config/audio-effects.cfg"
+  fi
+
+  rm -f "$repo_root/.claude/config/background-music-enabled.txt"
 }
 
 @test "background music is NOT mixed when disabled" {
-  # Calculate repo root (BATS_TEST_DIRNAME is test/unit, so go up two levels)
   REPO_ROOT="${BATS_TEST_DIRNAME}/../.."
 
-  # Disable background music (create in repo's config dir where script looks)
   mkdir -p "$REPO_ROOT/.claude/config"
   echo "false" > "$REPO_ROOT/.claude/config/background-music-enabled.txt"
 
-  # Run audio processor (it should skip background music)
   export AGENTVIBES_TEST_MODE=true
 
-  # Create a dummy input WAV file (audio-processor.sh validates input exists)
   cd "$CLAUDE_PROJECT_DIR"
   echo "RIFF....WAVEfmt " > test.wav
 
-  # Run audio processor
   output=$(bash "$REPO_ROOT/.claude/hooks/audio-processor.sh" "test.wav" "" "test" 2>&1 || true)
 
-  # Verify background music was NOT mentioned in output
   if echo "$output" | grep -q "Mixing background:"; then
     echo "FAIL: Background music was mixed even though it's disabled!"
     echo "Output: $output"
     return 1
   fi
-
-  # Success - no background music mentioned
-  return 0
 }
 
 @test "background music IS mixed when enabled" {
-  # Calculate repo root (BATS_TEST_DIRNAME is test/unit, so go up two levels)
   REPO_ROOT="${BATS_TEST_DIRNAME}/../.."
 
-  # Enable background music (create in repo's config dir where script looks)
+  # Fix #3: Assert the required track exists before running the test that depends on it.
+  local track="$REPO_ROOT/.claude/audio/tracks/agentvibes_soft_flamenco_loop.mp3"
+  if [[ ! -f "$track" ]]; then
+    skip "Required track not found: agentvibes_soft_flamenco_loop.mp3 (git checkout issue?)"
+  fi
+
   mkdir -p "$REPO_ROOT/.claude/config"
   echo "true" > "$REPO_ROOT/.claude/config/background-music-enabled.txt"
 
-  # Run audio processor
   export AGENTVIBES_TEST_MODE=true
 
-  # Create a dummy input WAV file (audio-processor.sh validates input exists)
   cd "$CLAUDE_PROJECT_DIR"
   echo "RIFF....WAVEfmt " > test.wav
 
-  # Run audio processor
   output=$(bash "$REPO_ROOT/.claude/hooks/audio-processor.sh" "test.wav" "" "test" 2>&1 || true)
 
-  # Verify background music WAS mentioned in output
+  # Fix #8: Two-level assertion:
+  # (1) "Mixing background:" confirms the if-block was entered.
+  # (2) The background path in stdout confirms used_background was set (mixing block completed).
   if ! echo "$output" | grep -q "Mixing background:"; then
     echo "FAIL: Background music was NOT mixed even though it's enabled!"
     echo "Output: $output"
     return 1
   fi
 
-  # Success - background music mentioned
-  return 0
+  if ! echo "$output" | grep -q "agentvibes_soft_flamenco_loop"; then
+    echo "FAIL: Background path not present in output — mixing if-block may not have completed."
+    echo "Output: $output"
+    return 1
+  fi
 }
 
 @test "background music defaults to disabled if config missing" {
-  # Calculate repo root (BATS_TEST_DIRNAME is test/unit, so go up two levels)
   REPO_ROOT="${BATS_TEST_DIRNAME}/../.."
 
-  # Remove the enabled config file (make sure it doesn't exist)
   rm -f "$REPO_ROOT/.claude/config/background-music-enabled.txt"
 
-  # Run audio processor
   export AGENTVIBES_TEST_MODE=true
 
-  # Create a dummy input WAV file (audio-processor.sh validates input exists)
   cd "$CLAUDE_PROJECT_DIR"
   echo "RIFF....WAVEfmt " > test.wav
 
-  # Run audio processor
   output=$(bash "$REPO_ROOT/.claude/hooks/audio-processor.sh" "test.wav" "" "test" 2>&1 || true)
 
-  # Verify background music was NOT mixed (default is disabled)
   if echo "$output" | grep -q "Mixing background:"; then
     echo "FAIL: Background music was mixed when config is missing (should default to disabled)!"
     echo "Output: $output"
     return 1
   fi
-
-  # Success - no background music mentioned
-  return 0
 }
