@@ -89,11 +89,22 @@ if (-not (Test-Path $ProviderScript)) {
     exit 1
 }
 
-# Check if background music is enabled
+# Check if background music is enabled.
+# Search order: CLAUDE_PROJECT_DIR (set by TUI preview) → package config dir.
+# This mirrors audio-processor.sh behaviour on Linux so preview writes to the
+# project dir and play-tts.ps1 still finds the flag regardless of where the
+# package is installed (global, npm link, etc.).
 $ConfigDir = "$ClaudeDir\config"
 $BgEnabled = $false
 $BgEnabledFile = "$ConfigDir\background-music-enabled.txt"
-if (Test-Path $BgEnabledFile) {
+if ($env:CLAUDE_PROJECT_DIR) {
+    $_projBgFile = Join-Path $env:CLAUDE_PROJECT_DIR ".claude\config\background-music-enabled.txt"
+    if (Test-Path $_projBgFile) {
+        $BgEnabled = (Get-Content $_projBgFile -Raw).Trim() -eq "true"
+    } elseif (Test-Path $BgEnabledFile) {
+        $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
+    }
+} elseif (Test-Path $BgEnabledFile) {
     $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
 }
 
@@ -203,10 +214,16 @@ $_LlmBgFile   = ""
 $_LlmBgVol    = ""
 $_LlmKey      = "llm:$llm"
 
-$_AudioEffectsCfgPaths = @(
-    (Join-Path $ClaudeDir "config\audio-effects.cfg"),
-    (Join-Path $env:USERPROFILE ".claude\config\audio-effects.cfg")
-)
+# Search order: CLAUDE_PROJECT_DIR → package config → user profile.
+# CLAUDE_PROJECT_DIR is set by the TUI preview (targetDir) and by Claude Code
+# hooks (the project being coded in), so per-LLM config written there is found
+# even in npm link / global install setups where the package dir is elsewhere.
+$_AudioEffectsCfgPaths = [System.Collections.Generic.List[string]]::new()
+if ($env:CLAUDE_PROJECT_DIR) {
+    $_AudioEffectsCfgPaths.Add((Join-Path $env:CLAUDE_PROJECT_DIR ".claude\config\audio-effects.cfg"))
+}
+$_AudioEffectsCfgPaths.Add((Join-Path $ClaudeDir "config\audio-effects.cfg"))
+$_AudioEffectsCfgPaths.Add((Join-Path $env:USERPROFILE ".claude\config\audio-effects.cfg"))
 
 $_LlmFound = $false
 :llmCfgSearch foreach ($_cfgFile in $_AudioEffectsCfgPaths) {
