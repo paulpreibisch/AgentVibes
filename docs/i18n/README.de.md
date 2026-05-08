@@ -4,7 +4,13 @@
 
 ---
 
-## 🌟 NEU IN v5.6.4 — Kritische Sicherheitskorrektur bei der Deinstallation
+## 🌟 NEU IN v5.6.6 — Vorschau-Schaltfläche funktioniert in WSL + Umfassende Windows-Testsuite
+
+**Die Vorschau-Schaltfläche in der LLM-Audiokonfiguration funktioniert jetzt korrekt in WSL.** Wenn du Stimme, Hall und Hintergrundtrack für jedes LLM konfigurierst, spielt ein Klick auf Vorschau nun dein vollständiges Audio-Setup ab — Stimme, Musik und Effekte — genau so, wie es während einer echten Sitzung klingt. Zuvor wurde die Hintergrundmusik bei `npm link`- und globalen Installationen lautlos weggelassen.
+
+Eine **umfassende Windows-Testsuite** wurde zur CI hinzugefügt und läuft parallel zur bestehenden Linux-BATS-Suite. Windows-spezifische Audiopfade werden nun bei jedem Push überprüft — Regressionen können nicht mehr lautlos durchrutschen.
+
+## v5.6.4 — Kritische Sicherheitskorrektur bei der Deinstallation
 
 `uninstall --global` hat dein gesamtes `~/.claude/`-Verzeichnis gelöscht — Einstellungen, CLAUDE.md, Skills, MCP-Konfigurationen, alles. Behoben: AgentVibes führt jetzt eine chirurgische Entfernung durch und berührt nur die Dateien, die es selbst erstellt hat. Ein Regressionstest in CI erzwingt dies ab sofort — wenn das Problem jemals zurückkehrt, schlägt der Build fehl, bevor er veröffentlicht wird.
 

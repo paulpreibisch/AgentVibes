@@ -4,6 +4,12 @@
 
 ---
 
+## 🌟 NOVITÀ IN v5.6.6 — Il Pulsante Anteprima Funziona in WSL + Suite di Test Windows Completa
+
+**Il pulsante Anteprima nella configurazione audio LLM ora funziona correttamente in WSL.** Quando si configura una voce, un riverbero e una traccia di sottofondo per ogni LLM, cliccando Anteprima si riproduce l'intera configurazione audio — voce, musica ed effetti — esattamente come suonerà durante una sessione reale. In precedenza, la musica di sottofondo veniva silenziosamente eliminata nelle installazioni tramite `npm link` e globali.
+
+È stata aggiunta alla CI una **suite di test Windows completa**, eseguita in parallelo con la suite Linux BATS esistente. I percorsi audio specifici di Windows vengono ora verificati ad ogni push — le regressioni non possono più passare inosservate.
+
 ## 🌟 NOVITÀ IN v5.6.4 — Correzione Critica di Sicurezza della Disinstallazione
 
 `uninstall --global` stava eliminando l'intera directory `~/.claude/` — impostazioni, CLAUDE.md, skill, configurazioni MCP, tutto. Risolto: AgentVibes esegue ora una rimozione chirurgica, toccando solo i file che ha creato. Un test di regressione in CI impone questo vincolo d'ora in poi — se il problema regredisce, il build fallisce prima della pubblicazione.

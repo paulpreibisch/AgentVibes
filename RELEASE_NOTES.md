@@ -1,6 +1,6 @@
 # AgentVibes Release Notes
 
-## 🔇→🎵 v5.6.6 — Background Music Preview Fixed for npm link & Global Installs
+## 🎵 v5.6.6 — Preview Button Works in WSL + Comprehensive Windows Test Suite
 
 **Released:** 2026-05-08
 

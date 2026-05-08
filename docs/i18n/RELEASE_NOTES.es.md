@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — Vista Previa de Música de Fondo Corregida para npm link e Instalaciones Globales
+
+**Lanzamiento:** 2026-05-08
+
+### 🐛 Música de Fondo Silenciosamente Ausente en la Vista Previa (npm link / Instalación Global)
+
+Cuando hacías clic en **Vista Previa** en el modal de configuración de LLM con una pista de fondo definida, solo escuchabas la voz — sin música — salvo que AgentVibes estuviera instalado como dependencia local. Corregido independientemente de cómo instales AgentVibes.
+
+**Causa raíz:** En configuraciones con `npm link` e instalación global, un script de sincronización que usaba `rsync --delete` borraba periódicamente `background-music-enabled.txt` del directorio del paquete porque el archivo está en el gitignore. Tras la eliminación, `audio-processor.sh` recurría a una configuración global con la música desactivada — silencio.
+
+**Corrección:** `audio-processor.sh` ahora comprueba `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt` **primero**. La Vista Previa de la TUI también escribe el indicador en el directorio del proyecto (no en el directorio del paquete), para que sobreviva a cualquier sincronización del directorio del paquete.
+
+### 🐛 Configuración por LLM No Encontrada en npm link / Instalaciones Globales
+
+En las mismas configuraciones, `audio-processor.sh` no encontraba la configuración de audio por LLM (voz, reverb, pista de fondo) cuando tu proyecto no era el propio paquete AgentVibes.
+
+**Corrección:** El script ahora busca en `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg` antes de recurrir a la configuración del paquete.
+
+### 🐛 Pista de Fondo "No Encontrada" Tras una Configuración Correcta
+
+Cuando una pista de fondo estaba configurada pero AgentVibes estaba instalado globalmente o vía `npm link`, no se encontraba el archivo de pista — solo se buscaba en el directorio del paquete.
+
+**Corrección:** `audio-processor.sh` ahora también busca en `CLAUDE_PROJECT_DIR/.claude/audio/tracks/` cuando la pista no está en el directorio del paquete.
+
+### 🐛 Análisis de Filas de Configuración LLM — Volumen Absorbiendo Columnas Extra
+
+Con una fila LLM completa de 7 columnas (el formato que escribe la TUI), el campo de volumen absorbía todas las columnas finales. ffmpeg recibía una cadena de volumen malformada y silenciosamente recurría a audio solo de voz.
+
+**Corrección:** El analizador ahora captura únicamente el campo de volumen numérico, dejando las columnas extra en `_rest`.
+
+### 🧪 Suite de Pruebas de CI para Windows
+
+Las pruebas nativas de Windows ahora se ejecutan en CI junto con la suite BATS de Linux, bloqueando la publicación para que las rutas específicas de Windows no puedan regresar silenciosamente.
+
+---
+
 ## 🛡️ v5.6.4 — Corrección Crítica de Seguridad en la Desinstalación
 
 **Lanzamiento:** 2026-05-08

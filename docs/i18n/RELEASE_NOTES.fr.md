@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — Prévisualisation de la Musique de Fond Corrigée pour npm link & Installations Globales
+
+**Sortie :** 2026-05-08
+
+### 🐛 Musique de Fond Silencieusement Absente de la Prévisualisation (npm link / Installation Globale)
+
+Lorsque vous cliquiez sur **Prévisualiser** dans le modal de configuration LLM avec une piste de fond définie, vous n'entendiez que la voix — sans musique — sauf si AgentVibes était installé comme dépendance locale. Corrigé quelle que soit la façon dont vous installez AgentVibes.
+
+**Cause racine :** Dans les configurations avec `npm link` et installation globale, un script de synchronisation utilisant `rsync --delete` effaçait périodiquement `background-music-enabled.txt` du répertoire du package car le fichier est gitignored. Après suppression, `audio-processor.sh` se rabattait sur une configuration globale avec la musique désactivée — silence.
+
+**Correction :** `audio-processor.sh` vérifie désormais `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt` **en premier**. La Prévisualisation de la TUI écrit également le drapeau dans le répertoire du projet (pas le répertoire du package), afin qu'il survive à toute synchronisation du répertoire du package.
+
+### 🐛 Configuration par LLM Introuvable dans npm link / Installations Globales
+
+Dans les mêmes configurations, `audio-processor.sh` ne trouvait pas la configuration audio par LLM (voix, réverbération, piste de fond) lorsque votre projet n'était pas le package AgentVibes lui-même.
+
+**Correction :** Le script recherche désormais dans `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg` avant de se rabattre sur la configuration du package.
+
+### 🐛 Piste de Fond "Introuvable" Après une Configuration Correcte
+
+Lorsqu'une piste de fond était configurée mais qu'AgentVibes était installé globalement ou via `npm link`, le fichier de piste était introuvable — seul le répertoire du package était fouillé.
+
+**Correction :** `audio-processor.sh` recherche également dans `CLAUDE_PROJECT_DIR/.claude/audio/tracks/` lorsque la piste n'est pas dans le répertoire du package.
+
+### 🐛 Analyse des Lignes de Config LLM — Le Volume Absorbant les Colonnes Supplémentaires
+
+Avec une ligne LLM complète à 7 colonnes (le format qu'écrit la TUI), le champ de volume absorbait toutes les colonnes finales. ffmpeg recevait une chaîne de volume malformée et se rabattait silencieusement sur l'audio voix uniquement.
+
+**Correction :** L'analyseur capture désormais uniquement le champ de volume numérique, laissant les colonnes supplémentaires dans `_rest`.
+
+### 🧪 Suite de Tests CI pour Windows
+
+Les tests natifs Windows s'exécutent désormais en CI aux côtés de la suite BATS Linux, bloquant la publication afin que les chemins spécifiques à Windows ne puissent pas régresser silencieusement.
+
+---
+
 ## 🛡️ v5.6.4 — Correction Critique de Sécurité de la Désinstallation
 
 **Sortie :** 2026-05-08

@@ -4,7 +4,13 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.6.4 — Correction Critique de Sécurité de la Désinstallation
+## 🌟 NOUVEAU DANS v5.6.6 — Le Bouton Aperçu Fonctionne dans WSL + Suite de Tests Windows Complète
+
+**Le bouton Aperçu dans la configuration audio LLM fonctionne désormais correctement dans WSL.** Lors de la configuration d'une voix, d'une réverbération et d'une piste de fond pour chaque LLM, cliquer sur Aperçu joue maintenant votre configuration audio complète — voix, musique et effets — exactement comme elle sonnera pendant une session réelle. Auparavant, la musique de fond était silencieusement abandonnée dans les configurations `npm link` et d'installation globale.
+
+Une **suite de tests Windows complète** a été ajoutée à CI, s'exécutant aux côtés de la suite BATS Linux existante. Les chemins audio spécifiques à Windows sont désormais vérifiés à chaque push — les régressions ne peuvent plus passer silencieusement.
+
+## v5.6.4 — Correction Critique de Sécurité de la Désinstallation
 
 `uninstall --global` supprimait l'intégralité de votre répertoire `~/.claude/` — paramètres, CLAUDE.md, skills, configurations MCP, tout. Corrigé : AgentVibes effectue désormais une suppression chirurgicale, en ne touchant que les fichiers qu'il a lui-même créés. Un test de régression dans CI impose cela désormais — si le problème réapparaît un jour, le build échoue avant la publication.
 

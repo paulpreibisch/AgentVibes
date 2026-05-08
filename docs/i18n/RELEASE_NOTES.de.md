@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — Hintergrundmusik-Vorschau für npm link und globale Installationen repariert
+
+**Veröffentlicht:** 2026-05-08
+
+### 🐛 Hintergrundmusik fehlte lautlos in der Vorschau (npm link / globale Installation)
+
+Wenn du im LLM-Konfigurationsmodal auf **Vorschau** geklickt hast und ein Hintergrundtrack eingestellt war, hörtest du nur die Stimme — keine Musik —, es sei denn, AgentVibes war als lokale Abhängigkeit installiert. Jetzt behoben, unabhängig davon, wie du AgentVibes installierst.
+
+**Grundursache:** Bei `npm link`- und globalen Installationen löschte ein Sync-Skript mit `rsync --delete` regelmäßig `background-music-enabled.txt` aus dem Paketverzeichnis, da die Datei gitignoriert ist. Nach der Löschung fiel `audio-processor.sh` auf eine globale Konfiguration zurück, bei der Musik deaktiviert war — Stille.
+
+**Behebung:** `audio-processor.sh` prüft nun **zuerst** `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt`. Die TUI-Vorschau schreibt das Flag ebenfalls in das Projektverzeichnis (nicht in das Paketverzeichnis), damit es jede Paketsynchronisierung übersteht.
+
+### 🐛 Pro-LLM-Konfiguration bei npm link / globalen Installationen nicht gefunden
+
+Bei denselben Setups konnte `audio-processor.sh` die Pro-LLM-Audiokonfiguration (Stimme, Reverb, Hintergrundtrack) nicht finden, wenn dein Projekt nicht das AgentVibes-Paket selbst war.
+
+**Behebung:** Das Skript sucht nun zuerst in `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg`, bevor es auf die Paketkonfiguration zurückfällt.
+
+### 🐛 Hintergrundtrack „Nicht gefunden" nach korrekter Konfiguration
+
+Wenn ein Hintergrundtrack konfiguriert war, AgentVibes aber global oder via `npm link` installiert wurde, konnte die Trackdatei nicht gefunden werden — nur das Paketverzeichnis wurde durchsucht.
+
+**Behebung:** `audio-processor.sh` durchsucht nun auch `CLAUDE_PROJECT_DIR/.claude/audio/tracks/`, wenn der Track nicht im Paketverzeichnis vorhanden ist.
+
+### 🐛 LLM-Konfigurationszeilen-Parser — Lautstärke saugt zusätzliche Spalten auf
+
+Bei einer vollständigen 7-Spalten-LLM-Zeile (das Format, das die TUI schreibt) absorbierte das Lautstärkefeld alle nachfolgenden Spalten. ffmpeg erhielt einen fehlerhaften Lautstärke-String und fiel still auf reines Sprachaudio zurück.
+
+**Behebung:** Der Parser erfasst nun nur das numerische Lautstärkefeld und lässt zusätzliche Spalten in `_rest`.
+
+### 🧪 Windows-CI-Testsuite
+
+Windows-native Tests laufen nun in CI zusammen mit der Linux-BATS-Suite und blockieren die Veröffentlichung, damit Windows-spezifische Pfade nicht lautlos regressieren können.
+
+---
+
 ## 🛡️ v5.6.4 — Kritische Sicherheitskorrektur bei der Deinstallation
 
 **Veröffentlicht:** 2026-05-08

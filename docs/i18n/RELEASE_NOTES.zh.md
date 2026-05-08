@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — npm link 与全局安装的背景音乐预览已修复
+
+**发布日期：** 2026-05-08
+
+### 🐛 预览时背景音乐无声失败（npm link / 全局安装）
+
+在 LLM 配置模态框中点击**预览**并设置了背景音轨时，您只能听到语音 — 没有音乐 — 除非 AgentVibes 以本地依赖方式安装。无论您以何种方式安装 AgentVibes，此问题均已修复。
+
+**根本原因：** 在 `npm link` 和全局安装方式下，一个使用 `rsync --delete` 的同步脚本会周期性地从软件包目录中删除 `background-music-enabled.txt`，因为该文件被 gitignore 忽略。删除后，`audio-processor.sh` 回退到一个禁用了音乐的全局配置 — 导致无声。
+
+**修复：** `audio-processor.sh` 现在**优先**检查 `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt`。TUI 预览也将该标志写入项目目录（而非软件包目录），使其在任何软件包目录同步后仍能保留。
+
+### 🐛 npm link / 全局安装中找不到每 LLM 配置
+
+在相同的安装方式下，当您的项目不是 AgentVibes 软件包本身时，`audio-processor.sh` 无法找到每 LLM 音频配置（语音、混响、背景音轨）。
+
+**修复：** 脚本现在在回退到软件包配置之前，优先搜索 `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg`。
+
+### 🐛 正确配置后背景音轨"未找到"
+
+当背景音轨已配置但 AgentVibes 以全局或 `npm link` 方式安装时，找不到音轨文件 — 只搜索了软件包目录。
+
+**修复：** `audio-processor.sh` 现在在软件包目录中找不到音轨时，还会搜索 `CLAUDE_PROJECT_DIR/.claude/audio/tracks/`。
+
+### 🐛 LLM 配置行解析 — 音量字段吸收多余列
+
+使用完整 7 列 LLM 行（TUI 写入的格式）时，音量字段会吸收所有尾随列。ffmpeg 收到格式错误的音量字符串，悄悄回退到仅有语音的音频。
+
+**修复：** 解析器现在只捕获数值音量字段，将多余列留在 `_rest` 中。
+
+### 🧪 Windows CI 测试套件
+
+Windows 原生测试现在在 CI 中与 Linux BATS 套件并行运行，在发布前把关，确保 Windows 特定路径不会悄悄回归。
+
+---
+
 ## 🛡️ v5.6.4 — 卸载安全关键修复
 
 **发布日期：** 2026-05-08

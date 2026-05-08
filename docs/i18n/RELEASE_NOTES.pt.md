@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — Pré-visualização de Música de Fundo Corrigida para npm link e Instalações Globais
+
+**Lançamento:** 2026-05-08
+
+### 🐛 Música de Fundo Silenciosamente Ausente da Pré-visualização (npm link / Instalação Global)
+
+Quando você clicava em **Pré-visualização** no modal de configuração do LLM com uma faixa de fundo definida, você ouvia apenas a voz — sem música —, a menos que o AgentVibes estivesse instalado como dependência local. Corrigido independentemente de como você instala o AgentVibes.
+
+**Causa raiz:** Em instalações via `npm link` e globais, um script de sincronização usando `rsync --delete` apagava periodicamente `background-music-enabled.txt` do diretório do pacote porque o arquivo é gitignored. Após a exclusão, `audio-processor.sh` recorria a uma configuração global com a música desativada — silêncio.
+
+**Correção:** `audio-processor.sh` agora verifica **primeiro** `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt`. A pré-visualização da TUI também grava o sinalizador no diretório do projeto (não no diretório do pacote), para que sobreviva a qualquer sincronização do diretório do pacote.
+
+### 🐛 Configuração Por LLM Não Encontrada em npm link / Instalações Globais
+
+Nos mesmos setups, `audio-processor.sh` não conseguia encontrar a configuração de áudio por LLM (voz, reverb, faixa de fundo) quando o seu projeto não era o próprio pacote AgentVibes.
+
+**Correção:** O script agora pesquisa `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg` antes de recorrer à configuração do pacote.
+
+### 🐛 Faixa de Fundo "Não Encontrada" Após Configuração Correta
+
+Quando uma faixa de fundo estava configurada mas o AgentVibes estava instalado globalmente ou via `npm link`, o arquivo da faixa não podia ser encontrado — apenas o diretório do pacote era pesquisado.
+
+**Correção:** `audio-processor.sh` agora também pesquisa `CLAUDE_PROJECT_DIR/.claude/audio/tracks/` quando a faixa não está no diretório do pacote.
+
+### 🐛 Parser de Linha de Configuração LLM — Volume Absorvendo Colunas Extras
+
+Com uma linha LLM completa de 7 colunas (o formato que a TUI grava), o campo de volume absorvia todas as colunas subsequentes. O ffmpeg recebia uma string de volume malformada e recorria silenciosamente ao áudio somente de voz.
+
+**Correção:** O parser agora captura apenas o campo numérico de volume, deixando as colunas extras em `_rest`.
+
+### 🧪 Suite de Testes CI para Windows
+
+Testes nativos do Windows agora são executados no CI junto com a suite BATS do Linux, bloqueando a publicação para que caminhos específicos do Windows não possam regredir silenciosamente.
+
+---
+
 ## 🛡️ v5.6.4 — Correção Crítica de Segurança na Desinstalação
 
 **Lançamento:** 2026-05-08

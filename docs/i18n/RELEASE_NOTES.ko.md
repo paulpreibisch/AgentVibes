@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — npm link 및 글로벌 설치에서 배경 음악 미리 듣기 수정
+
+**릴리스:** 2026-05-08
+
+### 🐛 미리 듣기에서 배경 음악이 조용히 사라짐 (npm link / 글로벌 설치)
+
+배경 트랙이 설정된 상태에서 LLM 구성 모달의 **Preview**를 클릭하면, AgentVibes가 로컬 의존성으로 설치되지 않은 경우 음성만 들리고 음악은 재생되지 않았습니다. 설치 방식과 관계없이 수정되었습니다.
+
+**근본 원인:** `npm link` 및 글로벌 설치 환경에서 `rsync --delete`를 사용하는 동기화 스크립트가 패키지 디렉토리에서 `background-music-enabled.txt`를 주기적으로 삭제했습니다(이 파일은 .gitignore에 포함됨). 삭제 후 `audio-processor.sh`가 음악이 비활성화된 글로벌 설정으로 폴백하여 무음 상태가 되었습니다.
+
+**수정:** `audio-processor.sh`가 이제 `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt`를 **먼저** 확인합니다. TUI Preview도 (패키지 디렉토리가 아닌) 프로젝트 디렉토리에 플래그를 기록하므로, 패키지 디렉토리 동기화 후에도 설정이 유지됩니다.
+
+### 🐛 npm link / 글로벌 설치에서 LLM별 구성을 찾을 수 없음
+
+동일한 환경에서 프로젝트가 AgentVibes 패키지 자체가 아닌 경우, `audio-processor.sh`가 LLM별 오디오 구성(음성, 리버브, 배경 트랙)을 찾을 수 없었습니다.
+
+**수정:** 스크립트가 패키지 구성으로 폴백하기 전에 `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg`를 먼저 검색합니다.
+
+### 🐛 올바르게 구성했음에도 배경 트랙 "찾을 수 없음"
+
+배경 트랙이 구성되어 있어도 AgentVibes가 글로벌 설치 또는 `npm link`를 통해 설치된 경우, 패키지 디렉토리만 검색하여 트랙 파일을 찾을 수 없었습니다.
+
+**수정:** `audio-processor.sh`가 패키지 디렉토리에 트랙이 없을 때 `CLAUDE_PROJECT_DIR/.claude/audio/tracks/`도 검색하도록 변경되었습니다.
+
+### 🐛 LLM 구성 행 파싱 — 볼륨이 여분의 열을 흡수
+
+TUI가 기록하는 형식인 전체 7열 LLM 행에서, 볼륨 필드가 모든 후행 열을 흡수했습니다. ffmpeg가 잘못된 볼륨 문자열을 받아 조용히 음성만 재생되는 오디오로 폴백했습니다.
+
+**수정:** 파서가 숫자 볼륨 필드만 캡처하고 여분의 열은 `_rest`에 남기도록 수정되었습니다.
+
+### 🧪 Windows CI 테스트 스위트
+
+Windows 네이티브 테스트가 이제 Linux BATS 스위트와 나란히 CI에서 실행되어, Windows 특정 경로가 조용히 회귀하지 않도록 퍼블리싱을 게이팅합니다.
+
+---
+
 ## 🛡️ v5.6.4 — 제거 기능의 심각한 보안 수정
 
 **릴리스:** 2026-05-08

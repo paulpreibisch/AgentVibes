@@ -4,7 +4,13 @@
 
 ---
 
-## 🌟 NUEVO EN v5.6.4 — Corrección Crítica de Seguridad en la Desinstalación
+## 🌟 NUEVO EN v5.6.6 — El Botón de Vista Previa Funciona en WSL + Suite de Pruebas Exhaustiva para Windows
+
+**El botón de Vista Previa en la configuración de audio por LLM ahora funciona correctamente en WSL.** Al configurar una voz, reverberación y pista de fondo para cada LLM, hacer clic en Vista Previa reproduce tu configuración de audio completa — voz, música y efectos — exactamente como sonará durante una sesión real. Anteriormente, la música de fondo era descartada silenciosamente en configuraciones con `npm link` e instalación global.
+
+Se ha añadido una **suite de pruebas exhaustiva para Windows** a CI, que se ejecuta junto a la suite BATS de Linux existente. Las rutas de audio específicas de Windows ahora se verifican en cada push — las regresiones ya no pueden colarse silenciosamente.
+
+## v5.6.4 — Corrección Crítica de Seguridad en la Desinstalación
 
 `uninstall --global` estaba eliminando todo tu directorio `~/.claude/` — ajustes, CLAUDE.md, skills, configuraciones MCP, todo. Corregido: AgentVibes ahora realiza una eliminación quirúrgica, tocando únicamente los archivos que él mismo creó. Una prueba de regresión en CI aplica esto de ahora en adelante — si alguna vez regresa el problema, la compilación falla antes de publicarse.
 

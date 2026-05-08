@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇→🎵 v5.6.6 — Anteprima Musica di Sottofondo Corretta per npm link e Installazioni Globali
+
+**Rilascio:** 2026-05-08
+
+### 🐛 Musica di Sottofondo Silenziosamente Assente dall'Anteprima (npm link / Installazione Globale)
+
+Quando cliccavi **Anteprima** nel modale di configurazione LLM con una traccia di sottofondo impostata, sentivi solo la voce — nessuna musica — a meno che AgentVibes non fosse installato come dipendenza locale. Corretto indipendentemente da come installi AgentVibes.
+
+**Causa principale:** Nelle installazioni tramite `npm link` e globali, uno script di sincronizzazione che usa `rsync --delete` cancellava periodicamente `background-music-enabled.txt` dalla directory del pacchetto perché il file è gitignored. Dopo la cancellazione, `audio-processor.sh` tornava a una configurazione globale con la musica disabilitata — silenzio.
+
+**Correzione:** `audio-processor.sh` ora controlla **prima** `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt`. L'anteprima TUI scrive anch'essa il flag nella directory del progetto (non nella directory del pacchetto), così sopravvive a qualsiasi sincronizzazione della directory del pacchetto.
+
+### 🐛 Configurazione Per-LLM Non Trovata in npm link / Installazioni Globali
+
+Nelle stesse installazioni, `audio-processor.sh` non riusciva a trovare la configurazione audio per-LLM (voce, riverbero, traccia di sottofondo) quando il tuo progetto non era il pacchetto AgentVibes stesso.
+
+**Correzione:** Lo script ora cerca `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg` prima di tornare alla configurazione del pacchetto.
+
+### 🐛 Traccia di Sottofondo "Non Trovata" Dopo Configurazione Corretta
+
+Quando una traccia di sottofondo era configurata ma AgentVibes era installato globalmente o tramite `npm link`, il file della traccia non veniva trovato — veniva cercata solo la directory del pacchetto.
+
+**Correzione:** `audio-processor.sh` ora cerca anche in `CLAUDE_PROJECT_DIR/.claude/audio/tracks/` quando la traccia non si trova nella directory del pacchetto.
+
+### 🐛 Parsing delle Righe di Configurazione LLM — Volume che Assorbe Colonne Extra
+
+Con una riga LLM completa a 7 colonne (il formato scritto dalla TUI), il campo del volume assorbiva tutte le colonne finali. ffmpeg riceveva una stringa del volume malformata e tornava silenziosamente all'audio solo voce.
+
+**Correzione:** Il parser cattura ora solo il campo del volume numerico, lasciando le colonne extra in `_rest`.
+
+### 🧪 Suite di Test CI per Windows
+
+I test nativi per Windows ora girano in CI insieme alla suite BATS per Linux, bloccando la pubblicazione in modo che i percorsi specifici di Windows non possano regredire silenziosamente.
+
+---
+
 ## 🛡️ v5.6.4 — Correzione Critica di Sicurezza della Disinstallazione
 
 **Rilascio:** 2026-05-08

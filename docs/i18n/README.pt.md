@@ -4,6 +4,12 @@
 
 ---
 
+## 🌟 NOVO NO v5.6.6 — Botão de Pré-visualização Funciona no WSL + Suite de Testes Windows Abrangente
+
+**O botão de Pré-visualização na configuração de áudio do LLM agora funciona corretamente no WSL.** Ao configurar uma voz, reverb e faixa de fundo para cada LLM, clicar em Pré-visualização agora reproduz toda a sua configuração de áudio — voz, música e efeitos — exatamente como soará durante uma sessão real. Anteriormente, a música de fundo era silenciosamente descartada em configurações via `npm link` e instalações globais.
+
+Uma **suite de testes Windows abrangente** foi adicionada ao CI, executando junto com a suite BATS do Linux existente. Os caminhos de áudio específicos do Windows agora são verificados a cada push — regressões não podem mais passar despercebidas.
+
 ## 🌟 NOVO NO v5.6.4 — Correção Crítica de Segurança na Desinstalação
 
 `uninstall --global` estava removendo todo o seu diretório `~/.claude/` — configurações, CLAUDE.md, skills, configurações MCP, tudo. Corrigido: AgentVibes agora realiza uma remoção cirúrgica, tocando apenas os arquivos que ele mesmo criou. Um teste de regressão no CI aplica isso daqui em diante — se o problema regredir, a compilação falha antes de ser publicada.

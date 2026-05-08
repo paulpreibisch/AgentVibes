@@ -40,9 +40,11 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.6 — Background Music Preview Fixed for npm link & Global Installs
+## 🌟 NEW IN v5.6.6 — Preview Button Works in WSL + Comprehensive Windows Test Suite
 
-Background music was silently absent from the LLM Configure → Preview in `npm link` and global-install setups — clicking Preview played the TTS voice but no music. Fixed in three places: `audio-processor.sh` now checks the project directory first for the enabled flag and background tracks, the TUI writes the preview flag to the project directory so it survives package syncs, and the 7-column LLM row parser no longer lets the volume field absorb extra columns.
+**The Preview button in LLM audio configuration now works correctly in WSL.** When configuring a voice, reverb, and background track for each LLM, clicking Preview now plays your full audio setup — voice, music, and effects — exactly as it will sound during a real session. Previously, background music was silently dropped in `npm link` and global-install setups.
+
+A **comprehensive Windows test suite** has been added to CI, running alongside the existing Linux BATS suite. Windows-specific audio paths are now verified on every push — regressions can't slip through silently.
 
 ## v5.6.4 — Critical Uninstall Safety Fix
 
