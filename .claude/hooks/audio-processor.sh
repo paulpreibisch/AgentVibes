@@ -42,6 +42,19 @@ BACKGROUNDS_DIR="$(cd "$SCRIPT_DIR/../audio" && pwd)/tracks"
 ENABLED_FILE="$(cd "$SCRIPT_DIR/.." && pwd)/config/background-music-enabled.txt"
 GLOBAL_ENABLED_FILE="$HOME/.claude/config/background-music-enabled.txt"
 
+# When the user's project dir differs from the package dir (e.g. npm link),
+# CLAUDE_PROJECT_DIR holds the project path — check its audio-effects.cfg first
+# so per-LLM settings written by the TUI are found (mirrors play-tts.sh search order).
+CLAUDE_PROJECT_CFG=""
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+    _candidate="${CLAUDE_PROJECT_DIR}/.claude/config/audio-effects.cfg"
+    _pkg_cfg_dir="$(cd "$SCRIPT_DIR/.." && pwd)/config"
+    if [[ "$(dirname "$_candidate")" != "$_pkg_cfg_dir" ]] && [[ -f "$_candidate" ]]; then
+        CLAUDE_PROJECT_CFG="$_candidate"
+    fi
+    unset _candidate _pkg_cfg_dir
+fi
+
 # Check if background music is enabled (project-local, then global fallback)
 is_background_music_enabled() {
     local enabled=""
@@ -83,22 +96,33 @@ fi
 # @returns Pipe-separated config line or default
 get_agent_config() {
     local agent="$1"
+    local config=""
 
-    if [[ ! -f "$CONFIG_FILE" ]]; then
+    # Search order: CLAUDE_PROJECT_DIR config (user project) → package config.
+    # This ensures per-LLM settings saved by the TUI are found even when the
+    # package dir differs from the project dir (e.g. npm link / global install).
+    local _search_files=()
+    [[ -n "$CLAUDE_PROJECT_CFG" ]] && _search_files+=("$CLAUDE_PROJECT_CFG")
+    [[ -f "$CONFIG_FILE" ]] && _search_files+=("$CONFIG_FILE")
+
+    if [[ ${#_search_files[@]} -eq 0 ]]; then
         echo "default|gain -8||0.0"
         return
     fi
 
-    # Try exact match first (use awk for safe literal matching)
-    local config
-    config=$(awk -F'|' -v agent="$agent" 'tolower($1) == tolower(agent)' "$CONFIG_FILE" 2>/dev/null | head -1)
+    for _cfg_file in "${_search_files[@]}"; do
+        config=$(awk -F'|' -v agent="$agent" 'tolower($1) == tolower(agent)' "$_cfg_file" 2>/dev/null | head -1)
+        [[ -n "$config" ]] && break
+    done
 
-    # Fall back to default
+    # Fall back to default row from first available config
     if [[ -z "$config" ]]; then
-        config=$(grep "^default|" "$CONFIG_FILE" 2>/dev/null | head -1)
+        for _cfg_file in "${_search_files[@]}"; do
+            config=$(grep "^default|" "$_cfg_file" 2>/dev/null | head -1)
+            [[ -n "$config" ]] && break
+        done
     fi
 
-    # Return config or empty default
     if [[ -n "$config" ]]; then
         echo "$config"
     else
