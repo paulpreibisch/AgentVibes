@@ -1,5 +1,30 @@
 # AgentVibes Release Notes
 
+## 🔐 v5.6.3 — Easier Setup & More Reliable Audio
+
+**Released:** 2026-05-07
+
+### 🎉 Easier Hermes Setup
+
+Setting up AgentVibes to work with a remote computer is now much simpler:
+
+- **Pick your SSH key from a list** — instead of typing a file path, AgentVibes now reads your SSH config and shows you a list of available keys to choose from
+- **Same-machine mode** — if your AI assistant and AgentVibes are on the same computer, you can skip the SSH step entirely and audio just plays directly
+- **Better control from Hermes** — Hermes agents can now adjust your audio settings (voice, music, reverb) on the fly, not just speak text
+
+### 🎉 Your LLM's Voice Follows It Everywhere
+
+If you've set up different voices for Claude, Copilot, or Codex — those voices now work even when your AI is running on a different computer and sending audio to your Windows machine over the network.
+
+### 🐛 Fixes
+
+- **No audio at all** — some setups would get complete silence with no error message. Fixed.
+- **Wrong voice playing** — in some configs, AgentVibes would ignore your per-AI voice settings and fall back to the default. Fixed.
+- **Audio settings leaking between messages** — music or reverb set for one message could accidentally carry over to the next one. Fixed.
+- **Lost messages after a crash** — if AgentVibes crashed mid-message, that message was gone. It now recovers and replays it when it restarts.
+
+---
+
 ## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
 
 **Released:** 2026-05-02

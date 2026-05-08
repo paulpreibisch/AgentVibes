@@ -40,7 +40,11 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.2 — Per-Message Audio Control
+## 🌟 NEW IN v5.6.3 — Easier Setup & More Reliable Audio
+
+Pick your SSH key from a list, skip SSH entirely if your AI and speakers are on the same machine, and get your per-AI voice settings working even over a network connection. Plus several fixes for silence, wrong voices, and lost messages.
+
+## v5.6.2 — Per-Message Audio Control
 
 Remote senders (Hermes, SSH remote provider) can now control **voice, music, reverb, and volume per message** — no persistent config changes needed. Pass any field in the JSON payload and the Windows receiver applies it for that message only.
 
