@@ -1802,10 +1802,11 @@ export function createSetupTab(screen, services) {
       const _hooksBase = fs.existsSync(path.join(packageDir, _playTtsName)) ? packageDir : targetDir;
 
       // Temporarily enable background music for preview if a track is configured.
-      // audio-processor.sh reads background-music-enabled.txt from SCRIPT_DIR/../config/
-      // (the hooks base dir), so write to _hooksBase — not targetDir — to match what the script reads.
+      // Write to targetDir (project): audio-processor.sh checks CLAUDE_PROJECT_DIR first
+      // (which is set to targetDir in the subprocess env), so this survives npm-link syncs
+      // that would delete files from the package dir via rsync --delete.
       if (!!draft.bgTrack) {
-        const bgEnabledFile = path.join(_hooksBase, '.claude', 'config', 'background-music-enabled.txt');
+        const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
         let bgWas = false;
         try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
         if (!bgWas) {

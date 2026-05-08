@@ -55,18 +55,31 @@ if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
     unset _candidate _pkg_cfg_dir
 fi
 
-# Check if background music is enabled (project-local, then global fallback)
+# Check if background music is enabled.
+# Search order: CLAUDE_PROJECT_DIR config → package config → global fallback.
+# CLAUDE_PROJECT_DIR takes priority so TUI preview writes to the project dir and
+# audio-processor.sh (running from the package hooks dir) still finds the flag.
 is_background_music_enabled() {
-    local enabled=""
+    local enabled="" _f
+    # 1. Project dir (set by TUI preview via CLAUDE_PROJECT_DIR env var)
+    if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+        _f="${CLAUDE_PROJECT_DIR}/.claude/config/background-music-enabled.txt"
+        if [[ -f "$_f" ]]; then
+            enabled=$(cat "$_f" 2>/dev/null | tr -d '[:space:]')
+            [[ "$enabled" == "true" ]] && return 0
+            [[ "$enabled" == "false" ]] && return 1
+        fi
+    fi
+    # 2. Package/hooks dir config
     if [[ -f "$ENABLED_FILE" ]]; then
         enabled=$(cat "$ENABLED_FILE" 2>/dev/null | tr -d '[:space:]')
+    # 3. Global fallback
     elif [[ -f "$GLOBAL_ENABLED_FILE" ]]; then
         enabled=$(cat "$GLOBAL_ENABLED_FILE" 2>/dev/null | tr -d '[:space:]')
     else
         return 1  # Disabled by default
     fi
 
-    # Return 0 (true) if enabled, 1 (false) otherwise
     [[ "$enabled" == "true" ]]
 }
 
@@ -488,17 +501,29 @@ main() {
         background_path="$custom_music_path"
         echo "  → Using custom background music" >&2
     elif [[ -n "$background_file" ]]; then
-        # Fall back to default background music from audio-effects.cfg
-        background_path="$BACKGROUNDS_DIR/$background_file"
-        # SECURITY: Validate resolved path stays within BACKGROUNDS_DIR (prevent path traversal
-        # via crafted entries like "../../etc/hostname" in audio-effects.cfg)
-        local _resolved_bg _safe_base
-        _resolved_bg=$(realpath -m "$background_path" 2>/dev/null || echo "$background_path")
-        _safe_base=$(realpath -m "$BACKGROUNDS_DIR" 2>/dev/null || echo "$BACKGROUNDS_DIR")
-        if [[ "$_resolved_bg" != "${_safe_base}/"* ]] && [[ "$_resolved_bg" != "$_safe_base" ]]; then
-            echo "Warning: background_file resolves outside allowed directory, skipping: $background_file" >&2
-            background_path=""
+        # Fall back to default background music from audio-effects.cfg.
+        # Search order: package tracks dir → CLAUDE_PROJECT_DIR tracks dir.
+        # The project dir fallback covers npm link / global install where the
+        # hooks run from the package but tracks were installed into the project.
+        local _candidate_dirs=("$BACKGROUNDS_DIR")
+        if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+            _candidate_dirs+=("${CLAUDE_PROJECT_DIR}/.claude/audio/tracks")
         fi
+        for _tracks_dir in "${_candidate_dirs[@]}"; do
+            local _candidate_path="$_tracks_dir/$background_file"
+            # SECURITY: Validate resolved path stays within the tracks dir
+            local _resolved_bg _safe_base
+            _resolved_bg=$(realpath -m "$_candidate_path" 2>/dev/null || echo "$_candidate_path")
+            _safe_base=$(realpath -m "$_tracks_dir" 2>/dev/null || echo "$_tracks_dir")
+            if [[ "$_resolved_bg" != "${_safe_base}/"* ]] && [[ "$_resolved_bg" != "$_safe_base" ]]; then
+                echo "Warning: background_file resolves outside allowed directory, skipping: $background_file" >&2
+                continue
+            fi
+            if [[ -f "$_candidate_path" ]]; then
+                background_path="$_candidate_path"
+                break
+            fi
+        done
     fi
 
     # Per-agent profile enables music independently of the global flag.
