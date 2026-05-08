@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.2
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.3
 
 ---
 
@@ -40,7 +40,15 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.2 — Per-Message Audio Control
+## 🌟 NEW IN v5.6.3 — AgentVibes Comes to Hermes + Easier Remote Setup
+
+**AgentVibes now works with [Hermes](https://github.com/NousResearch/hermes-agent)** — one of the most popular open-source AI agents on GitHub (21,000+ stars). When Hermes finishes a response, AgentVibes speaks it aloud through your speakers automatically.
+
+When you configure any LLM in AgentVibes (Claude Code, Copilot, Codex, or Hermes), you can set a **unique voice, reverb style, background music, and intro prefix** for each one — so every AI sounds distinct. New in this version: you can also set the **audio destination** per LLM. Choose **Local** to play through the computer you're on, or **Remote** to send audio to a different machine (your laptop, for example) while you work on a remote server.
+
+Setting up remote audio used to require typing an SSH path by hand. Now there's a **dropdown menu right in the AgentVibes TUI** that reads your existing SSH aliases — just pick the one that points to your speakers and you're done. Develop on a remote server or run Hermes in the cloud, and the voice comes out of your laptop speakers without any manual configuration.
+
+## v5.6.2 — Per-Message Audio Control
 
 Remote senders (Hermes, SSH remote provider) can now control **voice, music, reverb, and volume per message** — no persistent config changes needed. Pass any field in the JSON payload and the Windows receiver applies it for that message only.
 

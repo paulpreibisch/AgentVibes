@@ -1,5 +1,33 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🌟 v5.6.3 — AgentVibes kommt zu Hermes + Einfachere Remote-Einrichtung
+
+**Veröffentlicht:** 2026-05-07
+
+### 🎉 AgentVibes funktioniert jetzt mit Hermes
+
+**[Hermes](https://github.com/NousResearch/hermes-agent)** ist einer der beliebtesten Open-Source-KI-Agenten auf GitHub — über 21.000 Sterne und wachsend. AgentVibes integriert sich jetzt direkt damit: Wenn Hermes eine Antwort abschließt, spricht AgentVibes sie automatisch über deine Lautsprecher. Keine zusätzliche Einrichtung außer der Installation des mitgelieferten Hooks.
+
+### 🎉 Audio-Ziel pro LLM — wähle, wo die Stimme herkommt
+
+Wenn du einen LLM in AgentVibes konfigurierst (Claude Code, Copilot, Codex oder Hermes), konntest du bereits eine einzigartige **Stimme, einen Reverb-Stil, Hintergrundmusik und ein Intro-Präfix** für jeden festlegen. Jetzt kannst du auch das **Audio-Ziel** pro LLM festlegen:
+
+- **Lokal** — über die Lautsprecher des Computers abspielen, an dem du arbeitest
+- **Remote** — Audio an eine andere Maschine senden (z. B. dein Laptop), während du auf einem Remote-Server arbeitest oder Hermes in der Cloud ausführst
+
+### 🎉 SSH-Alias-Auswahl — kein manuelles Tippen von Pfaden mehr
+
+Das Einrichten von Remote-Audio erforderte früher das manuelle Eintippen eines SSH-Pfads. Jetzt gibt es ein **Dropdown direkt in der AgentVibes-TUI**, das die SSH-Aliase liest, die bereits auf deiner Maschine vorhanden sind. Wähle den aus, der auf deine Lautsprecher zeigt — fertig. Deine Stimme folgt dir, egal ob du lokal oder remote bist.
+
+### 🐛 Fehlerbehebungen
+
+- **Gar kein Audio** — manche Setups erzeugten vollständige Stille ohne jede Fehlermeldung. Behoben.
+- **Falsche Stimme wird abgespielt** — in manchen Konfigurationen ignorierte AgentVibes deine Pro-KI-Stimmeinstellungen und fiel auf den Standard zurück. Behoben.
+- **Audio-Einstellungen lecken zwischen Nachrichten** — Musik oder Reverb, die für eine Nachricht gesetzt wurden, konnten versehentlich auf die nächste übertragen werden. Behoben.
+- **Verlorene Nachrichten nach einem Absturz** — wenn AgentVibes mitten in einer Nachricht abstürzte, war diese Nachricht verloren. Es stellt sie jetzt wieder her und spielt sie beim Neustart ab.
+
+---
+
 ## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
 
 > See [English release notes](../../RELEASE_NOTES.md) for full details.

@@ -1,5 +1,33 @@
 # AgentVibes Release Notes
 
+## 🌟 v5.6.3 — AgentVibes Comes to Hermes + Easier Remote Setup
+
+**Released:** 2026-05-07
+
+### 🎉 AgentVibes Now Works with Hermes
+
+**[Hermes](https://github.com/NousResearch/hermes-agent)** is one of the most popular open-source AI agents on GitHub — 21,000+ stars and growing. AgentVibes now integrates with it out of the box: when Hermes finishes a response, AgentVibes speaks it aloud through your speakers automatically. No extra setup beyond installing the included hook.
+
+### 🎉 Per-LLM Audio Destination — Pick Where the Voice Comes From
+
+When you configure an LLM in AgentVibes (Claude Code, Copilot, Codex, or Hermes), you already could set a unique **voice, reverb style, background music, and intro prefix** for each one. Now you can also set the **audio destination** per LLM:
+
+- **Local** — play through the speakers on the computer you're working on
+- **Remote** — send audio to a different machine (your laptop, for example) while you work on a remote server or run Hermes in the cloud
+
+### 🎉 SSH Alias Picker — No More Typing Paths
+
+Setting up remote audio used to require typing an SSH path by hand. Now there's a **dropdown right in the AgentVibes TUI** that reads the SSH aliases already on your machine. Pick the one that points to your speakers — done. Your voice follows you whether you're local or remote.
+
+### 🐛 Fixes
+
+- **No audio at all** — some setups would get complete silence with no error message. Fixed.
+- **Wrong voice playing** — in some configs, AgentVibes would ignore your per-LLM voice settings and fall back to the default. Fixed.
+- **Audio settings leaking between messages** — music or reverb set for one message could accidentally carry over to the next one. Fixed.
+- **Lost messages after a crash** — if AgentVibes crashed mid-message, that message was gone. It now recovers and replays it when it restarts.
+
+---
+
 ## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
 
 **Released:** 2026-05-02

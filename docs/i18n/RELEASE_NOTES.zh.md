@@ -1,5 +1,33 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🌟 v5.6.3 — AgentVibes 支持 Hermes + 更简单的远程设置
+
+**发布日期：** 2026-05-07
+
+### 🎉 AgentVibes 现已支持 Hermes
+
+**[Hermes](https://github.com/NousResearch/hermes-agent)** 是 GitHub 上最受欢迎的开源 AI 代理之一 — 拥有 21,000 余颗星并持续增长。AgentVibes 现在开箱即用地与其集成：当 Hermes 完成响应后，AgentVibes 会自动通过扬声器大声朗读。除了安装附带的 hook 外，无需额外设置。
+
+### 🎉 每个 LLM 独立音频目标 — 选择声音从哪里发出
+
+在 AgentVibes 中配置 LLM（Claude Code、Copilot、Codex 或 Hermes）时，您已经可以为每个 LLM 设置独特的**语音、混响风格、背景音乐和前缀介绍**。现在您还可以为每个 LLM 设置**音频目标**：
+
+- **本地** — 通过您正在工作的计算机的扬声器播放
+- **远程** — 在远程服务器上工作或在云端运行 Hermes 时，将音频发送到其他机器（例如您的笔记本电脑）
+
+### 🎉 SSH 别名选择器 — 告别手动输入路径
+
+以前设置远程音频需要手动输入 SSH 路径。现在 **AgentVibes TUI 中直接内置了一个下拉菜单**，可以读取您机器上已有的 SSH 别名。选择指向您扬声器的那个 — 完成。无论您是在本地还是远程工作，声音都会跟随您。
+
+### 🐛 修复
+
+- **完全没有音频** — 某些配置会出现完全无声的情况，且没有任何错误提示。已修复。
+- **播放了错误的声音** — 在某些配置中，AgentVibes 会忽略您的每个 AI 声音设置并回退到默认值。已修复。
+- **音频设置在消息间泄漏** — 为某条消息设置的音乐或混响可能会意外延续到下一条消息。已修复。
+- **崩溃后消息丢失** — 如果 AgentVibes 在消息处理中途崩溃，该消息就会丢失。现在它会在重启时恢复并重新播放。
+
+---
+
 ## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
 
 > See [English release notes](../../RELEASE_NOTES.md) for full details.

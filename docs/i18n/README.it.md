@@ -4,7 +4,15 @@
 
 ---
 
-## 🌟 NOVITÀ IN v5.6.2 — Integrazione Hermes Agent
+## 🌟 NOVITÀ IN v5.6.3 — AgentVibes arriva su Hermes + Configurazione remota più semplice
+
+**AgentVibes ora funziona con [Hermes](https://github.com/NousResearch/hermes-agent)** — uno degli agenti AI open source più popolari su GitHub (oltre 21.000 stelle). Quando Hermes termina una risposta, AgentVibes la legge ad alta voce attraverso i tuoi altoparlanti automaticamente.
+
+Quando configuri un LLM in AgentVibes (Claude Code, Copilot, Codex o Hermes), puoi impostare una **voce, uno stile di riverbero, una musica di sottofondo e un prefisso introduttivo** unici per ciascuno — così ogni IA suona in modo distinto. Novità in questa versione: puoi anche impostare la **destinazione audio** per LLM. Scegli **Locale** per riprodurre attraverso il computer su cui stai lavorando, o **Remoto** per inviare l'audio a una macchina diversa (il tuo laptop, ad esempio) mentre lavori su un server remoto o esegui Hermes nel cloud.
+
+Configurare l'audio remoto richiedeva in precedenza di digitare manualmente un percorso SSH. Ora c'è un **menu a tendina direttamente nella TUI di AgentVibes** che legge i tuoi alias SSH esistenti — seleziona semplicemente quello che punta ai tuoi altoparlanti e il gioco è fatto. Sviluppa su un server remoto o esegui Hermes nel cloud, e la voce esce dagli altoparlanti del tuo laptop senza alcuna configurazione manuale.
+
+## v5.6.2 — Integrazione Hermes Agent
 
 AgentVibes ora parla per **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — l'assistente AI self-hosted e auto-migliorante. Due skill pronte per la produzione sono incluse in `docs/hermes/skills/`:
 
@@ -13,7 +21,7 @@ AgentVibes ora parla per **[Hermes Agent](https://github.com/NousResearch/hermes
 
 Anche in questa versione: correzioni di compatibilità PS5.1 per `play-tts.ps1`, riparazioni modal/hotkey e il tab BMAD ora mostra tutti gli agenti.
 
-## v5.5 — Novità — Routing Audio per LLM
+## v5.5 — Routing Audio per LLM
 
 Assegna a **ogni LLM la propria voce, pretext e musica** — Claude Code, Copilot e Codex possono suonare in modo diverso senza toccare le impostazioni globali.
 
