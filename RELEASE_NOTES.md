@@ -1,5 +1,19 @@
 # AgentVibes Release Notes
 
+## 🪟 v5.6.7 — Windows Preview Fixed
+
+**Released:** 2026-05-08
+
+### 🐛 Preview Button Now Works Correctly on Windows
+
+When configuring audio per LLM on Windows, clicking **Preview** was playing the wrong voice (defaulting to Windows SAPI) with no background music or reverb. Now it plays exactly the voice, reverb, and background track you configured.
+
+### 🧪 Regression Tests Added
+
+Two new Windows CI tests verify the preview config lookup — so this can't regress silently in a future release.
+
+---
+
 ## 🎵 v5.6.6 — Preview Button Works in WSL + Comprehensive Windows Test Suite
 
 **Released:** 2026-05-08

@@ -40,7 +40,11 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.6 — Preview Button Works in WSL + Comprehensive Windows Test Suite
+## 🌟 NEW IN v5.6.7 — Windows Preview Fixed
+
+The **Preview button in LLM audio configuration now works correctly on Windows**. It plays the voice, reverb, and background track you configured — no more defaulting to the wrong voice or playing silence.
+
+## v5.6.6 — Preview Button Works in WSL + Comprehensive Windows Test Suite
 
 **The Preview button in LLM audio configuration now works correctly in WSL.** When configuring a voice, reverb, and background track for each LLM, clicking Preview now plays your full audio setup — voice, music, and effects — exactly as it will sound during a real session. Previously, background music was silently dropped in `npm link` and global-install setups.
 
