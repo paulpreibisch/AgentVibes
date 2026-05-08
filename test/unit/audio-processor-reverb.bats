@@ -160,6 +160,79 @@ CFG
 }
 
 # ---------------------------------------------------------------------------
+# LLM 7-column row parsing (bg_volume must not swallow extra fields)
+# ---------------------------------------------------------------------------
+
+@test "audio-processor: 7-column LLM row parses bg_volume as numeric only" {
+  # Regression: read without _rest caused bg_volume='0.15||voice|pretext|engine'
+  # which ffmpeg rejected, silently falling back to voice-only.
+  local repo_root="${BATS_TEST_DIRNAME}/../.."
+  local cfg_file="$repo_root/.claude/config/audio-effects.cfg"
+  local enabled_file="$repo_root/.claude/config/background-music-enabled.txt"
+
+  local cfg_existed=false enabled_existed=false
+  [[ -f "$cfg_file" ]] && { cfg_existed=true; cp "$cfg_file" "$BATS_TEST_TMPDIR/cfg.bak"; }
+  [[ -f "$enabled_file" ]] && { enabled_existed=true; cp "$enabled_file" "$BATS_TEST_TMPDIR/en.bak"; }
+
+  mkdir -p "$repo_root/.claude/config"
+  # 7-field LLM row (the format saveLlmConfigSync writes)
+  printf 'llm:claude-code|light||0.15||Test pretext|piper\n' > "$cfg_file"
+  printf 'false\n' > "$enabled_file"  # disabled — we just check volume parsed, not mixing
+
+  local out
+  out=$(bash "$AUDIO_PROCESSOR" \
+    "$BATS_TEST_TMPDIR/input.wav" "llm:claude-code" "$BATS_TEST_TMPDIR/output.wav" 2>&1 || true)
+
+  if $cfg_existed; then cp "$BATS_TEST_TMPDIR/cfg.bak" "$cfg_file"; else rm -f "$cfg_file"; fi
+  if $enabled_existed; then cp "$BATS_TEST_TMPDIR/en.bak" "$enabled_file"; else rm -f "$enabled_file"; fi
+
+  # Should NOT see the non-numeric volume in any output
+  if echo "$out" | grep -qF "0.15||"; then
+    echo "FAIL: bg_volume was not trimmed — extra fields leaked into volume string"
+    echo "Output: $out"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# CLAUDE_PROJECT_DIR config search (npm link / global install fix)
+# ---------------------------------------------------------------------------
+
+@test "audio-processor: CLAUDE_PROJECT_DIR config takes priority over package config" {
+  local repo_root="${BATS_TEST_DIRNAME}/../.."
+  local pkg_cfg="$repo_root/.claude/config/audio-effects.cfg"
+  local pkg_enabled="$repo_root/.claude/config/background-music-enabled.txt"
+
+  local pkg_cfg_existed=false pkg_en_existed=false
+  [[ -f "$pkg_cfg" ]] && { pkg_cfg_existed=true; cp "$pkg_cfg" "$BATS_TEST_TMPDIR/pkg_cfg.bak"; }
+  [[ -f "$pkg_enabled" ]] && { pkg_en_existed=true; cp "$pkg_enabled" "$BATS_TEST_TMPDIR/pkg_en.bak"; }
+
+  # Package config has no LLM row; project config has the LLM row
+  mkdir -p "$repo_root/.claude/config"
+  printf 'default||agentvibes_soft_flamenco_loop.mp3|0.30\n' > "$pkg_cfg"
+  printf 'false\n' > "$pkg_enabled"
+
+  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/config"
+  printf 'llm:test-agent|off||0.20\n' > "$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg"
+
+  local out
+  out=$(CLAUDE_PROJECT_DIR="$CLAUDE_PROJECT_DIR" bash "$AUDIO_PROCESSOR" \
+    "$BATS_TEST_TMPDIR/input.wav" "llm:test-agent" "$BATS_TEST_TMPDIR/output.wav" 2>&1 || true)
+
+  if $pkg_cfg_existed; then cp "$BATS_TEST_TMPDIR/pkg_cfg.bak" "$pkg_cfg"; else rm -f "$pkg_cfg"; fi
+  if $pkg_en_existed; then cp "$BATS_TEST_TMPDIR/pkg_en.bak" "$pkg_enabled"; else rm -f "$pkg_enabled"; fi
+
+  # Processor must have found the LLM agent row from CLAUDE_PROJECT_DIR config
+  if echo "$out" | grep -q "Processing audio for agent: llm:test-agent"; then
+    : # agent was recognized
+  else
+    echo "FAIL: processor didn't use CLAUDE_PROJECT_DIR config"
+    echo "Output: $out"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Path traversal guard (M4 fix)
 # ---------------------------------------------------------------------------
 
