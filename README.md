@@ -40,7 +40,11 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.4 — Critical Uninstall Safety Fix
+## 🌟 NEW IN v5.6.6 — Background Music Preview Fixed for npm link & Global Installs
+
+Background music was silently absent from the LLM Configure → Preview in `npm link` and global-install setups — clicking Preview played the TTS voice but no music. Fixed in three places: `audio-processor.sh` now checks the project directory first for the enabled flag and background tracks, the TUI writes the preview flag to the project directory so it survives package syncs, and the 7-column LLM row parser no longer lets the volume field absorb extra columns.
+
+## v5.6.4 — Critical Uninstall Safety Fix
 
 `uninstall --global` was removing your entire `~/.claude/` directory — settings, CLAUDE.md, skills, MCP configs, everything. Fixed: AgentVibes now performs a surgical removal, only touching files it created. A regression test in CI enforces this going forward — if it ever regresses, the build breaks before it ships.
 

@@ -1,5 +1,41 @@
 # AgentVibes Release Notes
 
+## 🔇→🎵 v5.6.6 — Background Music Preview Fixed for npm link & Global Installs
+
+**Released:** 2026-05-08
+
+### 🐛 Background Music Silently Missing from Preview (npm link / Global Install)
+
+When you clicked **Preview** in the LLM configure modal with a background track set, you heard only the voice — no music — unless AgentVibes was installed as a local dependency. Fixed regardless of how you install AgentVibes.
+
+**Root cause:** In `npm link` and global-install setups, a sync script using `rsync --delete` periodically erased `background-music-enabled.txt` from the package directory because the file is gitignored. After deletion, `audio-processor.sh` fell back to a global config that had music disabled — silence.
+
+**Fix:** `audio-processor.sh` now checks `CLAUDE_PROJECT_DIR/.claude/config/background-music-enabled.txt` **first**. The TUI Preview also writes the flag to the project directory (not the package directory), so it survives any package-dir sync.
+
+### 🐛 Per-LLM Config Not Found in npm link / Global Installs
+
+In the same setups, `audio-processor.sh` couldn't find per-LLM audio configuration (voice, reverb, background track) when your project wasn't the AgentVibes package itself.
+
+**Fix:** The script now searches `CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg` before falling back to the package config.
+
+### 🐛 Background Track "Not Found" After Correct Config
+
+When a background track was configured but AgentVibes was installed globally or via `npm link`, the track file couldn't be found — only the package directory was searched.
+
+**Fix:** `audio-processor.sh` now also searches `CLAUDE_PROJECT_DIR/.claude/audio/tracks/` when the track isn't in the package directory.
+
+### 🐛 LLM Config Row Parsing — Volume Absorbing Extra Columns
+
+With a full 7-column LLM row (the format the TUI writes), the volume field absorbed all trailing columns. ffmpeg received a malformed volume string and silently fell back to voice-only audio.
+
+**Fix:** Parser now captures only the numeric volume field, leaving extra columns in `_rest`.
+
+### 🧪 Windows CI Test Suite
+
+Windows-native tests now run in CI alongside the Linux BATS suite, gating publishing so Windows-specific paths can't regress silently.
+
+---
+
 ## 🛡️ v5.6.4 — Critical Uninstall Safety Fix
 
 **Released:** 2026-05-08
