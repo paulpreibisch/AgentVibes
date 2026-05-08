@@ -63,7 +63,7 @@ while [[ "$PROJECT_ROOT" != "/" && "$PROJECT_ROOT" != "$(dirname "$PROJECT_ROOT"
     break  # PROJECT_ROOT is already the project root when its .claude/hooks child exists
   fi
   PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
-  ((_search_depth++))
+  _search_depth=$(( _search_depth + 1 ))
 done
 unset _search_depth
 
