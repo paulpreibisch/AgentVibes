@@ -40,7 +40,11 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.3 — AgentVibes Comes to Hermes + Easier Remote Setup
+## 🌟 NEW IN v5.6.4 — Critical Uninstall Safety Fix
+
+`uninstall --global` was removing your entire `~/.claude/` directory — settings, CLAUDE.md, skills, MCP configs, everything. Fixed: AgentVibes now performs a surgical removal, only touching files it created. A regression test in CI enforces this going forward — if it ever regresses, the build breaks before it ships.
+
+## v5.6.3 — Hermes + Easier Remote Setup
 
 **AgentVibes now works with [Hermes](https://github.com/NousResearch/hermes-agent)** — one of the most popular open-source AI agents on GitHub (21,000+ stars). When Hermes finishes a response, AgentVibes speaks it aloud through your speakers automatically.
 

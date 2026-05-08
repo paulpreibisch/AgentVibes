@@ -1,5 +1,30 @@
 # AgentVibes Release Notes
 
+## 🛡️ v5.6.4 — Critical Uninstall Safety Fix
+
+**Released:** 2026-05-08
+
+### 🐛 `--global` Uninstall No Longer Wipes ~/.claude/
+
+With `--global`, the uninstaller was removing `~/.claude/` recursively rather than only the AgentVibes-owned paths within it. This caused total data loss — settings, CLAUDE.md, skills, plugins, MCP configurations, custom tools, everything. Confirmed real, confirmed fixed.
+
+**v5.6.4 performs a surgical removal — only paths AgentVibes installed:**
+
+- `~/.claude/hooks/`, `hooks-windows/`, `commands/agent-vibes/`, `personalities/`, `audio/`
+- `~/.agentvibes/` — fully AgentVibes-owned, removed entirely
+- `settings.json`, `CLAUDE.md`, skills, plugins, MCP configs — **untouched**
+
+A regression test now enforces this in CI. If anyone reintroduces broad deletion, the build fails:
+
+```js
+// issue #182 regression guard
+assert: settings.json and CLAUDE.md survived --global uninstall
+```
+
+This can't quietly regress — it will break the build first.
+
+---
+
 ## 🌟 v5.6.3 — AgentVibes Comes to Hermes + Easier Remote Setup
 
 **Released:** 2026-05-07
