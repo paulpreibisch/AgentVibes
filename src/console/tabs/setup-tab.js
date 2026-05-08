@@ -1790,21 +1790,6 @@ export function createSetupTab(screen, services) {
       // Save first so play-tts picks up current settings
       _autoSave(true);
 
-      // Temporarily enable background music for preview if a track is configured.
-      // audio-processor.sh reads background-music-enabled.txt — write directly to that file.
-      if (!!draft.bgTrack) {
-        const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
-        let bgWas = false;
-        try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
-        if (!bgWas) {
-          try {
-            fs.mkdirSync(path.dirname(bgEnabledFile), { recursive: true });
-            fs.writeFileSync(bgEnabledFile, 'true', 'utf8');
-          } catch {}
-          _bgRestoreFn = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
-        }
-      }
-
       const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       // Don't include pretext — play-tts already prepends it from the config
@@ -1815,6 +1800,22 @@ export function createSetupTab(screen, services) {
       // the package hook doesn't exist (e.g. custom project-only setups).
       const _playTtsName = path.join('.claude', hooksSubdir, isWin ? 'play-tts.ps1' : 'play-tts.sh');
       const _hooksBase = fs.existsSync(path.join(packageDir, _playTtsName)) ? packageDir : targetDir;
+
+      // Temporarily enable background music for preview if a track is configured.
+      // audio-processor.sh reads background-music-enabled.txt from SCRIPT_DIR/../config/
+      // (the hooks base dir), so write to _hooksBase — not targetDir — to match what the script reads.
+      if (!!draft.bgTrack) {
+        const bgEnabledFile = path.join(_hooksBase, '.claude', 'config', 'background-music-enabled.txt');
+        let bgWas = false;
+        try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
+        if (!bgWas) {
+          try {
+            fs.mkdirSync(path.dirname(bgEnabledFile), { recursive: true });
+            fs.writeFileSync(bgEnabledFile, 'true', 'utf8');
+          } catch {}
+          _bgRestoreFn = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
+        }
+      }
 
       let cmd, args;
       if (isWin) {
