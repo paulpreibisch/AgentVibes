@@ -386,8 +386,10 @@ main() {
     local config
     config=$(get_agent_config "$AGENT_NAME")
 
-    # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME)
-    IFS='|' read -r _ sox_effects background_file bg_volume <<< "$config"
+    # Parse config (format: NAME|EFFECTS|BACKGROUND|VOLUME[|voice|pretext|engine...])
+    # LLM rows have 7 fields; _rest absorbs columns 5+ so bg_volume stays numeric.
+    local _rest
+    IFS='|' read -r _ sox_effects background_file bg_volume _rest <<< "$config"
 
     # Translate reverb preset names (stored by the console Configure UI) to sox effects strings.
     # LLM per-agent rows store human-readable names like "light"; sox needs the raw effect string.
