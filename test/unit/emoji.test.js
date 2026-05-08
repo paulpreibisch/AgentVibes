@@ -47,9 +47,9 @@ function supportsEmoji() {
 
   const isModernTerminal = modernTerminals.some(t => term.toLowerCase().includes(t));
 
-  // Windows Terminal
+  // Windows Terminal — coerce to boolean so WT_SESSION UUID is never returned directly
   const isWindowsTerminal = process.platform === 'win32' &&
-                            (process.env.WT_SESSION || process.env.WT_PROFILE_ID);
+                            !!(process.env.WT_SESSION || process.env.WT_PROFILE_ID);
 
   // macOS
   const isMacOS = process.platform === 'darwin';
@@ -57,11 +57,9 @@ function supportsEmoji() {
   // Linux with UTF-8
   const isLinuxWithUtf8 = process.platform === 'linux' && isUtf8;
 
-  // Unknown terminal with UTF-8: Only enable emoji if TERM is not explicitly unsupported AND has UTF-8
-  // This prevents false positives like "vt100" with UTF-8 reporting emoji support
-  const unknownTerminalWithUtf8 = term &&
-                                 !unsupportedTerminals.includes(term.toLowerCase()) &&
-                                 isUtf8;
+  // Enable emoji when TERM is not explicitly unsupported and locale is UTF-8.
+  // Omitting the `term &&` guard allows empty TERM + UTF-8 locale to enable emoji.
+  const unknownTerminalWithUtf8 = !unsupportedTerminals.includes(term.toLowerCase()) && isUtf8;
 
   return isModernTerminal || isWindowsTerminal || isMacOS || isLinuxWithUtf8 || unknownTerminalWithUtf8;
 }

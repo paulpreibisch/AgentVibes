@@ -68,7 +68,8 @@ test('Copy: File stored in correct directory structure', async () => {
     const result = await copyToSecureStorage(sourceFile, env.claudeDir);
 
     assert(result.success, 'Copy should succeed');
-    assert(result.storagePath.includes('audio/custom-music/tracks'), 'Should be in correct directory structure');
+    // Normalize to forward slashes so the assertion works on Windows (backslash paths) too
+    assert(result.storagePath.replace(/\\/g, '/').includes('audio/custom-music/tracks'), 'Should be in correct directory structure');
   } finally {
     env.cleanup();
   }
@@ -102,6 +103,9 @@ test('Copy: Directories created with secure permissions (700)', async () => {
 
     const musicDir = path.join(env.claudeDir, 'audio/custom-music');
     assert(fs.existsSync(musicDir), 'Music directory should exist');
+
+    // Windows does not honour Unix chmod — skip the mode check on that platform
+    if (process.platform === 'win32') return;
 
     const stats = fs.statSync(musicDir);
     const dirPerms = stats.mode & 0o777;

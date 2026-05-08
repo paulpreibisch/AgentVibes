@@ -155,8 +155,8 @@ test('Provider: switch then get round-trips correctly', { skip: !isWindows }, as
   const originalContent = exSync(providerFile) ? rfSync(providerFile, 'utf-8') : null;
 
   try {
-    // Switch to sapi (always available on Windows)
-    const switchResult = await runPowerShell(['-File', providerScript, 'switch', 'sapi']);
+    // Switch to windows-sapi (always available on Windows; 'sapi' is not a valid provider name)
+    const switchResult = await runPowerShell(['-File', providerScript, 'switch', 'windows-sapi']);
     if (switchResult.exitCode !== 0) {
       console.log('  Skipping: could not switch to sapi');
       return;
