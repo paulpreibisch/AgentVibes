@@ -169,6 +169,7 @@ fi
 LLM_REVERB=""
 LLM_BG_FILE=""
 LLM_BG_VOLUME=""
+LLM_PRETEXT=""
 
 # Build config search path: CLAUDE_PROJECT_DIR first (the actual user project,
 # even when hooks run from the package dir), then PROJECT_ROOT (may be the
@@ -195,6 +196,10 @@ for _cfg in "${_llm_cfg_paths[@]}"; do
         esac
         [[ -n "$_bgfile" ]] && LLM_BG_FILE="$_bgfile"
         [[ -n "$_bgvol"  ]] && LLM_BG_VOLUME="$_bgvol"
+        # Extract VOICE(col5) and PRETEXT(col6) from _rest
+        IFS="|" read -r _llm_voice_col _llm_pretext_col _llm_engine_col <<< "$_rest"
+        _llm_pretext_col="${_llm_pretext_col## }"; _llm_pretext_col="${_llm_pretext_col%% }"
+        [[ -n "$_llm_pretext_col" ]] && LLM_PRETEXT="$_llm_pretext_col"
         _llm_row_found=1
         break  # first matching row in this file wins
       fi
@@ -215,6 +220,8 @@ PRETEXT_FILE="$PROJECT_ROOT/.agentvibes/config/pretext.txt"
 if [[ -f "$PRETEXT_FILE" ]]; then
   PRETEXT=$(cat "$PRETEXT_FILE" 2>/dev/null || true)
 fi
+# llm: row pretext wins over pretext.txt
+[[ -n "$LLM_PRETEXT" ]] && PRETEXT="$LLM_PRETEXT"
 
 # Read speed if configured
 SPEED=""
