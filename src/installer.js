@@ -5902,9 +5902,16 @@ program
 
     // Global items
     if (options.global) {
-      console.log(chalk.white.bold('\n  Global Files:'));
-      console.log(chalk.gray('   • ~/.claude/ (global configuration)'));
-      console.log(chalk.gray('   • ~/.agentvibes/ (global cache)'));
+      console.log(chalk.white.bold('\n  Global Files (AgentVibes-owned only):'));
+      console.log(chalk.gray('   • ~/.claude/hooks/           (TTS hook scripts)'));
+      console.log(chalk.gray('   • ~/.claude/hooks-windows/   (Windows TTS scripts)'));
+      console.log(chalk.gray('   • ~/.claude/commands/agent-vibes/'));
+      console.log(chalk.gray('   • ~/.claude/personalities/'));
+      console.log(chalk.gray('   • ~/.claude/audio/'));
+      console.log(chalk.gray('   • ~/.claude/tts-*.txt, verbosity.txt, etc.'));
+      console.log(chalk.gray('   • ~/.agentvibes/             (queue, logs, cache)'));
+      console.log(chalk.yellow('\n   ⚠ Your settings.json, CLAUDE.md, skills, plugins,'));
+      console.log(chalk.yellow('     and MCP configs will NOT be touched.\n'));
     }
 
     // Piper TTS
@@ -5984,21 +5991,45 @@ program
         }
       }
 
-      // Remove global files if requested
+      // Remove global files if requested — only AgentVibes-owned items,
+      // never the entire ~/.claude/ directory (which contains user data:
+      // settings.json, CLAUDE.md, skills, plugins, MCP configs, etc.)
       if (options.global) {
         const homedir = process.env.HOME || process.env.USERPROFILE;
-        const globalPaths = [
-          path.join(homedir, '.claude'),
-          path.join(homedir, '.agentvibes'),
+
+        // ~/.agentvibes/ is entirely AgentVibes-owned — safe to remove whole dir
+        try {
+          await fs.rm(path.join(homedir, '.agentvibes'), { recursive: true, force: true });
+          removedCount++;
+        } catch (_) { /* not present */ }
+
+        // Inside ~/.claude/, remove only the subdirs/files AgentVibes installed
+        const claudeDir = path.join(homedir, '.claude');
+        const agentVibesOwnedInClaude = [
+          path.join(claudeDir, 'hooks'),
+          path.join(claudeDir, 'hooks-windows'),
+          path.join(claudeDir, 'commands', 'agent-vibes'),
+          path.join(claudeDir, 'personalities'),
+          path.join(claudeDir, 'output-styles'),
+          path.join(claudeDir, 'audio'),
+        ];
+        const agentVibesConfigFiles = [
+          'tts-voice.txt', 'tts-provider.txt', 'tts-personality.txt',
+          'tts-verbosity.txt', 'tts-translate.txt', 'tts-target-voice.txt',
+          'tts-target-language.txt', 'tts-language.txt', 'personalities.json',
+          'github-star-reminder.txt', 'piper-voices-dir.txt', 'verbosity.txt',
         ];
 
-        for (const dirPath of globalPaths) {
+        for (const dirPath of agentVibesOwnedInClaude) {
           try {
             await fs.rm(dirPath, { recursive: true, force: true });
             removedCount++;
-          } catch (err) {
-            // Ignore if directory doesn't exist
-          }
+          } catch (_) { /* not present */ }
+        }
+        for (const fileName of agentVibesConfigFiles) {
+          try {
+            await fs.unlink(path.join(claudeDir, fileName));
+          } catch (_) { /* not present */ }
         }
       }
 

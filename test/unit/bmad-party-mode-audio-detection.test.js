@@ -325,6 +325,10 @@ describe('BMAD Party Mode Audio Characteristic Detection', () => {
 
   describe('Audio Generation Configuration', () => {
     it('background music is globally enabled for audio mixing', async () => {
+      // These config files are gitignored (runtime state) — skip in CI/test mode
+      if (process.env.AGENTVIBES_TEST_MODE) {
+        return;
+      }
       // Support both legacy flag file and newer text config formats
       const legacyFile = path.join(PROJECT_ROOT, '.claude', 'config', 'background-music-enabled.txt');
       const newFile    = path.join(PROJECT_ROOT, '.claude', 'config', 'background-music.txt');

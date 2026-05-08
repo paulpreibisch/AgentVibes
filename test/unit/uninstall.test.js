@@ -89,18 +89,28 @@ class UninstallHandler {
     if (!this.options.global) return;
 
     const homedir = process.env.HOME || process.env.USERPROFILE;
-    const globalPaths = [
-      path.join(homedir, '.claude'),
-      path.join(homedir, '.agentvibes'),
-    ];
 
-    for (const dirPath of globalPaths) {
+    // ~/.agentvibes is entirely AgentVibes-owned — safe to remove whole dir
+    try {
+      await fs.rm(path.join(homedir, '.agentvibes'), { recursive: true, force: true });
+      this.removedPaths.push(path.join(homedir, '.agentvibes'));
+    } catch (_) { /* not present */ }
+
+    // Inside ~/.claude only remove AgentVibes-owned subdirs — never the whole dir
+    const claudeDir = path.join(homedir, '.claude');
+    const agentVibesOwnedInClaude = [
+      path.join(claudeDir, 'hooks'),
+      path.join(claudeDir, 'hooks-windows'),
+      path.join(claudeDir, 'commands', 'agent-vibes'),
+      path.join(claudeDir, 'personalities'),
+      path.join(claudeDir, 'output-styles'),
+      path.join(claudeDir, 'audio'),
+    ];
+    for (const dirPath of agentVibesOwnedInClaude) {
       try {
         await fs.rm(dirPath, { recursive: true, force: true });
         this.removedPaths.push(dirPath);
-      } catch (err) {
-        // Ignore if directory doesn't exist
-      }
+      } catch (_) { /* not present */ }
     }
   }
 
@@ -294,24 +304,38 @@ describe('Uninstall Command', () => {
       } catch {}
     });
 
-    it('should remove global directories when --global flag is set', async () => {
+    it('should remove AgentVibes subdirs from ~/.claude but NOT the directory itself', async () => {
+      // Setup: AgentVibes subdirs + user-owned files that must survive
+      await fs.mkdir(path.join(tempHome, '.claude', 'hooks'), { recursive: true });
+      await fs.mkdir(path.join(tempHome, '.claude', 'hooks-windows'), { recursive: true });
+      await fs.mkdir(path.join(tempHome, '.claude', 'audio'), { recursive: true });
+      await fs.writeFile(path.join(tempHome, '.claude', 'settings.json'), '{"key":"value"}');
+      await fs.writeFile(path.join(tempHome, '.claude', 'CLAUDE.md'), '# My Instructions');
+
       const handler = new UninstallHandler(testDir, { global: true });
       await handler.removeGlobalFiles();
 
-      // Verify global directories are removed
-      try {
-        await fs.access(path.join(tempHome, '.claude'));
-        assert.fail('Global .claude directory should have been removed');
-      } catch {
-        assert.ok(true, 'Global .claude directory was removed');
-      }
+      // AgentVibes subdirs removed
+      await assert.rejects(() => fs.access(path.join(tempHome, '.claude', 'hooks')));
+      await assert.rejects(() => fs.access(path.join(tempHome, '.claude', 'audio')));
 
-      try {
-        await fs.access(path.join(tempHome, '.agentvibes'));
-        assert.fail('Global .agentvibes directory should have been removed');
-      } catch {
-        assert.ok(true, 'Global .agentvibes directory was removed');
-      }
+      // ~/.claude itself must still exist
+      await fs.access(path.join(tempHome, '.claude'));
+
+      // User files must be untouched — issue #182 regression guard
+      await fs.access(path.join(tempHome, '.claude', 'settings.json'));
+      await fs.access(path.join(tempHome, '.claude', 'CLAUDE.md'));
+      assert.ok(true, 'settings.json and CLAUDE.md survived --global uninstall');
+    });
+
+    it('should remove ~/.agentvibes entirely', async () => {
+      const handler = new UninstallHandler(testDir, { global: true });
+      await handler.removeGlobalFiles();
+
+      await assert.rejects(
+        () => fs.access(path.join(tempHome, '.agentvibes')),
+        'Global .agentvibes directory should be removed'
+      );
     });
 
     it('should NOT remove global directories without --global flag', async () => {
@@ -412,27 +436,28 @@ describe('Uninstall Command', () => {
     });
 
     it('should handle --global and --with-piper together', async () => {
+      // Add user files that must survive
+      await fs.writeFile(path.join(tempHome, '.claude', 'settings.json'), '{}');
+
       const handler = new UninstallHandler(testDir, { global: true, withPiper: true });
       const result = await handler.execute();
 
       assert.strictEqual(result.success, true, 'Uninstall should succeed');
 
-      // Verify all directories are removed
-      const pathsToCheck = [
-        path.join(testDir, '.claude'),
-        path.join(tempHome, '.claude'),
-        path.join(tempHome, '.agentvibes'),
-        path.join(tempHome, 'piper'),
-      ];
+      // Project .claude/commands/agent-vibes removed
+      await assert.rejects(
+        () => fs.access(path.join(testDir, '.claude', 'commands', 'agent-vibes')),
+        'Project commands dir should be removed'
+      );
 
-      for (const checkPath of pathsToCheck) {
-        try {
-          await fs.access(checkPath);
-          assert.fail(`Path ${checkPath} should have been removed`);
-        } catch {
-          assert.ok(true, `Path ${checkPath} was removed`);
-        }
-      }
+      // ~/.agentvibes and ~/piper removed entirely
+      await assert.rejects(() => fs.access(path.join(tempHome, '.agentvibes')));
+      await assert.rejects(() => fs.access(path.join(tempHome, 'piper')));
+
+      // ~/.claude itself must still exist (user data preserved)
+      await fs.access(path.join(tempHome, '.claude'));
+      await fs.access(path.join(tempHome, '.claude', 'settings.json'));
+      assert.ok(true, 'User data in ~/.claude survived combined uninstall');
     });
   });
 
