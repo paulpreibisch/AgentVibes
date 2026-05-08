@@ -326,15 +326,24 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
 # TTS to a remote host — overriding with a local engine would synthesize on
 # the wrong machine.
 if ($_LlmEngine) {
-    $allowedLocalEngines = @("windows-sapi", "windows-piper", "soprano")
-    if ($allowedLocalEngines -contains $_LlmEngine) {
-        switch ($_LlmEngine) {
-            "windows-sapi"  { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1"  }
-            "windows-piper" { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
-            "soprano"       { $ProviderScript = "$HooksDir\play-tts-soprano.ps1"        }
+    # Accept both canonical Windows names and the cross-platform aliases the TUI
+    # writes (e.g. "piper" saved on a Linux/WSL install that is later read on
+    # Windows, or "sapi" as a short form).  Unknown values keep the global default.
+    # Mirror the global-provider switch: prefer the PS-5.1-compatible script name,
+    # fall back to the alternate name if the first doesn't exist on disk.
+    switch ($_LlmEngine) {
+        { $_ -in "windows-sapi", "sapi" } {
+            $ProviderScript = "$HooksDir\play-tts-sapi.ps1"
+            if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1" }
         }
-    } else {
-        Write-Host "[INFO] play-tts.ps1: Unrecognised engine '$_LlmEngine' in audio-effects.cfg — keeping default provider" -ForegroundColor DarkGray
+        { $_ -in "windows-piper", "piper" } {
+            $ProviderScript = "$HooksDir\play-tts-piper.ps1"
+            if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
+        }
+        "soprano" { $ProviderScript = "$HooksDir\play-tts-soprano.ps1" }
+        default {
+            Write-Host "[INFO] play-tts.ps1: Unrecognised engine '$_LlmEngine' — keeping default provider" -ForegroundColor DarkGray
+        }
     }
 }
 

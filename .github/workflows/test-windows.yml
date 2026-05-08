@@ -242,6 +242,76 @@ jobs:
           Write-Host "Output: $result"
           Write-Host "✅ provider-manager.ps1 get completed (exit: $LASTEXITCODE)"
 
+      # ─── play-tts.ps1 CLAUDE_PROJECT_DIR regression test ────────────────────
+      # Regression guard for: play-tts.ps1 must read audio-effects.cfg and
+      # background-music-enabled.txt from CLAUDE_PROJECT_DIR first, so that
+      # global/npm-link installs (where the package dir ≠ project dir) still
+      # pick up per-LLM config written by the TUI preview to the project dir.
+
+      - name: play-tts.ps1 reads LLM config from CLAUDE_PROJECT_DIR
+        shell: powershell
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+          AGENTVIBES_VERBOSE: "1"
+        run: |
+          # Create an isolated project dir with its own audio-effects.cfg
+          $proj = Join-Path $env:TEMP "agentvibes-ci-proj-$([System.IO.Path]::GetRandomFileName())"
+          $cfgDir = Join-Path $proj ".claude\config"
+          New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null
+
+          # Write a sentinel LLM row — voice field has a unique value we can grep for
+          # Engine "piper" tests the cross-platform alias (TUI writes "piper", not "windows-piper")
+          Set-Content "$cfgDir\audio-effects.cfg" "llm:ci-test|off||0.20|ci-sentinel-voice||piper"
+          Set-Content "$cfgDir\background-music-enabled.txt" "false"
+
+          $env:CLAUDE_PROJECT_DIR = $proj
+
+          $out = & powershell -NoProfile -ExecutionPolicy Bypass `
+            -File (Resolve-Path ".claude\hooks-windows\play-tts.ps1").Path `
+            "CI regression test" "" -llm "ci-test" 2>&1 | Out-String
+
+          Remove-Item $proj -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Output: $out"
+
+          # The sentinel voice must appear in verbose debug output
+          if ($out -notmatch "ci-sentinel-voice") {
+            Write-Error "FAIL: play-tts.ps1 did not read audio-effects.cfg from CLAUDE_PROJECT_DIR — LLM config lookup broken"
+            exit 1
+          }
+          Write-Host "✅ play-tts.ps1 correctly read LLM config from CLAUDE_PROJECT_DIR"
+
+      - name: play-tts.ps1 reads bg-music-enabled from CLAUDE_PROJECT_DIR
+        shell: powershell
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+          AGENTVIBES_VERBOSE: "1"
+        run: |
+          $proj = Join-Path $env:TEMP "agentvibes-ci-proj-$([System.IO.Path]::GetRandomFileName())"
+          $cfgDir = Join-Path $proj ".claude\config"
+          New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null
+
+          # LLM row with no bg track — enabled flag must come from CLAUDE_PROJECT_DIR
+          Set-Content "$cfgDir\audio-effects.cfg" "llm:ci-bgtest|off|||ci-bg-voice||piper"
+          Set-Content "$cfgDir\background-music-enabled.txt" "true"
+
+          $env:CLAUDE_PROJECT_DIR = $proj
+
+          $out = & powershell -NoProfile -ExecutionPolicy Bypass `
+            -File (Resolve-Path ".claude\hooks-windows\play-tts.ps1").Path `
+            "CI bg test" "" -llm "ci-bgtest" 2>&1 | Out-String
+
+          Remove-Item $proj -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Output: $out"
+
+          # BgEnabled should be True in verbose output
+          if ($out -notmatch "BgEnabled=True") {
+            Write-Error "FAIL: play-tts.ps1 did not read background-music-enabled.txt from CLAUDE_PROJECT_DIR"
+            exit 1
+          }
+          Write-Host "✅ play-tts.ps1 correctly read BgEnabled=true from CLAUDE_PROJECT_DIR"
+
       # ─── Installer smoke test ─────────────────────────────────────────────
 
       # Fix #10: Removed || true — real errors must not be silenced
