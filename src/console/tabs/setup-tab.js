@@ -1767,8 +1767,15 @@ export function createSetupTab(screen, services) {
       style: { bg: COLORS.contentBg },
     });
 
+    // _bgRestoreFn is modal-scoped so _killPreview can restore bg music synchronously,
+    // eliminating the race condition when Preview is clicked twice rapidly.
     let _previewModalProc = null;
+    let _bgRestoreFn = null;
     function _killPreview() {
+      // Restore bg music immediately (synchronously) before killing the process.
+      // This prevents the async exit-handler race where a second Preview invocation
+      // reads bgWas=true (music already enabled) before the first's exit fires.
+      if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
       if (_previewModalProc) {
         try { _previewModalProc.kill(); } catch {}
         _previewModalProc = null;
@@ -1783,28 +1790,18 @@ export function createSetupTab(screen, services) {
       // Save first so play-tts picks up current settings
       _autoSave(true);
 
-      // Temporarily enable background music for preview if a track is configured
-      const hasBgTrack = !!draft.bgTrack;
-      let _bgRestore = null;
-      if (hasBgTrack) {
-        const avCfgPath = path.join(targetDir, '.agentvibes', 'config.json');
-        try {
-          const raw = fs.readFileSync(avCfgPath, 'utf8');
-          const cfg = JSON.parse(raw);
-          if (cfg.backgroundMusic && !cfg.backgroundMusic.enabled) {
-            cfg.backgroundMusic.enabled = true;
-            fs.writeFileSync(avCfgPath, JSON.stringify(cfg, null, 2) + '\n');
-            _bgRestore = () => { cfg.backgroundMusic.enabled = false; fs.writeFileSync(avCfgPath, JSON.stringify(cfg, null, 2) + '\n'); };
-          }
-        } catch {
-          // No .agentvibes/config.json — use legacy txt fallback
-          const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
-          let bgWas = false;
-          try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
-          if (!bgWas) {
-            try { fs.writeFileSync(bgEnabledFile, 'true', 'utf8'); } catch {}
-            _bgRestore = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
-          }
+      // Temporarily enable background music for preview if a track is configured.
+      // audio-processor.sh reads background-music-enabled.txt — write directly to that file.
+      if (!!draft.bgTrack) {
+        const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
+        let bgWas = false;
+        try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
+        if (!bgWas) {
+          try {
+            fs.mkdirSync(path.dirname(bgEnabledFile), { recursive: true });
+            fs.writeFileSync(bgEnabledFile, 'true', 'utf8');
+          } catch {}
+          _bgRestoreFn = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
         }
       }
 
@@ -1837,16 +1834,14 @@ export function createSetupTab(screen, services) {
       });
       _previewModalProc = proc;
 
-      const _restoreBg = () => { if (_bgRestore) _bgRestore(); };
-
       proc.on('exit', () => {
         _previewModalProc = null;
-        _restoreBg();
+        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
         if (!_closed) { previewLine.setContent(''); screen.render(); }
       });
       proc.on('error', () => {
         _previewModalProc = null;
-        _restoreBg();
+        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
         if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
       });
     }

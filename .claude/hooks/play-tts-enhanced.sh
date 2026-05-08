@@ -44,9 +44,10 @@ if [[ -n "$AGENT_PROFILE" ]] && [[ -f "$AGENT_PROFILE" ]]; then
     _PROFILE_MUSIC_TRACK=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(p.backgroundMusic?.track||'')}catch{}" 2>/dev/null || true)
     _PROFILE_MUSIC_VOL=$(_APFILE="$AGENT_PROFILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._APFILE,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume||''))}catch{}" 2>/dev/null || true)
 
-    # Apply per-agent reverb via effects-manager (scoped to this agent's config key)
-    if [[ -n "$_PROFILE_REVERB" ]] && [[ -f "$SCRIPT_DIR/effects-manager.sh" ]]; then
-        bash "$SCRIPT_DIR/effects-manager.sh" set-reverb "$_PROFILE_REVERB" "$CONFIG_KEY" 2>/dev/null || true
+    # Apply per-invocation reverb via env var override (processed by audio-processor.sh).
+    # This avoids permanently mutating audio-effects.cfg — env var is process-scoped and auto-cleaned.
+    if [[ -n "$_PROFILE_REVERB" ]]; then
+        export AGENTVIBES_REVERB_OVERRIDE="$_PROFILE_REVERB"
     fi
 
     # Override background music track/volume for this invocation via env vars

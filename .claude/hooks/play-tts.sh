@@ -159,7 +159,6 @@ fi
 # Format: llm:<name>|REVERB_PRESET|BACKGROUND_FILE|BACKGROUND_VOLUME|VOICE|PRETEXT
 _LLM_VOICE=""
 _LLM_PRETEXT=""
-_LLM_REVERB=""
 _LLM_ENGINE=""
 if [[ -n "$LLM_PROVIDER" ]]; then
   _llm_key="llm:${LLM_PROVIDER}"
@@ -175,11 +174,9 @@ if [[ -n "$LLM_PROVIDER" ]]; then
     if [[ -z "$_LLM_VOICE" && -z "$_LLM_PRETEXT" && -f "$_cfg" ]]; then
       while IFS='|' read -r _key _reverb _bgfile _bgvol _voice _pretext _engine _rest; do
         if [[ "$_key" == "$_llm_key" ]]; then
-          _reverb="${_reverb## }"; _reverb="${_reverb%% }"
           _voice="${_voice## }"; _voice="${_voice%% }"
           _pretext="${_pretext## }"; _pretext="${_pretext%% }"
           _engine="${_engine## }"; _engine="${_engine%% }"
-          [[ -n "$_reverb" ]] && _LLM_REVERB="$_reverb"
           [[ -n "$_voice" ]] && _LLM_VOICE="$_voice"
           [[ -n "$_pretext" ]] && _LLM_PRETEXT="$_pretext"
           [[ -n "$_engine" ]] && _LLM_ENGINE="$_engine"
