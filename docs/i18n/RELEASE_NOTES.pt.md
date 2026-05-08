@@ -1,5 +1,33 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🌟 v5.6.3 — AgentVibes chega ao Hermes + Configuração remota mais fácil
+
+**Lançamento:** 2026-05-07
+
+### 🎉 AgentVibes agora funciona com o Hermes
+
+**[Hermes](https://github.com/NousResearch/hermes-agent)** é um dos agentes de IA de código aberto mais populares do GitHub — mais de 21.000 estrelas e crescendo. AgentVibes agora se integra com ele nativamente: quando o Hermes termina uma resposta, o AgentVibes a fala em voz alta pelos seus alto-falantes automaticamente. Nenhuma configuração extra além de instalar o hook incluído.
+
+### 🎉 Destino de áudio por LLM — escolha de onde vem a voz
+
+Quando você configura um LLM no AgentVibes (Claude Code, Copilot, Codex ou Hermes), você já podia definir uma **voz, estilo de reverb, música de fundo e prefixo de introdução** exclusivos para cada um. Agora você também pode definir o **destino de áudio** por LLM:
+
+- **Local** — reproduzir pelos alto-falantes do computador em que você está trabalhando
+- **Remoto** — enviar o áudio para uma máquina diferente (seu laptop, por exemplo) enquanto você trabalha em um servidor remoto ou executa o Hermes na nuvem
+
+### 🎉 Seletor de alias SSH — sem mais digitar caminhos manualmente
+
+Configurar o áudio remoto antes exigia digitar um caminho SSH manualmente. Agora há um **menu suspenso diretamente na TUI do AgentVibes** que lê os aliases SSH que já estão na sua máquina. Escolha o que aponta para seus alto-falantes — pronto. Sua voz te segue seja você local ou remoto.
+
+### 🐛 Correções
+
+- **Sem áudio algum** — algumas configurações produziam silêncio completo sem nenhuma mensagem de erro. Corrigido.
+- **Voz errada tocando** — em algumas configurações, o AgentVibes ignorava suas configurações de voz por IA e voltava ao padrão. Corrigido.
+- **Configurações de áudio vazando entre mensagens** — música ou reverb definidos para uma mensagem podiam acidentalmente passar para a próxima. Corrigido.
+- **Mensagens perdidas após um crash** — se o AgentVibes falhasse no meio de uma mensagem, essa mensagem era perdida. Agora ele a recupera e reproduz ao reiniciar.
+
+---
+
 ## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
 
 > See [English release notes](../../RELEASE_NOTES.md) for full details.

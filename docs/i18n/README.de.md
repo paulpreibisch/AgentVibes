@@ -4,7 +4,15 @@
 
 ---
 
-## 🌟 NEU IN v5.6.2 — Hermes Agent Integration
+## 🌟 NEU IN v5.6.3 — AgentVibes kommt zu Hermes + Einfachere Remote-Einrichtung
+
+**AgentVibes funktioniert jetzt mit [Hermes](https://github.com/NousResearch/hermes-agent)** — einem der beliebtesten Open-Source-KI-Agenten auf GitHub (über 21.000 Sterne). Wenn Hermes eine Antwort abschließt, spricht AgentVibes sie automatisch über deine Lautsprecher.
+
+Wenn du einen LLM in AgentVibes konfigurierst (Claude Code, Copilot, Codex oder Hermes), kannst du eine einzigartige **Stimme, einen Reverb-Stil, Hintergrundmusik und ein Intro-Präfix** für jeden festlegen — damit jede KI anders klingt. Neu in dieser Version: Du kannst auch das **Audio-Ziel** pro LLM festlegen. Wähle **Lokal**, um über den Computer abzuspielen, an dem du arbeitest, oder **Remote**, um Audio an eine andere Maschine zu senden (z. B. deinen Laptop), während du auf einem Remote-Server arbeitest.
+
+Das Einrichten von Remote-Audio erforderte früher das manuelle Eintippen eines SSH-Pfads. Jetzt gibt es ein **Dropdown direkt in der AgentVibes-TUI**, das deine vorhandenen SSH-Aliase liest — wähle einfach den aus, der auf deine Lautsprecher zeigt, und fertig. Entwickle auf einem Remote-Server oder führe Hermes in der Cloud aus, und die Stimme kommt aus den Laptop-Lautsprechern ohne manuelle Konfiguration.
+
+## v5.6.2 — Hermes Agent Integration
 
 AgentVibes spricht jetzt für **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — den selbst gehosteten, selbst verbessernden KI-Assistenten. Zwei produktionsreife Skills sind in `docs/hermes/skills/` enthalten:
 

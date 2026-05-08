@@ -1,25 +1,28 @@
 # AgentVibes Release Notes
 
-## 🔐 v5.6.3 — Easier Setup & More Reliable Audio
+## 🌟 v5.6.3 — AgentVibes Comes to Hermes + Easier Remote Setup
 
 **Released:** 2026-05-07
 
-### 🎉 Easier Hermes Setup
+### 🎉 AgentVibes Now Works with Hermes
 
-Setting up AgentVibes to work with a remote computer is now much simpler:
+**[Hermes](https://github.com/NousResearch/hermes-agent)** is one of the most popular open-source AI agents on GitHub — 21,000+ stars and growing. AgentVibes now integrates with it out of the box: when Hermes finishes a response, AgentVibes speaks it aloud through your speakers automatically. No extra setup beyond installing the included hook.
 
-- **Pick your SSH key from a list** — instead of typing a file path, AgentVibes now reads your SSH config and shows you a list of available keys to choose from
-- **Same-machine mode** — if your AI assistant and AgentVibes are on the same computer, you can skip the SSH step entirely and audio just plays directly
-- **Better control from Hermes** — Hermes agents can now adjust your audio settings (voice, music, reverb) on the fly, not just speak text
+### 🎉 Per-LLM Audio Destination — Pick Where the Voice Comes From
 
-### 🎉 Your LLM's Voice Follows It Everywhere
+When you configure an LLM in AgentVibes (Claude Code, Copilot, Codex, or Hermes), you already could set a unique **voice, reverb style, background music, and intro prefix** for each one. Now you can also set the **audio destination** per LLM:
 
-If you've set up different voices for Claude, Copilot, or Codex — those voices now work even when your AI is running on a different computer and sending audio to your Windows machine over the network.
+- **Local** — play through the speakers on the computer you're working on
+- **Remote** — send audio to a different machine (your laptop, for example) while you work on a remote server or run Hermes in the cloud
+
+### 🎉 SSH Alias Picker — No More Typing Paths
+
+Setting up remote audio used to require typing an SSH path by hand. Now there's a **dropdown right in the AgentVibes TUI** that reads the SSH aliases already on your machine. Pick the one that points to your speakers — done. Your voice follows you whether you're local or remote.
 
 ### 🐛 Fixes
 
 - **No audio at all** — some setups would get complete silence with no error message. Fixed.
-- **Wrong voice playing** — in some configs, AgentVibes would ignore your per-AI voice settings and fall back to the default. Fixed.
+- **Wrong voice playing** — in some configs, AgentVibes would ignore your per-LLM voice settings and fall back to the default. Fixed.
 - **Audio settings leaking between messages** — music or reverb set for one message could accidentally carry over to the next one. Fixed.
 - **Lost messages after a crash** — if AgentVibes crashed mid-message, that message was gone. It now recovers and replays it when it restarts.
 

@@ -4,7 +4,15 @@
 
 ---
 
-## 🌟 v5.6.2 新功能 — Hermes Agent 集成
+## 🌟 v5.6.3 新功能 — AgentVibes 支持 Hermes + 更简单的远程设置
+
+**AgentVibes 现已支持 [Hermes](https://github.com/NousResearch/hermes-agent)** — GitHub 上最受欢迎的开源 AI 代理之一（21,000 余颗星）。当 Hermes 完成响应后，AgentVibes 会自动通过扬声器大声朗读。
+
+在 AgentVibes 中配置任意 LLM（Claude Code、Copilot、Codex 或 Hermes）时，您可以为每个 LLM 设置独特的**语音、混响风格、背景音乐和前缀介绍** — 让每个 AI 听起来各不相同。本版新增功能：您还可以为每个 LLM 设置**音频目标**。选择**本地**可通过您所在计算机的扬声器播放，选择**远程**则可在远程服务器上工作或在云端运行 Hermes 时，将音频发送到另一台机器（例如您的笔记本电脑）。
+
+以前设置远程音频需要手动输入 SSH 路径。现在 **AgentVibes TUI 中直接内置了一个下拉菜单**，可以读取您已有的 SSH 别名 — 只需选择指向您扬声器的那个即可完成。在远程服务器上开发或在云端运行 Hermes，声音无需任何手动配置就能从笔记本电脑的扬声器中传出。
+
+## v5.6.2 新功能 — Hermes Agent 集成
 
 AgentVibes 现在可以为 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 自托管、自我改进的 AI 助手发声。两个生产就绪的技能包含在 `docs/hermes/skills/` 中：
 

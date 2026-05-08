@@ -4,7 +4,15 @@
 
 ---
 
-## 🌟 v5.6.2 신기능 — Hermes Agent 통합
+## 🌟 v5.6.3 신기능 — AgentVibes, Hermes 지원 + 더 쉬워진 원격 설정
+
+**AgentVibes가 이제 [Hermes](https://github.com/NousResearch/hermes-agent)와 함께 작동합니다** — GitHub에서 가장 인기 있는 오픈소스 AI 에이전트 중 하나(21,000개 이상의 별). Hermes가 응답을 완료하면 AgentVibes가 자동으로 스피커를 통해 소리 내어 읽어줍니다.
+
+AgentVibes에서 LLM(Claude Code, Copilot, Codex 또는 Hermes)을 구성할 때, 각각에 고유한 **음성, 리버브 스타일, 배경 음악, 인트로 프리픽스**를 설정할 수 있어 — 각 AI가 독특한 소리를 냅니다. 이번 버전의 새 기능: LLM별로 **오디오 목적지**도 설정할 수 있습니다. **로컬**을 선택하면 작업 중인 컴퓨터의 스피커로 재생되고, **원격**을 선택하면 원격 서버에서 작업하거나 클라우드에서 Hermes를 실행하는 동안 다른 기기(노트북 등)로 오디오가 전송됩니다.
+
+원격 오디오 설정에는 이전에 SSH 경로를 직접 입력해야 했습니다. 이제 **AgentVibes TUI 안에 드롭다운 메뉴**가 생겼으며, 기존 SSH 별칭을 읽어옵니다. 스피커가 연결된 것을 선택하면 끝입니다. 원격 서버에서 개발하거나 클라우드에서 Hermes를 실행해도, 별도 설정 없이 노트북 스피커에서 음성이 나옵니다.
+
+## v5.6.2 신기능 — Hermes Agent 통합
 
 AgentVibes가 이제 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 자체 호스팅, 자기 개선 AI 어시스턴트를 위해 말할 수 있습니다. 프로덕션 준비 완료된 스킬 2개가 `docs/hermes/skills/`에 포함됩니다:
 
