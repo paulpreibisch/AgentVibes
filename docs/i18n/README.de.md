@@ -4,6 +4,10 @@
 
 ---
 
+## 🌟 NEU IN v5.6.7 — Windows-Vorschau repariert
+
+Die **Vorschau-Schaltfläche in der LLM-Audiokonfiguration funktioniert jetzt korrekt unter Windows**. Sie spielt die Stimme, den Hall und den Hintergrundtrack ab, den du konfiguriert hast — kein Zurückfallen auf die falsche Stimme oder Stille.
+
 ## 🌟 NEU IN v5.6.6 — Vorschau-Schaltfläche funktioniert in WSL + Umfassende Windows-Testsuite
 
 **Die Vorschau-Schaltfläche in der LLM-Audiokonfiguration funktioniert jetzt korrekt in WSL.** Wenn du Stimme, Hall und Hintergrundtrack für jedes LLM konfigurierst, spielt ein Klick auf Vorschau nun dein vollständiges Audio-Setup ab — Stimme, Musik und Effekte — genau so, wie es während einer echten Sitzung klingt. Zuvor wurde die Hintergrundmusik bei `npm link`- und globalen Installationen lautlos weggelassen.

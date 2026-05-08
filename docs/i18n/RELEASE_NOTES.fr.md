@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🪟 v5.6.7 — Aperçu Windows Corrigé
+
+**Sortie :** 2026-05-08
+
+### 🐛 Le Bouton Aperçu Fonctionne Désormais Correctement sur Windows
+
+Lors de la configuration audio par LLM sur Windows, cliquer sur **Aperçu** jouait la mauvaise voix (utilisant par défaut Windows SAPI) sans musique de fond ni réverbération. Désormais, il joue exactement la voix, la réverbération et la piste de fond que vous avez configurées.
+
+### 🧪 Tests de Régression Ajoutés
+
+Deux nouveaux tests CI Windows vérifient la recherche de configuration d'aperçu — ce bug ne peut donc plus régresser silencieusement dans une version future.
+
+---
+
 ## 🔇→🎵 v5.6.6 — Prévisualisation de la Musique de Fond Corrigée pour npm link & Installations Globales
 
 **Sortie :** 2026-05-08

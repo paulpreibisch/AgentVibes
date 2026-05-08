@@ -4,6 +4,10 @@
 
 ---
 
+## 🌟 NUEVO EN v5.6.7 — Vista Previa en Windows Corregida
+
+El **botón de Vista Previa en la configuración de audio del LLM ahora funciona correctamente en Windows**. Reproduce la voz, reverberación y pista de fondo que configuraste — sin volver a la voz incorrecta ni reproducir silencio.
+
 ## 🌟 NUEVO EN v5.6.6 — El Botón de Vista Previa Funciona en WSL + Suite de Pruebas Exhaustiva para Windows
 
 **El botón de Vista Previa en la configuración de audio por LLM ahora funciona correctamente en WSL.** Al configurar una voz, reverberación y pista de fondo para cada LLM, hacer clic en Vista Previa reproduce tu configuración de audio completa — voz, música y efectos — exactamente como sonará durante una sesión real. Anteriormente, la música de fondo era descartada silenciosamente en configuraciones con `npm link` e instalación global.

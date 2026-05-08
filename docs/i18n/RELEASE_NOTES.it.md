@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🪟 v5.6.7 — Il Pulsante Anteprima Funziona Correttamente su Windows
+
+**Rilascio:** 2026-05-08
+
+### 🐛 Il Pulsante Anteprima Ora Funziona Correttamente su Windows
+
+Quando si configurava l'audio per LLM su Windows, cliccando **Anteprima** veniva riprodotta la voce sbagliata (con Windows SAPI come predefinito) senza musica di sottofondo né riverbero. Ora riproduce esattamente la voce, il riverbero e la traccia di sottofondo che hai configurato.
+
+### 🧪 Test di Regressione Aggiunti
+
+Due nuovi test CI per Windows verificano la ricerca della configurazione di anteprima — così questo problema non potrà regredire silenziosamente in un rilascio futuro.
+
+---
+
 ## 🔇→🎵 v5.6.6 — Anteprima Musica di Sottofondo Corretta per npm link e Installazioni Globali
 
 **Rilascio:** 2026-05-08

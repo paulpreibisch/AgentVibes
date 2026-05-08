@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🪟 v5.6.7 — Windows-Vorschau repariert
+
+**Veröffentlicht:** 2026-05-08
+
+### 🐛 Vorschau-Schaltfläche funktioniert jetzt korrekt unter Windows
+
+Beim Konfigurieren von Audio pro LLM unter Windows spielte ein Klick auf **Vorschau** die falsche Stimme (Standard: Windows SAPI) ohne Hintergrundmusik oder Hall ab. Jetzt spielt es genau die Stimme, den Hall und den Hintergrundtrack ab, den du konfiguriert hast.
+
+### 🧪 Regressionstests hinzugefügt
+
+Zwei neue Windows-CI-Tests überprüfen die Vorschau-Konfigurationssuche — damit kann dies in einer zukünftigen Version nicht lautlos regressieren.
+
+---
+
 ## 🔇→🎵 v5.6.6 — Hintergrundmusik-Vorschau für npm link und globale Installationen repariert
 
 **Veröffentlicht:** 2026-05-08

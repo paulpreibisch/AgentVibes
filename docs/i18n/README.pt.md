@@ -4,6 +4,10 @@
 
 ---
 
+## 🌟 NOVO NO v5.6.7 — Pré-visualização no Windows Corrigida
+
+O **botão de Pré-visualização na configuração de áudio do LLM agora funciona corretamente no Windows**. Ele reproduz a voz, o reverb e a faixa de fundo que você configurou — sem retornar à voz errada nem reproduzir silêncio.
+
 ## 🌟 NOVO NO v5.6.6 — Botão de Pré-visualização Funciona no WSL + Suite de Testes Windows Abrangente
 
 **O botão de Pré-visualização na configuração de áudio do LLM agora funciona corretamente no WSL.** Ao configurar uma voz, reverb e faixa de fundo para cada LLM, clicar em Pré-visualização agora reproduz toda a sua configuração de áudio — voz, música e efeitos — exatamente como soará durante uma sessão real. Anteriormente, a música de fundo era silenciosamente descartada em configurações via `npm link` e instalações globais.

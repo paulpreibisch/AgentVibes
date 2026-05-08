@@ -4,6 +4,10 @@
 
 ---
 
+## 🌟 NOUVEAU DANS v5.6.7 — Aperçu Windows Corrigé
+
+Le **bouton Aperçu dans la configuration audio LLM fonctionne désormais correctement sur Windows**. Il joue la voix, la réverbération et la piste de fond que vous avez configurées — sans repli sur la mauvaise voix ni lecture du silence.
+
 ## 🌟 NOUVEAU DANS v5.6.6 — Le Bouton Aperçu Fonctionne dans WSL + Suite de Tests Windows Complète
 
 **Le bouton Aperçu dans la configuration audio LLM fonctionne désormais correctement dans WSL.** Lors de la configuration d'une voix, d'une réverbération et d'une piste de fond pour chaque LLM, cliquer sur Aperçu joue maintenant votre configuration audio complète — voix, musique et effets — exactement comme elle sonnera pendant une session réelle. Auparavant, la musique de fond était silencieusement abandonnée dans les configurations `npm link` et d'installation globale.

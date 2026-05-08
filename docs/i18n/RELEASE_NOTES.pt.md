@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🪟 v5.6.7 — Pré-visualização no Windows Corrigida
+
+**Lançamento:** 2026-05-08
+
+### 🐛 O Botão de Pré-visualização Agora Funciona Corretamente no Windows
+
+Ao configurar o áudio por LLM no Windows, clicar em **Pré-visualização** reproduzia a voz errada (usando por padrão o Windows SAPI) sem música de fundo ou reverb. Agora reproduz exatamente a voz, o reverb e a faixa de fundo que você configurou.
+
+### 🧪 Testes de Regressão Adicionados
+
+Dois novos testes CI do Windows verificam a busca de configuração de pré-visualização — assim, isso não pode regredir silenciosamente em uma versão futura.
+
+---
+
 ## 🔇→🎵 v5.6.6 — Pré-visualização de Música de Fundo Corrigida para npm link e Instalações Globais
 
 **Lançamento:** 2026-05-08

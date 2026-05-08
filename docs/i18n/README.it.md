@@ -4,6 +4,10 @@
 
 ---
 
+## 🌟 NOVITÀ IN v5.6.7 — Il Pulsante Anteprima Funziona Correttamente su Windows
+
+**Il pulsante Anteprima nella configurazione audio LLM ora funziona correttamente su Windows.** Riproduce la voce, il riverbero e la traccia di sottofondo che hai configurato — niente più selezione della voce sbagliata o riproduzione silenziosa.
+
 ## 🌟 NOVITÀ IN v5.6.6 — Il Pulsante Anteprima Funziona in WSL + Suite di Test Windows Completa
 
 **Il pulsante Anteprima nella configurazione audio LLM ora funziona correttamente in WSL.** Quando si configura una voce, un riverbero e una traccia di sottofondo per ogni LLM, cliccando Anteprima si riproduce l'intera configurazione audio — voce, musica ed effetti — esattamente come suonerà durante una sessione reale. In precedenza, la musica di sottofondo veniva silenziosamente eliminata nelle installazioni tramite `npm link` e globali.

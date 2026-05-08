@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🪟 v5.6.7 — Vista Previa en Windows Corregida
+
+**Lanzamiento:** 2026-05-08
+
+### 🐛 El Botón de Vista Previa Ahora Funciona Correctamente en Windows
+
+Al configurar el audio por LLM en Windows, hacer clic en **Vista Previa** reproducía la voz incorrecta (utilizando por defecto Windows SAPI) sin música de fondo ni reverberación. Ahora reproduce exactamente la voz, reverberación y pista de fondo que configuraste.
+
+### 🧪 Pruebas de Regresión Añadidas
+
+Dos nuevas pruebas de CI para Windows verifican la búsqueda de configuración de vista previa — así que esto no puede regresar silenciosamente en una versión futura.
+
+---
+
 ## 🔇→🎵 v5.6.6 — Vista Previa de Música de Fondo Corregida para npm link e Instalaciones Globales
 
 **Lanzamiento:** 2026-05-08
