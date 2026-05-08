@@ -4,15 +4,11 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.6.3 — AgentVibes débarque sur Hermes + Configuration distante simplifiée
+## 🌟 NOUVEAU DANS v5.6.4 — Correction Critique de Sécurité de la Désinstallation
 
-**AgentVibes fonctionne maintenant avec [Hermes](https://github.com/NousResearch/hermes-agent)** — l'un des agents IA open source les plus populaires sur GitHub (plus de 21 000 étoiles). Quand Hermes termine une réponse, AgentVibes la lit à voix haute via vos haut-parleurs automatiquement.
+`uninstall --global` supprimait l'intégralité de votre répertoire `~/.claude/` — paramètres, CLAUDE.md, skills, configurations MCP, tout. Corrigé : AgentVibes effectue désormais une suppression chirurgicale, en ne touchant que les fichiers qu'il a lui-même créés. Un test de régression dans CI impose cela désormais — si le problème réapparaît un jour, le build échoue avant la publication.
 
-Quand vous configurez un LLM dans AgentVibes (Claude Code, Copilot, Codex ou Hermes), vous pouvez définir une **voix, un style de réverbération, une musique de fond et un préfixe d'introduction** uniques pour chacun — pour que chaque IA sonne différemment. Nouveau dans cette version : vous pouvez aussi définir la **destination audio** par LLM. Choisissez **Local** pour jouer via l'ordinateur sur lequel vous êtes, ou **Distant** pour envoyer l'audio vers une autre machine (votre ordinateur portable, par exemple) pendant que vous travaillez sur un serveur distant.
-
-Configurer l'audio distant nécessitait auparavant de taper un chemin SSH manuellement. Il y a maintenant un **menu déroulant directement dans la TUI d'AgentVibes** qui lit vos alias SSH existants — choisissez simplement celui qui pointe vers vos haut-parleurs et c'est fait. Développez sur un serveur distant ou exécutez Hermes dans le cloud, et la voix sort de vos haut-parleurs d'ordinateur portable sans aucune configuration manuelle.
-
-## v5.6.2 — Intégration Hermes Agent
+## v5.6.3 — Hermes + Configuration distante simplifiée
 
 AgentVibes parle désormais pour **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — l'assistant IA auto-hébergé et auto-améliorant. Deux skills prêtes pour la production sont incluses dans `docs/hermes/skills/` :
 

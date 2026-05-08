@@ -1,5 +1,30 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.6.4 — 卸载安全关键修复
+
+**发布日期：** 2026-05-08
+
+### 🐛 `--global` 卸载不再清除 ~/.claude/
+
+使用 `--global` 时，卸载程序会递归删除 `~/.claude/`，而不是仅删除其中属于 AgentVibes 的路径。这导致数据完全丢失 — 设置、CLAUDE.md、skills、插件、MCP 配置、自定义工具，全部消失。已确认为真实问题，已确认修复。
+
+**v5.6.4 执行精准删除 — 仅删除 AgentVibes 安装的路径：**
+
+- `~/.claude/hooks/`、`hooks-windows/`、`commands/agent-vibes/`、`personalities/`、`audio/`
+- `~/.agentvibes/` — 完全由 AgentVibes 所有，整体删除
+- `settings.json`、`CLAUDE.md`、skills、插件、MCP 配置 — **保持不变**
+
+回归测试现在在 CI 中强制执行此约束。如果有人重新引入大范围删除，构建将失败：
+
+```js
+// issue #182 regression guard
+assert: settings.json and CLAUDE.md survived --global uninstall
+```
+
+这不会悄悄地回归 — 构建会首先失败。
+
+---
+
 ## 🌟 v5.6.3 — AgentVibes 支持 Hermes + 更简单的远程设置
 
 **发布日期：** 2026-05-07

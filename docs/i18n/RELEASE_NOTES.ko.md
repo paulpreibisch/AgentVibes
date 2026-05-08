@@ -1,5 +1,30 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.6.4 — 제거 기능의 심각한 보안 수정
+
+**릴리스:** 2026-05-08
+
+### 🐛 `--global` 제거 시 ~/.claude/가 더 이상 삭제되지 않습니다
+
+`--global` 옵션을 사용하면 제거 프로그램이 AgentVibes가 소유한 경로만 삭제하는 대신 `~/.claude/`를 재귀적으로 삭제하고 있었습니다. 이로 인해 설정, CLAUDE.md, 스킬, 플러그인, MCP 구성, 사용자 지정 도구 등 모든 데이터가 손실되었습니다. 실제 문제로 확인되었으며 수정되었습니다.
+
+**v5.6.4는 정밀한 제거를 수행합니다 — AgentVibes가 설치한 경로만:**
+
+- `~/.claude/hooks/`, `hooks-windows/`, `commands/agent-vibes/`, `personalities/`, `audio/`
+- `~/.agentvibes/` — AgentVibes가 완전히 소유하며, 전체 삭제
+- `settings.json`, `CLAUDE.md`, 스킬, 플러그인, MCP 구성 — **변경 없음**
+
+회귀 테스트가 이제 CI에서 이를 강제합니다. 누군가 광범위한 삭제를 다시 도입하면 빌드가 실패합니다:
+
+```js
+// issue #182 regression guard
+assert: settings.json and CLAUDE.md survived --global uninstall
+```
+
+이것은 조용히 회귀할 수 없습니다 — 먼저 빌드가 깨집니다.
+
+---
+
 ## 🌟 v5.6.3 — AgentVibes, Hermes 지원 + 더 쉬워진 원격 설정
 
 **릴리스:** 2026-05-07

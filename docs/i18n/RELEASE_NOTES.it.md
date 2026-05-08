@@ -1,5 +1,30 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.6.4 — Correzione Critica di Sicurezza della Disinstallazione
+
+**Rilascio:** 2026-05-08
+
+### 🐛 La disinstallazione con `--global` non cancella più ~/.claude/
+
+Con `--global`, il programma di disinstallazione rimuoveva `~/.claude/` in modo ricorsivo invece di eliminare solo i percorsi di proprietà di AgentVibes al suo interno. Questo causava la perdita totale dei dati — impostazioni, CLAUDE.md, skill, plugin, configurazioni MCP, strumenti personalizzati, tutto. Confermato come reale, confermato come corretto.
+
+**v5.6.4 esegue una rimozione chirurgica — solo i percorsi installati da AgentVibes:**
+
+- `~/.claude/hooks/`, `hooks-windows/`, `commands/agent-vibes/`, `personalities/`, `audio/`
+- `~/.agentvibes/` — interamente di proprietà di AgentVibes, rimosso completamente
+- `settings.json`, `CLAUDE.md`, skill, plugin, configurazioni MCP — **intatti**
+
+Un test di regressione ora impone questo vincolo in CI. Se qualcuno reintroduce una cancellazione ampia, il build fallisce:
+
+```js
+// issue #182 regression guard
+assert: settings.json and CLAUDE.md survived --global uninstall
+```
+
+Non può regredire silenziosamente — il build si romperà prima.
+
+---
+
 ## 🌟 v5.6.3 — AgentVibes arriva su Hermes + Configurazione remota più semplice
 
 **Rilascio:** 2026-05-07

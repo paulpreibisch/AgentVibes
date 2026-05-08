@@ -1,5 +1,30 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🛡️ v5.6.4 — アンインストールの重大なセキュリティ修正
+
+**リリース日:** 2026-05-08
+
+### 🐛 `--global` アンインストールが ~/.claude/ を削除しなくなりました
+
+`--global` を指定すると、アンインストーラーは AgentVibes が所有するパスのみを削除するのではなく、`~/.claude/` を再帰的に削除していました。これにより、設定、CLAUDE.md、スキル、プラグイン、MCP 設定、カスタムツールなど、すべてのデータが失われていました。実際の問題として確認され、修正済みです。
+
+**v5.6.4 は外科的な削除を実施します — AgentVibes がインストールしたパスのみ:**
+
+- `~/.claude/hooks/`、`hooks-windows/`、`commands/agent-vibes/`、`personalities/`、`audio/`
+- `~/.agentvibes/` — AgentVibes が完全に所有しており、全体を削除
+- `settings.json`、`CLAUDE.md`、スキル、プラグイン、MCP 設定 — **変更なし**
+
+リグレッションテストが CI でこれを強制するようになりました。誰かが広範な削除を再導入した場合、ビルドが失敗します:
+
+```js
+// issue #182 regression guard
+assert: settings.json and CLAUDE.md survived --global uninstall
+```
+
+これは静かにリグレッションすることはできません — まずビルドが壊れます。
+
+---
+
 ## 🌟 v5.6.3 — AgentVibes が Hermes に対応 + リモートセットアップが簡単に
 
 **リリース日:** 2026-05-07
