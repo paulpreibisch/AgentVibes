@@ -6,6 +6,7 @@
  */
 
 import path from 'node:path';
+import os from 'node:os';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 
@@ -26,6 +27,11 @@ export const PROVIDERS = [
     id: 'openai-codex',
     name: 'OpenAI Codex',
     desc: 'OpenAI CLI agent — .codex/config.toml + AGENTS.md',
+  },
+  {
+    id: 'hermes',
+    name: 'Hermes Agent',
+    desc: 'NousResearch Hermes — SSH hook auto-speaks every response',
   },
   {
     id: 'default',
@@ -73,6 +79,14 @@ const DEFAULT_LLM_CONFIGS = {
     // lessac-high works reliably, so use it as the default for codex.
     voice: 'en_US-lessac-high',
     pretext: 'Codex here',
+    ttsEngine: 'piper',
+  },
+  hermes: {
+    effects: 'light',
+    bgTrack: 'agent_vibes_bachata_v1_loop.mp3',
+    bgVolume: '0.15',
+    voice: 'en_US-libritts-high::Leo-8',
+    pretext: 'Hermes here',
     ttsEngine: 'piper',
   },
 };
@@ -212,14 +226,25 @@ export async function installClaudeMcp(targetDir) {
     // Explicitly write tts-provider.txt so `get_active_provider()` in
     // provider-manager.sh doesn't silently fall back to "piper".  Without
     // this, headless servers with no audio device hit a confusing failure
-    // mode where TTS tries to synth locally and fails silently.  Users
-    // can still change the provider via the Setup TUI or slash command.
+    // mode where TTS tries to synth locally and fails silently.
+    // Inherit from global ~/.claude/tts-provider.txt if it exists, so users
+    // with ssh-remote or other transport providers configured globally don't
+    // have to reconfigure every new project.  Fall back to "piper" only if
+    // no global setting is found.
     const ttsProviderPath = path.join(targetDir, '.claude', 'tts-provider.txt');
     try {
       await fs.access(ttsProviderPath);
       // Already exists — user has explicitly set a provider, don't clobber
     } catch {
-      await fs.writeFile(ttsProviderPath, 'piper\n');
+      // Read global provider to inherit; default to piper if not configured
+      let globalProvider = 'piper';
+      try {
+        const globalPath = path.join(os.homedir(), '.claude', 'tts-provider.txt');
+        const val = await fs.readFile(globalPath, 'utf8');
+        const trimmed = val.trim();
+        if (trimmed) globalProvider = trimmed;
+      } catch {}
+      await fs.writeFile(ttsProviderPath, globalProvider + '\n');
     }
 
     return { success: true, mcpCreated, mcpError };
@@ -580,6 +605,246 @@ export async function removeCodexHooks(targetDir) {
   } catch { /* not empty or gone */ }
 }
 
+// ── Hermes install/check/remove ─────────────────────────────────────────────
+
+function _getHermesHooksDir() {
+  const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
+  return path.join(hermesHome, 'hooks', 'agentvibes-tts');
+}
+
+const HERMES_CONFIG_DEFAULTS = {
+  mode: 'local',
+  sshKey: '/absolute/path/to/id_ed25519_agentvibes',
+  host: 'your-receiver-tailscale-ip',
+  port: '2222',
+  voice: 'en_US-libritts-high::Leo-8',
+};
+
+export async function getHermesConfig() {
+  const cfgPath = path.join(_getHermesHooksDir(), 'agentvibes-ssh-config.json');
+  try {
+    const raw = await fs.readFile(cfgPath, 'utf8');
+    return { ...HERMES_CONFIG_DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    return { ...HERMES_CONFIG_DEFAULTS };
+  }
+}
+
+export async function saveHermesConfig(cfg) {
+  const hooksDir = _getHermesHooksDir();
+  const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
+  const resolvedHooksDir = path.resolve(hooksDir);
+  const resolvedHermesHome = path.resolve(hermesHome);
+  if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+    throw new Error('Invalid Hermes hooks path');
+  }
+  await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
+  const rawMode = String(cfg.mode || HERMES_CONFIG_DEFAULTS.mode);
+  const safe = {
+    mode:   rawMode === 'local' ? 'local' : 'remote',
+    sshKey: String(cfg.sshKey || HERMES_CONFIG_DEFAULTS.sshKey),
+    host:   String(cfg.host   || HERMES_CONFIG_DEFAULTS.host),
+    port:   String(cfg.port   || HERMES_CONFIG_DEFAULTS.port),
+    voice:  String(cfg.voice  || HERMES_CONFIG_DEFAULTS.voice),
+  };
+  await fs.writeFile(
+    path.join(hooksDir, 'agentvibes-ssh-config.json'),
+    JSON.stringify(safe, null, 2),
+    { mode: 0o600 }
+  );
+  return safe;
+}
+
+export async function checkHermesInstalled() {
+  try {
+    await fs.access(path.join(_getHermesHooksDir(), 'HOOK.yaml'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function installHermes() {
+  const hooksDir = _getHermesHooksDir();
+
+  // Validate path stays within hermesHome (no traversal)
+  const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
+  const resolvedHooksDir = path.resolve(hooksDir);
+  const resolvedHermesHome = path.resolve(hermesHome);
+  if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+    throw new Error('Invalid Hermes hooks path');
+  }
+
+  await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
+
+  const hookYaml = `name: agentvibes-tts\ndescription: Send agent responses to AgentVibes TTS remotely\nevents:\n  - agent:end\n`;
+  await fs.writeFile(path.join(hooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 });
+
+  // Write default SSH config only if it doesn't already exist
+  const cfgPath = path.join(hooksDir, 'agentvibes-ssh-config.json');
+  try {
+    await fs.access(cfgPath);
+  } catch {
+    await fs.writeFile(cfgPath, JSON.stringify(HERMES_CONFIG_DEFAULTS, null, 2), { mode: 0o600 });
+  }
+
+  const handlerPy = `"""
+AgentVibes TTS Hook — fires on agent:end to speak the agent's response.
+
+Supports two modes (set via agentvibes-ssh-config.json):
+  mode=local   — Hermes and speakers are on the same machine. Calls play-tts.sh directly.
+  mode=remote  — Hermes is on a remote server; sends audio over SSH to a receiver.
+
+SETUP: Use the AgentVibes TUI (Configure button) or: set_hermes_config MCP tool,
+       then run: hermes gateway restart
+"""
+
+import asyncio, base64, json, logging, os, re, subprocess, time
+
+# ---------------------------------------------------------------------------
+# Config is read from agentvibes-ssh-config.json in this directory.
+# Edit that file directly or use the AgentVibes TUI / MCP tools.
+# ---------------------------------------------------------------------------
+_CFG_DIR  = os.path.dirname(os.path.abspath(__file__))
+_CFG_PATH = os.path.join(_CFG_DIR, "agentvibes-ssh-config.json")
+try:
+    with open(_CFG_PATH, encoding="utf-8") as _f:
+        _cfg = json.load(_f)
+except Exception:
+    _cfg = {}
+
+_MODE               = _cfg.get("mode",   "local")   # "local" or "remote"
+AGENTVIBES_SSH_KEY  = _cfg.get("sshKey", "/absolute/path/to/id_ed25519_agentvibes")
+AGENTVIBES_HOST     = _cfg.get("host",   "your-receiver-tailscale-ip")
+AGENTVIBES_PORT     = _cfg.get("port",   "2222")
+AGENTVIBES_VOICE    = _cfg.get("voice",  "en_US-libritts-high::Leo-8")
+AGENTVIBES_USER     = "agentvibes-receiver"
+AGENTVIBES_PROJECT  = "hermes"
+MAX_CONTENT_LEN     = 200
+PREFIX              = "Hermes here, "
+_KNOWN_HOSTS        = os.path.join(_CFG_DIR, "known_hosts")
+_LOG_FILE           = os.path.join(_CFG_DIR, "tts-hook.log")
+
+_log = logging.getLogger("agentvibes-tts")
+if not _log.handlers:
+    try:
+        _h = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+        _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        _log.addHandler(_h)
+    except OSError:
+        _log.addHandler(logging.NullHandler())
+    _log.setLevel(logging.INFO)
+
+_last_sent: float = 0.0
+_MIN_INTERVAL_S: float = 3.0
+
+
+def _find_play_tts() -> str | None:
+    """Locate the AgentVibes play-tts.sh on this machine (local mode only)."""
+    env_hooks = os.environ.get("AGENTVIBES_HOOKS", "")
+    candidates = []
+    if env_hooks:
+        candidates.append(os.path.join(env_hooks, "play-tts.sh"))
+    candidates += [
+        os.path.expanduser("~/.claude/hooks/play-tts.sh"),
+        os.path.expanduser("~/.npm-global/lib/node_modules/agentvibes/.claude/hooks/play-tts.sh"),
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
+def _tts_speak_local(text: str) -> None:
+    """Local mode: call play-tts.sh directly on this machine."""
+    play_tts = _find_play_tts()
+    if not play_tts:
+        _log.warning("local mode: play-tts.sh not found — set AGENTVIBES_HOOKS or install AgentVibes")
+        return
+    env = os.environ.copy()
+    env.setdefault("AGENTVIBES_LLM", AGENTVIBES_PROJECT)
+    try:
+        result = subprocess.run(
+            ["bash", play_tts, text],
+            capture_output=True, timeout=30, env=env,
+        )
+        if result.returncode != 0:
+            _log.warning("play-tts exit %d: %s", result.returncode, result.stderr.decode(errors="replace").strip())
+        else:
+            _log.info("local TTS OK")
+    except subprocess.TimeoutExpired:
+        _log.warning("play-tts timed out after 30s")
+    except Exception as exc:
+        _log.warning("play-tts error: %s", exc)
+
+
+def _tts_speak_remote(text: str) -> None:
+    """Remote mode: send payload over SSH to AgentVibes receiver."""
+    payload = base64.b64encode(json.dumps({
+        "text": text, "voice": AGENTVIBES_VOICE, "project": AGENTVIBES_PROJECT,
+        "provider": "piper", "pretext": "", "effects": "", "music": "", "volume": "", "speed": "",
+    }).encode()).decode()
+    cmd = ["ssh", "-i", AGENTVIBES_SSH_KEY, "-o", "ConnectTimeout=5",
+           "-o", "StrictHostKeyChecking=accept-new", "-o", f"UserKnownHostsFile={_KNOWN_HOSTS}",
+           "-o", "BatchMode=yes", "-p", AGENTVIBES_PORT, f"{AGENTVIBES_USER}@{AGENTVIBES_HOST}", payload]
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        if result.returncode != 0:
+            _log.warning("ssh exit %d: %s", result.returncode, result.stderr.decode(errors="replace").strip())
+        else:
+            _log.info("queued OK: %s", result.stdout.decode(errors="replace").strip())
+    except subprocess.TimeoutExpired:
+        _log.warning("ssh timed out after 15s")
+    except Exception as exc:
+        _log.warning("ssh error: %s", exc)
+
+
+def _tts_speak(text: str) -> None:
+    global _last_sent
+    if not text or not text.strip():
+        return
+    now = time.monotonic()
+    if now - _last_sent < _MIN_INTERVAL_S:
+        _log.info("rate-limited: %.1fs since last send — skipping", now - _last_sent)
+        return
+    _last_sent = now
+    full_text = PREFIX + text.strip()
+    max_len = len(PREFIX) + MAX_CONTENT_LEN
+    if len(full_text) > max_len:
+        full_text = full_text[:max_len].rsplit(" ", 1)[0] + "..."
+    if _MODE == "local":
+        _tts_speak_local(full_text)
+    else:
+        _tts_speak_remote(full_text)
+
+async def handle(event_type: str, context: dict) -> None:
+    if event_type != "agent:end":
+        return
+    response = (context.get("response") or "").strip()
+    if not response:
+        return
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _tts_speak, _strip_markdown(response))
+
+def _strip_markdown(text: str) -> str:
+    text = re.sub(r"\`\`\`[\\s\\S]*?\`\`\`", "", text)
+    text = re.sub(r"\`([^\`]+)\`", r"\\1", text)
+    text = re.sub(r"\\*{1,2}([^\\*]+)\\*{1,2}", r"\\1", text)
+    text = re.sub(r"\\[([^\\]]+)\\]\\([^\\)]+\\)", r"\\1", text)
+    return re.sub(r"\\s+", " ", text).strip()
+`;
+  await fs.writeFile(path.join(hooksDir, 'handler.py'), handlerPy, { mode: 0o600 });
+
+  return { hooksDir, handlerPath: path.join(hooksDir, 'handler.py'), cfgPath };
+}
+
+export async function removeHermes() {
+  const hooksDir = _getHermesHooksDir();
+  try { await fs.unlink(path.join(hooksDir, 'HOOK.yaml')); } catch { /* already gone */ }
+  try { await fs.unlink(path.join(hooksDir, 'handler.py')); } catch { /* already gone */ }
+  try { await fs.rmdir(hooksDir); } catch { /* not empty or gone */ }
+}
+
 // ── Config path resolution ──────────────────────────────────────────────────
 
 export function resolveCfgPath(targetDir) {
@@ -632,11 +897,18 @@ export function loadLlmConfigSync(llmKey, targetDir) {
  */
 export function saveLlmConfigSync(llmKey, config, targetDir) {
   const cfgKey = `llm:${llmKey}`;
-  // Sanitize pipe chars in user-editable fields to prevent config format corruption
-  const sanitize = (v) => (v || '').replace(/\|/g, '');
-  const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${config.bgVolume}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
+  // Sanitize user-editable fields: strip pipe chars (config delimiter) and newlines
+  // (newlines could inject extra rows into the pipe-delimited config file)
+  const sanitize = (v) => (v || '').replace(/[\|\n\r]/g, '');
+  const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${sanitize(config.bgVolume)}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
   const resolvedTargetDir = targetDir || process.env.INIT_CWD || process.cwd();
-  const cfgPath = config.sourcePath || resolveCfgPath(resolvedTargetDir);
+  // When targetDir is explicitly passed, write there directly (do not fall back to global).
+  // resolveCfgPath falls back to ~/.claude when the local file doesn't yet exist,
+  // which would silently redirect writes away from the intended directory.
+  const cfgPath = config.sourcePath ||
+    (targetDir
+      ? path.join(resolvedTargetDir, '.claude', 'config', 'audio-effects.cfg')
+      : resolveCfgPath(resolvedTargetDir));
 
   try {
     let content = '';
@@ -656,4 +928,92 @@ export function saveLlmConfigSync(llmKey, config, targetDir) {
     fsSync.mkdirSync(path.dirname(cfgPath), { recursive: true });
     fsSync.writeFileSync(cfgPath, lines.join('\n'));
   } catch { /* best effort */ }
+}
+
+// ── Transport Provider SSH Config ────────────────────────────────────────────
+
+export const TRANSPORT_PROVIDERS = [
+  {
+    id: 'ssh-remote',
+    name: 'SSH Remote',
+    desc: 'Send text to remote device via SSH for local TTS playback',
+    defaultPort: '22',
+  },
+  {
+    id: 'agentvibes-receiver',
+    name: 'AgentVibes Receiver',
+    desc: 'Send to a device running the AgentVibes receiver app',
+    defaultPort: '2222',
+  },
+  {
+    id: 'termux-ssh',
+    name: 'Termux SSH',
+    desc: 'Play TTS on Android via Termux SSH',
+    defaultPort: '8022',
+  },
+];
+
+const _TRANSPORT_CFG_PATH = path.join(
+  process.env.HOME || process.env.USERPROFILE || '',
+  '.agentvibes', 'transport-config.json'
+);
+
+export async function getTransportConfig(providerId) {
+  const defaultPort = TRANSPORT_PROVIDERS.find(p => p.id === providerId)?.defaultPort ?? '22';
+  const defaults = { mode: 'local', connType: 'manual', sshKey: '', host: '', port: defaultPort };
+  try {
+    const raw = await fs.readFile(_TRANSPORT_CFG_PATH, 'utf8');
+    const all = JSON.parse(raw);
+    return { ...defaults, ...(all[providerId] || {}) };
+  } catch {
+    return { ...defaults };
+  }
+}
+
+export async function saveTransportConfig(providerId, cfg) {
+  const cfgDir = path.dirname(_TRANSPORT_CFG_PATH);
+  // Validate path stays within .agentvibes home dir
+  const resolvedPath = path.resolve(_TRANSPORT_CFG_PATH);
+  const resolvedDir = path.resolve(cfgDir);
+  if (!resolvedPath.startsWith(resolvedDir + path.sep) && resolvedPath !== resolvedDir) {
+    throw new Error('Invalid transport config path');
+  }
+  await fs.mkdir(cfgDir, { recursive: true, mode: 0o700 });
+
+  let all = {};
+  try {
+    const raw = await fs.readFile(_TRANSPORT_CFG_PATH, 'utf8');
+    all = JSON.parse(raw);
+  } catch {}
+
+  const defaultPort = TRANSPORT_PROVIDERS.find(p => p.id === providerId)?.defaultPort ?? '22';
+  const isAlias = cfg.connType === 'alias';
+  const safe = {
+    mode:     cfg.mode === 'remote' ? 'remote' : 'local',
+    connType: isAlias ? 'alias' : 'manual',
+    sshKey:   String(cfg.sshKey || ''),
+    host:     String(cfg.host   || ''),
+    // In alias mode, port is handled by ~/.ssh/config — persist empty string
+    // so alias detection on reload doesn't require port to be absent.
+    port:     isAlias ? '' : String(cfg.port || defaultPort),
+  };
+  all[providerId] = safe;
+
+  await fs.writeFile(_TRANSPORT_CFG_PATH, JSON.stringify(all, null, 2), { mode: 0o600 });
+
+  // Write backward-compat host file so legacy scripts still work
+  const hostFileMap = {
+    'ssh-remote':           'ssh-remote-host.txt',
+    'agentvibes-receiver':  'agentvibes-receiver-host.txt',
+    'termux-ssh':           'termux-ssh-host.txt',
+  };
+  const hostFile = hostFileMap[providerId];
+  if (hostFile && safe.host) {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const claudeDir = path.join(homeDir, '.claude');
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.writeFile(path.join(claudeDir, hostFile), safe.host + '\n', { mode: 0o600 });
+  }
+
+  return safe;
 }

@@ -14,6 +14,7 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { SURNAME_POOL, uniquifyVoiceName } from '../../utils/voice-names.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -194,43 +195,7 @@ function patchLibriTTSSpeakerNames() {
 export const COL_NAME_W   = 26;
 export const COL_GENDER_W = 4;
 
-// Surname pool used to convert "Anna-2" → "Anna Carter" so every speaker
-// in the LibriTTS catalog gets a unique, friendly display name.  Indexed by
-// the trailing -N suffix (1-based: no suffix → idx 0, "-2" → idx 1, ...).
-const SURNAME_POOL = [
-  'Bell', 'Carter', 'Davis', 'Ellis', 'Foster', 'Gray', 'Hayes', 'Irving',
-  'Jones', 'Knox', 'Lane', 'Mason', 'Nash', 'Owens', 'Pierce', 'Quinn',
-];
-
-/**
- * Convert a raw catalog speaker name like "Anna" or "Anna-2" into a unique
- * friendly display name by appending a deterministic surname.
- *   "Anna"        → "Anna Bell"
- *   "Anna-2"      → "Anna Carter"
- *   "Anna-16"     → "Anna Quinn"
- *   "Cori Samuel" → "Cori Samuel"   (already full name — left alone)
- *
- * @param {string} rawName
- * @returns {string}
- */
-export function uniquifyVoiceName(rawName) {
-  if (!rawName) return rawName;
-  const m = rawName.match(/^(.+)-(\d+)$/);
-  if (m) {
-    const base = m[1];
-    const n    = parseInt(m[2], 10);
-    // Only treat -N as a duplicate counter when N >= 2 (catalog convention).
-    // -0 / -1 would otherwise produce collisions or undefined surnames.
-    if (n >= 2) {
-      const idx = (n - 1) % SURNAME_POOL.length;
-      return `${base} ${SURNAME_POOL[idx]}`;
-    }
-  }
-  // Only append a surname if the name is a single word — otherwise it's
-  // already a full name (e.g. "Cori Samuel") and we leave it alone.
-  if (/\s/.test(rawName)) return rawName;
-  return `${rawName} ${SURNAME_POOL[0]}`;
-}
+// SURNAME_POOL and uniquifyVoiceName are imported from ../../utils/voice-names.js
 
 /**
  * Map a gender string to a single-character icon for compact display.
@@ -456,7 +421,7 @@ export function scanInstalledVoices() {
   try {
     const files = fs.readdirSync(PIPER_VOICES_DIR);
     const onnxFiles = files
-      .filter(f => f.endsWith('.onnx') && !f.endsWith('.onnx.json'));
+      .filter(f => f.endsWith('.onnx') && !f.endsWith('.onnx.json') && !f.startsWith('-'));
 
     const result = [];
     for (const f of onnxFiles) {
@@ -791,8 +756,9 @@ export function createVoicesTab(screen, services) {
     parent: box,
     top: '70%',
     left: 2,
+    height: 1,
     tags: true,
-    content: '',
+    content: ' ',
     style: { fg: COLORS.activeFg, bg: COLORS.contentBg },
   });
 
@@ -872,6 +838,7 @@ export function createVoicesTab(screen, services) {
   let _playingProcess = null;
   let _playingVoiceId = null;
   let _downloadProcess = null;
+  let _closed = false;
 
   // Kill the entire process group so child audio players (piper, aplay, play) all die
   function _killPlayingProcess() {
@@ -882,6 +849,27 @@ export function createVoicesTab(screen, services) {
   }
 
   const _spawnEnv = buildAudioEnv();
+
+  // Remote providers play audio on a remote device — local piper voices are irrelevant.
+  // This check uses the same provider search order as _previewVoice.
+  const _remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
+  function _isRemoteProvider() {
+    const projectRoot = path.resolve(__dirname, '..', '..', '..');
+    try {
+      const providerPaths = [
+        process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
+        path.join(process.cwd(), '.claude', 'tts-provider.txt'),
+        path.join(projectRoot, '.claude', 'tts-provider.txt'),
+        path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+      ].filter(Boolean);
+      for (const p of providerPaths) {
+        if (fs.existsSync(p)) {
+          return _remoteProviders.includes(fs.readFileSync(p, 'utf8').trim());
+        }
+      }
+    } catch {}
+    return false;
+  }
 
   /**
    * Preview a voice by synthesizing a sample phrase with piper, then playing the wav.
@@ -901,10 +889,13 @@ export function createVoicesTab(screen, services) {
     _killPlayingProcess();
     _playingVoiceId = null;
 
-    // Check if we should route through remote provider (ssh-remote / agentvibes-receiver)
-    // Search order: CLAUDE_PROJECT_DIR (actual project) → cwd → package root → home
-    const projectRoot = path.resolve(__dirname, '..', '..');
-    const remoteProviders = ['ssh-remote', 'agentvibes-receiver'];
+    // Check if we should route through remote provider (ssh-remote / agentvibes-receiver).
+    // Search order: CLAUDE_PROJECT_DIR (project override) → cwd → package root → home.
+    // Per-project tts-provider.txt intentionally overrides global — if a project sets
+    // "piper" that is respected here.  If local playback fails (no audio device), the
+    // error is surfaced in the previewLine rather than silently clearing.
+    // NOTE: projectRoot is AgentVibes repo root (3 levels up from src/console/tabs/)
+    const projectRoot = path.resolve(__dirname, '..', '..', '..');
     let activeProvider = '';
     try {
       const providerPaths = [
@@ -918,12 +909,18 @@ export function createVoicesTab(screen, services) {
       }
     } catch {}
 
-    if (remoteProviders.includes(activeProvider)) {
+    if (_remoteProviders.includes(activeProvider)) {
       const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
-      // Resolve play-tts from the actual project (CLAUDE_PROJECT_DIR / cwd),
-      // not the npm package root — hooks live in the user's project dir.
-      const hooksBase = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      // Hooks live in the AgentVibes package (projectRoot), not the user's project dir.
+      // Fall back to CLAUDE_PROJECT_DIR / cwd only if the hook isn't at projectRoot
+      // (e.g. when running from a published npm package with a different layout).
+      const _playTtsName = isWindows
+        ? path.join('.claude', 'hooks-windows', 'play-tts.ps1')
+        : path.join('.claude', 'hooks', 'play-tts.sh');
+      const hooksBase = fs.existsSync(path.join(projectRoot, _playTtsName))
+        ? projectRoot
+        : (process.env.CLAUDE_PROJECT_DIR || process.cwd());
       let proc;
       if (isWindows) {
         const playTts = path.join(hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
@@ -933,23 +930,36 @@ export function createVoicesTab(screen, services) {
       } else {
         const playTts = path.join(hooksBase, '.claude', 'hooks', 'play-tts.sh');
         proc = spawn('bash', [playTts, phrase, voiceId], {
-          stdio: 'ignore', detached: true, env: _spawnEnv,
+          stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _spawnEnv,
+          cwd: process.cwd(),
         });
       }
       _playingProcess = proc;
       _playingVoiceId = voiceId;
-      previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing (remote): ${voiceId}{/${COLORS.activeFg}-fg}`);
+      refreshDisplay();
+      previewLine.setContent('{bright-magenta-fg}♪ Synthesizing on remote...{/bright-magenta-fg}');
       screen.render();
-      proc.on('exit', () => {
+      let _stderrBuf = '';
+      if (proc.stderr) {
+        proc.stderr.on('data', d => { _stderrBuf += d.toString(); });
+      }
+      proc.on('exit', (code) => {
         if (_playingVoiceId === voiceId) {
           _playingVoiceId = null; _playingProcess = null;
-          previewLine.setContent(_listFocused ? HINT_TEXT : '');
-          refreshDisplay();
+          if (code !== 0 && _stderrBuf) {
+            const msg = _stderrBuf.trim().split('\n').pop() || 'Remote TTS failed';
+            previewLine.setContent(`{red-fg}♪ ${msg}{/red-fg}`);
+            screen.render();
+            setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); refreshDisplay(); } }, 6000);
+          } else {
+            // Keep message + ♪ visible for 5s while remote device synthesises and plays
+            setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); refreshDisplay(); } }, 5000);
+          }
         }
       });
-      proc.on('error', () => {
+      proc.on('error', (err) => {
         _playingVoiceId = null; _playingProcess = null;
-        previewLine.setContent(`{red-fg}Remote preview failed{/red-fg}`);
+        previewLine.setContent(`{red-fg}Remote preview failed: ${err.message}{/red-fg}`);
         screen.render();
         setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 4000);
       });
@@ -965,7 +975,7 @@ export function createVoicesTab(screen, services) {
     }
 
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
-    const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+    const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
 
     // Synthesize: spawn piper; on Windows use the exe path directly
     const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
@@ -1037,12 +1047,18 @@ export function createVoicesTab(screen, services) {
       previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing: ${voiceId}  (Enter/Space to stop){/${COLORS.activeFg}-fg}`);
       screen.render();
 
-      playProc.on('exit', () => {
+      playProc.on('exit', (code) => {
         if (_playingVoiceId === voiceId) {
           _playingVoiceId = null;
           _playingProcess = null;
-          previewLine.setContent(_listFocused ? HINT_TEXT : '');
-          refreshDisplay(); // clears (playing) label
+          if (code !== 0) {
+            previewLine.setContent(`{red-fg}♪ Audio playback failed (no audio device?) — check your provider in Setup{/red-fg}`);
+            screen.render();
+            setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); } }, 5000);
+          } else {
+            previewLine.setContent(_listFocused ? HINT_TEXT : '');
+            refreshDisplay(); // clears (playing) label
+          }
         }
         try { fs.unlinkSync(tempWav); } catch {}
       });
@@ -1050,7 +1066,9 @@ export function createVoicesTab(screen, services) {
       playProc.on('error', () => {
         _playingVoiceId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? HINT_TEXT : '');
+        previewLine.setContent(`{red-fg}♪ Audio player not found — install ffmpeg or check your provider in Setup{/red-fg}`);
+        screen.render();
+        setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); } }, 5000);
         try { fs.unlinkSync(tempWav); } catch {}
       });
     });
@@ -1788,12 +1806,12 @@ export function createVoicesTab(screen, services) {
   });
 
   // Space → preview voice (toggle: second press stops playback)
-  // Only works for installed voices — uninstalled need download first
+  // For remote providers, skip the install check — audio plays on the remote device.
   voiceList.key(['space'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (!selected) return;
-    if (!_isInstalled(selected)) {
+    if (!_isRemoteProvider() && !_isInstalled(selected)) {
       previewLine.setContent(`{bright-yellow-fg}⬇ Voice not installed — press [Enter] to download first{/bright-yellow-fg}`);
       screen.render();
       setTimeout(() => { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); }, 3000);
@@ -1813,7 +1831,7 @@ export function createVoicesTab(screen, services) {
     previewLine.setContent('');
     screen.render();
 
-    if (_isInstalled(selected)) {
+    if (_isRemoteProvider() || _isInstalled(selected)) {
       _openSelectVoiceModal(selected);
     } else {
       _openDownloadModal(selected);
@@ -1964,12 +1982,14 @@ export function createVoicesTab(screen, services) {
     box,
 
     show() {
+      _closed = false;
       box.show();
       refreshDisplay();
       screen.render();
     },
 
     hide() {
+      _closed = true;
       _killPlayingProcess();
       _playingVoiceId = null;
       if (_downloadProcess) { try { _downloadProcess.kill(); } catch {} _downloadProcess = null; }

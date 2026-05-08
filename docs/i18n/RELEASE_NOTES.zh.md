@@ -1,5 +1,50 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
+
+> See [English release notes](../../RELEASE_NOTES.md) for full details.
+
+---
+
+
+## 🤖 v5.6.1 — Hermes Agent 集成 & Windows PS5.1 修复
+
+**发布日期：** 2026-05-01
+
+### 🎉 Hermes Agent 集成（全新！）
+
+AgentVibes 现已正式支持 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 自托管、自我改进的 AI 助手。两个生产就绪的 Hermes 技能随附于 `docs/hermes/skills/`：
+
+**`hermes-agentvibes-hook`** — 通过 AgentVibes 自动播报每条 Hermes 响应
+- 在每个 `agent:end` 事件触发（Telegram、Discord、CLI 等）
+- 播报前去除 Markdown、代码块、表情符号
+- 在单词边界处截断，限制速率以防止队列溢出
+- 使用 `StrictHostKeyChecking=accept-new` + 持久 `known_hosts` 防止 MITM 的安全 SSH
+- 完整日志记录到 `tts-hook.log` 以便调试
+
+**`agentvibes-target`** — 教 Hermes 按需将任意文本发送到您的扬声器
+- 通过 SSH 传输 Base64 JSON 负载（与 Windows 接收器相同的 ForceCommand 架构）
+- 支持 Windows 和 Android 目标
+- 包含详细的故障排除指南
+
+**安装：** 将技能复制到 Hermes 主目录并重启网关：
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Windows PS5.1 修复
+
+- **play-tts.ps1 PS5.1 兼容性** — 修复 v5.6.0 变基引入的三个回归问题：
+  将 PS7 的 null 条件运算符（`?.`）替换为 PS5.1 兼容的 if/else，添加 UTF-8 BOM
+  防止 CP1252 损坏 em 破折号，恢复合并中丢失的 piper 提供者别名和
+  `AGENTVIBES_TEXT_FILE` 标记
+- **模态框 & 快捷键修复** — 模态框 Escape 键、导航快捷键、Q+Caps Lock、
+  语音预览错误处理全部修复
+- **BMAD 选项卡** — 现在显示所有代理，不受模块限制
+
+---
+
 ## 🎵 v5.5.0 — 每 LLM 音频路由与 Windows 安装程序可靠性增强
 
 **发布日期：** 2026-04-27

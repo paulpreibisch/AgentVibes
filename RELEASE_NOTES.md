@@ -1,5 +1,69 @@
 # AgentVibes Release Notes
 
+## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
+
+**Released:** 2026-05-02
+
+### 🎉 Per-Message Override: Voice, Music, Reverb, Volume
+
+Remote senders (Hermes, SSH remote provider) can now control every audio parameter **per message** without touching the receiver's persistent config:
+
+- **Music** — pass `"music": "bachata"` (keyword) or full filename to switch background track for that message
+- **Volume** — pass `"volume": "0.35"` to adjust music volume for that message  
+- **Reverb** — pass `"effects": "medium"` (`off`/`light`/`medium`/`heavy`/`cathedral`) to set reverb per message
+- **Voice** — already worked; now documented with full field reference
+- **Pretext** — pass `"pretext": ""` to suppress the intro prefix for a single message
+
+Previously these fields were parsed by the receiver and queued but **never applied** — `play-tts.ps1` didn't read the `AGENTVIBES_OVERRIDE_*` env vars the watcher set. Fixed.
+
+### 📚 Hermes Skill: Full Payload Field Reference
+
+`agentvibes-target` SKILL.md now documents all 9 JSON payload fields with examples so Hermes (or any AI agent) can say "switch to chillwave", "add reverb", "use a female voice", "remove the intro prefix" — and it just works.
+
+### 🐛 Hermes Hook: handler.py + HOOK.yaml now ship in the package
+
+`docs/hermes/skills/tts/hermes-agentvibes-hook/` was missing `handler.py` and `HOOK.yaml` — only `SKILL.md` was included. Both files now ship. `handler.py` also reads `AGENTVIBES_MUSIC` from the environment so the default background music is configurable without editing the file.
+
+---
+
+## 🤖 v5.6.1 — Hermes Agent Integration & Windows PS5.1 Fixes
+
+**Released:** 2026-05-01
+
+### 🎉 Hermes Agent Integration (New!)
+
+AgentVibes now officially supports **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the self-hosted, self-improving AI assistant. Two production-ready Hermes skills ship in `docs/hermes/skills/`:
+
+**`hermes-agentvibes-hook`** — Auto-speaks every Hermes response via AgentVibes
+- Fires on every `agent:end` event (Telegram, Discord, CLI, etc.)
+- Strips markdown, code blocks, emoji before speaking
+- Truncates at word boundaries, rate-limits to prevent queue flooding
+- MITM-safe SSH with `StrictHostKeyChecking=accept-new` + persistent `known_hosts`
+- Full logging to `tts-hook.log` for debugging
+
+**`agentvibes-target`** — Teaches Hermes to send any text to your speakers on demand
+- Base64 JSON payload over SSH (same ForceCommand architecture as the Windows receiver)
+- Supports Windows and Android targets
+- Detailed troubleshooting guide included
+
+**Install:** Copy the skill to your Hermes home and restart the gateway:
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Windows PS5.1 Bug Fixes
+
+- **play-tts.ps1 PS5.1 compatibility** — Fixed three regressions from v5.6.0 rebase:
+  replaced PS7 null-conditional (`?.`) with PS5.1-compatible if/else, added UTF-8 BOM so
+  em-dash literals aren't mangled by CP1252, restored piper provider alias and
+  `AGENTVIBES_TEXT_FILE` sentinel lost in merge
+- **Modal & hotkey fixes** — Modal escape key, navigation hotkeys, Q+Caps Lock, and voice
+  preview error handling all repaired
+- **BMAD tab** — Now shows all agents regardless of module
+
+---
+
 ## 📸 v5.6.0 — TUI Screenshots & Documentation Cleanup
 
 **Released:** 2026-04-28

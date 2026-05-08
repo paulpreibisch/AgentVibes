@@ -142,6 +142,11 @@ try {
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
     Write-Host "[VOICE] Voice used: $VoiceName (Piper)" -ForegroundColor Green
 
+    # Emit the WAV path as a bare Write-Output line so play-tts.ps1 can find it
+    # when AGENTVIBES_NO_PLAY is set (reverb/music mixing mode).
+    # Write-Host is not captured by the caller's $(...) / 2>&1 capture; Write-Output is.
+    if ($env:AGENTVIBES_NO_PLAY) { Write-Output $AudioFile }
+
     # Play the audio (skip if AGENTVIBES_NO_PLAY is set)
     if (-not $env:AGENTVIBES_NO_PLAY) {
         # Prefer ffplay: handles 22050 Hz → 48000 Hz resampling cleanly (SoundPlayer uses

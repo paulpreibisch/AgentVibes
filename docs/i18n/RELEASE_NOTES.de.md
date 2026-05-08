@@ -1,5 +1,50 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
+
+> See [English release notes](../../RELEASE_NOTES.md) for full details.
+
+---
+
+
+## 🤖 v5.6.1 — Hermes Agent Integration & Windows PS5.1-Korrekturen
+
+**Veröffentlicht:** 2026-05-01
+
+### 🎉 Hermes Agent Integration (Neu!)
+
+AgentVibes unterstützt jetzt offiziell **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — den selbst gehosteten, selbst verbessernden KI-Assistenten. Zwei produktionsreife Hermes-Skills sind in `docs/hermes/skills/` enthalten:
+
+**`hermes-agentvibes-hook`** — Spricht jede Hermes-Antwort automatisch über AgentVibes
+- Wird bei jedem `agent:end`-Ereignis ausgelöst (Telegram, Discord, CLI usw.)
+- Entfernt Markdown, Code-Blöcke und Emojis vor dem Sprechen
+- Kürzt an Wortgrenzen, begrenzt die Rate zur Vermeidung von Warteschlangen-Überlastung
+- MITM-sicheres SSH mit `StrictHostKeyChecking=accept-new` + persistentem `known_hosts`
+- Vollständiges Logging in `tts-hook.log` zur Fehlersuche
+
+**`agentvibes-target`** — Bringt Hermes bei, beliebigen Text auf Abruf an deine Lautsprecher zu senden
+- Base64-JSON-Payload über SSH (gleiche ForceCommand-Architektur wie der Windows-Empfänger)
+- Unterstützt Windows- und Android-Ziele
+- Detaillierte Fehlerbehebungsanleitung enthalten
+
+**Installation:** Skill ins Hermes-Home-Verzeichnis kopieren und Gateway neu starten:
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Windows PS5.1-Korrekturen
+
+- **play-tts.ps1 PS5.1-Kompatibilität** — Drei Regressionen aus dem v5.6.0-Rebase behoben:
+  PS7-Null-Conditional-Operator (`?.`) durch PS5.1-kompatibles if/else ersetzt, UTF-8-BOM hinzugefügt
+  damit Em-Dashes nicht durch CP1252 korrumpiert werden, Piper-Provider-Alias und
+  `AGENTVIBES_TEXT_FILE`-Sentinel nach Merge-Verlust wiederhergestellt
+- **Modal- & Hotkey-Korrekturen** — Modal-Escape-Taste, Navigations-Hotkeys, Q+Feststelltaste
+  und Fehlerbehandlung der Sprachvorschau repariert
+- **BMAD-Tab** — Zeigt jetzt alle Agenten unabhängig vom Modul
+
+---
+
 ## 🎵 v5.5.0 — LLM-spezifisches Audio-Routing & Windows-Installer-Resilienz
 
 **Veröffentlicht:** 2026-04-27

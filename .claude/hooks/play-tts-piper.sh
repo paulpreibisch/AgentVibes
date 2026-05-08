@@ -496,17 +496,17 @@ if [ -f "$LOCK_FILE" ]; then
   fi
 fi
 
-# Wait for previous audio to finish (max 2 seconds to prevent blocking)
-for i in {1..4}; do
+# Wait for previous audio to finish (max 15 seconds to prevent overlapping playback)
+for i in {1..30}; do
   if [ ! -f "$LOCK_FILE" ]; then
     break
   fi
   sleep 0.5
 done
 
-# If still locked after 2 seconds, skip this TTS to prevent blocking Claude
+# If still locked after 15 seconds, skip this TTS to prevent blocking Claude
 if [ -f "$LOCK_FILE" ]; then
-  echo "⏭️  Skipping TTS (previous audio still playing)" >&2
+  echo "⏭️  Skipping TTS (previous audio still playing after 15s)" >&2
   exit 0
 fi
 
@@ -557,9 +557,10 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
   fi
 fi
 
-# Wait for audio to finish, then release locks (both global and write lock)
-(sleep $DURATION; rm -f "$LOCK_FILE" "$WRITE_LOCK_FILE") &
-disown
+# Lock will be released after player finishes (see wait + rm below).
+# Removed timer-based release — sleep $DURATION was underestimating actual
+# playback time (paplay startup latency, network audio), causing early lock
+# release and TTS overlap. Now released only after wait $PLAYER_PID returns.
 
 # Get audio cache path
 AUDIO_DIR_PATH=$(get_audio_dir)
@@ -655,9 +656,10 @@ if [[ -z "$BACKGROUND_MUSIC" ]]; then
   fi
 fi
 
-# Wait for audio player to finish before returning.
-# This keeps the bmad-speak.sh speech lock held until playback is actually done,
-# preventing party-mode agents from talking over each other.
+# Wait for audio player to finish before returning, then release the lock.
+# Lock is released HERE — after actual playback — not via a timer.
+# This prevents overlap caused by underestimated audio duration.
 if [[ -n "$PLAYER_PID" ]]; then
   wait "$PLAYER_PID" 2>/dev/null || true
 fi
+rm -f "$LOCK_FILE" "$WRITE_LOCK_FILE"

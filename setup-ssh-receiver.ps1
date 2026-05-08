@@ -76,13 +76,13 @@ $userExists = Get-LocalUser -Name $ReceiverUser -ErrorAction SilentlyContinue
 if ($userExists) {
     # Read+Execute on .agentvibes
     icacls "$agentvibesDir" /grant "${ReceiverUser}:(OI)(CI)RX" /T /Q 2>$null
-    # Modify on tts-queue (receiver writes request files) — create if absent
+    # Modify on tts-queue (receiver writes request files) - create if absent
     $queueDir = "$agentvibesDir\tts-queue"
     if (-not (Test-Path $queueDir)) {
         New-Item -ItemType Directory -Path $queueDir -Force | Out-Null
     }
     icacls "$queueDir" /grant "${ReceiverUser}:(OI)(CI)M" /T /Q 2>$null
-    # Modify on receiver.log — touch if absent so icacls can target it
+    # Modify on receiver.log - touch if absent so icacls can target it
     $logFile = "$agentvibesDir\receiver.log"
     if (-not (Test-Path $logFile)) {
         New-Item -ItemType File -Path $logFile -Force | Out-Null
@@ -160,9 +160,27 @@ if (-not (Test-Path $adminKeysFile)) {
 Write-Host "[7.5/8] Installing user-session watcher..." -ForegroundColor Yellow
 $watcherScript = @'
 # AgentVibes TTS Queue Watcher - runs in user session for audio access
+# Single-instance guard: exit immediately if another watcher is already running.
+$mutex = New-Object System.Threading.Mutex($false, 'Global\AgentVibesTtsWatcher')
+if (-not $mutex.WaitOne(0)) {
+    $mutex.Dispose()
+    exit 0
+}
+
 $QueueDir = "$env:USERPROFILE\.agentvibes\tts-queue"
+$LogFile  = "$env:USERPROFILE\.agentvibes\watcher.log"
 $PlayTts  = "$env:USERPROFILE\.claude\hooks-windows\play-tts.ps1"
 if (-not (Test-Path $QueueDir)) { New-Item -ItemType Directory -Path $QueueDir -Force | Out-Null }
+
+function Write-WatcherLog {
+    param([string]$Level, [string]$Msg)
+    $ts = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
+    Add-Content -Path $LogFile -Value "$ts [$Level] $Msg" -ErrorAction SilentlyContinue
+}
+
+Write-WatcherLog "INFO" "Watcher started. PlayTts=$PlayTts PlayTtsExists=$(Test-Path $PlayTts)"
+
+try {
 while ($true) {
     $files = Get-ChildItem "$QueueDir\*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
     foreach ($f in $files) {
@@ -170,31 +188,54 @@ while ($true) {
             $req = Get-Content $f.FullName -Raw | ConvertFrom-Json
             Remove-Item $f.FullName -Force
             $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
-            # Server already prepended its pretext before sending —
-            # don't add the local default pretext on top.
             $env:AGENTVIBES_NO_PRETEXT = "1"
-            # Forward per-call overrides from queue JSON via env vars
             if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }   else { $env:AGENTVIBES_OVERRIDE_MUSIC   = $null }
             if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }  else { $env:AGENTVIBES_OVERRIDE_VOLUME  = $null }
             if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
-            # Spawn as child process so play-tts.ps1's 120s watchdog kills its
-            # own PID, not the watcher's.  Dot-sourcing would kill the watcher.
-            # Pass text via temp file — command-line args get truncated/mangled
-            # by Windows process creation for text with quotes or special chars.
-            $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
-            try {
-                [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
-                $env:AGENTVIBES_TEXT_FILE = $tempText
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice
-            } finally {
-                $env:AGENTVIBES_TEXT_FILE = $null
-                Remove-Item $tempText -Force -ErrorAction SilentlyContinue
+
+            if (Test-Path $PlayTts) {
+                # Full AgentVibes pipeline: piper / SAPI / etc.
+                $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
+                try {
+                    [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
+                    $env:AGENTVIBES_TEXT_FILE = $tempText
+                    $llmArg = @()
+                    if ($req.llm) {
+                        if ($req.llm -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+                            $llmArg = @('-llm', $req.llm)
+                        } else {
+                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
+                        }
+                    }
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice) llm=$($req.llm)"
+                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice @llmArg 2>&1
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"
+                    } else {
+                        Write-WatcherLog "INFO" "play-tts ok exit=0 id=$($req.id)"
+                    }
+                } finally {
+                    $env:AGENTVIBES_TEXT_FILE = $null
+                    Remove-Item $tempText -Force -ErrorAction SilentlyContinue
+                }
+            } else {
+                # Fallback: Windows SAPI (built-in, no installation required)
+                Write-WatcherLog "WARN" "play-tts.ps1 not found - using SAPI fallback for id=$($req.id)"
+                Add-Type -AssemblyName System.Speech
+                $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+                $synth.Speak($req.text)
+                $synth.Dispose()
             }
         } catch {
+            Write-WatcherLog "ERROR" "id=$($req.id) err=$_"
             Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
         }
     }
     Start-Sleep -Milliseconds 200
+}
+} finally {
+    $mutex.ReleaseMutex()
+    $mutex.Dispose()
 }
 '@
 Set-Content -Path "$env:USERPROFILE\.agentvibes\tts-watcher.ps1" -Value $watcherScript -Encoding UTF8
@@ -208,6 +249,15 @@ Set-Content -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Value $vbsLa
 # Install autostart shortcut in Startup folder
 $startupDir = [Environment]::GetFolderPath('Startup')
 Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Destination "$startupDir\agentvibes-watcher.vbs" -Force
+
+# Kill any existing watcher instances before launching - prevents double-playback
+# if setup is run more than once (each run would otherwise add another watcher process).
+$existingWatchers = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher.ps1*" }
+if ($existingWatchers) {
+    $existingWatchers | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Milliseconds 300  # Wait for processes to exit
+    Write-Host "       Stopped $($existingWatchers.Count) existing watcher(s)" -ForegroundColor DarkYellow
+}
 
 # Launch it now so streaming works without requiring logout/login
 Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -WindowStyle Hidden

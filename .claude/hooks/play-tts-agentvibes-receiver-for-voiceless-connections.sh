@@ -28,29 +28,45 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Get SSH host from config
-SSH_HOST=$(cat "$PROJECT_ROOT/.claude/agentvibes-receiver-host.txt" 2>/dev/null || \
-           cat "$HOME/.claude/agentvibes-receiver-host.txt" 2>/dev/null || echo "")
+# ---------------------------------------------------------------------------
+# Get SSH connection details from config
+# Prefer ~/.agentvibes/transport-config.json, fall back to legacy host file
+# ---------------------------------------------------------------------------
+
+SSH_HOST=""
+SSH_KEY=""
+SSH_PORT=""
+
+_TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
+if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
+  SSH_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+  SSH_KEY=$(python3  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+  SSH_PORT=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+fi
+
+if [[ -z "$SSH_HOST" ]]; then
+  SSH_HOST=$(cat "$PROJECT_ROOT/.claude/agentvibes-receiver-host.txt" 2>/dev/null || \
+             cat "$HOME/.claude/agentvibes-receiver-host.txt" 2>/dev/null || echo "")
+fi
 
 if [[ -z "$SSH_HOST" ]]; then
   echo "❌ AgentVibes Receiver host not configured" >&2
-  echo "💡 Set host: echo 'your-device' > ~/.claude/agentvibes-receiver-host.txt" >&2
+  echo "💡 Configure in AgentVibes Setup → Audio Transport → AgentVibes Receiver → Configure" >&2
   exit 1
 fi
 
 # SECURITY: Validate SSH_HOST to prevent option injection
-# Must be a valid hostname, IP address, or SSH config alias (alphanumeric, dots, hyphens, underscores)
 if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
   echo "❌ Invalid SSH host format: $SSH_HOST" >&2
   echo "💡 Host must be alphanumeric (may contain dots, hyphens, underscores)" >&2
   exit 1
 fi
 
-# SECURITY: Reject hosts starting with hyphen (SSH option injection)
-if [[ "$SSH_HOST" == -* ]]; then
-  echo "❌ Invalid SSH host: cannot start with hyphen" >&2
-  exit 1
-fi
+# SECURITY: Validate SSH_KEY path (must be absolute)
+if [[ -n "$SSH_KEY" ]] && [[ ! "$SSH_KEY" =~ ^/ ]]; then SSH_KEY=""; fi
+
+# SECURITY: Validate SSH_PORT (digits only)
+if [[ -n "$SSH_PORT" ]] && [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]]; then SSH_PORT=""; fi
 
 # SECURITY: Validate VOICE (allow :: for multi-speaker, . for locale, space for names)
 _voice_re='^[a-zA-Z0-9_.:  -]+$'
@@ -79,9 +95,14 @@ fi
 # Send text to remote for local AgentVibes playback
 echo "📱 Sending to $SSH_HOST for local playback..." >&2
 
+# Build SSH args — use explicit key/port from config if available, else rely on ~/.ssh/config
+SSH_ARGS=()
+[[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
+[[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
+
 # Try receiver scripts in order — single SSH call, no separate probe
 # SECURITY: Base64-encoded values are safe to pass as arguments (no shell metacharacters)
-ssh "$SSH_HOST" "
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "
   if [ -f ~/.agentvibes/play-remote.sh ]; then
     bash ~/.agentvibes/play-remote.sh '$ENCODED_TEXT' '$VOICE' '$ENCODED_AGENT'
   elif [ -f ~/.termux/agentvibes-play.sh ]; then

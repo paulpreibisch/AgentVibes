@@ -22,8 +22,13 @@ export LC_ALL=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Config file location
-CONFIG_DIR="$SCRIPT_DIR/../config"
+# Config file location — prefer CLAUDE_PROJECT_DIR (user's project) over package dir
+# This ensures MCP writes go to the project that play-tts.sh will read.
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  CONFIG_DIR="$CLAUDE_PROJECT_DIR/.claude/config"
+else
+  CONFIG_DIR="$SCRIPT_DIR/../config"
+fi
 ENABLED_FILE="$CONFIG_DIR/background-music-enabled.txt"
 VOLUME_FILE="$CONFIG_DIR/background-music-volume.txt"
 
@@ -122,7 +127,7 @@ list_tracks() {
 # @function get_default_track
 # @intent Get the current default background music track
 get_default_track() {
-    local audio_effects_cfg="$SCRIPT_DIR/../config/audio-effects.cfg"
+    local audio_effects_cfg="$CONFIG_DIR/audio-effects.cfg"
 
     if [[ ! -f "$audio_effects_cfg" ]]; then
         echo ""
@@ -138,7 +143,7 @@ get_default_track() {
 # @param $1 Track filename
 set_default_track() {
     local track="$1"
-    local audio_effects_cfg="$SCRIPT_DIR/../config/audio-effects.cfg"
+    local audio_effects_cfg="$CONFIG_DIR/audio-effects.cfg"
     local bg_dir="$SCRIPT_DIR/../audio/tracks"
 
     if [[ -z "$track" ]]; then
@@ -243,7 +248,7 @@ show_status() {
 set_agent_track() {
     local agent="$1"
     local track="$2"
-    local config_file="$SCRIPT_DIR/../config/audio-effects.cfg"
+    local config_file="$CONFIG_DIR/audio-effects.cfg"
 
     if [[ -z "$agent" ]] || [[ -z "$track" ]]; then
         echo "❌ Error: Agent name and track required"
@@ -289,7 +294,7 @@ set_agent_track() {
 # Set background music for all agents
 set_all_agents_track() {
     local track="$1"
-    local config_file="$SCRIPT_DIR/../config/audio-effects.cfg"
+    local config_file="$CONFIG_DIR/audio-effects.cfg"
 
     if [[ -z "$track" ]]; then
         echo "❌ Error: Track name required"

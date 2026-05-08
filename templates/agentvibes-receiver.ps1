@@ -18,13 +18,13 @@ param(
     [string]$EncodedPayload = ""
 )
 
-# Paths — __OWNER_HOME__ is replaced at install time by setup-ssh-receiver.ps1
+# Paths - __OWNER_HOME__ is replaced at install time by setup-ssh-receiver.ps1
 # with the installing user's home directory (e.g. C:\Users\Paul).
 # This is necessary because sshd runs the ForceCommand as the SSH user
 # (e.g. agentvibes-receiver), whose $env:USERPROFILE is a different directory.
 $OwnerHome = "__OWNER_HOME__"
-if ($OwnerHome -eq "__OWNER_HOME__") {
-    Write-Output "Error: Receiver not installed properly — run setup-ssh-receiver.ps1"
+if (-not (Test-Path $OwnerHome)) {
+    Write-Output "Error: Receiver not installed properly - run setup-ssh-receiver.ps1"
     exit 1
 }
 $AgentVibesDir = "$OwnerHome\.agentvibes"
@@ -58,7 +58,11 @@ function Write-Log {
 # ---------------------------------------------------------------------------
 
 if (-not $EncodedPayload) {
-    # Read from stdin (SSH ForceCommand pipes input)
+    # SSH ForceCommand stores the client's requested command in SSH_ORIGINAL_COMMAND
+    $EncodedPayload = $env:SSH_ORIGINAL_COMMAND
+}
+if (-not $EncodedPayload) {
+    # Fallback: read from stdin (direct invocation or piped input)
     $EncodedPayload = [Console]::In.ReadToEnd().Trim()
 }
 
@@ -94,6 +98,7 @@ $script:Project = "unknown"
 $Pretext = ""
 $Speed = ""
 $Provider = "piper"
+$Llm = "default"
 
 if ($decoded.TrimStart().StartsWith('{')) {
     # JSON payload
@@ -108,6 +113,7 @@ if ($decoded.TrimStart().StartsWith('{')) {
         if ($json.pretext)  { $Pretext = $json.pretext }
         if ($json.speed)    { $Speed = $json.speed }
         if ($json.provider) { $Provider = $json.provider }
+        if ($json.llm)      { $Llm = $json.llm }
     } catch {
         Write-Output "Error: Failed to parse JSON payload"
         exit 1
@@ -131,6 +137,11 @@ if ($script:Voice -notmatch '^[a-zA-Z0-9_\-\. ]+$' -and $script:Voice -notmatch 
 # Validate provider
 if ($Provider -notin @("piper", "soprano", "windows-sapi", "windows-piper", "macos")) {
     $Provider = "piper"
+}
+
+# Validate LLM name - only safe identifier chars (mirrors play-tts.ps1 check)
+if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+    $Llm = "default"
 }
 
 # Validate volume is numeric
@@ -169,7 +180,7 @@ if ($Speed -and $Speed -match '^\d+\.?\d*$') {
 #
 # CRITICAL: SSH receiver runs in Windows session 0 (sshd service), which has
 # NO access to audio devices.  Calling play-tts.ps1 directly here would run
-# silently — synthesis succeeds, but PlaySync writes to a null audio sink.
+# silently - synthesis succeeds, but PlaySync writes to a null audio sink.
 #
 # Instead, write a JSON request to ~/.agentvibes/tts-queue/.  The watcher
 # (tts-watcher.ps1, started by start-watcher.vbs in the user session via the
@@ -194,6 +205,7 @@ $ReqJson = @{
     effects  = $SoxEffects
     speed    = $Speed
     provider = $Provider
+    llm      = $Llm
 } | ConvertTo-Json -Compress
 
 try {

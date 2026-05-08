@@ -97,6 +97,16 @@ if (Test-Path $BgEnabledFile) {
     $BgEnabled = (Get-Content $BgEnabledFile -Raw).Trim() -eq "true"
 }
 
+# Per-message overrides from SSH/remote payload (set by the queue watcher).
+# These allow remote senders (Hermes, SSH remote provider) to override music,
+# volume, and effects for a single message without mutating persistent config.
+$OverrideMusic   = if ($env:AGENTVIBES_OVERRIDE_MUSIC)   { $env:AGENTVIBES_OVERRIDE_MUSIC.Trim() }   else { "" }
+$OverrideVolume  = if ($env:AGENTVIBES_OVERRIDE_VOLUME)  { $env:AGENTVIBES_OVERRIDE_VOLUME.Trim() }  else { "" }
+$OverrideEffects = if ($env:AGENTVIBES_OVERRIDE_EFFECTS) { $env:AGENTVIBES_OVERRIDE_EFFECTS.Trim() } else { "" }
+
+# If a music override is set, force background music on for this message
+if ($OverrideMusic -ne "") { $BgEnabled = $true }
+
 # Check if reverb is enabled (allowlist validation)
 $ReverbLevel = "off"
 $ReverbFile = "$ConfigDir\reverb-level.txt"
@@ -105,6 +115,12 @@ if (Test-Path $ReverbFile) {
     if ($reverbVal -in @("off", "light", "medium", "heavy", "cathedral")) {
         $ReverbLevel = $reverbVal
     }
+}
+# Per-message reverb override: AGENTVIBES_OVERRIDE_EFFECTS accepts a preset name
+# ("off", "light", "medium", "heavy", "cathedral") — Sox effect strings are Linux-only
+# and are silently ignored on Windows.
+if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium", "heavy", "cathedral")) {
+    $ReverbLevel = $OverrideEffects
 }
 $HasReverb = $ReverbLevel -ne "off"
 
@@ -233,7 +249,10 @@ if ($_LlmVoice -and -not $VoiceOverride) {
 # Prepend the configured pretext (e.g. "Agent Vibes Here") to the speech
 # text.  Guard against double-prefixing on re-entrant or looped calls by
 # checking whether the text already starts with the pretext string.
-if ($_LlmPretext -and -not $Text.StartsWith($_LlmPretext)) {
+# Skip when AGENTVIBES_NO_PRETEXT=1 — the watcher sets this so that the
+# Linux-side pretext (already embedded in the text by the SSH receiver)
+# is not overwritten by the Windows audio-effects.cfg default pretext.
+if ($_LlmPretext -and -not $Text.StartsWith($_LlmPretext) -and $env:AGENTVIBES_NO_PRETEXT -ne "1") {
     $Text = "$_LlmPretext, $Text"
 }
 
@@ -251,6 +270,34 @@ if ($_LlmReverb) {
         if ($HasReverb -and -not $HasFfmpeg) {
             try { $null = Get-Command ffmpeg -ErrorAction Stop; $HasFfmpeg = $true } catch {}
         }
+    }
+}
+
+# --- Background music from per-LLM config ------------------------------------
+# Apply the LLM-specific music track/volume when no per-message override is
+# set (AGENTVIBES_OVERRIDE_MUSIC takes priority — it comes from the remote
+# sender and represents a more-specific per-message choice).
+if ($_LlmBgFile -and $OverrideMusic -eq "") {
+    $OverrideMusic = $_LlmBgFile
+    $BgEnabled = $true
+}
+if ($_LlmBgVol -and $OverrideVolume -eq "" -and $_LlmBgVol -match '^\d+\.?\d*$') {
+    $OverrideVolume = $_LlmBgVol
+}
+# Ensure ffmpeg check covers newly-enabled background music
+if ($BgEnabled -and -not $HasFfmpeg) {
+    try { $null = Get-Command ffmpeg -ErrorAction Stop; $HasFfmpeg = $true } catch {}
+}
+
+# --- AGENTVIBES_OVERRIDE_EFFECTS final-priority re-apply ---------------------
+# The per-message override env var (set by the SSH-remote watcher) must win
+# over the LLM config row above.  Re-apply it here so a Windows-side
+# audio-effects.cfg llm: row cannot silently cancel a remote sender's choice.
+if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium", "heavy", "cathedral")) {
+    $ReverbLevel = $OverrideEffects
+    $HasReverb = $ReverbLevel -ne "off"
+    if ($HasReverb -and -not $HasFfmpeg) {
+        try { $null = Get-Command ffmpeg -ErrorAction Stop; $HasFfmpeg = $true } catch {}
     }
 }
 
@@ -336,17 +383,28 @@ catch {
     exit 1
 }
 
+# Resolve the exact audio file path from provider.
+# Write-Host is not captured by 2>&1 in PS5.1, so we rely on Write-Output (bare .wav path).
+$AudioFilePath = ""
+foreach ($line in $providerOutput) {
+    $lineStr = "$line".Trim()
+    if ($lineStr -match '^.+\.wav$' -and (Test-Path $lineStr)) {
+        $AudioFilePath = $lineStr
+        break
+    }
+}
+
 # Apply reverb and/or mix with background music
 if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     $env:AGENTVIBES_NO_PLAY = $null
 
-    # Find the most recent TTS wav file
-    $AudioDir = "$ClaudeDir\audio"
-    $RecentWav = Get-ChildItem -Path $AudioDir -Filter "tts-*.wav" -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $AudioFilePath -or -not (Test-Path $AudioFilePath)) {
+        Write-Host "[ERROR] Provider did not return a valid audio file path" -ForegroundColor Red
+        exit 1
+    }
 
-    if ($RecentWav -and $RecentWav.Length -gt 0) {
-        $voicePath = $RecentWav.FullName
+    if ($true) {
+        $voicePath = $AudioFilePath
 
         # Apply reverb if configured
         if ($HasReverb) {
@@ -380,6 +438,21 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                     $DefaultTrack = $configTrack
                 }
             }
+            # Per-message music override from remote payload (e.g. Hermes, SSH remote)
+            # Accepts full filename (e.g. "agent_vibes_bachata_v1_loop.mp3") or a
+            # keyword (e.g. "bachata") — keyword triggers a glob search in TracksDir.
+            if ($OverrideMusic -ne "") {
+                if ($OverrideMusic -match '^[a-zA-Z0-9_\-\.]+$') {
+                    if ($OverrideMusic -match '\.mp3$') {
+                        # Full filename — use directly
+                        $DefaultTrack = $OverrideMusic
+                    } else {
+                        # Keyword — find first matching track file
+                        $matched = Get-ChildItem -Path $TracksDir -Filter "*$OverrideMusic*" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                        if ($matched) { $DefaultTrack = $matched.Name }
+                    }
+                }
+            }
             $BgTrackPath = Join-Path $TracksDir $DefaultTrack
             # Path containment: verify resolved path stays within tracks directory
             $ResolvedBgTrack = [System.IO.Path]::GetFullPath($BgTrackPath)
@@ -388,16 +461,19 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                 $BgTrackPath = Join-Path $TracksDir "agent_vibes_bachata_v1_loop.mp3"
             }
 
-            # Get volume (default 0.25)
+            # Get volume (default 0.25) — per-message override takes precedence
             $BgVolume = "0.25"
             $VolumeFile = "$ConfigDir\background-music-volume.txt"
             if (Test-Path $VolumeFile) {
                 $vol = (Get-Content $VolumeFile -Raw).Trim()
                 if ($vol -match '^\d+\.?\d*$') { $BgVolume = $vol }
             }
+            if ($OverrideVolume -ne "" -and $OverrideVolume -match '^\d+\.?\d*$') {
+                $BgVolume = $OverrideVolume
+            }
 
             if (Test-Path $BgTrackPath) {
-                $MixedFile = $RecentWav.FullName -replace '\.wav$', '-mixed.wav'
+                $MixedFile = $AudioFilePath -replace '\.wav$', '-mixed.wav'
 
                 try {
                     # Get voice duration to calculate total length
@@ -446,4 +522,9 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
     }
 } else {
     $env:AGENTVIBES_NO_PLAY = $null
+    # Play only when provider delegated playback via Write-Output (e.g. Piper).
+    # SAPI plays audio inline itself and emits no path — skip to avoid double-play.
+    if ($AudioFilePath -and (Test-Path $AudioFilePath)) {
+        Invoke-AudioPlay $AudioFilePath
+    }
 }

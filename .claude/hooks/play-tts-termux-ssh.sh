@@ -114,16 +114,32 @@ check_termux_connection() {
 }
 
 # Main execution
-SSH_HOST=$(get_ssh_host)
+# Try ~/.agentvibes/transport-config.json first, then legacy config
+SSH_KEY=""
+SSH_PORT=""
+
+_TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
+if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
+  _CFG_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+  SSH_KEY=$(python3    -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+  SSH_PORT=$(python3   -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+fi
+
+if [[ -n "${_CFG_HOST:-}" ]]; then
+  SSH_HOST="$_CFG_HOST"
+else
+  SSH_HOST=$(get_ssh_host)
+fi
+
+# SECURITY: Validate SSH_KEY path (must be absolute)
+if [[ -n "$SSH_KEY" ]] && [[ ! "$SSH_KEY" =~ ^/ ]]; then SSH_KEY=""; fi
+# SECURITY: Validate SSH_PORT (digits only)
+if [[ -n "$SSH_PORT" ]] && [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]]; then SSH_PORT=""; fi
 
 if [[ -z "$SSH_HOST" ]]; then
   echo "❌ Termux SSH provider not configured" >&2
-  echo "   Set SSH host alias in one of:" >&2
-  echo "   - Environment: export TERMUX_SSH_HOST='android'" >&2
-  echo "   - Global: echo 'android' > ~/.claude/termux-ssh-host.txt" >&2
-  echo "   - Project: echo 'android' > .claude/termux-ssh-host.txt" >&2
-  echo "" >&2
-  echo "   See provider documentation for SSH setup instructions" >&2
+  echo "   Configure in AgentVibes Setup → Audio Transport → Termux SSH → Configure" >&2
+  echo "   Or: export TERMUX_SSH_HOST='android'" >&2
   exit 1
 fi
 
@@ -133,7 +149,7 @@ if [[ -z "$TEXT" ]]; then
 fi
 
 # Check if SSH connection is available (with timeout)
-if ! check_termux_connection "$SSH_HOST"; then
+if ! ssh -o ConnectTimeout=2 -o BatchMode=yes "${SSH_ARGS[@]}" "$SSH_HOST" "echo ok" >/dev/null 2>&1; then
   echo "⚠️  Cannot connect to SSH host '$SSH_HOST'" >&2
   echo "   Make sure:" >&2
   echo "   - Android device is reachable" >&2
@@ -146,10 +162,15 @@ fi
 # Replace ' with '\'' (end quote, escaped quote, start quote)
 SAFE_TEXT="${TEXT//\'/\'\\\'\'}"
 
+# Build SSH args — use explicit key/port from config if available, else rely on ~/.ssh/config
+SSH_ARGS=(-o ConnectTimeout=5)
+[[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
+[[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
+
 # Send TTS command to Android device via SSH
 # Use termux-tts-speak for native Android TTS
 # Run in background to avoid blocking
-ssh -o ConnectTimeout=5 "$SSH_HOST" "termux-tts-speak '$SAFE_TEXT'" &
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "termux-tts-speak '$SAFE_TEXT'" &
 
 # Get the background process PID
 SSH_PID=$!

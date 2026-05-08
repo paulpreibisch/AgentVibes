@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "agentvibes",
-  "version": "5.6.0",
+  "version": "5.6.2",
   "description": "Now your AI Agents can finally talk back! Professional TTS voice for Claude Code, Claude Desktop (via MCP), and Clawdbot with multi-provider support.",
   "homepage": "https://agentvibes.org",
   "keywords": [
@@ -77,6 +77,7 @@
   "scripts": {
     "install-local": "node src/installer.js install",
     "postinstall": "node mcp-server/install-deps.js",
+    "version": "node scripts/sync-readme-version.js && git add README.md",
     "install-mcp-deps": "node mcp-server/install-deps.js",
     "test": "npm run test:syntax && AGENTVIBES_TEST_MODE=true bats test/unit/*.bats && npm run test:coverage",
     "test:syntax": "node -c src/installer.js && node -c mcp-server/install-deps.js",

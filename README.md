@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.2
 
 ---
 
@@ -40,7 +40,20 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.5 — Per-LLM Audio Routing
+## 🌟 NEW IN v5.6.2 — Per-Message Audio Control
+
+Remote senders (Hermes, SSH remote provider) can now control **voice, music, reverb, and volume per message** — no persistent config changes needed. Pass any field in the JSON payload and the Windows receiver applies it for that message only.
+
+## v5.6.1 — Hermes Agent Integration
+
+AgentVibes now speaks for **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the self-hosted, self-improving AI assistant. Two production-ready skills ship in `docs/hermes/skills/`:
+
+- **`hermes-agentvibes-hook`** — Auto-speaks every Hermes response via AgentVibes TTS. Fires on `agent:end`, strips markdown, rate-limits, and ships with full SSH MITM protection
+- **`agentvibes-target`** — Teaches Hermes to send any text to your speakers on demand, supporting laptop and Android targets
+
+Also in this release: Windows PS5.1 compatibility fixes for `play-tts.ps1`, modal/hotkey repairs, and BMAD tab now shows all agents.
+
+## v5.5 — Per-LLM Audio Routing
 
 Give **each LLM its own voice, pretext, and music** — Claude Code, Copilot, and Codex can all sound different without touching global settings.
 
@@ -271,6 +284,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 - [💡 Common Workflows](#-common-workflows) - Quick examples
 - [🔧 Advanced Features](#-advanced-features) - Custom voices & personalities
 - [🔊 Remote Audio Setup](#-remote-audio-setup) - Play TTS from remote servers
+- [🖥️ Windows SSH Receiver & TTS Watcher](#️-windows-ssh-receiver--tts-watcher) - Stream audio to Windows PC from Linux/macOS
 - [🚨 Security Hardening Guide](docs/security-hardening-guide.md) - **REQUIRED if running OpenClaw on remote server**: SSH hardening, Fail2Ban, Tailscale, UFW, AIDE
 - [🔬 Technical Deep Dive](docs/technical-deep-dive.md) - How AgentVibes works under the hood
 - [❓ Troubleshooting](#-troubleshooting) - Common issues & fixes
@@ -1592,6 +1606,100 @@ AgentVibes supports **custom personalities** and **custom voices**.
 
 ---
 
+## 🖥️ Windows SSH Receiver & TTS Watcher
+
+**Stream TTS audio from a Linux/macOS machine to your Windows PC.**
+
+When you run Claude Code on a Linux server (or WSL) and want audio to play on your Windows laptop, AgentVibes routes audio over SSH using a queue-based architecture — required because SSH connections on Windows run in **Session 0**, which has no access to audio devices.
+
+### How It Works
+
+```
+Linux/macOS (sender)                    Windows (receiver)
+─────────────────────                   ──────────────────
+play-tts-ssh-remote.sh                  agentvibes-receiver.ps1  ← SSH ForceCommand
+  │                                           │
+  │  SSH: base64 JSON payload ──────────────▶ │  writes req-xxxx.json
+  │                                           ▼
+  │                                     ~/.agentvibes/tts-queue/
+  │                                           │
+  │                                     tts-watcher.ps1  ← runs in your user session
+  │                                           │
+  │                                     play-tts.ps1 → piper/SAPI → 🔊 speakers
+```
+
+The **receiver** (`agentvibes-receiver.ps1`) runs as an SSH ForceCommand — it accepts base64 JSON payloads and writes them to a queue directory. The **watcher** (`tts-watcher.ps1`) runs invisibly in your user session (the only session that has audio), picks up queue items, and plays them.
+
+### Is It Visible to the User?
+
+**No — completely invisible during normal use.** The watcher is a hidden background process that:
+- Auto-starts on Windows login via the Startup folder shortcut (`agentvibes-watcher.vbs`)
+- Runs as a hidden PowerShell window (no taskbar icon, no UI)
+- Writes a log to `%USERPROFILE%\.agentvibes\watcher.log` for debugging
+- Silently plays audio when TTS requests arrive
+
+### One-Time Setup (Windows)
+
+Run this **once** in an **Administrator PowerShell** from the AgentVibes repo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup-ssh-receiver.ps1
+```
+
+This:
+1. Installs and hardens OpenSSH with ForceCommand (SSH → receiver only, no shell)
+2. Creates the `agentvibes-receiver` Windows user for SSH isolation
+3. Installs the TTS watcher + auto-start shortcut in your Startup folder
+4. Configures the firewall rule (Tailscale-only by default)
+
+**After setup, no further action is needed.** The watcher starts automatically on every login.
+
+### After-Install Checklist
+
+| Step | Required? | Notes |
+|------|-----------|-------|
+| Run `setup-ssh-receiver.ps1` | ✅ Once | Admin PowerShell |
+| Add sender's SSH public key | ✅ Once | To `C:\ProgramData\ssh\administrators_authorized_keys` |
+| Start the watcher | ✅ First time | Auto-starts on next login; or run `start-watcher.vbs` manually |
+| Install piper voices on Windows | Optional | Without it, falls back to Windows SAPI (built-in) |
+
+### Watcher Fallback Behaviour
+
+If `%USERPROFILE%\.claude\hooks-windows\play-tts.ps1` is not present (e.g. AgentVibes has not been installed on the Windows machine itself), the watcher automatically falls back to **Windows SAPI** — the built-in speech synthesizer. Audio will still play; it just uses the default Windows voice instead of a Piper voice.
+
+### Troubleshooting
+
+**No audio after the watcher is running:**
+```powershell
+# Check the log
+Get-Content "$env:USERPROFILE\.agentvibes\watcher.log" -Tail 20
+```
+
+**Watcher not running after reboot:**
+```powershell
+# Restart manually (no admin needed)
+Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -WindowStyle Hidden
+```
+
+**Update the watcher without re-running full setup:**
+```powershell
+# From the AgentVibes repo root (no admin needed)
+powershell -ExecutionPolicy Bypass -File update-watcher.ps1
+```
+
+### Platform Comparison
+
+| Platform | Watcher needed? | Reason |
+|----------|----------------|--------|
+| **Windows** | ✅ Yes | SSH runs in Session 0 — no audio access |
+| **Linux** | No | SSH sessions can reach PulseAudio/PipeWire directly |
+| **macOS** | No | SSH sessions have audio access |
+| **WSL** | No | Uses Linux audio stack |
+
+[↑ Back to top](#-table-of-contents)
+
+---
+
 ## 🛠️ Technical Documentation
 
 ### Audio Architecture
@@ -1715,6 +1823,13 @@ sudo pacman -S ffmpeg
 **No Audio Playing?**
 1. Verify hook is installed: `ls -la .claude/hooks/session-start-tts.sh`
 2. Test: `/agent-vibes:sample Aria`
+
+**No Audio on Windows (SSH Receiver)?**
+The Windows receiver queues audio but requires a separate watcher process to play it:
+1. Check if watcher is running: `Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher*" }`
+2. If not running: `Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -WindowStyle Hidden`
+3. Check the log: `Get-Content "$env:USERPROFILE\.agentvibes\watcher.log" -Tail 20`
+4. [→ Full Windows setup guide](#️-windows-ssh-receiver--tts-watcher)
 
 **Commands Not Found?**
 ```bash

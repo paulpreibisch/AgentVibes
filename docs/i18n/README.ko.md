@@ -1,10 +1,19 @@
 > 🌐 [English version](../../README.md)
 
-**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.5.0
+**저자**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **버전**: v5.6.2
 
 ---
 
-## 🌟 v5.5 신기능 — LLM별 오디오 라우팅
+## 🌟 v5.6.2 신기능 — Hermes Agent 통합
+
+AgentVibes가 이제 **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — 자체 호스팅, 자기 개선 AI 어시스턴트를 위해 말할 수 있습니다. 프로덕션 준비 완료된 스킬 2개가 `docs/hermes/skills/`에 포함됩니다:
+
+- **`hermes-agentvibes-hook`** — AgentVibes TTS를 통해 모든 Hermes 응답을 자동 음성 출력. `agent:end`에서 실행, Markdown 제거, 속도 제한, 완전한 SSH MITM 보호 제공
+- **`agentvibes-target`** — Hermes가 온디맨드로 임의 텍스트를 스피커에 전송하도록 교육. Windows 및 Android 지원
+
+이번 릴리스에도 포함: `play-tts.ps1`의 PS5.1 호환성 수정, 모달/단축키 수정, BMAD 탭이 이제 모든 에이전트 표시.
+
+## v5.5 신기능 — LLM별 오디오 라우팅
 
 **각 LLM에 고유한 보이스, 프리텍스트, 음악을 부여** — Claude Code, Copilot, Codex가 전역 설정을 건드리지 않고도 서로 다른 소리를 낼 수 있습니다.
 

@@ -156,6 +156,107 @@ class AgentVibesServer:
 
         return voice_name
 
+    # ── LibriTTS display-name resolution ──────────────────────────────────────
+
+    _SURNAME_POOL = [
+        'Bell', 'Carter', 'Davis', 'Ellis', 'Foster', 'Gray', 'Hayes', 'Irving',
+        'Jones', 'Knox', 'Lane', 'Mason', 'Nash', 'Owens', 'Pierce', 'Quinn',
+    ]
+
+    @classmethod
+    def _uniquify_voice_name(cls, raw_name: str) -> str:
+        """Python port of uniquifyVoiceName from src/utils/voice-names.js"""
+        import re as _re
+        if not raw_name:
+            return raw_name
+        m = _re.match(r'^(.+)-(\d+)$', raw_name)
+        if m:
+            base, n = m.group(1), int(m.group(2))
+            if n >= 2:
+                return f"{base} {cls._SURNAME_POOL[(n - 1) % len(cls._SURNAME_POOL)]}"
+        if ' ' in raw_name:
+            return raw_name
+        return f"{raw_name} {cls._SURNAME_POOL[0]}"
+
+    def _build_libritts_catalog(self) -> dict:
+        """
+        Build a case-insensitive display-name → entry map from voice-assignments.json.
+        Returns dict keyed by lowercased display name / raw name / speaker name.
+        """
+        catalog: dict = {}
+        va_path = self.agentvibes_root / "voice-assignments.json"
+        if not va_path.exists():
+            return catalog
+        try:
+            data = json.loads(va_path.read_text())
+            for id_str, entry in data.get("libritts_speakers", {}).items():
+                speaker_id = int(id_str)
+                raw_name = entry.get("voice_name", "")
+                display_name = self._uniquify_voice_name(raw_name)
+                voice_id = f"en_US-libritts-high::{raw_name}"
+                info = {
+                    "voice_id": voice_id,
+                    "model": "en_US-libritts-high",
+                    "speaker_name": raw_name,
+                    "speaker_id": speaker_id,
+                    "display_name": display_name,
+                    "gender": entry.get("gender", ""),
+                }
+                for key in (display_name.lower(), raw_name.lower(),
+                            raw_name.replace(" ", "_").lower()):
+                    catalog.setdefault(key, info)
+        except (json.JSONDecodeError, KeyError, ValueError, OSError):
+            pass
+        return catalog
+
+    def _resolve_voice_input(self, voice_input: str) -> Optional[dict]:
+        """
+        Resolve a voice display name or ID to a dict with model/speakerId/voiceId.
+        Returns None if unresolvable.
+        Accepts: "Bella Bell", "Bella-2", "en_US-libritts-high::Bella",
+                 "Kristin_Hughes", "en_US-amy-medium"
+        """
+        import re as _re
+        if not voice_input:
+            return None
+        MS_SEP = "::"
+
+        # Already a full voiceId with MS_SEP
+        if MS_SEP in voice_input:
+            parts = voice_input.split(MS_SEP, 1)
+            model, speaker_name = parts[0], parts[1]
+            if not _re.match(r'^[a-zA-Z0-9_-]+$', model):
+                return None
+            catalog = self._build_libritts_catalog()
+            entry = catalog.get(speaker_name.lower())
+            return {
+                "voice_id": voice_input,
+                "model": model,
+                "speaker_name": speaker_name,
+                "speaker_id": entry["speaker_id"] if entry else None,
+                "display_name": entry["display_name"] if entry else speaker_name,
+            }
+
+        # Plain piper model ID (e.g. en_US-amy-medium)
+        if _re.match(r'^en_[A-Z]{2}-[a-zA-Z0-9_]+-[a-z]+$', voice_input):
+            return {
+                "voice_id": voice_input, "model": voice_input,
+                "speaker_name": None, "speaker_id": None, "display_name": voice_input,
+            }
+
+        # LibriTTS display name / raw name lookup
+        catalog = self._build_libritts_catalog()
+        normalised = voice_input.replace("_", " ")
+        entry = catalog.get(normalised.lower()) or catalog.get(voice_input.lower())
+        return entry or None
+
+    def _get_config_dir(self) -> Path:
+        """Return the .claude dir to write voice config files into (project or global)."""
+        cwd = Path.cwd()
+        if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
+            return cwd / ".claude"
+        return self.claude_dir
+
     async def text_to_speech(
         self,
         text: str,
@@ -313,6 +414,28 @@ class AgentVibesServer:
             for voice in voices:
                 marker = " ✓ (current)" if voice == current_voice else ""
                 output += f"  • {voice}{marker}\n"
+
+            # Expand LibriTTS named speakers when en_US-libritts-high is installed
+            piper_voices_dir = Path.home() / ".local" / "share" / "piper-voices"
+            libritts_onnx = piper_voices_dir / "en_US-libritts-high.onnx"
+            if libritts_onnx.exists():
+                catalog = self._build_libritts_catalog()
+                if catalog:
+                    output += f"\n  📖 LibriTTS named speakers (en_US-libritts-high):\n"
+                    # De-duplicate: only one entry per display name
+                    seen: set = set()
+                    for entry in catalog.values():
+                        dn = entry["display_name"]
+                        if dn in seen:
+                            continue
+                        seen.add(dn)
+                        spk = entry["speaker_name"]
+                        sid = entry["speaker_id"]
+                        gender = entry.get("gender", "")
+                        g_icon = "♀" if gender.lower() == "female" else ("♂" if gender.lower() == "male" else "—")
+                        marker = " ✓ (current)" if entry["voice_id"] == current_voice else ""
+                        output += f"  • {dn} ({g_icon} speaker {sid}){marker}\n"
+
             output += f"{self.SEPARATOR}\n"
 
             # Add provider switch hint
@@ -332,19 +455,51 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        # Resolve friendly name to Piper ID
+        # Try new display-name resolver first (handles "Bella Bell", "::" ids, etc.)
+        resolved = self._resolve_voice_input(voice_name)
+
+        if resolved:
+            voice_id     = resolved["voice_id"]
+            display_name = resolved["display_name"]
+            model        = resolved["model"]
+            speaker_id   = resolved["speaker_id"]
+            speaker_name = resolved["speaker_name"]
+
+            # Write the three config files directly (no voice-manager.sh needed)
+            config_dir = self._get_config_dir()
+            try:
+                config_dir.mkdir(parents=True, exist_ok=True)
+                (config_dir / "tts-voice.txt").write_text(display_name + "\n")
+                if speaker_name:
+                    (config_dir / "tts-piper-model.txt").write_text(model + "\n")
+                    if speaker_id is not None:
+                        (config_dir / "tts-piper-speaker-id.txt").write_text(str(speaker_id) + "\n")
+                    else:
+                        # Clear speaker-id so piper uses default
+                        try: (config_dir / "tts-piper-speaker-id.txt").unlink()
+                        except FileNotFoundError: pass
+                else:
+                    # Single-speaker model — clear multi-speaker files
+                    for f in ("tts-piper-model.txt", "tts-piper-speaker-id.txt"):
+                        try: (config_dir / f).unlink()
+                        except FileNotFoundError: pass
+            except OSError as e:
+                return f"❌ Failed to write voice config: {e}"
+
+            detail = f" (speaker {speaker_id}, model {model})" if speaker_id is not None else ""
+            return f"✅ Voice set to: {display_name}{detail}"
+
+        # Fall back to legacy friendly-name resolver (voice-metadata.json)
         original_name = voice_name
         resolved_name = self._resolve_friendly_name(voice_name)
-
         result = await self._run_script(
             self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name, "--silent"]
         )
-
         if result and "✅" in result:
             if original_name.lower() != resolved_name.lower():
                 return f"✅ Voice switched to: {original_name} ({resolved_name})"
             return f"✅ Voice switched to: {voice_name}"
-        return f"❌ Failed to switch voice: {result}"
+        return f"❌ Failed to switch voice — could not resolve '{voice_name}'. Try 'list_voices' to see available names."
 
     async def list_personalities(self) -> str:
         """
@@ -869,6 +1024,115 @@ class AgentVibesServer:
         result = await self._run_script("clean-audio-cache.sh", [])
         return result if result else "❌ Failed to clean audio cache"
 
+    # ── Hermes config helpers ────────────────────────────────────────────────
+
+    def _hermes_cfg_path(self) -> Path:
+        hermes_home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+        return hermes_home / "hooks" / "agentvibes-tts" / "agentvibes-ssh-config.json"
+
+    async def get_hermes_config(self) -> str:
+        """
+        Get current Hermes AgentVibes SSH configuration.
+
+        Returns:
+            Current SSH key, host, port, and voice settings
+        """
+        cfg_path = self._hermes_cfg_path()
+        defaults = {
+            "mode": "local",
+            "sshKey": "/absolute/path/to/id_ed25519_agentvibes",
+            "host": "your-receiver-tailscale-ip",
+            "port": "2222",
+            "voice": "en_US-libritts-high::Leo-8",
+        }
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            cfg = {}
+        merged = {**defaults, **cfg}
+        installed = cfg_path.exists()
+        is_local = merged.get("mode", "local") == "local"
+        out = "🔌 Hermes AgentVibes Configuration\n"
+        out += "─" * 40 + "\n"
+        out += f"Status:   {'✅ Configured' if installed else '⚠️  Not yet installed (run: agentvibes install)'}\n"
+        out += f"Mode:     {'🏠 Local (Hermes & speakers on same machine)' if is_local else '🌐 Remote (SSH to receiver)'}\n"
+        out += f"Voice:    {merged['voice']}\n"
+        if not is_local:
+            out += f"SSH Key:  {merged['sshKey']}\n"
+            out += f"Host:     {merged['host']}\n"
+            out += f"Port:     {merged['port']}\n"
+        if installed:
+            out += f"\nConfig file: {cfg_path}\n"
+            out += "After changes, run: hermes gateway restart\n"
+        return out
+
+    async def set_hermes_config(
+        self,
+        mode: Optional[str] = None,
+        ssh_key: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[str] = None,
+        voice: Optional[str] = None,
+    ) -> str:
+        """
+        Save Hermes AgentVibes SSH configuration.
+
+        Returns:
+            Success message with saved values
+        """
+        import re as _re
+        cfg_path = self._hermes_cfg_path()
+        defaults = {
+            "mode": "local",
+            "sshKey": "/absolute/path/to/id_ed25519_agentvibes",
+            "host": "your-receiver-tailscale-ip",
+            "port": "2222",
+            "voice": "en_US-libritts-high::Leo-8",
+        }
+        try:
+            existing = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing = {}
+        merged = {**defaults, **existing}
+
+        if mode is not None:
+            m = str(mode).lower().strip()
+            if m not in ("local", "remote"):
+                return "❌ Invalid mode: must be 'local' or 'remote'"
+            merged["mode"] = m
+        if ssh_key is not None:
+            merged["sshKey"] = str(ssh_key)[:512]
+        if host is not None:
+            merged["host"] = str(host)[:253]
+        if port is not None:
+            p = str(port).strip()
+            if not _re.match(r"^\d{1,5}$", p):
+                return "❌ Invalid port: must be a number (e.g. '2222')"
+            merged["port"] = p
+        if voice is not None:
+            merged["voice"] = str(voice)[:200]
+
+        try:
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_path.chmod(0o700) if cfg_path.parent.exists() else None
+            cfg_path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            cfg_path.chmod(0o600)
+        except Exception as e:
+            return f"❌ Failed to save config: {e}"
+
+        is_local = merged.get("mode", "local") == "local"
+        out = "✅ Hermes config saved!\n"
+        out += "─" * 40 + "\n"
+        out += f"Mode:     {'🏠 Local' if is_local else '🌐 Remote (SSH)'}\n"
+        out += f"Voice:    {merged['voice']}\n"
+        if not is_local:
+            out += f"SSH Key:  {merged['sshKey']}\n"
+            out += f"Host:     {merged['host']}\n"
+            out += f"Port:     {merged['port']}\n"
+        out += f"\nConfig file: {cfg_path}\n"
+        out += "Run: hermes gateway restart\n"
+        return out
+
     # Helper methods
     def _build_script_env(self) -> dict:
         """Build environment dict for script execution (shared by all script runners)"""
@@ -1367,6 +1631,41 @@ Examples:
             description="Clean all TTS audio cache files and report space freed. Non-interactive cleanup that removes all wav/mp3/aiff files while preserving background music tracks.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="get_hermes_config",
+            description="Get current Hermes AgentVibes SSH configuration (SSH key path, host, port, voice). Use this to check what's currently set before changing it.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_hermes_config",
+            description="Configure Hermes AgentVibes TTS settings. Choose 'local' mode when Hermes runs on the same machine as your speakers (no SSH needed), or 'remote' mode to send audio over SSH to a receiver. Omit any field to keep its current value.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["local", "remote"],
+                        "description": "'local' = Hermes and speakers on same machine (no SSH). 'remote' = send audio over SSH to a receiver machine.",
+                    },
+                    "ssh_key": {
+                        "type": "string",
+                        "description": "Absolute path to SSH private key (e.g. /home/user/.ssh/id_ed25519_agentvibes) — only used in remote mode",
+                    },
+                    "host": {
+                        "type": "string",
+                        "description": "Tailscale IP or hostname of the machine with speakers — only used in remote mode",
+                    },
+                    "port": {
+                        "type": "string",
+                        "description": "AgentVibes receiver SSH port (e.g. '2222') — only used in remote mode",
+                    },
+                    "voice": {
+                        "type": "string",
+                        "description": "Piper voice model (e.g. 'en_US-libritts-high::Leo-8')",
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -1444,6 +1743,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.list_audio_effects()
         elif name == "clean_audio_cache":
             result = await agent_vibes.clean_audio_cache()
+        elif name == "get_hermes_config":
+            result = await agent_vibes.get_hermes_config()
+        elif name == "set_hermes_config":
+            result = await agent_vibes.set_hermes_config(
+                mode=arguments.get("mode"),
+                ssh_key=arguments.get("ssh_key"),
+                host=arguments.get("host"),
+                port=arguments.get("port"),
+                voice=arguments.get("voice"),
+            )
         else:
             result = f"Unknown tool: {name}"
 

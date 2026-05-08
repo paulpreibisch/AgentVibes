@@ -1,5 +1,50 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎛️ v5.6.2 — Per-Message Audio Control for Remote Providers
+
+> See [English release notes](../../RELEASE_NOTES.md) for full details.
+
+---
+
+
+## 🤖 v5.6.1 — Hermes Agent 統合 & Windows PS5.1 修正
+
+**リリース日:** 2026-05-01
+
+### 🎉 Hermes Agent 統合（新機能！）
+
+AgentVibes が **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** を正式サポートしました — セルフホスト型の自己改善 AI アシスタントです。本番対応の Hermes スキルが 2 つ `docs/hermes/skills/` に含まれています：
+
+**`hermes-agentvibes-hook`** — AgentVibes 経由で Hermes の全レスポンスを自動音声出力
+- すべての `agent:end` イベントで発火（Telegram、Discord、CLI など）
+- 発話前に Markdown、コードブロック、絵文字を除去
+- 単語境界でトランケート、キュー溢れ防止のためレート制限
+- `StrictHostKeyChecking=accept-new` + 永続的 `known_hosts` で MITM 安全な SSH
+- デバッグ用の完全ログを `tts-hook.log` に記録
+
+**`agentvibes-target`** — オンデマンドで任意のテキストをスピーカーに送る方法を Hermes に教える
+- SSH 経由の Base64 JSON ペイロード（Windows レシーバーと同じ ForceCommand アーキテクチャ）
+- Windows および Android ターゲットをサポート
+- 詳細なトラブルシューティングガイド付き
+
+**インストール：** スキルを Hermes ホームディレクトリにコピーしてゲートウェイを再起動：
+```bash
+cp -r docs/hermes/skills/tts/hermes-agentvibes-hook ~/.hermes/skills/tts/
+hermes gateway restart
+```
+
+### 🐛 Windows PS5.1 修正
+
+- **play-tts.ps1 の PS5.1 互換性** — v5.6.0 リベースからの 3 つのリグレッションを修正：
+  PS7 の null 条件演算子（`?.`）を PS5.1 互換の if/else に置き換え、CP1252 で em ダッシュが
+  壊れないよう UTF-8 BOM を追加、マージで失われた piper プロバイダーエイリアスと
+  `AGENTVIBES_TEXT_FILE` センチネルを復元
+- **モーダル & ホットキーの修正** — モーダルのエスケープキー、ナビゲーションホットキー、Q+Caps Lock、
+  ボイスプレビューのエラーハンドリングをすべて修復
+- **BMAD タブ** — モジュールに関係なくすべてのエージェントを表示するように
+
+---
+
 ## 🎵 v5.5.0 — LLM別オーディオルーティング & Windows インストーラーの堅牢化
 
 **リリース日:** 2026-04-27

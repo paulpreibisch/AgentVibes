@@ -86,6 +86,9 @@ try {
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
     Write-Host "[VOICE] Voice used: $ActualVoice (Windows SAPI)" -ForegroundColor Green
 
+    # Emit via output stream so parent can capture path for bg/reverb mixing
+    Write-Output $AudioFile
+
     # Play the audio using built-in Windows audio player (skip if AGENTVIBES_NO_PLAY is set)
     if (-not $env:AGENTVIBES_NO_PLAY) {
         try {

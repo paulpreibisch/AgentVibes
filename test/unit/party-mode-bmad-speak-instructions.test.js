@@ -13,8 +13,8 @@ async function readProjectFile(relativePath) {
 
 describe('party mode TTS instructions', () => {
   it('uses the cross-platform bmad-speak entry point in the packaged workflow steps', async () => {
-    const discussionStep = await readProjectFile('_bmad/core/workflows/party-mode/steps/step-02-discussion-orchestration.md');
-    const exitStep = await readProjectFile('_bmad/core/workflows/party-mode/steps/step-03-graceful-exit.md');
+    const discussionStep = await readProjectFile('.claude/skills/bmad-party-mode/steps/step-02-discussion-orchestration.md');
+    const exitStep = await readProjectFile('.claude/skills/bmad-party-mode/steps/step-03-graceful-exit.md');
 
     assert.match(discussionStep, /node bin\/bmad-speak\.js/);
     assert.match(exitStep, /node bin\/bmad-speak\.js/);

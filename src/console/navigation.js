@@ -58,10 +58,13 @@ export function setupNavigation(screen, navigationService, focusMainTabBar) {
     }
   });
 
-  // Escape — close modal if open, otherwise return focus to tab bar
+  // Escape — close modal if open, otherwise return focus to tab bar.
+  // forceCloseAll() is used (not closeModal()) so close callbacks are
+  // actually invoked even when the focused element is inside a sub-picker
+  // that is not in the ancestor chain of the main modal's fieldList.
   screen.key(['escape'], () => {
     if (navigationService.isModalOpen()) {
-      navigationService.closeModal();
+      navigationService.forceCloseAll();
     } else if (typeof focusMainTabBar === 'function') {
       focusMainTabBar();
     }
