@@ -23,7 +23,7 @@ param(
 # This is necessary because sshd runs the ForceCommand as the SSH user
 # (e.g. agentvibes-receiver), whose $env:USERPROFILE is a different directory.
 $OwnerHome = "__OWNER_HOME__"
-if (-not (Test-Path $OwnerHome)) {
+if (-not (Test-Path "$OwnerHome\.agentvibes")) {
     Write-Output "Error: Receiver not installed properly - run setup-ssh-receiver.ps1"
     exit 1
 }
@@ -59,7 +59,7 @@ function Write-Log {
 
 if (-not $EncodedPayload) {
     # SSH ForceCommand stores the client's requested command in SSH_ORIGINAL_COMMAND
-    $EncodedPayload = $env:SSH_ORIGINAL_COMMAND
+    $EncodedPayload = if ($env:SSH_ORIGINAL_COMMAND) { $env:SSH_ORIGINAL_COMMAND.Trim() } else { "" }
 }
 if (-not $EncodedPayload) {
     # Fallback: read from stdin (direct invocation or piped input)

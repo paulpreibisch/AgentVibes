@@ -151,7 +151,7 @@ if (-not (Test-Path $adminKeysFile)) {
     Write-Host "       Add your sender's public key there, then run:" -ForegroundColor Yellow
     Write-Host "       icacls `"$adminKeysFile`" /inheritance:r /grant `"SYSTEM:F`" /grant `"BUILTIN\Administrators:F`"" -ForegroundColor Cyan
 } else {
-    cmd /c "icacls `"$adminKeysFile`" /inheritance:r /grant `"SYSTEM:F`" /grant `"BUILTIN\Administrators:F`"" 2>$null
+    & icacls $adminKeysFile /inheritance:r /grant "SYSTEM:F" /grant "BUILTIN\Administrators:F" 2>$null
 }
 # Step 7.5: Install user-session watcher (audio device access)
 # CRITICAL: SSH receiver runs in session 0 (no audio).  The receiver writes
@@ -182,16 +182,23 @@ Write-WatcherLog "INFO" "Watcher started. PlayTts=$PlayTts PlayTtsExists=$(Test-
 
 try {
 while ($true) {
-    $files = Get-ChildItem "$QueueDir\*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
+    $files = Get-ChildItem "$QueueDir\req-*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
     foreach ($f in $files) {
+        # Rename to proc-* before processing — crash recovery on restart
+        $procFile = $f.FullName -replace '\\req-', '\proc-'
+        try { Rename-Item $f.FullName $procFile -ErrorAction Stop } catch { continue }
         try {
-            $req = Get-Content $f.FullName -Raw | ConvertFrom-Json
-            Remove-Item $f.FullName -Force
+            $req = Get-Content $procFile -Raw | ConvertFrom-Json
+            # Validate voice before passing to command line
+            $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
             $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
             $env:AGENTVIBES_NO_PRETEXT = "1"
-            if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }   else { $env:AGENTVIBES_OVERRIDE_MUSIC   = $null }
-            if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }  else { $env:AGENTVIBES_OVERRIDE_VOLUME  = $null }
-            if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
+            if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }
+            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",   $null, "Process") }
+            if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }
+            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_VOLUME",  $null, "Process") }
+            if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects }
+            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_EFFECTS", $null, "Process") }
 
             if (Test-Path $PlayTts) {
                 # Full AgentVibes pipeline: piper / SAPI / etc.
@@ -207,15 +214,15 @@ while ($true) {
                             Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
                         }
                     }
-                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice) llm=$($req.llm)"
-                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice @llmArg 2>&1
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm)"
+                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg 2>&1
                     if ($LASTEXITCODE -ne 0) {
                         Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"
                     } else {
                         Write-WatcherLog "INFO" "play-tts ok exit=0 id=$($req.id)"
                     }
                 } finally {
-                    $env:AGENTVIBES_TEXT_FILE = $null
+                    [System.Environment]::SetEnvironmentVariable("AGENTVIBES_TEXT_FILE", $null, "Process")
                     Remove-Item $tempText -Force -ErrorAction SilentlyContinue
                 }
             } else {
@@ -226,10 +233,17 @@ while ($true) {
                 $synth.Speak($req.text)
                 $synth.Dispose()
             }
+            Remove-Item $procFile -Force -ErrorAction SilentlyContinue
         } catch {
             Write-WatcherLog "ERROR" "id=$($req.id) err=$_"
-            Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+            Remove-Item $procFile -Force -ErrorAction SilentlyContinue
         }
+    }
+    # Crash recovery: re-queue any proc-* files left from previous watcher crash
+    $stale = Get-ChildItem "$QueueDir\proc-*.json" -ErrorAction SilentlyContinue
+    foreach ($s in $stale) {
+        $recovered = $s.FullName -replace '\\proc-', '\req-'
+        try { Rename-Item $s.FullName $recovered -ErrorAction SilentlyContinue } catch {}
     }
     Start-Sleep -Milliseconds 200
 }
@@ -252,7 +266,7 @@ Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -Destination "$
 
 # Kill any existing watcher instances before launching - prevents double-playback
 # if setup is run more than once (each run would otherwise add another watcher process).
-$existingWatchers = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher.ps1*" }
+$existingWatchers = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher.ps1*" -and $_.Name -like "powershell*" }
 if ($existingWatchers) {
     $existingWatchers | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 300  # Wait for processes to exit

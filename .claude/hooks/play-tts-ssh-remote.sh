@@ -110,8 +110,9 @@ if [[ -z "$SSH_HOST" ]]; then
   exit 1
 fi
 
-# SECURITY: Validate SSH_HOST format (hostname, IP, or ~/.ssh/config alias)
-if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+# SECURITY: Validate SSH_HOST format (hostname, IP, IPv6, or ~/.ssh/config alias)
+if [[ ! "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] && \
+   [[ ! "$SSH_HOST" =~ ^\[[0-9a-fA-F:]+\]$ ]]; then
   echo "Invalid SSH host format: $SSH_HOST" >&2
   exit 1
 fi
@@ -298,6 +299,12 @@ SSH_ARGS=()
 # ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD" &
 SSH_PID=$!
+
+# Log SSH failures asynchronously so the hook doesn't block
+( wait "$SSH_PID"; _exit=$?; if [[ $_exit -ne 0 ]]; then
+    echo "$(date -Iseconds) [ERROR] SSH to $SSH_HOST failed (exit $_exit)" \
+      >> "$HOME/.agentvibes/ssh-remote.log" 2>/dev/null || true
+  fi ) &
 
 echo "Sent to $SSH_HOST (PID: $SSH_PID)" >&2
 exit 0

@@ -8,7 +8,7 @@
 Write-Host "`n=== AgentVibes Watcher Update ===" -ForegroundColor Cyan
 
 # Kill existing watcher
-$existing = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher*" }
+$existing = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*tts-watcher*" -and $_.Name -like "powershell*" }
 if ($existing) {
     $existing | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 300
@@ -37,16 +37,24 @@ Write-WatcherLog "INFO" "Watcher started. PlayTts exists: $(Test-Path $PlayTts)"
 
 try {
 while ($true) {
-    $files = Get-ChildItem "$QueueDir\*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
+    $files = Get-ChildItem "$QueueDir\req-*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
     foreach ($f in $files) {
+        # Rename to proc-* before processing — crash recovery on restart
+        $procFile = $f.FullName -replace '\\req-', '\proc-'
+        try { Rename-Item $f.FullName $procFile -ErrorAction Stop } catch { continue }
         try {
-            $req = Get-Content $f.FullName -Raw | ConvertFrom-Json
-            Remove-Item $f.FullName -Force
+            $req = Get-Content $procFile -Raw | ConvertFrom-Json
+            # Validate voice before passing to command line
+            $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
             $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
             $env:AGENTVIBES_NO_PRETEXT = "1"
-            if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }   else { $env:AGENTVIBES_OVERRIDE_MUSIC   = $null }
-            if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }  else { $env:AGENTVIBES_OVERRIDE_VOLUME  = $null }
-            if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects } else { $env:AGENTVIBES_OVERRIDE_EFFECTS = $null }
+            # Use SetEnvironmentVariable to truly unset (assignment to $null leaves empty string)
+            if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }
+            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",   $null, "Process") }
+            if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }
+            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_VOLUME",  $null, "Process") }
+            if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects }
+            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_EFFECTS", $null, "Process") }
 
             if (Test-Path $PlayTts) {
                 # Play remote arrival prefix sound if configured
@@ -74,15 +82,15 @@ while ($true) {
                             Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
                         }
                     }
-                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$($req.voice) llm=$($req.llm)"
-                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $req.voice @llmArg 2>&1
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm)"
+                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg 2>&1
                     if ($LASTEXITCODE -ne 0) {
                         Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"
                     } else {
                         Write-WatcherLog "INFO" "play-tts ok exit=0 id=$($req.id)"
                     }
                 } finally {
-                    $env:AGENTVIBES_TEXT_FILE = $null
+                    [System.Environment]::SetEnvironmentVariable("AGENTVIBES_TEXT_FILE", $null, "Process")
                     Remove-Item $tempText -Force -ErrorAction SilentlyContinue
                 }
             } else {
@@ -93,10 +101,17 @@ while ($true) {
                 $synth.Speak($req.text)
                 $synth.Dispose()
             }
+            Remove-Item $procFile -Force -ErrorAction SilentlyContinue
         } catch {
             Write-WatcherLog "ERROR" "id=$($req.id) err=$_"
-            Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
+            Remove-Item $procFile -Force -ErrorAction SilentlyContinue
         }
+    }
+    # Crash recovery: any proc-* files left from a previous watcher crash → re-queue
+    $stale = Get-ChildItem "$QueueDir\proc-*.json" -ErrorAction SilentlyContinue
+    foreach ($s in $stale) {
+        $recovered = $s.FullName -replace '\\proc-', '\req-'
+        try { Rename-Item $s.FullName $recovered -ErrorAction SilentlyContinue } catch {}
     }
     Start-Sleep -Milliseconds 200
 }

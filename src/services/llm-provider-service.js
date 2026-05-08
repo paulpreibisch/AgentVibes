@@ -635,7 +635,7 @@ export async function saveHermesConfig(cfg) {
   const hermesHome = process.env.HERMES_HOME || path.join(process.env.HOME || process.env.USERPROFILE || '', '.hermes');
   const resolvedHooksDir = path.resolve(hooksDir);
   const resolvedHermesHome = path.resolve(hermesHome);
-  if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+  if (!resolvedHooksDir.startsWith(resolvedHermesHome + path.sep)) {
     throw new Error('Invalid Hermes hooks path');
   }
   await fs.mkdir(hooksDir, { recursive: true, mode: 0o700 });
@@ -899,7 +899,7 @@ export function saveLlmConfigSync(llmKey, config, targetDir) {
   const cfgKey = `llm:${llmKey}`;
   // Sanitize user-editable fields: strip pipe chars (config delimiter) and newlines
   // (newlines could inject extra rows into the pipe-delimited config file)
-  const sanitize = (v) => (v || '').replace(/[\|\n\r]/g, '');
+  const sanitize = (v) => (v || '').replace(/[\|\n\r\x00]/g, '');
   const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${sanitize(config.bgVolume)}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
   const resolvedTargetDir = targetDir || process.env.INIT_CWD || process.cwd();
   // When targetDir is explicitly passed, write there directly (do not fall back to global).

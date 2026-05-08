@@ -208,8 +208,9 @@ $_AudioEffectsCfgPaths = @(
     (Join-Path $env:USERPROFILE ".claude\config\audio-effects.cfg")
 )
 
+$_LlmFound = $false
 :llmCfgSearch foreach ($_cfgFile in $_AudioEffectsCfgPaths) {
-    if ((-not $_LlmVoice) -and (-not $_LlmPretext) -and (Test-Path $_cfgFile)) {
+    if (-not $_LlmFound -and (Test-Path $_cfgFile)) {
         $cfgContent = Get-Content $_cfgFile -ErrorAction SilentlyContinue
         if ($null -ne $cfgContent) {
             foreach ($_cfgLine in $cfgContent) {
@@ -227,6 +228,7 @@ $_AudioEffectsCfgPaths = @(
                     if ($_cols.Count -ge 5) { $_LlmVoice   = $_cols[4].Trim() }
                     if ($_cols.Count -ge 6) { $_LlmPretext = $_cols[5].Trim() }
                     if ($_cols.Count -ge 7) { $_LlmEngine  = $_cols[6].Trim() }
+                    $_LlmFound = $true
                     break llmCfgSearch
                 }
             }
@@ -403,10 +405,10 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
         exit 1
     }
 
-    if ($true) {
-        $voicePath = $AudioFilePath
+    $voicePath = $AudioFilePath
+    $AudioDir = Split-Path $AudioFilePath
 
-        # Apply reverb if configured
+    # Apply reverb if configured
         if ($HasReverb) {
             $reverbFilter = switch ($ReverbLevel) {
                 "light"     { "aecho=0.8:0.88:60:0.4" }
@@ -477,13 +479,14 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
 
                 try {
                     # Get voice duration to calculate total length
+                    $durTmpFile = "$env:TEMP\agentvibes-dur-$([Guid]::NewGuid().ToString('N').Substring(0,8)).txt"
                     $probArgs = "-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 `"$voicePath`""
-                    $durationProc = Start-Process -FilePath "ffprobe" -ArgumentList $probArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL" -RedirectStandardOutput "$env:TEMP\agentvibes-duration.txt"
+                    $durationProc = Start-Process -FilePath "ffprobe" -ArgumentList $probArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL" -RedirectStandardOutput $durTmpFile
                     $voiceDuration = 5  # default fallback
-                    if (Test-Path "$env:TEMP\agentvibes-duration.txt") {
-                        $durStr = (Get-Content "$env:TEMP\agentvibes-duration.txt" -Raw).Trim()
+                    if (Test-Path $durTmpFile) {
+                        $durStr = (Get-Content $durTmpFile -Raw).Trim()
                         if ($durStr -match '^\d+\.?\d*$') { $voiceDuration = [double]$durStr }
-                        Remove-Item "$env:TEMP\agentvibes-duration.txt" -Force -ErrorAction SilentlyContinue
+                        Remove-Item $durTmpFile -Force -ErrorAction SilentlyContinue
                     }
                     $totalDuration = $voiceDuration + 4  # 2s intro + voice + 2s outro
                     $fadeOutStart = $totalDuration - 2
@@ -519,7 +522,6 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
             # No background music, play the (possibly reverbed) voice
             Invoke-AudioPlay $voicePath
         }
-    }
 } else {
     $env:AGENTVIBES_NO_PLAY = $null
     # Play only when provider delegated playback via Write-Output (e.g. Piper).

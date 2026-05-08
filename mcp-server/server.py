@@ -44,6 +44,7 @@ import asyncio
 import json
 import os
 import platform
+import re as _re
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -330,7 +331,12 @@ class AgentVibesServer:
                 env=env,
             )
             try:
-                stdout, stderr = await result.communicate()
+                try:
+                    stdout, stderr = await asyncio.wait_for(result.communicate(), timeout=60.0)
+                except asyncio.TimeoutError:
+                    result.kill()
+                    await result.wait()
+                    return "❌ TTS timed out after 60 seconds"
 
                 if result.returncode == 0:
                     output = stdout.decode().strip()
@@ -535,7 +541,6 @@ class AgentVibesServer:
         Returns:
             Current voice, personality, language, provider, and LLM settings
         """
-        import re as _re
         voice = await self._get_current_voice()
         personality = await self._get_personality()
         language = await self._get_language()
@@ -1101,9 +1106,15 @@ class AgentVibesServer:
                 return "❌ Invalid mode: must be 'local' or 'remote'"
             merged["mode"] = m
         if ssh_key is not None:
-            merged["sshKey"] = str(ssh_key)[:512]
+            sk = str(ssh_key).strip()
+            if not _re.match(r'^[/~][a-zA-Z0-9_./ -]{0,511}$', sk):
+                return "❌ Invalid ssh_key: must be an absolute path (no special chars)"
+            merged["sshKey"] = sk
         if host is not None:
-            merged["host"] = str(host)[:253]
+            h = str(host).strip()
+            if not _re.match(r'^[a-zA-Z0-9._\[\]:-]{1,253}$', h):
+                return "❌ Invalid host: must be a hostname or IP address"
+            merged["host"] = h
         if port is not None:
             p = str(port).strip()
             if not _re.match(r"^\d{1,5}$", p):
@@ -1114,7 +1125,7 @@ class AgentVibesServer:
 
         try:
             cfg_path.parent.mkdir(parents=True, exist_ok=True)
-            cfg_path.chmod(0o700) if cfg_path.parent.exists() else None
+            cfg_path.parent.chmod(0o700)
             cfg_path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
             cfg_path.chmod(0o600)
         except Exception as e:

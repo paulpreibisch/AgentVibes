@@ -932,9 +932,13 @@ async function handleCustomMusicTrack(userFilePath, tracksDir) {
       return null;
     }
 
-    // Verify file is within expected directory (prevent path traversal)
-    if (!resolvedPath.startsWith(path.resolve(os.homedir()))) {
-      console.error(chalk.red('✗ File must be in your home directory or subdirectories.'));
+    // Verify file is not a dangerous system path (prevent path traversal to /proc, /sys etc.)
+    const normalizedPath = resolvedPath.toLowerCase();
+    const blockedPrefixes = ['/proc/', '/sys/', '/dev/', '/etc/'];
+    const isBlockedUnix = blockedPrefixes.some(p => normalizedPath.startsWith(p));
+    const isUncPath = resolvedPath.startsWith('\\\\');
+    if (isBlockedUnix || isUncPath) {
+      console.error(chalk.red('✗ File path not allowed.'));
       return null;
     }
 

@@ -57,12 +57,15 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 # Find PROJECT_ROOT by searching up the directory tree for .claude/hooks
 # This handles non-standard installations and directory structures
 PROJECT_ROOT="$SCRIPT_DIR"
-while [[ "$PROJECT_ROOT" != "/" ]]; do
+_search_depth=0
+while [[ "$PROJECT_ROOT" != "/" && "$PROJECT_ROOT" != "$(dirname "$PROJECT_ROOT")" && $_search_depth -lt 20 ]]; do
   if [[ -d "$PROJECT_ROOT/.claude/hooks" ]]; then
     break  # PROJECT_ROOT is already the project root when its .claude/hooks child exists
   fi
   PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+  ((_search_depth++))
 done
+unset _search_depth
 
 # Verify PROJECT_ROOT is valid
 if [[ ! -d "$PROJECT_ROOT/.claude/hooks" ]]; then
@@ -131,8 +134,8 @@ if [[ -z "$TEXT" ]]; then
   exit 1
 fi
 
-# Security: Validate voice override doesn't contain dangerous characters
-if [[ -n "$VOICE_OVERRIDE" ]] && [[ "$VOICE_OVERRIDE" =~ [';|&$`<>(){}'] ]]; then
+# Security: Validate voice override (allowlist — only safe chars for voice IDs)
+if [[ -n "$VOICE_OVERRIDE" ]] && [[ ! "$VOICE_OVERRIDE" =~ ^[a-zA-Z0-9_:./\ -]+$ ]]; then
   echo "Error: Invalid characters in voice parameter" >&2
   exit 1
 fi
@@ -246,12 +249,34 @@ _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
 if [[ "$ACTIVE_PROVIDER" != "ssh-remote" && "$ACTIVE_PROVIDER" != "agentvibes-receiver" && "$ACTIVE_PROVIDER" != "termux-ssh" ]] \
    && [[ -n "$LLM_PROVIDER" && "$LLM_PROVIDER" != "default" ]] \
    && [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-  _LLM_SSH_MODE=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('mode','local'))" 2>/dev/null || echo "local")
+  _LLM_SSH_MODE=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" python3 - <<'PYEOF'
+import json, os, sys
+try:
+    d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
+    print(d.get(os.environ['AGENTVIBES_KEY'], {}).get('mode', 'local'))
+except Exception:
+    print('local')
+PYEOF
+)
   if [[ "$_LLM_SSH_MODE" == "remote" ]]; then
     # Redirect this LLM's audio through ssh-remote using its own SSH config
-    _LLM_SSH_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('host',''))" 2>/dev/null || echo "")
-    _LLM_SSH_KEY=$(python3  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('sshKey',''))" 2>/dev/null || echo "")
-    _LLM_SSH_PORT=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); print(d.get('$LLM_PROVIDER',{}).get('port','22'))" 2>/dev/null || echo "22")
+    _llm_remote_data=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" python3 - <<'PYEOF'
+import json, os, sys
+try:
+    d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
+    p = d.get(os.environ['AGENTVIBES_KEY'], {})
+    print(p.get('host', ''))
+    print(p.get('sshKey', ''))
+    print(p.get('port', '22'))
+except Exception:
+    print('')
+    print('')
+    print('22')
+PYEOF
+)
+    _LLM_SSH_HOST=$(echo "$_llm_remote_data" | sed -n '1p')
+    _LLM_SSH_KEY=$(echo  "$_llm_remote_data" | sed -n '2p')
+    _LLM_SSH_PORT=$(echo "$_llm_remote_data" | sed -n '3p')
     if [[ -n "$_LLM_SSH_HOST" ]]; then
       # Override transport config env vars so play-tts-ssh-remote.sh picks up this LLM's SSH settings
       export AGENTVIBES_SSH_HOST="$_LLM_SSH_HOST"
