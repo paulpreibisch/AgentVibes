@@ -811,6 +811,51 @@ test('Per-LLM Routing - play-tts.ps1 reads voice from CLAUDE_PROJECT_DIR config'
   }
 }, 30000);
 
+// ============================================================
+// Suite: Multi-Speaker Voice Display (regression for issue #186)
+// ============================================================
+
+test('Multi-Speaker Display - [VOICE] output includes ::SpeakerName from llm config', { skip: process.platform !== 'win32' }, async () => {
+  // Regression: play-tts-piper.ps1 was stripping "::SpeakerName" before the [VOICE] log line,
+  // making it impossible to verify which speaker was used from the Bash output.
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-speaker-display-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    'llm:claude-code|off||0.15|en_US-libritts-high::Mary|display-test|piper\n'
+  );
+
+  try {
+    const result = await runPowerShell(
+      ['-File', join(hooksDir, 'play-tts.ps1'), 'speaker display test', '-llm', 'claude-code'],
+      {
+        env: {
+          CLAUDE_PROJECT_DIR: tempDir,
+          AGENTVIBES_VERBOSE: '1',
+          USERPROFILE: process.env.USERPROFILE,
+          LOCALAPPDATA: process.env.LOCALAPPDATA,
+          Path: process.env.Path || process.env.PATH,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const output = result.stdout + result.stderr;
+    // The [VOICE] line MUST include the full model::SpeakerName, not just the model.
+    // Failure here means the speaker suffix was stripped before logging (issue #186).
+    assert.ok(
+      output.includes('[VOICE] Voice used: en_US-libritts-high::Mary'),
+      `[VOICE] line must include ::SpeakerName. Got output:\n${output.slice(0, 600)}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}, 30000);
+
 test('Per-LLM Routing - without -llm flag falls back to llm:default not project claude-code', { skip: process.platform !== 'win32' }, async () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-routing-default-'));
   const configDir = join(tempDir, '.claude', 'config');

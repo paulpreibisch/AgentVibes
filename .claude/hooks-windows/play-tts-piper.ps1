@@ -75,6 +75,7 @@ elseif (Test-Path $VoiceFile) {
 # IMPORTANT: The trailing number in a speaker name (e.g. "Holly-7") is a disambiguation
 # suffix, NOT the speaker index. Real index must be looked up from voice-assignments.json.
 $SpeakerId = $null
+$DisplayVoiceName = $VoiceName  # preserve full name (e.g. "model::SpeakerName") for logging
 
 if ($VoiceName -match '::') {
     $parts = $VoiceName -split '::'
@@ -227,7 +228,7 @@ try {
 
     # Display results
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
-    Write-Host "[VOICE] Voice used: $VoiceName (Piper)" -ForegroundColor Green
+    Write-Host "[VOICE] Voice used: $DisplayVoiceName (Piper)" -ForegroundColor Green
 
     # Apply audio effects (reverb, background music) if processor script exists.
     # SKIP when AGENTVIBES_NO_PLAY is set — that means the parent play-tts.ps1
