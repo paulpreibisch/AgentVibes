@@ -187,6 +187,14 @@ if ($llm -and $llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
 }
 
 # --- Default fallback --------------------------------------------------------
+# When no -llm flag is passed (e.g. hooks invoked by Claude Code without the
+# flag), check AGENTVIBES_LLM_KEY first — it is set by the hook infrastructure
+# as "llm:<name>" and carries the active LLM identity.  Strip the "llm:" prefix
+# to get the bare key used for config lookup.
+if (-not $llm -and $env:AGENTVIBES_LLM_KEY -match '^llm:([a-zA-Z0-9][a-zA-Z0-9_-]*)$') {
+    $llm = $Matches[1]
+}
+
 # An empty $llm routes through the "default" pseudo-LLM.  Users who configure
 # an `llm:default` row in audio-effects.cfg get consistent audio settings for
 # every LLM that doesn't pass its own -llm flag — a convenient global override
