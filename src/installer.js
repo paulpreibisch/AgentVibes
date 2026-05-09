@@ -4054,20 +4054,18 @@ async function configureSessionStartHook(targetDir, spinner) {
       existingSettings.hooks = {};
     }
 
-    if (!existingSettings.hooks.SessionStart) {
-      if (isNativeWindows()) {
-        // Use $HOME (global hooks) so the always-up-to-date global script runs.
-        // session-start-tts.ps1 reads per-project settings via $env:CLAUDE_PROJECT_DIR,
-        // which Claude Code sets to the project root before firing the hook.
-        existingSettings.hooks.SessionStart = [{
-          hooks: [{
-            type: 'command',
-            command: 'powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\session-start-tts.ps1"'
-          }]
-        }];
-      } else {
-        existingSettings.hooks.SessionStart = templateSettings.hooks.SessionStart;
-      }
+    // Windows uses SessionStart; Linux/macOS/WSL uses UserPromptSubmit.
+    // Both point to the global $HOME path so updates to the hook script
+    // take effect immediately without needing per-project reinstalls.
+    const hookKey = isNativeWindows() ? 'SessionStart' : 'UserPromptSubmit';
+    const hookCommand = isNativeWindows()
+      ? 'powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\session-start-tts.ps1"'
+      : 'bash "$HOME/.claude/hooks/session-start-tts.sh"';
+
+    if (!existingSettings.hooks[hookKey]) {
+      existingSettings.hooks[hookKey] = [{
+        hooks: [{ type: 'command', command: hookCommand }]
+      }];
 
       if (!existingSettings.$schema) {
         existingSettings.$schema = templateSettings.$schema;
@@ -5059,45 +5057,38 @@ const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'session-start-tts.ps1', 'bmad-s
  * @returns {Promise<number>} Number of hooks updated
  */
 async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
-  const globalHooksDir = path.join(homeDirOverride || os.homedir(), '.claude', 'hooks');
+  const homeDir = homeDirOverride || os.homedir();
+  const globalHooksDir = path.join(homeDir, '.claude', 'hooks');
   let updated = 0;
-  try {
-    await fs.access(globalHooksDir);
-  } catch {
-    return 0; // global hooks dir not present — nothing to do
-  }
+
+  // Always ensure the global hooks dir exists so registered $HOME hooks resolve.
+  await fs.mkdir(globalHooksDir, { recursive: true });
 
   for (const hook of CRITICAL_HOOKS) {
     const destPath = path.join(globalHooksDir, hook);
     const srcPath = path.join(srcHooksDir, hook);
     try {
-      await fs.access(destPath); // only update if already installed
       await fs.copyFile(srcPath, destPath);
       await fs.chmod(destPath, 0o750);
       updated++;
     } catch {
-      // file not in global dir or src missing — skip silently
+      // src missing — skip silently
     }
   }
 
-  // Also update Windows global hooks-windows dir if present
-  const globalHooksWindowsDir = path.join(homeDirOverride || os.homedir(), '.claude', 'hooks-windows');
+  // Also ensure Windows global hooks-windows dir and scripts are up to date.
+  const globalHooksWindowsDir = path.join(homeDir, '.claude', 'hooks-windows');
   const srcHooksWindowsDir = path.join(path.dirname(srcHooksDir), 'hooks-windows');
-  try {
-    await fs.access(globalHooksWindowsDir);
-    for (const hook of CRITICAL_HOOKS_WINDOWS) {
-      const destPath = path.join(globalHooksWindowsDir, hook);
-      const srcPath = path.join(srcHooksWindowsDir, hook);
-      try {
-        await fs.access(destPath); // only update if already installed
-        await fs.copyFile(srcPath, destPath);
-        updated++;
-      } catch {
-        // file not in global dir or src missing — skip silently
-      }
+  await fs.mkdir(globalHooksWindowsDir, { recursive: true });
+  for (const hook of CRITICAL_HOOKS_WINDOWS) {
+    const destPath = path.join(globalHooksWindowsDir, hook);
+    const srcPath = path.join(srcHooksWindowsDir, hook);
+    try {
+      await fs.copyFile(srcPath, destPath);
+      updated++;
+    } catch {
+      // src missing — skip silently
     }
-  } catch {
-    // hooks-windows dir not present — nothing to do
   }
 
   return updated;
@@ -5340,6 +5331,13 @@ async function install(options = {}) {
     await copyBackgroundMusicFiles(targetDir, silentSpinner);
     await copyConfigFiles(targetDir, silentSpinner);
     await copyCodexFiles(targetDir, silentSpinner);
+
+    // Populate global ~/.claude/hooks[/-windows]/ so $HOME hook paths resolve
+    // on first install (not just on update).
+    const hooksSubdirInstall = isNativeWindows() ? 'hooks-windows' : 'hooks';
+    const srcHooksDirInstall = path.join(__dirname, '..', '.claude', hooksSubdirInstall);
+    await updateGlobalHooks(srcHooksDirInstall);
+
     await configureSessionStartHook(targetDir, silentSpinner);
     await configurePartyModeHook(targetDir, silentSpinner);
     await installPluginManifest(targetDir, silentSpinner);

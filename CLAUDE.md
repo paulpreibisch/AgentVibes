@@ -28,6 +28,15 @@ This project follows **BMAD (BMM - Business Model Methodology)** for all story d
 4. **Update sprint-status.yaml** automatically via `/dev-story`
 5. **Code review included** - Built into `/dev-story` workflow
 
+### ✅ Non-Destructive Configuration Rule (MANDATORY)
+All code that reads, writes, or modifies user configuration MUST be non-destructive:
+1. **Never delete or overwrite** existing user `.claude/` or `~/.claude/` config files (settings, voices, personalities, audio-effects.cfg) unless the user explicitly requested it
+2. **Copy new files; never remove existing ones** — installer adds missing files only
+3. **Write hooks only when absent** — `configureSessionStartHook` and similar functions check for existing hooks before writing
+4. **Preserve custom entries** — e.g. `audio-effects.cfg` user rows must survive an `agentvibes update`
+5. **Creating directories is fine** — `mkdir -p` / `{ recursive: true }` is always safe
+6. Any function that could overwrite user data must have a test asserting idempotency
+
 ### ✅ Git Workflow (ONLY Outside BMAD)
 For changes outside story development:
 1. Describe changes before acting

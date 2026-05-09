@@ -117,20 +117,27 @@ describe('updateGlobalHooks', () => {
     assert.ok(content.includes('NEW VERSION'), 'stop-tts.sh should be updated to new version');
   });
 
-  test('does not create hooks that do not exist in global dir', async () => {
-    // play-tts.sh was not pre-created in tmpGlobalDir/hooks — must not be added
+  test('creates hooks in global dir even if they did not exist before', async () => {
+    // updateGlobalHooks now always ensures all CRITICAL_HOOKS are present
     await updateGlobalHooks(tmpSrcDir, tmpGlobalDir);
     let exists = false;
     try {
       await fs.access(path.join(tmpGlobalDir, '.claude', 'hooks', 'play-tts.sh'));
       exists = true;
-    } catch { /* expected */ }
-    assert.equal(exists, false, 'Should not create hooks that did not exist in global dir');
+    } catch { /* not expected */ }
+    assert.equal(exists, true, 'Should create hooks in global dir so $HOME hook paths resolve');
   });
 
-  test('returns 0 when global hooks dir does not exist', async () => {
-    const count = await updateGlobalHooks(tmpSrcDir, path.join(os.tmpdir(), 'av-nonexistent-home-999'));
-    assert.equal(count, 0);
+  test('creates global hooks dir when it does not exist', async () => {
+    const freshHomeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'av-fresh-home-'));
+    try {
+      const count = await updateGlobalHooks(tmpSrcDir, freshHomeDir);
+      assert.ok(count >= 1, `Should create hooks in a fresh home dir, got count=${count}`);
+      // The dir must now exist
+      await fs.access(path.join(freshHomeDir, '.claude', 'hooks'));
+    } finally {
+      await fs.rm(freshHomeDir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -10,18 +10,39 @@ set -euo pipefail
 # Fix locale warnings
 export LC_ALL=C
 
-# Get script directory
+# Get script directory (resolve symlinks so $SCRIPT_DIR is the real hooks dir)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Resolve absolute path to play-tts.sh from this script's own location.
+# Using an absolute path in the injected protocol ensures the correct
+# play-tts.sh is called regardless of the working directory when Claude
+# runs the command — fixes "wrong voice in fresh folder" regression.
+PLAY_TTS_PATH="$SCRIPT_DIR/play-tts.sh"
+
 # Check if AgentVibes is installed
-if [[ ! -f "$SCRIPT_DIR/play-tts.sh" ]]; then
+if [[ ! -f "$PLAY_TTS_PATH" ]]; then
   # AgentVibes not installed, don't inject anything
   exit 0
 fi
 
+# Resolve per-project .claude dir.
+# CLAUDE_PROJECT_DIR is set by Claude Code to the session's project root.
+# This works correctly whether the script runs from a per-project copy or
+# from the global ~/.claude/hooks/ location.
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" && -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  _PROJECT_CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
+else
+  # Fallback: derive from script location (works for per-project installs)
+  _PROJECT_CLAUDE_DIR="$(dirname "$SCRIPT_DIR")/.claude"
+fi
+
 # Check for sentiment (priority) or personality (fallback)
-SENTIMENT=$(cat .claude/tts-sentiment.txt 2>/dev/null || cat ~/.claude/tts-sentiment.txt 2>/dev/null || echo "")
-PERSONALITY=$(cat .claude/tts-personality.txt 2>/dev/null || cat ~/.claude/tts-personality.txt 2>/dev/null || echo "normal")
+SENTIMENT=$(cat "$_PROJECT_CLAUDE_DIR/tts-sentiment.txt" 2>/dev/null \
+  || cat "$HOME/.claude/tts-sentiment.txt" 2>/dev/null \
+  || echo "")
+PERSONALITY=$(cat "$_PROJECT_CLAUDE_DIR/tts-personality.txt" 2>/dev/null \
+  || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null \
+  || echo "normal")
 
 # Determine style
 if [[ -n "$SENTIMENT" ]]; then
@@ -31,26 +52,30 @@ else
 fi
 
 # Get verbosity level (Issue #32)
-VERBOSITY=$(cat .claude/tts-verbosity.txt 2>/dev/null || cat ~/.claude/tts-verbosity.txt 2>/dev/null || echo "low")
+VERBOSITY=$(cat "$_PROJECT_CLAUDE_DIR/tts-verbosity.txt" 2>/dev/null \
+  || cat "$HOME/.claude/tts-verbosity.txt" 2>/dev/null \
+  || echo "low")
 
-# Output optimized TTS protocol
-cat <<'EOF'
+# Output optimized TTS protocol.
+# Note: heredoc uses double-quotes (<<EOF not <<'EOF') so $PLAY_TTS_PATH expands.
+# Backticks must be escaped (\`) to avoid command substitution.
+cat << EOF
 
 # AgentVibes TTS Protocol
 
 **CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
 
-1. **Acknowledgment** - Start of task: `Bash: .claude/hooks/play-tts.sh "[action]"`
-2. **Completion** - End of task: `Bash: .claude/hooks/play-tts.sh "[result + key details]"`
+1. **Acknowledgment** - Start of task: \`Bash: $PLAY_TTS_PATH "[action]" --llm claude-code\`
+2. **Completion** - End of task: \`Bash: $PLAY_TTS_PATH "[result + key details]" --llm claude-code\`
 
 **IMPORTANT: Run TTS commands inline (NOT in background). Wait for each TTS call to complete before continuing.**
 
 **Example:**
-```
-[Bash: .claude/hooks/play-tts.sh "Checking git status"]
+\`\`\`
+[Bash: $PLAY_TTS_PATH "Checking git status" --llm claude-code]
 [work...]
-[Bash: .claude/hooks/play-tts.sh "Repository is clean, no changes"]
-```
+[Bash: $PLAY_TTS_PATH "Repository is clean, no changes" --llm claude-code]
+\`\`\`
 
 EOF
 
