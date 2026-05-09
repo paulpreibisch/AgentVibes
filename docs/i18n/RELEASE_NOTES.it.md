@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐧 v5.6.8 — Routing Vocale WSL Corretto + Affidabilità del Ciclo di Vita della Sessione
+
+**Rilascio:** 2026-05-09
+
+### 🐛 WSL: Ora Viene Riprodotta la Voce Configurata (Non il Fallback su lessac)
+
+Nelle sessioni WSL, AgentVibes riproduceva `en_US-lessac-medium` indipendentemente dalla voce configurata. La causa principale: `pipx` installa Piper in `~/.local/bin/`, che le shell interattive ottengono tramite `.bashrc`/`.zshrc`, ma le chiamate Bash di Claude Code vengono eseguite in modo non interattivo e saltano il caricamento dei profili — `command -v piper` falliva, tornando alla voce predefinita.
+
+**Correzione:** `play-tts-piper.sh` ora antepone `~/.local/bin` e il bin del venv Piper di pipx al `PATH` prima del controllo del binario, così Piper viene trovato indipendentemente dalla modalità della shell.
+
+### 🐛 Voce/Musica Per-Progetto Persa Quando `CLAUDE_PROJECT_DIR` Non È nell'Ambiente Bash
+
+Quando Claude Code esegue una chiamata allo strumento Bash, `CLAUDE_PROJECT_DIR` non viene passato nell'ambiente. I hook TTS non riuscivano a trovare la configurazione per-progetto e tornavano ai valori globali predefiniti — voce errata, musica errata, nessun pretext.
+
+**Correzione:** `session-start-tts.sh` (e `.ps1`) ora incorpora la directory del progetto nel comando hook iniettato come `--project-dir`. `play-tts.sh` legge questo flag prima di qualsiasi ricerca di configurazione, così il routing per-progetto è affidabile in ogni chiamata allo strumento Bash.
+
+### 🐛 `play-tts-piper.sh` e `play-tts-piper.ps1` Non Distribuiti da `agentvibes install`
+
+Questi hook erano assenti da `CRITICAL_HOOKS` / `CRITICAL_HOOKS_WINDOWS`, quindi `agentvibes install` non propagava mai le versioni aggiornate a `~/.claude/hooks/`.
+
+**Correzione:** Entrambi sono ora nell'elenco degli hook critici e vengono sempre distribuiti all'installazione/aggiornamento.
+
+### 🐛 Bug nei Nomi Visualizzati delle Voci
+
+- `uniquifyVoiceName("Mary-1")` restituiva `"Mary-1 Bell"` invece di `"Mary Bell"`.
+- I nomi 16Speakers come `Rose_Ibex` ricevevano erroneamente un cognome aggiunto (`"Rose Ibex Bell"`).
+- La riga `🎤 Voice used:` era assente dall'output bash di WSL.
+
+Tutti e tre risolti. Un nuovo file di test (`test/unit/voice-names.test.js`, 16 test) copre questi casi.
+
+---
+
 ## 🪟 v5.6.7 — Il Pulsante Anteprima Funziona Correttamente su Windows
 
 **Rilascio:** 2026-05-08

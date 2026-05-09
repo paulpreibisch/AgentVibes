@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐧 v5.6.8 — Enrutamiento de Voz en WSL Corregido + Fiabilidad del Ciclo de Vida de Sesión
+
+**Lanzamiento:** 2026-05-09
+
+### 🐛 WSL: Ahora se Reproduce la Voz Configurada (No el Fallback Lessac)
+
+En sesiones WSL, AgentVibes reproducía `en_US-lessac-medium` sin importar qué voz hubieras configurado. La causa raíz: `pipx` instala Piper en `~/.local/bin/`, que los shells interactivos obtienen mediante `.bashrc`/`.zshrc`, pero las llamadas a la herramienta Bash de Claude Code se ejecutan de forma no interactiva y omiten la carga del perfil — `command -v piper` fallaba y recurría a la voz predeterminada.
+
+**Corrección:** `play-tts-piper.sh` ahora antepone `~/.local/bin` y el bin del venv de Piper de pipx al `PATH` antes de la comprobación del binario, de modo que Piper se encuentra independientemente del modo del shell.
+
+### 🐛 Voz/Música por Proyecto Perdida Cuando `CLAUDE_PROJECT_DIR` No Está en el Entorno Bash
+
+Cuando Claude Code ejecuta una llamada a la herramienta Bash, `CLAUDE_PROJECT_DIR` no se pasa en el entorno. Los hooks de TTS no podían encontrar la configuración por proyecto y recurrían a los valores predeterminados globales — voz incorrecta, música incorrecta, sin pretexto.
+
+**Corrección:** `session-start-tts.sh` (y `.ps1`) ahora incorpora el directorio del proyecto en el comando hook inyectado como `--project-dir`. `play-tts.sh` lee este parámetro antes de cualquier búsqueda de configuración, por lo que el enrutamiento por proyecto es fiable en cada llamada a la herramienta Bash.
+
+### 🐛 `play-tts-piper.sh` y `play-tts-piper.ps1` No Desplegados por `agentvibes install`
+
+Estos hooks faltaban en `CRITICAL_HOOKS` / `CRITICAL_HOOKS_WINDOWS`, por lo que `agentvibes install` nunca propagaba versiones actualizadas a `~/.claude/hooks/`.
+
+**Corrección:** Ambos están ahora en la lista de hooks críticos y siempre se despliegan al instalar/actualizar.
+
+### 🐛 Errores en el Nombre a Mostrar de la Voz
+
+- `uniquifyVoiceName("Mary-1")` devolvía `"Mary-1 Bell"` en lugar de `"Mary Bell"`.
+- Nombres de 16Speakers como `Rose_Ibex` recibían incorrectamente un apellido añadido (`"Rose Ibex Bell"`).
+- La línea `🎤 Voice used:` faltaba en la salida de bash de WSL.
+
+Los tres corregidos. Un nuevo archivo de pruebas (`test/unit/voice-names.test.js`, 16 pruebas) cubre estos casos.
+
+---
+
 ## 🪟 v5.6.7 — Vista Previa en Windows Corregida
 
 **Lanzamiento:** 2026-05-08

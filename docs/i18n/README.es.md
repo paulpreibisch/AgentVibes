@@ -4,9 +4,17 @@
 
 ---
 
-## 🌟 NUEVO EN v5.6.7 — Vista Previa en Windows Corregida
+## 🌟 NUEVO EN v5.6.8 — Enrutamiento de Voz en WSL Corregido + Fiabilidad del Ciclo de Vida de Sesión
 
-El **botón de Vista Previa en la configuración de audio del LLM ahora funciona correctamente en Windows**. Reproduce la voz, reverberación y pista de fondo que configuraste — sin volver a la voz incorrecta ni reproducir silencio.
+**Usuarios de WSL:** AgentVibes reproducía `en_US-lessac-medium` independientemente de la voz configurada. Corregido — ahora Piper se encuentra en shells no interactivos añadiendo explícitamente `~/.local/bin` al `PATH` antes de la comprobación del binario.
+
+**Enrutamiento por proyecto:** El hook de inicio de sesión ahora incorpora `--project-dir` en cada comando TTS inyectado, de modo que tu voz y música configuradas se reproducen correctamente en las llamadas a la herramienta Bash incluso cuando `CLAUDE_PROJECT_DIR` no está en el entorno.
+
+`play-tts-piper.sh` y `play-tts-piper.ps1` ahora están incluidos en el despliegue de hooks críticos de `agentvibes install` — las versiones actualizadas se propagan automáticamente.
+
+## v5.6.7 — Vista Previa en Windows Corregida
+
+El botón de Vista Previa en la configuración de audio del LLM ahora funciona correctamente en Windows.
 
 ## 🌟 NUEVO EN v5.6.6 — El Botón de Vista Previa Funciona en WSL + Suite de Pruebas Exhaustiva para Windows
 

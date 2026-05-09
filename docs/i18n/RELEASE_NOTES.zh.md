@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐧 v5.6.8 — WSL 语音路由已修复 + 会话生命周期可靠性提升
+
+**发布日期：** 2026-05-09
+
+### 🐛 WSL：现在播放已配置的语音（不再回退到 lessac）
+
+在 WSL 会话中，无论配置了什么语音，AgentVibes 都会播放 `en_US-lessac-medium`。根本原因：`pipx` 将 Piper 安装到 `~/.local/bin/`，交互式 Shell 通过 `.bashrc`/`.zshrc` 获取此路径，但 Claude Code 的 Bash 工具调用以非交互方式运行，跳过了配置文件加载 — `command -v piper` 失败，回退到默认语音。
+
+**修复：** `play-tts-piper.sh` 现在在二进制文件检查前将 `~/.local/bin` 和 pipx Piper venv bin 追加到 `PATH` 开头，因此无论 Shell 模式如何，都能找到 Piper。
+
+### 🐛 `CLAUDE_PROJECT_DIR` 不在 Bash 环境中时，项目专属语音/音乐丢失
+
+当 Claude Code 执行 Bash 工具调用时，`CLAUDE_PROJECT_DIR` 不会传入环境。TTS 钩子无法找到项目专属配置，回退到全局默认值 — 语音错误、音乐错误、无前缀文本。
+
+**修复：** `session-start-tts.sh`（及 `.ps1`）现在将项目目录作为 `--project-dir` 烘入注入的钩子命令中。`play-tts.sh` 在任何配置查找之前读取此标志，因此在每次 Bash 工具调用中项目专属路由都是可靠的。
+
+### 🐛 `play-tts-piper.sh` 和 `play-tts-piper.ps1` 未被 `agentvibes install` 部署
+
+这些钩子未包含在 `CRITICAL_HOOKS` / `CRITICAL_HOOKS_WINDOWS` 中，因此 `agentvibes install` 从未将更新版本传播到 `~/.claude/hooks/`。
+
+**修复：** 两者现已列入关键钩子列表，安装/更新时始终部署。
+
+### 🐛 语音显示名称错误
+
+- `uniquifyVoiceName("Mary-1")` 返回 `"Mary-1 Bell"` 而非 `"Mary Bell"`。
+- `Rose_Ibex` 等 16Speakers 名称被错误地追加了姓氏（`"Rose Ibex Bell"`）。
+- WSL bash 输出中缺少 `🎤 Voice used:` 行。
+
+三处均已修复。新增测试文件（`test/unit/voice-names.test.js`，16 个测试）覆盖这些场景。
+
+---
+
 ## 🪟 v5.6.7 — Windows 预览按钮已修复
 
 **发布日期：** 2026-05-08

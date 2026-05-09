@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐧 v5.6.8 — WSL ボイスルーティング修正 + セッションライフサイクルの信頼性向上
+
+**リリース日:** 2026-05-09
+
+### 🐛 WSL: 設定したボイスが再生されるように（lessac へのフォールバックを解消）
+
+WSL セッションでは、設定したボイスに関係なく `en_US-lessac-medium` が再生されていました。根本原因: `pipx` は Piper を `~/.local/bin/` にインストールしますが、インタラクティブシェルは `.bashrc`/`.zshrc` 経由でこのパスを取得します。一方、Claude Code の Bash ツール呼び出しは非インタラクティブで実行されプロファイルが読み込まれないため、`command -v piper` が失敗しデフォルトボイスにフォールバックしていました。
+
+**修正:** `play-tts-piper.sh` がバイナリチェック前に `~/.local/bin` と pipx の Piper venv bin を `PATH` の先頭に追加するようになりました。これによりシェルモードに関わらず Piper が見つかります。
+
+### 🐛 `CLAUDE_PROJECT_DIR` が Bash 環境にない場合にプロジェクト別ボイス・音楽が失われる
+
+Claude Code が Bash ツール呼び出しを実行する際、`CLAUDE_PROJECT_DIR` は環境に渡されません。TTS フックがプロジェクト別設定を見つけられずグローバルデフォルトにフォールバックし、ボイス・音楽・プリテキストが正しく設定されませんでした。
+
+**修正:** `session-start-tts.sh`（および `.ps1`）が注入するフックコマンドにプロジェクトディレクトリを `--project-dir` として焼き込むようになりました。`play-tts.sh` は設定参照の前にこのフラグを読み取るため、すべての Bash ツール呼び出しでプロジェクト別ルーティングが確実に機能します。
+
+### 🐛 `play-tts-piper.sh` と `play-tts-piper.ps1` が `agentvibes install` で展開されない
+
+これらのフックが `CRITICAL_HOOKS` / `CRITICAL_HOOKS_WINDOWS` に含まれていなかったため、`agentvibes install` が更新バージョンを `~/.claude/hooks/` に反映していませんでした。
+
+**修正:** 両ファイルがクリティカルフックリストに追加され、インストール・更新時に常に展開されます。
+
+### 🐛 ボイス表示名のバグ
+
+- `uniquifyVoiceName("Mary-1")` が `"Mary Bell"` ではなく `"Mary-1 Bell"` を返していました。
+- `Rose_Ibex` のような 16Speakers の名前に誤ってサーネームが付与されていました（`"Rose Ibex Bell"`）。
+- WSL bash 出力から `🎤 Voice used:` の行が欠落していました。
+
+3 件すべて修正済み。新しいテストファイル（`test/unit/voice-names.test.js`、16 件のテスト）がこれらのケースをカバーします。
+
+---
+
 ## 🪟 v5.6.7 — Windows でのプレビューボタン修正
 
 **リリース日:** 2026-05-08

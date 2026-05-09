@@ -4,9 +4,17 @@
 
 ---
 
-## 🌟 NEU IN v5.6.7 — Windows-Vorschau repariert
+## 🌟 NEU IN v5.6.8 — WSL-Stimmen-Routing repariert + Zuverlässigkeit des Sitzungslebenszyklus
 
-Die **Vorschau-Schaltfläche in der LLM-Audiokonfiguration funktioniert jetzt korrekt unter Windows**. Sie spielt die Stimme, den Hall und den Hintergrundtrack ab, den du konfiguriert hast — kein Zurückfallen auf die falsche Stimme oder Stille.
+**WSL-Nutzer:** AgentVibes spielte `en_US-lessac-medium` ab, unabhängig von der konfigurierten Stimme. Behoben — Piper wird jetzt in nicht-interaktiven Shells gefunden, indem `~/.local/bin` explizit dem `PATH` vor der Binärprüfung vorangestellt wird.
+
+**Pro-Projekt-Routing:** Der Sitzungsstart-Hook bäckt jetzt `--project-dir` in jeden injizierten TTS-Befehl ein, sodass deine konfigurierte Stimme und Musik in Bash-Tool-Aufrufen korrekt abgespielt werden, auch wenn `CLAUDE_PROJECT_DIR` nicht in der Umgebung vorhanden ist.
+
+`play-tts-piper.sh` und `play-tts-piper.ps1` sind jetzt in der kritischen Hooks-Bereitstellung von `agentvibes install` enthalten — aktualisierte Versionen werden automatisch propagiert.
+
+## v5.6.7 — Windows-Vorschau repariert
+
+Die Vorschau-Schaltfläche in der LLM-Audiokonfiguration funktioniert jetzt korrekt unter Windows.
 
 ## 🌟 NEU IN v5.6.6 — Vorschau-Schaltfläche funktioniert in WSL + Umfassende Windows-Testsuite
 

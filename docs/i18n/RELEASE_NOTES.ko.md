@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🐧 v5.6.8 — WSL 보이스 라우팅 수정 + 세션 라이프사이클 안정성
+
+**릴리스:** 2026-05-09
+
+### 🐛 WSL: 설정된 보이스가 재생됨 (lessac 폴백 해소)
+
+WSL 세션에서 설정된 보이스와 상관없이 `en_US-lessac-medium`이 재생되었습니다. 근본 원인: `pipx`는 Piper를 `~/.local/bin/`에 설치하는데, 인터랙티브 셸은 `.bashrc`/`.zshrc`를 통해 이 경로를 가져옵니다. 하지만 Claude Code의 Bash 도구 호출은 비인터랙티브로 실행되어 프로파일 소싱을 건너뛰기 때문에 `command -v piper`가 실패하여 기본 보이스로 폴백했습니다.
+
+**수정:** `play-tts-piper.sh`가 이제 바이너리 검사 전에 `~/.local/bin`과 pipx Piper venv bin을 `PATH` 앞에 추가하여 셸 모드와 관계없이 Piper를 찾을 수 있습니다.
+
+### 🐛 `CLAUDE_PROJECT_DIR`이 Bash 환경에 없을 때 프로젝트별 보이스/음악이 사라지는 문제
+
+Claude Code가 Bash 도구 호출을 실행할 때 `CLAUDE_PROJECT_DIR`이 환경에 전달되지 않습니다. TTS 훅이 프로젝트별 설정을 찾을 수 없어 전역 기본값으로 폴백했고, 잘못된 보이스·음악·프리텍스트가 재생되었습니다.
+
+**수정:** `session-start-tts.sh`(및 `.ps1`)가 이제 주입된 훅 명령에 프로젝트 디렉토리를 `--project-dir`로 굽습니다. `play-tts.sh`는 설정 조회 전에 이 플래그를 읽으므로 모든 Bash 도구 호출에서 프로젝트별 라우팅이 안정적으로 동작합니다.
+
+### 🐛 `play-tts-piper.sh`와 `play-tts-piper.ps1`이 `agentvibes install`로 배포되지 않는 문제
+
+이 훅들이 `CRITICAL_HOOKS` / `CRITICAL_HOOKS_WINDOWS`에 없어서 `agentvibes install`이 업데이트된 버전을 `~/.claude/hooks/`에 반영하지 않았습니다.
+
+**수정:** 두 파일 모두 크리티컬 훅 목록에 추가되어 인스톨/업데이트 시 항상 배포됩니다.
+
+### 🐛 보이스 표시 이름 버그
+
+- `uniquifyVoiceName("Mary-1")`이 `"Mary Bell"` 대신 `"Mary-1 Bell"`을 반환했습니다.
+- `Rose_Ibex`와 같은 16Speakers 이름에 성(姓)이 잘못 추가되었습니다(`"Rose Ibex Bell"`).
+- WSL bash 출력에서 `🎤 Voice used:` 줄이 누락되었습니다.
+
+세 가지 모두 수정되었습니다. 새 테스트 파일(`test/unit/voice-names.test.js`, 16개 테스트)이 이 케이스들을 커버합니다.
+
+---
+
 ## 🪟 v5.6.7 — Windows 미리 듣기 버튼 수정
 
 **릴리스:** 2026-05-08

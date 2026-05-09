@@ -4,9 +4,17 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.6.7 — Aperçu Windows Corrigé
+## 🌟 NOUVEAU DANS v5.6.8 — Routage Voix WSL Corrigé + Fiabilité du Cycle de Vie des Sessions
 
-Le **bouton Aperçu dans la configuration audio LLM fonctionne désormais correctement sur Windows**. Il joue la voix, la réverbération et la piste de fond que vous avez configurées — sans repli sur la mauvaise voix ni lecture du silence.
+**Utilisateurs WSL :** AgentVibes jouait `en_US-lessac-medium` quelle que soit votre voix configurée. Corrigé — Piper est maintenant trouvé dans les shells non interactifs en ajoutant explicitement `~/.local/bin` au `PATH` avant la vérification du binaire.
+
+**Routage par projet :** Le hook de démarrage de session intègre maintenant `--project-dir` dans chaque commande TTS injectée, de sorte que votre voix et votre musique configurées jouent correctement dans les appels à l'outil Bash même quand `CLAUDE_PROJECT_DIR` n'est pas dans l'environnement.
+
+`play-tts-piper.sh` et `play-tts-piper.ps1` sont maintenant inclus dans le déploiement des hooks critiques d'`agentvibes install` — les versions mises à jour se propagent automatiquement.
+
+## v5.6.7 — Aperçu Windows Corrigé
+
+Le bouton Aperçu dans la configuration audio LLM fonctionne désormais correctement sur Windows.
 
 ## 🌟 NOUVEAU DANS v5.6.6 — Le Bouton Aperçu Fonctionne dans WSL + Suite de Tests Windows Complète
 

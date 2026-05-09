@@ -4,6 +4,14 @@
 
 ---
 
+## 🌟 NOVITÀ IN v5.6.8 — Routing Vocale WSL Corretto + Affidabilità del Ciclo di Vita della Sessione
+
+**Utenti WSL:** AgentVibes riproduceva `en_US-lessac-medium` indipendentemente dalla voce configurata. Risolto — Piper viene ora trovato nelle shell non interattive aggiungendo esplicitamente `~/.local/bin` all'inizio del `PATH` prima del controllo del binario.
+
+**Routing per-progetto:** L'hook di avvio sessione ora incorpora `--project-dir` in ogni comando TTS iniettato, così la voce e la musica configurate vengono riprodotte correttamente nelle chiamate allo strumento Bash anche quando `CLAUDE_PROJECT_DIR` non è nell'ambiente.
+
+`play-tts-piper.sh` e `play-tts-piper.ps1` sono ora inclusi nella distribuzione degli hook critici di `agentvibes install` — le versioni aggiornate si propagano automaticamente.
+
 ## 🌟 NOVITÀ IN v5.6.7 — Il Pulsante Anteprima Funziona Correttamente su Windows
 
 **Il pulsante Anteprima nella configurazione audio LLM ora funziona correttamente su Windows.** Riproduce la voce, il riverbero e la traccia di sottofondo che hai configurato — niente più selezione della voce sbagliata o riproduzione silenziosa.

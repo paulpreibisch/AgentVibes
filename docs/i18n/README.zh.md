@@ -4,6 +4,14 @@
 
 ---
 
+## 🌟 v5.6.8 新功能 — WSL 语音路由已修复 + 会话生命周期可靠性提升
+
+**WSL 用户：** AgentVibes 无论您配置了什么语音都会播放 `en_US-lessac-medium`。已修复 — 通过在二进制文件检查前显式将 `~/.local/bin` 追加到 `PATH` 开头，现在在非交互式 Shell 中也能找到 Piper。
+
+**项目专属路由：** 会话启动钩子现在将 `--project-dir` 烘入每个注入的 TTS 命令中，因此即使 `CLAUDE_PROJECT_DIR` 不在环境中，您配置的语音和音乐也能在 Bash 工具调用中正确播放。
+
+`play-tts-piper.sh` 和 `play-tts-piper.ps1` 现已包含在 `agentvibes install` 的关键钩子部署中 — 更新版本自动传播。
+
 ## 🌟 v5.6.7 新功能 — Windows 预览按钮已修复
 
 **LLM 音频配置中的预览按钮现在在 Windows 上可以正常工作。** 它将播放您配置的语音、混响和背景音轨 — 不再默认使用错误的语音或播放无声音频。
