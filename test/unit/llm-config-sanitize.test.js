@@ -98,6 +98,36 @@ describe('saveLlmConfigSync sanitization', () => {
     assert.strictEqual(loaded.ttsEngine, 'piper');
   });
 
+  test('saveLlmConfigSync with targetDir never writes to sourcePath (global config pollution fix)', () => {
+    // Regression: if loadLlmConfigSync found a row in the global ~/.claude/config, it set
+    // sourcePath to the global path.  saveLlmConfigSync then followed sourcePath and wrote back
+    // to global, polluting other projects (e.g., "Test5 pretext" appearing in a fresh Test6 install).
+    const globalDir = makeTempDir();
+    const projectDir = makeTempDir();
+
+    // Seed global config with a row
+    writeFileSync(
+      join(globalDir, '.claude', 'config', 'audio-effects.cfg'),
+      'llm:claude-code|off||0.20|global-voice|GlobalPretext|piper\n',
+    );
+
+    // Simulate: TUI loads config (finds it in globalDir), then user saves from projectDir
+    const loaded = loadLlmConfigSync('claude-code', globalDir);
+    assert.strictEqual(loaded.sourcePath, join(globalDir, '.claude', 'config', 'audio-effects.cfg'));
+
+    // Save with targetDir = projectDir (even though sourcePath points at globalDir)
+    saveLlmConfigSync('claude-code', { ...loaded, pretext: 'ProjectPretext' }, projectDir);
+
+    // Global config must NOT have been modified
+    const globalContent = readFileSync(join(globalDir, '.claude', 'config', 'audio-effects.cfg'), 'utf8');
+    assert.ok(globalContent.includes('GlobalPretext'), 'Global config must remain unchanged');
+    assert.ok(!globalContent.includes('ProjectPretext'), 'Global config must not have project pretext');
+
+    // Project config must have the new value
+    const projectContent = readFileSync(join(projectDir, '.claude', 'config', 'audio-effects.cfg'), 'utf8');
+    assert.ok(projectContent.includes('ProjectPretext'), 'Project config must have new pretext');
+  });
+
   test('M2: bgVolume with pipe survives round-trip as sanitized value', () => {
     const dir = makeTempDir();
     saveLlmConfigSync('copilot', {

@@ -246,21 +246,26 @@ describe('Default LLM provider (config-only fallback)', () => {
 });
 
 describe('packaged per-LLM defaults cover all supported LLMs', () => {
-  let audioEffects;
+  // Read DEFAULT_LLM_CONFIGS from the service source to avoid relying on the
+  // gitignored local audio-effects.cfg (which reflects the developer's live config
+  // and is not a reliable fixture for a test).
+  let svcSrc;
   before(() => {
-    audioEffects = readFileSync(
-      path.join(PROJECT_ROOT, '.claude', 'config', 'audio-effects.cfg'),
+    svcSrc = readFileSync(
+      path.join(PROJECT_ROOT, 'src', 'services', 'llm-provider-service.js'),
       'utf8'
     );
   });
 
   test('includes Claude Code, Copilot, and Codex rows', () => {
-    assert.match(audioEffects, /^llm:claude-code\|.*\|piper$/m,
-      'audio-effects.cfg must have an llm:claude-code row with piper engine');
-    assert.match(audioEffects, /^llm:copilot\|.*\|piper$/m,
-      'audio-effects.cfg must have an llm:copilot row with piper engine');
-    assert.match(audioEffects, /^llm:codex\|.*\|piper$/m,
-      'audio-effects.cfg must have an llm:codex row with piper engine');
+    // Verify DEFAULT_LLM_CONFIGS in llm-provider-service.js has piper entries
+    // for the three primary LLMs — these seed new installs via ensureDefaultLlmConfigSync.
+    assert.match(svcSrc, /'claude-code':\s*\{[^}]*ttsEngine:\s*'piper'/s,
+      'DEFAULT_LLM_CONFIGS must have a claude-code entry with ttsEngine: piper');
+    assert.match(svcSrc, /copilot:\s*\{[^}]*ttsEngine:\s*'piper'/s,
+      'DEFAULT_LLM_CONFIGS must have a copilot entry with ttsEngine: piper');
+    assert.match(svcSrc, /codex:\s*\{[^}]*ttsEngine:\s*'piper'/s,
+      'DEFAULT_LLM_CONFIGS must have a codex entry with ttsEngine: piper');
   });
 
   test('Codex setup does not install or remove Copilot MCP config', () => {

@@ -902,13 +902,12 @@ export function saveLlmConfigSync(llmKey, config, targetDir) {
   const sanitize = (v) => (v || '').replace(/[\|\n\r\x00]/g, '');
   const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${sanitize(config.bgVolume)}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
   const resolvedTargetDir = targetDir || process.env.INIT_CWD || process.cwd();
-  // When targetDir is explicitly passed, write there directly (do not fall back to global).
-  // resolveCfgPath falls back to ~/.claude when the local file doesn't yet exist,
-  // which would silently redirect writes away from the intended directory.
-  const cfgPath = config.sourcePath ||
-    (targetDir
-      ? path.join(resolvedTargetDir, '.claude', 'config', 'audio-effects.cfg')
-      : resolveCfgPath(resolvedTargetDir));
+  // When targetDir is explicitly passed, always write to the project dir — never follow
+  // config.sourcePath back to the global ~/.claude/config (it may have been loaded from there
+  // as a "default seed" for a new project, and writing back would pollute other projects).
+  const cfgPath = targetDir
+    ? path.join(resolvedTargetDir, '.claude', 'config', 'audio-effects.cfg')
+    : (config.sourcePath || resolveCfgPath(resolvedTargetDir));
 
   try {
     let content = '';
