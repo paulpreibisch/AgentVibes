@@ -40,9 +40,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.7 — Windows Preview Fixed
+## 🌟 NEW IN v5.6.8 — WSL Voice Routing Fixed + Session Lifecycle Reliability
 
-The **Preview button in LLM audio configuration now works correctly on Windows**. It plays the voice, reverb, and background track you configured — no more defaulting to the wrong voice or playing silence.
+**WSL users:** AgentVibes was playing `en_US-lessac-medium` regardless of your configured voice. Fixed — Piper is now found in non-interactive shells by explicitly prepending `~/.local/bin` to `PATH` before the binary check.
+
+**Per-project routing:** The session-start hook now bakes `--project-dir` into every injected TTS command, so your configured voice and music play correctly in Bash tool calls even when `CLAUDE_PROJECT_DIR` isn't in the environment.
+
+`play-tts-piper.sh` and `play-tts-piper.ps1` are now included in `agentvibes install`'s critical hooks deployment — updated versions propagate automatically.
+
+## v5.6.7 — Windows Preview Fixed
+
+The Preview button in LLM audio configuration now works correctly on Windows.
 
 ## v5.6.6 — Preview Button Works in WSL + Comprehensive Windows Test Suite
 

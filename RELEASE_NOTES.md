@@ -1,5 +1,37 @@
 # AgentVibes Release Notes
 
+## 🐧 v5.6.8 — WSL Voice Routing Fixed + Session Lifecycle Reliability
+
+**Released:** 2026-05-09
+
+### 🐛 WSL: Configured Voice Now Plays (Not Lessac Fallback)
+
+In WSL sessions, AgentVibes was playing `en_US-lessac-medium` regardless of what voice you configured. The root cause: `pipx` installs Piper to `~/.local/bin/`, which interactive shells get via `.bashrc`/`.zshrc`, but Claude Code's Bash tool calls run non-interactively and skip profile sourcing — `command -v piper` failed, falling back to the default voice.
+
+**Fix:** `play-tts-piper.sh` now prepends `~/.local/bin` and the pipx Piper venv bin to `PATH` before the binary check, so Piper is found regardless of shell mode.
+
+### 🐛 Per-Project Voice/Music Lost When `CLAUDE_PROJECT_DIR` Not in Bash Environment
+
+When Claude Code runs a Bash tool call, `CLAUDE_PROJECT_DIR` is not passed in the environment. The TTS hooks couldn't find per-project config and fell back to global defaults — wrong voice, wrong music, no pretext.
+
+**Fix:** `session-start-tts.sh` (and `.ps1`) now bakes the project directory into the injected hook command as `--project-dir`. `play-tts.sh` reads this flag before any config lookup, so per-project routing is reliable in every Bash tool call.
+
+### 🐛 `play-tts-piper.sh` and `play-tts-piper.ps1` Not Deployed by `agentvibes install`
+
+These hooks were missing from `CRITICAL_HOOKS` / `CRITICAL_HOOKS_WINDOWS`, so `agentvibes install` never propagated updated versions to `~/.claude/hooks/`.
+
+**Fix:** Both are now in the critical hooks list and always deployed on install/update.
+
+### 🐛 Voice Display Name Bugs
+
+- `uniquifyVoiceName("Mary-1")` returned `"Mary-1 Bell"` instead of `"Mary Bell"`.
+- 16Speakers names like `Rose_Ibex` were incorrectly getting a surname appended (`"Rose Ibex Bell"`).
+- `🎤 Voice used:` line was missing from WSL bash output.
+
+All three fixed. A new test file (`test/unit/voice-names.test.js`, 16 tests) covers these cases.
+
+---
+
 ## 🪟 v5.6.7 — Windows Preview Fixed
 
 **Released:** 2026-05-08
