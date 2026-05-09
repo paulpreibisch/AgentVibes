@@ -4056,10 +4056,13 @@ async function configureSessionStartHook(targetDir, spinner) {
 
     if (!existingSettings.hooks.SessionStart) {
       if (isNativeWindows()) {
+        // Use $HOME (global hooks) so the always-up-to-date global script runs.
+        // session-start-tts.ps1 reads per-project settings via $env:CLAUDE_PROJECT_DIR,
+        // which Claude Code sets to the project root before firing the hook.
         existingSettings.hooks.SessionStart = [{
           hooks: [{
             type: 'command',
-            command: 'powershell -NoProfile -ExecutionPolicy Bypass -File "$CLAUDE_PROJECT_DIR\\.claude\\hooks-windows\\session-start-tts.ps1"'
+            command: 'powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\session-start-tts.ps1"'
           }]
         }];
       } else {
