@@ -9,18 +9,26 @@
 
 $ErrorActionPreference = "Stop"
 
-# Get script directory
+# Get script directory and resolve absolute path to play-tts.ps1.
+# Using an absolute path in the injected protocol ensures the correct play-tts.ps1
+# is called regardless of the working directory when Claude runs the command.
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PlayTtsPath = Join-Path $ScriptDir "play-tts.ps1"
 
 # Check if AgentVibes is installed
-if (-not (Test-Path (Join-Path $ScriptDir "play-tts.ps1"))) {
+if (-not (Test-Path $PlayTtsPath)) {
     # AgentVibes not installed, don't inject anything
     exit 0
 }
 
-# Resolve project .claude dir from script location (avoids CWD-relative path issues)
-$ProjectClaudeDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
-$ProjectClaudeDir = Join-Path $ProjectClaudeDir ".claude"
+# Resolve project .claude dir: prefer CLAUDE_PROJECT_DIR (set by Claude Code to the
+# session's project root) so per-project settings are read correctly even when this
+# script runs from the global ~/.claude/hooks-windows/ location.
+if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) {
+    $ProjectClaudeDir = "$env:CLAUDE_PROJECT_DIR\.claude"
+} else {
+    $ProjectClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptDir)) ".claude"
+}
 
 # Check for sentiment (priority) or personality (fallback)
 $Sentiment = ""
@@ -65,14 +73,14 @@ Write-Output @"
 
 **CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
 
-1. **Acknowledgment** - Start of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "[action]" -llm claude-code``
-2. **Completion** - End of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "[result + key details]" -llm claude-code``
+1. **Acknowledgment** - Start of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "[action]" -llm claude-code``
+2. **Completion** - End of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "[result + key details]" -llm claude-code``
 
 **Example:**
 ``````
-[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Checking git status" -llm claude-code]
+[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "Checking git status" -llm claude-code]
 [work...]
-[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File ".claude\hooks-windows\play-tts.ps1" "Repository is clean, no changes" -llm claude-code]
+[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "Repository is clean, no changes" -llm claude-code]
 ``````
 
 "@

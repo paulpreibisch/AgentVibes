@@ -33,10 +33,11 @@ const HOOK_SCRIPTS = [
  * Helper: run a PowerShell command and capture output
  */
 function runPowerShell(args, options = {}) {
+  const ms = options.timeout || 10000;
   return new Promise((resolve) => {
     const child = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', ...args], {
       env: { ...process.env, ...options.env },
-      timeout: 10000,
+      timeout: ms,
     });
 
     let stdout = '';
@@ -52,7 +53,7 @@ function runPowerShell(args, options = {}) {
     setTimeout(() => {
       child.kill();
       resolve({ stdout, stderr, exitCode: -1 });
-    }, 10000);
+    }, ms);
   });
 }
 
@@ -710,3 +711,140 @@ test('Piper Provider - voice-manager works via PowerShell', { skip: process.plat
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+// ============================================================
+// Suite: Session-start TTS Protocol Injection
+// ============================================================
+
+test('Session Start - injects -llm claude-code flag', { skip: process.platform !== 'win32' }, async () => {
+  const result = await runPowerShell(
+    ['-File', join(hooksDir, 'session-start-tts.ps1')],
+    { env: { CLAUDE_PROJECT_DIR: projectRoot } }
+  );
+
+  const output = result.stdout + result.stderr;
+  assert.ok(
+    output.includes('-llm claude-code'),
+    'session-start-tts.ps1 must inject -llm claude-code so per-LLM voice/music is used'
+  );
+});
+
+test('Session Start - injects absolute play-tts.ps1 path not relative', { skip: process.platform !== 'win32' }, async () => {
+  const result = await runPowerShell(
+    ['-File', join(hooksDir, 'session-start-tts.ps1')],
+    { env: { CLAUDE_PROJECT_DIR: projectRoot } }
+  );
+
+  const output = result.stdout + result.stderr;
+  // Must NOT contain the relative path that breaks when CWD != project dir
+  assert.ok(
+    !output.includes('".claude\\hooks-windows\\play-tts.ps1"'),
+    'session-start-tts.ps1 must not inject relative play-tts.ps1 path'
+  );
+  // Must contain an absolute path ending in play-tts.ps1
+  assert.ok(
+    /[A-Za-z]:\\.*play-tts\.ps1/.test(output),
+    'session-start-tts.ps1 must inject an absolute path to play-tts.ps1'
+  );
+});
+
+test('Session Start - static check: uses $PlayTtsPath variable not hardcoded relative path', () => {
+  const content = readFileSync(join(hooksDir, 'session-start-tts.ps1'), 'utf-8');
+  assert.ok(
+    content.includes('$PlayTtsPath'),
+    'session-start-tts.ps1 must define $PlayTtsPath for absolute path resolution'
+  );
+  assert.ok(
+    !content.includes('".claude\\hooks-windows\\play-tts.ps1"'),
+    'session-start-tts.ps1 must not hardcode relative play-tts.ps1 path'
+  );
+});
+
+// ============================================================
+// Suite: Per-LLM Voice Routing (regression — fresh folder uses configured voice)
+// ============================================================
+
+test('Per-LLM Routing - play-tts.ps1 reads voice from CLAUDE_PROJECT_DIR config', { skip: process.platform !== 'win32' }, async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-routing-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  // Write a known per-LLM config — using a real installed voice so Piper can synthesize
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    'llm:claude-code|off||0.15|en_US-lessac-high|routing-test|piper\n'
+  );
+
+  try {
+    const result = await runPowerShell(
+      ['-File', join(hooksDir, 'play-tts.ps1'), 'routing test', '-llm', 'claude-code'],
+      {
+        env: {
+          CLAUDE_PROJECT_DIR: tempDir,
+          AGENTVIBES_VERBOSE: '1',
+          USERPROFILE: process.env.USERPROFILE,  // real voices/piper live here
+          LOCALAPPDATA: process.env.LOCALAPPDATA,
+          Path: process.env.Path || process.env.PATH,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const output = result.stdout + result.stderr;
+    // Debug line must show llm=claude-code and voice from project config
+    assert.ok(
+      output.includes('llm=claude-code'),
+      `play-tts.ps1 must route to llm:claude-code. Output: ${output.slice(0, 500)}`
+    );
+    assert.ok(
+      output.includes('voice=en_US-lessac-high'),
+      `play-tts.ps1 must use voice from project config. Output: ${output.slice(0, 500)}`
+    );
+    assert.ok(
+      output.includes('pretext=routing-test'),
+      `play-tts.ps1 must pick up pretext from project config. Output: ${output.slice(0, 500)}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}, 30000);
+
+test('Per-LLM Routing - without -llm flag falls back to llm:default not project claude-code', { skip: process.platform !== 'win32' }, async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-routing-default-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    'llm:default|off||0.15|en_US-lessac-high|default-pretext|piper\nllm:claude-code|off||0.15|en_US-lessac-high|cc-pretext|piper\n'
+  );
+
+  try {
+    const result = await runPowerShell(
+      ['-File', join(hooksDir, 'play-tts.ps1'), 'routing test'],
+      {
+        env: {
+          CLAUDE_PROJECT_DIR: tempDir,
+          AGENTVIBES_VERBOSE: '1',
+          AGENTVIBES_LLM_KEY: '',
+          USERPROFILE: process.env.USERPROFILE,
+          LOCALAPPDATA: process.env.LOCALAPPDATA,
+          Path: process.env.Path || process.env.PATH,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const output = result.stdout + result.stderr;
+    assert.ok(
+      output.includes('llm=default'),
+      `Without -llm flag, must route to llm:default. Output: ${output.slice(0, 500)}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}, 30000);
