@@ -312,6 +312,44 @@ jobs:
           }
           Write-Host "✅ play-tts.ps1 correctly read BgEnabled=true from CLAUDE_PROJECT_DIR"
 
+      # ─── AGENTVIBES_LLM_KEY fallback regression test ────────────────────────
+      # Regression guard: when Claude Code fires hooks it sets AGENTVIBES_LLM_KEY
+      # but does NOT pass -llm to play-tts.ps1.  The script must fall back to
+      # AGENTVIBES_LLM_KEY so the user's configured voice/reverb/music is used
+      # instead of the global default.
+
+      - name: play-tts.ps1 uses AGENTVIBES_LLM_KEY when -llm flag is absent
+        shell: powershell
+        env:
+          AGENTVIBES_TEST_MODE: "true"
+          AGENTVIBES_VERBOSE: "1"
+        run: |
+          # Create a project dir with a known LLM config row
+          $proj = Join-Path $env:TEMP "agentvibes-ci-llmkey-$([System.IO.Path]::GetRandomFileName())"
+          $cfgDir = Join-Path $proj ".claude\config"
+          New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null
+
+          # Sentinel voice — unique string we can grep for in verbose output
+          Set-Content "$cfgDir\audio-effects.cfg" "llm:claude-code|off|||llmkey-sentinel-voice||piper"
+
+          $env:CLAUDE_PROJECT_DIR  = $proj
+          $env:AGENTVIBES_LLM_KEY  = "llm:claude-code"   # set by Claude Code hooks; no -llm flag passed
+
+          # Call play-tts.ps1 WITHOUT the -llm parameter (exactly how Claude Code hooks invoke it)
+          $out = & powershell -NoProfile -ExecutionPolicy Bypass `
+            -File (Resolve-Path ".claude\hooks-windows\play-tts.ps1").Path `
+            "CI hook test" 2>&1 | Out-String
+
+          Remove-Item $proj -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Output: $out"
+
+          if ($out -notmatch "llmkey-sentinel-voice") {
+            Write-Error "FAIL: play-tts.ps1 did not resolve LLM identity from AGENTVIBES_LLM_KEY — configured voice will not play when hooks fire"
+            exit 1
+          }
+          Write-Host "✅ play-tts.ps1 correctly resolved LLM config from AGENTVIBES_LLM_KEY (no -llm flag)"
+
       # ─── Installer smoke test ─────────────────────────────────────────────
 
       # Fix #10: Removed || true — real errors must not be silenced
