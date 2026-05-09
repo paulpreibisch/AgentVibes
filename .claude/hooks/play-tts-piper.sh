@@ -225,6 +225,10 @@ if [[ -z "$TEXT" ]]; then
   exit 1
 fi
 
+# Augment PATH for non-interactive shells (pipx installs to ~/.local/bin which
+# interactive shells get via .bashrc/.zshrc, but Bash tool calls skip profile)
+export PATH="$HOME/.local/bin:$HOME/.local/share/pipx/venvs/piper-tts/bin:$PATH"
+
 # Check if Piper is installed
 if ! command -v piper &> /dev/null; then
   echo "❌ Error: Piper TTS not installed"
