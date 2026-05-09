@@ -16,7 +16,13 @@ param(
     # When provided, the router looks up an `llm:<name>` row in audio-effects.cfg
     # to apply LLM-specific voice, pretext, reverb, and engine settings.
     [Parameter(Mandatory = $false)]
-    [string]$llm = ""
+    [string]$llm = "",
+
+    # Project directory override. session-start-tts.ps1 bakes the session's
+    # CLAUDE_PROJECT_DIR value here so per-project config is found even when
+    # Bash tool calls do not propagate CLAUDE_PROJECT_DIR to child processes.
+    [Parameter(Mandatory = $false)]
+    [string]$ProjectDir = ""
 )
 
 # Text-file handoff: the SSH receiver watcher writes long/special-char text to
@@ -29,6 +35,16 @@ if ($Text -eq "__from_file__" -and $env:AGENTVIBES_TEXT_FILE) {
         Write-Error "AGENTVIBES_TEXT_FILE set to missing path: $($env:AGENTVIBES_TEXT_FILE)"
         exit 1
     }
+}
+
+# If -ProjectDir was passed (by session-start-tts.ps1), promote it to the
+# CLAUDE_PROJECT_DIR env var so the per-LLM config lookup below finds it.
+# This ensures per-project audio settings work even when Bash tool calls
+# don't automatically inherit CLAUDE_PROJECT_DIR from Claude Code.
+if ($ProjectDir -and (Test-Path $ProjectDir)) {
+    # Always prefer the explicitly-injected project dir; validates path exists
+    # before trusting it (fixes both the stale-env-var override bug and path injection).
+    $env:CLAUDE_PROJECT_DIR = $ProjectDir
 }
 
 # Configuration paths

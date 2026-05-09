@@ -35,6 +35,8 @@ export function uniquifyVoiceName(rawName) {
       const idx = (n - 1) % SURNAME_POOL.length;
       return `${base} ${SURNAME_POOL[idx]}`;
     }
+    // n=1 (or 0): strip the suffix — "Mary-1" → "Mary Bell" is cleaner than "Mary-1 Bell"
+    return `${base} ${SURNAME_POOL[0]}`;
   }
   if (/\s/.test(rawName)) return rawName;
   return `${rawName} ${SURNAME_POOL[0]}`;

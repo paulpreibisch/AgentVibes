@@ -91,6 +91,7 @@ DEFAULT_VOICE="en_US-lessac-medium"
 # @returns Sets $VOICE_MODEL global variable
 # @sideeffects None
 VOICE_MODEL=""
+FILE_VOICE=""
 
 # Get current language setting
 CURRENT_LANGUAGE=$(get_language_code)
@@ -204,6 +205,15 @@ else
       VOICE_MODEL="$DEFAULT_VOICE"
     fi
   fi
+fi
+
+# Preserve full display name (with ::SpeakerName) before any stripping for logging
+if [[ -n "$VOICE_OVERRIDE" ]]; then
+  DISPLAY_VOICE_NAME="$VOICE_OVERRIDE"
+elif [[ -n "$FILE_VOICE" ]]; then
+  DISPLAY_VOICE_NAME="$FILE_VOICE"
+else
+  DISPLAY_VOICE_NAME="$VOICE_MODEL"
 fi
 
 # @function validate_inputs
@@ -614,7 +624,31 @@ if [[ -n "$BACKGROUND_MUSIC" ]]; then
   MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")
   echo -e "${WHITE}🎵 Background music:${NC} ${PURPLE}$MUSIC_FILENAME${NC}"
 fi
-echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$VOICE_MODEL${NC} ${WHITE}(Piper TTS)${NC}"
+# Build friendly label: "model::Mike-13 [Mike Nash]"
+_SURNAME_POOL=("Bell" "Carter" "Davis" "Ellis" "Foster" "Gray" "Hayes" "Irving" "Jones" "Knox" "Lane" "Mason" "Nash" "Owens" "Pierce" "Quinn")
+_VOICE_DISPLAY_LABEL="$DISPLAY_VOICE_NAME"
+if [[ "$DISPLAY_VOICE_NAME" == *"::"* ]]; then
+  _SP="${DISPLAY_VOICE_NAME#*::}"
+  # Skip 16Speakers names (underscore = already first_last format)
+  if [[ "$_SP" != *"_"* ]]; then
+    _FRIENDLY=""
+    if [[ "$_SP" =~ ^(.+)-([0-9]+)$ ]]; then
+      if [[ ${BASH_REMATCH[2]} -ge 2 ]]; then
+        _IDX=$(( (${BASH_REMATCH[2]} - 1) % 16 ))
+        _FRIENDLY="${BASH_REMATCH[1]} ${_SURNAME_POOL[$_IDX]}"
+      else
+        # n=1: strip suffix, use Bell — matches uniquifyVoiceName JS behaviour
+        _FRIENDLY="${BASH_REMATCH[1]} ${_SURNAME_POOL[0]}"
+      fi
+    elif [[ "$_SP" =~ [[:space:]] ]]; then
+      _FRIENDLY="$_SP"
+    else
+      _FRIENDLY="$_SP ${_SURNAME_POOL[0]}"
+    fi
+    [[ "$_FRIENDLY" != "$_SP" ]] && _VOICE_DISPLAY_LABEL="$DISPLAY_VOICE_NAME [$_FRIENDLY]"
+  fi
+fi
+echo -e "${WHITE}🎤 Voice used:${NC} ${BLUE}$_VOICE_DISPLAY_LABEL${NC} ${WHITE}(Piper TTS)${NC}"
 
 # Show personality if configured
 PERSONALITY=$(cat "$PROJECT_ROOT/.claude/tts-personality.txt" 2>/dev/null || cat "$HOME/.claude/tts-personality.txt" 2>/dev/null || echo "")

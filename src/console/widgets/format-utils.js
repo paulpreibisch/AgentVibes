@@ -5,6 +5,8 @@
  * circular imports between widgets and tabs.
  */
 
+import { uniquifyVoiceName } from '../../utils/voice-names.js';
+
 const TRACK_NAMES = Object.freeze({
   'agentvibes_soft_flamenco_loop.mp3':                 '🎻 Soft Flamenco',
   'agent_vibes_bachata_v1_loop.mp3':                   '🎺 Bachata',
@@ -60,8 +62,15 @@ export function formatVoiceName(voice) {
 
   let name;
   if (voice.includes('::')) {
-    // 16Speakers::Rose_Ibex → extract after '::'
-    name = voice.split('::')[1];
+    const speakerPart = voice.split('::')[1];
+    if (speakerPart.includes('_')) {
+      // 16Speakers format (Rose_Ibex) — already a complete name, just normalise display
+      name = speakerPart.replace(/_/g, ' ');
+    } else {
+      // LibriTTS / single-word names: append deterministic surname
+      // "Mary" → "Mary Bell", "Mary-7" → "Mary Hayes"
+      name = uniquifyVoiceName(speakerPart);
+    }
   } else {
     const parts = voice.split('-');
     const QUALITIES = new Set(['high', 'medium', 'low']);

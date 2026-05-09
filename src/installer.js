@@ -5046,8 +5046,8 @@ async function updateCommandFiles(targetDir, spinner) {
  * These hooks contain bug fixes (e.g. markdown stripping) that must propagate
  * on every `npx agentvibes update` regardless of target directory.
  */
-const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
-const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1'];
+const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'play-tts-piper.sh', 'audio-processor.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
+const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1'];
 
 /**
  * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.

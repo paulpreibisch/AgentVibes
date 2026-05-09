@@ -25,15 +25,25 @@ if [[ ! -f "$PLAY_TTS_PATH" ]]; then
   exit 0
 fi
 
-# Resolve per-project .claude dir.
-# CLAUDE_PROJECT_DIR is set by Claude Code to the session's project root.
-# This works correctly whether the script runs from a per-project copy or
-# from the global ~/.claude/hooks/ location.
+# Capture project dir NOW while Claude Code has set CLAUDE_PROJECT_DIR.
+# Bash tool calls (how Claude actually runs play-tts.sh) do not automatically
+# receive CLAUDE_PROJECT_DIR, so we bake it into the injected protocol command
+# via --project-dir so the correct per-project config is always found.
+CAPTURED_PROJECT_DIR=""
 if [[ -n "${CLAUDE_PROJECT_DIR:-}" && -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  CAPTURED_PROJECT_DIR="$CLAUDE_PROJECT_DIR"
   _PROJECT_CLAUDE_DIR="$CLAUDE_PROJECT_DIR/.claude"
 else
-  # Fallback: derive from script location (works for per-project installs)
-  _PROJECT_CLAUDE_DIR="$(dirname "$SCRIPT_DIR")/.claude"
+  # Fallback: script lives inside .claude/hooks/, so parent IS .claude/
+  _PROJECT_CLAUDE_DIR="$(dirname "$SCRIPT_DIR")"
+fi
+
+# Build --project-dir flag to embed in TTS commands.
+# Sanitize: strip any embedded quotes that would break shell quoting.
+PROJECT_DIR_FLAG=""
+if [[ -n "$CAPTURED_PROJECT_DIR" ]]; then
+  _SAFE_PROJECT_DIR="${CAPTURED_PROJECT_DIR//\"/}"
+  PROJECT_DIR_FLAG=" --project-dir \"$_SAFE_PROJECT_DIR\""
 fi
 
 # Check for sentiment (priority) or personality (fallback)
@@ -65,16 +75,16 @@ cat << EOF
 
 **CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
 
-1. **Acknowledgment** - Start of task: \`Bash: $PLAY_TTS_PATH "[action]" --llm claude-code\`
-2. **Completion** - End of task: \`Bash: $PLAY_TTS_PATH "[result + key details]" --llm claude-code\`
+1. **Acknowledgment** - Start of task: \`Bash: $PLAY_TTS_PATH "[action]" --llm claude-code$PROJECT_DIR_FLAG\`
+2. **Completion** - End of task: \`Bash: $PLAY_TTS_PATH "[result + key details]" --llm claude-code$PROJECT_DIR_FLAG\`
 
 **IMPORTANT: Run TTS commands inline (NOT in background). Wait for each TTS call to complete before continuing.**
 
 **Example:**
 \`\`\`
-[Bash: $PLAY_TTS_PATH "Checking git status" --llm claude-code]
+[Bash: $PLAY_TTS_PATH "Checking git status" --llm claude-code$PROJECT_DIR_FLAG]
 [work...]
-[Bash: $PLAY_TTS_PATH "Repository is clean, no changes" --llm claude-code]
+[Bash: $PLAY_TTS_PATH "Repository is clean, no changes" --llm claude-code$PROJECT_DIR_FLAG]
 \`\`\`
 
 EOF

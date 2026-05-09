@@ -115,6 +115,15 @@ while [[ $# -gt 0 ]]; do
       LLM_PROVIDER="${2:-}"
       shift 2
       ;;
+    --project-dir)
+      # Always prefer the explicitly-injected project dir over any stale
+      # CLAUDE_PROJECT_DIR in the environment (fixes silent override by env).
+      # Validate the path exists before trusting it.
+      if [[ -n "${2:-}" && -d "${2}" ]]; then
+        export CLAUDE_PROJECT_DIR="${2}"
+      fi
+      shift 2
+      ;;
     *)
       _POSITIONAL_ARGS+=("$1")
       shift

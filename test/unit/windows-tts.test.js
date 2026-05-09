@@ -856,6 +856,169 @@ test('Multi-Speaker Display - [VOICE] output includes ::SpeakerName from llm con
   }
 }, 30000);
 
+// ============================================================
+// Suite: Config-vs-Output Round-Trip (regression for issue #186)
+// ============================================================
+
+test('Config round-trip - [VOICE] output matches voice configured in audio-effects.cfg', { skip: process.platform !== 'win32' }, async () => {
+  // Regression: [VOICE] line was showing only the model name (en_US-libritts-high)
+  // instead of the full model::SpeakerName. This test verifies the displayed voice
+  // matches whatever is stored in audio-effects.cfg so we can detect drift.
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-cfg-roundtrip-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  const configuredVoice = 'en_US-libritts-high::Mary';
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    `llm:claude-code|off||0.15|${configuredVoice}|roundtrip-test|piper\n`
+  );
+
+  try {
+    const result = await runPowerShell(
+      ['-File', join(hooksDir, 'play-tts.ps1'), 'round trip test', '-llm', 'claude-code'],
+      {
+        env: {
+          CLAUDE_PROJECT_DIR: tempDir,
+          AGENTVIBES_VERBOSE: '1',
+          USERPROFILE: process.env.USERPROFILE,
+          LOCALAPPDATA: process.env.LOCALAPPDATA,
+          Path: process.env.Path || process.env.PATH,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const output = result.stdout + result.stderr;
+    assert.ok(
+      output.includes(`[VOICE] Voice used: ${configuredVoice}`),
+      `[VOICE] must exactly match configured voice "${configuredVoice}".\nGot: ${output.slice(0, 600)}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}, 30000);
+
+// ============================================================
+// Suite: Session Lifecycle E2E (regression for issue #187)
+// Simulates what actually happens during a Claude Code session:
+// 1. SessionStart fires (CLAUDE_PROJECT_DIR is set)
+// 2. Protocol is injected with the TTS command
+// 3. Claude later runs that exact command WITHOUT CLAUDE_PROJECT_DIR
+//    (Bash tool calls don't inherit it)
+// The test verifies that the project config is still used.
+// ============================================================
+
+test('E2E Session Lifecycle - project voice used even when CLAUDE_PROJECT_DIR not in Bash env', { skip: process.platform !== 'win32' }, async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-e2e-lifecycle-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  const configuredVoice = 'en_US-libritts-high::Mary';
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    `llm:claude-code|off||0.15|${configuredVoice}|e2e-test|piper\n`
+  );
+
+  // Step 1: Run session-start-tts.ps1 WITH CLAUDE_PROJECT_DIR set (as Claude Code does)
+  // Capture the injected TTS protocol to extract the exact play-tts command
+  const sessionResult = await runPowerShell(
+    ['-File', join(hooksDir, 'session-start-tts.ps1')],
+    {
+      env: {
+        CLAUDE_PROJECT_DIR: tempDir,
+        USERPROFILE: process.env.USERPROFILE,
+        APPDATA: process.env.APPDATA,
+        Path: process.env.Path || process.env.PATH,
+      },
+      timeout: 15000,
+    }
+  );
+
+  const protocol = sessionResult.stdout + sessionResult.stderr;
+  // Verify session-start injected -ProjectDir into the protocol
+  assert.ok(
+    protocol.includes('-ProjectDir') || protocol.includes(tempDir),
+    `session-start-tts.ps1 must embed project dir in injected command.\nProtocol: ${protocol.slice(0, 400)}`
+  );
+
+  // Step 2: Extract the -ProjectDir value from the injected command
+  const projDirMatch = protocol.match(/-ProjectDir\s+"([^"]+)"/);
+  assert.ok(projDirMatch, `Must find -ProjectDir in injected protocol.\nProtocol: ${protocol.slice(0, 400)}`);
+  const injectedProjectDir = projDirMatch[1];
+
+  // Step 3: Run play-tts.ps1 WITHOUT CLAUDE_PROJECT_DIR in env (simulates Bash tool call)
+  // but WITH -ProjectDir as injected by session-start — this is the real fix
+  const ttsResult = await runPowerShell(
+    ['-File', join(hooksDir, 'play-tts.ps1'), 'e2e lifecycle test', '-llm', 'claude-code', '-ProjectDir', injectedProjectDir],
+    {
+      env: {
+        // Deliberately NO CLAUDE_PROJECT_DIR — simulates Bash tool call env
+        USERPROFILE: process.env.USERPROFILE,
+        LOCALAPPDATA: process.env.LOCALAPPDATA,
+        APPDATA: process.env.APPDATA,
+        Path: process.env.Path || process.env.PATH,
+      },
+      timeout: 30000,
+    }
+  );
+
+  const output = ttsResult.stdout + ttsResult.stderr;
+  assert.ok(
+    output.includes(`[VOICE] Voice used: ${configuredVoice}`),
+    `[VOICE] must use project config voice even without CLAUDE_PROJECT_DIR in env.\n` +
+    `Expected: ${configuredVoice}\nGot: ${output.slice(0, 600)}`
+  );
+
+  // Cleanup
+  rmSync(tempDir, { recursive: true, force: true });
+}, 45000);
+
+test('E2E Session Lifecycle - without -ProjectDir falls through to wrong config (demonstrates the bug)', { skip: process.platform !== 'win32' }, async () => {
+  // This test documents the ORIGINAL bug behaviour: without -ProjectDir, the project
+  // config is silently ignored when CLAUDE_PROJECT_DIR is absent from the Bash env.
+  // It should FAIL to find the project-specific pretext, proving the isolation works.
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-e2e-noproj-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  const uniquePretext = `pretext-isolation-${Date.now()}`;
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    `llm:claude-code|off||0.15|en_US-libritts-high::Mary|${uniquePretext}|piper\n`
+  );
+
+  // Run WITHOUT -ProjectDir AND without CLAUDE_PROJECT_DIR (bug condition)
+  const result = await runPowerShell(
+    ['-File', join(hooksDir, 'play-tts.ps1'), 'isolation test', '-llm', 'claude-code'],
+    {
+      env: {
+        // No CLAUDE_PROJECT_DIR, no -ProjectDir → should NOT find project config
+        USERPROFILE: process.env.USERPROFILE,
+        LOCALAPPDATA: process.env.LOCALAPPDATA,
+        APPDATA: process.env.APPDATA,
+        Path: process.env.Path || process.env.PATH,
+      },
+      timeout: 30000,
+    }
+  );
+
+  const output = result.stdout + result.stderr;
+  // The unique pretext from the project config must NOT appear — it was never found
+  assert.ok(
+    !output.includes(uniquePretext),
+    `Project pretext should NOT appear without -ProjectDir or CLAUDE_PROJECT_DIR.\nGot: ${output.slice(0, 400)}`
+  );
+
+  rmSync(tempDir, { recursive: true, force: true });
+}, 45000);
+
 test('Per-LLM Routing - without -llm flag falls back to llm:default not project claude-code', { skip: process.platform !== 'win32' }, async () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-routing-default-'));
   const configDir = join(tempDir, '.claude', 'config');

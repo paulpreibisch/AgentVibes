@@ -228,7 +228,31 @@ try {
 
     # Display results
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
-    Write-Host "[VOICE] Voice used: $DisplayVoiceName (Piper)" -ForegroundColor Green
+
+    # Build friendly label: "model::Mike-13 [Mike Nash]"
+    $SURNAME_POOL = @('Bell','Carter','Davis','Ellis','Foster','Gray','Hayes','Irving','Jones','Knox','Lane','Mason','Nash','Owens','Pierce','Quinn')
+    $VoiceDisplayLabel = $DisplayVoiceName
+    if ($DisplayVoiceName -match '::(.+)$') {
+        $sp = $Matches[1]
+        # Skip 16Speakers names (contain underscore — already first_last format)
+        if ($sp -notmatch '_') {
+            $friendly = $null
+            if ($sp -match '^(.+)-(\d+)$') {
+                if ([int]$Matches[2] -ge 2) {
+                    $friendly = "$($Matches[1]) $($SURNAME_POOL[([int]$Matches[2] - 1) % $SURNAME_POOL.Length])"
+                } else {
+                    # n=1: strip suffix, use Bell — matches uniquifyVoiceName JS behaviour
+                    $friendly = "$($Matches[1]) $($SURNAME_POOL[0])"
+                }
+            } elseif ($sp -match '\s') {
+                $friendly = $sp
+            } else {
+                $friendly = "$sp $($SURNAME_POOL[0])"
+            }
+            if ($null -ne $friendly -and $friendly -ne $sp) { $VoiceDisplayLabel = "$DisplayVoiceName [$friendly]" }
+        }
+    }
+    Write-Host "[VOICE] Voice used: $VoiceDisplayLabel (Piper)" -ForegroundColor Green
 
     # Apply audio effects (reverb, background music) if processor script exists.
     # SKIP when AGENTVIBES_NO_PLAY is set — that means the parent play-tts.ps1

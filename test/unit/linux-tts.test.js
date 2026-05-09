@@ -197,6 +197,111 @@ test('Per-LLM Routing (Linux) - without --llm flag falls back to llm:default', {
 // Suite: Installer — hook registration uses $HOME not $CLAUDE_PROJECT_DIR
 // ============================================================
 
+// ============================================================
+// Suite: Config-vs-Output Round-Trip (Linux)
+// ============================================================
+
+test('Config round-trip (Linux) - Voice output matches voice configured in audio-effects.cfg', { skip: SKIP_ON_WINDOWS }, async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-linux-roundtrip-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  const configuredVoice = 'en_US-libritts-high::Mary';
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    `llm:claude-code|off||0.15|${configuredVoice}|roundtrip-test|piper\n`
+  );
+
+  try {
+    const result = await runBash(
+      [join(hooksDir, 'play-tts.sh'), 'round trip test', '--llm', 'claude-code'],
+      {
+        env: {
+          CLAUDE_PROJECT_DIR: tempDir,
+          AGENTVIBES_VERBOSE: '1',
+          HOME: process.env.HOME,
+          PATH: process.env.PATH,
+        },
+        timeout: 30000,
+      }
+    );
+
+    const output = result.stdout + result.stderr;
+    assert.ok(
+      output.includes(configuredVoice),
+      `Voice output must include configured voice "${configuredVoice}".\nGot: ${output.slice(0, 600)}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}, 30000);
+
+// ============================================================
+// Suite: Session Lifecycle E2E - Linux (regression for issue #187)
+// Simulates real Claude Code session: session-start captures project dir,
+// then play-tts is called WITHOUT CLAUDE_PROJECT_DIR in env (Bash tool call).
+// ============================================================
+
+test('E2E (Linux) - project voice used even when CLAUDE_PROJECT_DIR not in Bash env', { skip: SKIP_ON_WINDOWS }, async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-linux-e2e-'));
+  const configDir = join(tempDir, '.claude', 'config');
+  const audioDir = join(tempDir, '.claude', 'audio');
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(audioDir, { recursive: true });
+
+  const configuredVoice = 'en_US-libritts-high::Mary';
+  writeFileSync(
+    join(configDir, 'audio-effects.cfg'),
+    `llm:claude-code|off||0.15|${configuredVoice}|e2e-test|piper\n`
+  );
+
+  // Step 1: Run session-start-tts.sh WITH CLAUDE_PROJECT_DIR to capture injected protocol
+  const sessionResult = await runBash(
+    [join(hooksDir, 'session-start-tts.sh')],
+    {
+      env: { CLAUDE_PROJECT_DIR: tempDir, HOME: process.env.HOME, PATH: process.env.PATH },
+      timeout: 15000,
+    }
+  );
+
+  const protocol = sessionResult.stdout + sessionResult.stderr;
+  assert.ok(
+    protocol.includes('--project-dir') || protocol.includes(tempDir),
+    `session-start-tts.sh must embed project dir in injected command.\nProtocol: ${protocol.slice(0, 400)}`
+  );
+
+  // Step 2: Extract --project-dir value from injected protocol
+  const projDirMatch = protocol.match(/--project-dir\s+"([^"]+)"/);
+  assert.ok(projDirMatch, `Must find --project-dir in injected protocol.\nProtocol: ${protocol.slice(0, 400)}`);
+  const injectedProjectDir = projDirMatch[1];
+
+  // Step 3: Run play-tts.sh WITHOUT CLAUDE_PROJECT_DIR but WITH --project-dir
+  const ttsResult = await runBash(
+    [join(hooksDir, 'play-tts.sh'), 'e2e lifecycle test', '--llm', 'claude-code', '--project-dir', injectedProjectDir],
+    {
+      env: {
+        // Deliberately NO CLAUDE_PROJECT_DIR
+        HOME: process.env.HOME,
+        PATH: process.env.PATH,
+      },
+      timeout: 30000,
+    }
+  );
+
+  try {
+    const output = ttsResult.stdout + ttsResult.stderr;
+    assert.ok(
+      output.includes(configuredVoice),
+      `Must use project voice even without CLAUDE_PROJECT_DIR in env.\n` +
+      `Expected: ${configuredVoice}\nGot: ${output.slice(0, 600)}`
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}, 45000);
+
 test('Installer - configureSessionStartHook registers $HOME path for Linux', async () => {
   const { configureSessionStartHook } = await import('../../src/installer.js');
 

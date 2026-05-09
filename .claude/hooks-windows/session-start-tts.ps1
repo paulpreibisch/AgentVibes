@@ -21,13 +21,24 @@ if (-not (Test-Path $PlayTtsPath)) {
     exit 0
 }
 
-# Resolve project .claude dir: prefer CLAUDE_PROJECT_DIR (set by Claude Code to the
-# session's project root) so per-project settings are read correctly even when this
-# script runs from the global ~/.claude/hooks-windows/ location.
+# Capture project dir NOW while Claude Code has set it correctly.
+# Bash tool calls (how Claude actually runs play-tts.ps1) do not
+# automatically receive CLAUDE_PROJECT_DIR, so we bake the value
+# into the injected protocol command via the -ProjectDir parameter.
+$CapturedProjectDir = ""
 if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) {
-    $ProjectClaudeDir = "$env:CLAUDE_PROJECT_DIR\.claude"
+    $CapturedProjectDir  = $env:CLAUDE_PROJECT_DIR
+    $ProjectClaudeDir    = "$env:CLAUDE_PROJECT_DIR\.claude"
 } else {
     $ProjectClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptDir)) ".claude"
+}
+
+# Build the -ProjectDir flag to inject into TTS commands (empty string = omit flag).
+# Sanitize: strip any embedded quotes that would break PowerShell argument quoting.
+$ProjectDirFlag = ""
+if ($CapturedProjectDir) {
+    $SafeProjectDir = $CapturedProjectDir -replace '"', ''
+    $ProjectDirFlag = " -ProjectDir `"$SafeProjectDir`""
 }
 
 # Check for sentiment (priority) or personality (fallback)
@@ -73,14 +84,14 @@ Write-Output @"
 
 **CRITICAL: You MUST execute TTS at TWO points for EVERY user interaction:**
 
-1. **Acknowledgment** - Start of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "[action]" -llm claude-code``
-2. **Completion** - End of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "[result + key details]" -llm claude-code``
+1. **Acknowledgment** - Start of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "[action]" -llm claude-code$ProjectDirFlag``
+2. **Completion** - End of task: ``Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "[result + key details]" -llm claude-code$ProjectDirFlag``
 
 **Example:**
 ``````
-[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "Checking git status" -llm claude-code]
+[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "Checking git status" -llm claude-code$ProjectDirFlag]
 [work...]
-[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "Repository is clean, no changes" -llm claude-code]
+[Bash: powershell -NoProfile -ExecutionPolicy Bypass -File "$PlayTtsPath" "Repository is clean, no changes" -llm claude-code$ProjectDirFlag]
 ``````
 
 "@
