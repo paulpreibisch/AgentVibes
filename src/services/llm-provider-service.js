@@ -92,13 +92,33 @@ const DEFAULT_LLM_CONFIGS = {
 };
 
 function ensureDefaultLlmConfigSync(llmKey, targetDir) {
-  const existing = loadLlmConfigSync(llmKey, targetDir);
-  if (existing.sourcePath) return;
+  // Check only the project dir — a global config row must not prevent seeding
+  // per-project defaults (otherwise new installs silently inherit a different
+  // project's voice/pretext and the per-LLM piper engine is never written,
+  // causing play-tts.ps1 to fall through to the global SAPI provider).
+  const resolvedDir = targetDir || process.env.INIT_CWD || process.cwd();
+  const projectCfgPath = path.join(resolvedDir, '.claude', 'config', 'audio-effects.cfg');
+  const cfgKey = `llm:${llmKey}`;
+  try {
+    const content = fsSync.readFileSync(projectCfgPath, 'utf8');
+    if (content.split('\n').some(line => line.startsWith(cfgKey + '|'))) return;
+  } catch { /* file not found — continue to seed */ }
 
   const defaults = DEFAULT_LLM_CONFIGS[llmKey];
   if (!defaults) return;
 
   saveLlmConfigSync(llmKey, defaults, targetDir);
+}
+
+/**
+ * Seed piper defaults for every LLM in DEFAULT_LLM_CONFIGS into the project dir.
+ * Called at install time so play-tts.ps1 always finds a per-LLM piper row in the
+ * project config and never silently falls back to the global windows-sapi provider.
+ */
+export function seedAllLlmDefaultsSync(targetDir) {
+  for (const llmKey of Object.keys(DEFAULT_LLM_CONFIGS)) {
+    ensureDefaultLlmConfigSync(llmKey, targetDir);
+  }
 }
 
 // ── Provider install-checks ─────────────────────────────────────────────────

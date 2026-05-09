@@ -9,7 +9,7 @@ import assert from 'node:assert';
 import { mkdirSync, writeFileSync, readFileSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { saveLlmConfigSync, loadLlmConfigSync } from '../../src/services/llm-provider-service.js';
+import { saveLlmConfigSync, loadLlmConfigSync, seedAllLlmDefaultsSync } from '../../src/services/llm-provider-service.js';
 
 function makeTempDir() {
   const dir = mkdtempSync(join(tmpdir(), 'av-sanitize-test-'));
@@ -126,6 +126,32 @@ describe('saveLlmConfigSync sanitization', () => {
     // Project config must have the new value
     const projectContent = readFileSync(join(projectDir, '.claude', 'config', 'audio-effects.cfg'), 'utf8');
     assert.ok(projectContent.includes('ProjectPretext'), 'Project config must have new pretext');
+  });
+
+  test('seedAllLlmDefaultsSync writes piper rows to project dir even when global config exists', () => {
+    // Regression: ensureDefaultLlmConfigSync returned early when global config had a row,
+    // preventing per-project piper defaults from being seeded. Result: play-tts.ps1 found
+    // no per-LLM row in the project, kept the global windows-sapi provider, and Microsoft
+    // David spoke instead of the user's configured piper voice.
+    const globalDir = makeTempDir();
+    const projectDir = makeTempDir();
+
+    // Simulate global config pollution from a previous project
+    writeFileSync(
+      join(globalDir, '.claude', 'config', 'audio-effects.cfg'),
+      'llm:claude-code|light|track.mp3|0.20|global-voice|GlobalPretext|piper\n',
+    );
+
+    // seedAllLlmDefaultsSync must write to projectDir despite global config existing
+    seedAllLlmDefaultsSync(projectDir);
+
+    const projectContent = readFileSync(join(projectDir, '.claude', 'config', 'audio-effects.cfg'), 'utf8');
+    assert.ok(projectContent.includes('llm:claude-code|'), 'Project must have claude-code row after seeding');
+    assert.ok(projectContent.includes('|piper'), 'Seeded row must have piper engine');
+
+    // Global must be untouched
+    const globalContent = readFileSync(join(globalDir, '.claude', 'config', 'audio-effects.cfg'), 'utf8');
+    assert.ok(globalContent.includes('GlobalPretext'), 'Global config must be unchanged');
   });
 
   test('M2: bgVolume with pipe survives round-trip as sanitized value', () => {

@@ -30,6 +30,7 @@ import { createReceiverTab } from './tabs/receiver-tab.js';
 import { createAgentsTab } from './tabs/agents-tab.js';
 import { ConfigService } from '../services/config-service.js';
 import { ProviderService } from '../services/provider-service.js';
+import { seedAllLlmDefaultsSync } from '../services/llm-provider-service.js';
 
 const _dir = path.dirname(fileURLToPath(import.meta.url));
 const _pkg = JSON.parse(readFileSync(path.join(_dir, '../../package.json'), 'utf8'));
@@ -893,6 +894,11 @@ export class AgentVibesConsole {
  * @returns {Promise<AgentVibesConsole>}
  */
 export async function launchConsole(opts = {}) {
+  // Seed per-LLM piper defaults into the project config on every TUI launch.
+  // This guarantees play-tts.ps1 always finds a piper engine row for each LLM
+  // and never silently falls back to the global windows-sapi provider.
+  seedAllLlmDefaultsSync(process.cwd());
+
   const app = new AgentVibesConsole(opts);
   await app.init();
   return app;
