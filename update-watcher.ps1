@@ -82,8 +82,17 @@ while ($true) {
                             Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
                         }
                     }
-                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm)"
-                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg 2>&1
+                    $providerArg = @()
+                    if ($req.provider) {
+                        $safeProvider = $req.provider.Trim()
+                        if ($safeProvider -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
+                            $providerArg = @('-ProviderOverride', $safeProvider)
+                        } else {
+                            Write-WatcherLog "WARN" "Invalid provider '$safeProvider' in payload - ignored"
+                        }
+                    }
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm) provider=$($req.provider)"
+                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg @providerArg 2>&1
                     if ($LASTEXITCODE -ne 0) {
                         Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"
                     } else {
