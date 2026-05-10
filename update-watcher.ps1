@@ -82,6 +82,9 @@ while ($true) {
                             Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
                         }
                     }
+                    # Provider override: the Linux sender embeds its configured provider
+                    # (from receiver-provider.txt / audio-effects.cfg ENGINE column) in the
+                    # JSON payload so the Windows receiver uses the Linux-side engine choice.
                     $providerArg = @()
                     if ($req.provider) {
                         $safeProvider = $req.provider.Trim()
@@ -91,7 +94,7 @@ while ($true) {
                             Write-WatcherLog "WARN" "Invalid provider '$safeProvider' in payload - ignored"
                         }
                     }
-                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm) provider=$($req.provider)"
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm) provider=$safeProvider"
                     $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg @providerArg 2>&1
                     if ($LASTEXITCODE -ne 0) {
                         Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"

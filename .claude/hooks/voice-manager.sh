@@ -573,6 +573,10 @@ case "$1" in
       exit 1
     fi
 
+    # Source provider-manager.sh first — get_active_provider and detect_routing_llm
+    # are both defined there; sourcing after calling them silently produces empty values.
+    source "$SCRIPT_DIR/provider-manager.sh" 2>/dev/null || true
+
     ACTIVE_PROVIDER=$(get_active_provider)
 
     # Friendly name resolution for Piper and transport providers
@@ -586,7 +590,7 @@ case "$1" in
             select(.key == $n or (.value.displayName | ascii_downcase) == $n) |
             .value.id
           ' "$SAMPLE_META" 2>/dev/null | head -1)
-          if [[ -n "$SAMPLE_RESOLVED" ]] && [[ "$SAMPLE_RESOLVED" =~ ^[a-zA-Z0-9_.:\/-]+$ ]]; then
+          if [[ -n "$SAMPLE_RESOLVED" ]] && [[ "$SAMPLE_RESOLVED" =~ ^[a-zA-Z0-9_.:+-]+$ ]]; then
             echo "🔍 Resolved '${SAMPLE_VOICE}' → '${SAMPLE_RESOLVED}'"
             SAMPLE_VOICE="$SAMPLE_RESOLVED"
           fi
@@ -595,7 +599,6 @@ case "$1" in
     esac
 
     # Detect routing LLM so SSH-remote setups forward audio to the receiver
-    source "$SCRIPT_DIR/provider-manager.sh" 2>/dev/null || true
     SAMPLE_LLM=$(detect_routing_llm 2>/dev/null || echo "")
     SAMPLE_LLM_ARG=()
     [[ -n "$SAMPLE_LLM" ]] && SAMPLE_LLM_ARG=(--llm "$SAMPLE_LLM")

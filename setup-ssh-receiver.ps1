@@ -226,7 +226,7 @@ while ($true) {
                             Write-WatcherLog "WARN" "Invalid provider '$safeProvider' in payload - ignored"
                         }
                     }
-                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm) provider=$($req.provider)"
+                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm) provider=$safeProvider"
                     $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg @providerArg 2>&1
                     if ($LASTEXITCODE -ne 0) {
                         Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"

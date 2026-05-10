@@ -384,7 +384,8 @@ except Exception:
     print('')
 PYEOF
 )
-    if [[ -n "$_remote_llm" ]]; then
+    # Validate the key is a safe LLM name before returning
+    if [[ -n "$_remote_llm" ]] && [[ "$_remote_llm" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
       echo "$_remote_llm"
       return 0
     fi
