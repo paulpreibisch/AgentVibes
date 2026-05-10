@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇 v5.6.9 — Hall und Hintergrundmusik in NPX-Installationen Stumm
+
+**Veröffentlicht:** 2026-05-09
+
+### 🐛 Hall und Hintergrundmusik Stumm für Alle NPX-Benutzer
+
+Wenn AgentVibes über `npx` installiert wird, werden Hook-Dateien aus dem Paket mit 644-Berechtigungen extrahiert — kein Ausführungsbit. `play-tts-piper.sh` rief `audio-processor.sh` direkt auf, was sofort mit Code 126 (Zugriff verweigert) bei einer nicht ausführbaren Datei beendet wird. Alle `npx`-installierten Benutzer erhielten nur Sprach-TTS — kein Hall, keine Hintergrundmusik, stillschweigend.
+
+**Korrektur 1:** `play-tts-piper.sh` ruft `audio-processor.sh` jetzt über `bash "$SCRIPT_DIR/audio-processor.sh"` auf, wodurch die Ausführungsbit-Prüfung umgangen wird.
+**Korrektur 2:** `install-deps.js` (postinstall) führt jetzt `ensureHookPermissions()` aus, um nach npm install `chmod 755` auf alle `.sh`-Dateien anzuwenden.
+
+### 🐛 Voice-Browser-Vorschau Ignorierte Hall und Hintergrundmusik
+
+Der **Vorschau**-Button im Voice Browser spielte rohe Piper-Ausgabe ohne Hall und Hintergrundmusik ab, wobei `audio-processor.sh` vollständig umgangen wurde.
+
+**Korrektur:** Vorschau-Audio wird jetzt durch dieselbe `audio-processor.sh`-Pipeline wie echtes TTS geleitet.
+
+### 🐛 MCP `text_to_speech` Gab Fehlerhaften Dateipfad und Fehlende Stimmeninformationen Zurück
+
+Das Werkzeug extrahierte den Audiodateipfad falsch (enthielt nachfolgende Größen-/Emoji-Zeichen) und meldete nie den Stimmnamen in seiner Antwort.
+
+**Korrektur:** ANSI-Codes werden vor dem Parsen entfernt, der `.wav`-Pfad wird sauber extrahiert, und die `🎤 Verwendete Stimme:`-Zeile wird in der Werkzeugantwort einbezogen.
+
+### 🐛 Hintergrundmusik-Umschalter in der TUI Hatte Keine Wirkung
+
+Das Aktivieren von Hintergrundmusik in der **Musik**-Registerkarte schrieb in `config.json`, aber nicht in `background-music-enabled.txt` (von Bash-Hooks gelesen). Die Musik blieb nach dem Umschalten deaktiviert. Das Speichern eines Tracks impliziert jetzt auch das Aktivieren der Musik.
+
+---
+
 ## 🐧 v5.6.8 — WSL-Stimmen-Routing repariert + Zuverlässigkeit des Sitzungslebenszyklus
 
 **Veröffentlicht:** 2026-05-09

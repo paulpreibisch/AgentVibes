@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇 v5.6.9 — Reverb e Música de Fundo Silenciosos em Instalações NPX
+
+**Lançamento:** 2026-05-09
+
+### 🐛 Reverb e Música de Fundo Silenciosamente Quebrados para Todos os Usuários NPX
+
+Quando o AgentVibes é instalado via `npx`, os arquivos de hook são extraídos do pacote com permissões 644 — sem bit de execução. `play-tts-piper.sh` chamava `audio-processor.sh` diretamente, que sai imediatamente com código 126 (Permissão negada) em um arquivo não executável. Todos os usuários instalados via `npx` recebiam TTS apenas de voz — sem reverb, sem música de fundo, silenciosamente.
+
+**Correção 1:** `play-tts-piper.sh` agora chama `audio-processor.sh` via `bash "$SCRIPT_DIR/audio-processor.sh"`, ignorando a verificação do bit de execução.
+**Correção 2:** `install-deps.js` (postinstall) agora executa `ensureHookPermissions()` para fazer `chmod 755` em todos os arquivos `.sh` após o npm install.
+
+### 🐛 Pré-visualização do Navegador de Voz Ignorava Reverb e Música de Fundo
+
+O botão **Pré-visualização** no Navegador de Voz reproduzia saída bruta do piper sem reverb nem música de fundo, ignorando completamente `audio-processor.sh`.
+
+**Correção:** O áudio de pré-visualização agora passa pelo mesmo pipeline `audio-processor.sh` que o TTS real.
+
+### 🐛 O MCP `text_to_speech` Retornava Caminho de Arquivo Corrompido e Informações de Voz Ausentes
+
+A ferramenta extraía o caminho do arquivo de áudio incorretamente (incluindo caracteres de tamanho/emoji no final) e nunca reportava o nome da voz em sua resposta.
+
+**Correção:** Os códigos ANSI são removidos antes da análise, o caminho `.wav` é extraído corretamente, e a linha `🎤 Voz utilizada:` é incluída na resposta da ferramenta.
+
+### 🐛 Toggle de Música de Fundo na TUI Não Tinha Efeito
+
+Ativar música de fundo na aba **Música** escrevia em `config.json` mas não em `background-music-enabled.txt` (lido pelos hooks bash). A música permanecia desativada após o toggle. Salvar uma faixa agora também implica ativar a música.
+
+---
+
 ## 🐧 v5.6.8 — Roteamento de Voz no WSL Corrigido + Confiabilidade do Ciclo de Vida da Sessão
 
 **Lançamento:** 2026-05-09

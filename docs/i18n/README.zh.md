@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.6.2
+**作者**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **版本**: v5.6.9
 
 ---
 
-## 🌟 v5.6.8 新功能 — WSL 语音路由已修复 + 会话生命周期可靠性提升
+## 🌟 v5.6.9 新功能 — NPX 安装中混响和背景音乐静音
+
+**NPX 用户：** 所有通过 `npx` 安装的用户混响和背景音乐都静默失效。从 npm 包提取的钩子文件缺少执行位（644），导致 `audio-processor.sh` 以代码 126 退出。通过调用方的 `bash` 前缀和 postinstall 的 `chmod 755` 步骤修复。
+
+**语音浏览器：** 预览按钮现在应用您配置的混响和背景音乐 — 之前播放无效果的原始音频。
+
+**MCP 工具：** `text_to_speech` 现在返回正确的音频文件路径（无末尾表情符号垃圾），并在响应中包含语音名称。
+
+**背景音乐开关：** 在 TUI 中启用音乐现在真正启用它 — bash 钩子读取的标志文件现在保持同步。
+
+## v5.6.8 新功能 — WSL 语音路由已修复 + 会话生命周期可靠性提升
 
 **WSL 用户：** AgentVibes 无论您配置了什么语音都会播放 `en_US-lessac-medium`。已修复 — 通过在二进制文件检查前显式将 `~/.local/bin` 追加到 `PATH` 开头，现在在非交互式 Shell 中也能找到 Piper。
 

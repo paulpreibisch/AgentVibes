@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇 v5.6.9 — Réverbération et Musique de Fond Silencieuses dans les Installations NPX
+
+**Date de sortie :** 2026-05-09
+
+### 🐛 Réverbération et Musique de Fond Silencieusement Cassées pour Tous les Utilisateurs NPX
+
+Lors de l'installation d'AgentVibes via `npx`, les fichiers de hook sont extraits du paquet avec des permissions 644 — sans bit d'exécution. `play-tts-piper.sh` appelait `audio-processor.sh` directement, ce qui se termine immédiatement avec le code 126 (Permission refusée) sur un fichier non exécutable. Tous les utilisateurs installés via `npx` obtenaient un TTS voix uniquement — sans réverbération, sans musique de fond, silencieusement.
+
+**Correction 1 :** `play-tts-piper.sh` appelle désormais `audio-processor.sh` via `bash "$SCRIPT_DIR/audio-processor.sh"`, contournant la vérification du bit d'exécution.
+**Correction 2 :** `install-deps.js` (postinstall) exécute maintenant `ensureHookPermissions()` pour faire `chmod 755` sur tous les fichiers `.sh` après npm install.
+
+### 🐛 L'Aperçu du Navigateur de Voix Ignorait la Réverbération et la Musique de Fond
+
+Le bouton **Aperçu** dans le Navigateur de Voix lisait la sortie brute de piper sans réverbération ni musique de fond, contournant entièrement `audio-processor.sh`.
+
+**Correction :** L'audio de prévisualisation passe maintenant par le même pipeline `audio-processor.sh` que le vrai TTS.
+
+### 🐛 Le MCP `text_to_speech` Retournait un Chemin de Fichier Corrompu et des Informations de Voix Manquantes
+
+L'outil extrayait le chemin du fichier audio incorrectement (incluant des caractères de taille/emoji en fin) et ne reportait jamais le nom de la voix dans sa réponse.
+
+**Correction :** Les codes ANSI sont supprimés avant l'analyse, le chemin `.wav` est extrait proprement, et la ligne `🎤 Voix utilisée :` est incluse dans la réponse de l'outil.
+
+### 🐛 Le Basculement de Musique de Fond dans la TUI N'Avait Pas d'Effet
+
+Activer la musique de fond dans l'onglet **Musique** écrivait dans `config.json` mais pas dans `background-music-enabled.txt` (lu par les hooks bash). La musique restait désactivée après le basculement. Sauvegarder une piste implique désormais aussi l'activation de la musique.
+
+---
+
 ## 🐧 v5.6.8 — Routage Voix WSL Corrigé + Fiabilité du Cycle de Vie des Sessions
 
 **Sortie :** 2026-05-09

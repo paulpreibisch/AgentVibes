@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.6.2
+**Auteur** : Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version** : v5.6.9
 
 ---
 
-## 🌟 NOUVEAU DANS v5.6.8 — Routage Voix WSL Corrigé + Fiabilité du Cycle de Vie des Sessions
+## 🌟 NOUVEAU DANS v5.6.9 — Réverbération et Musique de Fond Silencieuses dans les Installations NPX
+
+**Utilisateurs NPX :** La réverbération et la musique de fond étaient silencieusement cassées pour tous les utilisateurs installés via `npx`. Les fichiers hook extraits du paquet npm manquaient de bits d'exécution (644), causant la sortie de `audio-processor.sh` avec le code 126. Corrigé via le préfixe `bash` dans l'appelant et une étape `chmod 755` en postinstall.
+
+**Navigateur de Voix :** Le bouton Aperçu applique maintenant votre réverbération et musique de fond configurées — il jouait de l'audio brut sans effets.
+
+**Outil MCP :** `text_to_speech` retourne maintenant le chemin de fichier audio correct (sans emoji parasite à la fin) et inclut le nom de la voix dans sa réponse.
+
+**Toggle musique de fond :** Activer la musique dans la TUI l'active réellement maintenant — le fichier de flag lu par les hooks bash est maintenant maintenu synchronisé.
+
+## v5.6.8 — Routage Voix WSL Corrigé + Fiabilité du Cycle de Vie des Sessions
 
 **Utilisateurs WSL :** AgentVibes jouait `en_US-lessac-medium` quelle que soit votre voix configurée. Corrigé — Piper est maintenant trouvé dans les shells non interactifs en ajoutant explicitement `~/.local/bin` au `PATH` avant la vérification du binaire.
 

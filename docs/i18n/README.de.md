@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.2
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.6.9
 
 ---
 
-## 🌟 NEU IN v5.6.8 — WSL-Stimmen-Routing repariert + Zuverlässigkeit des Sitzungslebenszyklus
+## 🌟 NEU IN v5.6.9 — Hall und Hintergrundmusik in NPX-Installationen Stumm
+
+**NPX-Nutzer:** Hall und Hintergrundmusik waren für alle über `npx` installierten Nutzer stillschweigend defekt. Hook-Dateien aus dem npm-Paket fehlten Ausführungsbits (644), wodurch `audio-processor.sh` mit Code 126 beendet wurde. Behoben durch das `bash`-Präfix im Aufrufer und einen `chmod 755`-Schritt in postinstall.
+
+**Voice Browser:** Die Vorschau-Schaltfläche wendet jetzt deinen konfigurierten Hall und deine Hintergrundmusik an — sie spielte vorher Audio ohne Effekte ab.
+
+**MCP-Tool:** `text_to_speech` gibt jetzt den korrekten Audiodateipfad zurück (kein Emoji-Müll am Ende) und enthält den Stimmnamen in seiner Antwort.
+
+**Hintergrundmusik-Schalter:** Das Aktivieren von Musik in der TUI aktiviert sie jetzt tatsächlich — die von Bash-Hooks gelesene Flag-Datei wird nun synchron gehalten.
+
+## v5.6.8 — WSL-Stimmen-Routing repariert + Zuverlässigkeit des Sitzungslebenszyklus
 
 **WSL-Nutzer:** AgentVibes spielte `en_US-lessac-medium` ab, unabhängig von der konfigurierten Stimme. Behoben — Piper wird jetzt in nicht-interaktiven Shells gefunden, indem `~/.local/bin` explizit dem `PATH` vor der Binärprüfung vorangestellt wird.
 

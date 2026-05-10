@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.6.2
+**Autore**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versione**: v5.6.9
 
 ---
 
-## 🌟 NOVITÀ IN v5.6.8 — Routing Vocale WSL Corretto + Affidabilità del Ciclo di Vita della Sessione
+## 🌟 NOVITÀ IN v5.6.9 — Riverbero e Musica di Sottofondo Silenziosi nelle Installazioni NPX
+
+**Utenti NPX:** Il riverbero e la musica di sottofondo erano silenziosamente interrotti per tutti gli utenti installati tramite `npx`. I file hook estratti dal pacchetto npm mancavano dei bit di esecuzione (644), causando l'uscita di `audio-processor.sh` con il codice 126. Risolto tramite il prefisso `bash` nel chiamante e un passaggio `chmod 755` in postinstall.
+
+**Browser Vocale:** Il pulsante Anteprima applica ora il riverbero e la musica di sottofondo configurati — in precedenza riproduceva audio grezzo senza effetti.
+
+**Strumento MCP:** `text_to_speech` restituisce ora il percorso corretto del file audio (senza caratteri spazzatura emoji alla fine) e include il nome della voce nella risposta.
+
+**Toggle musica di sottofondo:** Abilitare la musica nella TUI ora la abilita effettivamente — il file flag letto dagli hook bash è ora mantenuto sincronizzato.
+
+## NOVITÀ IN v5.6.8 — Routing Vocale WSL Corretto + Affidabilità del Ciclo di Vita della Sessione
 
 **Utenti WSL:** AgentVibes riproduceva `en_US-lessac-medium` indipendentemente dalla voce configurata. Risolto — Piper viene ora trovato nelle shell non interattive aggiungendo esplicitamente `~/.local/bin` all'inizio del `PATH` prima del controllo del binario.
 

@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇 v5.6.9 — Riverbero e Musica di Sfondo Silenziosi nelle Installazioni NPX
+
+**Rilascio:** 2026-05-09
+
+### 🐛 Riverbero e Musica di Sfondo Silenziosamente Rotti per Tutti gli Utenti NPX
+
+Quando AgentVibes viene installato tramite `npx`, i file hook vengono estratti dal pacchetto con permessi 644 — senza bit di esecuzione. `play-tts-piper.sh` chiamava `audio-processor.sh` direttamente, che termina immediatamente con codice 126 (Permesso negato) su un file non eseguibile. Tutti gli utenti installati via `npx` ricevevano TTS solo voce — nessun riverbero, nessuna musica di sfondo, silenziosamente.
+
+**Correzione 1:** `play-tts-piper.sh` ora chiama `audio-processor.sh` tramite `bash "$SCRIPT_DIR/audio-processor.sh"`, bypassando il controllo del bit di esecuzione.
+**Correzione 2:** `install-deps.js` (postinstall) ora esegue `ensureHookPermissions()` per applicare `chmod 755` a tutti i file `.sh` dopo npm install.
+
+### 🐛 L'Anteprima del Browser Vocale Ignorava Riverbero e Musica di Sfondo
+
+Il pulsante **Anteprima** nel Browser Vocale riproduceva l'output grezzo di piper senza riverbero né musica di sfondo, bypassando completamente `audio-processor.sh`.
+
+**Correzione:** L'audio di anteprima ora passa attraverso la stessa pipeline `audio-processor.sh` del TTS reale.
+
+### 🐛 Il MCP `text_to_speech` Restituiva Percorso File Corrotto e Informazioni Vocali Mancanti
+
+Lo strumento estraeva il percorso del file audio in modo errato (inclusi caratteri di dimensione/emoji finali) e non riportava mai il nome della voce nella sua risposta.
+
+**Correzione:** I codici ANSI vengono rimossi prima dell'analisi, il percorso `.wav` viene estratto correttamente, e la riga `🎤 Voce utilizzata:` è inclusa nella risposta dello strumento.
+
+### 🐛 Il Toggle Musica di Sfondo nella TUI Non Aveva Effetto
+
+Abilitare la musica di sfondo nella scheda **Musica** scriveva in `config.json` ma non in `background-music-enabled.txt` (letto dagli hook bash). La musica rimaneva disabilitata dopo il toggle. Salvare una traccia ora implica anche l'abilitazione della musica.
+
+---
+
 ## 🐧 v5.6.8 — Routing Vocale WSL Corretto + Affidabilità del Ciclo di Vita della Sessione
 
 **Rilascio:** 2026-05-09

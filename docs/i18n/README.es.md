@@ -1,10 +1,20 @@
 > 🌐 [English version](../../README.md)
 
-**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.6.2
+**Autor**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Versión**: v5.6.9
 
 ---
 
-## 🌟 NUEVO EN v5.6.8 — Enrutamiento de Voz en WSL Corregido + Fiabilidad del Ciclo de Vida de Sesión
+## 🌟 NUEVO EN v5.6.9 — Reverb y Música de Fondo Silenciosos en Instalaciones NPX
+
+**Usuarios de NPX:** El reverb y la música de fondo estaban silenciosamente rotos para todos los usuarios instalados vía `npx`. Los archivos de hook extraídos del paquete npm carecían de bits de ejecución (644), haciendo que `audio-processor.sh` saliera con código 126. Corregido mediante el prefijo `bash` en el llamador y un paso `chmod 755` en postinstall.
+
+**Navegador de Voz:** El botón Vista Previa ahora aplica tu reverb y música de fondo configurados — antes reproducía audio sin efectos.
+
+**Herramienta MCP:** `text_to_speech` ahora devuelve la ruta de archivo de audio correcta (sin emoji basura al final) e incluye el nombre de la voz en su respuesta.
+
+**Toggle de música de fondo:** Habilitar música en la TUI ahora realmente la habilita — el archivo de flag leído por los hooks bash ahora se mantiene sincronizado.
+
+## v5.6.8 — Enrutamiento de Voz en WSL Corregido + Fiabilidad del Ciclo de Vida de Sesión
 
 **Usuarios de WSL:** AgentVibes reproducía `en_US-lessac-medium` independientemente de la voz configurada. Corregido — ahora Piper se encuentra en shells no interactivos añadiendo explícitamente `~/.local/bin` al `PATH` antes de la comprobación del binario.
 

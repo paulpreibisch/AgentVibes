@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇 v5.6.9 — Reverb y Música de Fondo Silenciosos en Instalaciones NPX
+
+**Lanzamiento:** 2026-05-09
+
+### 🐛 Reverb y Música de Fondo Silenciosamente Rotos para Todos los Usuarios de NPX
+
+Cuando AgentVibes se instala mediante `npx`, los archivos de hook se extraen del paquete con permisos 644 — sin bit de ejecución. `play-tts-piper.sh` llamaba a `audio-processor.sh` directamente, que sale inmediatamente con código 126 (Permiso denegado) en un archivo no ejecutable. Todos los usuarios instalados vía `npx` obtenían TTS solo de voz — sin reverb, sin música de fondo, silenciosamente.
+
+**Corrección 1:** `play-tts-piper.sh` ahora llama a `audio-processor.sh` mediante `bash "$SCRIPT_DIR/audio-processor.sh"`, evitando la comprobación del bit de ejecución.
+**Corrección 2:** `install-deps.js` (postinstall) ahora ejecuta `ensureHookPermissions()` para hacer `chmod 755` en todos los archivos `.sh` después de npm install.
+
+### 🐛 La Vista Previa del Navegador de Voz Ignoraba el Reverb y la Música de Fondo
+
+El botón **Vista Previa** en el Navegador de Voz reproducía salida bruta de piper sin reverb ni música de fondo, saltando `audio-processor.sh` por completo.
+
+**Corrección:** El audio de vista previa ahora pasa por el mismo pipeline de `audio-processor.sh` que el TTS real.
+
+### 🐛 El MCP `text_to_speech` Devolvía Ruta de Archivo Corrupta e Información de Voz Ausente
+
+La herramienta extraía la ruta del archivo de audio incorrectamente (incluyendo caracteres de tamaño/emoji al final) y nunca reportaba el nombre de la voz en su respuesta.
+
+**Corrección:** Los códigos ANSI se eliminan antes del análisis, la ruta `.wav` se extrae correctamente, y la línea `🎤 Voz utilizada:` se incluye en la respuesta de la herramienta.
+
+### 🐛 El Toggle de Música de Fondo en la TUI No Tenía Efecto
+
+Habilitar música de fondo en la pestaña **Música** escribía en `config.json` pero no en `background-music-enabled.txt` (leído por los hooks de bash). La música permanecía desactivada tras el toggle. Guardar una pista ahora también implica habilitar la música.
+
+---
+
 ## 🐧 v5.6.8 — Enrutamiento de Voz en WSL Corregido + Fiabilidad del Ciclo de Vida de Sesión
 
 **Lanzamiento:** 2026-05-09

@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔇 v5.6.9 — NPX 安装中混响和背景音乐静音
+
+**发布日期：** 2026-05-09
+
+### 🐛 所有 NPX 用户的混响和背景音乐静默失效
+
+通过 `npx` 安装 AgentVibes 时，钩子文件从 npm 包中以 644 权限解压——没有执行位。`play-tts-piper.sh` 直接调用 `audio-processor.sh`，对于不可执行的文件会立即以代码 126（权限拒绝）退出。所有 `npx` 安装的用户只能获得纯语音 TTS——没有混响，没有背景音乐，无声无息。
+
+**修复1：** `play-tts-piper.sh` 现在通过 `bash "$SCRIPT_DIR/audio-processor.sh"` 调用 `audio-processor.sh`，绕过执行位检查。
+**修复2：** `install-deps.js`（postinstall）现在运行 `ensureHookPermissions()`，在 npm install 后对所有 `.sh` 文件执行 `chmod 755`。
+
+### 🐛 语音浏览器预览忽略了混响和背景音乐
+
+语音浏览器中的**预览**按钮播放原始 piper 输出，没有混响和背景音乐，完全绕过了 `audio-processor.sh`。
+
+**修复：** 预览音频现在通过与真实 TTS 相同的 `audio-processor.sh` 管道处理。
+
+### 🐛 MCP `text_to_speech` 返回损坏的文件路径和缺失的语音信息
+
+该工具错误地提取了音频文件路径（包含末尾的大小/表情符号字符），从未在响应中报告语音名称。
+
+**修复：** 解析前去除 ANSI 代码，干净地提取 `.wav` 路径，并在工具响应中包含 `🎤 使用的语音：` 行。
+
+### 🐛 TUI 背景音乐开关不生效
+
+在**音乐**标签中启用背景音乐会写入 `config.json`，但不写入 bash 钩子读取的 `background-music-enabled.txt`。切换后音乐仍然关闭。现在保存曲目也意味着启用音乐。
+
+---
+
 ## 🐧 v5.6.8 — WSL 语音路由已修复 + 会话生命周期可靠性提升
 
 **发布日期：** 2026-05-09
