@@ -40,7 +40,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.6.8 — WSL Voice Routing Fixed + Session Lifecycle Reliability
+## 🌟 NEW IN v5.6.9 — Reverb & Background Music Silent in NPX Installs
+
+**NPX users:** Reverb and background music were silently broken for all `npx`-installed users. Hook files extracted from the npm tarball lacked execute bits (644), causing `audio-processor.sh` to exit with code 126. Fixed via `bash` prefix in the caller and a postinstall `chmod 755` step.
+
+**Voice Browser:** The Preview button now applies your configured reverb and background music — it was playing raw audio with no effects.
+
+**MCP tool:** `text_to_speech` now returns the correct audio file path (no trailing emoji garbage) and includes the voice name in its response.
+
+**Background music toggle:** Enabling music in the TUI now actually enables it — the flag file read by bash hooks is now kept in sync.
+
+## v5.6.8 — WSL Voice Routing Fixed + Session Lifecycle Reliability
 
 **WSL users:** AgentVibes was playing `en_US-lessac-medium` regardless of your configured voice. Fixed — Piper is now found in non-interactive shells by explicitly prepending `~/.local/bin` to `PATH` before the binary check.
 

@@ -1,5 +1,34 @@
 # AgentVibes Release Notes
 
+## 🔇 v5.6.9 — Reverb & Background Music Silent in NPX Installs
+
+**Released:** 2026-05-09
+
+### 🐛 Reverb and Background Music Silently Broken for All NPX Users
+
+When AgentVibes is installed via `npx`, hook files are extracted from the tarball with 644 permissions — no execute bit. `play-tts-piper.sh` called `audio-processor.sh` directly, which exits immediately with code 126 (Permission denied) on a non-executable file. Every `npx`-installed user was getting voice-only TTS — no reverb, no background music, silently.
+
+**Fix 1:** `play-tts-piper.sh` now calls `audio-processor.sh` via `bash "$SCRIPT_DIR/audio-processor.sh"`, bypassing the execute-bit check.
+**Fix 2:** `install-deps.js` (postinstall) now runs `ensureHookPermissions()` to `chmod 755` all `.sh` files after npm install.
+
+### 🐛 Voice Browser Preview Ignored Reverb and Background Music
+
+The **Preview** button in the Voice Browser played raw piper output with no reverb and no background music, bypassing `audio-processor.sh` entirely.
+
+**Fix:** Preview audio now routes through the same `audio-processor.sh` pipeline as real TTS.
+
+### 🐛 MCP `text_to_speech` Returned Garbled File Path and Missing Voice Info
+
+The tool extracted the audio file path incorrectly (trailing size/emoji characters included) and never reported the voice name in its response.
+
+**Fix:** ANSI codes are stripped before parsing, the `.wav` path is cleanly extracted, and the `🎤 Voice used:` line is included in the tool response.
+
+### 🐛 Background Music TUI Toggle Didn't Take Effect
+
+Enabling background music in the **Music** tab wrote to `config.json` but not to `background-music-enabled.txt` (read by bash hooks). Music stayed off after toggling. Saving a track also now implies enabling music.
+
+---
+
 ## 🐧 v5.6.8 — WSL Voice Routing Fixed + Session Lifecycle Reliability
 
 **Released:** 2026-05-09
