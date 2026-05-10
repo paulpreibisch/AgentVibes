@@ -356,6 +356,43 @@ get_provider_script_path() {
   echo "$provider_script"
 }
 
+# @function detect_routing_llm
+# @intent Detect the LLM name to use for SSH/remote routing in preview and sample commands
+# @why preview/sample call play-tts.sh without --llm, so SSH routing is skipped and audio
+#      plays locally (no sound on headless servers). Detecting the remote LLM and passing
+#      --llm mirrors normal hook behaviour so audio reaches the configured receiver.
+# @returns Echoes LLM name (e.g. "claude-code") or empty string if no remote routing configured
+# @exitcode 0=always
+detect_routing_llm() {
+  # Priority 1: AGENTVIBES_LLM_KEY env var (set during active TTS sessions)
+  if [[ -n "${AGENTVIBES_LLM_KEY:-}" ]] && [[ "$AGENTVIBES_LLM_KEY" =~ ^llm:([a-zA-Z0-9][a-zA-Z0-9_-]*)$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  # Priority 2: First mode=remote entry in transport-config.json
+  local _transport_cfg="$HOME/.agentvibes/transport-config.json"
+  if [[ -f "$_transport_cfg" ]] && command -v python3 &>/dev/null; then
+    local _remote_llm
+    _remote_llm=$(AGENTVIBES_CFG="$_transport_cfg" python3 - <<'PYEOF'
+import json, os, sys
+try:
+    d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
+    hits = [k for k, v in d.items() if isinstance(v, dict) and v.get('mode') == 'remote']
+    print(hits[0] if hits else '')
+except Exception:
+    print('')
+PYEOF
+)
+    if [[ -n "$_remote_llm" ]]; then
+      echo "$_remote_llm"
+      return 0
+    fi
+  fi
+
+  echo ""
+}
+
 # AI NOTE: This file provides the core abstraction layer for multi-provider TTS.
 # All provider state is managed through simple text files for simplicity and reliability.
 # Project-local configuration takes precedence over global to support per-project providers.
