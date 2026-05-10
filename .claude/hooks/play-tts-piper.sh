@@ -468,7 +468,7 @@ if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
   # Lookup order: LLM key (from --llm) → default
   _AGENT_KEY="${AGENTVIBES_LLM_KEY:-default}"
-  PROCESSOR_OUTPUT=$("$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "$_AGENT_KEY" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
+  PROCESSOR_OUTPUT=$(bash "$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "$_AGENT_KEY" "$PROCESSED_FILE" "$AGENT_PROFILE_FILE" 2>/dev/null) || {
     echo "Warning: Audio processing failed, using unprocessed audio" >&2
     PROCESSED_FILE="$TEMP_FILE"
     PROCESSOR_OUTPUT="$TEMP_FILE|"

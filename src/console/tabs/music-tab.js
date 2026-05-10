@@ -226,6 +226,19 @@ function _setMusic(configService, update) {
 }
 
 /**
+ * Sync the background-music-enabled.txt flag file so bash hooks see the change.
+ * The TUI stores enabled state in config.json, but audio-processor.sh and
+ * play-tts-piper.sh read from this .txt file — they must stay in sync.
+ * @param {boolean} enabled
+ */
+export function applyEnabledToFile(enabled) {
+  const enabledFile = path.join(process.cwd(), '.claude', 'config', 'background-music-enabled.txt');
+  try {
+    fs.writeFileSync(enabledFile, enabled ? 'true' : 'false', 'utf-8');
+  } catch { /* non-fatal */ }
+}
+
+/**
  * Patch the 'default' entry in audio-effects.cfg to use the given track.
  * play-tts-piper.sh reads the track from audio-effects.cfg (not from config.json),
  * so any track change must be reflected here to take effect at runtime.
@@ -431,7 +444,9 @@ export function createMusicTab(screen, services) {
 
   const toggleBtn = _createBtn(_tl('musicToggleBtn'), () => {
     const { enabled } = _getMusic(configService);
-    _setMusic(configService, { enabled: !enabled });
+    const next = !enabled;
+    _setMusic(configService, { enabled: next });
+    applyEnabledToFile(next);  // sync bash hooks (audio-processor.sh reads this file)
     refreshDisplay();
   });
   toggleBtn.bottom = 4;
@@ -772,8 +787,9 @@ export function createMusicTab(screen, services) {
     }
 
     function _saveLocally() {
-      _setMusic(configService, { track: trackId });
+      _setMusic(configService, { track: trackId, enabled: true });
       applyTrackToAudioEffects(trackId);
+      applyEnabledToFile(true);  // saving a track implies enabling music
       refreshDisplay();
       _showTrackChangedNotice(displayName);
     }

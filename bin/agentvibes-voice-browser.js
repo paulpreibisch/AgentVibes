@@ -474,6 +474,51 @@ class AgentVibesVoiceBrowser {
     this.screen.render();
   }
 
+  /**
+   * Apply audio effects (reverb, background music) via audio-processor.sh.
+   * Falls back to rawFile if the processor is unavailable or fails.
+   * @param {string} rawFile - Path to the raw piper-generated WAV
+   * @returns {Promise<string>} Path to processed WAV (or rawFile on failure)
+   */
+  async applyEffects(rawFile) {
+    // Find audio-processor.sh relative to this script (bin/../.claude/hooks/)
+    const processorPath = path.resolve(path.join(__dirname, '..', '.claude', 'hooks', 'audio-processor.sh'));
+
+    // SECURITY: Validate path stays within the expected hooks directory
+    const hooksDir = path.resolve(path.join(__dirname, '..', '.claude', 'hooks'));
+    if (!processorPath.startsWith(hooksDir + path.sep) && processorPath !== hooksDir) {
+      return rawFile;
+    }
+
+    if (!fsSync.existsSync(processorPath)) {
+      return rawFile;
+    }
+
+    const processedFile = rawFile.replace(/\.wav$/, '-preview-proc.wav');
+    const env = { ...process.env, CLAUDE_PROJECT_DIR: process.cwd() };
+
+    return new Promise((resolve) => {
+      // Use 'bash' prefix so the script works even without execute permission (NPX cache)
+      const proc = spawn('bash', [processorPath, rawFile, 'llm:claude-code', processedFile, ''], {
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env
+      });
+
+      proc.on('close', (code) => {
+        let stat;
+        try { stat = fsSync.statSync(processedFile); } catch { stat = null; }
+        if (code === 0 && stat && stat.size > 0) {
+          resolve(processedFile);
+        } else {
+          try { fsSync.unlinkSync(processedFile); } catch { /* ignore */ }
+          resolve(rawFile);
+        }
+      });
+
+      proc.on('error', () => resolve(rawFile));
+    });
+  }
+
   async playSample(row) {
     if (this.currentAudioProcess) {
       try {
@@ -574,10 +619,13 @@ class AgentVibesVoiceBrowser {
       }
     }
 
+    // Apply audio effects (reverb, background music) before playback
+    const playFile = await this.applyEffects(outputFile);
+
     const players = [
-      { cmd: 'aplay', args: [outputFile] },
-      { cmd: 'paplay', args: [outputFile] },
-      { cmd: 'ffplay', args: ['-nodisp', '-autoexit', outputFile] }
+      { cmd: 'aplay', args: [playFile] },
+      { cmd: 'paplay', args: [playFile] },
+      { cmd: 'ffplay', args: ['-nodisp', '-autoexit', playFile] }
     ];
 
     for (const player of players) {
@@ -592,13 +640,20 @@ class AgentVibesVoiceBrowser {
           if (this.currentAudioProcess === audioProcess) {
             this.currentAudioProcess = null;
           }
+          // Clean up processed preview file (not the cached raw file)
+          if (playFile !== outputFile) {
+            try { fsSync.unlinkSync(playFile); } catch { /* ignore */ }
+          }
           this.statusBar.setContent(`{green-fg}✓ Played ${row.name}{/green-fg}`);
           this.screen.render();
         });
 
-        audioProcess.on('error', (err) => {
+        audioProcess.on('error', () => {
           if (this.currentAudioProcess === audioProcess) {
             this.currentAudioProcess = null;
+          }
+          if (playFile !== outputFile) {
+            try { fsSync.unlinkSync(playFile); } catch { /* ignore */ }
           }
         });
 

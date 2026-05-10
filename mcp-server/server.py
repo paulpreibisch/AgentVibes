@@ -340,18 +340,28 @@ class AgentVibesServer:
 
                 if result.returncode == 0:
                     output = stdout.decode().strip()
-                    # Extract file path from output
+                    # Strip ANSI escape codes for clean extraction
+                    _ansi_strip = _re.compile(r'\x1b\[[0-9;]*m')
                     audio_file_path = None
+                    voice_info = None
                     for line in output.split("\n"):
-                        if "Saved to:" in line:
-                            audio_file_path = line.split("Saved to:")[1].strip()
-                            break
+                        clean = _ansi_strip.sub('', line).strip()
+                        if "Saved to:" in clean and audio_file_path is None:
+                            raw_path = clean.split("Saved to:")[1].strip()
+                            # Path ends at .wav (strip trailing size/count info)
+                            wav_end = raw_path.find(".wav")
+                            audio_file_path = raw_path[:wav_end + 4] if wav_end != -1 else raw_path.split()[0]
+                        if ("Voice used:" in clean or ("Voice:" in clean and "Background" not in clean)) and voice_info is None:
+                            voice_info = clean
 
                     if audio_file_path:
                         truncated = (
                             f"{text[:50]}..." if len(text) > 50 else text
                         )
-                        return f"✅ Spoke: {truncated}\n📁 Audio saved: {audio_file_path}"
+                        result_msg = f"✅ Spoke: {truncated}\n📁 Audio saved: {audio_file_path}"
+                        if voice_info:
+                            result_msg += f"\n{voice_info}"
+                        return result_msg
 
                     return f"✅ Spoke: {text[:50]}..." if len(text) > 50 else f"✅ Spoke: {text}"
                 else:

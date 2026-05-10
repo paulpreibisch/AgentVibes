@@ -7,6 +7,9 @@
 
 import { execFileSync } from 'child_process';
 import { platform } from 'os';
+import { readdirSync, chmodSync, statSync } from 'fs';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const isWindows = platform() === 'win32';
 
@@ -87,8 +90,52 @@ function installMcp(pythonCmd) {
   }
 }
 
+/**
+ * Ensure all shell hook files have execute permissions.
+ * npm publish can strip execute bits from .sh files; this restores them.
+ * No-op on Windows (execute bit is meaningless there).
+ */
+function ensureHookPermissions() {
+  if (isWindows) return;
+
+  const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const hooksDirs = [
+    join(packageRoot, '.claude', 'hooks'),
+  ];
+
+  for (const dir of hooksDirs) {
+    let entries;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue; // Directory may not exist
+    }
+
+    for (const file of entries) {
+      if (!file.endsWith('.sh')) continue;
+      const filePath = join(dir, file);
+      // SECURITY: Validate path stays within hooks directory
+      const resolved = resolve(filePath);
+      if (!resolved.startsWith(resolve(dir) + '/') && resolved !== resolve(dir)) continue;
+      try {
+        const stat = statSync(filePath);
+        // Only chmod if not already executable (avoids unnecessary writes)
+        if ((stat.mode & 0o111) === 0) {
+          chmodSync(filePath, stat.mode | 0o755);
+        }
+      } catch {
+        // Non-fatal: log and continue
+        console.warn(`⚠️  Could not chmod ${file}`);
+      }
+    }
+  }
+}
+
 // Main installation flow
 function main() {
+  // Restore execute permissions on hook files (npm publish may strip them)
+  ensureHookPermissions();
+
   // Check if Python is available
   const pythonCmd = checkPython();
 
