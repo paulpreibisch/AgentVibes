@@ -62,9 +62,11 @@ test('Audio effects config exists and is valid', () => {
   const content = readFileSync(configPath, 'utf-8');
   assert.ok(content.length > 0, 'Config file should not be empty');
 
-  // Check for default entry
-  const hasDefault = content.split('\n').some(line => line.startsWith('default|'));
-  assert.ok(hasDefault, 'Config should have a default entry');
+  // Check for default entry (accepts both legacy 'default|' and current 'llm:default|' format)
+  const hasDefault = content.split('\n').some(line =>
+    line.startsWith('default|') || line.startsWith('llm:default|')
+  );
+  assert.ok(hasDefault, 'Config should have a default entry (default| or llm:default|)');
 });
 
 test('Audio effects config uses snake_case filenames', () => {

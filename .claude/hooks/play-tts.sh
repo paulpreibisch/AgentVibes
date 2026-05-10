@@ -203,6 +203,10 @@ if [[ -n "$LLM_PROVIDER" ]]; then
   fi
   # Export LLM key for child scripts (process-local, not system-wide)
   export AGENTVIBES_LLM_KEY="llm:${LLM_PROVIDER}"
+  # Emit routing info when verbose debugging is enabled (used by tests and diagnostics)
+  if [[ "${AGENTVIBES_VERBOSE:-0}" == "1" ]]; then
+    echo "llm=${LLM_PROVIDER}" >&2
+  fi
 fi
 
 # Prepend intro text (pretext) if configured
