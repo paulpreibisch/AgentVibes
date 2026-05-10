@@ -167,6 +167,8 @@ bin/ensure-soprano-running.sh
 docs/personality-preview-phrases.md
 .claude/skills/
 .claude/agentvibes-unmuted
+.claude/worktrees/
+.bundler-temp/
 
 # Test infrastructure (not part of core package)
 test/installer/

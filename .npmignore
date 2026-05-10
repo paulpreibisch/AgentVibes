@@ -84,3 +84,7 @@ src/*.backup
 .bmad/
 .claude/commands/bmad/
 .claude/commands/BMad/
+
+# Claude Code session artifacts (never publishable)
+.claude/worktrees/
+.bundler-temp/
