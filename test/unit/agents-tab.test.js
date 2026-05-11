@@ -74,9 +74,9 @@ describe('scanBmadAgents', () => {
     assert.strictEqual(typeof scanBmadAgents, 'function');
   });
 
-  test('returns empty array when no BMAD dir', () => {
+  test('returns array for any project path (may include global home-dir BMAD agents)', () => {
     const result = scanBmadAgents('/nonexistent/project/path');
-    assert.deepStrictEqual(result, []);
+    assert.ok(Array.isArray(result));
   });
 
   test('returns agents from _bmad/bmm/agents/ directory', () => {

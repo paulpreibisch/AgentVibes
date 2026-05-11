@@ -49,7 +49,7 @@ GRAY='\033[0;90m'
 NC='\033[0m' # No Color
 
 # Detect BMAD installation and version
-# Supports both v4 (.bmad-core/) and v6-alpha (.bmad/) installations
+# Supports both v4 (.bmad-core/) and v6-alpha (.bmad/, _bmad/) installations
 detect_bmad() {
   local bmad_core_dir=""
 
@@ -58,6 +58,11 @@ detect_bmad() {
     bmad_core_dir=".bmad"
   elif [[ -d "../.bmad" ]]; then
     bmad_core_dir="../.bmad"
+  # Check for _bmad (current BMAD installer default — underscore prefix, project-local)
+  elif [[ -d "_bmad" ]]; then
+    bmad_core_dir="_bmad"
+  elif [[ -d "../_bmad" ]]; then
+    bmad_core_dir="../_bmad"
   # Check for v6-alpha without dot (legacy naming)
   elif [[ -d "bmad" ]]; then
     bmad_core_dir="bmad"
@@ -73,6 +78,11 @@ detect_bmad() {
     bmad_core_dir="bmad-core"
   elif [[ -d "../bmad-core" ]]; then
     bmad_core_dir="../bmad-core"
+  # Check home-dir global BMAD install (~/_bmad is the default for standalone BMAD installs)
+  elif [[ -d "$HOME/_bmad" ]]; then
+    bmad_core_dir="$HOME/_bmad"
+  elif [[ -d "$HOME/.bmad" ]]; then
+    bmad_core_dir="$HOME/.bmad"
   else
     echo -e "${RED}❌ BMAD installation not found${NC}" >&2
     echo -e "${GRAY}   Looked for bmad/, .bmad-core/, or bmad-core/ directory${NC}" >&2
@@ -85,21 +95,34 @@ detect_bmad() {
 # Find all BMAD agents
 find_agents() {
   local bmad_core="$1"
-  local agents_dir=""
+  local found=0
 
-  # Check for v6-alpha structure (bmad/bmm/agents/)
-  if [[ -d "$bmad_core/bmm/agents" ]]; then
-    agents_dir="$bmad_core/bmm/agents"
-  # Check for v4 structure (.bmad-core/agents/)
-  elif [[ -d "$bmad_core/agents" ]]; then
-    agents_dir="$bmad_core/agents"
-  else
-    echo -e "${RED}❌ Agents directory not found in $bmad_core${NC}" >&2
-    echo -e "${GRAY}   Tried: $bmad_core/bmm/agents/ and $bmad_core/agents/${NC}" >&2
-    return 1
+  # v6.6+: agents under .claude/skills/*/agents/ (new BMAD structure)
+  local skills_dir=".claude/skills"
+  if [[ -d "$skills_dir" ]]; then
+    while IFS= read -r -d '' agent_file; do
+      echo "$agent_file"
+      found=1
+    done < <(find "$skills_dir" -path "*/agents/*.md" -type f -print0 2>/dev/null)
   fi
 
-  find "$agents_dir" -name "*.md" -type f
+  # v6.x: bmad/bmm/agents/
+  if [[ -d "$bmad_core/bmm/agents" ]]; then
+    find "$bmad_core/bmm/agents" -name "*.md" -type f
+    found=1
+  fi
+
+  # v4: .bmad-core/agents/
+  if [[ -d "$bmad_core/agents" ]]; then
+    find "$bmad_core/agents" -name "*.md" -type f
+    found=1
+  fi
+
+  if [[ $found -eq 0 ]]; then
+    echo -e "${RED}❌ Agents directory not found in $bmad_core${NC}" >&2
+    echo -e "${GRAY}   Tried: $bmad_core/bmm/agents/, $bmad_core/agents/, .claude/skills/*/agents/${NC}" >&2
+    return 1
+  fi
 }
 
 # Check if agent has TTS injection
@@ -217,6 +240,15 @@ inject_tts() {
     return 0
   fi
 
+  # Detect format BEFORE creating backups — skip v6.6+ plain Markdown agents (no activation section)
+  local is_v6=false
+  if grep -q "<activation" "$agent_file"; then
+    is_v6=true
+  elif ! grep -q "activation-instructions:" "$agent_file"; then
+    echo -e "${GRAY}   ℹ️  Skipped (v6.6+ format): $(basename "$agent_file")${NC}"
+    return 2
+  fi
+
   # Create backup directory for centralized timestamped backups
   local backup_dir=".agentvibes/backups/agents"
   mkdir -p "$backup_dir"
@@ -230,15 +262,6 @@ inject_tts() {
   cp "$agent_file" "$agent_file.backup-pre-tts"
 
   echo -e "${GRAY}   📦 Backup saved: $backup_dir/$backup_name${NC}"
-
-  # Detect v4 vs v6 structure
-  local is_v6=false
-  if grep -q "<activation" "$agent_file"; then
-    is_v6=true
-  elif ! grep -q "activation-instructions:" "$agent_file"; then
-    echo -e "${RED}❌ No activation section found in: $(basename "$agent_file")${NC}"
-    return 1
-  fi
 
   # Create TTS injection script based on version
   if [[ "$is_v6" == "true" ]]; then
@@ -411,6 +434,7 @@ enable_all() {
   local agents=$(find_agents "$bmad_core")
   local success_count=0
   local skip_count=0
+  local format_skip_count=0
   local fail_count=0
 
   # Track modified files and backups for summary
@@ -423,7 +447,10 @@ enable_all() {
       continue
     fi
 
-    if inject_tts "$agent_file"; then
+    inject_tts "$agent_file" && local inject_result=0 || local inject_result=$?
+    if [[ $inject_result -eq 2 ]]; then
+      format_skip_count=$((format_skip_count + 1))
+    elif [[ $inject_result -eq 0 ]]; then
       success_count=$((success_count + 1))
       modified_files+=("$agent_file")
       # Track the backup file that was created
@@ -444,6 +471,7 @@ enable_all() {
   # Show results
   echo -e "${GREEN}✅ Successfully modified: $success_count agents${NC}"
   [[ $skip_count -gt 0 ]] && echo -e "${YELLOW}⏭️  Skipped (already enabled): $skip_count agents${NC}"
+  [[ $format_skip_count -gt 0 ]] && echo -e "${GRAY}   ℹ️  Skipped (v6.6+ format, not supported): $format_skip_count agents${NC}"
   [[ $fail_count -gt 0 ]] && echo -e "${RED}❌ Failed: $fail_count agents${NC}"
   echo ""
 

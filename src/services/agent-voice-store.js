@@ -109,9 +109,17 @@ export function isSingleVoiceProvider(provider) {
  */
 export function parseBmadManifest(projectRoot) {
   const safeRoot = path.resolve(projectRoot ?? process.cwd());
-  const manifestPath = path.resolve(safeRoot, '_bmad', '_config', 'agent-manifest.csv');
+  // Check project-local first, then home dir (global BMAD install)
+  const roots = [safeRoot];
+  const homeDir = os.homedir();
+  if (safeRoot !== homeDir) roots.push(homeDir);
 
-  if (!fs.existsSync(manifestPath)) return [];
+  let manifestPath = null;
+  for (const root of roots) {
+    const candidate = path.resolve(root, '_bmad', '_config', 'agent-manifest.csv');
+    if (fs.existsSync(candidate)) { manifestPath = candidate; break; }
+  }
+  if (!manifestPath) return [];
 
   try {
     const raw = fs.readFileSync(manifestPath, 'utf8');
@@ -196,11 +204,32 @@ export function scanBmadAgents(projectRoot) {
   const fromManifest = parseBmadManifest(projectRoot);
   if (fromManifest.length > 0) return fromManifest;
 
-  // Fallback: directory scan
+  // Fallback: directory scan — check project-local then home dir
   const safeRoot = path.resolve(projectRoot ?? process.cwd());
+  const homeDir2 = os.homedir();
+
+  // v6.6+: agents under .claude/skills/*/agents/ — collect all such dirs
+  const skillsAgentDirs = [];
+  for (const root of (safeRoot !== homeDir2 ? [safeRoot, homeDir2] : [safeRoot])) {
+    const skillsDir = path.resolve(root, '.claude', 'skills');
+    if (fs.existsSync(skillsDir)) {
+      try {
+        for (const skill of fs.readdirSync(skillsDir)) {
+          const agentsDir = path.resolve(skillsDir, skill, 'agents');
+          if (fs.existsSync(agentsDir)) skillsAgentDirs.push(agentsDir);
+        }
+      } catch { /* skip */ }
+    }
+  }
+
   const candidateDirs = [
     path.resolve(safeRoot, '_bmad', 'bmm', 'agents'),
     path.resolve(safeRoot, '.bmad', 'agents'),
+    ...(safeRoot !== homeDir2 ? [
+      path.resolve(homeDir2, '_bmad', 'bmm', 'agents'),
+      path.resolve(homeDir2, '.bmad', 'agents'),
+    ] : []),
+    ...skillsAgentDirs,
   ];
 
   for (const dir of candidateDirs) {
@@ -232,15 +261,33 @@ export function scanBmadAgents(projectRoot) {
  */
 export function isBmadDetected(projectRoot) {
   const safeRoot = path.resolve(projectRoot ?? process.cwd());
-  const manifestPath = path.resolve(safeRoot, '_bmad', '_config', 'agent-manifest.csv');
-  if (fs.existsSync(manifestPath)) return true;
+  const homeDir = os.homedir();
 
-  // Fallback checks
-  const dirs = [
-    path.resolve(safeRoot, '_bmad', 'bmm', 'agents'),
-    path.resolve(safeRoot, '.bmad', 'agents'),
-  ];
-  return dirs.some(d => fs.existsSync(d));
+  // Check project-local first, then home-dir (BMAD can be installed globally at ~/_bmad)
+  const roots = safeRoot !== homeDir ? [safeRoot, homeDir] : [safeRoot];
+
+  for (const root of roots) {
+    // v6.x: agent-manifest.csv; v6.6+: manifest.yaml only (no agent-manifest.csv)
+    if (fs.existsSync(path.resolve(root, '_bmad', '_config', 'agent-manifest.csv'))) return true;
+    if (fs.existsSync(path.resolve(root, '_bmad', '_config', 'manifest.yaml'))) return true;
+
+    const dirs = [
+      path.resolve(root, '_bmad', 'bmm', 'agents'),
+      path.resolve(root, '.bmad', 'agents'),
+    ];
+    if (dirs.some(d => fs.existsSync(d))) return true;
+
+    // v6.6+: agents live under .claude/skills/*/agents/
+    const skillsDir = path.resolve(root, '.claude', 'skills');
+    if (fs.existsSync(skillsDir)) {
+      try {
+        const skills = fs.readdirSync(skillsDir);
+        if (skills.some(s => fs.existsSync(path.resolve(skillsDir, s, 'agents')))) return true;
+      } catch { /* skip */ }
+    }
+  }
+
+  return false;
 }
 
 // ---------------------------------------------------------------------------

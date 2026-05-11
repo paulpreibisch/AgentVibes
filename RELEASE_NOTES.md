@@ -1,5 +1,37 @@
 # AgentVibes Release Notes
 
+## 🎭 v5.7.0 — BMAD v6.6 Support + Windows Auto-Restart Watcher
+
+**Released:** 2026-05-11
+
+### 🆕 BMAD v6.6.0 Compatibility
+
+BMAD v6.6 restructured where agents live — they moved from `_bmad/bmm/agents/` to `.claude/skills/*/agents/`. AgentVibes now detects and scans these new paths correctly.
+
+**TTS injection** gracefully skips v6.6+ agents (which use plain Markdown without XML/YAML activation sections) instead of throwing errors. The install summary now clearly reports how many agents were skipped vs. modified.
+
+**BMAD tab detection** now finds globally-installed BMAD at `~/_bmad` (home-dir install) in addition to project-local installs. Previously the BMAD tab showed "Not detected" even when BMAD was installed globally.
+
+**Security:** The installer's path validation now correctly permits BMAD paths under the user's home directory, fixing a false-positive "Invalid BMAD path" error for global installs.
+
+### 🆕 Windows TTS Watcher — Standalone File + Auto-Restart
+
+`tts-watcher.ps1` is now extracted to `~/.agentvibes/tts-watcher.ps1` as a standalone file. Running `npx agentvibes update` automatically restarts the watcher with the new version — no manual restart needed after updates.
+
+### 🐛 Windows Provider Override Respected on Laptop
+
+`play-tts.ps1` now reads the `ProviderOverride` setting from the Linux-side config when receiving audio via SSH. Previously the laptop always used its locally-configured provider even if the server specified a different one.
+
+### 🐛 Sample Command Added to Voice Manager
+
+`voice-manager.sh sample` was missing its handler — calling it fell through to the usage/exit path silently. Fixed.
+
+### 🐛 Preview SSH Routing Detects Correct Endpoint
+
+`provider-manager.sh` now includes `detect_routing_llm()` which checks `AGENTVIBES_LLM_KEY` then `transport-config.json` for the first `mode=remote` entry, so preview audio reaches the correct SSH host.
+
+---
+
 ## 🔇 v5.6.9 — Reverb & Background Music Silent in NPX Installs
 
 **Released:** 2026-05-09

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import yaml from 'js-yaml';
 
 /**
@@ -8,23 +9,35 @@ import yaml from 'js-yaml';
  * @returns {Promise<Object>} Detection result with version info
  */
 export async function detectBMAD(targetDir) {
-  // Check v6 first (newer version) - support both .bmad and bmad paths
-  // Try .bmad (standard path with dot prefix) first
-  let v6Manifest = path.join(targetDir, '.bmad/_cfg/manifest.yaml');
-  let bmadPath = '.bmad';
+  // Check v6 first (newer version).
+  // Search order: project-local variants first, then home-dir (_bmad is the current BMAD installer default)
+  const homeDir = os.homedir();
+  const v6Candidates = [
+    // Project-local checks first
+    { manifest: path.join(targetDir, '.bmad/_cfg/manifest.yaml'),    bmadPath: '.bmad' },
+    { manifest: path.join(targetDir, 'bmad/_cfg/manifest.yaml'),     bmadPath: 'bmad' },
+    { manifest: path.join(targetDir, '_bmad/_cfg/manifest.yaml'),    bmadPath: '_bmad' },
+    { manifest: path.join(targetDir, '_bmad/_config/manifest.yaml'), bmadPath: '_bmad' },
+    // Home-dir installs (global BMAD not inside a project) — detected but NOT injected
+    { manifest: path.join(homeDir, '_bmad/_config/manifest.yaml'),   bmadPath: '_bmad', root: homeDir, isGlobal: true },
+    { manifest: path.join(homeDir, '_bmad/_cfg/manifest.yaml'),      bmadPath: '_bmad', root: homeDir, isGlobal: true },
+    { manifest: path.join(homeDir, '.bmad/_cfg/manifest.yaml'),      bmadPath: '.bmad', root: homeDir, isGlobal: true },
+  ];
 
-  try {
-    await fs.access(v6Manifest);
-  } catch {
-    // Try bmad (alternative path without dot prefix)
-    v6Manifest = path.join(targetDir, 'bmad/_cfg/manifest.yaml');
-    bmadPath = 'bmad';
+  let v6Manifest = null;
+  let bmadPath = null;
+  let bmadRoot = targetDir;
+  let isGlobal = false;
+
+  for (const candidate of v6Candidates) {
     try {
-      await fs.access(v6Manifest);
-    } catch {
-      // Neither path found, continue to v4 check
-      bmadPath = null;
-    }
+      await fs.access(candidate.manifest);
+      v6Manifest = candidate.manifest;
+      bmadPath = candidate.bmadPath;
+      bmadRoot = candidate.root ?? targetDir;
+      isGlobal = candidate.isGlobal ?? false;
+      break;
+    } catch { /* try next */ }
   }
 
   if (bmadPath) {
@@ -36,9 +49,10 @@ export async function detectBMAD(targetDir) {
         version: 6,
         detailedVersion: manifest.installation?.version || '6.0.0-alpha.x',
         manifestPath: v6Manifest,
-        configPath: path.join(targetDir, bmadPath, 'core/config.yaml'),
-        bmadPath: path.join(targetDir, bmadPath),
-        installed: true
+        configPath: path.join(bmadRoot, bmadPath, 'core/config.yaml'),
+        bmadPath: path.join(bmadRoot, bmadPath),
+        installed: true,
+        isGlobal,
       };
     } catch {}
   }

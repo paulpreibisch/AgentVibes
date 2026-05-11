@@ -4570,9 +4570,8 @@ async function handleMcpConfiguration(targetDir, options) {
  * @param {string} targetDir - Base installation directory to validate bmadPath is within
  */
 async function processBmadTtsInjections(bmadPath, targetDir) {
-  // Security: Validate bmadPath is within targetDir (not process.cwd() which may differ
-  // when called from BMAD's installer via npx with a different cwd)
-  if (!isPathSafe(bmadPath, targetDir)) {
+  // Security: bmadPath must be within targetDir OR home dir (BMAD may be installed globally at ~/_bmad)
+  if (!isPathSafe(bmadPath, targetDir) && !isPathSafe(bmadPath, os.homedir())) {
     console.error(chalk.red('⚠️  Security: Invalid BMAD path detected'));
     return;
   }
@@ -4841,14 +4840,17 @@ async function handleBmadIntegration(targetDir, options = {}) {
   }
 
   // Process TTS_INJECTION markers in BMAD files if they exist
-  // This handles the case where BMAD was installed before AgentVibes
-  await processBmadTtsInjections(bmadDetection.bmadPath, targetDir);
+  // Skip for global home-dir BMAD installs — only inject into project-local BMAD
+  if (!bmadDetection.isGlobal) {
+    await processBmadTtsInjections(bmadDetection.bmadPath, targetDir);
+  }
 
   // Create default voice assignments if they don't exist
   await createDefaultBmadVoiceAssignmentsProactive(targetDir);
 
   // Prompt user to inject TTS into BMAD agents (or auto-inject with --yes flag)
-  let enableTtsInjection = options.yes; // Auto-enable with --yes flag
+  // Skip injection prompt for global BMAD — modifying shared ~/.bmad files from a project install is wrong
+  let enableTtsInjection = bmadDetection.isGlobal ? false : options.yes;
 
   if (!options.yes) {
     console.log(''); // Add spacing
