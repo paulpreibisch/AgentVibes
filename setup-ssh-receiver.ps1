@@ -158,101 +158,15 @@ if (-not (Test-Path $adminKeysFile)) {
 # to ~/.agentvibes/tts-queue/, and a watcher running in the user's
 # interactive session picks up requests and plays audio.
 Write-Host "[7.5/8] Installing user-session watcher..." -ForegroundColor Yellow
-$watcherScript = @'
-# AgentVibes TTS Queue Watcher - runs in user session for audio access
-# Single-instance guard: exit immediately if another watcher is already running.
-$mutex = New-Object System.Threading.Mutex($false, 'Global\AgentVibesTtsWatcher')
-if (-not $mutex.WaitOne(0)) {
-    $mutex.Dispose()
-    exit 0
+# Copy watcher from repo source — single source of truth, no embedded heredoc
+$sourceWatcher = Join-Path $PSScriptRoot ".claude\hooks-windows\tts-watcher.ps1"
+if (-not (Test-Path $sourceWatcher)) {
+    Write-Host "       ERROR: $sourceWatcher not found — run from the AgentVibes repo root" -ForegroundColor Red
+    exit 1
 }
-
-$QueueDir = "$env:USERPROFILE\.agentvibes\tts-queue"
-$LogFile  = "$env:USERPROFILE\.agentvibes\watcher.log"
-$PlayTts  = "$env:USERPROFILE\.claude\hooks-windows\play-tts.ps1"
-if (-not (Test-Path $QueueDir)) { New-Item -ItemType Directory -Path $QueueDir -Force | Out-Null }
-
-function Write-WatcherLog {
-    param([string]$Level, [string]$Msg)
-    $ts = Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'
-    Add-Content -Path $LogFile -Value "$ts [$Level] $Msg" -ErrorAction SilentlyContinue
-}
-
-Write-WatcherLog "INFO" "Watcher started. PlayTts=$PlayTts PlayTtsExists=$(Test-Path $PlayTts)"
-
-try {
-while ($true) {
-    $files = Get-ChildItem "$QueueDir\req-*.json" -ErrorAction SilentlyContinue | Sort-Object CreationTime
-    foreach ($f in $files) {
-        # Rename to proc-* before processing — crash recovery on restart
-        $procFile = $f.FullName -replace '\\req-', '\proc-'
-        try { Rename-Item $f.FullName $procFile -ErrorAction Stop } catch { continue }
-        try {
-            $req = Get-Content $procFile -Raw | ConvertFrom-Json
-            # Validate voice before passing to command line
-            $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
-            $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
-            $env:AGENTVIBES_NO_PRETEXT = "1"
-            if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }
-            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",   $null, "Process") }
-            if ($req.volume)  { $env:AGENTVIBES_OVERRIDE_VOLUME  = $req.volume }
-            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_VOLUME",  $null, "Process") }
-            if ($req.effects) { $env:AGENTVIBES_OVERRIDE_EFFECTS = $req.effects }
-            else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_EFFECTS", $null, "Process") }
-
-            if (Test-Path $PlayTts) {
-                # Full AgentVibes pipeline: piper / SAPI / etc.
-                $tempText = Join-Path $env:TEMP "agentvibes-tts-$($req.id).txt"
-                try {
-                    [System.IO.File]::WriteAllText($tempText, $req.text, [System.Text.UTF8Encoding]::new($false))
-                    $env:AGENTVIBES_TEXT_FILE = $tempText
-                    $llmArg = @()
-                    if ($req.llm) {
-                        if ($req.llm -match '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
-                            $llmArg = @('-llm', $req.llm)
-                        } else {
-                            Write-WatcherLog "WARN" "Invalid LLM name '$($req.llm)' - using default"
-                        }
-                    }
-                    Write-WatcherLog "INFO" "play-tts id=$($req.id) voice=$safeVoice llm=$($req.llm)"
-                    $playOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PlayTts "__from_file__" $safeVoice @llmArg 2>&1
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-WatcherLog "ERROR" "play-tts exit=$LASTEXITCODE id=$($req.id) output=$($playOutput -join ' | ')"
-                    } else {
-                        Write-WatcherLog "INFO" "play-tts ok exit=0 id=$($req.id)"
-                    }
-                } finally {
-                    [System.Environment]::SetEnvironmentVariable("AGENTVIBES_TEXT_FILE", $null, "Process")
-                    Remove-Item $tempText -Force -ErrorAction SilentlyContinue
-                }
-            } else {
-                # Fallback: Windows SAPI (built-in, no installation required)
-                Write-WatcherLog "WARN" "play-tts.ps1 not found - using SAPI fallback for id=$($req.id)"
-                Add-Type -AssemblyName System.Speech
-                $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
-                $synth.Speak($req.text)
-                $synth.Dispose()
-            }
-            Remove-Item $procFile -Force -ErrorAction SilentlyContinue
-        } catch {
-            Write-WatcherLog "ERROR" "id=$($req.id) err=$_"
-            Remove-Item $procFile -Force -ErrorAction SilentlyContinue
-        }
-    }
-    # Crash recovery: re-queue any proc-* files left from previous watcher crash
-    $stale = Get-ChildItem "$QueueDir\proc-*.json" -ErrorAction SilentlyContinue
-    foreach ($s in $stale) {
-        $recovered = $s.FullName -replace '\\proc-', '\req-'
-        try { Rename-Item $s.FullName $recovered -ErrorAction SilentlyContinue } catch {}
-    }
-    Start-Sleep -Milliseconds 200
-}
-} finally {
-    $mutex.ReleaseMutex()
-    $mutex.Dispose()
-}
-'@
-Set-Content -Path "$env:USERPROFILE\.agentvibes\tts-watcher.ps1" -Value $watcherScript -Encoding UTF8
+$watcherDestDir = "$env:USERPROFILE\.agentvibes"
+if (-not (Test-Path $watcherDestDir)) { New-Item -ItemType Directory -Path $watcherDestDir -Force | Out-Null }
+Copy-Item -Path $sourceWatcher -Destination "$watcherDestDir\tts-watcher.ps1" -Force
 
 $vbsLauncher = @'
 Set WshShell = CreateObject("WScript.Shell")

@@ -5047,7 +5047,7 @@ async function updateCommandFiles(targetDir, spinner) {
  * on every `npx agentvibes update` regardless of target directory.
  */
 const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'play-tts-piper.sh', 'audio-processor.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
-const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1'];
+const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1', 'tts-watcher.ps1'];
 
 /**
  * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.
@@ -5095,6 +5095,59 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
 }
 
 /**
+ * Restart the AgentVibes TTS queue watcher on Windows after an update.
+ * Only runs if the watcher is already installed (~/.agentvibes/tts-watcher.ps1 exists),
+ * meaning the user previously ran setup-ssh-receiver.ps1.  Silently skips for users
+ * who don't use the SSH remote receiver.
+ * @param {string} [homeDirOverride] - Override home dir (for testing only)
+ * @returns {Promise<boolean>} true if watcher was restarted, false if skipped
+ */
+async function restartWatcherIfInstalled(homeDirOverride) {
+  if (!isNativeWindows()) return false;
+
+  const homeDir = homeDirOverride || os.homedir();
+  const watcherDest = path.join(homeDir, '.agentvibes', 'tts-watcher.ps1');
+  const vbsLauncher = path.join(homeDir, '.agentvibes', 'start-watcher.vbs');
+
+  // Only act if the user has the SSH receiver set up
+  try {
+    await fs.access(watcherDest);
+  } catch {
+    return false;
+  }
+
+  const { spawnSync, spawn } = require('child_process');
+
+  // Kill old watcher — use array args to avoid quoting issues
+  spawnSync('powershell.exe', [
+    '-NoProfile', '-Command',
+    'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*tts-watcher.ps1*\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }'
+  ], { stdio: 'ignore', timeout: 8000 });
+
+  // Copy updated watcher from global hooks to the deployed location
+  const watcherSrc = path.join(homeDir, '.claude', 'hooks-windows', 'tts-watcher.ps1');
+  try {
+    await fs.copyFile(watcherSrc, watcherDest);
+  } catch {
+    // src may not exist on a fresh install path — skip copy, the file was already
+    // put there by updateGlobalHooks() earlier in the same run
+  }
+
+  // Restart via VBS launcher (hidden, no console flash) or fall back to direct spawn
+  try {
+    await fs.access(vbsLauncher);
+    spawnSync('wscript.exe', [vbsLauncher], { stdio: 'ignore' });
+  } catch {
+    const ps = spawn('powershell.exe', [
+      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', watcherDest
+    ], { detached: true, stdio: 'ignore' });
+    ps.unref();
+  }
+
+  return true;
+}
+
+/**
  * Perform all update operations
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
@@ -5118,6 +5171,14 @@ async function performUpdateOperations(targetDir, spinner) {
   const globalHooksUpdated = await updateGlobalHooks(srcHooksDir);
   if (globalHooksUpdated > 0) {
     console.log(chalk.green(`✓ Updated ${globalHooksUpdated} critical scripts in ~/.claude/hooks/`));
+  }
+
+  // On Windows: restart the TTS queue watcher if it was previously installed via
+  // setup-ssh-receiver.ps1.  This propagates hook updates without requiring the
+  // user to manually run update-watcher.ps1 after every `npx agentvibes update`.
+  const watcherRestarted = await restartWatcherIfInstalled();
+  if (watcherRestarted) {
+    console.log(chalk.green('✓ TTS watcher restarted with updated scripts'));
   }
 
   // Update personalities
