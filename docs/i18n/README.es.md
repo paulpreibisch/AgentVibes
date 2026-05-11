@@ -4,17 +4,15 @@
 
 ---
 
-## 🌟 NUEVO EN v5.6.9 — Reverb y Música de Fondo Silenciosos en Instalaciones NPX
+## 🌟 NUEVO EN v5.7.0 — Soporte para BMAD v6.6 + Reinicio Automático del Watcher en Windows
 
-**Usuarios de NPX:** El reverb y la música de fondo estaban silenciosamente rotos para todos los usuarios instalados vía `npx`. Los archivos de hook extraídos del paquete npm carecían de bits de ejecución (644), haciendo que `audio-processor.sh` saliera con código 126. Corregido mediante el prefijo `bash` en el llamador y un paso `chmod 755` en postinstall.
+**BMAD v6.6.0:** AgentVibes ahora detecta la nueva estructura de agentes `.claude/skills/*/agents/`, gestiona correctamente BMAD instalado globalmente en `~/_bmad`, y omite graciosamente los agentes v6.6+ de Markdown simple durante la inyección de TTS en lugar de dar error. La pestaña BMAD ahora muestra la detección correctamente para instalaciones globales.
 
-**Navegador de Voz:** El botón Vista Previa ahora aplica tu reverb y música de fondo configurados — antes reproducía audio sin efectos.
+**Watcher de Windows:** `tts-watcher.ps1` es ahora un archivo independiente en `~/.agentvibes/tts-watcher.ps1`. Ejecutar `npx agentvibes update` ahora copia el watcher más reciente **y** lo reinicia automáticamente — tanto el archivo como el proceso se actualizan en un solo paso, sin reinicio manual.
 
-**Herramienta MCP:** `text_to_speech` ahora devuelve la ruta de archivo de audio correcta (sin emoji basura al final) e incluye el nombre de la voz en su respuesta.
+**Proveedor de Windows:** `play-tts.ps1` ahora respeta el `ProviderOverride` de la configuración del servidor Linux al recibir audio remoto.
 
-**Toggle de música de fondo:** Habilitar música en la TUI ahora realmente la habilita — el archivo de flag leído por los hooks bash ahora se mantiene sincronizado.
-
-## v5.6.8 — Enrutamiento de Voz en WSL Corregido + Fiabilidad del Ciclo de Vida de Sesión
+## v5.6.9 — Reverb y Música de Fondo Silenciosos en Instalaciones NPX
 
 **Usuarios de WSL:** AgentVibes reproducía `en_US-lessac-medium` independientemente de la voz configurada. Corregido — ahora Piper se encuentra en shells no interactivos añadiendo explícitamente `~/.local/bin` al `PATH` antes de la comprobación del binario.
 

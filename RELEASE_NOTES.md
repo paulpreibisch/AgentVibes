@@ -16,7 +16,7 @@ BMAD v6.6 restructured where agents live — they moved from `_bmad/bmm/agents/`
 
 ### 🆕 Windows TTS Watcher — Standalone File + Auto-Restart
 
-`tts-watcher.ps1` is now extracted to `~/.agentvibes/tts-watcher.ps1` as a standalone file. Running `npx agentvibes update` automatically restarts the watcher with the new version — no manual restart needed after updates.
+`tts-watcher.ps1` is now extracted to `~/.agentvibes/tts-watcher.ps1` as a standalone file. Running `npx agentvibes update` now copies the latest watcher to that location **and** automatically restarts it — so both the watcher script itself and its running process are updated in one step. No manual file replacement or restart needed after updates.
 
 ### 🐛 Windows Provider Override Respected on Laptop
 

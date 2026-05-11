@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.0 — Support BMAD v6.6 + Redémarrage Automatique du Watcher Windows
+
+**Date de sortie :** 2026-05-11
+
+### 🆕 Compatibilité avec BMAD v6.6.0
+
+BMAD v6.6 a restructuré l'emplacement des agents — ils sont passés de `_bmad/bmm/agents/` à `.claude/skills/*/agents/`. AgentVibes détecte et analyse désormais ces nouveaux chemins correctement.
+
+**L'injection TTS** ignore gracieusement les agents v6.6+ (qui utilisent du Markdown simple sans sections d'activation XML/YAML) au lieu de générer des erreurs. Le résumé d'installation indique maintenant clairement combien d'agents ont été ignorés vs. modifiés.
+
+**La détection de l'onglet BMAD** trouve désormais BMAD installé globalement dans `~/_bmad` (installation dans le répertoire home) en plus des installations locales au projet. Auparavant, l'onglet BMAD affichait "Non détecté" même lorsque BMAD était installé globalement.
+
+**Sécurité :** La validation des chemins de l'installateur autorise désormais correctement les chemins BMAD sous le répertoire home de l'utilisateur, corrigeant une fausse alerte "Chemin BMAD invalide" pour les installations globales.
+
+### 🆕 Watcher TTS Windows — Fichier Autonome + Redémarrage Automatique
+
+`tts-watcher.ps1` est maintenant extrait en tant que fichier autonome dans `~/.agentvibes/tts-watcher.ps1`. Exécuter `npx agentvibes update` copie désormais le dernier watcher **et** le redémarre automatiquement — le fichier et le processus sont mis à jour en une seule étape, sans redémarrage manuel.
+
+### 🐛 Remplacement de Fournisseur Windows Respecté sur le Portable
+
+`play-tts.ps1` lit maintenant le paramètre `ProviderOverride` depuis la configuration côté Linux lors de la réception audio via SSH. Auparavant, le portable utilisait toujours son fournisseur configuré localement même si le serveur en spécifiait un différent.
+
+### 🐛 Commande Sample Ajoutée au Gestionnaire de Voix
+
+`voice-manager.sh sample` n'avait pas de gestionnaire — l'appeler tombait silencieusement dans le chemin d'utilisation/sortie. Corrigé.
+
+### 🐛 Le Routage SSH de Prévisualisation Détecte le Bon Endpoint
+
+`provider-manager.sh` inclut maintenant `detect_routing_llm()` qui vérifie `AGENTVIBES_LLM_KEY` puis `transport-config.json` pour la première entrée `mode=remote`, afin que l'audio de prévisualisation atteigne le bon hôte SSH.
+
+---
+
 ## 🔇 v5.6.9 — Réverbération et Musique de Fond Silencieuses dans les Installations NPX
 
 **Date de sortie :** 2026-05-09

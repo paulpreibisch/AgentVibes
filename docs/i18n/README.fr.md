@@ -4,17 +4,15 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.6.9 — Réverbération et Musique de Fond Silencieuses dans les Installations NPX
+## 🌟 NOUVEAU DANS v5.7.0 — Support BMAD v6.6 + Redémarrage Automatique du Watcher Windows
 
-**Utilisateurs NPX :** La réverbération et la musique de fond étaient silencieusement cassées pour tous les utilisateurs installés via `npx`. Les fichiers hook extraits du paquet npm manquaient de bits d'exécution (644), causant la sortie de `audio-processor.sh` avec le code 126. Corrigé via le préfixe `bash` dans l'appelant et une étape `chmod 755` en postinstall.
+**BMAD v6.6.0 :** AgentVibes détecte maintenant la nouvelle structure d'agents `.claude/skills/*/agents/`, gère correctement BMAD installé globalement dans `~/_bmad`, et ignore gracieusement les agents v6.6+ en Markdown simple lors de l'injection TTS au lieu d'erreur. L'onglet BMAD affiche maintenant la détection correctement pour les installations globales.
 
-**Navigateur de Voix :** Le bouton Aperçu applique maintenant votre réverbération et musique de fond configurées — il jouait de l'audio brut sans effets.
+**Watcher Windows :** `tts-watcher.ps1` est maintenant un fichier autonome dans `~/.agentvibes/tts-watcher.ps1`. Exécuter `npx agentvibes update` copie maintenant le dernier watcher **et** le redémarre automatiquement — le fichier et le processus sont mis à jour en une seule étape, sans redémarrage manuel.
 
-**Outil MCP :** `text_to_speech` retourne maintenant le chemin de fichier audio correct (sans emoji parasite à la fin) et inclut le nom de la voix dans sa réponse.
+**Fournisseur Windows :** `play-tts.ps1` respecte maintenant le `ProviderOverride` de la configuration du serveur Linux lors de la réception d'audio distant.
 
-**Toggle musique de fond :** Activer la musique dans la TUI l'active réellement maintenant — le fichier de flag lu par les hooks bash est maintenant maintenu synchronisé.
-
-## v5.6.8 — Routage Voix WSL Corrigé + Fiabilité du Cycle de Vie des Sessions
+## v5.6.9 — Réverbération et Musique de Fond Silencieuses dans les Installations NPX
 
 **Utilisateurs WSL :** AgentVibes jouait `en_US-lessac-medium` quelle que soit votre voix configurée. Corrigé — Piper est maintenant trouvé dans les shells non interactifs en ajoutant explicitement `~/.local/bin` au `PATH` avant la vérification du binaire.
 

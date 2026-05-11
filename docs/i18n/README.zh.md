@@ -4,17 +4,15 @@
 
 ---
 
-## 🌟 v5.6.9 新功能 — NPX 安装中混响和背景音乐静音
+## 🌟 v5.7.0 新功能 — BMAD v6.6 支持 + Windows 监视器自动重启
 
-**NPX 用户：** 所有通过 `npx` 安装的用户混响和背景音乐都静默失效。从 npm 包提取的钩子文件缺少执行位（644），导致 `audio-processor.sh` 以代码 126 退出。通过调用方的 `bash` 前缀和 postinstall 的 `chmod 755` 步骤修复。
+**BMAD v6.6.0：** AgentVibes 现在检测新的代理结构 `.claude/skills/*/agents/`，正确处理在 `~/_bmad` 全局安装的 BMAD，并在 TTS 注入时优雅地跳过 v6.6+ 纯 Markdown 代理而不是报错。BMAD 标签现在对全局安装正确显示检测状态。
 
-**语音浏览器：** 预览按钮现在应用您配置的混响和背景音乐 — 之前播放无效果的原始音频。
+**Windows 监视器：** `tts-watcher.ps1` 现在是 `~/.agentvibes/tts-watcher.ps1` 的独立文件。运行 `npx agentvibes update` 现在会复制最新的监视器**并**自动重启它 — 文件和进程都在一步中更新，无需手动重启。
 
-**MCP 工具：** `text_to_speech` 现在返回正确的音频文件路径（无末尾表情符号垃圾），并在响应中包含语音名称。
+**Windows 提供商：** `play-tts.ps1` 现在在接收远程音频时遵守 Linux 服务器配置的 `ProviderOverride`。
 
-**背景音乐开关：** 在 TUI 中启用音乐现在真正启用它 — bash 钩子读取的标志文件现在保持同步。
-
-## v5.6.8 新功能 — WSL 语音路由已修复 + 会话生命周期可靠性提升
+## v5.6.9 新功能 — NPX 安装中混响和背景音乐静音
 
 **WSL 用户：** AgentVibes 无论您配置了什么语音都会播放 `en_US-lessac-medium`。已修复 — 通过在二进制文件检查前显式将 `~/.local/bin` 追加到 `PATH` 开头，现在在非交互式 Shell 中也能找到 Piper。
 

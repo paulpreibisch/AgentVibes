@@ -44,7 +44,7 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 **BMAD v6.6.0:** AgentVibes now detects the new `.claude/skills/*/agents/` agent structure, correctly handles globally-installed BMAD at `~/_bmad`, and gracefully skips v6.6+ plain-Markdown agents during TTS injection instead of erroring. The BMAD tab now shows detection correctly for global installs.
 
-**Windows watcher:** `tts-watcher.ps1` is now a standalone file at `~/.agentvibes/tts-watcher.ps1`. Running `npx agentvibes update` restarts it automatically — no manual restart after updates.
+**Windows watcher:** `tts-watcher.ps1` is now a standalone file at `~/.agentvibes/tts-watcher.ps1`. Running `npx agentvibes update` now copies the latest watcher **and** restarts it automatically — both the file and the process are updated in one step, no manual restart needed.
 
 **Windows provider:** `play-tts.ps1` now respects the `ProviderOverride` from the Linux server config when receiving remote audio.
 

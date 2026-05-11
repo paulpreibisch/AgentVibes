@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.0 — BMAD v6.6 支持 + Windows 监视器自动重启
+
+**发布日期：** 2026-05-11
+
+### 🆕 BMAD v6.6.0 兼容性
+
+BMAD v6.6 重新规划了代理的存放位置 — 从 `_bmad/bmm/agents/` 迁移到 `.claude/skills/*/agents/`。AgentVibes 现在可以正确检测和扫描这些新路径。
+
+**TTS 注入**现在可以优雅地跳过 v6.6+ 代理（使用不带 XML/YAML 激活部分的纯 Markdown），而不是抛出错误。安装摘要现在清楚地显示跳过了多少代理与修改了多少代理。
+
+**BMAD 标签检测**现在可以找到安装在 `~/_bmad`（主目录安装）的全局 BMAD，以及项目本地安装。以前，即使 BMAD 已全局安装，BMAD 标签也会显示"未检测到"。
+
+**安全性：** 安装程序的路径验证现在正确允许用户主目录下的 BMAD 路径，修复了全局安装时"无效 BMAD 路径"的误报。
+
+### 🆕 Windows TTS 监视器 — 独立文件 + 自动重启
+
+`tts-watcher.ps1` 现在作为独立文件提取到 `~/.agentvibes/tts-watcher.ps1`。运行 `npx agentvibes update` 现在会复制最新的监视器**并**自动重启它 — 文件和进程都在一步中更新，无需手动重启。
+
+### 🐛 Windows 提供商覆盖在笔记本上得到遵守
+
+`play-tts.ps1` 现在在通过 SSH 接收音频时从 Linux 端配置读取 `ProviderOverride` 设置。以前，即使服务器指定了不同的提供商，笔记本也始终使用其本地配置的提供商。
+
+### 🐛 语音管理器添加了 Sample 命令
+
+`voice-manager.sh sample` 缺少处理程序 — 调用时会静默地落入使用/退出路径。已修复。
+
+### 🐛 预览 SSH 路由检测到正确的端点
+
+`provider-manager.sh` 现在包含 `detect_routing_llm()`，它检查 `AGENTVIBES_LLM_KEY`，然后在 `transport-config.json` 中查找第一个 `mode=remote` 条目，使预览音频到达正确的 SSH 主机。
+
+---
+
 ## 🔇 v5.6.9 — NPX 安装中混响和背景音乐静音
 
 **发布日期：** 2026-05-09

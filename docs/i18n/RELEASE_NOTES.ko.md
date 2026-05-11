@@ -1,5 +1,37 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.0 — BMAD v6.6 지원 + Windows 워처 자동 재시작
+
+**출시일:** 2026-05-11
+
+### 🆕 BMAD v6.6.0 호환성
+
+BMAD v6.6은 에이전트 위치를 재구성했습니다 — `_bmad/bmm/agents/`에서 `.claude/skills/*/agents/`로 이동되었습니다. AgentVibes는 이제 이러한 새로운 경로를 올바르게 감지하고 스캔합니다.
+
+**TTS 주입**은 오류를 발생시키는 대신 v6.6+ 에이전트(XML/YAML 활성화 섹션이 없는 일반 Markdown 사용)를 정상적으로 건너뜁니다. 설치 요약에 이제 건너뛴 에이전트 수와 수정된 에이전트 수가 명확하게 표시됩니다.
+
+**BMAD 탭 감지**는 이제 프로젝트 로컬 설치 외에 `~/_bmad`(홈 디렉터리 설치)에 전역적으로 설치된 BMAD를 찾습니다. 이전에는 BMAD가 전역적으로 설치되어 있어도 BMAD 탭이 "감지되지 않음"을 표시했습니다.
+
+**보안:** 설치 관리자의 경로 유효성 검사가 이제 사용자 홈 디렉터리 아래의 BMAD 경로를 올바르게 허용하여 전역 설치에서 발생하는 "유효하지 않은 BMAD 경로" 오탐지를 수정합니다.
+
+### 🆕 Windows TTS 워처 — 독립 실행형 파일 + 자동 재시작
+
+`tts-watcher.ps1`은 이제 `~/.agentvibes/tts-watcher.ps1`에 독립 실행형 파일로 추출됩니다. `npx agentvibes update`를 실행하면 이제 최신 워처를 복사**하고** 자동으로 재시작합니다 — 파일과 프로세스 모두 한 번에 업데이트되며 수동 재시작이 필요하지 않습니다.
+
+### 🐛 Windows 공급자 재정의가 노트북에서 적용됨
+
+`play-tts.ps1`은 이제 SSH를 통해 오디오를 수신할 때 Linux 측 구성에서 `ProviderOverride` 설정을 읽습니다. 이전에는 서버가 다른 공급자를 지정해도 노트북은 항상 로컬로 구성된 공급자를 사용했습니다.
+
+### 🐛 음성 관리자에 Sample 명령 추가
+
+`voice-manager.sh sample`에 핸들러가 없어 호출 시 사용법/종료 경로로 조용히 폴백했습니다. 수정됨.
+
+### 🐛 미리 보기 SSH 라우팅이 올바른 엔드포인트를 감지
+
+`provider-manager.sh`에 이제 `detect_routing_llm()`이 포함되어 `AGENTVIBES_LLM_KEY`를 확인한 후 `transport-config.json`에서 첫 번째 `mode=remote` 항목을 찾으므로 미리 보기 오디오가 올바른 SSH 호스트에 도달합니다.
+
+---
+
 ## 🔇 v5.6.9 — NPX 설치에서 리버브 및 배경 음악 무음
 
 **출시일:** 2026-05-09

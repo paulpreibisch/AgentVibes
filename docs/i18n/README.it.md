@@ -4,17 +4,15 @@
 
 ---
 
-## 🌟 NOVITÀ IN v5.6.9 — Riverbero e Musica di Sottofondo Silenziosi nelle Installazioni NPX
+## 🌟 NOVITÀ IN v5.7.0 — Supporto BMAD v6.6 + Riavvio Automatico del Watcher Windows
 
-**Utenti NPX:** Il riverbero e la musica di sottofondo erano silenziosamente interrotti per tutti gli utenti installati tramite `npx`. I file hook estratti dal pacchetto npm mancavano dei bit di esecuzione (644), causando l'uscita di `audio-processor.sh` con il codice 126. Risolto tramite il prefisso `bash` nel chiamante e un passaggio `chmod 755` in postinstall.
+**BMAD v6.6.0:** AgentVibes ora rileva la nuova struttura degli agenti `.claude/skills/*/agents/`, gestisce correttamente BMAD installato globalmente in `~/_bmad`, e salta elegantemente gli agenti v6.6+ in Markdown semplice durante l'iniezione TTS invece di generare errori. La scheda BMAD mostra ora il rilevamento correttamente per le installazioni globali.
 
-**Browser Vocale:** Il pulsante Anteprima applica ora il riverbero e la musica di sottofondo configurati — in precedenza riproduceva audio grezzo senza effetti.
+**Watcher Windows:** `tts-watcher.ps1` è ora un file autonomo in `~/.agentvibes/tts-watcher.ps1`. Eseguire `npx agentvibes update` ora copia l'ultimo watcher **e** lo riavvia automaticamente — file e processo vengono aggiornati in un unico passaggio, senza riavvio manuale.
 
-**Strumento MCP:** `text_to_speech` restituisce ora il percorso corretto del file audio (senza caratteri spazzatura emoji alla fine) e include il nome della voce nella risposta.
+**Provider Windows:** `play-tts.ps1` ora rispetta il `ProviderOverride` dalla configurazione del server Linux quando riceve audio remoto.
 
-**Toggle musica di sottofondo:** Abilitare la musica nella TUI ora la abilita effettivamente — il file flag letto dagli hook bash è ora mantenuto sincronizzato.
-
-## NOVITÀ IN v5.6.8 — Routing Vocale WSL Corretto + Affidabilità del Ciclo di Vita della Sessione
+## NOVITÀ IN v5.6.9 — Riverbero e Musica di Sottofondo Silenziosi nelle Installazioni NPX
 
 **Utenti WSL:** AgentVibes riproduceva `en_US-lessac-medium` indipendentemente dalla voce configurata. Risolto — Piper viene ora trovato nelle shell non interattive aggiungendo esplicitamente `~/.local/bin` all'inizio del `PATH` prima del controllo del binario.
 

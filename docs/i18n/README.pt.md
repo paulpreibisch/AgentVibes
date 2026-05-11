@@ -4,17 +4,15 @@
 
 ---
 
-## 🌟 NOVO NO v5.6.9 — Reverb e Música de Fundo Silenciosos em Instalações NPX
+## 🌟 NOVO NO v5.7.0 — Suporte a BMAD v6.6 + Reinício Automático do Watcher no Windows
 
-**Usuários NPX:** O reverb e a música de fundo estavam silenciosamente quebrados para todos os usuários instalados via `npx`. Os arquivos de hook extraídos do pacote npm careciam de bits de execução (644), fazendo `audio-processor.sh` sair com código 126. Corrigido via prefixo `bash` no chamador e um passo `chmod 755` em postinstall.
+**BMAD v6.6.0:** O AgentVibes agora detecta a nova estrutura de agentes `.claude/skills/*/agents/`, lida corretamente com BMAD instalado globalmente em `~/_bmad`, e ignora graciosamente agentes v6.6+ de Markdown simples durante a injeção de TTS em vez de dar erro. A aba BMAD agora mostra a detecção corretamente para instalações globais.
 
-**Navegador de Voz:** O botão de Pré-visualização agora aplica seu reverb e música de fundo configurados — antes reproduzia áudio sem efeitos.
+**Watcher do Windows:** `tts-watcher.ps1` agora é um arquivo independente em `~/.agentvibes/tts-watcher.ps1`. Executar `npx agentvibes update` agora copia o watcher mais recente **e** o reinicia automaticamente — o arquivo e o processo são atualizados em um único passo, sem reinício manual.
 
-**Ferramenta MCP:** `text_to_speech` agora retorna o caminho correto do arquivo de áudio (sem lixo de emoji no final) e inclui o nome da voz em sua resposta.
+**Provedor do Windows:** `play-tts.ps1` agora respeita o `ProviderOverride` da configuração do servidor Linux ao receber áudio remoto.
 
-**Toggle de música de fundo:** Ativar música na TUI agora realmente a ativa — o arquivo de flag lido pelos hooks bash é mantido sincronizado.
-
-## v5.6.8 — Roteamento de Voz no WSL Corrigido + Confiabilidade do Ciclo de Vida da Sessão
+## v5.6.9 — Reverb e Música de Fundo Silenciosos em Instalações NPX
 
 **Usuários do WSL:** O AgentVibes reproduzia `en_US-lessac-medium` independentemente da sua voz configurada. Corrigido — o Piper agora é encontrado em shells não interativos ao adicionar explicitamente `~/.local/bin` ao `PATH` antes da verificação do binário.
 

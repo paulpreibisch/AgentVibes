@@ -4,17 +4,15 @@
 
 ---
 
-## 🌟 NEU IN v5.6.9 — Hall und Hintergrundmusik in NPX-Installationen Stumm
+## 🌟 NEU IN v5.7.0 — BMAD v6.6 Unterstützung + Automatischer Neustart des Windows Watchers
 
-**NPX-Nutzer:** Hall und Hintergrundmusik waren für alle über `npx` installierten Nutzer stillschweigend defekt. Hook-Dateien aus dem npm-Paket fehlten Ausführungsbits (644), wodurch `audio-processor.sh` mit Code 126 beendet wurde. Behoben durch das `bash`-Präfix im Aufrufer und einen `chmod 755`-Schritt in postinstall.
+**BMAD v6.6.0:** AgentVibes erkennt jetzt die neue Agentenstruktur `.claude/skills/*/agents/`, verarbeitet global installiertes BMAD in `~/_bmad` korrekt, und überspringt v6.6+ Plain-Markdown-Agenten bei der TTS-Injektion statt Fehler zu werfen. Der BMAD-Tab zeigt die Erkennung jetzt korrekt für globale Installationen an.
 
-**Voice Browser:** Die Vorschau-Schaltfläche wendet jetzt deinen konfigurierten Hall und deine Hintergrundmusik an — sie spielte vorher Audio ohne Effekte ab.
+**Windows Watcher:** `tts-watcher.ps1` ist jetzt eine eigenständige Datei unter `~/.agentvibes/tts-watcher.ps1`. Das Ausführen von `npx agentvibes update` kopiert jetzt den neuesten Watcher **und** startet ihn automatisch neu — Datei und Prozess werden in einem Schritt aktualisiert, kein manueller Neustart erforderlich.
 
-**MCP-Tool:** `text_to_speech` gibt jetzt den korrekten Audiodateipfad zurück (kein Emoji-Müll am Ende) und enthält den Stimmnamen in seiner Antwort.
+**Windows Provider:** `play-tts.ps1` respektiert jetzt den `ProviderOverride` aus der Linux-Server-Konfiguration beim Empfang von Remote-Audio.
 
-**Hintergrundmusik-Schalter:** Das Aktivieren von Musik in der TUI aktiviert sie jetzt tatsächlich — die von Bash-Hooks gelesene Flag-Datei wird nun synchron gehalten.
-
-## v5.6.8 — WSL-Stimmen-Routing repariert + Zuverlässigkeit des Sitzungslebenszyklus
+## v5.6.9 — Hall und Hintergrundmusik in NPX-Installationen Stumm
 
 **WSL-Nutzer:** AgentVibes spielte `en_US-lessac-medium` ab, unabhängig von der konfigurierten Stimme. Behoben — Piper wird jetzt in nicht-interaktiven Shells gefunden, indem `~/.local/bin` explizit dem `PATH` vor der Binärprüfung vorangestellt wird.
 
