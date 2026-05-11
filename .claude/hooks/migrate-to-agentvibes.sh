@@ -46,22 +46,25 @@ echo -e "${BLUE}🔍 Checking for BMAD files in .claude/plugins/...${NC}"
 
 if [[ -f ".claude/plugins/bmad-voices-enabled.flag" ]]; then
     echo -e "${YELLOW}  Found: bmad-voices-enabled.flag${NC}"
-    mv .claude/plugins/bmad-voices-enabled.flag .agentvibes/bmad/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}"
+    mv -n .claude/plugins/bmad-voices-enabled.flag .agentvibes/bmad/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/bmad/ — skipped${NC}"
     MIGRATED=true
 fi
 
 if [[ -f ".claude/plugins/bmad-party-mode-disabled.flag" ]]; then
     echo -e "${YELLOW}  Found: bmad-party-mode-disabled.flag${NC}"
-    mv .claude/plugins/bmad-party-mode-disabled.flag .agentvibes/bmad/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}"
+    mv -n .claude/plugins/bmad-party-mode-disabled.flag .agentvibes/bmad/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/bmad/ — skipped${NC}"
     MIGRATED=true
 fi
 
 if [[ -f ".claude/plugins/.bmad-previous-settings" ]]; then
     echo -e "${YELLOW}  Found: .bmad-previous-settings${NC}"
-    mv .claude/plugins/.bmad-previous-settings .agentvibes/bmad/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}"
+    mv -n .claude/plugins/.bmad-previous-settings .agentvibes/bmad/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/bmad/ — skipped${NC}"
     MIGRATED=true
 fi
 
@@ -72,8 +75,9 @@ echo -e "${BLUE}🔍 Checking for BMAD files in .claude/config/...${NC}"
 
 if [[ -f ".claude/config/bmad-voices.md" ]]; then
     echo -e "${YELLOW}  Found: bmad-voices.md${NC}"
-    mv .claude/config/bmad-voices.md .agentvibes/bmad/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}"
+    mv -n .claude/config/bmad-voices.md .agentvibes/bmad/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/bmad/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/bmad/ — skipped${NC}"
     MIGRATED=true
 fi
 
@@ -97,29 +101,33 @@ echo -e "${BLUE}🔍 Checking for AgentVibes config in .claude/config/...${NC}"
 
 if [[ -f ".claude/config/agentvibes.json" ]]; then
     echo -e "${YELLOW}  Found: agentvibes.json${NC}"
-    mv .claude/config/agentvibes.json .agentvibes/config/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}"
+    mv -n .claude/config/agentvibes.json .agentvibes/config/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/config/ — skipped${NC}"
     MIGRATED=true
 fi
 
 if [[ -f ".claude/config/personality-voice-defaults.default.json" ]]; then
     echo -e "${YELLOW}  Found: personality-voice-defaults.default.json${NC}"
-    mv .claude/config/personality-voice-defaults.default.json .agentvibes/config/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}"
+    mv -n .claude/config/personality-voice-defaults.default.json .agentvibes/config/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/config/ — skipped${NC}"
     MIGRATED=true
 fi
 
 if [[ -f ".claude/config/personality-voice-defaults.json" ]]; then
     echo -e "${YELLOW}  Found: personality-voice-defaults.json${NC}"
-    mv .claude/config/personality-voice-defaults.json .agentvibes/config/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}"
+    mv -n .claude/config/personality-voice-defaults.json .agentvibes/config/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/config/ — skipped${NC}"
     MIGRATED=true
 fi
 
 if [[ -f ".claude/config/README-personality-defaults.md" ]]; then
     echo -e "${YELLOW}  Found: README-personality-defaults.md${NC}"
-    mv .claude/config/README-personality-defaults.md .agentvibes/config/
-    echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}"
+    mv -n .claude/config/README-personality-defaults.md .agentvibes/config/ && \
+        echo -e "${GREEN}  ✓ Moved to .agentvibes/config/${NC}" || \
+        echo -e "${YELLOW}  ⚠ Already exists in .agentvibes/config/ — skipped${NC}"
     MIGRATED=true
 fi
 

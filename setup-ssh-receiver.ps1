@@ -29,8 +29,14 @@ Write-Host "[2/8] Backing up original sshd_config..." -ForegroundColor Yellow
 $configPath = "C:\ProgramData\ssh\sshd_config"
 $backupPath = "C:\ProgramData\ssh\sshd_config.bak"
 if (Test-Path $configPath) {
-    Copy-Item $configPath $backupPath -Force
-    Write-Host "       Backup: $backupPath" -ForegroundColor Gray
+    # Only create the backup once — never overwrite it, so the user's original
+    # sshd_config is always recoverable even if this script is run multiple times.
+    if (-not (Test-Path $backupPath)) {
+        Copy-Item $configPath $backupPath
+        Write-Host "       Backup: $backupPath" -ForegroundColor Gray
+    } else {
+        Write-Host "       Backup already exists: $backupPath (skipped)" -ForegroundColor DarkGray
+    }
 }
 
 # Step 3: Deploy hardened config with user-specific values

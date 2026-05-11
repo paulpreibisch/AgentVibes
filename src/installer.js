@@ -84,6 +84,105 @@ const packageJson = JSON.parse(
 );
 const VERSION = packageJson.version;
 
+// ── Install manifest utilities ──────────────────────────────────────────────
+// The manifest records the SHA-256 hash of every file AgentVibes installs,
+// so update() can detect user modifications before overwriting.  Files whose
+// hash has changed since the last install are skipped (a .user.bak copy is
+// saved), preventing silent destruction of user customisations.
+
+const MANIFEST_FILENAME = 'install-manifest.json';
+
+function getProjectManifestPath(targetDir) {
+  return path.join(targetDir, '.agentvibes', MANIFEST_FILENAME);
+}
+
+function getGlobalManifestPath(homeDir) {
+  return path.join(homeDir || os.homedir(), '.agentvibes', MANIFEST_FILENAME);
+}
+
+async function computeFileHash(filePath) {
+  try {
+    const buf = await fs.readFile(filePath);
+    return crypto.createHash('sha256').update(buf).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+async function loadManifest(manifestPath) {
+  try {
+    const data = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    return data.files ?? {};
+  } catch {
+    return {};
+  }
+}
+
+async function saveManifest(manifestPath, files) {
+  await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+  const tmp = manifestPath + '.tmp.' + process.pid;
+  try {
+    await fs.writeFile(
+      tmp,
+      JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), files }, null, 2),
+      { mode: 0o600 }
+    );
+    await fs.rename(tmp, manifestPath);
+  } catch (err) {
+    try { await fs.unlink(tmp); } catch { /* cleanup */ }
+    throw err;
+  }
+}
+
+// Copies srcPath → destPath only when safe:
+//   • dest missing                     → copy  (action: 'new')
+//   • dest == src (already current)    → skip  (action: 'unchanged')
+//   • dest hash == manifest hash       → copy  (action: 'updated')
+//   • dest hash != manifest hash       → skip  (action: 'skipped', .user.bak saved)
+//   • no manifest entry yet            → copy  (action: 'updated')
+async function manifestSafeCopy(srcPath, destPath, manifest) {
+  const srcHash = await computeFileHash(srcPath);
+  if (!srcHash) return { action: 'skipped', hash: null }; // src missing
+
+  const destHash = await computeFileHash(destPath);
+
+  if (!destHash) {
+    await fs.copyFile(srcPath, destPath);
+    return { action: 'new', hash: srcHash };
+  }
+
+  if (destHash === srcHash) {
+    return { action: 'unchanged', hash: srcHash };
+  }
+
+  const manifestHash = manifest[destPath]?.hash;
+  if (manifestHash && destHash !== manifestHash) {
+    // User modified the file since we last installed it — preserve it
+    try { await fs.copyFile(destPath, destPath + '.user.bak'); } catch { /* best effort */ }
+    return { action: 'skipped', hash: destHash };
+  }
+
+  // Stock file (or no manifest entry yet) — safe to overwrite
+  await fs.copyFile(srcPath, destPath);
+  return { action: 'updated', hash: srcHash };
+}
+
+// Delete only the files listed in manifest that reside under baseDir.
+// Then attempt (non-recursively) to prune any resulting empty directories.
+async function removeManifestFiles(manifest, baseDir, dirsToTryPrune = []) {
+  const base = path.resolve(baseDir);
+  let count = 0;
+  for (const filePath of Object.keys(manifest)) {
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(base + path.sep)) continue;
+    try { await fs.unlink(filePath); count++; } catch { /* already gone */ }
+  }
+  for (const dir of dirsToTryPrune) {
+    try { await fs.rmdir(dir); } catch { /* not empty or already gone — leave it */ }
+  }
+  return count;
+}
+
 // Personality emoji mapping for quick visual recognition
 const personalityEmojis = {
   'angry': '😠',
@@ -3387,17 +3486,28 @@ async function copyCommandFiles(targetDir, spinner) {
     let failedCommands = [];
     let successCount = 0;
 
+    const manifestPath = getProjectManifestPath(targetDir);
+    const manifest = await loadManifest(manifestPath);
+    const manifestUpdates = {};
+
     for (const file of commandFiles) {
       const srcPath = path.join(srcCommandsDir, file);
       const destPath = path.join(agentVibesCommandsDir, file);
       try {
-        await fs.copyFile(srcPath, destPath);
-        installedCommands.push(file);
-        successCount++;
+        const result = await manifestSafeCopy(srcPath, destPath, manifest);
+        if (result.action !== 'skipped') {
+          installedCommands.push(file);
+          successCount++;
+          if (result.hash) manifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+        }
       } catch (err) {
         failedCommands.push({ file, error: err.message });
         // Continue with other files
       }
+    }
+
+    if (Object.keys(manifestUpdates).length > 0) {
+      await saveManifest(manifestPath, { ...manifest, ...manifestUpdates }).catch(() => { /* best effort */ });
     }
 
     if (successCount === commandFiles.length) {
@@ -3515,16 +3625,17 @@ async function filterHookFiles(srcHooksDir, allFiles) {
  * @param {string} filename - Name of the file
  * @returns {Promise<Object>} Result object with success/error info
  */
-async function copyHookFile(srcPath, destPath, filename) {
+async function copyHookFile(srcPath, destPath, filename, manifest = {}) {
   try {
-    await fs.copyFile(srcPath, destPath);
-
-    if (filename.endsWith('.sh')) {
-      await fs.chmod(destPath, 0o750);
-      return { success: true, name: filename, executable: true };
+    const result = await manifestSafeCopy(srcPath, destPath, manifest);
+    if (result.action === 'skipped' && result.hash !== null) {
+      // User-modified file preserved — do not chmod or report as installed
+      return { success: true, name: filename, executable: false, userModified: true, hash: null };
     }
-
-    return { success: true, name: filename, executable: false };
+    if (filename.endsWith('.sh') && result.action !== 'skipped') {
+      await fs.chmod(destPath, 0o750);
+    }
+    return { success: true, name: filename, executable: filename.endsWith('.sh'), hash: result.hash };
   } catch (err) {
     return { success: false, name: filename, error: err.message };
   }
@@ -3600,19 +3711,31 @@ async function copyHookFiles(targetDir, spinner) {
 
     spinner.start(`Installing ${hookFiles.length} TTS scripts...`);
 
+    const manifestPath = getProjectManifestPath(targetDir);
+    const manifest = await loadManifest(manifestPath);
+    const manifestUpdates = {};
+
     const installedFiles = [];
     const failedFiles = [];
 
     for (const file of hookFiles) {
       const srcPath = path.join(srcHooksDir, file);
       const destPath = path.join(hooksDir, file);
-      const result = await copyHookFile(srcPath, destPath, file);
+      const result = await copyHookFile(srcPath, destPath, file, manifest);
 
       if (result.success) {
-        installedFiles.push({ name: result.name, executable: result.executable });
+        if (!result.userModified) {
+          installedFiles.push({ name: result.name, executable: result.executable });
+          if (result.hash) manifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+        }
+        // userModified files are silently skipped (their .user.bak is already saved)
       } else {
         failedFiles.push({ name: result.name, error: result.error });
       }
+    }
+
+    if (Object.keys(manifestUpdates).length > 0) {
+      await saveManifest(manifestPath, { ...manifest, ...manifestUpdates }).catch(() => { /* best effort */ });
     }
 
     const successCount = installedFiles.length;
@@ -3663,11 +3786,22 @@ async function copyPersonalityFiles(targetDir, spinner) {
   spinner.start(`Installing ${personalityMdFiles.length} personality templates...`);
   let installedPersonalities = [];
 
+  const personalityManifestPath = getProjectManifestPath(targetDir);
+  const personalityManifest = await loadManifest(personalityManifestPath);
+  const personalityManifestUpdates = {};
+
   for (const file of personalityMdFiles) {
     const srcPath = path.join(srcPersonalitiesDir, file);
     const destPath = path.join(destPersonalitiesDir, file);
-    await fs.copyFile(srcPath, destPath);
-    installedPersonalities.push(file);
+    const result = await manifestSafeCopy(srcPath, destPath, personalityManifest);
+    if (result.action !== 'skipped') {
+      installedPersonalities.push(file);
+      if (result.hash) personalityManifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+    }
+  }
+
+  if (Object.keys(personalityManifestUpdates).length > 0) {
+    await saveManifest(personalityManifestPath, { ...personalityManifest, ...personalityManifestUpdates }).catch(() => { /* best effort */ });
   }
 
   spinner.succeed(chalk.green('Installed personality templates!\n'));
@@ -4982,6 +5116,10 @@ async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
   let newPersonalities = 0;
   let updatedPersonalities = 0;
 
+  const manifestPath = getProjectManifestPath(targetDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = {};
+
   for (const file of allPersonalityFiles) {
     const srcPath = path.join(srcPersonalitiesDir, file);
     const stat = await fs.stat(srcPath);
@@ -4991,15 +5129,22 @@ async function updatePersonalityFiles(targetDir, srcPersonalitiesDir) {
     }
 
     const destPath = path.join(destPersonalitiesDir, file);
+    const result = await manifestSafeCopy(srcPath, destPath, manifest);
 
-    try {
-      await fs.access(destPath);
-      await fs.copyFile(srcPath, destPath);
-      updatedPersonalities++;
-    } catch {
-      await fs.copyFile(srcPath, destPath);
+    if (result.action === 'new') {
       newPersonalities++;
+    } else if (result.action === 'updated' || result.action === 'unchanged') {
+      updatedPersonalities++;
     }
+    // 'skipped' = user modified — leave it alone, .user.bak already saved
+
+    if (result.hash && result.action !== 'skipped') {
+      manifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+    }
+  }
+
+  if (Object.keys(manifestUpdates).length > 0) {
+    await saveManifest(manifestPath, { ...manifest, ...manifestUpdates }).catch(() => { /* best effort */ });
   }
 
   return { new: newPersonalities, updated: updatedPersonalities };
@@ -5033,10 +5178,21 @@ async function updateCommandFiles(targetDir, spinner) {
   const srcCommandsDir = path.join(__dirname, '..', '.claude', 'commands', 'agent-vibes');
   const commandFiles = await fs.readdir(srcCommandsDir);
 
+  const manifestPath = getProjectManifestPath(targetDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = {};
+
   for (const file of commandFiles) {
     const srcPath = path.join(srcCommandsDir, file);
     const destPath = path.join(commandsDir, file);
-    await fs.copyFile(srcPath, destPath);
+    const result = await manifestSafeCopy(srcPath, destPath, manifest);
+    if (result.hash && result.action !== 'skipped') {
+      manifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+    }
+  }
+
+  if (Object.keys(manifestUpdates).length > 0) {
+    await saveManifest(manifestPath, { ...manifest, ...manifestUpdates }).catch(() => { /* best effort */ });
   }
 
   return commandFiles.length;
@@ -5066,13 +5222,20 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
   // Always ensure the global hooks dir exists so registered $HOME hooks resolve.
   await fs.mkdir(globalHooksDir, { recursive: true });
 
+  const manifestPath = getGlobalManifestPath(homeDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = { ...manifest };
+
   for (const hook of CRITICAL_HOOKS) {
     const destPath = path.join(globalHooksDir, hook);
     const srcPath = path.join(srcHooksDir, hook);
     try {
-      await fs.copyFile(srcPath, destPath);
-      await fs.chmod(destPath, 0o750);
-      updated++;
+      const result = await manifestSafeCopy(srcPath, destPath, manifest);
+      if (result.action !== 'skipped') {
+        if (result.action !== 'unchanged') await fs.chmod(destPath, 0o750);
+        if (result.hash) manifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+        updated++;
+      }
     } catch {
       // src missing — skip silently
     }
@@ -5086,12 +5249,17 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
     const destPath = path.join(globalHooksWindowsDir, hook);
     const srcPath = path.join(srcHooksWindowsDir, hook);
     try {
-      await fs.copyFile(srcPath, destPath);
-      updated++;
+      const result = await manifestSafeCopy(srcPath, destPath, manifest);
+      if (result.action !== 'skipped') {
+        if (result.hash) manifestUpdates[destPath] = { hash: result.hash, installedAt: new Date().toISOString() };
+        updated++;
+      }
     } catch {
       // src missing — skip silently
     }
   }
+
+  await saveManifest(manifestPath, manifestUpdates).catch(() => { /* best effort */ });
 
   return updated;
 }
@@ -5406,7 +5574,7 @@ async function install(options = {}) {
     await installPluginManifest(targetDir, silentSpinner);
     await ensureGitRepo(targetDir, silentSpinner);
 
-    // Save provider configuration
+    // Save provider configuration (always written — provider was explicitly chosen in wizard)
     const providerConfigPath = path.join(claudeDir, 'tts-provider.txt');
     await fs.writeFile(providerConfigPath, selectedProvider);
 
@@ -5520,7 +5688,8 @@ Troubleshooting:
         default:               defaultVoice = 'Samantha'; break;
       }
     }
-    await fs.writeFile(voiceConfigPath, defaultVoice);
+    // Only write voice on first install — preserve user's current voice selection on reinstall
+    try { await fs.access(voiceConfigPath); } catch { await fs.writeFile(voiceConfigPath, defaultVoice); }
 
     // Sync voice + provider to global .agentvibes/config.json so TUI finds them
     // regardless of which directory it's launched from
@@ -5579,16 +5748,18 @@ Troubleshooting:
       await fs.writeFile(translateFile, 'auto', { mode: 0o600 });
     }
 
-    // Apply verbosity, personality, pretext
-    await fs.writeFile(path.join(claudeDir, 'tts-verbosity.txt'), userConfig.verbosity);
+    // Apply verbosity and personality — only write on first install to preserve user customisation.
+    // To reset these, delete the files manually or use the MCP tools.
+    const verbosityPath = path.join(claudeDir, 'tts-verbosity.txt');
+    try { await fs.access(verbosityPath); } catch { await fs.writeFile(verbosityPath, userConfig.verbosity); }
     if (userConfig.personality && userConfig.personality !== 'none') {
-      await fs.writeFile(path.join(claudeDir, 'tts-personality.txt'), userConfig.personality);
+      const personalityPath = path.join(claudeDir, 'tts-personality.txt');
+      try { await fs.access(personalityPath); } catch { await fs.writeFile(personalityPath, userConfig.personality); }
     }
     if (userConfig.pretext && userConfig.pretext.trim()) {
       await fs.writeFile(path.join(configDir, 'tts-pretext.txt'), userConfig.pretext, { mode: 0o600 });
-    } else {
-      try { await fs.unlink(path.join(configDir, 'tts-pretext.txt')); } catch { /* ok */ }
     }
+    // Do NOT unlink tts-pretext.txt when blank — user may have set it via MCP or manually.
 
     // Apply reverb setting
     const selectedReverb = userConfig.reverb;
@@ -6008,23 +6179,40 @@ program
     try {
       let removedCount = 0;
 
-      // Remove project-level files
-      const projectPaths = [
+      // Remove project-level files.
+      // AgentVibes-exclusive directories are safe to rm -r.
+      // Shared directories (.claude/hooks, .claude/personalities, etc.) are
+      // cleaned up via the install manifest so user-added files are preserved.
+      const exclusiveDirs = [
         path.join(targetDir, '.claude', 'commands', 'agent-vibes'),
+        path.join(targetDir, '.agentvibes'),
+      ];
+      for (const dirPath of exclusiveDirs) {
+        try { await fs.rm(dirPath, { recursive: true, force: true }); removedCount++; } catch { /* not present */ }
+      }
+
+      // Manifest-based removal for shared directories
+      const projectManifest = await loadManifest(getProjectManifestPath(targetDir));
+      const sharedDirsToTryPrune = [
         path.join(targetDir, '.claude', 'hooks'),
         path.join(targetDir, '.claude', 'hooks-windows'),
         path.join(targetDir, '.claude', 'personalities'),
         path.join(targetDir, '.claude', 'output-styles'),
         path.join(targetDir, '.claude', 'audio'),
-        path.join(targetDir, '.agentvibes'),
       ];
-
-      for (const dirPath of projectPaths) {
-        try {
-          await fs.rm(dirPath, { recursive: true, force: true });
-          removedCount++;
-        } catch (err) {
-          // Ignore if directory doesn't exist
+      if (Object.keys(projectManifest).length > 0) {
+        removedCount += await removeManifestFiles(projectManifest, targetDir, sharedDirsToTryPrune);
+      } else {
+        // No manifest (pre-manifest install) — fall back to named-file removal for safety
+        const knownProjectFiles = [
+          ...CRITICAL_HOOKS.map(h => path.join(targetDir, '.claude', 'hooks', h)),
+          ...CRITICAL_HOOKS_WINDOWS.map(h => path.join(targetDir, '.claude', 'hooks-windows', h)),
+        ];
+        for (const f of knownProjectFiles) {
+          try { await fs.unlink(f); removedCount++; } catch { /* not present */ }
+        }
+        for (const dir of sharedDirsToTryPrune) {
+          try { await fs.rmdir(dir); } catch { /* not empty or gone */ }
         }
       }
 
@@ -6065,33 +6253,44 @@ program
           removedCount++;
         } catch (_) { /* not present */ }
 
-        // Inside ~/.claude/, remove only the subdirs/files AgentVibes installed
+        // Inside ~/.claude/, remove only the files AgentVibes installed.
+        // Use the global manifest so user-added hooks/personalities are preserved.
+        // AgentVibes-exclusive subdir is removed via rm -r; shared dirs via manifest.
         const claudeDir = path.join(homedir, '.claude');
-        const agentVibesOwnedInClaude = [
+        try { await fs.rm(path.join(claudeDir, 'commands', 'agent-vibes'), { recursive: true, force: true }); removedCount++; } catch { /* not present */ }
+
+        const globalManifest = await loadManifest(getGlobalManifestPath(homedir));
+        const globalSharedDirs = [
           path.join(claudeDir, 'hooks'),
           path.join(claudeDir, 'hooks-windows'),
-          path.join(claudeDir, 'commands', 'agent-vibes'),
           path.join(claudeDir, 'personalities'),
           path.join(claudeDir, 'output-styles'),
           path.join(claudeDir, 'audio'),
         ];
+        if (Object.keys(globalManifest).length > 0) {
+          removedCount += await removeManifestFiles(globalManifest, homedir, globalSharedDirs);
+        } else {
+          // No manifest — remove only known AgentVibes hook files by name
+          const knownGlobalFiles = [
+            ...CRITICAL_HOOKS.map(h => path.join(claudeDir, 'hooks', h)),
+            ...CRITICAL_HOOKS_WINDOWS.map(h => path.join(claudeDir, 'hooks-windows', h)),
+          ];
+          for (const f of knownGlobalFiles) {
+            try { await fs.unlink(f); removedCount++; } catch { /* not present */ }
+          }
+          for (const dir of globalSharedDirs) {
+            try { await fs.rmdir(dir); } catch { /* not empty or gone */ }
+          }
+        }
+
         const agentVibesConfigFiles = [
           'tts-voice.txt', 'tts-provider.txt', 'tts-personality.txt',
           'tts-verbosity.txt', 'tts-translate.txt', 'tts-target-voice.txt',
           'tts-target-language.txt', 'tts-language.txt', 'personalities.json',
           'github-star-reminder.txt', 'piper-voices-dir.txt', 'verbosity.txt',
         ];
-
-        for (const dirPath of agentVibesOwnedInClaude) {
-          try {
-            await fs.rm(dirPath, { recursive: true, force: true });
-            removedCount++;
-          } catch (_) { /* not present */ }
-        }
         for (const fileName of agentVibesConfigFiles) {
-          try {
-            await fs.unlink(path.join(claudeDir, fileName));
-          } catch (_) { /* not present */ }
+          try { await fs.unlink(path.join(claudeDir, fileName)); } catch { /* not present */ }
         }
       }
 
@@ -6503,5 +6702,9 @@ export {
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
   copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
   installPluginManifest, checkAndInstallPiper,
-  updateGlobalHooks, CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
+  updateGlobalHooks, updateCommandFiles, updatePersonalityFiles,
+  CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
+  // Manifest utilities (used by tests and external tooling)
+  getProjectManifestPath, getGlobalManifestPath,
+  loadManifest, saveManifest, computeFileHash, manifestSafeCopy, removeManifestFiles,
 };

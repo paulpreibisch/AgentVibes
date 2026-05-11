@@ -47,6 +47,13 @@ foreach ($script in $Scripts) {
     $src = Join-Path $SourceDir $script
     $dst = Join-Path $DestDir  $script
     if (Test-Path $src) {
+        # Back up any existing file before overwriting so user edits are recoverable
+        if (Test-Path $dst) {
+            $bak = $dst + '.user.bak'
+            if (-not (Test-Path $bak)) {
+                Copy-Item -Path $dst -Destination $bak -ErrorAction SilentlyContinue
+            }
+        }
         Copy-Item -Path $src -Destination $dst -Force
         Write-Host "  Updated: $script" -ForegroundColor Green
         $Updated++

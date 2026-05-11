@@ -481,19 +481,54 @@ export async function removeCopilotMcp(targetDir) {
   }
 }
 
+const AGENTVIBES_MARKER_START = '<!-- BEGIN AGENTVIBES -->';
+const AGENTVIBES_MARKER_END = '<!-- END AGENTVIBES -->';
+
+function wrapWithMarkers(content) {
+  return `${AGENTVIBES_MARKER_START}\n${content.trim()}\n${AGENTVIBES_MARKER_END}\n`;
+}
+
+function injectMarkerBlock(existing, newBlock) {
+  const start = existing.indexOf(AGENTVIBES_MARKER_START);
+  const end = existing.indexOf(AGENTVIBES_MARKER_END);
+  if (start !== -1 && end !== -1) {
+    return existing.substring(0, start) + newBlock + existing.substring(end + AGENTVIBES_MARKER_END.length + 1);
+  }
+  return existing.trimEnd() + (existing.trim() ? '\n\n' : '') + newBlock;
+}
+
+function removeMarkerBlock(existing) {
+  const start = existing.indexOf(AGENTVIBES_MARKER_START);
+  const end = existing.indexOf(AGENTVIBES_MARKER_END);
+  if (start === -1 || end === -1) return existing;
+  const before = existing.substring(0, start).trimEnd();
+  const after = existing.substring(end + AGENTVIBES_MARKER_END.length).replace(/^\n+/, '\n');
+  return (before + after).trimEnd() + '\n';
+}
+
 export async function installCopilotInstructions(targetDir, packageDir) {
   const destPath = path.join(targetDir, '.github', 'copilot-instructions.md');
   const srcPath = path.join(packageDir, '.github', 'copilot-instructions.md');
   try {
     await fs.mkdir(path.join(targetDir, '.github'), { recursive: true });
-    const content = await fs.readFile(srcPath, 'utf8');
-    await fs.writeFile(destPath, content);
+    const srcContent = await fs.readFile(srcPath, 'utf8');
+    let existing = '';
+    try { existing = await fs.readFile(destPath, 'utf8'); } catch { /* new file */ }
+    const block = wrapWithMarkers(srcContent);
+    await fs.writeFile(destPath, injectMarkerBlock(existing, block));
   } catch { /* best effort */ }
 }
 
 export async function removeCopilotInstructions(targetDir) {
+  const destPath = path.join(targetDir, '.github', 'copilot-instructions.md');
   try {
-    await fs.unlink(path.join(targetDir, '.github', 'copilot-instructions.md'));
+    const existing = await fs.readFile(destPath, 'utf8');
+    const updated = removeMarkerBlock(existing);
+    if (updated.trim()) {
+      await fs.writeFile(destPath, updated);
+    } else {
+      await fs.unlink(destPath);
+    }
   } catch { /* already gone */ }
 }
 
@@ -582,10 +617,15 @@ export function buildCodexToml(existingContent = '') {
 export async function installCodexInstructions(targetDir, packageDir) {
   const srcPath = path.join(packageDir, '.codex', 'AGENTS.md');
   try {
-    const content = await fs.readFile(srcPath, 'utf8');
+    const srcContent = await fs.readFile(srcPath, 'utf8');
+    const block = wrapWithMarkers(srcContent);
     await fs.mkdir(path.join(targetDir, '.codex'), { recursive: true });
-    await fs.writeFile(path.join(targetDir, '.codex', 'AGENTS.md'), content);
-    await fs.writeFile(path.join(targetDir, 'AGENTS.md'), content);
+
+    for (const dest of [path.join(targetDir, '.codex', 'AGENTS.md'), path.join(targetDir, 'AGENTS.md')]) {
+      let existing = '';
+      try { existing = await fs.readFile(dest, 'utf8'); } catch { /* new file */ }
+      await fs.writeFile(dest, injectMarkerBlock(existing, block));
+    }
   } catch { /* best effort */ }
 }
 
@@ -604,12 +644,17 @@ export async function installCodexHooks(targetDir, packageDir) {
 }
 
 export async function removeCodexInstructions(targetDir) {
-  try {
-    await fs.unlink(path.join(targetDir, '.codex', 'AGENTS.md'));
-  } catch { /* already gone */ }
-  try {
-    await fs.unlink(path.join(targetDir, 'AGENTS.md'));
-  } catch { /* already gone */ }
+  for (const dest of [path.join(targetDir, '.codex', 'AGENTS.md'), path.join(targetDir, 'AGENTS.md')]) {
+    try {
+      const existing = await fs.readFile(dest, 'utf8');
+      const updated = removeMarkerBlock(existing);
+      if (updated.trim()) {
+        await fs.writeFile(dest, updated);
+      } else {
+        await fs.unlink(dest);
+      }
+    } catch { /* already gone */ }
+  }
 }
 
 export async function removeCodexHooks(targetDir) {

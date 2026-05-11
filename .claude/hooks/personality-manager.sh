@@ -276,6 +276,13 @@ case "$1" in
       exit 1
     fi
 
+    # Validate name: alphanumeric, hyphens, underscores only — no path traversal
+    if [[ ! "$NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      echo "❌ Invalid personality name '$NAME'"
+      echo "   Name must contain only letters, numbers, hyphens, and underscores"
+      exit 1
+    fi
+
     FILE="$PERSONALITIES_DIR/${NAME}.md"
     if [[ -f "$FILE" ]]; then
       echo "❌ Personality '$NAME' already exists"
@@ -306,8 +313,8 @@ Describe how the AI should generate messages for this personality.
 - "Example response 2"
 EOF
 
-    # Replace NAME with actual name
-    sed -i "s/NAME/$NAME/g" "$FILE"
+    # Replace NAME placeholder — use | as delimiter to avoid issues with / in paths
+    sed -i "s|NAME|${NAME}|g" "$FILE"
 
     echo "✅ Created new personality: $NAME"
     echo "📝 Edit the file: $FILE"
@@ -324,6 +331,12 @@ EOF
     if [[ -z "$NAME" ]]; then
       echo "❌ Please specify a personality name"
       echo "Usage: $0 edit <name>"
+      exit 1
+    fi
+
+    if [[ ! "$NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      echo "❌ Invalid personality name '$NAME'"
+      echo "   Name must contain only letters, numbers, hyphens, and underscores"
       exit 1
     fi
 
