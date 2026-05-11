@@ -118,16 +118,20 @@ test('Session Start (Linux) - injects absolute play-tts.sh path not relative', {
 
 test('Per-LLM Routing (Linux) - play-tts.sh reads CLAUDE_PROJECT_DIR config', { skip: SKIP_ON_WINDOWS }, async () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-linux-routing-'));
+  // Isolated HOME prevents ~/.agentvibes/transport-config.json from routing to ssh-remote
+  const fakeHome = mkdtempSync(join(tmpdir(), 'agentvibes-routing-home-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
   mkdirSync(configDir, { recursive: true });
   mkdirSync(audioDir, { recursive: true });
+  mkdirSync(join(fakeHome, '.agentvibes'), { recursive: true });
 
   // Write a known per-LLM config row
   writeFileSync(
     join(configDir, 'audio-effects.cfg'),
     'llm:claude-code|off||0.15|en_US-lessac-high|routing-test|piper\n'
   );
+  writeFileSync(join(tempDir, '.claude', 'tts-provider.txt'), 'piper');
 
   try {
     const result = await runBash(
@@ -136,7 +140,7 @@ test('Per-LLM Routing (Linux) - play-tts.sh reads CLAUDE_PROJECT_DIR config', { 
         env: {
           CLAUDE_PROJECT_DIR: tempDir,
           AGENTVIBES_VERBOSE: '1',
-          HOME: process.env.HOME,
+          HOME: fakeHome,
           PATH: process.env.PATH,
         },
         timeout: 30000,
@@ -150,20 +154,25 @@ test('Per-LLM Routing (Linux) - play-tts.sh reads CLAUDE_PROJECT_DIR config', { 
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+    rmSync(fakeHome, { recursive: true, force: true });
   }
 }, 30000);
 
 test('Per-LLM Routing (Linux) - without --llm flag falls back to llm:default', { skip: SKIP_ON_WINDOWS }, async () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-linux-default-'));
+  // Isolated HOME prevents ~/.agentvibes/transport-config.json from routing to ssh-remote
+  const fakeHome = mkdtempSync(join(tmpdir(), 'agentvibes-default-home-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
   mkdirSync(configDir, { recursive: true });
   mkdirSync(audioDir, { recursive: true });
+  mkdirSync(join(fakeHome, '.agentvibes'), { recursive: true });
 
   writeFileSync(
     join(configDir, 'audio-effects.cfg'),
     'llm:default|off||0.15|en_US-ryan-high|default-pretext|piper\nllm:claude-code|off||0.15|en_US-lessac-high|cc-pretext|piper\n'
   );
+  writeFileSync(join(tempDir, '.claude', 'tts-provider.txt'), 'piper');
 
   try {
     const result = await runBash(
@@ -172,7 +181,7 @@ test('Per-LLM Routing (Linux) - without --llm flag falls back to llm:default', {
         env: {
           CLAUDE_PROJECT_DIR: tempDir,
           AGENTVIBES_VERBOSE: '1',
-          HOME: process.env.HOME,
+          HOME: fakeHome,
           PATH: process.env.PATH,
         },
         timeout: 30000,
@@ -190,6 +199,7 @@ test('Per-LLM Routing (Linux) - without --llm flag falls back to llm:default', {
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+    rmSync(fakeHome, { recursive: true, force: true });
   }
 }, 30000);
 
@@ -203,16 +213,21 @@ test('Per-LLM Routing (Linux) - without --llm flag falls back to llm:default', {
 
 test('Config round-trip (Linux) - Voice output matches voice configured in audio-effects.cfg', { skip: SKIP_ON_WINDOWS }, async () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-linux-roundtrip-'));
+  // Isolated HOME prevents ~/.agentvibes/transport-config.json from routing to ssh-remote
+  const fakeHome = mkdtempSync(join(tmpdir(), 'agentvibes-roundtrip-home-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
   mkdirSync(configDir, { recursive: true });
   mkdirSync(audioDir, { recursive: true });
+  mkdirSync(join(fakeHome, '.agentvibes'), { recursive: true });
 
   const configuredVoice = 'en_US-libritts-high::Mary';
   writeFileSync(
     join(configDir, 'audio-effects.cfg'),
     `llm:claude-code|off||0.15|${configuredVoice}|roundtrip-test|piper\n`
   );
+  // Force piper locally so the test never attempts an SSH transport
+  writeFileSync(join(tempDir, '.claude', 'tts-provider.txt'), 'piper');
 
   try {
     const result = await runBash(
@@ -221,7 +236,7 @@ test('Config round-trip (Linux) - Voice output matches voice configured in audio
         env: {
           CLAUDE_PROJECT_DIR: tempDir,
           AGENTVIBES_VERBOSE: '1',
-          HOME: process.env.HOME,
+          HOME: fakeHome,
           PATH: process.env.PATH,
         },
         timeout: 30000,
@@ -235,6 +250,7 @@ test('Config round-trip (Linux) - Voice output matches voice configured in audio
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+    rmSync(fakeHome, { recursive: true, force: true });
   }
 }, 30000);
 
@@ -246,22 +262,27 @@ test('Config round-trip (Linux) - Voice output matches voice configured in audio
 
 test('E2E (Linux) - project voice used even when CLAUDE_PROJECT_DIR not in Bash env', { skip: SKIP_ON_WINDOWS }, async () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-linux-e2e-'));
+  // Isolated HOME prevents ~/.agentvibes/transport-config.json from routing to ssh-remote
+  const fakeHome = mkdtempSync(join(tmpdir(), 'agentvibes-e2e-home-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
   mkdirSync(configDir, { recursive: true });
   mkdirSync(audioDir, { recursive: true });
+  mkdirSync(join(fakeHome, '.agentvibes'), { recursive: true });
 
   const configuredVoice = 'en_US-libritts-high::Mary';
   writeFileSync(
     join(configDir, 'audio-effects.cfg'),
     `llm:claude-code|off||0.15|${configuredVoice}|e2e-test|piper\n`
   );
+  // Force piper locally so the test never attempts an SSH transport
+  writeFileSync(join(tempDir, '.claude', 'tts-provider.txt'), 'piper');
 
   // Step 1: Run session-start-tts.sh WITH CLAUDE_PROJECT_DIR to capture injected protocol
   const sessionResult = await runBash(
     [join(hooksDir, 'session-start-tts.sh')],
     {
-      env: { CLAUDE_PROJECT_DIR: tempDir, HOME: process.env.HOME, PATH: process.env.PATH },
+      env: { CLAUDE_PROJECT_DIR: tempDir, HOME: fakeHome, PATH: process.env.PATH },
       timeout: 15000,
     }
   );
@@ -277,13 +298,14 @@ test('E2E (Linux) - project voice used even when CLAUDE_PROJECT_DIR not in Bash 
   assert.ok(projDirMatch, `Must find --project-dir in injected protocol.\nProtocol: ${protocol.slice(0, 400)}`);
   const injectedProjectDir = projDirMatch[1];
 
-  // Step 3: Run play-tts.sh WITHOUT CLAUDE_PROJECT_DIR but WITH --project-dir
+  // Step 3: Run play-tts.sh WITHOUT CLAUDE_PROJECT_DIR but WITH --project-dir.
+  // Use fakeHome so transport-config.json (ssh-remote) is not inherited from real $HOME.
   const ttsResult = await runBash(
     [join(hooksDir, 'play-tts.sh'), 'e2e lifecycle test', '--llm', 'claude-code', '--project-dir', injectedProjectDir],
     {
       env: {
-        // Deliberately NO CLAUDE_PROJECT_DIR
-        HOME: process.env.HOME,
+        // Deliberately NO CLAUDE_PROJECT_DIR — play-tts.sh must recover it from --project-dir
+        HOME: fakeHome,
         PATH: process.env.PATH,
       },
       timeout: 30000,
@@ -299,6 +321,7 @@ test('E2E (Linux) - project voice used even when CLAUDE_PROJECT_DIR not in Bash 
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+    rmSync(fakeHome, { recursive: true, force: true });
   }
 }, 45000);
 

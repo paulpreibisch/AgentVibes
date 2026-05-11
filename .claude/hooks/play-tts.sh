@@ -335,6 +335,12 @@ if [[ -n "$VOICE_OVERRIDE" ]]; then
   esac
 fi
 
+# Emit resolved voice and provider in verbose mode (used by tests and diagnostics)
+if [[ "${AGENTVIBES_VERBOSE:-0}" == "1" ]]; then
+  [[ -n "${VOICE_OVERRIDE:-}" ]] && echo "voice=${VOICE_OVERRIDE}" >&2
+  echo "provider=${ACTIVE_PROVIDER}" >&2
+fi
+
 # @function speak_text
 # @intent Route text to appropriate TTS provider
 # @why Reusable function for speaking, used by both single and learning modes
