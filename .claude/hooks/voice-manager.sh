@@ -561,8 +561,55 @@ case "$1" in
     fi
     ;;
 
+  sample)
+    # Play a sample phrase with the specified voice (used by /agent-vibes:sample)
+    SAMPLE_VOICE="${2:-}"
+    if [[ -z "$SAMPLE_VOICE" ]]; then
+      echo "❌ Usage: /agent-vibes:sample <voice-name>"
+      echo ""
+      echo "Examples:"
+      echo "  /agent-vibes:sample en_US-amy-medium"
+      echo "  /agent-vibes:sample Ryan"
+      exit 1
+    fi
+
+    # Source provider-manager.sh first — get_active_provider and detect_routing_llm
+    # are both defined there; sourcing after calling them silently produces empty values.
+    source "$SCRIPT_DIR/provider-manager.sh" 2>/dev/null || true
+
+    ACTIVE_PROVIDER=$(get_active_provider)
+
+    # Friendly name resolution for Piper and transport providers
+    case "$ACTIVE_PROVIDER" in
+      piper|ssh-remote|agentvibes-receiver|termux-ssh)
+        source "$SCRIPT_DIR/piper-voice-manager.sh" 2>/dev/null || true
+        SAMPLE_META="$(realpath "$SCRIPT_DIR/../../.agentvibes/config/voice-metadata.json" 2>/dev/null || echo "")"
+        if [[ -f "$SAMPLE_META" ]] && command -v jq >/dev/null 2>&1; then
+          SAMPLE_RESOLVED=$(jq -r --arg n "$(to_lower "$SAMPLE_VOICE")" '
+            .voices | to_entries[] |
+            select(.key == $n or (.value.displayName | ascii_downcase) == $n) |
+            .value.id
+          ' "$SAMPLE_META" 2>/dev/null | head -1)
+          if [[ -n "$SAMPLE_RESOLVED" ]] && [[ "$SAMPLE_RESOLVED" =~ ^[a-zA-Z0-9_.:+-]+$ ]]; then
+            echo "🔍 Resolved '${SAMPLE_VOICE}' → '${SAMPLE_RESOLVED}'"
+            SAMPLE_VOICE="$SAMPLE_RESOLVED"
+          fi
+        fi
+        ;;
+    esac
+
+    # Detect routing LLM so SSH-remote setups forward audio to the receiver
+    SAMPLE_LLM=$(detect_routing_llm 2>/dev/null || echo "")
+    SAMPLE_LLM_ARG=()
+    [[ -n "$SAMPLE_LLM" ]] && SAMPLE_LLM_ARG=(--llm "$SAMPLE_LLM")
+
+    echo "🎤 Sampling voice: $SAMPLE_VOICE"
+    "$SCRIPT_DIR/play-tts.sh" "Hi, I'm ${SAMPLE_VOICE}. How does my voice sound?" \
+      "$SAMPLE_VOICE" "${SAMPLE_LLM_ARG[@]+"${SAMPLE_LLM_ARG[@]}"}"
+    ;;
+
   *)
-    echo "Usage: voice-manager.sh [list|switch|get|replay|whoami] [voice_name]"
+    echo "Usage: voice-manager.sh [list|switch|get|replay|whoami|sample] [voice_name]"
     echo ""
     echo "Commands:"
     echo "  list                    - List all available voices"
@@ -570,6 +617,7 @@ case "$1" in
     echo "  get                     - Get current voice name"
     echo "  replay [N]              - Replay Nth most recent audio (default: 1)"
     echo "  whoami                  - Show current voice and personality"
+    echo "  sample <voice_name>     - Play sample audio with the given voice"
     exit 1
     ;;
 esac

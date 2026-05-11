@@ -449,6 +449,14 @@ provider_preview() {
   echo "🎤 Voice Preview ($current_provider)"
   echo ""
 
+  # Detect routing LLM so preview audio reaches SSH/remote receivers
+  # (without --llm, play-tts.sh plays locally on headless servers instead of
+  # forwarding to the configured Windows/remote receiver)
+  local _preview_llm _preview_llm_args
+  _preview_llm=$(detect_routing_llm 2>/dev/null || echo "")
+  _preview_llm_args=()
+  [[ -n "$_preview_llm" ]] && _preview_llm_args=(--llm "$_preview_llm")
+
   case "$current_provider" in
     piper)
       # Use the Piper voice manager's list functionality
@@ -468,7 +476,8 @@ provider_preview() {
           if verify_voice "$voice_arg"; then
             echo "🎤 Previewing Piper voice: $voice_arg"
             echo ""
-            "$SCRIPT_DIR/play-tts.sh" "Hello, this is the $voice_arg voice. How do you like it?" "$voice_arg"
+            "$SCRIPT_DIR/play-tts.sh" "Hello, this is the $voice_arg voice. How do you like it?" \
+              "$voice_arg" "${_preview_llm_args[@]+"${_preview_llm_args[@]}"}"
           else
             echo "❌ Voice model not found: $voice_arg"
             echo ""
@@ -506,7 +515,8 @@ provider_preview() {
         local display_name="${voice_entry##*:}"
 
         echo "🔊 ${display_name}..."
-        "$SCRIPT_DIR/play-tts.sh" "Hi, my name is ${display_name}" "$voice_name"
+        "$SCRIPT_DIR/play-tts.sh" "Hi, my name is ${display_name}" \
+          "$voice_name" "${_preview_llm_args[@]+"${_preview_llm_args[@]}"}"
 
         # Wait for the voice to finish playing before starting next one
         sleep 3
@@ -532,7 +542,8 @@ provider_preview() {
         if say -v ? 2>/dev/null | grep -qi "^${voice_arg} "; then
           echo "🎤 Previewing macOS voice: $voice_arg"
           echo ""
-          "$SCRIPT_DIR/play-tts.sh" "Hello, this is ${voice_arg}. How do you like my voice?" "$voice_arg"
+          "$SCRIPT_DIR/play-tts.sh" "Hello, this is ${voice_arg}. How do you like my voice?" \
+            "$voice_arg" "${_preview_llm_args[@]+"${_preview_llm_args[@]}"}"
         else
           echo "❌ Voice not found: $voice_arg"
           echo ""
@@ -554,7 +565,8 @@ provider_preview() {
       for voice in "${sample_voices[@]}"; do
         if say -v ? 2>/dev/null | grep -qi "^${voice} "; then
           echo "🔊 ${voice}..."
-          "$SCRIPT_DIR/play-tts.sh" "Hi, my name is ${voice}" "$voice"
+          "$SCRIPT_DIR/play-tts.sh" "Hi, my name is ${voice}" \
+            "$voice" "${_preview_llm_args[@]+"${_preview_llm_args[@]}"}"
           sleep 3
         fi
       done

@@ -22,7 +22,17 @@ param(
     # CLAUDE_PROJECT_DIR value here so per-project config is found even when
     # Bash tool calls do not propagate CLAUDE_PROJECT_DIR to child processes.
     [Parameter(Mandatory = $false)]
-    [string]$ProjectDir = ""
+    [string]$ProjectDir = "",
+
+    # Provider override from the remote sender (set by the watcher from the
+    # JSON payload's "provider" field).  Overrides the local tts-provider.txt
+    # default so the Linux-side config fully controls which engine the Windows
+    # receiver uses — no Windows-side provider config needed.
+    # Per-LLM engine rows in audio-effects.cfg still take final priority for
+    # explicit Windows overrides (e.g. llm:copilot → windows-sapi).
+    # Accepts cross-platform aliases: "piper" = windows-piper, "sapi" = windows-sapi.
+    [Parameter(Mandatory = $false)]
+    [string]$ProviderOverride = ""
 )
 
 # Text-file handoff: the SSH receiver watcher writes long/special-char text to
@@ -96,6 +106,29 @@ switch ($ActiveProvider) {
         Write-Host "[ERROR] Unknown provider: $ActiveProvider" -ForegroundColor Red
         Write-Host "Use: .\provider-manager.ps1 list" -ForegroundColor Yellow
         exit 1
+    }
+}
+
+# Apply remote provider override (from the JSON payload's "provider" field, passed
+# by the SSH-receiver watcher via -ProviderOverride).  This lets the Linux-side
+# audio-effects.cfg row for llm:claude-code specify "piper" and have it honoured
+# on Windows without requiring the Windows tts-provider.txt to be reconfigured.
+# Priority: lower than per-LLM $_LlmEngine (audio-effects.cfg row, set later), higher
+# than the global tts-provider.txt default set above.
+if ($ProviderOverride) {
+    switch ($ProviderOverride) {
+        { $_ -in "windows-piper", "piper" } {
+            $ProviderScript = "$HooksDir\play-tts-piper.ps1"
+            if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
+        }
+        { $_ -in "windows-sapi", "sapi" } {
+            $ProviderScript = "$HooksDir\play-tts-sapi.ps1"
+            if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1" }
+        }
+        "soprano" { $ProviderScript = "$HooksDir\play-tts-soprano.ps1" }
+        default {
+            Write-Host "[WARNING] play-tts.ps1: Unknown ProviderOverride '$ProviderOverride' ignored" -ForegroundColor Yellow
+        }
     }
 }
 
