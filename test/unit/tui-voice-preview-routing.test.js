@@ -208,3 +208,169 @@ test('audio-env: detectRemoteLlm is exported', () => {
     'detectRemoteLlm must be an exported function in audio-env.js'
   );
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite 3: setup-tab _openVoicePickerForLlm per-LLM remote routing
+//
+// Regression: when global provider is piper but an LLM has mode=remote in
+// transport-config.json, voice previews inside _openVoicePickerForLlm were
+// played locally and never reached the remote receiver (e.g. laptop-win).
+// The fix reads transport-config.json once in _openVoicePickerForLlm and
+// sets _llmIsRemote, which is then OR'd into the _remoteProviders check.
+// ──────────────────────────────────────────────────────────────────────────────
+
+test('setup-tab: _openVoicePickerForLlm reads transport-config.json to set _llmIsRemote', () => {
+  const src = readFileSync(join(PROJECT_ROOT, 'src/console/tabs/setup-tab.js'), 'utf-8');
+
+  const fnStart = src.indexOf('function _openVoicePickerForLlm(');
+  assert.ok(fnStart !== -1, '_openVoicePickerForLlm must exist in setup-tab.js');
+
+  // Find where the outer function ends
+  let depth = 0, i = fnStart;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    i++;
+  }
+  const fnBody = src.slice(fnStart, i + 1);
+
+  assert.ok(
+    fnBody.includes('_llmIsRemote'),
+    '_openVoicePickerForLlm must declare _llmIsRemote to track per-LLM remote routing'
+  );
+  assert.ok(
+    fnBody.includes('transport-config.json'),
+    '_openVoicePickerForLlm must read transport-config.json to determine _llmIsRemote'
+  );
+  assert.ok(
+    fnBody.includes("mode === 'remote'") || fnBody.includes("mode==='remote'"),
+    '_openVoicePickerForLlm must check mode===remote in transport-config.json'
+  );
+});
+
+test('setup-tab: _previewVoice uses _llmIsRemote as fallback routing path', () => {
+  const src = readFileSync(join(PROJECT_ROOT, 'src/console/tabs/setup-tab.js'), 'utf-8');
+
+  const fnStart = src.indexOf('function _previewVoice(');
+  assert.ok(fnStart !== -1, '_previewVoice must exist in setup-tab.js');
+
+  let depth = 0, i = fnStart;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    i++;
+  }
+  const fnBody = src.slice(fnStart, i + 1);
+
+  assert.ok(
+    fnBody.includes('_llmIsRemote'),
+    '_previewVoice must check _llmIsRemote so per-LLM remote routing triggers even when global provider is piper'
+  );
+  assert.ok(
+    fnBody.includes('play-tts.sh'),
+    '_previewVoice must route through play-tts.sh when _llmIsRemote is true'
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Suite 4: agents-tab _openVoicePickerForAgent voice preview indicators
+//
+// Regression: _previewVoice in agents-tab was missing _refreshVP() calls so
+// the ♪ dot never appeared in the voice list. Also, ssh-remote exits
+// immediately (fire-and-forget SSH), causing the "♪ Playing" indicator to
+// vanish in ~100ms. Fix adds _refreshVP() calls and a 2s minimum display timer.
+// ──────────────────────────────────────────────────────────────────────────────
+
+test('agents-tab: _openVoicePickerForAgent._previewVoice calls _refreshVP after starting preview', () => {
+  const src = readFileSync(join(PROJECT_ROOT, 'src/console/tabs/agents-tab.js'), 'utf-8');
+
+  const fnStart = src.indexOf('function _openVoicePickerForAgent(');
+  assert.ok(fnStart !== -1, '_openVoicePickerForAgent must exist in agents-tab.js');
+
+  let depth = 0, i = fnStart;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    i++;
+  }
+  const fnBody = src.slice(fnStart, i + 1);
+
+  const previewFnStart = fnBody.indexOf('function _previewVoice(');
+  assert.ok(previewFnStart !== -1, '_previewVoice must exist inside _openVoicePickerForAgent');
+
+  let d2 = 0, j = previewFnStart;
+  while (j < fnBody.length) {
+    if (fnBody[j] === '{') d2++;
+    else if (fnBody[j] === '}') { d2--; if (d2 === 0) break; }
+    j++;
+  }
+  const previewBody = fnBody.slice(previewFnStart, j + 1);
+
+  assert.ok(
+    previewBody.includes('_refreshVP()'),
+    '_previewVoice must call _refreshVP() so the ♪ dot updates in the voice list'
+  );
+});
+
+test('agents-tab: _openVoicePickerForAgent uses minimum display timer for ssh-remote', () => {
+  const src = readFileSync(join(PROJECT_ROOT, 'src/console/tabs/agents-tab.js'), 'utf-8');
+
+  const fnStart = src.indexOf('function _openVoicePickerForAgent(');
+  let depth = 0, i = fnStart;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    i++;
+  }
+  const fnBody = src.slice(fnStart, i + 1);
+
+  assert.ok(
+    fnBody.includes('_previewMinTimer'),
+    '_openVoicePickerForAgent must declare _previewMinTimer for minimum indicator display'
+  );
+  assert.ok(
+    fnBody.includes('setTimeout'),
+    '_previewVoice must use setTimeout to keep indicator visible when ssh-remote exits immediately'
+  );
+  assert.ok(
+    fnBody.includes('clearTimeout'),
+    '_killVP must clearTimeout(_previewMinTimer) to prevent stale timer state'
+  );
+});
+
+test('agents-tab: _openVoicePickerForAgent._previewVoice passes CLAUDE_PROJECT_DIR in spawn env', () => {
+  const src = readFileSync(join(PROJECT_ROOT, 'src/console/tabs/agents-tab.js'), 'utf-8');
+
+  const fnStart = src.indexOf('function _openVoicePickerForAgent(');
+  let depth = 0, i = fnStart;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    i++;
+  }
+  const fnBody = src.slice(fnStart, i + 1);
+
+  assert.ok(
+    fnBody.includes('CLAUDE_PROJECT_DIR'),
+    '_previewVoice must pass CLAUDE_PROJECT_DIR in spawn env so play-tts.sh finds audio-effects.cfg'
+  );
+});
+
+test('setup-tab: os module is imported before _openVoicePickerForLlm uses os.homedir()', () => {
+  const src = readFileSync(join(PROJECT_ROOT, 'src/console/tabs/setup-tab.js'), 'utf-8');
+
+  // os must be imported (not just available via global scope) so os.homedir() works
+  // in _openVoicePickerForLlm. A missing import causes a silent ReferenceError inside
+  // the try/catch, leaving _llmIsRemote=false and routing audio locally instead of remote.
+  const importOsIdx = src.search(/^import os from ['"]node:os['"]/m);
+  assert.ok(importOsIdx !== -1, 'setup-tab.js must import os from node:os');
+
+  // Import must appear before _openVoicePickerForLlm
+  const pickerIdx = src.indexOf('function _openVoicePickerForLlm(');
+  assert.ok(pickerIdx !== -1, '_openVoicePickerForLlm must exist');
+  assert.ok(importOsIdx < pickerIdx, 'os import must appear before _openVoicePickerForLlm');
+
+  // Must not have duplicate os imports (duplicate causes SyntaxError crashing the app)
+  const matches = [...src.matchAll(/^import os from ['"]node:os['"]/gm)];
+  assert.strictEqual(matches.length, 1, 'os must be imported exactly once — duplicate causes SyntaxError');
+});
