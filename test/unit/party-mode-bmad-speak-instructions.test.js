@@ -3,9 +3,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
-import path from 'node:path';
+import path, { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PROJECT_ROOT = path.resolve(import.meta.dirname, '..', '..');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 async function readProjectFile(relativePath) {
   return fs.readFile(path.join(PROJECT_ROOT, relativePath), 'utf8');
