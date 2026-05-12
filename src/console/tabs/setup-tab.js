@@ -2112,6 +2112,17 @@ export function createSetupTab(screen, services) {
     const _spawnEnv = buildAudioEnv();
     const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
 
+    // Check if this LLM has mode=remote in transport-config.json so voice previews
+    // are routed to the remote receiver even when the global provider is piper/local.
+    let _llmIsRemote = false;
+    if (llmKey) {
+      try {
+        const _tcPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
+        const _tc = JSON.parse(fs.readFileSync(_tcPath, 'utf8'));
+        _llmIsRemote = _tc[llmKey]?.mode === 'remote';
+      } catch {}
+    }
+
     function _killVP() {
       if (_previewProc) {
         try {
@@ -2239,7 +2250,7 @@ export function createSetupTab(screen, services) {
         }
       } catch {}
 
-      if (_remoteProviders.includes(_activeProvider)) {
+      if (_remoteProviders.includes(_activeProvider) || _llmIsRemote) {
         const _playTtsName = _isWin
           ? path.join('.claude', 'hooks-windows', 'play-tts.ps1')
           : path.join('.claude', 'hooks', 'play-tts.sh');
