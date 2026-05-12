@@ -19,12 +19,15 @@
 
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
-import path from 'node:path';
+import path, { dirname } from 'node:path';
 import fs from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const PROJECT_ROOT = path.resolve(import.meta.dirname, '..', '..');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 // ============================================================================
 // Voice Model Metadata
