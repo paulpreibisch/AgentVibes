@@ -18,7 +18,7 @@ import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
   parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, genderIconTag,
 } from './voices-tab.js';
-import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { t } from '../../i18n/strings.js';
@@ -1031,64 +1031,35 @@ ${_tl('bmadDesc')}
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); screen.render(); return; }
       _killVP();
 
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-
-      const _ms = parseMultiSpeaker(voiceId);
-      const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
-      const safeBase = path.resolve(PIPER_VOICES_DIR);
-      if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
-
-      const tempWav = _secureTempWav('vp');
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+      if (!fs.existsSync(playTtsScript)) return;
 
-      // Resolve piper binary (on Windows, find piper.exe)
-      let _piperBin = 'piper';
-      if (_isWin) {
-        const _lad = process.env.LOCALAPPDATA ||
-          (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
-        if (_lad) {
-          const _ep = path.join(_lad, 'Programs', 'Piper', 'piper.exe');
-          if (fs.existsSync(_ep)) _piperBin = _ep;
-        }
-      }
+      const remoteLlm = detectRemoteLlm();
+      const args = [playTtsScript, phrase, voiceId];
+      if (remoteLlm) args.push('--llm', remoteLlm);
 
-      const args = ['--model', voicePath, '--output_file', tempWav];
-      if (_ms.speakerId != null) args.push('--speaker', String(_ms.speakerId));
-      const piper = spawn(_piperBin, args, {
-        stdio: ['pipe', 'ignore', 'ignore'],
-        detached: !_isWin,
-        windowsHide: true,
+      _previewProc = spawn('bash', args, {
+        stdio: 'ignore',
+        detached: true,
         env: _spawnEnv,
+        cwd: _projectRoot,
       });
-      piper.stdin.write(phrase + '\n');
-      piper.stdin.end();
-      _previewProc = piper;
       _previewVoiceId = voiceId;
 
       if (!_vpClosed) {
-        vpPreviewLine.setContent(`{bright-cyan-fg}♪ Synthesizing: ${voiceId}...{/bright-cyan-fg}`);
+        vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`);
         screen.render();
       }
 
-      piper.on('exit', (code) => {
-        if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
-        const wp = detectWavPlayer(_spawnEnv);
-        if (!wp) return;
-        const pp = spawn(wp.bin, wp.args(tempWav), {
-          stdio: 'ignore',
-          detached: !_isWin,
-          windowsHide: true,
-          env: _spawnEnv,
-        });
-        _previewProc = pp;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}{/bright-cyan-fg}`); screen.render(); }
-        pp.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }
-          try { fs.unlinkSync(tempWav); } catch {}
-        });
+      _previewProc.on('exit', () => {
+        if (_previewVoiceId === voiceId) {
+          _previewVoiceId = null;
+          _previewProc = null;
+          if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); }
+        }
       });
-      piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+      _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
     }
 
     vpList.key(['enter'], () => {
@@ -1220,8 +1191,10 @@ ${_tl('bmadDesc')}
       const _spawnEnv = buildAudioEnv();
       const scriptDir = path.join(_projectRoot, '.claude', 'hooks');
       const plainScript = path.join(scriptDir, 'play-tts.sh');
+      const remoteLlm = detectRemoteLlm();
       const args = [plainScript, phrase];
       if (voiceId) args.push(voiceId);
+      if (remoteLlm) args.push('--llm', remoteLlm);
 
       const proc = spawn('bash', args, {
         stdio: ['ignore', 'ignore', 'ignore'],

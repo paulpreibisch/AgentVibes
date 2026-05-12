@@ -110,6 +110,29 @@ function _detect(players, env) {
 }
 
 /**
+ * Detect the first LLM configured with remote transport in
+ * ~/.agentvibes/transport-config.json.
+ *
+ * Returns the LLM key (e.g. "claude-code") whose `mode` is "remote", or
+ * null if no such entry exists or the file is absent/invalid.
+ * Used by TUI voice-preview functions to route audio through the correct
+ * SSH transport rather than playing locally.
+ *
+ * @returns {string|null}
+ */
+export function detectRemoteLlm() {
+  const cfgPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
+  if (!fs.existsSync(cfgPath)) return null;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    for (const [llm, opts] of Object.entries(cfg)) {
+      if (opts && opts.mode === 'remote') return llm;
+    }
+  } catch {}
+  return null;
+}
+
+/**
  * Detect the best available MP3 player.
  * On Windows, falls back to ffplay/mpv if installed, otherwise null.
  *

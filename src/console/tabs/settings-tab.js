@@ -24,7 +24,7 @@ import {
 } from './voices-tab.js';
 import { LanguageService } from '../../services/language-service.js';
 import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
-import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { openReverbPicker } from '../widgets/reverb-picker.js';
 import { openPersonalityPicker } from '../widgets/personality-picker.js';
@@ -633,61 +633,35 @@ export function createSettingsTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
-      const _ms = parseMultiSpeaker(voiceId);
-      const voicePath = path.resolve(PIPER_VOICES_DIR, _ms.model + '.onnx');
-      const safeBase = path.resolve(PIPER_VOICES_DIR);
-      if (!voicePath.startsWith(safeBase + path.sep) && voicePath !== safeBase) return;
-
-      const tempWav = _secureTempWav('vp');
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+      if (!fs.existsSync(playTtsScript)) return;
 
-      let _piperBin = 'piper';
-      if (_isWin) {
-        const _lad = process.env.LOCALAPPDATA ||
-          (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
-        if (_lad) {
-          const _ep = path.join(_lad, 'Programs', 'Piper', 'piper.exe');
-          if (fs.existsSync(_ep)) _piperBin = _ep;
-        }
-      }
+      const remoteLlm = detectRemoteLlm();
+      const args = [playTtsScript, phrase, voiceId];
+      if (remoteLlm) args.push('--llm', remoteLlm);
 
-      const args = ['--model', voicePath, '--output_file', tempWav];
-      if (_ms.speakerId != null) args.push('--speaker', String(_ms.speakerId));
-      const piper = spawn(_piperBin, args, {
-        stdio: ['pipe', 'ignore', 'ignore'],
-        detached: !_isWin,
-        windowsHide: true,
+      _previewProc = spawn('bash', args, {
+        stdio: 'ignore',
+        detached: true,
         env: _spawnEnv,
+        cwd: _projectRoot,
       });
-      piper.stdin.write(phrase + '\n');
-      piper.stdin.end();
-      _previewProc = piper;
       _previewVoiceId = voiceId;
 
       if (!_vpClosed) {
-        vpPreviewLine.setContent(`{cyan-fg}♪ Synthesizing: ${voiceId}...{/cyan-fg}`);
+        vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}...{/cyan-fg}`);
         _refreshVP();
       }
 
-      piper.on('exit', (code) => {
-        if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-        if (code !== 0) { _previewProc = null; _previewVoiceId = null; try { fs.unlinkSync(tempWav); } catch {} return; }
-        const wp = detectWavPlayer(_spawnEnv);
-        if (!wp) return;
-        const pp = spawn(wp.bin, wp.args(tempWav), {
-          stdio: 'ignore',
-          detached: !_isWin,
-          windowsHide: true,
-          env: _spawnEnv,
-        });
-        _previewProc = pp;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
-        pp.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
-          try { fs.unlinkSync(tempWav); } catch {}
-        });
+      _previewProc.on('exit', () => {
+        if (_previewVoiceId === voiceId) {
+          _previewVoiceId = null;
+          _previewProc = null;
+          if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+        }
       });
-      piper.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+      _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
     }
 
     vpList.key(['enter'], () => {

@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
-import { buildAudioEnv } from '../audio-env.js';
+import { buildAudioEnv, detectRemoteLlm } from '../audio-env.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { PERSONALITY_EMOJIS, PERSONALITIES } from '../constants/personalities.js';
 
@@ -138,7 +138,10 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
       });
     } else {
       const ttsScript = path.join(process.cwd(), '.claude', 'hooks', 'play-tts.sh');
-      _pickerTtsProc = spawn('bash', [ttsScript, phrase], {
+      const remoteLlm = detectRemoteLlm();
+      const ttsArgs = [ttsScript, phrase];
+      if (remoteLlm) ttsArgs.push('--llm', remoteLlm);
+      _pickerTtsProc = spawn('bash', ttsArgs, {
         stdio: 'ignore',
         detached: true,
         env: _env,
