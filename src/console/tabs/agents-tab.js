@@ -917,11 +917,13 @@ ${_tl('bmadDesc')}
     let _allVoices = [];
     let _previewProc = null;
     let _previewVoiceId = null;
+    let _previewMinTimer = null;
     let _vpClosed = false;
 
     const _spawnEnv = buildAudioEnv();
 
     function _killVP() {
+      if (_previewMinTimer) { clearTimeout(_previewMinTimer); _previewMinTimer = null; }
       if (_previewProc) {
         try {
           if (process.platform === 'win32') {
@@ -1028,8 +1030,9 @@ ${_tl('bmadDesc')}
     }
 
     function _previewVoice(voiceId) {
-      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); screen.render(); return; }
+      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
+      if (_previewMinTimer) { clearTimeout(_previewMinTimer); _previewMinTimer = null; }
 
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
       const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
@@ -1042,24 +1045,32 @@ ${_tl('bmadDesc')}
       _previewProc = spawn('bash', args, {
         stdio: 'ignore',
         detached: true,
-        env: _spawnEnv,
+        env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;
 
       if (!_vpClosed) {
         vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`);
-        screen.render();
+        _refreshVP();
       }
 
-      _previewProc.on('exit', () => {
+      const _clearAfterMinDisplay = () => {
         if (_previewVoiceId === voiceId) {
           _previewVoiceId = null;
           _previewProc = null;
-          if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); }
+          if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
         }
+        _previewMinTimer = null;
+      };
+
+      // Keep indicator visible for at least 2s (ssh-remote exits immediately)
+      _previewProc.on('exit', () => {
+        _previewMinTimer = setTimeout(_clearAfterMinDisplay, 2000);
       });
-      _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+      _previewProc.on('error', () => {
+        _previewMinTimer = setTimeout(_clearAfterMinDisplay, 2000);
+      });
     }
 
     vpList.key(['enter'], () => {
