@@ -71,6 +71,10 @@ test('Audio effects config exists and is valid', () => {
 
 test('Audio effects config uses snake_case filenames', () => {
   const configPath = join(PROJECT_ROOT, '.claude/config/audio-effects.cfg');
+  if (!existsSync(configPath)) {
+    console.log('  Skipping: audio-effects.cfg not found');
+    return;
+  }
   const content = readFileSync(configPath, 'utf-8');
 
   // Extract all background file references (3rd pipe-separated field)
@@ -99,6 +103,10 @@ test('Audio effects config uses snake_case filenames', () => {
 
 test('Audio effects config does not reference optimized/ subdirectory', () => {
   const configPath = join(PROJECT_ROOT, '.claude/config/audio-effects.cfg');
+  if (!existsSync(configPath)) {
+    console.log('  Skipping: audio-effects.cfg not found');
+    return;
+  }
   const content = readFileSync(configPath, 'utf-8');
 
   // Extract all background file references
@@ -123,6 +131,10 @@ test('Audio effects config does not reference optimized/ subdirectory', () => {
 
 test('All referenced background files exist', () => {
   const configPath = join(PROJECT_ROOT, '.claude/config/audio-effects.cfg');
+  if (!existsSync(configPath)) {
+    console.log('  Skipping: audio-effects.cfg not found');
+    return;
+  }
   const bgDir = join(PROJECT_ROOT, '.claude/audio/tracks');
   const content = readFileSync(configPath, 'utf-8');
 

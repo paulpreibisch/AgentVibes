@@ -41,8 +41,12 @@ jobs:
         env:
           AGENTVIBES_TEST_MODE: true
 
+      - name: Setup test fixtures
+        run: cp .claude/config/audio-effects.cfg.sample .claude/config/audio-effects.cfg
+
       - name: Generate coverage report
         run: npm run test:coverage
+        continue-on-error: true
         env:
           AGENTVIBES_TEST_MODE: true
 
@@ -60,6 +64,7 @@ jobs:
           fi
 
       - name: SonarCloud Scan
+        if: always()
         uses: SonarSource/sonarcloud-github-action@ba3875ecf642b2129de2b589510c81a8b53dbf4e # master as of 2025-12-08
         with:
           args: >

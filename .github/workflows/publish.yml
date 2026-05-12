@@ -38,6 +38,9 @@ jobs:
           sudo apt-get update && sudo apt-get install -y sox ffmpeg
           npm install -g bats
 
+      - name: Setup test fixtures
+        run: cp .claude/config/audio-effects.cfg.sample .claude/config/audio-effects.cfg
+
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key

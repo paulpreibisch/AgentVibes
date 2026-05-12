@@ -40,7 +40,7 @@ jobs:
           echo "=== Bash ==="
           bash --version | head -1
           echo "=== PowerShell ==="
-          powershell -NoProfile -Command "Write-Host $PSVersionTable.PSVersion.ToString()"
+          powershell -NoProfile -Command 'Write-Host $PSVersionTable.PSVersion.ToString()'
           echo "=== ffmpeg (pre-installed) ==="
           ffmpeg -version 2>&1 | head -1 || echo "ffmpeg not found"
 
@@ -72,6 +72,9 @@ jobs:
         run: npm install -g bats
 
       # ─── JavaScript / Node.js tests ──────────────────────────────────────
+
+      - name: Setup test fixtures
+        run: cp .claude/config/audio-effects.cfg.sample .claude/config/audio-effects.cfg
 
       - name: Validate JS syntax
         run: npm run test:syntax

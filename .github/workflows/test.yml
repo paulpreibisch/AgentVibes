@@ -41,6 +41,9 @@ jobs:
             echo "$(brew --prefix)/bin" >> $GITHUB_PATH
           fi
 
+      - name: Setup test fixtures
+        run: cp .claude/config/audio-effects.cfg.sample .claude/config/audio-effects.cfg
+
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
