@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🖥️ v5.7.5 — TUI 버튼 대비 + BMAD 라우팅 수정
+
+**출시일:** 2026-05-13
+
+### 🐛 TUI 버튼 포커스: 모든 터미널에서 회색 텍스트 제거
+
+TUI(음성, 음악, 설정, 설치 탭)의 포커스되거나 선택된 버튼이 많은 터미널에서 연한 파란색 배경에 연한 회색 텍스트를 표시했습니다. 근본 원인: `bold: true`와 어두운 전경색의 조합이 터미널의 "밝은 모드"를 활성화하여 정확한 색조에 관계없이 회색으로 렌더링됩니다.
+
+**수정:** 모든 버튼 포커스 상태가 이제 **진한 녹색 배경(`#2e7d32`)에 흰색 텍스트**를 사용합니다 — 에이전트 탭에서 이미 사용하는 동일한 고대비 패턴입니다. `attachBtnBlink`가 blessed의 수동 `style.focus` 색상 적용을 방해하지 않도록 setup-tab 모달 버튼에 명시적 `focus`/`blur` 핸들러가 추가되었습니다.
+
+### 🐛 BMAD 탭 음성 선택기 ♪ 표시기가 표시되지 않음
+
+BMAD 탭 음성 목록의 ♪ 미리보기 표시기가 미리보기 중에 나타나지 않았습니다. 에이전트 탭에는 설정 탭이 이미 가진 `_refreshVP()` 호출이 없었습니다. SSH-remote가 즉시 종료될 때(fire-and-forget 모드) 표시기를 2초 최소 표시 타이머로 계속 표시합니다.
+
+### 🐛 비인터랙티브 설치: 프로젝트 이름 대신 일반 프리텍스트
+
+`agentvibes install`을 비인터랙티브로 실행하면 프로젝트에 관계없이 항상 프리텍스트가 `"Claude Code here"`로 설정되었습니다. 이제 설치 프로그램이 `path.basename(process.cwd())`에서 대문자화와 함께 프로젝트 인식 프리텍스트를 도출합니다(예: `"MyProject here"`). Docker 루트 경로에는 안전한 폴백이 있습니다.
+
+### 🐛 전역 프리텍스트가 프로젝트별 구성을 재정의
+
+`seedAllLlmDefaultsSync`가 전역 프리텍스트 문자열로 프로젝트 레벨 LLM 행을 시드하여 전역 `"Claude Code here"`가 프로젝트별 `tts-pretext.txt` 값을 재정의했습니다. 프로젝트 레벨 행은 이제 빈 프리텍스트로 시드되어 프로젝트별 파일이 우선합니다.
+
+### 🐛 `screen`/`tmux` TERM 변형이 `plab_norm` 기능 오류 유발
+
+`TERM`이 `screen-*` 또는 `tmux-*` 변형으로 설정된 경우, blessed가 시작 시 `plab_norm` 터미널 기능 오류를 던졌습니다. 이제 앱은 이러한 변형이 감지될 때 blessed 화면을 만들기 전에 `TERM`을 `xterm-256color`로 재정의합니다.
+
+### 🐛 BMAD 에이전트별 음악/리버브가 SSH 수신기에 도달하지 않음
+
+`play-tts.sh`가 `AGENT_PROFILE_FILE`을 SSH 원격 전송으로 전달하지 않아 BMAD 탭의 에이전트별 배경 음악 및 리버브 재정의가 원격 오디오에 대해 자동으로 무시되었습니다. 이제 프로필 파일 경로가 `play-tts-ssh-remote.sh`의 인수 4로 전달됩니다.
+
+### 🐛 Node 18 호환성: `import.meta.dirname` 교체
+
+테스트 파일이 Node 21+에서만 사용 가능한 `import.meta.dirname`을 사용했습니다. Node 18 및 20에서 테스트가 올바르게 실행되도록 `fileURLToPath(import.meta.url)` 패턴으로 교체되었습니다.
+
+---
+
 ## 🎭 v5.7.0 — BMAD v6.6 지원 + Windows 워처 자동 재시작
 
 **출시일:** 2026-05-11

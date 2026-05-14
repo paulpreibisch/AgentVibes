@@ -4,7 +4,19 @@
 
 ---
 
-## 🌟 v5.7.0 新功能 — BMAD v6.6 支持 + Windows 监视器自动重启
+## 🌟 v5.7.5 新功能 — TUI 按钮对比度 + BMAD 路由修复
+
+**TUI 按钮：** 所有焦点/选中按钮现在显示深绿色背景上的白色文字 — 浅蓝色背景上的灰色文字在所有终端和所有标签页中消失了。
+
+**BMAD 标签：** ♪ 语音预览指示符现在在语音列表中正确显示，并带有 2 秒最小显示计时器，适用于 SSH-remote fire-and-forget 模式。
+
+**安装程序预文本：** 非交互式安装现在从项目文件夹名称派生预文本（例如 `"MyProject here"`），而不是始终使用 `"Claude Code here"`。
+
+**BMAD 音乐路由：** 每代理的背景音乐和混响覆盖现在正确到达 SSH 接收器。
+
+**TERM 修复：** 当 `TERM` 为 `screen-*` 或 `tmux-*` 变体时，TUI 不再抛出 `plab_norm` 错误。
+
+## v5.7.0 新功能 — BMAD v6.6 支持 + Windows 监视器自动重启
 
 **BMAD v6.6.0：** AgentVibes 现在检测新的代理结构 `.claude/skills/*/agents/`，正确处理在 `~/_bmad` 全局安装的 BMAD，并在 TTS 注入时优雅地跳过 v6.6+ 纯 Markdown 代理而不是报错。BMAD 标签现在对全局安装正确显示检测状态。
 

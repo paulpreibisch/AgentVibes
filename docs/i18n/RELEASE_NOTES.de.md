@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🖥️ v5.7.5 — TUI-Schaltflächenkontrast + BMAD-Routing-Korrekturen
+
+**Veröffentlicht:** 2026-05-13
+
+### 🐛 TUI-Schaltflächen-Fokus: Grauer Text in Allen Terminals Beseitigt
+
+Fokussierte und ausgewählte Schaltflächen in der TUI zeigten in vielen Terminals hellgrauen Text auf hellblauem Hintergrund. Ursache: `bold: true` kombiniert mit einer dunklen Vordergrundfarbe aktiviert den „hellen Modus" des Terminals und rendert die Farbe als Grau unabhängig vom genauen Farbton.
+
+**Korrektur:** Alle Schaltflächen-Fokuszustände verwenden jetzt **weißen Text auf dunkelgrünem Hintergrund (`#2e7d32`)** — dasselbe Hochkontrast-Muster, das bereits im Agents-Tab verwendet wird. Explizite `focus`/`blur`-Handler wurden zu den modalen Schaltflächen im setup-tab hinzugefügt, um zu verhindern, dass `attachBtnBlink` die passive `style.focus`-Farbgebung von blessed beeinträchtigt.
+
+### 🐛 ♪-Indikator des Stimmenwählers im BMAD-Tab Fehlte
+
+Der ♪-Vorschauindikator in der Stimmenliste des BMAD-Tabs erschien während der Vorschau nicht. Im Agents-Tab fehlten die `_refreshVP()`-Aufrufe, die der Einstellungs-Tab bereits hatte. Ein 2-Sekunden-Mindestanzeigetimer hält den Indikator sichtbar, wenn SSH-remote sofort beendet (Fire-and-Forget-Modus).
+
+### 🐛 Nicht-Interaktive Installation: Generischer Prätext Statt Projektname
+
+Das Ausführen von `agentvibes install` nicht-interaktiv setzte den Prätext immer auf `"Claude Code here"` unabhängig vom Projekt. Der Installer leitet jetzt einen projektbewussten Prätext von `path.basename(process.cwd())` mit Großschreibung ab (z.B. `"MyProject here"`), mit sicherem Fallback für Docker-Root-Pfade.
+
+### 🐛 Globaler Prätext Überschreibt Projektspezifische Konfiguration
+
+`seedAllLlmDefaultsSync` seeding die LLM-Zeilen auf Projektebene mit dem globalen Prätext, sodass das globale `"Claude Code here"` die `tts-pretext.txt`-Werte pro Projekt überschrieb. Projektebenen-Zeilen werden jetzt mit leeren Prätexten geseeded, damit die projektspezifische Datei Vorrang hat.
+
+### 🐛 `screen`/`tmux`-TERM-Variante Verursachte `plab_norm`-Fähigkeitsfehler
+
+Wenn `TERM` auf eine `screen-*`- oder `tmux-*`-Variante gesetzt war, warf blessed beim Start einen `plab_norm`-Terminalfähigkeitsfehler. Die App überschreibt jetzt `TERM` auf `xterm-256color`, bevor der blessed-Screen erstellt wird, wenn eine solche Variante erkannt wird.
+
+### 🐛 BMAD Pro-Agent-Musik/Hall Erreichte SSH-Empfänger Nicht
+
+`play-tts.sh` leitete `AGENT_PROFILE_FILE` nicht an den SSH-Remote-Transport weiter, sodass die pro-Agent-Hintergrundmusik- und Hall-Überschreibungen im BMAD-Tab für Remote-Audio still ignoriert wurden. Der Profildateipfad wird jetzt als Argument 4 an `play-tts-ssh-remote.sh` übergeben.
+
+### 🐛 Node-18-Kompatibilität: `import.meta.dirname` Ersetzt
+
+Eine Testdatei verwendete `import.meta.dirname`, das nur in Node 21+ verfügbar ist. Durch das `fileURLToPath(import.meta.url)`-Muster ersetzt, damit Tests korrekt auf Node 18 und 20 laufen.
+
+---
+
 ## 🎭 v5.7.0 — BMAD v6.6 Unterstützung + Automatischer Neustart des Windows Watchers
 
 **Veröffentlicht:** 2026-05-11

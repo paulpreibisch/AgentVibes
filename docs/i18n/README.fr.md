@@ -4,7 +4,19 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.7.0 — Support BMAD v6.6 + Redémarrage Automatique du Watcher Windows
+## 🌟 NOUVEAU DANS v5.7.5 — Contraste des Boutons TUI + Corrections de Routage BMAD
+
+**Boutons TUI :** Tous les boutons focalisés/sélectionnés affichent désormais du texte blanc sur fond vert foncé — le texte gris sur fond bleu clair a disparu sur tous les terminaux et tous les onglets.
+
+**Onglet BMAD :** L'indicateur ♪ de prévisualisation des voix apparaît désormais correctement dans la liste des voix, avec un minuteur d'affichage minimum de 2 secondes pour le mode SSH-remote fire-and-forget.
+
+**Prétext de l'installateur :** Les installations non interactives dérivent maintenant le prétext du nom du dossier du projet (ex., `"MyProject here"`) au lieu de toujours utiliser `"Claude Code here"`.
+
+**Routage musical BMAD :** Les remplacements de musique de fond et de réverbération par agent atteignent désormais correctement le récepteur SSH.
+
+**Correction TERM :** La TUI ne lance plus d'erreur `plab_norm` quand `TERM` est une variante `screen-*` ou `tmux-*`.
+
+## v5.7.0 — Support BMAD v6.6 + Redémarrage Automatique du Watcher Windows
 
 **BMAD v6.6.0 :** AgentVibes détecte maintenant la nouvelle structure d'agents `.claude/skills/*/agents/`, gère correctement BMAD installé globalement dans `~/_bmad`, et ignore gracieusement les agents v6.6+ en Markdown simple lors de l'injection TTS au lieu d'erreur. L'onglet BMAD affiche maintenant la détection correctement pour les installations globales.
 

@@ -4,7 +4,19 @@
 
 ---
 
-## 🌟 NOVO NO v5.7.0 — Suporte a BMAD v6.6 + Reinício Automático do Watcher no Windows
+## 🌟 NOVO NO v5.7.5 — Contraste dos Botões TUI + Correções de Roteamento BMAD
+
+**Botões TUI:** Todos os botões focados/selecionados agora mostram texto branco sobre verde escuro — o texto cinza sobre azul claro desapareceu em todos os terminais e abas.
+
+**Aba BMAD:** O indicador ♪ de pré-visualização de voz agora aparece corretamente na lista de vozes, com um temporizador de exibição mínimo de 2 segundos para o modo SSH-remoto fire-and-forget.
+
+**Pretext do instalador:** As instalações não interativas agora derivam o pretext do nome da pasta do projeto (ex., `"MyProject here"`) em vez de sempre usar `"Claude Code here"`.
+
+**Roteamento de música BMAD:** As substituições de música de fundo e reverb por agente agora chegam corretamente ao receptor SSH.
+
+**Correção de TERM:** A TUI não lança mais um erro `plab_norm` quando `TERM` é uma variante `screen-*` ou `tmux-*`.
+
+## v5.7.0 — Suporte a BMAD v6.6 + Reinício Automático do Watcher no Windows
 
 **BMAD v6.6.0:** O AgentVibes agora detecta a nova estrutura de agentes `.claude/skills/*/agents/`, lida corretamente com BMAD instalado globalmente em `~/_bmad`, e ignora graciosamente agentes v6.6+ de Markdown simples durante a injeção de TTS em vez de dar erro. A aba BMAD agora mostra a detecção corretamente para instalações globais.
 

@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🖥️ v5.7.5 — Contraste des Boutons TUI + Corrections de Routage BMAD
+
+**Date de sortie :** 2026-05-13
+
+### 🐛 Focus des Boutons TUI : Texte Gris Éliminé sur Tous les Terminaux
+
+Les boutons focalisés et sélectionnés dans la TUI affichaient du texte gris clair sur fond bleu clair dans de nombreux terminaux. Cause principale : `bold: true` combiné à une couleur de premier plan sombre active le « mode lumineux » du terminal, rendant la couleur en gris quel que soit le ton exact.
+
+**Correctif :** Tous les états de focus des boutons utilisent désormais **texte blanc sur fond vert foncé (`#2e7d32`)** — le même motif à contraste élevé déjà utilisé par l'onglet Agents. Des gestionnaires explicites `focus`/`blur` ont été ajoutés aux boutons modaux de setup-tab pour empêcher `attachBtnBlink` d'interférer avec l'application des couleurs `style.focus` passif de blessed.
+
+### 🐛 Indicateur ♪ du Sélecteur de Voix de l'Onglet BMAD Absent
+
+L'indicateur ♪ de prévisualisation dans la liste des voix de l'onglet BMAD n'apparaissait pas lors de la prévisualisation. L'onglet Agents manquait des appels `_refreshVP()` que l'onglet Paramètres avait déjà. Un minuteur d'affichage minimum de 2 secondes maintient désormais l'indicateur visible lorsque SSH-remote se termine immédiatement (mode fire-and-forget).
+
+### 🐛 Installation Non Interactive : Prétext Générique au Lieu du Nom du Projet
+
+Exécuter `agentvibes install` en mode non interactif définissait toujours le prétext comme `"Claude Code here"` quel que soit le projet. L'installateur dérive désormais un prétext tenant compte du projet à partir de `path.basename(process.cwd())` avec majuscules (ex., `"MyProject here"`), avec une solution de repli sûre pour les chemins racine Docker.
+
+### 🐛 Prétext Global Écrasant la Configuration par Projet
+
+`seedAllLlmDefaultsSync` remplissait les lignes LLM au niveau du projet avec la chaîne de prétext global, faisant que le `"Claude Code here"` global écrasait les valeurs `tts-pretext.txt` par projet. Les lignes au niveau du projet sont désormais remplies avec des prétexts vides pour que le fichier par projet prenne la priorité.
+
+### 🐛 Variante TERM `screen`/`tmux` Causait une Erreur de Capacité `plab_norm`
+
+Lorsque `TERM` était défini sur une variante `screen-*` ou `tmux-*`, blessed lançait une erreur de capacité `plab_norm` au démarrage. L'application remplace désormais `TERM` par `xterm-256color` avant de créer l'écran blessed quand une telle variante est détectée.
+
+### 🐛 Musique/Réverb par Agent BMAD N'atteignait Pas le Récepteur SSH
+
+`play-tts.sh` ne transmettait pas `AGENT_PROFILE_FILE` au transport distant SSH, donc les remplacements de musique de fond et de réverb par agent dans l'onglet BMAD étaient ignorés silencieusement pour l'audio distant. Le chemin du fichier de profil est maintenant passé comme argument 4 à `play-tts-ssh-remote.sh`.
+
+### 🐛 Compatibilité Node 18 : `import.meta.dirname` Remplacé
+
+Un fichier de test utilisait `import.meta.dirname`, disponible uniquement dans Node 21+. Remplacé par le motif `fileURLToPath(import.meta.url)` pour que les tests s'exécutent correctement sur Node 18 et 20.
+
+---
+
 ## 🎭 v5.7.0 — Support BMAD v6.6 + Redémarrage Automatique du Watcher Windows
 
 **Date de sortie :** 2026-05-11

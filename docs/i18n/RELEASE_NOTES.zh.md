@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🖥️ v5.7.5 — TUI 按钮对比度 + BMAD 路由修复
+
+**发布日期：** 2026-05-13
+
+### 🐛 TUI 按钮焦点：在所有终端中消除灰色文字
+
+TUI（声音、音乐、设置、安装选项卡）中的焦点和选中按钮在许多终端中显示浅蓝色背景上的浅灰色文字。根本原因：`bold: true` 与深色前景色结合触发终端的"亮色模式"，无论确切的色调如何都将颜色渲染为灰色。
+
+**修复：** 所有按钮焦点状态现在使用**深绿色背景（`#2e7d32`）上的白色文字** — 与代理选项卡已使用的相同高对比度模式。setup-tab 模态按钮添加了显式的 `focus`/`blur` 处理程序，以防止 `attachBtnBlink` 干扰 blessed 的被动 `style.focus` 颜色应用。
+
+### 🐛 BMAD 选项卡语音选择器 ♪ 指示符不显示
+
+BMAD 选项卡语音列表中的 ♪ 预览指示符在预览期间未出现。代理选项卡缺少设置选项卡已有的 `_refreshVP()` 调用。当 SSH-remote 立即退出时（fire-and-forget 模式），2秒最小显示计时器使指示符保持可见。
+
+### 🐛 非交互式安装：通用预文本而非项目名称
+
+以非交互方式运行 `agentvibes install` 总是将预文本设置为 `"Claude Code here"`，而不考虑项目。安装程序现在从 `path.basename(process.cwd())` 派生带有大写的项目感知预文本（例如 `"MyProject here"`），并为 Docker 根路径提供安全回退。
+
+### 🐛 全局预文本覆盖项目配置
+
+`seedAllLlmDefaultsSync` 用全局预文本字符串填充项目级别的 LLM 行，导致全局的 `"Claude Code here"` 覆盖了每个项目的 `tts-pretext.txt` 值。项目级别的行现在用空预文本填充，以便项目文件优先。
+
+### 🐛 `screen`/`tmux` TERM 变体导致 `plab_norm` 功能错误
+
+当 `TERM` 设置为 `screen-*` 或 `tmux-*` 变体时，blessed 在启动时抛出 `plab_norm` 终端功能错误。现在，当检测到此类变体时，应用在创建 blessed 屏幕之前将 `TERM` 覆盖为 `xterm-256color`。
+
+### 🐛 BMAD 每代理音乐/混响未到达 SSH 接收器
+
+`play-tts.sh` 没有将 `AGENT_PROFILE_FILE` 转发到 SSH 远程传输，因此 BMAD 选项卡中配置的每代理背景音乐和混响覆盖对于远程音频被静默忽略。配置文件路径现在作为参数 4 传递给 `play-tts-ssh-remote.sh`。
+
+### 🐛 Node 18 兼容性：替换 `import.meta.dirname`
+
+测试文件使用了仅在 Node 21+ 中可用的 `import.meta.dirname`。已替换为 `fileURLToPath(import.meta.url)` 模式，使测试在 Node 18 和 20 上正确运行。
+
+---
+
 ## 🎭 v5.7.0 — BMAD v6.6 支持 + Windows 监视器自动重启
 
 **发布日期：** 2026-05-11
