@@ -59,7 +59,7 @@ AgentVibes supports two TTS providers - pick the one that fits your needs:
 - ✅ 18 languages supported
 - ✅ Privacy-focused local processing
 
-Option B: if on a Mac, you can ise Mac Say
+Option B: if on a Mac, you can use Mac Say
 ```
 
 **Switch providers anytime:** `/agent-vibes:provider switch`
