@@ -1,5 +1,41 @@
 # AgentVibes Release Notes
 
+## 🖥️ v5.7.5 — TUI Button Contrast + BMAD Routing Fixes
+
+**Released:** 2026-05-13
+
+### 🐛 TUI Button Focus: Grey Text Eliminated Across All Terminals
+
+Focused and selected buttons in the TUI (voices, music, settings, setup tabs) displayed light grey text on light-blue backgrounds in many terminals. Root cause: `bold: true` combined with a dark foreground triggers terminal "bright mode," rendering the color as grey regardless of shade.
+
+**Fix:** All button focus states now use **white text on dark green (`#2e7d32`) background** — the same high-contrast pattern already used by the Agents tab. Explicit `focus`/`blur` handlers were added to setup-tab modal buttons to prevent `attachBtnBlink` from interfering with blessed's passive `style.focus` color application.
+
+### 🐛 BMAD Tab Voice Picker ♪ Indicator Not Showing
+
+The ♪ preview indicator in the BMAD tab voice list didn't appear during preview. The Agents tab was missing `_refreshVP()` calls that the Settings tab already had. A 2-second minimum display timer now keeps the indicator visible when SSH-remote exits immediately (fire-and-forget mode).
+
+### 🐛 Non-Interactive Install: Generic Pretext Instead of Project Name
+
+Running `agentvibes install` non-interactively always set the pretext to `"Claude Code here"` regardless of project. The installer now derives a project-aware pretext from `path.basename(process.cwd())` with capitalization (e.g., `"MyProject here"`), with a safe fallback for Docker root paths.
+
+### 🐛 Global Pretext Overriding Per-Project Config
+
+`seedAllLlmDefaultsSync` was seeding project-level LLM rows with the global pretext string, causing the global `"Claude Code here"` to override per-project `tts-pretext.txt` values. Project-level rows are now seeded with empty pretexts so the per-project file takes precedence.
+
+### 🐛 `screen`/`tmux` TERM Variant Caused `plab_norm` Capability Error
+
+When `TERM` was set to a `screen-*` or `tmux-*` variant, blessed threw a `plab_norm` terminal capability error on startup. The app now overrides `TERM` to `xterm-256color` before creating the blessed screen when such a variant is detected.
+
+### 🐛 BMAD Per-Agent Music/Reverb Not Reaching SSH Receiver
+
+`play-tts.sh` was not forwarding `AGENT_PROFILE_FILE` to the SSH remote transport, so per-agent background music and reverb overrides in the BMAD tab were silently ignored for remote audio. The profile file path is now passed as argument 4 to `play-tts-ssh-remote.sh`.
+
+### 🐛 Node 18 Compatibility: `import.meta.dirname` Replaced
+
+A test file used `import.meta.dirname`, available only in Node 21+. Replaced with the `fileURLToPath(import.meta.url)` pattern so tests run correctly on Node 18 and 20.
+
+---
+
 ## 🎭 v5.7.0 — BMAD v6.6 Support + Windows Auto-Restart Watcher
 
 **Released:** 2026-05-11

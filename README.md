@@ -40,7 +40,19 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.7.0 — BMAD v6.6 Support + Windows Auto-Restart Watcher
+## 🌟 NEW IN v5.7.5 — TUI Button Contrast + BMAD Routing Fixes
+
+**TUI buttons:** All focused/selected buttons now show white text on dark green — grey text on light-blue is gone across all terminals and all tabs.
+
+**BMAD tab:** The ♪ voice preview indicator now appears correctly in the voice list, with a 2-second minimum display timer for SSH-remote fire-and-forget mode.
+
+**Installer pretext:** Non-interactive installs now derive the pretext from the project folder name (e.g., `"MyProject here"`) instead of always defaulting to `"Claude Code here"`.
+
+**BMAD music routing:** Per-agent background music and reverb overrides now correctly reach the SSH receiver.
+
+**TERM fix:** The TUI no longer throws a `plab_norm` error when `TERM` is a `screen-*` or `tmux-*` variant.
+
+## v5.7.0 — BMAD v6.6 Support + Windows Auto-Restart Watcher
 
 **BMAD v6.6.0:** AgentVibes now detects the new `.claude/skills/*/agents/` agent structure, correctly handles globally-installed BMAD at `~/_bmad`, and gracefully skips v6.6+ plain-Markdown agents during TTS injection instead of erroring. The BMAD tab now shows detection correctly for global installs.
 
