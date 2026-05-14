@@ -31,7 +31,7 @@ npx agentvibes install --yes
 1. **Check config file**: Verify JSON syntax in `claude_desktop_config.json` or `.mcp-minimal.json`
 2. **Restart app**: Close and reopen Claude Desktop/Warp/Claude Code
 3. **Check logs**: Look for MCP connection errors in app logs
-4. **Verify npx**: Run `npx -y agentvibes-mcp-server` manually to test
+4. **Verify npx**: Run `npx -y -p agentvibes@beta agentvibes-mcp-server` manually to test
 
 ---
 

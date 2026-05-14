@@ -249,4 +249,4 @@ Check `hooks/agentvibes-tts/tts-hook.log` after the next agent turn. Every SSH c
 
 ## MCP Server Integration
 
-AgentVibes ships with an MCP server (`npx agentvibes-mcp-server`) with tools for voice selection, effects, background music, and mute/unmute. Install it in your Hermes MCP config to control AgentVibes with natural language commands. The MCP server must run on the target machine where speakers live.
+AgentVibes ships with an MCP server (`npx -y -p agentvibes@beta agentvibes-mcp-server`) with tools for voice selection, effects, background music, and mute/unmute. Install it in your Hermes MCP config to control AgentVibes with natural language commands. The MCP server must run on the target machine where speakers live.

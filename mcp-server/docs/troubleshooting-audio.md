@@ -270,7 +270,7 @@ Your config file has syntax errors:
      "mcpServers": {
        "agentvibes": {
          "command": "npx",
-         "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"]
+         "args": ["-y", "-p", "agentvibes@beta", "agentvibes-mcp-server"]
        }
      }
    }

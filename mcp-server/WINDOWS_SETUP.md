@@ -121,7 +121,7 @@ Now we'll tell Claude Desktop to use AgentVibes.
        "mcpServers": {
          "agentvibes": {
            "command": "npx",
-           "args": ["-y", "agentvibes@beta", "agentvibes-mcp-server"]
+           "args": ["-y", "-p", "agentvibes@beta", "agentvibes-mcp-server"]
          }
        }
      }
