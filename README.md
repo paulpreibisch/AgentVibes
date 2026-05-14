@@ -353,7 +353,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.6.0 - "Voice Explorer" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v3.6.0)** 🎉
+**[v3.6.0 - "Voice Explorer" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v5.7.5)** 🎉
 
 ### 🎤 Voices Tab — Browse & Sample 914 Voices
 
