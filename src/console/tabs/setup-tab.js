@@ -78,7 +78,7 @@ const COLORS = {
   noticeFg:   'white',
   btnBg:      'blue',
   btnFg:      'white',
-  btnFocusBg: 'cyan',
+  btnFocusBg: '#2e7d32',
   removeBg:   'red',
   removeFocusBg: 'magenta',
   cfgBg:      'green',
@@ -354,7 +354,7 @@ export function createSetupTab(screen, services) {
       content: '  Install  ', tags: true, mouse: true, keys: true, hidden: true,
       style: {
         fg: COLORS.btnFg, bg: COLORS.btnBg,
-        focus: { fg: 'black', bg: COLORS.btnFocusBg },
+        focus: { fg: 'white', bg: COLORS.btnFocusBg },
       },
     });
 
@@ -534,7 +534,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.btnFg,
         bg: COLORS.btnBg,
-        focus: { fg: 'black', bg: COLORS.btnFocusBg },
+        focus: { fg: 'white', bg: COLORS.btnFocusBg },
       },
     });
 
@@ -870,10 +870,12 @@ export function createSetupTab(screen, services) {
         padding: { left: 1, right: 1 },
         style: {
           bg: 'blue', fg: 'white',
-          focus: { bg: 'cyan', fg: 'black', bold: true },
-          hover: { bg: 'cyan', fg: 'black', bold: true },
+          focus: { bg: '#2e7d32', fg: 'white', bold: true },
+          hover: { bg: '#2e7d32', fg: 'white', bold: true },
         },
       });
+      btn.on('focus', () => { btn.style.bg = '#2e7d32'; btn.style.fg = 'white'; screen.render(); });
+      btn.on('blur',  () => { btn.style.bg = 'blue';    btn.style.fg = 'white'; screen.render(); });
       btn.key(['enter', 'space'], () => onClick());
       btn.on('click', () => onClick());
       return btn;
@@ -1115,7 +1117,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
+        selected: { bg: 'blue', fg: 'black', bold: true },
       },
     });
     picker.setFront();
@@ -1154,7 +1156,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
+        selected: { bg: 'blue', fg: 'black', bold: true },
       },
     });
     picker.setFront();
@@ -1268,7 +1270,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
+        selected: { bg: 'blue', fg: 'black', bold: true },
       },
     });
     picker.setFront();
@@ -1326,7 +1328,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
+        selected: { bg: 'blue', fg: 'black', bold: true },
       },
     });
     picker.setFront();
@@ -1364,7 +1366,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
+        selected: { bg: 'blue', fg: 'black', bold: true },
       },
     });
     picker.setFront();
@@ -1400,7 +1402,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'cyan' },
-        selected: { bg: 'blue', fg: 'white', bold: true },
+        selected: { bg: 'blue', fg: 'black', bold: true },
       },
     });
     picker.setFront();
@@ -1501,10 +1503,12 @@ export function createSetupTab(screen, services) {
         padding: { left: 1, right: 1 },
         style: {
           bg: 'blue', fg: 'white',
-          focus: { bg: 'cyan', fg: 'black', bold: true },
-          hover: { bg: 'cyan', fg: 'black', bold: true },
+          focus: { bg: '#2e7d32', fg: 'white', bold: true },
+          hover: { bg: '#2e7d32', fg: 'white', bold: true },
         },
       });
+      btn.on('focus', () => { btn.style.bg = '#2e7d32'; btn.style.fg = 'white'; screen.render(); });
+      btn.on('blur',  () => { btn.style.bg = 'blue';    btn.style.fg = 'white'; screen.render(); });
       btn.key(['enter', 'space'], () => onClick());
       btn.on('click', () => onClick());
       return btn;
@@ -1618,11 +1622,15 @@ export function createSetupTab(screen, services) {
     let _closed = false;
     navigationService?.openModal(null, _closeModal);
 
+    const _folderName = path.basename(targetDir);
+    const _folderPretext = _folderName
+      ? _folderName.charAt(0).toUpperCase() + _folderName.slice(1) + ' here'
+      : '';
     const defaultPretext = {
-      'claude-code': 'Claude Code here',
-      'copilot': 'Copilot here',
-      'codex': 'Codex here',
-      'default': path.basename(targetDir),  // default to project folder name
+      'claude-code': _folderPretext,
+      'copilot':     _folderPretext,
+      'codex':       _folderPretext,
+      'default':     _folderPretext,
     };
 
     // Read global defaults for display
@@ -1747,10 +1755,12 @@ export function createSetupTab(screen, services) {
         style: {
           bg: 'blue',
           fg: 'white',
-          focus: { bg: 'cyan', fg: 'black', bold: true },
-          hover: { bg: 'cyan', fg: 'black', bold: true },
+          focus: { bg: '#2e7d32', fg: 'white', bold: true },
+          hover: { bg: '#2e7d32', fg: 'white', bold: true },
         },
       });
+      btn.on('focus', () => { btn.style.bg = '#2e7d32'; btn.style.fg = 'white'; screen.render(); });
+      btn.on('blur',  () => { btn.style.bg = 'blue';    btn.style.fg = 'white'; screen.render(); });
       btn.key(['enter', 'space'], () => onClick());
       btn.on('click', () => onClick());
       return btn;
@@ -2172,7 +2182,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'blue' },
-        selected: { bg: 'green', fg: 'white', bold: true },
+        selected: { bg: 'green', fg: 'black', bold: true },
         item: { fg: COLORS.labelFg },
       },
     });
@@ -2431,8 +2441,6 @@ export function createSetupTab(screen, services) {
     const inputBox = blessed.textbox({
       parent: editModal, top: 3, left: 2, right: 2, height: 3,
       border: { type: 'line' },
-      inputOnFocus: true,
-      value: draft.pretext,
       style: {
         fg: 'white', bg: 'black',
         border: { fg: 'blue' },
@@ -2440,21 +2448,79 @@ export function createSetupTab(screen, services) {
       },
     });
 
+    let _editClosed = false;
+    let _cursor = (draft.pretext || '').length;
+    inputBox.value = draft.pretext || '';
+
+    function _renderPretext() {
+      const val = inputBox.value;
+      const lpos = inputBox._getCoords();
+      if (!lpos) { screen.render(); return; }
+      const contentWidth = Math.max(1, (lpos.xl - lpos.xi) - inputBox.iwidth);
+      const start = _cursor > contentWidth - 1 ? _cursor - contentWidth + 1 : 0;
+      inputBox.setContent(val.slice(start));
+      screen.render();
+      screen.program.cup(lpos.yi + inputBox.itop, lpos.xi + inputBox.ileft + (_cursor - start));
+    }
+
+    const _prevGrabKeys = screen.grabKeys;
     function _closeEdit(save) {
+      if (_editClosed) return;
+      _editClosed = true;
+      inputBox.removeAllListeners('keypress');
+      screen.grabKeys = _prevGrabKeys;
+      screen.program.hideCursor();
       if (save) {
-        const val = (inputBox.getValue() || '').trim().slice(0, 200);
-        draft.pretext = val;
+        draft.pretext = (inputBox.value || '').trim().slice(0, 200);
       }
       destroyList(editModal, screen);
       onDone();
     }
 
-    inputBox.key(['enter'], () => _closeEdit(true));
-    inputBox.key(['escape'], () => _closeEdit(false));
+    // Guard: if editModal is destroyed externally without _closeEdit being called,
+    // restore grab state so TUI stays responsive.
+    editModal.once('destroy', () => {
+      if (!_editClosed) {
+        _editClosed = true;
+        inputBox.removeAllListeners('keypress');
+        screen.grabKeys = _prevGrabKeys;
+        screen.program.hideCursor();
+      }
+    });
 
+    screen.grabKeys = true;
     inputBox.focus();
-    inputBox.readInput(() => {});
-    screen.render();
+    screen.render(); // Layout pass so _getCoords() returns valid coords on first _renderPretext
+    screen.program.showCursor();
+    _renderPretext();
+
+    inputBox.on('keypress', function(ch, key) {
+      if (_editClosed) return;
+      const val = inputBox.value;
+      if (key.name === 'enter') { _closeEdit(true); return; }
+      if (key.name === 'escape') { _closeEdit(false); return; }
+      if (key.name === 'home' || (key.ctrl && key.name === 'a')) {
+        _cursor = 0;
+      } else if (key.name === 'end' || (key.ctrl && key.name === 'e')) {
+        _cursor = val.length;
+      } else if (key.name === 'left') {
+        if (_cursor > 0) _cursor--; else return;
+      } else if (key.name === 'right') {
+        if (_cursor < val.length) _cursor++; else return;
+      } else if (key.name === 'backspace') {
+        if (_cursor > 0) { inputBox.value = val.slice(0, _cursor - 1) + val.slice(_cursor); _cursor--; }
+        else return;
+      } else if (key.name === 'delete') {
+        if (_cursor < val.length) { inputBox.value = val.slice(0, _cursor) + val.slice(_cursor + 1); }
+        else return;
+      } else if (ch && !key.ctrl && !key.meta && !/^[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]$/.test(ch)) {
+        inputBox.value = val.slice(0, _cursor) + ch + val.slice(_cursor);
+        _cursor++;
+      } else {
+        return;
+      }
+      _renderPretext();
+    });
   }
 
   // ── Saved toast ───────────────────────────────────────────────────────────

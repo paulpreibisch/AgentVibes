@@ -1122,7 +1122,7 @@ export function createVoicesTab(screen, services) {
       padding: { left: 1, right: 1 },
       style: {
         bg: COLORS.btnDefault,
-        fg: 'white',
+        fg: 'bright-white',
         focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
       },
@@ -1136,7 +1136,7 @@ export function createVoicesTab(screen, services) {
     });
     btn.on('blur', () => {
       btn.style.bg = COLORS.btnDefault;
-      btn.style.fg = 'white';
+      btn.style.fg = 'bright-white';
       const raw = btn.content.replace(/[►◄]/g, '').trim();
       btn.setContent(raw);
       screen.render();
@@ -1306,7 +1306,7 @@ export function createVoicesTab(screen, services) {
         padding: { left: 1, right: 1 },
         style: {
           bg,
-          fg: 'white',
+          fg: 'bright-white',
           focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
           hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         },
@@ -1341,7 +1341,7 @@ export function createVoicesTab(screen, services) {
       padding: { left: 1, right: 1 },
       style: {
         bg: '#e65100',
-        fg: 'white',
+        fg: 'bright-white',
         focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
       },
@@ -1550,7 +1550,7 @@ export function createVoicesTab(screen, services) {
         padding: { left: 1, right: 1 },
         style: {
           bg,
-          fg: 'white',
+          fg: 'bright-white',
           focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
           hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         },

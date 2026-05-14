@@ -367,7 +367,7 @@ speak_text() {
       bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
     ssh-remote)
-      bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice"
+      bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice" "" "${profile_file:-}"
       ;;
     agentvibes-receiver)
       bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
@@ -497,7 +497,7 @@ case "$ACTIVE_PROVIDER" in
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   ssh-remote)
-    exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE" "" "${AGENT_PROFILE_FILE:-}"
     ;;
   agentvibes-receiver)
     exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"

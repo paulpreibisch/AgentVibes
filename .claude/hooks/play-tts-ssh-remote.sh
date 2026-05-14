@@ -17,6 +17,7 @@ set -euo pipefail
 TEXT="${1:-}"
 VOICE="${2:-en_US-lessac-medium}"
 AGENT_NAME="${3:-default}"
+AGENT_PROFILE_FILE="${4:-}"
 
 # LLM identity — forwarded to the remote so it can look up its own
 # audio-effects.cfg llm:<name> row for voice, reverb, music, pretext, engine.
@@ -209,6 +210,19 @@ done
 [[ -n "$LLM_REVERB"    ]] && SOX_EFFECTS="$LLM_REVERB"
 [[ -n "$LLM_BG_FILE"   ]] && BG_FILE="$LLM_BG_FILE"
 [[ -n "$LLM_BG_VOLUME" ]] && BG_VOLUME="$LLM_BG_VOLUME"
+
+# Per-agent profile (written by bmad-speak.sh) takes highest priority for music
+if [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
+  _prof_track=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(p.backgroundMusic?.track??'')}catch{process.stdout.write('')}" 2>/dev/null || true)
+  _prof_vol=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.volume??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+  _prof_enabled=$(_AV_PROF="$AGENT_PROFILE_FILE" node -e "try{const p=JSON.parse(require('fs').readFileSync(process.env._AV_PROF,'utf8'));process.stdout.write(String(p.backgroundMusic?.enabled??''))}catch{process.stdout.write('')}" 2>/dev/null || true)
+  if [[ "$_prof_enabled" == "true" ]] && [[ -n "$_prof_track" ]]; then
+    BG_FILE="$_prof_track"
+    if [[ "$_prof_vol" =~ ^[0-9]+$ ]]; then
+      BG_VOLUME=$(awk "BEGIN{printf \"%.2f\", ${_prof_vol}/100}")
+    fi
+  fi
+fi
 
 # Read pretext if configured
 PRETEXT=""

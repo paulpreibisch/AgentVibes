@@ -59,7 +59,7 @@ const DEFAULT_LLM_CONFIGS = {
     bgTrack: 'agent_vibes_chillwave_v2_loop.mp3',
     bgVolume: '0.15',
     voice: 'en_US-lessac-high',
-    pretext: 'Claude Code here',
+    pretext: '',
     ttsEngine: 'piper',
   },
   copilot: {
@@ -67,7 +67,7 @@ const DEFAULT_LLM_CONFIGS = {
     bgTrack: 'agent_vibes_bossa_nova_v2_loop.mp3',
     bgVolume: '0.15',
     voice: 'en_US-libritts-high::Anna-11',
-    pretext: 'Copilot here',
+    pretext: '',
     ttsEngine: 'piper',
   },
   codex: {
@@ -78,7 +78,7 @@ const DEFAULT_LLM_CONFIGS = {
     // Windows Piper installs (loads the model, exits with no output).
     // lessac-high works reliably, so use it as the default for codex.
     voice: 'en_US-lessac-high',
-    pretext: 'Codex here',
+    pretext: '',
     ttsEngine: 'piper',
   },
   hermes: {
@@ -86,7 +86,7 @@ const DEFAULT_LLM_CONFIGS = {
     bgTrack: 'agent_vibes_bachata_v1_loop.mp3',
     bgVolume: '0.15',
     voice: 'en_US-libritts-high::Leo-8',
-    pretext: 'Hermes here',
+    pretext: '',
     ttsEngine: 'piper',
   },
 };

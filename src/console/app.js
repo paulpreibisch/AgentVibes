@@ -138,7 +138,14 @@ export class AgentVibesConsole {
       return;
     }
 
+    // blessed's terminfo parser chokes on screen-256color's plab_norm capability.
+    // xterm-256color is functionally identical for our TUI and parses cleanly.
+    const _origTerm = process.env.TERM;
+    if (/^(screen|tmux)(-256color)?$/.test(process.env.TERM || '')) {
+      process.env.TERM = 'xterm-256color';
+    }
     this.screen = blessed.screen(this._screenOptions);
+    if (_origTerm !== undefined) process.env.TERM = _origTerm;
 
     // Reflow on terminal resize
     this.screen.on('resize', () => this.screen.render());

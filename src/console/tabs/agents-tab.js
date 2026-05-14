@@ -367,7 +367,7 @@ ${_tl('bmadDesc')}
       padding: { left: 1, right: 1 },
       style: {
         bg: COLORS.btnDefault,
-        fg: 'white',
+        fg: 'bright-white',
         focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
       },
@@ -711,7 +711,7 @@ ${_tl('bmadDesc')}
         padding: { left: 1, right: 1 },
         style: {
           bg: COLORS.btnDefault,
-          fg: 'white',
+          fg: 'bright-white',
           focus: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
           hover: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
         },
@@ -1139,8 +1139,6 @@ ${_tl('bmadDesc')}
     const inputBox = blessed.textbox({
       parent: editModal, top: 3, left: 2, right: 2, height: 3,
       border: { type: 'line' },
-      inputOnFocus: true,
-      value: draft.pretext,
       style: {
         fg: COLORS.valueFg, bg: '#0d1b35',
         border: { fg: COLORS.borderFg },
@@ -1149,22 +1147,78 @@ ${_tl('bmadDesc')}
     });
 
     let _editClosed = false;
+    let _cursor = draft.pretext.length;
+    inputBox.value = draft.pretext;
+
+    function _renderPretext() {
+      const val = inputBox.value;
+      const lpos = inputBox._getCoords();
+      if (!lpos) { screen.render(); return; }
+      const contentWidth = Math.max(1, (lpos.xl - lpos.xi) - inputBox.iwidth);
+      const start = _cursor > contentWidth - 1 ? _cursor - contentWidth + 1 : 0;
+      inputBox.setContent(val.slice(start));
+      screen.render();
+      screen.program.cup(lpos.yi + inputBox.itop, lpos.xi + inputBox.ileft + (_cursor - start));
+    }
+
+    const _prevGrabKeys = screen.grabKeys;
     function _closeEdit(save) {
       if (_editClosed) return;
       _editClosed = true;
+      inputBox.removeAllListeners('keypress');
+      screen.grabKeys = _prevGrabKeys;
+      screen.program.hideCursor();
       if (save) {
-        const raw = inputBox.getValue().trim();
-        // M7: enforce max pretext length
-        draft.pretext = (raw || draft.pretext).slice(0, MAX_PRETEXT_LENGTH);
+        // M7: enforce max pretext length; allow clearing to empty string
+        draft.pretext = inputBox.value.trim().slice(0, MAX_PRETEXT_LENGTH);
       }
       destroyList(editModal, screen, onDone);
     }
 
-    inputBox.key(['enter'], () => _closeEdit(true));
-    inputBox.key(['escape'], () => _closeEdit(false));
+    // Guard: if editModal is destroyed externally (parent closed, signal, etc.)
+    // without _closeEdit being called, restore grab state so TUI stays responsive.
+    editModal.once('destroy', () => {
+      if (!_editClosed) {
+        _editClosed = true;
+        inputBox.removeAllListeners('keypress');
+        screen.grabKeys = _prevGrabKeys;
+        screen.program.hideCursor();
+      }
+    });
 
+    screen.grabKeys = true;
     inputBox.focus();
-    screen.render();
+    screen.render(); // Layout pass so _getCoords() returns valid coords on first _renderPretext
+    screen.program.showCursor();
+    _renderPretext();
+
+    inputBox.on('keypress', function(ch, key) {
+      if (_editClosed) return;
+      const val = inputBox.value;
+      if (key.name === 'enter') { _closeEdit(true); return; }
+      if (key.name === 'escape') { _closeEdit(false); return; }
+      if (key.name === 'home' || (key.ctrl && key.name === 'a')) {
+        _cursor = 0;
+      } else if (key.name === 'end' || (key.ctrl && key.name === 'e')) {
+        _cursor = val.length;
+      } else if (key.name === 'left') {
+        if (_cursor > 0) _cursor--; else return;
+      } else if (key.name === 'right') {
+        if (_cursor < val.length) _cursor++; else return;
+      } else if (key.name === 'backspace') {
+        if (_cursor > 0) { inputBox.value = val.slice(0, _cursor - 1) + val.slice(_cursor); _cursor--; }
+        else return;
+      } else if (key.name === 'delete') {
+        if (_cursor < val.length) { inputBox.value = val.slice(0, _cursor) + val.slice(_cursor + 1); }
+        else return;
+      } else if (ch && !key.ctrl && !key.meta && !/^[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]$/.test(ch)) {
+        inputBox.value = val.slice(0, _cursor) + ch + val.slice(_cursor);
+        _cursor++;
+      } else {
+        return;
+      }
+      _renderPretext();
+    });
   }
 
   // -------------------------------------------------------------------------

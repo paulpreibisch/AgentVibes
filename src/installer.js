@@ -74,6 +74,7 @@ import { promptForCustomMusic } from './installer/music-file-input.js';
 import { createPreviewListPrompt } from './utils/preview-list-prompt.js';
 import { selectLanguage } from './installer/language-screen.js';
 import { t } from './i18n/strings.js';
+import { seedAllLlmDefaultsSync } from './services/llm-provider-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1248,12 +1249,20 @@ async function collectConfiguration(options = {}) {
       config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
       config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
     }
-    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
     // AI agent / non-interactive defaults: no reverb, no background music, no hermes
     config.reverb = 'none';
     config.backgroundMusic = { enabled: false, track: 'agentvibes_soft_flamenco_loop.mp3' };
     config.hermes = { enabled: false };
+    // Use folder name as project identity when no existing pretext is set
+    if (!config.pretext) {
+      const folderName = path.basename(process.cwd());
+      // Guard empty basename (e.g. process.cwd() === '/' in some Docker containers)
+      if (folderName) {
+        config.pretext = folderName.charAt(0).toUpperCase() + folderName.slice(1) + ' here';
+      }
+    }
     return config;
   }
 
@@ -5760,6 +5769,11 @@ Troubleshooting:
       await fs.writeFile(path.join(configDir, 'tts-pretext.txt'), userConfig.pretext, { mode: 0o600 });
     }
     // Do NOT unlink tts-pretext.txt when blank — user may have set it via MCP or manually.
+
+    // Seed project-level llm: rows with empty pretext so global ~/.claude/config/audio-effects.cfg
+    // "Claude Code here" rows don't override tts-pretext.txt (play-tts.sh stops searching when it
+    // finds a row with a voice, then falls through to tts-pretext.txt for the pretext).
+    seedAllLlmDefaultsSync(targetDir);
 
     // Apply reverb setting
     const selectedReverb = userConfig.reverb;

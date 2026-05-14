@@ -583,7 +583,7 @@ export function createSettingsTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'blue' },
-        selected: { bg: 'green', fg: 'white', bold: true },
+        selected: { bg: 'green', fg: 'black', bold: true },
         item: { fg: COLORS.labelFg },
       },
     });
