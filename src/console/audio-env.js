@@ -121,7 +121,7 @@ function _detect(players, env) {
  * @returns {string|null}
  */
 export function detectRemoteLlm() {
-  const cfgPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
+  const cfgPath = path.join(process.env.HOME || os.homedir(), '.agentvibes', 'transport-config.json');
   if (!fs.existsSync(cfgPath)) return null;
   try {
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));

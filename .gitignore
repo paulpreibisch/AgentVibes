@@ -108,6 +108,7 @@ nul
 
 # Backup and temp files
 *.backup-*
+*.user.bak
 *.new
 .claude/personalities/backups/
 
