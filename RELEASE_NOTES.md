@@ -1,5 +1,36 @@
 # AgentVibes Release Notes
 
+## 🔧 v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
+
+**Released:** 2026-05-16
+
+### 🐛 SSH Remote Playing Wrong Music and Voice
+
+When using the SSH remote TTS feature, the wrong project's music track and voice were being applied. Root cause: `CLAUDE_PROJECT_DIR` was not forwarded to the sender, causing it to fall back to the global config instead of the active project's `audio-effects.cfg`.
+
+### 🐛 Bash Receiver Incompatible with JSON Payload Format
+
+The Linux/Termux bash receiver (`agentvibes-receiver.sh`) was using a positional-argument format from pre-v5.5 and could not decode the current base64 JSON payload at all. The receiver has been fully rewritten to match the PowerShell receiver's logic: decodes base64, parses JSON, applies voice/music/effects/volume, and validates all fields.
+
+### 🐛 Personality Intro Heard Twice on Remote
+
+The personality pretext (e.g., "Bcs latin dance here") was being spoken twice when using SSH remote TTS. Root cause: `play-tts.sh` already prepends the pretext to the speech text before calling the sender; the sender was also packing it into the JSON `pretext` field, causing the receiver to prepend it again. The `pretext` JSON field is now intentionally left empty — the personality is delivered via the `text` field only.
+
+### 🆕 SSH Host Alias Visible in Settings Tab
+
+The configured SSH remote host alias is now displayed in the Settings and Voices tabs so users can confirm which remote machine TTS is targeting without opening config files.
+
+### 🔒 Security Fixes
+
+Input validation improvements in the SSH remote sender and receiver.
+
+### 🧪 24 New BATS Tests
+
+- 15 SSH remote payload tests: verify voice, music track, volume, reverb/effects, pretext handling, LLM identifier, project config precedence, and JSON validity
+- 9 end-to-end round-trip tests: sender builds payload → receiver decodes and applies all fields simultaneously, catching regressions in either end
+
+---
+
 ## 🖥️ v5.7.5 — TUI Button Contrast + BMAD Routing Fixes
 
 **Released:** 2026-05-13

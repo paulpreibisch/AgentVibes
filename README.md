@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.7.5
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.7.6
 
 ---
 
@@ -40,19 +40,19 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.7.5 — TUI Button Contrast + BMAD Routing Fixes
+## 🌟 NEW IN v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
 
-**TUI buttons:** All focused/selected buttons now show white text on dark green — grey text on light-blue is gone across all terminals and all tabs.
+**SSH remote music/voice fix:** The correct project music track and voice now reach the remote receiver — previously the global config was used instead of the active project's settings.
 
-**BMAD tab:** The ♪ voice preview indicator now appears correctly in the voice list, with a 2-second minimum display timer for SSH-remote fire-and-forget mode.
+**Bash receiver rewrite:** The Linux/Termux `agentvibes-receiver.sh` has been fully rewritten to decode the current base64 JSON payload format. The old positional-arg format from pre-v5.5 is gone.
 
-**Installer pretext:** Non-interactive installs now derive the pretext from the project folder name (e.g., `"MyProject here"`) instead of always defaulting to `"Claude Code here"`.
+**No more double intro:** The personality pretext (e.g., "Bcs latin dance here") is no longer spoken twice over SSH remote. `play-tts.sh` prepends it to the text; the receiver no longer gets a separate pretext field to prepend again.
 
-**BMAD music routing:** Per-agent background music and reverb overrides now correctly reach the SSH receiver.
+**SSH host visible in TUI:** The Settings and Voices tabs now display your configured SSH remote host alias.
 
-**TERM fix:** The TUI no longer throws a `plab_norm` error when `TERM` is a `screen-*` or `tmux-*` variant.
+**Security fixes** and 24 new BATS tests covering the full sender → receiver round-trip.
 
-## v5.7.0 — BMAD v6.6 Support + Windows Auto-Restart Watcher
+## v5.7.5 — TUI Button Contrast + BMAD Routing Fixes
 
 **BMAD v6.6.0:** AgentVibes now detects the new `.claude/skills/*/agents/` agent structure, correctly handles globally-installed BMAD at `~/_bmad`, and gracefully skips v6.6+ plain-Markdown agents during TTS injection instead of erroring. The BMAD tab now shows detection correctly for global installs.
 

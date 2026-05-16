@@ -1,5 +1,36 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.7.6 — Integrità del Payload SSH Remoto + Riscrittura del Ricevitore
+
+**Rilasciato il:** 2026-05-16
+
+### 🐛 SSH Remoto Riproduce Musica e Voce Errate
+
+Quando si utilizza la funzione TTS SSH remoto, venivano applicate la traccia musicale e la voce del progetto sbagliato. Causa principale: `CLAUDE_PROJECT_DIR` non veniva inoltrato al mittente, causando il ricorso alla configurazione globale invece del `audio-effects.cfg` del progetto attivo.
+
+### 🐛 Ricevitore Bash Incompatibile con il Formato Payload JSON
+
+Il ricevitore bash Linux/Termux (`agentvibes-receiver.sh`) utilizzava un formato di argomenti posizionali precedente alla v5.5 e non riusciva affatto a decodificare il payload base64 JSON attuale. Il ricevitore è stato completamente riscritto per corrispondere alla logica del ricevitore PowerShell: decodifica base64, analizza JSON, applica voce/musica/effetti/volume e valida tutti i campi.
+
+### 🐛 Introduzione della Personalità Sentita Due Volte in Remoto
+
+Il pretext della personalità (es., "Bcs latin dance here") veniva pronunciato due volte quando si utilizzava TTS SSH remoto. Causa principale: `play-tts.sh` già antepone il pretext al testo del parlato prima di chiamare il mittente; il mittente lo impacchettava anche nel campo JSON `pretext`, causando che il ricevitore lo anteponesse di nuovo. Il campo JSON `pretext` è ora intenzionalmente lasciato vuoto — la personalità viene consegnata solo tramite il campo `text`.
+
+### 🆕 Alias Host SSH Visibile nella Scheda Impostazioni
+
+L'alias host SSH remoto configurato viene ora visualizzato nelle schede Impostazioni e Voci in modo che gli utenti possano confermare quale macchina remota è il target del TTS senza aprire file di configurazione.
+
+### 🔒 Correzioni di Sicurezza
+
+Miglioramenti alla validazione degli input nel mittente e nel ricevitore SSH remoto.
+
+### 🧪 24 Nuovi Test BATS
+
+- 15 test del payload SSH remoto: verificano voce, traccia musicale, volume, reverb/effetti, gestione del pretext, identificatore LLM, precedenza della configurazione del progetto e validità JSON
+- 9 test di andata e ritorno end-to-end: il mittente costruisce il payload → il ricevitore decodifica e applica tutti i campi simultaneamente, rilevando regressioni su entrambe le estremità
+
+---
+
 ## 🖥️ v5.7.5 — Contrasto Pulsanti TUI + Correzioni Routing BMAD
 
 **Rilascio:** 2026-05-13

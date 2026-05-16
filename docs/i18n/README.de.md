@@ -4,17 +4,19 @@
 
 ---
 
-## 🌟 NEU IN v5.7.5 — TUI-Schaltflächenkontrast + BMAD-Routing-Korrekturen
+## 🌟 NEU IN v5.7.6 — SSH-Remote-Payload-Integrität + Receiver-Neuschreibung
 
-**TUI-Schaltflächen:** Alle fokussierten/ausgewählten Schaltflächen zeigen jetzt weißen Text auf dunkelgrünem Hintergrund — grauer Text auf hellblauem Hintergrund ist in allen Terminals und allen Tabs verschwunden.
+**SSH-Remote-Musik/Stimmen-Korrektur:** Die richtige Musiktitel und Stimme des Projekts erreichen jetzt den Remote-Empfänger — zuvor wurde die globale Konfiguration statt der Einstellungen des aktiven Projekts verwendet.
 
-**BMAD-Tab:** Der ♪-Vorschauindikator erscheint jetzt korrekt in der Stimmenliste, mit einem 2-Sekunden-Mindestanzeigetimer für den SSH-remote Fire-and-Forget-Modus.
+**Bash-Receiver-Neuschreibung:** Der `agentvibes-receiver.sh` für Linux/Termux wurde vollständig neu geschrieben, um das aktuelle base64-JSON-Payload-Format zu dekodieren. Das alte Positionsargument-Format aus der Zeit vor v5.5 ist verschwunden.
 
-**Installer-Prätext:** Nicht-interaktive Installationen leiten den Prätext jetzt vom Projektordnernamen ab (z.B. `"MyProject here"`) statt immer `"Claude Code here"` zu verwenden.
+**Kein doppeltes Intro mehr:** Der Persönlichkeits-Prätext (z.B. "Bcs latin dance here") wird über SSH-Remote nicht mehr zweimal gesprochen. `play-tts.sh` stellt ihn dem Text voran; der Receiver erhält kein separates Prätext-Feld mehr zum erneuten Voranstellen.
 
-**BMAD-Musik-Routing:** Pro-Agenten-Hintergrundmusik- und Hall-Überschreibungen erreichen jetzt korrekt den SSH-Empfänger.
+**SSH-Host in TUI sichtbar:** Die Tabs Einstellungen und Stimmen zeigen jetzt den konfigurierten SSH-Remote-Host-Alias an.
 
-**TERM-Korrektur:** Die TUI wirft keinen `plab_norm`-Fehler mehr, wenn `TERM` eine `screen-*`- oder `tmux-*`-Variante ist.
+**Sicherheitskorrekturen** und 24 neue BATS-Tests, die den vollständigen Sender → Receiver-Roundtrip abdecken.
+
+## v5.7.5 — TUI-Schaltflächenkontrast + BMAD-Routing-Korrekturen
 
 ## v5.7.0 — BMAD v6.6 Unterstützung + Automatischer Neustart des Windows Watchers
 

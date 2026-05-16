@@ -1,5 +1,36 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
+
+**Lançamento:** 2026-05-16
+
+### 🐛 SSH Remoto Reproduzindo Música e Voz Incorretas
+
+Ao usar o recurso TTS SSH remoto, a faixa de música e a voz do projeto errado estavam sendo aplicadas. Causa raiz: `CLAUDE_PROJECT_DIR` não era encaminhado ao emissor, fazendo-o usar a configuração global em vez do `audio-effects.cfg` do projeto ativo.
+
+### 🐛 Receptor Bash Incompatível com o Formato de Payload JSON
+
+O receptor bash Linux/Termux (`agentvibes-receiver.sh`) usava um formato de argumento posicional anterior à v5.5 e não conseguia decodificar o payload base64 JSON atual de forma alguma. O receptor foi completamente reescrito para corresponder à lógica do receptor PowerShell: decodifica base64, analisa JSON, aplica voz/música/efeitos/volume e valida todos os campos.
+
+### 🐛 Introdução de Personalidade Ouvida Duas Vezes no Remoto
+
+O pretext de personalidade (ex., "Bcs latin dance here") estava sendo falado duas vezes ao usar TTS SSH remoto. Causa raiz: `play-tts.sh` já adiciona o pretext ao texto de fala antes de chamar o emissor; o emissor também o colocava no campo JSON `pretext`, fazendo o receptor adicioná-lo novamente. O campo JSON `pretext` agora é intencionalmente deixado vazio — a personalidade é entregue apenas pelo campo `text`.
+
+### 🆕 Alias de Host SSH Visível na Aba de Configurações
+
+O alias de host SSH remoto configurado agora é exibido nas abas Configurações e Vozes para que os usuários possam confirmar qual máquina remota o TTS está direcionando sem abrir arquivos de configuração.
+
+### 🔒 Correções de Segurança
+
+Melhorias de validação de entrada no emissor e receptor SSH remoto.
+
+### 🧪 24 Novos Testes BATS
+
+- 15 testes de payload SSH remoto: verificam voz, faixa de música, volume, reverb/efeitos, tratamento de pretext, identificador LLM, precedência de configuração do projeto e validade JSON
+- 9 testes de viagem de ida e volta de ponta a ponta: o emissor constrói o payload → o receptor decodifica e aplica todos os campos simultaneamente, detectando regressões em ambas as extremidades
+
+---
+
 ## 🖥️ v5.7.5 — Contraste dos Botões TUI + Correções de Roteamento BMAD
 
 **Lançamento:** 2026-05-13

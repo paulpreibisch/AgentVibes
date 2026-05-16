@@ -1,5 +1,36 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.7.6 — SSH-Remote-Payload-Integrität + Receiver-Neuschreibung
+
+**Veröffentlicht:** 2026-05-16
+
+### 🐛 SSH-Remote Spielte Falsche Musik und Stimme
+
+Bei der Verwendung der SSH-Remote-TTS-Funktion wurden die falsche Musiktitel und Stimme des Projekts angewendet. Ursache: `CLAUDE_PROJECT_DIR` wurde nicht an den Sender weitergeleitet, was dazu führte, dass die globale Konfiguration anstelle des `audio-effects.cfg` des aktiven Projekts verwendet wurde.
+
+### 🐛 Bash-Receiver Inkompatibel mit JSON-Payload-Format
+
+Der Linux/Termux-Bash-Receiver (`agentvibes-receiver.sh`) verwendete ein Positionsargument-Format aus der Zeit vor v5.5 und konnte den aktuellen base64-JSON-Payload überhaupt nicht dekodieren. Der Receiver wurde vollständig neu geschrieben, um der Logik des PowerShell-Receivers zu entsprechen: dekodiert base64, analysiert JSON, wendet Stimme/Musik/Effekte/Lautstärke an und validiert alle Felder.
+
+### 🐛 Persönlichkeitseinleitung Zweimal auf Remote Gehört
+
+Der Persönlichkeits-Pretext (z.B. "Bcs latin dance here") wurde bei der Verwendung von SSH-Remote-TTS zweimal gesprochen. Ursache: `play-tts.sh` stellt den Pretext bereits dem Sprechtext voran, bevor der Sender aufgerufen wird; der Sender packte ihn auch in das JSON-Feld `pretext`, was dazu führte, dass der Receiver ihn erneut voranstellte. Das JSON-Feld `pretext` wird jetzt absichtlich leer gelassen — die Persönlichkeit wird nur über das Feld `text` übermittelt.
+
+### 🆕 SSH-Host-Alias in Einstellungen-Tab Sichtbar
+
+Der konfigurierte SSH-Remote-Host-Alias wird jetzt in den Tabs Einstellungen und Stimmen angezeigt, damit Benutzer bestätigen können, welche Remote-Maschine TTS anspricht, ohne Konfigurationsdateien öffnen zu müssen.
+
+### 🔒 Sicherheitskorrekturen
+
+Verbesserungen der Eingabevalidierung im SSH-Remote-Sender und -Receiver.
+
+### 🧪 24 Neue BATS-Tests
+
+- 15 SSH-Remote-Payload-Tests: Überprüfen Stimme, Musiktitel, Lautstärke, Reverb/Effekte, Pretext-Verarbeitung, LLM-Identifikator, Projekt-Konfigurationspräzedenz und JSON-Gültigkeit
+- 9 End-to-End-Roundtrip-Tests: Der Sender erstellt den Payload → der Receiver dekodiert und wendet alle Felder gleichzeitig an, Regressionen an beiden Enden werden erkannt
+
+---
+
 ## 🖥️ v5.7.5 — TUI-Schaltflächenkontrast + BMAD-Routing-Korrekturen
 
 **Veröffentlicht:** 2026-05-13

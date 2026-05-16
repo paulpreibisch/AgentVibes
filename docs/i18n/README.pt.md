@@ -4,17 +4,19 @@
 
 ---
 
-## 🌟 NOVO NO v5.7.5 — Contraste dos Botões TUI + Correções de Roteamento BMAD
+## 🌟 NOVO NO v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
 
-**Botões TUI:** Todos os botões focados/selecionados agora mostram texto branco sobre verde escuro — o texto cinza sobre azul claro desapareceu em todos os terminais e abas.
+**Correção de música/voz SSH remoto:** A faixa de música e a voz corretas do projeto agora chegam ao receptor remoto — anteriormente a configuração global era usada em vez das configurações do projeto ativo.
 
-**Aba BMAD:** O indicador ♪ de pré-visualização de voz agora aparece corretamente na lista de vozes, com um temporizador de exibição mínimo de 2 segundos para o modo SSH-remoto fire-and-forget.
+**Reescrita do receptor Bash:** O `agentvibes-receiver.sh` Linux/Termux foi completamente reescrito para decodificar o formato de payload base64 JSON atual. O antigo formato de argumento posicional anterior à v5.5 desapareceu.
 
-**Pretext do instalador:** As instalações não interativas agora derivam o pretext do nome da pasta do projeto (ex., `"MyProject here"`) em vez de sempre usar `"Claude Code here"`.
+**Sem introdução dupla:** O pretext de personalidade (ex., "Bcs latin dance here") não é mais falado duas vezes via SSH remoto. `play-tts.sh` o adiciona ao texto; o receptor não recebe mais um campo pretext separado para adicionar novamente.
 
-**Roteamento de música BMAD:** As substituições de música de fundo e reverb por agente agora chegam corretamente ao receptor SSH.
+**Host SSH visível na TUI:** As abas Configurações e Vozes agora exibem o alias de host SSH remoto configurado.
 
-**Correção de TERM:** A TUI não lança mais um erro `plab_norm` quando `TERM` é uma variante `screen-*` ou `tmux-*`.
+**Correções de segurança** e 24 novos testes BATS cobrindo o percurso completo emissor → receptor.
+
+## v5.7.5 — Contraste dos Botões TUI + Correções de Roteamento BMAD
 
 ## v5.7.0 — Suporte a BMAD v6.6 + Reinício Automático do Watcher no Windows
 

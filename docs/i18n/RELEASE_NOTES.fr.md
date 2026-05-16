@@ -1,5 +1,36 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.7.6 — Intégrité du Payload SSH Distant + Réécriture du Récepteur
+
+**Publié le :** 2026-05-16
+
+### 🐛 SSH Distant Jouant la Mauvaise Musique et Voix
+
+Lors de l'utilisation de la fonctionnalité TTS SSH distant, la mauvaise piste musicale et voix du projet étaient appliquées. Cause racine : `CLAUDE_PROJECT_DIR` n'était pas transmis à l'émetteur, le faisant revenir à la configuration globale au lieu du `audio-effects.cfg` du projet actif.
+
+### 🐛 Récepteur Bash Incompatible avec le Format de Payload JSON
+
+Le récepteur bash Linux/Termux (`agentvibes-receiver.sh`) utilisait un format d'arguments positionnels d'avant la v5.5 et ne pouvait pas du tout décoder le payload base64 JSON actuel. Le récepteur a été entièrement réécrit pour correspondre à la logique du récepteur PowerShell : décode le base64, analyse le JSON, applique voix/musique/effets/volume et valide tous les champs.
+
+### 🐛 Introduction de Personnalité Entendue Deux Fois à Distance
+
+Le prétext de personnalité (ex., "Bcs latin dance here") était prononcé deux fois lors de l'utilisation du TTS SSH distant. Cause racine : `play-tts.sh` préfixe déjà le prétext au texte de la parole avant d'appeler l'émetteur ; l'émetteur le plaçait également dans le champ JSON `pretext`, causant le récepteur à le préfixer à nouveau. Le champ JSON `pretext` est maintenant intentionnellement laissé vide — la personnalité est transmise uniquement via le champ `text`.
+
+### 🆕 Alias d'Hôte SSH Visible dans l'Onglet Paramètres
+
+L'alias d'hôte SSH distant configuré est maintenant affiché dans les onglets Paramètres et Voix afin que les utilisateurs puissent confirmer quelle machine distante cible le TTS sans ouvrir les fichiers de configuration.
+
+### 🔒 Corrections de Sécurité
+
+Améliorations de validation des entrées dans l'émetteur et le récepteur SSH distant.
+
+### 🧪 24 Nouveaux Tests BATS
+
+- 15 tests de payload SSH distant : vérifient la voix, la piste musicale, le volume, la réverbération/effets, le traitement du prétext, l'identifiant LLM, la précédence de la configuration du projet et la validité JSON
+- 9 tests de voyage aller-retour de bout en bout : l'émetteur construit le payload → le récepteur décode et applique tous les champs simultanément, détectant les régressions aux deux extrémités
+
+---
+
 ## 🖥️ v5.7.5 — Contraste des Boutons TUI + Corrections de Routage BMAD
 
 **Date de sortie :** 2026-05-13

@@ -4,17 +4,19 @@
 
 ---
 
-## 🌟 NUEVO EN v5.7.5 — Contraste de Botones TUI + Correcciones de Enrutamiento BMAD
+## 🌟 NUEVO EN v5.7.6 — Integridad del Payload SSH Remoto + Reescritura del Receptor
 
-**Botones TUI:** Todos los botones enfocados/seleccionados ahora muestran texto blanco sobre verde oscuro — el texto gris sobre azul claro ha desaparecido en todos los terminales y pestañas.
+**Arreglo de música/voz SSH remoto:** La pista de música y la voz correctas del proyecto ahora llegan al receptor remoto — anteriormente se usaba la configuración global en lugar de la configuración del proyecto activo.
 
-**Pestaña BMAD:** El indicador ♪ de vista previa de voz ahora aparece correctamente en la lista de voces, con un temporizador de visualización mínimo de 2 segundos para el modo SSH-remoto fire-and-forget.
+**Reescritura del receptor Bash:** El `agentvibes-receiver.sh` de Linux/Termux ha sido completamente reescrito para decodificar el formato de payload base64 JSON actual. El antiguo formato de argumentos posicionales de pre-v5.5 ha desaparecido.
 
-**Pretext del instalador:** Las instalaciones no interactivas ahora derivan el pretext del nombre de la carpeta del proyecto (ej., `"MyProject here"`) en lugar de siempre usar `"Claude Code here"`.
+**Sin doble introducción:** El pretext de personalidad (ej., "Bcs latin dance here") ya no se escucha dos veces sobre SSH remoto. `play-tts.sh` lo antepone al texto; el receptor ya no recibe un campo de pretext separado para anteponer de nuevo.
 
-**Enrutamiento de música BMAD:** Las anulaciones de música de fondo y reverb por agente ahora llegan correctamente al receptor SSH.
+**Host SSH visible en TUI:** Las pestañas de Configuración y Voces ahora muestran tu alias de host SSH remoto configurado.
 
-**Corrección de TERM:** La TUI ya no lanza un error `plab_norm` cuando `TERM` es una variante `screen-*` o `tmux-*`.
+**Correcciones de seguridad** y 24 nuevas pruebas BATS que cubren el viaje de ida y vuelta completo emisor → receptor.
+
+## v5.7.5 — Contraste de Botones TUI + Correcciones de Enrutamiento BMAD
 
 ## v5.7.0 — Soporte para BMAD v6.6 + Reinicio Automático del Watcher en Windows
 

@@ -4,17 +4,19 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.7.5 — Contraste des Boutons TUI + Corrections de Routage BMAD
+## 🌟 NOUVEAU DANS v5.7.6 — Intégrité du Payload SSH Distant + Réécriture du Récepteur
 
-**Boutons TUI :** Tous les boutons focalisés/sélectionnés affichent désormais du texte blanc sur fond vert foncé — le texte gris sur fond bleu clair a disparu sur tous les terminaux et tous les onglets.
+**Correction musique/voix SSH distant :** La bonne piste musicale et voix du projet atteignent maintenant le récepteur distant — auparavant la configuration globale était utilisée au lieu des paramètres du projet actif.
 
-**Onglet BMAD :** L'indicateur ♪ de prévisualisation des voix apparaît désormais correctement dans la liste des voix, avec un minuteur d'affichage minimum de 2 secondes pour le mode SSH-remote fire-and-forget.
+**Réécriture du récepteur Bash :** Le `agentvibes-receiver.sh` Linux/Termux a été entièrement réécrit pour décoder le format de payload base64 JSON actuel. L'ancien format d'arguments positionnels d'avant v5.5 a disparu.
 
-**Prétext de l'installateur :** Les installations non interactives dérivent maintenant le prétext du nom du dossier du projet (ex., `"MyProject here"`) au lieu de toujours utiliser `"Claude Code here"`.
+**Plus de double introduction :** Le prétext de personnalité (ex., "Bcs latin dance here") n'est plus prononcé deux fois via SSH distant. `play-tts.sh` le préfixe au texte ; le récepteur ne reçoit plus de champ prétext séparé à préfixer à nouveau.
 
-**Routage musical BMAD :** Les remplacements de musique de fond et de réverbération par agent atteignent désormais correctement le récepteur SSH.
+**Hôte SSH visible dans la TUI :** Les onglets Paramètres et Voix affichent maintenant l'alias d'hôte SSH distant configuré.
 
-**Correction TERM :** La TUI ne lance plus d'erreur `plab_norm` quand `TERM` est une variante `screen-*` ou `tmux-*`.
+**Corrections de sécurité** et 24 nouveaux tests BATS couvrant le voyage aller-retour complet émetteur → récepteur.
+
+## v5.7.5 — Contraste des Boutons TUI + Corrections de Routage BMAD
 
 ## v5.7.0 — Support BMAD v6.6 + Redémarrage Automatique du Watcher Windows
 

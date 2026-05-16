@@ -4,17 +4,19 @@
 
 ---
 
-## 🌟 NOVITÀ IN v5.7.5 — Contrasto Pulsanti TUI + Correzioni Routing BMAD
+## 🌟 NOVITÀ IN v5.7.6 — Integrità del Payload SSH Remoto + Riscrittura del Ricevitore
 
-**Pulsanti TUI:** Tutti i pulsanti focalizzati/selezionati mostrano ora testo bianco su sfondo verde scuro — il testo grigio su sfondo azzurro è scomparso su tutti i terminali e tutte le schede.
+**Correzione musica/voce SSH remoto:** La traccia musicale e la voce corrette del progetto raggiungono ora il ricevitore remoto — in precedenza veniva usata la configurazione globale invece delle impostazioni del progetto attivo.
 
-**Scheda BMAD:** L'indicatore ♪ di anteprima voce appare ora correttamente nell'elenco voci, con un timer di visualizzazione minimo di 2 secondi per la modalità SSH-remote fire-and-forget.
+**Riscrittura del ricevitore Bash:** Il `agentvibes-receiver.sh` Linux/Termux è stato completamente riscritto per decodificare il formato payload base64 JSON attuale. Il vecchio formato di argomenti posizionali precedente alla v5.5 è scomparso.
 
-**Pretest dell'installer:** Le installazioni non interattive derivano ora il pretest dal nome della cartella del progetto (es., `"MyProject here"`) invece di usare sempre `"Claude Code here"`.
+**Niente più doppia introduzione:** Il pretext della personalità (es., "Bcs latin dance here") non viene più pronunciato due volte via SSH remoto. `play-tts.sh` lo antepone al testo; il ricevitore non riceve più un campo pretext separato da anteporre di nuovo.
 
-**Routing musica BMAD:** Le sovrascritture di musica di sottofondo e riverbero per agente raggiungono ora correttamente il ricevitore SSH.
+**Host SSH visibile nella TUI:** Le schede Impostazioni e Voci mostrano ora l'alias host SSH remoto configurato.
 
-**Correzione TERM:** La TUI non genera più un errore `plab_norm` quando `TERM` è una variante `screen-*` o `tmux-*`.
+**Correzioni di sicurezza** e 24 nuovi test BATS che coprono il percorso completo mittente → ricevitore.
+
+## v5.7.5 — Contrasto Pulsanti TUI + Correzioni Routing BMAD
 
 ## v5.7.0 — Supporto BMAD v6.6 + Riavvio Automatico del Watcher Windows
 
