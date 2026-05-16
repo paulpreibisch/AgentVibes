@@ -163,3 +163,22 @@ export function detectWavPlayer(env) {
   }
   return _detect(WAV_PLAYERS, env);
 }
+
+/**
+ * Returns all installed WAV players in preference order.
+ * Used for fallback playback — try each until one succeeds.
+ * On Windows, always appends the PowerShell fallback.
+ *
+ * @param {Object} [env] - Environment (defaults to buildAudioEnv())
+ * @returns {Player[]}
+ */
+export function getAllWavPlayers(env) {
+  env = env || buildAudioEnv();
+  const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+  const installed = WAV_PLAYERS.filter(p => {
+    const r = spawnSync(whichCmd, [p.bin], { stdio: 'pipe', env });
+    return r.status === 0;
+  });
+  if (process.platform === 'win32') installed.push(WIN_WAV_PLAYER);
+  return installed;
+}

@@ -13,7 +13,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { buildAudioEnv, detectWavPlayer, getAllWavPlayers } from '../audio-env.js';
 import { SURNAME_POOL, uniquifyVoiceName } from '../../utils/voice-names.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1022,9 +1022,9 @@ export function createVoicesTab(screen, services) {
         return;
       }
 
-      // Play the synthesized wav in its own process group so we can kill it
-      const _wavP = detectWavPlayer(_spawnEnv);
-      if (!_wavP) {
+      // Play the synthesized wav — try each installed player until one succeeds
+      const _wavPlayers = getAllWavPlayers(_spawnEnv);
+      if (_wavPlayers.length === 0) {
         _playingVoiceId = null;
         _playingProcess = null;
         previewLine.setContent(`{red-fg}No audio player found. Install ffmpeg.{/red-fg}`);
@@ -1033,44 +1033,62 @@ export function createVoicesTab(screen, services) {
         try { fs.unlinkSync(tempWav); } catch {}
         return;
       }
-      const playProc = spawn(_wavP.bin, _wavP.args(tempWav), {
-        stdio: 'ignore',
-        detached: !isWindows,
-        windowsHide: true,
-        env: _spawnEnv,
-      });
+
       // Race note: _playingVoiceId could change between piper exit and here
       // if the user stops playback. Re-check before assigning to avoid orphan.
       if (_playingVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-      _playingProcess = playProc;
 
       previewLine.setContent(`{${COLORS.activeFg}-fg}♪ Playing: ${voiceId}  (Enter/Space to stop){/${COLORS.activeFg}-fg}`);
       screen.render();
 
-      playProc.on('exit', (code) => {
-        if (_playingVoiceId === voiceId) {
+      function _tryNextPlayer(remainingPlayers) {
+        if (!remainingPlayers.length) {
           _playingVoiceId = null;
           _playingProcess = null;
-          if (code !== 0) {
-            previewLine.setContent(`{red-fg}♪ Audio playback failed (no audio device?) — check your provider in Setup{/red-fg}`);
-            screen.render();
-            setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); } }, 5000);
-          } else {
-            previewLine.setContent(_listFocused ? HINT_TEXT : '');
-            refreshDisplay(); // clears (playing) label
-          }
+          previewLine.setContent(`{red-fg}♪ Audio playback failed (no audio device?) — check your provider in Setup{/red-fg}`);
+          screen.render();
+          setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); } }, 5000);
+          try { fs.unlinkSync(tempWav); } catch {}
+          return;
         }
-        try { fs.unlinkSync(tempWav); } catch {}
-      });
+        const [wavP, ...rest] = remainingPlayers;
+        const playProc = spawn(wavP.bin, wavP.args(tempWav), {
+          stdio: 'ignore',
+          detached: !isWindows,
+          windowsHide: true,
+          env: _spawnEnv,
+        });
+        if (_playingVoiceId !== voiceId) {
+          try { playProc.kill(); } catch {}
+          try { fs.unlinkSync(tempWav); } catch {}
+          return;
+        }
+        _playingProcess = playProc;
 
-      playProc.on('error', () => {
-        _playingVoiceId = null;
-        _playingProcess = null;
-        previewLine.setContent(`{red-fg}♪ Audio player not found — install ffmpeg or check your provider in Setup{/red-fg}`);
-        screen.render();
-        setTimeout(() => { if (!_closed) { previewLine.setContent(_listFocused ? HINT_TEXT : ''); screen.render(); } }, 5000);
-        try { fs.unlinkSync(tempWav); } catch {}
-      });
+        playProc.on('exit', (code) => {
+          if (_playingVoiceId !== voiceId) {
+            try { fs.unlinkSync(tempWav); } catch {}
+            return;
+          }
+          if (code !== 0) {
+            // This player failed — try the next one
+            _tryNextPlayer(rest);
+          } else {
+            _playingVoiceId = null;
+            _playingProcess = null;
+            previewLine.setContent(_listFocused ? HINT_TEXT : '');
+            refreshDisplay();
+            try { fs.unlinkSync(tempWav); } catch {}
+          }
+        });
+
+        playProc.on('error', () => {
+          if (_playingVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
+          _tryNextPlayer(rest);
+        });
+      }
+
+      _tryNextPlayer(_wavPlayers);
     });
 
     piper.on('error', () => {

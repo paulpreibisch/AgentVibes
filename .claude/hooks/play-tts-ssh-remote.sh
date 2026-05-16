@@ -151,12 +151,23 @@ SOX_EFFECTS=""
 BG_FILE=""
 BG_VOLUME="0.10"
 
-EFFECTS_CFG="$PROJECT_ROOT/.claude/config/audio-effects.cfg"
+# Use CLAUDE_PROJECT_DIR (injected via --project-dir by play-tts.sh) so the
+# agent-name / default row is read from the user's project, not the package.
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" && -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  EFFECTS_CFG="$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg"
+else
+  EFFECTS_CFG="$PROJECT_ROOT/.claude/config/audio-effects.cfg"
+fi
 if [[ -f "$EFFECTS_CFG" ]]; then
-  CONFIG_LINE=$(grep "^${AGENT_NAME}|" "$EFFECTS_CFG" 2>/dev/null || \
-                grep "^default|" "$EFFECTS_CFG" 2>/dev/null || true)
+  # awk exact field-1 match — no regex injection risk from AGENT_NAME
+  CONFIG_LINE=$(awk -F'|' -v k="${AGENT_NAME}" '$1==k{print;exit}' "$EFFECTS_CFG" 2>/dev/null || true)
+  [[ -z "$CONFIG_LINE" ]] && \
+    CONFIG_LINE=$(awk -F'|' '$1=="default"{print;exit}' "$EFFECTS_CFG" 2>/dev/null || true)
   if [[ -n "$CONFIG_LINE" ]]; then
     IFS='|' read -r _ SOX_EFFECTS BG_FILE BG_VOLUME <<< "$CONFIG_LINE"
+    SOX_EFFECTS="${SOX_EFFECTS## }"; SOX_EFFECTS="${SOX_EFFECTS%% }"
+    BG_FILE="${BG_FILE## }"; BG_FILE="${BG_FILE%% }"
+    BG_VOLUME="${BG_VOLUME## }"; BG_VOLUME="${BG_VOLUME%% }"
   fi
 fi
 
@@ -172,14 +183,18 @@ LLM_REVERB=""
 LLM_BG_FILE=""
 LLM_BG_VOLUME=""
 
-# Build config search path: CLAUDE_PROJECT_DIR first (the actual user project,
-# even when hooks run from the package dir), then PROJECT_ROOT (may be the
-# same or the package dir), then global home fallback.
+# Build config search path for LLM-specific row lookup.
+# Priority: CLAUDE_PROJECT_DIR (real user project) → global HOME fallback.
+# PROJECT_ROOT is intentionally excluded when CLAUDE_PROJECT_DIR is set and
+# different — prevents the AgentVibes package's own audio-effects.cfg from
+# bleeding into a user project that doesn't define its own llm: row.
 _llm_cfg_paths=()
 if [[ -n "${CLAUDE_PROJECT_DIR:-}" && "$CLAUDE_PROJECT_DIR" != "$PROJECT_ROOT" ]]; then
   _llm_cfg_paths+=("$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg")
+else
+  _llm_cfg_paths+=("$PROJECT_ROOT/.claude/config/audio-effects.cfg")
 fi
-_llm_cfg_paths+=("$PROJECT_ROOT/.claude/config/audio-effects.cfg" "$HOME/.claude/config/audio-effects.cfg")
+_llm_cfg_paths+=("$HOME/.claude/config/audio-effects.cfg")
 
 _llm_key="llm:${LLM_NAME}"
 _llm_row_found=0
@@ -224,7 +239,11 @@ if [[ -n "$AGENT_PROFILE_FILE" ]] && [[ -f "$AGENT_PROFILE_FILE" ]]; then
   fi
 fi
 
-# Read pretext if configured
+# PRETEXT is NOT extracted from the llm row here.
+# play-tts.sh already prepends the llm row's pretext to TEXT before calling this script.
+# Extracting it again and sending it as a separate JSON field would cause the receiver
+# to prepend it a second time — the user hears the intro text twice.
+# PRETEXT here is only for the (rare) pretext.txt override file, not the llm row.
 PRETEXT=""
 PRETEXT_FILE="$PROJECT_ROOT/.agentvibes/config/pretext.txt"
 if [[ -f "$PRETEXT_FILE" ]]; then
@@ -279,9 +298,9 @@ build_json_payload() {
       --arg llm "$LLM_NAME" \
       '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm}'
   else
-    # Manual JSON — escape double quotes and backslashes in text
+    # Manual JSON — escape backslashes, quotes, control chars
     local escaped_text
-    escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')
+    escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' ' | sed 's/\r//g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
     printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s"}' \
@@ -302,6 +321,13 @@ fi
 # ---------------------------------------------------------------------------
 # Send to receiver via SSH (fire and forget — backgrounded)
 # ---------------------------------------------------------------------------
+
+# In test mode, dump the decoded payload to stdout so tests can inspect it
+# without needing a real SSH connection or a mock binary.
+if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
+  echo "$JSON_PAYLOAD"
+  exit 0
+fi
 
 echo "Sending to $SSH_HOST..." >&2
 

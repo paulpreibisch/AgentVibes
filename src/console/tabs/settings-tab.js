@@ -202,6 +202,15 @@ export function createSettingsTab(screen, services) {
       desc: 'Play audio locally or stream to a remote host via SSH',
     },
     {
+      key: 'sshAlias',
+      label: 'SSH Host Alias',
+      getValue: () => {
+        const alias = configService?.getConfig?.()?.audio_ssh_alias ?? '';
+        return alias || '(not set)';
+      },
+      desc: 'SSH host alias from ~/.ssh/config used when Audio Destination is Remote',
+    },
+    {
       key: 'configStorage',
       label: 'Config Storage',
       getValue: () => {
@@ -394,6 +403,9 @@ export function createSettingsTab(screen, services) {
         break;
       case 'audioDst':
         _editAudioDst();
+        break;
+      case 'sshAlias':
+        _editSshAlias();
         break;
       case 'rerunWizard':
         _rerunWizard();
@@ -861,6 +873,68 @@ export function createSettingsTab(screen, services) {
         box.focus();
         screen.render();
       });
+    screen.render();
+  }
+
+  // ── SSH alias editor ─────────────────────────────────────────────────────
+
+  function _editSshAlias() {
+    navigationService?.openModal();
+
+    const aliases = _detectSshAliases().filter(a => !a.includes('github.com'));
+    const MANUAL_OPTION = '  Type manually...';
+    const items = [...aliases.map(a => `  ${a}`), MANUAL_OPTION];
+    const currentAlias = configService?.getConfig?.()?.audio_ssh_alias ?? '';
+
+    const listHeight = Math.min(items.length + 4, 18);
+    const modal = blessed.list({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 44,
+      height: listHeight,
+      border: { type: 'line' },
+      tags: true,
+      label: ' {bold}{cyan-fg} Select SSH Host Alias {/cyan-fg}{/bold} ',
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        border: { fg: 'cyan' },
+        selected: { bg: 'blue', fg: 'yellow' },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+    modal.setFront();
+    modal.setItems(items);
+
+    const currentIdx = aliases.indexOf(currentAlias);
+    if (currentIdx >= 0) modal.select(currentIdx);
+
+    modal.key(['enter'], () => {
+      const selItem = items[modal.selected];
+      if (selItem === MANUAL_OPTION) {
+        _closeModal();
+        _promptSshAlias();
+        return;
+      }
+      const alias = selItem?.trim();
+      if (alias) configService.set('audio_ssh_alias', alias);
+      _closeModal();
+    });
+    modal.key(['escape', 'q'], _closeModal);
+
+    function _closeModal() {
+      navigationService?.closeModal();
+      destroyList(modal, screen);
+      _refreshValues();
+      box.focus();
+      screen.render();
+    }
+
+    modal.focus();
     screen.render();
   }
 
