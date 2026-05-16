@@ -60,7 +60,7 @@ SSH_PORT=""
 if [[ -n "${AGENTVIBES_SSH_HOST:-}" ]]; then
   SSH_HOST="$AGENTVIBES_SSH_HOST"
   SSH_KEY="${AGENTVIBES_SSH_KEY:-}"
-  SSH_PORT="${AGENTVIBES_SSH_PORT:-22}"
+  SSH_PORT="${AGENTVIBES_SSH_PORT:-}"
 fi
 
 # Priority 2: ~/.agentvibes/transport-config.json (ssh-remote section)
@@ -336,15 +336,16 @@ SSH_ARGS=()
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
 [[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
 
-# ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD" &
-SSH_PID=$!
-
-# Log SSH failures asynchronously so the hook doesn't block
-( wait "$SSH_PID"; _exit=$?; if [[ $_exit -ne 0 ]]; then
+# ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly.
+# Run SSH inside the subshell so it is a direct child — avoids the
+# "wait: pid N is not a child of this shell" error when wait runs in a sibling subshell.
+( ssh -o ConnectTimeout=10 "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD"
+  _exit=$?
+  if [[ $_exit -ne 0 ]]; then
     echo "$(date -Iseconds) [ERROR] SSH to $SSH_HOST failed (exit $_exit)" \
       >> "$HOME/.agentvibes/ssh-remote.log" 2>/dev/null || true
   fi ) &
+SSH_PID=$!
 
 echo "Sent to $SSH_HOST (PID: $SSH_PID)" >&2
 exit 0
