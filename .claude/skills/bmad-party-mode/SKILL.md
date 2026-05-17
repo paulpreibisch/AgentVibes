@@ -114,7 +114,7 @@ Rules:
 - Truncate the response to roughly 300 characters for TTS — full text in chat, condensed for audio.
 - Strip any leading icon + bold-name header (e.g. `📊 **Mary:** `) before passing to bmad-speak; it's already announced via voice/pretext.
 - Run the calls in the **same order** the responses appear in your text output, so audio and text match.
-- This script delegates to `.claude/hooks-windows/bmad-speak.ps1` on Windows and `.claude/hooks/bmad-speak.sh` on Linux/macOS/WSL. Each call blocks until playback completes.
+- This script delegates to `.claude/hooks-windows/bmad-speak.ps1` on Windows and `.claude/hooks/bmad-speak.sh` on Linux/macOS/WSL. Each call blocks until playback completes before the next agent speaks.
 
 **What the script applies per agent (read automatically from `~/.agentvibes/bmad-voice-map.json`):**
 - **`voice`** — the Piper/ElevenLabs voice (e.g. `en_US-libritts-high::Frank-11` for the architect)
