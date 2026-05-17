@@ -1,5 +1,35 @@
 # AgentVibes Release Notes
 
+## 🎭 v5.7.7 — Party Mode Voice Restore + Polish
+
+**Released:** 2026-05-17
+
+### 🐛 BMAD Party Mode Agents Silent (No Per-Agent TTS)
+
+Party mode agents were displaying responses in text but not speaking with their unique voices. Two root causes:
+
+**Skill disambiguation:** `/party-mode` was matching the upstream BMAD `_bmad/core/workflows/party-mode` command (which tries to load a path that doesn't exist in this project) instead of the AgentVibes skill. A project-local `/party-mode` command override now routes to the correct skill.
+
+**Mandatory TTS step:** The orchestrator's `bmad-speak.js` call step was underspecified, so it was sometimes skipped. Step 4 in the BMAD party mode skill is now clearly marked MANDATORY, with explicit documentation of what `bmad-speak.js` applies per agent: voice, pretext, reverb, personality, and background music — all loaded automatically from `~/.agentvibes/bmad-voice-map.json`.
+
+### 🔍 Party Mode Debug Logging
+
+`bmad-party-speak.sh` (PostToolUse hook) now writes structured diagnostic entries to `/tmp/agentvibes-party-debug.log` — `fired`, `fingerprint HIT/MISS`, `invoking`, and errors — so voice issues are diagnosable without guessing.
+
+### 🎵 New Bundled Track: CelestialVelvet
+
+A new ambient music track **CelestialVelvet** (🌌) has been added to the built-in catalog. Available immediately in the TUI music picker and BMAD voice map — no download required.
+
+### 🐛 TUI: Gray Text on Selected Rows Fixed
+
+White text now renders correctly on selected rows in the Voices and Agents tabs. Previously `bright-black` foreground combined with green background produced unreadable gray text in many terminals.
+
+### 🐛 SSH Remote: "wait: pid is not a child of this shell" Error
+
+`play-tts-ssh-remote.sh` would emit `wait: pid X is not a child of this shell` on certain shells. Fixed by spawning `ssh` directly inside the background subshell so `$?` captures the exit code without a cross-shell `wait` call.
+
+---
+
 ## 🔧 v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
 
 **Released:** 2026-05-16

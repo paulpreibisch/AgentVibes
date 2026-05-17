@@ -40,7 +40,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
+## 🌟 NEW IN v5.7.7 — Party Mode Voice Restore + Polish
+
+**Party mode agents now speak again:** BMAD `/party-mode` now reliably invokes the correct AgentVibes skill, and each agent's response is spoken aloud in their unique voice with per-agent music, pretext, and reverb — loaded automatically from `~/.agentvibes/bmad-voice-map.json`.
+
+**New bundled track:** 🌌 CelestialVelvet added to the built-in music catalog.
+
+**TUI contrast fix:** Selected rows in Voices and Agents tabs no longer render unreadable gray text.
+
+**SSH remote:** Fixed "wait: pid is not a child of this shell" error in `play-tts-ssh-remote.sh`.
+
+## v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
 
 **SSH remote music/voice fix:** The correct project music track and voice now reach the remote receiver — previously the global config was used instead of the active project's settings.
 
