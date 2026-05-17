@@ -99,14 +99,35 @@ The format is simple: each agent's response one after another, separated by a bl
 
 After all agent responses are presented in full, you may optionally add a brief **Orchestrator Note** — flagging a disagreement worth exploring, or suggesting an agent to bring in next round. Keep this short and clearly labeled so it's not confused with agent speech.
 
-**Speak each response via TTS in the agent's unique voice.**
-After presenting all responses in text, call the cross-platform BMAD speech entry point sequentially — one agent at a time, do NOT run in parallel:
+### 4. Speak Each Response Aloud — MANDATORY
+
+**This step is not optional.** Party mode's entire value is the agents speaking in their own voices. Skipping this step means the user gets silent text — the same thing they'd get from any other workflow. Do not skip it. Do not condition it on whether the user "seems to want audio." Always run it.
+
+After presenting all responses in text (step 3), call the cross-platform BMAD speech entry point **once per agent, sequentially** (never in parallel — each call must finish before the next starts, otherwise voices overlap):
+
 ```bash
 node bin/bmad-speak.js "{displayName}" "{their response text — truncate to ~300 chars for TTS}"
 ```
-This delegates to `.claude/hooks-windows/bmad-speak.ps1` on Windows and `.claude/hooks/bmad-speak.sh` elsewhere. Each call blocks until playback completes before the next agent speaks.
 
-### 4. Handle Follow-ups
+Rules:
+- Use the agent's `{displayName}` exactly as it appears in the manifest (case-sensitive). The script maps it to the agent ID and loads that agent's full BMAD voice profile automatically — **do not pass any voice, reverb, music, or personality flags**. The script handles all of them.
+- Truncate the response to roughly 300 characters for TTS — full text in chat, condensed for audio.
+- Strip any leading icon + bold-name header (e.g. `📊 **Mary:** `) before passing to bmad-speak; it's already announced via voice/pretext.
+- Run the calls in the **same order** the responses appear in your text output, so audio and text match.
+- This script delegates to `.claude/hooks-windows/bmad-speak.ps1` on Windows and `.claude/hooks/bmad-speak.sh` on Linux/macOS/WSL. Each call blocks until playback completes.
+
+**What the script applies per agent (read automatically from `~/.agentvibes/bmad-voice-map.json`):**
+- **`voice`** — the Piper/ElevenLabs voice (e.g. `en_US-libritts-high::Frank-11` for the architect)
+- **`pretext`** — the spoken intro phrase prepended to the dialogue (e.g. "Winston here." before the response)
+- **`reverbPreset`** — reverb profile applied during synthesis (cathedral, room, etc., when configured)
+- **`personality`** — affects voice modulation/style
+- **`backgroundMusic.track` / `.volume` / `.enabled`** — per-agent ambient music played underneath their speech (e.g. Late Night Hip Hop Groove under the architect, harp under the analyst)
+
+If audio plays but voices sound identical, the agent isn't found in the voice-map — check that `~/.agentvibes/bmad-voice-map.json` has an entry under `agents.<agent-id>` matching the display-name → ID mapping in `_bmad/_config/agent-manifest.csv`. If the script exits silently with no audio at all, the project is likely missing `_bmad/_config/agent-manifest.csv` (bmad-speak refuses to run without BMAD installed at the project root).
+
+A PostToolUse hook (`~/.claude/hooks/bmad-party-speak.sh`) also tries to auto-speak responses after each `Agent` tool call. Treat that hook as a backup — your explicit `bmad-speak.js` calls are the primary mechanism. Calling explicitly guarantees audio even if the hook fingerprint or environment fails.
+
+### 5. Handle Follow-ups
 
 The user drives what happens next. Common patterns:
 
