@@ -1,5 +1,35 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.7 — Restauration des Voix en Mode Party + Améliorations
+
+**Publié le :** 2026-05-17
+
+### 🐛 Agents en Mode Party Silencieux (Pas de TTS par Agent)
+
+Les agents du mode party affichaient les réponses en texte mais ne les lisaient pas avec leurs voix uniques. Deux causes profondes :
+
+**Désambiguïsation du skill :** `/party-mode` correspondait à la commande BMAD `_bmad/core/workflows/party-mode` (qui tente de charger un chemin inexistant dans ce projet) au lieu du skill AgentVibes. Une commande `/party-mode` locale au projet redirige maintenant vers le bon skill.
+
+**Étape TTS obligatoire :** L'étape d'appel `bmad-speak.js` de l'orchestrateur était mal spécifiée et parfois ignorée. L'étape 4 dans le skill du mode party BMAD est maintenant clairement marquée OBLIGATOIRE, avec une documentation explicite de ce que `bmad-speak.js` applique par agent : voix, pretext, reverb, personnalité et musique de fond — tout chargé automatiquement depuis `~/.agentvibes/bmad-voice-map.json`.
+
+### 🔍 Journalisation de Diagnostic pour le Mode Party
+
+`bmad-party-speak.sh` (hook PostToolUse) écrit maintenant des entrées de diagnostic structurées dans `/tmp/agentvibes-party-debug.log` — `fired`, `fingerprint HIT/MISS`, `invoking` et erreurs — pour diagnostiquer les problèmes de voix sans deviner.
+
+### 🎵 Nouvelle Piste Intégrée : CelestialVelvet
+
+Une nouvelle piste de musique ambiante **CelestialVelvet** (🌌) a été ajoutée au catalogue intégré. Disponible immédiatement dans le sélecteur de musique TUI et la carte de voix BMAD — aucun téléchargement requis.
+
+### 🐛 TUI : Texte Gris sur les Lignes Sélectionnées Corrigé
+
+Le texte blanc s'affiche maintenant correctement sur les lignes sélectionnées dans les onglets Voix et Agents. Auparavant, le premier plan `bright-black` combiné au fond vert produisait du texte gris illisible dans de nombreux terminaux.
+
+### 🐛 SSH Distant : Erreur "wait: pid is not a child of this shell"
+
+`play-tts-ssh-remote.sh` émettait `wait: pid X is not a child of this shell` dans certains shells. Corrigé en lançant `ssh` directement dans le sous-shell en arrière-plan pour que `$?` capture le code de sortie sans appel `wait` inter-shell.
+
+---
+
 ## 🔧 v5.7.6 — Intégrité du Payload SSH Distant + Réécriture du Récepteur
 
 **Publié le :** 2026-05-16

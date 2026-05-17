@@ -1,5 +1,35 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.7 — 파티 모드 음성 복원 + 개선
+
+**출시일:** 2026-05-17
+
+### 🐛 BMAD 파티 모드 에이전트 음소거 (에이전트별 TTS 없음)
+
+파티 모드 에이전트가 텍스트로 응답을 표시했지만 고유한 음성으로 읽지 않았습니다. 두 가지 근본 원인:
+
+**스킬 명확화:** `/party-mode`가 AgentVibes 스킬 대신 업스트림 BMAD 명령 `_bmad/core/workflows/party-mode`(이 프로젝트에 존재하지 않는 경로를 로드하려고 시도)와 일치했습니다. 프로젝트 로컬 `/party-mode` 명령 재정의가 이제 올바른 스킬로 라우팅합니다.
+
+**필수 TTS 단계:** 오케스트레이터의 `bmad-speak.js` 호출 단계가 불충분하게 지정되어 때때로 건너뛰었습니다. BMAD 파티 모드 스킬의 4단계가 이제 필수로 명확히 표시되며, `bmad-speak.js`가 에이전트별로 적용하는 것에 대한 명시적 문서가 추가되었습니다: 음성, 프리텍스트, 리버브, 퍼소낼리티, 배경 음악 — 모두 `~/.agentvibes/bmad-voice-map.json`에서 자동으로 로드됩니다.
+
+### 🔍 파티 모드 진단 로깅
+
+`bmad-party-speak.sh`(PostToolUse 훅)가 이제 `/tmp/agentvibes-party-debug.log`에 구조화된 진단 항목을 씁니다 — `fired`, `fingerprint HIT/MISS`, `invoking`, 오류 — 추측 없이 음성 문제를 진단할 수 있습니다.
+
+### 🎵 새 번들 트랙: CelestialVelvet
+
+새로운 앰비언트 음악 트랙 **CelestialVelvet**(🌌)이 내장 카탈로그에 추가되었습니다. TUI 음악 선택기와 BMAD 음성 맵에서 즉시 사용 가능 — 다운로드 불필요.
+
+### 🐛 TUI: 선택된 행의 회색 텍스트 수정
+
+이제 음성 및 에이전트 탭의 선택된 행에 흰색 텍스트가 올바르게 렌더링됩니다. 이전에는 `bright-black` 전경색과 녹색 배경의 조합이 많은 터미널에서 읽기 어려운 회색 텍스트를 생성했습니다.
+
+### 🐛 SSH 원격: "wait: pid is not a child of this shell" 오류
+
+`play-tts-ssh-remote.sh`가 특정 셸에서 `wait: pid X is not a child of this shell`을 출력했습니다. 백그라운드 서브셸 내에서 직접 `ssh`를 실행하도록 수정하여 셸 간 `wait` 호출 없이 `$?`로 종료 코드를 캡처합니다.
+
+---
+
 ## 🔧 v5.7.6 — SSH 원격 페이로드 무결성 + 수신기 재작성
 
 **출시일:** 2026-05-16

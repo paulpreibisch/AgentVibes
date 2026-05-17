@@ -1,5 +1,35 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.7 — Ripristino Voci Modalità Party + Miglioramenti
+
+**Rilasciato il:** 2026-05-17
+
+### 🐛 Agenti in Modalità Party Silenziosi (Nessun TTS per Agente)
+
+Gli agenti della modalità party mostravano le risposte in testo ma non le leggevano con le loro voci uniche. Due cause principali:
+
+**Disambiguazione dello skill:** `/party-mode` corrispondeva al comando BMAD `_bmad/core/workflows/party-mode` (che tenta di caricare un percorso inesistente in questo progetto) invece dello skill di AgentVibes. Una sostituzione del comando `/party-mode` locale al progetto ora instrada allo skill corretto.
+
+**Passaggio TTS obbligatorio:** Il passaggio di chiamata `bmad-speak.js` dell'orchestratore era poco specificato e a volte veniva saltato. Il Passaggio 4 nello skill della modalità party BMAD è ora chiaramente contrassegnato come OBBLIGATORIO, con documentazione esplicita di ciò che `bmad-speak.js` applica per agente: voce, pretext, reverb, personalità e musica di sottofondo — tutto caricato automaticamente da `~/.agentvibes/bmad-voice-map.json`.
+
+### 🔍 Registrazione Diagnostica per la Modalità Party
+
+`bmad-party-speak.sh` (hook PostToolUse) ora scrive voci di diagnostica strutturate in `/tmp/agentvibes-party-debug.log` — `fired`, `fingerprint HIT/MISS`, `invoking` ed errori — per diagnosticare i problemi vocali senza indovinare.
+
+### 🎵 Nuova Traccia Inclusa: CelestialVelvet
+
+Una nuova traccia di musica ambient **CelestialVelvet** (🌌) è stata aggiunta al catalogo integrato. Disponibile immediatamente nel selettore musicale TUI e nella mappa voci BMAD — nessun download richiesto.
+
+### 🐛 TUI: Testo Grigio nelle Righe Selezionate Corretto
+
+Il testo bianco ora viene visualizzato correttamente nelle righe selezionate nelle schede Voci e Agenti. In precedenza, il primo piano `bright-black` combinato con lo sfondo verde produceva testo grigio illeggibile in molti terminali.
+
+### 🐛 SSH Remoto: Errore "wait: pid is not a child of this shell"
+
+`play-tts-ssh-remote.sh` emetteva `wait: pid X is not a child of this shell` in certi shell. Corretto avviando `ssh` direttamente all'interno del sottoshell in background in modo che `$?` catturi il codice di uscita senza una chiamata `wait` tra shell.
+
+---
+
 ## 🔧 v5.7.6 — Integrità del Payload SSH Remoto + Riscrittura del Ricevitore
 
 **Rilasciato il:** 2026-05-16

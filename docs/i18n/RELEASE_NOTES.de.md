@@ -1,5 +1,35 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.7 — Party-Mode-Stimmen Wiederhergestellt + Verbesserungen
+
+**Veröffentlicht:** 2026-05-17
+
+### 🐛 BMAD Party-Mode-Agenten Stumm (Kein TTS pro Agent)
+
+Party-Mode-Agenten zeigten Antworten als Text, sprachen diese aber nicht mit ihren einzigartigen Stimmen aus. Zwei Grundursachen:
+
+**Skill-Disambiguierung:** `/party-mode` stimmte mit dem BMAD-Befehl `_bmad/core/workflows/party-mode` überein (der versucht, einen Pfad zu laden, der in diesem Projekt nicht existiert) anstatt mit dem AgentVibes-Skill. Eine projektlokale `/party-mode`-Befehlsüberschreibung leitet nun zum richtigen Skill weiter.
+
+**Obligatorischer TTS-Schritt:** Der `bmad-speak.js`-Aufruf des Orchestrators war unzureichend spezifiziert und wurde manchmal übersprungen. Schritt 4 im BMAD Party-Mode-Skill ist jetzt klar als OBLIGATORISCH markiert, mit expliziter Dokumentation, was `bmad-speak.js` pro Agent anwendet: Stimme, Pretext, Reverb, Persönlichkeit und Hintergrundmusik — alles automatisch aus `~/.agentvibes/bmad-voice-map.json` geladen.
+
+### 🔍 Diagnose-Protokollierung für Party-Mode
+
+`bmad-party-speak.sh` (PostToolUse-Hook) schreibt jetzt strukturierte Diagnoseeinträge in `/tmp/agentvibes-party-debug.log` — `fired`, `fingerprint HIT/MISS`, `invoking` und Fehler — damit Stimmprobleme ohne Rätselraten diagnostiziert werden können.
+
+### 🎵 Neuer Enthaltener Track: CelestialVelvet
+
+Ein neuer Ambient-Musiktrack **CelestialVelvet** (🌌) wurde dem integrierten Katalog hinzugefügt. Sofort im TUI-Musikwähler und der BMAD-Stimmenkarte verfügbar — kein Download erforderlich.
+
+### 🐛 TUI: Grauer Text in Ausgewählten Zeilen Behoben
+
+Weißer Text wird jetzt korrekt in ausgewählten Zeilen der Registerkarten Stimmen und Agenten dargestellt. Zuvor erzeugte der `bright-black`-Vordergrund kombiniert mit grünem Hintergrund unlesbaren grauen Text in vielen Terminals.
+
+### 🐛 SSH-Remote: Fehler "wait: pid is not a child of this shell"
+
+`play-tts-ssh-remote.sh` gab `wait: pid X is not a child of this shell` in bestimmten Shells aus. Behoben, indem `ssh` direkt innerhalb der Hintergrund-Subshell gestartet wird, sodass `$?` den Exit-Code ohne Shell-übergreifenden `wait`-Aufruf erfasst.
+
+---
+
 ## 🔧 v5.7.6 — SSH-Remote-Payload-Integrität + Receiver-Neuschreibung
 
 **Veröffentlicht:** 2026-05-16

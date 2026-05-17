@@ -1,5 +1,35 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.7 — 派对模式语音恢复 + 改进
+
+**发布日期：** 2026-05-17
+
+### 🐛 BMAD 派对模式代理无声（无每代理 TTS）
+
+派对模式代理以文本显示响应，但未用其独特声音朗读。两个根本原因：
+
+**技能消歧：** `/party-mode` 匹配了上游 BMAD 命令 `_bmad/core/workflows/party-mode`（尝试加载此项目中不存在的路径），而非 AgentVibes 技能。项目本地 `/party-mode` 命令覆盖现在路由到正确的技能。
+
+**必需 TTS 步骤：** 编排器的 `bmad-speak.js` 调用步骤规范不足，有时被跳过。BMAD 派对模式技能中的步骤 4 现在明确标记为必需，并附有 `bmad-speak.js` 每代理应用内容的明确文档：声音、预文本、混响、个性和背景音乐 — 全部从 `~/.agentvibes/bmad-voice-map.json` 自动加载。
+
+### 🔍 派对模式诊断日志
+
+`bmad-party-speak.sh`（PostToolUse 钩子）现在将结构化诊断条目写入 `/tmp/agentvibes-party-debug.log` — `fired`、`fingerprint HIT/MISS`、`invoking` 和错误 — 无需猜测即可诊断语音问题。
+
+### 🎵 新捆绑曲目：CelestialVelvet
+
+新的环境音乐曲目 **CelestialVelvet**（🌌）已添加到内置目录。在 TUI 音乐选择器和 BMAD 语音映射中立即可用 — 无需下载。
+
+### 🐛 TUI：修复选定行的灰色文本
+
+现在在"声音"和"代理"选项卡的选定行中正确呈现白色文本。以前，`bright-black` 前景色与绿色背景结合在许多终端中产生难以阅读的灰色文本。
+
+### 🐛 SSH 远程："wait: pid is not a child of this shell" 错误
+
+`play-tts-ssh-remote.sh` 在某些 shell 中会发出 `wait: pid X is not a child of this shell`。通过在后台子 shell 内直接生成 `ssh` 来修复，使 `$?` 无需跨 shell `wait` 调用即可捕获退出代码。
+
+---
+
 ## 🔧 v5.7.6 — SSH 远程负载完整性 + 接收器重写
 
 **发布日期：** 2026-05-16

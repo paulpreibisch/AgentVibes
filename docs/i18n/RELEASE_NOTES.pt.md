@@ -1,5 +1,35 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎭 v5.7.7 — Restauração de Vozes no Modo Party + Melhorias
+
+**Lançamento:** 2026-05-17
+
+### 🐛 Agentes do Modo Party Silenciosos (Sem TTS por Agente)
+
+Os agentes do modo party exibiam respostas em texto mas não as liam com suas vozes únicas. Duas causas raiz:
+
+**Desambiguação do skill:** `/party-mode` correspondia ao comando BMAD `_bmad/core/workflows/party-mode` (que tenta carregar um caminho inexistente neste projeto) em vez do skill do AgentVibes. Uma substituição de comando `/party-mode` local ao projeto agora encaminha para o skill correto.
+
+**Etapa TTS obrigatória:** A etapa de chamada `bmad-speak.js` do orquestrador estava mal especificada e às vezes era ignorada. A Etapa 4 no skill do modo party BMAD agora está claramente marcada como OBRIGATÓRIA, com documentação explícita do que `bmad-speak.js` aplica por agente: voz, pretext, reverb, personalidade e música de fundo — tudo carregado automaticamente de `~/.agentvibes/bmad-voice-map.json`.
+
+### 🔍 Registro de Diagnóstico para Modo Party
+
+`bmad-party-speak.sh` (hook PostToolUse) agora escreve entradas de diagnóstico estruturadas em `/tmp/agentvibes-party-debug.log` — `fired`, `fingerprint HIT/MISS`, `invoking` e erros — para que problemas de voz sejam diagnosticáveis sem adivinhação.
+
+### 🎵 Nova Faixa Incluída: CelestialVelvet
+
+Uma nova faixa de música ambiente **CelestialVelvet** (🌌) foi adicionada ao catálogo integrado. Disponível imediatamente no seletor de música TUI e no mapa de vozes BMAD — sem download necessário.
+
+### 🐛 TUI: Texto Cinza em Linhas Selecionadas Corrigido
+
+O texto branco agora é exibido corretamente nas linhas selecionadas nas abas Vozes e Agentes. Anteriormente, o primeiro plano `bright-black` combinado com fundo verde produzia texto cinza ilegível em muitos terminais.
+
+### 🐛 SSH Remoto: Erro "wait: pid is not a child of this shell"
+
+`play-tts-ssh-remote.sh` emitia `wait: pid X is not a child of this shell` em certos shells. Corrigido iniciando `ssh` diretamente dentro do subshell em segundo plano para que `$?` capture o código de saída sem uma chamada `wait` entre shells.
+
+---
+
 ## 🔧 v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
 
 **Lançamento:** 2026-05-16

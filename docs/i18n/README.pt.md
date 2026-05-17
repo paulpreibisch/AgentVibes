@@ -4,7 +4,17 @@
 
 ---
 
-## 🌟 NOVO NO v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
+## 🌟 NOVO NO v5.7.7 — Restauração de Vozes no Modo Party + Melhorias
+
+**Os agentes do modo party falam novamente:** BMAD `/party-mode` agora invoca de forma confiável o skill correto do AgentVibes, e cada resposta do agente é lida em voz alta com sua voz única com música, pretext e reverb por agente — carregados automaticamente de `~/.agentvibes/bmad-voice-map.json`.
+
+**Nova faixa incluída:** 🌌 CelestialVelvet adicionada ao catálogo de música integrado.
+
+**Correção de contraste TUI:** Linhas selecionadas nas abas Vozes e Agentes não exibem mais texto cinza ilegível.
+
+**SSH remoto:** Corrigido o erro "wait: pid is not a child of this shell" em `play-tts-ssh-remote.sh`.
+
+## v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
 
 **Correção de música/voz SSH remoto:** A faixa de música e a voz corretas do projeto agora chegam ao receptor remoto — anteriormente a configuração global era usada em vez das configurações do projeto ativo.
 
