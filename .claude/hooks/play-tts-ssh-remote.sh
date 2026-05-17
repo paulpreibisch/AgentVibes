@@ -336,15 +336,18 @@ SSH_ARGS=()
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
 [[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
 
-# ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD" &
-SSH_PID=$!
-
-# Log SSH failures asynchronously so the hook doesn't block
-( wait "$SSH_PID"; _exit=$?; if [[ $_exit -ne 0 ]]; then
+# ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly.
+# Run ssh inside the backgrounded subshell so its exit code is reachable via $?
+# (a `wait` from outside the spawning shell would error: "pid X is not a child").
+(
+  ssh "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD"
+  _exit=$?
+  if [[ $_exit -ne 0 ]]; then
     echo "$(date -Iseconds) [ERROR] SSH to $SSH_HOST failed (exit $_exit)" \
       >> "$HOME/.agentvibes/ssh-remote.log" 2>/dev/null || true
-  fi ) &
+  fi
+) &
+SSH_PID=$!
 
 echo "Sent to $SSH_HOST (PID: $SSH_PID)" >&2
 exit 0

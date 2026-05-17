@@ -770,7 +770,7 @@ export function createVoicesTab(screen, services) {
   // Inline selection hint appended to the currently highlighted voice row.
   // _hintBase stores the item's clean content (no hint, no █) — no sentinel needed.
   // Use getter functions so hints re-translate when language changes.
-  const _rowHintInstalled   = () => `  {bright-black-fg}${_tl('voicesRowHintInstalled')}{/bright-black-fg}`;
+  const _rowHintInstalled   = () => `  {white-fg}${_tl('voicesRowHintInstalled')}{/white-fg}`;
   const _rowHintUninstalled = () => `  {bright-yellow-fg}${_tl('voicesRowHintUninstalled')}{/bright-yellow-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended

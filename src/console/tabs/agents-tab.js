@@ -153,7 +153,7 @@ const COL_MUSIC    = 11;
 const COL_VOL      = 5;   // e.g. "70%" or "100%"
 
 // Inline hint appended to the selected row when list is focused
-const _ROW_HINT_BMAD = `  {bright-black-fg}[Space] Preview  [Enter] Configure{/bright-black-fg}`;
+const _ROW_HINT_BMAD = `  {white-fg}[Space] Preview  [Enter] Configure{/white-fg}`;
 
 // ---------------------------------------------------------------------------
 
