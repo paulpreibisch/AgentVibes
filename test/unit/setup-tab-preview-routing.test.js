@@ -195,3 +195,60 @@ describe('nvPicker key bindings', () => {
     );
   });
 });
+
+describe('Piper picker space bar regression guard', () => {
+  test('_previewVoice still exists for Piper voices', () => {
+    const fnIdx = setupSrc.indexOf('function _previewVoice(');
+    assert.ok(fnIdx >= 0, '_previewVoice must exist for Piper voice picker');
+  });
+
+  test('_previewVoice spawns piper binary for Piper voices', () => {
+    const fnIdx = setupSrc.indexOf('function _previewVoice(');
+    let depth = 0, i = fnIdx;
+    while (i < setupSrc.length) {
+      if (setupSrc[i] === '{') depth++;
+      else if (setupSrc[i] === '}') { depth--; if (depth === 0) break; }
+      i++;
+    }
+    const fnBody = setupSrc.slice(fnIdx, i + 1);
+    assert.ok(
+      fnBody.includes('_piperBin') || fnBody.includes("spawn('piper'") || fnBody.includes('piper.exe'),
+      '_previewVoice must still spawn piper binary for Piper voices (regression guard)'
+    );
+  });
+
+  test('vpList space key handler calls _previewVoice', () => {
+    const src = setupSrc;
+    // The Piper picker's space key handler
+    const vpListSpaceIdx = src.indexOf("vpList.key(['space']");
+    assert.ok(vpListSpaceIdx >= 0, "vpList must bind ['space'] key for Piper preview");
+    const snippet = src.slice(vpListSpaceIdx, vpListSpaceIdx + 200);
+    assert.ok(
+      snippet.includes('_previewVoice'),
+      "vpList space handler must call _previewVoice for Piper voices"
+    );
+  });
+});
+
+describe('nvPicker shows exactly 1 item for native engines', () => {
+  test('nvPicker.setItems call exists in native guard block', () => {
+    const guardBlock = getNativeGuardBlock(setupSrc);
+    const setItemsIdx = guardBlock.indexOf('nvPicker.setItems([');
+    assert.ok(setItemsIdx >= 0, 'nvPicker.setItems must be called in the native engine guard');
+  });
+
+  test('nvPicker.setItems has a single entry (no second comma-separated element)', () => {
+    const guardBlock = getNativeGuardBlock(setupSrc);
+    const setItemsIdx = guardBlock.indexOf('nvPicker.setItems([');
+    assert.ok(setItemsIdx >= 0, 'nvPicker.setItems must be called');
+    // Find the closing ]) of the setItems call to bound the search
+    const afterOpen = guardBlock.indexOf('[', setItemsIdx + 'nvPicker.setItems('.length);
+    const closeIdx = guardBlock.indexOf('])', afterOpen);
+    const arrayContent = guardBlock.slice(afterOpen + 1, closeIdx);
+    // A second array item would be a backtick or quote after a comma: `, \`` or `, '`
+    assert.ok(
+      !arrayContent.includes('`,') && !arrayContent.includes("',"),
+      'nvPicker.setItems must contain exactly 1 item (no trailing comma + second element found)'
+    );
+  });
+});
