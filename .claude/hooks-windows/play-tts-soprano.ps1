@@ -106,7 +106,8 @@ if (Test-WebUI) {
     $SynthMode = "webui"
     $pythonHelper = Join-Path $ScriptDir "soprano-gradio-synth.py"
     if (Test-Path $pythonHelper) {
-        & python $pythonHelper $Text $TempFile $SopranoPort 2>$null
+        # Wrap in try/catch: PS7.3+ throws on native non-zero exit with ErrorActionPreference=Stop
+        try { & python $pythonHelper $Text $TempFile $SopranoPort 2>$null } catch { }
     } else {
         Write-Host "[ERROR] soprano-gradio-synth.py not found" -ForegroundColor Red
         exit 1
@@ -128,7 +129,8 @@ if (Test-WebUI) {
 } elseif (Test-SopranoCLI) {
     # CLI fallback - reloads model each call (slowest)
     $SynthMode = "cli"
-    & soprano $Text -o $TempFile -d $SopranoDevice 2>$null
+    # Wrap in try/catch: PS7.3+ throws on native non-zero exit with ErrorActionPreference=Stop
+    try { & soprano $Text -o $TempFile -d $SopranoDevice 2>$null } catch { }
 } else {
     Write-Host "[ERROR] Soprano TTS not installed and no server running on port $SopranoPort" -ForegroundColor Red
     Write-Host ""
