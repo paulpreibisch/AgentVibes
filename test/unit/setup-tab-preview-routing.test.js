@@ -47,11 +47,23 @@ function getPreviewNativeFnBody(src) {
 }
 
 describe('_previewNativeVoice spawn routing', () => {
-  test('soprano engine spawns soprano-tts binary', () => {
+  test('soprano engine spawns soprano-tts binary (non-Windows)', () => {
     const body = getPreviewNativeFnBody(setupSrc);
     assert.ok(
       body.includes("spawn('soprano-tts'"),
-      "soprano engine must spawn 'soprano-tts'"
+      "soprano engine must spawn 'soprano-tts' on non-Windows"
+    );
+  });
+
+  test('soprano engine on win32 routes through play-tts-soprano.ps1', () => {
+    const body = getPreviewNativeFnBody(setupSrc);
+    assert.ok(
+      body.includes("play-tts-soprano.ps1"),
+      "soprano engine on win32 must route through play-tts-soprano.ps1"
+    );
+    assert.ok(
+      body.includes("process.platform === 'win32'"),
+      "soprano must have win32 platform guard"
     );
   });
 

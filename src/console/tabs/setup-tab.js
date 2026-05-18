@@ -2236,7 +2236,14 @@ export function createSetupTab(screen, services) {
         let proc = null;
         try {
           if (engine === 'soprano') {
-            proc = spawn('soprano-tts', [phrase], { stdio: 'ignore', windowsHide: true });
+            if (process.platform === 'win32') {
+              // Python entry points aren't directly spawnable from Node.js on Windows;
+              // route through play-tts-soprano.ps1 which handles WebUI/API/CLI modes.
+              const scriptPath = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts-soprano.ps1');
+              proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, phrase], { stdio: 'ignore', windowsHide: true });
+            } else {
+              proc = spawn('soprano-tts', [phrase], { stdio: 'ignore' });
+            }
           } else if (engine === 'sapi') {
             const safePhrase = phrase.replace(/'/g, "''");
             const sapiScript = `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${safePhrase}')`;
