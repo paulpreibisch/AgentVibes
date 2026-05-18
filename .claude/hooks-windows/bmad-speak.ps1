@@ -227,9 +227,9 @@ try {
         }
     }
 
-    # Clear music override env vars
+    # Clear music override env vars (use SetEnvironmentVariable to fully remove, not just empty)
     if ($AgentBgEnabled -and $AgentBgTrack) {
-        $env:AGENTVIBES_OVERRIDE_MUSIC  = ""
-        $env:AGENTVIBES_OVERRIDE_VOLUME = ""
+        [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",  $null, "Process")
+        [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_VOLUME", $null, "Process")
     }
 }

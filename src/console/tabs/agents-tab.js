@@ -755,7 +755,7 @@ ${_tl('bmadDesc')}
       refreshDisplay();
     });
 
-    const saveBtn = _modalBtn('Save', 41, () => { _autoSaveAgent(); _closeModal(); });
+    const saveBtn = _modalBtn('Save', 41, () => { try { _autoSaveAgent(); } catch {} _closeModal(); });
 
     const closeBtn = _modalBtn('Close', 50, _closeModal);
 

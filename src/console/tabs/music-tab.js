@@ -65,6 +65,7 @@ const TRACK_DISPLAY = Object.freeze({
   'agent_vibes_bachata_v1_loop.mp3':                   '🎺 Bachata',
   'agent_vibes_bossa_nova_v2_loop.mp3':                '🌸 Bossa Nova',
   'celestial_velvet.mp3':                               '🌌 Celestial Velvet',
+  'CelestialVelvet.mp3':                               '🌌 Celestial Velvet', // legacy alias — display only, file renamed in v5.7.7
   'agent_vibes_celtic_harp_v1_loop.mp3':               '🎶 Celtic Harp',
   'agent_vibes_chillwave_v2_loop.mp3':                 '🌊 Chillwave',
   'agent_vibes_cumbia_v1_loop.mp3':                    '🎸 Cumbia',
