@@ -161,3 +161,5 @@ if (-not $env:AGENTVIBES_NO_PLAY) {
 
 Write-Host "Saved to: $TempFile"
 Write-Host "Voice: Soprano-1.1-80M (Soprano TTS, $SynthMode mode)"
+# Output bare path so play-tts.ps1 can capture it for reverb/bg-music processing
+Write-Output $TempFile
