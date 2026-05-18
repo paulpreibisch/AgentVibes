@@ -2260,9 +2260,16 @@ export function createSetupTab(screen, services) {
         _nvPreviewProc = proc;
         nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
         screen.render();
-        proc.on('exit', () => {
+        proc.on('exit', (code) => {
           _nvPreviewProc = null;
-          if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); }
+          if (!_nvClosed) {
+            if (code !== 0 && code !== null) {
+              nvPicker.setLabel(` {red-fg}Start ${nativeVoice.label} server first{/red-fg} `);
+            } else {
+              nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+            }
+            screen.render();
+          }
         });
         proc.on('error', () => {
           _nvPreviewProc = null;

@@ -20,6 +20,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Refresh PATH from registry so Python-installed scripts (soprano, soprano-webui) are
+# found when this script is spawned from Node.js, which inherits a stripped PATH.
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+            [System.Environment]::GetEnvironmentVariable("Path", "User")
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Validate port is numeric to prevent injection
 $SopranoPort = "7860"
