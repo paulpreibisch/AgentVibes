@@ -200,6 +200,98 @@ validation_checklist:
     - acceptance_criteria_clear: true
     - ready_to_start_sprint: true
 
+# ============================================================
+# SPRINT 4 — Epic 5: TTS Engine Awareness (Issue #194)
+# ============================================================
+sprint_4:
+  sprint: 4
+  epic_id: AVI-E05
+  epic_name: TTS Engine Awareness
+  feature_id: AVI-05-ENGINE-AWARE
+  priority: High
+  story_points_total: 12
+  duration: 1 week
+  focus: Engine-aware voice picker, preview routing, auto-save fix
+  github_issue: "#194"
+  outcome: Voice picker and preview work correctly for Soprano, SAPI, macOS Say
+  created_date: 2026-05-18
+
+  development_status:
+
+    story_5_1:
+      id: AVI-S5.1
+      title: Engine-Aware Voice Picker in LLM Config Modal
+      status: complete
+      story_points: 3
+      acceptance_criteria_count: 6
+      completion_date: 2026-05-18
+      file: docs/implementation-artifacts/5-1-engine-aware-voice-picker.md
+      description: |
+        When a non-Piper engine is selected, the voice picker shows only
+        one entry (the engine default) and auto-selects it. Piper behaviour unchanged.
+      notes: |
+        Implemented NATIVE_ENGINE_VOICES constant at module scope.
+        Added native-engine guard in _openVoicePickerForLlm (1-item picker, no scanInstalledVoices).
+        _openTtsEnginePicker clears draft.voice on engine change.
+        Both _buildFields voice getValue shows label for native engine IDs.
+        15 tests all pass (test/unit/setup-tab-engine-voices.test.js).
+        Also fixed voice picker text contrast (green bg + white text) and
+        duplicate voice names (catalog lookup + empty speaker_id_map guard in voices-tab.js).
+      dependencies: []
+
+    story_5_2:
+      id: AVI-S5.2
+      title: Engine-Correct Space Bar Preview in Voice Picker
+      status: ready-for-dev
+      story_points: 3
+      acceptance_criteria_count: 7
+      file: docs/implementation-artifacts/5-2-engine-correct-preview.md
+      description: |
+        Space bar preview routes to the correct TTS binary for the selected engine
+        (soprano-tts, powershell SAPI, say, or piper). Config modal preview button also fixed.
+      dependencies:
+        - AVI-S5.1
+
+    story_5_3:
+      id: AVI-S5.3
+      title: Auto-Save Engine Inference Fix
+      status: ready-for-dev
+      story_points: 2
+      acceptance_criteria_count: 5
+      file: docs/implementation-artifacts/5-3-autosave-engine-fix.md
+      description: |
+        _autoSave() stops hardcoding 'piper' when voice is set.
+        draft.ttsEngine is preserved; piper only inferred when engine is unset and
+        voice is a Piper voice ID.
+      dependencies:
+        - AVI-S5.1
+
+    story_5_4:
+      id: AVI-S5.4
+      title: Tests for Engine-Aware Voice Picker and Preview
+      status: ready-for-dev
+      story_points: 4
+      acceptance_criteria_count: 16
+      file: docs/implementation-artifacts/5-4-engine-aware-tests.md
+      description: |
+        Jest tests: picker item count per engine, scanInstalledVoices not called for
+        native engines, spawn args per engine, auto-save engine preservation,
+        getAvailableEngines() platform filtering.
+      dependencies:
+        - AVI-S5.1
+        - AVI-S5.2
+        - AVI-S5.3
+
+  statistics:
+    total_stories: 4
+    completed_stories: 1
+    ready_for_dev: 3
+    total_story_points: 12
+    completed_points: 3
+    ready_for_dev_points: 9
+    completion_percentage: 25.0
+    next_milestone: "Implement AVI-S5.2 and AVI-S5.3 via /dev-story"
+
 notes: |
   ✅ EPIC COMPLETE: Sprint 3 Epic 4 - Custom Background Music System
 

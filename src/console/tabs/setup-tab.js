@@ -87,6 +87,14 @@ const COLORS = {
 
 const FOOTER_TEXT = '[Enter] Continue  [Esc] Back  [Tab] Next Tab  [Q] Quit';
 
+// Maps non-Piper engine IDs to their canonical voice ID and display label.
+// Used by the voice picker, _buildFields display, and auto-save logic.
+const NATIVE_ENGINE_VOICES = {
+  soprano:     { id: 'soprano',   label: 'Soprano'      },
+  sapi:        { id: 'sapi',      label: 'Windows SAPI' },
+  'macos-say': { id: 'macos-say', label: 'macOS Say'    },
+};
+
 // ---------------------------------------------------------------------------
 // Exported pure helpers (kept from install-tab for backward compat)
 
@@ -807,7 +815,7 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
         { key: 'reverb',      label: 'Reverb',       getValue: () => {
           const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
@@ -1675,7 +1683,7 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
         { key: 'reverb',      label: 'Reverb',       getValue: () => {
           const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
@@ -2092,6 +2100,8 @@ export function createSetupTab(screen, services) {
       } else {
         draft.ttsEngine = engines[idx - 1].id;
       }
+      // Clear voice on any engine change so stale Piper voices don't persist (Task 3)
+      draft.voice = '';
       _closePicker();
     });
 
@@ -2151,6 +2161,48 @@ export function createSetupTab(screen, services) {
       destroyList(vpModal, screen, onDone);
     }
 
+    // Tasks 1.2 + 2.1–2.4: Single-item overlay for non-Piper engines.
+    // scanInstalledVoices() is NOT called; draft.voice is set immediately.
+    const nativeVoice = NATIVE_ENGINE_VOICES[draft.ttsEngine];
+    if (nativeVoice) {
+      draft.voice = nativeVoice.id;
+      let _nvClosed = false;
+      function _closeNV() {
+        if (_nvClosed) return;
+        _nvClosed = true;
+        navigationService?.closeModal();
+        destroyList(nvPicker, screen, onDone);
+      }
+      const nvPicker = blessed.list({
+        parent: screen,
+        top: 'center',
+        left: 'center',
+        width: 50,
+        height: 7,
+        border: { type: 'line' },
+        tags: true,
+        label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
+        keys: true,
+        vi: false,
+        mouse: true,
+        style: {
+          fg: COLORS.labelFg,
+          bg: COLORS.contentBg,
+          border: { fg: 'cyan' },
+          selected: { bg: 'green', fg: 'white', bold: true },
+          item: { fg: COLORS.labelFg },
+        },
+      });
+      nvPicker.setFront();
+      nvPicker.setItems([`  ${nativeVoice.label}`]);
+      nvPicker.select(0);
+      nvPicker.key(['enter', 'space'], () => { draft.voice = nativeVoice.id; _closeNV(); });
+      nvPicker.key(['escape', 'q', 'Q'], _closeNV);
+      nvPicker.focus();
+      screen.render();
+      return;
+    }
+
     const vpModal = blessed.box({
       parent: screen,
       top: '6%',
@@ -2182,7 +2234,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'blue' },
-        selected: { bg: 'green', fg: 'black', bold: true },
+        selected: { bg: 'green', fg: 'white', bold: true },
         item: { fg: COLORS.labelFg },
       },
     });
