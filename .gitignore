@@ -89,6 +89,7 @@ personalities
 # Local utility scripts
 fixcolors
 sonar
+release-push.sh
 scripts/fix-wsl-audio.sh
 scripts/fix-audio-tunnel.sh
 scripts/fix-audio-tunnel-complete.sh
@@ -109,6 +110,7 @@ nul
 # Backup and temp files
 *.backup-*
 *.new
+*.user.bak
 .claude/personalities/backups/
 
 # LinkedIn articles (personal drafts)

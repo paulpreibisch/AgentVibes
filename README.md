@@ -220,6 +220,11 @@ Replace the default background tracks with your own audio files for complete son
 - Automatic format detection
 - Duration warnings for non-optimal lengths
 
+**Custom Track Naming Rules:**
+- Use `snake_case` filenames only — e.g. `my_focus_music.mp3` ✅
+- No spaces or uppercase letters in filenames — e.g. `My Focus Music.mp3` ❌
+- Misnamed files will not appear in the music picker and will be skipped by the audio engine
+
 **Perfect for:**
 - 🎸 **Team Audio Branding** - Company theme music
 - 🎮 **Gaming Sessions** - Epic background tracks

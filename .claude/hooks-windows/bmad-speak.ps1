@@ -198,29 +198,13 @@ if ($AgentPersonality -and (Test-Path (Split-Path $PersonalityFile -Parent))) {
 }
 
 # ---------------------------------------------------------------------------
-# Temporarily patch background music config for this agent.
-# The caller (bmad-party-speak.ps1) holds a named mutex so only one speak
-# call runs at a time — these file patches are safe from concurrent clobber.
-$BgEnabledFile   = Join-Path $TtsConfigDir "background-music-enabled.txt"
-$AudioEffectsCfg = Join-Path $TtsConfigDir "audio-effects.cfg"
-$OldBgEnabled    = $null
-$TempCfgLine     = ""
-
+# Apply per-agent background music via AGENTVIBES_OVERRIDE_* env vars.
+# play-tts.ps1 reads these directly and forces BgEnabled=true when OVERRIDE_MUSIC
+# is set — no config file patching needed, and cleanup is automatic (env vars
+# are scoped to the child process spawned by & powershell below).
 if ($AgentBgEnabled -and $AgentBgTrack) {
-    # Save + enable background music
-    if (Test-Path $BgEnabledFile) {
-        $OldBgEnabled = (Get-Content $BgEnabledFile -Raw -ErrorAction SilentlyContinue).Trim()
-    }
-    Set-Content $BgEnabledFile "true" -NoNewline
-
-    # Prepend agent line to audio-effects.cfg so play-tts.ps1 finds it first
-    # Format: AGENT_NAME|SOX_EFFECTS|BACKGROUND_FILE|BACKGROUND_VOLUME
-    $TempCfgLine = "${AgentId}||${AgentBgTrack}|${AgentBgVolume}"
-    $env:AGENTVIBES_AGENT_NAME = $AgentId
-    $existingCfg = if (Test-Path $AudioEffectsCfg) {
-        Get-Content $AudioEffectsCfg -Raw -ErrorAction SilentlyContinue
-    } else { "" }
-    Set-Content $AudioEffectsCfg "${TempCfgLine}`n${existingCfg}" -NoNewline
+    $env:AGENTVIBES_OVERRIDE_MUSIC  = $AgentBgTrack
+    $env:AGENTVIBES_OVERRIDE_VOLUME = $AgentBgVolume
 }
 
 try {
@@ -243,22 +227,9 @@ try {
         }
     }
 
-    # Restore background music config
+    # Clear music override env vars
     if ($AgentBgEnabled -and $AgentBgTrack) {
-        if ($null -ne $OldBgEnabled) {
-            Set-Content $BgEnabledFile $OldBgEnabled -NoNewline
-        } elseif (Test-Path $BgEnabledFile) {
-            Remove-Item $BgEnabledFile -Force -ErrorAction SilentlyContinue
-        }
-
-        # Remove the prepended agent line from audio-effects.cfg
-        if (Test-Path $AudioEffectsCfg) {
-            $cfgRaw = Get-Content $AudioEffectsCfg -Raw -ErrorAction SilentlyContinue
-            $escaped = [regex]::Escape($TempCfgLine)
-            $cfgRaw  = $cfgRaw -replace "^${escaped}\r?\n?", ""
-            Set-Content $AudioEffectsCfg $cfgRaw -NoNewline
-        }
-
-        $env:AGENTVIBES_AGENT_NAME = ""
+        $env:AGENTVIBES_OVERRIDE_MUSIC  = ""
+        $env:AGENTVIBES_OVERRIDE_VOLUME = ""
     }
 }

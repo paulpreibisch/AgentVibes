@@ -121,7 +121,10 @@ function _detect(players, env) {
  * @returns {string|null}
  */
 export function detectRemoteLlm() {
-  const cfgPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
+  // process.env.HOME takes priority over os.homedir() so tests can inject a fake home on all platforms.
+  // On Windows production use, HOME is typically unset, so os.homedir() (reads USERPROFILE) is the fallback.
+  const homeDir = process.env.HOME ?? os.homedir();
+  const cfgPath = path.join(homeDir, '.agentvibes', 'transport-config.json');
   if (!fs.existsSync(cfgPath)) return null;
   try {
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));

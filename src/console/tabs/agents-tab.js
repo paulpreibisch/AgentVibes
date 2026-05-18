@@ -17,6 +17,7 @@ import { formatReverbState, formatTrackName, formatVoiceName } from '../widgets/
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
   parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, genderIconTag,
+  getFavorites, getThumbsDown, toggleThumbsUp, toggleThumbsDown,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
 import { destroyList } from '../widgets/destroy-list.js';
@@ -694,7 +695,7 @@ ${_tl('bmadDesc')}
       left: 2,
       right: 2,
       tags: true,
-      content: '{white-fg}[↑↓] Navigate  [Enter] Edit  [Tab] → Preview/Save  [Esc] Cancel{/white-fg}',
+      content: '{white-fg}[↑↓] Navigate  [Enter] Edit  [Tab] → Buttons  [Esc] Close{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -754,10 +755,12 @@ ${_tl('bmadDesc')}
       refreshDisplay();
     });
 
-    const closeBtn = _modalBtn('Cancel', 42, _closeModal);
+    const saveBtn = _modalBtn('Save', 41, () => { _autoSaveAgent(); _closeModal(); });
+
+    const closeBtn = _modalBtn('Close', 50, _closeModal);
 
     // Blinking █ cursor + preview spinner — reusable across all modal buttons
-    const btnBlink = attachBtnBlink([previewBtn, resetBtn, closeBtn], screen);
+    const btnBlink = attachBtnBlink([previewBtn, resetBtn, saveBtn, closeBtn], screen);
 
     function _closeModal() {
       if (_closed) return;
@@ -868,6 +871,7 @@ ${_tl('bmadDesc')}
     fieldList.key(['escape', 'q', 'Q'], _closeModal);
     previewBtn.key(['escape', 'q', 'Q'], _closeModal);
     resetBtn.key(['escape', 'q', 'Q'], _closeModal);
+    saveBtn.key(['escape', 'q', 'Q'], _closeModal);
     closeBtn.key(['escape', 'q', 'Q'], _closeModal);
 
     // Tab + arrow navigation within modal
@@ -895,18 +899,27 @@ ${_tl('bmadDesc')}
     // Wrap: up on buttons → back to field list
     previewBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
     resetBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
+    saveBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
     closeBtn.key(['up'], () => { fieldList.focus(); fieldList.select(FIELDS.length - 1); screen.render(); });
 
     previewBtn.key(['tab', 'right'], () => { resetBtn.focus(); screen.render(); });
     previewBtn.key(['left'], () => { closeBtn.focus(); screen.render(); });
 
-    resetBtn.key(['tab', 'right'], () => { closeBtn.focus(); screen.render(); });
+    resetBtn.key(['tab', 'right'], () => { saveBtn.focus(); screen.render(); });
     resetBtn.key(['left'], () => { previewBtn.focus(); screen.render(); });
 
+    saveBtn.key(['tab', 'right'], () => { closeBtn.focus(); screen.render(); });
+    saveBtn.key(['left'], () => { resetBtn.focus(); screen.render(); });
+
     closeBtn.key(['tab', 'right'], () => { fieldList.focus(); screen.render(); });
-    closeBtn.key(['left'], () => { resetBtn.focus(); screen.render(); });
+    closeBtn.key(['left'], () => { saveBtn.focus(); screen.render(); });
 
     fieldList.focus();
+    try {
+      for (let r = 0; r < screen.height; r++)
+        for (let c = 0; c < screen.width; c++)
+          if (screen.olines[r]?.[c]) screen.olines[r][c][0] = -1;
+    } catch {}
     screen.render();
   }
 
@@ -984,33 +997,38 @@ ${_tl('bmadDesc')}
       },
     });
 
-    const vpInfoLine = blessed.text({
-      parent: vpModal, bottom: 4, left: 2, right: 2, tags: true,
-      content: '', style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-    });
-
     const vpPreviewLine = blessed.text({
-      parent: vpModal, bottom: 3, left: 2, right: 2, tags: true,
+      parent: vpModal, bottom: 4, left: 2, right: 2, height: 1, tags: true,
       content: '', style: { fg: 'bright-cyan', bg: COLORS.contentBg },
     });
 
     blessed.text({
-      parent: vpModal, bottom: 2, left: 2, right: 2, tags: true,
-      content: '{#455a64-fg}[↑↓] Nav  [PgUp/PgDn] Page  [Home/End]  [a-z] Jump  [Enter] Select  [Space] Preview  [Esc] Cancel{/#455a64-fg}',
+      parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
+      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump{/white-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: vpModal, bottom: 2, left: 2, right: 2, height: 1, tags: true,
+      content: '{white-fg}[Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
       style: { bg: COLORS.contentBg },
     });
 
     function _buildVoiceItems(voices) {
+      const favs = getFavorites(configService);
+      const td = getThumbsDown(configService);
       return voices.map(v => {
         const isActive = v === draft.voice;
         const isPrev = v === _previewVoiceId;
+        const isUp = favs.includes(v);
+        const isDown = td.includes(v);
         const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
+        const star = isUp ? '{green-fg}👍{/green-fg}' : (isDown ? '{red-fg}👎{/red-fg}' : '  ');
         const meta = getVoiceMeta(v);
         const name = meta.displayName.length > COL_N
           ? meta.displayName.slice(0, COL_N - 1) + '…'
           : meta.displayName.padEnd(COL_N);
         // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
-        return ` ${dot} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
+        return ` ${dot}${star} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
       });
     }
 
@@ -1034,7 +1052,26 @@ ${_tl('bmadDesc')}
       _killVP();
       if (_previewMinTimer) { clearTimeout(_previewMinTimer); _previewMinTimer = null; }
 
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+
+      if (_isWin) {
+        // Windows: route through play-tts.ps1 (same pattern as non-Windows bash route)
+        const playTtsScript = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        if (!fs.existsSync(playTtsScript)) return;
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
+        _previewProc = spawn('powershell', [
+          '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTtsScript, phrase, voiceId,
+        ], { stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv });
+        _previewProc.on('exit', () => {
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+        });
+        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        return;
+      }
+
+      // Non-Windows: use bash play-tts.sh
       const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
@@ -1043,34 +1080,23 @@ ${_tl('bmadDesc')}
       if (remoteLlm) args.push('--llm', remoteLlm);
 
       _previewProc = spawn('bash', args, {
-        stdio: 'ignore',
-        detached: true,
+        stdio: 'ignore', detached: true,
         env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;
-
-      if (!_vpClosed) {
-        vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`);
-        _refreshVP();
-      }
+      if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
 
       const _clearAfterMinDisplay = () => {
         if (_previewVoiceId === voiceId) {
-          _previewVoiceId = null;
-          _previewProc = null;
+          _previewVoiceId = null; _previewProc = null;
           if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
         }
         _previewMinTimer = null;
       };
-
       // Keep indicator visible for at least 2s (ssh-remote exits immediately)
-      _previewProc.on('exit', () => {
-        _previewMinTimer = setTimeout(_clearAfterMinDisplay, 2000);
-      });
-      _previewProc.on('error', () => {
-        _previewMinTimer = setTimeout(_clearAfterMinDisplay, 2000);
-      });
+      _previewProc.on('exit', () => { _previewMinTimer = setTimeout(_clearAfterMinDisplay, 2000); });
+      _previewProc.on('error', () => { _previewMinTimer = setTimeout(_clearAfterMinDisplay, 2000); });
     }
 
     vpList.key(['enter'], () => {
@@ -1081,7 +1107,15 @@ ${_tl('bmadDesc')}
       const sel = _allVoices[vpList.selected];
       if (sel) _previewVoice(sel);
     });
-    vpList.key(['escape', 'q'], _closeVP);
+    vpList.key(['*', '+'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) { toggleThumbsUp(configService, sel); _refreshVP(); }
+    });
+    vpList.key(['-'], () => {
+      const sel = _allVoices[vpList.selected];
+      if (sel) { toggleThumbsDown(configService, sel); _refreshVP(); }
+    });
+    vpList.key(['escape', 'q', 'Q'], _closeVP);
 
     // PageUp / PageDown / Home / End navigation
     const _pageSize = () => Math.max(1, (vpList.height ?? 10) - 2);
@@ -1357,7 +1391,7 @@ ${_tl('bmadDesc')}
     });
   }
 
-  /** Windows full-effects preview: temporarily patches config files then calls play-tts.ps1 */
+  /** Windows full-effects preview: temporarily patches personality/reverb, passes music via env vars */
   function _sampleWithFullEffectsWindows(gen, agent, profile, phrase, onComplete) {
     const _spawnEnv = buildAudioEnv();
     const homeDir = process.env.USERPROFILE || os.homedir();
@@ -1365,38 +1399,35 @@ ${_tl('bmadDesc')}
     const claudeDir = fs.existsSync(path.join(_projectRoot, '.claude'))
       ? path.join(_projectRoot, '.claude')
       : path.join(homeDir, '.claude');
-    const configDir  = path.join(claudeDir, 'config');
-    const hooksDir   = path.join(claudeDir, 'hooks-windows');
-    const playTts    = path.join(hooksDir, 'play-tts.ps1');
+    const configDir = path.join(claudeDir, 'config');
+    const hooksDir  = path.join(claudeDir, 'hooks-windows');
+    const playTts   = path.join(hooksDir, 'play-tts.ps1');
     if (!fs.existsSync(playTts)) { _sampleWithPiperDirect(gen, profile.voice || '', phrase); return; }
 
-    // Files to temporarily patch
-    const personalityFile  = path.join(configDir, 'personality.txt');
-    const reverbFile       = path.join(configDir, 'reverb-level.txt');
-    const bgEnabledFile    = path.join(configDir, 'background-music-enabled.txt');
-    const audioEffectsCfg  = path.join(configDir, 'audio-effects.cfg');
+    const personalityFile = path.join(configDir, 'personality.txt');
+    const reverbFile      = path.join(configDir, 'reverb-level.txt');
 
-    // Save originals
     const _read = f => { try { return fs.readFileSync(f, 'utf8'); } catch { return null; } };
     const origPersonality = _read(personalityFile);
     const origReverb      = _read(reverbFile);
-    const origBgEnabled   = _read(bgEnabledFile);
-    const origAudioEffects = _read(audioEffectsCfg);
 
-    const bgMusic   = profile.backgroundMusic;
-    let tempCfgLine = '';
+    const bgMusic = profile.backgroundMusic;
+
+    // Build spawn env — pass per-agent music via AGENTVIBES_OVERRIDE_* env vars.
+    // play-tts.ps1 reads these directly and forces BgEnabled=true when set,
+    // so no config file patching is needed for background music.
+    const spawnEnv = { ..._spawnEnv, AGENTVIBES_AGENT_NAME: agent.id, CLAUDE_PROJECT_DIR: _projectRoot };
+    if (bgMusic?.enabled && bgMusic?.track) {
+      const vol = ((bgMusic.volume ?? 20) / 100).toFixed(2);
+      spawnEnv.AGENTVIBES_OVERRIDE_MUSIC  = bgMusic.track;
+      spawnEnv.AGENTVIBES_OVERRIDE_VOLUME = vol;
+    }
 
     try {
       if (profile.personality && profile.personality !== 'none')
         fs.writeFileSync(personalityFile, profile.personality);
       if (profile.reverbPreset)
         fs.writeFileSync(reverbFile, profile.reverbPreset);
-      if (bgMusic?.enabled && bgMusic?.track) {
-        fs.writeFileSync(bgEnabledFile, 'true');
-        const vol = ((bgMusic.volume ?? 20) / 100).toFixed(2);
-        tempCfgLine = `${agent.id}||${bgMusic.track}|${vol}`;
-        fs.writeFileSync(audioEffectsCfg, `${tempCfgLine}\n${origAudioEffects || ''}`);
-      }
     } catch { /* degrade gracefully */ }
 
     const voiceId = profile.voice || '';
@@ -1404,10 +1435,7 @@ ${_tl('bmadDesc')}
     if (voiceId) psArgs.push(voiceId);
 
     const proc = spawn('powershell', psArgs, {
-      stdio: 'ignore', detached: false, windowsHide: true,
-      // CLAUDE_PROJECT_DIR tells play-tts.ps1 to use the project's .claude/config
-      // rather than falling back to ~/.claude where our patches don't exist.
-      env: { ..._spawnEnv, AGENTVIBES_AGENT_NAME: agent.id, CLAUDE_PROJECT_DIR: _projectRoot },
+      stdio: 'ignore', detached: false, windowsHide: true, env: spawnEnv,
     });
     _playingProcess = proc;
 
@@ -1416,11 +1444,6 @@ ${_tl('bmadDesc')}
         if (origPersonality !== null) fs.writeFileSync(personalityFile, origPersonality);
         else try { fs.unlinkSync(personalityFile); } catch {}
         if (origReverb !== null) fs.writeFileSync(reverbFile, origReverb);
-        if (bgMusic?.enabled && bgMusic?.track) {
-          if (origBgEnabled !== null) fs.writeFileSync(bgEnabledFile, origBgEnabled);
-          else try { fs.unlinkSync(bgEnabledFile); } catch {}
-          if (origAudioEffects !== null) fs.writeFileSync(audioEffectsCfg, origAudioEffects);
-        }
       } catch {}
     }
 
