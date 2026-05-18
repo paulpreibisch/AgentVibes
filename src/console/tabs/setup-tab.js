@@ -47,6 +47,7 @@ import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import net from 'node:net';
 
 const _execFileAsync = promisify(execFile);
 
@@ -94,6 +95,38 @@ const NATIVE_ENGINE_VOICES = {
   sapi:        { id: 'sapi',      label: 'Windows SAPI' },
   'macos-say': { id: 'macos-say', label: 'macOS Say'    },
 };
+
+// ---------------------------------------------------------------------------
+// Soprano WebUI auto-start helpers
+
+function _checkSopranoPort(port) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: '127.0.0.1', port });
+    socket.setTimeout(2000);
+    socket.once('connect', () => { socket.destroy(); resolve(true); });
+    socket.once('error', () => resolve(false));
+    socket.once('timeout', () => { socket.destroy(); resolve(false); });
+  });
+}
+
+async function _ensureSopranoWebUI(onStatus) {
+  const port = parseInt(process.env.SOPRANO_PORT || '7860', 10);
+  if (await _checkSopranoPort(port)) return true;
+  onStatus('Starting Soprano WebUI...');
+  try {
+    const p = spawn('soprano-webui', [], {
+      stdio: 'ignore', detached: true, windowsHide: true,
+      shell: process.platform === 'win32',
+    });
+    p.unref();
+  } catch {}
+  for (let i = 0; i < 45; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    if (await _checkSopranoPort(port)) return true;
+    onStatus(`Starting Soprano WebUI... ${(i + 1) * 2}s`);
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Exported pure helpers (kept from install-tab for backward compat)
@@ -1848,44 +1881,65 @@ export function createSetupTab(screen, services) {
         }
       }
 
-      let cmd, args;
-      if (isWin) {
-        const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
-        cmd = 'powershell';
-        args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
-      } else {
-        const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.sh');
-        cmd = 'bash';
-        args = [script, sampleText, '', '--llm', llmKey];
-      }
+      function _doSpawnPreview() {
+        let cmd, args;
+        if (isWin) {
+          const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
+          cmd = 'powershell';
+          args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
+        } else {
+          const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.sh');
+          cmd = 'bash';
+          args = [script, sampleText, '', '--llm', llmKey];
+        }
+        const proc = spawn(cmd, args, {
+          stdio: 'ignore',
+          windowsHide: true,
+          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
+        });
+        _previewModalProc = proc;
 
-      const proc = spawn(cmd, args, {
-        stdio: 'ignore',
-        windowsHide: true,
-        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
-      });
-      _previewModalProc = proc;
+        proc.on('exit', (code) => {
+          _previewModalProc = null;
+          if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+          if (!_closed) {
+            if (code !== 0 && code !== null) {
+              const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
+              previewLine.setContent(`{red-fg}Preview failed — is ${engineLabel} running/installed?{/red-fg}`);
+              screen.render();
+              setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
+            } else {
+              previewLine.setContent(''); screen.render();
+            }
+          }
+        });
+        proc.on('error', () => {
+          _previewModalProc = null;
+          if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+          if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
+        });
+      }  // end _doSpawnPreview
 
-      proc.on('exit', (code) => {
-        _previewModalProc = null;
-        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
-        if (!_closed) {
-          if (code !== 0 && code !== null) {
-            const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
-            previewLine.setContent(`{red-fg}Preview failed — is ${engineLabel} running/installed?{/red-fg}`);
+      // Soprano on Windows: ensure WebUI server is running before preview
+      if (draft.ttsEngine === 'soprano' && isWin) {
+        previewLine.setContent('{cyan-fg}Checking Soprano...{/cyan-fg}');
+        screen.render();
+        _ensureSopranoWebUI((msg) => {
+          if (!_closed) { previewLine.setContent(`{cyan-fg}${msg}{/cyan-fg}`); screen.render(); }
+        }).then((ready) => {
+          if (_closed) return;
+          if (!ready) {
+            previewLine.setContent('{red-fg}Soprano WebUI failed to start{/red-fg}');
             screen.render();
             setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
-          } else {
-            previewLine.setContent(''); screen.render();
+            return;
           }
-        }
-      });
-      proc.on('error', () => {
-        _previewModalProc = null;
-        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
-        if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
-      });
-    }
+          _doSpawnPreview();
+        });
+        return;
+      }
+      _doSpawnPreview();
+    }  // end _playPreview
 
     // Auto-save: persist draft to config immediately on any change
     function _autoSave(silent) {
@@ -2233,17 +2287,49 @@ export function createSetupTab(screen, services) {
         }
         const phrase = `Hi, I am the ${nativeVoice.label} voice.`;
         const engine = nativeVoice.id;
+
+        function _spawnAndTrack(cmd, args, opts) {
+          let proc;
+          try { proc = spawn(cmd, args, opts); } catch { return; }
+          _nvPreviewProc = proc;
+          nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+          screen.render();
+          proc.on('exit', (code) => {
+            _nvPreviewProc = null;
+            if (!_nvClosed) {
+              nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+              screen.render();
+            }
+          });
+          proc.on('error', () => {
+            _nvPreviewProc = null;
+            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+          });
+        }
+
+        if (engine === 'soprano' && process.platform === 'win32') {
+          // Ensure soprano WebUI is running before preview; start it if not.
+          nvPicker.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
+          screen.render();
+          _ensureSopranoWebUI((msg) => {
+            if (!_nvClosed) { nvPicker.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
+          }).then((ready) => {
+            if (_nvClosed) return;
+            if (!ready) {
+              nvPicker.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
+              screen.render();
+              return;
+            }
+            const scriptPath = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts-soprano.ps1');
+            _spawnAndTrack('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, phrase], { stdio: 'ignore', windowsHide: true });
+          });
+          return;
+        }
+
         let proc = null;
         try {
           if (engine === 'soprano') {
-            if (process.platform === 'win32') {
-              // Python entry points aren't directly spawnable from Node.js on Windows;
-              // route through play-tts-soprano.ps1 which handles WebUI/API/CLI modes.
-              const scriptPath = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts-soprano.ps1');
-              proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, phrase], { stdio: 'ignore', windowsHide: true });
-            } else {
-              proc = spawn('soprano-tts', [phrase], { stdio: 'ignore' });
-            }
+            proc = spawn('soprano-tts', [phrase], { stdio: 'ignore' });
           } else if (engine === 'sapi') {
             const safePhrase = phrase.replace(/'/g, "''");
             const sapiScript = `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${safePhrase}')`;
@@ -2260,16 +2346,9 @@ export function createSetupTab(screen, services) {
         _nvPreviewProc = proc;
         nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
         screen.render();
-        proc.on('exit', (code) => {
+        proc.on('exit', () => {
           _nvPreviewProc = null;
-          if (!_nvClosed) {
-            if (code !== 0 && code !== null) {
-              nvPicker.setLabel(` {red-fg}Start ${nativeVoice.label} server first{/red-fg} `);
-            } else {
-              nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
-            }
-            screen.render();
-          }
+          if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); }
         });
         proc.on('error', () => {
           _nvPreviewProc = null;
