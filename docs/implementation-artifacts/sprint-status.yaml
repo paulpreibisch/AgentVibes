@@ -242,34 +242,46 @@ sprint_4:
     story_5_2:
       id: AVI-S5.2
       title: Engine-Correct Space Bar Preview in Voice Picker
-      status: ready-for-dev
+      status: complete
       story_points: 3
       acceptance_criteria_count: 7
+      completion_date: 2026-05-18
       file: docs/implementation-artifacts/5-2-engine-correct-preview.md
       description: |
         Space bar preview routes to the correct TTS binary for the selected engine
         (soprano-tts, powershell SAPI, say, or piper). Config modal preview button also fixed.
+      notes: |
+        Added _previewNativeVoice() inside native-engine guard block.
+        soprano: spawn soprano-tts; sapi: spawn powershell+System.Speech; macos-say: spawn say.
+        Toggle behavior: second Space press kills preview proc.
+        Error handling: setLabel shows "Engine not installed" instead of crashing.
+        _closeNV kills preview proc before destroying picker.
       dependencies:
         - AVI-S5.1
 
     story_5_3:
       id: AVI-S5.3
       title: Auto-Save Engine Inference Fix
-      status: ready-for-dev
+      status: complete
       story_points: 2
       acceptance_criteria_count: 5
+      completion_date: 2026-05-18
       file: docs/implementation-artifacts/5-3-autosave-engine-fix.md
       description: |
         _autoSave() stops hardcoding 'piper' when voice is set.
         draft.ttsEngine is preserved; piper only inferred when engine is unset and
         voice is a Piper voice ID.
+      notes: |
+        Fixed both _openLlmConfigModal and _openHermesConfigModal _autoSave functions.
+        Pattern: draft.ttsEngine || (draft.voice && !NATIVE_ENGINE_VOICES[draft.voice] ? 'piper' : '')
+        Uses existing NATIVE_ENGINE_VOICES constant (DRY, no new Set needed).
       dependencies:
         - AVI-S5.1
 
     story_5_4:
       id: AVI-S5.4
       title: Tests for Engine-Aware Voice Picker and Preview
-      status: ready-for-dev
+      status: in-progress
       story_points: 4
       acceptance_criteria_count: 16
       file: docs/implementation-artifacts/5-4-engine-aware-tests.md
@@ -284,13 +296,14 @@ sprint_4:
 
   statistics:
     total_stories: 4
-    completed_stories: 1
-    ready_for_dev: 3
+    completed_stories: 3
+    ready_for_dev: 0
+    in_progress: 1
     total_story_points: 12
-    completed_points: 3
-    ready_for_dev_points: 9
-    completion_percentage: 25.0
-    next_milestone: "Implement AVI-S5.2 and AVI-S5.3 via /dev-story"
+    completed_points: 8
+    ready_for_dev_points: 0
+    completion_percentage: 75.0
+    next_milestone: "Complete AVI-S5.4 tests"
 
 notes: |
   ✅ EPIC COMPLETE: Sprint 3 Epic 4 - Custom Background Music System

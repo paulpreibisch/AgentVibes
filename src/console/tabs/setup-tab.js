@@ -901,7 +901,7 @@ export function createSetupTab(screen, services) {
 
     // Auto-save: persist both audio config and Hermes SSH config
     function _autoSave(silent) {
-      const engine = draft.ttsEngine || (draft.voice ? 'piper' : '');
+      const engine = draft.ttsEngine || (draft.voice && !NATIVE_ENGINE_VOICES[draft.voice] ? 'piper' : '');
       saveLlmConfigSync('hermes', {
         voice:      draft.voice,
         pretext:    draft.pretext,
@@ -1868,9 +1868,9 @@ export function createSetupTab(screen, services) {
 
     // Auto-save: persist draft to config immediately on any change
     function _autoSave(silent) {
-      // Infer engine from voice — voice picker only shows Piper voices,
-      // so if a voice is set but no engine chosen, default to piper
-      const engine = draft.ttsEngine || (draft.voice ? 'piper' : '');
+      // Preserve draft.ttsEngine as authoritative; only infer 'piper' when engine
+      // is unset AND voice is not a native-engine canonical ID.
+      const engine = draft.ttsEngine || (draft.voice && !NATIVE_ENGINE_VOICES[draft.voice] ? 'piper' : '');
       saveLlmConfigSync(llmKey, {
         voice: draft.voice,
         pretext: draft.pretext,
@@ -2161,23 +2161,31 @@ export function createSetupTab(screen, services) {
       destroyList(vpModal, screen, onDone);
     }
 
-    // Tasks 1.2 + 2.1–2.4: Single-item overlay for non-Piper engines.
-    // scanInstalledVoices() is NOT called; draft.voice is set immediately.
+    // AVI-S5.1/5.2: Single-item overlay for non-Piper engines.
+    // scanInstalledVoices() is NOT called; Space previews via the correct engine binary.
     const nativeVoice = NATIVE_ENGINE_VOICES[draft.ttsEngine];
     if (nativeVoice) {
       draft.voice = nativeVoice.id;
       let _nvClosed = false;
+      let _nvPreviewProc = null;
+
+      function _killNvPreview() {
+        if (_nvPreviewProc) { try { _nvPreviewProc.kill(); } catch {} _nvPreviewProc = null; }
+      }
+
       function _closeNV() {
         if (_nvClosed) return;
         _nvClosed = true;
+        _killNvPreview();
         navigationService?.closeModal();
         destroyList(nvPicker, screen, onDone);
       }
+
       const nvPicker = blessed.list({
         parent: screen,
         top: 'center',
         left: 'center',
-        width: 50,
+        width: 52,
         height: 7,
         border: { type: 'line' },
         tags: true,
@@ -2194,9 +2202,50 @@ export function createSetupTab(screen, services) {
         },
       });
       nvPicker.setFront();
-      nvPicker.setItems([`  ${nativeVoice.label}`]);
+      nvPicker.setItems([`  ${nativeVoice.label}  {gray-fg}[Space] preview  [Enter] select{/gray-fg}`]);
       nvPicker.select(0);
-      nvPicker.key(['enter', 'space'], () => { draft.voice = nativeVoice.id; _closeNV(); });
+
+      function _previewNativeVoice() {
+        if (_nvPreviewProc) {
+          _killNvPreview();
+          nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+          screen.render();
+          return;
+        }
+        const phrase = `Hi, I am the ${nativeVoice.label} voice.`;
+        const engine = nativeVoice.id;
+        let proc = null;
+        try {
+          if (engine === 'soprano') {
+            proc = spawn('soprano-tts', [phrase], { stdio: 'ignore', windowsHide: true });
+          } else if (engine === 'sapi') {
+            const safePhrase = phrase.replace(/'/g, "''");
+            const sapiScript = `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${safePhrase}')`;
+            proc = spawn('powershell', ['-NoProfile', '-Command', sapiScript], { stdio: 'ignore', windowsHide: true });
+          } else if (engine === 'macos-say') {
+            proc = spawn('say', [phrase], { stdio: 'ignore' });
+          }
+        } catch {}
+        if (!proc) {
+          nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} ');
+          screen.render();
+          return;
+        }
+        _nvPreviewProc = proc;
+        nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+        screen.render();
+        proc.on('exit', () => {
+          _nvPreviewProc = null;
+          if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); }
+        });
+        proc.on('error', () => {
+          _nvPreviewProc = null;
+          if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+        });
+      }
+
+      nvPicker.key(['enter'], () => { draft.voice = nativeVoice.id; _closeNV(); });
+      nvPicker.key(['space'], _previewNativeVoice);
       nvPicker.key(['escape', 'q', 'Q'], _closeNV);
       nvPicker.focus();
       screen.render();
