@@ -99,16 +99,26 @@ describe('_openVoicePickerForLlm native-engine guard', () => {
   });
 });
 
-// ── Suite 3: Engine picker clears draft.voice ─────────────────────────────────
+// ── Suite 3: Engine picker auto-sets draft.voice on engine change ─────────────
 
-describe('_openTtsEnginePicker clears draft.voice on selection', () => {
-  test('enter handler sets draft.voice to empty string', () => {
+describe('_openTtsEnginePicker auto-sets draft.voice on engine change', () => {
+  test('enter handler assigns draft.voice from NATIVE_ENGINE_VOICES or empty', () => {
     const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
     assert.ok(fnIdx >= 0, '_openTtsEnginePicker must exist');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 1500);
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    // New pattern: NATIVE_ENGINE_VOICES[selectedEngine]?.id || ''
     assert.ok(
-      fnBody.includes("draft.voice = ''"),
-      "Engine picker enter handler must set draft.voice = ''"
+      fnBody.includes('NATIVE_ENGINE_VOICES[selectedEngine]'),
+      "Engine picker enter handler must set draft.voice from NATIVE_ENGINE_VOICES for native engines"
+    );
+  });
+
+  test('enter handler falls back to empty string for non-native engines', () => {
+    const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    assert.ok(
+      fnBody.includes("?.id || ''"),
+      "Engine picker must fall back to empty string when engine is not a native engine"
     );
   });
 });

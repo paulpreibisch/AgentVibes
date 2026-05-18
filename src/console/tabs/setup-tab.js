@@ -946,7 +946,19 @@ export function createSetupTab(screen, services) {
         env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
       });
       _previewModalProc = proc;
-      proc.on('exit', () => { _previewModalProc = null; if (!_closed) { previewLine.setContent(''); screen.render(); } });
+      proc.on('exit', (code) => {
+        _previewModalProc = null;
+        if (!_closed) {
+          if (code !== 0 && code !== null) {
+            const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
+            previewLine.setContent(`{red-fg}Preview failed — is ${engineLabel} running/installed?{/red-fg}`);
+            screen.render();
+            setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
+          } else {
+            previewLine.setContent(''); screen.render();
+          }
+        }
+      });
       proc.on('error', () => { _previewModalProc = null; if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); } });
     }
 
@@ -1854,10 +1866,19 @@ export function createSetupTab(screen, services) {
       });
       _previewModalProc = proc;
 
-      proc.on('exit', () => {
+      proc.on('exit', (code) => {
         _previewModalProc = null;
         if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
-        if (!_closed) { previewLine.setContent(''); screen.render(); }
+        if (!_closed) {
+          if (code !== 0 && code !== null) {
+            const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
+            previewLine.setContent(`{red-fg}Preview failed — is ${engineLabel} running/installed?{/red-fg}`);
+            screen.render();
+            setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
+          } else {
+            previewLine.setContent(''); screen.render();
+          }
+        }
       });
       proc.on('error', () => {
         _previewModalProc = null;
@@ -2095,13 +2116,11 @@ export function createSetupTab(screen, services) {
 
     picker.key(['enter'], () => {
       const idx = picker.selected;
-      if (idx === 0) {
-        draft.ttsEngine = '';
-      } else {
-        draft.ttsEngine = engines[idx - 1].id;
-      }
-      // Clear voice on any engine change so stale Piper voices don't persist (Task 3)
-      draft.voice = '';
+      const selectedEngine = idx === 0 ? '' : engines[idx - 1].id;
+      draft.ttsEngine = selectedEngine;
+      // Auto-set voice to native engine canonical ID so the Voice field updates
+      // immediately. For piper or empty engine, clear to '' (shows global default).
+      draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
       _closePicker();
     });
 
