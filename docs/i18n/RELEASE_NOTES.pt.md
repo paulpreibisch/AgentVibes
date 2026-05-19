@@ -1,5 +1,72 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎸 v5.8.0 — Soprano Agora Funciona + Seletor de Voz Corrigido para Todos os Motores
+
+**Lançamento:** 2026-05-18
+
+### 🐛 Soprano TTS Estava Quebrado — Agora Corrigido
+
+Soprano (nosso motor de TTS neural com 80M de parâmetros, introduzido na v5.6) falha silenciosamente no Windows. Vários problemas combinados o quebravam de ponta a ponta:
+
+- O seletor de voz do Windows mostrava o Soprano como opção, mas o iniciava com o nome de binário errado (`soprano-tts` em vez de `soprano`)
+- `play-tts-soprano.ps1` era chamado pelo Node.js com um PATH reduzido, de modo que os executáveis `soprano` e `soprano-webui` não podiam ser encontrados mesmo que instalados
+- O caminho do arquivo wav era escrito no stream de Informação do PowerShell (`Write-Host`) em vez de stdout, então o processador de reverb/música de fundo não conseguia encontrá-lo
+- O Gradio WebUI nunca iniciava automaticamente — era necessário executar `soprano-webui` manualmente antes de cada sessão
+
+Todos esses problemas estão agora corrigidos. AgentVibes detecta automaticamente se o servidor WebUI do Soprano está rodando na porta 7860, inicia-o se não estiver, e aguarda até que esteja pronto (até 90 segundos). Três modos funcionam em ordem de prioridade: WebUI (mais rápido — modelo permanece carregado) → API compatível com OpenAI → CLI `soprano` direto.
+
+### 🐛 O Seletor de Voz Ignorava Windows SAPI e macOS Say
+
+Ao abrir o seletor de voz para um LLM configurado para usar **Windows SAPI** ou **macOS Say**, o seletor exibia a lista completa de vozes do Piper em vez da voz embutida do motor. Isso era confuso — selecionar uma voz do Piper ao usar SAPI ou macOS Say não tinha efeito, e a pré-visualização com a barra de espaço tocava através do motor errado.
+
+O seletor agora se adapta ao motor selecionado:
+
+- **Windows SAPI / macOS Say / Soprano:** mostra exatamente um item (a voz embutida do motor), seleciona-o automaticamente, e a pré-visualização com a barra de espaço fala através do binário correto do motor
+- **Piper:** mostra o catálogo completo de vozes instaladas como antes
+
+Além disso, salvar a configuração não sobrescreve mais silenciosamente o campo `ttsEngine` para `piper` quando um motor nativo está em uso.
+
+### 🔒 Confiabilidade do Soprano (9 Correções de Revisão Adversarial)
+
+- **Correção de crash:** `destroy()` no socket poderia emitir um evento `error` tardio sem listener, causando crash no processo Node.js — um handler absorvedor está agora em vigor
+- **Cancelamento de loop:** o loop de polling do WebUI de 90 segundos agora para imediatamente quando o modal ou seletor de voz é fechado (via AbortController)
+- **Sem rejeições não tratadas:** handlers `.catch()` adicionados a todas as chamadas async de verificação do WebUI
+- **Sem processos duplicados:** um cooldown de 10 segundos evita iniciar duas instâncias de `soprano-webui` ao clicar rapidamente em Pré-visualizar
+- **Melhor feedback de erros:** falhas de spawn e códigos de saída não nulos agora mostram um label de erro visível no seletor de voz
+- **PATH preservado:** a atualização do PATH no PowerShell agora acrescenta entradas do registro em vez de substituir todo o PATH, para que os shims do nvm, conda e pyenv continuem funcionando
+
+---
+
+## 🎭 v5.7.7 — Restauração de Vozes no Modo Party + Melhorias
+
+**Lançamento:** 2026-05-17
+
+### 🐛 Agentes do Modo Party Silenciosos (Sem TTS por Agente)
+
+Os agentes do modo party exibiam respostas em texto mas não as liam com suas vozes únicas. Duas causas raiz:
+
+**Desambiguação do skill:** `/party-mode` correspondia ao comando BMAD `_bmad/core/workflows/party-mode` (que tenta carregar um caminho inexistente neste projeto) em vez do skill do AgentVibes. Uma substituição de comando `/party-mode` local ao projeto agora encaminha para o skill correto.
+
+**Etapa TTS obrigatória:** A etapa de chamada `bmad-speak.js` do orquestrador estava mal especificada e às vezes era ignorada. A Etapa 4 no skill do modo party BMAD agora está claramente marcada como OBRIGATÓRIA, com documentação explícita do que `bmad-speak.js` aplica por agente: voz, pretext, reverb, personalidade e música de fundo — tudo carregado automaticamente de `~/.agentvibes/bmad-voice-map.json`.
+
+### 🔍 Registro de Diagnóstico para Modo Party
+
+`bmad-party-speak.sh` (hook PostToolUse) agora escreve entradas de diagnóstico estruturadas em `/tmp/agentvibes-party-debug.log` — `fired`, `fingerprint HIT/MISS`, `invoking` e erros — para que problemas de voz sejam diagnosticáveis sem adivinhação.
+
+### 🎵 Nova Faixa Incluída: CelestialVelvet
+
+Uma nova faixa de música ambiente **CelestialVelvet** (🌌) foi adicionada ao catálogo integrado. Disponível imediatamente no seletor de música TUI e no mapa de vozes BMAD — sem download necessário.
+
+### 🐛 TUI: Texto Cinza em Linhas Selecionadas Corrigido
+
+O texto branco agora é exibido corretamente nas linhas selecionadas nas abas Vozes e Agentes. Anteriormente, o primeiro plano `bright-black` combinado com fundo verde produzia texto cinza ilegível em muitos terminais.
+
+### 🐛 SSH Remoto: Erro "wait: pid is not a child of this shell"
+
+`play-tts-ssh-remote.sh` emitia `wait: pid X is not a child of this shell` em certos shells. Corrigido iniciando `ssh` diretamente dentro do subshell em segundo plano para que `$?` capture o código de saída sem uma chamada `wait` entre shells.
+
+---
+
 ## 🔧 v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
 
 **Lançamento:** 2026-05-16

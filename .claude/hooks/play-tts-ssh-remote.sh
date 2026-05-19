@@ -337,14 +337,16 @@ SSH_ARGS=()
 [[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
 
 # ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly.
-# Run SSH inside the subshell so it is a direct child — avoids the
-# "wait: pid N is not a child of this shell" error when wait runs in a sibling subshell.
-( ssh -o ConnectTimeout=10 "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD"
+# Run ssh inside the backgrounded subshell so its exit code is reachable via $?
+# (a `wait` from outside the spawning shell would error: "pid X is not a child").
+(
+  ssh -o ConnectTimeout=10 "${SSH_ARGS[@]}" "$SSH_HOST" "$ENCODED_PAYLOAD"
   _exit=$?
   if [[ $_exit -ne 0 ]]; then
     echo "$(date -Iseconds) [ERROR] SSH to $SSH_HOST failed (exit $_exit)" \
       >> "$HOME/.agentvibes/ssh-remote.log" 2>/dev/null || true
-  fi ) &
+  fi
+) &
 SSH_PID=$!
 
 echo "Sent to $SSH_HOST (PID: $SSH_PID)" >&2

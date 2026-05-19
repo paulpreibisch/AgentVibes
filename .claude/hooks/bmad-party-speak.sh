@@ -19,10 +19,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK_FILE="/tmp/agentvibes-party-queue.lock"
+DEBUG_LOG="/tmp/agentvibes-party-debug.log"
+
+_dbg() { printf '[%s] %s\n' "$(date -Iseconds)" "$*" >> "$DEBUG_LOG" 2>/dev/null || true; }
 
 # --- Read stdin ---
 raw="$(cat)"
-[[ -z "$raw" ]] && exit 0
+if [[ -z "$raw" ]]; then
+    _dbg "exit: empty stdin"
+    exit 0
+fi
+_dbg "fired (stdin ${#raw} bytes)"
 
 # --- Parse all needed fields in one python3 call (fixes M5: 3x subprocess, echo safety) ---
 # Outputs: TOOL_NAME|DISPLAY_NAME|RESPONSE_TEXT (newlines in response encoded as \n literals)
@@ -73,13 +80,26 @@ response_text="${rest#*|}"
 response_text="${response_text//\\n/ }"
 
 # --- Only handle Agent tool ---
-[[ "$tool_name" != "Agent" ]] && exit 0
+if [[ "$tool_name" != "Agent" ]]; then
+    _dbg "skip: tool_name='$tool_name' (not Agent)"
+    exit 0
+fi
 
 # --- Fingerprint: only fire for BMAD party mode agents (safe string match, no pipe) ---
-[[ "$raw" == *"BMAD agent in a collaborative roundtable"* ]] || exit 0
+if [[ "$raw" != *"BMAD agent in a collaborative roundtable"* ]]; then
+    _dbg "skip: fingerprint MISS (Agent call but prompt lacks 'BMAD agent in a collaborative roundtable')"
+    exit 0
+fi
+_dbg "fingerprint HIT: display='$display_name' text_len=${#response_text}"
 
-[[ -z "$display_name" ]] && exit 0
-[[ -z "$response_text" ]] && exit 0
+if [[ -z "$display_name" ]]; then
+    _dbg "skip: empty display_name"
+    exit 0
+fi
+if [[ -z "$response_text" ]]; then
+    _dbg "skip: empty response_text"
+    exit 0
+fi
 
 # --- Resolve project root ---
 project_root="${CLAUDE_PROJECT_DIR:-}"
@@ -154,7 +174,8 @@ esac
 exec 9>"$LOCK_FILE"
 if command -v flock &>/dev/null; then
     flock -w 60 9
-    "$bmad_speak" "$agent_id" "$response_text" || true
+    _dbg "invoking: $bmad_speak '$agent_id' (text_len=${#response_text})"
+    "$bmad_speak" "$agent_id" "$response_text" || _dbg "bmad-speak returned non-zero"
     flock -u 9
 else
     # macOS fallback: atomic mkdir polling lock

@@ -429,7 +429,7 @@ export function scanInstalledVoices() {
       const jsonPath = path.join(PIPER_VOICES_DIR, voiceId + '.onnx.json');
       try {
         const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        if (data.num_speakers > 1 && data.speaker_id_map) {
+        if (data.num_speakers > 1 && data.speaker_id_map && Object.keys(data.speaker_id_map).length > 0) {
           // Expand multi-speaker model into individual entries
           for (const speakerName of Object.keys(data.speaker_id_map)) {
             result.push(`${voiceId}${MS_SEP}${speakerName}`);
@@ -593,6 +593,18 @@ export function getVoiceMeta(voiceId) {
       displayName,
       gender: inferGender(ms.speakerName, null),
       provider: `Piper (${ms.model})`,
+    };
+    _metaCache.set(voiceId, result);
+    return result;
+  }
+
+  // Prefer catalog name for known curated single-speaker voices (avoids dataset-based duplicates)
+  const catEntry = _catalogMap.get(voiceId);
+  if (catEntry) {
+    const result = {
+      displayName: catEntry.displayName,
+      gender: catEntry.gender || inferGender(voiceId, null),
+      provider: 'Piper',
     };
     _metaCache.set(voiceId, result);
     return result;
@@ -770,7 +782,7 @@ export function createVoicesTab(screen, services) {
   // Inline selection hint appended to the currently highlighted voice row.
   // _hintBase stores the item's clean content (no hint, no █) — no sentinel needed.
   // Use getter functions so hints re-translate when language changes.
-  const _rowHintInstalled   = () => `  {bright-black-fg}${_tl('voicesRowHintInstalled')}{/bright-black-fg}`;
+  const _rowHintInstalled   = () => `  {white-fg}${_tl('voicesRowHintInstalled')}{/white-fg}`;
   const _rowHintUninstalled = () => `  {bright-yellow-fg}${_tl('voicesRowHintUninstalled')}{/bright-yellow-fg}`;
   let _hintIdx  = -1;
   let _hintBase = '';   // content of items[_hintIdx] before hint was appended

@@ -240,9 +240,9 @@ This allows seamless switching between the two providers without changing any ot
 
 ---
 
-## System 2: The Provider System - Two Engines, One Interface
+## System 2: The Provider System - Multiple Engines, One Interface
 
-AgentVibes supports two TTS providers with the same interface:
+AgentVibes supports multiple TTS providers behind a single unified interface. The active provider is read from `tts-provider.txt` (project-local first, then global `~/.claude/`).
 
 ### Piper TTS Provider
 
@@ -302,27 +302,29 @@ say -v "$VOICE" -o "$AUDIO_FILE" "$TEXT"
 afplay "$AUDIO_FILE"
 ```
 
-### Why Two Providers?
+### Provider Summary
 
-**Piper TTS:**
-- ✅ High-quality neural voices
-- ✅ 50+ voices across 18 languages
-- ✅ Completely free
-- ✅ Works offline
-- ✅ Cross-platform (Windows, macOS, Linux, WSL)
-- ✅ No API key needed
-- ❌ Requires local installation
+| Provider | Platform | Key Benefit |
+|----------|----------|-------------|
+| **Piper TTS** | Linux/macOS/WSL | 150+ neural voices, 30+ languages, offline |
+| **macOS Say** | macOS only | 70+ built-in voices, zero install |
+| **Windows SAPI** | Windows | Native speech API, built-in voices |
+| **Windows Piper** | Windows | Neural voices on Windows |
+| **SSH Remote** | All | Play audio on a remote machine over SSH |
+| **Soprano** | All | Gradio API for custom TTS models |
+| **Termux SSH** | Android | Mobile audio via Termux over SSH |
+| **AgentVibes Receiver** | All | Proxy for voiceless/headless connections |
 
-**macOS Say:**
-- ✅ Completely free
-- ✅ Works offline
-- ✅ 70+ built-in voices
-- ✅ 40+ languages
-- ✅ Zero installation (built into macOS)
-- ✅ Native system integration
-- ❌ macOS only
+### Additional Pipeline Features (v3.0+)
 
-By supporting both, AgentVibes provides flexibility: cross-platform consistency with Piper or native integration with macOS Say.
+The core pipeline gained several layers beyond simple synthesis:
+
+- **TTS Queue** (`tts-queue.sh`) — serializes TTS requests to prevent audio overlap
+- **Audio Processor** (`audio-processor.sh`) — post-processing, padding, format conversion
+- **Background Music** (`background-music-manager.sh`) — ambient music mixed under speech
+- **Effects Manager** (`effects-manager.sh`) — reverb, EQ, and audio effects per personality
+- **Speed Manager** (`speed-manager.sh`) — playback rate control
+- **Windows Hooks** (`hooks-windows/*.ps1`) — full PowerShell parallel to the bash hooks
 
 ---
 

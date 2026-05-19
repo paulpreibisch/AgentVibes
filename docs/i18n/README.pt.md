@@ -4,7 +4,25 @@
 
 ---
 
-## 🌟 NOVO NO v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
+## 🌟 NOVO NO v5.8.0 — Soprano Agora Funciona + Seletor de Voz Corrigido para Todos os Motores
+
+**Soprano TTS realmente funciona agora:** Soprano (nosso motor de TTS neural) estava silenciosamente quebrado no Windows desde o lançamento — nome de binário errado, PATH reduzido, caminho do wav enviado para o fluxo de saída errado, e sem auto-início para o servidor WebUI. Tudo corrigido. Instale com `pip install soprano-tts`, selecione Soprano na aba de configuração, e AgentVibes cuida do resto.
+
+**O seletor de voz agora funciona para Windows SAPI e macOS Say:** Anteriormente o seletor mostrava todo o catálogo de vozes do Piper mesmo quando SAPI ou macOS Say estava selecionado, e a pré-visualização com a barra de espaço tocava através do motor errado. O seletor agora mostra exatamente um item para cada motor nativo e pré-visualiza através do binário correto.
+
+**O salvamento automático não quebra mais sua configuração de motor:** Salvar uma configuração de LLM não sobrescreve mais silenciosamente seu motor escolhido de volta para Piper.
+
+## v5.7.7 — Restauração de Vozes no Modo Party + Melhorias
+
+**Os agentes do modo party falam novamente:** BMAD `/party-mode` agora invoca de forma confiável o skill correto do AgentVibes, e cada resposta do agente é lida em voz alta com sua voz única com música, pretext e reverb por agente — carregados automaticamente de `~/.agentvibes/bmad-voice-map.json`.
+
+**Nova faixa incluída:** 🌌 CelestialVelvet adicionada ao catálogo de música integrado.
+
+**Correção de contraste TUI:** Linhas selecionadas nas abas Vozes e Agentes não exibem mais texto cinza ilegível.
+
+**SSH remoto:** Corrigido o erro "wait: pid is not a child of this shell" em `play-tts-ssh-remote.sh`.
+
+## v5.7.6 — Integridade do Payload SSH Remoto + Reescrita do Receptor
 
 **Correção de música/voz SSH remoto:** A faixa de música e a voz corretas do projeto agora chegam ao receptor remoto — anteriormente a configuração global era usada em vez das configurações do projeto ativo.
 

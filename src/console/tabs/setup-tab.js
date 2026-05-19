@@ -47,6 +47,7 @@ import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import net from 'node:net';
 
 const _execFileAsync = promisify(execFile);
 
@@ -86,6 +87,60 @@ const COLORS = {
 };
 
 const FOOTER_TEXT = '[Enter] Continue  [Esc] Back  [Tab] Next Tab  [Q] Quit';
+
+// Maps non-Piper engine IDs to their canonical voice ID and display label.
+// Used by the voice picker, _buildFields display, and auto-save logic.
+const NATIVE_ENGINE_VOICES = {
+  soprano:     { id: 'soprano',   label: 'Soprano'      },
+  sapi:        { id: 'sapi',      label: 'Windows SAPI' },
+  'macos-say': { id: 'macos-say', label: 'macOS Say'    },
+};
+
+// ---------------------------------------------------------------------------
+// Soprano WebUI auto-start helpers
+
+function _checkSopranoPort(port) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: '127.0.0.1', port });
+    socket.setTimeout(2000);
+    socket.once('connect', () => { socket.destroy(); resolve(true); });
+    socket.once('error', () => resolve(false));
+    socket.once('timeout', () => { socket.destroy(); resolve(false); });
+    // Absorb any late errors emitted after destroy() to prevent uncaught 'error' crash
+    socket.on('error', () => {});
+  });
+}
+
+// Timestamp of last soprano-webui spawn; prevents duplicate processes on rapid re-entry
+let _sopranoSpawnedAt = 0;
+
+async function _ensureSopranoWebUI(onStatus, signal) {
+  const port = parseInt(process.env.SOPRANO_PORT || '7860', 10);
+  if (signal?.aborted) return false;
+  if (await _checkSopranoPort(port)) return true;
+  onStatus('Starting Soprano WebUI...');
+  // Only spawn a new soprano-webui process if we haven't done so in the last 10 s
+  if (Date.now() - _sopranoSpawnedAt > 10_000) {
+    _sopranoSpawnedAt = Date.now();
+    try {
+      const p = spawn('soprano-webui', [], {
+        stdio: 'ignore', detached: true, windowsHide: true,
+        shell: process.platform === 'win32',
+      });
+      p.unref();
+    } catch (e) {
+      process.stderr.write(`[AgentVibes] soprano-webui spawn failed: ${e.message}\n`);
+    }
+  }
+  for (let i = 0; i < 45; i++) {
+    if (signal?.aborted) return false;
+    await new Promise(r => setTimeout(r, 2000));
+    if (signal?.aborted) return false;
+    if (await _checkSopranoPort(port)) return true;
+    onStatus(`Starting Soprano WebUI... ${(i + 1) * 2}s`);
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Exported pure helpers (kept from install-tab for backward compat)
@@ -807,7 +862,7 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
         { key: 'reverb',      label: 'Reverb',       getValue: () => {
           const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
@@ -893,7 +948,7 @@ export function createSetupTab(screen, services) {
 
     // Auto-save: persist both audio config and Hermes SSH config
     function _autoSave(silent) {
-      const engine = draft.ttsEngine || (draft.voice ? 'piper' : '');
+      const engine = draft.ttsEngine || (draft.voice && !NATIVE_ENGINE_VOICES[draft.voice] ? 'piper' : '');
       saveLlmConfigSync('hermes', {
         voice:      draft.voice,
         pretext:    draft.pretext,
@@ -938,7 +993,19 @@ export function createSetupTab(screen, services) {
         env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
       });
       _previewModalProc = proc;
-      proc.on('exit', () => { _previewModalProc = null; if (!_closed) { previewLine.setContent(''); screen.render(); } });
+      proc.on('exit', (code) => {
+        _previewModalProc = null;
+        if (!_closed) {
+          if (code !== 0 && code !== null) {
+            const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
+            previewLine.setContent(`{red-fg}Preview failed — is ${engineLabel} running/installed?{/red-fg}`);
+            screen.render();
+            setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
+          } else {
+            previewLine.setContent(''); screen.render();
+          }
+        }
+      });
       proc.on('error', () => { _previewModalProc = null; if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); } });
     }
 
@@ -1675,7 +1742,7 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => draft.voice || `(global: ${globalVoice})` },
+        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
         { key: 'reverb',      label: 'Reverb',       getValue: () => {
           const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
@@ -1781,11 +1848,13 @@ export function createSetupTab(screen, services) {
     // eliminating the race condition when Preview is clicked twice rapidly.
     let _previewModalProc = null;
     let _bgRestoreFn = null;
+    let _previewEnsureAbort = null;
     function _killPreview() {
       // Restore bg music immediately (synchronously) before killing the process.
       // This prevents the async exit-handler race where a second Preview invocation
       // reads bgWas=true (music already enabled) before the first's exit fires.
       if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+      if (_previewEnsureAbort) { _previewEnsureAbort.abort(); _previewEnsureAbort = null; }
       if (_previewModalProc) {
         try { _previewModalProc.kill(); } catch {}
         _previewModalProc = null;
@@ -1828,41 +1897,73 @@ export function createSetupTab(screen, services) {
         }
       }
 
-      let cmd, args;
-      if (isWin) {
-        const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
-        cmd = 'powershell';
-        args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
-      } else {
-        const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.sh');
-        cmd = 'bash';
-        args = [script, sampleText, '', '--llm', llmKey];
+      function _doSpawnPreview() {
+        let cmd, args;
+        if (isWin) {
+          const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
+          cmd = 'powershell';
+          args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
+        } else {
+          const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.sh');
+          cmd = 'bash';
+          args = [script, sampleText, '', '--llm', llmKey];
+        }
+        const proc = spawn(cmd, args, {
+          stdio: 'ignore',
+          windowsHide: true,
+          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
+        });
+        _previewModalProc = proc;
+
+        proc.on('exit', (code) => {
+          _previewModalProc = null;
+          if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+          if (!_closed) {
+            if (code !== 0 && code !== null) {
+              const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
+              previewLine.setContent(`{red-fg}Preview failed — is ${engineLabel} running/installed?{/red-fg}`);
+              screen.render();
+              setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
+            } else {
+              previewLine.setContent(''); screen.render();
+            }
+          }
+        });
+        proc.on('error', () => {
+          _previewModalProc = null;
+          if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+          if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
+        });
+      }  // end _doSpawnPreview
+
+      // Soprano on Windows: ensure WebUI server is running before preview
+      if (draft.ttsEngine === 'soprano' && isWin) {
+        previewLine.setContent('{cyan-fg}Checking Soprano...{/cyan-fg}');
+        screen.render();
+        _previewEnsureAbort = new AbortController();
+        _ensureSopranoWebUI((msg) => {
+          if (!_closed) { previewLine.setContent(`{cyan-fg}${msg}{/cyan-fg}`); screen.render(); }
+        }, _previewEnsureAbort.signal).then((ready) => {
+          _previewEnsureAbort = null;
+          if (_closed) return;
+          if (!ready) {
+            previewLine.setContent('{red-fg}Soprano WebUI failed to start{/red-fg}');
+            screen.render();
+            setTimeout(() => { if (!_closed) { previewLine.setContent(''); screen.render(); } }, 4000);
+            return;
+          }
+          _doSpawnPreview();
+        }).catch(() => { _previewEnsureAbort = null; });
+        return;
       }
-
-      const proc = spawn(cmd, args, {
-        stdio: 'ignore',
-        windowsHide: true,
-        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
-      });
-      _previewModalProc = proc;
-
-      proc.on('exit', () => {
-        _previewModalProc = null;
-        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
-        if (!_closed) { previewLine.setContent(''); screen.render(); }
-      });
-      proc.on('error', () => {
-        _previewModalProc = null;
-        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
-        if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
-      });
-    }
+      _doSpawnPreview();
+    }  // end _playPreview
 
     // Auto-save: persist draft to config immediately on any change
     function _autoSave(silent) {
-      // Infer engine from voice — voice picker only shows Piper voices,
-      // so if a voice is set but no engine chosen, default to piper
-      const engine = draft.ttsEngine || (draft.voice ? 'piper' : '');
+      // Preserve draft.ttsEngine as authoritative; only infer 'piper' when engine
+      // is unset AND voice is not a native-engine canonical ID.
+      const engine = draft.ttsEngine || (draft.voice && !NATIVE_ENGINE_VOICES[draft.voice] ? 'piper' : '');
       saveLlmConfigSync(llmKey, {
         voice: draft.voice,
         pretext: draft.pretext,
@@ -2087,11 +2188,11 @@ export function createSetupTab(screen, services) {
 
     picker.key(['enter'], () => {
       const idx = picker.selected;
-      if (idx === 0) {
-        draft.ttsEngine = '';
-      } else {
-        draft.ttsEngine = engines[idx - 1].id;
-      }
+      const selectedEngine = idx === 0 ? '' : engines[idx - 1].id;
+      draft.ttsEngine = selectedEngine;
+      // Auto-set voice to native engine canonical ID so the Voice field updates
+      // immediately. For piper or empty engine, clear to '' (shows global default).
+      draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
       _closePicker();
     });
 
@@ -2151,6 +2252,149 @@ export function createSetupTab(screen, services) {
       destroyList(vpModal, screen, onDone);
     }
 
+    // AVI-S5.1/5.2: Single-item overlay for non-Piper engines.
+    // scanInstalledVoices() is NOT called; Space previews via the correct engine binary.
+    const nativeVoice = NATIVE_ENGINE_VOICES[draft.ttsEngine];
+    if (nativeVoice) {
+      draft.voice = nativeVoice.id;
+      let _nvClosed = false;
+      let _nvPreviewProc = null;
+      let _nvEnsureAbort = null;
+
+      function _killNvPreview() {
+        if (_nvPreviewProc) { try { _nvPreviewProc.kill(); } catch {} _nvPreviewProc = null; }
+      }
+
+      function _closeNV() {
+        if (_nvClosed) return;
+        _nvClosed = true;
+        _killNvPreview();
+        if (_nvEnsureAbort) { _nvEnsureAbort.abort(); _nvEnsureAbort = null; }
+        navigationService?.closeModal();
+        destroyList(nvPicker, screen, onDone);
+      }
+
+      const nvPicker = blessed.list({
+        parent: screen,
+        top: 'center',
+        left: 'center',
+        width: 52,
+        height: 7,
+        border: { type: 'line' },
+        tags: true,
+        label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
+        keys: true,
+        vi: false,
+        mouse: true,
+        style: {
+          fg: COLORS.labelFg,
+          bg: COLORS.contentBg,
+          border: { fg: 'cyan' },
+          selected: { bg: 'green', fg: 'white', bold: true },
+          item: { fg: COLORS.labelFg },
+        },
+      });
+      nvPicker.setFront();
+      nvPicker.setItems([`  ${nativeVoice.label}  {gray-fg}[Space] preview  [Enter] select{/gray-fg}`]);
+      nvPicker.select(0);
+
+      function _previewNativeVoice() {
+        if (_nvPreviewProc) {
+          _killNvPreview();
+          nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+          screen.render();
+          return;
+        }
+        const phrase = `Hi, I am the ${nativeVoice.label} voice.`;
+        const engine = nativeVoice.id;
+
+        function _spawnAndTrack(cmd, args, opts) {
+          let proc;
+          try { proc = spawn(cmd, args, opts); } catch (e) {
+            process.stderr.write(`[AgentVibes] preview spawn failed: ${e.message}\n`);
+            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+            return;
+          }
+          _nvPreviewProc = proc;
+          nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+          screen.render();
+          proc.on('exit', (code) => {
+            _nvPreviewProc = null;
+            if (!_nvClosed) {
+              if (code !== 0 && code !== null) {
+                nvPicker.setLabel(` {red-fg}Preview failed (exit ${code}){/red-fg} `);
+                setTimeout(() => { if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); } }, 3000);
+              } else {
+                nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+              }
+              screen.render();
+            }
+          });
+          proc.on('error', () => {
+            _nvPreviewProc = null;
+            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+          });
+        }
+
+        if (engine === 'soprano' && process.platform === 'win32' && !process.env.WSL_DISTRO_NAME) {
+          // Ensure soprano WebUI is running before preview; start it if not.
+          nvPicker.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
+          screen.render();
+          _nvEnsureAbort = new AbortController();
+          _ensureSopranoWebUI((msg) => {
+            if (!_nvClosed) { nvPicker.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
+          }, _nvEnsureAbort.signal).then((ready) => {
+            _nvEnsureAbort = null;
+            if (_nvClosed) return;
+            if (!ready) {
+              nvPicker.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
+              screen.render();
+              return;
+            }
+            const scriptPath = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts-soprano.ps1');
+            _spawnAndTrack('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, phrase], { stdio: 'ignore', windowsHide: true });
+          }).catch(() => { _nvEnsureAbort = null; });
+          return;
+        }
+
+        let proc = null;
+        try {
+          if (engine === 'soprano') {
+            proc = spawn('soprano', [phrase], { stdio: 'ignore' });
+          } else if (engine === 'sapi') {
+            const safePhrase = phrase.replace(/'/g, "''");
+            const sapiScript = `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${safePhrase}')`;
+            proc = spawn('powershell', ['-NoProfile', '-Command', sapiScript], { stdio: 'ignore', windowsHide: true });
+          } else if (engine === 'macos-say') {
+            proc = spawn('say', [phrase], { stdio: 'ignore' });
+          }
+        } catch {}
+        if (!proc) {
+          nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} ');
+          screen.render();
+          return;
+        }
+        _nvPreviewProc = proc;
+        nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+        screen.render();
+        proc.on('exit', () => {
+          _nvPreviewProc = null;
+          if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); }
+        });
+        proc.on('error', () => {
+          _nvPreviewProc = null;
+          if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+        });
+      }
+
+      nvPicker.key(['enter'], () => { draft.voice = nativeVoice.id; _closeNV(); });
+      nvPicker.key(['space'], _previewNativeVoice);
+      nvPicker.key(['escape', 'q', 'Q'], _closeNV);
+      nvPicker.focus();
+      screen.render();
+      return;
+    }
+
     const vpModal = blessed.box({
       parent: screen,
       top: '6%',
@@ -2182,7 +2426,7 @@ export function createSetupTab(screen, services) {
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
         border: { fg: 'blue' },
-        selected: { bg: 'green', fg: 'black', bold: true },
+        selected: { bg: 'green', fg: 'white', bold: true },
         item: { fg: COLORS.labelFg },
       },
     });

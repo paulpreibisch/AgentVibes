@@ -4,7 +4,25 @@
 
 ---
 
-## 🌟 NUEVO EN v5.7.6 — Integridad del Payload SSH Remoto + Reescritura del Receptor
+## 🌟 NUEVO EN v5.8.0 — Soprano Ahora Funciona + Selector de Voz Corregido para Todos los Motores
+
+**Soprano TTS funciona ahora de verdad:** Soprano (nuestro motor de TTS neuronal) estaba silenciosamente roto en Windows desde el lanzamiento — nombre binario incorrecto, PATH recortado, ruta del wav enviada al flujo de salida incorrecto, y sin auto-inicio para el servidor WebUI. Todo corregido. Instala con `pip install soprano-tts`, selecciona Soprano en la pestaña de configuración, y AgentVibes se encarga del resto.
+
+**El selector de voz ahora funciona para Windows SAPI y macOS Say:** Anteriormente el selector mostraba todo el catálogo de voces de Piper incluso cuando SAPI o macOS Say estaba seleccionado, y la vista previa con barra espaciadora reproducía a través del motor incorrecto. El selector ahora muestra exactamente un elemento para cada motor nativo y previsualiza a través del binario correcto.
+
+**El guardado automático ya no rompe tu configuración de motor:** Guardar una configuración de LLM ya no sobrescribe silenciosamente tu motor elegido de vuelta a Piper.
+
+## v5.7.7 — Restauración de Voces en Modo Party + Mejoras
+
+**Los agentes del modo party ahora hablan de nuevo:** BMAD `/party-mode` ahora invoca de forma confiable el skill correcto de AgentVibes, y cada respuesta del agente se lee en voz alta con su voz única con música, pretext y reverb por agente — cargados automáticamente desde `~/.agentvibes/bmad-voice-map.json`.
+
+**Nueva pista incluida:** 🌌 CelestialVelvet añadida al catálogo de música integrado.
+
+**Corrección de contraste TUI:** Las filas seleccionadas en las pestañas Voces y Agentes ya no muestran texto gris ilegible.
+
+**SSH remoto:** Corregido el error "wait: pid is not a child of this shell" en `play-tts-ssh-remote.sh`.
+
+## v5.7.6 — Integridad del Payload SSH Remoto + Reescritura del Receptor
 
 **Arreglo de música/voz SSH remoto:** La pista de música y la voz correctas del proyecto ahora llegan al receptor remoto — anteriormente se usaba la configuración global en lugar de la configuración del proyecto activo.
 

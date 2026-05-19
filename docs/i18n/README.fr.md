@@ -4,7 +4,25 @@
 
 ---
 
-## 🌟 NOUVEAU DANS v5.7.6 — Intégrité du Payload SSH Distant + Réécriture du Récepteur
+## 🌟 NOUVEAU DANS v5.8.0 — Soprano Fonctionne Maintenant + Sélecteur de Voix Corrigé pour Tous les Moteurs
+
+**Soprano TTS fonctionne vraiment maintenant :** Soprano (notre moteur TTS neuronal) était silencieusement cassé sur Windows depuis le lancement — mauvais nom de binaire, PATH tronqué, chemin wav envoyé au mauvais flux de sortie, et pas d'auto-démarrage du serveur WebUI. Tout est corrigé. Installez avec `pip install soprano-tts`, sélectionnez Soprano dans l'onglet de configuration, et AgentVibes s'occupe du reste.
+
+**Le sélecteur de voix fonctionne maintenant pour Windows SAPI et macOS Say :** Auparavant le sélecteur affichait tout le catalogue de voix Piper même quand SAPI ou macOS Say était sélectionné, et la prévisualisation avec barre espace se faisait via le mauvais moteur. Le sélecteur affiche maintenant exactement un élément pour chaque moteur natif et prévisualise via le bon binaire.
+
+**La sauvegarde automatique ne casse plus votre paramètre de moteur :** Sauvegarder une configuration LLM n'écrase plus silencieusement votre moteur choisi pour revenir à Piper.
+
+## v5.7.7 — Restauration des Voix en Mode Party + Améliorations
+
+**Les agents du mode party parlent à nouveau :** BMAD `/party-mode` invoque maintenant de manière fiable le bon skill AgentVibes, et chaque réponse d'agent est lue à voix haute avec sa voix unique avec musique, pretext et reverb par agent — chargés automatiquement depuis `~/.agentvibes/bmad-voice-map.json`.
+
+**Nouvelle piste intégrée :** 🌌 CelestialVelvet ajoutée au catalogue musical intégré.
+
+**Correction du contraste TUI :** Les lignes sélectionnées dans les onglets Voix et Agents n'affichent plus de texte gris illisible.
+
+**SSH distant :** Correction de l'erreur "wait: pid is not a child of this shell" dans `play-tts-ssh-remote.sh`.
+
+## v5.7.6 — Intégrité du Payload SSH Distant + Réécriture du Récepteur
 
 **Correction musique/voix SSH distant :** La bonne piste musicale et voix du projet atteignent maintenant le récepteur distant — auparavant la configuration globale était utilisée au lieu des paramètres du projet actif.
 

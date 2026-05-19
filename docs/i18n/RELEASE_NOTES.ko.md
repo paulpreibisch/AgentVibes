@@ -1,5 +1,72 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎸 v5.8.0 — 소프라노 이제 작동 + 모든 엔진의 음성 선택기 수정
+
+**출시일:** 2026-05-18
+
+### 🐛 Soprano TTS가 작동하지 않았음 — 이제 수정됨
+
+Soprano(v5.6에서 도입된 80M 파라미터 신경망 TTS 엔진)는 Windows에서 조용히 실패하고 있었습니다. 여러 문제가 결합되어 처음부터 끝까지 작동하지 않았습니다:
+
+- Windows 음성 선택기는 Soprano를 옵션으로 표시했지만 잘못된 바이너리 이름(`soprano` 대신 `soprano-tts`)으로 실행하려 했습니다
+- `play-tts-soprano.ps1`은 Node.js에서 잘려진 PATH로 호출되어 설치되어 있어도 `soprano`와 `soprano-webui` 실행 파일을 찾을 수 없었습니다
+- wav 파일 경로가 stdout 대신 PowerShell의 Information 스트림(`Write-Host`)에 쓰여져 리버브/배경음악 프로세서가 경로를 찾지 못했습니다
+- Gradio WebUI가 자동으로 시작되지 않아 매 세션 전에 수동으로 `soprano-webui`를 실행해야 했습니다
+
+이 모든 문제가 이제 수정되었습니다. AgentVibes는 Soprano WebUI 서버가 포트 7860에서 실행 중인지 자동으로 감지하고, 실행 중이지 않으면 시작하여 준비될 때까지 폴링합니다(최대 90초). 세 가지 모드가 우선순위 순서로 작동합니다: WebUI (가장 빠름 — 모델이 로드된 상태 유지) → OpenAI 호환 API → `soprano` CLI 직접 실행.
+
+### 🐛 음성 선택기가 Windows SAPI와 macOS Say를 무시했음
+
+**Windows SAPI** 또는 **macOS Say**를 사용하도록 구성된 LLM의 음성 선택기를 열면 엔진 내장 음성 대신 Piper의 전체 음성 목록이 표시되었습니다. 이는 혼란스러웠습니다 — SAPI나 macOS Say를 사용하면서 Piper 음성을 선택해도 효과가 없었고, 스페이스바 미리보기도 잘못된 엔진을 통해 재생되었습니다.
+
+선택기는 이제 선택된 엔진에 맞게 적응합니다:
+
+- **Windows SAPI / macOS Say / Soprano:** 엔진 내장 음성의 정확히 하나의 항목을 표시하고, 자동 선택하며, 스페이스바 미리보기가 올바른 엔진 바이너리를 통해 발음됩니다
+- **Piper:** 이전과 같이 설치된 전체 음성 카탈로그를 표시합니다
+
+또한, 네이티브 엔진이 사용 중일 때 설정을 저장해도 더 이상 `ttsEngine` 필드를 `piper`로 자동으로 덮어쓰지 않습니다.
+
+### 🔒 Soprano 안정성 (어드버서리얼 리뷰 9개 수정)
+
+- **충돌 수정:** 소켓 `destroy()`가 리스너 없는 지연 `error` 이벤트를 발생시켜 Node.js 프로세스를 충돌시킬 수 있었습니다 — 흡수 핸들러가 추가되었습니다
+- **루프 취소:** 모달 또는 음성 선택기가 닫히면 90초 WebUI 폴링 루프가 즉시 중지됩니다 (AbortController 통해)
+- **미처리 거부 없음:** 모든 비동기 WebUI 확인 호출에 `.catch()` 핸들러 추가
+- **중복 프로세스 없음:** 미리보기를 빠르게 클릭할 때 두 개의 `soprano-webui` 인스턴스가 실행되는 것을 방지하는 10초 쿨다운
+- **더 나은 오류 피드백:** spawn 실패 및 비제로 종료 코드가 음성 선택기에서 표시되는 오류 레이블로 나타납니다
+- **PATH 보존:** PowerShell PATH 갱신이 전체 PATH를 교체하는 대신 레지스트리 항목을 추가하여 nvm, conda, pyenv 심이 계속 작동합니다
+
+---
+
+## 🎭 v5.7.7 — 파티 모드 음성 복원 + 개선
+
+**출시일:** 2026-05-17
+
+### 🐛 BMAD 파티 모드 에이전트 음소거 (에이전트별 TTS 없음)
+
+파티 모드 에이전트가 텍스트로 응답을 표시했지만 고유한 음성으로 읽지 않았습니다. 두 가지 근본 원인:
+
+**스킬 명확화:** `/party-mode`가 AgentVibes 스킬 대신 업스트림 BMAD 명령 `_bmad/core/workflows/party-mode`(이 프로젝트에 존재하지 않는 경로를 로드하려고 시도)와 일치했습니다. 프로젝트 로컬 `/party-mode` 명령 재정의가 이제 올바른 스킬로 라우팅합니다.
+
+**필수 TTS 단계:** 오케스트레이터의 `bmad-speak.js` 호출 단계가 불충분하게 지정되어 때때로 건너뛰었습니다. BMAD 파티 모드 스킬의 4단계가 이제 필수로 명확히 표시되며, `bmad-speak.js`가 에이전트별로 적용하는 것에 대한 명시적 문서가 추가되었습니다: 음성, 프리텍스트, 리버브, 퍼소낼리티, 배경 음악 — 모두 `~/.agentvibes/bmad-voice-map.json`에서 자동으로 로드됩니다.
+
+### 🔍 파티 모드 진단 로깅
+
+`bmad-party-speak.sh`(PostToolUse 훅)가 이제 `/tmp/agentvibes-party-debug.log`에 구조화된 진단 항목을 씁니다 — `fired`, `fingerprint HIT/MISS`, `invoking`, 오류 — 추측 없이 음성 문제를 진단할 수 있습니다.
+
+### 🎵 새 번들 트랙: CelestialVelvet
+
+새로운 앰비언트 음악 트랙 **CelestialVelvet**(🌌)이 내장 카탈로그에 추가되었습니다. TUI 음악 선택기와 BMAD 음성 맵에서 즉시 사용 가능 — 다운로드 불필요.
+
+### 🐛 TUI: 선택된 행의 회색 텍스트 수정
+
+이제 음성 및 에이전트 탭의 선택된 행에 흰색 텍스트가 올바르게 렌더링됩니다. 이전에는 `bright-black` 전경색과 녹색 배경의 조합이 많은 터미널에서 읽기 어려운 회색 텍스트를 생성했습니다.
+
+### 🐛 SSH 원격: "wait: pid is not a child of this shell" 오류
+
+`play-tts-ssh-remote.sh`가 특정 셸에서 `wait: pid X is not a child of this shell`을 출력했습니다. 백그라운드 서브셸 내에서 직접 `ssh`를 실행하도록 수정하여 셸 간 `wait` 호출 없이 `$?`로 종료 코드를 캡처합니다.
+
+---
+
 ## 🔧 v5.7.6 — SSH 원격 페이로드 무결성 + 수신기 재작성
 
 **출시일:** 2026-05-16

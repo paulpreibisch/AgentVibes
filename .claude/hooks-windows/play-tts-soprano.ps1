@@ -20,6 +20,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Append registry PATH entries so Python-installed scripts (soprano, soprano-webui) are
+# found when spawned from Node.js. Prepend existing PATH to preserve runtime shims
+# (nvm, conda, pyenv) that were added after the process started.
+$env:Path = $env:Path + ";" +
+            [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+            [System.Environment]::GetEnvironmentVariable("Path", "User")
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Validate port is numeric to prevent injection
 $SopranoPort = "7860"
@@ -101,7 +108,8 @@ if (Test-WebUI) {
     $SynthMode = "webui"
     $pythonHelper = Join-Path $ScriptDir "soprano-gradio-synth.py"
     if (Test-Path $pythonHelper) {
-        & python $pythonHelper $Text $TempFile $SopranoPort 2>$null
+        # Wrap in try/catch: PS7.3+ throws on native non-zero exit with ErrorActionPreference=Stop
+        try { & python $pythonHelper $Text $TempFile $SopranoPort 2>$null } catch { }
     } else {
         Write-Host "[ERROR] soprano-gradio-synth.py not found" -ForegroundColor Red
         exit 1
@@ -123,7 +131,8 @@ if (Test-WebUI) {
 } elseif (Test-SopranoCLI) {
     # CLI fallback - reloads model each call (slowest)
     $SynthMode = "cli"
-    & soprano $Text -o $TempFile -d $SopranoDevice 2>$null
+    # Wrap in try/catch: PS7.3+ throws on native non-zero exit with ErrorActionPreference=Stop
+    try { & soprano $Text -o $TempFile -d $SopranoDevice 2>$null } catch { }
 } else {
     Write-Host "[ERROR] Soprano TTS not installed and no server running on port $SopranoPort" -ForegroundColor Red
     Write-Host ""
@@ -156,3 +165,5 @@ if (-not $env:AGENTVIBES_NO_PLAY) {
 
 Write-Host "Saved to: $TempFile"
 Write-Host "Voice: Soprano-1.1-80M (Soprano TTS, $SynthMode mode)"
+# Output bare path so play-tts.ps1 can capture it for reverb/bg-music processing
+Write-Output $TempFile

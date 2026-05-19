@@ -11,7 +11,7 @@
 [![Publish](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml/badge.svg)](https://github.com/paulpreibisch/AgentVibes/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.7.6
+**Author**: Paul Preibisch ([@997Fire](https://x.com/997Fire)) | **Version**: v5.8.0
 
 ---
 
@@ -40,7 +40,33 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
+## 🌟 NEW IN v5.8.0 — Soprano Now Works + Voice Picker Fixed for All Engines
+
+**Soprano TTS actually works now:** Soprano (our neural TTS engine) was silently broken
+on Windows since launch — wrong binary name, stripped PATH, wav path sent to the wrong
+output stream, and no auto-start for the WebUI server. All fixed. Install with
+`pip install soprano-tts`, select Soprano in the setup tab, and AgentVibes handles
+the rest.
+
+**Voice picker now works for Windows SAPI and macOS Say:** Previously the picker showed
+the entire Piper voice catalog even when SAPI or macOS Say was selected, and Space-bar
+preview played through the wrong engine. The picker now shows exactly one item for each
+native engine and previews through the correct binary.
+
+**Auto-save no longer breaks your engine setting:** Saving an LLM config no longer silently
+overwrites your chosen engine back to Piper.
+
+## v5.7.7 — Party Mode Voice Restore + Polish
+
+**Party mode agents now speak again:** BMAD `/party-mode` now reliably invokes the correct AgentVibes skill, and each agent's response is spoken aloud in their unique voice with per-agent music, pretext, and reverb — loaded automatically from `~/.agentvibes/bmad-voice-map.json`.
+
+**New bundled track:** 🌌 CelestialVelvet added to the built-in music catalog.
+
+**TUI contrast fix:** Selected rows in Voices and Agents tabs no longer render unreadable gray text.
+
+**SSH remote:** Fixed "wait: pid is not a child of this shell" error in `play-tts-ssh-remote.sh`.
+
+## v5.7.6 — SSH Remote Payload Integrity + Receiver Rewrite
 
 **SSH remote music/voice fix:** The correct project music track and voice now reach the remote receiver — previously the global config was used instead of the active project's settings.
 
@@ -209,6 +235,11 @@ Replace the default background tracks with your own audio files for complete son
 - Maximum size: 50MB
 - Automatic format detection
 - Duration warnings for non-optimal lengths
+
+**Custom Track Naming Rules:**
+- Use `snake_case` filenames only — e.g. `my_focus_music.mp3` ✅
+- No spaces or uppercase letters in filenames — e.g. `My Focus Music.mp3` ❌
+- Misnamed files will not appear in the music picker and will be skipped by the audio engine
 
 **Perfect for:**
 - 🎸 **Team Audio Branding** - Company theme music

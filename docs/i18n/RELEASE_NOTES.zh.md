@@ -1,5 +1,72 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎸 v5.8.0 — Soprano 现已正常工作 + 修复了所有引擎的语音选择器
+
+**发布日期：** 2026-05-18
+
+### 🐛 Soprano TTS 曾无法工作 — 现已修复
+
+Soprano（我们在 v5.6 引入的 80M 参数神经网络 TTS 引擎）在 Windows 上一直静默失败。多个问题组合导致其从头到尾无法正常工作：
+
+- Windows 语音选择器将 Soprano 显示为选项，但使用了错误的二进制文件名（`soprano-tts` 而非 `soprano`）来启动它
+- `play-tts-soprano.ps1` 从 Node.js 以精简的 PATH 被调用，因此即使已安装，`soprano` 和 `soprano-webui` 可执行文件也无法被找到
+- wav 文件路径被写入 PowerShell 的 Information 流（`Write-Host`）而非 stdout，导致混响/背景音乐处理器无法找到该路径
+- Gradio WebUI 从未自动启动 — 每次会话前都需要手动运行 `soprano-webui`
+
+所有这些问题现已修复。AgentVibes 会自动检测 Soprano WebUI 服务器是否在端口 7860 上运行，如未运行则启动它，并轮询直到就绪（最多 90 秒）。三种模式按优先级顺序工作：WebUI（最快 — 模型保持加载状态）→ OpenAI 兼容 API → 直接使用 `soprano` CLI。
+
+### 🐛 语音选择器忽略了 Windows SAPI 和 macOS Say
+
+打开配置为使用 **Windows SAPI** 或 **macOS Say** 的 LLM 的语音选择器时，选择器显示了完整的 Piper 语音列表，而非引擎内置语音。这令人困惑 — 使用 SAPI 或 macOS Say 时选择 Piper 语音毫无效果，空格键预览也通过错误的引擎播放。
+
+选择器现在会根据所选引擎进行适配：
+
+- **Windows SAPI / macOS Say / Soprano：** 仅显示一个条目（引擎内置语音），自动选中，空格键预览通过正确的引擎二进制文件发声
+- **Piper：** 如以前一样显示完整的已安装语音目录
+
+此外，保存配置时，当原生引擎正在使用时，不再悄悄将 `ttsEngine` 字段覆盖为 `piper`。
+
+### 🔒 Soprano 稳定性（对抗性审查的 9 项修复）
+
+- **崩溃修复：** 套接字 `destroy()` 可能会发出无监听器的延迟 `error` 事件，导致 Node.js 进程崩溃 — 现已添加吸收处理器
+- **循环取消：** 当模态框或语音选择器关闭时，90 秒的 WebUI 轮询循环现在会立即停止（通过 AbortController）
+- **无未处理的拒绝：** 为所有异步 WebUI 检查调用添加了 `.catch()` 处理器
+- **无重复进程：** 10 秒冷却防止快速点击预览时启动两个 `soprano-webui` 实例
+- **更好的错误反馈：** spawn 失败和非零退出代码现在会在语音选择器中显示可见的错误标签
+- **PATH 保留：** PowerShell PATH 刷新现在追加注册表条目而非替换整个 PATH，确保 nvm、conda 和 pyenv 的 shim 继续工作
+
+---
+
+## 🎭 v5.7.7 — 派对模式语音恢复 + 改进
+
+**发布日期：** 2026-05-17
+
+### 🐛 BMAD 派对模式代理无声（无每代理 TTS）
+
+派对模式代理以文本显示响应，但未用其独特声音朗读。两个根本原因：
+
+**技能消歧：** `/party-mode` 匹配了上游 BMAD 命令 `_bmad/core/workflows/party-mode`（尝试加载此项目中不存在的路径），而非 AgentVibes 技能。项目本地 `/party-mode` 命令覆盖现在路由到正确的技能。
+
+**必需 TTS 步骤：** 编排器的 `bmad-speak.js` 调用步骤规范不足，有时被跳过。BMAD 派对模式技能中的步骤 4 现在明确标记为必需，并附有 `bmad-speak.js` 每代理应用内容的明确文档：声音、预文本、混响、个性和背景音乐 — 全部从 `~/.agentvibes/bmad-voice-map.json` 自动加载。
+
+### 🔍 派对模式诊断日志
+
+`bmad-party-speak.sh`（PostToolUse 钩子）现在将结构化诊断条目写入 `/tmp/agentvibes-party-debug.log` — `fired`、`fingerprint HIT/MISS`、`invoking` 和错误 — 无需猜测即可诊断语音问题。
+
+### 🎵 新捆绑曲目：CelestialVelvet
+
+新的环境音乐曲目 **CelestialVelvet**（🌌）已添加到内置目录。在 TUI 音乐选择器和 BMAD 语音映射中立即可用 — 无需下载。
+
+### 🐛 TUI：修复选定行的灰色文本
+
+现在在"声音"和"代理"选项卡的选定行中正确呈现白色文本。以前，`bright-black` 前景色与绿色背景结合在许多终端中产生难以阅读的灰色文本。
+
+### 🐛 SSH 远程："wait: pid is not a child of this shell" 错误
+
+`play-tts-ssh-remote.sh` 在某些 shell 中会发出 `wait: pid X is not a child of this shell`。通过在后台子 shell 内直接生成 `ssh` 来修复，使 `$?` 无需跨 shell `wait` 调用即可捕获退出代码。
+
+---
+
 ## 🔧 v5.7.6 — SSH 远程负载完整性 + 接收器重写
 
 **发布日期：** 2026-05-16

@@ -4,7 +4,25 @@
 
 ---
 
-## 🌟 NEU IN v5.7.6 — SSH-Remote-Payload-Integrität + Receiver-Neuschreibung
+## 🌟 NEU IN v5.8.0 — Soprano Funktioniert Jetzt + Sprachauswahl für Alle Engines Korrigiert
+
+**Soprano TTS funktioniert jetzt wirklich:** Soprano (unsere neuronale TTS-Engine) war seit dem Launch auf Windows stillschweigend kaputt — falscher Binärname, abgeschnittener PATH, wav-Pfad an den falschen Ausgabestream gesendet, und kein Auto-Start für den WebUI-Server. Alles behoben. Installiere mit `pip install soprano-tts`, wähle Soprano im Setup-Tab, und AgentVibes kümmert sich um den Rest.
+
+**Die Sprachauswahl funktioniert jetzt für Windows SAPI und macOS Say:** Bisher zeigte die Auswahl den gesamten Piper-Stimmenkatalog, auch wenn SAPI oder macOS Say ausgewählt war, und die Leerzeichen-Vorschau spielte durch die falsche Engine. Die Auswahl zeigt jetzt genau einen Eintrag für jede native Engine und zeigt eine Vorschau durch das richtige Binary.
+
+**Die automatische Speicherung bricht deine Engine-Einstellung nicht mehr:** Das Speichern einer LLM-Konfiguration überschreibt deine gewählte Engine nicht mehr stillschweigend zurück zu Piper.
+
+## v5.7.7 — Party-Mode-Stimmen Wiederhergestellt + Verbesserungen
+
+**Party-Mode-Agenten sprechen wieder:** BMAD `/party-mode` ruft jetzt zuverlässig den richtigen AgentVibes-Skill auf, und jede Agentenantwort wird mit der einzigartigen Stimme des Agenten mit agentspezifischer Musik, Prätext und Reverb vorgelesen — automatisch aus `~/.agentvibes/bmad-voice-map.json` geladen.
+
+**Neuer enthaltener Track:** 🌌 CelestialVelvet zum integrierten Musikkatalog hinzugefügt.
+
+**TUI-Kontrastkorrektur:** Ausgewählte Zeilen in den Tabs Stimmen und Agenten zeigen keinen unlesbaren grauen Text mehr.
+
+**SSH-Remote:** Fehler "wait: pid is not a child of this shell" in `play-tts-ssh-remote.sh` behoben.
+
+## v5.7.6 — SSH-Remote-Payload-Integrität + Receiver-Neuschreibung
 
 **SSH-Remote-Musik/Stimmen-Korrektur:** Die richtige Musiktitel und Stimme des Projekts erreichen jetzt den Remote-Empfänger — zuvor wurde die globale Konfiguration statt der Einstellungen des aktiven Projekts verwendet.
 
