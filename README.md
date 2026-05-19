@@ -40,7 +40,23 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.7.7 — Party Mode Voice Restore + Polish
+## 🌟 NEW IN v5.8.0 — Soprano Now Works + Voice Picker Fixed for All Engines
+
+**Soprano TTS actually works now:** Soprano (our neural TTS engine) was silently broken
+on Windows since launch — wrong binary name, stripped PATH, wav path sent to the wrong
+output stream, and no auto-start for the WebUI server. All fixed. Install with
+`pip install soprano-tts`, select Soprano in the setup tab, and AgentVibes handles
+the rest.
+
+**Voice picker now works for Windows SAPI and macOS Say:** Previously the picker showed
+the entire Piper voice catalog even when SAPI or macOS Say was selected, and Space-bar
+preview played through the wrong engine. The picker now shows exactly one item for each
+native engine and previews through the correct binary.
+
+**Auto-save no longer breaks your engine setting:** Saving an LLM config no longer silently
+overwrites your chosen engine back to Piper.
+
+## v5.7.7 — Party Mode Voice Restore + Polish
 
 **Party mode agents now speak again:** BMAD `/party-mode` now reliably invokes the correct AgentVibes skill, and each agent's response is spoken aloud in their unique voice with per-agent music, pretext, and reverb — loaded automatically from `~/.agentvibes/bmad-voice-map.json`.
 
