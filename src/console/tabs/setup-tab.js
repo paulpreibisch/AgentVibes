@@ -106,22 +106,36 @@ function _checkSopranoPort(port) {
     socket.once('connect', () => { socket.destroy(); resolve(true); });
     socket.once('error', () => resolve(false));
     socket.once('timeout', () => { socket.destroy(); resolve(false); });
+    // Absorb any late errors emitted after destroy() to prevent uncaught 'error' crash
+    socket.on('error', () => {});
   });
 }
 
-async function _ensureSopranoWebUI(onStatus) {
+// Timestamp of last soprano-webui spawn; prevents duplicate processes on rapid re-entry
+let _sopranoSpawnedAt = 0;
+
+async function _ensureSopranoWebUI(onStatus, signal) {
   const port = parseInt(process.env.SOPRANO_PORT || '7860', 10);
+  if (signal?.aborted) return false;
   if (await _checkSopranoPort(port)) return true;
   onStatus('Starting Soprano WebUI...');
-  try {
-    const p = spawn('soprano-webui', [], {
-      stdio: 'ignore', detached: true, windowsHide: true,
-      shell: process.platform === 'win32',
-    });
-    p.unref();
-  } catch {}
+  // Only spawn a new soprano-webui process if we haven't done so in the last 10 s
+  if (Date.now() - _sopranoSpawnedAt > 10_000) {
+    _sopranoSpawnedAt = Date.now();
+    try {
+      const p = spawn('soprano-webui', [], {
+        stdio: 'ignore', detached: true, windowsHide: true,
+        shell: process.platform === 'win32',
+      });
+      p.unref();
+    } catch (e) {
+      process.stderr.write(`[AgentVibes] soprano-webui spawn failed: ${e.message}\n`);
+    }
+  }
   for (let i = 0; i < 45; i++) {
+    if (signal?.aborted) return false;
     await new Promise(r => setTimeout(r, 2000));
+    if (signal?.aborted) return false;
     if (await _checkSopranoPort(port)) return true;
     onStatus(`Starting Soprano WebUI... ${(i + 1) * 2}s`);
   }
@@ -1834,11 +1848,13 @@ export function createSetupTab(screen, services) {
     // eliminating the race condition when Preview is clicked twice rapidly.
     let _previewModalProc = null;
     let _bgRestoreFn = null;
+    let _previewEnsureAbort = null;
     function _killPreview() {
       // Restore bg music immediately (synchronously) before killing the process.
       // This prevents the async exit-handler race where a second Preview invocation
       // reads bgWas=true (music already enabled) before the first's exit fires.
       if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+      if (_previewEnsureAbort) { _previewEnsureAbort.abort(); _previewEnsureAbort = null; }
       if (_previewModalProc) {
         try { _previewModalProc.kill(); } catch {}
         _previewModalProc = null;
@@ -1924,9 +1940,11 @@ export function createSetupTab(screen, services) {
       if (draft.ttsEngine === 'soprano' && isWin) {
         previewLine.setContent('{cyan-fg}Checking Soprano...{/cyan-fg}');
         screen.render();
+        _previewEnsureAbort = new AbortController();
         _ensureSopranoWebUI((msg) => {
           if (!_closed) { previewLine.setContent(`{cyan-fg}${msg}{/cyan-fg}`); screen.render(); }
-        }).then((ready) => {
+        }, _previewEnsureAbort.signal).then((ready) => {
+          _previewEnsureAbort = null;
           if (_closed) return;
           if (!ready) {
             previewLine.setContent('{red-fg}Soprano WebUI failed to start{/red-fg}');
@@ -1935,7 +1953,7 @@ export function createSetupTab(screen, services) {
             return;
           }
           _doSpawnPreview();
-        });
+        }).catch(() => { _previewEnsureAbort = null; });
         return;
       }
       _doSpawnPreview();
@@ -2241,6 +2259,7 @@ export function createSetupTab(screen, services) {
       draft.voice = nativeVoice.id;
       let _nvClosed = false;
       let _nvPreviewProc = null;
+      let _nvEnsureAbort = null;
 
       function _killNvPreview() {
         if (_nvPreviewProc) { try { _nvPreviewProc.kill(); } catch {} _nvPreviewProc = null; }
@@ -2250,6 +2269,7 @@ export function createSetupTab(screen, services) {
         if (_nvClosed) return;
         _nvClosed = true;
         _killNvPreview();
+        if (_nvEnsureAbort) { _nvEnsureAbort.abort(); _nvEnsureAbort = null; }
         navigationService?.closeModal();
         destroyList(nvPicker, screen, onDone);
       }
@@ -2290,14 +2310,23 @@ export function createSetupTab(screen, services) {
 
         function _spawnAndTrack(cmd, args, opts) {
           let proc;
-          try { proc = spawn(cmd, args, opts); } catch { return; }
+          try { proc = spawn(cmd, args, opts); } catch (e) {
+            process.stderr.write(`[AgentVibes] preview spawn failed: ${e.message}\n`);
+            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+            return;
+          }
           _nvPreviewProc = proc;
           nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
           screen.render();
           proc.on('exit', (code) => {
             _nvPreviewProc = null;
             if (!_nvClosed) {
-              nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+              if (code !== 0 && code !== null) {
+                nvPicker.setLabel(` {red-fg}Preview failed (exit ${code}){/red-fg} `);
+                setTimeout(() => { if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); } }, 3000);
+              } else {
+                nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+              }
               screen.render();
             }
           });
@@ -2307,13 +2336,15 @@ export function createSetupTab(screen, services) {
           });
         }
 
-        if (engine === 'soprano' && process.platform === 'win32') {
+        if (engine === 'soprano' && process.platform === 'win32' && !process.env.WSL_DISTRO_NAME) {
           // Ensure soprano WebUI is running before preview; start it if not.
           nvPicker.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
           screen.render();
+          _nvEnsureAbort = new AbortController();
           _ensureSopranoWebUI((msg) => {
             if (!_nvClosed) { nvPicker.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
-          }).then((ready) => {
+          }, _nvEnsureAbort.signal).then((ready) => {
+            _nvEnsureAbort = null;
             if (_nvClosed) return;
             if (!ready) {
               nvPicker.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
@@ -2322,14 +2353,14 @@ export function createSetupTab(screen, services) {
             }
             const scriptPath = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts-soprano.ps1');
             _spawnAndTrack('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, phrase], { stdio: 'ignore', windowsHide: true });
-          });
+          }).catch(() => { _nvEnsureAbort = null; });
           return;
         }
 
         let proc = null;
         try {
           if (engine === 'soprano') {
-            proc = spawn('soprano-tts', [phrase], { stdio: 'ignore' });
+            proc = spawn('soprano', [phrase], { stdio: 'ignore' });
           } else if (engine === 'sapi') {
             const safePhrase = phrase.replace(/'/g, "''");
             const sapiScript = `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${safePhrase}')`;

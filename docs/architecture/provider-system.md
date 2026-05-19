@@ -31,9 +31,18 @@ AgentVibes implements a **multi-provider TTS architecture** that allows seamless
 - 🔌 **Plugin extensibility** for adding new providers
 - ⚡ **Zero-downtime switching** with immediate effect
 
-**Current Providers:**
-- **Piper TTS** - Premium AI voices (150+ voices, 30+ languages)
-- **Piper TTS** - Free offline neural voices (50+ voices, 18 languages)
+**Current Providers (Linux/macOS):**
+- **Piper TTS** (`play-tts-piper.sh`) - Local neural voices (150+ voices, 30+ languages)
+- **macOS Say** (`play-tts-macos.sh`) - Native macOS TTS (70+ voices, 40+ languages)
+- **SSH Remote** (`play-tts-ssh-remote.sh`) - Forwards TTS to a remote host over SSH
+- **Soprano** (`play-tts-soprano.sh`) - Gradio API endpoint for custom models
+- **Termux SSH** (`play-tts-termux-ssh.sh`) - Android device via Termux
+
+**Current Providers (Windows):**
+- **Windows SAPI** (`play-tts-sapi.ps1`) - Native Windows Speech API
+- **Windows Piper** (`play-tts-windows-piper.ps1`) - Local neural voices on Windows
+- **Windows Soprano** (`play-tts-soprano.ps1`) - Gradio API on Windows
+- **AgentVibes Receiver** (`play-tts-agentvibes-receiver.sh`) - Proxy for voiceless connections
 
 ---
 
@@ -71,34 +80,32 @@ AgentVibes implements a **multi-provider TTS architecture** that allows seamless
 ## Component Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    User/Claude Code                         │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  play-tts.sh (Router)                       │
-│  • Personality provider override check                       │
-│  • Active provider resolution                                │
-│  • Provider script delegation                                │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                                  │
-          ▼                                  ▼
-┌──────────────────────┐         ┌──────────────────────┐
-│ play-tts-piper  │         │   play-tts-piper     │
-│                      │         │                      │
-│ • API requests       │         │ • Local synthesis    │
-│ • Voice mapping      │         │ • Voice models       │
-│ • Language codes     │         │ • Offline mode       │
-│ • Error handling     │         │ • Fast generation    │
-└──────────┬───────────┘         └──────────┬───────────┘
-           │                                 │
-           ▼                                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Audio Output (mpv/afplay)                  │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│              User / Claude Code / MCP Client                      │
+└──────────────────────────────┬────────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────────┐
+│          play-tts.sh / play-tts.ps1  (Router)                     │
+│  • Per-LLM override check (audio-effects.cfg)                     │
+│  • Transport provider passthrough (ssh-remote, termux-ssh)        │
+│  • Personality voice resolution                                   │
+│  • Active provider lookup → provider script delegation            │
+└──────────────────────────────┬────────────────────────────────────┘
+             │                 │                 │
+    ┌────────┘          ┌──────┴──────┐          └────────┐
+    ▼                   ▼             ▼                    ▼
+┌──────────┐  ┌──────────────┐  ┌──────────┐  ┌──────────────────┐
+│  Piper   │  │  macOS Say   │  │  Soprano │  │  SSH / Termux /  │
+│ (local)  │  │  (local)     │  │ (Gradio) │  │  AV Receiver     │
+└────┬─────┘  └──────┬───────┘  └────┬─────┘  └────────┬─────────┘
+     │               │               │                  │
+     ▼               ▼               ▼                  ▼
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│   Local Audio Output         │  │   Remote Audio Output        │
+│   (mpv / paplay / afplay /   │  │   (plays on target host)     │
+│    PowerShell Media)         │  └──────────────────────────────┘
+└──────────────────────────────┘
 ```
 
 ### Router Layer
@@ -140,14 +147,18 @@ Each provider implements:
 - Error messaging
 - Audio playback integration
 
-**Current Implementations:**
-- `play-tts-piper.sh` - Piper TTS API integration
-- `play-tts-piper.sh` - Piper TTS local synthesis
+**Linux/macOS Implementations:**
+- `play-tts-piper.sh` - Piper TTS local neural synthesis
+- `play-tts-macos.sh` - macOS native Say command
+- `play-tts-soprano.sh` - Soprano Gradio API endpoint
+- `play-tts-ssh-remote.sh` - SSH remote audio forwarding
+- `play-tts-termux-ssh.sh` - Termux (Android) SSH audio
+- `play-tts-agentvibes-receiver.sh` - Proxy for voiceless connections
 
-**Future Providers:**
-- `play-tts-azure.sh` - Microsoft Azure TTS
-- `play-tts-google.sh` - Google Cloud TTS
-- `play-tts-aws.sh` - Amazon Polly
+**Windows Implementations (PowerShell):**
+- `play-tts-sapi.ps1` - Windows SAPI native synthesis
+- `play-tts-windows-piper.ps1` - Windows Piper neural synthesis
+- `play-tts-soprano.ps1` - Windows Soprano Gradio API
 
 ### Provider Manager
 
@@ -467,10 +478,16 @@ Create `.docs/providers/yourprovider-setup.md` with:
 
 | File | Purpose |
 |------|---------|
-| `.claude/hooks/play-tts.sh` | Router - main entry point |
-| `.claude/hooks/provider-manager.sh` | Provider management functions |
+| `.claude/hooks/play-tts.sh` | Router - Linux/macOS entry point |
+| `.claude/hooks-windows/play-tts.ps1` | Router - Windows entry point |
+| `.claude/hooks/provider-manager.sh` | Provider management functions (Linux/macOS) |
+| `.claude/hooks-windows/provider-manager.ps1` | Provider management (Windows) |
 | `.claude/hooks/play-tts-piper.sh` | Piper TTS implementation |
-| `.claude/hooks/play-tts-piper.sh` | Piper implementation |
+| `.claude/hooks/play-tts-macos.sh` | macOS Say implementation |
+| `.claude/hooks/play-tts-ssh-remote.sh` | SSH remote forwarding |
+| `.claude/hooks/play-tts-soprano.sh` | Soprano Gradio API |
+| `.claude/hooks-windows/play-tts-sapi.ps1` | Windows SAPI implementation |
+| `.claude/hooks-windows/play-tts-windows-piper.ps1` | Windows Piper implementation |
 | `.claude/hooks/provider-commands.sh` | Slash commands for providers |
 
 ### Voice Management
@@ -569,6 +586,6 @@ New features added:
 
 ---
 
-**Last Updated**: 2025-01-05
-**Architecture Version**: 2.0.0
+**Last Updated**: 2026-05-18
+**Architecture Version**: 5.7.7
 **Status**: Production

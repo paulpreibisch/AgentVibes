@@ -281,14 +281,25 @@ sprint_4:
     story_5_4:
       id: AVI-S5.4
       title: Tests for Engine-Aware Voice Picker and Preview
-      status: in-progress
+      status: complete
       story_points: 4
       acceptance_criteria_count: 16
+      completion_date: 2026-05-18
       file: docs/implementation-artifacts/5-4-engine-aware-tests.md
       description: |
         Jest tests: picker item count per engine, scanInstalledVoices not called for
         native engines, spawn args per engine, auto-save engine preservation,
         getAvailableEngines() platform filtering.
+      notes: |
+        57 tests across 4 test files — all pass:
+        - setup-tab-engine-voices.test.js (15 tests): NATIVE_ENGINE_VOICES const,
+          guard, engine picker clears voice, buildFields label, platform filtering
+        - setup-tab-preview-routing.test.js (19 tests): soprano/sapi/macos-say spawn
+          routing, toggle, error handling, key bindings, piper regression guard,
+          single-item assertion
+        - setup-tab-autosave.test.js (13 tests): LLM+Hermes _autoSave NATIVE_ENGINE_VOICES
+          guard, old broken pattern absent
+        - tts-engine-service tests included in Suite 5 of engine-voices file
       dependencies:
         - AVI-S5.1
         - AVI-S5.2
@@ -296,14 +307,14 @@ sprint_4:
 
   statistics:
     total_stories: 4
-    completed_stories: 3
+    completed_stories: 4
     ready_for_dev: 0
-    in_progress: 1
+    in_progress: 0
     total_story_points: 12
-    completed_points: 8
+    completed_points: 12
     ready_for_dev_points: 0
-    completion_percentage: 75.0
-    next_milestone: "Complete AVI-S5.4 tests"
+    completion_percentage: 100.0
+    next_milestone: "Epic AVI-E05 COMPLETE — close GitHub issue #194"
 
 notes: |
   ✅ EPIC COMPLETE: Sprint 3 Epic 4 - Custom Background Music System
