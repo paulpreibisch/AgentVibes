@@ -1,5 +1,30 @@
 # AgentVibes Release Notes
 
+## 🔧 v5.9.0 — SSH Remote + Windows Home Directory Fixes
+
+**Released:** 2026-05-18
+
+### 🐛 SSH Remote: Connection Timeout Added
+
+The SSH remote transport could hang indefinitely if the remote host was unreachable or
+slow to respond. A `ConnectTimeout=10` option is now applied to all SSH connections, so
+a stuck session surfaces an error within 10 seconds instead of blocking forever.
+
+The SSH subshell structure was also cleaned up so the process exit code is reliably
+captured — a previous formatting issue could cause `wait` to report "pid N is not a
+child of this shell" in some shell environments.
+
+### 🐛 Windows: Home Directory Detection Fixed
+
+`detectRemoteLlm()` used `process.env.HOME || os.homedir()` to find the AgentVibes
+config directory. On Windows, `HOME` is typically unset, but `||` would fall through to
+`os.homedir()` correctly — however `??` (null-coalescing) is strictly safer since it
+only falls back on `null`/`undefined`, not on an empty string. The fix also adds test
+injectability: passing a fake `HOME` in tests now reliably overrides the system value on
+all platforms.
+
+---
+
 ## 🎸 v5.8.0 — Soprano Now Works + Voice Picker Fixed for All Engines
 
 **Released:** 2026-05-18

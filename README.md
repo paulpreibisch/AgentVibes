@@ -40,7 +40,17 @@ Whether you're coding in Claude Code, chatting in Claude Desktop, using Warp Ter
 
 ---
 
-## 🌟 NEW IN v5.8.0 — Soprano Now Works + Voice Picker Fixed for All Engines
+## 🌟 NEW IN v5.9.0 — SSH Remote + Windows Home Directory Fixes
+
+**SSH remote no longer hangs:** The SSH transport now applies a 10-second connection
+timeout, so a stuck or unreachable remote host surfaces an error quickly instead of
+blocking forever.
+
+**Windows home directory detection fixed:** `detectRemoteLlm()` now uses null-coalescing
+(`??`) to fall back to `os.homedir()` only when `HOME` is genuinely unset — safer than
+the previous `||` which could misfire on an empty string.
+
+## v5.8.0 — Soprano Now Works + Voice Picker Fixed for All Engines
 
 **Soprano TTS actually works now:** Soprano (our neural TTS engine) was silently broken
 on Windows since launch — wrong binary name, stripped PATH, wav path sent to the wrong
