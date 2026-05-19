@@ -1,5 +1,42 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎸 v5.8.0 — Soprano Fonctionne Maintenant + Sélecteur de Voix Corrigé pour Tous les Moteurs
+
+**Publié le :** 2026-05-18
+
+### 🐛 Soprano TTS Était Cassé — Maintenant Corrigé
+
+Soprano (notre moteur TTS neuronal à 80M de paramètres, introduit dans la v5.6) échouait silencieusement sur Windows. Plusieurs problèmes combinés le cassaient de bout en bout :
+
+- Le sélecteur de voix Windows affichait Soprano comme option mais le lançait avec le mauvais nom de binaire (`soprano-tts` au lieu de `soprano`)
+- `play-tts-soprano.ps1` était appelé depuis Node.js avec un PATH tronqué, de sorte que les exécutables `soprano` et `soprano-webui` ne pouvaient pas être trouvés même s'ils étaient installés
+- Le chemin du fichier wav était écrit dans le flux Information de PowerShell (`Write-Host`) au lieu de stdout, ce qui empêchait le processeur de reverb/musique de fond de le trouver
+- Le Gradio WebUI ne démarrait jamais automatiquement — il fallait lancer `soprano-webui` manuellement avant chaque session
+
+Tous ces problèmes sont maintenant corrigés. AgentVibes détecte automatiquement si le serveur WebUI de Soprano tourne sur le port 7860, le démarre sinon, et attend jusqu'à ce qu'il soit prêt (jusqu'à 90 secondes). Trois modes fonctionnent par ordre de priorité : WebUI (le plus rapide — le modèle reste chargé) → API compatible OpenAI → CLI `soprano` direct.
+
+### 🐛 Le Sélecteur de Voix Ignorait Windows SAPI et macOS Say
+
+Lors de l'ouverture du sélecteur de voix pour un LLM configuré pour utiliser **Windows SAPI** ou **macOS Say**, le sélecteur affichait la liste complète des voix Piper au lieu de la voix intégrée du moteur. C'était déroutant — sélectionner une voix Piper en utilisant SAPI ou macOS Say n'avait aucun effet, et la prévisualisation avec la barre espace se faisait via le mauvais moteur.
+
+Le sélecteur s'adapte maintenant au moteur sélectionné :
+
+- **Windows SAPI / macOS Say / Soprano :** affiche exactement un élément (la voix intégrée du moteur), le sélectionne automatiquement, et la prévisualisation avec barre espace parle via le bon binaire du moteur
+- **Piper :** affiche le catalogue complet des voix installées comme avant
+
+De plus, la sauvegarde de la configuration n'écrase plus silencieusement le champ `ttsEngine` avec `piper` lorsqu'un moteur natif est utilisé.
+
+### 🔒 Fiabilité de Soprano (9 Corrections de Revue Adversariale)
+
+- **Correction de plantage :** `destroy()` sur le socket pouvait émettre un événement `error` tardif sans écouteur, faisant planter le processus Node.js — un gestionnaire absorbeur est maintenant en place
+- **Annulation de boucle :** la boucle de sondage WebUI de 90 secondes s'arrête maintenant immédiatement quand la fenêtre modale ou le sélecteur de voix est fermé (via AbortController)
+- **Aucun rejet non géré :** gestionnaires `.catch()` ajoutés à tous les appels async de vérification WebUI
+- **Aucun processus en double :** un délai de 10 secondes empêche de lancer deux instances de `soprano-webui` lors d'un clic rapide sur Aperçu
+- **Meilleur retour d'erreur :** les échecs de spawn et les codes de sortie non nuls affichent maintenant un label d'erreur visible dans le sélecteur de voix
+- **PATH préservé :** la mise à jour du PATH dans PowerShell ajoute maintenant les entrées du registre au lieu de remplacer tout le PATH, pour que les shims nvm, conda et pyenv continuent de fonctionner
+
+---
+
 ## 🎭 v5.7.7 — Restauration des Voix en Mode Party + Améliorations
 
 **Publié le :** 2026-05-17

@@ -4,7 +4,15 @@
 
 ---
 
-## 🌟 NOVITÀ IN v5.7.7 — Ripristino Voci Modalità Party + Miglioramenti
+## 🌟 NOVITÀ IN v5.8.0 — Soprano Ora Funziona + Selettore Voci Corretto per Tutti i Motori
+
+**Soprano TTS funziona davvero ora:** Soprano (il nostro motore TTS neurale) era silenziosamente rotto su Windows dal lancio — nome binario sbagliato, PATH ridotto, percorso wav inviato al flusso di output sbagliato, e nessun auto-avvio per il server WebUI. Tutto corretto. Installa con `pip install soprano-tts`, seleziona Soprano nella scheda di configurazione, e AgentVibes fa il resto.
+
+**Il selettore voci ora funziona per Windows SAPI e macOS Say:** In precedenza il selettore mostrava l'intero catalogo voci Piper anche quando SAPI o macOS Say era selezionato, e l'anteprima con barra spaziatrice suonava tramite il motore sbagliato. Il selettore ora mostra esattamente un elemento per ogni motore nativo e mostra un'anteprima tramite il binary corretto.
+
+**Il salvataggio automatico non rompe più l'impostazione del motore:** Salvare una configurazione LLM non sovrascrive più silenziosamente il motore scelto tornando a Piper.
+
+## v5.7.7 — Ripristino Voci Modalità Party + Miglioramenti
 
 **Gli agenti della modalità party parlano di nuovo:** BMAD `/party-mode` ora invoca in modo affidabile lo skill corretto di AgentVibes, e ogni risposta dell'agente viene letta ad alta voce con la sua voce unica con musica, pretext e reverb per agente — caricati automaticamente da `~/.agentvibes/bmad-voice-map.json`.
 
