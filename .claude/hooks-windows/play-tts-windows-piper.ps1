@@ -62,15 +62,20 @@ if (-not $VoiceName) {
 }
 
 # Security: Validate voice name to prevent path traversal
-# Only allow alphanumeric, underscore, hyphen, and period
-if ($VoiceName -notmatch '^[a-zA-Z0-9_\-\.]+$') {
+# Format: <model> or <model>::<speaker> for multi-speaker Piper models
+# Only allow alphanumeric, underscore, hyphen, period, and the :: separator
+if ($VoiceName -notmatch '^[a-zA-Z0-9_\-\.]+(::[a-zA-Z0-9_\-\.]+)?$') {
     Write-Host "[ERROR] Invalid voice name: $VoiceName" -ForegroundColor Red
     exit 1
 }
 
+# Extract model name and optional speaker (multi-speaker format: model::Speaker)
+$VoiceModel  = ($VoiceName -split '::')[0]
+$SpeakerName = if ($VoiceName -match '::(.+)$') { $Matches[1] } else { "" }
+
 # Resolve voice model path and validate it stays within VoicesDir
-$VoiceModelFile = [System.IO.Path]::GetFullPath("$VoicesDir\$VoiceName.onnx")
-$VoiceJsonFile = [System.IO.Path]::GetFullPath("$VoicesDir\$VoiceName.onnx.json")
+$VoiceModelFile = [System.IO.Path]::GetFullPath("$VoicesDir\$VoiceModel.onnx")
+$VoiceJsonFile  = [System.IO.Path]::GetFullPath("$VoicesDir\$VoiceModel.onnx.json")
 $ResolvedVoicesDir = [System.IO.Path]::GetFullPath($VoicesDir)
 if (-not $VoiceModelFile.StartsWith($ResolvedVoicesDir)) {
     Write-Host "[ERROR] Voice path outside voices directory" -ForegroundColor Red
@@ -79,15 +84,15 @@ if (-not $VoiceModelFile.StartsWith($ResolvedVoicesDir)) {
 
 # Check if voice model exists, download if missing
 if (-not (Test-Path $VoiceModelFile)) {
-    Write-Host "[DOWNLOAD] Voice model: $VoiceName" -ForegroundColor Yellow
+    Write-Host "[DOWNLOAD] Voice model: $VoiceModel" -ForegroundColor Yellow
 
     # Try to download from Hugging Face
     # Voice name format: {lang}_{region}-{speaker}-{quality}
     # HF path format:    {lang}/{lang}_{region}/{speaker}/{quality}/{voicename}.onnx
     try {
-        # Parse voice name to build correct HF path
+        # Parse model name to build correct HF path (strip ::Speaker suffix first)
         # e.g. en_US-ryan-high -> en/en_US/ryan/high/en_US-ryan-high.onnx
-        if ($VoiceName -match '^([a-z]{2})_([A-Z]{2})-([a-zA-Z0-9_]+)-([a-z]+)$') {
+        if ($VoiceModel -match '^([a-z]{2})_([A-Z]{2})-([a-zA-Z0-9_]+)-([a-z]+)$') {
             $Lang = $Matches[1]
             $LangRegion = "$($Matches[1])_$($Matches[2])"
             $Speaker = $Matches[3]
@@ -97,8 +102,8 @@ if (-not (Test-Path $VoiceModelFile)) {
             # Fallback for non-standard voice names
             $HFBase = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high"
         }
-        $ModelUrl = "$HFBase/$VoiceName.onnx"
-        $JsonUrl = "$HFBase/$VoiceName.onnx.json"
+        $ModelUrl = "$HFBase/$VoiceModel.onnx"
+        $JsonUrl = "$HFBase/$VoiceModel.onnx.json"
 
         Write-Host "   Downloading model..." -ForegroundColor Cyan
         Invoke-WebRequest -Uri $ModelUrl -OutFile $VoiceModelFile -ErrorAction Stop
@@ -127,11 +132,10 @@ $AudioFile = "$AudioDir\tts-$Timestamp.wav"
 try {
     Write-Host "[SYNTH] Synthesizing with Piper..." -ForegroundColor Cyan
 
-    # Run Piper with text input
-    $Text | & $PiperExe `
-        --model $VoiceModelFile `
-        --output-file $AudioFile `
-        2>$null
+    # Run Piper with text input; pass --speaker for multi-speaker models (model::Speaker format)
+    $piperArgs = @('--model', $VoiceModelFile, '--output-file', $AudioFile)
+    if ($SpeakerName) { $piperArgs += @('--speaker', $SpeakerName) }
+    $Text | & $PiperExe @piperArgs 2>$null
 
     if (-not (Test-Path $AudioFile)) {
         Write-Host "[ERROR] Piper synthesis failed" -ForegroundColor Red
