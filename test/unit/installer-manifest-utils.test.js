@@ -65,7 +65,8 @@ function rmTmpDir(dir) {
 describe('getProjectManifestPath()', () => {
   test('returns path inside targetDir/.agentvibes/', () => {
     const p = getProjectManifestPath('/some/project');
-    assert.ok(p.startsWith('/some/project'));
+    // Use path.normalize so forward-slash literals match Windows backslash output
+    assert.ok(path.normalize(p).startsWith(path.normalize('/some/project')));
     assert.ok(p.includes('.agentvibes'));
     assert.ok(p.endsWith('.json'));
   });
@@ -81,7 +82,7 @@ describe('getProjectManifestPath()', () => {
 describe('getGlobalManifestPath()', () => {
   test('returns path under provided homeDir', () => {
     const p = getGlobalManifestPath('/custom/home');
-    assert.ok(p.startsWith('/custom/home'));
+    assert.ok(path.normalize(p).startsWith(path.normalize('/custom/home')));
     assert.ok(p.includes('.agentvibes'));
   });
 
@@ -315,8 +316,10 @@ describe('copyHookFiles()', () => {
 
   test('creates .claude/hooks directory', async () => {
     await copyHookFiles(tmp, silentSpinner);
-    const hooksDir = path.join(tmp, '.claude', 'hooks');
-    assert.ok(fs.existsSync(hooksDir), '.claude/hooks must exist');
+    // copyHookFiles installs to hooks-windows on Windows, hooks on POSIX
+    const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
+    const hooksDir = path.join(tmp, '.claude', hooksSubdir);
+    assert.ok(fs.existsSync(hooksDir), `.claude/${hooksSubdir} must exist`);
   });
 
   test('returns object with count property', async () => {
@@ -351,7 +354,8 @@ describe('configurePartyModeHook()', () => {
 
   test('creates .claude/hooks directory in homeDirOverride', async () => {
     await configurePartyModeHook(tmp, silentSpinner, tmp);
-    const hooksDir = path.join(tmp, '.claude', 'hooks');
+    const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
+    const hooksDir = path.join(tmp, '.claude', hooksSubdir);
     assert.ok(fs.existsSync(hooksDir));
   });
 });

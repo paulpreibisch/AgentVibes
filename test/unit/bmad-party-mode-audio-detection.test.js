@@ -328,8 +328,8 @@ describe('BMAD Party Mode Audio Characteristic Detection', () => {
 
   describe('Audio Generation Configuration', () => {
     it('background music is globally enabled for audio mixing', async () => {
-      // These config files are gitignored (runtime state) — skip in CI/test mode
-      if (process.env.AGENTVIBES_TEST_MODE) {
+      // These config files are gitignored (runtime state) — skip in CI
+      if (process.env.AGENTVIBES_TEST_MODE || process.env.CI) {
         return;
       }
       // Support both legacy flag file and newer text config formats
