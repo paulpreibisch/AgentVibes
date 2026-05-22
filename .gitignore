@@ -163,15 +163,18 @@ scripts/generate-*.sh
 scripts/regenerate-*.sh
 
 # Local project state files
+.agentvibes-muted
 .agentvibes-unmuted
+.claude/agentvibes-muted
+.claude/agentvibes-unmuted
 .claude/hooks/post-response.sh
 .claude/story-workflow.sh
 bin/ensure-soprano-running.sh
 docs/personality-preview-phrases.md
 .claude/skills/
-.claude/agentvibes-unmuted
 .claude/worktrees/
 .bundler-temp/
+debug-voices.mjs
 
 # Test infrastructure (not part of core package)
 test/installer/
