@@ -226,11 +226,19 @@ if [[ -z "$TEXT" ]]; then
 fi
 
 # Augment PATH for non-interactive shells (pipx installs to ~/.local/bin which
-# interactive shells get via .bashrc/.zshrc, but Bash tool calls skip profile)
+# interactive shells get via .bashrc/.zshrc, but Bash tool calls skip profile).
+# Mac: add both Apple Silicon (/opt/homebrew) and Intel (/usr/local) Homebrew locations.
 export PATH="$HOME/.local/bin:$HOME/.local/share/pipx/venvs/piper-tts/bin:$PATH"
+if [[ "$(uname -s 2>/dev/null)" == "Darwin" ]]; then
+  export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+fi
+
+# Resolve explicit piper binary path — avoids bare `piper` invocation failing when
+# PATH augmentation above hasn't propagated into nested subshells.
+PIPER_BIN=$(command -v piper 2>/dev/null || echo "")
 
 # Check if Piper is installed
-if ! command -v piper &> /dev/null; then
+if [[ -z "$PIPER_BIN" ]]; then
   echo "❌ Error: Piper TTS not installed"
   echo "Install with: pipx install piper-tts"
   echo "Or run: .claude/hooks/piper-installer.sh"
@@ -380,6 +388,10 @@ get_speech_rate() {
 
 SPEECH_RATE=$(get_speech_rate)
 
+# Ensure piper log directory exists so stderr redirect never silently fails
+_PIPER_LOG_DIR="${AGENTVIBES_LOG_DIR:-$HOME/.local/state/agentvibes/logs}"
+mkdir -p "$_PIPER_LOG_DIR" 2>/dev/null || true
+
 # @function synthesize_with_piper
 # @intent Generate speech using Piper TTS
 # @why Provides free, offline TTS alternative
@@ -391,10 +403,10 @@ SPEECH_RATE=$(get_speech_rate)
 if [[ -n "${SPEAKER_ID:-}" ]]; then
   # Multi-speaker voice: Pass speaker ID
   # SECURITY: Use printf instead of echo for pipe safety (#134)
-  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  printf '%s\n' "$TEXT" | "$PIPER_BIN" --model "$VOICE_PATH" --speaker "$SPEAKER_ID" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>>"$_PIPER_LOG_DIR/piper.log"
 else
   # Single-speaker voice
-  printf '%s\n' "$TEXT" | piper --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>/dev/null
+  printf '%s\n' "$TEXT" | "$PIPER_BIN" --model "$VOICE_PATH" --length-scale "$SPEECH_RATE" --sentence-silence 2.0 --output_file "$TEMP_FILE" 2>>"$_PIPER_LOG_DIR/piper.log"
 fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then

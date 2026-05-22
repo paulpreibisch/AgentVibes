@@ -71,9 +71,15 @@ export function formatVoicesList(voices, options = {}) {
   } = options;
 
   if (voices.length === 0) {
-    const content = chalk.yellow('No voices found') + '\n\n' +
-      chalk.gray('Download voices with:\n') +
-      chalk.cyan('  /agent-vibes:provider download <voice-name>');
+    const content =
+      chalk.yellow('No voices downloaded yet') + '\n\n' +
+      chalk.white('AgentVibes includes 900+ free voices.\n') +
+      chalk.white('Get started with a default voice:\n\n') +
+      chalk.cyan('  /agent-vibes:add\n\n') +
+      chalk.gray('Or browse the full voice library:\n') +
+      chalk.cyan('  /agent-vibes:list\n\n') +
+      chalk.dim('Piper installed but voices missing? Run:\n') +
+      chalk.dim('  /agent-vibes:provider download en_US-lessac-medium');
 
     return boxen(content, {
       padding: 1,

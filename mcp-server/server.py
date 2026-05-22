@@ -1167,15 +1167,24 @@ class AgentVibesServer:
         if (cwd / ".claude").is_dir() and cwd != self.agentvibes_root:
             env["CLAUDE_PROJECT_DIR"] = str(cwd)
 
-        # Add common locations for piper to PATH (Unix only)
+        # Augment PATH with platform-specific binary locations (Unix only).
+        # MCP servers launched by Claude Desktop inherit a sanitized launchd/dbus PATH
+        # that omits Homebrew (Mac) and pipx (all POSIX) locations.
         if not self.is_windows:
             home_dir = Path.home()
-            local_bin = str(home_dir / ".local" / "bin")
-            if "PATH" in env:
-                if local_bin not in env["PATH"]:
-                    env["PATH"] = f"{local_bin}:{env['PATH']}"
-            else:
-                env["PATH"] = local_bin
+            extra_paths = [
+                str(home_dir / ".local" / "bin"),
+                str(home_dir / ".local" / "share" / "pipx" / "venvs" / "piper-tts" / "bin"),
+            ]
+            # Mac: add Homebrew prefix for both Apple Silicon (/opt/homebrew) and Intel (/usr/local)
+            if platform.system() == "Darwin":
+                extra_paths = ["/opt/homebrew/bin", "/usr/local/bin"] + extra_paths
+
+            current_path = env.get("PATH", "")
+            path_parts = current_path.split(os.pathsep) if current_path else []
+            new_dirs = [p for p in extra_paths if p not in path_parts]
+            if new_dirs:
+                env["PATH"] = os.pathsep.join(new_dirs) + os.pathsep + current_path
 
         return env
 

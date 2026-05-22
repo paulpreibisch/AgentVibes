@@ -468,7 +468,7 @@ export async function installMCP() {
 
   // Step 7: Update Claude Desktop config
   console.log(chalk.bold('📝 Step 7: Updating Claude Desktop configuration...\n'));
-  const configPath = updateClaudeConfig(agentVibesDir, provider, apiKey);
+  const configPath = updateClaudeConfig(agentVibesDir, provider);
   console.log(chalk.green(`✓ Updated: ${configPath}\n`));
 
   // Success!

@@ -91,6 +91,33 @@ describe('resolveStartTab', () => {
     assert.ok('startTab' in result,
       'empty string arg is falsy → treats as bare invocation');
   });
+
+  test('"install --non-interactive" → cliInstall: true with args', () => {
+    const result = resolveStartTab(['install', '--non-interactive'], notInstalledStub);
+    assert.deepStrictEqual(result, { cliInstall: true, args: ['--non-interactive'] });
+  });
+
+  test('"install --yes" → cliInstall: true', () => {
+    const result = resolveStartTab(['install', '--yes'], notInstalledStub);
+    assert.deepStrictEqual(result, { cliInstall: true, args: ['--yes'] });
+  });
+
+  test('"install -y" → cliInstall: true', () => {
+    const result = resolveStartTab(['install', '-y'], notInstalledStub);
+    assert.deepStrictEqual(result, { cliInstall: true, args: ['-y'] });
+  });
+
+  test('"--help" → help text object', () => {
+    const result = resolveStartTab(['--help'], notInstalledStub);
+    assert.ok('help' in result, '--help must return { help }');
+    assert.ok(typeof result.help === 'string', 'help must be a string');
+    assert.ok(result.help.includes('AgentVibes'), 'help text mentions AgentVibes');
+  });
+
+  test('"-h" → help text object', () => {
+    const result = resolveStartTab(['-h'], notInstalledStub);
+    assert.ok('help' in result, '-h must return { help }');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -6721,4 +6721,9 @@ export {
   // Manifest utilities (used by tests and external tooling)
   getProjectManifestPath, getGlobalManifestPath,
   loadManifest, saveManifest, computeFileHash, manifestSafeCopy, removeManifestFiles,
+  // Pure helper functions exported for testing
+  isPiperProvider, supportsEmoji, getPersonalityIcon,
+  detectEnvironment, createPageHeaderFooter, buildNavigationChoices, handleNavigationAction, getPageTitle,
+  getUserShell, showWelcome, getReleaseInfoBoxen, generateActivationInstructions,
+  collectConfiguration,
 };
