@@ -20,7 +20,8 @@ import { checkDependencies, displayMissingDependencies } from '../utils/dependen
 
 function commandExists(cmd) {
   try {
-    execFileSync('which', [cmd], { stdio: 'pipe' });
+    const finder = process.platform === 'win32' ? 'where' : 'which';
+    execFileSync(finder, [cmd], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -62,6 +63,12 @@ async function ensurePipx(platform) {
     console.log(chalk.cyan('📦 Installing pipx via apt-get...\n'));
     try {
       execFileSync('sudo', ['apt-get', 'install', '-y', 'pipx'], { stdio: 'inherit', env: process.env });
+      // Augment PATH with ~/.local/bin so pipx and piper are findable in this process
+      const localBin = path.join(os.homedir(), '.local', 'bin');
+      const existingParts = new Set((process.env.PATH || '').split(path.delimiter));
+      if (!existingParts.has(localBin)) {
+        process.env.PATH = localBin + path.delimiter + process.env.PATH;
+      }
       try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ }
       return true;
     } catch {
@@ -346,7 +353,14 @@ async function checkSystemDependencies() {
 
     if (doInstall) {
       await autoInstallOptionalDeps(depResults.missing, platform);
-      console.log(chalk.green('✓ Optional dependencies installed\n'));
+      const recheckResults = checkDependencies();
+      const stillMissing = Object.values(recheckResults.missing).some(Boolean);
+      if (stillMissing) {
+        console.log(chalk.yellow('⚠️  Some dependencies could not be installed automatically.\n'));
+        displayMissingDependencies(recheckResults);
+      } else {
+        console.log(chalk.green('✓ All optional dependencies installed\n'));
+      }
       return;
     }
   } else if (platform === 'darwin' && !brewExists()) {
@@ -517,14 +531,23 @@ async function setupPythonDependencies(isWindows) {
 async function downloadPiperVoices(agentVibesDir) {
   console.log(chalk.bold('\n🎙️  Step 4b: Download Voice Models\n'));
 
-  // Skip if voices are already present
+  // Skip if voices are already present — respect PIPER_VOICES_DIR override so we
+  // check the same directory the runtime will use.
   const homeDir = os.homedir();
-  const defaultVoiceDir = path.join(homeDir, '.claude', 'piper-voices');
+  const voiceDir = process.env.PIPER_VOICES_DIR || path.join(homeDir, '.claude', 'piper-voices');
   try {
-    if (fs.existsSync(defaultVoiceDir)) {
-      const voiceFiles = fs.readdirSync(defaultVoiceDir).filter(f => f.endsWith('.onnx'));
-      if (voiceFiles.length > 0) {
-        console.log(chalk.green(`✓ ${voiceFiles.length} voice model(s) already installed — skipping download\n`));
+    if (fs.existsSync(voiceDir)) {
+      const onnxFiles = fs.readdirSync(voiceDir).filter(f => f.endsWith('.onnx'));
+      // Only count voices where both .onnx and .onnx.json exist and are non-empty
+      const completeVoices = onnxFiles.filter(f => {
+        try {
+          const onnxStat = fs.statSync(path.join(voiceDir, f));
+          const jsonStat = fs.statSync(path.join(voiceDir, f + '.json'));
+          return onnxStat.size > 0 && jsonStat.size > 0;
+        } catch { return false; }
+      });
+      if (completeVoices.length > 0) {
+        console.log(chalk.green(`✓ ${completeVoices.length} voice model(s) already installed — skipping download\n`));
         return;
       }
     }
@@ -572,7 +595,8 @@ async function downloadPiperVoices(agentVibesDir) {
   if (voiceChoice === 'starter') {
     console.log(chalk.cyan('\n📥 Downloading en_US-lessac-medium (~13 MB)...\n'));
     try {
-      execFileSync('bash', ['-c', `source "${voiceManagerScript}" && download_voice en_US-lessac-medium`], {
+      // Use positional params ($1/$2) so the script path is never string-interpolated
+      execFileSync('bash', ['-c', 'source "$1" && download_voice "$2"', '--', voiceManagerScript, 'en_US-lessac-medium'], {
         stdio: 'inherit',
         env: process.env
       });
@@ -584,7 +608,7 @@ async function downloadPiperVoices(agentVibesDir) {
     console.log(chalk.cyan('\n📥 Downloading LibriTTS 900-speaker pack (~57 MB)...\n'));
     console.log(chalk.gray('   This gives you 900 individually named speakers to choose from.\n'));
     try {
-      execFileSync('bash', ['-c', `source "${voiceManagerScript}" && download_voice en_US-libritts-high`], {
+      execFileSync('bash', ['-c', 'source "$1" && download_voice "$2"', '--', voiceManagerScript, 'en_US-libritts-high'], {
         stdio: 'inherit',
         env: process.env
       });

@@ -73,10 +73,8 @@ TEXT=$(printf '%s' "$TEXT" | perl -CSD -pe '
   s/^\s*[-]\s*//g;                # list dashes
 ')
 
-# Source voice manager and language manager
-# Use readlink -f to handle symlinks correctly
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+# cd-based resolution works on macOS (BSD readlink lacks -f) and Linux alike
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/piper-voice-manager.sh"
 source "$SCRIPT_DIR/language-manager.sh"
 source "$SCRIPT_DIR/audio-cache-utils.sh"

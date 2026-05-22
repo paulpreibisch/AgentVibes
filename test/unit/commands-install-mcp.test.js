@@ -99,6 +99,8 @@ await mock.module('fs', {
     mkdirSync:     () => {},
     renameSync:    () => {},
     unlinkSync:    () => {},
+    readdirSync:   () => [],
+    statSync:      () => ({ size: 1024, isFile: () => true }),
   },
   namedExports: {
     existsSync:    (p) => _existsSyncFn(p),
@@ -107,6 +109,8 @@ await mock.module('fs', {
     mkdirSync:     () => {},
     renameSync:    () => {},
     unlinkSync:    () => {},
+    readdirSync:   () => [],
+    statSync:      () => ({ size: 1024, isFile: () => true }),
   },
 });
 
@@ -262,6 +266,20 @@ describe('commands-install-mcp', () => {
     _promptQueue.push({ doInstall: true }, { provider: 'piper' });
     try { await installMCP(); } catch { /* expected */ }
     assert.ok(true);
+  });
+
+  test('process.exit called when user cancels after declining missing deps', async () => {
+    resetState();
+    _hasMissingDeps = true;
+    let capturedCode = undefined;
+    const origExit = process.exit;
+    process.exit = (code) => { capturedCode = code; throw new Error(`process.exit(${code ?? ''})`); };
+    try {
+      _promptQueue.push({ doInstall: false }, { continueAnyway: false });
+      await installMCP();
+    } catch { /* expected — process.exit throws */ }
+    process.exit = origExit;
+    assert.strictEqual(capturedCode, 0, 'expected process.exit(0) on user cancel');
   });
 
   test('top-level execution passed without fatal errors', () => {

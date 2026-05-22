@@ -41,7 +41,7 @@ export function detectPlatform() {
   const p = process.platform;
   const arch = process.arch;
 
-  if (p === 'linux' && isWSL()) return 'linux-x64';
+  if (p === 'linux' && isWSL()) return arch === 'arm64' ? 'linux-arm64' : 'linux-x64';
   if (p === 'darwin') return arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
   if (p === 'linux') return arch === 'arm64' ? 'linux-arm64' : 'linux-x64';
   if (p === 'win32') return 'win32-x64';
@@ -125,7 +125,23 @@ const FFMPEG_HINTS = {
   },
 };
 
-const BINARY_HINTS = { piper: PIPER_HINTS, ffmpeg: FFMPEG_HINTS };
+// Derive ffprobe hints by substituting the binary name in every ffmpeg path.
+// ffprobe is always co-located with ffmpeg so sharing the directory list is correct.
+function deriveBinaryHints(templateHints, binaryName) {
+  const result = {};
+  for (const [plat, fn] of Object.entries(templateHints)) {
+    result[plat] = () => fn().map(p => {
+      const dir = path.dirname(p);
+      const ext = path.extname(p);
+      return path.join(dir, binaryName + ext);
+    });
+  }
+  return result;
+}
+
+const FFPROBE_HINTS = deriveBinaryHints(FFMPEG_HINTS, 'ffprobe');
+
+const BINARY_HINTS = { piper: PIPER_HINTS, ffmpeg: FFMPEG_HINTS, ffprobe: FFPROBE_HINTS };
 
 /** Canonical env var names — only override surface permitted by the contract */
 export const ENV_VARS = {
@@ -320,11 +336,12 @@ export function resolveConfigDir() {
   return path.join(os.homedir(), '.config', 'agentvibes');
 }
 
-// ─── PATH Augmentation Helper (for server.py parity) ─────────────────────────
+// ─── PATH Augmentation Helper ─────────────────────────────────────────────────
 
 /**
  * Return extra PATH directories for the current platform.
- * Used by the Python MCP server to augment subprocess PATH.
+ * MCP servers launched by Claude Desktop inherit a sanitized PATH that omits
+ * Homebrew (Mac) and pipx (POSIX) locations — this list covers those gaps.
  * Never includes directories already on PATH.
  * @returns {string[]} List of absolute directory paths
  */

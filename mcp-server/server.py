@@ -71,6 +71,7 @@ class AgentVibesServer:
         """Initialize the AgentVibes MCP server"""
         # Detect native Windows (not WSL)
         self.is_windows = platform.system() == "Windows" and not os.environ.get("WSL_DISTRO_NAME")
+        self.is_darwin = platform.system() == "Darwin"
 
         # Script name constants — Windows uses .ps1, Unix uses .sh
         if self.is_windows:
@@ -1177,7 +1178,7 @@ class AgentVibesServer:
                 str(home_dir / ".local" / "share" / "pipx" / "venvs" / "piper-tts" / "bin"),
             ]
             # Mac: add Homebrew prefix for both Apple Silicon (/opt/homebrew) and Intel (/usr/local)
-            if platform.system() == "Darwin":
+            if self.is_darwin:
                 extra_paths = ["/opt/homebrew/bin", "/usr/local/bin"] + extra_paths
 
             current_path = env.get("PATH", "")
