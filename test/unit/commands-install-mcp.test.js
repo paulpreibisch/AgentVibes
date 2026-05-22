@@ -8,14 +8,23 @@
  *  - Happy path: piper provider, all deps present, agentVibesDir found
  *  - macOS provider branch
  *  - locateAgentVibesDir prompt path (no dir found)
- *  - checkSystemDependencies optional-missing-deps prompt path
+ *  - checkSystemDependencies: auto-install path (doInstall=true) and skip path (doInstall=false, continueAnyway=true)
  *  - installMCPPackage path (mcp not installed)
+ *  - installPiper: pipx missing → ensurePipx called
  */
 
 import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
+
+// ---------------------------------------------------------------------------
+// Prevent process.exit from killing the test runner.
+// Any call throws instead so try/catch blocks swallow it cleanly.
+// ---------------------------------------------------------------------------
+const _originalExit = process.exit;
+let _exitCode = null;
+process.exit = (code) => { _exitCode = code; throw new Error(`process.exit(${code ?? ''})`); };
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -127,6 +136,7 @@ function resetState() {
   _execFileThrows = false;
   _mcpInstalled   = true;
   _pipxFails      = false;
+  _exitCode       = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,11 +173,19 @@ function resetState() {
   try { await installMCP(); } catch {}
 }
 
-// Pass 4: optional deps missing → shows prompt for continueAnyway
+// Pass 4: optional deps missing → user declines auto-install → continues anyway
 {
   resetState();
   _hasMissingDeps = true;
-  _promptQueue.push({ continueAnyway: true }, { provider: 'piper' });
+  _promptQueue.push({ doInstall: false }, { continueAnyway: true }, { provider: 'piper' });
+  try { await installMCP(); } catch {}
+}
+
+// Pass 4b: optional deps missing → user accepts auto-install → installer proceeds
+{
+  resetState();
+  _hasMissingDeps = true;
+  _promptQueue.push({ doInstall: true }, { provider: 'piper' });
   try { await installMCP(); } catch {}
 }
 
@@ -199,6 +217,9 @@ function resetState() {
   try { await installMCP(); } catch {}
 }
 
+// Restore process.exit before describe/test callbacks and before the runner exits.
+process.exit = _originalExit;
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
@@ -227,10 +248,18 @@ describe('commands-install-mcp', () => {
     assert.ok(true);
   });
 
-  test('installMCP handles missing-deps prompt path', async () => {
+  test('installer skips auto-install and continues when user declines missing deps', async () => {
     resetState();
     _hasMissingDeps = true;
-    _promptQueue.push({ continueAnyway: true }, { provider: 'piper' });
+    _promptQueue.push({ doInstall: false }, { continueAnyway: true }, { provider: 'piper' });
+    try { await installMCP(); } catch { /* expected */ }
+    assert.ok(true);
+  });
+
+  test('installer auto-installs optional deps when user agrees', async () => {
+    resetState();
+    _hasMissingDeps = true;
+    _promptQueue.push({ doInstall: true }, { provider: 'piper' });
     try { await installMCP(); } catch { /* expected */ }
     assert.ok(true);
   });

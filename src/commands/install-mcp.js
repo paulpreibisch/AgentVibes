@@ -16,6 +16,92 @@ import ora from 'ora';
 import boxen from 'boxen';
 import { checkDependencies, displayMissingDependencies } from '../utils/dependency-checker.js';
 
+// ─── Platform helpers ──────────────────────────────────────────────────────────
+
+function commandExists(cmd) {
+  try {
+    execFileSync('which', [cmd], { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function brewExists() {
+  return commandExists('brew');
+}
+
+// Add Homebrew bin dirs to the current process's PATH so newly installed
+// binaries are discoverable without restarting the shell.
+function augmentPathForBrew() {
+  const brewPaths = ['/opt/homebrew/bin', '/usr/local/bin'];
+  const existing = new Set((process.env.PATH || '').split(path.delimiter));
+  const toAdd = brewPaths.filter(p => !existing.has(p));
+  if (toAdd.length > 0) {
+    process.env.PATH = [...toAdd, process.env.PATH].join(path.delimiter);
+  }
+}
+
+// Install pipx via the platform package manager and augment PATH afterward.
+async function ensurePipx(platform) {
+  if (platform === 'darwin') {
+    if (!brewExists()) {
+      console.log(chalk.yellow('Homebrew not found. Install it from https://brew.sh, then re-run.\n'));
+      return false;
+    }
+    console.log(chalk.cyan('📦 Installing pipx via Homebrew...\n'));
+    try {
+      execFileSync('brew', ['install', 'pipx'], { stdio: 'inherit', env: process.env });
+      augmentPathForBrew();
+      try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ }
+      return true;
+    } catch {
+      return false;
+    }
+  } else if (platform === 'linux') {
+    console.log(chalk.cyan('📦 Installing pipx via apt-get...\n'));
+    try {
+      execFileSync('sudo', ['apt-get', 'install', '-y', 'pipx'], { stdio: 'inherit', env: process.env });
+      try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+// Auto-install missing optional deps (ffmpeg, sox, pipx, etc.) via brew / apt.
+async function autoInstallOptionalDeps(missing, platform) {
+  const installable = ['ffmpeg', 'sox', 'pipx', 'flock', 'curl', 'bc'];
+  const toInstall = installable.filter(dep => missing[dep]);
+  if (toInstall.length === 0) return;
+
+  if (platform === 'darwin') {
+    const brewMap = { ffmpeg: 'ffmpeg', sox: 'sox', pipx: 'pipx', flock: 'util-linux', curl: 'curl', bc: 'bc' };
+    const packages = toInstall.map(d => brewMap[d]).filter(Boolean);
+    if (packages.length === 0) return;
+    console.log(chalk.cyan(`\n📦 Homebrew: brew install ${packages.join(' ')}\n`));
+    try {
+      execFileSync('brew', ['install', ...packages], { stdio: 'inherit', env: process.env });
+      augmentPathForBrew();
+    } catch {
+      console.log(chalk.yellow('⚠️  Some Homebrew packages may have failed — continuing\n'));
+    }
+  } else if (platform === 'linux') {
+    const aptMap = { ffmpeg: ['ffmpeg'], sox: ['sox', 'libsox-fmt-mp3'], pipx: ['pipx'], flock: ['util-linux'], curl: ['curl'], bc: ['bc'] };
+    const packages = toInstall.flatMap(d => aptMap[d] || []);
+    if (packages.length === 0) return;
+    console.log(chalk.cyan(`\n📦 apt-get: sudo apt-get install -y ${packages.join(' ')}\n`));
+    try {
+      execFileSync('sudo', ['apt-get', 'update', '-qq'], { stdio: 'pipe', env: process.env });
+      execFileSync('sudo', ['apt-get', 'install', '-y', ...packages], { stdio: 'inherit', env: process.env });
+    } catch {
+      console.log(chalk.yellow('⚠️  Some apt packages may have failed — continuing\n'));
+    }
+  }
+}
+
 /**
  * Check if WSL is installed on Windows
  */
@@ -163,26 +249,37 @@ function updateClaudeConfig(agentVibesPath, provider, apiKey = null) {
  * Install Piper TTS
  */
 async function installPiper(useWSL = false) {
-  const spinner = ora('Installing Piper TTS...').start();
+  const platform = os.platform();
 
+  // Ensure pipx is present before attempting piper-tts install
+  if (!useWSL && !commandExists('pipx')) {
+    console.log(chalk.yellow('\n⚠️  pipx not found — installing it first...\n'));
+    const ok = await ensurePipx(platform);
+    if (!ok) {
+      console.log(chalk.red('❌ Could not install pipx automatically.'));
+      if (platform === 'darwin') {
+        console.log(chalk.cyan('   brew install pipx'));
+      } else {
+        console.log(chalk.cyan('   sudo apt install pipx'));
+      }
+      console.log(chalk.gray('   Then re-run this installer.\n'));
+      return false;
+    }
+    console.log(chalk.green('✓ pipx ready\n'));
+  }
+
+  console.log(chalk.cyan('\n📦 Installing Piper TTS via pipx...\n'));
   try {
-    // Security: Use execFileSync with array args to prevent command injection
+    // Security: execFileSync with array args prevents command injection
     if (useWSL) {
       execFileSync('wsl', ['pipx', 'install', 'piper-tts'], { stdio: 'inherit' });
     } else {
-      execFileSync('pipx', ['install', 'piper-tts'], { stdio: 'inherit' });
+      execFileSync('pipx', ['install', 'piper-tts'], { stdio: 'inherit', env: process.env });
     }
-    spinner.succeed('Piper TTS installed successfully!');
+    console.log(chalk.green('\n✅ Piper TTS installed!\n'));
     return true;
   } catch (error) {
-    spinner.fail('Failed to install Piper TTS');
-    console.error(chalk.yellow('\n⚠️  You may need to install pipx first:'));
-    if (useWSL) {
-      console.log(chalk.cyan('   wsl sudo apt install pipx'));
-    } else {
-      console.log(chalk.cyan('   brew install pipx  (macOS)'));
-      console.log(chalk.cyan('   sudo apt install pipx  (Linux)'));
-    }
+    console.log(chalk.red(`\n❌ Failed to install Piper TTS: ${error.message}\n`));
     return false;
   }
 }
@@ -227,6 +324,7 @@ async function checkSystemDependencies() {
     return;
   }
 
+  const platform = os.platform();
   const hasCoreMissing = depResults.missing.node || depResults.missing.python || depResults.missing.bash;
 
   if (hasCoreMissing) {
@@ -234,7 +332,28 @@ async function checkSystemDependencies() {
     process.exit(1);
   }
 
-  // Only optional dependencies missing
+  // Optional deps missing — offer auto-install on Mac/Linux
+  const canAutoInstall = (platform === 'darwin' && brewExists()) || platform === 'linux';
+
+  if (canAutoInstall) {
+    const mgr = platform === 'darwin' ? 'Homebrew' : 'apt-get';
+    const { doInstall } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'doInstall',
+      message: `Install missing optional dependencies now using ${mgr}?`,
+      default: true
+    }]);
+
+    if (doInstall) {
+      await autoInstallOptionalDeps(depResults.missing, platform);
+      console.log(chalk.green('✓ Optional dependencies installed\n'));
+      return;
+    }
+  } else if (platform === 'darwin' && !brewExists()) {
+    console.log(chalk.yellow('ℹ️  Homebrew not found — install it from https://brew.sh to get ffmpeg and other tools automatically.\n'));
+  }
+
+  // Fall through: ask to continue without the missing deps
   const { continueAnyway } = await inquirer.prompt([{
     type: 'confirm',
     name: 'continueAnyway',
@@ -243,7 +362,7 @@ async function checkSystemDependencies() {
   }]);
 
   if (!continueAnyway) {
-    console.log(chalk.yellow('\nInstallation cancelled. Please install the dependencies and try again.\n'));
+    console.log(chalk.yellow('\nInstallation cancelled. Install the missing dependencies and try again.\n'));
     process.exit(0);
   }
 }
