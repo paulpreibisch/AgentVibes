@@ -24,7 +24,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install dependencies
         run: npm ci
@@ -48,7 +48,9 @@ jobs:
         run: npm run test:coverage
         continue-on-error: true
         env:
-          AGENTVIBES_TEST_MODE: true
+          ELEVENLABS_API_KEY: test_mock_key
+          # Note: AGENTVIBES_TEST_MODE is NOT set here — test:coverage uses
+          # mock.module for isolation and must not have the stub env var set.
 
       - name: Verify coverage file exists
         run: |

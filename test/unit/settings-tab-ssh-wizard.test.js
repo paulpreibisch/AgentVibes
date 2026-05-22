@@ -8,7 +8,18 @@
  * Strategy: improved blessed stub where select() actually updates w.selected,
  * and input() properly finds and calls the function argument. Targeted key
  * presses navigate to specific SETTINGS indices and fire their edit handlers.
+ *
+ * IMPORTANT: settings-tab.js checks AGENTVIBES_TEST_MODE at load time. When
+ * set to 'true', createSettingsTab() returns a stub that never creates blessed
+ * widgets. This file must run with AGENTVIBES_TEST_MODE unset so the real
+ * implementation runs (blessed is safely mocked below instead).
  */
+
+// Unset before any mock.module or import so settings-tab.js evaluates IS_TEST=false.
+// settings-tab-navigation.test.js sets this env var at module level which would
+// cache the stub version before this file runs in a full test-suite run.
+const _savedTestMode = process.env.AGENTVIBES_TEST_MODE;
+delete process.env.AGENTVIBES_TEST_MODE;
 
 import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -140,6 +151,13 @@ await mock.module('node:child_process', {
 // ---------------------------------------------------------------------------
 
 const { createSettingsTab } = await import('../../src/console/tabs/settings-tab.js');
+
+// Restore the env var so other modules in the full suite are not affected.
+if (_savedTestMode !== undefined) {
+  process.env.AGENTVIBES_TEST_MODE = _savedTestMode;
+} else {
+  delete process.env.AGENTVIBES_TEST_MODE;
+}
 
 // ---------------------------------------------------------------------------
 // Service factories

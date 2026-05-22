@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['18', '20', '22']
+        node-version: ['20', '22']
 
     # Use Git bash for all steps so globs expand and Unix commands work
     defaults:
@@ -82,16 +82,17 @@ jobs:
       - name: Run Node.js unit tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
-          AGENTVIBES_TEST_MODE: "true"
+          # Note: AGENTVIBES_TEST_MODE is NOT set here intentionally.
+          # Node.js unit tests use mock.module for isolation and must not have
+          # AGENTVIBES_TEST_MODE set, otherwise IS_TEST stubs bypass real code paths.
         # Run directly (not via npm) so Git bash expands the glob
-        run: node --test test/unit/*.test.js
+        run: node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js
 
       # Fix #12: Use npx c8 instead of ./node_modules/.bin/c8 (fragile on Windows)
       - name: Run Node.js coverage report
         env:
           ELEVENLABS_API_KEY: test_mock_key
-          AGENTVIBES_TEST_MODE: "true"
-        run: npx c8 --reporter=lcov --reporter=text node --test test/unit/*.test.js
+        run: npx c8 --reporter=lcov --reporter=text node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js
 
       # ─── BATS integration tests via Git bash ─────────────────────────────
 

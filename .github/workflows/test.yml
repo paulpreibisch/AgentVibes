@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node-version: ['18', '20']
+        node-version: ['20', '22']
 
     steps:
       - name: Checkout code
@@ -47,7 +47,10 @@ jobs:
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
-          AGENTVIBES_TEST_MODE: "true"
+          # Note: AGENTVIBES_TEST_MODE is NOT set here intentionally.
+          # The bats tests set it themselves (AGENTVIBES_TEST_MODE=true bats ...).
+          # Node.js unit tests use mock.module for isolation and must not have
+          # AGENTVIBES_TEST_MODE set, otherwise IS_TEST stubs bypass real code paths.
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             # Ensure BATS uses bash 5.x for associative array support
