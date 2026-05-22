@@ -390,6 +390,111 @@ async function setupPythonDependencies(isWindows) {
 }
 
 /**
+ * Interactive voice download step shown after Piper installs.
+ * Offers starter, libritts-900, full pack, or skip.
+ * @param {string} agentVibesDir - Path to the AgentVibes installation directory
+ * @returns {Promise<void>}
+ */
+async function downloadPiperVoices(agentVibesDir) {
+  console.log(chalk.bold('\n🎙️  Step 4b: Download Voice Models\n'));
+
+  // Skip if voices are already present
+  const homeDir = os.homedir();
+  const defaultVoiceDir = path.join(homeDir, '.claude', 'piper-voices');
+  try {
+    if (fs.existsSync(defaultVoiceDir)) {
+      const voiceFiles = fs.readdirSync(defaultVoiceDir).filter(f => f.endsWith('.onnx'));
+      if (voiceFiles.length > 0) {
+        console.log(chalk.green(`✓ ${voiceFiles.length} voice model(s) already installed — skipping download\n`));
+        return;
+      }
+    }
+  } catch { /* ignore, fall through to download prompt */ }
+
+  console.log(chalk.gray('Piper needs at least one voice model to speak.\n'));
+
+  const { voiceChoice } = await inquirer.prompt([{
+    type: 'list',
+    name: 'voiceChoice',
+    message: 'Which voices would you like to download?',
+    choices: [
+      {
+        name: chalk.cyan('Starter voice') + chalk.gray(' — en_US-lessac-medium (~13 MB, download in seconds)'),
+        value: 'starter',
+        short: 'Starter'
+      },
+      {
+        name: chalk.cyan('LibriTTS 900-speaker pack') + chalk.gray(' — en_US-libritts-high (~57 MB, 900 unique named speakers)'),
+        value: 'libritts',
+        short: 'LibriTTS 900'
+      },
+      {
+        name: chalk.cyan('Full pack') + chalk.gray(' — 11 voices including LibriTTS (~250 MB, all BMAD agent voices)'),
+        value: 'full',
+        short: 'Full pack'
+      },
+      {
+        name: chalk.gray('Skip — download voices later with /agent-vibes:add'),
+        value: 'skip',
+        short: 'Skip'
+      }
+    ]
+  }]);
+
+  if (voiceChoice === 'skip') {
+    console.log(chalk.yellow('\n⚠️  No voices downloaded.'));
+    console.log(chalk.gray('   Download voices anytime with: ') + chalk.cyan('/agent-vibes:add\n'));
+    return;
+  }
+
+  const voiceManagerScript = path.join(agentVibesDir, '.claude', 'hooks', 'piper-voice-manager.sh');
+  const fullPackScript = path.join(agentVibesDir, '.claude', 'hooks', 'piper-download-voices.sh');
+
+  if (voiceChoice === 'starter') {
+    console.log(chalk.cyan('\n📥 Downloading en_US-lessac-medium (~13 MB)...\n'));
+    try {
+      execFileSync('bash', ['-c', `source "${voiceManagerScript}" && download_voice en_US-lessac-medium`], {
+        stdio: 'inherit',
+        env: process.env
+      });
+      console.log(chalk.green('\n✅ Starter voice ready!\n'));
+    } catch {
+      console.log(chalk.yellow('\n⚠️  Download failed — try later with: /agent-vibes:add\n'));
+    }
+  } else if (voiceChoice === 'libritts') {
+    console.log(chalk.cyan('\n📥 Downloading LibriTTS 900-speaker pack (~57 MB)...\n'));
+    console.log(chalk.gray('   This gives you 900 individually named speakers to choose from.\n'));
+    try {
+      execFileSync('bash', ['-c', `source "${voiceManagerScript}" && download_voice en_US-libritts-high`], {
+        stdio: 'inherit',
+        env: process.env
+      });
+      console.log(chalk.green('\n✅ LibriTTS 900-speaker pack ready!'));
+      console.log(chalk.gray('   Browse speakers with: ') + chalk.cyan('/agent-vibes:list\n'));
+    } catch {
+      console.log(chalk.yellow('\n⚠️  Download failed — try later with: /agent-vibes:add\n'));
+    }
+  } else if (voiceChoice === 'full') {
+    console.log(chalk.cyan('\n📥 Downloading full voice pack (~250 MB)...\n'));
+    console.log(chalk.gray('   This includes all BMAD agent voices plus LibriTTS 900 speakers.\n'));
+    try {
+      if (fs.existsSync(fullPackScript)) {
+        execFileSync('bash', [fullPackScript, '--yes'], {
+          stdio: 'inherit',
+          env: process.env
+        });
+        console.log(chalk.green('\n✅ Full voice pack downloaded!\n'));
+      } else {
+        console.log(chalk.yellow('   Download script not found at: ' + fullPackScript));
+        console.log(chalk.yellow('   Try: /agent-vibes:add\n'));
+      }
+    } catch {
+      console.log(chalk.yellow('\n⚠️  Download failed — try later with: /agent-vibes:add\n'));
+    }
+  }
+}
+
+/**
  * Display welcome banner
  * @param {string} platform - Platform name
  */
@@ -433,7 +538,8 @@ function showSuccessMessage(configPath, provider) {
   console.log(chalk.gray(`  ${configPath}\n`));
 
   if (provider === 'piper') {
-    console.log(chalk.gray('Voice models will download automatically on first use.\n'));
+    console.log(chalk.gray('Browse voices: ') + chalk.cyan('/agent-vibes:list') + '\n');
+    console.log(chalk.gray('Add more voices: ') + chalk.cyan('/agent-vibes:add') + '\n');
   }
 }
 
@@ -456,6 +562,11 @@ export async function installMCP() {
 
   // Step 4: Choose TTS provider
   const provider = await setupTTSProvider(isWindows);
+
+  // Step 4b: Download voices if Piper was selected
+  if (provider === 'piper') {
+    await downloadPiperVoices(agentVibesDir);
+  }
 
   // Step 5: Install Python dependencies
   await setupPythonDependencies(isWindows);
