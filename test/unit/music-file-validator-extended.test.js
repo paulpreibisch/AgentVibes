@@ -242,6 +242,7 @@ describe('createSecureTempDir()', () => {
   });
 
   test('new directory is created with restrictive 0o700 mode', () => {
+    if (process.platform === 'win32') return; // Windows does not enforce Unix file permission modes
     const newDir = path.join(tmpDir, 'mode-check');
     createSecureTempDir(newDir);
 
@@ -252,6 +253,7 @@ describe('createSecureTempDir()', () => {
   });
 
   test('succeeds when the directory already exists with secure permissions (0o700)', () => {
+    if (process.platform === 'win32') return; // Windows does not enforce Unix file permission modes
     const existingDir = path.join(tmpDir, 'already-secure');
     fs.mkdirSync(existingDir, { mode: 0o700 });
 
@@ -374,6 +376,7 @@ describe('isPathSafe() — file existence and type checks', () => {
   });
 
   test('returns isValid:true and resolvedPath for a valid regular file inside homeDir', () => {
+    if (process.platform === 'win32') return; // File ownership verification not available on Windows
     // Create a file owned by the current user inside tmpDir
     const validFile = path.join(tmpDir, 'valid-audio.mp3');
     fs.writeFileSync(validFile, Buffer.alloc(100, 0xff), { mode: 0o600 });

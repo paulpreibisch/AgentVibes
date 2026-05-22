@@ -193,6 +193,7 @@ describe('LanguageService — setLang() round-trip', () => {
   });
 
   test('setLang("ja") writes language file with mode 0o600', () => {
+    if (process.platform === 'win32') return; // Windows does not enforce Unix file permission modes
     resetLangFile();
     const svc = new LanguageService();
     svc.setLang('ja');

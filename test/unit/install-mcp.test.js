@@ -145,7 +145,7 @@ describe('getClaudeConfigPath logic — darwin', () => {
 
   test('darwin path starts under the home directory', () => {
     const p = getClaudeConfigPathForPlatform('darwin', home);
-    assert.ok(p.startsWith(home), `Expected path to start with ${home}, got: ${p}`);
+    assert.ok(path.normalize(p).startsWith(path.normalize(home)), `Expected path to start with ${home}, got: ${p}`);
   });
 
   test('darwin path contains Claude directory', () => {
@@ -189,7 +189,7 @@ describe('getClaudeConfigPath logic — linux (default)', () => {
 
   test('linux path starts under the home directory', () => {
     const p = getClaudeConfigPathForPlatform('linux', home);
-    assert.ok(p.startsWith(home), `Expected path to start with ${home}, got: ${p}`);
+    assert.ok(path.normalize(p).startsWith(path.normalize(home)), `Expected path to start with ${home}, got: ${p}`);
   });
 
   test('freebsd falls through to linux default path', () => {
