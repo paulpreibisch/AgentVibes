@@ -6,8 +6,11 @@
  * Mocks blessed FIRST so the tab files load (they conditionally import blessed).
  */
 
-import { test, describe, mock } from 'node:test';
+import { test, describe, mock, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Blessed stub — tabs import blessed conditionally; mock it so the modules load
@@ -570,6 +573,22 @@ describe('applyEnabledToFile()', () => {
 });
 
 describe('applyTrackToAudioEffects()', () => {
+  let _savedCwd;
+  let _tempDir;
+
+  before(() => {
+    _savedCwd = process.cwd();
+    _tempDir = mkdtempSync(join(tmpdir(), 'av-music-test-'));
+    mkdirSync(join(_tempDir, '.claude', 'config'), { recursive: true });
+    writeFileSync(join(_tempDir, '.claude', 'config', 'audio-effects.cfg'), 'default|||0.30\n', 'utf-8');
+    process.chdir(_tempDir);
+  });
+
+  after(() => {
+    process.chdir(_savedCwd);
+    try { rmSync(_tempDir, { recursive: true, force: true }); } catch {}
+  });
+
   test('does not throw for valid track name', () => {
     assert.doesNotThrow(() => applyTrackToAudioEffects('agent_vibes_jazz.mp3'));
   });
