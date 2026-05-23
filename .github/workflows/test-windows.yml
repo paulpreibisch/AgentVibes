@@ -86,13 +86,14 @@ jobs:
           # Node.js unit tests use mock.module for isolation and must not have
           # AGENTVIBES_TEST_MODE set, otherwise IS_TEST stubs bypass real code paths.
         # Run directly (not via npm) so Git bash expands the glob
-        run: node --experimental-test-module-mocks --test test/unit/*.test.js
+        # --test-force-exit prevents readline.emitKeypressEvents workers from hanging
+        run: node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js
 
       # Fix #12: Use npx c8 instead of ./node_modules/.bin/c8 (fragile on Windows)
       - name: Run Node.js coverage report
         env:
           ELEVENLABS_API_KEY: test_mock_key
-        run: npx c8 --reporter=lcov --reporter=text node --experimental-test-module-mocks --test test/unit/*.test.js
+        run: npx c8 --reporter=lcov --reporter=text node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js
 
       # ─── BATS integration tests via Git bash ─────────────────────────────
 
