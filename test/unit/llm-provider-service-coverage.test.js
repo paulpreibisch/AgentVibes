@@ -27,7 +27,15 @@ import path from 'node:path';
 import os from 'node:os';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-import {
+// Redirect HOME to a fresh temp dir BEFORE loading the service so that the
+// module-level _TRANSPORT_CFG_PATH constant never points at the real user
+// config file.  This prevents a parallel-worker race with
+// llm-provider-service-extended.test.js which also writes to that path.
+const _tcIsolateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'av-cov-home-'));
+process.on('exit', () => { try { fs.rmSync(_tcIsolateHome, { recursive: true, force: true }); } catch {} });
+const _origHomeForTc = process.env.HOME;
+process.env.HOME = _tcIsolateHome;
+const {
   buildCodexToml,
   resolveCfgPath,
   loadLlmConfigSync,
@@ -53,7 +61,8 @@ import {
   removeHermes,
   TRANSPORT_PROVIDERS,
   PROVIDERS,
-} from '../../src/services/llm-provider-service.js';
+} = await import('../../src/services/llm-provider-service.js');
+process.env.HOME = _origHomeForTc;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -553,20 +562,8 @@ describe('installCodexInstructions() + removeCodexInstructions()', () => {
 // ===========================================================================
 
 describe('getTransportConfig() — defaults', () => {
-  // Save and clear the real transport config before these tests so parallel
-  // test files that write ssh-remote:mode=remote don't pollute the defaults checks.
-  const _tcPath = path.join(process.env.HOME || process.env.USERPROFILE || '', '.agentvibes', 'transport-config.json');
-  let _tcSaved = null;
-  before(() => {
-    try { _tcSaved = fs.readFileSync(_tcPath, 'utf8'); } catch {}
-    try { fs.rmSync(_tcPath); } catch {}
-  });
-  after(() => {
-    if (_tcSaved !== null) {
-      fs.mkdirSync(path.dirname(_tcPath), { recursive: true });
-      fs.writeFileSync(_tcPath, _tcSaved);
-    }
-  });
+  // _TRANSPORT_CFG_PATH in this worker points to _tcIsolateHome (temp dir),
+  // so no real user config file is ever read or written here — no before/after needed.
 
   test('returns an object with mode, connType, sshKey, host, port', async () => {
     const cfg = await getTransportConfig('ssh-remote');
