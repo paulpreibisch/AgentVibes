@@ -9,6 +9,7 @@
 
 import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -200,6 +201,11 @@ function fireAllHandlers(widgets) {
   }
 }
 
+// Temp dir used for "already installed" passes so installer handlers write
+// to an isolated location rather than the real working directory.
+const _installedTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-setup-tab-test-'));
+process.on('exit', () => { try { fs.rmSync(_installedTmpDir, { recursive: true, force: true }); } catch {} });
+
 // ---------------------------------------------------------------------------
 // TOP-LEVEL execution with hidden=false
 // ---------------------------------------------------------------------------
@@ -253,7 +259,7 @@ function fireAllHandlers(widgets) {
   _allWidgets.length = 0;
   _allWidgets.push(_screen);
   const origInitCwd = process.env.INIT_CWD;
-  process.env.INIT_CWD = path.resolve('.');
+  process.env.INIT_CWD = _installedTmpDir;
 
   const tab = createSetupTab(_screen, {
     configService:     makeConfigService({ setupCompleted: true }),
@@ -356,7 +362,7 @@ function fireAllHandlers(widgets) {
   _allWidgets.length = 0;
   _allWidgets.push(_screen);
   const origInitCwd = process.env.INIT_CWD;
-  process.env.INIT_CWD = path.resolve('.');
+  process.env.INIT_CWD = _installedTmpDir;
 
   const tab = createSetupTab(_screen, {
     configService:     makeConfigService({ setupCompleted: true, provider: 'piper' }),
