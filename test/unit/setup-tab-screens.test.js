@@ -189,6 +189,11 @@ function fireAllHandlers(widgets) {
   }
 }
 
+// Isolated temp dir for "already installed" pass so file operations don't
+// write into the repo working tree.
+const _installedTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-setup-screens-test-'));
+process.on('exit', () => { try { fs.rmSync(_installedTmpDir, { recursive: true, force: true }); } catch {} });
+
 // ---------------------------------------------------------------------------
 // TOP-LEVEL execution — covers all wizard screens before test callbacks
 // ---------------------------------------------------------------------------
@@ -233,9 +238,9 @@ function fireAllHandlers(widgets) {
 // ===== Pass 2: Already-installed path (screen 3 — providers) =====
 {
   _allWidgets.length = 0;
-  // Use the actual project dir so alreadyInstalled=true → _screen=3
+  // Use isolated temp dir so alreadyInstalled=true → _screen=3 without touching real working tree
   const origInitCwd = process.env.INIT_CWD;
-  process.env.INIT_CWD = path.resolve('.');
+  process.env.INIT_CWD = _installedTmpDir;
 
   const tab = createSetupTab(_screen, {
     configService:     makeConfigService({ setupCompleted: true }),
