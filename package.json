@@ -83,7 +83,7 @@
     "test:syntax": "node -c src/installer.js && node -c mcp-server/install-deps.js",
     "test:bats": "AGENTVIBES_TEST_MODE=true bats test/unit/*.bats",
     "test:node": "node --test test/unit/*.test.js",
-    "test:coverage": "c8 --reporter=lcov --reporter=text node --experimental-test-module-mocks --test test/unit/*.test.js",
+    "test:coverage": "c8 --reporter=lcov --reporter=text node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js",
     "test:verbose": "AGENTVIBES_TEST_MODE=true bats -t test/unit/*.bats"
   },
   "dependencies": {
