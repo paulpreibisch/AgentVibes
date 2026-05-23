@@ -246,6 +246,11 @@ function patchTTY(value) {
   patchTTY(undefined);
 }
 
+// readline.emitKeypressEvents() adds a 'data' listener to process.stdin that
+// prevents the worker subprocess from exiting naturally after tests complete.
+// Unref stdin so the event loop can drain once all test callbacks finish.
+try { process.stdin.unref(); } catch {}
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------

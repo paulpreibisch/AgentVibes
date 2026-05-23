@@ -818,6 +818,8 @@ test('Per-LLM Routing - play-tts.ps1 reads voice from CLAUDE_PROJECT_DIR config'
 test('Multi-Speaker Display - [VOICE] output includes ::SpeakerName from llm config', { skip: process.platform !== 'win32' }, async () => {
   // Regression: play-tts-piper.ps1 was stripping "::SpeakerName" before the [VOICE] log line,
   // making it impossible to verify which speaker was used from the Bash output.
+  const piperPath = join(process.env.LOCALAPPDATA || '', 'Programs', 'Piper', 'piper.exe');
+  if (!existsSync(piperPath)) return; // Piper not installed on this runner — skip
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-speaker-display-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
@@ -864,6 +866,8 @@ test('Config round-trip - [VOICE] output matches voice configured in audio-effec
   // Regression: [VOICE] line was showing only the model name (en_US-libritts-high)
   // instead of the full model::SpeakerName. This test verifies the displayed voice
   // matches whatever is stored in audio-effects.cfg so we can detect drift.
+  const piperPath = join(process.env.LOCALAPPDATA || '', 'Programs', 'Piper', 'piper.exe');
+  if (!existsSync(piperPath)) return; // Piper not installed on this runner — skip
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-cfg-roundtrip-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
@@ -912,6 +916,8 @@ test('Config round-trip - [VOICE] output matches voice configured in audio-effec
 // ============================================================
 
 test('E2E Session Lifecycle - project voice used even when CLAUDE_PROJECT_DIR not in Bash env', { skip: process.platform !== 'win32' }, async () => {
+  const piperPath = join(process.env.LOCALAPPDATA || '', 'Programs', 'Piper', 'piper.exe');
+  if (!existsSync(piperPath)) return; // Piper not installed on this runner — skip
   const tempDir = mkdtempSync(join(tmpdir(), 'agentvibes-e2e-lifecycle-'));
   const configDir = join(tempDir, '.claude', 'config');
   const audioDir = join(tempDir, '.claude', 'audio');
