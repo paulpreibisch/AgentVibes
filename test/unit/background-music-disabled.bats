@@ -20,6 +20,11 @@ setup() {
     cp "$repo_root/.claude/config/audio-effects.cfg" "$BATS_TEST_TMPDIR/audio-effects.cfg.bak"
   fi
 
+  # Backup background-music-enabled.txt so teardown can restore it (Node.js tests depend on it).
+  if [[ -f "$repo_root/.claude/config/background-music-enabled.txt" ]]; then
+    cp "$repo_root/.claude/config/background-music-enabled.txt" "$BATS_TEST_TMPDIR/background-music-enabled.txt.bak"
+  fi
+
   # Fix #13: Atomic write — write to temp file then move to prevent partial-write corruption.
   local tmp_cfg
   tmp_cfg=$(mktemp "$repo_root/.claude/config/audio-effects.cfg.XXXXXX")
@@ -41,7 +46,12 @@ teardown() {
     rm -f "$repo_root/.claude/config/audio-effects.cfg"
   fi
 
-  rm -f "$repo_root/.claude/config/background-music-enabled.txt"
+  # Restore background-music-enabled.txt to pre-test state (Node.js tests need it intact).
+  if [[ -f "$BATS_TEST_TMPDIR/background-music-enabled.txt.bak" ]]; then
+    cp "$BATS_TEST_TMPDIR/background-music-enabled.txt.bak" "$repo_root/.claude/config/background-music-enabled.txt"
+  else
+    rm -f "$repo_root/.claude/config/background-music-enabled.txt"
+  fi
 }
 
 @test "background music is NOT mixed when disabled" {

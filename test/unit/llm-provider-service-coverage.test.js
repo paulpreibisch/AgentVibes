@@ -20,7 +20,7 @@
  * Uses node:test + node:assert/strict, ESM.
  */
 
-import { describe, test, beforeEach, afterEach } from 'node:test';
+import { describe, test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -553,6 +553,21 @@ describe('installCodexInstructions() + removeCodexInstructions()', () => {
 // ===========================================================================
 
 describe('getTransportConfig() — defaults', () => {
+  // Save and clear the real transport config before these tests so parallel
+  // test files that write ssh-remote:mode=remote don't pollute the defaults checks.
+  const _tcPath = path.join(process.env.HOME || process.env.USERPROFILE || '', '.agentvibes', 'transport-config.json');
+  let _tcSaved = null;
+  before(() => {
+    try { _tcSaved = fs.readFileSync(_tcPath, 'utf8'); } catch {}
+    try { fs.rmSync(_tcPath); } catch {}
+  });
+  after(() => {
+    if (_tcSaved !== null) {
+      fs.mkdirSync(path.dirname(_tcPath), { recursive: true });
+      fs.writeFileSync(_tcPath, _tcSaved);
+    }
+  });
+
   test('returns an object with mode, connType, sshKey, host, port', async () => {
     const cfg = await getTransportConfig('ssh-remote');
     assert.ok(typeof cfg === 'object');
