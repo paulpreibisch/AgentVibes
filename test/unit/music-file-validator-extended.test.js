@@ -390,6 +390,7 @@ describe('isPathSafe() — file existence and type checks', () => {
   });
 
   test('resolvedPath is an absolute path on success', () => {
+    if (process.platform === 'win32') return; // isPathSafe uses process.getuid() which is unavailable on Windows
     const validFile = path.join(tmpDir, 'abs-check.wav');
     fs.writeFileSync(validFile, Buffer.alloc(10, 0x00));
 

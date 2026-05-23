@@ -107,6 +107,7 @@ describe('detecting the current platform', () => {
 
 describe('checking whether a binary is valid and usable', () => {
   it('marks a real executable as valid when it runs successfully', () => {
+    if (process.platform === 'win32') return; // createFakeBinary creates Unix shell scripts, not Windows executables
     const fakeBin = createFakeBinary('fake-piper-valid');
     const result = validateBinary(fakeBin, 'piper');
     assert.equal(result.valid, true);
@@ -146,6 +147,7 @@ describe('checking whether a binary is valid and usable', () => {
 
 describe('resolving a binary when the override environment variable points to a valid file', () => {
   it('uses the override path when the environment variable points to a valid binary', () => {
+    if (process.platform === 'win32') return; // createFakeBinary creates Unix shell scripts, not Windows executables
     const fakeBin = createFakeBinary('piper-override');
     withEnv({ [ENV_VARS.piper]: fakeBin }, () => {
       const result = resolveBinary('piper');
@@ -257,6 +259,7 @@ describe('finding a binary via the system PATH', () => {
 
 describe('resolving a binary by finding it on the system PATH', () => {
   it('finds a binary by searching the system PATH when no override is set', () => {
+    if (process.platform === 'win32') return; // createFakeBinary creates Unix shell scripts, not Windows executables
     // Put a fake piper on PATH so which finds it
     const fakeBin = createFakeBinary('piper');
     const origPath = process.env.PATH;
