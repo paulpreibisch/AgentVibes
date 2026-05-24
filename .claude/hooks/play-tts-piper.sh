@@ -549,11 +549,6 @@ WRITE_LOCK_FILE="$AUDIO_DIR/$(basename "$TEMP_FILE" .wav).lock"
 touch "$WRITE_LOCK_FILE"
 
 # Get audio duration for proper lock timing
-DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null)
-DURATION=${DURATION%.*}  # Round to integer
-DURATION=${DURATION:-1}   # Default to 1 second if detection fails
-
-# Get audio duration for proper lock timing
 DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$TEMP_FILE" 2>/dev/null || true)
 DURATION=${DURATION%.*}  # Round to integer
 # SECURITY: Validate duration is numeric (#134)

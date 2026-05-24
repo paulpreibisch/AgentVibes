@@ -99,7 +99,9 @@ teardown() {
 
   [ "$status" -eq 0 ]
   assert_output_contains "Replaying audio #1"
-  assert_output_contains "$CLAUDE_PROJECT_DIR/.claude/audio/tts-123456.mp3"
+  # Use pwd -P to resolve symlinks (e.g. /tmp -> /c/Users/... on Windows Git Bash)
+  expected_path=$(cd "$CLAUDE_PROJECT_DIR/.claude/audio" && pwd -P)/tts-123456.mp3
+  assert_output_contains "$expected_path"
 }
 
 @test "voice-manager replay falls back to HOME when no project directory" {
@@ -113,7 +115,9 @@ teardown() {
 
   [ "$status" -eq 0 ]
   assert_output_contains "Replaying audio #1"
-  assert_output_contains "$TEST_HOME/.claude/audio/tts-789012.mp3"
+  # Use pwd -P to resolve symlinks (e.g. /tmp -> /c/Users/... on Windows Git Bash)
+  expected_path=$(cd "$TEST_HOME/.claude/audio" && pwd -P)/tts-789012.mp3
+  assert_output_contains "$expected_path"
 }
 
 @test "voice-manager replay with no audio history fails gracefully" {
