@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 #
 # AgentVibes SSH Receiver Setup (Windows)
 # Run this in an ADMIN PowerShell:

@@ -155,12 +155,14 @@ try {
     if (-not $env:AGENTVIBES_NO_PLAY) {
         # Prefer ffplay: handles 22050 Hz → 48000 Hz resampling cleanly (SoundPlayer uses
         # WinMM's low-quality resampler which produces choppy audio at non-native rates).
-        $ffplayPath = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+        $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
+        $ffplayPath = if ($ffplayCmd) { $ffplayCmd.Source }
         if (-not $ffplayPath) {
             # SSH/watcher sessions may have a minimal PATH — refresh from registry
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
                         [System.Environment]::GetEnvironmentVariable("Path","User")
-            $ffplayPath = (Get-Command ffplay -ErrorAction SilentlyContinue)?.Source
+            $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
+            $ffplayPath = if ($ffplayCmd) { $ffplayCmd.Source }
         }
         if ($ffplayPath) {
             & $ffplayPath -autoexit -nodisp -loglevel quiet $AudioFile 2>$null
