@@ -513,6 +513,12 @@ case "$1" in
       fi
     fi
 
+    # Normalize to canonical path so ls output is consistent across platforms
+    # (Git Bash resolves /tmp→/c/Users/..., macOS has /var→/private/var)
+    if [[ -d "$AUDIO_DIR" ]]; then
+      AUDIO_DIR=$(cd "$AUDIO_DIR" && pwd -P)
+    fi
+
     # Default to replay last audio (N=1)
     N="${2:-1}"
 
