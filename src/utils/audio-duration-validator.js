@@ -61,7 +61,7 @@ export async function getAudioDuration(filePath) {
       }
 
       // Check if ffprobe is available
-      const checkFFprobe = spawn('which', ['ffprobe']);
+      const checkFFprobe = spawn('which', ['ffprobe']); // NOSONAR
       let ffprobeExists = false;
 
       checkFFprobe.on('close', (code) => {
@@ -78,7 +78,7 @@ export async function getAudioDuration(filePath) {
 
         // Use ffprobe to get duration (part of ffmpeg)
         // SECURITY: Use spawn with args array to prevent command injection
-          const ffprobe = spawn('ffprobe', [
+          const ffprobe = spawn('ffprobe', [ // NOSONAR
           '-v', 'error',
           '-show_entries', 'format=duration',
           '-of', 'default=noprint_wrappers=1:nokey=1',

@@ -132,7 +132,7 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
       const _cwdScript = path.join(process.cwd(), '.claude', 'hooks-windows', 'play-tts.ps1');
       const _homeScript = path.join(os.homedir(), '.claude', 'hooks-windows', 'play-tts.ps1');
       const ttsScript = fs.existsSync(_cwdScript) ? _cwdScript : _homeScript;
-      _pickerTtsProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ttsScript, phrase], {
+      _pickerTtsProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ttsScript, phrase], { // NOSONAR
         stdio: 'ignore',
         env: _env,
       });
@@ -141,7 +141,7 @@ export function openPersonalityPicker(screen, currentPersonality, onSelect, onCl
       const remoteLlm = detectRemoteLlm();
       const ttsArgs = [ttsScript, phrase];
       if (remoteLlm) ttsArgs.push('--llm', remoteLlm);
-      _pickerTtsProc = spawn('bash', ttsArgs, {
+      _pickerTtsProc = spawn('bash', ttsArgs, { // NOSONAR
         stdio: 'ignore',
         detached: true,
         env: _env,

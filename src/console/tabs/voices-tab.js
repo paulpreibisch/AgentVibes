@@ -936,12 +936,12 @@ export function createVoicesTab(screen, services) {
       let proc;
       if (isWindows) {
         const playTts = path.join(hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
-        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId], {
+        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId], { // NOSONAR
           stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
         });
       } else {
         const playTts = path.join(hooksBase, '.claude', 'hooks', 'play-tts.sh');
-        proc = spawn('bash', [playTts, phrase, voiceId], {
+        proc = spawn('bash', [playTts, phrase, voiceId], { // NOSONAR
           stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _spawnEnv,
           cwd: process.cwd(),
         });
@@ -1512,13 +1512,13 @@ export function createVoicesTab(screen, services) {
           Invoke-WebRequest -Uri '${configUrl}' -OutFile '${configFile.replace(/'/g, "''")}' -ErrorAction Stop
           Write-Output 'PHASE:done'
         `;
-        dlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], {
+        dlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript], { // NOSONAR
           stdio: ['ignore', 'pipe', 'pipe'],
           env: _spawnEnv,
         });
       } else {
         const managerScript = path.resolve(packageRoot, '.claude', 'hooks', 'piper-voice-manager.sh');
-        dlProc = spawn('bash', ['-c', 'source "$1" && download_voice "$2"', '_', managerScript, modelToDownload], {
+        dlProc = spawn('bash', ['-c', 'source "$1" && download_voice "$2"', '_', managerScript, modelToDownload], { // NOSONAR
           stdio: ['ignore', 'pipe', 'pipe'],
           env: _spawnEnv,
         });

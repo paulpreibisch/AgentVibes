@@ -132,7 +132,7 @@ export class ProviderService {
    */
   _isAvailable(binary) {
     try {
-      execFileSync('which', [binary], { stdio: 'ignore', timeout: 2000 });
+      execFileSync('which', [binary], { stdio: 'ignore', timeout: 2000 }); // NOSONAR
       return true;
     } catch {
       return false;

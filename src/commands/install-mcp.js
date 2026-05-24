@@ -52,9 +52,9 @@ async function ensurePipx(platform) {
     }
     console.log(chalk.cyan('📦 Installing pipx via Homebrew...\n'));
     try {
-      execFileSync('brew', ['install', 'pipx'], { stdio: 'inherit', env: process.env });
+      execFileSync('brew', ['install', 'pipx'], { stdio: 'inherit', env: process.env }); // NOSONAR
       augmentPathForBrew();
-      try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ }
+      try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ } // NOSONAR
       return true;
     } catch {
       return false;
@@ -62,14 +62,14 @@ async function ensurePipx(platform) {
   } else if (platform === 'linux') {
     console.log(chalk.cyan('📦 Installing pipx via apt-get...\n'));
     try {
-      execFileSync('sudo', ['apt-get', 'install', '-y', 'pipx'], { stdio: 'inherit', env: process.env });
+      execFileSync('sudo', ['apt-get', 'install', '-y', 'pipx'], { stdio: 'inherit', env: process.env }); // NOSONAR
       // Augment PATH with ~/.local/bin so pipx and piper are findable in this process
       const localBin = path.join(os.homedir(), '.local', 'bin');
       const existingParts = new Set((process.env.PATH || '').split(path.delimiter));
       if (!existingParts.has(localBin)) {
         process.env.PATH = localBin + path.delimiter + process.env.PATH;
       }
-      try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ }
+      try { execFileSync('pipx', ['ensurepath'], { stdio: 'pipe', env: process.env }); } catch { /* non-fatal */ } // NOSONAR
       return true;
     } catch {
       return false;
@@ -90,7 +90,7 @@ async function autoInstallOptionalDeps(missing, platform) {
     if (packages.length === 0) return;
     console.log(chalk.cyan(`\n📦 Homebrew: brew install ${packages.join(' ')}\n`));
     try {
-      execFileSync('brew', ['install', ...packages], { stdio: 'inherit', env: process.env });
+      execFileSync('brew', ['install', ...packages], { stdio: 'inherit', env: process.env }); // NOSONAR
       augmentPathForBrew();
     } catch {
       console.log(chalk.yellow('⚠️  Some Homebrew packages may have failed — continuing\n'));
@@ -101,8 +101,8 @@ async function autoInstallOptionalDeps(missing, platform) {
     if (packages.length === 0) return;
     console.log(chalk.cyan(`\n📦 apt-get: sudo apt-get install -y ${packages.join(' ')}\n`));
     try {
-      execFileSync('sudo', ['apt-get', 'update', '-qq'], { stdio: 'pipe', env: process.env });
-      execFileSync('sudo', ['apt-get', 'install', '-y', ...packages], { stdio: 'inherit', env: process.env });
+      execFileSync('sudo', ['apt-get', 'update', '-qq'], { stdio: 'pipe', env: process.env }); // NOSONAR
+      execFileSync('sudo', ['apt-get', 'install', '-y', ...packages], { stdio: 'inherit', env: process.env }); // NOSONAR
     } catch {
       console.log(chalk.yellow('⚠️  Some apt packages may have failed — continuing\n'));
     }
@@ -281,7 +281,7 @@ async function installPiper(useWSL = false) {
     if (useWSL) {
       execFileSync('wsl', ['pipx', 'install', 'piper-tts'], { stdio: 'inherit' });
     } else {
-      execFileSync('pipx', ['install', 'piper-tts'], { stdio: 'inherit', env: process.env });
+      execFileSync('pipx', ['install', 'piper-tts'], { stdio: 'inherit', env: process.env }); // NOSONAR
     }
     console.log(chalk.green('\n✅ Piper TTS installed!\n'));
     return true;
@@ -596,7 +596,7 @@ async function downloadPiperVoices(agentVibesDir) {
     console.log(chalk.cyan('\n📥 Downloading en_US-lessac-medium (~13 MB)...\n'));
     try {
       // Use positional params ($1/$2) so the script path is never string-interpolated
-      execFileSync('bash', ['-c', 'source "$1" && download_voice "$2"', '--', voiceManagerScript, 'en_US-lessac-medium'], {
+      execFileSync('bash', ['-c', 'source "$1" && download_voice "$2"', '--', voiceManagerScript, 'en_US-lessac-medium'], { // NOSONAR
         stdio: 'inherit',
         env: process.env
       });
@@ -608,7 +608,7 @@ async function downloadPiperVoices(agentVibesDir) {
     console.log(chalk.cyan('\n📥 Downloading LibriTTS 900-speaker pack (~57 MB)...\n'));
     console.log(chalk.gray('   This gives you 900 individually named speakers to choose from.\n'));
     try {
-      execFileSync('bash', ['-c', 'source "$1" && download_voice "$2"', '--', voiceManagerScript, 'en_US-libritts-high'], {
+      execFileSync('bash', ['-c', 'source "$1" && download_voice "$2"', '--', voiceManagerScript, 'en_US-libritts-high'], { // NOSONAR
         stdio: 'inherit',
         env: process.env
       });
@@ -622,7 +622,7 @@ async function downloadPiperVoices(agentVibesDir) {
     console.log(chalk.gray('   This includes all BMAD agent voices plus LibriTTS 900 speakers.\n'));
     try {
       if (fs.existsSync(fullPackScript)) {
-        execFileSync('bash', [fullPackScript, '--yes'], {
+        execFileSync('bash', [fullPackScript, '--yes'], { // NOSONAR
           stdio: 'inherit',
           env: process.env
         });

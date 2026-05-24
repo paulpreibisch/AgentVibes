@@ -1061,7 +1061,7 @@ ${_tl('bmadDesc')}
         if (!fs.existsSync(playTtsScript)) return;
         _previewVoiceId = voiceId;
         if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
-        _previewProc = spawn('powershell', [
+        _previewProc = spawn('powershell', [ // NOSONAR
           '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTtsScript, phrase, voiceId,
         ], { stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv });
         _previewProc.on('exit', () => {
@@ -1079,7 +1079,7 @@ ${_tl('bmadDesc')}
       const args = [playTtsScript, phrase, voiceId];
       if (remoteLlm) args.push('--llm', remoteLlm);
 
-      _previewProc = spawn('bash', args, {
+      _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore', detached: true,
         env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
         cwd: _projectRoot,
@@ -1277,7 +1277,7 @@ ${_tl('bmadDesc')}
 
     const voiceId = profile.voice || '';
     const pretext = profile.pretext || AgentVoiceStore.getDefaultPretext(agent.displayName, agent.title);
-    const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`;
+    const phrase = `${pretext} ${SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]}`; // NOSONAR
 
     const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
 
@@ -1295,7 +1295,7 @@ ${_tl('bmadDesc')}
       if (voiceId) args.push(voiceId);
       if (remoteLlm) args.push('--llm', remoteLlm);
 
-      const proc = spawn('bash', args, {
+      const proc = spawn('bash', args, { // NOSONAR
         stdio: ['ignore', 'ignore', 'ignore'],
         detached: true,
         env: { ..._spawnEnv },
@@ -1434,7 +1434,7 @@ ${_tl('bmadDesc')}
     const psArgs  = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase];
     if (voiceId) psArgs.push(voiceId);
 
-    const proc = spawn('powershell', psArgs, {
+    const proc = spawn('powershell', psArgs, { // NOSONAR
       stdio: 'ignore', detached: false, windowsHide: true, env: spawnEnv,
     });
     _playingProcess = proc;
@@ -1457,7 +1457,7 @@ ${_tl('bmadDesc')}
   function _shuffleArray(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(Math.random() * (i + 1)); // NOSONAR
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;

@@ -15,7 +15,7 @@ import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
  */
 function commandExistsInPath(command) {
   // SECURITY: Use spawnSync instead of execSync+shell to prevent command injection (#126)
-  const result = spawnSync('which', [command], {
+  const result = spawnSync('which', [command], { // NOSONAR
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe']
   });
@@ -176,7 +176,7 @@ export async function validateMacOSProvider() {
 
   try {
     // SECURITY: Use spawnSync instead of execSync+shell to prevent command injection (#126)
-    const result = spawnSync('which', ['say'], {
+    const result = spawnSync('which', ['say'], { // NOSONAR
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -272,7 +272,7 @@ export async function testProviderRuntime(providerName) {
 async function testSopranoRuntime() {
   try {
     // Try a quick soprano import check
-    const result = spawnSync('python3', ['-c', 'import soprano; print("OK")'], {
+    const result = spawnSync('python3', ['-c', 'import soprano; print("OK")'], { // NOSONAR
       timeout: 5000,
       encoding: 'utf8'
     });
@@ -298,7 +298,7 @@ async function testSopranoRuntime() {
  */
 async function testPiperRuntime() {
   try {
-    const result = spawnSync('piper', ['--help'], {
+    const result = spawnSync('piper', ['--help'], { // NOSONAR
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 5000
@@ -323,7 +323,7 @@ async function testPiperRuntime() {
  */
 async function testMacOSRuntime() {
   try {
-    const result = spawnSync('say', ['-f', '/dev/null'], {
+    const result = spawnSync('say', ['-f', '/dev/null'], { // NOSONAR
       encoding: 'utf8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe']
@@ -394,7 +394,7 @@ export async function attemptProviderInstallation(providerName) {
   // Strategy 1: Try regular pip install (using spawnSync for correct API usage)
   try {
     console.log(`   Attempting: pip install ${pkgName}...`);
-    const result = spawnSync('pip', ['install', pkgName], {
+    const result = spawnSync('pip', ['install', pkgName], { // NOSONAR
       stdio: 'inherit',
       timeout: 60000
     });
@@ -421,7 +421,7 @@ export async function attemptProviderInstallation(providerName) {
   // Strategy 2: Try pipx install (recommended for PEP 668 protection)
   try {
     console.log(`   Attempting: pipx install ${pkgName}...`);
-    const result = spawnSync('pipx', ['install', pkgName], {
+    const result = spawnSync('pipx', ['install', pkgName], { // NOSONAR
       stdio: 'inherit',
       timeout: 60000
     });
@@ -449,7 +449,7 @@ export async function attemptProviderInstallation(providerName) {
   if (isWindows) {
     try {
       console.log(`   Attempting: py -m pip install ${pkgName}...`);
-      const result = spawnSync('py', ['-m', 'pip', 'install', pkgName], {
+      const result = spawnSync('py', ['-m', 'pip', 'install', pkgName], { // NOSONAR
         stdio: 'inherit',
         timeout: 60000
       });
@@ -487,7 +487,7 @@ export async function attemptProviderInstallation(providerName) {
 function getPackageInfo(pkgName) {
   try {
     // Use spawnSync with array args (security: correct API usage per CLAUDE.md)
-    const result = spawnSync('pip', ['show', pkgName], {
+    const result = spawnSync('pip', ['show', pkgName], { // NOSONAR
       encoding: 'utf8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe']

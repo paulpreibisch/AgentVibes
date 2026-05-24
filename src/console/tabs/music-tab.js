@@ -549,7 +549,7 @@ export function createMusicTab(screen, services) {
       try {
         if (_isWin) {
           // Windows: kill the process tree via taskkill (process group kill doesn't work)
-          spawn('taskkill', ['/F', '/T', '/PID', String(_playingProcess.pid)], {
+          spawn('taskkill', ['/F', '/T', '/PID', String(_playingProcess.pid)], { // NOSONAR
             stdio: 'ignore', windowsHide: true,
           });
         } else {

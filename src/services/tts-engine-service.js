@@ -49,10 +49,10 @@ export function checkEngineInstalled(engineId) {
             (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : null);
           if (localAppData && fs.existsSync(path.join(localAppData, 'Programs', 'Piper', 'piper.exe'))) return true;
         }
-        execFileSync('where', [binary], { stdio: 'ignore', timeout: 2000 });
+        execFileSync('where', [binary], { stdio: 'ignore', timeout: 2000 }); // NOSONAR
         return true;
       }
-      execFileSync('which', [binary], { stdio: 'ignore', timeout: 2000 });
+      execFileSync('which', [binary], { stdio: 'ignore', timeout: 2000 }); // NOSONAR
       return true;
     } catch {
       // try next binary

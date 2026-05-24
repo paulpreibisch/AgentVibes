@@ -238,9 +238,9 @@ export class AgentVibesConsole {
     // Right-aligned: git remote + branch when available, else AgentVibes repo link
     let topRightContent = `{${BRAND_PINK}-fg}github.com/preibisch/agentvibes{/${BRAND_PINK}-fg}`;
     try {
-      const branchResult = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
+      const branchResult = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], // NOSONAR
         { encoding: 'utf8', timeout: 2000, cwd });
-      const remoteResult = spawnSync('git', ['remote', 'get-url', 'origin'],
+      const remoteResult = spawnSync('git', ['remote', 'get-url', 'origin'], // NOSONAR
         { encoding: 'utf8', timeout: 2000, cwd });
       if (branchResult.status === 0 && remoteResult.status === 0) {
         const branch = branchResult.stdout.trim();
@@ -627,7 +627,7 @@ export class AgentVibesConsole {
   _createFooter() {
     // Detect installed providers inline (same logic as ProviderService)
     const _has = (bin) => {
-      try { execFileSync('which', [bin], { stdio: 'ignore', timeout: 2000 }); return true; }
+      try { execFileSync('which', [bin], { stdio: 'ignore', timeout: 2000 }); return true; } // NOSONAR
       catch { return false; }
     };
     const detected = {

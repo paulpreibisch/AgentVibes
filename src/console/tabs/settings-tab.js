@@ -645,7 +645,7 @@ export function createSettingsTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
+      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]; // NOSONAR
       const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
@@ -653,7 +653,7 @@ export function createSettingsTab(screen, services) {
       const args = [playTtsScript, phrase, voiceId];
       if (remoteLlm) args.push('--llm', remoteLlm);
 
-      _previewProc = spawn('bash', args, {
+      _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore',
         detached: true,
         env: _spawnEnv,

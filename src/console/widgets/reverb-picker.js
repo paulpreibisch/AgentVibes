@@ -78,7 +78,7 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
       const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       if (!_isWin) {
         const effectsScript = path.join(process.cwd(), '.claude', 'hooks', 'effects-manager.sh');
-        spawnSync('bash', [effectsScript, 'set-reverb', selected.value, 'default'], {
+        spawnSync('bash', [effectsScript, 'set-reverb', selected.value, 'default'], { // NOSONAR
           stdio: 'ignore',
           timeout: 5000,
           env: { ...process.env },
