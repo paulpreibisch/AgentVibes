@@ -252,7 +252,7 @@ jobs:
         run: |
           $script = ".claude\hooks-windows\effects-manager.ps1"
           if (-not (Test-Path $script)) {
-            Write-Host "⚠️  effects-manager.ps1 not found — skipping"
+            Write-Host "effects-manager.ps1 not found - skipping"
             exit 0
           }
           $result = & powershell -NoProfile -ExecutionPolicy Bypass `
@@ -267,7 +267,7 @@ jobs:
         run: |
           $script = ".claude\hooks-windows\provider-manager.ps1"
           if (-not (Test-Path $script)) {
-            Write-Host "⚠️  provider-manager.ps1 not found — skipping"
+            Write-Host "provider-manager.ps1 not found - skipping"
             exit 0
           }
           $result = & powershell -NoProfile -ExecutionPolicy Bypass `
@@ -309,7 +309,7 @@ jobs:
 
           # The sentinel voice must appear in verbose debug output
           if ($out -notmatch "ci-sentinel-voice") {
-            Write-Error "FAIL: play-tts.ps1 did not read audio-effects.cfg from CLAUDE_PROJECT_DIR — LLM config lookup broken"
+            Write-Error "FAIL: play-tts.ps1 did not read audio-effects.cfg from CLAUDE_PROJECT_DIR - LLM config lookup broken"
             exit 1
           }
           Write-Host "✅ play-tts.ps1 correctly read LLM config from CLAUDE_PROJECT_DIR"
@@ -378,7 +378,7 @@ jobs:
           Write-Host "Output: $out"
 
           if ($out -notmatch "llmkey-sentinel-voice") {
-            Write-Error "FAIL: play-tts.ps1 did not resolve LLM identity from AGENTVIBES_LLM_KEY — configured voice will not play when hooks fire"
+            Write-Error "FAIL: play-tts.ps1 did not resolve LLM identity from AGENTVIBES_LLM_KEY - configured voice will not play when hooks fire"
             exit 1
           }
           Write-Host "✅ play-tts.ps1 correctly resolved LLM config from AGENTVIBES_LLM_KEY (no -llm flag)"
