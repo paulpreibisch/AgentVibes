@@ -187,7 +187,7 @@ jobs:
           if ($data.Length -gt 1000) {
             Write-Host "✅ SAPI synthesized $($data.Length) bytes of raw PCM audio"
           } else {
-            Write-Error "❌ SAPI produced insufficient audio ($($data.Length) bytes — expected >1000)"
+            Write-Error "SAPI produced insufficient audio ($($data.Length) bytes - expected >1000)"
             exit 1
           }
 
