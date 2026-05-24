@@ -315,6 +315,8 @@ else
 fi
 
 mkdir -p "$AUDIO_DIR"
+# Normalize to canonical path (handles Git Bash /tmp→/c/Users/..., macOS /var→/private/var)
+AUDIO_DIR=$(cd "$AUDIO_DIR" && pwd -P)
 _tmp=$(mktemp "$AUDIO_DIR/tts-XXXXXX"); TEMP_FILE="${_tmp}.wav"; mv "$_tmp" "$TEMP_FILE"
 
 # @function get_speech_rate

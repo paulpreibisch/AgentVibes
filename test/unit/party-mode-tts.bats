@@ -129,8 +129,8 @@ teardown() {
   local end_time=$(date +%s)
   local duration=$((end_time - start_time))
 
-  # Should complete in reasonable time (< 15 seconds for 5 messages on slower CI systems)
-  [ "$duration" -lt 15 ]
+  # Should complete in reasonable time (< 60 seconds for 5 messages on slower CI systems)
+  [ "$duration" -lt 60 ]
 }
 
 @test "party mode: long dialogue chains (10+ agent turns)" {

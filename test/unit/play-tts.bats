@@ -52,7 +52,9 @@ teardown() {
   run "$PLAY_TTS" "Test message"
 
   [ "$status" -eq 0 ]
-  assert_output_contains "$CLAUDE_PROJECT_DIR/.claude/audio/tts-"
+  # Use pwd -P to resolve symlinks (e.g. /tmp -> /c/Users/... on Windows Git Bash)
+  expected_audio_dir=$(cd "$CLAUDE_PROJECT_DIR/.claude/audio" && pwd -P)
+  assert_output_contains "$expected_audio_dir/tts-"
 }
 
 @test "play-tts saves to HOME when no project directory found" {
