@@ -44,7 +44,9 @@ jobs:
       - name: Run tests
         env:
           ELEVENLABS_API_KEY: test_mock_key
-          AGENTVIBES_TEST_MODE: "true"
+          # AGENTVIBES_TEST_MODE must NOT be set here — Node.js unit tests use
+          # mock.module for isolation and setting this flag bypasses real code paths.
+          # The BATS portion of npm test sets it inline itself.
         run: npm test
 
   publish:
