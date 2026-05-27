@@ -77,6 +77,15 @@ fi
 
 export PROJECT_ROOT  # Export for child scripts
 
+# Suppress audio when tests are running in a separate shell.
+# AGENTVIBES_TEST_MODE only propagates to child processes of the test runner;
+# external callers (e.g. Claude Code hooks) don't inherit it.
+# scripts/run-tests.sh writes this marker file so all play-tts.sh invocations —
+# regardless of which process spawns them — stay silent during test runs.
+if [[ -f "${HOME}/.agentvibes-tests-running" ]]; then
+  exit 0
+fi
+
 # Check if muted (persists across sessions)
 # Project settings always override global settings:
 # - .claude/agentvibes-unmuted = project explicitly unmuted (overrides global mute)

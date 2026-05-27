@@ -95,6 +95,21 @@ teardown() {
   assert_output_contains "Error: No text provided"
 }
 
+@test "play-tts exits silently when .agentvibes-tests-running marker exists in HOME" {
+  # The marker file at $HOME/.agentvibes-tests-running suppresses all TTS so that
+  # external callers (e.g. Claude Code hooks running in a separate shell) stay silent
+  # while npm test is in progress. The test helper overrides $HOME to a temp dir, so
+  # this test creates the marker there — no interference with real $HOME.
+  touch "$HOME/.agentvibes-tests-running"
+
+  run "$PLAY_TTS" "should be suppressed"
+
+  rm -f "$HOME/.agentvibes-tests-running"
+  [ "$status" -eq 0 ]
+  # Output should be empty (silent exit, no audio generation)
+  [ -z "$output" ]
+}
+
 # ============================================================================
 # Provider Routing Tests (Issue #52)
 # ============================================================================
