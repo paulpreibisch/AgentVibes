@@ -53,18 +53,29 @@ if [[ "$1" == "--yes" ]] || [[ "$1" == "-y" ]]; then
 fi
 
 # Common voice models to download
+# Includes all models required by voice-assignments.json (voices-tab curated voices)
+# plus BMAD agent voices.
 COMMON_VOICES=(
-  "en_US-ryan-high"          # Default, expressive male (30MB) - BMAD: John (pm)
-  "en_US-amy-medium"         # Warm female (13MB) - BMAD: Mary (analyst)
-  "en_US-hfc_female-medium"  # Professional female (13MB) - BMAD: Amelia (dev)
-  "en_US-lessac-medium"      # Clear female (13MB) - BMAD: Murat (tea) - NOTE: Female voice
-  "en_US-danny-low"          # Calm male (13MB) - BMAD: Winston (architect)
-  "en_US-bryce-medium"       # Professional male (13MB) - BMAD: Bob (sm)
-  "en_US-kathleen-low"       # Clear female (13MB) - BMAD: Paige (tech-writer)
-  "en_US-kusal-medium"       # Male voice (13MB) - BMAD: Saif (frame-expert)
-  "en_US-kristin-medium"     # Female voice (13MB) - BMAD: Sally (ux-designer)
-  "en_US-libritts_r-medium"  # Premium male (57MB) - BMAD: BMad Master (NOTE: Changed from -high to -medium, -high doesn't exist)
-  "en_US-libritts-high"      # Premium quality (57MB)
+  # --- Voices-tab curated voices (voice-assignments.json: curated_voices) ---
+  "en_US-ryan-high"                    # Ryan — expressive male (30MB)
+  "en_US-joe-medium"                   # Joe — natural male (13MB)
+  "en_GB-alan-medium"                  # Alan — British male (13MB)
+  "en_US-kusal-medium"                 # Marcus — male (13MB)
+  "en_US-john-medium"                  # John — male (13MB)
+  "en_US-lessac-high"                  # Katherine — clear female high-quality (30MB)
+  "en_US-ljspeech-high"               # Linda — female high-quality (30MB)
+  "en_US-amy-medium"                   # Amy — warm female (13MB)
+  "en_US-kristin-medium"              # Kristin — female (13MB)
+  "en_GB-southern_english_female-low" # Charlotte — British female (13MB)
+  # --- LibriTTS (powers all 904 LibriTTS speakers in voices-tab) ---
+  "en_US-libritts-high"               # LibriTTS speakers — premium quality (57MB)
+  # --- Additional BMAD agent voices ---
+  "en_US-hfc_female-medium"           # Professional female (13MB) - BMAD: Amelia (dev)
+  "en_US-lessac-medium"               # Clear female (13MB) - BMAD: Murat (tea)
+  "en_US-danny-low"                   # Calm male (13MB) - BMAD: Winston (architect)
+  "en_US-bryce-medium"                # Professional male (13MB) - BMAD: Bob (sm)
+  "en_US-kathleen-low"                # Clear female (13MB) - BMAD: Paige (tech-writer)
+  "en_US-libritts_r-medium"           # Premium male (57MB) - BMAD: BMad Master
 )
 
 echo "🎙️  Piper Voice Model Downloader"

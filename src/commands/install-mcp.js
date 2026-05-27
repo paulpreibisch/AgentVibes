@@ -571,7 +571,7 @@ async function downloadPiperVoices(agentVibesDir) {
         short: 'LibriTTS 900'
       },
       {
-        name: chalk.cyan('Full pack') + chalk.gray(' — 11 voices including LibriTTS (~250 MB, all BMAD agent voices)'),
+        name: chalk.cyan('Full pack') + chalk.gray(' — 17 voices including LibriTTS (~360 MB, all voices-tab curated + BMAD agent voices)'),
         value: 'full',
         short: 'Full pack'
       },
@@ -618,8 +618,8 @@ async function downloadPiperVoices(agentVibesDir) {
       console.log(chalk.yellow('\n⚠️  Download failed — try later with: /agent-vibes:add\n'));
     }
   } else if (voiceChoice === 'full') {
-    console.log(chalk.cyan('\n📥 Downloading full voice pack (~250 MB)...\n'));
-    console.log(chalk.gray('   This includes all BMAD agent voices plus LibriTTS 900 speakers.\n'));
+    console.log(chalk.cyan('\n📥 Downloading full voice pack (~360 MB)...\n'));
+    console.log(chalk.gray('   This includes all voices-tab curated voices, BMAD agent voices, and LibriTTS 900 speakers.\n'));
     try {
       if (fs.existsSync(fullPackScript)) {
         execFileSync('bash', [fullPackScript, '--yes'], { // NOSONAR
