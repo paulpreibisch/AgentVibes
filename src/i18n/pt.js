@@ -143,6 +143,7 @@ export default {
   voicesSwitchBtn: "[Trocar Voz]",
   voicesFavoriteBtn: "[★ Favorito]",
   voicesDownloadBtn: "[Baixar Voz]",
+  voicesInstallAllBtn: "[Instalar Vozes BMAD]",
   voicesRowHintInstalled: "[Space] Visualizar  [Enter] Selecionar  [*] Favorito",
   voicesRowHintUninstalled: "[Enter] Baixar e instalar",
   musicRowHint: "[Space] Reproduzir  [Enter] Selecionar  [*] Favorito",

@@ -1229,6 +1229,134 @@ export function createVoicesTab(screen, services) {
   installBtn.bottom = 4;
   installBtn.left = 38;
 
+  const installAllBtn = _createBtn(_tl('voicesInstallAllBtn'), () => {
+    _openInstallAllModal();
+  });
+  installAllBtn.bottom = 4;
+  installAllBtn.left = 58;
+
+  // -------------------------------------------------------------------------
+  // Bulk install modal — downloads all standard BMAD voices via piper-download-voices.sh
+
+  function _openInstallAllModal() {
+    const packageRoot = path.resolve(__dirname, '..', '..', '..');
+    const script = path.join(packageRoot, '.claude', 'hooks', 'piper-download-voices.sh');
+
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 70,
+      height: 16,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {${COLORS.activeFg}-fg}Install BMAD Voices{/${COLORS.activeFg}-fg} `,
+      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
+    });
+
+    blessed.text({
+      parent: modal,
+      top: 1,
+      left: 2,
+      right: 2,
+      tags: true,
+      content:
+        `Downloads {${COLORS.valueFg}-fg}9 BMAD agent voices{/${COLORS.valueFg}-fg} + ` +
+        `{${COLORS.valueFg}-fg}LibriTTS 900-speaker pack{/${COLORS.valueFg}-fg}\n` +
+        `{bright-black-fg}~250 MB total from HuggingFace — may take a few minutes{/bright-black-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const logBox = blessed.log({
+      parent: modal,
+      top: 4,
+      left: 2,
+      right: 2,
+      bottom: 4,
+      tags: false,
+      scrollable: true,
+      alwaysScroll: true,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
+    });
+
+    const statusLine = blessed.text({
+      parent: modal,
+      bottom: 2,
+      left: 2,
+      right: 2,
+      tags: true,
+      content: '',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _running = false;
+
+    function _close() {
+      if (_running) return;
+      modal.destroy();
+      voiceList.focus();
+      refreshDisplay();
+      screen.render();
+    }
+
+    const okBtn = _createBtn('[ Install ]', () => {
+      if (_running) return;
+      _running = true;
+      okBtn.hide();
+      cancelBtn.hide();
+      screen.render();
+
+      const spinFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+      let spinIdx = 0;
+      const spinTimer = setInterval(() => {
+        spinIdx = (spinIdx + 1) % spinFrames.length;
+        statusLine.setContent(`{${COLORS.activeFg}-fg}${spinFrames[spinIdx]} Downloading…{/${COLORS.activeFg}-fg}`);
+        screen.render();
+      }, 100);
+
+      const proc = spawn('bash', [script, '--yes'], { detached: false });
+
+      proc.stdout.on('data', (chunk) => {
+        chunk.toString().split('\n').forEach(l => {
+          const clean = l.replace(/\x1b\[[0-9;]*m/g, '').trimEnd(); // NOSONAR
+          if (clean) { logBox.log(clean); screen.render(); }
+        });
+      });
+      proc.stderr.on('data', (chunk) => {
+        chunk.toString().split('\n').forEach(l => {
+          const clean = l.replace(/\x1b\[[0-9;]*m/g, '').trimEnd(); // NOSONAR
+          if (clean) { logBox.log(clean); screen.render(); }
+        });
+      });
+      proc.on('close', (code) => {
+        clearInterval(spinTimer);
+        _running = false;
+        if (code === 0) {
+          statusLine.setContent(`{${COLORS.activeFg}-fg}✓ All voices installed!{/${COLORS.activeFg}-fg}`);
+        } else {
+          statusLine.setContent(`{red-fg}✗ Install failed (exit ${code}){/red-fg}`);
+        }
+        const doneBtn = _createBtn('[ Done ]', _close);
+        doneBtn.bottom = 1;
+        doneBtn.left = 2;
+        modal.append(doneBtn);
+        doneBtn.focus();
+        screen.render();
+      });
+    });
+    okBtn.bottom = 1;
+    okBtn.left = 2;
+
+    const cancelBtn = _createBtn('[ Cancel ]', _close);
+    cancelBtn.bottom = 1;
+    cancelBtn.left = 14;
+
+    modal.key(['escape'], _close);
+    modal.setFront();
+    okBtn.focus();
+    screen.render();
+  }
+
   // -------------------------------------------------------------------------
   // "Voice Changed" notice — auto-dismisses after 2 s
 
@@ -1729,7 +1857,7 @@ export function createVoicesTab(screen, services) {
     const filtered = _getFilteredVoices();
     const items = _buildListItems(filtered, active, favorites, thumbsDown);
 
-    voiceList.setItems(items.length > 0 ? items : [' (no voices found — install piper first)']);
+    voiceList.setItems(items.length > 0 ? items : [' No voices installed — press [Install BMAD Voices] to download the full pack']);
     const maxIdx = Math.max(0, (items.length > 0 ? items.length : 1) - 1);
     voiceList.select(Math.min(savedIdx, maxIdx));
     voiceList.childBase = Math.min(savedScroll, Math.max(0, (items.length > 0 ? items.length : 1) - (voiceList.height - 2)));
@@ -1998,6 +2126,7 @@ export function createVoicesTab(screen, services) {
     switchBtn.setContent(_tl('voicesSwitchBtn'));
     favoriteBtn.setContent(_tl('voicesFavoriteBtn'));
     installBtn.setContent(_tl('voicesDownloadBtn'));
+    installAllBtn.setContent(_tl('voicesInstallAllBtn'));
     screen.render();
   }
 
