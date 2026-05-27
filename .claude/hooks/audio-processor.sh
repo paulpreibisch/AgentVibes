@@ -447,6 +447,14 @@ main() {
         fi
     fi
 
+    # When audio is explicitly enabled during test runs (AGENTVIBES_TEST_AUDIO=true
+    # passed to scripts/run-tests.sh), use a calmer test track so spooky/goa-trance
+    # music doesn't play.  run-tests.sh sets AGENTVIBES_TEST_TRACK=flamenco by default;
+    # the user may override it with any other track filename.
+    if [[ -n "${AGENTVIBES_TEST_TRACK:-}" ]]; then
+        background_file="$AGENTVIBES_TEST_TRACK"
+    fi
+
     # SECURITY: Use secure temp directory per CLAUDE.md guidelines
     # Prefer XDG_RUNTIME_DIR (user-owned, restricted permissions)
     # Fall back to user-specific directory in /tmp
