@@ -8,6 +8,9 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const _hooksDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.claude', 'hooks');
 
 const TTS_ENGINES = [
   {
@@ -16,7 +19,7 @@ const TTS_ENGINES = [
       ? 'winget install --id Rhasspy.Piper --accept-package-agreements --accept-source-agreements'
       : process.platform === 'darwin'
         ? 'brew install piper'
-        : 'pip install piper-tts',
+        : `${path.join(_hooksDir, 'piper-installer.sh')} --non-interactive`,
   },
   {
     id: 'soprano', name: 'Soprano TTS', desc: 'Web-based TTS service with premium voices', native: false,

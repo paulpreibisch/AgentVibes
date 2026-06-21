@@ -427,8 +427,19 @@ export function createSetupTab(screen, services) {
 
   function _cycleTtsFocus(dir) {
     const items = _ttsFocusableItems.filter(b => !b.hidden);
-    if (!items.length) return;
-    _ttsFocusIndex = (_ttsFocusIndex + dir + items.length) % items.length;
+    if (!items.length) {
+      _s2ContinueBtn.focus();
+      screen.render();
+      return;
+    }
+    const nextIdx = _ttsFocusIndex + dir;
+    if (dir > 0 && nextIdx >= items.length) {
+      // Tab past last install button → land on Continue
+      _s2ContinueBtn.focus();
+      screen.render();
+      return;
+    }
+    _ttsFocusIndex = (nextIdx + items.length) % items.length;
     items[_ttsFocusIndex].focus();
     screen.render();
   }
@@ -465,15 +476,19 @@ export function createSetupTab(screen, services) {
     if (!engine.installCmd || _ttsInstalling) return;
     _ttsInstalling = true;
 
-    // Show installing status
     const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
-    if (row) {
-      row.statusLabel.setContent('{yellow-fg}[Installing...]{/yellow-fg}');
-      screen.render();
-    }
+    const spinFrames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+    let spinIdx = 0;
+    const spinTimer = setInterval(() => {
+      if (row) {
+        row.statusLabel.setContent(`{yellow-fg}${spinFrames[spinIdx % spinFrames.length]} Installing...{/yellow-fg}`);
+        screen.render();
+      }
+      spinIdx++;
+    }, 100);
 
     try {
-      const opts = { stdio: 'pipe', timeout: 120000 };
+      const opts = { stdio: 'pipe', timeout: 1800000 };
       if (process.platform === 'win32') {
         opts.shell = true;
         await _execFileAsync(engine.installCmd, [], opts);
@@ -482,7 +497,7 @@ export function createSetupTab(screen, services) {
         await _execFileAsync(parts[0], parts.slice(1), opts);
       }
 
-      // Re-check and update status
+      clearInterval(spinTimer);
       const installed = checkEngineInstalled(engine.id);
       if (row) {
         row.statusLabel.setContent(installed
@@ -491,6 +506,7 @@ export function createSetupTab(screen, services) {
         if (installed) row.installBtn.hide();
       }
     } catch (err) {
+      clearInterval(spinTimer);
       if (row) {
         row.statusLabel.setContent(`{red-fg}[Failed]{/red-fg}`);
       }
@@ -504,6 +520,15 @@ export function createSetupTab(screen, services) {
     if (_screen < 3) { _screen++; _showCurrentScreen(); }
   });
   _s2ContinueBtn.hidden = true;
+  _s2ContinueBtn.key(['right', 'enter'], () => { if (_screen < 3) { _screen++; _showCurrentScreen(); } });
+  _s2ContinueBtn.key(['S-tab', 'up'], () => {
+    const items = _ttsFocusableItems.filter(b => !b.hidden);
+    if (items.length) {
+      _ttsFocusIndex = items.length - 1;
+      items[_ttsFocusIndex].focus();
+      screen.render();
+    }
+  });
 
   // =========================================================================
   // SCREEN 3: LLM Providers (new — from llm-providers-tab)
@@ -3193,11 +3218,9 @@ export function createSetupTab(screen, services) {
       '',
       '',
     ]));
-    if (ttsOk) {
-      _s1ContinueBtn.setContent(_tl('continueArrowBtn'));
-      _s1ContinueBtn.show();
-      _s1ContinueBtn.focus();
-    }
+    _s1ContinueBtn.setContent(ttsOk ? _tl('continueArrowBtn') : '  Install TTS  ->');
+    _s1ContinueBtn.show();
+    _s1ContinueBtn.focus();
     screen.render();
   }
 
