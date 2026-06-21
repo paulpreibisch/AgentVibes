@@ -1,5 +1,46 @@
 # AgentVibes Release Notes
 
+## 🎙️ v5.11.0 — LibriTTS 900+ Voices, Install BMAD Voices, Better Setup UX
+
+**Released:** 2026-06-21
+
+### ✨ New: LibriTTS Voice Library Offer During Install
+
+When Piper is already installed but LibriTTS hasn't been downloaded yet, the installer now prompts you to optionally grab the full **904-speaker LibriTTS model** (~114 MB). This unlocks named voices like Ryan, Sarah, Joe, and hundreds more — all browsable with `/agent-vibes:list`. If you skip it, the prompt shows you the exact command to run later.
+
+### ✨ New: Install BMAD Voices Button in Voices Tab
+
+The Voices tab now has an **Install BMAD Voices** button that downloads the curated set of voices used by BMAD agents in party mode — no need to know which model files to grab manually.
+
+The `piper-download-voices.sh` script has been expanded to include all the curated voice models shown in the Voices tab, so the button and the CLI command are always in sync.
+
+### 🔧 Linux Piper Install Now Uses Project Installer
+
+On Linux, the TTS engine setup screen previously ran `pip install piper-tts` to install Piper, which required Python and could conflict with system packages. It now calls the project's own `piper-installer.sh --non-interactive` instead — the same battle-tested script that handles binary download, PATH wiring, and voice setup consistently across environments.
+
+### 🎛️ Setup Tab UX Improvements
+
+- **Spinner animation** replaces the static "Installing..." label during TTS engine installation, giving clear visual feedback that work is happening.
+- **Tab key navigation** past the last install button now lands on the Continue button, instead of wrapping back to the top. This makes keyboard-only setup flow naturally.
+- **Installation timeout** raised from 2 minutes to 30 minutes to accommodate slow connections and large voice model downloads.
+
+### 🧪 Test Infrastructure
+
+- Added opt-in background audio during test runs (configurable via `AGENTVIBES_TEST_TRACK`) so audio mixing tests can verify real playback behavior without bleeding to remote speakers.
+- Remote speaker output is suppressed during all test runs.
+- Reverb BATS tests updated for accuracy.
+
+### 🔇 CI: Automated npm Publish Removed
+
+The automated npm publish step has been removed from CI. Releases are now triggered manually, giving full control over when packages land on the registry.
+
+### 🛡️ Quality Notes
+
+- All 1902 tests pass (290 BATS + 1612 Node.js unit/coverage).
+- Known pre-existing: `piper-voice-manager.sh` lacks `set -euo pipefail`; `piper-installer.sh` uses `set -e` only. Both pre-date this release and are tracked for a future hardening pass.
+
+---
+
 ## 🔧 v5.9.0 — SSH Remote + Windows Home Directory Fixes
 
 **Released:** 2026-05-18
