@@ -2510,16 +2510,17 @@ export function createSetupTab(screen, services) {
 
       // ── Remote preview: route through SSH pipeline so receiver plays it ──
       if (_validSshHost) {
-        kBox.setLabel(` {cyan-fg}♪ ${voiceId}... (Space=stop){/cyan-fg} `);
+        kBox.setLabel(` {cyan-fg}♪ ${voiceId}→${_sshHost}... (Space=stop){/cyan-fg} `);
         screen.render();
         const hookDir = path.join(packageDir, '.claude', 'hooks');
         const remoteEnv = { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_SSH_HOST: _sshHost };
         if (_validSshKey)  remoteEnv.AGENTVIBES_SSH_KEY  = _sshKey;
         if (_validSshPort) remoteEnv.AGENTVIBES_SSH_PORT = _sshPort;
         let remoteProc;
+        let _remoteStderr = '';
         try {
           remoteProc = spawn('bash', [path.join(hookDir, 'play-tts-ssh-remote.sh'), phrase, voiceId], { // NOSONAR
-            stdio: 'ignore',
+            stdio: ['ignore', 'ignore', 'pipe'],
             env: remoteEnv,
           });
         } catch {
@@ -2530,11 +2531,21 @@ export function createSetupTab(screen, services) {
           }
           return;
         }
+        remoteProc.stderr.on('data', (d) => { _remoteStderr += d.toString(); });
         _kPreviewProc = remoteProc;
-        // play-tts-ssh-remote.sh backgrounds SSH and exits quickly — keep label 2s
-        remoteProc.on('exit', () => {
+        remoteProc.on('exit', (code) => {
           _kPreviewProc = null;
-          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 2000);
+          if (!_kClosed) {
+            const errLine = _remoteStderr.split('\n').find(l => l.includes('[ERROR]') || l.includes('kex_') || l.includes('Connection'));
+            const label = errLine
+              ? ` {red-fg}SSH: ${errLine.slice(0, 50)}{/red-fg} `
+              : code !== 0
+                ? ` {red-fg}SSH exit ${code}{/red-fg} `
+                : ` {green-fg}✓ sent→${_sshHost}{/green-fg} `;
+            kBox.setLabel(label);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
         });
         remoteProc.on('error', () => {
           _kPreviewProc = null;
