@@ -2382,6 +2382,7 @@ export function createSetupTab(screen, services) {
     let _kClosed = false;
     let _kPreviewProc = null;
     let _kTmpWav = null;
+    let _kAnimInterval = null;
 
     // Read SSH config so previews route to the receiver (server-side WAV → SSH pipe)
     let _sshHost = '', _sshKey = '', _sshPort = '22';
@@ -2406,6 +2407,7 @@ export function createSetupTab(screen, services) {
     const IDLE_LABEL = ' {bold}{cyan-fg} Kokoro — Select Voice {/cyan-fg}{/bold} ';
 
     function _killKPreview() {
+      if (_kAnimInterval) { clearInterval(_kAnimInterval); _kAnimInterval = null; }
       if (_kPreviewProc) { try { _kPreviewProc.kill(); } catch {} _kPreviewProc = null; }
       if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
     }
@@ -2480,13 +2482,51 @@ export function createSetupTab(screen, services) {
       }
 
       const isDownloaded = cached.has(voiceId);
-      kBox.setLabel(isDownloaded
-        ? ` {cyan-fg}♪ Synthesizing ${voiceId}...{/cyan-fg} `
-        : ` {yellow-fg}☁ Downloading ${voiceId} from HuggingFace...{/yellow-fg} `
-      );
+
+      // ── Download progress bar helpers ──────────────────────────────────────
+      const DL_BAR_W = 22;
+      const DL_SPIN  = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+      let _dlSpinIdx = 0;
+      let _dlRealPct = -1;  // -1 = no real % received yet
+
+      function _dlBarLabel(pct) {
+        const filled = Math.round(pct * DL_BAR_W / 100);
+        const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
+                  + '{#555555-fg}' + '░'.repeat(DL_BAR_W - filled) + '{/#555555-fg}';
+        return ` {yellow-fg}☁{/yellow-fg} [${bar}{gray-fg}]{/gray-fg} {white-fg}${pct}%{/white-fg} {gray-fg}${voiceId}{/gray-fg} `;
+      }
+
+      function _startDlAnim() {
+        kBox.setLabel(_dlBarLabel(0));
+        screen.render();
+        _kAnimInterval = setInterval(() => {
+          if (_kClosed) { clearInterval(_kAnimInterval); _kAnimInterval = null; return; }
+          if (_dlRealPct >= 0) {
+            // Real progress received — update bar, keep interval running for smooth render
+            kBox.setLabel(_dlBarLabel(_dlRealPct));
+          } else {
+            // No real data yet — spin
+            _dlSpinIdx = (_dlSpinIdx + 1) % DL_SPIN.length;
+            kBox.setLabel(` {yellow-fg}${DL_SPIN[_dlSpinIdx]} Downloading ${voiceId}...{/yellow-fg} `);
+          }
+          screen.render();
+        }, 120);
+      }
+
+      function _stopDlAnim() {
+        if (_kAnimInterval) { clearInterval(_kAnimInterval); _kAnimInterval = null; }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
+      if (isDownloaded) {
+        kBox.setLabel(` {cyan-fg}♪ Synthesizing ${voiceId}...{/cyan-fg} `);
+      } else {
+        _startDlAnim();
+      }
       screen.render();
 
       // Phase 1: synthesize WAV locally with kokoro-tts.py
+      // stderr is captured so we can parse HuggingFace tqdm download progress
       const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
       const phrase = `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
       const tmpWav = _secureTempWav('kokoro-preview');
@@ -2495,10 +2535,11 @@ export function createSetupTab(screen, services) {
       let synthProc;
       try {
         synthProc = spawn('python3', [pyScript, phrase, voiceId, tmpWav, '1.0'], { // NOSONAR
-          stdio: 'ignore',
+          stdio: ['ignore', 'ignore', 'pipe'],
           env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
         });
       } catch {
+        _stopDlAnim();
         _kTmpWav = null;
         try { fs.unlinkSync(tmpWav); } catch {}
         if (!_kClosed) {
@@ -2510,7 +2551,26 @@ export function createSetupTab(screen, services) {
       }
       _kPreviewProc = synthProc;
 
+      // Parse HuggingFace tqdm lines from stderr: " 51%|████░░  42.5M/83.5M"
+      if (!isDownloaded) {
+        let _stderrBuf = '';
+        synthProc.stderr.on('data', (chunk) => {
+          if (_kClosed) return;
+          _stderrBuf += chunk.toString();
+          // tqdm writes \r-terminated progress on same line; split on \r or \n
+          const parts = _stderrBuf.split(/[\r\n]/);
+          _stderrBuf = parts.pop() ?? '';
+          for (const line of parts) {
+            const m = line.match(/\b(\d{1,3})%\s*\|/);
+            if (m) {
+              _dlRealPct = Math.min(100, parseInt(m[1], 10));
+            }
+          }
+        });
+      }
+
       synthProc.on('exit', (synthCode) => {
+        _stopDlAnim();
         _kPreviewProc = null;
         _kTmpWav = null;
         if (_kClosed) { try { fs.unlinkSync(tmpWav); } catch {} return; }
@@ -2521,8 +2581,11 @@ export function createSetupTab(screen, services) {
           setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
           return;
         }
-        // Mark as downloaded so icon updates on next render
-        if (!isDownloaded) cached.add(voiceId);
+        // Update icon to ★ for newly-downloaded voice
+        if (!isDownloaded) {
+          cached.add(voiceId);
+          kPicker.setItem(kPicker.selected, `  {green-fg}★{/green-fg} ${_kokoroVoiceLabel(voiceId)}`);
+        }
 
         // Phase 2: play WAV — either locally or pipe to receiver via SSH
         let playProc;
@@ -2578,6 +2641,7 @@ export function createSetupTab(screen, services) {
       });
 
       synthProc.on('error', () => {
+        _stopDlAnim();
         _kPreviewProc = null;
         _kTmpWav = null;
         try { fs.unlinkSync(tmpWav); } catch {}
