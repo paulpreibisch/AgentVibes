@@ -102,6 +102,9 @@ switch ($ActiveProvider) {
     "soprano" {
         $ProviderScript = "$HooksDir\play-tts-soprano.ps1"
     }
+    "kokoro" {
+        $ProviderScript = "$HooksDir\play-tts-kokoro.ps1"
+    }
     default {
         Write-Host "[ERROR] Unknown provider: $ActiveProvider" -ForegroundColor Red
         Write-Host "Use: .\provider-manager.ps1 list" -ForegroundColor Yellow
@@ -126,6 +129,7 @@ if ($ProviderOverride) {
             if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1" }
         }
         "soprano" { $ProviderScript = "$HooksDir\play-tts-soprano.ps1" }
+        "kokoro" { $ProviderScript = "$HooksDir\play-tts-kokoro.ps1" }
         default {
             Write-Host "[WARNING] play-tts.ps1: Unknown ProviderOverride '$ProviderOverride' ignored" -ForegroundColor Yellow
         }
@@ -398,6 +402,7 @@ if ($_LlmEngine) {
             if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
         }
         "soprano" { $ProviderScript = "$HooksDir\play-tts-soprano.ps1" }
+        "kokoro" { $ProviderScript = "$HooksDir\play-tts-kokoro.ps1" }
         default {
             Write-Host "[INFO] play-tts.ps1: Unrecognised engine '$_LlmEngine' — keeping default provider" -ForegroundColor DarkGray
         }

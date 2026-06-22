@@ -197,6 +197,40 @@ if ($existingWatchers) {
 Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-watcher.vbs" -WindowStyle Hidden
 Write-Host "       Watcher: installed + started + autostart enabled" -ForegroundColor Green
 
+# Step 7.6: Install Kokoro daemon autostart (only when Kokoro is available)
+# The Kokoro provider synthesizes via a resident HTTP daemon (kokoro-server.py)
+# that keeps the model on the GPU. Without it, the FIRST receiver message after
+# every reboot pays a ~12s cold model-load. A Startup-folder .vbs keeps it warm.
+Write-Host "[7.6/8] Installing Kokoro daemon autostart (if Kokoro installed)..." -ForegroundColor Yellow
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+$kokoroAvailable = $false
+if ($pythonCmd) {
+    # find_spec avoids importing torch (slow); exit 0 => kokoro importable
+    & $pythonCmd.Source -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>$null
+    $kokoroAvailable = ($LASTEXITCODE -eq 0)
+}
+if ($kokoroAvailable) {
+    $pythonwPath = $pythonCmd.Source -replace 'python\.exe$', 'pythonw.exe'
+    if (-not (Test-Path $pythonwPath)) { $pythonwPath = $pythonCmd.Source }  # fall back to python.exe
+    $kokoroVbs = @"
+' AgentVibes - Kokoro TTS daemon launcher (autostart)
+' Keeps the Kokoro model resident on the GPU so receiver TTS latency stays low.
+Set WshShell = CreateObject("WScript.Shell")
+pythonw = "$pythonwPath"
+script = WshShell.ExpandEnvironmentStrings("%USERPROFILE%") & "\.claude\hooks-windows\kokoro-server.py"
+WshShell.Run """" & pythonw & """ """ & script & """ 7855", 0, False
+"@
+    Set-Content -Path "$env:USERPROFILE\.agentvibes\start-kokoro-server.vbs" -Value $kokoroVbs -Encoding ASCII
+    Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-kokoro-server.vbs" -Destination "$startupDir\agentvibes-kokoro-server.vbs" -Force
+    # Kill any existing daemon, then launch a fresh one so it's warm immediately
+    Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*kokoro-server.py*" } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-kokoro-server.vbs" -WindowStyle Hidden
+    Write-Host "       Kokoro daemon: installed + started + autostart enabled (pythonw: $pythonwPath)" -ForegroundColor Green
+} else {
+    Write-Host "       SKIP: Kokoro not installed (pip install kokoro soundfile numpy to enable)" -ForegroundColor DarkYellow
+}
+
 # Step 8: Start sshd
 Write-Host "[8/8] Starting sshd..." -ForegroundColor Yellow
 Start-Service sshd

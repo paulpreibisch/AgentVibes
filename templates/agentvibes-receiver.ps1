@@ -135,7 +135,7 @@ if ($script:Voice -notmatch '^[a-zA-Z0-9_\-\. ]+$' -and $script:Voice -notmatch 
 }
 
 # Validate provider
-if ($Provider -notin @("piper", "soprano", "windows-sapi", "windows-piper", "macos")) {
+if ($Provider -notin @("piper", "soprano", "kokoro", "windows-sapi", "windows-piper", "macos")) {
     $Provider = "piper"
 }
 
