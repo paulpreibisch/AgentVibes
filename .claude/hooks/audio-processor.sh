@@ -411,23 +411,35 @@ main() {
     # LLM per-agent rows store human-readable names like "light"; sox needs the raw effect string.
     # Raw sox strings (used by BMAD agent rows) pass through unchanged.
     case "${sox_effects:-}" in
-        light)     sox_effects="reverb 20 50 50" ;;
-        medium)    sox_effects="reverb 40 50 70" ;;
-        heavy)     sox_effects="reverb 70 50 100" ;;
-        cathedral) sox_effects="reverb 90 30 100" ;;
-        off)       sox_effects="" ;;
+        light)        sox_effects="reverb 20 50 50" ;;
+        medium)       sox_effects="reverb 40 50 70" ;;
+        heavy)        sox_effects="reverb 70 50 100" ;;
+        cathedral)    sox_effects="reverb 90 30 100" ;;
+        chorus-light) sox_effects="chorus 0.7 0.9 55 0.4 0.25 2 -t" ;;
+        chorus-deep)  sox_effects="chorus 0.8 0.9 55 0.4 0.25 2 -t chorus 0.8 0.9 44 0.4 0.2 2.3 -t" ;;
+        echo-short)   sox_effects="echo 0.8 0.6 60 0.4" ;;
+        echo-long)    sox_effects="echo 0.8 0.7 100 0.5 200 0.3" ;;
+        warm)         sox_effects="bass 5 reverb 30 50 60" ;;
+        radio)        sox_effects="highpass 300 treble 5 gain -3 overdrive 10 gain -3" ;;
+        off)          sox_effects="" ;;
     esac
 
     # Per-invocation reverb override (set by play-tts-enhanced.sh for profile-based reverb).
     # Using an env var avoids permanently mutating audio-effects.cfg — process-scoped and race-free.
     if [[ -n "${AGENTVIBES_REVERB_OVERRIDE:-}" ]]; then
         case "$AGENTVIBES_REVERB_OVERRIDE" in
-            light)     sox_effects="reverb 20 50 50" ;;
-            medium)    sox_effects="reverb 40 50 70" ;;
-            heavy)     sox_effects="reverb 70 50 100" ;;
-            cathedral) sox_effects="reverb 90 30 100" ;;
-            off)       sox_effects="" ;;
-            *)         sox_effects="$AGENTVIBES_REVERB_OVERRIDE" ;;  # raw sox string passthrough
+            light)        sox_effects="reverb 20 50 50" ;;
+            medium)       sox_effects="reverb 40 50 70" ;;
+            heavy)        sox_effects="reverb 70 50 100" ;;
+            cathedral)    sox_effects="reverb 90 30 100" ;;
+            chorus-light) sox_effects="chorus 0.7 0.9 55 0.4 0.25 2 -t" ;;
+            chorus-deep)  sox_effects="chorus 0.8 0.9 55 0.4 0.25 2 -t chorus 0.8 0.9 44 0.4 0.2 2.3 -t" ;;
+            echo-short)   sox_effects="echo 0.8 0.6 60 0.4" ;;
+            echo-long)    sox_effects="echo 0.8 0.7 100 0.5 200 0.3" ;;
+            warm)         sox_effects="bass 5 reverb 30 50 60" ;;
+            radio)        sox_effects="highpass 300 treble 5 gain -3 overdrive 10 gain -3" ;;
+            off)          sox_effects="" ;;
+            *)            sox_effects="$AGENTVIBES_REVERB_OVERRIDE" ;;  # raw sox string passthrough
         esac
     fi
 

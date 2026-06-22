@@ -96,6 +96,18 @@ export function formatVoiceName(voice) {
  * @returns {string}
  */
 export function formatReverbState(preset) {
-  const LABELS = { off: 'Off', light: 'Light (Small room)', medium: 'Medium (Conference room)', heavy: 'Heavy (Large hall)', cathedral: 'Cathedral (Epic space)' };
-  return LABELS[preset] ?? LABELS.light;
+  const LABELS = {
+    off:          'Off',
+    light:        'Light Reverb',
+    medium:       'Medium Reverb',
+    heavy:        'Heavy Reverb',
+    cathedral:    'Cathedral',
+    'chorus-light': 'Light Chorus',
+    'chorus-deep':  'Deep Chorus',
+    'echo-short':   'Echo (short)',
+    'echo-long':    'Cave Echo',
+    warm:           'Warm',
+    radio:          'Radio',
+  };
+  return LABELS[preset] ?? 'Light Reverb';
 }

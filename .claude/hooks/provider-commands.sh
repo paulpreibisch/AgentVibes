@@ -63,12 +63,23 @@ is_language_supported() {
 
   case "$provider" in
     piper)
-      # Piper only supports English natively
+      # Piper only supports English natively (multilingual models exist but aren't bundled)
       return 1
       ;;
     macos)
       # macOS has voices for 40+ languages built-in
       return 0
+      ;;
+    elevenlabs)
+      # ElevenLabs eleven_multilingual_v2 supports 32+ languages
+      return 0
+      ;;
+    kokoro)
+      # Kokoro supports English, Japanese, Korean, French, German, Spanish, Portuguese, Hindi
+      case "$language" in
+        japanese|korean|french|german|spanish|portuguese|hindi) return 0 ;;
+        *) return 1 ;;
+      esac
       ;;
     *)
       return 1
@@ -88,48 +99,86 @@ provider_list() {
     is_macos=true
   fi
 
-  echo "┌────────────────────────────────────────────────────────────┐"
-  echo "│ Available TTS Providers                                    │"
-  echo "├────────────────────────────────────────────────────────────┤"
+  # Check installation status of optional providers
+  local kokoro_installed=false
+  python3 -c "import kokoro" 2>/dev/null && kokoro_installed=true
+
+  local elevenlabs_key_set=false
+  if [[ -n "${ELEVENLABS_API_KEY:-}" ]]; then
+    elevenlabs_key_set=true
+  elif [[ -f "${HOME}/.agentvibes/elevenlabs-key.txt" ]]; then
+    elevenlabs_key_set=true
+  fi
+
+  _active() { [[ "$current_provider" == "$1" ]]; }
+  _mark()   { _active "$1" && echo "[ACTIVE]" || echo ""; }
+
+  echo "┌──────────────────────────────────────────────────────────────┐"
+  echo "│ Available TTS Providers                                      │"
+  echo "├──────────────────────────────────────────────────────────────┤"
 
   # macOS Say (show first on macOS systems)
   if [[ "$is_macos" == true ]]; then
-    if [[ "$current_provider" == "macos" ]]; then
-      echo "│ ✓ macOS Say     Built-in, free     ⭐⭐⭐⭐      [ACTIVE]    │"
+    if _active "macos"; then
+      echo "│ ✓ macOS Say     Built-in, free     ⭐⭐⭐⭐      [ACTIVE]     │"
     else
-      echo "│   macOS Say     Built-in, free     ⭐⭐⭐⭐   [RECOMMENDED] │"
+      echo "│   macOS Say     Built-in, free     ⭐⭐⭐⭐  [RECOMMENDED]  │"
     fi
-    echo "│   Cost: Free (built-in)                                   │"
-    echo "│   Platform: macOS only                                    │"
-    echo "│   Offline: Yes                                            │"
-    echo "│                                                            │"
+    echo "│   Cost: Free (built-in)  Platform: macOS  Offline: Yes     │"
+    echo "│                                                              │"
   fi
 
   # Piper
-  if [[ "$current_provider" == "piper" ]]; then
+  if _active "piper"; then
     echo "│ ✓ Piper TTS     Free, offline      ⭐⭐⭐⭐       [ACTIVE]    │"
   else
-    echo "│   Piper TTS     Free, offline      ⭐⭐⭐⭐                  │"
+    echo "│   Piper TTS     Free, offline      ⭐⭐⭐⭐                   │"
   fi
-  echo "│   Cost: Free forever                                       │"
-  echo "│   Platform: WSL, Linux only                                │"
-  echo "│   Offline: Yes                                             │"
+  echo "│   Cost: Free forever  Platform: Linux/WSL  Offline: Yes     │"
+  echo "│                                                              │"
+
+  # Kokoro
+  if _active "kokoro"; then
+    echo "│ ✓ Kokoro TTS    Local neural        ⭐⭐⭐⭐⭐    [ACTIVE]    │"
+  else
+    if [[ "$kokoro_installed" == true ]]; then
+      echo "│   Kokoro TTS    Local neural        ⭐⭐⭐⭐⭐  [installed]  │"
+    else
+      echo "│   Kokoro TTS    Local neural        ⭐⭐⭐⭐⭐  [not installed]│"
+    fi
+  fi
+  echo "│   Cost: Free  60+ voices  8 languages  Offline: Yes         │"
+  echo "│   Install: ${SCRIPT_DIR}/kokoro-installer.sh               │"
+  echo "│                                                              │"
+
+  # ElevenLabs
+  if _active "elevenlabs"; then
+    echo "│ ✓ ElevenLabs    Premium cloud      ⭐⭐⭐⭐⭐    [ACTIVE]    │"
+  else
+    if [[ "$elevenlabs_key_set" == true ]]; then
+      echo "│   ElevenLabs    Premium cloud      ⭐⭐⭐⭐⭐  [key set]    │"
+    else
+      echo "│   ElevenLabs    Premium cloud      ⭐⭐⭐⭐⭐  [needs key]  │"
+    fi
+  fi
+  echo "│   Cost: Free tier available  32+ languages  Offline: No     │"
+  echo "│   Key:  export ELEVENLABS_API_KEY=your_key                  │"
+  echo "│                                                              │"
 
   # macOS Say (show at end for non-macOS systems)
   if [[ "$is_macos" != true ]]; then
-    echo "│                                                            │"
-    if [[ "$current_provider" == "macos" ]]; then
+    if _active "macos"; then
       echo "│ ✓ macOS Say     Built-in, free     ⭐⭐⭐⭐      [ACTIVE]    │"
     else
       echo "│   macOS Say     Built-in, free     ⭐⭐⭐⭐   (macOS only)  │"
     fi
-    echo "│   Cost: Free (built-in)                                   │"
-    echo "│   Platform: macOS only                                    │"
-    echo "│   Offline: Yes                                            │"
+    echo "│   Cost: Free (built-in)  Platform: macOS only             │"
+    echo "│                                                              │"
   fi
 
-  echo "└────────────────────────────────────────────────────────────┘"
+  echo "└──────────────────────────────────────────────────────────────┘"
   echo ""
+  echo "Switch:  /agent-vibes:provider switch <name>"
   echo "Learn more: agentvibes.org/providers"
 }
 

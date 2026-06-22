@@ -20,12 +20,26 @@ if (!IS_TEST) {
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 export const REVERB_PRESETS = Object.freeze([
-  { label: 'Off (Dry, no reverb)',        value: 'off' },
-  { label: 'Light (Small room)',           value: 'light' },
-  { label: 'Medium (Conference room)',     value: 'medium' },
-  { label: 'Heavy (Large hall)',           value: 'heavy' },
-  { label: 'Cathedral (Epic space)',       value: 'cathedral' },
+  // ── No effect ────────────────────────────────────────────────────────
+  { label: 'Off  (no effects)',               value: 'off'          },
+  // ── Reverb ───────────────────────────────────────────────────────────
+  { label: 'Light Reverb  (small room)',      value: 'light'        },
+  { label: 'Medium Reverb  (conference)',     value: 'medium'       },
+  { label: 'Heavy Reverb  (large hall)',      value: 'heavy'        },
+  { label: 'Cathedral  (epic space)',         value: 'cathedral'    },
+  // ── Chorus ───────────────────────────────────────────────────────────
+  { label: 'Light Chorus',                   value: 'chorus-light' },
+  { label: 'Deep Chorus',                    value: 'chorus-deep'  },
+  // ── Echo ─────────────────────────────────────────────────────────────
+  { label: 'Echo  (short delay)',             value: 'echo-short'   },
+  { label: 'Cave Echo  (long)',               value: 'echo-long'    },
+  // ── Character ────────────────────────────────────────────────────────
+  { label: 'Warm  (reverb + bass)',           value: 'warm'         },
+  { label: 'Radio  (EQ + overdrive)',         value: 'radio'        },
 ]);
+
+// Alias for callers that haven't updated yet
+export const AUDIO_EFFECT_PRESETS = REVERB_PRESETS;
 
 /**
  * Open the reverb preset picker modal.
@@ -50,11 +64,11 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     parent: screen,
     top: 'center',
     left: 'center',
-    width: 40,
-    height: REVERB_PRESETS.length + 4,
+    width: 48,
+    height: Math.min(REVERB_PRESETS.length + 4, 18),
     border: { type: 'line' },
     tags: true,
-    label: _modalTitle('Select Reverb Preset'),
+    label: _modalTitle('Select Audio Effect'),
     items: REVERB_PRESETS.map((p, i) => (i === currentIdx ? `● ${p.label}` : `  ${p.label}`)),
     keys: true,
     vi: false,

@@ -191,12 +191,18 @@ migrate_voice_to_provider() {
   local piper_default="en_US-lessac-medium"
   local macos_default="Samantha"
   local soprano_default="soprano-default"  # Single voice — no selection needed
+  local elevenlabs_default="Rachel"
+  local kokoro_default="af_heart"
 
-  # Soprano has a single voice, so migration is straightforward
-  if [[ "$target_provider" == "soprano" ]]; then
-    echo "$soprano_default"
-    return 0
-  fi
+  # Single-voice providers: migration is straightforward
+  case "$target_provider" in
+    soprano)
+      echo "$soprano_default"; return 0 ;;
+    elevenlabs)
+      echo "$elevenlabs_default"; return 0 ;;
+    kokoro)
+      echo "$kokoro_default"; return 0 ;;
+  esac
 
   # If no current voice, return default for target provider
   if [[ -z "$current_voice" ]]; then
@@ -208,8 +214,8 @@ migrate_voice_to_provider() {
     return 0
   fi
 
-  # If migrating FROM Soprano, return default for target provider
-  if [[ "$current_voice" == "soprano-default" ]]; then
+  # If migrating FROM a single-voice provider, return default for target provider
+  if [[ "$current_voice" == "soprano-default" || "$current_voice" == "Rachel" || "$current_voice" =~ ^[a-z]{2}_[a-z_]+$ ]]; then
     case "$target_provider" in
       piper) echo "$piper_default" ;;
       macos) echo "$macos_default" ;;
@@ -265,6 +271,8 @@ migrate_voice_to_provider() {
   case "$target_provider" in
     piper) echo "$piper_default" ;;
     macos) echo "$macos_default" ;;
+    elevenlabs) echo "$elevenlabs_default" ;;
+    kokoro) echo "$kokoro_default" ;;
     *) echo "$piper_default" ;;
   esac
 }

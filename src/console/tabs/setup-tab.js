@@ -91,9 +91,10 @@ const FOOTER_TEXT = '[Enter] Continue  [Esc] Back  [Tab] Next Tab  [Q] Quit';
 // Maps non-Piper engine IDs to their canonical voice ID and display label.
 // Used by the voice picker, _buildFields display, and auto-save logic.
 const NATIVE_ENGINE_VOICES = {
-  soprano:     { id: 'soprano',   label: 'Soprano'      },
-  sapi:        { id: 'sapi',      label: 'Windows SAPI' },
-  'macos-say': { id: 'macos-say', label: 'macOS Say'    },
+  soprano:     { id: 'soprano',         label: 'Soprano'                  },
+  sapi:        { id: 'sapi',            label: 'Windows SAPI'             },
+  'macos-say': { id: 'macos-say',       label: 'macOS Say'                },
+  elevenlabs:  { id: 'elevenlabs-Rachel', label: 'ElevenLabs (Rachel)'    },
 };
 
 // ---------------------------------------------------------------------------
@@ -204,7 +205,26 @@ async function _checkDependenciesAsync() {
     }
   }
 
-  return { node, npm, piper, soprano: sopranoTts || sopranoWebui, ffmpeg };
+  // Kokoro: check python import (non-fatal if python3 unavailable)
+  // Use find_spec instead of import to avoid slow torch load (which causes ETIMEDOUT on sync checks)
+  const kokoro = await new Promise(resolve => {
+    try {
+      const proc = spawn('python3', ['-c', "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)"], { stdio: 'ignore' }); // NOSONAR
+      const timer = setTimeout(() => { proc.kill(); resolve(false); }, 5000);
+      proc.on('close', code => { clearTimeout(timer); resolve(code === 0); });
+      proc.on('error', () => { clearTimeout(timer); resolve(false); });
+    } catch { resolve(false); }
+  });
+
+  // ElevenLabs: check env var or key file (sync — just a file read)
+  const elevenlabs = Boolean(process.env.ELEVENLABS_API_KEY) || (() => {
+    try {
+      const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+      return fs.existsSync(kf) && fs.readFileSync(kf, 'utf8').trim().length > 0;
+    } catch { return false; }
+  })();
+
+  return { node, npm, piper, soprano: sopranoTts || sopranoWebui, kokoro, elevenlabs, ffmpeg };
 }
 
 // ---------------------------------------------------------------------------
@@ -889,7 +909,7 @@ export function createSetupTab(screen, services) {
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
         { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-        { key: 'reverb',      label: 'Reverb',       getValue: () => {
+        { key: 'audioEffects', label: 'Audio Effects', getValue: () => {
           const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
           return p ? p.label : draft.reverbPreset || 'Off';
         }},
@@ -1088,7 +1108,7 @@ export function createSetupTab(screen, services) {
         case 'ttsEngine':      _openTtsEnginePicker(draft, _refreshField);      break;
         case 'voice':          _openVoicePickerForLlm(draft, _refreshField);    break;
         case 'pretext':        _openPretextEditor(modal, draft, _refreshField); break;
-        case 'reverb':
+        case 'audioEffects':
           openReverbPicker(screen, draft.reverbPreset, (val) => { draft.reverbPreset = val; _refreshField(); }, _cancelField, { applyToEffectsManager: false });
           break;
         case 'bgTrack':
@@ -1769,7 +1789,7 @@ export function createSetupTab(screen, services) {
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
         { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-        { key: 'reverb',      label: 'Reverb',       getValue: () => {
+        { key: 'audioEffects', label: 'Audio Effects', getValue: () => {
           const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
           return p ? p.label : draft.reverbPreset || 'Off';
         }},
@@ -2083,7 +2103,7 @@ export function createSetupTab(screen, services) {
           _openPretextEditor(modal, draft, _refreshField);
           break;
 
-        case 'reverb':
+        case 'audioEffects':
           openReverbPicker(screen, draft.reverbPreset, (val) => {
             draft.reverbPreset = val;
             _refreshField();
@@ -2214,6 +2234,21 @@ export function createSetupTab(screen, services) {
     picker.key(['enter'], () => {
       const idx = picker.selected;
       const selectedEngine = idx === 0 ? '' : engines[idx - 1].id;
+      // Guard: block selection of non-installed optional engines
+      if (selectedEngine) {
+        const engineStatus = engines.find(e => e.id === selectedEngine);
+        if (engineStatus && !engineStatus.installed && !engineStatus.native) {
+          picker.setLabel(` {red-fg} ${engineStatus.name} is not installed — go to Setup > TTS Engines to install {/red-fg} `);
+          screen.render();
+          setTimeout(() => {
+            if (!picker.destroyed) {
+              picker.setLabel(' {bold}{cyan-fg} Select TTS Engine {/cyan-fg}{/bold} ');
+              screen.render();
+            }
+          }, 3000);
+          return;
+        }
+      }
       draft.ttsEngine = selectedEngine;
       // Auto-set voice to native engine canonical ID so the Voice field updates
       // immediately. For piper or empty engine, clear to '' (shows global default).
@@ -2227,7 +2262,337 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
+  // ── API Key Warning Popup ─────────────────────────────────────────────────
+  // Non-blocking warning when a cloud TTS provider needs an API key.
+  // Shows on top of whatever is currently open; calls onDismiss() when closed.
+  function _showApiKeyWarning(serviceName, envVarName, keyFilePath, onDismiss) {
+    const warningBox = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 66,
+      height: 11,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {bold}{yellow-fg} ${serviceName} — API Key Not Detected {/yellow-fg}{/bold} `,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'yellow' } },
+    });
+    warningBox.setFront();
+
+    blessed.text({
+      parent: warningBox, top: 1, left: 2, right: 2, tags: true,
+      content: `{yellow-fg}No API key found for ${serviceName}.{/yellow-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: warningBox, top: 3, left: 2, right: 2, tags: true,
+      content: `Set it in your shell:\n  {cyan-fg}export ${envVarName}=your_key_here{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: warningBox, top: 6, left: 2, right: 2, tags: true,
+      content: `Or write the key to:\n  {cyan-fg}${keyFilePath}{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: warningBox, bottom: 1, left: 2, right: 2, tags: true,
+      content: '{gray-fg}[Enter] or [Esc] to dismiss{/gray-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    function _closeWarning() {
+      destroyList(warningBox, screen);
+      onDismiss();
+    }
+
+    warningBox.key(['enter', 'escape', 'space', 'q', 'Q'], _closeWarning);
+    warningBox.on('click', _closeWarning);
+    warningBox.focus();
+    screen.render();
+  }
+
   // ── Voice picker for LLM config (matches agents-tab pattern) ──────────────
+
+  // ── Kokoro voice scanner ─────────────────────────────────────────────────
+  // Full static list for Kokoro v0.9.x. Voices not yet cached are downloaded
+  // automatically by the library on first use via huggingface-hub.
+  const _KOKORO_ALL_VOICES = [
+    // American English female
+    'af_heart','af_alloy','af_aoede','af_bella','af_jessica',
+    'af_kore','af_nicole','af_nova','af_river','af_sarah','af_sky',
+    // American English male
+    'am_adam','am_echo','am_eric','am_fenrir','am_liam','am_michael','am_onyx','am_puck',
+    // British English female
+    'bf_alice','bf_emma','bf_isabella','bf_lily',
+    // British English male
+    'bm_daniel','bm_fable','bm_george','bm_lewis',
+    // Japanese
+    'jf_alpha','jf_gongitsune','jf_nezumi','jf_tebukuro','jm_kumo',
+    // Mandarin Chinese
+    'zf_xiaobei','zf_xiaoni','zf_xiaoxiao','zf_xiaoyi','zm_yunxi','zm_yunxia','zm_yunyang',
+    // Spanish
+    'ef_dora','em_alex','em_santa',
+    // French
+    'ff_siwis',
+    // Hindi
+    'hf_alpha','hm_omega',
+    // Italian
+    'if_sara','im_nicola',
+    // Brazilian Portuguese
+    'pf_dora','pm_alex','pm_santa',
+    // Korean
+    'kf_alpha','km_hyunsu',
+  ];
+
+  function _scanKokoroVoices() {
+    // Determine which voices are already cached locally
+    const cached = new Set();
+    try {
+      const snapshotsDir = path.join(
+        os.homedir(), '.cache', 'huggingface', 'hub',
+        'models--hexgrad--Kokoro-82M', 'snapshots'
+      );
+      for (const snap of fs.readdirSync(snapshotsDir)) {
+        const voicesDir = path.join(snapshotsDir, snap, 'voices');
+        if (!fs.existsSync(voicesDir)) continue;
+        for (const f of fs.readdirSync(voicesDir)) {
+          if (f.endsWith('.pt')) cached.add(f.replace('.pt', ''));
+        }
+      }
+    } catch {}
+    return { voices: _KOKORO_ALL_VOICES, cached };
+  }
+
+  function _kokoroVoiceLabel(id) {
+    const prefix = id.slice(0, 2);
+    const name = id.slice(3);
+    const lang = {
+      af: 'en-US ♀', am: 'en-US ♂', bf: 'en-GB ♀', bm: 'en-GB ♂',
+      jf: 'ja ♀',    jm: 'ja ♂',    zf: 'zh ♀',    zm: 'zh ♂',
+      ef: 'es ♀',    em: 'es ♂',    ff: 'fr ♀',    fm: 'fr ♂',
+      hf: 'hi ♀',    hm: 'hi ♂',    pf: 'pt ♀',    pm: 'pt ♂',
+      kf: 'ko ♀',    km: 'ko ♂',    if: 'it ♀',    im: 'it ♂',
+    }[prefix] || prefix;
+    const label = name.charAt(0).toUpperCase() + name.slice(1);
+    return `${label.padEnd(14)} {gray-fg}(${lang}){/gray-fg}  {cyan-fg}${id}{/cyan-fg}`;
+  }
+
+  function _openKokoroVoicePicker(draft, onDone, llmKey = '') {
+    const { voices, cached } = _scanKokoroVoices();
+    let _kClosed = false;
+    let _kPreviewProc = null;
+    let _kTmpWav = null;
+
+    // Read SSH config so previews route to the receiver (server-side WAV → SSH pipe)
+    let _sshHost = '', _sshKey = '', _sshPort = '22';
+    try {
+      const tcPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
+      const tc = JSON.parse(fs.readFileSync(tcPath, 'utf8'));
+      if (llmKey && tc[llmKey]?.mode === 'remote') {
+        _sshHost = tc[llmKey].host || '';
+        _sshKey  = tc[llmKey].sshKey || '';
+        _sshPort = String(tc[llmKey].port || '22');
+      } else {
+        const provFilePath = path.join(os.homedir(), '.claude', 'tts-provider.txt');
+        const globalProv = fs.readFileSync(provFilePath, 'utf8').trim();
+        if (globalProv === 'ssh-remote' || globalProv === 'agentvibes-receiver') {
+          _sshHost = tc[globalProv]?.host || '';
+          _sshKey  = tc[globalProv]?.sshKey || '';
+          _sshPort = String(tc[globalProv]?.port || '22');
+        }
+      }
+    } catch {}
+
+    const IDLE_LABEL = ' {bold}{cyan-fg} Kokoro — Select Voice {/cyan-fg}{/bold} ';
+
+    function _killKPreview() {
+      if (_kPreviewProc) { try { _kPreviewProc.kill(); } catch {} _kPreviewProc = null; }
+      if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+    }
+    function _closeKP() {
+      if (_kClosed) return;
+      _kClosed = true;
+      _killKPreview();
+      navigationService?.closeModal();
+      destroyList(kBox, screen, onDone);
+    }
+    navigationService?.openModal(null, _closeKP);
+
+    // ★ = cached locally, ☁ = auto-downloads from HuggingFace on first preview/use
+    const items = voices.map(id => {
+      const mark = cached.has(id) ? '{green-fg}★{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
+      return `  ${mark} ${_kokoroVoiceLabel(id)}`;
+    });
+
+    const LEGEND_H = 1;
+    const pickerH = Math.min(voices.length + LEGEND_H + 3, 22);
+
+    // Outer box (border + label) — legend is a fixed child, not part of the scroll list
+    const kBox = blessed.box({
+      parent: screen,
+      top: 'center', left: 'center',
+      width: 66, height: pickerH,
+      border: { type: 'line' }, tags: true,
+      label: IDLE_LABEL,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    kBox.setFront();
+
+    // Scrollable voice list — stops LEGEND_H rows above the bottom border
+    const kPicker = blessed.list({
+      parent: kBox,
+      top: 0, left: 0, right: 0, bottom: LEGEND_H,
+      keys: true, vi: true, mouse: true, tags: true,
+      items,
+      scrollable: true,
+      alwaysScroll: true,
+      scrollbar: { ch: '|', style: { fg: 'cyan' } },
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        selected: { bg: 'green', fg: 'white', bold: true },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+
+    // Fixed legend row — always visible, outside the scroll area
+    blessed.text({
+      parent: kBox, bottom: 0, left: 1, right: 1, height: LEGEND_H, tags: true,
+      content: '{green-fg}★{/green-fg}{gray-fg}=cached  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=downloads on first use  [Enter]=select  [Space]=preview  [Esc]=cancel{/gray-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    const curIdx = voices.indexOf(draft.voice);
+    if (curIdx >= 0) kPicker.select(curIdx);
+
+    kPicker.key(['enter'], () => {
+      if (voices.length) draft.voice = voices[kPicker.selected];
+      _closeKP();
+    });
+
+    kPicker.key(['space'], () => {
+      if (!voices.length) return;
+      const voiceId = voices[kPicker.selected];
+      if (_kPreviewProc) {
+        _killKPreview();
+        kBox.setLabel(IDLE_LABEL);
+        screen.render();
+        return;
+      }
+
+      const isDownloaded = cached.has(voiceId);
+      kBox.setLabel(isDownloaded
+        ? ` {cyan-fg}♪ Synthesizing ${voiceId}...{/cyan-fg} `
+        : ` {yellow-fg}☁ Downloading ${voiceId} from HuggingFace...{/yellow-fg} `
+      );
+      screen.render();
+
+      // Phase 1: synthesize WAV locally with kokoro-tts.py
+      const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+      const phrase = `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
+      const tmpWav = _secureTempWav('kokoro-preview');
+      _kTmpWav = tmpWav;
+
+      let synthProc;
+      try {
+        synthProc = spawn('python3', [pyScript, phrase, voiceId, tmpWav, '1.0'], { // NOSONAR
+          stdio: 'ignore',
+          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        });
+      } catch {
+        _kTmpWav = null;
+        try { fs.unlinkSync(tmpWav); } catch {}
+        if (!_kClosed) {
+          kBox.setLabel(` {red-fg}Preview failed — is Kokoro installed?{/red-fg} `);
+          screen.render();
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+        }
+        return;
+      }
+      _kPreviewProc = synthProc;
+
+      synthProc.on('exit', (synthCode) => {
+        _kPreviewProc = null;
+        _kTmpWav = null;
+        if (_kClosed) { try { fs.unlinkSync(tmpWav); } catch {} return; }
+        if (synthCode !== 0) {
+          try { fs.unlinkSync(tmpWav); } catch {}
+          kBox.setLabel(` {red-fg}Synthesis failed — is Kokoro installed?{/red-fg} `);
+          screen.render();
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          return;
+        }
+        // Mark as downloaded so icon updates on next render
+        if (!isDownloaded) cached.add(voiceId);
+
+        // Phase 2: play WAV — either locally or pipe to receiver via SSH
+        let playProc;
+        const _validSshHost = _sshHost && /^[a-zA-Z0-9][a-zA-Z0-9._@:-]*$/.test(_sshHost);
+        const _validSshKey  = _sshKey && /^\//.test(_sshKey) && fs.existsSync(_sshKey);
+        const _validSshPort = _sshPort && /^\d+$/.test(_sshPort);
+        try {
+          if (_validSshHost) {
+            // Pipe WAV bytes via SSH → receiver plays with aplay/paplay (no kokoro needed on receiver)
+            const sshArgs = ['-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes'];
+            if (_validSshKey) sshArgs.push('-i', _sshKey);
+            if (_validSshPort && _sshPort !== '22') sshArgs.push('-p', _sshPort);
+            sshArgs.push(_sshHost, 'aplay -q - 2>/dev/null || paplay /dev/stdin 2>/dev/null || cat > /dev/null'); // NOSONAR
+            playProc = spawn('ssh', sshArgs, { // NOSONAR
+              stdio: ['pipe', 'ignore', 'ignore'],
+              env: { ...process.env },
+            });
+            // Pipe WAV file to ssh stdin
+            const wavStream = fs.createReadStream(tmpWav);
+            wavStream.pipe(playProc.stdin);
+            wavStream.on('error', () => { try { playProc.stdin.destroy(); } catch {} });
+            playProc.stdin.on('error', () => {});
+          } else {
+            // Local playback
+            playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
+              stdio: 'ignore',
+              env: { ...process.env },
+            });
+          }
+        } catch {
+          try { fs.unlinkSync(tmpWav); } catch {}
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}Playback failed{/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+          return;
+        }
+        _kPreviewProc = playProc;
+        _kTmpWav = tmpWav;
+        kBox.setLabel(` {cyan-fg}♪ ${voiceId}... (Space=stop){/cyan-fg} `);
+        screen.render();
+        playProc.on('exit', () => {
+          _kPreviewProc = null;
+          if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+          if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); }
+        });
+        playProc.on('error', () => {
+          _kPreviewProc = null;
+          if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+          if (!_kClosed) { kBox.setLabel(` {red-fg}Playback failed{/red-fg} `); screen.render(); }
+        });
+      });
+
+      synthProc.on('error', () => {
+        _kPreviewProc = null;
+        _kTmpWav = null;
+        try { fs.unlinkSync(tmpWav); } catch {}
+        if (!_kClosed) {
+          kBox.setLabel(` {red-fg}Preview failed — is Kokoro installed?{/red-fg} `);
+          screen.render();
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+        }
+      });
+    });
+
+    kPicker.key(['escape', 'q', 'Q'], _closeKP);
+    kPicker.focus();
+    screen.render();
+  }
 
   function _secureTempWav(prefix) {
     const baseDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
@@ -2238,6 +2603,12 @@ export function createSetupTab(screen, services) {
   }
 
   function _openVoicePickerForLlm(draft, onDone, llmKey = '') {
+    // Kokoro has its own multi-voice picker (voices scanned from HF cache)
+    if (draft.ttsEngine === 'kokoro') {
+      _openKokoroVoicePicker(draft, onDone, llmKey);
+      return;
+    }
+
     navigationService?.openModal(null, _closeVP);
 
     let _allVoices = [];
@@ -2392,6 +2763,12 @@ export function createSetupTab(screen, services) {
             proc = spawn('powershell', ['-NoProfile', '-Command', sapiScript], { stdio: 'ignore', windowsHide: true }); // NOSONAR
           } else if (engine === 'macos-say') {
             proc = spawn('say', [phrase], { stdio: 'ignore' }); // NOSONAR
+          } else if (engine.startsWith('elevenlabs')) {
+            const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
+            proc = spawn('bash', [elScript, phrase, 'Rachel'], { // NOSONAR
+              stdio: 'ignore',
+              env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+            });
           }
         } catch {}
         if (!proc) {
@@ -2417,6 +2794,25 @@ export function createSetupTab(screen, services) {
       nvPicker.key(['escape', 'q', 'Q'], _closeNV);
       nvPicker.focus();
       screen.render();
+
+      // ElevenLabs: if no API key is set, show a warning on top of the picker.
+      // The picker stays open; user dismisses the warning and can still select/preview.
+      if (draft.ttsEngine === 'elevenlabs') {
+        const _elKeySet = Boolean(process.env.ELEVENLABS_API_KEY) || (() => {
+          try {
+            const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+            return fs.existsSync(kf) && fs.readFileSync(kf, 'utf8').trim().length > 0;
+          } catch { return false; }
+        })();
+        if (!_elKeySet) {
+          _showApiKeyWarning(
+            'ElevenLabs',
+            'ELEVENLABS_API_KEY',
+            path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt'),
+            () => { if (!_nvClosed) { nvPicker.focus(); screen.render(); } }
+          );
+        }
+      }
       return;
     }
 
@@ -3200,17 +3596,19 @@ export function createSetupTab(screen, services) {
     const ok  = () => `{green-fg}OK  ${t(_getLang(), 'installed')}{/green-fg}`;
     const bad = () => `{red-fg}X  ${t(_getLang(), 'notFound')}{/red-fg}`;
 
-    const ttsOk = _deps.piper || _deps.soprano;
+    const ttsOk = _deps.piper || _deps.soprano || _deps.kokoro || _deps.elevenlabs;
     contentBox.setContent(_c([
       _HDR('', t(_getLang(), 'dependencyCheck')),
       '',
-      `  {white-fg}${'Dependency'.padEnd(14)}${'Status'}{/white-fg}`,
+      `  {white-fg}${'Dependency'.padEnd(16)}${'Status'}{/white-fg}`,
       `  {white-fg}${'---'.repeat(26)}{/white-fg}`,
-      `  {white-fg}${'Node.js'.padEnd(14)}{/white-fg}${_deps.node    ? ok() : bad()}`,
-      `  {white-fg}${'npm'.padEnd(14)}{/white-fg}${_deps.npm     ? ok() : bad()}`,
-      `  {white-fg}${'Piper TTS'.padEnd(14)}{/white-fg}${_deps.piper   ? ok() : bad()}`,
-      `  {white-fg}${'Soprano TTS'.padEnd(14)}{/white-fg}${_deps.soprano ? ok() : bad()}`,
-      `  {white-fg}${'ffmpeg'.padEnd(14)}{/white-fg}${_deps.ffmpeg  ? ok() : `{red-fg}!  ${t(_getLang(), 'ffmpegMissing')}{/red-fg}`}`,
+      `  {white-fg}${'Node.js'.padEnd(16)}{/white-fg}${_deps.node       ? ok() : bad()}`,
+      `  {white-fg}${'npm'.padEnd(16)}{/white-fg}${_deps.npm        ? ok() : bad()}`,
+      `  {white-fg}${'Piper TTS'.padEnd(16)}{/white-fg}${_deps.piper      ? ok() : bad()}`,
+      `  {white-fg}${'Kokoro TTS'.padEnd(16)}{/white-fg}${_deps.kokoro     ? ok() : `{#546e7a-fg}-  optional{/#546e7a-fg}`}`,
+      `  {white-fg}${'ElevenLabs'.padEnd(16)}{/white-fg}${_deps.elevenlabs ? ok() : `{#546e7a-fg}-  needs API key{/#546e7a-fg}`}`,
+      `  {white-fg}${'Soprano TTS'.padEnd(16)}{/white-fg}${_deps.soprano    ? ok() : `{#546e7a-fg}-  optional{/#546e7a-fg}`}`,
+      `  {white-fg}${'ffmpeg'.padEnd(16)}{/white-fg}${_deps.ffmpeg     ? ok() : `{red-fg}!  ${t(_getLang(), 'ffmpegMissing')}{/red-fg}`}`,
       '',
       ttsOk
         ? `  {green-fg}OK  ${t(_getLang(), 'ttsDetected')}{/green-fg}`

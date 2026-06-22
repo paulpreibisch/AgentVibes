@@ -26,28 +26,28 @@ describe('formatReverbState', () => {
     assert.strictEqual(formatReverbState('off'), 'Off');
   });
 
-  test('returns "Light (Small room)" for preset "light"', () => {
-    assert.strictEqual(formatReverbState('light'), 'Light (Small room)');
+  test('returns "Light Reverb" for preset "light"', () => {
+    assert.strictEqual(formatReverbState('light'), 'Light Reverb');
   });
 
-  test('returns "Medium (Conference room)" for preset "medium"', () => {
-    assert.strictEqual(formatReverbState('medium'), 'Medium (Conference room)');
+  test('returns "Medium Reverb" for preset "medium"', () => {
+    assert.strictEqual(formatReverbState('medium'), 'Medium Reverb');
   });
 
-  test('returns "Heavy (Large hall)" for preset "heavy"', () => {
-    assert.strictEqual(formatReverbState('heavy'), 'Heavy (Large hall)');
+  test('returns "Heavy Reverb" for preset "heavy"', () => {
+    assert.strictEqual(formatReverbState('heavy'), 'Heavy Reverb');
   });
 
-  test('returns "Cathedral (Epic space)" for preset "cathedral"', () => {
-    assert.strictEqual(formatReverbState('cathedral'), 'Cathedral (Epic space)');
+  test('returns "Cathedral" for preset "cathedral"', () => {
+    assert.strictEqual(formatReverbState('cathedral'), 'Cathedral');
   });
 
-  test('defaults to "Light (Small room)" for unknown preset', () => {
-    assert.strictEqual(formatReverbState('unknown'), 'Light (Small room)');
+  test('defaults to "Light Reverb" for unknown preset', () => {
+    assert.strictEqual(formatReverbState('unknown'), 'Light Reverb');
   });
 
-  test('defaults to "Light (Small room)" when preset is undefined', () => {
-    assert.strictEqual(formatReverbState(undefined), 'Light (Small room)');
+  test('defaults to "Light Reverb" when preset is undefined', () => {
+    assert.strictEqual(formatReverbState(undefined), 'Light Reverb');
   });
 
   test('returns distinct label for each of the 5 presets', () => {

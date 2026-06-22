@@ -372,6 +372,12 @@ speak_text() {
     macos)
       bash "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
       ;;
+    elevenlabs)
+      bash "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$text" "$voice"
+      ;;
+    kokoro)
+      bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$text" "$voice"
+      ;;
     termux-ssh)
       bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
@@ -501,6 +507,12 @@ case "$ACTIVE_PROVIDER" in
     ;;
   macos)
     exec bash "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  elevenlabs)
+    exec bash "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  kokoro)
+    exec bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   termux-ssh)
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
