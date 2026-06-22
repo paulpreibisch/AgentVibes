@@ -2404,6 +2404,11 @@ export function createSetupTab(screen, services) {
       }
     } catch {}
 
+    // Pre-validate SSH config once so the space handler can branch without re-checking
+    const _validSshHost = Boolean(_sshHost && /^[a-zA-Z0-9][a-zA-Z0-9._@:-]*$/.test(_sshHost));
+    const _validSshKey  = Boolean(_sshKey && /^\//.test(_sshKey) && fs.existsSync(_sshKey));
+    const _validSshPort = Boolean(_sshPort && /^\d+$/.test(_sshPort));
+
     const IDLE_LABEL = ' {bold}{cyan-fg} Kokoro — Select Voice {/cyan-fg}{/bold} ';
 
     function _killKPreview() {
@@ -2434,7 +2439,7 @@ export function createSetupTab(screen, services) {
     const kBox = blessed.box({
       parent: screen,
       top: 'center', left: 'center',
-      width: 66, height: pickerH,
+      width: 78, height: pickerH,
       border: { type: 'line' }, tags: true,
       label: IDLE_LABEL,
       style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
@@ -2443,8 +2448,8 @@ export function createSetupTab(screen, services) {
 
     // Fixed legend row — pinned at top so it never scrolls away
     blessed.text({
-      parent: kBox, top: 0, left: 1, right: 1, height: LEGEND_H, tags: true,
-      content: '{yellow-fg}★ = cached  ☁ = downloads on first use  [Enter]=select  [Space]=preview  [D]=download all  [Esc]=cancel{/yellow-fg}',
+      parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{brightyellow-fg}select{/brightyellow-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{brightyellow-fg}sample{/brightyellow-fg}  {green-fg}★{/green-fg}{gray-fg}={/gray-fg}{brightyellow-fg}cached{/brightyellow-fg}  {cyan-fg}☁{/cyan-fg}{gray-fg}={/gray-fg}{brightyellow-fg}Download{/brightyellow-fg}  {gray-fg}[D]={/gray-fg}all  {gray-fg}[Esc]={/gray-fg}cancel',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2482,6 +2487,48 @@ export function createSetupTab(screen, services) {
         return;
       }
 
+      const phrase = `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
+
+      // ── Remote preview: route through SSH pipeline so receiver plays it ──
+      if (_validSshHost) {
+        kBox.setLabel(` {cyan-fg}♪ ${voiceId}... (Space=stop){/cyan-fg} `);
+        screen.render();
+        const hookDir = path.join(packageDir, '.claude', 'hooks');
+        const remoteEnv = { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_SSH_HOST: _sshHost };
+        if (_validSshKey)  remoteEnv.AGENTVIBES_SSH_KEY  = _sshKey;
+        if (_validSshPort) remoteEnv.AGENTVIBES_SSH_PORT = _sshPort;
+        let remoteProc;
+        try {
+          remoteProc = spawn('bash', [path.join(hookDir, 'play-tts-ssh-remote.sh'), phrase, voiceId], { // NOSONAR
+            stdio: 'ignore',
+            env: remoteEnv,
+          });
+        } catch {
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}Remote preview failed{/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+          return;
+        }
+        _kPreviewProc = remoteProc;
+        // play-tts-ssh-remote.sh backgrounds SSH and exits quickly — keep label 2s
+        remoteProc.on('exit', () => {
+          _kPreviewProc = null;
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 2000);
+        });
+        remoteProc.on('error', () => {
+          _kPreviewProc = null;
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}Remote preview failed{/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+        });
+        return;
+      }
+
+      // ── Local preview: synthesize WAV then play ──────────────────────────
       const isDownloaded = cached.has(voiceId);
 
       // ── Download progress bar helpers ──────────────────────────────────────
@@ -2529,7 +2576,6 @@ export function createSetupTab(screen, services) {
       // Phase 1: synthesize WAV locally with kokoro-tts.py
       // stderr is captured so we can parse HuggingFace tqdm download progress
       const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
-      const phrase = `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
       const tmpWav = _secureTempWav('kokoro-preview');
       _kTmpWav = tmpWav;
 
@@ -2588,34 +2634,13 @@ export function createSetupTab(screen, services) {
           kPicker.setItem(kPicker.selected, `  {green-fg}★{/green-fg} ${_kokoroVoiceLabel(voiceId)}`);
         }
 
-        // Phase 2: play WAV — either locally or pipe to receiver via SSH
+        // Phase 2: play WAV locally (remote destinations handled before synthesis via SSH pipeline)
         let playProc;
-        const _validSshHost = _sshHost && /^[a-zA-Z0-9][a-zA-Z0-9._@:-]*$/.test(_sshHost);
-        const _validSshKey  = _sshKey && /^\//.test(_sshKey) && fs.existsSync(_sshKey);
-        const _validSshPort = _sshPort && /^\d+$/.test(_sshPort);
         try {
-          if (_validSshHost) {
-            // Pipe WAV bytes via SSH → receiver plays with aplay/paplay (no kokoro needed on receiver)
-            const sshArgs = ['-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes'];
-            if (_validSshKey) sshArgs.push('-i', _sshKey);
-            if (_validSshPort && _sshPort !== '22') sshArgs.push('-p', _sshPort);
-            sshArgs.push(_sshHost, 'aplay -q - 2>/dev/null || paplay /dev/stdin 2>/dev/null || cat > /dev/null'); // NOSONAR
-            playProc = spawn('ssh', sshArgs, { // NOSONAR
-              stdio: ['pipe', 'ignore', 'ignore'],
-              env: { ...process.env },
-            });
-            // Pipe WAV file to ssh stdin
-            const wavStream = fs.createReadStream(tmpWav);
-            wavStream.pipe(playProc.stdin);
-            wavStream.on('error', () => { try { playProc.stdin.destroy(); } catch {} });
-            playProc.stdin.on('error', () => {});
-          } else {
-            // Local playback
-            playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
-              stdio: 'ignore',
-              env: { ...process.env },
-            });
-          }
+          playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
+            stdio: 'ignore',
+            env: { ...process.env },
+          });
         } catch {
           try { fs.unlinkSync(tmpWav); } catch {}
           if (!_kClosed) {
