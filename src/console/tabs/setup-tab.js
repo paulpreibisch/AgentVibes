@@ -2384,22 +2384,41 @@ export function createSetupTab(screen, services) {
     let _kTmpWav = null;
     let _kAnimInterval = null;
 
-    // Read SSH config so previews route to the receiver (server-side WAV → SSH pipe)
+    // Read SSH config so previews route to the receiver
     let _sshHost = '', _sshKey = '', _sshPort = '22';
     try {
       const tcPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
       const tc = JSON.parse(fs.readFileSync(tcPath, 'utf8'));
+
+      // Priority 1: per-LLM remote config (e.g. tc['claude-code'].mode === 'remote')
       if (llmKey && tc[llmKey]?.mode === 'remote') {
         _sshHost = tc[llmKey].host || '';
         _sshKey  = tc[llmKey].sshKey || '';
         _sshPort = String(tc[llmKey].port || '22');
-      } else {
+      }
+
+      // Priority 2: global provider is explicitly ssh-remote/agentvibes-receiver
+      if (!_sshHost) {
         const provFilePath = path.join(os.homedir(), '.claude', 'tts-provider.txt');
         const globalProv = fs.readFileSync(provFilePath, 'utf8').trim();
         if (globalProv === 'ssh-remote' || globalProv === 'agentvibes-receiver') {
           _sshHost = tc[globalProv]?.host || '';
           _sshKey  = tc[globalProv]?.sshKey || '';
           _sshPort = String(tc[globalProv]?.port || '22');
+        }
+      }
+
+      // Priority 3: scan all transport-config entries for any mode=remote entry
+      // (mirrors play-tts-ssh-remote.sh Priority 2b — handles the case where
+      // tts-provider.txt says 'piper' but a per-LLM remote route is configured)
+      if (!_sshHost) {
+        for (const val of Object.values(tc)) {
+          if (val?.mode === 'remote' && val?.host) {
+            _sshHost = val.host;
+            _sshKey  = val.sshKey || '';
+            _sshPort = String(val.port || '22');
+            break;
+          }
         }
       }
     } catch {}
@@ -2449,7 +2468,7 @@ export function createSetupTab(screen, services) {
     // Fixed legend row — pinned at top so it never scrolls away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{brightyellow-fg}select{/brightyellow-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{brightyellow-fg}sample{/brightyellow-fg}  {green-fg}★{/green-fg}{gray-fg}={/gray-fg}{brightyellow-fg}cached{/brightyellow-fg}  {cyan-fg}☁{/cyan-fg}{gray-fg}={/gray-fg}{brightyellow-fg}Download{/brightyellow-fg}  {gray-fg}[D]={/gray-fg}all  {gray-fg}[Esc]={/gray-fg}cancel',
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {green-fg}★{/green-fg}{gray-fg}={/gray-fg}{#FFD700-fg}cached{/#FFD700-fg}  {cyan-fg}☁{/cyan-fg}{gray-fg}={/gray-fg}{#FFD700-fg}Download{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}all  {gray-fg}[Esc]={/gray-fg}cancel',
       style: { bg: COLORS.contentBg },
     });
 
