@@ -265,6 +265,17 @@ case "$ACTIVE_PROVIDER" in
     ;;
 esac
 
+# AGENTVIBES_FORCE_PROVIDER: set by agentvibes-receiver.sh to honour the
+# provider field in the incoming JSON payload (e.g. kokoro, elevenlabs).
+# Only applies when the locally-configured provider is still the default "piper"
+# so a receiver that has tts-provider.txt set keeps its own preference.
+if [[ -n "${AGENTVIBES_FORCE_PROVIDER:-}" && "$ACTIVE_PROVIDER" == "piper" ]]; then
+  case "$AGENTVIBES_FORCE_PROVIDER" in
+    piper|soprano|macos|windows-sapi|kokoro|elevenlabs)
+      ACTIVE_PROVIDER="$AGENTVIBES_FORCE_PROVIDER" ;;
+  esac
+fi
+
 # Per-LLM SSH override: if the current LLM has mode=remote in transport-config.json,
 # write a one-shot env override so play-tts-ssh-remote.sh uses that LLM's SSH config.
 _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
