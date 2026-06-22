@@ -165,7 +165,9 @@ SAFE_TEXT="${TEXT//\'/\'\\\'\'}"
 # Build SSH args — use explicit key/port from config if available, else rely on ~/.ssh/config
 SSH_ARGS=(-o ConnectTimeout=5)
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
-[[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
+# Never force "-p 22" (ssh default) -- it would override an ~/.ssh/config
+# Host alias port (e.g. laptop-win -> 45217). Empty/22 => defer to ssh config.
+if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then SSH_ARGS+=(-p "$SSH_PORT"); fi
 
 # Send TTS command to Android device via SSH
 # Use termux-tts-speak for native Android TTS

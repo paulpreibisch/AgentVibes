@@ -2385,7 +2385,7 @@ export function createSetupTab(screen, services) {
     let _kAnimInterval = null;
 
     // Read SSH config so previews route to the receiver
-    let _sshHost = '', _sshKey = '', _sshPort = '22';
+    let _sshHost = '', _sshKey = '', _sshPort = '';
     try {
       const tcPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
       const tc = JSON.parse(fs.readFileSync(tcPath, 'utf8'));
@@ -2394,7 +2394,7 @@ export function createSetupTab(screen, services) {
       if (llmKey && tc[llmKey]?.mode === 'remote') {
         _sshHost = tc[llmKey].host || '';
         _sshKey  = tc[llmKey].sshKey || '';
-        _sshPort = String(tc[llmKey].port || '22');
+        _sshPort = String(tc[llmKey].port || '');
       }
 
       // Priority 2: global provider is explicitly ssh-remote/agentvibes-receiver
@@ -2404,7 +2404,7 @@ export function createSetupTab(screen, services) {
         if (globalProv === 'ssh-remote' || globalProv === 'agentvibes-receiver') {
           _sshHost = tc[globalProv]?.host || '';
           _sshKey  = tc[globalProv]?.sshKey || '';
-          _sshPort = String(tc[globalProv]?.port || '22');
+          _sshPort = String(tc[globalProv]?.port || '');
         }
       }
 
@@ -2416,7 +2416,7 @@ export function createSetupTab(screen, services) {
           if (val?.mode === 'remote' && val?.host) {
             _sshHost = val.host;
             _sshKey  = val.sshKey || '';
-            _sshPort = String(val.port || '22');
+            _sshPort = String(val.port || '');
             break;
           }
         }
@@ -2426,6 +2426,8 @@ export function createSetupTab(screen, services) {
     // Pre-validate SSH config once so the space handler can branch without re-checking
     const _validSshHost = Boolean(_sshHost && /^[a-zA-Z0-9][a-zA-Z0-9._@:-]*$/.test(_sshHost));
     const _validSshKey  = Boolean(_sshKey && /^\//.test(_sshKey) && fs.existsSync(_sshKey));
+    // Empty port => omit AGENTVIBES_SSH_PORT so the sender never forces
+    // "-p 22" and an ~/.ssh/config Host alias keeps its real port (defer to ~/.ssh/config).
     const _validSshPort = Boolean(_sshPort && /^\d+$/.test(_sshPort));
 
     const IDLE_LABEL = ' {bold}{cyan-fg} Kokoro — Select Voice {/cyan-fg}{/bold} ';

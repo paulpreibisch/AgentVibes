@@ -386,7 +386,25 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
 # Transport providers (ssh-remote etc.) are not listed because they forward
 # TTS to a remote host — overriding with a local engine would synthesize on
 # the wrong machine.
-if ($_LlmEngine) {
+#
+# Voice/engine coupling guard: Kokoro voice ids follow a strict
+# "<2-letter prefix>_<name>" pattern where the 2nd char is the gender (f/m)
+# — e.g. af_river, am_eric, bf_emma, jf_alpha.  They are all-lowercase with no
+# locale, hyphen, digit, or "::" multi-speaker separator that Piper/LibriTTS
+# voices always carry, so the pattern can never match a Piper voice.  Such a
+# voice can ONLY be synthesised by the Kokoro engine.  When the active voice is
+# a Kokoro voice (e.g. the Kokoro voice picker preview, which sends
+# provider=kokoro + a Kokoro voice), the per-LLM ENGINE column — which may name
+# piper/sapi for that LLM's normal text responses that use Piper voices — must
+# NOT redirect it to an incompatible engine, or synthesis fails silently
+# (Piper can't find the Kokoro voice model → no audio, exit 0).
+$_VoiceIsKokoro = $VoiceOverride -match '^[a-z][fm]_[a-z]+$'
+if ($_VoiceIsKokoro) {
+    # A Kokoro-format voice forces the Kokoro engine regardless of the per-LLM
+    # ENGINE column or the global tts-provider.txt default.
+    $ProviderScript = "$HooksDir\play-tts-kokoro.ps1"
+}
+elseif ($_LlmEngine) {
     # Accept both canonical Windows names and the cross-platform aliases the TUI
     # writes (e.g. "piper" saved on a Linux/WSL install that is later read on
     # Windows, or "sapi" as a short form).  Unknown values keep the global default.
