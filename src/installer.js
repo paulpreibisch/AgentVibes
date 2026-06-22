@@ -3598,7 +3598,7 @@ function shouldIncludeHookFile(file, stat) {
            !file.startsWith('.');
   }
   return stat.isFile() &&
-         (file.endsWith('.sh') || file === 'hooks.json') &&
+         (file.endsWith('.sh') || file.endsWith('.py') || file === 'hooks.json') &&
          !file.includes('prepare-release') &&
          !file.startsWith('.');
 }
