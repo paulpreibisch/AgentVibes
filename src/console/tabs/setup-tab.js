@@ -2415,6 +2415,7 @@ export function createSetupTab(screen, services) {
       if (_kClosed) return;
       _kClosed = true;
       _killKPreview();
+      // _dlAllProc and _dlAllActive are closed via _kClosed check in the dl loop
       navigationService?.closeModal();
       destroyList(kBox, screen, onDone);
     }
@@ -2440,10 +2441,17 @@ export function createSetupTab(screen, services) {
     });
     kBox.setFront();
 
-    // Scrollable voice list — stops LEGEND_H rows above the bottom border
+    // Fixed legend row — pinned at top so it never scrolls away
+    blessed.text({
+      parent: kBox, top: 0, left: 1, right: 1, height: LEGEND_H, tags: true,
+      content: '{yellow-fg}★ = cached  ☁ = downloads on first use  [Enter]=select  [Space]=preview  [D]=download all  [Esc]=cancel{/yellow-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    // Scrollable voice list — starts below the legend row
     const kPicker = blessed.list({
       parent: kBox,
-      top: 0, left: 0, right: 0, bottom: LEGEND_H,
+      top: LEGEND_H, left: 0, right: 0, bottom: 0,
       keys: true, vi: true, mouse: true, tags: true,
       items,
       scrollable: true,
@@ -2454,13 +2462,6 @@ export function createSetupTab(screen, services) {
         selected: { bg: 'green', fg: 'white', bold: true },
         item: { fg: COLORS.labelFg },
       },
-    });
-
-    // Fixed legend row — always visible, outside the scroll area
-    blessed.text({
-      parent: kBox, bottom: 0, left: 1, right: 1, height: LEGEND_H, tags: true,
-      content: '{green-fg}★{/green-fg}{gray-fg}=cached  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=downloads on first use  [Enter]=select  [Space]=preview  [Esc]=cancel{/gray-fg}',
-      style: { bg: COLORS.contentBg },
     });
 
     const curIdx = voices.indexOf(draft.voice);
@@ -2551,23 +2552,23 @@ export function createSetupTab(screen, services) {
       }
       _kPreviewProc = synthProc;
 
-      // Parse HuggingFace tqdm lines from stderr: " 51%|████░░  42.5M/83.5M"
-      if (!isDownloaded) {
-        let _stderrBuf = '';
-        synthProc.stderr.on('data', (chunk) => {
-          if (_kClosed) return;
-          _stderrBuf += chunk.toString();
-          // tqdm writes \r-terminated progress on same line; split on \r or \n
-          const parts = _stderrBuf.split(/[\r\n]/);
-          _stderrBuf = parts.pop() ?? '';
-          for (const line of parts) {
-            const m = line.match(/\b(\d{1,3})%\s*\|/);
-            if (m) {
-              _dlRealPct = Math.min(100, parseInt(m[1], 10));
-            }
+      // Always drain stderr to prevent pipe-buffer deadlock from PyTorch warnings.
+      // For uncached voices, also parse tqdm download progress lines.
+      let _stderrBuf = '';
+      synthProc.stderr.on('data', (chunk) => {
+        if (_kClosed) return;
+        if (isDownloaded) return;  // just drain — no UI update needed
+        _stderrBuf += chunk.toString();
+        // tqdm writes \r-terminated progress on same line; split on \r or \n
+        const parts = _stderrBuf.split(/[\r\n]/);
+        _stderrBuf = parts.pop() ?? '';
+        for (const line of parts) {
+          const m = line.match(/\b(\d{1,3})%\s*\|/);
+          if (m) {
+            _dlRealPct = Math.min(100, parseInt(m[1], 10));
           }
-        });
-      }
+        }
+      });
 
       synthProc.on('exit', (synthCode) => {
         _stopDlAnim();
@@ -2651,6 +2652,92 @@ export function createSetupTab(screen, services) {
           setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
         }
       });
+    });
+
+    // Download All — sequentially downloads every uncached voice
+    let _dlAllActive = false;
+    let _dlAllProc = null;
+    kPicker.key(['d', 'D'], () => {
+      if (_kPreviewProc || _dlAllActive) return;
+      const toDownload = voices.filter(v => !cached.has(v));
+      if (!toDownload.length) {
+        kBox.setLabel(` {green-fg}✓ All ${voices.length} voices already cached{/green-fg} `);
+        setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 2500);
+        screen.render();
+        return;
+      }
+      _dlAllActive = true;
+      let dlIdx = 0;
+
+      function _dlNext() {
+        if (_kClosed || dlIdx >= toDownload.length) {
+          _dlAllActive = false;
+          _dlAllProc = null;
+          if (!_kClosed) {
+            const total = voices.filter(v => cached.has(v)).length;
+            kBox.setLabel(` {green-fg}✓ Download complete — ${total}/${voices.length} cached{/green-fg} `);
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+            screen.render();
+          }
+          return;
+        }
+        const voiceId = toDownload[dlIdx];
+        const n = dlIdx + 1;
+        kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length}: ${voiceId}...{/yellow-fg} `);
+        screen.render();
+
+        const tmpWav = _secureTempWav('kokoro-dl');
+        const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+        let dlProc;
+        try {
+          dlProc = spawn('python3', [pyScript, 'hello', voiceId, tmpWav, '1.0'], { // NOSONAR
+            stdio: ['ignore', 'ignore', 'pipe'],
+            env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+          });
+        } catch {
+          dlIdx++;
+          _dlNext();
+          return;
+        }
+        _dlAllProc = dlProc;
+
+        let _buf = '', _dlPct = -1;
+        const DL_W = 18;
+        dlProc.stderr.on('data', (chunk) => {
+          if (_kClosed) return;
+          _buf += chunk.toString();
+          const parts = _buf.split(/[\r\n]/);
+          _buf = parts.pop() ?? '';
+          for (const line of parts) {
+            const m = line.match(/\b(\d{1,3})%\s*\|/);
+            if (m) {
+              const pct = Math.min(100, parseInt(m[1], 10));
+              if (pct !== _dlPct) {
+                _dlPct = pct;
+                const filled = Math.round(pct * DL_W / 100);
+                const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
+                          + '{#555555-fg}' + '░'.repeat(DL_W - filled) + '{/#555555-fg}';
+                kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length} [${bar}] ${pct}% ${voiceId}{/yellow-fg} `);
+                screen.render();
+              }
+            }
+          }
+        });
+
+        dlProc.on('exit', (code) => {
+          _dlAllProc = null;
+          try { fs.unlinkSync(tmpWav); } catch {}
+          if (code === 0) {
+            cached.add(voiceId);
+            const listIdx = voices.indexOf(voiceId);
+            if (listIdx >= 0) kPicker.setItem(listIdx, `  {green-fg}★{/green-fg} ${_kokoroVoiceLabel(voiceId)}`);
+          }
+          dlIdx++;
+          _dlNext();
+        });
+        dlProc.on('error', () => { _dlAllProc = null; try { fs.unlinkSync(tmpWav); } catch {} dlIdx++; _dlNext(); });
+      }
+      _dlNext();
     });
 
     kPicker.key(['escape', 'q', 'Q'], _closeKP);
