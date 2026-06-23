@@ -134,11 +134,11 @@ function serializeSelections(sel) {
 
 // ── TTS + effect preview ──────────────────────────────────────────────────────
 
-function previewEffectWithVoice(effectValue, phrase, opts) {
+function previewEffectWithVoice(effectValue, phrase, opts, onDone) {
   if (IS_TEST) return;
   stopPreview();
   const playTts = path.join(opts.previewHooksDir, 'play-tts.sh');
-  if (!fs.existsSync(playTts)) { previewEffect(effectValue); return; }
+  if (!fs.existsSync(playTts)) { previewEffect(effectValue); onDone?.(); return; }
 
   const env = { ...process.env, AGENTVIBES_REVERB_OVERRIDE: effectValue };
   if (opts.previewTargetDir) env.CLAUDE_PROJECT_DIR = opts.previewTargetDir;
@@ -148,8 +148,8 @@ function previewEffectWithVoice(effectValue, phrase, opts) {
 
   _previewProc = spawn(args[0], args.slice(1), { stdio: 'ignore', env });
   if (_previewProc) {
-    _previewProc.on('close', () => { _previewProc = null; });
-    _previewProc.on('error', () => { _previewProc = null; });
+    _previewProc.on('close', () => { _previewProc = null; onDone?.(); });
+    _previewProc.on('error', () => { _previewProc = null; onDone?.(); });
   }
 }
 
@@ -313,7 +313,27 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     screen.render();
   };
 
+  const _SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  let _spinInterval = null;
+  let _spinIdx = 0;
+
+  const _stopSpinner = () => {
+    if (_spinInterval) { clearInterval(_spinInterval); _spinInterval = null; }
+    list.setLabel(_modalTitle('Audio Effects'));
+    screen.render();
+  };
+
+  const _startSpinner = (name) => {
+    _stopSpinner();
+    _spinIdx = 0;
+    _spinInterval = setInterval(() => {
+      list.setLabel(` {cyan-fg}${_SPIN[_spinIdx++ % _SPIN.length]} ${name}...{/cyan-fg} `);
+      screen.render();
+    }, 80);
+  };
+
   const _confirm = () => {
+    _stopSpinner();
     const val = serializeSelections(selections);
     if (applyToEffectsManager) {
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
@@ -355,7 +375,8 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     if (!item || item.isHeader || item.isLegend) return;
     if (opts.previewHooksDir) {
       const name = item.label.replace(/\s{2,}\(.*?\)\s*$/, '').trim();
-      previewEffectWithVoice(item.value, `Testing ${name}.`, opts);
+      _startSpinner(name);
+      previewEffectWithVoice(item.value, `Testing ${name}.`, opts, _stopSpinner);
     } else {
       previewEffect(item.value);
     }
@@ -364,6 +385,7 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   list.key(['c', 'C'], _confirm);
 
   list.key(['escape', 'q', 'Q'], () => {
+    _stopSpinner();
     stopPreview();
     destroyList(list, screen, onClose);
   });
