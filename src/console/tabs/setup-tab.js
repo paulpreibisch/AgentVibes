@@ -2460,10 +2460,16 @@ export function createSetupTab(screen, services) {
     }
     navigationService?.openModal(null, _closeKP);
 
-    // ✓ = cached locally, ☁ = auto-downloads from HuggingFace on first preview/use, ★ = favorited
+    // ✓ = cached locally, ☁ = downloadable, ! = CJK (needs pyopenjtalk), ★ = favorited
+    function _isCjkVoice(id) {
+      return ['jf','jm','zf','zm','kf','km'].includes(id.slice(0, 2));
+    }
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
-      const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
+      let mark;
+      if (cached.has(id))       mark = '{green-fg}✓{/green-fg}';
+      else if (_isCjkVoice(id)) mark = '{yellow-fg}!{/yellow-fg}';
+      else                      mark = '{cyan-fg}☁{/cyan-fg}';
       return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
     }
     const items = voices.map(_kokoroItem);
@@ -2512,7 +2518,7 @@ export function createSetupTab(screen, services) {
     // Fixed legend rows — pinned at top so they never scroll away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=needs download',
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=download  {/gray-fg}{yellow-fg}!{/yellow-fg}{gray-fg}=needs pyopenjtalk (ja/zh/ko)',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2580,7 +2586,36 @@ export function createSetupTab(screen, services) {
         remoteProc.on('exit', (code) => {
           _kPreviewProc = null;
           _stopKSpinner();
-          if (!_kClosed) {
+          if (_kClosed) return;
+          if (code !== 0 && _isCjkVoice(voiceId)) {
+            // CJK voice failed on receiver (needs pyopenjtalk there).
+            // Still try to download the .pt file locally so the picker shows ✓.
+            const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+            const dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
+              stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
+            });
+            let dlOut = '';
+            dlProc.stdout.on('data', d => { dlOut += d.toString(); });
+            dlProc.on('exit', (dlCode) => {
+              if (dlCode === 0 && dlOut.trim()) {
+                cached.add(voiceId);
+                const li = voices.indexOf(voiceId);
+                if (li >= 0) { kPicker.setItem(li, _kokoroItem(voiceId)); }
+              }
+              if (!_kClosed) {
+                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs  pip install pyopenjtalk{/yellow-fg} `);
+                screen.render();
+                setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
+              }
+            });
+            dlProc.on('error', () => {
+              if (!_kClosed) {
+                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: needs pyopenjtalk on receiver{/yellow-fg} `);
+                screen.render();
+                setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
+              }
+            });
+          } else {
             const errLine = _remoteStderr.split('\n').find(l => l.includes('[ERROR]') || l.includes('kex_') || l.includes('Connection'));
             const label = errLine
               ? ` {red-fg}SSH: ${errLine.slice(0, 50)}{/red-fg} `
@@ -2831,56 +2866,79 @@ export function createSetupTab(screen, services) {
         kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length}: ${voiceId}...{/yellow-fg} `);
         screen.render();
 
-        const tmpWav = _secureTempWav('kokoro-dl');
         const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
         let dlProc;
-        try {
-          dlProc = spawn('python3', [pyScript, 'hello', voiceId, tmpWav, '1.0'], { // NOSONAR
-            stdio: ['ignore', 'ignore', 'pipe'],
-            env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
-          });
-        } catch {
-          dlIdx++;
-          _dlNext();
-          return;
-        }
-        _dlAllProc = dlProc;
 
-        let _buf = '', _dlPct = -1;
-        const DL_W = 18;
-        dlProc.stderr.on('data', (chunk) => {
-          if (_kClosed) return;
-          _buf += chunk.toString();
-          const parts = _buf.split(/[\r\n]/);
-          _buf = parts.pop() ?? '';
-          for (const line of parts) {
-            const m = line.match(/\b(\d{1,3})%\s*\|/);
-            if (m) {
-              const pct = Math.min(100, parseInt(m[1], 10));
-              if (pct !== _dlPct) {
-                _dlPct = pct;
-                const filled = Math.round(pct * DL_W / 100);
-                const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
-                          + '{#555555-fg}' + '░'.repeat(DL_W - filled) + '{/#555555-fg}';
-                kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length} [${bar}] ${pct}% ${voiceId}{/yellow-fg} `);
-                screen.render();
+        if (_isCjkVoice(voiceId)) {
+          // CJK voices: skip synthesis (needs pyopenjtalk), just download the .pt file
+          try {
+            dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
+              stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
+            });
+          } catch { dlIdx++; _dlNext(); return; }
+          _dlAllProc = dlProc;
+          let dlOut = '';
+          dlProc.stdout.on('data', d => { dlOut += d.toString(); });
+          dlProc.on('exit', (code) => {
+            _dlAllProc = null;
+            if (code === 0 && dlOut.trim()) {
+              cached.add(voiceId);
+              const listIdx = voices.indexOf(voiceId);
+              if (listIdx >= 0) kPicker.setItem(listIdx, _kokoroItem(voiceId));
+            }
+            dlIdx++; _dlNext();
+          });
+          dlProc.on('error', () => { _dlAllProc = null; dlIdx++; _dlNext(); });
+        } else {
+          const tmpWav = _secureTempWav('kokoro-dl');
+          try {
+            dlProc = spawn('python3', [pyScript, 'hello', voiceId, tmpWav, '1.0'], { // NOSONAR
+              stdio: ['ignore', 'ignore', 'pipe'],
+              env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+            });
+          } catch {
+            dlIdx++;
+            _dlNext();
+            return;
+          }
+          _dlAllProc = dlProc;
+
+          let _buf = '', _dlPct = -1;
+          const DL_W = 18;
+          dlProc.stderr.on('data', (chunk) => {
+            if (_kClosed) return;
+            _buf += chunk.toString();
+            const parts = _buf.split(/[\r\n]/);
+            _buf = parts.pop() ?? '';
+            for (const line of parts) {
+              const m = line.match(/\b(\d{1,3})%\s*\|/);
+              if (m) {
+                const pct = Math.min(100, parseInt(m[1], 10));
+                if (pct !== _dlPct) {
+                  _dlPct = pct;
+                  const filled = Math.round(pct * DL_W / 100);
+                  const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
+                            + '{#555555-fg}' + '░'.repeat(DL_W - filled) + '{/#555555-fg}';
+                  kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length} [${bar}] ${pct}% ${voiceId}{/yellow-fg} `);
+                  screen.render();
+                }
               }
             }
-          }
-        });
+          });
 
-        dlProc.on('exit', (code) => {
-          _dlAllProc = null;
-          try { fs.unlinkSync(tmpWav); } catch {}
-          if (code === 0) {
-            cached.add(voiceId);
-            const listIdx = voices.indexOf(voiceId);
-            if (listIdx >= 0) kPicker.setItem(listIdx, _kokoroItem(voiceId));
-          }
-          dlIdx++;
-          _dlNext();
-        });
-        dlProc.on('error', () => { _dlAllProc = null; try { fs.unlinkSync(tmpWav); } catch {} dlIdx++; _dlNext(); });
+          dlProc.on('exit', (code) => {
+            _dlAllProc = null;
+            try { fs.unlinkSync(tmpWav); } catch {}
+            if (code === 0) {
+              cached.add(voiceId);
+              const listIdx = voices.indexOf(voiceId);
+              if (listIdx >= 0) kPicker.setItem(listIdx, _kokoroItem(voiceId));
+            }
+            dlIdx++;
+            _dlNext();
+          });
+          dlProc.on('error', () => { _dlAllProc = null; try { fs.unlinkSync(tmpWav); } catch {} dlIdx++; _dlNext(); });
+        }
       }
       _dlNext();
     });
