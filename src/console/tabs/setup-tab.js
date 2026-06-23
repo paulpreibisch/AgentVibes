@@ -44,7 +44,7 @@ import { destroyList } from '../widgets/destroy-list.js';
 import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import net from 'node:net';
