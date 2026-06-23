@@ -2612,8 +2612,8 @@ export function createSetupTab(screen, services) {
       }
     }
 
-    // Check if the kokoro package itself is installed (needed for all voice synthesis)
-    let _kokoroInstalled = spawnSync(_pythonCmd, ['-c', 'import kokoro'], { stdio: 'ignore', timeout: 3000 }).status === 0; // NOSONAR
+    // Check if kokoro + soundfile are installed (both required for synthesis)
+    let _kokoroInstalled = spawnSync(_pythonCmd, ['-c', 'import kokoro, soundfile'], { stdio: 'ignore', timeout: 3000 }).status === 0; // NOSONAR
 
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
@@ -2780,7 +2780,7 @@ export function createSetupTab(screen, services) {
         iMod.key(['escape'], cancelInstall);
         screen.render();
 
-        _installProc = spawn(_pythonCmd, ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
+        _installProc = spawn(_pythonCmd, ['-m', 'pip', 'install', '--progress-bar', 'on', ...pkg.split(/\s+/)], { // NOSONAR
           stdio: ['ignore', 'pipe', 'pipe'],
         });
 
@@ -2901,7 +2901,7 @@ export function createSetupTab(screen, services) {
 
       // kokoro package itself must be installed for any voice
       if (!_kokoroInstalled) {
-        _promptInstallPkg('kokoro', 'Kokoro TTS engine', voiceId, () => {
+        _promptInstallPkg('kokoro soundfile numpy', 'Kokoro TTS engine', voiceId, () => {
           _kokoroInstalled = true;
           voices.forEach((v, i) => kPicker.setItem(i, _kokoroItem(v)));
         });
