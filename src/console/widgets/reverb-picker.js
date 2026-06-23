@@ -140,7 +140,7 @@ function previewEffectWithVoice(effectValue, phrase, opts, onDone) {
   const playTts = path.join(opts.previewHooksDir, 'play-tts.sh');
   if (!fs.existsSync(playTts)) { previewEffect(effectValue); onDone?.(); return; }
 
-  const env = { ...process.env, AGENTVIBES_REVERB_OVERRIDE: effectValue };
+  const env = { ...process.env, AGENTVIBES_REVERB_OVERRIDE: effectValue, AGENTVIBES_EFFECTS_PREVIEW: '1' };
   if (opts.previewTargetDir) env.CLAUDE_PROJECT_DIR = opts.previewTargetDir;
 
   const args = ['bash', playTts, phrase];
@@ -259,7 +259,11 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   const WIDTH = 52;
   const HEIGHT = Math.min(FLAT_ITEMS.length + 4, Math.max(20, (screen.height || 24) - 2));
 
-  const renderItems = () => FLAT_ITEMS.map(item => {
+  let _previewIdx = -1;
+  let _spinFrame = 0;
+  const _SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+
+  const renderItems = () => FLAT_ITEMS.map((item, idx) => {
     if (item.isHeader) {
       const fill = Math.max(0, WIDTH - 6 - item.label.length);
       return `{#546e7a-fg}${item.label}${'─'.repeat(fill)}{/#546e7a-fg}`;
@@ -269,7 +273,8 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
       ? selections.get('character') === item.value
       : selections.get(item.category) === item.value;
     const dot = isSel ? '{green-fg}●{/green-fg}' : '{#546e7a-fg}○{/#546e7a-fg}';
-    return ` ${dot}  ${item.label}`;
+    const spin = idx === _previewIdx ? ` {cyan-fg}${_SPIN[_spinFrame % _SPIN.length]}{/cyan-fg}` : '';
+    return ` ${dot}  ${item.label}${spin}`;
   });
 
   const list = blessed.list({
@@ -313,22 +318,21 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     screen.render();
   };
 
-  const _SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
   let _spinInterval = null;
-  let _spinIdx = 0;
 
   const _stopSpinner = () => {
     if (_spinInterval) { clearInterval(_spinInterval); _spinInterval = null; }
-    list.setLabel(_modalTitle('Audio Effects'));
-    screen.render();
+    _previewIdx = -1;
+    _refresh();
   };
 
-  const _startSpinner = (name) => {
+  const _startSpinner = (idx) => {
     _stopSpinner();
-    _spinIdx = 0;
+    _previewIdx = idx;
+    _spinFrame = 0;
     _spinInterval = setInterval(() => {
-      list.setLabel(` {cyan-fg}${_SPIN[_spinIdx++ % _SPIN.length]} ${name}...{/cyan-fg} `);
-      screen.render();
+      _spinFrame++;
+      _refresh();
     }, 80);
   };
 
@@ -371,11 +375,12 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   });
 
   list.key('space', () => {
-    const item = FLAT_ITEMS[list.selected];
+    const idx = list.selected;
+    const item = FLAT_ITEMS[idx];
     if (!item || item.isHeader || item.isLegend) return;
     if (opts.previewHooksDir) {
       const name = item.label.replace(/\s{2,}\(.*?\)\s*$/, '').trim();
-      _startSpinner(name);
+      _startSpinner(idx);
       previewEffectWithVoice(item.value, `Testing ${name}.`, opts, _stopSpinner);
     } else {
       previewEffect(item.value);

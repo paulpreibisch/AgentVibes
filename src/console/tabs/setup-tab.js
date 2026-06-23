@@ -2445,6 +2445,7 @@ export function createSetupTab(screen, services) {
     const IDLE_LABEL = ' {bold}{cyan-fg} Kokoro — Select Voice {/cyan-fg}{/bold} ';
 
     function _killKPreview() {
+      _stopKSpinner();
       if (_kAnimInterval) { clearInterval(_kAnimInterval); _kAnimInterval = null; }
       if (_kPreviewProc) { try { _kPreviewProc.kill(); } catch {} _kPreviewProc = null; }
       if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
@@ -2460,14 +2461,42 @@ export function createSetupTab(screen, services) {
     navigationService?.openModal(null, _closeKP);
 
     // ✓ = cached locally, ☁ = auto-downloads from HuggingFace on first preview/use, ★ = favorited
-    const items = voices.map(id => {
+    function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
       const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
       return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
-    });
+    }
+    const items = voices.map(_kokoroItem);
 
-    const LEGEND_H = 1;
-    const pickerH = Math.min(voices.length + LEGEND_H + 3, 22);
+    // Spinner state for Space-preview animation on the item row
+    const _K_SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+    let _kSpinInterval = null;
+    let _kSpinFrame = 0;
+    let _kSpinningIdx = -1;
+
+    function _startKSpinner(listIdx) {
+      _stopKSpinner();
+      _kSpinningIdx = listIdx;
+      _kSpinFrame = 0;
+      _kSpinInterval = setInterval(() => {
+        if (_kClosed) { _stopKSpinner(); return; }
+        const spin = `{cyan-fg}${_K_SPIN[_kSpinFrame++ % _K_SPIN.length]}{/cyan-fg}`;
+        kPicker.setItem(listIdx, `${_kokoroItem(voices[listIdx])} ${spin}`);
+        screen.render();
+      }, 80);
+    }
+
+    function _stopKSpinner() {
+      if (_kSpinInterval) { clearInterval(_kSpinInterval); _kSpinInterval = null; }
+      if (_kSpinningIdx >= 0 && !_kClosed) {
+        kPicker.setItem(_kSpinningIdx, _kokoroItem(voices[_kSpinningIdx]));
+        screen.render();
+      }
+      _kSpinningIdx = -1;
+    }
+
+    const LEGEND_H = 2;
+    const pickerH = Math.min(voices.length + LEGEND_H + 3, 24);
 
     // Outer box (border + label) — legend is a fixed child, not part of the scroll list
     const kBox = blessed.box({
@@ -2480,10 +2509,10 @@ export function createSetupTab(screen, services) {
     });
     kBox.setFront();
 
-    // Fixed legend row — pinned at top so it never scrolls away
+    // Fixed legend rows — pinned at top so they never scroll away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {green-fg}✓{/green-fg}{gray-fg}={/gray-fg}{#FFD700-fg}cached{/#FFD700-fg}  {#FFD700-fg}★{/#FFD700-fg}{gray-fg}={/gray-fg}{#FFD700-fg}fav  {gray-fg}[F]{/gray-fg}=fav  {cyan-fg}☁{/cyan-fg}{gray-fg}={/gray-fg}{#FFD700-fg}Download{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}all  {gray-fg}[Esc]={/gray-fg}cancel',
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=needs download',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2525,8 +2554,7 @@ export function createSetupTab(screen, services) {
 
       // ── Remote preview: route through SSH pipeline so receiver plays it ──
       if (_validSshHost) {
-        kBox.setLabel(` {cyan-fg}♪ ${voiceId}→${_sshHost}... (Space=stop){/cyan-fg} `);
-        screen.render();
+        _startKSpinner(kPicker.selected);
         const hookDir = path.join(packageDir, '.claude', 'hooks');
         const remoteEnv = { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_SSH_HOST: _sshHost };
         if (_validSshKey)  remoteEnv.AGENTVIBES_SSH_KEY  = _sshKey;
@@ -2539,6 +2567,7 @@ export function createSetupTab(screen, services) {
             env: remoteEnv,
           });
         } catch {
+          _stopKSpinner();
           if (!_kClosed) {
             kBox.setLabel(` {red-fg}Remote preview failed{/red-fg} `);
             screen.render();
@@ -2550,6 +2579,7 @@ export function createSetupTab(screen, services) {
         _kPreviewProc = remoteProc;
         remoteProc.on('exit', (code) => {
           _kPreviewProc = null;
+          _stopKSpinner();
           if (!_kClosed) {
             const errLine = _remoteStderr.split('\n').find(l => l.includes('[ERROR]') || l.includes('kex_') || l.includes('Connection'));
             const label = errLine
@@ -2564,6 +2594,7 @@ export function createSetupTab(screen, services) {
         });
         remoteProc.on('error', () => {
           _kPreviewProc = null;
+          _stopKSpinner();
           if (!_kClosed) {
             kBox.setLabel(` {red-fg}Remote preview failed{/red-fg} `);
             screen.render();
@@ -2612,7 +2643,7 @@ export function createSetupTab(screen, services) {
       // ──────────────────────────────────────────────────────────────────────
 
       if (isDownloaded) {
-        kBox.setLabel(` {cyan-fg}♪ Synthesizing ${voiceId}...{/cyan-fg} `);
+        _startKSpinner(kPicker.selected);
       } else {
         _startDlAnim();
       }
@@ -2663,6 +2694,7 @@ export function createSetupTab(screen, services) {
 
       synthProc.on('exit', (synthCode) => {
         _stopDlAnim();
+        _stopKSpinner();
         _kPreviewProc = null;
         _kTmpWav = null;
         if (_kClosed) { try { fs.unlinkSync(tmpWav); } catch {} return; }
@@ -2684,12 +2716,7 @@ export function createSetupTab(screen, services) {
             dlProc.on('exit', (dlCode) => {
               if (dlCode === 0 && dlOut.trim()) {
                 cached.add(voiceId);
-                const newItems = voices.map(id => {
-                  const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
-                  const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
-                  return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
-                });
-                kPicker.setItems(newItems);
+                kPicker.setItems(voices.map(_kokoroItem));
                 if (!_kClosed) { kBox.setLabel(` {green-fg}✓ ${voiceId} cached (synthesis requires extra deps){/green-fg} `); screen.render(); }
                 setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
               }
@@ -2700,8 +2727,7 @@ export function createSetupTab(screen, services) {
         // Update icon to ✓ for newly-downloaded voice
         if (!isDownloaded) {
           cached.add(voiceId);
-          const fav  = _kokoroFavorites.has(voiceId) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
-          kPicker.setItem(kPicker.selected, `${fav}{green-fg}✓{/green-fg}  ${_kokoroVoiceLabel(voiceId)}`);
+          kPicker.setItem(kPicker.selected, _kokoroItem(voiceId));
         }
 
         // Phase 2: play WAV locally (remote destinations handled before synthesis via SSH pipeline)
@@ -2722,15 +2748,16 @@ export function createSetupTab(screen, services) {
         }
         _kPreviewProc = playProc;
         _kTmpWav = tmpWav;
-        kBox.setLabel(` {cyan-fg}♪ ${voiceId}... (Space=stop){/cyan-fg} `);
+        _startKSpinner(kPicker.selected);
         screen.render();
         playProc.on('exit', () => {
           _kPreviewProc = null;
+          _stopKSpinner();
           if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
-          if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); }
         });
         playProc.on('error', () => {
           _kPreviewProc = null;
+          _stopKSpinner();
           if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
           if (!_kClosed) { kBox.setLabel(` {red-fg}Playback failed{/red-fg} `); screen.render(); }
         });
@@ -2738,6 +2765,7 @@ export function createSetupTab(screen, services) {
 
       synthProc.on('error', () => {
         _stopDlAnim();
+        _stopKSpinner();
         _kPreviewProc = null;
         _kTmpWav = null;
         try { fs.unlinkSync(tmpWav); } catch {}
@@ -2765,9 +2793,7 @@ export function createSetupTab(screen, services) {
       } catch {}
       // Rebuild picker items
       const newItems = voices.map(id => {
-        const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
-        const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
-        return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
+        return _kokoroItem(id);
       });
       kPicker.setItems(newItems);
       screen.render();
@@ -2849,10 +2875,7 @@ export function createSetupTab(screen, services) {
           if (code === 0) {
             cached.add(voiceId);
             const listIdx = voices.indexOf(voiceId);
-            if (listIdx >= 0) {
-              const fav  = _kokoroFavorites.has(voiceId) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
-              kPicker.setItem(listIdx, `${fav}{green-fg}✓{/green-fg}  ${_kokoroVoiceLabel(voiceId)}`);
-            }
+            if (listIdx >= 0) kPicker.setItem(listIdx, _kokoroItem(voiceId));
           }
           dlIdx++;
           _dlNext();
