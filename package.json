@@ -55,6 +55,7 @@
     ".claude/personalities/",
     ".claude/output-styles/",
     ".claude/audio/tracks/",
+    ".claude/audio/ui/",
     ".claude/config/",
     ".claude/docs/",
     ".claude/language-voices.yaml",
