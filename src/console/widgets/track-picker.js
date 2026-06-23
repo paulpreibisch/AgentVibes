@@ -8,11 +8,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { formatTrackName } from './format-utils.js';
-import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
+import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;
@@ -221,18 +220,12 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
 
   // Preview playback state
   const _spawnEnv = buildAudioEnv();
-  const _mp3Player = detectMp3Player(_spawnEnv);
   let _previewProc = null;
   let _previewTrackId = null;
 
   function _killPreview() {
     if (_previewProc) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
-        try { _previewProc.kill(); } catch {}
-      } else {
-        try { process.kill(-_previewProc.pid, 'SIGTERM'); } catch {}
-      }
+      _previewProc.kill();
       _previewProc = null;
     }
     _previewTrackId = null;
@@ -252,23 +245,26 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     const safeBase = path.resolve(tracksDir);
     if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
 
-    if (!_mp3Player || !fs.existsSync(trackPath)) {
-      _setHint('{red-fg}No MP3 player found or track missing{/red-fg}');
-      setTimeout(() => {
-        _setHint(_hintLabel);
-      }, 3000);
+    if (!fs.existsSync(trackPath)) {
+      _setHint('{red-fg}Track file missing{/red-fg}');
+      setTimeout(() => { _setHint(_hintLabel); }, 3000);
       return;
     }
 
-    _previewProc = spawn(_mp3Player.bin, _mp3Player.args(trackPath), {
-      stdio: 'ignore', detached: true, env: _spawnEnv,
-    });
+    const proc = spawnMp3Player(trackPath, _spawnEnv);
+    if (!proc) {
+      _setHint('{red-fg}No MP3 player found{/red-fg}');
+      setTimeout(() => { _setHint(_hintLabel); }, 3000);
+      return;
+    }
+
+    _previewProc = proc;
     _previewTrackId = trackFile;
 
     const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
     _setHint(`{bright-cyan-fg}♪ Previewing: ${label}  (Space to stop){/bright-cyan-fg}`);
 
-    _previewProc.on('exit', () => {
+    proc.on('exit', () => {
       if (_previewTrackId === trackFile) {
         _previewTrackId = null;
         _previewProc = null;
@@ -276,7 +272,7 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
       }
     });
 
-    _previewProc.on('error', () => {
+    proc.on('error', () => {
       _previewTrackId = null;
       _previewProc = null;
     });
