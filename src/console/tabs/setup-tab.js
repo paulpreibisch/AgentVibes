@@ -491,9 +491,120 @@ export function createSetupTab(screen, services) {
     }
   }
 
+  function _openApiKeyInput(engine, row) {
+    const keyFile = path.join(os.homedir(), '.agentvibes', `${engine.id}-key.txt`);
+    const dlg = blessed.box({
+      parent: screen, top: 'center', left: 'center',
+      width: 70, height: 11,
+      border: { type: 'line' }, tags: true,
+      label: ` {bold}{cyan-fg} ${engine.name} — Enter API Key {/cyan-fg}{/bold} `,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    dlg.setFront();
+
+    blessed.text({
+      parent: dlg, top: 1, left: 2, tags: true,
+      content: `{white-fg}Paste your ${engine.name} API key (saved to ${keyFile}):{/white-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const inputBox = blessed.textbox({
+      parent: dlg, top: 3, left: 2, right: 2, height: 3,
+      border: { type: 'line' },
+      style: { fg: 'white', bg: 'black', border: { fg: 'blue' }, focus: { border: { fg: 'cyan' } } },
+    });
+
+    blessed.text({
+      parent: dlg, top: 7, left: 2, tags: true,
+      content: '{gray-fg}[Enter] Save  [Esc] Cancel{/gray-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _closed = false;
+    const _prevGrabKeys = screen.grabKeys;
+
+    function _close(save) {
+      if (_closed) return;
+      _closed = true;
+      inputBox.removeAllListeners('keypress');
+      screen.grabKeys = _prevGrabKeys;
+      screen.program.hideCursor();
+      dlg.destroy();
+      if (save) {
+        const key = (inputBox.value || '').trim();
+        if (key.length > 0) {
+          try {
+            fs.mkdirSync(path.join(os.homedir(), '.agentvibes'), { recursive: true });
+            fs.writeFileSync(keyFile, key + '\n', { mode: 0o600 });
+            if (row) {
+              row.statusLabel.setContent('{green-fg}[Installed]{/green-fg}');
+              row.installBtn.hide();
+            }
+          } catch (e) {
+            if (row) row.statusLabel.setContent(`{red-fg}[Save failed: ${e.message}]{/red-fg}`);
+          }
+        }
+      }
+      screen.render();
+    }
+
+    let _cursor = 0;
+    inputBox.value = '';
+
+    function _renderInput() {
+      const val = inputBox.value;
+      const lpos = inputBox._getCoords();
+      if (!lpos) { screen.render(); return; }
+      const contentWidth = Math.max(1, (lpos.xl - lpos.xi) - inputBox.iwidth);
+      const start = _cursor > contentWidth - 1 ? _cursor - contentWidth + 1 : 0;
+      inputBox.setContent(val.slice(start));
+      screen.render();
+      screen.program.cup(lpos.yi + inputBox.itop, lpos.xi + inputBox.ileft + (_cursor - start));
+    }
+
+    screen.grabKeys = true;
+    inputBox.on('keypress', (ch, key) => {
+      if (key.name === 'enter') { _close(true); return; }
+      if (key.name === 'escape') { _close(false); return; }
+      if (key.name === 'backspace') {
+        if (_cursor > 0) { inputBox.value = inputBox.value.slice(0, _cursor - 1) + inputBox.value.slice(_cursor); _cursor--; }
+      } else if (key.name === 'delete') {
+        if (_cursor < inputBox.value.length) { inputBox.value = inputBox.value.slice(0, _cursor) + inputBox.value.slice(_cursor + 1); }
+      } else if (key.name === 'left') {
+        if (_cursor > 0) _cursor--;
+      } else if (key.name === 'right') {
+        if (_cursor < inputBox.value.length) _cursor++;
+      } else if (key.name === 'home') {
+        _cursor = 0;
+      } else if (key.name === 'end') {
+        _cursor = inputBox.value.length;
+      } else if (ch && !key.ctrl && !key.meta) {
+        inputBox.value = inputBox.value.slice(0, _cursor) + ch + inputBox.value.slice(_cursor);
+        _cursor++;
+      }
+      _renderInput();
+    });
+
+    dlg.once('destroy', () => {
+      if (!_closed) { _closed = true; inputBox.removeAllListeners('keypress'); screen.grabKeys = _prevGrabKeys; screen.program.hideCursor(); }
+    });
+
+    inputBox.focus();
+    screen.program.showCursor();
+    _renderInput();
+  }
+
   let _ttsInstalling = false;
   async function _handleTtsInstall(engine) {
     if (!engine.installCmd || _ttsInstalling) return;
+
+    // ElevenLabs requires an API key — show a key-entry dialog instead of running a shell command
+    if (engine.requiresApiKey) {
+      const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
+      _openApiKeyInput(engine, row);
+      return;
+    }
+
     _ttsInstalling = true;
 
     const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
@@ -4117,7 +4228,7 @@ export function createSetupTab(screen, services) {
 
     // Show provider rows instead of contentBox
     contentBox.hide();
-    hintLine.setContent('  Screen 3: LLM Providers  |  [Enter] Action  |  [Tab] Next button  |  [Esc] Tab bar');
+    hintLine.setContent('  Screen 3: LLM Providers  |  [Enter] Action  |  [Tab] Next button  |  [Esc] TTS Engines');
     showAllProviderRows();
     refreshInstalledState().then(() => {
       if (providerFocusableItems.length) {
