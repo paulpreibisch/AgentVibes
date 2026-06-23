@@ -2712,12 +2712,12 @@ export function createSetupTab(screen, services) {
         screen.render();
 
         const installProc = spawn('python3', ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
-          stdio: ['ignore', 'ignore', 'pipe'],
+          stdio: ['ignore', 'pipe', 'ignore'],
         });
 
-        installProc.stderr.on('data', (chunk) => {
+        installProc.stdout.on('data', (chunk) => {
           if (_kClosed) return;
-          _pipBuf += chunk.toString();
+          _pipBuf += chunk.toString('utf8');
           const parts = _pipBuf.split(/[\r\n]/);
           _pipBuf = parts.pop() ?? '';
           for (const line of parts) {
