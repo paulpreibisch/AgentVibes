@@ -206,8 +206,8 @@ if [[ -n "$LLM_PROVIDER" ]]; then
       done < "$_cfg"
     fi
   done
-  # Apply LLM voice (only if no explicit voice override)
-  if [[ -n "$_LLM_VOICE" && -z "$VOICE_OVERRIDE" ]]; then
+  # Apply LLM voice (only if no explicit voice override, and not in effects-preview mode)
+  if [[ -n "$_LLM_VOICE" && -z "$VOICE_OVERRIDE" && -z "${AGENTVIBES_EFFECTS_PREVIEW:-}" ]]; then
     VOICE_OVERRIDE="$_LLM_VOICE"
   fi
   # Export LLM key for child scripts (process-local, not system-wide)

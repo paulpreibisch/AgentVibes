@@ -223,6 +223,8 @@ done
 
 # LLM settings win over agent-name settings
 [[ -n "$LLM_REVERB"    ]] && SOX_EFFECTS="$LLM_REVERB"
+# Allow caller to override reverb for one-shot preview (e.g. effects picker Space preview)
+[[ -n "${AGENTVIBES_REVERB_OVERRIDE:-}" ]] && SOX_EFFECTS="$AGENTVIBES_REVERB_OVERRIDE"
 [[ -n "$LLM_BG_FILE"   ]] && BG_FILE="$LLM_BG_FILE"
 [[ -n "$LLM_BG_VOLUME" ]] && BG_VOLUME="$LLM_BG_VOLUME"
 
