@@ -106,7 +106,7 @@ await mock.module('blessed', { defaultExport: blessedStub });
 const { openPersonalityPicker, PERSONALITY_EMOJIS, PERSONALITIES } =
   await import('../../src/console/widgets/personality-picker.js');
 
-const { openReverbPicker, REVERB_PRESETS } =
+const { openReverbPicker, REVERB_PRESETS, formatEffectLabel } =
   await import('../../src/console/widgets/reverb-picker.js');
 
 const { openTrackPicker, openVolumeInput } =
@@ -260,6 +260,28 @@ describe('REVERB_PRESETS constant', () => {
 
   test('includes off preset', () => {
     assert.ok(REVERB_PRESETS.some(p => p.value === 'off'));
+  });
+});
+
+describe('formatEffectLabel()', () => {
+  test('returns Off for null/empty/off', () => {
+    assert.equal(formatEffectLabel(null), 'Off');
+    assert.equal(formatEffectLabel(''), 'Off');
+    assert.equal(formatEffectLabel('off'), 'Off');
+  });
+
+  test('returns label for single preset', () => {
+    const label = formatEffectLabel('light');
+    assert.ok(label.toLowerCase().includes('reverb') || label.toLowerCase().includes('light'));
+  });
+
+  test('joins labels for combined value', () => {
+    const label = formatEffectLabel('light+echo-short');
+    assert.ok(label.includes('+'), `Expected '+' separator in "${label}"`);
+  });
+
+  test('returns value for unknown preset', () => {
+    assert.equal(formatEffectLabel('custom-effect'), 'custom-effect');
   });
 });
 

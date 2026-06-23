@@ -19,6 +19,18 @@ import sys
 import os
 
 def main():
+    # --download-only: fetch voice .pt file from HuggingFace without synthesis
+    if len(sys.argv) >= 2 and sys.argv[1] == '--download-only':
+        voice = sys.argv[2] if len(sys.argv) > 2 else 'af_heart'
+        try:
+            from huggingface_hub import hf_hub_download
+            local = hf_hub_download(repo_id='hexgrad/Kokoro-82M', filename=f'voices/{voice}.pt')
+            print(local)
+        except Exception as e:
+            print(f"❌ Download failed: {e}", file=sys.stderr)
+            sys.exit(4)
+        sys.exit(0)
+
     if len(sys.argv) < 4:
         print("Usage: kokoro-tts.py <text> <voice> <output_path> [speed]", file=sys.stderr)
         sys.exit(1)

@@ -37,7 +37,7 @@ import {
 import {
   getAvailableEngines, getEngineStatuses, checkEngineInstalled,
 } from '../../services/tts-engine-service.js';
-import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
+import { openReverbPicker, formatEffectLabel } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
@@ -909,10 +909,7 @@ export function createSetupTab(screen, services) {
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
         { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-        { key: 'audioEffects', label: 'Audio Effects', getValue: () => {
-          const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
-          return p ? p.label : draft.reverbPreset || 'Off';
-        }},
+        { key: 'audioEffects', label: 'Audio Effects', getValue: () => formatEffectLabel(draft.reverbPreset) },
         { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
         { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
         { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
@@ -1109,7 +1106,12 @@ export function createSetupTab(screen, services) {
         case 'voice':          _openVoicePickerForLlm(draft, _refreshField);    break;
         case 'pretext':        _openPretextEditor(modal, draft, _refreshField); break;
         case 'audioEffects':
-          openReverbPicker(screen, draft.reverbPreset, (val) => { draft.reverbPreset = val; _refreshField(); }, _cancelField, { applyToEffectsManager: false });
+          openReverbPicker(screen, draft.reverbPreset, (val) => { draft.reverbPreset = val; _refreshField(); }, _cancelField, {
+            applyToEffectsManager: false,
+            previewHooksDir: path.join(packageDir, '.claude', 'hooks'),
+            previewLlmKey: 'hermes',
+            previewTargetDir: targetDir,
+          });
           break;
         case 'bgTrack':
           openTrackPicker(screen, draft.bgTrack, Math.round(parseFloat(draft.bgVolume) * 100), (track) => { draft.bgTrack = track; _refreshField(); }, _cancelField, { skipVolume: true });
@@ -1789,10 +1791,7 @@ export function createSetupTab(screen, services) {
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
         { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-        { key: 'audioEffects', label: 'Audio Effects', getValue: () => {
-          const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
-          return p ? p.label : draft.reverbPreset || 'Off';
-        }},
+        { key: 'audioEffects', label: 'Audio Effects', getValue: () => formatEffectLabel(draft.reverbPreset) },
         { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
         { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
         { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
@@ -2107,7 +2106,12 @@ export function createSetupTab(screen, services) {
           openReverbPicker(screen, draft.reverbPreset, (val) => {
             draft.reverbPreset = val;
             _refreshField();
-          }, _cancelField, { applyToEffectsManager: false });
+          }, _cancelField, {
+            applyToEffectsManager: false,
+            previewHooksDir: path.join(packageDir, '.claude', 'hooks'),
+            previewLlmKey: llmKey,
+            previewTargetDir: targetDir,
+          });
           break;
 
         case 'bgTrack':
@@ -2379,6 +2383,14 @@ export function createSetupTab(screen, services) {
 
   function _openKokoroVoicePicker(draft, onDone, llmKey = '') {
     const { voices, cached } = _scanKokoroVoices();
+
+    // Load favorites from ~/.agentvibes/kokoro-favorites.json
+    let _kokoroFavorites = new Set();
+    try {
+      const favPath = path.join(os.homedir(), '.agentvibes', 'kokoro-favorites.json');
+      _kokoroFavorites = new Set(JSON.parse(fs.readFileSync(favPath, 'utf8')));
+    } catch {}
+
     let _kClosed = false;
     let _kPreviewProc = null;
     let _kTmpWav = null;
@@ -2447,10 +2459,11 @@ export function createSetupTab(screen, services) {
     }
     navigationService?.openModal(null, _closeKP);
 
-    // ★ = cached locally, ☁ = auto-downloads from HuggingFace on first preview/use
+    // ✓ = cached locally, ☁ = auto-downloads from HuggingFace on first preview/use, ★ = favorited
     const items = voices.map(id => {
-      const mark = cached.has(id) ? '{green-fg}★{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
-      return `  ${mark} ${_kokoroVoiceLabel(id)}`;
+      const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
+      const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
+      return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
     });
 
     const LEGEND_H = 1;
@@ -2470,7 +2483,7 @@ export function createSetupTab(screen, services) {
     // Fixed legend row — pinned at top so it never scrolls away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {green-fg}★{/green-fg}{gray-fg}={/gray-fg}{#FFD700-fg}cached{/#FFD700-fg}  {cyan-fg}☁{/cyan-fg}{gray-fg}={/gray-fg}{#FFD700-fg}Download{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}all  {gray-fg}[Esc]={/gray-fg}cancel',
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {green-fg}✓{/green-fg}{gray-fg}={/gray-fg}{#FFD700-fg}cached{/#FFD700-fg}  {#FFD700-fg}★{/#FFD700-fg}{gray-fg}={/gray-fg}{#FFD700-fg}fav  {gray-fg}[F]{/gray-fg}=fav  {cyan-fg}☁{/cyan-fg}{gray-fg}={/gray-fg}{#FFD700-fg}Download{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}all  {gray-fg}[Esc]={/gray-fg}cancel',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2658,12 +2671,37 @@ export function createSetupTab(screen, services) {
           kBox.setLabel(` {red-fg}Synthesis failed — is Kokoro installed?{/red-fg} `);
           screen.render();
           setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          // For voices where synthesis fails due to missing language deps (exit 3),
+          // try a direct .pt file download so the voice can still be cached (shows ✓)
+          if (synthCode === 3) {
+            const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+            const dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
+              stdio: ['ignore', 'pipe', 'ignore'],
+              env: { ...process.env },
+            });
+            let dlOut = '';
+            dlProc.stdout.on('data', d => { dlOut += d.toString(); });
+            dlProc.on('exit', (dlCode) => {
+              if (dlCode === 0 && dlOut.trim()) {
+                cached.add(voiceId);
+                const newItems = voices.map(id => {
+                  const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
+                  const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
+                  return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
+                });
+                kPicker.setItems(newItems);
+                if (!_kClosed) { kBox.setLabel(` {green-fg}✓ ${voiceId} cached (synthesis requires extra deps){/green-fg} `); screen.render(); }
+                setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+              }
+            });
+          }
           return;
         }
-        // Update icon to ★ for newly-downloaded voice
+        // Update icon to ✓ for newly-downloaded voice
         if (!isDownloaded) {
           cached.add(voiceId);
-          kPicker.setItem(kPicker.selected, `  {green-fg}★{/green-fg} ${_kokoroVoiceLabel(voiceId)}`);
+          const fav  = _kokoroFavorites.has(voiceId) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
+          kPicker.setItem(kPicker.selected, `${fav}{green-fg}✓{/green-fg}  ${_kokoroVoiceLabel(voiceId)}`);
         }
 
         // Phase 2: play WAV locally (remote destinations handled before synthesis via SSH pipeline)
@@ -2709,6 +2747,30 @@ export function createSetupTab(screen, services) {
           setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
         }
       });
+    });
+
+    // Toggle favorite
+    kPicker.key(['f', 'F'], () => {
+      const voiceId = voices[kPicker.selected];
+      if (!voiceId) return;
+      const favPath = path.join(os.homedir(), '.agentvibes', 'kokoro-favorites.json');
+      if (_kokoroFavorites.has(voiceId)) {
+        _kokoroFavorites.delete(voiceId);
+      } else {
+        _kokoroFavorites.add(voiceId);
+      }
+      try {
+        fs.mkdirSync(path.join(os.homedir(), '.agentvibes'), { recursive: true });
+        fs.writeFileSync(favPath, JSON.stringify([..._kokoroFavorites], null, 2));
+      } catch {}
+      // Rebuild picker items
+      const newItems = voices.map(id => {
+        const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
+        const mark = cached.has(id) ? '{green-fg}✓{/green-fg}' : '{cyan-fg}☁{/cyan-fg}';
+        return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
+      });
+      kPicker.setItems(newItems);
+      screen.render();
     });
 
     // Download All — sequentially downloads every uncached voice
@@ -2787,7 +2849,10 @@ export function createSetupTab(screen, services) {
           if (code === 0) {
             cached.add(voiceId);
             const listIdx = voices.indexOf(voiceId);
-            if (listIdx >= 0) kPicker.setItem(listIdx, `  {green-fg}★{/green-fg} ${_kokoroVoiceLabel(voiceId)}`);
+            if (listIdx >= 0) {
+              const fav  = _kokoroFavorites.has(voiceId) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
+              kPicker.setItem(listIdx, `${fav}{green-fg}✓{/green-fg}  ${_kokoroVoiceLabel(voiceId)}`);
+            }
           }
           dlIdx++;
           _dlNext();
