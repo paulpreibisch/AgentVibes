@@ -2497,6 +2497,17 @@ export function createSetupTab(screen, services) {
   function _openKokoroVoicePicker(draft, onDone, llmKey = '') {
     const { voices, cached } = _scanKokoroVoices();
 
+    // Detect the correct Python command for this platform (Windows: python / py, Unix: python3)
+    let _pythonCmd = 'python3';
+    for (const cmd of process.platform === 'win32' ? ['python', 'python3', 'py'] : ['python3', 'python']) {
+      try {
+        if (spawnSync(cmd, ['--version'], { stdio: 'ignore', timeout: 2000 }).status === 0) { // NOSONAR
+          _pythonCmd = cmd;
+          break;
+        }
+      } catch {}
+    }
+
     // Load favorites from ~/.agentvibes/kokoro-favorites.json
     let _kokoroFavorites = new Set();
     try {
@@ -2596,7 +2607,7 @@ export function createSetupTab(screen, services) {
       [['kf', 'km'], 'jamo'],
       [['zf', 'zm'], 'pypinyin'],
     ]) {
-      if (spawnSync('python3', ['-c', `import ${check}`], { stdio: 'ignore', timeout: 3000 }).status === 0) { // NOSONAR
+      if (spawnSync(_pythonCmd, ['-c', `import ${check}`], { stdio: 'ignore', timeout: 3000 }).status === 0) { // NOSONAR
         pfxes.forEach(p => _cjkInstalled.add(p));
       }
     }
@@ -2764,7 +2775,7 @@ export function createSetupTab(screen, services) {
         iMod.key(['escape'], cancelInstall);
         screen.render();
 
-        _installProc = spawn('python3', ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
+        _installProc = spawn(_pythonCmd, ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
           stdio: ['ignore', 'pipe', 'pipe'],
         });
 
@@ -2849,7 +2860,7 @@ export function createSetupTab(screen, services) {
           if (_mClosed) return;
           iMod.setLabel(` {red-fg}✗  pip Not Found{/red-fg} `);
           iMod.style.border.fg = 'red';
-          _setContent(0, 'error', `  {red-fg}python3 not in PATH — install Python 3 first{/red-fg}`, true);
+          _setContent(0, 'error', `  {red-fg}Python not in PATH — install Python 3 first{/red-fg}`, true);
           const closeOk = () => {
             if (_mClosed) return;
             _mClosed = true;
@@ -2878,7 +2889,7 @@ export function createSetupTab(screen, services) {
       // CJK voices need language-specific misaki extras — prompt to install if missing
       if (_isCjkVoice(voiceId)) {
         const { check: importCheck } = _cjkDeps(voiceId);
-        const depCheck = spawnSync('python3', ['-c', `import ${importCheck}`], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
+        const depCheck = spawnSync(_pythonCmd, ['-c', `import ${importCheck}`], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
         if (depCheck.status !== 0) {
           _promptInstallMisakiLang(voiceId);
           return;
@@ -2929,7 +2940,7 @@ export function createSetupTab(screen, services) {
             // Still try to download the .pt file locally so the picker shows ✓.
             const { pkg: cjkPkg } = _cjkDeps(voiceId);
             const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
-            const dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
+            const dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
               stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
             });
             let dlOut = '';
@@ -3030,7 +3041,7 @@ export function createSetupTab(screen, services) {
 
       let synthProc;
       try {
-        synthProc = spawn('python3', [pyScript, phrase, voiceId, tmpWav, '1.0'], { // NOSONAR
+        synthProc = spawn(_pythonCmd, [pyScript, phrase, voiceId, tmpWav, '1.0'], { // NOSONAR
           stdio: ['ignore', 'ignore', 'pipe'],
           env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
         });
@@ -3073,14 +3084,14 @@ export function createSetupTab(screen, services) {
         if (_kClosed) { try { fs.unlinkSync(tmpWav); } catch {} return; }
         if (synthCode !== 0) {
           try { fs.unlinkSync(tmpWav); } catch {}
-          kBox.setLabel(` {red-fg}Synthesis failed — is Kokoro installed?{/red-fg} `);
+          kBox.setLabel(` {red-fg}Synthesis failed — run: pip install kokoro{/red-fg} `);
           screen.render();
-          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
           // For voices where synthesis fails due to missing language deps (exit 3),
           // try a direct .pt file download so the voice can still be cached (shows ✓)
           if (synthCode === 3) {
             const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
-            const dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
+            const dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
               stdio: ['ignore', 'pipe', 'ignore'],
               env: { ...process.env },
             });
@@ -3106,10 +3117,17 @@ export function createSetupTab(screen, services) {
         // Phase 2: play WAV locally (remote destinations handled before synthesis via SSH pipeline)
         let playProc;
         try {
-          playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
-            stdio: 'ignore',
-            env: { ...process.env },
-          });
+          if (process.platform === 'win32') {
+            const winPath = tmpWav.replace(/\\/g, '/');
+            playProc = spawn('powershell', ['-NoProfile', '-Command', // NOSONAR
+              `(New-Object Media.SoundPlayer('${winPath}')).PlaySync()`,
+            ], { stdio: 'ignore', env: { ...process.env } });
+          } else {
+            playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
+              stdio: 'ignore',
+              env: { ...process.env },
+            });
+          }
         } catch {
           try { fs.unlinkSync(tmpWav); } catch {}
           if (!_kClosed) {
@@ -3143,9 +3161,9 @@ export function createSetupTab(screen, services) {
         _kTmpWav = null;
         try { fs.unlinkSync(tmpWav); } catch {}
         if (!_kClosed) {
-          kBox.setLabel(` {red-fg}Preview failed — is Kokoro installed?{/red-fg} `);
+          kBox.setLabel(` {red-fg}Python not found — run: pip install kokoro{/red-fg} `);
           screen.render();
-          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
         }
       });
     });
@@ -3210,7 +3228,7 @@ export function createSetupTab(screen, services) {
         if (_isCjkVoice(voiceId)) {
           // CJK voices: skip synthesis (needs misaki[lang]), just download the .pt file
           try {
-            dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
+            dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
               stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
             });
           } catch { dlIdx++; _dlNext(); return; }
@@ -3230,7 +3248,7 @@ export function createSetupTab(screen, services) {
         } else {
           const tmpWav = _secureTempWav('kokoro-dl');
           try {
-            dlProc = spawn('python3', [pyScript, 'hello', voiceId, tmpWav, '1.0'], { // NOSONAR
+            dlProc = spawn(_pythonCmd, [pyScript, 'hello', voiceId, tmpWav, '1.0'], { // NOSONAR
               stdio: ['ignore', 'ignore', 'pipe'],
               env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
             });
