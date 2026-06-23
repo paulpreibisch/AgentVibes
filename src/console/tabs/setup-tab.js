@@ -2764,7 +2764,7 @@ export function createSetupTab(screen, services) {
           screen.render();
         }
 
-        _setContent(0, 'starting...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+        _setContent(0, 'starting...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
         iMod.focus();
 
         const cancelInstall = () => {
@@ -2789,31 +2789,33 @@ export function createSetupTab(screen, services) {
           _pipBuf += chunk.toString('utf8');
           const parts = _pipBuf.split(/[\r\n]/);
           _pipBuf = parts.pop() ?? '';
-          for (const line of parts) {
+          for (const rawLine of parts) {
+            // Strip ANSI escape codes — pip on Windows emits them even on non-TTY
+            const line = rawLine.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''); // NOSONAR
             const dlMatch = line.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(kB|MB|GB)/i);
             if (dlMatch) {
               const done = parseFloat(dlMatch[1]), total = parseFloat(dlMatch[2]);
               if (total > 0) _pipPct = Math.max(_pipPct, Math.round(25 + (done / total) * 55));
-              _setContent(_pipPct, 'downloading...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+              _setContent(_pipPct, 'downloading...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
               continue;
             }
             const t = line.trim();
             if (/^Collecting /i.test(t)) {
               _collecting++;
               _pipPct = Math.max(_pipPct, Math.min(20, _collecting * 5));
-              _setContent(_pipPct, 'collecting...', `  {gray-fg}${t}{/gray-fg}`, false);
+              _setContent(_pipPct, 'collecting...', `  {cyan-fg}${t}{/cyan-fg}`, false);
             } else if (/Downloading.*\.whl/i.test(t)) {
               _pipPct = Math.max(_pipPct, 25);
-              _setContent(_pipPct, 'downloading...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+              _setContent(_pipPct, 'downloading...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
             } else if (/Building|Running setup|running build/i.test(t)) {
               _pipPct = Math.max(_pipPct, 75);
-              _setContent(_pipPct, 'building...', `  {gray-fg}compiling ${pkg} from source{/gray-fg}`, false);
+              _setContent(_pipPct, 'building...', `  {cyan-fg}compiling ${pkg} from source{/cyan-fg}`, false);
             } else if (/Installing collected/i.test(t)) {
               _pipPct = Math.max(_pipPct, 88);
-              _setContent(_pipPct, 'installing...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+              _setContent(_pipPct, 'installing...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
             } else if (/Successfully installed/i.test(t)) {
               _pipPct = 100;
-              _setContent(100, 'done', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+              _setContent(100, 'done', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
             }
           }
         });
