@@ -18,6 +18,16 @@ Install: pip install kokoro-onnx soundfile numpy
 import sys
 import os
 
+# Kokoro/torch auto-selects CUDA whenever a GPU is visible, but many setups
+# (notably Windows) fail GPU allocation with "CUDA error: unknown error /
+# Memory allocation failure", which crashes synthesis after a long torch load.
+# The 82M-param Kokoro model runs fine on CPU in a few seconds, so force CPU by
+# default. Opt back into GPU with AGENTVIBES_KOKORO_DEVICE=cuda. This MUST run
+# before torch/kokoro are imported so torch.cuda.is_available() sees no device.
+_KOKORO_DEVICE = os.environ.get('AGENTVIBES_KOKORO_DEVICE', 'cpu').strip().lower()
+if _KOKORO_DEVICE != 'cuda':
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+
 def main():
     # --download-only: fetch voice .pt file from HuggingFace without synthesis
     if len(sys.argv) >= 2 and sys.argv[1] == '--download-only':
@@ -73,7 +83,13 @@ def main():
         sys.exit(2)
 
     try:
-        pipeline = KPipeline(lang_code=lang_code)
+        # Pass device explicitly when supported; fall back for older kokoro
+        # versions whose KPipeline has no `device` kwarg (CUDA_VISIBLE_DEVICES
+        # already forces CPU in that case).
+        try:
+            pipeline = KPipeline(lang_code=lang_code, device=_KOKORO_DEVICE if _KOKORO_DEVICE == 'cuda' else 'cpu')
+        except TypeError:
+            pipeline = KPipeline(lang_code=lang_code)
         generator = pipeline(text, voice=voice, speed=speed)
 
         all_samples = []

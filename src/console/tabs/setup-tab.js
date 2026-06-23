@@ -167,6 +167,19 @@ export function formatGreeting(introText, projectName) {
   return `${name} is ready! Welcome to AgentVibes. Love AgentVibes? We'd really appreciate it if you could give us a star on GitHub.`;
 }
 
+/**
+ * Build `python` args that check whether modules are importable WITHOUT
+ * importing them. `import kokoro` drags in torch (40s+ cold-start on Windows)
+ * and blows short spawn timeouts; find_spec only resolves the module spec and
+ * is ~instant. Pure/testable — caller runs it via spawnSync.
+ * @param {string[]} mods - top-level module names (e.g. ['kokoro','soundfile'])
+ * @returns {string[]} args array for `python <args>`; exit 0 = all present
+ */
+export function buildPyModuleCheckArgs(mods) {
+  const expr = mods.map(m => `u.find_spec('${m}')`).join(' and ');
+  return ['-c', `import importlib.util as u, sys; sys.exit(0 if ${expr} else 1)`];
+}
+
 // ---------------------------------------------------------------------------
 // Dependency detection helpers
 
@@ -2508,6 +2521,15 @@ export function createSetupTab(screen, services) {
       } catch {}
     }
 
+    // Check Python modules are importable WITHOUT importing them. `import kokoro`
+    // drags in torch, which on Windows cold-start takes 40s+ and blows any short
+    // spawnSync timeout — yielding a false "not installed" and a pointless pip run
+    // that sits at 0% ("Requirement already satisfied"). find_spec is ~instant and
+    // only resolves the module spec, so detection stays reliable. (see line ~209)
+    const _pyHasModules = (mods) =>
+      spawnSync(_pythonCmd, buildPyModuleCheckArgs(mods), // NOSONAR
+        { stdio: 'ignore', timeout: 5000 }).status === 0;
+
     // Load favorites from ~/.agentvibes/kokoro-favorites.json
     let _kokoroFavorites = new Set();
     try {
@@ -2607,13 +2629,13 @@ export function createSetupTab(screen, services) {
       [['kf', 'km'], 'jamo'],
       [['zf', 'zm'], 'pypinyin'],
     ]) {
-      if (spawnSync(_pythonCmd, ['-c', `import ${check}`], { stdio: 'ignore', timeout: 3000 }).status === 0) { // NOSONAR
+      if (_pyHasModules([check])) {
         pfxes.forEach(p => _cjkInstalled.add(p));
       }
     }
 
     // Check if kokoro + soundfile are installed (both required for synthesis)
-    let _kokoroInstalled = spawnSync(_pythonCmd, ['-c', 'import kokoro, soundfile'], { stdio: 'ignore', timeout: 3000 }).status === 0; // NOSONAR
+    let _kokoroInstalled = _pyHasModules(['kokoro', 'soundfile']);
 
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
@@ -2804,6 +2826,11 @@ export function createSetupTab(screen, services) {
               _collecting++;
               _pipPct = Math.max(_pipPct, Math.min(20, _collecting * 5));
               _setContent(_pipPct, 'collecting...', `  {cyan-fg}${t}{/cyan-fg}`, false);
+            } else if (/^Requirement already satisfied/i.test(t)) {
+              // Everything already installed — pip emits no Collecting/Downloading,
+              // so without this the bar would freeze at 0% until exit. Show motion.
+              _pipPct = Math.max(_pipPct, 90);
+              _setContent(_pipPct, 'verifying...', `  {gray-fg}already satisfied — verifying{/gray-fg}`, false);
             } else if (/Downloading.*\.whl/i.test(t)) {
               _pipPct = Math.max(_pipPct, 25);
               _setContent(_pipPct, 'downloading...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
@@ -2911,8 +2938,7 @@ export function createSetupTab(screen, services) {
       // CJK voices need language-specific misaki extras — prompt to install if missing
       if (_isCjkVoice(voiceId)) {
         const { check: importCheck } = _cjkDeps(voiceId);
-        const depCheck = spawnSync(_pythonCmd, ['-c', `import ${importCheck}`], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
-        if (depCheck.status !== 0) {
+        if (!_pyHasModules([importCheck])) {
           _promptInstallMisakiLang(voiceId);
           return;
         }
