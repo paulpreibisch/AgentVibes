@@ -2589,10 +2589,15 @@ export function createSetupTab(screen, services) {
 
     // Check which CJK language groups already have their misaki extras installed.
     // Runs three quick spawnSync checks at picker-open time so icons are accurate.
+    // Keys are the 2-char voice prefixes (jf/jm, kf/km, zf/zm) so _kokoroItem lookup is direct.
     const _cjkInstalled = new Set();
-    for (const [pfx, check] of [['ja', 'pyopenjtalk'], ['ko', 'jamo'], ['zh', 'pypinyin']]) {
+    for (const [pfxes, check] of [
+      [['jf', 'jm'], 'pyopenjtalk'],
+      [['kf', 'km'], 'jamo'],
+      [['zf', 'zm'], 'pypinyin'],
+    ]) {
       if (spawnSync('python3', ['-c', `import ${check}`], { stdio: 'ignore', timeout: 3000 }).status === 0) { // NOSONAR
-        _cjkInstalled.add(pfx);
+        pfxes.forEach(p => _cjkInstalled.add(p));
       }
     }
 
@@ -2708,155 +2713,154 @@ export function createSetupTab(screen, services) {
       dlg.key(['i', 'I', 'y', 'Y', 'enter'], () => {
         navigationService?.closeModal();
         dlg.destroy();
-        const _PIP_BAR_W = 20;
+
+        // ── Single persistent install modal: shows progress during install,
+        //    updates to success/failure when done. Enter=OK only after done. ──
+        const _PIP_BAR_W = 22;
         let _pipPct = 0;
         let _collecting = 0;
         let _pipBuf = '';
         let _pipErrBuf = '';
+        let _mClosed = false;
+        let _installProc = null;
 
-        function _pipBar(p, phase) {
-          const filled = Math.round(p * _PIP_BAR_W / 100);
-          const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
-                    + '{#555555-fg}' + '░'.repeat(_PIP_BAR_W - filled) + '{/#555555-fg}';
-          return ` {yellow-fg}⬇{/yellow-fg} [${bar}] {white-fg}${p}%{/white-fg} {gray-fg}${phase}{/gray-fg} `;
+        function _bar(p) {
+          const f = Math.round(p * _PIP_BAR_W / 100);
+          return '{yellow-fg}' + '█'.repeat(f) + '{/yellow-fg}'
+               + '{#555555-fg}' + '░'.repeat(_PIP_BAR_W - f) + '{/#555555-fg}';
         }
 
-        function _pipResultModal(title, lines, borderColor) {
-          kBox.setLabel(IDLE_LABEL);
-          const rDlg = blessed.box({
-            parent: screen,
-            top: 'center', left: 'center',
-            width: 66, height: 10,
-            border: { type: 'line' }, tags: true,
-            label: ` ${title} `,
-            content: lines.join('\n'),
-            style: { border: { fg: borderColor }, bg: '#1a1a2e' },
-          });
-          let _rClosed = false;
-          const closeResult = () => {
-            if (_rClosed) return;
-            _rClosed = true;
-            navigationService?.closeModal();
-            rDlg.destroy();
-            kPicker.focus();
-            screen.render();
-          };
-          navigationService?.openModal(null, closeResult);
-          rDlg.key(['enter', 'space', 'o', 'O'], closeResult);
-          rDlg.focus();
+        const iMod = blessed.box({
+          parent: screen,
+          top: 'center', left: 'center',
+          width: 66, height: 9,
+          border: { type: 'line' }, tags: true,
+          label: ` {yellow-fg}⬇  Installing ${pkg}{/yellow-fg} `,
+          style: { border: { fg: 'yellow' }, bg: '#1a1a2e' },
+        });
+
+        function _setContent(barPct, phase, extra, isDone) {
+          const barStr = `  {yellow-fg}⬇{/yellow-fg} [${_bar(barPct)}] {white-fg}${barPct}%{/white-fg} {gray-fg}${phase}{/gray-fg}`;
+          const footer = isDone
+            ? `  {green-fg}[Enter]{/green-fg}{gray-fg} = OK{/gray-fg}`
+            : `  {red-fg}[Esc]{/red-fg}{gray-fg} = Cancel{/gray-fg}`;
+          iMod.setContent([ '', barStr, '', extra, '', footer ].join('\n'));
           screen.render();
         }
 
-        kBox.setLabel(_pipBar(0, `installing ${pkg}...`));
+        _setContent(0, 'starting...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+        iMod.focus();
+
+        const cancelInstall = () => {
+          if (_mClosed) return;
+          _mClosed = true;
+          if (_installProc && !_installProc.killed) { try { _installProc.kill(); } catch {} }
+          navigationService?.closeModal();
+          iMod.destroy();
+          kBox.setLabel(IDLE_LABEL);
+          setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
+        };
+        navigationService?.openModal(null, cancelInstall);
+        iMod.key(['escape'], cancelInstall);
         screen.render();
 
-        const installProc = spawn('python3', ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
+        _installProc = spawn('python3', ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
           stdio: ['ignore', 'pipe', 'pipe'],
         });
 
-        installProc.stdout.on('data', (chunk) => {
-          if (_kClosed) return;
+        _installProc.stdout.on('data', (chunk) => {
+          if (_mClosed) return;
           _pipBuf += chunk.toString('utf8');
           const parts = _pipBuf.split(/[\r\n]/);
           _pipBuf = parts.pop() ?? '';
           for (const line of parts) {
-            // Rich/pip download progress: "1.5/3.0 MB" or "500/1500 kB"
             const dlMatch = line.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(kB|MB|GB)/i);
             if (dlMatch) {
-              const done = parseFloat(dlMatch[1]);
-              const total = parseFloat(dlMatch[2]);
+              const done = parseFloat(dlMatch[1]), total = parseFloat(dlMatch[2]);
               if (total > 0) _pipPct = Math.max(_pipPct, Math.round(25 + (done / total) * 55));
-              kBox.setLabel(_pipBar(_pipPct, `downloading...`));
-              screen.render();
+              _setContent(_pipPct, 'downloading...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
               continue;
             }
             const t = line.trim();
             if (/^Collecting /i.test(t)) {
               _collecting++;
               _pipPct = Math.max(_pipPct, Math.min(20, _collecting * 5));
-              kBox.setLabel(_pipBar(_pipPct, `collecting...`));
+              _setContent(_pipPct, 'collecting...', `  {gray-fg}${t}{/gray-fg}`, false);
             } else if (/Downloading.*\.whl/i.test(t)) {
               _pipPct = Math.max(_pipPct, 25);
-              kBox.setLabel(_pipBar(_pipPct, `downloading...`));
+              _setContent(_pipPct, 'downloading...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
             } else if (/Building|Running setup|running build/i.test(t)) {
               _pipPct = Math.max(_pipPct, 75);
-              kBox.setLabel(_pipBar(_pipPct, `building...`));
+              _setContent(_pipPct, 'building...', `  {gray-fg}compiling ${pkg} from source{/gray-fg}`, false);
             } else if (/Installing collected/i.test(t)) {
               _pipPct = Math.max(_pipPct, 88);
-              kBox.setLabel(_pipBar(_pipPct, `installing...`));
+              _setContent(_pipPct, 'installing...', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
             } else if (/Successfully installed/i.test(t)) {
               _pipPct = 100;
-              kBox.setLabel(_pipBar(100, `done`));
-            } else { continue; }
-            screen.render();
+              _setContent(100, 'done', `  {gray-fg}pip install ${pkg}{/gray-fg}`, false);
+            }
           }
         });
 
-        // Accumulate stderr silently — used only to detect build-error hints
-        installProc.stderr.on('data', (chunk) => { _pipErrBuf += chunk.toString('utf8'); });
+        _installProc.stderr.on('data', (chunk) => { _pipErrBuf += chunk.toString('utf8'); });
 
-        installProc.on('exit', (code) => {
-          if (_kClosed) return;
+        _installProc.on('exit', (code) => {
+          if (_mClosed) return;
+          const closeOk = () => {
+            if (_mClosed) return;
+            _mClosed = true;
+            navigationService?.closeModal();
+            iMod.destroy();
+            kBox.setLabel(IDLE_LABEL);
+            setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
+          };
           if (code === 0) {
+            // Mark both gender variants of the same language (e.g. zf+zm for Chinese)
+            const _LANG_PAIRS = { jf: 'jm', jm: 'jf', kf: 'km', km: 'kf', zf: 'zm', zm: 'zf' };
             const langPfx = voiceId.slice(0, 2);
             _cjkInstalled.add(langPfx);
+            _cjkInstalled.add(_LANG_PAIRS[langPfx] ?? langPfx);
             voices.forEach((v, i) => {
-              if (v.slice(0, 2) === langPfx) kPicker.setItem(i, _kokoroItem(v));
+              if (v.slice(0, 2) === langPfx || v.slice(0, 2) === (_LANG_PAIRS[langPfx] ?? langPfx)) {
+                kPicker.setItem(i, _kokoroItem(v));
+              }
             });
-            _pipResultModal(
-              '{green-fg}✓  Installed{/green-fg}',
-              [
-                '',
-                `  {green-fg}${pkg}{/green-fg}{gray-fg} installed successfully.{/gray-fg}`,
-                '',
-                `  {gray-fg}Press Space on {/gray-fg}{white-fg}${voiceId}{/white-fg}{gray-fg} to preview.{/gray-fg}`,
-                '',
-                `  {gray-fg}SSH receiver? Also run: {/gray-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}`,
-                '',
-                `  {green-fg}[Enter]{/green-fg}{gray-fg} = OK`,
-              ],
-              'green'
-            );
+            iMod.setLabel(` {green-fg}✓  Installed{/green-fg} `);
+            iMod.style.border.fg = 'green';
+            _setContent(100, 'done', `  {green-fg}${pkg}{/green-fg}{gray-fg} installed — press Space on {/gray-fg}{white-fg}${voiceId}{/white-fg}{gray-fg} to preview{/gray-fg}`, true);
           } else {
             const allOut = _pipBuf + _pipErrBuf;
             const needsDev   = /Python\.h|python3-dev/i.test(allOut);
             const needsCmake = /cmake not found|cmake.*required/i.test(allOut);
             let hint;
-            if (needsDev)        hint = `  {yellow-fg}Needs:{/yellow-fg} {cyan-fg}sudo apt install python3-dev build-essential{/cyan-fg}`;
-            else if (needsCmake) hint = `  {yellow-fg}Needs:{/yellow-fg} {cyan-fg}sudo apt install cmake{/cyan-fg}`;
+            if (needsDev)        hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install python3-dev build-essential{/cyan-fg}`;
+            else if (needsCmake) hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install cmake{/cyan-fg}`;
             else                 hint = `  {gray-fg}Run {/gray-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}{gray-fg} in a terminal to see the error.{/gray-fg}`;
-            _pipResultModal(
-              '{red-fg}✗  Install Failed{/red-fg}',
-              [
-                '',
-                `  {red-fg}pip install ${pkg}{/red-fg}{gray-fg} failed (exit ${code}).{/gray-fg}`,
-                '',
-                hint,
-                '',
-                `  {gray-fg}Then retry install here, or run pip in a terminal.{/gray-fg}`,
-                '',
-                `  {red-fg}[Enter]{/red-fg}{gray-fg} = OK`,
-              ],
-              'red'
-            );
+            iMod.setLabel(` {red-fg}✗  Install Failed{/red-fg} `);
+            iMod.style.border.fg = 'red';
+            _setContent(_pipPct, `failed (exit ${code})`, hint, true);
           }
+          iMod.key(['enter', 'o', 'O'], closeOk);
+          iMod.focus();
+          screen.render();
         });
-        installProc.on('error', () => {
-          if (_kClosed) return;
-          _pipResultModal(
-            '{red-fg}✗  pip Not Found{/red-fg}',
-            [
-              '',
-              `  {red-fg}python3 not found in PATH.{/red-fg}`,
-              '',
-              `  {cyan-fg}sudo apt install python3 python3-pip{/cyan-fg}`,
-              '',
-              `  {gray-fg}Install Python 3, then retry.{/gray-fg}`,
-              '',
-              `  {red-fg}[Enter]{/red-fg}{gray-fg} = OK`,
-            ],
-            'red'
-          );
+
+        _installProc.on('error', () => {
+          if (_mClosed) return;
+          iMod.setLabel(` {red-fg}✗  pip Not Found{/red-fg} `);
+          iMod.style.border.fg = 'red';
+          _setContent(0, 'error', `  {red-fg}python3 not in PATH — install Python 3 first{/red-fg}`, true);
+          const closeOk = () => {
+            if (_mClosed) return;
+            _mClosed = true;
+            navigationService?.closeModal();
+            iMod.destroy();
+            kBox.setLabel(IDLE_LABEL);
+            setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
+          };
+          iMod.key(['enter', 'o', 'O'], closeOk);
+          iMod.focus();
+          screen.render();
         });
       });
     }
@@ -2881,7 +2885,15 @@ export function createSetupTab(screen, services) {
         }
       }
 
-      const phrase = `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
+      // CJK voices require native-language text — English produces silence
+      const _pfx2 = voiceId.slice(0, 2);
+      const phrase = _pfx2 === 'zf' || _pfx2 === 'zm'
+        ? '你好，这是 Kokoro 中文语音预览。'
+        : _pfx2 === 'kf' || _pfx2 === 'km'
+          ? '안녕하세요, 코코로 한국어 음성 미리보기입니다.'
+          : _pfx2 === 'jf' || _pfx2 === 'jm'
+            ? 'こんにちは、これはKokoroの日本語音声プレビューです。'
+            : `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
 
       // ── Remote preview: route through SSH pipeline so receiver plays it ──
       if (_validSshHost) {
