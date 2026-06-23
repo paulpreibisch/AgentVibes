@@ -2612,11 +2612,15 @@ export function createSetupTab(screen, services) {
       }
     }
 
+    // Check if the kokoro package itself is installed (needed for all voice synthesis)
+    let _kokoroInstalled = spawnSync(_pythonCmd, ['-c', 'import kokoro'], { stdio: 'ignore', timeout: 3000 }).status === 0; // NOSONAR
+
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
       let mark;
-      if (cached.has(id))                                          mark = '{green-fg}✓{/green-fg}';
-      else if (_isCjkVoice(id) && !_cjkInstalled.has(id.slice(0, 2))) mark = '{yellow-fg}!{/yellow-fg}';
+      if (_isCjkVoice(id) && !_cjkInstalled.has(id.slice(0, 2)))  mark = '{yellow-fg}!{/yellow-fg}';
+      else if (!_kokoroInstalled)                                    mark = '{yellow-fg}!{/yellow-fg}';
+      else if (cached.has(id))                                       mark = '{green-fg}✓{/green-fg}';
       else                                                         mark = '{cyan-fg}☁{/cyan-fg}';
       return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
     }
@@ -2666,7 +2670,7 @@ export function createSetupTab(screen, services) {
     // Fixed legend rows — pinned at top so they never scroll away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=download  {/gray-fg}{yellow-fg}!{/yellow-fg}{gray-fg}=needs misaki[lang] (ja/ko/zh)',
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=download  {/gray-fg}{yellow-fg}!{/yellow-fg}{gray-fg}=needs pip install (kokoro or misaki[lang])',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2694,8 +2698,9 @@ export function createSetupTab(screen, services) {
       _closeKP();
     });
 
-    function _promptInstallMisakiLang(voiceId, onCancel) {
-      const { pkg, label } = _cjkDeps(voiceId);
+    // Generic pip-install dialog + progress modal. onSuccess() is called after a clean exit
+    // to let callers update icons/state; onCancel() is called when the user dismisses.
+    function _promptInstallPkg(pkg, label, voiceId, onSuccess, onCancel) {
       const dlg = blessed.box({
         parent: screen,
         top: 'center', left: 'center',
@@ -2705,7 +2710,7 @@ export function createSetupTab(screen, services) {
         content: [
           '',
           `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs {/gray-fg}{cyan-fg}${pkg}{/cyan-fg}{gray-fg} to speak.{/gray-fg}`,
-          `  {gray-fg}misaki is Kokoro's text engine — {/gray-fg}{cyan-fg}${pkg}{/cyan-fg}{gray-fg} adds ${label}:{/gray-fg}`,
+          `  {gray-fg}Install it now with:{/gray-fg}`,
           `  {cyan-fg}pip install ${pkg}{/cyan-fg}`,
           '',
           `  {gray-fg}If using SSH receiver, run pip install there too.{/gray-fg}`,
@@ -2826,16 +2831,7 @@ export function createSetupTab(screen, services) {
             setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
           };
           if (code === 0) {
-            // Mark both gender variants of the same language (e.g. zf+zm for Chinese)
-            const _LANG_PAIRS = { jf: 'jm', jm: 'jf', kf: 'km', km: 'kf', zf: 'zm', zm: 'zf' };
-            const langPfx = voiceId.slice(0, 2);
-            _cjkInstalled.add(langPfx);
-            _cjkInstalled.add(_LANG_PAIRS[langPfx] ?? langPfx);
-            voices.forEach((v, i) => {
-              if (v.slice(0, 2) === langPfx || v.slice(0, 2) === (_LANG_PAIRS[langPfx] ?? langPfx)) {
-                kPicker.setItem(i, _kokoroItem(v));
-              }
-            });
+            onSuccess?.();
             iMod.setLabel(` {green-fg}✓  Installed{/green-fg} `);
             iMod.style.border.fg = 'green';
             _setContent(100, 'done', `  {green-fg}${pkg}{/green-fg}{gray-fg} installed — press Space on {/gray-fg}{white-fg}${voiceId}{/white-fg}{gray-fg} to preview{/gray-fg}`, true);
@@ -2876,6 +2872,21 @@ export function createSetupTab(screen, services) {
       });
     }
 
+    function _promptInstallMisakiLang(voiceId, onCancel) {
+      const { pkg, label } = _cjkDeps(voiceId);
+      _promptInstallPkg(pkg, label, voiceId, () => {
+        const _LANG_PAIRS = { jf: 'jm', jm: 'jf', kf: 'km', km: 'kf', zf: 'zm', zm: 'zf' };
+        const langPfx = voiceId.slice(0, 2);
+        _cjkInstalled.add(langPfx);
+        _cjkInstalled.add(_LANG_PAIRS[langPfx] ?? langPfx);
+        voices.forEach((v, i) => {
+          if (v.slice(0, 2) === langPfx || v.slice(0, 2) === (_LANG_PAIRS[langPfx] ?? langPfx)) {
+            kPicker.setItem(i, _kokoroItem(v));
+          }
+        });
+      }, onCancel);
+    }
+
     kPicker.key(['space'], () => {
       if (!voices.length) return;
       const voiceId = voices[kPicker.selected];
@@ -2883,6 +2894,15 @@ export function createSetupTab(screen, services) {
         _killKPreview();
         kBox.setLabel(IDLE_LABEL);
         screen.render();
+        return;
+      }
+
+      // kokoro package itself must be installed for any voice
+      if (!_kokoroInstalled) {
+        _promptInstallPkg('kokoro', 'Kokoro TTS engine', voiceId, () => {
+          _kokoroInstalled = true;
+          voices.forEach((v, i) => kPicker.setItem(i, _kokoroItem(v)));
+        });
         return;
       }
 
