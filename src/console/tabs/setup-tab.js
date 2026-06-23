@@ -2712,6 +2712,7 @@ export function createSetupTab(screen, services) {
         let _pipPct = 0;
         let _collecting = 0;
         let _pipBuf = '';
+        let _pipErrBuf = '';
 
         function _pipBar(p, phase) {
           const filled = Math.round(p * _PIP_BAR_W / 100);
@@ -2720,11 +2721,37 @@ export function createSetupTab(screen, services) {
           return ` {yellow-fg}⬇{/yellow-fg} [${bar}] {white-fg}${p}%{/white-fg} {gray-fg}${phase}{/gray-fg} `;
         }
 
+        function _pipResultModal(title, lines, borderColor) {
+          kBox.setLabel(IDLE_LABEL);
+          const rDlg = blessed.box({
+            parent: screen,
+            top: 'center', left: 'center',
+            width: 66, height: 10,
+            border: { type: 'line' }, tags: true,
+            label: ` ${title} `,
+            content: lines.join('\n'),
+            style: { border: { fg: borderColor }, bg: '#1a1a2e' },
+          });
+          let _rClosed = false;
+          const closeResult = () => {
+            if (_rClosed) return;
+            _rClosed = true;
+            navigationService?.closeModal();
+            rDlg.destroy();
+            kPicker.focus();
+            screen.render();
+          };
+          navigationService?.openModal(null, closeResult);
+          rDlg.key(['enter', 'space', 'o', 'O'], closeResult);
+          rDlg.focus();
+          screen.render();
+        }
+
         kBox.setLabel(_pipBar(0, `installing ${pkg}...`));
         screen.render();
 
         const installProc = spawn('python3', ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
-          stdio: ['ignore', 'pipe', 'ignore'],
+          stdio: ['ignore', 'pipe', 'pipe'],
         });
 
         installProc.stdout.on('data', (chunk) => {
@@ -2765,31 +2792,71 @@ export function createSetupTab(screen, services) {
           }
         });
 
+        // Accumulate stderr silently — used only to detect build-error hints
+        installProc.stderr.on('data', (chunk) => { _pipErrBuf += chunk.toString('utf8'); });
+
         installProc.on('exit', (code) => {
-          if (!_kClosed) {
-            if (code === 0) {
-              // Mark this language group as installed and refresh icons for all its voices
-              const langPfx = voiceId.slice(0, 2);
-              _cjkInstalled.add(langPfx);
-              voices.forEach((v, i) => {
-                if (v.slice(0, 2) === langPfx) kPicker.setItem(i, _kokoroItem(v));
-              });
-              kBox.setLabel(` {green-fg}✓ Installed! Press Space to preview ${voiceId}{/green-fg} `);
-            } else {
-              kBox.setLabel(` {red-fg}Install failed — run: pip install ${pkg}{/red-fg} `);
-            }
-            kPicker.focus();
-            screen.render();
-            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 4000);
+          if (_kClosed) return;
+          if (code === 0) {
+            const langPfx = voiceId.slice(0, 2);
+            _cjkInstalled.add(langPfx);
+            voices.forEach((v, i) => {
+              if (v.slice(0, 2) === langPfx) kPicker.setItem(i, _kokoroItem(v));
+            });
+            _pipResultModal(
+              '{green-fg}✓  Installed{/green-fg}',
+              [
+                '',
+                `  {green-fg}${pkg}{/green-fg}{gray-fg} installed successfully.{/gray-fg}`,
+                '',
+                `  {gray-fg}Press Space on {/gray-fg}{white-fg}${voiceId}{/white-fg}{gray-fg} to preview.{/gray-fg}`,
+                '',
+                `  {gray-fg}SSH receiver? Also run: {/gray-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}`,
+                '',
+                `  {green-fg}[Enter]{/green-fg}{gray-fg} = OK`,
+              ],
+              'green'
+            );
+          } else {
+            const allOut = _pipBuf + _pipErrBuf;
+            const needsDev   = /Python\.h|python3-dev/i.test(allOut);
+            const needsCmake = /cmake not found|cmake.*required/i.test(allOut);
+            let hint;
+            if (needsDev)        hint = `  {yellow-fg}Needs:{/yellow-fg} {cyan-fg}sudo apt install python3-dev build-essential{/cyan-fg}`;
+            else if (needsCmake) hint = `  {yellow-fg}Needs:{/yellow-fg} {cyan-fg}sudo apt install cmake{/cyan-fg}`;
+            else                 hint = `  {gray-fg}Run {/gray-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}{gray-fg} in a terminal to see the error.{/gray-fg}`;
+            _pipResultModal(
+              '{red-fg}✗  Install Failed{/red-fg}',
+              [
+                '',
+                `  {red-fg}pip install ${pkg}{/red-fg}{gray-fg} failed (exit ${code}).{/gray-fg}`,
+                '',
+                hint,
+                '',
+                `  {gray-fg}Then retry install here, or run pip in a terminal.{/gray-fg}`,
+                '',
+                `  {red-fg}[Enter]{/red-fg}{gray-fg} = OK`,
+              ],
+              'red'
+            );
           }
         });
         installProc.on('error', () => {
-          if (!_kClosed) {
-            kBox.setLabel(` {red-fg}pip not found — install Python first{/red-fg} `);
-            kPicker.focus();
-            screen.render();
-            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 4000);
-          }
+          if (_kClosed) return;
+          _pipResultModal(
+            '{red-fg}✗  pip Not Found{/red-fg}',
+            [
+              '',
+              `  {red-fg}python3 not found in PATH.{/red-fg}`,
+              '',
+              `  {cyan-fg}sudo apt install python3 python3-pip{/cyan-fg}`,
+              '',
+              `  {gray-fg}Install Python 3, then retry.{/gray-fg}`,
+              '',
+              `  {red-fg}[Enter]{/red-fg}{gray-fg} = OK`,
+            ],
+            'red'
+          );
         });
       });
     }
