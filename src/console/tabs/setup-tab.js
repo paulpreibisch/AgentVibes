@@ -3140,10 +3140,12 @@ export function createSetupTab(screen, services) {
         let playProc;
         try {
           if (process.platform === 'win32') {
-            const winPath = tmpWav.replace(/\\/g, '/');
+            // SoundPlayer needs the Windows Forms assembly loaded and native backslash paths
+            const psPath = tmpWav.replace(/'/g, "''");
             playProc = spawn('powershell', ['-NoProfile', '-Command', // NOSONAR
-              `(New-Object Media.SoundPlayer('${winPath}')).PlaySync()`,
-            ], { stdio: 'ignore', env: { ...process.env } });
+              `Add-Type -AssemblyName System.Windows.Forms; ` +
+              `(New-Object System.Media.SoundPlayer('${psPath}')).PlaySync()`,
+            ], { stdio: 'pipe', env: { ...process.env } });
           } else {
             playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
               stdio: 'ignore',
@@ -3163,10 +3165,15 @@ export function createSetupTab(screen, services) {
         _kTmpWav = tmpWav;
         _startKSpinner(kPicker.selected);
         screen.render();
-        playProc.on('exit', () => {
+        playProc.on('exit', (code) => {
           _kPreviewProc = null;
           _stopKSpinner();
           if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+          if (code !== 0 && !_kClosed) {
+            kBox.setLabel(` {red-fg}Playback failed (exit ${code}){/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 4000);
+          }
         });
         playProc.on('error', () => {
           _kPreviewProc = null;
