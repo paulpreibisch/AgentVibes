@@ -2573,25 +2573,35 @@ export function createSetupTab(screen, services) {
     }
     navigationService?.openModal(null, _closeKP);
 
-    // ✓ = cached locally, ☁ = downloadable, ! = CJK (needs misaki[lang]), ★ = favorited
+    // ✓ = cached locally, ☁ = downloadable, ! = CJK (misaki[lang] missing), ★ = favorited
     function _isCjkVoice(id) {
       return ['jf','jm','zf','zm','kf','km'].includes(id.slice(0, 2));
     }
     // Returns the misaki extra and the import check for each CJK language group.
-    // ja: misaki[ja] → pyopenjtalk; ko: misaki[ko] → nltk; zh: misaki[zh] → pypinyin
+    // ja: misaki[ja] → pyopenjtalk; ko: misaki[ko] → jamo; zh: misaki[zh] → pypinyin
     function _cjkDeps(id) {
       const pfx = id.slice(0, 2);
       if (pfx === 'jf' || pfx === 'jm') return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'Japanese language support' };
-      if (pfx === 'kf' || pfx === 'km') return { pkg: 'misaki[ko]', check: 'nltk',        label: 'Korean language support' };
+      if (pfx === 'kf' || pfx === 'km') return { pkg: 'misaki[ko]', check: 'jamo',        label: 'Korean language support' };
       if (pfx === 'zf' || pfx === 'zm') return { pkg: 'misaki[zh]', check: 'pypinyin',    label: 'Chinese language support' };
       return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'Japanese language support' };
     }
+
+    // Check which CJK language groups already have their misaki extras installed.
+    // Runs three quick spawnSync checks at picker-open time so icons are accurate.
+    const _cjkInstalled = new Set();
+    for (const [pfx, check] of [['ja', 'pyopenjtalk'], ['ko', 'jamo'], ['zh', 'pypinyin']]) {
+      if (spawnSync('python3', ['-c', `import ${check}`], { stdio: 'ignore', timeout: 3000 }).status === 0) { // NOSONAR
+        _cjkInstalled.add(pfx);
+      }
+    }
+
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
       let mark;
-      if (cached.has(id))       mark = '{green-fg}✓{/green-fg}';
-      else if (_isCjkVoice(id)) mark = '{yellow-fg}!{/yellow-fg}';
-      else                      mark = '{cyan-fg}☁{/cyan-fg}';
+      if (cached.has(id))                                          mark = '{green-fg}✓{/green-fg}';
+      else if (_isCjkVoice(id) && !_cjkInstalled.has(id.slice(0, 2))) mark = '{yellow-fg}!{/yellow-fg}';
+      else                                                         mark = '{cyan-fg}☁{/cyan-fg}';
       return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
     }
     const items = voices.map(_kokoroItem);
@@ -2689,12 +2699,14 @@ export function createSetupTab(screen, services) {
         style: { border: { fg: 'yellow' }, bg: '#1a1a2e' },
       });
       dlg.focus();
+      navigationService?.openModal(null, () => { closeDlg(); });
       screen.render();
 
-      const closeDlg = () => { dlg.destroy(); kPicker.focus(); screen.render(); };
+      const closeDlg = () => { navigationService?.closeModal(); dlg.destroy(); kPicker.focus(); screen.render(); };
 
       dlg.key(['escape', 'n', 'N'], () => { closeDlg(); onCancel?.(); });
       dlg.key(['i', 'I', 'y', 'Y', 'enter'], () => {
+        navigationService?.closeModal();
         dlg.destroy();
         const _PIP_BAR_W = 20;
         let _pipPct = 0;
@@ -2756,6 +2768,12 @@ export function createSetupTab(screen, services) {
         installProc.on('exit', (code) => {
           if (!_kClosed) {
             if (code === 0) {
+              // Mark this language group as installed and refresh icons for all its voices
+              const langPfx = voiceId.slice(0, 2);
+              _cjkInstalled.add(langPfx);
+              voices.forEach((v, i) => {
+                if (v.slice(0, 2) === langPfx) kPicker.setItem(i, _kokoroItem(v));
+              });
               kBox.setLabel(` {green-fg}✓ Installed! Press Space to preview ${voiceId}{/green-fg} `);
             } else {
               kBox.setLabel(` {red-fg}Install failed — run: pip install ${pkg}{/red-fg} `);
