@@ -2581,10 +2581,10 @@ export function createSetupTab(screen, services) {
     // ja: misaki[ja] → pyopenjtalk; ko: misaki[ko] → nltk; zh: misaki[zh] → pypinyin
     function _cjkDeps(id) {
       const pfx = id.slice(0, 2);
-      if (pfx === 'jf' || pfx === 'jm') return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'pyopenjtalk' };
-      if (pfx === 'kf' || pfx === 'km') return { pkg: 'misaki[ko]', check: 'nltk',        label: 'nltk' };
-      if (pfx === 'zf' || pfx === 'zm') return { pkg: 'misaki[zh]', check: 'pypinyin',    label: 'pypinyin' };
-      return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'pyopenjtalk' };
+      if (pfx === 'jf' || pfx === 'jm') return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'Japanese language support' };
+      if (pfx === 'kf' || pfx === 'km') return { pkg: 'misaki[ko]', check: 'nltk',        label: 'Korean language support' };
+      if (pfx === 'zf' || pfx === 'zm') return { pkg: 'misaki[zh]', check: 'pypinyin',    label: 'Chinese language support' };
+      return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'Japanese language support' };
     }
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
@@ -2673,15 +2673,15 @@ export function createSetupTab(screen, services) {
       const dlg = blessed.box({
         parent: screen,
         top: 'center', left: 'center',
-        width: 62, height: 10,
+        width: 64, height: 10,
         border: { type: 'line' }, tags: true,
         label: ` {yellow-fg}⚠  Missing: ${label}{/yellow-fg} `,
         content: [
           '',
-          `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs ${label} for synthesis:{/gray-fg}`,
-          `  {cyan-fg}pip install ${pkg}{/cyan-fg}`,
+          `  {white-fg}${voiceId}{/white-fg}{gray-fg} requires ${label} to speak:{/gray-fg}`,
+          `  {cyan-fg}pip install ${pkg}{/cyan-fg}  {gray-fg}(adds language support to misaki){/gray-fg}`,
           '',
-          `  {gray-fg}If using SSH receiver, install there too.{/gray-fg}`,
+          `  {gray-fg}If using SSH receiver, run pip install there too.{/gray-fg}`,
           '',
           `  {green-fg}[I]{/green-fg}{gray-fg}=Install now   {/gray-fg}{red-fg}[Esc]{/red-fg}{gray-fg}=Cancel`,
         ].join('\n'),
