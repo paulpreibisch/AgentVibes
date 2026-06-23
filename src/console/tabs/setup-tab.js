@@ -2573,9 +2573,18 @@ export function createSetupTab(screen, services) {
     }
     navigationService?.openModal(null, _closeKP);
 
-    // ✓ = cached locally, ☁ = downloadable, ! = CJK (needs pyopenjtalk), ★ = favorited
+    // ✓ = cached locally, ☁ = downloadable, ! = CJK (needs misaki[lang]), ★ = favorited
     function _isCjkVoice(id) {
       return ['jf','jm','zf','zm','kf','km'].includes(id.slice(0, 2));
+    }
+    // Returns the misaki extra and the import check for each CJK language group.
+    // ja: misaki[ja] → pyopenjtalk; ko: misaki[ko] → nltk; zh: misaki[zh] → pypinyin
+    function _cjkDeps(id) {
+      const pfx = id.slice(0, 2);
+      if (pfx === 'jf' || pfx === 'jm') return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'pyopenjtalk' };
+      if (pfx === 'kf' || pfx === 'km') return { pkg: 'misaki[ko]', check: 'nltk',        label: 'nltk' };
+      if (pfx === 'zf' || pfx === 'zm') return { pkg: 'misaki[zh]', check: 'pypinyin',    label: 'pypinyin' };
+      return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'pyopenjtalk' };
     }
     function _kokoroItem(id) {
       const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
@@ -2631,7 +2640,7 @@ export function createSetupTab(screen, services) {
     // Fixed legend rows — pinned at top so they never scroll away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=download  {/gray-fg}{yellow-fg}!{/yellow-fg}{gray-fg}=needs pyopenjtalk (ja/zh/ko)',
+      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=download  {/gray-fg}{yellow-fg}!{/yellow-fg}{gray-fg}=needs misaki[lang] (ja/ko/zh)',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2659,17 +2668,18 @@ export function createSetupTab(screen, services) {
       _closeKP();
     });
 
-    function _promptInstallPyopenjtalk(voiceId, onCancel) {
+    function _promptInstallMisakiLang(voiceId, onCancel) {
+      const { pkg, label } = _cjkDeps(voiceId);
       const dlg = blessed.box({
         parent: screen,
         top: 'center', left: 'center',
         width: 62, height: 10,
         border: { type: 'line' }, tags: true,
-        label: ' {yellow-fg}⚠  Missing: pyopenjtalk{/yellow-fg} ',
+        label: ` {yellow-fg}⚠  Missing: ${label}{/yellow-fg} `,
         content: [
           '',
-          `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs pyopenjtalk for synthesis:{/gray-fg}`,
-          `  {cyan-fg}pip install misaki[ja]{/cyan-fg}`,
+          `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs ${label} for synthesis:{/gray-fg}`,
+          `  {cyan-fg}pip install ${pkg}{/cyan-fg}`,
           '',
           `  {gray-fg}If using SSH receiver, install there too.{/gray-fg}`,
           '',
@@ -2689,10 +2699,10 @@ export function createSetupTab(screen, services) {
         const _IS = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
         const _spinTimer = setInterval(() => {
           if (_kClosed) { clearInterval(_spinTimer); return; }
-          kBox.setLabel(` {yellow-fg}${_IS[_installSpin++ % _IS.length]} Installing misaki[ja]...{/yellow-fg} `);
+          kBox.setLabel(` {yellow-fg}${_IS[_installSpin++ % _IS.length]} Installing ${pkg}...{/yellow-fg} `);
           screen.render();
         }, 80);
-        const installProc = spawn('python3', ['-m', 'pip', 'install', 'misaki[ja]'], { // NOSONAR
+        const installProc = spawn('python3', ['-m', 'pip', 'install', pkg], { // NOSONAR
           stdio: 'ignore',
         });
         installProc.on('exit', (code) => {
@@ -2701,7 +2711,7 @@ export function createSetupTab(screen, services) {
             if (code === 0) {
               kBox.setLabel(` {green-fg}✓ Installed! Press Space to preview ${voiceId}{/green-fg} `);
             } else {
-              kBox.setLabel(` {red-fg}Install failed — run: pip install misaki[ja]{/red-fg} `);
+              kBox.setLabel(` {red-fg}Install failed — run: pip install ${pkg}{/red-fg} `);
             }
             kPicker.focus();
             screen.render();
@@ -2730,11 +2740,12 @@ export function createSetupTab(screen, services) {
         return;
       }
 
-      // CJK voices need pyopenjtalk — prompt to install if missing
+      // CJK voices need language-specific misaki extras — prompt to install if missing
       if (_isCjkVoice(voiceId)) {
-        const check = spawnSync('python3', ['-c', 'import pyopenjtalk'], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
-        if (check.status !== 0) {
-          _promptInstallPyopenjtalk(voiceId);
+        const { check: importCheck } = _cjkDeps(voiceId);
+        const depCheck = spawnSync('python3', ['-c', `import ${importCheck}`], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
+        if (depCheck.status !== 0) {
+          _promptInstallMisakiLang(voiceId);
           return;
         }
       }
@@ -2771,8 +2782,9 @@ export function createSetupTab(screen, services) {
           _stopKSpinner();
           if (_kClosed) return;
           if (code !== 0 && _isCjkVoice(voiceId)) {
-            // CJK voice failed on receiver (needs pyopenjtalk there).
+            // CJK voice failed on receiver — needs the language-specific misaki extra there.
             // Still try to download the .pt file locally so the picker shows ✓.
+            const { pkg: cjkPkg } = _cjkDeps(voiceId);
             const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
             const dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
               stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
@@ -2786,14 +2798,14 @@ export function createSetupTab(screen, services) {
                 if (li >= 0) { kPicker.setItem(li, _kokoroItem(voiceId)); }
               }
               if (!_kClosed) {
-                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs  pip install pyopenjtalk{/yellow-fg} `);
+                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs  pip install ${cjkPkg}{/yellow-fg} `);
                 screen.render();
                 setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
               }
             });
             dlProc.on('error', () => {
               if (!_kClosed) {
-                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: needs pyopenjtalk on receiver{/yellow-fg} `);
+                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs pip install ${cjkPkg}{/yellow-fg} `);
                 screen.render();
                 setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
               }
@@ -3053,7 +3065,7 @@ export function createSetupTab(screen, services) {
         let dlProc;
 
         if (_isCjkVoice(voiceId)) {
-          // CJK voices: skip synthesis (needs pyopenjtalk), just download the .pt file
+          // CJK voices: skip synthesis (needs misaki[lang]), just download the .pt file
           try {
             dlProc = spawn('python3', [pyScript, '--download-only', voiceId], { // NOSONAR
               stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
