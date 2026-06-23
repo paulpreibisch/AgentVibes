@@ -134,7 +134,7 @@ function serializeSelections(sel) {
 
 // ── TTS + effect preview ──────────────────────────────────────────────────────
 
-function previewEffectWithVoice(effectValue, opts) {
+function previewEffectWithVoice(effectValue, phrase, opts) {
   if (IS_TEST) return;
   stopPreview();
   const playTts = path.join(opts.previewHooksDir, 'play-tts.sh');
@@ -143,7 +143,7 @@ function previewEffectWithVoice(effectValue, opts) {
   const env = { ...process.env, AGENTVIBES_REVERB_OVERRIDE: effectValue };
   if (opts.previewTargetDir) env.CLAUDE_PROJECT_DIR = opts.previewTargetDir;
 
-  const args = ['bash', playTts, 'Testing audio effects.'];
+  const args = ['bash', playTts, phrase];
   if (opts.previewLlmKey) args.push('--llm', opts.previewLlmKey, '--project-dir', opts.previewTargetDir || '');
 
   _previewProc = spawn(args[0], args.slice(1), { stdio: 'ignore', env });
@@ -354,7 +354,8 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     const item = FLAT_ITEMS[list.selected];
     if (!item || item.isHeader || item.isLegend) return;
     if (opts.previewHooksDir) {
-      previewEffectWithVoice(item.value, opts);
+      const name = item.label.replace(/\s{2,}\(.*?\)\s*$/, '').trim();
+      previewEffectWithVoice(item.value, `Testing ${name}.`, opts);
     } else {
       previewEffect(item.value);
     }
