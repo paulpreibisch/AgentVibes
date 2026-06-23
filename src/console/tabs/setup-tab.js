@@ -2673,13 +2673,14 @@ export function createSetupTab(screen, services) {
       const dlg = blessed.box({
         parent: screen,
         top: 'center', left: 'center',
-        width: 64, height: 10,
+        width: 64, height: 11,
         border: { type: 'line' }, tags: true,
         label: ` {yellow-fg}⚠  Missing: ${label}{/yellow-fg} `,
         content: [
           '',
-          `  {white-fg}${voiceId}{/white-fg}{gray-fg} requires ${label} to speak:{/gray-fg}`,
-          `  {cyan-fg}pip install ${pkg}{/cyan-fg}  {gray-fg}(adds language support to misaki){/gray-fg}`,
+          `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs {/gray-fg}{cyan-fg}${pkg}{/cyan-fg}{gray-fg} to speak.{/gray-fg}`,
+          `  {gray-fg}misaki is Kokoro's text engine — {/gray-fg}{cyan-fg}${pkg}{/cyan-fg}{gray-fg} adds ${label}:{/gray-fg}`,
+          `  {cyan-fg}pip install ${pkg}{/cyan-fg}`,
           '',
           `  {gray-fg}If using SSH receiver, run pip install there too.{/gray-fg}`,
           '',
