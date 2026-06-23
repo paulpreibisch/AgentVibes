@@ -2696,18 +2696,64 @@ export function createSetupTab(screen, services) {
       dlg.key(['escape', 'n', 'N'], () => { closeDlg(); onCancel?.(); });
       dlg.key(['i', 'I', 'y', 'Y', 'enter'], () => {
         dlg.destroy();
-        let _installSpin = 0;
-        const _IS = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
-        const _spinTimer = setInterval(() => {
-          if (_kClosed) { clearInterval(_spinTimer); return; }
-          kBox.setLabel(` {yellow-fg}${_IS[_installSpin++ % _IS.length]} Installing ${pkg}...{/yellow-fg} `);
-          screen.render();
-        }, 80);
-        const installProc = spawn('python3', ['-m', 'pip', 'install', pkg], { // NOSONAR
-          stdio: 'ignore',
+        const _PIP_BAR_W = 20;
+        let _pipPct = 0;
+        let _collecting = 0;
+        let _pipBuf = '';
+
+        function _pipBar(p, phase) {
+          const filled = Math.round(p * _PIP_BAR_W / 100);
+          const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
+                    + '{#555555-fg}' + '░'.repeat(_PIP_BAR_W - filled) + '{/#555555-fg}';
+          return ` {yellow-fg}⬇{/yellow-fg} [${bar}] {white-fg}${p}%{/white-fg} {gray-fg}${phase}{/gray-fg} `;
+        }
+
+        kBox.setLabel(_pipBar(0, `installing ${pkg}...`));
+        screen.render();
+
+        const installProc = spawn('python3', ['-m', 'pip', 'install', '--progress-bar', 'on', pkg], { // NOSONAR
+          stdio: ['ignore', 'ignore', 'pipe'],
         });
+
+        installProc.stderr.on('data', (chunk) => {
+          if (_kClosed) return;
+          _pipBuf += chunk.toString();
+          const parts = _pipBuf.split(/[\r\n]/);
+          _pipBuf = parts.pop() ?? '';
+          for (const line of parts) {
+            // Rich/pip download progress: "1.5/3.0 MB" or "500/1500 kB"
+            const dlMatch = line.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(kB|MB|GB)/i);
+            if (dlMatch) {
+              const done = parseFloat(dlMatch[1]);
+              const total = parseFloat(dlMatch[2]);
+              if (total > 0) _pipPct = Math.max(_pipPct, Math.round(25 + (done / total) * 55));
+              kBox.setLabel(_pipBar(_pipPct, `downloading...`));
+              screen.render();
+              continue;
+            }
+            const t = line.trim();
+            if (/^Collecting /i.test(t)) {
+              _collecting++;
+              _pipPct = Math.max(_pipPct, Math.min(20, _collecting * 5));
+              kBox.setLabel(_pipBar(_pipPct, `collecting...`));
+            } else if (/Downloading.*\.whl/i.test(t)) {
+              _pipPct = Math.max(_pipPct, 25);
+              kBox.setLabel(_pipBar(_pipPct, `downloading...`));
+            } else if (/Building|Running setup|running build/i.test(t)) {
+              _pipPct = Math.max(_pipPct, 75);
+              kBox.setLabel(_pipBar(_pipPct, `building...`));
+            } else if (/Installing collected/i.test(t)) {
+              _pipPct = Math.max(_pipPct, 88);
+              kBox.setLabel(_pipBar(_pipPct, `installing...`));
+            } else if (/Successfully installed/i.test(t)) {
+              _pipPct = 100;
+              kBox.setLabel(_pipBar(100, `done`));
+            } else { continue; }
+            screen.render();
+          }
+        });
+
         installProc.on('exit', (code) => {
-          clearInterval(_spinTimer);
           if (!_kClosed) {
             if (code === 0) {
               kBox.setLabel(` {green-fg}✓ Installed! Press Space to preview ${voiceId}{/green-fg} `);
@@ -2720,7 +2766,6 @@ export function createSetupTab(screen, services) {
           }
         });
         installProc.on('error', () => {
-          clearInterval(_spinTimer);
           if (!_kClosed) {
             kBox.setLabel(` {red-fg}pip not found — install Python first{/red-fg} `);
             kPicker.focus();
