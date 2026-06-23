@@ -1111,6 +1111,7 @@ export function createSetupTab(screen, services) {
             previewHooksDir: path.join(packageDir, '.claude', 'hooks'),
             previewLlmKey: 'hermes',
             previewTargetDir: targetDir,
+            previewVoice: draft.voice,
           });
           break;
         case 'bgTrack':
@@ -2111,6 +2112,7 @@ export function createSetupTab(screen, services) {
             previewHooksDir: path.join(packageDir, '.claude', 'hooks'),
             previewLlmKey: llmKey,
             previewTargetDir: targetDir,
+            previewVoice: draft.voice,
           });
           break;
 
@@ -2546,6 +2548,67 @@ export function createSetupTab(screen, services) {
       _closeKP();
     });
 
+    function _promptInstallPyopenjtalk(voiceId, onCancel) {
+      const dlg = blessed.box({
+        parent: screen,
+        top: 'center', left: 'center',
+        width: 62, height: 10,
+        border: { type: 'line' }, tags: true,
+        label: ' {yellow-fg}⚠  Missing: pyopenjtalk{/yellow-fg} ',
+        content: [
+          '',
+          `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs pyopenjtalk for synthesis:{/gray-fg}`,
+          `  {cyan-fg}pip install misaki[ja]{/cyan-fg}`,
+          '',
+          `  {gray-fg}If using SSH receiver, install there too.{/gray-fg}`,
+          '',
+          `  {green-fg}[I]{/green-fg}{gray-fg}=Install now   {/gray-fg}{red-fg}[Esc]{/red-fg}{gray-fg}=Cancel`,
+        ].join('\n'),
+        style: { border: { fg: 'yellow' }, bg: '#1a1a2e' },
+      });
+      dlg.focus();
+      screen.render();
+
+      const closeDlg = () => { dlg.destroy(); kPicker.focus(); screen.render(); };
+
+      dlg.key(['escape', 'n', 'N'], () => { closeDlg(); onCancel?.(); });
+      dlg.key(['i', 'I', 'y', 'Y', 'enter'], () => {
+        dlg.destroy();
+        let _installSpin = 0;
+        const _IS = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+        const _spinTimer = setInterval(() => {
+          if (_kClosed) { clearInterval(_spinTimer); return; }
+          kBox.setLabel(` {yellow-fg}${_IS[_installSpin++ % _IS.length]} Installing misaki[ja]...{/yellow-fg} `);
+          screen.render();
+        }, 80);
+        const installProc = spawn('python3', ['-m', 'pip', 'install', 'misaki[ja]'], { // NOSONAR
+          stdio: 'ignore',
+        });
+        installProc.on('exit', (code) => {
+          clearInterval(_spinTimer);
+          if (!_kClosed) {
+            if (code === 0) {
+              kBox.setLabel(` {green-fg}✓ Installed! Press Space to preview ${voiceId}{/green-fg} `);
+            } else {
+              kBox.setLabel(` {red-fg}Install failed — run: pip install misaki[ja]{/red-fg} `);
+            }
+            kPicker.focus();
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 4000);
+          }
+        });
+        installProc.on('error', () => {
+          clearInterval(_spinTimer);
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}pip not found — install Python first{/red-fg} `);
+            kPicker.focus();
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 4000);
+          }
+        });
+      });
+    }
+
     kPicker.key(['space'], () => {
       if (!voices.length) return;
       const voiceId = voices[kPicker.selected];
@@ -2554,6 +2617,15 @@ export function createSetupTab(screen, services) {
         kBox.setLabel(IDLE_LABEL);
         screen.render();
         return;
+      }
+
+      // CJK voices need pyopenjtalk — prompt to install if missing
+      if (_isCjkVoice(voiceId)) {
+        const check = spawnSync('python3', ['-c', 'import pyopenjtalk'], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
+        if (check.status !== 0) {
+          _promptInstallPyopenjtalk(voiceId);
+          return;
+        }
       }
 
       const phrase = `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;

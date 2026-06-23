@@ -145,6 +145,8 @@ function previewEffectWithVoice(effectValue, phrase, opts, onDone) {
 
   const args = ['bash', playTts, phrase];
   if (opts.previewLlmKey) args.push('--llm', opts.previewLlmKey, '--project-dir', opts.previewTargetDir || '');
+  // Pass voice explicitly so the preview uses the current voice, not the LLM row's default
+  if (opts.previewVoice) args.push(opts.previewVoice);
 
   _previewProc = spawn(args[0], args.slice(1), { stdio: 'ignore', env });
   if (_previewProc) {
@@ -322,8 +324,13 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
 
   const _stopSpinner = () => {
     if (_spinInterval) { clearInterval(_spinInterval); _spinInterval = null; }
+    if (_previewIdx >= 0) {
+      const prevIdx = _previewIdx;
+      _previewIdx = -1;
+      list.setItem(prevIdx, renderItems()[prevIdx]);
+      screen.render();
+    }
     _previewIdx = -1;
-    _refresh();
   };
 
   const _startSpinner = (idx) => {
@@ -332,7 +339,9 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     _spinFrame = 0;
     _spinInterval = setInterval(() => {
       _spinFrame++;
-      _refresh();
+      // Update only the spinning item — avoids full-list redraw flashing
+      list.setItem(_previewIdx, renderItems()[_previewIdx]);
+      screen.render();
     }, 80);
   };
 
