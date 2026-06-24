@@ -197,13 +197,15 @@ function previewEffect(effectValue) {
   };
 
   const doPlay = (file) => {
-    _previewProc = spawn('play', [file], { stdio: 'ignore' });
+    // S4036: 'play'/'sox' are standard SoX tools on the user's local PATH; absolute
+    // paths aren't portable across distros/Homebrew. Risk accepted.
+    _previewProc = spawn('play', [file], { stdio: 'ignore' }); // NOSONAR
     _previewProc.on('error', cleanup);
     _previewProc.on('close', () => { _previewProc = null; cleanup(); });
   };
 
   // Generate a two-octave harmonic tone (~1s) — richer than pure sine for hearing effects
-  const gen = spawn('sox', [
+  const gen = spawn('sox', [ // NOSONAR — see S4036 note above
     '-n', '-r', '44100', '-c', '1', tonePath,
     'synth', '1.0', 'sine', '220', 'sine', '440',
     'gain', '-n', '-6',
@@ -215,7 +217,7 @@ function previewEffect(effectValue) {
     if (code !== 0 || !fs.existsSync(tonePath)) { cleanup(); return; }
     if (!soxFx) { doPlay(tonePath); return; }
 
-    const fxProc = spawn('sox', [tonePath, prevPath, ...soxFx.split(/\s+/).filter(Boolean)], { stdio: 'ignore' });
+    const fxProc = spawn('sox', [tonePath, prevPath, ...soxFx.split(/\s+/).filter(Boolean)], { stdio: 'ignore' }); // NOSONAR — see S4036 note above
     _previewProc = fxProc;
     fxProc.on('error', () => doPlay(tonePath));
     fxProc.on('close', (c) => {

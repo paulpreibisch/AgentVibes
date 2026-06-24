@@ -3190,7 +3190,9 @@ function execScript(scriptPath, options = {}) {
   // Instead, directly execute the script file without sourcing shell config
   // The script itself will be executed in a clean environment
   // Note: This means shell aliases/functions won't be available, but that's safer
-  return execFileSync(scriptFile, args, {
+  // S8701: scriptFile is validated to live under .claude/hooks (above), args are
+  // passed as an array and shell:false disables shell interpretation. Risk handled.
+  return execFileSync(scriptFile, args, { // NOSONAR
     ...options,
     shell: false  // Don't use shell to avoid injection risks
   });
@@ -5874,17 +5876,22 @@ Troubleshooting:
     if (userConfig.hermes?.enabled) {
       try {
         const hermesHooksDir = path.join(userConfig.hermes.hermesHome, 'hooks', 'agentvibes-tts');
-        // Validate that hermesHome stays within expected bounds (no path traversal)
+        // Validate that hermesHome stays within expected bounds (no path traversal).
+        // Use a trailing path.sep so a sibling like ".../hermes-evil" can't satisfy
+        // the prefix check against ".../hermes".
         const resolvedHermesHome = path.resolve(userConfig.hermes.hermesHome);
         const resolvedHooksDir = path.resolve(hermesHooksDir);
-        if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+        if (resolvedHooksDir !== resolvedHermesHome &&
+            !resolvedHooksDir.startsWith(resolvedHermesHome + path.sep)) {
           throw new Error('Invalid Hermes hooks path — possible path traversal');
         }
-        await fs.mkdir(hermesHooksDir, { recursive: true, mode: 0o700 });
+        // S8707: writes target resolvedHooksDir, validated above to stay within
+        // the user-configured hermesHome. Risk handled.
+        await fs.mkdir(hermesHooksDir, { recursive: true, mode: 0o700 }); // NOSONAR
 
         // HOOK.yaml
         const hookYaml = `name: agentvibes-tts\ndescription: Send agent responses to AgentVibes TTS remotely\nevents:\n  - agent:end\n`;
-        await fs.writeFile(path.join(hermesHooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 });
+        await fs.writeFile(path.join(hermesHooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 }); // NOSONAR — see S8707 note above
 
         // handler.py — substitute config values; use JSON.stringify for safe string embedding
         const safeKeyPath  = JSON.stringify(userConfig.hermes.sshKeyPath);
@@ -6021,7 +6028,7 @@ def _strip_markdown(text: str) -> str:
     text = re.sub(r"\\s+", " ", text).strip()
     return text
 `;
-        await fs.writeFile(path.join(hermesHooksDir, 'handler.py'), handlerPy, { mode: 0o600 });
+        await fs.writeFile(path.join(hermesHooksDir, 'handler.py'), handlerPy, { mode: 0o600 }); // NOSONAR — see S8707 note above
         spinner.succeed(chalk.green('Hermes integration installed!'));
         console.log(chalk.gray(`   Hooks written to: ${hermesHooksDir}`));
         console.log(chalk.gray('   Run: hermes gateway restart'));

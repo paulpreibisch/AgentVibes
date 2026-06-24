@@ -37,9 +37,9 @@ setup() {
     "en_US-kathleen-low"
     "en_US-kusal-medium"
     "en_US-kristin-medium"
-    "en_US-libritts_r-high"
-    "16Speakers"
   )
+  # Note: LibriTTS voices are opt-in (--libritts) and 16Speakers lives in the
+  # multispeaker registry, so neither belongs in this COMMON_VOICES check.
 }
 
 teardown() {
@@ -89,8 +89,8 @@ teardown() {
   done
 }
 
-@test "16Speakers model is included in download list" {
-  run grep -q "16Speakers" "$TEST_PROJECT_DIR/.claude/hooks/piper-download-voices.sh"
+@test "16Speakers model is registered in the multispeaker registry" {
+  run grep -q "16Speakers" "$TEST_PROJECT_DIR/.claude/hooks/piper-multispeaker-registry.sh"
   [ "$status" -eq 0 ]
 }
 

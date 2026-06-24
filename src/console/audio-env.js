@@ -180,15 +180,18 @@ export function spawnMp3Player(trackPath, env) {
   env = env ?? buildAudioEnv();
 
   if (_isHeadlessPulse(env)) {
-    // Check required binaries are present
-    if (spawnSync('which', ['ffmpeg'], { stdio: 'ignore', env }).status !== 0) return null;
-    if (spawnSync('which', ['pacat'],  { stdio: 'ignore', env }).status !== 0) return null;
+    // Check required binaries are present.
+    // S4036: standard system media tools resolved via the user's local PATH on
+    // their own machine — no untrusted PATH, absolute paths aren't portable
+    // across distros/Homebrew/Nix. Risk accepted.
+    if (spawnSync('which', ['ffmpeg'], { stdio: 'ignore', env }).status !== 0) return null; // NOSONAR
+    if (spawnSync('which', ['pacat'],  { stdio: 'ignore', env }).status !== 0) return null; // NOSONAR
 
-    const ff = spawn('ffmpeg',
+    const ff = spawn('ffmpeg', // NOSONAR — see S4036 note above
       ['-i', trackPath, '-f', 's16le', '-ac', '2', '-ar', '44100', 'pipe:1', '-loglevel', 'quiet'],
       { stdio: ['ignore', 'pipe', 'ignore'], env },
     );
-    const pa = spawn('pacat',
+    const pa = spawn('pacat', // NOSONAR — see S4036 note above
       ['--playback', '--format=s16le', '--channels=2', '--rate=44100'],
       { stdio: ['pipe', 'ignore', 'ignore'], env },
     );
