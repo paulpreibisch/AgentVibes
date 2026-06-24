@@ -566,6 +566,9 @@ export function createSetupTab(screen, services) {
       inputBox.removeAllListeners('keypress');
       screen.grabKeys = _prevGrabKeys;
       screen.program.hideCursor();
+      // Balance the openModal() below so the global Escape/nav handlers see the
+      // correct modal depth once this dialog is gone.
+      navigationService?.closeModal();
       dlg.destroy();
       if (save) {
         const key = (inputBox.value || '').trim();
@@ -582,8 +585,19 @@ export function createSetupTab(screen, services) {
           }
         }
       }
+      // Return focus to the TTS engine list so arrow/Tab/Escape work again.
+      const _visible = _ttsFocusableItems.filter(b => !b.hidden);
+      const _target = (row && row.installBtn && !row.installBtn.hidden) ? row.installBtn : _visible[0];
+      _target?.focus();
       screen.render();
     }
+
+    // Register as a modal so the global Escape handlers (setup-tab line ~4610 and
+    // navigation.js) recognise this dialog. Without this, isModalOpen() stays
+    // false and Escape navigates the wizard back a screen while leaving this box
+    // orphaned with grabKeys stuck on — trapping the user. forceCloseAll() will
+    // invoke this close callback to dismiss the dialog cleanly.
+    navigationService?.openModal(null, () => _close(false));
 
     let _cursor = 0;
     inputBox.value = '';
@@ -623,7 +637,7 @@ export function createSetupTab(screen, services) {
     });
 
     dlg.once('destroy', () => {
-      if (!_closed) { _closed = true; inputBox.removeAllListeners('keypress'); screen.grabKeys = _prevGrabKeys; screen.program.hideCursor(); }
+      if (!_closed) { _closed = true; inputBox.removeAllListeners('keypress'); screen.grabKeys = _prevGrabKeys; screen.program.hideCursor(); navigationService?.closeModal(); }
     });
 
     inputBox.focus();
