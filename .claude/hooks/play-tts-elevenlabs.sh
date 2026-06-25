@@ -44,20 +44,92 @@ if [[ ${#TEXT} -gt 2000 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# API key — check env var, then ~/.agentvibes/elevenlabs-key.txt
-API_KEY="${ELEVENLABS_API_KEY:-}"
+# Optional: fetch the key from Infisical on demand, so no key is stored on disk.
+# Opt-in via ~/.agentvibes/infisical.env, which sets (env vars take precedence):
+#   INFISICAL_SECRET_NAME   name of the secret in Infisical (e.g. ELEVEN_LABS)
+#   INFISICAL_PROJECT_ID    project/workspace id
+#   INFISICAL_ENV           environment slug         (default: prod)
+#   INFISICAL_DOMAIN        API base URL             (default: http://127.0.0.1:8200/api)
+#   INFISICAL_BOOTSTRAP     universal-auth creds file (default: ~/.palace-bootstrap)
+# Requires the infisical CLI + python3. Fails soft: prints nothing and returns
+# non-zero when unconfigured or unreachable, so the normal error path still runs.
+# The fetched value is never printed.
+_fetch_key_from_infisical() {
+  local cfg="${HOME}/.agentvibes/infisical.env"
+  if [[ -f "$cfg" ]]; then
+    set -o allexport; source "$cfg"; set +o allexport
+  fi
+
+  local secret_name="${INFISICAL_SECRET_NAME:-}"
+  local project_id="${INFISICAL_PROJECT_ID:-}"
+  local env_name="${INFISICAL_ENV:-prod}"
+  local domain="${INFISICAL_DOMAIN:-http://127.0.0.1:8200/api}"
+  local bootstrap="${INFISICAL_BOOTSTRAP:-${HOME}/.palace-bootstrap}"
+
+  [[ -n "$secret_name" && -n "$project_id" ]] || return 1
+  command -v infisical >/dev/null 2>&1 || return 1
+  command -v python3   >/dev/null 2>&1 || return 1
+
+  # Obtain an access token: reuse an exported INFISICAL_TOKEN, else exchange the
+  # universal-auth client credentials from the bootstrap file (creds via env only).
+  local token="${INFISICAL_TOKEN:-}"
+  if [[ -z "$token" ]]; then
+    [[ -f "$bootstrap" ]] || return 1
+    set -o allexport; source "$bootstrap"; set +o allexport
+    [[ -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-}" && -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:-}" ]] || return 1
+    token="$(_AV_DOMAIN="$domain" python3 -c '
+import os, json, urllib.request
+d = os.environ["_AV_DOMAIN"].rstrip("/")
+req = urllib.request.Request(d + "/v1/auth/universal-auth/login",
+    data=json.dumps({"clientId": os.environ["INFISICAL_UNIVERSAL_AUTH_CLIENT_ID"],
+                     "clientSecret": os.environ["INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET"]}).encode(),
+    headers={"Content-Type": "application/json"})
+print(json.loads(urllib.request.urlopen(req, timeout=10).read())["accessToken"])
+' 2>/dev/null || true)"
+  fi
+  [[ -n "$token" ]] || return 1
+
+  INFISICAL_TOKEN="$token" infisical secrets get "$secret_name" \
+    --projectId "$project_id" --env "$env_name" --domain "$domain" \
+    --plain 2>/dev/null | head -1
+}
+
+# ---------------------------------------------------------------------------
+# API key — env var (only if it looks valid), then key file, then Infisical.
+# A malformed/truncated ELEVENLABS_API_KEY (e.g. a half-pasted key) is ignored so
+# it can't silently shadow a good key file — a common foot-gun that yields
+# confusing "API key fail" errors despite a valid key on disk.
+_looks_like_el_key() {
+  [[ "$1" =~ ^sk_[A-Za-z0-9]{40,}$ ]] && return 0   # current format: sk_ + >=40 chars
+  [[ "$1" =~ ^[A-Fa-f0-9]{32}$ ]] && return 0        # legacy 32-char hex key
+  return 1
+}
+
+API_KEY=""
+if [[ -n "${ELEVENLABS_API_KEY:-}" ]]; then
+  if _looks_like_el_key "$ELEVENLABS_API_KEY"; then
+    API_KEY="$ELEVENLABS_API_KEY"
+  else
+    echo "⚠️  ELEVENLABS_API_KEY env var looks malformed (length ${#ELEVENLABS_API_KEY}); ignoring it and using the key file instead." >&2
+  fi
+fi
 if [[ -z "$API_KEY" ]]; then
   _key_file="${HOME}/.agentvibes/elevenlabs-key.txt"
   if [[ -f "$_key_file" ]]; then
-    API_KEY="$(cat "$_key_file" | tr -d '[:space:]')"
+    API_KEY="$(tr -d '[:space:]' < "$_key_file")"
   fi
+fi
+if [[ -z "$API_KEY" ]]; then
+  API_KEY="$(_fetch_key_from_infisical || true)"
+  API_KEY="$(printf '%s' "$API_KEY" | tr -d '[:space:]')"
 fi
 
 if [[ -z "$API_KEY" ]]; then
   echo "❌ ElevenLabs API key not set." >&2
-  echo "   Set it one of two ways:" >&2
+  echo "   Set it one of three ways:" >&2
   echo "   1. export ELEVENLABS_API_KEY=your_key  (add to ~/.bashrc or ~/.zshrc)" >&2
   echo "   2. echo 'your_key' > ~/.agentvibes/elevenlabs-key.txt && chmod 600 ~/.agentvibes/elevenlabs-key.txt" >&2
+  echo "   3. Configure Infisical in ~/.agentvibes/infisical.env (INFISICAL_SECRET_NAME + INFISICAL_PROJECT_ID)" >&2
   echo "   Get a free key at: https://elevenlabs.io" >&2
   exit 2
 fi
@@ -165,7 +237,23 @@ mkdir -p "$AUDIO_DIR"
 chmod 700 "$AUDIO_DIR"
 
 TEMP_FILE="${AUDIO_DIR}/tts-elevenlabs-$(date +%s%N | head -c 18).mp3"
-trap 'rm -f "${TEMP_FILE:-}" 2>/dev/null || true' EXIT
+BODY_FILE="${AUDIO_DIR}/tts-el-body-$(date +%s%N | head -c 18).json"
+trap 'rm -f "${TEMP_FILE:-}" "${BODY_FILE:-}" 2>/dev/null || true' EXIT
+
+# ---------------------------------------------------------------------------
+# Build the JSON request body with python so all escaping is handled correctly
+# (text is passed via env, never interpolated into a shell-quoted payload).
+if ! TTS_TEXT="$TEXT" TTS_MODEL="$MODEL_ID" TTS_LANG="$LANGUAGE_CODE" python3 -c '
+import os, json
+print(json.dumps({
+    "text": os.environ["TTS_TEXT"],
+    "model_id": os.environ["TTS_MODEL"],
+    "language_code": os.environ["TTS_LANG"],
+    "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+}))' > "$BODY_FILE" 2>/dev/null; then
+  echo "❌ Failed to build ElevenLabs request body (python3 required)" >&2
+  exit 3
+fi
 
 # ---------------------------------------------------------------------------
 # Call ElevenLabs API
@@ -175,12 +263,8 @@ HTTP_STATUS=$(curl -s -o "$TEMP_FILE" -w "%{http_code}" \
   -H "xi-api-key: ${API_KEY}" \
   -H "Content-Type: application/json" \
   --max-time 30 \
-  -d "{
-    \"text\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$TEXT" 2>/dev/null || echo "\"${TEXT//\"/\\\"}\\""),
-    \"model_id\": \"${MODEL_ID}\",
-    \"language_code\": \"${LANGUAGE_CODE}\",
-    \"voice_settings\": {\"stability\": 0.5, \"similarity_boost\": 0.75}
-  }" 2>&1)
+  --data-binary "@${BODY_FILE}" 2>&1)
+rm -f "$BODY_FILE" 2>/dev/null || true
 
 if [[ "$HTTP_STATUS" != "200" ]]; then
   echo "❌ ElevenLabs API error (HTTP $HTTP_STATUS)" >&2
@@ -196,26 +280,66 @@ if [[ ! -f "$TEMP_FILE" || ! -s "$TEMP_FILE" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Optional: add silence padding to prevent WSL audio static
+# Convert MP3 → WAV so the post-processor (sox effects) can read it, and add a
+# short silence lead-in (prevents a clipped first phoneme / WSL audio static).
+# ffmpeg is preferred; if it is absent we keep the MP3 and skip effects/music.
 if command -v ffmpeg &>/dev/null; then
-  _PADDED="${AUDIO_DIR}/tts-el-padded-$(date +%s%N | head -c 18).mp3"
-  trap 'rm -f "${TEMP_FILE:-}" "${_PADDED:-}" 2>/dev/null || true' EXIT
+  _WAV="${AUDIO_DIR}/tts-el-$(date +%s%N | head -c 18).wav"
+  trap 'rm -f "${TEMP_FILE:-}" "${_WAV:-}" 2>/dev/null || true' EXIT
   if ffmpeg -f lavfi -i "anullsrc=r=44100:cl=mono:d=0.15" -i "$TEMP_FILE" \
       -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" \
-      -map "[out]" -c:a libmp3lame -q:a 2 -y "$_PADDED" 2>/dev/null \
-      && [[ -s "$_PADDED" ]]; then
+      -map "[out]" -ar 44100 -ac 1 -y "$_WAV" 2>/dev/null \
+      && [[ -s "$_WAV" ]]; then
     rm -f "$TEMP_FILE"
-    TEMP_FILE="$_PADDED"
+    TEMP_FILE="$_WAV"
   fi
 fi
 
-# Play audio — try players in order
-(paplay "$TEMP_FILE" 2>/dev/null \
-  || aplay "$TEMP_FILE" 2>/dev/null \
-  || mpg123 -q "$TEMP_FILE" 2>/dev/null \
-  || ffplay -nodisp -autoexit "$TEMP_FILE" 2>/dev/null \
-  || true) &
-wait $!
+# ---------------------------------------------------------------------------
+# Post-process: apply audio effects (reverb/echo/chorus via sox) and mix
+# background music (via ffmpeg) — exactly like the Piper provider does. Honors
+# the per-LLM row (AGENTVIBES_LLM_KEY) and any per-call AGENTVIBES_REVERB_OVERRIDE.
+# Fails soft: if audio-processor.sh or its tools (sox/ffmpeg) are missing, the
+# unprocessed audio is played instead. NOTE: reverb/echo/chorus REQUIRE sox to be
+# installed; without it, effects are silently skipped (background music still works
+# via ffmpeg).
+#
+# Only post-process when invoked via the orchestrator (which exports
+# AGENTVIBES_LLM_KEY) or with an explicit per-call effect override. A bare direct
+# call — e.g. the voice-picker audition — gets the clean, dry voice so the user
+# hears the voice itself, not the default LLM row's effects/music.
+if [[ -f "$SCRIPT_DIR/audio-processor.sh" \
+      && ( -n "${AGENTVIBES_LLM_KEY:-}" || -n "${AGENTVIBES_REVERB_OVERRIDE:-}" ) ]]; then
+  _PROCESSED="${AUDIO_DIR}/tts-el-proc-$(date +%s%N | head -c 18).wav"
+  trap 'rm -f "${TEMP_FILE:-}" "${_PROCESSED:-}" 2>/dev/null || true' EXIT
+  _AGENT_KEY="${AGENTVIBES_LLM_KEY:-default}"
+  if _PROC_OUT="$(bash "$SCRIPT_DIR/audio-processor.sh" "$TEMP_FILE" "$_AGENT_KEY" "$_PROCESSED" 2>/dev/null)"; then
+    _PF="${_PROC_OUT%%|*}"
+    if [[ -n "$_PF" && -f "$_PF" && -s "$_PF" && "$_PF" != "$TEMP_FILE" ]]; then
+      rm -f "$TEMP_FILE"
+      TEMP_FILE="$_PF"
+    fi
+  fi
+fi
+
+# Play audio
+# Native Windows (git-bash, OS=Windows_NT — not WSL) has none of the Linux
+# players, and ffplay spawned from the TUI's Node process is unreliable. Use the
+# built-in PowerShell WPF MediaPlayer (same as audio-env.js) — no ffmpeg/PATH
+# dependency. Other platforms try the usual players.
+_PS_BIN="$(command -v powershell 2>/dev/null || command -v powershell.exe 2>/dev/null || true)"
+if [[ "${OS:-}" == "Windows_NT" && -n "$_PS_BIN" ]]; then
+  _WINPATH="$(cygpath -w "$TEMP_FILE" 2>/dev/null || echo "$TEMP_FILE")"
+  _WINPATH="${_WINPATH//\'/\'\'}"   # escape single quotes for the PowerShell literal
+  "$_PS_BIN" -NoProfile -Command "Add-Type -AssemblyName PresentationCore; \$p = New-Object System.Windows.Media.MediaPlayer; \$p.Open([uri]'${_WINPATH}'); \$p.Play(); Start-Sleep -Milliseconds 300; \$last=[TimeSpan]::Zero; \$stall=0; \$n=0; while (\$n -lt 100) { Start-Sleep -Milliseconds 100; \$pos=\$p.Position; if (\$p.NaturalDuration.HasTimeSpan -and \$pos -ge \$p.NaturalDuration.TimeSpan) { break }; if (\$pos -eq \$last) { \$stall++ } else { \$stall=0 }; if (\$stall -ge 8 -and \$pos -gt [TimeSpan]::Zero) { break }; \$last=\$pos; \$n++ }; \$p.Stop(); \$p.Close()" 2>/dev/null || true
+else
+  (paplay "$TEMP_FILE" 2>/dev/null \
+    || aplay "$TEMP_FILE" 2>/dev/null \
+    || mpg123 -q "$TEMP_FILE" 2>/dev/null \
+    || ffplay -nodisp -autoexit -loglevel error "$TEMP_FILE" 2>/dev/null \
+    || true) &
+  wait $!
+fi
 
 # Cancel trap so file persists in cache (for replay)
 trap '' EXIT

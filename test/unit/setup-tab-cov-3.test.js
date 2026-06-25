@@ -300,8 +300,10 @@ async function openKokoroPicker() {
   try { fieldList._handlers['key:enter'](); } catch {}
   await tick();
 
-  // 3. Engine picker = newest list with "Select TTS Engine" label
-  const enginePicker = findLast(w => /Select TTS Engine/.test(w._opts?.label || ''));
+  // 3. Engine picker = newest list whose items include the "(global default)" row.
+  //    (Title now lives on the wrapping box, so match the list by its content.)
+  const enginePicker = findLast(w => w._tag === 'list'
+    && (w._opts?.items || []).some(it => /global default/.test(String(it))));
   if (enginePicker) {
     // Kokoro is engines[1] → picker index 2 (after unshifted "(global default)")
     enginePicker.selected = 2;

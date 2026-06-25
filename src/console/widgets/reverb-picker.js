@@ -11,7 +11,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import { spawnSync, spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
-import { BRAND_PINK } from '../brand-colors.js';
+import { renderHelpBar, selectorTitle } from './help-bar.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;
@@ -19,8 +19,6 @@ if (!IS_TEST) {
   const { default: b } = await import('blessed');
   blessed = b;
 }
-
-const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
 
 // ── Effect category definitions ───────────────────────────────────────────────
 
@@ -142,8 +140,14 @@ function previewEffectWithVoice(effectValue, phrase, opts, onDone) {
 
   const env = { ...process.env, AGENTVIBES_REVERB_OVERRIDE: effectValue, AGENTVIBES_EFFECTS_PREVIEW: '1' };
   if (opts.previewTargetDir) env.CLAUDE_PROJECT_DIR = opts.previewTargetDir;
+  // Force a specific synth provider when the caller knows it (e.g. ElevenLabs),
+  // so the orchestrator doesn't fall back to the global provider.
+  if (opts.previewForceProvider) env.AGENTVIBES_FORCE_PROVIDER = opts.previewForceProvider;
 
-  const args = ['bash', playTts, phrase];
+  // On Windows, a bare 'bash' resolves to WSL (no audio/key access); the caller
+  // passes the real git-bash path via previewBashBin.
+  const bashBin = opts.previewBashBin || 'bash';
+  const args = [bashBin, playTts, phrase];
   if (opts.previewLlmKey) args.push('--llm', opts.previewLlmKey, '--project-dir', opts.previewTargetDir || '');
   // Pass voice explicitly so the preview uses the current voice, not the LLM row's default
   if (opts.previewVoice) args.push(opts.previewVoice);
@@ -231,13 +235,23 @@ function previewEffect(effectValue) {
 
 function buildFlatItems() {
   const items = [];
+  items.push({ isHelp: true, label: renderHelpBar([
+    { key: 'Space', label: 'test' },
+    { key: 'Enter', label: 'toggle' },
+    { key: 'A', label: 'apply' },
+    { key: 'Esc', label: 'cancel' },
+  ]) });
+  items.push({ isSpacer: true, label: '' });
   for (const cat of EFFECT_CATEGORIES) {
     items.push({ isHeader: true, label: `── ${cat.label} ` });
     for (const item of cat.items) items.push({ category: cat.id, ...item });
   }
   items.push({ isHeader: true, label: '── Character  (compound presets) ' });
   for (const item of CHARACTER_PRESETS) items.push({ category: 'character', ...item });
-  items.push({ isLegend: true, label: '  Enter=select  Space=preview  c=apply  Esc=cancel' });
+  // Top padding so the Apply button isn't hunched against the last option. The
+  // button is the LAST row so pressing Down to the bottom always lands on it.
+  items.push({ isSpacer: true, label: '' });
+  items.push({ isApply: true, label: '✓  Apply effects' });
   return items;
 }
 
@@ -266,13 +280,27 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   let _previewIdx = -1;
   let _spinFrame = 0;
   const _SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  // Tracked selection index so the Apply button (whose solid bg overrides
+  // blessed's row highlight) can render a distinct focused state.
+  let _selIdx = 0;
+  const _applyIdx = FLAT_ITEMS.findIndex(it => it.isApply);
 
   const renderItems = () => FLAT_ITEMS.map((item, idx) => {
+    if (item.isSpacer) return '';
+    if (item.isHelp) return ` ${item.label}`;
     if (item.isHeader) {
       const fill = Math.max(0, WIDTH - 6 - item.label.length);
-      return `{#546e7a-fg}${item.label}${'─'.repeat(fill)}{/#546e7a-fg}`;
+      return `{#90a4ae-fg}${item.label}${'─'.repeat(fill)}{/#90a4ae-fg}`;
     }
-    if (item.isLegend) return `{#546e7a-fg}${item.label}{/#546e7a-fg}`;
+    if (item.isLegend) return `{#90a4ae-fg}${item.label}{/#90a4ae-fg}`;
+    if (item.isApply) {
+      const btn = '  ✓  Apply effects  ';
+      const pad = ' '.repeat(Math.max(0, Math.floor((WIDTH - 4 - btn.length) / 2)));
+      // Bright + arrows when focused, dim when not — so navigating to it is obvious.
+      return idx === _selIdx
+        ? `${pad}{#43a047-bg}{white-fg}{bold}▸${btn}◂{/bold}{/white-fg}{/#43a047-bg}`
+        : `${pad}{#1b3a1f-bg}{#81c784-fg} ${btn} {/#81c784-fg}{/#1b3a1f-bg}`;
+    }
     const isSel = item.category === 'character'
       ? selections.get('character') === item.value
       : selections.get(item.category) === item.value;
@@ -289,11 +317,12 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     height: HEIGHT,
     border: { type: 'line' },
     tags: true,
-    label: _modalTitle('Audio Effects'),
+    label: selectorTitle('Audio Effects'),
     items: renderItems(),
-    keys: true,
+    keys: false,
     vi: false,
     mouse: true,
+    scrollable: true,
     scrollbar: { ch: '▐', style: { fg: '#2e7d32' } },
     style: {
       border: { fg: '#2e7d32' },
@@ -304,19 +333,21 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
 
   // Position cursor at first active (non-off) selection, or first selectable item
   let initialIdx = FLAT_ITEMS.findIndex(item =>
-    !item.isHeader && !item.isLegend && item.category &&
+    item.category &&
     (item.category === 'character'
       ? selections.get('character') === item.value
       : selections.get(item.category) === item.value && !item.value.startsWith('off-'))
   );
-  if (initialIdx < 0) initialIdx = FLAT_ITEMS.findIndex(item => !item.isHeader && !item.isLegend);
+  if (initialIdx < 0) initialIdx = FLAT_ITEMS.findIndex(item => item.category);
 
-  list.select(Math.max(0, initialIdx));
+  _selIdx = Math.max(0, initialIdx);
+  list.select(_selIdx);
   list.focus();
   screen.render();
 
   const _refresh = () => {
     const cur = list.selected;
+    _selIdx = cur;
     list.setItems(renderItems());
     list.select(cur);
     screen.render();
@@ -366,7 +397,8 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
 
   list.key('enter', () => {
     const item = FLAT_ITEMS[list.selected];
-    if (!item || item.isHeader || item.isLegend) return;
+    if (!item || item.isHeader || item.isLegend || item.isHelp || item.isSpacer) return;
+    if (item.isApply) { _confirm(); return; }
 
     if (item.category === 'character') {
       // Toggle: selecting same character preset again turns it off
@@ -388,7 +420,7 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
   list.key('space', () => {
     const idx = list.selected;
     const item = FLAT_ITEMS[idx];
-    if (!item || item.isHeader || item.isLegend) return;
+    if (!item || item.isHeader || item.isLegend || item.isApply || item.isHelp || item.isSpacer) return;
     if (opts.previewHooksDir) {
       const name = item.label.replace(/\s{2,}\(.*?\)\s*$/, '').trim();
       _startSpinner(idx);
@@ -398,7 +430,37 @@ export function openReverbPicker(screen, currentPreset, onSelect, onClose, opts 
     }
   });
 
-  list.key(['c', 'C'], _confirm);
+  list.key(['a', 'A', 'c', 'C'], _confirm);
+
+  // Navigation skips decoration (headers, spacers, help) so arrow keys move only
+  // between real options and the Apply button — Down to the bottom always lands
+  // on Apply. (keys:false above disables blessed's built-in nav so we own it.)
+  const _isSelectable = (i) => {
+    const it = FLAT_ITEMS[i];
+    return Boolean(it && (it.category || it.isApply));
+  };
+  // Select row i and repaint the Apply button so its focused/dim state follows.
+  const _selectRow = (i) => {
+    _selIdx = i;
+    list.select(i);
+    if (_applyIdx >= 0) list.setItem(_applyIdx, renderItems()[_applyIdx]);
+    screen.render();
+  };
+  const _move = (dir) => {
+    let i = list.selected;
+    do { i += dir; } while (i >= 0 && i < FLAT_ITEMS.length && !_isSelectable(i));
+    if (i >= 0 && i < FLAT_ITEMS.length && _isSelectable(i)) _selectRow(i);
+  };
+  const _jump = (dir) => {
+    const idx = dir > 0
+      ? FLAT_ITEMS.map((_, i) => i).reverse().find(_isSelectable)
+      : FLAT_ITEMS.findIndex((_, i) => _isSelectable(i));
+    if (idx >= 0) _selectRow(idx);
+  };
+  list.key(['down', 'j'], () => _move(1));
+  list.key(['up', 'k'], () => _move(-1));
+  list.key(['home'], () => _jump(-1));
+  list.key(['end'], () => _jump(1)); // jump straight to Apply
 
   list.key(['escape', 'q', 'Q'], () => {
     _stopSpinner();

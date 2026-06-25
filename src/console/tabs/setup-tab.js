@@ -39,9 +39,10 @@ import {
 } from '../../services/tts-engine-service.js';
 import { openReverbPicker, formatEffectLabel } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
+import { renderHelpBar, selectorTitle } from '../widgets/help-bar.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { spawn, spawnSync } from 'node:child_process';
@@ -52,6 +53,28 @@ import net from 'node:net';
 const _execFileAsync = promisify(execFile);
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
+
+// Resolve a real Unix bash for spawning .sh hooks. On Windows a bare
+// spawn('bash', …) resolves to C:\Windows\System32\bash.exe — that's WSL, which
+// has a different HOME (no AgentVibes key/config), doesn't inherit the Windows
+// env, and can't execute a Windows-path script. Prefer git-bash / msys2 bash.
+let _cachedBash = null;
+function resolveBash() {
+  if (_cachedBash) return _cachedBash;
+  if (process.platform !== 'win32') { _cachedBash = 'bash'; return _cachedBash; }
+  const candidates = [
+    process.env.AGENTVIBES_BASH,
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+    'C:\\msys64\\usr\\bin\\bash.exe',
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) { _cachedBash = c; return _cachedBash; } } catch { /* keep trying */ }
+  }
+  _cachedBash = 'bash'; // last resort
+  return _cachedBash;
+}
 
 let blessed;
 if (!IS_TEST) {
@@ -94,8 +117,57 @@ const NATIVE_ENGINE_VOICES = {
   soprano:     { id: 'soprano',         label: 'Soprano'                  },
   sapi:        { id: 'sapi',            label: 'Windows SAPI'             },
   'macos-say': { id: 'macos-say',       label: 'macOS Say'                },
-  elevenlabs:  { id: 'elevenlabs-Rachel', label: 'ElevenLabs (Rachel)'    },
+  // elevenlabs is handled by its own multi-voice picker (see ELEVENLABS_VOICES);
+  // the id here is the default voice assigned when the engine is first selected.
+  elevenlabs:  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'ElevenLabs'           },
 };
+
+// Static built-in ElevenLabs premade voices — universal to every ElevenLabs
+// account. The stored config value is the raw ElevenLabs voice_id; the TTS hook
+// accepts raw IDs directly (its ^[a-zA-Z0-9]{10,40}$ path), so there is no
+// name→id map to keep in sync. Custom/cloned account voices are NOT listed here
+// (that needs a live API fetch); add them on elevenlabs.io to use their IDs.
+const ELEVENLABS_DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+const ELEVENLABS_VOICES = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',   gender: 'Female', lang: 'en-US', desc: 'Mature, reassuring'      },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger',   gender: 'Male',   lang: 'en-US', desc: 'Laid-back, casual'       },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura',   gender: 'Female', lang: 'en-US', desc: 'Enthusiast, quirky'      },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'Male',   lang: 'en-AU', desc: 'Deep, confident'         },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',  gender: 'Male',   lang: 'en-GB', desc: 'Warm storyteller'        },
+  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum',  gender: 'Male',   lang: 'en-US', desc: 'Husky trickster'         },
+  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River',   gender: '',       lang: 'en-US', desc: 'Relaxed, neutral'        },
+  { id: 'SOYHLrjzK2X1ezoPC6cr', name: 'Harry',   gender: 'Male',   lang: 'en-US', desc: 'Fierce warrior'          },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam',    gender: 'Male',   lang: 'en-US', desc: 'Energetic creator'       },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',   gender: 'Female', lang: 'en-GB', desc: 'Clear educator'          },
+  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'Female', lang: 'en-US', desc: 'Knowledgable, pro'       },
+  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will',    gender: 'Male',   lang: 'en-US', desc: 'Relaxed optimist'        },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'Female', lang: 'en-US', desc: 'Playful, bright'         },
+  { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric',    gender: 'Male',   lang: 'en-US', desc: 'Smooth, trustworthy'     },
+  { id: 'hpp4J3VqNfWAUOO0d1Us', name: 'Bella',   gender: 'Female', lang: 'en-US', desc: 'Professional, warm'      },
+  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris',   gender: 'Male',   lang: 'en-US', desc: 'Charming, down-to-earth' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian',   gender: 'Male',   lang: 'en-US', desc: 'Deep, comforting'        },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',  gender: 'Male',   lang: 'en-GB', desc: 'Steady broadcaster'      },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',    gender: 'Female', lang: 'en-GB', desc: 'Velvety actress'         },
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam',    gender: 'Male',   lang: 'en-US', desc: 'Dominant, firm'          },
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill',    gender: 'Male',   lang: 'en-US', desc: 'Wise, mature'            },
+  // ── Added from the ElevenLabs voice library (raw library voice_ids) ───────
+  { id: 'HBDoL4wkcalemIO0nUAu', name: 'Emily',      gender: 'Female', lang: 'en-GB', desc: 'RPG, immersive'    },
+  { id: 'Mtmp3KhFIjYpWYRycDe3', name: 'John',       gender: 'Male',   lang: 'en-US', desc: 'Raspy surfer'      },
+  { id: '8kgj5469z1URcH4MB2G4', name: 'Sakuya',     gender: 'Female', lang: 'en-US', desc: 'Cheerful anime'    },
+  { id: '2ajXGJNYBR0iNHpS4VZb', name: 'Rob',        gender: 'Male',   lang: 'en-GB', desc: 'Tough, gritty'     },
+  { id: 'mMdTuD2nnFiCH88UdXSb', name: 'Jane',       gender: 'Female', lang: 'en-US', desc: 'Cinematic villain' },
+];
+
+/** Returns the friendly name for an ElevenLabs voice_id, or null if unknown. */
+const elevenLabsVoiceName = (id) => ELEVENLABS_VOICES.find(v => v.id === id)?.name || null;
+
+/** Formats a stored voice value for display in the Voice field. */
+function formatVoiceLabel(voice, globalVoice) {
+  if (NATIVE_ENGINE_VOICES[voice]) return NATIVE_ENGINE_VOICES[voice].label;
+  const el = elevenLabsVoiceName(voice);
+  if (el) return `ElevenLabs (${el})`;
+  return voice || `(global: ${globalVoice})`;
+}
 
 // ---------------------------------------------------------------------------
 // Soprano WebUI auto-start helpers
@@ -553,7 +625,7 @@ export function createSetupTab(screen, services) {
 
     blessed.text({
       parent: dlg, top: 7, left: 2, tags: true,
-      content: '{gray-fg}[Enter] Save  [Esc] Cancel{/gray-fg}',
+      content: '{#9e9e9e-fg}[Enter] Save  [Esc] Cancel{/#9e9e9e-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -1069,7 +1141,7 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
+        { key: 'voice',       label: 'Voice',        getValue: () => formatVoiceLabel(draft.voice, globalVoice) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
         { key: 'audioEffects', label: 'Audio Effects', getValue: () => formatEffectLabel(draft.reverbPreset) },
         { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
@@ -1085,8 +1157,8 @@ export function createSetupTab(screen, services) {
           return `✏  ${h}${p}${k}`;
         }});
         if (draft.connType === 'manual') {
-          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
-          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{gray-fg}(default: 22){/gray-fg}' });
+          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{#9e9e9e-fg}(optional){/#9e9e9e-fg}' });
+          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{#9e9e9e-fg}(default: 22){/#9e9e9e-fg}' });
         }
       }
       return base;
@@ -1183,7 +1255,15 @@ export function createSetupTab(screen, services) {
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       const sampleText = 'This is how your Hermes audio settings sound right now.';
       let cmd, args;
-      if (isWin) {
+      if (draft.ttsEngine === 'elevenlabs') {
+        // ElevenLabs has no Windows provider; route through the bash orchestrator
+        // (play-tts.sh) so pretext, effects, and background music all apply. It then
+        // dispatches to the ElevenLabs provider for synthesis.
+        const script = path.join(packageDir, '.claude', 'hooks', 'play-tts.sh');
+        cmd = resolveBash();
+        args = [script, sampleText, draft.voice || ELEVENLABS_DEFAULT_VOICE_ID,
+                '--llm', 'hermes', '--project-dir', targetDir];
+      } else if (isWin) {
         const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.ps1');
         cmd = 'powershell';
         args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', 'hermes'];
@@ -1194,7 +1274,10 @@ export function createSetupTab(screen, services) {
       }
       const proc = spawn(cmd, args, {
         stdio: 'ignore', windowsHide: true,
-        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        env: {
+          ...process.env, CLAUDE_PROJECT_DIR: targetDir,
+          ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
+        },
       });
       _previewModalProc = proc;
       proc.on('exit', (code) => {
@@ -1274,6 +1357,8 @@ export function createSetupTab(screen, services) {
             previewLlmKey: 'hermes',
             previewTargetDir: targetDir,
             previewVoice: draft.voice,
+            previewBashBin: resolveBash(),
+            previewForceProvider: draft.ttsEngine === 'elevenlabs' ? 'elevenlabs' : undefined,
           });
           break;
         case 'bgTrack':
@@ -1526,7 +1611,7 @@ export function createSetupTab(screen, services) {
     const known   = _getKnownHosts().filter(h => !aliases.includes(h));  // avoid duplicates
 
     // Build display items — aliases first (they carry key/port in ~/.ssh/config)
-    const aliasItems = aliases.map(a => `  📋 ${a}  {gray-fg}(SSH alias){/gray-fg}`);
+    const aliasItems = aliases.map(a => `  📋 ${a}  {#9e9e9e-fg}(SSH alias){/#9e9e9e-fg}`);
     const knownItems = known.map(h => `  ${h}`);
     const allItems   = [...aliasItems, ...knownItems, '  ✏  Enter manually…'];
 
@@ -1599,7 +1684,7 @@ export function createSetupTab(screen, services) {
       border: { type: 'line' }, tags: true,
       label: ' {bold}{cyan-fg} SSH Connection {/cyan-fg}{/bold} ',
       items: [
-        `  📋 SSH Alias   — pick from ~/.ssh/config${hasAliases ? '' : '  {gray-fg}(none found){/gray-fg}'}`,
+        `  📋 SSH Alias   — pick from ~/.ssh/config${hasAliases ? '' : '  {#9e9e9e-fg}(none found){/#9e9e9e-fg}'}`,
         '  ✏  Manual      — enter host, key, and port',
       ],
       style: {
@@ -1727,8 +1812,8 @@ export function createSetupTab(screen, services) {
         return `✏  ${h}${p}${k}`;
       }}];
       if (draft.connType === 'manual') {
-        base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
-        base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || provider.defaultPort || '{gray-fg}(default){/gray-fg}' });
+        base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{#9e9e9e-fg}(optional){/#9e9e9e-fg}' });
+        base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || provider.defaultPort || '{#9e9e9e-fg}(default){/#9e9e9e-fg}' });
       }
       return base;
     }
@@ -1796,7 +1881,7 @@ export function createSetupTab(screen, services) {
         // Refresh status text below provider name
         const row = transportRows.find(r => r.id === provider.id);
         if (row && draft.host) {
-          row.statusText.setContent(`{gray-fg}→ ${draft.host}:${draft.port}{/gray-fg}`);
+          row.statusText.setContent(`{#9e9e9e-fg}→ ${draft.host}:${draft.port}{/#9e9e9e-fg}`);
           screen.render();
         }
       }).catch(() => {});
@@ -1821,7 +1906,7 @@ export function createSetupTab(screen, services) {
         ? spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText], { // NOSONAR
             stdio: 'ignore', windowsHide: true, env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
           })
-        : spawn('bash', [script, sampleText], { // NOSONAR
+        : spawn(resolveBash(), [script, sampleText], { // NOSONAR
             stdio: 'ignore', env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
           });
       _previewProc = proc;
@@ -1952,7 +2037,7 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
+        { key: 'voice',       label: 'Voice',        getValue: () => formatVoiceLabel(draft.voice, globalVoice) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
         { key: 'audioEffects', label: 'Audio Effects', getValue: () => formatEffectLabel(draft.reverbPreset) },
         { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
@@ -1968,8 +2053,8 @@ export function createSetupTab(screen, services) {
           return `✏  ${h}${p}${k}`;
         }});
         if (draft.connType === 'manual') {
-          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
-          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{gray-fg}(default: 22){/gray-fg}' });
+          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{#9e9e9e-fg}(optional){/#9e9e9e-fg}' });
+          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{#9e9e9e-fg}(default: 22){/#9e9e9e-fg}' });
         }
       }
       return base;
@@ -2106,7 +2191,15 @@ export function createSetupTab(screen, services) {
 
       function _doSpawnPreview() {
         let cmd, args;
-        if (isWin) {
+        if (draft.ttsEngine === 'elevenlabs') {
+          // ElevenLabs has no Windows provider; route through the bash orchestrator
+          // (play-tts.sh) so pretext, effects, and background music all apply. It then
+          // dispatches to the ElevenLabs provider for synthesis.
+          const script = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
+          cmd = resolveBash();
+          args = [script, sampleText, draft.voice || ELEVENLABS_DEFAULT_VOICE_ID,
+                  '--llm', llmKey, '--project-dir', targetDir];
+        } else if (isWin) {
           const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
           cmd = 'powershell';
           args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
@@ -2118,7 +2211,10 @@ export function createSetupTab(screen, services) {
         const proc = spawn(cmd, args, {
           stdio: 'ignore',
           windowsHide: true,
-          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
+          env: {
+            ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}`,
+            ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
+          },
         });
         _previewModalProc = proc;
 
@@ -2275,6 +2371,8 @@ export function createSetupTab(screen, services) {
             previewLlmKey: llmKey,
             previewTargetDir: targetDir,
             previewVoice: draft.voice,
+            previewBashBin: resolveBash(),
+            previewForceProvider: draft.ttsEngine === 'elevenlabs' ? 'elevenlabs' : undefined,
           });
           break;
 
@@ -2363,7 +2461,7 @@ export function createSetupTab(screen, services) {
   function _openTtsEnginePicker(draft, onDone) {
     function _closePicker() {
       navigationService?.closeModal();
-      destroyList(picker, screen);
+      destroyList(box, screen);
       onDone();
     }
     navigationService?.openModal(null, _closePicker);
@@ -2376,41 +2474,62 @@ export function createSetupTab(screen, services) {
     // Add "(global default)" option at top
     items.unshift('  (global default)');
 
-    const picker = blessed.list({
+    // Standardized chrome: titled box + pinned top help bar; selecting an engine
+    // is not audible, so no preview hint.
+    const ENGINE_TITLE = selectorTitle('Text To Speech (TTS) Engine');
+    const box = blessed.box({
       parent: screen,
       top: 'center',
       left: 'center',
       width: 70,
-      height: Math.min(items.length + 4, 16),
+      height: Math.min(items.length + 5, 17),
       border: { type: 'line' },
       tags: true,
-      label: ' {bold}{cyan-fg} Select TTS Engine {/cyan-fg}{/bold} ',
+      label: ENGINE_TITLE,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    box.setFront();
+    blessed.text({
+      parent: box, top: 0, left: 1, right: 1, height: 1, tags: true,
+      content: renderHelpBar([{ key: 'Enter', label: 'select' }, { key: 'Esc', label: 'cancel' }]),
+      style: { bg: COLORS.contentBg },
+    });
+
+    const picker = blessed.list({
+      parent: box,
+      top: 1,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      tags: true,
+      items,
       keys: true,
       vi: false,
       mouse: true,
       style: {
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
-        border: { fg: 'cyan' },
         selected: { bg: 'blue', fg: 'yellow' },
         item: { fg: COLORS.labelFg },
       },
     });
-    picker.setFront();
-    picker.setItems(items);
 
     picker.key(['enter'], () => {
       const idx = picker.selected;
-      const selectedEngine = idx === 0 ? '' : engines[idx - 1].id;
+      // idx 0 = "(global default)"; idx 1..N map to engines[idx-1]. Guard the
+      // bounds so a stray/out-of-range selection can never read .id of undefined.
+      const engine = idx > 0 ? engines[idx - 1] : null;
+      if (idx > 0 && !engine) { _closePicker(); return; }
+      const selectedEngine = engine ? engine.id : '';
       // Guard: block selection of non-installed optional engines
       if (selectedEngine) {
         const engineStatus = engines.find(e => e.id === selectedEngine);
         if (engineStatus && !engineStatus.installed && !engineStatus.native) {
-          picker.setLabel(` {red-fg} ${engineStatus.name} is not installed — go to Setup > TTS Engines to install {/red-fg} `);
+          box.setLabel(` {red-fg} ${engineStatus.name} is not installed — go to Setup > TTS Engines to install {/red-fg} `);
           screen.render();
           setTimeout(() => {
-            if (!picker.destroyed) {
-              picker.setLabel(' {bold}{cyan-fg} Select TTS Engine {/cyan-fg}{/bold} ');
+            if (!box.destroyed) {
+              box.setLabel(ENGINE_TITLE);
               screen.render();
             }
           }, 3000);
@@ -2420,7 +2539,16 @@ export function createSetupTab(screen, services) {
       draft.ttsEngine = selectedEngine;
       // Auto-set voice to native engine canonical ID so the Voice field updates
       // immediately. For piper or empty engine, clear to '' (shows global default).
-      draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
+      if (selectedEngine === 'elevenlabs') {
+        // Keep an already-chosen ElevenLabs voice — a known built-in OR any raw
+        // 20-char ElevenLabs voice_id (a custom/library voice the user configured
+        // that isn't in our static list). Otherwise assign the default.
+        const looksLikeElId = /^[A-Za-z0-9]{20}$/.test(draft.voice || '');
+        draft.voice = (elevenLabsVoiceName(draft.voice) || looksLikeElId)
+          ? draft.voice : ELEVENLABS_DEFAULT_VOICE_ID;
+      } else {
+        draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
+      }
       _closePicker();
     });
 
@@ -2464,7 +2592,7 @@ export function createSetupTab(screen, services) {
     });
     blessed.text({
       parent: warningBox, bottom: 1, left: 2, right: 2, tags: true,
-      content: '{gray-fg}[Enter] or [Esc] to dismiss{/gray-fg}',
+      content: '{#9e9e9e-fg}[Enter] or [Esc] to dismiss{/#9e9e9e-fg}',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2531,18 +2659,24 @@ export function createSetupTab(screen, services) {
     return { voices: _KOKORO_ALL_VOICES, cached };
   }
 
-  function _kokoroVoiceLabel(id) {
-    const prefix = id.slice(0, 2);
+  // Kokoro voice-id prefix → { language, gender } so they render as SEPARATE,
+  // identically-styled columns (gender colored) like the other providers.
+  const KOKORO_LANG = {
+    af: { lang: 'en-US', gender: 'Female' }, am: { lang: 'en-US', gender: 'Male' },
+    bf: { lang: 'en-GB', gender: 'Female' }, bm: { lang: 'en-GB', gender: 'Male' },
+    jf: { lang: 'ja',    gender: 'Female' }, jm: { lang: 'ja',    gender: 'Male' },
+    zf: { lang: 'zh',    gender: 'Female' }, zm: { lang: 'zh',    gender: 'Male' },
+    ef: { lang: 'es',    gender: 'Female' }, em: { lang: 'es',    gender: 'Male' },
+    ff: { lang: 'fr',    gender: 'Female' }, fm: { lang: 'fr',    gender: 'Male' },
+    hf: { lang: 'hi',    gender: 'Female' }, hm: { lang: 'hi',    gender: 'Male' },
+    pf: { lang: 'pt',    gender: 'Female' }, pm: { lang: 'pt',    gender: 'Male' },
+    kf: { lang: 'ko',    gender: 'Female' }, km: { lang: 'ko',    gender: 'Male' },
+    if: { lang: 'it',    gender: 'Female' }, im: { lang: 'it',    gender: 'Male' },
+  };
+  function _kokoroVoiceMeta(id) {
+    const m = KOKORO_LANG[id.slice(0, 2)] || { lang: id.slice(0, 2), gender: '' };
     const name = id.slice(3);
-    const lang = {
-      af: 'en-US ♀', am: 'en-US ♂', bf: 'en-GB ♀', bm: 'en-GB ♂',
-      jf: 'ja ♀',    jm: 'ja ♂',    zf: 'zh ♀',    zm: 'zh ♂',
-      ef: 'es ♀',    em: 'es ♂',    ff: 'fr ♀',    fm: 'fr ♂',
-      hf: 'hi ♀',    hm: 'hi ♂',    pf: 'pt ♀',    pm: 'pt ♂',
-      kf: 'ko ♀',    km: 'ko ♂',    if: 'it ♀',    im: 'it ♂',
-    }[prefix] || prefix;
-    const label = name.charAt(0).toUpperCase() + name.slice(1);
-    return `${label.padEnd(14)} {gray-fg}(${lang}){/gray-fg}  {cyan-fg}${id}{/cyan-fg}`;
+    return { displayName: name.charAt(0).toUpperCase() + name.slice(1), lang: m.lang, gender: m.gender };
   }
 
   function _openKokoroVoicePicker(draft, onDone, llmKey = '') {
@@ -2626,7 +2760,7 @@ export function createSetupTab(screen, services) {
     // "-p 22" and an ~/.ssh/config Host alias keeps its real port (defer to ~/.ssh/config).
     const _validSshPort = Boolean(_sshPort && /^\d+$/.test(_sshPort));
 
-    const IDLE_LABEL = ' {bold}{cyan-fg} Kokoro — Select Voice {/cyan-fg}{/bold} ';
+    const IDLE_LABEL = selectorTitle('Voice');
 
     function _killKPreview() {
       _stopKSpinner();
@@ -2682,7 +2816,8 @@ export function createSetupTab(screen, services) {
       else if (!_kokoroInstalled)                                    mark = '{yellow-fg}!{/yellow-fg}';
       else if (cached.has(id))                                       mark = '{green-fg}✓{/green-fg}';
       else                                                         mark = '{cyan-fg}☁{/cyan-fg}';
-      return `${fav}${mark}  ${_kokoroVoiceLabel(id)}`;
+      const m = _kokoroVoiceMeta(id);
+      return formatVoiceRow({ status: `${fav}${mark}`, name: m.displayName, gender: m.gender, lang: m.lang, detail: id });
     }
     const items = voices.map(_kokoroItem);
 
@@ -2713,7 +2848,7 @@ export function createSetupTab(screen, services) {
       _kSpinningIdx = -1;
     }
 
-    const LEGEND_H = 2;
+    const LEGEND_H = 3;
     const pickerH = Math.min(voices.length + LEGEND_H + 3, 24);
 
     // Outer box (border + label) — legend is a fixed child, not part of the scroll list
@@ -2730,7 +2865,16 @@ export function createSetupTab(screen, services) {
     // Fixed legend rows — pinned at top so they never scroll away
     blessed.text({
       parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
-      content: '{gray-fg}[{/gray-fg}{#FF69B4-fg}Enter{/#FF69B4-fg}{gray-fg}]={/gray-fg}{#FFD700-fg}select{/#FFD700-fg}  {gray-fg}[{/gray-fg}Space{gray-fg}]={/gray-fg}{#FFD700-fg}sample{/#FFD700-fg}  {gray-fg}[F]={/gray-fg}{#FFD700-fg}★ fav{/#FFD700-fg}  {gray-fg}[D]={/gray-fg}{#FFD700-fg}download all{/#FFD700-fg}  {gray-fg}[Esc]=cancel\n{/gray-fg}{green-fg}✓{/green-fg}{gray-fg}=cached  {/gray-fg}{#FFD700-fg}★{/#FFD700-fg}{gray-fg}=fav  {/gray-fg}{cyan-fg}☁{/cyan-fg}{gray-fg}=download  {/gray-fg}{yellow-fg}!{/yellow-fg}{gray-fg}=needs pip install (kokoro or misaki[lang])',
+      // Controls split across two rows so they don't wrap in narrow tmux panes;
+      // third row is the symbol legend.
+      content: renderHelpBar([
+        { key: 'Space', label: 'preview' },
+        { key: 'Enter', label: 'select' },
+        { key: 'Esc', label: 'cancel' },
+      ]) + '\n' + renderHelpBar([
+        { key: 'F', label: 'favorite' },
+        { key: 'D', label: 'download all' },
+      ]) + '\n{green-fg}✓{/green-fg}{#9e9e9e-fg}=cached  {/#9e9e9e-fg}{#FFD700-fg}★{/#FFD700-fg}{#9e9e9e-fg}=fav  {/#9e9e9e-fg}{cyan-fg}☁{/cyan-fg}{#9e9e9e-fg}=download  {/#9e9e9e-fg}{yellow-fg}!{/yellow-fg}{#9e9e9e-fg}=needs pip install (kokoro or misaki[lang])',
       style: { bg: COLORS.contentBg },
     });
 
@@ -2741,7 +2885,6 @@ export function createSetupTab(screen, services) {
       keys: true, vi: true, mouse: true, tags: true,
       items,
       scrollable: true,
-      alwaysScroll: true,
       scrollbar: { ch: '|', style: { fg: 'cyan' } },
       style: {
         fg: COLORS.labelFg, bg: COLORS.contentBg,
@@ -2769,13 +2912,13 @@ export function createSetupTab(screen, services) {
         label: ` {yellow-fg}⚠  Missing: ${label}{/yellow-fg} `,
         content: [
           '',
-          `  {white-fg}${voiceId}{/white-fg}{gray-fg} needs {/gray-fg}{cyan-fg}${pkg}{/cyan-fg}{gray-fg} to speak.{/gray-fg}`,
-          `  {gray-fg}Install it now with:{/gray-fg}`,
+          `  {white-fg}${voiceId}{/white-fg}{#9e9e9e-fg} needs {/#9e9e9e-fg}{cyan-fg}${pkg}{/cyan-fg}{#9e9e9e-fg} to speak.{/#9e9e9e-fg}`,
+          `  {#9e9e9e-fg}Install it now with:{/#9e9e9e-fg}`,
           `  {cyan-fg}pip install ${pkg}{/cyan-fg}`,
           '',
-          `  {gray-fg}If using SSH receiver, run pip install there too.{/gray-fg}`,
+          `  {#9e9e9e-fg}If using SSH receiver, run pip install there too.{/#9e9e9e-fg}`,
           '',
-          `  {green-fg}[I]{/green-fg}{gray-fg}=Install now   {/gray-fg}{red-fg}[Esc]{/red-fg}{gray-fg}=Cancel`,
+          `  {green-fg}[I]{/green-fg}{#9e9e9e-fg}=Install now   {/#9e9e9e-fg}{red-fg}[Esc]{/red-fg}{#9e9e9e-fg}=Cancel`,
         ].join('\n'),
         style: { border: { fg: 'yellow' }, bg: '#1a1a2e' },
       });
@@ -2816,10 +2959,10 @@ export function createSetupTab(screen, services) {
         });
 
         function _setContent(barPct, phase, extra, isDone) {
-          const barStr = `  {yellow-fg}⬇{/yellow-fg} [${_bar(barPct)}] {white-fg}${barPct}%{/white-fg} {gray-fg}${phase}{/gray-fg}`;
+          const barStr = `  {yellow-fg}⬇{/yellow-fg} [${_bar(barPct)}] {white-fg}${barPct}%{/white-fg} {#9e9e9e-fg}${phase}{/#9e9e9e-fg}`;
           const footer = isDone
-            ? `  {green-fg}[Enter]{/green-fg}{gray-fg} = OK{/gray-fg}`
-            : `  {red-fg}[Esc]{/red-fg}{gray-fg} = Cancel{/gray-fg}`;
+            ? `  {green-fg}[Enter]{/green-fg}{#9e9e9e-fg} = OK{/#9e9e9e-fg}`
+            : `  {red-fg}[Esc]{/red-fg}{#9e9e9e-fg} = Cancel{/#9e9e9e-fg}`;
           iMod.setContent([ '', barStr, '', extra, '', footer ].join('\n'));
           screen.render();
         }
@@ -2868,7 +3011,7 @@ export function createSetupTab(screen, services) {
               // Everything already installed — pip emits no Collecting/Downloading,
               // so without this the bar would freeze at 0% until exit. Show motion.
               _pipPct = Math.max(_pipPct, 90);
-              _setContent(_pipPct, 'verifying...', `  {gray-fg}already satisfied — verifying{/gray-fg}`, false);
+              _setContent(_pipPct, 'verifying...', `  {#9e9e9e-fg}already satisfied — verifying{/#9e9e9e-fg}`, false);
             } else if (/Downloading.*\.whl/i.test(t)) {
               _pipPct = Math.max(_pipPct, 25);
               _setContent(_pipPct, 'downloading...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
@@ -2901,7 +3044,7 @@ export function createSetupTab(screen, services) {
             onSuccess?.();
             iMod.setLabel(` {green-fg}✓  Installed{/green-fg} `);
             iMod.style.border.fg = 'green';
-            _setContent(100, 'done', `  {green-fg}${pkg}{/green-fg}{gray-fg} installed — press Space on {/gray-fg}{white-fg}${voiceId}{/white-fg}{gray-fg} to preview{/gray-fg}`, true);
+            _setContent(100, 'done', `  {green-fg}${pkg}{/green-fg}{#9e9e9e-fg} installed — press Space on {/#9e9e9e-fg}{white-fg}${voiceId}{/white-fg}{#9e9e9e-fg} to preview{/#9e9e9e-fg}`, true);
           } else {
             const allOut = _pipBuf + _pipErrBuf;
             const needsDev   = /Python\.h|python3-dev/i.test(allOut);
@@ -2909,7 +3052,7 @@ export function createSetupTab(screen, services) {
             let hint;
             if (needsDev)        hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install python3-dev build-essential{/cyan-fg}`;
             else if (needsCmake) hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install cmake{/cyan-fg}`;
-            else                 hint = `  {gray-fg}Run {/gray-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}{gray-fg} in a terminal to see the error.{/gray-fg}`;
+            else                 hint = `  {#9e9e9e-fg}Run {/#9e9e9e-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}{#9e9e9e-fg} in a terminal to see the error.{/#9e9e9e-fg}`;
             iMod.setLabel(` {red-fg}✗  Install Failed{/red-fg} `);
             iMod.style.border.fg = 'red';
             _setContent(_pipPct, `failed (exit ${code})`, hint, true);
@@ -3024,7 +3167,7 @@ export function createSetupTab(screen, services) {
         let remoteProc;
         let _remoteStderr = '';
         try {
-          remoteProc = spawn('bash', [path.join(hookDir, 'play-tts-ssh-remote.sh'), phrase, voiceId], { // NOSONAR
+          remoteProc = spawn(resolveBash(), [path.join(hookDir, 'play-tts-ssh-remote.sh'), phrase, voiceId], { // NOSONAR
             stdio: ['ignore', 'ignore', 'pipe'],
             env: remoteEnv,
           });
@@ -3109,7 +3252,7 @@ export function createSetupTab(screen, services) {
         const filled = Math.round(pct * DL_BAR_W / 100);
         const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
                   + '{#555555-fg}' + '░'.repeat(DL_BAR_W - filled) + '{/#555555-fg}';
-        return ` {yellow-fg}☁{/yellow-fg} [${bar}{gray-fg}]{/gray-fg} {white-fg}${pct}%{/white-fg} {gray-fg}${voiceId}{/gray-fg} `;
+        return ` {yellow-fg}☁{/yellow-fg} [${bar}{#9e9e9e-fg}]{/#9e9e9e-fg} {white-fg}${pct}%{/white-fg} {#9e9e9e-fg}${voiceId}{/#9e9e9e-fg} `;
       }
 
       function _startDlAnim() {
@@ -3233,7 +3376,7 @@ export function createSetupTab(screen, services) {
               `(New-Object System.Media.SoundPlayer('${psPath}')).PlaySync()`,
             ], { stdio: 'pipe', env: { ...process.env } });
           } else {
-            playProc = spawn('bash', ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
+            playProc = spawn(resolveBash(), ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
               stdio: 'ignore',
               env: { ...process.env },
             });
@@ -3427,10 +3570,149 @@ export function createSetupTab(screen, services) {
     return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
   }
 
+  // ElevenLabs voice picker — lists the static built-in premade voices.
+  // Space previews the highlighted voice (real API call via the hook), Enter
+  // selects it (stores the raw voice_id), Escape cancels.
+  function _openElevenLabsVoicePicker(draft, onDone) {
+    let _elClosed = false;
+    let _elPreviewProc = null;
+
+    function _killElPreview() {
+      if (_elPreviewProc) { try { _elPreviewProc.kill(); } catch {} _elPreviewProc = null; }
+    }
+    function _closeEl() {
+      if (_elClosed) return;
+      _elClosed = true;
+      _killElPreview();
+      navigationService?.closeModal();
+      destroyList(elBox, screen, onDone);
+    }
+
+    const _items = ELEVENLABS_VOICES.map(v => formatVoiceRow({ name: v.name, gender: v.gender, lang: v.lang, detail: v.desc }));
+    const _height = Math.min(ELEVENLABS_VOICES.length + 5, Math.max(13, (screen.height || 24) - 4));
+
+    // Standardized chrome: titled box + pinned top help bar; transient
+    // preview/error status shows in the title area.
+    const _defaultHint = selectorTitle('Voice');
+    const elBox = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 56,
+      height: _height,
+      border: { type: 'line' },
+      tags: true,
+      label: _defaultHint,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    elBox.setFront();
+    blessed.text({
+      parent: elBox, top: 0, left: 1, right: 1, height: 1, tags: true,
+      content: renderHelpBar([
+        { key: 'Space', label: 'preview' },
+        { key: 'Enter', label: 'select' },
+        { key: 'Esc', label: 'cancel' },
+      ]),
+      style: { bg: COLORS.contentBg },
+    });
+
+    const elPicker = blessed.list({
+      parent: elBox,
+      top: 1,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      tags: true,
+      items: _items,
+      keys: true,
+      vi: false,
+      mouse: true,
+      scrollbar: { ch: '|', style: { fg: 'cyan' } },
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        selected: { bg: 'green', fg: 'white', bold: true },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+
+    // Start on the currently-selected voice if it is one of ours.
+    const _curIdx = ELEVENLABS_VOICES.findIndex(v => v.id === draft.voice);
+    elPicker.select(_curIdx >= 0 ? _curIdx : 0);
+
+    function _setHint(text) { elBox.setLabel(text || _defaultHint); screen.render(); }
+    _setHint(_defaultHint);
+
+    function _previewEl() {
+      if (_elPreviewProc) {  // toggle off
+        _killElPreview();
+        _setHint(_defaultHint);
+        return;
+      }
+      const v = ELEVENLABS_VOICES[elPicker.selected];
+      if (!v) return;
+      const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
+      let proc;
+      try {
+        proc = spawn(resolveBash(), [elScript, `Hi, I am ${v.name}.`, v.id], { // NOSONAR — local hook on user's PATH
+          stdio: 'ignore',
+          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        });
+      } catch (e) {
+        _setHint(' {red-fg}Preview failed to start{/red-fg} ');
+        return;
+      }
+      _elPreviewProc = proc;
+      _setHint(` {cyan-fg}♪ ${v.name}... (Space=stop){/cyan-fg} `);
+      proc.on('exit', (code) => {
+        _elPreviewProc = null;
+        if (_elClosed) return;
+        if (code && code !== 0) {
+          _setHint(' {red-fg}Preview failed — check API key / plan{/red-fg} ');
+          setTimeout(() => { if (!_elClosed) _setHint(_defaultHint); }, 3000);
+        } else {
+          _setHint(_defaultHint);
+        }
+      });
+      proc.on('error', () => { _elPreviewProc = null; if (!_elClosed) _setHint(' {red-fg}Preview failed{/red-fg} '); });
+    }
+
+    elPicker.key(['enter'], () => {
+      const v = ELEVENLABS_VOICES[elPicker.selected];
+      if (v) draft.voice = v.id;
+      _closeEl();
+    });
+    elPicker.key(['space'], _previewEl);
+    elPicker.key(['escape', 'q', 'Q'], _closeEl);
+
+    navigationService?.openModal(null, _closeEl);
+    elPicker.focus();
+    screen.render();
+
+    // Warn (non-blocking) if no API key is configured yet.
+    const _elKeySet = Boolean(process.env.ELEVENLABS_API_KEY) || (() => {
+      try {
+        const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+        return fs.existsSync(kf) && fs.readFileSync(kf, 'utf8').trim().length > 0;
+      } catch { return false; }
+    })();
+    if (!_elKeySet) {
+      _showApiKeyWarning('ElevenLabs', 'ELEVENLABS_API_KEY',
+        path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt'),
+        () => { if (!_elClosed) { elPicker.focus(); screen.render(); } });
+    }
+  }
+
   function _openVoicePickerForLlm(draft, onDone, llmKey = '') {
     // Kokoro has its own multi-voice picker (voices scanned from HF cache)
     if (draft.ttsEngine === 'kokoro') {
       _openKokoroVoicePicker(draft, onDone, llmKey);
+      return;
+    }
+
+    // ElevenLabs has its own multi-voice picker (static built-in premade list)
+    if (draft.ttsEngine === 'elevenlabs') {
+      _openElevenLabsVoicePicker(draft, onDone);
       return;
     }
 
@@ -3492,37 +3774,47 @@ export function createSetupTab(screen, services) {
         _killNvPreview();
         if (_nvEnsureAbort) { _nvEnsureAbort.abort(); _nvEnsureAbort = null; }
         navigationService?.closeModal();
-        destroyList(nvPicker, screen, onDone);
+        destroyList(nvBox, screen, onDone);
       }
 
-      const nvPicker = blessed.list({
+      const NV_TITLE = selectorTitle('Voice');
+      const NV_HELP = renderHelpBar([{ key: 'Space', label: 'preview' }, { key: 'Enter', label: 'select' }, { key: 'Esc', label: 'cancel' }]);
+      // Standardized chrome: titled box + pinned top help bar; the single voice
+      // row sits below. Status messages show in the title area.
+      const nvBox = blessed.box({
         parent: screen,
-        top: 'center',
-        left: 'center',
-        width: 52,
-        height: 7,
-        border: { type: 'line' },
+        top: 'center', left: 'center',
+        width: 52, height: 7,
+        border: { type: 'line' }, tags: true,
+        label: NV_TITLE,
+        style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+      });
+      nvBox.setFront();
+      blessed.text({
+        parent: nvBox, top: 0, left: 1, right: 1, height: 1, tags: true,
+        content: NV_HELP, style: { bg: COLORS.contentBg },
+      });
+      const nvPicker = blessed.list({
+        parent: nvBox,
+        top: 1, left: 0, right: 0, bottom: 0,
         tags: true,
-        label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
         keys: true,
         vi: false,
         mouse: true,
         style: {
           fg: COLORS.labelFg,
           bg: COLORS.contentBg,
-          border: { fg: 'cyan' },
           selected: { bg: 'green', fg: 'white', bold: true },
           item: { fg: COLORS.labelFg },
         },
       });
-      nvPicker.setFront();
-      nvPicker.setItems([`  ${nativeVoice.label}  {gray-fg}[Space] preview  [Enter] select{/gray-fg}`]);
+      nvPicker.setItems([`  ${nativeVoice.label}`]);
       nvPicker.select(0);
 
       function _previewNativeVoice() {
         if (_nvPreviewProc) {
           _killNvPreview();
-          nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+          nvBox.setLabel(NV_TITLE);
           screen.render();
           return;
         }
@@ -3533,42 +3825,42 @@ export function createSetupTab(screen, services) {
           let proc;
           try { proc = spawn(cmd, args, opts); } catch (e) {
             process.stderr.write(`[AgentVibes] preview spawn failed: ${e.message}\n`);
-            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+            if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
             return;
           }
           _nvPreviewProc = proc;
-          nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+          nvBox.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
           screen.render();
           proc.on('exit', (code) => {
             _nvPreviewProc = null;
             if (!_nvClosed) {
               if (code !== 0 && code !== null) {
-                nvPicker.setLabel(` {red-fg}Preview failed (exit ${code}){/red-fg} `);
-                setTimeout(() => { if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); } }, 3000);
+                nvBox.setLabel(` {red-fg}Preview failed (exit ${code}){/red-fg} `);
+                setTimeout(() => { if (!_nvClosed) { nvBox.setLabel(NV_TITLE); screen.render(); } }, 3000);
               } else {
-                nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+                nvBox.setLabel(NV_TITLE);
               }
               screen.render();
             }
           });
           proc.on('error', () => {
             _nvPreviewProc = null;
-            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+            if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
           });
         }
 
         if (engine === 'soprano' && process.platform === 'win32' && !process.env.WSL_DISTRO_NAME) {
           // Ensure soprano WebUI is running before preview; start it if not.
-          nvPicker.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
+          nvBox.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
           screen.render();
           _nvEnsureAbort = new AbortController();
           _ensureSopranoWebUI((msg) => {
-            if (!_nvClosed) { nvPicker.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
+            if (!_nvClosed) { nvBox.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
           }, _nvEnsureAbort.signal).then((ready) => {
             _nvEnsureAbort = null;
             if (_nvClosed) return;
             if (!ready) {
-              nvPicker.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
+              nvBox.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
               screen.render();
               return;
             }
@@ -3590,27 +3882,27 @@ export function createSetupTab(screen, services) {
             proc = spawn('say', [phrase], { stdio: 'ignore' }); // NOSONAR
           } else if (engine.startsWith('elevenlabs')) {
             const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
-            proc = spawn('bash', [elScript, phrase, 'Rachel'], { // NOSONAR
+            proc = spawn(resolveBash(), [elScript, phrase, 'Rachel'], { // NOSONAR
               stdio: 'ignore',
               env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
             });
           }
         } catch {}
         if (!proc) {
-          nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} ');
+          nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} ');
           screen.render();
           return;
         }
         _nvPreviewProc = proc;
-        nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+        nvBox.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
         screen.render();
         proc.on('exit', () => {
           _nvPreviewProc = null;
-          if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); }
+          if (!_nvClosed) { nvBox.setLabel(NV_TITLE); screen.render(); }
         });
         proc.on('error', () => {
           _nvPreviewProc = null;
-          if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+          if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
         });
       }
 
@@ -3649,22 +3941,33 @@ export function createSetupTab(screen, services) {
       height: '88%',
       border: { type: 'line' },
       tags: true,
-      label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
+      label: selectorTitle('Voice'),
       style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
     });
     vpModal.setFront();
 
-    // Column header
-    const COL_N = 30;
-    const COL_G = 4;
+    // Standardized help bar, pinned at the top (under the title).
     blessed.text({
-      parent: vpModal, top: 1, left: 6, tags: true,
-      content: `{cyan-fg}${'Name'.padEnd(COL_N)}{/cyan-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {cyan-fg}Provider{/cyan-fg}`,
+      parent: vpModal, top: 0, left: 2, right: 2, height: 1, tags: true,
+      content: renderHelpBar([
+        { key: 'Space', label: 'preview' },
+        { key: 'Enter', label: 'select' },
+        { key: '+', label: 'like' },
+        { key: '-', label: 'dislike' },
+        { key: 'Esc', label: 'cancel' },
+      ]),
+      style: { bg: COLORS.contentBg },
+    });
+
+    // Column header — matches the shared formatVoiceRow column layout.
+    blessed.text({
+      parent: vpModal, top: 2, left: 3, tags: true,
+      content: voiceRowHeader(),
       style: { bg: COLORS.contentBg },
     });
 
     const vpList = blessed.list({
-      parent: vpModal, top: 2, left: 2, right: 2, bottom: 5,
+      parent: vpModal, top: 3, left: 2, right: 2, bottom: 5,
       keys: true, vi: true, mouse: true,
       border: { type: 'line' },
       scrollbar: { ch: '|', style: { fg: 'cyan' } },
@@ -3682,15 +3985,15 @@ export function createSetupTab(screen, services) {
       content: ' ', style: { fg: 'cyan', bg: COLORS.contentBg },
     });
 
-    // Footer split into two fixed-height lines so wrapping never covers vpPreviewLine
-    blessed.text({
-      parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
-      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump{/white-fg}',
-      style: { bg: COLORS.contentBg },
-    });
+    // Movement hints at the bottom (primary actions live in the top help bar, so
+    // they are not duplicated here). Standardized [key] = label formatting.
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, height: 1, tags: true,
-      content: '{white-fg}[Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
+      content: renderHelpBar([
+        { key: '↑↓', label: 'move' },
+        { key: 'PgUp/PgDn', label: 'page' },
+        { key: 'a-z', label: 'jump' },
+      ]),
       style: { bg: COLORS.contentBg },
     });
 
@@ -3705,11 +4008,10 @@ export function createSetupTab(screen, services) {
         const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
         const star = isUp ? '{green-fg}👍{/green-fg}' : (isDown ? '{red-fg}👎{/red-fg}' : '  ');
         const meta = getVoiceMeta(v);
-        const name = meta.displayName.length > COL_N
-          ? meta.displayName.slice(0, COL_N - 1) + '…'
-          : meta.displayName.padEnd(COL_N);
-        // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
-        return ` ${dot}${star} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
+        // Derive the language tag from the Piper voice id prefix (e.g. en_US-… → en-US).
+        const _lm = v.match(/^([a-z]{2})_([A-Z]{2})/);
+        const lang = _lm ? `${_lm[1]}-${_lm[2]}` : '';
+        return formatVoiceRow({ status: `${dot}${star}`, name: meta.displayName, gender: meta.gender, lang, detail: meta.provider });
       });
     }
 
@@ -3771,7 +4073,7 @@ export function createSetupTab(screen, services) {
         } else {
           const _playTts = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
           const _llmArgs = llmKey ? ['--llm', llmKey] : [];
-          rProc = spawn('bash', [_playTts, phrase, voiceId, ..._llmArgs], { // NOSONAR
+          rProc = spawn(resolveBash(), [_playTts, phrase, voiceId, ..._llmArgs], { // NOSONAR
             stdio: 'ignore', detached: true, env: _rEnv, cwd: targetDir,
           });
         }

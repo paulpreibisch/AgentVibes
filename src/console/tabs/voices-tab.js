@@ -229,6 +229,37 @@ export function genderIconTag(gender) {
   return '—';
 }
 
+// Fixed column widths shared by every provider's voice picker so the rows line up
+// identically regardless of engine.
+export const VOICE_ROW_COLS = Object.freeze({ name: 14, lang: 6 });
+
+/**
+ * Canonical voice-row renderer used by ALL voice pickers (Piper, Kokoro,
+ * ElevenLabs) so their columns and per-column styling are identical:
+ *   [status]  [Name]  [gender ♀/♂ colored]  [language grey]  [detail grey]
+ *
+ * @param {object} o
+ * @param {string} [o.status='  ']  provider indicator slot (e.g. fav/cache marks); may contain tags
+ * @param {string} [o.name='']      voice display name
+ * @param {string} [o.gender='']    'Female' | 'Male' | '' (drives the colored icon)
+ * @param {string} [o.lang='']      language tag (e.g. 'en-US', 'ja')
+ * @param {string} [o.detail='']    trailing description / id / provider (rendered grey)
+ * @returns {string} blessed tag-formatted row (host list must set tags:true)
+ */
+export function formatVoiceRow({ status = '  ', name = '', gender = '', lang = '', detail = '' } = {}) {
+  const { name: NAME_W, lang: LANG_W } = VOICE_ROW_COLS;
+  const nm = name.length > NAME_W ? name.slice(0, NAME_W - 1) + '…' : name.padEnd(NAME_W);
+  const lg = String(lang || '').padEnd(LANG_W);
+  const det = detail ? `{#9e9e9e-fg}${detail}{/#9e9e9e-fg}` : '';
+  return ` ${status} ${nm} ${genderIconTag(gender)} {#9e9e9e-fg}${lg}{/#9e9e9e-fg} ${det}`;
+}
+
+/** Standardized column header matching formatVoiceRow's layout. */
+export function voiceRowHeader() {
+  const { name: NAME_W, lang: LANG_W } = VOICE_ROW_COLS;
+  return `    {cyan-fg}${'Name'.padEnd(NAME_W)}{/cyan-fg} {cyan-fg}⚥{/cyan-fg} {cyan-fg}${'Lang'.padEnd(LANG_W)}{/cyan-fg} {cyan-fg}Detail{/cyan-fg}`;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers — exported for testability
 

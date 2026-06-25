@@ -113,6 +113,19 @@ const blessedStub = {
 
 await mock.module('blessed', { defaultExport: blessedStub });
 
+// Mock child_process so driving the voice/preview handlers (Space) NEVER spawns
+// real audio or TTS API calls. Without this, firing previews on the real tab
+// floods the machine with overlapping local audio (and could hit paid engines).
+await mock.module('node:child_process', {
+  namedExports: {
+    spawn: () => ({ on: () => {}, kill: () => {}, killed: false, pid: 0, stdout: { on: () => {} }, stderr: { on: () => {} } }),
+    spawnSync: () => ({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }),
+    execFile: (...args) => { const cb = args[args.length - 1]; if (typeof cb === 'function') cb(null, { stdout: '', stderr: '' }); return { on: () => {}, kill: () => {} }; },
+    execFileSync: () => Buffer.from(''),
+    exec: (...args) => { const cb = args[args.length - 1]; if (typeof cb === 'function') cb(null, '', ''); return { on: () => {}, kill: () => {} }; },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Import after mock installed
 // ---------------------------------------------------------------------------
