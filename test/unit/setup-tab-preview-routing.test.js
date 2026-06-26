@@ -55,8 +55,8 @@ describe('_previewNativeVoice spawn routing', () => {
   test('soprano engine spawns soprano binary (non-Windows)', () => {
     const body = getPreviewNativeFnBody(setupSrc);
     assert.ok(
-      body.includes("spawn('soprano'"),
-      "soprano engine must spawn 'soprano' on non-Windows (not the defunct 'soprano-tts' name)"
+      body.includes("_spawnAudio('soprano'"),
+      "soprano engine must spawn 'soprano' on non-Windows (via _spawnAudio, not the defunct 'soprano-tts' name)"
     );
   });
 
@@ -75,8 +75,8 @@ describe('_previewNativeVoice spawn routing', () => {
   test('sapi engine spawns powershell', () => {
     const body = getPreviewNativeFnBody(setupSrc);
     assert.ok(
-      body.includes("spawn('powershell'"),
-      "sapi engine must spawn 'powershell'"
+      body.includes("_spawnAudio('powershell'"),
+      "sapi engine must spawn 'powershell' (via _spawnAudio)"
     );
   });
 
@@ -99,8 +99,8 @@ describe('_previewNativeVoice spawn routing', () => {
   test('macos-say engine spawns say binary', () => {
     const body = getPreviewNativeFnBody(setupSrc);
     assert.ok(
-      body.includes("spawn('say'"),
-      "macos-say engine must spawn 'say'"
+      body.includes("_spawnAudio('say'"),
+      "macos-say engine must spawn 'say' (via _spawnAudio)"
     );
   });
 

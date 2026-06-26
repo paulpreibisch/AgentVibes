@@ -54,6 +54,52 @@ const _execFileAsync = promisify(execFile);
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
+// True while the automated test suite is running. The voice/cue previews below
+// synthesize audio by spawning players DIRECTLY (SAPI, piper, say, the
+// ElevenLabs hook, kokoro playback) — bypassing play-tts.sh's mute guard. The
+// coverage suites fire every key handler (including Space = preview) on real
+// widgets, so without this guard they would speak aloud on the developer's
+// machine. We honor an explicit env flag (set by scripts/run-tests.sh) and the
+// shared "tests running" marker file that play-tts.sh already respects.
+// NOTE: distinct from AGENTVIBES_TEST_MODE, which stubs the whole tab — these
+// previews must keep running their bodies (for coverage); only the final audio
+// process is replaced with a silent no-op.
+function _suppressAudio() {
+  if (process.env.AGENTVIBES_SUPPRESS_AUDIO === 'true') return true;
+  try { return fs.existsSync(path.join(os.homedir(), '.agentvibes-tests-running')); } catch { return false; }
+}
+
+// A child_process-like stub that emits a clean exit on the next tick, so the
+// surrounding preview lifecycle code (label updates, exit/error handlers) still
+// runs and stays covered — without launching a real audio process. Not routed
+// through the imported spawn(), so it never pollutes a test's spawn tracking.
+function _silentProc() {
+  const proc = {
+    _cbs: {},
+    killed: false,
+    on(ev, cb) { (this._cbs[ev] ||= []).push(cb); return this; },
+    once(ev, cb) { return this.on(ev, cb); },
+    emit(ev, ...a) { (this._cbs[ev] || []).forEach((f) => f(...a)); return true; },
+    kill() { this.killed = true; },
+    unref() {},
+    stdin: { write() {}, end() {} },
+    stdout: { on() {}, },
+    stderr: { on() {}, },
+  };
+  setImmediate(() => proc.emit('exit', 0));
+  return proc;
+}
+
+// Spawn an audio player, or a silent no-op while tests are running.
+function _spawnAudio(cmd, args, opts) {
+  if (_suppressAudio()) return _silentProc();
+  return spawn(cmd, args, opts);
+}
+
+// Exported under stable aliases purely so the audio-suppression behavior can be
+// unit-tested without standing up the blessed TUI.
+export { _suppressAudio as __suppressAudio, _silentProc as __silentProc, _spawnAudio as __spawnAudio };
+
 // Resolve a real Unix bash for spawning .sh hooks. On Windows a bare
 // spawn('bash', …) resolves to C:\Windows\System32\bash.exe — that's WSL, which
 // has a different HOME (no AgentVibes key/config), doesn't inherit the Windows
@@ -1284,7 +1330,7 @@ export function createSetupTab(screen, services) {
         cmd = 'bash';
         args = [script, sampleText, '', '--llm', 'hermes'];
       }
-      const proc = spawn(cmd, args, {
+      const proc = _spawnAudio(cmd, args, {
         stdio: 'ignore', windowsHide: true,
         env: {
           ...process.env, CLAUDE_PROJECT_DIR: targetDir,
@@ -1915,10 +1961,10 @@ export function createSetupTab(screen, services) {
       const sampleText = 'This is how your audio settings sound right now.';
       const script = path.join(targetDir, '.claude', hooksSubdir, isWin ? 'play-tts.ps1' : 'play-tts.sh');
       const proc = isWin
-        ? spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText], { // NOSONAR
+        ? _spawnAudio('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText], { // NOSONAR
             stdio: 'ignore', windowsHide: true, env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
           })
-        : spawn(resolveBash(), [script, sampleText], { // NOSONAR
+        : _spawnAudio(resolveBash(), [script, sampleText], { // NOSONAR
             stdio: 'ignore', env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
           });
       _previewProc = proc;
@@ -2220,7 +2266,7 @@ export function createSetupTab(screen, services) {
           cmd = 'bash';
           args = [script, sampleText, '', '--llm', llmKey];
         }
-        const proc = spawn(cmd, args, {
+        const proc = _spawnAudio(cmd, args, {
           stdio: 'ignore',
           windowsHide: true,
           env: {
@@ -3697,7 +3743,7 @@ export function createSetupTab(screen, services) {
       const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
       let proc;
       try {
-        proc = spawn(resolveBash(), [elScript, `Hi, I am ${v.name}.`, v.id], { // NOSONAR — local hook on user's PATH
+        proc = _spawnAudio(resolveBash(), [elScript, `Hi, I am ${v.name}.`, v.id], { // NOSONAR — local hook on user's PATH
           stdio: 'ignore',
           env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
         });
@@ -3866,7 +3912,7 @@ export function createSetupTab(screen, services) {
 
         function _spawnAndTrack(cmd, args, opts) {
           let proc;
-          try { proc = spawn(cmd, args, opts); } catch (e) {
+          try { proc = _spawnAudio(cmd, args, opts); } catch (e) {
             process.stderr.write(`[AgentVibes] preview spawn failed: ${e.message}\n`);
             if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
             return;
@@ -3916,16 +3962,16 @@ export function createSetupTab(screen, services) {
         let proc = null;
         try {
           if (engine === 'soprano') {
-            proc = spawn('soprano', [phrase], { stdio: 'ignore' }); // NOSONAR
+            proc = _spawnAudio('soprano', [phrase], { stdio: 'ignore' }); // NOSONAR
           } else if (engine === 'sapi') {
             const safePhrase = phrase.replace(/'/g, "''");
             const sapiScript = `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${safePhrase}')`;
-            proc = spawn('powershell', ['-NoProfile', '-Command', sapiScript], { stdio: 'ignore', windowsHide: true }); // NOSONAR
+            proc = _spawnAudio('powershell', ['-NoProfile', '-Command', sapiScript], { stdio: 'ignore', windowsHide: true }); // NOSONAR
           } else if (engine === 'macos-say') {
-            proc = spawn('say', [phrase], { stdio: 'ignore' }); // NOSONAR
+            proc = _spawnAudio('say', [phrase], { stdio: 'ignore' }); // NOSONAR
           } else if (engine.startsWith('elevenlabs')) {
             const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
-            proc = spawn(resolveBash(), [elScript, phrase, 'Rachel'], { // NOSONAR
+            proc = _spawnAudio(resolveBash(), [elScript, phrase, 'Rachel'], { // NOSONAR
               stdio: 'ignore',
               env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
             });
@@ -4153,7 +4199,7 @@ export function createSetupTab(screen, services) {
 
       const args = ['--model', voicePath, '--output_file', tempWav];
       if (_ms.speakerId != null) args.push('--speaker', String(_ms.speakerId));
-      const piper = spawn(_piperBin, args, {
+      const piper = _spawnAudio(_piperBin, args, {
         stdio: ['pipe', 'ignore', 'ignore'],
         detached: !_isWin,
         windowsHide: true,

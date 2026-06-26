@@ -26,6 +26,10 @@ else
   # shellcheck disable=SC2064
   trap "rm -f '$MARKER'" EXIT
   touch "$MARKER"
+  # Belt-and-suspenders: the marker silences the shell hooks (play-tts.sh /
+  # play-tts.ps1), while this env flag silences the TUI's direct-spawn voice
+  # previews (SAPI/piper/say/kokoro) that coverage tests fire via the Space key.
+  export AGENTVIBES_SUPPRESS_AUDIO=true
 fi
 
 npm run test:syntax
