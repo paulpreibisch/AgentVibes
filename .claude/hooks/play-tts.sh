@@ -361,6 +361,43 @@ if [[ "${AGENTVIBES_VERBOSE:-0}" == "1" ]]; then
   echo "provider=${ACTIVE_PROVIDER}" >&2
 fi
 
+# @function _play_windows_sapi
+# @intent Speak via the built-in Windows SAPI engine from a POSIX shell
+# @why On Windows git-bash the `sapi`/`windows-sapi` provider has no native bash
+#      player; delegate to the PowerShell SAPI script so the engine selector's
+#      `sapi` id no longer dead-ends in "Unknown provider".
+# @param $1 text to speak
+# @param $2 voice override (optional)
+_play_windows_sapi() {
+  local text="$1"
+  local voice="${2:-}"
+
+  # Sibling hooks-windows/ holds the PowerShell players. Prefer the short name,
+  # fall back to the legacy windows-prefixed one.
+  local ps1="$SCRIPT_DIR/../hooks-windows/play-tts-sapi.ps1"
+  [[ -f "$ps1" ]] || ps1="$SCRIPT_DIR/../hooks-windows/play-tts-windows-sapi.ps1"
+  if [[ ! -f "$ps1" ]]; then
+    echo "❌ Windows SAPI player not found beside this hook" >&2
+    return 1
+  fi
+
+  local ps_exe=""
+  local c
+  for c in powershell.exe pwsh.exe powershell pwsh; do
+    if command -v "$c" >/dev/null 2>&1; then ps_exe="$c"; break; fi
+  done
+  if [[ -z "$ps_exe" ]]; then
+    echo "❌ Windows SAPI requires PowerShell (Windows only)" >&2
+    return 1
+  fi
+
+  # PowerShell needs a native Windows path, not a /c/... MSYS path.
+  local win_ps1="$ps1"
+  command -v cygpath >/dev/null 2>&1 && win_ps1="$(cygpath -w "$ps1")"
+
+  "$ps_exe" -NoProfile -ExecutionPolicy Bypass -File "$win_ps1" "$text" "$voice"
+}
+
 # @function speak_text
 # @intent Route text to appropriate TTS provider
 # @why Reusable function for speaking, used by both single and learning modes
@@ -388,6 +425,9 @@ speak_text() {
       ;;
     kokoro)
       bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$text" "$voice"
+      ;;
+    sapi|windows-sapi)
+      _play_windows_sapi "$text" "$voice"
       ;;
     termux-ssh)
       bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
@@ -524,6 +564,10 @@ case "$ACTIVE_PROVIDER" in
     ;;
   kokoro)
     exec bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  sapi|windows-sapi)
+    _play_windows_sapi "$TEXT" "$VOICE_OVERRIDE"
+    exit $?
     ;;
   termux-ssh)
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"

@@ -230,8 +230,30 @@ export function genderIconTag(gender) {
 }
 
 // Fixed column widths shared by every provider's voice picker so the rows line up
-// identically regardless of engine.
-export const VOICE_ROW_COLS = Object.freeze({ name: 14, lang: 6 });
+// identically regardless of engine. `status` is in terminal cells (emoji count 2).
+export const VOICE_ROW_COLS = Object.freeze({ status: 3, name: 14, lang: 6 });
+
+const _TAG_RE = /\{[^}]*\}/g;
+
+/**
+ * Visible terminal-cell width of a blessed-tagged string. Color tags ({...}) are
+ * zero-width; astral-plane emoji (👍/👎, cp ≥ U+1F000) render two cells; the
+ * VS16 emoji-presentation selector (U+FE0F) adds none. BMP symbols (★ ♀ ♂ ♪ ✓ ☁)
+ * stay one cell. Used to pad the status column so emoji-bearing rows (Piper's
+ * thumbs) align with single-glyph rows (Kokoro/ElevenLabs).
+ * @param {string} str
+ * @returns {number}
+ */
+export function cellWidth(str) {
+  const plain = String(str).replace(_TAG_RE, '');
+  let w = 0;
+  for (const ch of plain) {
+    const cp = ch.codePointAt(0);
+    if (cp === 0xFE0F) continue;       // variation selector — zero width
+    w += cp >= 0x1F000 ? 2 : 1;        // astral emoji = 2 cells, everything else = 1
+  }
+  return w;
+}
 
 /**
  * Canonical voice-row renderer used by ALL voice pickers (Piper, Kokoro,
@@ -247,17 +269,22 @@ export const VOICE_ROW_COLS = Object.freeze({ name: 14, lang: 6 });
  * @returns {string} blessed tag-formatted row (host list must set tags:true)
  */
 export function formatVoiceRow({ status = '  ', name = '', gender = '', lang = '', detail = '' } = {}) {
-  const { name: NAME_W, lang: LANG_W } = VOICE_ROW_COLS;
+  const { status: STATUS_W, name: NAME_W, lang: LANG_W } = VOICE_ROW_COLS;
+  // Pad the status to a fixed cell width so every provider's name column starts
+  // at the same offset, even when the status holds a 2-cell emoji (Piper thumbs).
+  const st = status + ' '.repeat(Math.max(0, STATUS_W - cellWidth(status)));
   const nm = name.length > NAME_W ? name.slice(0, NAME_W - 1) + '…' : name.padEnd(NAME_W);
   const lg = String(lang || '').padEnd(LANG_W);
   const det = detail ? `{#9e9e9e-fg}${detail}{/#9e9e9e-fg}` : '';
-  return ` ${status} ${nm} ${genderIconTag(gender)} {#9e9e9e-fg}${lg}{/#9e9e9e-fg} ${det}`;
+  return ` ${st} ${nm} ${genderIconTag(gender)} {#9e9e9e-fg}${lg}{/#9e9e9e-fg} ${det}`;
 }
 
 /** Standardized column header matching formatVoiceRow's layout. */
 export function voiceRowHeader() {
-  const { name: NAME_W, lang: LANG_W } = VOICE_ROW_COLS;
-  return `    {cyan-fg}${'Name'.padEnd(NAME_W)}{/cyan-fg} {cyan-fg}⚥{/cyan-fg} {cyan-fg}${'Lang'.padEnd(LANG_W)}{/cyan-fg} {cyan-fg}Detail{/cyan-fg}`;
+  const { status: STATUS_W, name: NAME_W, lang: LANG_W } = VOICE_ROW_COLS;
+  // Lead = the row's leading space + status column + the space after it.
+  const lead = ' '.repeat(1 + STATUS_W + 1);
+  return `${lead}{cyan-fg}${'Name'.padEnd(NAME_W)}{/cyan-fg} {cyan-fg}⚥{/cyan-fg} {cyan-fg}${'Lang'.padEnd(LANG_W)}{/cyan-fg} {cyan-fg}Detail{/cyan-fg}`;
 }
 
 // ---------------------------------------------------------------------------
