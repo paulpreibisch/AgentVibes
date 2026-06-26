@@ -39,4 +39,6 @@ fi
 
 npm run test:syntax
 AGENTVIBES_TEST_MODE=true bats test/unit/*.bats
+# test:coverage runs scripts/run-coverage.mjs, which gates on the reported test
+# results (not node's flaky --test-force-exit exit code).
 npm run test:coverage

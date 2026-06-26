@@ -79,21 +79,16 @@ jobs:
       - name: Validate JS syntax
         run: npm run test:syntax
 
-      - name: Run Node.js unit tests
+      # Single coverage pass via the shared gated runner (scripts/run-coverage.mjs).
+      # It gates on the reported test results, not node's flaky --test-force-exit
+      # exit code, and enforces --test-concurrency=2 for determinism.
+      - name: Run Node.js tests with coverage
         env:
           ELEVENLABS_API_KEY: test_mock_key
           # Note: AGENTVIBES_TEST_MODE is NOT set here intentionally.
           # Node.js unit tests use mock.module for isolation and must not have
           # AGENTVIBES_TEST_MODE set, otherwise IS_TEST stubs bypass real code paths.
-        # Run directly (not via npm) so Git bash expands the glob
-        # --test-force-exit prevents readline.emitKeypressEvents workers from hanging
-        run: node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js
-
-      # Fix #12: Use npx c8 instead of ./node_modules/.bin/c8 (fragile on Windows)
-      - name: Run Node.js coverage report
-        env:
-          ELEVENLABS_API_KEY: test_mock_key
-        run: npx c8 --reporter=lcov --reporter=text node --experimental-test-module-mocks --test-force-exit --test test/unit/*.test.js
+        run: npm run test:coverage
 
       # ─── BATS integration tests via Git bash ─────────────────────────────
 
