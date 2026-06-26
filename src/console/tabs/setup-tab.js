@@ -270,9 +270,13 @@ export function buildBlingCommand(platform, wavPath, haveWav) {
       : '[System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 700';
     return { command: 'powershell', args: ['-NoProfile', '-Command', ps] };
   }
-  const sh = haveWav
-    ? `paplay "${wavPath}" 2>/dev/null || aplay -q "${wavPath}" 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null`
-    : 'paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
+  if (haveWav) {
+    // Pass wavPath as a positional arg ($1) so the path is never interpolated
+    // into the shell string (prevents injection / breakage on special chars).
+    const sh = 'paplay "$1" 2>/dev/null || aplay -q "$1" 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
+    return { command: 'bash', args: ['-c', sh, '--', wavPath] };
+  }
+  const sh = 'paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
   return { command: 'bash', args: ['-c', sh] };
 }
 
@@ -680,7 +684,9 @@ export function createSetupTab(screen, services) {
       if (!lpos) { screen.render(); return; }
       const contentWidth = Math.max(1, (lpos.xl - lpos.xi) - inputBox.iwidth);
       const start = _cursor > contentWidth - 1 ? _cursor - contentWidth + 1 : 0;
-      inputBox.setContent(val.slice(start));
+      // Mask the API key on screen — render bullets while inputBox.value keeps
+      // the real key. This is the API-key dialog (engine.requiresApiKey).
+      inputBox.setContent('•'.repeat(val.length).slice(start));
       screen.render();
       screen.program.cup(lpos.yi + inputBox.itop, lpos.xi + inputBox.ileft + (_cursor - start));
     }
@@ -702,8 +708,11 @@ export function createSetupTab(screen, services) {
       } else if (key.name === 'end') {
         _cursor = inputBox.value.length;
       } else if (ch && !key.ctrl && !key.meta) {
-        inputBox.value = inputBox.value.slice(0, _cursor) + ch + inputBox.value.slice(_cursor);
-        _cursor++;
+        // Strip CR/LF from pasted text and advance the cursor by the full
+        // inserted length (a multi-char paste otherwise desyncs the cursor).
+        const ins = ch.replace(/[\r\n]/g, '');
+        inputBox.value = inputBox.value.slice(0, _cursor) + ins + inputBox.value.slice(_cursor);
+        _cursor += ins.length;
       }
       _renderInput();
     });
@@ -743,7 +752,10 @@ export function createSetupTab(screen, services) {
 
     try {
       const opts = { stdio: 'pipe', timeout: 1800000 };
-      if (process.platform === 'win32') {
+      if (engine.installSpec) {
+        // Structured form — space-safe, no shell (FIX: installCmd.split(' ') corrupted paths with spaces)
+        await _execFileAsync(engine.installSpec.cmd, engine.installSpec.args, opts);
+      } else if (process.platform === 'win32') {
         opts.shell = true;
         await _execFileAsync(engine.installCmd, [], opts);
       } else {
@@ -2543,7 +2555,7 @@ export function createSetupTab(screen, services) {
         // Keep an already-chosen ElevenLabs voice — a known built-in OR any raw
         // 20-char ElevenLabs voice_id (a custom/library voice the user configured
         // that isn't in our static list). Otherwise assign the default.
-        const looksLikeElId = /^[A-Za-z0-9]{20}$/.test(draft.voice || '');
+        const looksLikeElId = /^[A-Za-z0-9]{10,40}$/.test(draft.voice || '');
         draft.voice = (elevenLabsVoiceName(draft.voice) || looksLikeElId)
           ? draft.voice : ELEVENLABS_DEFAULT_VOICE_ID;
       } else {
@@ -2596,13 +2608,23 @@ export function createSetupTab(screen, services) {
       style: { bg: COLORS.contentBg },
     });
 
+    let _warnClosed = false;
     function _closeWarning() {
+      if (_warnClosed) return;
+      _warnClosed = true;
+      // Balance the openModal() below so a tab-switch forceCloseAll() that
+      // invokes this callback tears the warning down cleanly instead of
+      // orphaning it over the destroyed picker.
+      navigationService?.closeModal();
       destroyList(warningBox, screen);
       onDismiss();
     }
 
     warningBox.key(['enter', 'escape', 'space', 'q', 'Q'], _closeWarning);
     warningBox.on('click', _closeWarning);
+    // Register as a modal so forceCloseAll() dismisses this dialog rather than
+    // leaving it orphaned when the underlying picker is destroyed.
+    navigationService?.openModal(null, _closeWarning);
     warningBox.focus();
     screen.render();
   }
@@ -2713,6 +2735,10 @@ export function createSetupTab(screen, services) {
     let _kPreviewProc = null;
     let _kTmpWav = null;
     let _kAnimInterval = null;
+    // Track all spawned download procs (Download-All + CJK/synth fallbacks) so
+    // _killKPreview() can terminate them on close and their exit handlers never
+    // touch a destroyed picker (use-after-destroy crash guard).
+    const _kDlProcs = [];
 
     // Read SSH config so previews route to the receiver
     let _sshHost = '', _sshKey = '', _sshPort = '';
@@ -2766,6 +2792,13 @@ export function createSetupTab(screen, services) {
       _stopKSpinner();
       if (_kAnimInterval) { clearInterval(_kAnimInterval); _kAnimInterval = null; }
       if (_kPreviewProc) { try { _kPreviewProc.kill(); } catch {} _kPreviewProc = null; }
+      // Kill any in-flight download procs (Download-All + fallbacks) so their
+      // exit handlers don't fire against a destroyed picker.
+      if (_dlAllProc) { try { _dlAllProc.kill(); } catch {} _dlAllProc = null; }
+      while (_kDlProcs.length) {
+        const p = _kDlProcs.pop();
+        if (p) { try { p.kill(); } catch {} }
+      }
       if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
     }
     function _closeKP() {
@@ -2817,7 +2850,7 @@ export function createSetupTab(screen, services) {
       else if (cached.has(id))                                       mark = '{green-fg}✓{/green-fg}';
       else                                                         mark = '{cyan-fg}☁{/cyan-fg}';
       const m = _kokoroVoiceMeta(id);
-      return formatVoiceRow({ status: `${fav}${mark}`, name: m.displayName, gender: m.gender, lang: m.lang, detail: id });
+      return formatVoiceRow({ status: `${fav} ${mark}`, name: m.displayName, gender: m.gender, lang: m.lang, detail: id });
     }
     const items = voices.map(_kokoroItem);
 
@@ -2872,7 +2905,7 @@ export function createSetupTab(screen, services) {
         { key: 'Enter', label: 'select' },
         { key: 'Esc', label: 'cancel' },
       ]) + '\n' + renderHelpBar([
-        { key: 'F', label: 'favorite' },
+        { key: '*', label: 'favorite' },
         { key: 'D', label: 'download all' },
       ]) + '\n{green-fg}✓{/green-fg}{#9e9e9e-fg}=cached  {/#9e9e9e-fg}{#FFD700-fg}★{/#FFD700-fg}{#9e9e9e-fg}=fav  {/#9e9e9e-fg}{cyan-fg}☁{/cyan-fg}{#9e9e9e-fg}=download  {/#9e9e9e-fg}{yellow-fg}!{/yellow-fg}{#9e9e9e-fg}=needs pip install (kokoro or misaki[lang])',
       style: { bg: COLORS.contentBg },
@@ -3194,9 +3227,12 @@ export function createSetupTab(screen, services) {
             const dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
               stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
             });
+            _kDlProcs.push(dlProc);
             let dlOut = '';
             dlProc.stdout.on('data', d => { dlOut += d.toString(); });
             dlProc.on('exit', (dlCode) => {
+              const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1);
+              if (_kClosed) return;
               if (dlCode === 0 && dlOut.trim()) {
                 cached.add(voiceId);
                 const li = voices.indexOf(voiceId);
@@ -3209,6 +3245,7 @@ export function createSetupTab(screen, services) {
               }
             });
             dlProc.on('error', () => {
+              const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1);
               if (!_kClosed) {
                 kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs pip install ${cjkPkg}{/yellow-fg} `);
                 screen.render();
@@ -3346,9 +3383,12 @@ export function createSetupTab(screen, services) {
               stdio: ['ignore', 'pipe', 'ignore'],
               env: { ...process.env },
             });
+            _kDlProcs.push(dlProc);
             let dlOut = '';
             dlProc.stdout.on('data', d => { dlOut += d.toString(); });
             dlProc.on('exit', (dlCode) => {
+              const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1);
+              if (_kClosed) return;
               if (dlCode === 0 && dlOut.trim()) {
                 cached.add(voiceId);
                 kPicker.setItems(voices.map(_kokoroItem));
@@ -3356,6 +3396,7 @@ export function createSetupTab(screen, services) {
                 setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
               }
             });
+            dlProc.on('error', () => { const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1); });
           }
           return;
         }
@@ -3426,8 +3467,8 @@ export function createSetupTab(screen, services) {
       });
     });
 
-    // Toggle favorite
-    kPicker.key(['f', 'F'], () => {
+    // Toggle favorite (use '*' for consistency with every other picker)
+    kPicker.key(['*', '+'], () => {
       const voiceId = voices[kPicker.selected];
       if (!voiceId) return;
       const favPath = path.join(os.homedir(), '.agentvibes', 'kokoro-favorites.json');
@@ -3495,6 +3536,7 @@ export function createSetupTab(screen, services) {
           dlProc.stdout.on('data', d => { dlOut += d.toString(); });
           dlProc.on('exit', (code) => {
             _dlAllProc = null;
+            if (_kClosed) return;
             if (code === 0 && dlOut.trim()) {
               cached.add(voiceId);
               const listIdx = voices.indexOf(voiceId);
@@ -3543,6 +3585,7 @@ export function createSetupTab(screen, services) {
           dlProc.on('exit', (code) => {
             _dlAllProc = null;
             try { fs.unlinkSync(tmpWav); } catch {}
+            if (_kClosed) return;
             if (code === 0) {
               cached.add(voiceId);
               const listIdx = voices.indexOf(voiceId);

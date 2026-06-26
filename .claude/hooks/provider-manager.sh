@@ -215,7 +215,7 @@ migrate_voice_to_provider() {
   fi
 
   # If migrating FROM a single-voice provider, return default for target provider
-  if [[ "$current_voice" == "soprano-default" || "$current_voice" == "Rachel" || "$current_voice" =~ ^[a-z]{2}_[a-z_]+$ ]]; then
+  if [[ "$current_voice" == "soprano-default" || "$current_voice" == "Rachel" || "$current_voice" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
     case "$target_provider" in
       piper) echo "$piper_default" ;;
       macos) echo "$macos_default" ;;

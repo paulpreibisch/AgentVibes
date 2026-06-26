@@ -21,10 +21,18 @@ const TTS_ENGINES = [
       : process.platform === 'darwin'
         ? 'brew install piper'
         : `${path.join(_hooksDir, 'piper-installer.sh')} --non-interactive`,
+    // Structured form — robust against spaces in paths (do NOT split installCmd on ' ').
+    installSpec: process.platform === 'win32'
+      ? { cmd: 'winget', args: ['install', '--id', 'Rhasspy.Piper', '--accept-package-agreements', '--accept-source-agreements'] }
+      : process.platform === 'darwin'
+        ? { cmd: 'brew', args: ['install', 'piper'] }
+        : { cmd: path.join(_hooksDir, 'piper-installer.sh'), args: ['--non-interactive'] },
   },
   {
     id: 'kokoro', name: 'Kokoro TTS', desc: 'Local neural TTS — 60+ voices, 8 languages, no API key', native: false,
     installCmd: `${path.join(_hooksDir, 'kokoro-installer.sh')} --non-interactive`,
+    // Structured form — robust against spaces in paths (do NOT split installCmd on ' ').
+    installSpec: { cmd: path.join(_hooksDir, 'kokoro-installer.sh'), args: ['--non-interactive'] },
     requiresApiKey: false,
   },
   {
@@ -52,19 +60,28 @@ export function checkEngineInstalled(engineId) {
 
   // ElevenLabs: check API key in env or key file
   if (engineId === 'elevenlabs') {
-    if (process.env.ELEVENLABS_API_KEY) return true;
+    if (process.env.ELEVENLABS_API_KEY?.trim()) return true;
     try {
       const keyFile = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
       return fs.existsSync(keyFile) && fs.readFileSync(keyFile, 'utf8').trim().length > 0;
     } catch { return false; }
   }
 
-  // Kokoro: use find_spec (no import) to avoid the slow torch load that causes ETIMEDOUT
+  // Kokoro: use find_spec (no import) to avoid the slow torch load that causes ETIMEDOUT.
+  // Try each platform-appropriate python command (Windows lacks `python3`).
   if (engineId === 'kokoro') {
-    try {
-      execFileSync('python3', ['-c', "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)"], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
-      return true;
-    } catch { return false; }
+    const pythonCommands = process.platform === 'win32'
+      ? ['py', 'python', 'python3']
+      : ['python3', 'python'];
+    for (const pythonCmd of pythonCommands) {
+      try {
+        execFileSync(pythonCmd, ['-c', "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('kokoro') else 1)"], { stdio: 'ignore', timeout: 3000 }); // NOSONAR
+        return true;
+      } catch {
+        // try next python command
+      }
+    }
+    return false;
   }
 
   // Check binary availability — soprano has two possible binaries

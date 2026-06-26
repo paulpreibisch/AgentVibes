@@ -87,16 +87,20 @@ describe('buildBlingCommand', () => {
   });
 
   // ── POSIX ──────────────────────────────────────────────────────────────
-  test('posix + wav present → paplay/aplay the wav', () => {
+  test('posix + wav present → paplay/aplay the wav (path passed as $1, not interpolated)', () => {
     const { command, args } = buildBlingCommand('linux', WAV, true);
     assert.equal(command, 'bash');
-    const sh = args.at(-1);
-    assert.match(sh, /paplay "[^"]*bling-success\.wav"/);
-    assert.match(sh, /aplay -q/);
+    // The wav is passed as a positional arg ($1) so it is never interpolated
+    // into the shell string (injection-safe). The sh script is the '-c' value.
+    const sh = args[args.indexOf('-c') + 1];
+    assert.match(sh, /paplay "\$1"/);
+    assert.match(sh, /aplay -q "\$1"/);
+    assert.ok(args.includes(WAV), 'wav path must be passed as a positional argument');
   });
 
   test('posix bell falls back to /dev/tty, not discarded stdout', () => {
-    const sh = buildBlingCommand('linux', WAV, true).args.at(-1);
+    const args = buildBlingCommand('linux', WAV, true).args;
+    const sh = args[args.indexOf('-c') + 1];
     assert.match(sh, /printf "\\a" > \/dev\/tty/);
   });
 

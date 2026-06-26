@@ -68,9 +68,14 @@ await mock.module('node:child_process', {
 
 let _existsSyncReturn = true;
 const _unlinked = [];
+const _mkdirs = [];
 const fsMock = {
   existsSync: () => _existsSyncReturn,
   unlinkSync: (p) => { _unlinked.push(p); },
+  // The secure-temp helper (_secureTempWav) creates a per-uid 0o700 dir before
+  // writing preview wavs; stub mkdir/chmod so nothing touches the real FS.
+  mkdirSync: (p, opts) => { _mkdirs.push({ p: String(p), opts }); },
+  chmodSync: () => {},
 };
 
 await mock.module('node:fs', {
@@ -217,20 +222,29 @@ describe('enter handler (lines 368-385)', () => {
   });
 
   test('selecting a character preset then toggling it off', () => {
-    const list = openAndGetList('off');
-    // Find the index of the first character preset item in FLAT_ITEMS.
-    // Layout: 3 reverb headers/items groups then a Character header then presets.
-    // Easiest: sweep selecting each index and fire enter; the character branch
-    // executes when item.category === 'character'.
-    let charIdx = -1;
-    for (let i = 0; i < 40; i++) {
-      list.selected = i;
-      fire(list, 'enter');
-    }
-    // toggle warm on then off explicitly: warm is a character preset
-    // Re-open and locate by behaviour is complex; the sweep above already
-    // exercised both character branches (set + toggle-off) and category branch.
-    assert.ok(charIdx === -1 || true);
+    // Locate the 'warm' character-preset row: opening the picker with that value
+    // positions the cursor on its row (initialIdx finds the active character item).
+    const probe = openAndGetList('warm');
+    const warmIdx = probe.selected;
+    assert.ok(warmIdx > 0, 'warm character-preset row should be locatable');
+
+    // Fresh picker (nothing selected): selecting warm + Enter sets the preset.
+    // Confirm with 'c' so onSelect observes the serialized value.
+    let selected = null;
+    const list = openAndGetList('off', (v) => { selected = v; });
+    list.selected = warmIdx;
+    fire(list, 'enter');         // character → 'warm'
+    fire(list, 'c');             // confirm → onSelect('warm')
+    assert.equal(selected, 'warm', 'first Enter selects the character preset');
+
+    // Fresh picker again: Enter twice on the same row toggles it back off.
+    selected = null;
+    const list2 = openAndGetList('off', (v) => { selected = v; });
+    list2.selected = warmIdx;
+    fire(list2, 'enter');        // character → 'warm'
+    fire(list2, 'enter');        // same preset again → toggled off (null)
+    fire(list2, 'c');            // confirm → onSelect('off')
+    assert.equal(selected, 'off', 'pressing Enter again toggles the preset off');
   });
 
   test('header / legend selection returns early', () => {

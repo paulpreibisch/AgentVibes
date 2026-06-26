@@ -50,10 +50,12 @@ function reset() {
 const mkConfig = () => ({ getConfig: () => ({}), getProjectRoot: () => process.cwd() });
 
 describe('ProviderService._isKokoroInstalled', () => {
-  test('returns true when `python3 -c import kokoro` succeeds', () => {
+  test('returns true when a python `find_spec(kokoro)` probe succeeds', () => {
     reset();
+    // Detection now uses importlib.util.find_spec (no slow torch import) and
+    // tries each platform-appropriate python command (py/python/python3).
     _execImpl = (cmd, args) => {
-      if (cmd === 'python3' && Array.isArray(args) && args[1] === 'import kokoro') return '';
+      if (Array.isArray(args) && typeof args[1] === 'string' && args[1].includes("find_spec('kokoro')")) return '';
       throw new Error('not found');
     };
     const svc = new ProviderService(mkConfig());
@@ -103,7 +105,7 @@ describe('ProviderService.getInstalledProviders — kokoro + elevenlabs', () => 
     reset();
     process.env.ELEVENLABS_API_KEY = 'sk-x';
     _execImpl = (cmd, args) => {
-      if (cmd === 'python3' && args[1] === 'import kokoro') return '';
+      if (Array.isArray(args) && typeof args[1] === 'string' && args[1].includes("find_spec('kokoro')")) return '';
       if (cmd === 'which') return ''; // piper/soprano present
       throw new Error('not found');
     };

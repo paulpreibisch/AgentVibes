@@ -246,12 +246,16 @@ function makeProviderService() {
 }
 
 function makeNavigationService() {
-  let modalOpen = false;
+  // isModalOpen() must stay false so every provider config button can open its
+  // LLM-config modal. (Install buttons now open the ElevenLabs API-key dialog,
+  // which registers itself as a modal via openModal(); if isModalOpen() tracked
+  // that real state, the very first install button would block every subsequent
+  // _openLlmConfigModal() and the Kokoro picker would never be reached.)
   return {
     switchTab: () => {},
-    isModalOpen: () => modalOpen,
-    openModal: () => { modalOpen = true; },
-    closeModal: () => { modalOpen = false; },
+    isModalOpen: () => false,
+    openModal: () => {},
+    closeModal: () => {},
     pushFocus: () => {},
     popFocus: () => null,
   };
@@ -355,9 +359,12 @@ describe('setup-tab kokoro local preview handler', () => {
     const pb3 = _spawned.length;
     synth3._emit('exit', 0);
     const play3 = _spawned[pb3];
-    if (play3) play3._emit('error', new Error('boom'));
+    assert.ok(play3, 'third preview spawned a player after synth success');
+    play3._emit('error', new Error('boom'));
 
-    assert.ok(true);
+    // Three previews each spawned a synth process that, on exit 0, spawned a
+    // player — so at least 6 child processes were created via the real handler.
+    assert.ok(_spawned.length >= 6, 'each of the 3 previews spawned a synth + player');
   });
 
   test('synth failure (exit 3) triggers direct .pt download', async () => {
@@ -373,11 +380,9 @@ describe('setup-tab kokoro local preview handler', () => {
     const dlBefore = _spawned.length;
     synth._emit('exit', 3); // failure path -> spawns download-only proc
     const dl = _spawned[dlBefore];
-    if (dl) {
-      dl._emitStdout('af_river.pt downloaded');
-      dl._emit('exit', 0);
-    }
-    assert.ok(true);
+    assert.ok(dl, 'synth failure (exit 3) spawns a direct .pt download process');
+    dl._emitStdout('af_river.pt downloaded');
+    dl._emit('exit', 0);
   });
 
   test('synth non-zero (generic failure) and synth error branch', async () => {
@@ -398,7 +403,8 @@ describe('setup-tab kokoro local preview handler', () => {
     const synth2 = _spawned[_spawned.length - 1];
     synth2._emit('error', new Error('python missing'));
 
-    assert.ok(true);
+    // Two previews ran: each Space press spawned at least a synth process.
+    assert.ok(_spawned.length >= 2, 'both previews spawned a synth process');
   });
 
   test('toggling preview off, favorite, and download-all handlers', async () => {
@@ -420,20 +426,22 @@ describe('setup-tab kokoro local preview handler', () => {
     }
 
     // download-all
-    if (kPicker._handlers['key:d']) {
-      const sb = _spawned.length;
-      kPicker._handlers['key:d']();
-      // drive any spawned download children to completion
-      for (let i = sb; i < _spawned.length; i++) {
-        _spawned[i]._emitStdout('5%|# |');
-        _spawned[i]._emit('exit', 0);
-      }
+    let _dlAllSpawned = 0;
+    assert.ok(kPicker._handlers['key:d'], 'Download-All (d) handler is registered');
+    const sb = _spawned.length;
+    kPicker._handlers['key:d']();
+    _dlAllSpawned = _spawned.length - sb;
+    // Download-All must spawn at least one per-voice download process.
+    assert.ok(_dlAllSpawned >= 1, 'Download-All spawns per-voice download processes');
+    // drive any spawned download children to completion
+    for (let i = sb; i < _spawned.length; i++) {
+      _spawned[i]._emitStdout('5%|# |');
+      _spawned[i]._emit('exit', 0);
     }
 
     // escape closes
-    if (kPicker._handlers['key:escape']) kPicker._handlers['key:escape']();
-
-    assert.ok(true);
+    assert.ok(kPicker._handlers['key:escape'], 'escape handler is registered');
+    kPicker._handlers['key:escape']();
   });
 
   test('cached voice spinner path + download animation tick', async () => {
@@ -464,7 +472,9 @@ describe('setup-tab kokoro local preview handler', () => {
     } finally {
       _cacheAfRiver = false;
     }
-    assert.ok(true);
+    // Both the cached-voice preview and the uncached-voice download preview
+    // spawned synth processes through the real Space handler.
+    assert.ok(_spawned.length >= 2, 'cached + uncached previews spawned processes');
   });
 
   test('synth spawn throws -> preview-failed branch', async () => {
@@ -476,8 +486,11 @@ describe('setup-tab kokoro local preview handler', () => {
     kPicker.selected = 0;
     _throwOnNextSpawn = true; // the bling cue is wrapped in try/catch; synth spawn throws
     kPicker._handlers['key:space']();
-    _throwOnNextSpawn = false;
-    assert.ok(true);
+    // A spawn was attempted while the throw flag was armed — spawnMock consumes
+    // the flag only when it actually throws, so a false flag proves the
+    // spawn-throws -> preview-failed branch executed (and was handled, no crash).
+    assert.equal(_throwOnNextSpawn, false, 'a spawn was attempted and threw, exercising the failure branch');
+    _throwOnNextSpawn = false; // safety: ensure no leak to later tests
   });
 
   test('remote SSH preview path (success and cjk failure tail)', async () => {
@@ -511,6 +524,7 @@ describe('setup-tab kokoro local preview handler', () => {
     } finally {
       _remoteHost = false;
     }
-    assert.ok(true);
+    // Three remote previews each spawned an SSH preview process.
+    assert.ok(_spawned.length >= 3, 'each remote preview spawned an SSH process');
   });
 });

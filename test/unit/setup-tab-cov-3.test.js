@@ -474,7 +474,11 @@ for (const p of _procs) { try { p.removeAllListeners(); } catch {} }
 
 describe('setup-tab kokoro picker — spinner + pip install coverage', () => {
   test('module + scenarios ran without fatal errors', () => {
-    assert.ok(true);
+    // The module-level scenarios call createSetupTab(), which synchronously
+    // builds the setup UI; the last scenario's widgets remain in _allWidgets.
+    // A populated registry proves the tab was actually constructed (the
+    // scenarios did not throw before producing UI).
+    assert.ok(_allWidgets.length > 0, 'createSetupTab built widgets during the scenarios');
   });
 
   test('reached the kokoro picker and its install-prompt or spinner path', () => {

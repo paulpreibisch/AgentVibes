@@ -398,7 +398,7 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
 # piper/sapi for that LLM's normal text responses that use Piper voices — must
 # NOT redirect it to an incompatible engine, or synthesis fails silently
 # (Piper can't find the Kokoro voice model → no audio, exit 0).
-$_VoiceIsKokoro = $VoiceOverride -match '^[a-z][fm]_[a-z]+$'
+$_VoiceIsKokoro = $VoiceOverride -match '^[a-z]{2}_[a-z0-9_]+$'
 if ($_VoiceIsKokoro) {
     # A Kokoro-format voice forces the Kokoro engine regardless of the per-LLM
     # ENGINE column or the global tts-provider.txt default.

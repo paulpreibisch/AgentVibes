@@ -290,7 +290,13 @@ describe('setup-tab-cov-6', () => {
     if (origInit === undefined) delete process.env.INIT_CWD;
     else process.env.INIT_CWD = origInit;
 
-    assert.ok(true);
+    // The config drill-down opened at least one voice picker (a list with a
+    // Space-preview handler) and the picker/detection paths spawned processes.
+    assert.ok(
+      _allWidgets.some(w => w._tag === 'list' && w._handlers['key:space']),
+      'config drill-down opened at least one voice picker',
+    );
+    assert.ok(_spawnedProcs.length >= 1, 'voice-picker/detection paths spawned a process');
   });
 
   test('kokoro picker opened directly via config with ttsEngine=kokoro', async () => {
@@ -350,7 +356,14 @@ describe('setup-tab-cov-6', () => {
       if (origInit === undefined) delete process.env.INIT_CWD;
       else process.env.INIT_CWD = origInit;
     }
-    assert.ok(true);
+    // With ttsEngine=kokoro forced via the cfg, the Voice field opens the Kokoro
+    // picker, which registers a Download-All (d) handler. Its presence proves the
+    // Kokoro picker actually opened, and processes were spawned driving it.
+    assert.ok(
+      _allWidgets.some(w => w._handlers['key:d']),
+      'a Kokoro voice picker (with a Download-All handler) opened',
+    );
+    assert.ok(_spawnedProcs.length >= 1, 'download-all/preview paths spawned processes');
   });
 
   test('native voice picker: elevenlabs preview spawn + API-key warning', async () => {
@@ -407,7 +420,14 @@ describe('setup-tab-cov-6', () => {
       if (origKey === undefined) delete process.env.ELEVENLABS_API_KEY;
       else process.env.ELEVENLABS_API_KEY = origKey;
     }
-    assert.ok(true);
+    // With ttsEngine=elevenlabs forced, the Voice field opens a native voice
+    // picker (a list with a Space-preview handler) and the Space preview spawns
+    // a process — both confirm the elevenlabs preview path executed.
+    assert.ok(
+      _allWidgets.some(w => w._tag === 'list' && w._handlers['key:space']),
+      'a native voice picker opened for elevenlabs',
+    );
+    assert.ok(_spawnedProcs.length >= 1, 'elevenlabs preview spawned a process');
   });
 
   test('screen 1 dependency check completion renders results table', async () => {
@@ -431,6 +451,8 @@ describe('setup-tab-cov-6', () => {
     if (origInit === undefined) delete process.env.INIT_CWD;
     else process.env.INIT_CWD = origInit;
 
-    assert.ok(true);
+    // The screen-1 dependency check spawns detection processes (python / `which`
+    // lookups); their presence confirms _checkDependenciesAsync actually ran.
+    assert.ok(_spawnedProcs.length >= 1, 'dependency check spawned detection processes');
   });
 });

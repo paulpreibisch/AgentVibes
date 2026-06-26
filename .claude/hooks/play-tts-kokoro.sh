@@ -52,7 +52,7 @@ DEFAULT_VOICE="af_heart"
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Accept kokoro-style voice IDs (2-letter prefix + underscore + name)
   # e.g. af_heart, am_adam, bf_emma, bm_george
-  if [[ "$VOICE_OVERRIDE" =~ ^[a-z]{2}_[a-z_]+$ ]]; then
+  if [[ "$VOICE_OVERRIDE" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
     VOICE="$VOICE_OVERRIDE"
   else
     echo "⚠️  Unrecognized kokoro voice '$VOICE_OVERRIDE', using $DEFAULT_VOICE" >&2
@@ -62,7 +62,7 @@ else
   # Check voice manager
   if [[ -f "$SCRIPT_DIR/voice-manager.sh" ]]; then
     _CONFIGURED="$("$SCRIPT_DIR/voice-manager.sh" get 2>/dev/null || true)"
-    if [[ "$_CONFIGURED" =~ ^[a-z]{2}_[a-z_]+$ ]]; then
+    if [[ "$_CONFIGURED" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
       VOICE="$_CONFIGURED"
     else
       VOICE="$DEFAULT_VOICE"
@@ -73,7 +73,9 @@ else
 fi
 
 # Speed from config (optional, defaults to 1.0)
+# SECURITY: Validate speed is numeric before passing to python (avoids traceback)
 SPEED="${KOKORO_SPEED:-1.0}"
+[[ "$SPEED" =~ ^[0-9]+(\.[0-9]+)?$ ]] || SPEED="1.0"
 
 # ---------------------------------------------------------------------------
 # Synthesis
@@ -90,6 +92,13 @@ if [[ ! -f "$SYNTH_SCRIPT" ]]; then
   exit 2
 fi
 
+# Skip the (slow) synthesis + playback entirely in test mode — nothing to play
+# and no need to spin up the kokoro model. Mirrors the sibling Piper provider.
+if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
+  trap '' EXIT
+  exit 0
+fi
+
 # Run synthesis — output path printed to stdout
 RESULT=$(python3 "$SYNTH_SCRIPT" "$TEXT" "$VOICE" "$TEMP_WAV" "$SPEED" 2>&1) || {
   echo "❌ Kokoro synthesis failed: $RESULT" >&2
@@ -103,12 +112,16 @@ fi
 
 # ---------------------------------------------------------------------------
 # Play audio — try players in order (WAV-capable)
-(aplay -q "$TEMP_WAV" 2>/dev/null \
-  || paplay "$TEMP_WAV" 2>/dev/null \
-  || ffplay -nodisp -autoexit -loglevel quiet "$TEMP_WAV" 2>/dev/null \
-  || mpg123 -q "$TEMP_WAV" 2>/dev/null \
-  || true) &
-wait $!
+# Skip playback in test mode or no-playback mode (matches the Piper provider).
+# AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
+  (aplay -q "$TEMP_WAV" 2>/dev/null \
+    || paplay "$TEMP_WAV" 2>/dev/null \
+    || ffplay -nodisp -autoexit -loglevel quiet "$TEMP_WAV" 2>/dev/null \
+    || mpg123 -q "$TEMP_WAV" 2>/dev/null \
+    || true) &
+  wait $!
+fi
 
 # Cancel trap so file persists in cache
 trap '' EXIT

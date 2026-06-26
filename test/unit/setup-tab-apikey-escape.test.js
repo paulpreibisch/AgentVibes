@@ -253,5 +253,8 @@ describe('ElevenLabs API-key dialog — escape / modal teardown', () => {
     assert.equal(_writes.length, 1, 'the API key should be written to its key file');
     assert.match(_writes[0].p, /elevenlabs-key\.txt$/, 'key file path should be the elevenlabs key file');
     assert.match(String(_writes[0].data), /sk-test-key-123/, 'written content should contain the key');
+    // The credential file must be written with owner-only 0o600 permissions so
+    // the API key is not world/group readable.
+    assert.equal(_writes[0].opts?.mode, 0o600, 'key file must be written with 0o600 (owner-only) mode');
   });
 });

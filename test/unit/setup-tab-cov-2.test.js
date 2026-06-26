@@ -30,7 +30,7 @@ import path from 'node:path';
 
 const _allWidgets = [];
 
-function makeTrackedWidget(tag = 'widget') {
+function makeTrackedWidget(tag = 'widget', opts = {}) {
   const _h = {};
   const w = {
     _tag: tag,
@@ -91,7 +91,10 @@ function makeTrackedWidget(tag = 'widget') {
     top:                0,
     bottom:             0,
     right:              0,
-    items:              [],
+    // Honor constructor `items` (some pickers — e.g. the TTS-engine picker — set
+    // items only via the blessed.list() constructor, never setItems(); without
+    // this they would look empty to item-based finders).
+    items:              Array.isArray(opts.items) ? [...opts.items] : [],
     ritems:             [],
     selected:           0,
     focused:            null,
@@ -109,15 +112,15 @@ function makeTrackedWidget(tag = 'widget') {
 }
 
 const blessedStub = {
-  box:      () => makeTrackedWidget('box'),
-  text:     () => makeTrackedWidget('text'),
-  textbox:  () => makeTrackedWidget('textbox'),
-  textarea: () => makeTrackedWidget('textarea'),
-  list:     () => makeTrackedWidget('list'),
-  listbar:  () => makeTrackedWidget('listbar'),
-  button:   () => makeTrackedWidget('button'),
-  prompt:   () => makeTrackedWidget('prompt'),
-  screen:   () => makeTrackedWidget('screen'),
+  box:      (o) => makeTrackedWidget('box', o),
+  text:     (o) => makeTrackedWidget('text', o),
+  textbox:  (o) => makeTrackedWidget('textbox', o),
+  textarea: (o) => makeTrackedWidget('textarea', o),
+  list:     (o) => makeTrackedWidget('list', o),
+  listbar:  (o) => makeTrackedWidget('listbar', o),
+  button:   (o) => makeTrackedWidget('button', o),
+  prompt:   (o) => makeTrackedWidget('prompt', o),
+  screen:   (o) => makeTrackedWidget('screen', o),
   escape:   (str) => str || '',
 };
 
@@ -387,7 +390,14 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
         }
       } catch {}
     }
-    assert.ok(true, 'kokoro picker drive ran without throwing');
+    assert.ok(fieldLists.length > 0, 'at least one provider config modal field list opened');
+    assert.ok(covered, 'engine picker accepted kokoro and the Voice field was driven');
+    // The Kokoro voice picker registers a Space-preview handler; its presence
+    // confirms _openKokoroVoicePicker actually opened (not just ran silently).
+    assert.ok(
+      _allWidgets.some(w => w._tag === 'list' && w._handlers['key:space']),
+      'a Kokoro voice picker (list with a Space handler) was created',
+    );
   });
 
   test('opens ElevenLabs native voice picker + API-key warning (covers _showApiKeyWarning)', async () => {
@@ -401,15 +411,21 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
     // Ensure no ELEVENLABS_API_KEY so the warning branch fires.
     const origKey = process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_API_KEY;
+    let elevenSet = false;
     try {
       for (const fl of fieldLists) {
         try {
           if (setEngineViaFieldList(fl, 'elevenlabs')) {
             fl.selected = 1;
             fl._handlers['key:enter']();
+            elevenSet = true;
           }
         } catch {}
       }
+      // The ElevenLabs voice picker registers a Space-preview handler — capture
+      // its presence BEFORE we fire teardown handlers below.
+      const elPickerOpened = _allWidgets.some(w => w._tag === 'list' && w._handlers['key:space']);
+
       // After the warning box is created, fire its enter/escape/click handlers
       // to execute _closeWarning() (destroyList + onDismiss).
       for (const w of _allWidgets) {
@@ -417,11 +433,13 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
         try { w._handlers['key:escape']?.(); } catch {}
         try { w._handlers['on:click']?.(); } catch {}
       }
+
+      assert.ok(elevenSet, 'engine picker accepted elevenlabs and the Voice field was driven');
+      assert.ok(elPickerOpened, 'an ElevenLabs voice picker (list with a Space handler) was created');
     } finally {
       if (origKey === undefined) delete process.env.ELEVENLABS_API_KEY;
       else process.env.ELEVENLABS_API_KEY = origKey;
     }
-    assert.ok(true, 'elevenlabs native picker + api-key warning drive ran without throwing');
   });
 
   test('kokoro picker handles favorites/transport-config present', async () => {

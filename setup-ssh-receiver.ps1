@@ -222,8 +222,10 @@ WshShell.Run """" & pythonw & """ """ & script & """ 7855", 0, False
 "@
     Set-Content -Path "$env:USERPROFILE\.agentvibes\start-kokoro-server.vbs" -Value $kokoroVbs -Encoding ASCII
     Copy-Item -Path "$env:USERPROFILE\.agentvibes\start-kokoro-server.vbs" -Destination "$startupDir\agentvibes-kokoro-server.vbs" -Force
-    # Kill any existing daemon, then launch a fresh one so it's warm immediately
-    Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*kokoro-server.py*" } |
+    # Kill only the managed daemon (this script's kokoro-server.py on the standard
+    # port 7855), then launch a fresh one so it's warm immediately. Scoping by the
+    # managed port avoids killing unrelated user-run kokoro-server.py daemons.
+    Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*kokoro-server.py*7855*" } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Process wscript.exe -ArgumentList "$env:USERPROFILE\.agentvibes\start-kokoro-server.vbs" -WindowStyle Hidden
     Write-Host "       Kokoro daemon: installed + started + autostart enabled (pythonw: $pythonwPath)" -ForegroundColor Green

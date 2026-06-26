@@ -17,6 +17,7 @@ Install: pip install kokoro-onnx soundfile numpy
 
 import sys
 import os
+import re
 
 # Kokoro/torch auto-selects CUDA whenever a GPU is visible, but many setups
 # (notably Windows) fail GPU allocation with "CUDA error: unknown error /
@@ -32,6 +33,11 @@ def main():
     # --download-only: fetch voice .pt file from HuggingFace without synthesis
     if len(sys.argv) >= 2 and sys.argv[1] == '--download-only':
         voice = sys.argv[2] if len(sys.argv) > 2 else 'af_heart'
+        # Validate before the id flows into a HuggingFace filename — blocks path
+        # traversal / arbitrary repo paths in voices/<voice>.pt.
+        if not re.match(r'^[a-z]{2}_[a-z0-9_]+$', voice):
+            print(f"❌ Invalid voice id: {voice}", file=sys.stderr)
+            sys.exit(4)
         try:
             from huggingface_hub import hf_hub_download
             local = hf_hub_download(repo_id='hexgrad/Kokoro-82M', filename=f'voices/{voice}.pt')
@@ -48,7 +54,10 @@ def main():
     text = sys.argv[1]
     voice = sys.argv[2]
     output_path = sys.argv[3]
-    speed = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+    try:
+        speed = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+    except ValueError:
+        speed = 1.0
 
     # Determine language code from voice prefix
     # af/am = American English ('a'), bf/bm = British English ('b')

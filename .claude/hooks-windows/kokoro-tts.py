@@ -26,7 +26,10 @@ def main():
     text = sys.argv[1]
     voice = sys.argv[2]
     output_path = sys.argv[3]
-    speed = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+    try:
+        speed = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+    except ValueError:
+        speed = 1.0
 
     # Determine language code from voice prefix
     # af/am = American English ('a'), bf/bm = British English ('b')

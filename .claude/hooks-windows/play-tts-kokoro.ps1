@@ -74,7 +74,7 @@ if (-not $VoiceName) { $VoiceName = "af_heart" }
 
 # Security: validate voice id (lowercase prefix + underscore + name).
 # Rejects path-traversal / injection before it reaches the command line.
-if ($VoiceName -notmatch '^[a-z]{2}_[a-z]+$') {
+if ($VoiceName -notmatch '^[a-z]{2}_[a-z0-9_]+$') {
     Write-Host "[WARNING] Invalid Kokoro voice '$VoiceName' - falling back to af_heart" -ForegroundColor Yellow
     $VoiceName = "af_heart"
 }

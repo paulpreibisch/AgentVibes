@@ -205,8 +205,22 @@ describe('spawnMp3Player — normal player path kill() lines', () => {
     };
     spawnedProcs = [];
     const r = spawnMp3Player('/tmp/track.mp3', { DISPLAY: ':0', __forceNoWinFallback: true });
-    // On win32 the source falls back to WIN_MP3_PLAYER (non-null); on other
-    // platforms it is null. Accept either — the detection path executed.
-    assert.ok(r === null || (r && typeof r.kill === 'function'));
+    if (process.platform === 'win32') {
+      // On win32, detectMp3Player() always falls back to WIN_MP3_PLAYER
+      // (PowerShell WPF MediaPlayer), so a controllable handle is returned even
+      // when no cross-platform player is on PATH. spawn() is mocked → pid 4242.
+      assert.ok(r, 'win32 must return the WIN_MP3_PLAYER fallback handle');
+      assert.equal(r.pid, 4242, 'fallback handle wraps the (mocked) spawned process');
+      assert.equal(typeof r.kill, 'function');
+      assert.equal(typeof r.on, 'function');
+    } else {
+      // On non-win32 there is no built-in fallback. Earlier tests in this file
+      // primed the module-level player cache with ffplay (status 0), so
+      // detectMp3Player() resolves ffplay and a kill-able handle is returned;
+      // the detection path executed deterministically and produced a handle.
+      assert.ok(r, 'non-win32 returns the detected player handle');
+      assert.equal(r.pid, 4242);
+      assert.equal(typeof r.kill, 'function');
+    }
   });
 });

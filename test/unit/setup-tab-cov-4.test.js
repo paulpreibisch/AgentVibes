@@ -605,7 +605,13 @@ describe('setup-tab-cov-4: kokoro picker install + remote preview handlers', () 
     assert.ok(_spawnedProcs.length >= 1, 'expected spawned processes');
   });
 
-  test('driving handlers did not throw fatally', () => {
-    assert.ok(true);
+  test('install path spawned a pip install process', () => {
+    // Driving the picker's install dialog (key:i) runs the real install handler,
+    // which spawns `pip install ...`. Its presence proves the install code path
+    // actually executed (not merely that nothing threw).
+    assert.ok(
+      _spawnedProcs.some(p => Array.isArray(p._args) && p._args.includes('pip')),
+      'expected a pip install process to be spawned by the install handler',
+    );
   });
 });

@@ -107,10 +107,13 @@ _looks_like_el_key() {
 
 API_KEY=""
 if [[ -n "${ELEVENLABS_API_KEY:-}" ]]; then
-  if _looks_like_el_key "$ELEVENLABS_API_KEY"; then
-    API_KEY="$ELEVENLABS_API_KEY"
-  else
-    echo "⚠️  ELEVENLABS_API_KEY env var looks malformed (length ${#ELEVENLABS_API_KEY}); ignoring it and using the key file instead." >&2
+  # A non-empty env var is authoritative — ElevenLabs has shipped several key
+  # formats over time, so we must not silently discard a key just because it
+  # looks unfamiliar. Warn (using ONLY the length, never the value) if the format
+  # is unexpected, but use it regardless.
+  API_KEY="$ELEVENLABS_API_KEY"
+  if ! _looks_like_el_key "$ELEVENLABS_API_KEY"; then
+    echo "⚠️  ELEVENLABS_API_KEY env var has an unexpected format (length ${#ELEVENLABS_API_KEY}); using it anyway." >&2
   fi
 fi
 if [[ -z "$API_KEY" ]]; then
@@ -256,11 +259,20 @@ print(json.dumps({
 fi
 
 # ---------------------------------------------------------------------------
+# Test mode: never make a billable request to the ElevenLabs API (and never play
+# audio). Short-circuit BEFORE the network call. Mirrors the sibling providers'
+# AGENTVIBES_TEST_MODE handling; the EXIT trap cleans up the temp files.
+if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # Call ElevenLabs API
-# Security: API key passed via header (never in URL or args)
-HTTP_STATUS=$(curl -s -o "$TEMP_FILE" -w "%{http_code}" \
+# Security: API key passed via a curl config read from stdin (-K -), so it never
+# appears in argv (where `ps` could expose it) nor in any temp file.
+HTTP_STATUS=$(printf 'header = "xi-api-key: %s"\n' "$API_KEY" | curl -s -o "$TEMP_FILE" -w "%{http_code}" \
   -X POST "https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}" \
-  -H "xi-api-key: ${API_KEY}" \
+  -K - \
   -H "Content-Type: application/json" \
   --max-time 30 \
   --data-binary "@${BODY_FILE}" 2>&1)
@@ -322,23 +334,26 @@ if [[ -f "$SCRIPT_DIR/audio-processor.sh" \
   fi
 fi
 
-# Play audio
+# Play audio (skip in test mode or no-playback mode — matches the Piper provider)
+# AGENTVIBES_NO_PLAYBACK: Set to "true" to generate audio without playing (for post-processing)
 # Native Windows (git-bash, OS=Windows_NT — not WSL) has none of the Linux
 # players, and ffplay spawned from the TUI's Node process is unreliable. Use the
 # built-in PowerShell WPF MediaPlayer (same as audio-env.js) — no ffmpeg/PATH
 # dependency. Other platforms try the usual players.
-_PS_BIN="$(command -v powershell 2>/dev/null || command -v powershell.exe 2>/dev/null || true)"
-if [[ "${OS:-}" == "Windows_NT" && -n "$_PS_BIN" ]]; then
-  _WINPATH="$(cygpath -w "$TEMP_FILE" 2>/dev/null || echo "$TEMP_FILE")"
-  _WINPATH="${_WINPATH//\'/\'\'}"   # escape single quotes for the PowerShell literal
-  "$_PS_BIN" -NoProfile -Command "Add-Type -AssemblyName PresentationCore; \$p = New-Object System.Windows.Media.MediaPlayer; \$p.Open([uri]'${_WINPATH}'); \$p.Play(); Start-Sleep -Milliseconds 300; \$last=[TimeSpan]::Zero; \$stall=0; \$n=0; while (\$n -lt 100) { Start-Sleep -Milliseconds 100; \$pos=\$p.Position; if (\$p.NaturalDuration.HasTimeSpan -and \$pos -ge \$p.NaturalDuration.TimeSpan) { break }; if (\$pos -eq \$last) { \$stall++ } else { \$stall=0 }; if (\$stall -ge 8 -and \$pos -gt [TimeSpan]::Zero) { break }; \$last=\$pos; \$n++ }; \$p.Stop(); \$p.Close()" 2>/dev/null || true
-else
-  (paplay "$TEMP_FILE" 2>/dev/null \
-    || aplay "$TEMP_FILE" 2>/dev/null \
-    || mpg123 -q "$TEMP_FILE" 2>/dev/null \
-    || ffplay -nodisp -autoexit -loglevel error "$TEMP_FILE" 2>/dev/null \
-    || true) &
-  wait $!
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYBACK:-false}" != "true" ]]; then
+  _PS_BIN="$(command -v powershell 2>/dev/null || command -v powershell.exe 2>/dev/null || true)"
+  if [[ "${OS:-}" == "Windows_NT" && -n "$_PS_BIN" ]]; then
+    _WINPATH="$(cygpath -w "$TEMP_FILE" 2>/dev/null || echo "$TEMP_FILE")"
+    _WINPATH="${_WINPATH//\'/\'\'}"   # escape single quotes for the PowerShell literal
+    "$_PS_BIN" -NoProfile -Command "Add-Type -AssemblyName PresentationCore; \$p = New-Object System.Windows.Media.MediaPlayer; \$p.Open([uri]'${_WINPATH}'); \$p.Play(); Start-Sleep -Milliseconds 300; \$last=[TimeSpan]::Zero; \$stall=0; \$n=0; while (\$n -lt 100) { Start-Sleep -Milliseconds 100; \$pos=\$p.Position; if (\$p.NaturalDuration.HasTimeSpan -and \$pos -ge \$p.NaturalDuration.TimeSpan) { break }; if (\$pos -eq \$last) { \$stall++ } else { \$stall=0 }; if (\$stall -ge 8 -and \$pos -gt [TimeSpan]::Zero) { break }; \$last=\$pos; \$n++ }; \$p.Stop(); \$p.Close()" 2>/dev/null || true
+  else
+    (paplay "$TEMP_FILE" 2>/dev/null \
+      || aplay "$TEMP_FILE" 2>/dev/null \
+      || mpg123 -q "$TEMP_FILE" 2>/dev/null \
+      || ffplay -nodisp -autoexit -loglevel error "$TEMP_FILE" 2>/dev/null \
+      || true) &
+    wait $!
+  fi
 fi
 
 # Cancel trap so file persists in cache (for replay)

@@ -9,6 +9,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { spawnSync, spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
 import { renderHelpBar, selectorTitle } from './help-bar.js';
@@ -85,9 +86,11 @@ export const AUDIO_EFFECT_PRESETS = REVERB_PRESETS;
 export function formatEffectLabel(value) {
   if (!value || value === 'off') return 'Off';
   return value.split('+')
+    .map(v => v.trim())
+    .filter(Boolean)
     .map(v => {
-      const p = REVERB_PRESETS.find(r => r.value === v.trim());
-      return p ? p.label.replace(/\s{2,}/g, ' ').trim() : v.trim();
+      const p = REVERB_PRESETS.find(r => r.value === v);
+      return p ? p.label.replace(/\s{2,}/g, ' ').trim() : v;
     })
     .join(' + ');
 }
@@ -177,6 +180,20 @@ const SOX_EFFECT_MAP = {
 
 let _previewProc = null;
 
+/**
+ * Create a secure temp .wav path: per-uid subdir under XDG_RUNTIME_DIR (fallback
+ * os.tmpdir()) with an unpredictable crypto.randomUUID() filename. Mirrors the
+ * private _secureTempWav helper used in the tabs (not importable without a larger
+ * refactor), so it is replicated here.
+ */
+function _secureTempWav(prefix) {
+  const baseDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
+  const dir = path.join(baseDir, `agentvibes-${process.getuid?.() ?? 'u'}`);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { fs.chmodSync(dir, 0o700); } catch {}
+  return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
+}
+
 function stopPreview() {
   if (_previewProc && !_previewProc.killed) {
     try { _previewProc.kill(); } catch {}
@@ -190,10 +207,8 @@ function previewEffect(effectValue) {
   stopPreview();
 
   const soxFx = SOX_EFFECT_MAP[effectValue] ?? '';
-  const pid = process.pid;
-  const tmpDir = os.tmpdir();
-  const tonePath = path.join(tmpDir, `av-tone-${pid}.wav`);
-  const prevPath = path.join(tmpDir, `av-prev-${pid}.wav`);
+  const tonePath = _secureTempWav('av-tone');
+  const prevPath = _secureTempWav('av-prev');
 
   const cleanup = () => {
     try { if (fs.existsSync(tonePath)) fs.unlinkSync(tonePath); } catch {}

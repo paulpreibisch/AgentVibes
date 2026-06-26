@@ -101,7 +101,7 @@ provider_list() {
 
   # Check installation status of optional providers
   local kokoro_installed=false
-  python3 -c "import kokoro" 2>/dev/null && kokoro_installed=true
+  python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>/dev/null && kokoro_installed=true
 
   local elevenlabs_key_set=false
   if [[ -n "${ELEVENLABS_API_KEY:-}" ]]; then

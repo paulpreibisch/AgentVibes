@@ -141,19 +141,31 @@ export class ProviderService {
     }
   }
 
-  /** Check if kokoro-onnx Python package is importable. */
+  /**
+   * Check if the kokoro Python package is importable.
+   * Uses importlib.util.find_spec (no torch import) to avoid the slow load
+   * that can exceed the timeout and falsely report not-installed. Tries each
+   * platform-appropriate python command until one succeeds.
+   */
   _isKokoroInstalled() {
-    try {
-      execFileSync('python3', ['-c', 'import kokoro'], { stdio: 'ignore', timeout: 5000 }); // NOSONAR
-      return true;
-    } catch {
-      return false;
+    // On Windows `python3` usually doesn't exist; `py` is the standard launcher.
+    const pythonCommands = process.platform === 'win32'
+      ? ['py', 'python', 'python3']
+      : ['python3', 'python'];
+    for (const pythonCmd of pythonCommands) {
+      try {
+        execFileSync(pythonCmd, ['-c', "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('kokoro') else 1)"], { stdio: 'ignore', timeout: 5000 }); // NOSONAR
+        return true;
+      } catch {
+        // try next python command
+      }
     }
+    return false;
   }
 
   /** Check if ElevenLabs API key is configured (env var or key file). */
   _isElevenLabsConfigured() {
-    if (process.env.ELEVENLABS_API_KEY) return true;
+    if (process.env.ELEVENLABS_API_KEY?.trim()) return true;
     try {
       const keyFile = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
       return fs.existsSync(keyFile) && fs.readFileSync(keyFile, 'utf8').trim().length > 0;
