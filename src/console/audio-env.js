@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 /**
  * Build a spawn environment with correct PULSE_SERVER handling.
@@ -149,6 +149,90 @@ export function detectMp3Player(env) {
     return _detect(MP3_PLAYERS, env) || WIN_MP3_PLAYER;
   }
   return _detect(MP3_PLAYERS, env);
+}
+
+/**
+ * Returns true when running headless with PulseAudio over TCP.
+ * SDL2-based players (ffplay) fail in this configuration with exit 123.
+ */
+function _isHeadlessPulse(env) {
+  return !env.DISPLAY && typeof env.PULSE_SERVER === 'string' && env.PULSE_SERVER.startsWith('tcp:');
+}
+
+/**
+ * Spawn an MP3 player for the given track path.
+ *
+ * On headless servers with PulseAudio TCP, SDL2-based players (ffplay) fail
+ * because DISPLAY is not set. In that case uses ffmpeg→pacat pipe.
+ *
+ * Returns a process-like object with:
+ *   .pid    — primary process PID
+ *   .kill() — stops playback, killing all spawned processes
+ *   .on(event, cb) — supports 'exit' and 'error'
+ *
+ * Returns null if no suitable player or required binaries are unavailable.
+ *
+ * @param {string} trackPath - Absolute path to the MP3 file
+ * @param {Object} [env]     - Environment (defaults to buildAudioEnv())
+ * @returns {{ pid: number, kill: Function, on: Function }|null}
+ */
+export function spawnMp3Player(trackPath, env) {
+  env = env ?? buildAudioEnv();
+
+  if (_isHeadlessPulse(env)) {
+    // Check required binaries are present.
+    // S4036: standard system media tools resolved via the user's local PATH on
+    // their own machine — no untrusted PATH, absolute paths aren't portable
+    // across distros/Homebrew/Nix. Risk accepted.
+    if (spawnSync('which', ['ffmpeg'], { stdio: 'ignore', env }).status !== 0) return null; // NOSONAR
+    if (spawnSync('which', ['pacat'],  { stdio: 'ignore', env }).status !== 0) return null; // NOSONAR
+
+    const ff = spawn('ffmpeg', // NOSONAR — see S4036 note above
+      ['-i', trackPath, '-f', 's16le', '-ac', '2', '-ar', '44100', 'pipe:1', '-loglevel', 'quiet'],
+      { stdio: ['ignore', 'pipe', 'ignore'], env },
+    );
+    const pa = spawn('pacat', // NOSONAR — see S4036 note above
+      ['--playback', '--format=s16le', '--channels=2', '--rate=44100'],
+      { stdio: ['pipe', 'ignore', 'ignore'], env },
+    );
+    ff.stdout.on('error', () => {});
+    pa.stdin.on('error', () => {});
+    ff.stdout.pipe(pa.stdin);
+
+    const _listeners = { exit: [], error: [] };
+    pa.on('exit', (code, sig) => _listeners.exit.forEach(cb => cb(code, sig)));
+    ff.on('error', err => _listeners.error.forEach(cb => cb(err)));
+    pa.on('error', err => _listeners.error.forEach(cb => cb(err)));
+
+    return {
+      pid: ff.pid,
+      kill() { try { ff.kill(); } catch {} try { pa.kill(); } catch {} },
+      on(event, cb) { if (_listeners[event]) _listeners[event].push(cb); },
+    };
+  }
+
+  const player = detectMp3Player(env);
+  if (!player) return null;
+
+  const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+  const proc = spawn(player.bin, player.args(trackPath), {
+    stdio: 'ignore', detached: !isWin, windowsHide: true, env,
+  });
+
+  return {
+    pid: proc.pid,
+    kill() {
+      try {
+        if (isWin) {
+          spawn('taskkill', ['/F', '/T', '/PID', String(proc.pid)], // NOSONAR
+            { stdio: 'ignore', windowsHide: true });
+        } else {
+          process.kill(-proc.pid, 'SIGTERM');
+        }
+      } catch (e) { if (e.code !== 'ESRCH') { /* ignore */ } }
+    },
+    on(event, cb) { proc.on(event, cb); },
+  };
 }
 
 /**

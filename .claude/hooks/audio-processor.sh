@@ -60,6 +60,9 @@ fi
 # CLAUDE_PROJECT_DIR takes priority so TUI preview writes to the project dir and
 # audio-processor.sh (running from the package hooks dir) still finds the flag.
 is_background_music_enabled() {
+    # Suppress music entirely when a test run is in progress
+    [[ -f "${HOME}/.agentvibes-tests-running" ]] && return 1
+
     local enabled="" _f
     # 1. Project dir (set by TUI preview via CLAUDE_PROJECT_DIR env var)
     if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
@@ -102,6 +105,47 @@ if ! command -v sox &> /dev/null; then
     echo "$OUTPUT_FILE"
     exit 0
 fi
+
+# @function _resolve_one_effect
+# @intent Translate a single preset name to its sox effect string
+# @param $1 Preset name (e.g. 'light', 'echo-short', 'off', 'off-reverb')
+# @returns Sox effect string (empty for off/unknown-off variants)
+_resolve_one_effect() {
+    case "${1:-}" in
+        light)        printf '%s' "reverb 20 50 50" ;;
+        medium)       printf '%s' "reverb 40 50 70" ;;
+        heavy)        printf '%s' "reverb 70 50 100" ;;
+        cathedral)    printf '%s' "reverb 90 30 100" ;;
+        chorus-light) printf '%s' "chorus 0.7 0.9 55 0.4 0.25 2 -t" ;;
+        chorus-deep)  printf '%s' "chorus 0.8 0.9 55 0.4 0.25 2 -t chorus 0.8 0.9 44 0.4 0.2 2.3 -t" ;;
+        echo-short)   printf '%s' "echo 0.8 0.6 60 0.4" ;;
+        echo-long)    printf '%s' "echo 0.8 0.7 100 0.5 200 0.3" ;;
+        warm)         printf '%s' "bass 5 reverb 30 50 60" ;;
+        radio)        printf '%s' "highpass 300 treble 5 gain -3 overdrive 10 gain -3" ;;
+        off*|'')      ;;  # empty output — no effects
+        *)            printf '%s' "$1" ;;  # raw sox string passthrough
+    esac
+}
+
+# @function _resolve_effect_value
+# @intent Translate a preset value (single or '+'-combined) to sox effects string
+# @param $1 Effect value, e.g. 'light', 'light+echo-short', 'off'
+# @returns Full sox effects argument string (may be empty)
+_resolve_effect_value() {
+    local _val="${1:-}"
+    if [[ "$_val" == *"+"* ]]; then
+        local _combined="" _part _resolved
+        IFS='+' read -ra _parts <<< "$_val"
+        for _part in "${_parts[@]}"; do
+            _part="${_part// /}"
+            _resolved=$(_resolve_one_effect "$_part")
+            [[ -n "$_resolved" ]] && _combined="${_combined:+$_combined }$_resolved"
+        done
+        printf '%s' "$_combined"
+    else
+        _resolve_one_effect "$_val"
+    fi
+}
 
 # @function get_agent_config
 # @intent Parse audio-effects.cfg for agent-specific settings
@@ -404,28 +448,15 @@ main() {
     local _rest
     IFS='|' read -r _ sox_effects background_file bg_volume _rest <<< "$config"
 
-    # Translate reverb preset names (stored by the console Configure UI) to sox effects strings.
-    # LLM per-agent rows store human-readable names like "light"; sox needs the raw effect string.
-    # Raw sox strings (used by BMAD agent rows) pass through unchanged.
-    case "${sox_effects:-}" in
-        light)     sox_effects="reverb 20 50 50" ;;
-        medium)    sox_effects="reverb 40 50 70" ;;
-        heavy)     sox_effects="reverb 70 50 100" ;;
-        cathedral) sox_effects="reverb 90 30 100" ;;
-        off)       sox_effects="" ;;
-    esac
+    # Translate preset names (single or '+'-combined) to sox effects strings.
+    # LLM per-agent rows store human-readable names like 'light' or 'light+echo-short';
+    # sox needs the raw effect string. Raw sox strings (BMAD agent rows) pass through.
+    sox_effects=$(_resolve_effect_value "${sox_effects:-}")
 
     # Per-invocation reverb override (set by play-tts-enhanced.sh for profile-based reverb).
     # Using an env var avoids permanently mutating audio-effects.cfg — process-scoped and race-free.
     if [[ -n "${AGENTVIBES_REVERB_OVERRIDE:-}" ]]; then
-        case "$AGENTVIBES_REVERB_OVERRIDE" in
-            light)     sox_effects="reverb 20 50 50" ;;
-            medium)    sox_effects="reverb 40 50 70" ;;
-            heavy)     sox_effects="reverb 70 50 100" ;;
-            cathedral) sox_effects="reverb 90 30 100" ;;
-            off)       sox_effects="" ;;
-            *)         sox_effects="$AGENTVIBES_REVERB_OVERRIDE" ;;  # raw sox string passthrough
-        esac
+        sox_effects=$(_resolve_effect_value "$AGENTVIBES_REVERB_OVERRIDE")
     fi
 
     # Per-agent background music override from bmad-speak.sh profile JSON (takes priority over cfg).

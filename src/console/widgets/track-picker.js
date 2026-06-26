@@ -8,11 +8,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { destroyList } from './destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
+import { renderHelpBar, selectorTitle } from './help-bar.js';
 import { formatTrackName } from './format-utils.js';
-import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
+import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;
@@ -22,7 +22,6 @@ if (!IS_TEST) {
 }
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
-const _hintLabel = '{#455a64-fg}[Space] Preview  [Enter] Select  [Esc] Cancel{/#455a64-fg}';
 
 /**
  * Open a small volume input modal (0–100).
@@ -172,16 +171,46 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
   );
   const currentIdx = tracks.findIndex(t => t.file === currentTrack);
 
-  const listHeight = Math.min(tracks.length + 6, Math.floor(screen.rows * 0.7));
-  const list = blessed.list({
+  // Standardized chrome: bordered box titled "Music Track Selector", a pinned
+  // (non-scrolling) help bar at the top, and the track list filling the rest.
+  const TITLE = selectorTitle('Music Track');
+  const HELP = renderHelpBar([
+    { key: 'Space', label: 'preview' },
+    { key: 'Enter', label: 'select' },
+    { key: 'Esc', label: 'cancel' },
+  ]);
+
+  const boxHeight = Math.min(tracks.length + 5, Math.floor(screen.rows * 0.7));
+  const box = blessed.box({
     parent: screen,
     top: 'center',
     left: 'center',
     width: 54,
-    height: listHeight,
+    height: boxHeight,
     border: { type: 'line' },
     tags: true,
-    label: _modalTitle('Select Track'),
+    label: TITLE,
+    style: { border: { fg: COLORS.btnFocus } },
+  });
+  box.setFront();
+
+  blessed.text({
+    parent: box,
+    top: 0,
+    left: 1,
+    right: 1,
+    height: 1,
+    tags: true,
+    content: HELP,
+  });
+
+  const list = blessed.list({
+    parent: box,
+    top: 1,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    tags: true,
     items,
     keys: true,
     vi: false,
@@ -189,31 +218,16 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     scrollable: true,
     scrollbar: { ch: '│', track: { bg: '#1e2a3a' }, style: { fg: COLORS.btnFocus } },
     style: {
-      border: { fg: COLORS.btnFocus },
       selected: { bg: COLORS.btnFocus, fg: COLORS.btnFocusFg, bold: true },
       item: { fg: '#e3f2fd' },
     },
   });
 
-  // Helper: update hint text in the bottom border label
-  function _setHint(text) {
-    list.setLabel({ text: _modalTitle('Select Track'), side: 'left' });
-    // Use _ prefix convention for bottom border content (blessed doesn't have setFooter)
-    list._label2 && list._label2.destroy();
-    list._label2 = blessed.text({
-      parent: list,
-      bottom: -1,
-      left: 1,
-      width: 50,
-      height: 1,
-      tags: true,
-      content: text,
-      style: { fg: '#e3f2fd' },
-    });
+  // Transient preview/error status shows in the title area; idle restores the title.
+  function _setStatus(text) {
+    box.setLabel(text || TITLE);
     screen.render();
   }
-
-  _setHint(_hintLabel);
 
   if (currentIdx >= 0) list.select(currentIdx);
   list.focus();
@@ -221,18 +235,12 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
 
   // Preview playback state
   const _spawnEnv = buildAudioEnv();
-  const _mp3Player = detectMp3Player(_spawnEnv);
   let _previewProc = null;
   let _previewTrackId = null;
 
   function _killPreview() {
     if (_previewProc) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      if (_isWin) {
-        try { _previewProc.kill(); } catch {}
-      } else {
-        try { process.kill(-_previewProc.pid, 'SIGTERM'); } catch {}
-      }
+      _previewProc.kill();
       _previewProc = null;
     }
     _previewTrackId = null;
@@ -242,7 +250,7 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     // Toggle off if same track
     if (_previewTrackId === trackFile) {
       _killPreview();
-      _setHint(_hintLabel);
+      _setStatus();
       return;
     }
 
@@ -252,31 +260,34 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     const safeBase = path.resolve(tracksDir);
     if (!trackPath.startsWith(safeBase + path.sep) && trackPath !== safeBase) return;
 
-    if (!_mp3Player || !fs.existsSync(trackPath)) {
-      _setHint('{red-fg}No MP3 player found or track missing{/red-fg}');
-      setTimeout(() => {
-        _setHint(_hintLabel);
-      }, 3000);
+    if (!fs.existsSync(trackPath)) {
+      _setStatus(' {red-fg}Track file missing{/red-fg} ');
+      setTimeout(() => { _setStatus(); }, 3000);
       return;
     }
 
-    _previewProc = spawn(_mp3Player.bin, _mp3Player.args(trackPath), {
-      stdio: 'ignore', detached: true, env: _spawnEnv,
-    });
+    const proc = spawnMp3Player(trackPath, _spawnEnv);
+    if (!proc) {
+      _setStatus(' {red-fg}No MP3 player found{/red-fg} ');
+      setTimeout(() => { _setStatus(); }, 3000);
+      return;
+    }
+
+    _previewProc = proc;
     _previewTrackId = trackFile;
 
     const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
-    _setHint(`{bright-cyan-fg}♪ Previewing: ${label}  (Space to stop){/bright-cyan-fg}`);
+    _setStatus(` {bright-cyan-fg}♪ ${label}  (Space to stop){/bright-cyan-fg} `);
 
-    _previewProc.on('exit', () => {
+    proc.on('exit', () => {
       if (_previewTrackId === trackFile) {
         _previewTrackId = null;
         _previewProc = null;
-        _setHint(_hintLabel);
+        _setStatus();
       }
     });
 
-    _previewProc.on('error', () => {
+    proc.on('error', () => {
       _previewTrackId = null;
       _previewProc = null;
     });
@@ -284,12 +295,11 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
 
   function _close(callback) {
     _killPreview();
-    if (list._label2) list._label2.destroy();
     if (callback) {
       callback();
-      destroyList(list, screen, onClose);
+      destroyList(box, screen, onClose);
     } else {
-      destroyList(list, screen, onClose);
+      destroyList(box, screen, onClose);
     }
   }
 
@@ -304,15 +314,14 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     const selected = tracks[list.selected];
     if (!selected) return;
     _killPreview();
-    if (list._label2) list._label2.destroy();
     if (options.skipVolume) {
-      destroyList(list, screen, null);
+      destroyList(box, screen, null);
       setTimeout(() => {
         onSelect(selected.file);
         if (onClose) onClose();
       }, 0);
     } else {
-      destroyList(list, screen, null);
+      destroyList(box, screen, null);
       openVolumeInput(screen, currentVolume ?? 20, (volume) => {
         onSelect(selected.file, volume);
       }, onClose);

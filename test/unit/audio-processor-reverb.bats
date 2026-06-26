@@ -277,7 +277,7 @@ CFG
 
 @test "audio-processor: AGENTVIBES_TEST_TRACK overrides configured background track" {
   cat > "$CLAUDE_PROJECT_DIR/.claude/config/audio-effects.cfg" << 'CFG'
-default||agent_vibes_goa_trance_v2_loop.mp3|0.30
+default||agent_vibes_bossa_nova_v2_loop.mp3|0.30
 CFG
   # Variable prefixes don't export into $() subshells, so use export/unset.
   export AGENTVIBES_TEST_TRACK="agentvibes_soft_flamenco_loop.mp3"
@@ -285,10 +285,10 @@ CFG
   track_output=$(bash "$AUDIO_PROCESSOR" "$BATS_TEST_TMPDIR/input.wav" "default" "$OUTPUT_WAV" 2>&1 || true)
   unset AGENTVIBES_TEST_TRACK
 
-  if echo "$track_output" | grep -q "goa_trance"; then
-    echo "FAIL: goa trance track was used even though AGENTVIBES_TEST_TRACK is set"
+  if echo "$track_output" | grep -q "bossa_nova"; then
+    echo "FAIL: bossa nova track was used even though AGENTVIBES_TEST_TRACK is set"
     echo "Output: $track_output"
     return 1
   fi
-  # Goa trance must not appear. Flamenco may or may not appear (depends on enabled flag).
+  # Bossa nova must not appear. Flamenco may or may not appear (depends on enabled flag).
 }

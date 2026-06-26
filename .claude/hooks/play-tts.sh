@@ -206,8 +206,8 @@ if [[ -n "$LLM_PROVIDER" ]]; then
       done < "$_cfg"
     fi
   done
-  # Apply LLM voice (only if no explicit voice override)
-  if [[ -n "$_LLM_VOICE" && -z "$VOICE_OVERRIDE" ]]; then
+  # Apply LLM voice (only if no explicit voice override, and not in effects-preview mode)
+  if [[ -n "$_LLM_VOICE" && -z "$VOICE_OVERRIDE" && -z "${AGENTVIBES_EFFECTS_PREVIEW:-}" ]]; then
     VOICE_OVERRIDE="$_LLM_VOICE"
   fi
   # Export LLM key for child scripts (process-local, not system-wide)
@@ -264,6 +264,17 @@ case "$ACTIVE_PROVIDER" in
     fi
     ;;
 esac
+
+# AGENTVIBES_FORCE_PROVIDER: set by agentvibes-receiver.sh to honour the
+# provider field in the incoming JSON payload (e.g. kokoro, elevenlabs).
+# Only applies when the locally-configured provider is still the default "piper"
+# so a receiver that has tts-provider.txt set keeps its own preference.
+if [[ -n "${AGENTVIBES_FORCE_PROVIDER:-}" && "$ACTIVE_PROVIDER" == "piper" ]]; then
+  case "$AGENTVIBES_FORCE_PROVIDER" in
+    piper|soprano|macos|windows-sapi|kokoro|elevenlabs)
+      ACTIVE_PROVIDER="$AGENTVIBES_FORCE_PROVIDER" ;;
+  esac
+fi
 
 # Per-LLM SSH override: if the current LLM has mode=remote in transport-config.json,
 # write a one-shot env override so play-tts-ssh-remote.sh uses that LLM's SSH config.
@@ -350,6 +361,43 @@ if [[ "${AGENTVIBES_VERBOSE:-0}" == "1" ]]; then
   echo "provider=${ACTIVE_PROVIDER}" >&2
 fi
 
+# @function _play_windows_sapi
+# @intent Speak via the built-in Windows SAPI engine from a POSIX shell
+# @why On Windows git-bash the `sapi`/`windows-sapi` provider has no native bash
+#      player; delegate to the PowerShell SAPI script so the engine selector's
+#      `sapi` id no longer dead-ends in "Unknown provider".
+# @param $1 text to speak
+# @param $2 voice override (optional)
+_play_windows_sapi() {
+  local text="$1"
+  local voice="${2:-}"
+
+  # Sibling hooks-windows/ holds the PowerShell players. Prefer the short name,
+  # fall back to the legacy windows-prefixed one.
+  local ps1="$SCRIPT_DIR/../hooks-windows/play-tts-sapi.ps1"
+  [[ -f "$ps1" ]] || ps1="$SCRIPT_DIR/../hooks-windows/play-tts-windows-sapi.ps1"
+  if [[ ! -f "$ps1" ]]; then
+    echo "❌ Windows SAPI player not found beside this hook" >&2
+    return 1
+  fi
+
+  local ps_exe=""
+  local c
+  for c in powershell.exe pwsh.exe powershell pwsh; do
+    if command -v "$c" >/dev/null 2>&1; then ps_exe="$c"; break; fi
+  done
+  if [[ -z "$ps_exe" ]]; then
+    echo "❌ Windows SAPI requires PowerShell (Windows only)" >&2
+    return 1
+  fi
+
+  # PowerShell needs a native Windows path, not a /c/... MSYS path.
+  local win_ps1="$ps1"
+  command -v cygpath >/dev/null 2>&1 && win_ps1="$(cygpath -w "$ps1")"
+
+  "$ps_exe" -NoProfile -ExecutionPolicy Bypass -File "$win_ps1" "$text" "$voice"
+}
+
 # @function speak_text
 # @intent Route text to appropriate TTS provider
 # @why Reusable function for speaking, used by both single and learning modes
@@ -371,6 +419,15 @@ speak_text() {
       ;;
     macos)
       bash "$SCRIPT_DIR/play-tts-macos.sh" "$text" "$voice"
+      ;;
+    elevenlabs)
+      bash "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$text" "$voice"
+      ;;
+    kokoro)
+      bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$text" "$voice"
+      ;;
+    sapi|windows-sapi)
+      _play_windows_sapi "$text" "$voice"
       ;;
     termux-ssh)
       bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
@@ -501,6 +558,16 @@ case "$ACTIVE_PROVIDER" in
     ;;
   macos)
     exec bash "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  elevenlabs)
+    exec bash "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  kokoro)
+    exec bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$TEXT" "$VOICE_OVERRIDE"
+    ;;
+  sapi|windows-sapi)
+    _play_windows_sapi "$TEXT" "$VOICE_OVERRIDE"
+    exit $?
     ;;
   termux-ssh)
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"

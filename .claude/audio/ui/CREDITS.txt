@@ -1,0 +1,16 @@
+AgentVibes — bundled UI sound credits
+=====================================
+
+bling-success.wav
+  Title:   "Ui sounds - Shimmering success"
+  Author:  Philip_Berger
+  Source:  https://freesound.org/people/Philip_Berger/sounds/648212/
+  License: Creative Commons 0 (CC0 1.0 Universal — public domain dedication)
+           https://creativecommons.org/publicdomain/zero/1.0/
+
+  CC0 places no requirements on use, modification, distribution, or
+  commercial use, and requires no attribution. This credit is provided
+  voluntarily as a courtesy to the author. Compatible with the project's
+  Apache-2.0 license.
+
+  Used as the local "preview ready" cue in the Kokoro voice picker.

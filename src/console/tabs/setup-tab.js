@@ -37,14 +37,15 @@ import {
 import {
   getAvailableEngines, getEngineStatuses, checkEngineInstalled,
 } from '../../services/tts-engine-service.js';
-import { openReverbPicker, REVERB_PRESETS } from '../widgets/reverb-picker.js';
+import { openReverbPicker, formatEffectLabel } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
+import { renderHelpBar, selectorTitle } from '../widgets/help-bar.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import net from 'node:net';
@@ -52,6 +53,28 @@ import net from 'node:net';
 const _execFileAsync = promisify(execFile);
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
+
+// Resolve a real Unix bash for spawning .sh hooks. On Windows a bare
+// spawn('bash', …) resolves to C:\Windows\System32\bash.exe — that's WSL, which
+// has a different HOME (no AgentVibes key/config), doesn't inherit the Windows
+// env, and can't execute a Windows-path script. Prefer git-bash / msys2 bash.
+let _cachedBash = null;
+function resolveBash() {
+  if (_cachedBash) return _cachedBash;
+  if (process.platform !== 'win32') { _cachedBash = 'bash'; return _cachedBash; }
+  const candidates = [
+    process.env.AGENTVIBES_BASH,
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+    'C:\\msys64\\usr\\bin\\bash.exe',
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) { _cachedBash = c; return _cachedBash; } } catch { /* keep trying */ }
+  }
+  _cachedBash = 'bash'; // last resort
+  return _cachedBash;
+}
 
 let blessed;
 if (!IS_TEST) {
@@ -91,10 +114,60 @@ const FOOTER_TEXT = '[Enter] Continue  [Esc] Back  [Tab] Next Tab  [Q] Quit';
 // Maps non-Piper engine IDs to their canonical voice ID and display label.
 // Used by the voice picker, _buildFields display, and auto-save logic.
 const NATIVE_ENGINE_VOICES = {
-  soprano:     { id: 'soprano',   label: 'Soprano'      },
-  sapi:        { id: 'sapi',      label: 'Windows SAPI' },
-  'macos-say': { id: 'macos-say', label: 'macOS Say'    },
+  soprano:     { id: 'soprano',         label: 'Soprano'                  },
+  sapi:        { id: 'sapi',            label: 'Windows SAPI'             },
+  'macos-say': { id: 'macos-say',       label: 'macOS Say'                },
+  // elevenlabs is handled by its own multi-voice picker (see ELEVENLABS_VOICES);
+  // the id here is the default voice assigned when the engine is first selected.
+  elevenlabs:  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'ElevenLabs'           },
 };
+
+// Static built-in ElevenLabs premade voices — universal to every ElevenLabs
+// account. The stored config value is the raw ElevenLabs voice_id; the TTS hook
+// accepts raw IDs directly (its ^[a-zA-Z0-9]{10,40}$ path), so there is no
+// name→id map to keep in sync. Custom/cloned account voices are NOT listed here
+// (that needs a live API fetch); add them on elevenlabs.io to use their IDs.
+const ELEVENLABS_DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+const ELEVENLABS_VOICES = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',   gender: 'Female', lang: 'en-US', desc: 'Mature, reassuring'      },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger',   gender: 'Male',   lang: 'en-US', desc: 'Laid-back, casual'       },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura',   gender: 'Female', lang: 'en-US', desc: 'Enthusiast, quirky'      },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'Male',   lang: 'en-AU', desc: 'Deep, confident'         },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',  gender: 'Male',   lang: 'en-GB', desc: 'Warm storyteller'        },
+  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum',  gender: 'Male',   lang: 'en-US', desc: 'Husky trickster'         },
+  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River',   gender: '',       lang: 'en-US', desc: 'Relaxed, neutral'        },
+  { id: 'SOYHLrjzK2X1ezoPC6cr', name: 'Harry',   gender: 'Male',   lang: 'en-US', desc: 'Fierce warrior'          },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam',    gender: 'Male',   lang: 'en-US', desc: 'Energetic creator'       },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',   gender: 'Female', lang: 'en-GB', desc: 'Clear educator'          },
+  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'Female', lang: 'en-US', desc: 'Knowledgable, pro'       },
+  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will',    gender: 'Male',   lang: 'en-US', desc: 'Relaxed optimist'        },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'Female', lang: 'en-US', desc: 'Playful, bright'         },
+  { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric',    gender: 'Male',   lang: 'en-US', desc: 'Smooth, trustworthy'     },
+  { id: 'hpp4J3VqNfWAUOO0d1Us', name: 'Bella',   gender: 'Female', lang: 'en-US', desc: 'Professional, warm'      },
+  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris',   gender: 'Male',   lang: 'en-US', desc: 'Charming, down-to-earth' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian',   gender: 'Male',   lang: 'en-US', desc: 'Deep, comforting'        },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',  gender: 'Male',   lang: 'en-GB', desc: 'Steady broadcaster'      },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',    gender: 'Female', lang: 'en-GB', desc: 'Velvety actress'         },
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam',    gender: 'Male',   lang: 'en-US', desc: 'Dominant, firm'          },
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill',    gender: 'Male',   lang: 'en-US', desc: 'Wise, mature'            },
+  // ── Added from the ElevenLabs voice library (raw library voice_ids) ───────
+  { id: 'HBDoL4wkcalemIO0nUAu', name: 'Emily',      gender: 'Female', lang: 'en-GB', desc: 'RPG, immersive'    },
+  { id: 'Mtmp3KhFIjYpWYRycDe3', name: 'John',       gender: 'Male',   lang: 'en-US', desc: 'Raspy surfer'      },
+  { id: '8kgj5469z1URcH4MB2G4', name: 'Sakuya',     gender: 'Female', lang: 'en-US', desc: 'Cheerful anime'    },
+  { id: '2ajXGJNYBR0iNHpS4VZb', name: 'Rob',        gender: 'Male',   lang: 'en-GB', desc: 'Tough, gritty'     },
+  { id: 'mMdTuD2nnFiCH88UdXSb', name: 'Jane',       gender: 'Female', lang: 'en-US', desc: 'Cinematic villain' },
+];
+
+/** Returns the friendly name for an ElevenLabs voice_id, or null if unknown. */
+const elevenLabsVoiceName = (id) => ELEVENLABS_VOICES.find(v => v.id === id)?.name || null;
+
+/** Formats a stored voice value for display in the Voice field. */
+function formatVoiceLabel(voice, globalVoice) {
+  if (NATIVE_ENGINE_VOICES[voice]) return NATIVE_ENGINE_VOICES[voice].label;
+  const el = elevenLabsVoiceName(voice);
+  if (el) return `ElevenLabs (${el})`;
+  return voice || `(global: ${globalVoice})`;
+}
 
 // ---------------------------------------------------------------------------
 // Soprano WebUI auto-start helpers
@@ -166,6 +239,47 @@ export function formatGreeting(introText, projectName) {
   return `${name} is ready! Welcome to AgentVibes. Love AgentVibes? We'd really appreciate it if you could give us a star on GitHub.`;
 }
 
+/**
+ * Build `python` args that check whether modules are importable WITHOUT
+ * importing them. `import kokoro` drags in torch (40s+ cold-start on Windows)
+ * and blows short spawn timeouts; find_spec only resolves the module spec and
+ * is ~instant. Pure/testable — caller runs it via spawnSync.
+ * @param {string[]} mods - top-level module names (e.g. ['kokoro','soundfile'])
+ * @returns {string[]} args array for `python <args>`; exit 0 = all present
+ */
+export function buildPyModuleCheckArgs(mods) {
+  const expr = mods.map(m => `u.find_spec('${m}')`).join(' and ');
+  return ['-c', `import importlib.util as u, sys; sys.exit(0 if ${expr} else 1)`];
+}
+
+/**
+ * Build the fire-and-forget "preview ready" cue command for a platform. Pure
+ * (no spawning here, so it is unit-testable). Plays the bundled CC0 wav when
+ * present, else falls back to a system sound (Windows) / freedesktop cue or
+ * terminal bell (POSIX). stdio is ignored by the caller, so the POSIX bell is
+ * redirected to /dev/tty rather than the discarded stdout.
+ * @param {string} platform - process.platform value
+ * @param {string} wavPath - absolute path to the bling wav
+ * @param {boolean} haveWav - whether wavPath exists on disk
+ * @returns {{command: string, args: string[]}}
+ */
+export function buildBlingCommand(platform, wavPath, haveWav) {
+  if (platform === 'win32') {
+    const ps = haveWav
+      ? `Add-Type -AssemblyName System.Windows.Forms; (New-Object System.Media.SoundPlayer('${wavPath.replace(/'/g, "''")}')).PlaySync()`
+      : '[System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 700';
+    return { command: 'powershell', args: ['-NoProfile', '-Command', ps] };
+  }
+  if (haveWav) {
+    // Pass wavPath as a positional arg ($1) so the path is never interpolated
+    // into the shell string (prevents injection / breakage on special chars).
+    const sh = 'paplay "$1" 2>/dev/null || aplay -q "$1" 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
+    return { command: 'bash', args: ['-c', sh, '--', wavPath] };
+  }
+  const sh = 'paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
+  return { command: 'bash', args: ['-c', sh] };
+}
+
 // ---------------------------------------------------------------------------
 // Dependency detection helpers
 
@@ -204,7 +318,26 @@ async function _checkDependenciesAsync() {
     }
   }
 
-  return { node, npm, piper, soprano: sopranoTts || sopranoWebui, ffmpeg };
+  // Kokoro: check python import (non-fatal if python3 unavailable)
+  // Use find_spec instead of import to avoid slow torch load (which causes ETIMEDOUT on sync checks)
+  const kokoro = await new Promise(resolve => {
+    try {
+      const proc = spawn('python3', ['-c', "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)"], { stdio: 'ignore' }); // NOSONAR
+      const timer = setTimeout(() => { proc.kill(); resolve(false); }, 5000);
+      proc.on('close', code => { clearTimeout(timer); resolve(code === 0); });
+      proc.on('error', () => { clearTimeout(timer); resolve(false); });
+    } catch { resolve(false); }
+  });
+
+  // ElevenLabs: check env var or key file (sync — just a file read)
+  const elevenlabs = Boolean(process.env.ELEVENLABS_API_KEY) || (() => {
+    try {
+      const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+      return fs.existsSync(kf) && fs.readFileSync(kf, 'utf8').trim().length > 0;
+    } catch { return false; }
+  })();
+
+  return { node, npm, piper, soprano: sopranoTts || sopranoWebui, kokoro, elevenlabs, ffmpeg };
 }
 
 // ---------------------------------------------------------------------------
@@ -427,8 +560,19 @@ export function createSetupTab(screen, services) {
 
   function _cycleTtsFocus(dir) {
     const items = _ttsFocusableItems.filter(b => !b.hidden);
-    if (!items.length) return;
-    _ttsFocusIndex = (_ttsFocusIndex + dir + items.length) % items.length;
+    if (!items.length) {
+      _s2ContinueBtn.focus();
+      screen.render();
+      return;
+    }
+    const nextIdx = _ttsFocusIndex + dir;
+    if (dir > 0 && nextIdx >= items.length) {
+      // Tab past last install button → land on Continue
+      _s2ContinueBtn.focus();
+      screen.render();
+      return;
+    }
+    _ttsFocusIndex = (nextIdx + items.length) % items.length;
     items[_ttsFocusIndex].focus();
     screen.render();
   }
@@ -460,21 +604,158 @@ export function createSetupTab(screen, services) {
     }
   }
 
-  let _ttsInstalling = false;
-  async function _handleTtsInstall(engine) {
-    if (!engine.installCmd || _ttsInstalling) return;
-    _ttsInstalling = true;
+  function _openApiKeyInput(engine, row) {
+    const keyFile = path.join(os.homedir(), '.agentvibes', `${engine.id}-key.txt`);
+    const dlg = blessed.box({
+      parent: screen, top: 'center', left: 'center',
+      width: 70, height: 11,
+      border: { type: 'line' }, tags: true,
+      label: ` {bold}{cyan-fg} ${engine.name} — Enter API Key {/cyan-fg}{/bold} `,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    dlg.setFront();
 
-    // Show installing status
-    const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
-    if (row) {
-      row.statusLabel.setContent('{yellow-fg}[Installing...]{/yellow-fg}');
+    blessed.text({
+      parent: dlg, top: 1, left: 2, tags: true,
+      content: `{white-fg}Paste your ${engine.name} API key (saved to ${keyFile}):{/white-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+
+    const inputBox = blessed.textbox({
+      parent: dlg, top: 3, left: 2, right: 2, height: 3,
+      border: { type: 'line' },
+      style: { fg: 'white', bg: 'black', border: { fg: 'blue' }, focus: { border: { fg: 'cyan' } } },
+    });
+
+    blessed.text({
+      parent: dlg, top: 7, left: 2, tags: true,
+      content: '{#9e9e9e-fg}[Enter] Save  [Esc] Cancel{/#9e9e9e-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _closed = false;
+    const _prevGrabKeys = screen.grabKeys;
+
+    function _close(save) {
+      if (_closed) return;
+      _closed = true;
+      inputBox.removeAllListeners('keypress');
+      screen.grabKeys = _prevGrabKeys;
+      screen.program.hideCursor();
+      // Balance the openModal() below so the global Escape/nav handlers see the
+      // correct modal depth once this dialog is gone.
+      navigationService?.closeModal();
+      dlg.destroy();
+      if (save) {
+        const key = (inputBox.value || '').trim();
+        if (key.length > 0) {
+          try {
+            fs.mkdirSync(path.join(os.homedir(), '.agentvibes'), { recursive: true });
+            fs.writeFileSync(keyFile, key + '\n', { mode: 0o600 });
+            if (row) {
+              row.statusLabel.setContent('{green-fg}[Installed]{/green-fg}');
+              row.installBtn.hide();
+            }
+          } catch (e) {
+            if (row) row.statusLabel.setContent(`{red-fg}[Save failed: ${e.message}]{/red-fg}`);
+          }
+        }
+      }
+      // Return focus to the TTS engine list so arrow/Tab/Escape work again.
+      const _visible = _ttsFocusableItems.filter(b => !b.hidden);
+      const _target = (row && row.installBtn && !row.installBtn.hidden) ? row.installBtn : _visible[0];
+      _target?.focus();
       screen.render();
     }
 
+    // Register as a modal so the global Escape handlers (setup-tab line ~4610 and
+    // navigation.js) recognise this dialog. Without this, isModalOpen() stays
+    // false and Escape navigates the wizard back a screen while leaving this box
+    // orphaned with grabKeys stuck on — trapping the user. forceCloseAll() will
+    // invoke this close callback to dismiss the dialog cleanly.
+    navigationService?.openModal(null, () => _close(false));
+
+    let _cursor = 0;
+    inputBox.value = '';
+
+    function _renderInput() {
+      const val = inputBox.value;
+      const lpos = inputBox._getCoords();
+      if (!lpos) { screen.render(); return; }
+      const contentWidth = Math.max(1, (lpos.xl - lpos.xi) - inputBox.iwidth);
+      const start = _cursor > contentWidth - 1 ? _cursor - contentWidth + 1 : 0;
+      // Mask the API key on screen — render bullets while inputBox.value keeps
+      // the real key. This is the API-key dialog (engine.requiresApiKey).
+      inputBox.setContent('•'.repeat(val.length).slice(start));
+      screen.render();
+      screen.program.cup(lpos.yi + inputBox.itop, lpos.xi + inputBox.ileft + (_cursor - start));
+    }
+
+    screen.grabKeys = true;
+    inputBox.on('keypress', (ch, key) => {
+      if (key.name === 'enter') { _close(true); return; }
+      if (key.name === 'escape') { _close(false); return; }
+      if (key.name === 'backspace') {
+        if (_cursor > 0) { inputBox.value = inputBox.value.slice(0, _cursor - 1) + inputBox.value.slice(_cursor); _cursor--; }
+      } else if (key.name === 'delete') {
+        if (_cursor < inputBox.value.length) { inputBox.value = inputBox.value.slice(0, _cursor) + inputBox.value.slice(_cursor + 1); }
+      } else if (key.name === 'left') {
+        if (_cursor > 0) _cursor--;
+      } else if (key.name === 'right') {
+        if (_cursor < inputBox.value.length) _cursor++;
+      } else if (key.name === 'home') {
+        _cursor = 0;
+      } else if (key.name === 'end') {
+        _cursor = inputBox.value.length;
+      } else if (ch && !key.ctrl && !key.meta) {
+        // Strip CR/LF from pasted text and advance the cursor by the full
+        // inserted length (a multi-char paste otherwise desyncs the cursor).
+        const ins = ch.replace(/[\r\n]/g, '');
+        inputBox.value = inputBox.value.slice(0, _cursor) + ins + inputBox.value.slice(_cursor);
+        _cursor += ins.length;
+      }
+      _renderInput();
+    });
+
+    dlg.once('destroy', () => {
+      if (!_closed) { _closed = true; inputBox.removeAllListeners('keypress'); screen.grabKeys = _prevGrabKeys; screen.program.hideCursor(); navigationService?.closeModal(); }
+    });
+
+    inputBox.focus();
+    screen.program.showCursor();
+    _renderInput();
+  }
+
+  let _ttsInstalling = false;
+  async function _handleTtsInstall(engine) {
+    if (!engine.installCmd || _ttsInstalling) return;
+
+    // ElevenLabs requires an API key — show a key-entry dialog instead of running a shell command
+    if (engine.requiresApiKey) {
+      const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
+      _openApiKeyInput(engine, row);
+      return;
+    }
+
+    _ttsInstalling = true;
+
+    const row = _ttsEngineRows.find(r => r.engine.id === engine.id);
+    const spinFrames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+    let spinIdx = 0;
+    const spinTimer = setInterval(() => {
+      if (row) {
+        row.statusLabel.setContent(`{yellow-fg}${spinFrames[spinIdx % spinFrames.length]} Installing...{/yellow-fg}`);
+        screen.render();
+      }
+      spinIdx++;
+    }, 100);
+
     try {
-      const opts = { stdio: 'pipe', timeout: 120000 };
-      if (process.platform === 'win32') {
+      const opts = { stdio: 'pipe', timeout: 1800000 };
+      if (engine.installSpec) {
+        // Structured form — space-safe, no shell (FIX: installCmd.split(' ') corrupted paths with spaces)
+        await _execFileAsync(engine.installSpec.cmd, engine.installSpec.args, opts);
+      } else if (process.platform === 'win32') {
         opts.shell = true;
         await _execFileAsync(engine.installCmd, [], opts);
       } else {
@@ -482,7 +763,7 @@ export function createSetupTab(screen, services) {
         await _execFileAsync(parts[0], parts.slice(1), opts);
       }
 
-      // Re-check and update status
+      clearInterval(spinTimer);
       const installed = checkEngineInstalled(engine.id);
       if (row) {
         row.statusLabel.setContent(installed
@@ -491,6 +772,7 @@ export function createSetupTab(screen, services) {
         if (installed) row.installBtn.hide();
       }
     } catch (err) {
+      clearInterval(spinTimer);
       if (row) {
         row.statusLabel.setContent(`{red-fg}[Failed]{/red-fg}`);
       }
@@ -504,6 +786,15 @@ export function createSetupTab(screen, services) {
     if (_screen < 3) { _screen++; _showCurrentScreen(); }
   });
   _s2ContinueBtn.hidden = true;
+  _s2ContinueBtn.key(['right', 'enter'], () => { if (_screen < 3) { _screen++; _showCurrentScreen(); } });
+  _s2ContinueBtn.key(['S-tab', 'up'], () => {
+    const items = _ttsFocusableItems.filter(b => !b.hidden);
+    if (items.length) {
+      _ttsFocusIndex = items.length - 1;
+      items[_ttsFocusIndex].focus();
+      screen.render();
+    }
+  });
 
   // =========================================================================
   // SCREEN 3: LLM Providers (new — from llm-providers-tab)
@@ -862,12 +1153,9 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
+        { key: 'voice',       label: 'Voice',        getValue: () => formatVoiceLabel(draft.voice, globalVoice) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-        { key: 'reverb',      label: 'Reverb',       getValue: () => {
-          const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
-          return p ? p.label : draft.reverbPreset || 'Off';
-        }},
+        { key: 'audioEffects', label: 'Audio Effects', getValue: () => formatEffectLabel(draft.reverbPreset) },
         { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
         { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
         { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
@@ -881,8 +1169,8 @@ export function createSetupTab(screen, services) {
           return `✏  ${h}${p}${k}`;
         }});
         if (draft.connType === 'manual') {
-          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
-          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{gray-fg}(default: 22){/gray-fg}' });
+          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{#9e9e9e-fg}(optional){/#9e9e9e-fg}' });
+          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{#9e9e9e-fg}(default: 22){/#9e9e9e-fg}' });
         }
       }
       return base;
@@ -979,7 +1267,15 @@ export function createSetupTab(screen, services) {
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       const sampleText = 'This is how your Hermes audio settings sound right now.';
       let cmd, args;
-      if (isWin) {
+      if (draft.ttsEngine === 'elevenlabs') {
+        // ElevenLabs has no Windows provider; route through the bash orchestrator
+        // (play-tts.sh) so pretext, effects, and background music all apply. It then
+        // dispatches to the ElevenLabs provider for synthesis.
+        const script = path.join(packageDir, '.claude', 'hooks', 'play-tts.sh');
+        cmd = resolveBash();
+        args = [script, sampleText, draft.voice || ELEVENLABS_DEFAULT_VOICE_ID,
+                '--llm', 'hermes', '--project-dir', targetDir];
+      } else if (isWin) {
         const script = path.join(targetDir, '.claude', hooksSubdir, 'play-tts.ps1');
         cmd = 'powershell';
         args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', 'hermes'];
@@ -990,7 +1286,10 @@ export function createSetupTab(screen, services) {
       }
       const proc = spawn(cmd, args, {
         stdio: 'ignore', windowsHide: true,
-        env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        env: {
+          ...process.env, CLAUDE_PROJECT_DIR: targetDir,
+          ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
+        },
       });
       _previewModalProc = proc;
       proc.on('exit', (code) => {
@@ -1063,8 +1362,16 @@ export function createSetupTab(screen, services) {
         case 'ttsEngine':      _openTtsEnginePicker(draft, _refreshField);      break;
         case 'voice':          _openVoicePickerForLlm(draft, _refreshField);    break;
         case 'pretext':        _openPretextEditor(modal, draft, _refreshField); break;
-        case 'reverb':
-          openReverbPicker(screen, draft.reverbPreset, (val) => { draft.reverbPreset = val; _refreshField(); }, _cancelField, { applyToEffectsManager: false });
+        case 'audioEffects':
+          openReverbPicker(screen, draft.reverbPreset, (val) => { draft.reverbPreset = val; _refreshField(); }, _cancelField, {
+            applyToEffectsManager: false,
+            previewHooksDir: path.join(packageDir, '.claude', 'hooks'),
+            previewLlmKey: 'hermes',
+            previewTargetDir: targetDir,
+            previewVoice: draft.voice,
+            previewBashBin: resolveBash(),
+            previewForceProvider: draft.ttsEngine === 'elevenlabs' ? 'elevenlabs' : undefined,
+          });
           break;
         case 'bgTrack':
           openTrackPicker(screen, draft.bgTrack, Math.round(parseFloat(draft.bgVolume) * 100), (track) => { draft.bgTrack = track; _refreshField(); }, _cancelField, { skipVolume: true });
@@ -1316,7 +1623,7 @@ export function createSetupTab(screen, services) {
     const known   = _getKnownHosts().filter(h => !aliases.includes(h));  // avoid duplicates
 
     // Build display items — aliases first (they carry key/port in ~/.ssh/config)
-    const aliasItems = aliases.map(a => `  📋 ${a}  {gray-fg}(SSH alias){/gray-fg}`);
+    const aliasItems = aliases.map(a => `  📋 ${a}  {#9e9e9e-fg}(SSH alias){/#9e9e9e-fg}`);
     const knownItems = known.map(h => `  ${h}`);
     const allItems   = [...aliasItems, ...knownItems, '  ✏  Enter manually…'];
 
@@ -1389,7 +1696,7 @@ export function createSetupTab(screen, services) {
       border: { type: 'line' }, tags: true,
       label: ' {bold}{cyan-fg} SSH Connection {/cyan-fg}{/bold} ',
       items: [
-        `  📋 SSH Alias   — pick from ~/.ssh/config${hasAliases ? '' : '  {gray-fg}(none found){/gray-fg}'}`,
+        `  📋 SSH Alias   — pick from ~/.ssh/config${hasAliases ? '' : '  {#9e9e9e-fg}(none found){/#9e9e9e-fg}'}`,
         '  ✏  Manual      — enter host, key, and port',
       ],
       style: {
@@ -1517,8 +1824,8 @@ export function createSetupTab(screen, services) {
         return `✏  ${h}${p}${k}`;
       }}];
       if (draft.connType === 'manual') {
-        base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
-        base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || provider.defaultPort || '{gray-fg}(default){/gray-fg}' });
+        base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{#9e9e9e-fg}(optional){/#9e9e9e-fg}' });
+        base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || provider.defaultPort || '{#9e9e9e-fg}(default){/#9e9e9e-fg}' });
       }
       return base;
     }
@@ -1586,7 +1893,7 @@ export function createSetupTab(screen, services) {
         // Refresh status text below provider name
         const row = transportRows.find(r => r.id === provider.id);
         if (row && draft.host) {
-          row.statusText.setContent(`{gray-fg}→ ${draft.host}:${draft.port}{/gray-fg}`);
+          row.statusText.setContent(`{#9e9e9e-fg}→ ${draft.host}:${draft.port}{/#9e9e9e-fg}`);
           screen.render();
         }
       }).catch(() => {});
@@ -1611,7 +1918,7 @@ export function createSetupTab(screen, services) {
         ? spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText], { // NOSONAR
             stdio: 'ignore', windowsHide: true, env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
           })
-        : spawn('bash', [script, sampleText], { // NOSONAR
+        : spawn(resolveBash(), [script, sampleText], { // NOSONAR
             stdio: 'ignore', env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
           });
       _previewProc = proc;
@@ -1742,12 +2049,9 @@ export function createSetupTab(screen, services) {
     function _buildFields() {
       const base = [
         { key: 'ttsEngine',   label: 'TTS Engine',  getValue: () => draft.ttsEngine || `(global: ${globalEngine})` },
-        { key: 'voice',       label: 'Voice',        getValue: () => NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || `(global: ${globalVoice})`) },
+        { key: 'voice',       label: 'Voice',        getValue: () => formatVoiceLabel(draft.voice, globalVoice) },
         { key: 'pretext',     label: 'Pretext',      getValue: () => draft.pretext || '(none)' },
-        { key: 'reverb',      label: 'Reverb',       getValue: () => {
-          const p = REVERB_PRESETS.find(r => r.value === draft.reverbPreset);
-          return p ? p.label : draft.reverbPreset || 'Off';
-        }},
+        { key: 'audioEffects', label: 'Audio Effects', getValue: () => formatEffectLabel(draft.reverbPreset) },
         { key: 'bgTrack',     label: 'Music Track',  getValue: () => formatTrackName(draft.bgTrack) || '(default)' },
         { key: 'bgVolume',    label: 'Music Vol',    getValue: () => `${Math.round(parseFloat(draft.bgVolume) * 100)}%` },
         { key: 'destination', label: 'Destination',  getValue: () => draft.mode === 'remote' ? '🌐 Remote (SSH)' : '🏠 Local' },
@@ -1761,8 +2065,8 @@ export function createSetupTab(screen, services) {
           return `✏  ${h}${p}${k}`;
         }});
         if (draft.connType === 'manual') {
-          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{gray-fg}(optional){/gray-fg}' });
-          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{gray-fg}(default: 22){/gray-fg}' });
+          base.push({ key: 'sshKey', label: 'SSH Key', getValue: () => draft.sshKey || '{#9e9e9e-fg}(optional){/#9e9e9e-fg}' });
+          base.push({ key: 'port',   label: 'Port',    getValue: () => draft.port   || '{#9e9e9e-fg}(default: 22){/#9e9e9e-fg}' });
         }
       }
       return base;
@@ -1899,7 +2203,15 @@ export function createSetupTab(screen, services) {
 
       function _doSpawnPreview() {
         let cmd, args;
-        if (isWin) {
+        if (draft.ttsEngine === 'elevenlabs') {
+          // ElevenLabs has no Windows provider; route through the bash orchestrator
+          // (play-tts.sh) so pretext, effects, and background music all apply. It then
+          // dispatches to the ElevenLabs provider for synthesis.
+          const script = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
+          cmd = resolveBash();
+          args = [script, sampleText, draft.voice || ELEVENLABS_DEFAULT_VOICE_ID,
+                  '--llm', llmKey, '--project-dir', targetDir];
+        } else if (isWin) {
           const script = path.join(_hooksBase, '.claude', hooksSubdir, 'play-tts.ps1');
           cmd = 'powershell';
           args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, sampleText, '', '-llm', llmKey];
@@ -1911,7 +2223,10 @@ export function createSetupTab(screen, services) {
         const proc = spawn(cmd, args, {
           stdio: 'ignore',
           windowsHide: true,
-          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}` },
+          env: {
+            ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}`,
+            ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
+          },
         });
         _previewModalProc = proc;
 
@@ -2058,11 +2373,19 @@ export function createSetupTab(screen, services) {
           _openPretextEditor(modal, draft, _refreshField);
           break;
 
-        case 'reverb':
+        case 'audioEffects':
           openReverbPicker(screen, draft.reverbPreset, (val) => {
             draft.reverbPreset = val;
             _refreshField();
-          }, _cancelField, { applyToEffectsManager: false });
+          }, _cancelField, {
+            applyToEffectsManager: false,
+            previewHooksDir: path.join(packageDir, '.claude', 'hooks'),
+            previewLlmKey: llmKey,
+            previewTargetDir: targetDir,
+            previewVoice: draft.voice,
+            previewBashBin: resolveBash(),
+            previewForceProvider: draft.ttsEngine === 'elevenlabs' ? 'elevenlabs' : undefined,
+          });
           break;
 
         case 'bgTrack':
@@ -2150,7 +2473,7 @@ export function createSetupTab(screen, services) {
   function _openTtsEnginePicker(draft, onDone) {
     function _closePicker() {
       navigationService?.closeModal();
-      destroyList(picker, screen);
+      destroyList(box, screen);
       onDone();
     }
     navigationService?.openModal(null, _closePicker);
@@ -2163,36 +2486,81 @@ export function createSetupTab(screen, services) {
     // Add "(global default)" option at top
     items.unshift('  (global default)');
 
-    const picker = blessed.list({
+    // Standardized chrome: titled box + pinned top help bar; selecting an engine
+    // is not audible, so no preview hint.
+    const ENGINE_TITLE = selectorTitle('Text To Speech (TTS) Engine');
+    const box = blessed.box({
       parent: screen,
       top: 'center',
       left: 'center',
       width: 70,
-      height: Math.min(items.length + 4, 16),
+      height: Math.min(items.length + 5, 17),
       border: { type: 'line' },
       tags: true,
-      label: ' {bold}{cyan-fg} Select TTS Engine {/cyan-fg}{/bold} ',
+      label: ENGINE_TITLE,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    box.setFront();
+    blessed.text({
+      parent: box, top: 0, left: 1, right: 1, height: 1, tags: true,
+      content: renderHelpBar([{ key: 'Enter', label: 'select' }, { key: 'Esc', label: 'cancel' }]),
+      style: { bg: COLORS.contentBg },
+    });
+
+    const picker = blessed.list({
+      parent: box,
+      top: 1,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      tags: true,
+      items,
       keys: true,
       vi: false,
       mouse: true,
       style: {
         fg: COLORS.labelFg,
         bg: COLORS.contentBg,
-        border: { fg: 'cyan' },
         selected: { bg: 'blue', fg: 'yellow' },
         item: { fg: COLORS.labelFg },
       },
     });
-    picker.setFront();
-    picker.setItems(items);
 
     picker.key(['enter'], () => {
       const idx = picker.selected;
-      const selectedEngine = idx === 0 ? '' : engines[idx - 1].id;
+      // idx 0 = "(global default)"; idx 1..N map to engines[idx-1]. Guard the
+      // bounds so a stray/out-of-range selection can never read .id of undefined.
+      const engine = idx > 0 ? engines[idx - 1] : null;
+      if (idx > 0 && !engine) { _closePicker(); return; }
+      const selectedEngine = engine ? engine.id : '';
+      // Guard: block selection of non-installed optional engines
+      if (selectedEngine) {
+        const engineStatus = engines.find(e => e.id === selectedEngine);
+        if (engineStatus && !engineStatus.installed && !engineStatus.native) {
+          box.setLabel(` {red-fg} ${engineStatus.name} is not installed — go to Setup > TTS Engines to install {/red-fg} `);
+          screen.render();
+          setTimeout(() => {
+            if (!box.destroyed) {
+              box.setLabel(ENGINE_TITLE);
+              screen.render();
+            }
+          }, 3000);
+          return;
+        }
+      }
       draft.ttsEngine = selectedEngine;
       // Auto-set voice to native engine canonical ID so the Voice field updates
       // immediately. For piper or empty engine, clear to '' (shows global default).
-      draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
+      if (selectedEngine === 'elevenlabs') {
+        // Keep an already-chosen ElevenLabs voice — a known built-in OR any raw
+        // 20-char ElevenLabs voice_id (a custom/library voice the user configured
+        // that isn't in our static list). Otherwise assign the default.
+        const looksLikeElId = /^[A-Za-z0-9]{10,40}$/.test(draft.voice || '');
+        draft.voice = (elevenLabsVoiceName(draft.voice) || looksLikeElId)
+          ? draft.voice : ELEVENLABS_DEFAULT_VOICE_ID;
+      } else {
+        draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
+      }
       _closePicker();
     });
 
@@ -2202,7 +2570,1040 @@ export function createSetupTab(screen, services) {
     screen.render();
   }
 
+  // ── API Key Warning Popup ─────────────────────────────────────────────────
+  // Non-blocking warning when a cloud TTS provider needs an API key.
+  // Shows on top of whatever is currently open; calls onDismiss() when closed.
+  function _showApiKeyWarning(serviceName, envVarName, keyFilePath, onDismiss) {
+    const warningBox = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 66,
+      height: 11,
+      border: { type: 'line' },
+      tags: true,
+      label: ` {bold}{yellow-fg} ${serviceName} — API Key Not Detected {/yellow-fg}{/bold} `,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'yellow' } },
+    });
+    warningBox.setFront();
+
+    blessed.text({
+      parent: warningBox, top: 1, left: 2, right: 2, tags: true,
+      content: `{yellow-fg}No API key found for ${serviceName}.{/yellow-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: warningBox, top: 3, left: 2, right: 2, tags: true,
+      content: `Set it in your shell:\n  {cyan-fg}export ${envVarName}=your_key_here{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: warningBox, top: 6, left: 2, right: 2, tags: true,
+      content: `Or write the key to:\n  {cyan-fg}${keyFilePath}{/cyan-fg}`,
+      style: { bg: COLORS.contentBg },
+    });
+    blessed.text({
+      parent: warningBox, bottom: 1, left: 2, right: 2, tags: true,
+      content: '{#9e9e9e-fg}[Enter] or [Esc] to dismiss{/#9e9e9e-fg}',
+      style: { bg: COLORS.contentBg },
+    });
+
+    let _warnClosed = false;
+    function _closeWarning() {
+      if (_warnClosed) return;
+      _warnClosed = true;
+      // Balance the openModal() below so a tab-switch forceCloseAll() that
+      // invokes this callback tears the warning down cleanly instead of
+      // orphaning it over the destroyed picker.
+      navigationService?.closeModal();
+      destroyList(warningBox, screen);
+      onDismiss();
+    }
+
+    warningBox.key(['enter', 'escape', 'space', 'q', 'Q'], _closeWarning);
+    warningBox.on('click', _closeWarning);
+    // Register as a modal so forceCloseAll() dismisses this dialog rather than
+    // leaving it orphaned when the underlying picker is destroyed.
+    navigationService?.openModal(null, _closeWarning);
+    warningBox.focus();
+    screen.render();
+  }
+
   // ── Voice picker for LLM config (matches agents-tab pattern) ──────────────
+
+  // ── Kokoro voice scanner ─────────────────────────────────────────────────
+  // Full static list for Kokoro v0.9.x. Voices not yet cached are downloaded
+  // automatically by the library on first use via huggingface-hub.
+  const _KOKORO_ALL_VOICES = [
+    // American English female
+    'af_heart','af_alloy','af_aoede','af_bella','af_jessica',
+    'af_kore','af_nicole','af_nova','af_river','af_sarah','af_sky',
+    // American English male
+    'am_adam','am_echo','am_eric','am_fenrir','am_liam','am_michael','am_onyx','am_puck',
+    // British English female
+    'bf_alice','bf_emma','bf_isabella','bf_lily',
+    // British English male
+    'bm_daniel','bm_fable','bm_george','bm_lewis',
+    // Japanese
+    'jf_alpha','jf_gongitsune','jf_nezumi','jf_tebukuro','jm_kumo',
+    // Mandarin Chinese
+    'zf_xiaobei','zf_xiaoni','zf_xiaoxiao','zf_xiaoyi','zm_yunxi','zm_yunxia','zm_yunyang',
+    // Spanish
+    'ef_dora','em_alex','em_santa',
+    // French
+    'ff_siwis',
+    // Hindi
+    'hf_alpha','hm_omega',
+    // Italian
+    'if_sara','im_nicola',
+    // Brazilian Portuguese
+    'pf_dora','pm_alex','pm_santa',
+    // Korean
+    'kf_alpha','km_hyunsu',
+  ];
+
+  function _scanKokoroVoices() {
+    // Determine which voices are already cached locally
+    const cached = new Set();
+    try {
+      const snapshotsDir = path.join(
+        os.homedir(), '.cache', 'huggingface', 'hub',
+        'models--hexgrad--Kokoro-82M', 'snapshots'
+      );
+      for (const snap of fs.readdirSync(snapshotsDir)) {
+        const voicesDir = path.join(snapshotsDir, snap, 'voices');
+        if (!fs.existsSync(voicesDir)) continue;
+        for (const f of fs.readdirSync(voicesDir)) {
+          if (f.endsWith('.pt')) cached.add(f.replace('.pt', ''));
+        }
+      }
+    } catch {}
+    return { voices: _KOKORO_ALL_VOICES, cached };
+  }
+
+  // Kokoro voice-id prefix → { language, gender } so they render as SEPARATE,
+  // identically-styled columns (gender colored) like the other providers.
+  const KOKORO_LANG = {
+    af: { lang: 'en-US', gender: 'Female' }, am: { lang: 'en-US', gender: 'Male' },
+    bf: { lang: 'en-GB', gender: 'Female' }, bm: { lang: 'en-GB', gender: 'Male' },
+    jf: { lang: 'ja',    gender: 'Female' }, jm: { lang: 'ja',    gender: 'Male' },
+    zf: { lang: 'zh',    gender: 'Female' }, zm: { lang: 'zh',    gender: 'Male' },
+    ef: { lang: 'es',    gender: 'Female' }, em: { lang: 'es',    gender: 'Male' },
+    ff: { lang: 'fr',    gender: 'Female' }, fm: { lang: 'fr',    gender: 'Male' },
+    hf: { lang: 'hi',    gender: 'Female' }, hm: { lang: 'hi',    gender: 'Male' },
+    pf: { lang: 'pt',    gender: 'Female' }, pm: { lang: 'pt',    gender: 'Male' },
+    kf: { lang: 'ko',    gender: 'Female' }, km: { lang: 'ko',    gender: 'Male' },
+    if: { lang: 'it',    gender: 'Female' }, im: { lang: 'it',    gender: 'Male' },
+  };
+  function _kokoroVoiceMeta(id) {
+    const m = KOKORO_LANG[id.slice(0, 2)] || { lang: id.slice(0, 2), gender: '' };
+    const name = id.slice(3);
+    return { displayName: name.charAt(0).toUpperCase() + name.slice(1), lang: m.lang, gender: m.gender };
+  }
+
+  function _openKokoroVoicePicker(draft, onDone, llmKey = '') {
+    const { voices, cached } = _scanKokoroVoices();
+
+    // Detect the correct Python command for this platform (Windows: python / py, Unix: python3)
+    let _pythonCmd = 'python3';
+    for (const cmd of process.platform === 'win32' ? ['python', 'python3', 'py'] : ['python3', 'python']) {
+      try {
+        if (spawnSync(cmd, ['--version'], { stdio: 'ignore', timeout: 2000 }).status === 0) { // NOSONAR
+          _pythonCmd = cmd;
+          break;
+        }
+      } catch {}
+    }
+
+    // Check Python modules are importable WITHOUT importing them. `import kokoro`
+    // drags in torch, which on Windows cold-start takes 40s+ and blows any short
+    // spawnSync timeout — yielding a false "not installed" and a pointless pip run
+    // that sits at 0% ("Requirement already satisfied"). find_spec is ~instant and
+    // only resolves the module spec, so detection stays reliable. (see line ~209)
+    const _pyHasModules = (mods) =>
+      spawnSync(_pythonCmd, buildPyModuleCheckArgs(mods), // NOSONAR
+        { stdio: 'ignore', timeout: 5000 }).status === 0;
+
+    // Load favorites from ~/.agentvibes/kokoro-favorites.json
+    let _kokoroFavorites = new Set();
+    try {
+      const favPath = path.join(os.homedir(), '.agentvibes', 'kokoro-favorites.json');
+      _kokoroFavorites = new Set(JSON.parse(fs.readFileSync(favPath, 'utf8')));
+    } catch {}
+
+    let _kClosed = false;
+    let _kPreviewProc = null;
+    let _kTmpWav = null;
+    let _kAnimInterval = null;
+    // Track all spawned download procs (Download-All + CJK/synth fallbacks) so
+    // _killKPreview() can terminate them on close and their exit handlers never
+    // touch a destroyed picker (use-after-destroy crash guard).
+    const _kDlProcs = [];
+
+    // Read SSH config so previews route to the receiver
+    let _sshHost = '', _sshKey = '', _sshPort = '';
+    try {
+      const tcPath = path.join(os.homedir(), '.agentvibes', 'transport-config.json');
+      const tc = JSON.parse(fs.readFileSync(tcPath, 'utf8'));
+
+      // Priority 1: per-LLM remote config (e.g. tc['claude-code'].mode === 'remote')
+      if (llmKey && tc[llmKey]?.mode === 'remote') {
+        _sshHost = tc[llmKey].host || '';
+        _sshKey  = tc[llmKey].sshKey || '';
+        _sshPort = String(tc[llmKey].port || '');
+      }
+
+      // Priority 2: global provider is explicitly ssh-remote/agentvibes-receiver
+      if (!_sshHost) {
+        const provFilePath = path.join(os.homedir(), '.claude', 'tts-provider.txt');
+        const globalProv = fs.readFileSync(provFilePath, 'utf8').trim();
+        if (globalProv === 'ssh-remote' || globalProv === 'agentvibes-receiver') {
+          _sshHost = tc[globalProv]?.host || '';
+          _sshKey  = tc[globalProv]?.sshKey || '';
+          _sshPort = String(tc[globalProv]?.port || '');
+        }
+      }
+
+      // Priority 3: scan all transport-config entries for any mode=remote entry
+      // (mirrors play-tts-ssh-remote.sh Priority 2b — handles the case where
+      // tts-provider.txt says 'piper' but a per-LLM remote route is configured)
+      if (!_sshHost) {
+        for (const val of Object.values(tc)) {
+          if (val?.mode === 'remote' && val?.host) {
+            _sshHost = val.host;
+            _sshKey  = val.sshKey || '';
+            _sshPort = String(val.port || '');
+            break;
+          }
+        }
+      }
+    } catch {}
+
+    // Pre-validate SSH config once so the space handler can branch without re-checking
+    const _validSshHost = Boolean(_sshHost && /^[a-zA-Z0-9][a-zA-Z0-9._@:-]*$/.test(_sshHost));
+    const _validSshKey  = Boolean(_sshKey && /^\//.test(_sshKey) && fs.existsSync(_sshKey));
+    // Empty port => omit AGENTVIBES_SSH_PORT so the sender never forces
+    // "-p 22" and an ~/.ssh/config Host alias keeps its real port (defer to ~/.ssh/config).
+    const _validSshPort = Boolean(_sshPort && /^\d+$/.test(_sshPort));
+
+    const IDLE_LABEL = selectorTitle('Voice');
+
+    function _killKPreview() {
+      _stopKSpinner();
+      if (_kAnimInterval) { clearInterval(_kAnimInterval); _kAnimInterval = null; }
+      if (_kPreviewProc) { try { _kPreviewProc.kill(); } catch {} _kPreviewProc = null; }
+      // Kill any in-flight download procs (Download-All + fallbacks) so their
+      // exit handlers don't fire against a destroyed picker.
+      if (_dlAllProc) { try { _dlAllProc.kill(); } catch {} _dlAllProc = null; }
+      while (_kDlProcs.length) {
+        const p = _kDlProcs.pop();
+        if (p) { try { p.kill(); } catch {} }
+      }
+      if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+    }
+    function _closeKP() {
+      if (_kClosed) return;
+      _kClosed = true;
+      _killKPreview();
+      // _dlAllProc and _dlAllActive are closed via _kClosed check in the dl loop
+      navigationService?.closeModal();
+      destroyList(kBox, screen, onDone);
+    }
+    navigationService?.openModal(null, _closeKP);
+
+    // ✓ = cached locally, ☁ = downloadable, ! = CJK (misaki[lang] missing), ★ = favorited
+    function _isCjkVoice(id) {
+      return ['jf','jm','zf','zm','kf','km'].includes(id.slice(0, 2));
+    }
+    // Returns the misaki extra and the import check for each CJK language group.
+    // ja: misaki[ja] → pyopenjtalk; ko: misaki[ko] → jamo; zh: misaki[zh] → pypinyin
+    function _cjkDeps(id) {
+      const pfx = id.slice(0, 2);
+      if (pfx === 'jf' || pfx === 'jm') return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'Japanese language support' };
+      if (pfx === 'kf' || pfx === 'km') return { pkg: 'misaki[ko]', check: 'jamo',        label: 'Korean language support' };
+      if (pfx === 'zf' || pfx === 'zm') return { pkg: 'misaki[zh]', check: 'pypinyin',    label: 'Chinese language support' };
+      return { pkg: 'misaki[ja]', check: 'pyopenjtalk', label: 'Japanese language support' };
+    }
+
+    // Check which CJK language groups already have their misaki extras installed.
+    // Runs three quick spawnSync checks at picker-open time so icons are accurate.
+    // Keys are the 2-char voice prefixes (jf/jm, kf/km, zf/zm) so _kokoroItem lookup is direct.
+    const _cjkInstalled = new Set();
+    for (const [pfxes, check] of [
+      [['jf', 'jm'], 'pyopenjtalk'],
+      [['kf', 'km'], 'jamo'],
+      [['zf', 'zm'], 'pypinyin'],
+    ]) {
+      if (_pyHasModules([check])) {
+        pfxes.forEach(p => _cjkInstalled.add(p));
+      }
+    }
+
+    // Check if kokoro + soundfile are installed (both required for synthesis)
+    let _kokoroInstalled = _pyHasModules(['kokoro', 'soundfile']);
+
+    function _kokoroItem(id) {
+      const fav  = _kokoroFavorites.has(id) ? '{#FFD700-fg}★{/#FFD700-fg}' : ' ';
+      let mark;
+      if (_isCjkVoice(id) && !_cjkInstalled.has(id.slice(0, 2)))  mark = '{yellow-fg}!{/yellow-fg}';
+      else if (!_kokoroInstalled)                                    mark = '{yellow-fg}!{/yellow-fg}';
+      else if (cached.has(id))                                       mark = '{green-fg}✓{/green-fg}';
+      else                                                         mark = '{cyan-fg}☁{/cyan-fg}';
+      const m = _kokoroVoiceMeta(id);
+      return formatVoiceRow({ status: `${fav} ${mark}`, name: m.displayName, gender: m.gender, lang: m.lang, detail: id });
+    }
+    const items = voices.map(_kokoroItem);
+
+    // Spinner state for Space-preview animation on the item row
+    const _K_SPIN = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+    let _kSpinInterval = null;
+    let _kSpinFrame = 0;
+    let _kSpinningIdx = -1;
+
+    function _startKSpinner(listIdx) {
+      _stopKSpinner();
+      _kSpinningIdx = listIdx;
+      _kSpinFrame = 0;
+      _kSpinInterval = setInterval(() => {
+        if (_kClosed) { _stopKSpinner(); return; }
+        const spin = `{cyan-fg}${_K_SPIN[_kSpinFrame++ % _K_SPIN.length]}{/cyan-fg}`;
+        kPicker.setItem(listIdx, `${_kokoroItem(voices[listIdx])} ${spin}`);
+        screen.render();
+      }, 80);
+    }
+
+    function _stopKSpinner() {
+      if (_kSpinInterval) { clearInterval(_kSpinInterval); _kSpinInterval = null; }
+      if (_kSpinningIdx >= 0 && !_kClosed) {
+        kPicker.setItem(_kSpinningIdx, _kokoroItem(voices[_kSpinningIdx]));
+        screen.render();
+      }
+      _kSpinningIdx = -1;
+    }
+
+    const LEGEND_H = 3;
+    const pickerH = Math.min(voices.length + LEGEND_H + 3, 24);
+
+    // Outer box (border + label) — legend is a fixed child, not part of the scroll list
+    const kBox = blessed.box({
+      parent: screen,
+      top: 'center', left: 'center',
+      width: 78, height: pickerH,
+      border: { type: 'line' }, tags: true,
+      label: IDLE_LABEL,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    kBox.setFront();
+
+    // Fixed legend rows — pinned at top so they never scroll away
+    blessed.text({
+      parent: kBox, top: 0, left: 0, right: 0, height: LEGEND_H, tags: true,
+      // Controls split across two rows so they don't wrap in narrow tmux panes;
+      // third row is the symbol legend.
+      content: renderHelpBar([
+        { key: 'Space', label: 'preview' },
+        { key: 'Enter', label: 'select' },
+        { key: 'Esc', label: 'cancel' },
+      ]) + '\n' + renderHelpBar([
+        { key: '*', label: 'favorite' },
+        { key: 'D', label: 'download all' },
+      ]) + '\n{green-fg}✓{/green-fg}{#9e9e9e-fg}=cached  {/#9e9e9e-fg}{#FFD700-fg}★{/#FFD700-fg}{#9e9e9e-fg}=fav  {/#9e9e9e-fg}{cyan-fg}☁{/cyan-fg}{#9e9e9e-fg}=download  {/#9e9e9e-fg}{yellow-fg}!{/yellow-fg}{#9e9e9e-fg}=needs pip install (kokoro or misaki[lang])',
+      style: { bg: COLORS.contentBg },
+    });
+
+    // Scrollable voice list — starts below the legend row
+    const kPicker = blessed.list({
+      parent: kBox,
+      top: LEGEND_H, left: 0, right: 0, bottom: 0,
+      keys: true, vi: true, mouse: true, tags: true,
+      items,
+      scrollable: true,
+      scrollbar: { ch: '|', style: { fg: 'cyan' } },
+      style: {
+        fg: COLORS.labelFg, bg: COLORS.contentBg,
+        selected: { bg: 'green', fg: 'white', bold: true },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+
+    const curIdx = voices.indexOf(draft.voice);
+    if (curIdx >= 0) kPicker.select(curIdx);
+
+    kPicker.key(['enter'], () => {
+      if (voices.length) draft.voice = voices[kPicker.selected];
+      _closeKP();
+    });
+
+    // Generic pip-install dialog + progress modal. onSuccess() is called after a clean exit
+    // to let callers update icons/state; onCancel() is called when the user dismisses.
+    function _promptInstallPkg(pkg, label, voiceId, onSuccess, onCancel) {
+      const dlg = blessed.box({
+        parent: screen,
+        top: 'center', left: 'center',
+        width: 64, height: 11,
+        border: { type: 'line' }, tags: true,
+        label: ` {yellow-fg}⚠  Missing: ${label}{/yellow-fg} `,
+        content: [
+          '',
+          `  {white-fg}${voiceId}{/white-fg}{#9e9e9e-fg} needs {/#9e9e9e-fg}{cyan-fg}${pkg}{/cyan-fg}{#9e9e9e-fg} to speak.{/#9e9e9e-fg}`,
+          `  {#9e9e9e-fg}Install it now with:{/#9e9e9e-fg}`,
+          `  {cyan-fg}pip install ${pkg}{/cyan-fg}`,
+          '',
+          `  {#9e9e9e-fg}If using SSH receiver, run pip install there too.{/#9e9e9e-fg}`,
+          '',
+          `  {green-fg}[I]{/green-fg}{#9e9e9e-fg}=Install now   {/#9e9e9e-fg}{red-fg}[Esc]{/red-fg}{#9e9e9e-fg}=Cancel`,
+        ].join('\n'),
+        style: { border: { fg: 'yellow' }, bg: '#1a1a2e' },
+      });
+      dlg.focus();
+      navigationService?.openModal(null, () => { closeDlg(); });
+      screen.render();
+
+      const closeDlg = () => { navigationService?.closeModal(); dlg.destroy(); kPicker.focus(); screen.render(); };
+
+      dlg.key(['escape', 'n', 'N'], () => { closeDlg(); onCancel?.(); });
+      dlg.key(['i', 'I', 'y', 'Y', 'enter'], () => {
+        navigationService?.closeModal();
+        dlg.destroy();
+
+        // ── Single persistent install modal: shows progress during install,
+        //    updates to success/failure when done. Enter=OK only after done. ──
+        const _PIP_BAR_W = 22;
+        let _pipPct = 0;
+        let _collecting = 0;
+        let _pipBuf = '';
+        let _pipErrBuf = '';
+        let _mClosed = false;
+        let _installProc = null;
+
+        function _bar(p) {
+          const f = Math.round(p * _PIP_BAR_W / 100);
+          return '{yellow-fg}' + '█'.repeat(f) + '{/yellow-fg}'
+               + '{#555555-fg}' + '░'.repeat(_PIP_BAR_W - f) + '{/#555555-fg}';
+        }
+
+        const iMod = blessed.box({
+          parent: screen,
+          top: 'center', left: 'center',
+          width: 66, height: 9,
+          border: { type: 'line' }, tags: true,
+          label: ` {yellow-fg}⬇  Installing ${pkg}{/yellow-fg} `,
+          style: { border: { fg: 'yellow' }, bg: '#1a1a2e' },
+        });
+
+        function _setContent(barPct, phase, extra, isDone) {
+          const barStr = `  {yellow-fg}⬇{/yellow-fg} [${_bar(barPct)}] {white-fg}${barPct}%{/white-fg} {#9e9e9e-fg}${phase}{/#9e9e9e-fg}`;
+          const footer = isDone
+            ? `  {green-fg}[Enter]{/green-fg}{#9e9e9e-fg} = OK{/#9e9e9e-fg}`
+            : `  {red-fg}[Esc]{/red-fg}{#9e9e9e-fg} = Cancel{/#9e9e9e-fg}`;
+          iMod.setContent([ '', barStr, '', extra, '', footer ].join('\n'));
+          screen.render();
+        }
+
+        _setContent(0, 'starting...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
+        iMod.focus();
+
+        const cancelInstall = () => {
+          if (_mClosed) return;
+          _mClosed = true;
+          if (_installProc && !_installProc.killed) { try { _installProc.kill(); } catch {} }
+          navigationService?.closeModal();
+          iMod.destroy();
+          kBox.setLabel(IDLE_LABEL);
+          setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
+        };
+        navigationService?.openModal(null, cancelInstall);
+        iMod.key(['escape'], cancelInstall);
+        screen.render();
+
+        _installProc = spawn(_pythonCmd, ['-m', 'pip', 'install', '--progress-bar', 'on', ...pkg.split(/\s+/)], { // NOSONAR
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        _installProc.stdout.on('data', (chunk) => {
+          if (_mClosed) return;
+          _pipBuf += chunk.toString('utf8');
+          const parts = _pipBuf.split(/[\r\n]/);
+          _pipBuf = parts.pop() ?? '';
+          for (const rawLine of parts) {
+            // Strip ANSI escape codes — pip on Windows emits them even on non-TTY
+            const line = rawLine.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''); // NOSONAR
+            const dlMatch = line.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(kB|MB|GB)/i);
+            if (dlMatch) {
+              const done = parseFloat(dlMatch[1]), total = parseFloat(dlMatch[2]);
+              if (total > 0) _pipPct = Math.max(_pipPct, Math.round(25 + (done / total) * 55));
+              _setContent(_pipPct, 'downloading...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
+              continue;
+            }
+            const t = line.trim();
+            if (/^Collecting /i.test(t)) {
+              _collecting++;
+              _pipPct = Math.max(_pipPct, Math.min(20, _collecting * 5));
+              _setContent(_pipPct, 'collecting...', `  {cyan-fg}${t}{/cyan-fg}`, false);
+            } else if (/^Requirement already satisfied/i.test(t)) {
+              // Everything already installed — pip emits no Collecting/Downloading,
+              // so without this the bar would freeze at 0% until exit. Show motion.
+              _pipPct = Math.max(_pipPct, 90);
+              _setContent(_pipPct, 'verifying...', `  {#9e9e9e-fg}already satisfied — verifying{/#9e9e9e-fg}`, false);
+            } else if (/Downloading.*\.whl/i.test(t)) {
+              _pipPct = Math.max(_pipPct, 25);
+              _setContent(_pipPct, 'downloading...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
+            } else if (/Building|Running setup|running build/i.test(t)) {
+              _pipPct = Math.max(_pipPct, 75);
+              _setContent(_pipPct, 'building...', `  {cyan-fg}compiling ${pkg} from source{/cyan-fg}`, false);
+            } else if (/Installing collected/i.test(t)) {
+              _pipPct = Math.max(_pipPct, 88);
+              _setContent(_pipPct, 'installing...', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
+            } else if (/Successfully installed/i.test(t)) {
+              _pipPct = 100;
+              _setContent(100, 'done', `  {cyan-fg}pip install ${pkg}{/cyan-fg}`, false);
+            }
+          }
+        });
+
+        _installProc.stderr.on('data', (chunk) => { _pipErrBuf += chunk.toString('utf8'); });
+
+        _installProc.on('exit', (code) => {
+          if (_mClosed) return;
+          const closeOk = () => {
+            if (_mClosed) return;
+            _mClosed = true;
+            navigationService?.closeModal();
+            iMod.destroy();
+            kBox.setLabel(IDLE_LABEL);
+            setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
+          };
+          if (code === 0) {
+            onSuccess?.();
+            iMod.setLabel(` {green-fg}✓  Installed{/green-fg} `);
+            iMod.style.border.fg = 'green';
+            _setContent(100, 'done', `  {green-fg}${pkg}{/green-fg}{#9e9e9e-fg} installed — press Space on {/#9e9e9e-fg}{white-fg}${voiceId}{/white-fg}{#9e9e9e-fg} to preview{/#9e9e9e-fg}`, true);
+          } else {
+            const allOut = _pipBuf + _pipErrBuf;
+            const needsDev   = /Python\.h|python3-dev/i.test(allOut);
+            const needsCmake = /cmake not found|cmake.*required/i.test(allOut);
+            let hint;
+            if (needsDev)        hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install python3-dev build-essential{/cyan-fg}`;
+            else if (needsCmake) hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install cmake{/cyan-fg}`;
+            else                 hint = `  {#9e9e9e-fg}Run {/#9e9e9e-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}{#9e9e9e-fg} in a terminal to see the error.{/#9e9e9e-fg}`;
+            iMod.setLabel(` {red-fg}✗  Install Failed{/red-fg} `);
+            iMod.style.border.fg = 'red';
+            _setContent(_pipPct, `failed (exit ${code})`, hint, true);
+          }
+          iMod.key(['enter', 'o', 'O'], closeOk);
+          iMod.focus();
+          screen.render();
+        });
+
+        _installProc.on('error', () => {
+          if (_mClosed) return;
+          iMod.setLabel(` {red-fg}✗  pip Not Found{/red-fg} `);
+          iMod.style.border.fg = 'red';
+          _setContent(0, 'error', `  {red-fg}Python not in PATH — install Python 3 first{/red-fg}`, true);
+          const closeOk = () => {
+            if (_mClosed) return;
+            _mClosed = true;
+            navigationService?.closeModal();
+            iMod.destroy();
+            kBox.setLabel(IDLE_LABEL);
+            setTimeout(() => { kPicker.focus(); screen.render(); }, 0);
+          };
+          iMod.key(['enter', 'o', 'O'], closeOk);
+          iMod.focus();
+          screen.render();
+        });
+      });
+    }
+
+    function _promptInstallMisakiLang(voiceId, onCancel) {
+      const { pkg, label } = _cjkDeps(voiceId);
+      _promptInstallPkg(pkg, label, voiceId, () => {
+        const _LANG_PAIRS = { jf: 'jm', jm: 'jf', kf: 'km', km: 'kf', zf: 'zm', zm: 'zf' };
+        const langPfx = voiceId.slice(0, 2);
+        _cjkInstalled.add(langPfx);
+        _cjkInstalled.add(_LANG_PAIRS[langPfx] ?? langPfx);
+        voices.forEach((v, i) => {
+          if (v.slice(0, 2) === langPfx || v.slice(0, 2) === (_LANG_PAIRS[langPfx] ?? langPfx)) {
+            kPicker.setItem(i, _kokoroItem(v));
+          }
+        });
+      }, onCancel);
+    }
+
+    // Instant "bling" the moment a preview starts. Kokoro synthesis (and the SSH
+    // round-trip to a remote receiver) can take ~20s, and silence reads as a hang
+    // — this confirms the preview is on its way. Fire-and-forget: detached,
+    // unref'd, errors swallowed, so it never blocks the UI or fails the preview.
+    // Mirrors the chime heard on incoming remote messages.
+    // Sound: "Ui sounds - Shimmering success" by Philip_Berger, CC0 (freesound
+    // #648212). See .claude/audio/ui/CREDITS.txt. Falls back to a system sound
+    // if the bundled asset is ever missing.
+    const _blingWav = path.join(packageDir, '.claude', 'audio', 'ui', 'bling-success.wav');
+    function _playReadyCue() {
+      try {
+        const { command, args } = buildBlingCommand(process.platform, _blingWav, fs.existsSync(_blingWav));
+        const cue = spawn(command, args, { stdio: 'ignore', detached: true }); // NOSONAR
+        cue.on('error', () => { /* best-effort cue; a spawn failure must not surface */ });
+        cue.unref();
+      } catch { /* the readiness cue is purely cosmetic — never break the preview */ }
+    }
+
+    kPicker.key(['space'], () => {
+      if (!voices.length) return;
+      const voiceId = voices[kPicker.selected];
+      if (_kPreviewProc) {
+        _killKPreview();
+        kBox.setLabel(IDLE_LABEL);
+        screen.render();
+        return;
+      }
+
+      // kokoro package itself must be installed for any voice
+      if (!_kokoroInstalled) {
+        _promptInstallPkg('kokoro soundfile numpy', 'Kokoro TTS engine', voiceId, () => {
+          _kokoroInstalled = true;
+          voices.forEach((v, i) => kPicker.setItem(i, _kokoroItem(v)));
+        });
+        return;
+      }
+
+      // CJK voices need language-specific misaki extras — prompt to install if missing
+      if (_isCjkVoice(voiceId)) {
+        const { check: importCheck } = _cjkDeps(voiceId);
+        if (!_pyHasModules([importCheck])) {
+          _promptInstallMisakiLang(voiceId);
+          return;
+        }
+      }
+
+      // CJK voices require native-language text — English produces silence
+      const _pfx2 = voiceId.slice(0, 2);
+      const phrase = _pfx2 === 'zf' || _pfx2 === 'zm'
+        ? '你好，这是 Kokoro 中文语音预览。'
+        : _pfx2 === 'kf' || _pfx2 === 'km'
+          ? '안녕하세요, 코코로 한국어 음성 미리보기입니다.'
+          : _pfx2 === 'jf' || _pfx2 === 'jm'
+            ? 'こんにちは、これはKokoroの日本語音声プレビューです。'
+            : `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
+
+      // Bling now — a real preview is committed (past the install-prompt and
+      // toggle-off early returns). Fires for both local and remote paths.
+      _playReadyCue();
+
+      // ── Remote preview: route through SSH pipeline so receiver plays it ──
+      if (_validSshHost) {
+        _startKSpinner(kPicker.selected);
+        const hookDir = path.join(packageDir, '.claude', 'hooks');
+        const remoteEnv = { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_SSH_HOST: _sshHost };
+        if (_validSshKey)  remoteEnv.AGENTVIBES_SSH_KEY  = _sshKey;
+        if (_validSshPort) remoteEnv.AGENTVIBES_SSH_PORT = _sshPort;
+        let remoteProc;
+        let _remoteStderr = '';
+        try {
+          remoteProc = spawn(resolveBash(), [path.join(hookDir, 'play-tts-ssh-remote.sh'), phrase, voiceId], { // NOSONAR
+            stdio: ['ignore', 'ignore', 'pipe'],
+            env: remoteEnv,
+          });
+        } catch {
+          _stopKSpinner();
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}Remote preview failed{/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+          return;
+        }
+        remoteProc.stderr.on('data', (d) => { _remoteStderr += d.toString(); });
+        _kPreviewProc = remoteProc;
+        remoteProc.on('exit', (code) => {
+          _kPreviewProc = null;
+          _stopKSpinner();
+          if (_kClosed) return;
+          if (code !== 0 && _isCjkVoice(voiceId)) {
+            // CJK voice failed on receiver — needs the language-specific misaki extra there.
+            // Still try to download the .pt file locally so the picker shows ✓.
+            const { pkg: cjkPkg } = _cjkDeps(voiceId);
+            const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+            const dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
+              stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
+            });
+            _kDlProcs.push(dlProc);
+            let dlOut = '';
+            dlProc.stdout.on('data', d => { dlOut += d.toString(); });
+            dlProc.on('exit', (dlCode) => {
+              const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1);
+              if (_kClosed) return;
+              if (dlCode === 0 && dlOut.trim()) {
+                cached.add(voiceId);
+                const li = voices.indexOf(voiceId);
+                if (li >= 0) { kPicker.setItem(li, _kokoroItem(voiceId)); }
+              }
+              if (!_kClosed) {
+                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs  pip install ${cjkPkg}{/yellow-fg} `);
+                screen.render();
+                setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
+              }
+            });
+            dlProc.on('error', () => {
+              const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1);
+              if (!_kClosed) {
+                kBox.setLabel(` {yellow-fg}⚠ ${voiceId}: receiver needs pip install ${cjkPkg}{/yellow-fg} `);
+                screen.render();
+                setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
+              }
+            });
+          } else {
+            const errLine = _remoteStderr.split('\n').find(l => l.includes('[ERROR]') || l.includes('kex_') || l.includes('Connection'));
+            const label = errLine
+              ? ` {red-fg}SSH: ${errLine.slice(0, 50)}{/red-fg} `
+              : code !== 0
+                ? ` {red-fg}SSH exit ${code}{/red-fg} `
+                : ` {green-fg}✓ sent→${_sshHost}{/green-fg} `;
+            kBox.setLabel(label);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+        });
+        remoteProc.on('error', () => {
+          _kPreviewProc = null;
+          _stopKSpinner();
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}Remote preview failed{/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+        });
+        return;
+      }
+
+      // ── Local preview: synthesize WAV then play ──────────────────────────
+      const isDownloaded = cached.has(voiceId);
+
+      // ── Download progress bar helpers ──────────────────────────────────────
+      const DL_BAR_W = 22;
+      const DL_SPIN  = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+      let _dlSpinIdx = 0;
+      let _dlRealPct = -1;  // -1 = no real % received yet
+
+      function _dlBarLabel(pct) {
+        const filled = Math.round(pct * DL_BAR_W / 100);
+        const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
+                  + '{#555555-fg}' + '░'.repeat(DL_BAR_W - filled) + '{/#555555-fg}';
+        return ` {yellow-fg}☁{/yellow-fg} [${bar}{#9e9e9e-fg}]{/#9e9e9e-fg} {white-fg}${pct}%{/white-fg} {#9e9e9e-fg}${voiceId}{/#9e9e9e-fg} `;
+      }
+
+      function _startDlAnim() {
+        kBox.setLabel(_dlBarLabel(0));
+        screen.render();
+        _kAnimInterval = setInterval(() => {
+          if (_kClosed) { clearInterval(_kAnimInterval); _kAnimInterval = null; return; }
+          if (_dlRealPct >= 0) {
+            // Real progress received — update bar, keep interval running for smooth render
+            kBox.setLabel(_dlBarLabel(_dlRealPct));
+          } else {
+            // No real data yet — spin
+            _dlSpinIdx = (_dlSpinIdx + 1) % DL_SPIN.length;
+            kBox.setLabel(` {yellow-fg}${DL_SPIN[_dlSpinIdx]} Downloading ${voiceId}...{/yellow-fg} `);
+          }
+          screen.render();
+        }, 120);
+      }
+
+      function _stopDlAnim() {
+        if (_kAnimInterval) { clearInterval(_kAnimInterval); _kAnimInterval = null; }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
+      if (isDownloaded) {
+        _startKSpinner(kPicker.selected);
+      } else {
+        _startDlAnim();
+      }
+      screen.render();
+
+      // Phase 1: synthesize WAV locally with kokoro-tts.py
+      // stderr is captured so we can parse HuggingFace tqdm download progress
+      const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+      const tmpWav = _secureTempWav('kokoro-preview');
+      _kTmpWav = tmpWav;
+
+      let synthProc;
+      try {
+        synthProc = spawn(_pythonCmd, [pyScript, phrase, voiceId, tmpWav, '1.0'], { // NOSONAR
+          stdio: ['ignore', 'ignore', 'pipe'],
+          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        });
+      } catch {
+        _stopDlAnim();
+        _kTmpWav = null;
+        try { fs.unlinkSync(tmpWav); } catch {}
+        if (!_kClosed) {
+          kBox.setLabel(` {red-fg}Preview failed — is Kokoro installed?{/red-fg} `);
+          screen.render();
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+        }
+        return;
+      }
+      _kPreviewProc = synthProc;
+
+      // Always drain stderr to prevent pipe-buffer deadlock from PyTorch warnings.
+      // For uncached voices, also parse tqdm download progress lines.
+      let _stderrBuf = '';
+      synthProc.stderr.on('data', (chunk) => {
+        if (_kClosed) return;
+        if (isDownloaded) return;  // just drain — no UI update needed
+        _stderrBuf += chunk.toString();
+        // tqdm writes \r-terminated progress on same line; split on \r or \n
+        const parts = _stderrBuf.split(/[\r\n]/);
+        _stderrBuf = parts.pop() ?? '';
+        for (const line of parts) {
+          const m = line.match(/\b(\d{1,3})%\s*\|/);
+          if (m) {
+            _dlRealPct = Math.min(100, parseInt(m[1], 10));
+          }
+        }
+      });
+
+      synthProc.on('exit', (synthCode) => {
+        _stopDlAnim();
+        _stopKSpinner();
+        _kPreviewProc = null;
+        _kTmpWav = null;
+        if (_kClosed) { try { fs.unlinkSync(tmpWav); } catch {} return; }
+        if (synthCode !== 0) {
+          try { fs.unlinkSync(tmpWav); } catch {}
+          kBox.setLabel(` {red-fg}Synthesis failed — run: pip install kokoro{/red-fg} `);
+          screen.render();
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
+          // For voices where synthesis fails due to missing language deps (exit 3),
+          // try a direct .pt file download so the voice can still be cached (shows ✓)
+          if (synthCode === 3) {
+            const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+            const dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
+              stdio: ['ignore', 'pipe', 'ignore'],
+              env: { ...process.env },
+            });
+            _kDlProcs.push(dlProc);
+            let dlOut = '';
+            dlProc.stdout.on('data', d => { dlOut += d.toString(); });
+            dlProc.on('exit', (dlCode) => {
+              const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1);
+              if (_kClosed) return;
+              if (dlCode === 0 && dlOut.trim()) {
+                cached.add(voiceId);
+                kPicker.setItems(voices.map(_kokoroItem));
+                if (!_kClosed) { kBox.setLabel(` {green-fg}✓ ${voiceId} cached (synthesis requires extra deps){/green-fg} `); screen.render(); }
+                setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+              }
+            });
+            dlProc.on('error', () => { const _i = _kDlProcs.indexOf(dlProc); if (_i >= 0) _kDlProcs.splice(_i, 1); });
+          }
+          return;
+        }
+        // Update icon to ✓ for newly-downloaded voice
+        if (!isDownloaded) {
+          cached.add(voiceId);
+          kPicker.setItem(kPicker.selected, _kokoroItem(voiceId));
+        }
+
+        // Phase 2: play WAV locally (remote destinations handled before synthesis via SSH pipeline)
+        let playProc;
+        try {
+          if (process.platform === 'win32') {
+            // SoundPlayer needs the Windows Forms assembly loaded and native backslash paths
+            const psPath = tmpWav.replace(/'/g, "''");
+            playProc = spawn('powershell', ['-NoProfile', '-Command', // NOSONAR
+              `Add-Type -AssemblyName System.Windows.Forms; ` +
+              `(New-Object System.Media.SoundPlayer('${psPath}')).PlaySync()`,
+            ], { stdio: 'pipe', env: { ...process.env } });
+          } else {
+            playProc = spawn(resolveBash(), ['-c', `aplay -q "$1" 2>/dev/null || paplay "$1" 2>/dev/null || true`, '--', tmpWav], { // NOSONAR
+              stdio: 'ignore',
+              env: { ...process.env },
+            });
+          }
+        } catch {
+          try { fs.unlinkSync(tmpWav); } catch {}
+          if (!_kClosed) {
+            kBox.setLabel(` {red-fg}Playback failed{/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+          }
+          return;
+        }
+        _kPreviewProc = playProc;
+        _kTmpWav = tmpWav;
+        _startKSpinner(kPicker.selected);
+        screen.render();
+        playProc.on('exit', (code) => {
+          _kPreviewProc = null;
+          _stopKSpinner();
+          if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+          if (code !== 0 && !_kClosed) {
+            kBox.setLabel(` {red-fg}Playback failed (exit ${code}){/red-fg} `);
+            screen.render();
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 4000);
+          }
+        });
+        playProc.on('error', () => {
+          _kPreviewProc = null;
+          _stopKSpinner();
+          if (_kTmpWav) { try { fs.unlinkSync(_kTmpWav); } catch {} _kTmpWav = null; }
+          if (!_kClosed) { kBox.setLabel(` {red-fg}Playback failed{/red-fg} `); screen.render(); }
+        });
+      });
+
+      synthProc.on('error', () => {
+        _stopDlAnim();
+        _stopKSpinner();
+        _kPreviewProc = null;
+        _kTmpWav = null;
+        try { fs.unlinkSync(tmpWav); } catch {}
+        if (!_kClosed) {
+          kBox.setLabel(` {red-fg}Python not found — run: pip install kokoro{/red-fg} `);
+          screen.render();
+          setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 5000);
+        }
+      });
+    });
+
+    // Toggle favorite (use '*' for consistency with every other picker)
+    kPicker.key(['*', '+'], () => {
+      const voiceId = voices[kPicker.selected];
+      if (!voiceId) return;
+      const favPath = path.join(os.homedir(), '.agentvibes', 'kokoro-favorites.json');
+      if (_kokoroFavorites.has(voiceId)) {
+        _kokoroFavorites.delete(voiceId);
+      } else {
+        _kokoroFavorites.add(voiceId);
+      }
+      try {
+        fs.mkdirSync(path.join(os.homedir(), '.agentvibes'), { recursive: true });
+        fs.writeFileSync(favPath, JSON.stringify([..._kokoroFavorites], null, 2));
+      } catch {}
+      // Rebuild picker items
+      const newItems = voices.map(id => {
+        return _kokoroItem(id);
+      });
+      kPicker.setItems(newItems);
+      screen.render();
+    });
+
+    // Download All — sequentially downloads every uncached voice
+    let _dlAllActive = false;
+    let _dlAllProc = null;
+    kPicker.key(['d', 'D'], () => {
+      if (_kPreviewProc || _dlAllActive) return;
+      const toDownload = voices.filter(v => !cached.has(v));
+      if (!toDownload.length) {
+        kBox.setLabel(` {green-fg}✓ All ${voices.length} voices already cached{/green-fg} `);
+        setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 2500);
+        screen.render();
+        return;
+      }
+      _dlAllActive = true;
+      let dlIdx = 0;
+
+      function _dlNext() {
+        if (_kClosed || dlIdx >= toDownload.length) {
+          _dlAllActive = false;
+          _dlAllProc = null;
+          if (!_kClosed) {
+            const total = voices.filter(v => cached.has(v)).length;
+            kBox.setLabel(` {green-fg}✓ Download complete — ${total}/${voices.length} cached{/green-fg} `);
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+            screen.render();
+          }
+          return;
+        }
+        const voiceId = toDownload[dlIdx];
+        const n = dlIdx + 1;
+        kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length}: ${voiceId}...{/yellow-fg} `);
+        screen.render();
+
+        const pyScript = path.join(packageDir, '.claude', 'hooks', 'kokoro-tts.py');
+        let dlProc;
+
+        if (_isCjkVoice(voiceId)) {
+          // CJK voices: skip synthesis (needs misaki[lang]), just download the .pt file
+          try {
+            dlProc = spawn(_pythonCmd, [pyScript, '--download-only', voiceId], { // NOSONAR
+              stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env },
+            });
+          } catch { dlIdx++; _dlNext(); return; }
+          _dlAllProc = dlProc;
+          let dlOut = '';
+          dlProc.stdout.on('data', d => { dlOut += d.toString(); });
+          dlProc.on('exit', (code) => {
+            _dlAllProc = null;
+            if (_kClosed) return;
+            if (code === 0 && dlOut.trim()) {
+              cached.add(voiceId);
+              const listIdx = voices.indexOf(voiceId);
+              if (listIdx >= 0) kPicker.setItem(listIdx, _kokoroItem(voiceId));
+            }
+            dlIdx++; _dlNext();
+          });
+          dlProc.on('error', () => { _dlAllProc = null; dlIdx++; _dlNext(); });
+        } else {
+          const tmpWav = _secureTempWav('kokoro-dl');
+          try {
+            dlProc = spawn(_pythonCmd, [pyScript, 'hello', voiceId, tmpWav, '1.0'], { // NOSONAR
+              stdio: ['ignore', 'ignore', 'pipe'],
+              env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+            });
+          } catch {
+            dlIdx++;
+            _dlNext();
+            return;
+          }
+          _dlAllProc = dlProc;
+
+          let _buf = '', _dlPct = -1;
+          const DL_W = 18;
+          dlProc.stderr.on('data', (chunk) => {
+            if (_kClosed) return;
+            _buf += chunk.toString();
+            const parts = _buf.split(/[\r\n]/);
+            _buf = parts.pop() ?? '';
+            for (const line of parts) {
+              const m = line.match(/\b(\d{1,3})%\s*\|/);
+              if (m) {
+                const pct = Math.min(100, parseInt(m[1], 10));
+                if (pct !== _dlPct) {
+                  _dlPct = pct;
+                  const filled = Math.round(pct * DL_W / 100);
+                  const bar = '{yellow-fg}' + '█'.repeat(filled) + '{/yellow-fg}'
+                            + '{#555555-fg}' + '░'.repeat(DL_W - filled) + '{/#555555-fg}';
+                  kBox.setLabel(` {yellow-fg}☁ ${n}/${toDownload.length} [${bar}] ${pct}% ${voiceId}{/yellow-fg} `);
+                  screen.render();
+                }
+              }
+            }
+          });
+
+          dlProc.on('exit', (code) => {
+            _dlAllProc = null;
+            try { fs.unlinkSync(tmpWav); } catch {}
+            if (_kClosed) return;
+            if (code === 0) {
+              cached.add(voiceId);
+              const listIdx = voices.indexOf(voiceId);
+              if (listIdx >= 0) kPicker.setItem(listIdx, _kokoroItem(voiceId));
+            }
+            dlIdx++;
+            _dlNext();
+          });
+          dlProc.on('error', () => { _dlAllProc = null; try { fs.unlinkSync(tmpWav); } catch {} dlIdx++; _dlNext(); });
+        }
+      }
+      _dlNext();
+    });
+
+    kPicker.key(['escape', 'q', 'Q'], _closeKP);
+    kPicker.focus();
+    screen.render();
+  }
 
   function _secureTempWav(prefix) {
     const baseDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
@@ -2212,7 +3613,152 @@ export function createSetupTab(screen, services) {
     return path.join(dir, `${prefix}-${crypto.randomUUID()}.wav`);
   }
 
+  // ElevenLabs voice picker — lists the static built-in premade voices.
+  // Space previews the highlighted voice (real API call via the hook), Enter
+  // selects it (stores the raw voice_id), Escape cancels.
+  function _openElevenLabsVoicePicker(draft, onDone) {
+    let _elClosed = false;
+    let _elPreviewProc = null;
+
+    function _killElPreview() {
+      if (_elPreviewProc) { try { _elPreviewProc.kill(); } catch {} _elPreviewProc = null; }
+    }
+    function _closeEl() {
+      if (_elClosed) return;
+      _elClosed = true;
+      _killElPreview();
+      navigationService?.closeModal();
+      destroyList(elBox, screen, onDone);
+    }
+
+    const _items = ELEVENLABS_VOICES.map(v => formatVoiceRow({ name: v.name, gender: v.gender, lang: v.lang, detail: v.desc }));
+    const _height = Math.min(ELEVENLABS_VOICES.length + 5, Math.max(13, (screen.height || 24) - 4));
+
+    // Standardized chrome: titled box + pinned top help bar; transient
+    // preview/error status shows in the title area.
+    const _defaultHint = selectorTitle('Voice');
+    const elBox = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: 56,
+      height: _height,
+      border: { type: 'line' },
+      tags: true,
+      label: _defaultHint,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+    });
+    elBox.setFront();
+    blessed.text({
+      parent: elBox, top: 0, left: 1, right: 1, height: 1, tags: true,
+      content: renderHelpBar([
+        { key: 'Space', label: 'preview' },
+        { key: 'Enter', label: 'select' },
+        { key: 'Esc', label: 'cancel' },
+      ]),
+      style: { bg: COLORS.contentBg },
+    });
+
+    const elPicker = blessed.list({
+      parent: elBox,
+      top: 1,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      tags: true,
+      items: _items,
+      keys: true,
+      vi: false,
+      mouse: true,
+      scrollbar: { ch: '|', style: { fg: 'cyan' } },
+      style: {
+        fg: COLORS.labelFg,
+        bg: COLORS.contentBg,
+        selected: { bg: 'green', fg: 'white', bold: true },
+        item: { fg: COLORS.labelFg },
+      },
+    });
+
+    // Start on the currently-selected voice if it is one of ours.
+    const _curIdx = ELEVENLABS_VOICES.findIndex(v => v.id === draft.voice);
+    elPicker.select(_curIdx >= 0 ? _curIdx : 0);
+
+    function _setHint(text) { elBox.setLabel(text || _defaultHint); screen.render(); }
+    _setHint(_defaultHint);
+
+    function _previewEl() {
+      if (_elPreviewProc) {  // toggle off
+        _killElPreview();
+        _setHint(_defaultHint);
+        return;
+      }
+      const v = ELEVENLABS_VOICES[elPicker.selected];
+      if (!v) return;
+      const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
+      let proc;
+      try {
+        proc = spawn(resolveBash(), [elScript, `Hi, I am ${v.name}.`, v.id], { // NOSONAR — local hook on user's PATH
+          stdio: 'ignore',
+          env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+        });
+      } catch (e) {
+        _setHint(' {red-fg}Preview failed to start{/red-fg} ');
+        return;
+      }
+      _elPreviewProc = proc;
+      _setHint(` {cyan-fg}♪ ${v.name}... (Space=stop){/cyan-fg} `);
+      proc.on('exit', (code) => {
+        _elPreviewProc = null;
+        if (_elClosed) return;
+        if (code && code !== 0) {
+          _setHint(' {red-fg}Preview failed — check API key / plan{/red-fg} ');
+          setTimeout(() => { if (!_elClosed) _setHint(_defaultHint); }, 3000);
+        } else {
+          _setHint(_defaultHint);
+        }
+      });
+      proc.on('error', () => { _elPreviewProc = null; if (!_elClosed) _setHint(' {red-fg}Preview failed{/red-fg} '); });
+    }
+
+    elPicker.key(['enter'], () => {
+      const v = ELEVENLABS_VOICES[elPicker.selected];
+      if (v) draft.voice = v.id;
+      _closeEl();
+    });
+    elPicker.key(['space'], _previewEl);
+    elPicker.key(['escape', 'q', 'Q'], _closeEl);
+
+    navigationService?.openModal(null, _closeEl);
+    elPicker.focus();
+    screen.render();
+
+    // Warn (non-blocking) if no API key is configured yet.
+    const _elKeySet = Boolean(process.env.ELEVENLABS_API_KEY) || (() => {
+      try {
+        const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+        return fs.existsSync(kf) && fs.readFileSync(kf, 'utf8').trim().length > 0;
+      } catch { return false; }
+    })();
+    if (!_elKeySet) {
+      _showApiKeyWarning('ElevenLabs', 'ELEVENLABS_API_KEY',
+        path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt'),
+        () => { if (!_elClosed) { elPicker.focus(); screen.render(); } });
+    }
+  }
+
   function _openVoicePickerForLlm(draft, onDone, llmKey = '') {
+    // Kokoro has its own multi-voice picker (voices scanned from HF cache)
+    if (draft.ttsEngine === 'kokoro') {
+      _openKokoroVoicePicker(draft, onDone, llmKey);
+      return;
+    }
+
+    // ElevenLabs has its own multi-voice picker (static built-in premade list)
+    if (draft.ttsEngine === 'elevenlabs') {
+      _openElevenLabsVoicePicker(draft, onDone);
+      return;
+    }
+
     navigationService?.openModal(null, _closeVP);
 
     let _allVoices = [];
@@ -2271,37 +3817,47 @@ export function createSetupTab(screen, services) {
         _killNvPreview();
         if (_nvEnsureAbort) { _nvEnsureAbort.abort(); _nvEnsureAbort = null; }
         navigationService?.closeModal();
-        destroyList(nvPicker, screen, onDone);
+        destroyList(nvBox, screen, onDone);
       }
 
-      const nvPicker = blessed.list({
+      const NV_TITLE = selectorTitle('Voice');
+      const NV_HELP = renderHelpBar([{ key: 'Space', label: 'preview' }, { key: 'Enter', label: 'select' }, { key: 'Esc', label: 'cancel' }]);
+      // Standardized chrome: titled box + pinned top help bar; the single voice
+      // row sits below. Status messages show in the title area.
+      const nvBox = blessed.box({
         parent: screen,
-        top: 'center',
-        left: 'center',
-        width: 52,
-        height: 7,
-        border: { type: 'line' },
+        top: 'center', left: 'center',
+        width: 52, height: 7,
+        border: { type: 'line' }, tags: true,
+        label: NV_TITLE,
+        style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
+      });
+      nvBox.setFront();
+      blessed.text({
+        parent: nvBox, top: 0, left: 1, right: 1, height: 1, tags: true,
+        content: NV_HELP, style: { bg: COLORS.contentBg },
+      });
+      const nvPicker = blessed.list({
+        parent: nvBox,
+        top: 1, left: 0, right: 0, bottom: 0,
         tags: true,
-        label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
         keys: true,
         vi: false,
         mouse: true,
         style: {
           fg: COLORS.labelFg,
           bg: COLORS.contentBg,
-          border: { fg: 'cyan' },
           selected: { bg: 'green', fg: 'white', bold: true },
           item: { fg: COLORS.labelFg },
         },
       });
-      nvPicker.setFront();
-      nvPicker.setItems([`  ${nativeVoice.label}  {gray-fg}[Space] preview  [Enter] select{/gray-fg}`]);
+      nvPicker.setItems([`  ${nativeVoice.label}`]);
       nvPicker.select(0);
 
       function _previewNativeVoice() {
         if (_nvPreviewProc) {
           _killNvPreview();
-          nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+          nvBox.setLabel(NV_TITLE);
           screen.render();
           return;
         }
@@ -2312,42 +3868,42 @@ export function createSetupTab(screen, services) {
           let proc;
           try { proc = spawn(cmd, args, opts); } catch (e) {
             process.stderr.write(`[AgentVibes] preview spawn failed: ${e.message}\n`);
-            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+            if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
             return;
           }
           _nvPreviewProc = proc;
-          nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+          nvBox.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
           screen.render();
           proc.on('exit', (code) => {
             _nvPreviewProc = null;
             if (!_nvClosed) {
               if (code !== 0 && code !== null) {
-                nvPicker.setLabel(` {red-fg}Preview failed (exit ${code}){/red-fg} `);
-                setTimeout(() => { if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); } }, 3000);
+                nvBox.setLabel(` {red-fg}Preview failed (exit ${code}){/red-fg} `);
+                setTimeout(() => { if (!_nvClosed) { nvBox.setLabel(NV_TITLE); screen.render(); } }, 3000);
               } else {
-                nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ');
+                nvBox.setLabel(NV_TITLE);
               }
               screen.render();
             }
           });
           proc.on('error', () => {
             _nvPreviewProc = null;
-            if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+            if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
           });
         }
 
         if (engine === 'soprano' && process.platform === 'win32' && !process.env.WSL_DISTRO_NAME) {
           // Ensure soprano WebUI is running before preview; start it if not.
-          nvPicker.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
+          nvBox.setLabel(' {cyan-fg}Checking Soprano...{/cyan-fg} ');
           screen.render();
           _nvEnsureAbort = new AbortController();
           _ensureSopranoWebUI((msg) => {
-            if (!_nvClosed) { nvPicker.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
+            if (!_nvClosed) { nvBox.setLabel(` {cyan-fg}${msg}{/cyan-fg} `); screen.render(); }
           }, _nvEnsureAbort.signal).then((ready) => {
             _nvEnsureAbort = null;
             if (_nvClosed) return;
             if (!ready) {
-              nvPicker.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
+              nvBox.setLabel(' {red-fg}Soprano WebUI failed to start{/red-fg} ');
               screen.render();
               return;
             }
@@ -2367,23 +3923,29 @@ export function createSetupTab(screen, services) {
             proc = spawn('powershell', ['-NoProfile', '-Command', sapiScript], { stdio: 'ignore', windowsHide: true }); // NOSONAR
           } else if (engine === 'macos-say') {
             proc = spawn('say', [phrase], { stdio: 'ignore' }); // NOSONAR
+          } else if (engine.startsWith('elevenlabs')) {
+            const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
+            proc = spawn(resolveBash(), [elScript, phrase, 'Rachel'], { // NOSONAR
+              stdio: 'ignore',
+              env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
+            });
           }
         } catch {}
         if (!proc) {
-          nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} ');
+          nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} ');
           screen.render();
           return;
         }
         _nvPreviewProc = proc;
-        nvPicker.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
+        nvBox.setLabel(` {cyan-fg}♪ ${nativeVoice.label}... (Space=stop){/cyan-fg} `);
         screen.render();
         proc.on('exit', () => {
           _nvPreviewProc = null;
-          if (!_nvClosed) { nvPicker.setLabel(' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} '); screen.render(); }
+          if (!_nvClosed) { nvBox.setLabel(NV_TITLE); screen.render(); }
         });
         proc.on('error', () => {
           _nvPreviewProc = null;
-          if (!_nvClosed) { nvPicker.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
+          if (!_nvClosed) { nvBox.setLabel(' {red-fg}Engine not installed{/red-fg} '); screen.render(); }
         });
       }
 
@@ -2392,6 +3954,25 @@ export function createSetupTab(screen, services) {
       nvPicker.key(['escape', 'q', 'Q'], _closeNV);
       nvPicker.focus();
       screen.render();
+
+      // ElevenLabs: if no API key is set, show a warning on top of the picker.
+      // The picker stays open; user dismisses the warning and can still select/preview.
+      if (draft.ttsEngine === 'elevenlabs') {
+        const _elKeySet = Boolean(process.env.ELEVENLABS_API_KEY) || (() => {
+          try {
+            const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+            return fs.existsSync(kf) && fs.readFileSync(kf, 'utf8').trim().length > 0;
+          } catch { return false; }
+        })();
+        if (!_elKeySet) {
+          _showApiKeyWarning(
+            'ElevenLabs',
+            'ELEVENLABS_API_KEY',
+            path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt'),
+            () => { if (!_nvClosed) { nvPicker.focus(); screen.render(); } }
+          );
+        }
+      }
       return;
     }
 
@@ -2403,22 +3984,33 @@ export function createSetupTab(screen, services) {
       height: '88%',
       border: { type: 'line' },
       tags: true,
-      label: ' {bold}{cyan-fg} Select Voice {/cyan-fg}{/bold} ',
+      label: selectorTitle('Voice'),
       style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'cyan' } },
     });
     vpModal.setFront();
 
-    // Column header
-    const COL_N = 30;
-    const COL_G = 4;
+    // Standardized help bar, pinned at the top (under the title).
     blessed.text({
-      parent: vpModal, top: 1, left: 6, tags: true,
-      content: `{cyan-fg}${'Name'.padEnd(COL_N)}{/cyan-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {cyan-fg}Provider{/cyan-fg}`,
+      parent: vpModal, top: 0, left: 2, right: 2, height: 1, tags: true,
+      content: renderHelpBar([
+        { key: 'Space', label: 'preview' },
+        { key: 'Enter', label: 'select' },
+        { key: '+', label: 'like' },
+        { key: '-', label: 'dislike' },
+        { key: 'Esc', label: 'cancel' },
+      ]),
+      style: { bg: COLORS.contentBg },
+    });
+
+    // Column header — matches the shared formatVoiceRow column layout.
+    blessed.text({
+      parent: vpModal, top: 2, left: 3, tags: true,
+      content: voiceRowHeader(),
       style: { bg: COLORS.contentBg },
     });
 
     const vpList = blessed.list({
-      parent: vpModal, top: 2, left: 2, right: 2, bottom: 5,
+      parent: vpModal, top: 3, left: 2, right: 2, bottom: 5,
       keys: true, vi: true, mouse: true,
       border: { type: 'line' },
       scrollbar: { ch: '|', style: { fg: 'cyan' } },
@@ -2436,15 +4028,15 @@ export function createSetupTab(screen, services) {
       content: ' ', style: { fg: 'cyan', bg: COLORS.contentBg },
     });
 
-    // Footer split into two fixed-height lines so wrapping never covers vpPreviewLine
-    blessed.text({
-      parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
-      content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump{/white-fg}',
-      style: { bg: COLORS.contentBg },
-    });
+    // Movement hints at the bottom (primary actions live in the top help bar, so
+    // they are not duplicated here). Standardized [key] = label formatting.
     blessed.text({
       parent: vpModal, bottom: 2, left: 2, right: 2, height: 1, tags: true,
-      content: '{white-fg}[Enter] Select  [Space] Preview  [+] 👍  [-] 👎  [Esc] Cancel{/white-fg}',
+      content: renderHelpBar([
+        { key: '↑↓', label: 'move' },
+        { key: 'PgUp/PgDn', label: 'page' },
+        { key: 'a-z', label: 'jump' },
+      ]),
       style: { bg: COLORS.contentBg },
     });
 
@@ -2459,11 +4051,10 @@ export function createSetupTab(screen, services) {
         const dot = isPrev ? '♪' : (isActive ? '●' : ' ');
         const star = isUp ? '{green-fg}👍{/green-fg}' : (isDown ? '{red-fg}👎{/red-fg}' : '  ');
         const meta = getVoiceMeta(v);
-        const name = meta.displayName.length > COL_N
-          ? meta.displayName.slice(0, COL_N - 1) + '…'
-          : meta.displayName.padEnd(COL_N);
-        // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
-        return ` ${dot}${star} ${name}${genderIconTag(meta.gender)}   ${meta.provider}`;
+        // Derive the language tag from the Piper voice id prefix (e.g. en_US-… → en-US).
+        const _lm = v.match(/^([a-z]{2})_([A-Z]{2})/);
+        const lang = _lm ? `${_lm[1]}-${_lm[2]}` : '';
+        return formatVoiceRow({ status: `${dot}${star}`, name: meta.displayName, gender: meta.gender, lang, detail: meta.provider });
       });
     }
 
@@ -2525,7 +4116,7 @@ export function createSetupTab(screen, services) {
         } else {
           const _playTts = path.join(_hooksBase, '.claude', 'hooks', 'play-tts.sh');
           const _llmArgs = llmKey ? ['--llm', llmKey] : [];
-          rProc = spawn('bash', [_playTts, phrase, voiceId, ..._llmArgs], { // NOSONAR
+          rProc = spawn(resolveBash(), [_playTts, phrase, voiceId, ..._llmArgs], { // NOSONAR
             stdio: 'ignore', detached: true, env: _rEnv, cwd: targetDir,
           });
         }
@@ -3175,17 +4766,19 @@ export function createSetupTab(screen, services) {
     const ok  = () => `{green-fg}OK  ${t(_getLang(), 'installed')}{/green-fg}`;
     const bad = () => `{red-fg}X  ${t(_getLang(), 'notFound')}{/red-fg}`;
 
-    const ttsOk = _deps.piper || _deps.soprano;
+    const ttsOk = _deps.piper || _deps.soprano || _deps.kokoro || _deps.elevenlabs;
     contentBox.setContent(_c([
       _HDR('', t(_getLang(), 'dependencyCheck')),
       '',
-      `  {white-fg}${'Dependency'.padEnd(14)}${'Status'}{/white-fg}`,
+      `  {white-fg}${'Dependency'.padEnd(16)}${'Status'}{/white-fg}`,
       `  {white-fg}${'---'.repeat(26)}{/white-fg}`,
-      `  {white-fg}${'Node.js'.padEnd(14)}{/white-fg}${_deps.node    ? ok() : bad()}`,
-      `  {white-fg}${'npm'.padEnd(14)}{/white-fg}${_deps.npm     ? ok() : bad()}`,
-      `  {white-fg}${'Piper TTS'.padEnd(14)}{/white-fg}${_deps.piper   ? ok() : bad()}`,
-      `  {white-fg}${'Soprano TTS'.padEnd(14)}{/white-fg}${_deps.soprano ? ok() : bad()}`,
-      `  {white-fg}${'ffmpeg'.padEnd(14)}{/white-fg}${_deps.ffmpeg  ? ok() : `{red-fg}!  ${t(_getLang(), 'ffmpegMissing')}{/red-fg}`}`,
+      `  {white-fg}${'Node.js'.padEnd(16)}{/white-fg}${_deps.node       ? ok() : bad()}`,
+      `  {white-fg}${'npm'.padEnd(16)}{/white-fg}${_deps.npm        ? ok() : bad()}`,
+      `  {white-fg}${'Piper TTS'.padEnd(16)}{/white-fg}${_deps.piper      ? ok() : bad()}`,
+      `  {white-fg}${'Kokoro TTS'.padEnd(16)}{/white-fg}${_deps.kokoro     ? ok() : `{#546e7a-fg}-  optional{/#546e7a-fg}`}`,
+      `  {white-fg}${'ElevenLabs'.padEnd(16)}{/white-fg}${_deps.elevenlabs ? ok() : `{#546e7a-fg}-  needs API key{/#546e7a-fg}`}`,
+      `  {white-fg}${'Soprano TTS'.padEnd(16)}{/white-fg}${_deps.soprano    ? ok() : `{#546e7a-fg}-  optional{/#546e7a-fg}`}`,
+      `  {white-fg}${'ffmpeg'.padEnd(16)}{/white-fg}${_deps.ffmpeg     ? ok() : `{red-fg}!  ${t(_getLang(), 'ffmpegMissing')}{/red-fg}`}`,
       '',
       ttsOk
         ? `  {green-fg}OK  ${t(_getLang(), 'ttsDetected')}{/green-fg}`
@@ -3193,11 +4786,9 @@ export function createSetupTab(screen, services) {
       '',
       '',
     ]));
-    if (ttsOk) {
-      _s1ContinueBtn.setContent(_tl('continueArrowBtn'));
-      _s1ContinueBtn.show();
-      _s1ContinueBtn.focus();
-    }
+    _s1ContinueBtn.setContent(ttsOk ? _tl('continueArrowBtn') : '  Install TTS  ->');
+    _s1ContinueBtn.show();
+    _s1ContinueBtn.focus();
     screen.render();
   }
 
@@ -3270,7 +4861,7 @@ export function createSetupTab(screen, services) {
 
     // Show provider rows instead of contentBox
     contentBox.hide();
-    hintLine.setContent('  Screen 3: LLM Providers  |  [Enter] Action  |  [Tab] Next button  |  [Esc] Tab bar');
+    hintLine.setContent('  Screen 3: LLM Providers  |  [Enter] Action  |  [Tab] Next button  |  [Esc] TTS Engines');
     showAllProviderRows();
     refreshInstalledState().then(() => {
       if (providerFocusableItems.length) {

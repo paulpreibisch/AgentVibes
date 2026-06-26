@@ -40,8 +40,12 @@ const KEY_TO_TAB = {
 export function setupNavigation(screen, navigationService, focusMainTabBar) {
   // Tab switching shortcuts — one handler per key (both cases)
   // When a modal is open, force-close all modals then switch tabs.
+  // Exception: if already on the target tab, pressing its shortcut is a no-op —
+  // the user is trying to do something within the tab (e.g. 'I' in setup means
+  // "install", not "re-navigate to setup and close all my pickers").
   for (const [key, tabId] of Object.entries(KEY_TO_TAB)) {
     screen.key([key], () => {
+      if (navigationService.getActiveTab() === tabId) return;
       if (navigationService.isModalOpen()) {
         navigationService.forceCloseAll();
         setTimeout(() => navigationService.switchTab(tabId), 0);

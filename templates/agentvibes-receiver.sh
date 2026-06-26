@@ -119,7 +119,7 @@ fi
 
 # Validate provider
 case "$PROVIDER" in
-    piper|soprano|macos|windows-sapi) ;;
+    piper|soprano|macos|windows-sapi|kokoro|elevenlabs) ;;
     *) PROVIDER="piper" ;;
 esac
 
@@ -226,6 +226,10 @@ if [[ "${AGENTVIBES_DEBUG:-0}" == "1" ]]; then
 fi
 
 echo "🎵 Playing via AgentVibes: ${TEXT:0:50}..." >&2
-bash "$PLAY_TTS" "$TEXT" "$VOICE"
+# AGENTVIBES_FORCE_PROVIDER lets the sender specify which engine the receiver
+# should use (e.g. kokoro, elevenlabs). The receiver's tts-provider.txt takes
+# precedence if already set to a non-default value; FORCE_PROVIDER is the
+# fallback when the receiver has no local preference configured.
+AGENTVIBES_FORCE_PROVIDER="$PROVIDER" bash "$PLAY_TTS" "$TEXT" "$VOICE"
 
 exit 0

@@ -642,7 +642,7 @@ ${_tl('bmadDesc')}
     const FIELDS = [
       { key: 'voice',        label: 'Voice',       getValue: () => draft.voice || '(global default)' },
       { key: 'pretext',      label: 'Pretext',     getValue: () => draft.pretext || '(default)' },
-      { key: 'reverbPreset', label: 'Reverb',      getValue: () => formatReverbState(draft.reverbPreset) },
+      { key: 'reverbPreset', label: 'Audio Effects', getValue: () => formatReverbState(draft.reverbPreset) },
       { key: 'personality',  label: 'Personality', getValue: () => {
         const p = draft.personality;
         const emoji = PERSONALITY_EMOJIS[p] || '';

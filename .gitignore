@@ -15,6 +15,9 @@ yarn-error.log*
 .claude/audio/*
 !.claude/audio/tracks/
 !.claude/audio/tracks/*.mp3
+!.claude/audio/ui/
+!.claude/audio/ui/*.wav
+!.claude/audio/ui/*.txt
 !.claude/audio/backgrounds/
 .claude/audio/backgrounds/*
 !.claude/audio/backgrounds/README.md

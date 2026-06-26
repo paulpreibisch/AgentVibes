@@ -62,16 +62,16 @@ PIPER_VOICES_BASE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main"
 # @calledby All voice management functions (verify_voice, get_voice_path, download_voice, list_downloaded_voices)
 # @calls mkdir, cat, dirname
 get_voice_storage_dir() {
-  local voice_dir
+  local voice_dir=""
 
   # Check for custom path in environment or config file
-  if [[ -n "$PIPER_VOICES_DIR" ]]; then
-    voice_dir="$PIPER_VOICES_DIR"
+  if [[ -n "${PIPER_VOICES_DIR:-}" ]]; then
+    voice_dir="${PIPER_VOICES_DIR}"
   else
     # Check for config file (project-local first, then global)
-    local config_file
-    if [[ -n "$CLAUDE_PROJECT_DIR" ]] && [[ -f "$CLAUDE_PROJECT_DIR/.claude/piper-voices-dir.txt" ]]; then
-      config_file="$CLAUDE_PROJECT_DIR/.claude/piper-voices-dir.txt"
+    local config_file=""
+    if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]] && [[ -f "${CLAUDE_PROJECT_DIR}/.claude/piper-voices-dir.txt" ]]; then
+      config_file="${CLAUDE_PROJECT_DIR}/.claude/piper-voices-dir.txt"
     else
       # Search up directory tree for .claude/
       local current_dir="$PWD"

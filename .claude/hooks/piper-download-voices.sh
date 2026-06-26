@@ -48,9 +48,13 @@ source "$SCRIPT_DIR/piper-voice-manager.sh"
 
 # Parse command line arguments
 AUTO_YES=false
-if [[ "$1" == "--yes" ]] || [[ "$1" == "-y" ]]; then
-  AUTO_YES=true
-fi
+INCLUDE_LIBRITTS=false
+for arg in "$@"; do
+  case "$arg" in
+    --yes|-y) AUTO_YES=true ;;
+    --libritts) INCLUDE_LIBRITTS=true ;;
+  esac
+done
 
 # Common voice models to download
 # Includes all models required by voice-assignments.json (voices-tab curated voices)
@@ -67,16 +71,24 @@ COMMON_VOICES=(
   "en_US-amy-medium"                   # Amy — warm female (13MB)
   "en_US-kristin-medium"              # Kristin — female (13MB)
   "en_GB-southern_english_female-low" # Charlotte — British female (13MB)
-  # --- LibriTTS (powers all 904 LibriTTS speakers in voices-tab) ---
-  "en_US-libritts-high"               # LibriTTS speakers — premium quality (57MB)
   # --- Additional BMAD agent voices ---
   "en_US-hfc_female-medium"           # Professional female (13MB) - BMAD: Amelia (dev)
   "en_US-lessac-medium"               # Clear female (13MB) - BMAD: Murat (tea)
   "en_US-danny-low"                   # Calm male (13MB) - BMAD: Winston (architect)
   "en_US-bryce-medium"                # Professional male (13MB) - BMAD: Bob (sm)
   "en_US-kathleen-low"                # Clear female (13MB) - BMAD: Paige (tech-writer)
-  "en_US-libritts_r-medium"           # Premium male (57MB) - BMAD: BMad Master
 )
+
+# LibriTTS voices — 904 named speakers, opt-in due to size (~114MB total)
+LIBRITTS_VOICES=(
+  "en_US-libritts-high"      # 904 named speakers — premium quality (57MB)
+  "en_US-libritts_r-medium"  # Premium male (57MB) - BMAD: BMad Master
+)
+
+# Merge libritts into the download list if requested
+if [[ "$INCLUDE_LIBRITTS" == "true" ]]; then
+  COMMON_VOICES+=("${LIBRITTS_VOICES[@]}")
+fi
 
 echo "🎙️  Piper Voice Model Downloader"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -166,14 +178,14 @@ for voice in "${NEED_DOWNLOAD[@]}"; do
   echo "📥 Downloading: $voice..."
 
   if download_voice "$voice"; then
-    ((DOWNLOADED++))
+    DOWNLOADED=$((DOWNLOADED + 1))
     voice_path="$VOICE_DIR/${voice}.onnx"
     file_size=$(du -h "$voice_path" 2>/dev/null | cut -f1)
     echo "   ✓ Downloaded: $voice"
     echo "   📁 Path: $voice_path"
     echo "   📦 Size: $file_size"
   else
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
     echo "   ✗ Failed: $voice"
   fi
 done

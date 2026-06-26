@@ -55,6 +55,10 @@ export async function validateProvider(providerName) {
       return await validateSopranoInstallation();
     case 'piper':
       return await validatePiperInstallation();
+    case 'kokoro':
+      return await validateKokoroInstallation();
+    case 'elevenlabs':
+      return await validateElevenLabsInstallation();
     case 'macos':
       return await validateMacOSProvider();
     case 'sapi':
@@ -140,6 +144,66 @@ async function validatePipxProvider(providerName, packageName) {
     message: `${providerName} TTS is not installed on your system (checked: ${checkedLocations.join(', ')})`,
     error: `${providerName.toUpperCase()}_NOT_FOUND`,
     checkedLocations
+  };
+}
+
+/**
+ * Validate Kokoro TTS installation (kokoro-onnx Python package)
+ * @returns {Promise<{installed: boolean, message: string, checkedLocations?: string[], error?: string}>}
+ */
+export async function validateKokoroInstallation() {
+  const pythonCommands = process.platform === 'win32'
+    ? ['py', 'python', 'python3']
+    : ['python3', 'python'];
+
+  for (const pythonCmd of pythonCommands) {
+    try {
+      const result = spawnSync(pythonCmd, ['-c', 'import kokoro; import soundfile; import numpy'], { // NOSONAR
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 8000,
+      });
+      if (result.status === 0) {
+        return { installed: true, message: `Kokoro TTS detected (via ${pythonCmd})`, checkedLocations: [pythonCmd] };
+      }
+    } catch {
+      // try next
+    }
+  }
+
+  return {
+    installed: false,
+    message: 'Kokoro TTS not installed. Run: pip install kokoro-onnx soundfile numpy',
+    error: 'KOKORO_NOT_FOUND',
+    checkedLocations: pythonCommands,
+  };
+}
+
+/**
+ * Validate ElevenLabs configuration (API key presence)
+ * @returns {Promise<{installed: boolean, message: string, error?: string}>}
+ */
+export async function validateElevenLabsInstallation() {
+  // Check environment variable
+  if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.length > 0) {
+    return { installed: true, message: 'ElevenLabs API key found in environment' };
+  }
+
+  // Check key file
+  const keyFile = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+  if (isSafePathExists(keyFile)) {
+    try {
+      const key = fs.readFileSync(keyFile, 'utf8').trim();
+      if (key.length > 0) {
+        return { installed: true, message: 'ElevenLabs API key found in ~/.agentvibes/elevenlabs-key.txt' };
+      }
+    } catch { /* fall through */ }
+  }
+
+  return {
+    installed: false,
+    message: 'ElevenLabs API key not set. Set ELEVENLABS_API_KEY env var or save key to ~/.agentvibes/elevenlabs-key.txt',
+    error: 'ELEVENLABS_NO_KEY',
   };
 }
 
@@ -352,6 +416,8 @@ export function getProviderInstallCommand(providerName) {
   const commands = {
     soprano: 'pip install soprano-tts',
     piper: 'pip install piper-tts',
+    kokoro: 'pip install kokoro-onnx soundfile numpy',
+    elevenlabs: 'export ELEVENLABS_API_KEY=your_key  # get free key at elevenlabs.io',
     // macOS Say and Windows SAPI are built-in, no install needed
   };
 
@@ -369,7 +435,9 @@ export async function attemptProviderInstallation(providerName) {
   const providers = {
     soprano: 'soprano-tts',
     piper: 'piper-tts',
+    kokoro: 'kokoro-onnx',
     'windows-piper': 'piper-windows-exe'
+    // elevenlabs requires API key, not pip install — handled separately
   };
 
   const pkgName = providers[providerName];
@@ -538,6 +606,8 @@ export function getProviderDisplayName(providerName) {
   const names = {
     soprano: 'Soprano TTS',
     piper: 'Piper TTS',
+    kokoro: 'Kokoro TTS',
+    elevenlabs: 'ElevenLabs',
     macos: 'macOS Say',
     sapi: 'Windows SAPI',
     'windows-sapi': 'Windows SAPI',

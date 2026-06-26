@@ -91,7 +91,11 @@ describe('ProviderService', () => {
   });
 
   test('getInstalledProviders() only returns known provider names', () => {
-    const KNOWN = new Set(['piper', 'soprano', 'macos', 'termux-ssh']);
+    // Must match every provider getInstalledProviders() can push (see
+    // provider-service.js): piper, kokoro, elevenlabs, soprano, macos. termux-ssh
+    // is retained for forward-compat. Kept in sync so newly-wired providers don't
+    // silently fail this allowlist check.
+    const KNOWN = new Set(['piper', 'kokoro', 'elevenlabs', 'soprano', 'macos', 'termux-ssh']);
     const mockConfig = { getConfig: () => ({}) };
     const svc = new ProviderService(mockConfig);
     const providers = svc.getInstalledProviders();

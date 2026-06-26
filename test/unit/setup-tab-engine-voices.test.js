@@ -67,7 +67,7 @@ describe('_openVoicePickerForLlm native-engine guard', () => {
   test('checks NATIVE_ENGINE_VOICES for draft.ttsEngine before Piper path', () => {
     const fnIdx = setupSrc.indexOf('function _openVoicePickerForLlm');
     assert.ok(fnIdx >= 0, '_openVoicePickerForLlm must exist');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
     assert.ok(
       fnBody.includes('NATIVE_ENGINE_VOICES[draft.ttsEngine]'),
       'Guard must check NATIVE_ENGINE_VOICES[draft.ttsEngine]'
@@ -77,7 +77,7 @@ describe('_openVoicePickerForLlm native-engine guard', () => {
   test('guard path does not call scanInstalledVoices', () => {
     // The early-return block for native engines ends before _refreshVP/_allVoices
     const fnIdx = setupSrc.indexOf('function _openVoicePickerForLlm');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
     // Guard block ends with 'return;' before scanInstalledVoices is reached
     const guardStart = fnBody.indexOf('NATIVE_ENGINE_VOICES[draft.ttsEngine]');
     const guardEnd   = fnBody.indexOf('return;', guardStart);
@@ -91,7 +91,7 @@ describe('_openVoicePickerForLlm native-engine guard', () => {
 
   test('native picker sets draft.voice to nativeVoice.id on Enter', () => {
     const fnIdx = setupSrc.indexOf('function _openVoicePickerForLlm');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
     assert.ok(
       fnBody.includes('draft.voice = nativeVoice.id'),
       'draft.voice must be set to nativeVoice.id in the guard block'
@@ -105,7 +105,7 @@ describe('_openTtsEnginePicker auto-sets draft.voice on engine change', () => {
   test('enter handler assigns draft.voice from NATIVE_ENGINE_VOICES or empty', () => {
     const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
     assert.ok(fnIdx >= 0, '_openTtsEnginePicker must exist');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
     // New pattern: NATIVE_ENGINE_VOICES[selectedEngine]?.id || ''
     assert.ok(
       fnBody.includes('NATIVE_ENGINE_VOICES[selectedEngine]'),
@@ -115,7 +115,7 @@ describe('_openTtsEnginePicker auto-sets draft.voice on engine change', () => {
 
   test('enter handler falls back to empty string for non-native engines', () => {
     const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 3000);
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
     assert.ok(
       fnBody.includes("?.id || ''"),
       "Engine picker must fall back to empty string when engine is not a native engine"
@@ -126,21 +126,29 @@ describe('_openTtsEnginePicker auto-sets draft.voice on engine change', () => {
 // ── Suite 4: _buildFields voice getValue uses label ───────────────────────────
 
 describe('_buildFields voice getValue shows native engine label', () => {
-  test('voice getValue uses NATIVE_ENGINE_VOICES label lookup', () => {
-    const occurrences = (setupSrc.match(/NATIVE_ENGINE_VOICES\[draft\.voice\]/g) || []).length;
+  test('both voice getValue instances delegate to formatVoiceLabel', () => {
+    const occurrences = (setupSrc.match(/formatVoiceLabel\(draft\.voice, globalVoice\)/g) || []).length;
     assert.ok(
       occurrences >= 2,
-      `Both _buildFields instances must use NATIVE_ENGINE_VOICES[draft.voice] — found ${occurrences}`
+      `Both _buildFields instances must use formatVoiceLabel(draft.voice, globalVoice) — found ${occurrences}`
     );
   });
 
-  test('voice getValue falls back to draft.voice when not a native engine', () => {
-    // Pattern: NATIVE_ENGINE_VOICES[draft.voice]?.label ?? (draft.voice || ...)
-    const count = (setupSrc.match(/NATIVE_ENGINE_VOICES\[draft\.voice\]\?\.label \?\?/g) || []).length;
-    assert.ok(
-      count >= 2,
-      `Both _buildFields must use null-coalescing fallback — found ${count}`
-    );
+  test('formatVoiceLabel does native-engine label lookup with fallback', () => {
+    // formatVoiceLabel must look up NATIVE_ENGINE_VOICES, then ElevenLabs name,
+    // then fall back to the raw voice / global default.
+    const fn = setupSrc.slice(setupSrc.indexOf('function formatVoiceLabel'));
+    assert.ok(fn.includes('NATIVE_ENGINE_VOICES[voice]'), 'must look up NATIVE_ENGINE_VOICES label');
+    assert.ok(fn.includes('elevenLabsVoiceName(voice)'), 'must map ElevenLabs voice IDs to a name');
+    assert.ok(fn.includes('global: ${globalVoice}'), 'must fall back to the global default');
+  });
+
+  test('ElevenLabs voices are defined as a static built-in list with raw IDs', () => {
+    assert.ok(setupSrc.includes('const ELEVENLABS_VOICES'), 'ELEVENLABS_VOICES must be defined');
+    assert.ok(setupSrc.includes('ELEVENLABS_DEFAULT_VOICE_ID'), 'a default voice ID must be defined');
+    // Sanity: at least ~20 premade voices listed
+    const ids = (setupSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
+    assert.ok(ids >= 20, `expected >=20 ElevenLabs voice IDs, found ${ids}`);
   });
 });
 

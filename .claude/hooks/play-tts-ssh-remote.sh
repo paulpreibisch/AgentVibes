@@ -223,6 +223,8 @@ done
 
 # LLM settings win over agent-name settings
 [[ -n "$LLM_REVERB"    ]] && SOX_EFFECTS="$LLM_REVERB"
+# Allow caller to override reverb for one-shot preview (e.g. effects picker Space preview)
+[[ -n "${AGENTVIBES_REVERB_OVERRIDE:-}" ]] && SOX_EFFECTS="$AGENTVIBES_REVERB_OVERRIDE"
 [[ -n "$LLM_BG_FILE"   ]] && BG_FILE="$LLM_BG_FILE"
 [[ -n "$LLM_BG_VOLUME" ]] && BG_VOLUME="$LLM_BG_VOLUME"
 
@@ -274,7 +276,7 @@ if [[ -z "$PROVIDER" ]]; then
 fi
 # Validate — only known TTS providers (not transport providers like ssh-remote)
 case "${PROVIDER:-}" in
-  piper|soprano|macos|windows-sapi) ;;
+  piper|soprano|macos|windows-sapi|kokoro|elevenlabs) ;;
   *) PROVIDER="piper" ;;
 esac
 
@@ -334,7 +336,12 @@ echo "Sending to $SSH_HOST..." >&2
 # Build SSH args — use explicit key/port from config if available, else rely on ~/.ssh/config
 SSH_ARGS=()
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
-[[ -n "$SSH_PORT" ]] && SSH_ARGS+=(-p "$SSH_PORT")
+# Only pass -p for an explicit, non-default port.  Port 22 is ssh's universal
+# default, so forcing "-p 22" is at best a no-op and at worst overrides the
+# real port of an ~/.ssh/config Host alias (e.g. laptop-win -> Port 45217),
+# silently delivering the payload to the wrong port.  Empty or "22" means
+# "use ssh / ~/.ssh/config defaults" -- never force it.
+if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then SSH_ARGS+=(-p "$SSH_PORT"); fi
 
 # ForceCommand receiver: SSH_ORIGINAL_COMMAND passes the payload directly.
 # Run ssh inside the backgrounded subshell so its exit code is reachable via $?

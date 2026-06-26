@@ -177,9 +177,11 @@ jobs:
             exit 1
           fi
 
-          echo "Checking for 16Speakers in download list..."
-          if ! grep -q "16Speakers" .claude/hooks/piper-download-voices.sh; then
-            echo "❌ 16Speakers not found in COMMON_VOICES"
+          echo "Checking for 16Speakers in the multispeaker registry..."
+          # The 16Speakers model moved out of piper-download-voices.sh into the
+          # multispeaker registry (per-speaker selection); check it there.
+          if ! grep -q "16Speakers" .claude/hooks/piper-multispeaker-registry.sh; then
+            echo "❌ 16Speakers not found in piper-multispeaker-registry.sh"
             exit 1
           fi
 

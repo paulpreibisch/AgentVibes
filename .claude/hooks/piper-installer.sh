@@ -178,9 +178,9 @@ else
 
     # Try to install pipx
     if command -v apt-get &> /dev/null; then
-      # Debian/Ubuntu
-      sudo apt-get update
-      sudo apt-get install -y pipx
+      # Debian/Ubuntu — DEBIAN_FRONTEND prevents tzdata interactive prompt
+      DEBIAN_FRONTEND=noninteractive sudo -E apt-get update -qq
+      DEBIAN_FRONTEND=noninteractive sudo -E apt-get install -y pipx
     elif command -v brew &> /dev/null; then
       # Linux with Homebrew
       brew install pipx
@@ -198,16 +198,21 @@ else
       exit 1
     fi
 
-    # Ensure pipx is in PATH
-    pipx ensurepath
+    # Ensure pipx is in PATH (updates shell rc file) and update current session
+    pipx ensurepath 2>/dev/null || true
+    export PATH="$HOME/.local/bin:$PATH"
     echo ""
   fi
+
+  # Make sure ~/.local/bin is in PATH for this session (pipx installs there)
+  export PATH="$HOME/.local/bin:$PATH"
+  INSTALL_DIR="$HOME/.local/bin"
 
   # Install Piper TTS
   echo "📥 Installing Piper TTS via pipx..."
   pipx install piper-tts
 
-  if ! command -v piper &> /dev/null; then
+  if ! command -v piper &> /dev/null && [[ ! -x "$HOME/.local/bin/piper" ]]; then
     echo ""
     echo "❌ Installation completed but piper command not found in PATH"
     echo ""

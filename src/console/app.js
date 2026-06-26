@@ -9,7 +9,8 @@
 
 import blessed from 'blessed';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { NavigationService, TAB_ORDER } from '../services/navigation-service.js';
@@ -630,21 +631,36 @@ export class AgentVibesConsole {
       try { execFileSync('which', [bin], { stdio: 'ignore', timeout: 2000 }); return true; } // NOSONAR
       catch { return false; }
     };
+    const _pyHas = (mod) => {
+      try { execFileSync('python3', ['-c', `import ${mod}`], { stdio: 'ignore', timeout: 3000 }); return true; } // NOSONAR
+      catch { return false; }
+    };
+    const _elKeySet = () => {
+      if (process.env.ELEVENLABS_API_KEY) return true;
+      try {
+        const kf = path.join(os.homedir(), '.agentvibes', 'elevenlabs-key.txt');
+        return existsSync(kf) && readFileSync(kf, 'utf8').trim().length > 0;
+      } catch { return false; }
+    };
     const detected = {
-      piper:   _has('piper'),
-      soprano: _has('soprano'),
-      sapi:    process.platform === 'win32',
-      macos:   process.platform === 'darwin' && _has('say'),
+      piper:       _has('piper'),
+      kokoro:      _pyHas('kokoro'),
+      elevenlabs:  _elKeySet(),
+      soprano:     _has('soprano'),
+      sapi:        process.platform === 'win32',
+      macos:       process.platform === 'darwin' && _has('say'),
     };
 
     // Build provider status badges:  ● Name  (green if detected, grey if not)
     const on  = (label) => `{green-fg}●{/green-fg} ${label}`;
     const off = (label) => `{#546e7a-fg}● ${label}{/#546e7a-fg}`;
     const badges = [
-      detected.piper   ? on('Piper')        : off('Piper'),
-      detected.soprano ? on('Soprano')      : off('Soprano'),
-      detected.sapi    ? on('Windows SAPI') : off('Windows SAPI'),
-      detected.macos   ? on('Mac Say')      : off('Mac Say'),
+      detected.piper       ? on('Piper')       : off('Piper'),
+      detected.kokoro      ? on('Kokoro')       : off('Kokoro'),
+      detected.elevenlabs  ? on('ElevenLabs')   : off('ElevenLabs'),
+      detected.soprano     ? on('Soprano')      : off('Soprano'),
+      detected.sapi        ? on('Windows SAPI') : off('Windows SAPI'),
+      detected.macos       ? on('Mac Say')      : off('Mac Say'),
     ].join('  ');
 
     const footer = blessed.box({

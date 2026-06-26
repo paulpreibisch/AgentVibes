@@ -3190,7 +3190,9 @@ function execScript(scriptPath, options = {}) {
   // Instead, directly execute the script file without sourcing shell config
   // The script itself will be executed in a clean environment
   // Note: This means shell aliases/functions won't be available, but that's safer
-  return execFileSync(scriptFile, args, {
+  // S8701: scriptFile is validated to live under .claude/hooks (above), args are
+  // passed as an array and shell:false disables shell interpretation. Risk handled.
+  return execFileSync(scriptFile, args, { // NOSONAR
     ...options,
     shell: false  // Don't use shell to avoid injection risks
   });
@@ -3598,7 +3600,7 @@ function shouldIncludeHookFile(file, stat) {
            !file.startsWith('.');
   }
   return stat.isFile() &&
-         (file.endsWith('.sh') || file === 'hooks.json') &&
+         (file.endsWith('.sh') || file.endsWith('.py') || file === 'hooks.json') &&
          !file.includes('prepare-release') &&
          !file.startsWith('.');
 }
@@ -4350,6 +4352,47 @@ async function installPluginManifest(targetDir, spinner) {
 }
 
 /**
+ * Prompt the user to optionally download the LibriTTS 900+ voice library.
+ * Skipped silently if: options.yes, libritts already downloaded, or script missing.
+ */
+async function offerLibriTTSDownload(piperDownloadPath, options) {
+  if (options.yes) return;
+  if (!fsSync.existsSync(piperDownloadPath)) return;
+
+  const voicesDir = path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'piper-voices');
+  const librittsAlreadyInstalled = fsSync.existsSync(path.join(voicesDir, 'en_US-libritts-high.onnx'));
+  if (librittsAlreadyInstalled) return;
+
+  console.log(chalk.cyan('\n🎙️  Want 900+ voice variations?\n'));
+  console.log(chalk.gray('   The LibriTTS model includes 904 named speakers (Ryan, Sarah, Joe, and more).'));
+  console.log(chalk.gray('   Browse them with /agent-vibes:list after install.'));
+  console.log(chalk.gray('   Download size: ~114MB\n'));
+
+  const { installLibriTTS } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'installLibriTTS',
+    message: 'Download LibriTTS voice library? (optional)',
+    default: false,
+  }]);
+
+  if (!installLibriTTS) {
+    console.log(chalk.gray('   Skipped. Run later: ~/.claude/hooks/piper-download-voices.sh --libritts\n'));
+    return;
+  }
+
+  try {
+    execScript(`${piperDownloadPath} --libritts --yes`, {
+      stdio: 'inherit',
+      env: process.env
+    });
+    console.log(chalk.green('\n✅ LibriTTS voices downloaded! Browse with /agent-vibes:list\n'));
+  } catch {
+    console.log(chalk.yellow('\n⚠️  LibriTTS download failed.'));
+    console.log(chalk.gray('   Run later: ~/.claude/hooks/piper-download-voices.sh --libritts\n'));
+  }
+}
+
+/**
  * Check if Piper is installed and optionally install it
  * @param {string} targetDir - Target installation directory
  * @param {Object} options - Installation options
@@ -4374,6 +4417,8 @@ async function checkAndInstallPiper(targetDir, options) {
 
           if (hasVoices) {
             console.log(chalk.green(`   Found ${voiceFiles.length} voice model(s)\n`));
+            const piperDownloadPathEarly = path.join(targetDir, '.claude', 'hooks', 'piper-download-voices.sh');
+            await offerLibriTTSDownload(piperDownloadPathEarly, options);
             return;
           }
         }
@@ -4402,6 +4447,7 @@ async function checkAndInstallPiper(targetDir, options) {
         console.log(chalk.cyan(`   ${piperDownloadPath}\n`));
       }
 
+      await offerLibriTTSDownload(piperDownloadPath, options);
       return;
     } catch {
       console.log(chalk.yellow('⚠️  Piper TTS binary not detected\n'));
@@ -4589,6 +4635,43 @@ async function checkAndInstallPiperWindows(targetDir, options) {
     } catch (error) {
       spinner.fail(chalk.red('Failed to download voice: ' + error.message));
       console.log(chalk.yellow('You can download voices manually later.\n'));
+    }
+  }
+
+  // Offer LibriTTS 900+ voices (Windows — downloaded via Node directly)
+  if (!options.yes && !fsSync.existsSync(path.join(voicesDir, 'en_US-libritts-high.onnx'))) {
+    console.log(chalk.cyan('\n🎙️  Want 900+ voice variations?\n'));
+    console.log(chalk.gray('   The LibriTTS model includes 904 named speakers (Ryan, Sarah, Joe, and more).'));
+    console.log(chalk.gray('   Browse them with /agent-vibes:list after install.'));
+    console.log(chalk.gray('   Download size: ~114MB\n'));
+
+    const { installLibriTTSWin } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'installLibriTTSWin',
+      message: 'Download LibriTTS voice library? (optional)',
+      default: false,
+    }]);
+
+    if (installLibriTTSWin) {
+      const librittsVoices = [
+        { name: 'en_US-libritts-high', path: 'en/en_US/libritts/high' },
+        { name: 'en_US-libritts_r-medium', path: 'en/en_US/libritts_r/medium' },
+      ];
+      const piperBase = 'https://huggingface.co/rhasspy/piper-voices/resolve/main';
+      await fs.mkdir(voicesDir, { recursive: true });
+      for (const v of librittsVoices) {
+        spinner.start(`Downloading ${v.name}...`);
+        try {
+          await downloadFile(`${piperBase}/${v.path}/${v.name}.onnx`, path.join(voicesDir, `${v.name}.onnx`));
+          await downloadFile(`${piperBase}/${v.path}/${v.name}.onnx.json`, path.join(voicesDir, `${v.name}.onnx.json`));
+          spinner.succeed(chalk.green(`Downloaded ${v.name}`));
+        } catch (err) {
+          spinner.fail(chalk.yellow(`Failed to download ${v.name}: ${err.message}`));
+        }
+      }
+      console.log(chalk.green('\n✅ LibriTTS voices ready! Browse with /agent-vibes:list\n'));
+    } else {
+      console.log(chalk.gray('   Skipped. Download later via: npx agentvibes  → Voices tab → Install BMAD Voices\n'));
     }
   }
 }
@@ -5793,17 +5876,22 @@ Troubleshooting:
     if (userConfig.hermes?.enabled) {
       try {
         const hermesHooksDir = path.join(userConfig.hermes.hermesHome, 'hooks', 'agentvibes-tts');
-        // Validate that hermesHome stays within expected bounds (no path traversal)
+        // Validate that hermesHome stays within expected bounds (no path traversal).
+        // Use a trailing path.sep so a sibling like ".../hermes-evil" can't satisfy
+        // the prefix check against ".../hermes".
         const resolvedHermesHome = path.resolve(userConfig.hermes.hermesHome);
         const resolvedHooksDir = path.resolve(hermesHooksDir);
-        if (!resolvedHooksDir.startsWith(resolvedHermesHome)) {
+        if (resolvedHooksDir !== resolvedHermesHome &&
+            !resolvedHooksDir.startsWith(resolvedHermesHome + path.sep)) {
           throw new Error('Invalid Hermes hooks path — possible path traversal');
         }
-        await fs.mkdir(hermesHooksDir, { recursive: true, mode: 0o700 });
+        // S8707: writes target resolvedHooksDir, validated above to stay within
+        // the user-configured hermesHome. Risk handled.
+        await fs.mkdir(hermesHooksDir, { recursive: true, mode: 0o700 }); // NOSONAR
 
         // HOOK.yaml
         const hookYaml = `name: agentvibes-tts\ndescription: Send agent responses to AgentVibes TTS remotely\nevents:\n  - agent:end\n`;
-        await fs.writeFile(path.join(hermesHooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 });
+        await fs.writeFile(path.join(hermesHooksDir, 'HOOK.yaml'), hookYaml, { mode: 0o600 }); // NOSONAR — see S8707 note above
 
         // handler.py — substitute config values; use JSON.stringify for safe string embedding
         const safeKeyPath  = JSON.stringify(userConfig.hermes.sshKeyPath);
@@ -5940,7 +6028,7 @@ def _strip_markdown(text: str) -> str:
     text = re.sub(r"\\s+", " ", text).strip()
     return text
 `;
-        await fs.writeFile(path.join(hermesHooksDir, 'handler.py'), handlerPy, { mode: 0o600 });
+        await fs.writeFile(path.join(hermesHooksDir, 'handler.py'), handlerPy, { mode: 0o600 }); // NOSONAR — see S8707 note above
         spinner.succeed(chalk.green('Hermes integration installed!'));
         console.log(chalk.gray(`   Hooks written to: ${hermesHooksDir}`));
         console.log(chalk.gray('   Run: hermes gateway restart'));

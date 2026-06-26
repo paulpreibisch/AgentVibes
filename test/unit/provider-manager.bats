@@ -55,6 +55,8 @@ teardown() {
   mv "$hooks_dir/play-tts-agentvibes-receiver.sh" "$hooks_dir/play-tts-agentvibes-receiver.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$hooks_dir/play-tts-agentvibes-receiver-for-voiceless-connections.sh.bak" 2>/dev/null || true
   mv "$hooks_dir/play-tts-windows-receiver.sh" "$hooks_dir/play-tts-windows-receiver.sh.bak" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-elevenlabs.sh" "$hooks_dir/play-tts-elevenlabs.sh.bak" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-kokoro.sh" "$hooks_dir/play-tts-kokoro.sh.bak" 2>/dev/null || true
 
   run "$PROVIDER_MANAGER" list
 
@@ -71,6 +73,8 @@ teardown() {
   mv "$hooks_dir/play-tts-agentvibes-receiver.sh.bak" "$hooks_dir/play-tts-agentvibes-receiver.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-agentvibes-receiver-for-voiceless-connections.sh.bak" "$hooks_dir/play-tts-agentvibes-receiver-for-voiceless-connections.sh" 2>/dev/null || true
   mv "$hooks_dir/play-tts-windows-receiver.sh.bak" "$hooks_dir/play-tts-windows-receiver.sh" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-elevenlabs.sh.bak" "$hooks_dir/play-tts-elevenlabs.sh" 2>/dev/null || true
+  mv "$hooks_dir/play-tts-kokoro.sh.bak" "$hooks_dir/play-tts-kokoro.sh" 2>/dev/null || true
 }
 
 # ============================================================================

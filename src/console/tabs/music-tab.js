@@ -13,8 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
-import { buildAudioEnv, detectMp3Player } from '../audio-env.js';
+import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
 import { t } from '../../i18n/strings.js';
 
 // Package-relative tracks dir — used as fallback when cwd has no .claude/audio/tracks/
@@ -542,28 +541,14 @@ export function createMusicTab(screen, services) {
   let _playingProcess = null;
   let _playingTrackId = null;
 
-  // Kill the entire process group so child audio processes (ffplay, play, mpg123) all die
   function _killPlayingProcess() {
     if (_playingProcess) {
-      const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      try {
-        if (_isWin) {
-          // Windows: kill the process tree via taskkill (process group kill doesn't work)
-          spawn('taskkill', ['/F', '/T', '/PID', String(_playingProcess.pid)], { // NOSONAR
-            stdio: 'ignore', windowsHide: true,
-          });
-        } else {
-          process.kill(-_playingProcess.pid, 'SIGTERM');
-        }
-      } catch (e) {
-        if (e.code !== 'ESRCH') { /* ignore */ }
-      }
+      _playingProcess.kill();
       _playingProcess = null;
     }
   }
 
   const _spawnEnv = buildAudioEnv();
-  const _detectedPlayer = detectMp3Player(_spawnEnv);
 
   process.on('exit', () => { _killPlayingProcess(); });
 
@@ -594,7 +579,8 @@ export function createMusicTab(screen, services) {
     _killPlayingProcess();
     _playingTrackId = null;
 
-    if (!_detectedPlayer) {
+    const proc = spawnMp3Player(trackPath, _spawnEnv);
+    if (!proc) {
       const installHint = process.platform === 'win32'
         ? 'No MP3 player found. Install ffmpeg: winget install ffmpeg'
         : 'No MP3 player found. Install ffmpeg: sudo apt install ffmpeg';
@@ -604,18 +590,14 @@ export function createMusicTab(screen, services) {
       return;
     }
 
-    const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-    // Spawn the detected player directly (no sh -c chain — avoids VLC/cvlc stderr issues)
-    _playingProcess = spawn(_detectedPlayer.bin, _detectedPlayer.args(trackPath), {
-      stdio: 'ignore', detached: !_isWin, windowsHide: true, env: _spawnEnv,
-    });
+    _playingProcess = proc;
     _playingTrackId = trackId;
 
     const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
     previewLine.setContent(`{${COLORS.playingFg}-fg}♪ Previewing: ${label}  (Space again to stop){/${COLORS.playingFg}-fg}`);
     screen.render();
 
-    _playingProcess.on('exit', () => {
+    proc.on('exit', () => {
       if (_playingTrackId === trackId) {
         _playingTrackId = null;
         _playingProcess = null;
@@ -624,7 +606,7 @@ export function createMusicTab(screen, services) {
       }
     });
 
-    _playingProcess.on('error', () => {
+    proc.on('error', () => {
       if (_playingTrackId === trackId) {
         _killPlayingProcess();
         _playingTrackId = null;

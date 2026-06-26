@@ -119,7 +119,7 @@ describe('formatTrackLabel', () => {
   });
 
   test('strips agent_vibes_ prefix and _loop/_v2 suffixes', () => {
-    assert.strictEqual(formatTrackLabel('agent_vibes_arabic_v2_loop.mp3'), '🎵 Arabic Oud');
+    assert.strictEqual(formatTrackLabel('agent_vibes_chillwave_v2_loop.mp3'), '🌊 Chillwave');
   });
 
   test('strips agentvibes_ prefix', () => {

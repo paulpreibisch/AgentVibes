@@ -42,13 +42,13 @@ export function t(lang, key) {
  * Each entry has: value (language code), name (display label for inquirer)
  */
 export const SUPPORTED_LANGUAGES = [
-  { value: 'en',    name: '🇺🇸 English' },
-  { value: 'es',    name: '🇪🇸 Español (Spanish)' },
-  { value: 'fr',    name: '🇫🇷 Français (French)' },
-  { value: 'de',    name: '🇩🇪 Deutsch (German)' },
-  { value: 'pt',    name: '🇧🇷 Português (Portuguese)' },
-  { value: 'ja',    name: '🇯🇵 日本語 (Japanese)' },
-  { value: 'hi',    name: '🇮🇳 हिन्दी (Hindi)' },
-  { value: 'zh-CN', name: '🇨🇳 中文 (Chinese Simplified)' },
-  { value: 'ko',    name: '🇰🇷 한국어 (Korean)' },
+  { value: 'en',    name: '[EN] English' },
+  { value: 'es',    name: '[ES] Español (Spanish)' },
+  { value: 'fr',    name: '[FR] Français (French)' },
+  { value: 'de',    name: '[DE] Deutsch (German)' },
+  { value: 'pt',    name: '[PT] Português (Portuguese)' },
+  { value: 'ja',    name: '[JA] 日本語 (Japanese)' },
+  { value: 'hi',    name: '[HI] हिन्दी (Hindi)' },
+  { value: 'zh-CN', name: '[ZH] 中文 (Chinese Simplified)' },
+  { value: 'ko',    name: '[KO] 한국어 (Korean)' },
 ];
