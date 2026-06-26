@@ -26,10 +26,15 @@ else
   # shellcheck disable=SC2064
   trap "rm -f '$MARKER'" EXIT
   touch "$MARKER"
-  # Belt-and-suspenders: the marker silences the shell hooks (play-tts.sh /
-  # play-tts.ps1), while this env flag silences the TUI's direct-spawn voice
-  # previews (SAPI/piper/say/kokoro) that coverage tests fire via the Space key.
+  # Belt-and-suspenders silencing during tests:
+  #  - the marker file silences the shell hooks (play-tts.sh / play-tts.ps1);
+  #  - AGENTVIBES_SUPPRESS_AUDIO silences the TUI's direct-spawn voice previews
+  #    (SAPI/piper/say/kokoro) that coverage tests fire via the Space key;
+  #  - AGENTVIBES_NO_PLAY is the providers' own "synthesize but don't play" flag,
+  #    honored by every play-tts-*.ps1/.sh, so any provider script a test invokes
+  #    directly still produces its [VOICE]/path output without real playback.
   export AGENTVIBES_SUPPRESS_AUDIO=true
+  export AGENTVIBES_NO_PLAY=1
 fi
 
 npm run test:syntax

@@ -451,6 +451,11 @@ if ($env:AGENTVIBES_VERBOSE -eq "1") {
 # ffplay uses libswresample with sinc resampling — no artefacts.
 function Invoke-AudioPlay {
     param([string]$FilePath)
+    # Stay silent while the automated test suite is running. The windows-tts/effects
+    # tests invoke this script and assert on its [VOICE]/routing output (printed
+    # earlier) — they never check playback — so skipping only the audio output keeps
+    # them green while preventing real speech on the developer's machine.
+    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) { return }
     $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
     $fp = if ($ffplayCmd) { $ffplayCmd.Source } else { $null }
     if (-not $fp) {
