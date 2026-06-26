@@ -49,10 +49,15 @@ export const DURATION_LIMITS = {
  */
 export async function getAudioDuration(filePath) {
   return new Promise((resolve) => {
+    // Resolve exactly once: an 'error' event, a 'close' event, and a timeout can
+    // all race, and a double-resolve would mask the first (correct) result.
+    let settled = false;
+    const done = (result) => { if (!settled) { settled = true; resolve(result); } };
+
     try {
       // Verify file exists
       if (!fs.existsSync(filePath)) {
-        resolve({
+        done({
           success: false,
           duration: null,
           error: 'File does not exist'
@@ -62,13 +67,35 @@ export async function getAudioDuration(filePath) {
 
       // Check if ffprobe is available
       const checkFFprobe = spawn('which', ['ffprobe']); // NOSONAR
-      let ffprobeExists = false;
+
+      // `which` does not exist on Windows, so this spawn can fail outright.
+      // Without an 'error' listener Node re-throws as an unhandled error and
+      // crashes the caller; handle it and degrade gracefully instead.
+      const checkTimer = setTimeout(() => {
+        try { checkFFprobe.kill(); } catch { /* already exited */ }
+        done({
+          success: false,
+          duration: null,
+          error: 'ffprobe availability check timed out'
+        });
+      }, 5000);
+      checkTimer.unref?.();
+
+      checkFFprobe.on('error', (err) => {
+        clearTimeout(checkTimer);
+        done({
+          success: false,
+          duration: null,
+          error: `ffprobe not found: ${err.message}. Please install ffmpeg.`
+        });
+      });
 
       checkFFprobe.on('close', (code) => {
-        ffprobeExists = (code === 0);
+        clearTimeout(checkTimer);
+        if (settled) return;
 
-        if (!ffprobeExists) {
-          resolve({
+        if (code !== 0) {
+          done({
             success: false,
             duration: null,
             error: 'ffprobe not found. Please install ffmpeg: sudo apt install ffmpeg (Linux) or brew install ffmpeg (macOS)'
@@ -85,6 +112,18 @@ export async function getAudioDuration(filePath) {
           filePath
         ]);
 
+        // A malformed or locked file can make ffprobe hang; cap it so the promise
+        // always settles instead of leaving the caller awaiting forever.
+        const ffTimer = setTimeout(() => {
+          try { ffprobe.kill(); } catch { /* already exited */ }
+          done({
+            success: false,
+            duration: null,
+            error: 'ffprobe timed out reading the file'
+          });
+        }, 10000);
+        ffTimer.unref?.();
+
         let stdoutChunks = [];
         let stderrChunks = [];
 
@@ -97,11 +136,14 @@ export async function getAudioDuration(filePath) {
         });
 
         ffprobe.on('close', (code) => {
+          clearTimeout(ffTimer);
+          if (settled) return;
+
           const stdout = Buffer.concat(stdoutChunks).toString();
           const stderr = Buffer.concat(stderrChunks).toString();
 
           if (code !== 0) {
-            resolve({
+            done({
               success: false,
               duration: null,
               error: `ffprobe exited with code ${code}: ${stderr || 'Unknown error'}`
@@ -112,7 +154,7 @@ export async function getAudioDuration(filePath) {
           const duration = parseFloat(stdout.trim());
 
           if (isNaN(duration) || duration <= 0) {
-            resolve({
+            done({
               success: false,
               duration: null,
               error: 'Invalid duration value from ffprobe'
@@ -120,7 +162,7 @@ export async function getAudioDuration(filePath) {
             return;
           }
 
-          resolve({
+          done({
             success: true,
             duration,
             error: null
@@ -128,7 +170,8 @@ export async function getAudioDuration(filePath) {
         });
 
         ffprobe.on('error', (err) => {
-          resolve({
+          clearTimeout(ffTimer);
+          done({
             success: false,
             duration: null,
             error: `Failed to spawn ffprobe: ${err.message}. Please install ffmpeg.`
@@ -137,7 +180,7 @@ export async function getAudioDuration(filePath) {
       });
 
     } catch (err) {
-      resolve({
+      done({
         success: false,
         duration: null,
         error: `Unexpected error: ${err.message}`

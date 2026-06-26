@@ -287,4 +287,45 @@ describe('utils-preview-list-prompt', () => {
   test('top-level execution passed without fatal errors', () => {
     assert.ok(true);
   });
+
+  // Regression: the finally block must pause() the flowing stdin that
+  // readline.emitKeypressEvents() opened, otherwise the stdin handle keeps the
+  // event loop alive after the prompt resolves (the leak that forced the
+  // module-level stdin.unref() band-aid).
+  test('pauses stdin on cleanup when onPreview + TTY were used', async () => {
+    const origIsTTY = process.stdin.isTTY;
+    const origSetRawMode = process.stdin.setRawMode;
+    patchTTY(true);
+    if (!process.stdin.setRawMode) process.stdin.setRawMode = () => {};
+
+    const pauseSpy = mock.method(process.stdin, 'pause', () => process.stdin);
+    try {
+      await createPreviewListPrompt(
+        { prompt: async () => _promptResult },
+        {
+          type: 'list', name: 'selectedVoice', message: 'Pick',
+          choices: makeChoices(), onPreview: async () => null,
+        }
+      );
+      assert.ok(pauseSpy.mock.callCount() >= 1, 'process.stdin.pause() should be called in finally');
+    } finally {
+      pauseSpy.mock.restore();
+      patchTTY(origIsTTY);
+      if (!origSetRawMode) { delete process.stdin.setRawMode; }
+      else { process.stdin.setRawMode = origSetRawMode; }
+    }
+  });
+
+  test('does NOT pause stdin when onPreview is absent (no keypress wiring)', async () => {
+    const pauseSpy = mock.method(process.stdin, 'pause', () => process.stdin);
+    try {
+      await createPreviewListPrompt(
+        { prompt: async () => _promptResult },
+        { type: 'list', name: 'selectedVoice', message: 'Pick', choices: makeChoices() }
+      );
+      assert.strictEqual(pauseSpy.mock.callCount(), 0, 'no stdin wiring → no pause');
+    } finally {
+      pauseSpy.mock.restore();
+    }
+  });
 });

@@ -129,6 +129,14 @@ export async function createPreviewListPrompt(inquirer, config) {
       } catch (e) {
         // Failed to restore raw mode, but we're exiting anyway
       }
+      // readline.emitKeypressEvents() put stdin into flowing mode; pause it so the
+      // open stdin handle no longer keeps the event loop alive after the prompt
+      // resolves (otherwise the process lingers until stdin is otherwise closed).
+      try {
+        process.stdin.pause();
+      } catch (e) {
+        // stdin may already be closed; nothing more to do
+      }
     }
   }
 }
