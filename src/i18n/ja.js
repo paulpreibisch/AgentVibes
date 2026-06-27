@@ -143,7 +143,6 @@ export default {
   voicesSwitchBtn: "[音声切り替え]",
   voicesFavoriteBtn: "[★ お気に入り]",
   voicesDownloadBtn: "[音声ダウンロード]",
-  voicesInstallAllBtn: "[BMADボイスをインストール]",
   voicesRowHintInstalled: "[Space] プレビュー  [Enter] 選択  [*] お気に入り",
   voicesRowHintUninstalled: "[Enter] ダウンロードしてインストール",
   musicRowHint: "[Space] 再生  [Enter] 選択  [*] お気に入り",

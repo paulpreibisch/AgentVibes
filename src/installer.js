@@ -4671,7 +4671,7 @@ async function checkAndInstallPiperWindows(targetDir, options) {
       }
       console.log(chalk.green('\n✅ LibriTTS voices ready! Browse with /agent-vibes:list\n'));
     } else {
-      console.log(chalk.gray('   Skipped. Download later via: npx agentvibes  → Voices tab → Install BMAD Voices\n'));
+      console.log(chalk.gray('   Skipped. Download later via: npx agentvibes voices download\n'));
     }
   }
 }

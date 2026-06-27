@@ -143,7 +143,6 @@ export default {
   voicesSwitchBtn: "[음성 전환]",
   voicesFavoriteBtn: "[★ 즐겨찾기]",
   voicesDownloadBtn: "[음성 다운로드]",
-  voicesInstallAllBtn: "[BMAD 음성 설치]",
   voicesRowHintInstalled: "[Space] 미리보기  [Enter] 선택  [*] 즐겨찾기",
   voicesRowHintUninstalled: "[Enter] 다운로드 및 설치",
   musicRowHint: "[Space] 재생  [Enter] 선택  [*] 즐겨찾기",

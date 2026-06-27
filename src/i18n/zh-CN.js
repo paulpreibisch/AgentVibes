@@ -143,7 +143,6 @@ export default {
   voicesSwitchBtn: "[切换语音]",
   voicesFavoriteBtn: "[★ 收藏]",
   voicesDownloadBtn: "[下载语音]",
-  voicesInstallAllBtn: "[安装BMAD语音]",
   voicesRowHintInstalled: "[Space] 预览  [Enter] 选择  [*] 收藏",
   voicesRowHintUninstalled: "[Enter] 下载并安装",
   musicRowHint: "[Space] 播放  [Enter] 选择  [*] 收藏",

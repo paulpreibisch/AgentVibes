@@ -143,7 +143,6 @@ export default {
   voicesSwitchBtn: "[Switch Voice]",
   voicesFavoriteBtn: "[+ Thumbs Up]",
   voicesDownloadBtn: "[Download Voice]",
-  voicesInstallAllBtn: "[Install BMAD Voices]",
   voicesRowHintInstalled: "[Space] Preview  [Enter] Select  [+/*] Up  [-] Down",
   voicesRowHintUninstalled: "[Enter] Download & Install",
   musicRowHint: "[Space] Play  [Enter] Select  [+/*] Favorite",
