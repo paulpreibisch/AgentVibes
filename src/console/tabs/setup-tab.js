@@ -20,6 +20,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
 import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
+import { ELEVENLABS_VOICES, KOKORO_VOICE_IDS } from '../../services/provider-voice-catalog.js';
 import {
   PROVIDERS,
   checkClaudeInstalled, checkCopilotInstalled, checkCodexInstalled,
@@ -174,35 +175,7 @@ const NATIVE_ENGINE_VOICES = {
 // name→id map to keep in sync. Custom/cloned account voices are NOT listed here
 // (that needs a live API fetch); add them on elevenlabs.io to use their IDs.
 const ELEVENLABS_DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
-const ELEVENLABS_VOICES = [
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',   gender: 'Female', lang: 'en-US', desc: 'Mature, reassuring'      },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger',   gender: 'Male',   lang: 'en-US', desc: 'Laid-back, casual'       },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura',   gender: 'Female', lang: 'en-US', desc: 'Enthusiast, quirky'      },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'Male',   lang: 'en-AU', desc: 'Deep, confident'         },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',  gender: 'Male',   lang: 'en-GB', desc: 'Warm storyteller'        },
-  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum',  gender: 'Male',   lang: 'en-US', desc: 'Husky trickster'         },
-  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River',   gender: '',       lang: 'en-US', desc: 'Relaxed, neutral'        },
-  { id: 'SOYHLrjzK2X1ezoPC6cr', name: 'Harry',   gender: 'Male',   lang: 'en-US', desc: 'Fierce warrior'          },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam',    gender: 'Male',   lang: 'en-US', desc: 'Energetic creator'       },
-  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',   gender: 'Female', lang: 'en-GB', desc: 'Clear educator'          },
-  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'Female', lang: 'en-US', desc: 'Knowledgable, pro'       },
-  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will',    gender: 'Male',   lang: 'en-US', desc: 'Relaxed optimist'        },
-  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'Female', lang: 'en-US', desc: 'Playful, bright'         },
-  { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric',    gender: 'Male',   lang: 'en-US', desc: 'Smooth, trustworthy'     },
-  { id: 'hpp4J3VqNfWAUOO0d1Us', name: 'Bella',   gender: 'Female', lang: 'en-US', desc: 'Professional, warm'      },
-  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris',   gender: 'Male',   lang: 'en-US', desc: 'Charming, down-to-earth' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian',   gender: 'Male',   lang: 'en-US', desc: 'Deep, comforting'        },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',  gender: 'Male',   lang: 'en-GB', desc: 'Steady broadcaster'      },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',    gender: 'Female', lang: 'en-GB', desc: 'Velvety actress'         },
-  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam',    gender: 'Male',   lang: 'en-US', desc: 'Dominant, firm'          },
-  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill',    gender: 'Male',   lang: 'en-US', desc: 'Wise, mature'            },
-  // ── Added from the ElevenLabs voice library (raw library voice_ids) ───────
-  { id: 'HBDoL4wkcalemIO0nUAu', name: 'Emily',      gender: 'Female', lang: 'en-GB', desc: 'RPG, immersive'    },
-  { id: 'Mtmp3KhFIjYpWYRycDe3', name: 'John',       gender: 'Male',   lang: 'en-US', desc: 'Raspy surfer'      },
-  { id: '8kgj5469z1URcH4MB2G4', name: 'Sakuya',     gender: 'Female', lang: 'en-US', desc: 'Cheerful anime'    },
-  { id: '2ajXGJNYBR0iNHpS4VZb', name: 'Rob',        gender: 'Male',   lang: 'en-GB', desc: 'Tough, gritty'     },
-  { id: 'mMdTuD2nnFiCH88UdXSb', name: 'Jane',       gender: 'Female', lang: 'en-US', desc: 'Cinematic villain' },
-];
+// ELEVENLABS_VOICES is imported from services/provider-voice-catalog.js (single source of truth).
 
 /** Returns the friendly name for an ElevenLabs voice_id, or null if unknown. */
 const elevenLabsVoiceName = (id) => ELEVENLABS_VOICES.find(v => v.id === id)?.name || null;
@@ -2680,33 +2653,7 @@ export function createSetupTab(screen, services) {
   // ── Kokoro voice scanner ─────────────────────────────────────────────────
   // Full static list for Kokoro v0.9.x. Voices not yet cached are downloaded
   // automatically by the library on first use via huggingface-hub.
-  const _KOKORO_ALL_VOICES = [
-    // American English female
-    'af_heart','af_alloy','af_aoede','af_bella','af_jessica',
-    'af_kore','af_nicole','af_nova','af_river','af_sarah','af_sky',
-    // American English male
-    'am_adam','am_echo','am_eric','am_fenrir','am_liam','am_michael','am_onyx','am_puck',
-    // British English female
-    'bf_alice','bf_emma','bf_isabella','bf_lily',
-    // British English male
-    'bm_daniel','bm_fable','bm_george','bm_lewis',
-    // Japanese
-    'jf_alpha','jf_gongitsune','jf_nezumi','jf_tebukuro','jm_kumo',
-    // Mandarin Chinese
-    'zf_xiaobei','zf_xiaoni','zf_xiaoxiao','zf_xiaoyi','zm_yunxi','zm_yunxia','zm_yunyang',
-    // Spanish
-    'ef_dora','em_alex','em_santa',
-    // French
-    'ff_siwis',
-    // Hindi
-    'hf_alpha','hm_omega',
-    // Italian
-    'if_sara','im_nicola',
-    // Brazilian Portuguese
-    'pf_dora','pm_alex','pm_santa',
-    // Korean
-    'kf_alpha','km_hyunsu',
-  ];
+  const _KOKORO_ALL_VOICES = KOKORO_VOICE_IDS;
 
   function _scanKokoroVoices() {
     // Determine which voices are already cached locally

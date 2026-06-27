@@ -20,6 +20,7 @@ import {
   getFavorites, getThumbsDown, toggleThumbsUp, toggleThumbsDown,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
+import { voicesForProvider } from '../../services/provider-voice-catalog.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { t } from '../../i18n/strings.js';
@@ -1494,13 +1495,18 @@ ${_tl('bmadDesc')}
   }
 
   function _autoAssignVoices() {
-    const installed = scanInstalledVoices();
+    // Pull the pool from whichever provider is currently active, not always Piper.
+    // Agent profiles store only a voice id (the active provider is global), so
+    // switching the provider and re-running auto-assign rebinds every agent to a
+    // voice from that provider (Kokoro, ElevenLabs, soprano, …).
+    const provider = providerService?.getActiveProvider?.() ?? 'piper';
+    const installed = voicesForProvider(provider, { scanInstalledVoices, getVoiceMeta });
     if (installed.length === 0) return false;
 
-    // Separate voices by gender
-    const femaleVoices = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Female'));
-    const maleVoices   = _shuffleArray(installed.filter(v => getVoiceMeta(v).gender === 'Male'));
-    const otherVoices  = _shuffleArray(installed.filter(v => !['Male', 'Female'].includes(getVoiceMeta(v).gender)));
+    // installed is [{ id, gender }] — separate the ids by gender.
+    const femaleVoices = _shuffleArray(installed.filter(v => v.gender === 'Female').map(v => v.id));
+    const maleVoices   = _shuffleArray(installed.filter(v => v.gender === 'Male').map(v => v.id));
+    const otherVoices  = _shuffleArray(installed.filter(v => !['Male', 'Female'].includes(v.gender)).map(v => v.id));
 
     // Separate agents by gender
     const femaleAgents = _agents.filter(a => _inferAgentGender(a) === 'Female');

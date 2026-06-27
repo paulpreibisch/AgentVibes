@@ -20,18 +20,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
-// True while the automated test suite is running. The handler-firing coverage
-// tests build the REAL tab (no AGENTVIBES_TEST_MODE) and fire every button,
-// including "Install BMAD Voices" — which would otherwise spawn a real ~250 MB
-// download whose spinner timer and stdout callbacks outlive the test and crash
-// on teardown ("blessed.log is not a function"), failing the whole file with a
-// non-zero exit. Honors the env flag and the shared marker file (set by
-// scripts/run-tests.sh) that play-tts.sh already respects.
-function _testsRunning() {
-  if (process.env.AGENTVIBES_SUPPRESS_AUDIO === 'true') return true;
-  try { return fs.existsSync(path.join(os.homedir(), '.agentvibes-tests-running')); } catch { return false; }
-}
-
 let blessed;
 if (!IS_TEST) {
   const { default: b } = await import('blessed');
@@ -57,7 +45,7 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [*] Favorite  [/] Search';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [*] Favorite  [/] Search  [End] Actions';
 /**
  * Resolve the Piper voice storage directory using the same precedence as the
  * shell-side get_voice_storage_dir() in piper-voice-manager.sh:
@@ -846,7 +834,7 @@ export function createVoicesTab(screen, services) {
 
   // -------------------------------------------------------------------------
   // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select  [+] thumbs up  [-] thumbs down{/white-fg}';
+  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select  [+] thumbs up  [-] thumbs down  [End] actions{/white-fg}';
   let _listFocused = false;
 
   // Inline selection hint appended to the currently highlighted voice row.
@@ -1298,138 +1286,6 @@ export function createVoicesTab(screen, services) {
   });
   installBtn.bottom = 4;
   installBtn.left = 38;
-
-  const installAllBtn = _createBtn(_tl('voicesInstallAllBtn'), () => {
-    _openInstallAllModal();
-  });
-  installAllBtn.bottom = 4;
-  installAllBtn.left = 58;
-
-  // -------------------------------------------------------------------------
-  // Bulk install modal — downloads all standard BMAD voices via piper-download-voices.sh
-
-  function _openInstallAllModal() {
-    // Skip entirely while the test suite is running. Handler-firing coverage
-    // tests invoke this button; building the modal calls blessed.log() (absent
-    // on the mocked blessed) and spawns a real ~250 MB download whose timer and
-    // stdout callbacks outlive the test, crashing teardown and failing the file.
-    if (_testsRunning()) return;
-    const packageRoot = path.resolve(__dirname, '..', '..', '..');
-    const script = path.join(packageRoot, '.claude', 'hooks', 'piper-download-voices.sh');
-
-    const modal = blessed.box({
-      parent: screen,
-      top: 'center',
-      left: 'center',
-      width: 70,
-      height: 16,
-      border: { type: 'line' },
-      tags: true,
-      label: ` {${COLORS.activeFg}-fg}Install BMAD Voices{/${COLORS.activeFg}-fg} `,
-      style: { border: { fg: COLORS.btnFocus }, bg: COLORS.contentBg },
-    });
-
-    blessed.text({
-      parent: modal,
-      top: 1,
-      left: 2,
-      right: 2,
-      tags: true,
-      content:
-        `Downloads {${COLORS.valueFg}-fg}9 BMAD agent voices{/${COLORS.valueFg}-fg} + ` +
-        `{${COLORS.valueFg}-fg}LibriTTS 900-speaker pack{/${COLORS.valueFg}-fg}\n` +
-        `{bright-black-fg}~250 MB total from HuggingFace — may take a few minutes{/bright-black-fg}`,
-      style: { bg: COLORS.contentBg },
-    });
-
-    const logBox = blessed.log({
-      parent: modal,
-      top: 4,
-      left: 2,
-      right: 2,
-      bottom: 4,
-      tags: false,
-      scrollable: true,
-      alwaysScroll: true,
-      style: { fg: COLORS.labelFg, bg: COLORS.contentBg },
-    });
-
-    const statusLine = blessed.text({
-      parent: modal,
-      bottom: 2,
-      left: 2,
-      right: 2,
-      tags: true,
-      content: '',
-      style: { bg: COLORS.contentBg },
-    });
-
-    let _running = false;
-
-    function _close() {
-      if (_running) return;
-      modal.destroy();
-      voiceList.focus();
-      refreshDisplay();
-      screen.render();
-    }
-
-    const okBtn = _createBtn('[ Install ]', () => {
-      if (_running) return;
-      _running = true;
-      okBtn.hide();
-      cancelBtn.hide();
-      screen.render();
-
-      const spinFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-      let spinIdx = 0;
-      const spinTimer = setInterval(() => {
-        spinIdx = (spinIdx + 1) % spinFrames.length;
-        statusLine.setContent(`{${COLORS.activeFg}-fg}${spinFrames[spinIdx]} Downloading…{/${COLORS.activeFg}-fg}`);
-        screen.render();
-      }, 100);
-
-      const proc = spawn('bash', [script, '--yes'], { detached: false });
-
-      // Guard the async log sinks so a late chunk after the modal is destroyed
-      // (e.g. the user navigated away) can't throw against a dead widget.
-      const _appendLog = (chunk) => {
-        if (modal.destroyed || typeof logBox.log !== 'function') return;
-        chunk.toString().split('\n').forEach(l => {
-          const clean = l.replace(/\x1b\[[0-9;]*m/g, '').trimEnd(); // NOSONAR
-          if (clean) { logBox.log(clean); screen.render(); }
-        });
-      };
-      proc.stdout.on('data', _appendLog);
-      proc.stderr.on('data', _appendLog);
-      proc.on('close', (code) => {
-        clearInterval(spinTimer);
-        _running = false;
-        if (code === 0) {
-          statusLine.setContent(`{${COLORS.activeFg}-fg}✓ All voices installed!{/${COLORS.activeFg}-fg}`);
-        } else {
-          statusLine.setContent(`{red-fg}✗ Install failed (exit ${code}){/red-fg}`);
-        }
-        const doneBtn = _createBtn('[ Done ]', _close);
-        doneBtn.bottom = 1;
-        doneBtn.left = 2;
-        modal.append(doneBtn);
-        doneBtn.focus();
-        screen.render();
-      });
-    });
-    okBtn.bottom = 1;
-    okBtn.left = 2;
-
-    const cancelBtn = _createBtn('[ Cancel ]', _close);
-    cancelBtn.bottom = 1;
-    cancelBtn.left = 14;
-
-    modal.key(['escape'], _close);
-    modal.setFront();
-    okBtn.focus();
-    screen.render();
-  }
 
   // -------------------------------------------------------------------------
   // "Voice Changed" notice — auto-dismisses after 2 s
@@ -1931,7 +1787,7 @@ export function createVoicesTab(screen, services) {
     const filtered = _getFilteredVoices();
     const items = _buildListItems(filtered, active, favorites, thumbsDown);
 
-    voiceList.setItems(items.length > 0 ? items : [' No voices installed — press [Install BMAD Voices] to download the full pack']);
+    voiceList.setItems(items.length > 0 ? items : [' No voices installed — run: npx agentvibes voices download']);
     const maxIdx = Math.max(0, (items.length > 0 ? items.length : 1) - 1);
     voiceList.select(Math.min(savedIdx, maxIdx));
     voiceList.childBase = Math.min(savedScroll, Math.max(0, (items.length > 0 ? items.length : 1) - (voiceList.height - 2)));
@@ -2176,6 +2032,14 @@ export function createVoicesTab(screen, services) {
     }
   });
 
+  // End → jump straight to the button row from anywhere in the list. Without this
+  // the buttons are only reachable by pressing ↓ on the very last of 900+ voices.
+  // Overrides blessed's default End-selects-last-item so focus lands on the buttons.
+  voiceList.key(['end'], () => {
+    switchBtn.focus();
+    screen.render();
+  });
+
   // ←/→ navigate between the three buttons
   switchBtn.key(['right'],    () => { favoriteBtn.focus();  screen.render(); });
   favoriteBtn.key(['right'],  () => { installBtn.focus();   screen.render(); });
@@ -2200,7 +2064,6 @@ export function createVoicesTab(screen, services) {
     switchBtn.setContent(_tl('voicesSwitchBtn'));
     favoriteBtn.setContent(_tl('voicesFavoriteBtn'));
     installBtn.setContent(_tl('voicesDownloadBtn'));
-    installAllBtn.setContent(_tl('voicesInstallAllBtn'));
     screen.render();
   }
 

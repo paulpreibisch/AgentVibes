@@ -22,6 +22,9 @@ const PROJECT_ROOT = resolve(__dirname, '../..');
 const setupSrc = readFileSync(
   resolve(PROJECT_ROOT, 'src/console/tabs/setup-tab.js'), 'utf8'
 );
+const catalogSrc = readFileSync(
+  resolve(PROJECT_ROOT, 'src/services/provider-voice-catalog.js'), 'utf8'
+);
 
 // ── Suite 1: NATIVE_ENGINE_VOICES constant ────────────────────────────────────
 
@@ -143,11 +146,17 @@ describe('_buildFields voice getValue shows native engine label', () => {
     assert.ok(fn.includes('global: ${globalVoice}'), 'must fall back to the global default');
   });
 
-  test('ElevenLabs voices are defined as a static built-in list with raw IDs', () => {
-    assert.ok(setupSrc.includes('const ELEVENLABS_VOICES'), 'ELEVENLABS_VOICES must be defined');
+  test('ElevenLabs voices are a static built-in list with raw IDs (in the shared catalog)', () => {
+    // The list now lives in services/provider-voice-catalog.js (single source of
+    // truth); setup-tab imports it so there is no duplicate to drift.
+    assert.ok(setupSrc.includes("from '../../services/provider-voice-catalog.js'"),
+      'setup-tab must import the shared voice catalog');
+    assert.ok(setupSrc.includes('ELEVENLABS_VOICES'), 'setup-tab must reference ELEVENLABS_VOICES');
     assert.ok(setupSrc.includes('ELEVENLABS_DEFAULT_VOICE_ID'), 'a default voice ID must be defined');
-    // Sanity: at least ~20 premade voices listed
-    const ids = (setupSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
+    assert.ok(catalogSrc.includes('export const ELEVENLABS_VOICES'),
+      'catalog must export ELEVENLABS_VOICES');
+    // Sanity: at least ~20 premade voices listed in the catalog
+    const ids = (catalogSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
     assert.ok(ids >= 20, `expected >=20 ElevenLabs voice IDs, found ${ids}`);
   });
 });
