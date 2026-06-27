@@ -347,7 +347,7 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
   - [🎤 Voices Tab](#-voices-tab) - Browse & sample 914 voices in the TUI
   - [💬 Intro Text](#-intro-text-pretext---your-personal-ai-branding) - Custom TTS prefixes
   - [🎵 Custom Background Music](#-custom-background-music---complete-audio-control) - Upload your own tracks
-- [📰 Latest Release](#-latest-release) - v5.5.0 with Per-LLM Audio Routing, Windows Installer Resilience
+- [📰 Latest Release](#-latest-release) - v5.11.0 with Kokoro & ElevenLabs Providers, Audio Effects
 - [🪟 Windows Setup Guide for Claude Desktop](mcp-server/WINDOWS_SETUP.md) - Complete Windows installation with WSL & Python
 
 ### AgentVibes MCP (Natural Language Control)
@@ -394,94 +394,20 @@ All 50+ Piper voices AgentVibes provides are sourced from Hugging Face's open-so
 
 ## 📰 Latest Release
 
-**[v3.6.0 - "Voice Explorer" Release](https://github.com/paulpreibisch/AgentVibes/releases/tag/v5.7.5)** 🎉
+**[v5.11.0 — Kokoro & ElevenLabs Providers + Audio Effects](https://github.com/paulpreibisch/AgentVibes/releases/tag/v5.11.0)** 🎉
 
-### 🎤 Voices Tab — Browse & Sample 914 Voices
+AgentVibes 5.11.0 adds two new TTS engines, combinable audio effects, a streamlined voices tab, and a deterministically green test suite.
 
-**Built into the TUI — launch with `npx agentvibes` then press V**
+### ✨ Highlights
 
-![AgentVibes Voices Tab](https://raw.githubusercontent.com/paulpreibisch/AgentVibes/master/docs/installation-screenshots/screenshot-voices.png)
+- **🆕 Kokoro provider** — high-quality **local neural** voices (CPU, no GPU needed), including Chinese / Japanese / Korean, with in-TUI dependency install.
+- **🆕 ElevenLabs provider** — premium **cloud** voices via an in-app API-key dialog.
+- **🎚️ Combinable audio effects** — stack **Reverb** (Room / Hall / Cathedral), **Echo** (short / cave), and **Chorus**; preview live with Space.
+- **🪟 Windows SAPI** routing fixed, and a **🎨 unified selector chrome** across every picker.
+- **🎤 Streamlined voices tab** — keystroke-only (Enter selects, `f` favorites ★); **BMAD auto-assign** now follows the active provider.
+- **🧪 Rock-solid CI** — eliminated the flaky failures; the test suite is deterministically green.
 
-- 🎧 Real-time voice sampling - press Space to hear before you choose
-- ⭐ Favorite system - mark your top voices
-- 🔍 Search & filter - find voices by personality, accent, gender
-- 📦 One-click select - press Enter to install directly
-- 🎨 Beautiful UI - built into the AgentVibes TUI
-
-**914 Total Voices:**
-- 904 Piper speaker variations (libritts-high)
-- 10 curated personality voices
-
-### 🎯 Major Features
-
-**🏷️ Friendly Voice Names**
-- No more cryptic IDs! Switch voices with names like "Ryan", "Joe", "Sarah"
-- All 904+ voices have memorable, personality-matched names
-- Voice metadata includes personalities, accents, and recommendations
-
-```bash
-# Before: /agent-vibes:switch en_US-libritts_r-medium-speaker-123
-# After:
-/agent-vibes:switch Ryan
-```
-
-**💬 Intro Text (Pretext) Feature**
-- Custom prefix for all TTS announcements
-- Set during installation or anytime after
-- Perfect for personal branding: "FireBot: Starting analysis..."
-- Up to 50 characters, UTF-8 and emoji support
-
-```bash
-npx agentvibes config intro-text
-```
-
-**🎵 Custom Background Music**
-- Upload your own audio files (.mp3, .wav, .ogg, .m4a)
-- **Battle-tested security:** 180+ attack variations blocked
-- Magic number validation ensures real audio files
-- File ownership verification (UID checks)
-- Audio duration validation (30-90s recommended, 300s max)
-- Secure storage with 600 permissions
-- Perfect for team audio branding
-
-```bash
-npx agentvibes config music
-```
-
-**🎨 Interactive Installer**
-- Preview voices during installation
-- Sample all 16 background music tracks
-- Audio environment auto-detection
-- Cross-platform preview support
-
-**🛡️ Security Hardening**
-- **180+ attack variations tested** - Path traversal, symlinks, Unicode, null bytes
-- **100% attack rejection rate** - All malicious attempts blocked
-- **OWASP compliant** - CWE-22 path traversal prevention verified
-- **Production certified** - Comprehensive security audit completed
-- **Defense-in-depth** - 7 validation layers protect your system
-- File ownership verification and secure storage (600 permissions)
-- Security audit report: `docs/security/SECURITY-AUDIT.md`
-
-### Quick Install
-
-```bash
-# Install AgentVibes
-npx agentvibes install
-
-# Browse voices in the TUI
-npx agentvibes  # press V for Voices tab
-```
-
-**🐞 Bug Fixes in v3.6.0:**
-- Fixed `get_verbosity` MCP tool returning wrong level after fresh install (now reads from correct project directory, defaults to `high`)
-- Fixed Voice Browser Soprano TTS detection, Custom Music race conditions, installer emoji rendering
-
-💡 **Tip:** If `npx agentvibes` shows an older version, clear cache: `npm cache clean --force && npx agentvibes@latest --help`
-
-🐛 **Found a bug?** Report at [GitHub Issues](https://github.com/paulpreibisch/AgentVibes/issues)
-
-[→ View Complete Release Notes](RELEASE_NOTES_v3.6.0.md) | [→ View All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
+📖 Full details: [RELEASE_NOTES.md](RELEASE_NOTES.md) | [→ All Releases](https://github.com/paulpreibisch/AgentVibes/releases)
 
 [↑ Back to top](#-table-of-contents)
 

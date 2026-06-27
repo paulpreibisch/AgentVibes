@@ -1,43 +1,62 @@
 # AgentVibes Release Notes
 
-## 🎙️ v5.11.0 — LibriTTS 900+ Voices, Install BMAD Voices, Better Setup UX
+## 🎙️ v5.11.0 — Kokoro & ElevenLabs Providers, Unified Pickers, Windows SAPI, Rock-Solid CI
 
-**Released:** 2026-06-21
+**Released:** 2026-06-26
 
-### ✨ New: LibriTTS Voice Library Offer During Install
+This is a big one. AgentVibes gains two new TTS engines — **Kokoro** (high-quality local neural voices, including Chinese/Japanese/Korean) and **ElevenLabs** (premium cloud voices) — combinable audio effects, a unified selector UI, a Windows SAPI routing fix, and a deterministically green test suite. It also rolls up everything from the earlier 5.11.0 preview (LibriTTS 900+ voices, setup UX).
 
-When Piper is already installed but LibriTTS hasn't been downloaded yet, the installer now prompts you to optionally grab the full **904-speaker LibriTTS model** (~114 MB). This unlocks named voices like Ryan, Sarah, Joe, and hundreds more — all browsable with `/agent-vibes:list`. If you skip it, the prompt shows you the exact command to run later.
+### 🆕 New TTS Provider: Kokoro (local neural voices)
+- Browse and preview Kokoro voices from the Setup tab using the standardized picker.
+- **CPU synthesis** path so it runs without a GPU.
+- Smart dependency detection with in-TUI install dialogs — installs `kokoro`, `soundfile`, and `numpy` together, with a real progress bar (not just a spinner).
+- **CJK support**: Chinese, Japanese, and Korean voices, with per-language `misaki` / `pyopenjtalk` dependency handling and native sample phrases.
+- Windows playback fixed (Forms assembly load, correct paths, clearer exit-code errors).
+- A readiness "bling" cue (bundled CC0 sound) signals when a voice is ready to preview.
 
-### ✨ New: Install BMAD Voices Button in Voices Tab
+### 🆕 New TTS Provider: ElevenLabs (premium cloud voices)
+- API-key dialog built into the Setup tab, with a navigation hint and Escape-to-close.
+- Routed through the same per-LLM voice system as every other provider.
 
-The Voices tab now has an **Install BMAD Voices** button that downloads the curated set of voices used by BMAD agents in party mode — no need to know which model files to grab manually.
+### 🎚️ New: Combinable Audio Effects — Reverb · Echo · Chorus
+Give any voice real character. A new multi-select effects modal lets you stack **reverb**, **echo**, and **chorus** independently:
+- **Reverb:** Room, Hall, Cathedral, and Warm (reverb + bass).
+- **Echo:** Echo (short delay) and Cave Echo (long) — brand new; there was no echo before.
+- **Chorus** for a richer, doubled timbre.
+- Effects **combine** (e.g. a little reverb *plus* a short echo), preview live with Space, and the picker now speaks the effect name and shows a spinner while auditioning.
 
-The `piper-download-voices.sh` script has been expanded to include all the curated voice models shown in the Voices tab, so the button and the CLI command are always in sync.
+### 🎨 Unified Selector Chrome
+- All selector pickers (voices, tracks, reverb/effects) now share a common help bar, title style, and a fixed-width voice-row formatter — a consistent look and aligned status columns across every picker.
 
-### 🔧 Linux Piper Install Now Uses Project Installer
+### 🪟 Windows SAPI Routing Fixed
+- The bash hook router now recognizes the `sapi` / `windows-sapi` provider and routes to `play-tts-sapi.ps1` correctly (previously errored with "Unknown provider: sapi").
 
-On Linux, the TTS engine setup screen previously ran `pip install piper-tts` to install Piper, which required Python and could conflict with system packages. It now calls the project's own `piper-installer.sh --non-interactive` instead — the same battle-tested script that handles binary download, PATH wiring, and voice setup consistently across environments.
+### 🎤 Voices & BMAD Tab Improvements
+- **Streamlined, keystroke-only voice list.** Removed the redundant Switch / Favorite / Download button row — **Enter** selects (and downloads an uninstalled Piper voice first), **Space** previews, and **`f`** toggles a favorite ★. Thumbs-up/thumbs-down collapsed into a single favorite star.
+- **Removed the confusing "Install BMAD Voices" button.** Bulk voice downloads are available from the CLI (`npx agentvibes voices download`) instead.
+- **BMAD auto-assign now respects the active provider.** Pressing **[A] Auto-assign** previously always picked Piper voices; it now assigns voices from whichever provider is currently selected (Piper, Kokoro, ElevenLabs, soprano, …).
 
-### 🎛️ Setup Tab UX Improvements
+### 🎛️ Picker & Preview Polish
+- **Effects preview:** correct voice + effect routing, an inline spinner on the item row, and a `pyopenjtalk` install prompt where needed.
+- **Track picker:** uses an `ffmpeg → pacat` pipe on headless PulseAudio TCP servers so previews work in remote/headless setups.
+- **Navigation:** pressing a tab's shortcut key while already on that tab is now a no-op.
 
-- **Spinner animation** replaces the static "Installing..." label during TTS engine installation, giving clear visual feedback that work is happening.
-- **Tab key navigation** past the last install button now lands on the Continue button, instead of wrapping back to the top. This makes keyboard-only setup flow naturally.
-- **Installation timeout** raised from 2 minutes to 30 minutes to accommodate slow connections and large voice model downloads.
+### 🧪 Rock-Solid CI (no more flaky failures)
+- Eliminated the intermittent CI red: fixed a `blessed.log()`-after-teardown crash in the Voices tab that randomly failed an innocent test file, and added a coverage runner (`scripts/run-coverage.mjs`) that gates on the actual reported test results instead of node's flaky `--test-force-exit` exit code. Real failures still fail the build; node's force-exit artifacts are tolerated.
+- Test audio is fully silenced during runs (marker file + env flags) so the suite never bleeds to your speakers.
 
-### 🧪 Test Infrastructure
+### 🐛 Audio Robustness Fixes
+- `getAudioDuration()` now attaches an error listener to its `which ffprobe` probe (previously this could throw an unhandled error and crash on Windows, where `which` doesn't exist) and bounds both spawns with 5s/10s timeouts so a stalled `ffprobe` can never hang the caller.
+- The interactive voice-preview prompt now releases (`pause()`) the stdin handle it opens, so the process exits cleanly instead of lingering.
 
-- Added opt-in background audio during test runs (configurable via `AGENTVIBES_TEST_TRACK`) so audio mixing tests can verify real playback behavior without bleeding to remote speakers.
-- Remote speaker output is suppressed during all test runs.
-- Reverb BATS tests updated for accuracy.
+### 📦 Also in 5.11.0 (earlier preview)
+- LibriTTS 900+ voice library offer during install (~114 MB, 904 speakers).
+- Linux Piper install now uses the project's own `piper-installer.sh --non-interactive`.
+- Setup tab: spinner during engine install, smarter Tab navigation to Continue, install timeout raised to 30 minutes.
 
-### 🔇 CI: Automated npm Publish Removed
-
-The automated npm publish step has been removed from CI. Releases are now triggered manually, giving full control over when packages land on the registry.
-
-### 🛡️ Quality Notes
-
-- All 1902 tests pass (290 BATS + 1612 Node.js unit/coverage).
-- Known pre-existing: `piper-voice-manager.sh` lacks `set -euo pipefail`; `piper-installer.sh` uses `set -e` only. Both pre-date this release and are tracked for a future hardening pass.
+### 🛡️ Quality
+- Full test suite green. New audio code covered: `audio-duration-validator` 96%, `preview-list-prompt` 90%.
+- Known pre-existing: `piper-voice-manager.sh` / `piper-installer.sh` use partial shell strict mode; tracked for a future hardening pass.
 
 ---
 
