@@ -1,5 +1,18 @@
 # AgentVibes Release Notes
 
+## 🧾 v5.11.1 — README Overhaul (docs only)
+
+**Released:** 2026-06-27
+
+A documentation release so the npm package page reflects the rewritten README. **No functional changes since 5.11.0.**
+
+- Rewrote `README.md` to be value-first: a clear elevator pitch, **explained** features, and the v5.11.0 highlights — trimmed from ~2,150 lines to ~235.
+- Removed the long inline version changelog; version history now lives here and in [GitHub Releases](https://github.com/paulpreibisch/AgentVibes/releases).
+
+See **v5.11.0** below for the full feature list (Kokoro + ElevenLabs providers, combinable audio effects, provider-aware BMAD auto-assign, streamlined voices tab, rock-solid CI).
+
+---
+
 ## 🎙️ v5.11.0 — Kokoro & ElevenLabs Providers, Unified Pickers, Windows SAPI, Rock-Solid CI
 
 **Released:** 2026-06-26
