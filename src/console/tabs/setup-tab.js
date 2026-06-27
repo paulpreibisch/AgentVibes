@@ -3009,7 +3009,21 @@ export function createSetupTab(screen, services) {
         iMod.key(['escape'], cancelInstall);
         screen.render();
 
-        _installProc = spawn(_pythonCmd, ['-m', 'pip', 'install', '--progress-bar', 'on', ...pkg.split(/\s+/)], { // NOSONAR
+        // PEP 668: modern Ubuntu/Debian mark the system Python "externally
+        // managed", so a bare `pip install` fails with
+        // "error: externally-managed-environment" — which is exactly why the
+        // Kokoro deps never install on a fresh server. Detect the marker and add
+        // --break-system-packages so the install actually proceeds. (The marker
+        // only exists on pip ≥ 23.0, which is also where the flag exists.)
+        let _pep668Args = [];
+        try {
+          const _chk = spawnSync(_pythonCmd, ['-c', // NOSONAR
+            "import sysconfig,os;print('1' if os.path.exists(os.path.join(sysconfig.get_path('stdlib'),'EXTERNALLY-MANAGED')) else '0')"],
+            { encoding: 'utf8', timeout: 4000 });
+          if ((_chk.stdout || '').trim() === '1') _pep668Args = ['--break-system-packages'];
+        } catch { /* fall back to a plain install */ }
+
+        _installProc = spawn(_pythonCmd, ['-m', 'pip', 'install', '--progress-bar', 'on', ..._pep668Args, ...pkg.split(/\s+/)], { // NOSONAR
           stdio: ['ignore', 'pipe', 'pipe'],
         });
 
@@ -3075,9 +3089,11 @@ export function createSetupTab(screen, services) {
             const allOut = _pipBuf + _pipErrBuf;
             const needsDev   = /Python\.h|python3-dev/i.test(allOut);
             const needsCmake = /cmake not found|cmake.*required/i.test(allOut);
+            const extManaged = /externally-managed-environment/i.test(allOut);
             let hint;
             if (needsDev)        hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install python3-dev build-essential{/cyan-fg}`;
             else if (needsCmake) hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}sudo apt install cmake{/cyan-fg}`;
+            else if (extManaged) hint = `  {yellow-fg}Fix:{/yellow-fg} {cyan-fg}${_pythonCmd} -m pip install --break-system-packages ${pkg}{/cyan-fg}`;
             else                 hint = `  {#9e9e9e-fg}Run {/#9e9e9e-fg}{cyan-fg}pip install ${pkg}{/cyan-fg}{#9e9e9e-fg} in a terminal to see the error.{/#9e9e9e-fg}`;
             iMod.setLabel(` {red-fg}✗  Install Failed{/red-fg} `);
             iMod.style.border.fg = 'red';
@@ -3487,6 +3503,16 @@ export function createSetupTab(screen, services) {
     let _dlAllProc = null;
     kPicker.key(['d', 'D'], () => {
       if (_kPreviewProc || _dlAllActive) return;
+      // Without the kokoro package every "download" (a synthesis that pulls the
+      // .pt file) fails, so prompt to install the engine first instead of
+      // grinding through the whole list and falsely reporting success.
+      if (!_kokoroInstalled) {
+        _promptInstallPkg('kokoro soundfile numpy', 'Kokoro TTS engine', voices[kPicker.selected] ?? voices[0], () => {
+          _kokoroInstalled = true;
+          voices.forEach((v, i) => kPicker.setItem(i, _kokoroItem(v)));
+        });
+        return;
+      }
       const toDownload = voices.filter(v => !cached.has(v));
       if (!toDownload.length) {
         kBox.setLabel(` {green-fg}✓ All ${voices.length} voices already cached{/green-fg} `);
@@ -3503,8 +3529,15 @@ export function createSetupTab(screen, services) {
           _dlAllProc = null;
           if (!_kClosed) {
             const total = voices.filter(v => cached.has(v)).length;
-            kBox.setLabel(` {green-fg}✓ Download complete — ${total}/${voices.length} cached{/green-fg} `);
-            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
+            const got = toDownload.filter(v => cached.has(v)).length;
+            // Only claim success if voices actually cached. If nothing downloaded
+            // (e.g. kokoro/misaki missing), say so instead of a false green ✓.
+            if (got > 0) {
+              kBox.setLabel(` {green-fg}✓ Download complete — ${total}/${voices.length} cached{/green-fg} `);
+            } else {
+              kBox.setLabel(` {yellow-fg}⚠ Nothing downloaded — install deps: ${_pythonCmd} -m pip install --break-system-packages kokoro soundfile{/yellow-fg} `);
+            }
+            setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, got > 0 ? 3000 : 6000);
             screen.render();
           }
           return;
