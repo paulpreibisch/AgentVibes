@@ -45,7 +45,7 @@ const COLORS = {
   dimFg:      '#455a64',
 };
 
-const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [*] Favorite  [/] Search  [End] Actions';
+const FOOTER_TEXT = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Select/Install  [f] Favorite ★  [/] Search';
 /**
  * Resolve the Piper voice storage directory using the same precedence as the
  * shell-side get_voice_storage_dir() in piper-voice-manager.sh:
@@ -834,7 +834,7 @@ export function createVoicesTab(screen, services) {
 
   // -------------------------------------------------------------------------
   // Hint text shown in previewLine when the list has focus and nothing is playing
-  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select  [+] thumbs up  [-] thumbs down  [End] actions{/white-fg}';
+  const HINT_TEXT = '{white-fg}[Space] preview  [Enter] select  [f] favorite ★  [/] search{/white-fg}';
   let _listFocused = false;
 
   // Inline selection hint appended to the currently highlighted voice row.
@@ -1243,49 +1243,10 @@ export function createVoicesTab(screen, services) {
     return btn;
   }
 
-  const switchBtn = _createBtn(_tl('voicesSwitchBtn'), () => {
-    const voices = _getFilteredVoices();
-    const selected = voices[voiceList.selected];
-    if (selected) {
-      _activateVoice(selected);
-      refreshDisplay();
-    }
-  });
-  switchBtn.bottom = 4;
-  switchBtn.left = 4;
-
-  const favoriteBtn = _createBtn(_tl('voicesFavoriteBtn'), () => {
-    const voices = _getFilteredVoices();
-    const selected = voices[voiceList.selected];
-    if (selected) {
-      toggleFavorite(configService, selected);
-      refreshDisplay();
-    }
-  });
-  favoriteBtn.bottom = 4;
-  favoriteBtn.left = 22;
-
-  const installBtn = _createBtn(_tl('voicesDownloadBtn'), () => {
-    const voices = _getFilteredVoices();
-    const selected = voices[voiceList.selected];
-    if (!selected) return;
-    if (_isInstalled(selected)) {
-      const notice = blessed.text({
-        parent: box,
-        top: 'center',
-        left: 'center',
-        content: 'Voice already installed. Scroll down to find uninstalled voices (greyed out).',
-        tags: true,
-        style: { fg: COLORS.noticeFg, bg: COLORS.contentBg },
-      });
-      screen.render();
-      setTimeout(() => { notice.destroy(); screen.render(); }, 3000);
-    } else {
-      _openDownloadModal(selected);
-    }
-  });
-  installBtn.bottom = 4;
-  installBtn.left = 38;
+  // The voice list is button-free: Enter selects (or downloads an uninstalled
+  // Piper voice then selects), Space previews, and 'f'/'*' toggles the favorite
+  // star. The old Switch/Favorite/Download button row was redundant with these
+  // keys and has been removed.
 
   // -------------------------------------------------------------------------
   // "Voice Changed" notice — auto-dismisses after 2 s
@@ -1783,7 +1744,9 @@ export function createVoicesTab(screen, services) {
 
     const active = providerService.getActiveVoiceId();
     const favorites = getFavorites(configService);
-    const thumbsDown = getThumbsDown(configService);
+    // Thumbs-down was removed — only the favorite star remains. Pass an empty
+    // set so any pre-existing downvotes in config no longer render.
+    const thumbsDown = [];
     const filtered = _getFilteredVoices();
     const items = _buildListItems(filtered, active, favorites, thumbsDown);
 
@@ -1874,21 +1837,13 @@ export function createVoicesTab(screen, services) {
   });
 
   // '*' or '+' in voiceList toggles thumbs-up
-  voiceList.key(['*', '+'], () => {
+  // 'f' / '*' / '+' toggle the favorite star. There is a single favorite
+  // mechanism now (the star) — thumbs-up/thumbs-down was removed.
+  voiceList.key(['f', '*', '+'], () => {
     const voices = _getFilteredVoices();
     const selected = voices[voiceList.selected];
     if (selected) {
-      toggleThumbsUp(configService, selected);
-      refreshDisplay();
-    }
-  });
-
-  // '-' in voiceList toggles thumbs-down
-  voiceList.key(['-'], () => {
-    const voices = _getFilteredVoices();
-    const selected = voices[voiceList.selected];
-    if (selected) {
-      toggleThumbsDown(configService, selected);
+      toggleFavorite(configService, selected);
       refreshDisplay();
     }
   });
@@ -2020,40 +1975,6 @@ export function createVoicesTab(screen, services) {
   });
 
   // -------------------------------------------------------------------------
-  // Button-row keyboard navigation
-  // ↓ at the last list item → descend into the button row (Switch Voice gets focus first)
-  // Note: Tab is NOT used — navigation.js registers screen.key(['tab']) to cycle tabs,
-  // so element.key(['tab']) + screen.key(['tab']) both fire simultaneously.
-  voiceList.key(['down'], () => {
-    const voices = _getFilteredVoices();
-    if (voiceList.selected >= voices.length - 1) {
-      switchBtn.focus();
-      screen.render();
-    }
-  });
-
-  // End → jump straight to the button row from anywhere in the list. Without this
-  // the buttons are only reachable by pressing ↓ on the very last of 900+ voices.
-  // Overrides blessed's default End-selects-last-item so focus lands on the buttons.
-  voiceList.key(['end'], () => {
-    switchBtn.focus();
-    screen.render();
-  });
-
-  // ←/→ navigate between the three buttons
-  switchBtn.key(['right'],    () => { favoriteBtn.focus();  screen.render(); });
-  favoriteBtn.key(['right'],  () => { installBtn.focus();   screen.render(); });
-  installBtn.key(['right'],   () => { switchBtn.focus();    screen.render(); });
-  switchBtn.key(['left'],     () => { installBtn.focus();   screen.render(); });
-  favoriteBtn.key(['left'],   () => { switchBtn.focus();    screen.render(); });
-  installBtn.key(['left'],    () => { favoriteBtn.focus();  screen.render(); });
-
-  // ↑ or Escape from any button → back to voice list
-  switchBtn.key(['up', 'escape'],   () => { voiceList.focus(); screen.render(); });
-  favoriteBtn.key(['up', 'escape'], () => { voiceList.focus(); screen.render(); });
-  installBtn.key(['up', 'escape'],  () => { voiceList.focus(); screen.render(); });
-
-  // -------------------------------------------------------------------------
   // Language refresh
 
   function refreshVoicesLabels() {
@@ -2061,9 +1982,6 @@ export function createVoicesTab(screen, services) {
     searchLabelText.setContent(_tl('searchLabel'));
     colHeaderText.setContent(`{#00897b-fg}${_tl('voicesColName').padEnd(COL_NAME_W)}{/#00897b-fg}{magenta-fg}♀{/magenta-fg}/{bright-cyan-fg}♂{/bright-cyan-fg} {#00897b-fg}${_tl('voicesColProvider')}{/#00897b-fg}`);
     voiceInfoHdr.setContent(`{#00897b-fg}${_tl('voicesInfoHeader')}${'─'.repeat(54)}{/#00897b-fg}`);
-    switchBtn.setContent(_tl('voicesSwitchBtn'));
-    favoriteBtn.setContent(_tl('voicesFavoriteBtn'));
-    installBtn.setContent(_tl('voicesDownloadBtn'));
     screen.render();
   }
 
