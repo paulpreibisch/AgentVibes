@@ -1,5 +1,15 @@
 # AgentVibes Release Notes
 
+## 🐛 v5.11.2 — Kokoro Installer Fix (PEP 668)
+
+**Released:** 2026-06-27
+
+- **Kokoro voice download now works on modern Ubuntu/Debian servers.** The Setup-tab Kokoro picker installed its Python dependencies with a bare `pip install`, which fails on externally-managed Python (PEP 668: `error: externally-managed-environment`). It now detects the `EXTERNALLY-MANAGED` marker and installs with `--break-system-packages`, so Kokoro voices actually download and flip from `!` to `✓`. ([#205](https://github.com/paulpreibisch/AgentVibes/issues/205))
+- **"Download all" is honest:** it prompts to install the Kokoro engine first when it's missing, and no longer reports a false "✓ complete" when nothing actually downloaded.
+- Added `scripts/diagnose-server.sh` to reproduce/verify install issues on a server.
+
+---
+
 ## 🧾 v5.11.1 — README Overhaul (docs only)
 
 **Released:** 2026-06-27
