@@ -398,7 +398,7 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
 # piper/sapi for that LLM's normal text responses that use Piper voices — must
 # NOT redirect it to an incompatible engine, or synthesis fails silently
 # (Piper can't find the Kokoro voice model → no audio, exit 0).
-$_VoiceIsKokoro = $VoiceOverride -match '^[a-z]{2}_[a-z0-9_]+$'
+$_VoiceIsKokoro = $VoiceOverride -match '^[a-z][fm]_[a-z]+$'
 if ($_VoiceIsKokoro) {
     # A Kokoro-format voice forces the Kokoro engine regardless of the per-LLM
     # ENGINE column or the global tts-provider.txt default.
@@ -451,11 +451,6 @@ if ($env:AGENTVIBES_VERBOSE -eq "1") {
 # ffplay uses libswresample with sinc resampling — no artefacts.
 function Invoke-AudioPlay {
     param([string]$FilePath)
-    # Stay silent while the automated test suite is running. The windows-tts/effects
-    # tests invoke this script and assert on its [VOICE]/routing output (printed
-    # earlier) — they never check playback — so skipping only the audio output keeps
-    # them green while preventing real speech on the developer's machine.
-    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) { return }
     $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
     $fp = if ($ffplayCmd) { $ffplayCmd.Source } else { $null }
     if (-not $fp) {
@@ -504,6 +499,34 @@ foreach ($line in $providerOutput) {
     if ($lineStr -match '^.+\.wav$' -and (Test-Path $lineStr)) {
         $AudioFilePath = $lineStr
         break
+    }
+}
+
+# ---------------------------------------------------------------------------
+# TalkingHead avatar forward (best-effort, non-blocking)
+# ---------------------------------------------------------------------------
+# When config/talking-head-enabled.txt is "true", POST the synthesized voice WAV
+# to the local TalkingHead server (127.0.0.1:3747) so the on-screen avatar
+# lip-syncs. If a browser is connected, the browser becomes the sole audio
+# source and local speaker playback is skipped (perfect sync, no echo).
+# Fully best-effort: a down server, missing flag, or no browser never blocks or
+# fails normal playback.
+$thFlag = "$ClaudeDir\config\talking-head-enabled.txt"
+if ((Test-Path $thFlag) -and ((Get-Content $thFlag -Raw).Trim() -eq "true") -and $AudioFilePath -and (Test-Path $AudioFilePath)) {
+    try {
+        $thB64 = [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($AudioFilePath))
+        $thProject = if ($env:AGENTVIBES_PROJECT) { $env:AGENTVIBES_PROJECT }
+                     elseif ($env:CLAUDE_PROJECT_DIR) { Split-Path $env:CLAUDE_PROJECT_DIR -Leaf }
+                     else { "AgentVibes" }
+        $thBody = @{ audioBase64 = $thB64; text = $Text; voice = $VoiceOverride; project = $thProject; origin = "remote"; llm = $llm } | ConvertTo-Json -Compress
+        $thResp = Invoke-RestMethod -Uri "http://127.0.0.1:3747/speak" -Method Post -Body $thBody -ContentType "application/json" -TimeoutSec 3
+        if ($thResp.browserConnected) {
+            # Browser is playing the audio for lip-sync — skip all local playback.
+            Write-Host "[TalkingHead] Forwarded to avatar (browser connected) — skipping local playback" -ForegroundColor DarkGray
+            exit 0
+        }
+    } catch {
+        # best-effort: avatar server may be down or no browser connected; fall through to normal playback
     }
 }
 

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Winston",
+    "role": "Architect",
+    "avatar": "avaturn",
+    "accent": "#22d3ee",
+    "voiceKey": "agent-winston",
+    "text": "The architecture is sound. We layer the talking heads over a live galaxy and route each voice to its own avatar.",
+    "audioUrl": "/demo-audio/cast1.wav"
+  },
+  {
+    "name": "Sally",
+    "role": "UX",
+    "avatar": "brunette",
+    "accent": "#fb7185",
+    "voiceKey": "agent-sally",
+    "text": "And it feels alive. Each agent glows and steps forward when it speaks. The cosmic stage is gorgeous.",
+    "audioUrl": "/demo-audio/cast2.wav"
+  },
+  {
+    "name": "John",
+    "role": "PM",
+    "avatar": "avatarsdk",
+    "accent": "#fbbf24",
+    "voiceKey": "agent-john",
+    "text": "Ship the smallest thing that proves the concept. This demo already does exactly that.",
+    "audioUrl": "/demo-audio/cast3.wav"
+  },
+  {
+    "name": "Amelia",
+    "role": "Dev",
+    "avatar": "vroid",
+    "accent": "#34d399",
+    "voiceKey": "agent-amelia",
+    "text": "It is wired to the live receiver. Real Agent Vibes messages drive these heads. It works.",
+    "audioUrl": "/demo-audio/cast4.wav"
+  }
+]

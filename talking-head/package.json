@@ -1,0 +1,8 @@
+{
+  "name": "agentvibes-talking-head",
+  "version": "1.0.0",
+  "description": "AgentVibes TalkingHead avatar server (no npm dependencies)",
+  "type": "commonjs",
+  "main": "server.js",
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,49 @@
+#
+# open-cosmic.ps1 — launch the AgentVibes cosmic avatar stage in a dedicated
+# Chrome app window with autoplay enabled (so audio plays hands-free).
+#
+# Usage:
+#   powershell -ExecutionPolicy Bypass -File open-cosmic.ps1            # gallery
+#   powershell -ExecutionPolicy Bypass -File open-cosmic.ps1 partydemo  # self-playing party
+#   powershell -ExecutionPolicy Bypass -File open-cosmic.ps1 party      # live party cast
+#   powershell -ExecutionPolicy Bypass -File open-cosmic.ps1 regular    # single avatar
+#   powershell -ExecutionPolicy Bypass -File open-cosmic.ps1 opencast   # themed cast
+#
+param([string]$View = "gallery")
+
+$ErrorActionPreference = "Stop"
+$thDir = "$env:USERPROFILE\.agentvibes\talking-head"
+$prof  = "$thDir\chrome-profile"
+$port  = 3747
+$base  = "http://localhost:$port"
+
+# Map the friendly view name to a URL
+switch ($View.ToLower()) {
+  "gallery"   { $url = "$base/gallery.html" }
+  "partydemo" { $url = "$base/cosmic.html?mode=party&demo=party" }
+  "party"     { $url = "$base/cosmic.html?mode=party" }
+  "regular"   { $url = "$base/cosmic.html?mode=regular" }
+  "opencast"  { $url = "$base/cosmic.html?mode=opencast" }
+  default     { $url = "$base/$View" }   # treat as a literal path
+}
+
+# Ensure the talking-head server is running
+try { Invoke-WebRequest "$base/health" -UseBasicParsing -TimeoutSec 3 | Out-Null }
+catch {
+  Write-Host "Starting talking-head server..." -ForegroundColor Cyan
+  Start-Process -FilePath "node" -ArgumentList "`"$thDir\server.js`"" -WorkingDirectory $thDir `
+    -RedirectStandardOutput "$thDir\server.log" -RedirectStandardError "$thDir\server.err.log" -WindowStyle Hidden
+  Start-Sleep -Seconds 2
+}
+
+New-Item -ItemType Directory -Path $prof -Force | Out-Null
+$chromeArgs = @(
+  "--app=$url",
+  "--autoplay-policy=no-user-gesture-required",
+  "--user-data-dir=$prof",
+  "--window-size=1100,840",
+  "--no-first-run",
+  "--no-default-browser-check"
+)
+Write-Host "Opening $url" -ForegroundColor Green
+Start-Process "chrome.exe" -ArgumentList $chromeArgs
