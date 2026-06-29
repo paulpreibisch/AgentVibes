@@ -428,6 +428,52 @@
     const p=setInterval(()=>{ if(running()){hint.style.display='none';clearInterval(p);} },800); setTimeout(()=>clearInterval(p),20000);
   }
 
+  // ---------- diagnostics (exposed for CDP testing) ----------
+  window.__errors = [];
+  window.addEventListener('error', e => { window.__errors.push(String(e.message||e.error||e)); dbg('JS ERROR '+(e.message||e)); });
+  window.addEventListener('unhandledrejection', e => { window.__errors.push('reject: '+String(e.reason)); dbg('REJECT '+String(e.reason)); });
+  window.__diag = () => {
+    const out = { activeKey, sessions:[...sessions.keys()], errors: window.__errors.slice(-8), slots:[] };
+    for (const s of sessions.values()) for (const sl of s.slots) {
+      out.slots.push({ session:s.key, voice:sl.voiceKey, avatar:sl.key, ready:sl.ready,
+        ctx: sl.head && sl.head.audioCtx ? sl.head.audioCtx.state : 'none',
+        gain: sl.head && sl.head.audioSpeechGainNode ? sl.head.audioSpeechGainNode.gain.value : null,
+        armature: sl.head ? !!sl.head.armature : false,
+        speechSrc: sl.head ? !!sl.head.audioSpeechSource : false,
+        reverbBuf: sl.head && sl.head.audioReverbNode ? !!sl.head.audioReverbNode.buffer : 'noReverbNode',
+        hasAnalyzer: sl.head ? !!sl.head.audioAnalyzerNode : false });
+    }
+    return out;
+  };
+  // Play a 0.4s beep straight to destination on the first slot's context — proves
+  // whether the page can output ANY audio (isolates TalkingHead's graph from the device).
+  window.__beep = async () => {
+    const sl = [...sessions.values()].flatMap(s=>s.slots)[0];
+    if (!sl || !sl.head || !sl.head.audioCtx) return 'no audio ctx';
+    const ctx = sl.head.audioCtx;
+    if (ctx.state!=='running') await ctx.resume().catch(()=>{});
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.frequency.value = 440; g.gain.value = 0.3;
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.4);
+    return 'beep on ctx='+ctx.state;
+  };
+  // Run a real clip through TalkingHead.speakAudio and measure the analyser
+  // amplitude — >0 means audio is flowing through the graph to the destination.
+  window.__testSpeak = async () => {
+    const sl = [...sessions.values()].flatMap(s=>s.slots)[0];
+    if (!sl || !sl.head) return 'no slot';
+    const ctx = sl.head.audioCtx;
+    if (ctx.state!=='running') await ctx.resume().catch(()=>{});
+    const buf = await ctx.decodeAudioData(await (await fetch('/demo-audio/cast1.wav')).arrayBuffer());
+    sl.head.speakAudio({ audio: buf }, { lipsyncLang:'en' });
+    const an = sl.head.audioAnalyzerNode;
+    const data = new Uint8Array(an.fftSize || 2048);
+    let maxAmp = 0;
+    for (let i=0;i<40;i++){ await new Promise(r=>setTimeout(r,50)); an.getByteTimeDomainData(data); for (const v of data) maxAmp=Math.max(maxAmp, Math.abs(v-128)); }
+    return { maxAnalyzerAmp: maxAmp, ctx: ctx.state, dur: +buf.duration.toFixed(1), gainNow: sl.head.audioSpeechGainNode.gain.value };
+  };
+
   // ---------- boot ----------
   (async()=>{
     try{

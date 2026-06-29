@@ -37,6 +37,25 @@ catch {
   Start-Sleep -Seconds 2
 }
 
+# Ensure the WARM piper server is running (sub-second avatar synthesis — no per-call model load)
+try { Invoke-WebRequest "http://127.0.0.1:5001/voices" -UseBasicParsing -TimeoutSec 2 | Out-Null }
+catch {
+  $py = (Get-Command python -ErrorAction SilentlyContinue).Source
+  if (-not $py) { $py = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" }
+  $vdir = "$env:USERPROFILE\.claude\piper-voices"
+  $sv = (Get-Content "$env:USERPROFILE\.claude\tts-voice.txt" -ErrorAction SilentlyContinue)
+  if (-not $sv) { $sv = "en_US-amy-medium" }
+  $sv = ($sv -split '::')[0]
+  $model = "$vdir\$sv.onnx"
+  if (-not (Test-Path $model)) { $model = "$vdir\en_US-amy-medium.onnx" }
+  if ((Test-Path $py) -and (Test-Path $model)) {
+    Write-Host "Starting warm piper server (voice $sv)..." -ForegroundColor Cyan
+    Start-Process -FilePath $py -ArgumentList "-m piper.http_server -m `"$model`" --data-dir `"$vdir`" --sentence-silence 0.0 --host 127.0.0.1 --port 5001" `
+      -WindowStyle Hidden -RedirectStandardOutput "$env:USERPROFILE\.agentvibes\piper-server.log" -RedirectStandardError "$env:USERPROFILE\.agentvibes\piper-server.err.log"
+    Start-Sleep -Seconds 5
+  }
+}
+
 # Idempotent: if a receiver window is already connected, refresh it in place
 # instead of opening a duplicate. (Multiple Claude sessions can call this safely.)
 try {

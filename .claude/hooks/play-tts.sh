@@ -166,6 +166,24 @@ TEXT="${TEXT//\\?/?}"        # Remove \?
 TEXT="${TEXT//\\,/,}"        # Remove \,
 TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 
+# ---------------------------------------------------------------------------
+# Fast avatar path — runs BEFORE any heavy sourcing/config lookup.
+# If the TalkingHead receiver window is open, do a lean raw-piper synth and
+# forward it to the browser, then exit. This is what makes avatar replies snappy:
+# it skips provider-manager, the per-LLM lookup, pretext, effects, padding, and
+# cache scans entirely. Falls through to the normal pipeline if the receiver is
+# closed or the lean path can't handle the voice.
+# ---------------------------------------------------------------------------
+_th_on()   { [[ -f "$HOME/.claude/config/talking-head-enabled.txt" ]] && \
+             [[ "$(tr -d '[:space:]' < "$HOME/.claude/config/talking-head-enabled.txt" 2>/dev/null)" == "true" ]]; }
+_th_conn() { curl -s --max-time 1 "http://127.0.0.1:3747/has-browser" 2>/dev/null | grep -q '"connected":true'; }
+if _th_on && _th_conn; then
+  if bash "$SCRIPT_DIR/forward-to-avatar.sh" "$TEXT" "${VOICE_OVERRIDE:-}" \
+       "$(basename "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")" "${LLM_PROVIDER:-claude-code}"; then
+    exit 0
+  fi
+fi
+
 # When no --llm is supplied, route through the "default" pseudo-LLM so the
 # user-managed `llm:default` row in audio-effects.cfg becomes the global
 # fallback for voice / pretext / music / effects.  This is configured via
