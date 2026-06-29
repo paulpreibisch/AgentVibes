@@ -101,6 +101,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Reload — broadcast a reload signal so open browsers refresh in place
+  if (req.method === 'POST' && urlPath === '/reload') {
+    broadcastSSE({ type: 'reload' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*' });
+    res.end();
+    return;
+  }
+
+  // Client log — browser posts debug lines here so they appear in server.log
+  if (req.method === 'POST' && urlPath === '/clientlog') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => { console.log('[CLIENT] ' + String(body).slice(0, 400)); res.writeHead(204, { 'Access-Control-Allow-Origin': '*' }); res.end(); });
+    return;
+  }
+
   // Browser connection count
   if (req.method === 'GET' && urlPath === '/has-browser') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });

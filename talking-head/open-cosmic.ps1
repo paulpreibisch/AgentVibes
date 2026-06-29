@@ -38,13 +38,23 @@ catch {
 }
 
 New-Item -ItemType Directory -Path $prof -Force | Out-Null
+
+# Always open on the LEFTMOST monitor (Paul's left screen).
+Add-Type -AssemblyName System.Windows.Forms
+$left = [System.Windows.Forms.Screen]::AllScreens | Sort-Object { $_.Bounds.X } | Select-Object -First 1
+$px = $left.Bounds.X + 40
+$py = $left.Bounds.Y + 40
+$pw = [Math]::Min(1240, $left.Bounds.Width - 80)
+$ph = [Math]::Min(900,  $left.Bounds.Height - 80)
+
 $chromeArgs = @(
   "--app=$url",
   "--autoplay-policy=no-user-gesture-required",
   "--user-data-dir=$prof",
-  "--window-size=1100,840",
+  "--window-position=$px,$py",
+  "--window-size=$pw,$ph",
   "--no-first-run",
   "--no-default-browser-check"
 )
-Write-Host "Opening $url" -ForegroundColor Green
+Write-Host "Opening $url on monitor at X=$($left.Bounds.X) (pos $px,$py)" -ForegroundColor Green
 Start-Process "chrome.exe" -ArgumentList $chromeArgs

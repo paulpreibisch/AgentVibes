@@ -548,26 +548,72 @@ if handle_translation_mode; then
   exit 0
 fi
 
+# --- TalkingHead local forward (best-effort) --------------------------------
+# When config/talking-head-enabled.txt is "true" and a browser is connected to
+# the local avatar server, forward the synthesized voice WAV so local-project
+# TTS also drives the on-screen avatars. If a browser is connected, local
+# speaker playback is suppressed (the browser becomes the audio source).
+_th_active() { [[ -f "$HOME/.claude/config/talking-head-enabled.txt" ]] && \
+  [[ "$(tr -d '[:space:]' < "$HOME/.claude/config/talking-head-enabled.txt" 2>/dev/null)" == "true" ]]; }
+_th_browser() { curl -s --max-time 1 http://127.0.0.1:3747/has-browser 2>/dev/null | grep -q '"connected":true'; }
+_th_forward() {
+  local out="$1" wav proj b64
+  wav=$(printf '%s\n' "$out" | grep -oE '([A-Za-z]:[\\/][^"]*|/[^"]*)\.wav' | head -1)
+  [[ -n "$wav" ]] || return 0
+  command -v cygpath >/dev/null 2>&1 && wav=$(cygpath -u "$wav" 2>/dev/null || printf '%s' "$wav")
+  [[ -f "$wav" ]] || return 0
+  proj=$(basename "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")
+  b64=$(base64 -w0 "$wav" 2>/dev/null) || return 0
+  AV_B64="$b64" AV_TEXT="$TEXT" AV_VOICE="$VOICE_OVERRIDE" AV_PROJ="$proj" AV_LLM="${LLM_PROVIDER:-}" \
+  python3 - <<'PY' 2>/dev/null || true
+import os,json,urllib.request
+b=json.dumps({"audioBase64":os.environ["AV_B64"],"text":os.environ.get("AV_TEXT",""),"voice":os.environ.get("AV_VOICE",""),"project":os.environ.get("AV_PROJ",""),"origin":"local","llm":os.environ.get("AV_LLM","")}).encode()
+try: urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:3747/speak",data=b,headers={"Content-Type":"application/json"}),timeout=3)
+except Exception: pass
+PY
+}
+_TH_GO=0
+if _th_active && _th_browser; then export AGENTVIBES_NO_PLAY=1; _TH_GO=1; fi
+
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in
   piper)
-    exec bash "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "${AGENT_PROFILE_FILE:-}"
+    set +e
+    _o=$(bash "$SCRIPT_DIR/play-tts-piper.sh" "$TEXT" "$VOICE_OVERRIDE" "${AGENT_PROFILE_FILE:-}"); _rc=$?
+    printf '%s\n' "$_o"
+    [ "$_TH_GO" = "1" ] && _th_forward "$_o"
+    exit "$_rc"
     ;;
   soprano)
-    exec bash "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"
+    set +e
+    _o=$(bash "$SCRIPT_DIR/play-tts-soprano.sh" "$TEXT" "$VOICE_OVERRIDE"); _rc=$?
+    printf '%s\n' "$_o"
+    [ "$_TH_GO" = "1" ] && _th_forward "$_o"
+    exit "$_rc"
     ;;
   macos)
     exec bash "$SCRIPT_DIR/play-tts-macos.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   elevenlabs)
-    exec bash "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"
+    set +e
+    _o=$(bash "$SCRIPT_DIR/play-tts-elevenlabs.sh" "$TEXT" "$VOICE_OVERRIDE"); _rc=$?
+    printf '%s\n' "$_o"
+    [ "$_TH_GO" = "1" ] && _th_forward "$_o"
+    exit "$_rc"
     ;;
   kokoro)
-    exec bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$TEXT" "$VOICE_OVERRIDE"
+    set +e
+    _o=$(bash "$SCRIPT_DIR/play-tts-kokoro.sh" "$TEXT" "$VOICE_OVERRIDE"); _rc=$?
+    printf '%s\n' "$_o"
+    [ "$_TH_GO" = "1" ] && _th_forward "$_o"
+    exit "$_rc"
     ;;
   sapi|windows-sapi)
-    _play_windows_sapi "$TEXT" "$VOICE_OVERRIDE"
-    exit $?
+    set +e
+    _o=$(_play_windows_sapi "$TEXT" "$VOICE_OVERRIDE"); _rc=$?
+    printf '%s\n' "$_o"
+    [ "$_TH_GO" = "1" ] && _th_forward "$_o"
+    exit "$_rc"
     ;;
   termux-ssh)
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
@@ -576,7 +622,7 @@ case "$ACTIVE_PROVIDER" in
     exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE" "" "${AGENT_PROFILE_FILE:-}"
     ;;
   agentvibes-receiver)
-    exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
+    exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE" "$(basename "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2

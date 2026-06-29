@@ -60,16 +60,34 @@
       border-radius: 10px; padding: 8px 10px; font-size: 12px; cursor: pointer; }
     .msg:hover { background: rgba(40,40,75,0.8); }
     .msg .who { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+    .msg .ts { float: right; font-weight: 400; opacity: 0.45; font-size: 10px; }
     .msg .proj { font-size: 10px; opacity: 0.55; }
     .msg.playing { box-shadow: 0 0 0 1px #4ade80 inset; }
 
+    /* Metallic translucent back-wall behind the avatars (so they read as solid) */
+    #wall { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 1; pointer-events: none; overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(48,54,68,0.18) 0%, rgba(60,68,84,0.34) 35%, rgba(38,43,54,0.5) 100%);
+      box-shadow: inset 0 3px 60px rgba(255,255,255,0.05); }
+    /* Brushed-metal sheen streaks */
+    #wall::after { content:''; position:absolute; inset:0;
+      background: repeating-linear-gradient(95deg, rgba(255,255,255,0.018) 0 2px, transparent 2px 7px); mix-blend-mode: screen; }
+    /* Side rails with bolts */
+    .rail { position: absolute; top: 0; bottom: 0; width: 40px; z-index: 2;
+      background: linear-gradient(90deg, #232833, #586377 45%, #2c323e); border-left: 1px solid rgba(0,0,0,0.5); border-right: 1px solid rgba(0,0,0,0.5);
+      box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+    .rail.left { left: 0; } .rail.right { right: 0; }
+    .rail::before { content:''; position:absolute; inset:0;
+      background-image: radial-gradient(circle at 50% 9px, #e8eefc 0 2px, #aab4c8 2px 3px, #20242e 4px 5.5px, transparent 6px);
+      background-size: 100% 46px; background-repeat: repeat-y; }
+
     /* Cast layer inside the stage */
-    .cast { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; gap: 0; pointer-events: none; }
+    .cast { position: absolute; inset: 0; z-index: 3; display: flex; align-items: flex-end; justify-content: center; gap: 0; pointer-events: none; }
     .cast.hidden { display: none; }
     .slot { position: relative; width: 420px; height: 94vh; display: flex; align-items: flex-end; justify-content: center;
-      transition: filter .5s, opacity .5s, transform .5s cubic-bezier(0.34,1.4,0.64,1);
-      filter: saturate(0.7) brightness(0.72); opacity: 0.78; }
-    .slot.speaking { filter: saturate(1.15) brightness(1.12); opacity: 1; transform: translateY(-10px) scale(1.03); z-index: 5; }
+      transition: filter .5s, transform .5s cubic-bezier(0.34,1.4,0.64,1);
+      filter: brightness(0.86) saturate(0.95); opacity: 1; }
+    .slot.speaking { filter: brightness(1.12) saturate(1.12); transform: translateY(-10px) scale(1.03); z-index: 5; }
     .slot .canvas-host { position: absolute; inset: 0; }
     .slot .glow { position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%); width: 300px; height: 300px;
       border-radius: 50%; background: radial-gradient(circle, var(--accent,#8a5cff) 0%, transparent 65%); opacity: 0;
@@ -122,6 +140,7 @@
       <div id="chat"></div>
     </div>
     <div id="stage">
+      <div id="wall"><div class="rail left"></div><div class="rail right"></div></div>
       <div id="empty"><div class="big">🌌</div><div>Waiting for AgentVibes messages…<br>avatars appear when someone speaks.</div></div>
       <!-- per-session cast containers are injected here -->
       <div id="caption"></div>
@@ -146,17 +165,20 @@
 
   // ---------- config ----------
   const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/';
+  // Smaller, fast-loading avatars first; the big ones (avaturn/avatarsdk ~12-13MB) last.
   const AVATARS = [
     { id:'brunette',  url:AVATAR_BASE+'brunette.glb',  body:'F' },
     { id:'brunette-t',url:AVATAR_BASE+'brunette-t.glb',body:'F' },
-    { id:'avaturn',   url:AVATAR_BASE+'avaturn.glb',   body:'M' },
-    { id:'avatarsdk', url:AVATAR_BASE+'avatarsdk.glb', body:'M' },
     { id:'vroid',     url:AVATAR_BASE+'vroid.glb',     body:'F' },
+    { id:'avatarsdk', url:AVATAR_BASE+'avatarsdk.glb', body:'M' },
+    { id:'avaturn',   url:AVATAR_BASE+'avaturn.glb',   body:'M' },
   ];
   const DEFAULT_AVATAR = 'brunette';
   const ACCENTS = ['#a78bfa','#22d3ee','#fb7185','#34d399','#fbbf24','#60a5fa'];
-  const MAX_SLOTS = 4;
   const params = new URLSearchParams(location.search);
+  const MODE = params.get('mode') || 'meeting';
+  // Single reliable avatar for the everyday receiver; up to 4 only for casts.
+  const MAX_SLOTS = (MODE==='party' || MODE==='opencast' || params.get('demo')==='party') ? 4 : 1;
   if (params.get('debug')==='1') document.getElementById('debug').classList.add('visible');
 
   // ---------- helpers ----------
@@ -164,7 +186,8 @@
   const stageEl=$('stage'), caption=$('caption'), chatEl=$('chat'), tabsEl=$('tabs'),
         emptyEl=$('empty'), connDot=$('connDot'), debugBox=$('debug');
   const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function dbg(m){ const t=new Date().toLocaleTimeString(); debugBox.textContent=`${t}  ${m}\n`+debugBox.textContent; if(debugBox.textContent.length>4000)debugBox.textContent=debugBox.textContent.slice(0,4000); }
+  function dbg(m){ const t=new Date().toLocaleTimeString(); debugBox.textContent=`${t}  ${m}\n`+debugBox.textContent; if(debugBox.textContent.length>4000)debugBox.textContent=debugBox.textContent.slice(0,4000);
+    try{ fetch('/clientlog',{method:'POST',body:m}); }catch{} }
   function showError(m){ const e=$('error-msg'); e.textContent=m; e.style.display='block'; }
   function hashStr(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return h; }
 
@@ -250,7 +273,7 @@
     chatEl.innerHTML='';
     s.clips.slice(-40).forEach(clip=>{
       const m=document.createElement('div'); m.className='msg'; m.style.borderLeftColor=clip.accent;
-      m.innerHTML=`<div class="who" style="color:${clip.accent}">${esc(clip.name)}</div>`+
+      m.innerHTML=`<div class="who" style="color:${clip.accent}">${esc(clip.name)}<span class="ts">${esc(clip.time||'')}</span></div>`+
                   `<div>${esc((clip.text||'(no text)').slice(0,160))}</div>`+
                   `<div class="proj">${esc(clip.project||clip.origin||'')}</div>`;
       m.addEventListener('click',()=>{ const slot=s.slots.find(x=>x.voiceKey===clip.voiceKey); if(slot) playClip(clip,slot,m); });
@@ -274,7 +297,11 @@
   async function ensureSlot(s, voiceKey){
     let slot=s.slots.find(x=>x.voiceKey===voiceKey);
     if(slot) return slot;
-    if(s.slots.length>=MAX_SLOTS){ slot=s.slots.reduce((a,b)=>(a._last||0)<=(b._last||0)?a:b); slot.voiceKey=voiceKey; }
+    if(s.slots.length>=MAX_SLOTS){
+      slot=s.slots.reduce((a,b)=>(a._last||0)<=(b._last||0)?a:b); slot.voiceKey=voiceKey;
+      const m=s.cast[voiceKey];
+      if(m){ slot.nm.textContent=m.name; slot.pj.textContent=m.project||s.label||''; slot.accent=m.accent; slot.el.style.setProperty('--accent',m.accent); }
+    }
     else {
       const meta=s.cast[voiceKey]; const accent=meta.accent;
       const el=document.createElement('div'); el.className='slot'; el.style.setProperty('--accent',accent);
@@ -299,35 +326,43 @@
 
   // ---------- audio ----------
   async function playClip(clip, slot, msgEl){
-    if(activeKey){ const s=sessions.get(activeKey); if(s){
-      caption.innerHTML=`<span class="spk">${esc(clip.name)} · ${esc(clip.project||clip.origin||'')}</span>${esc(clip.text||'(no text)')}`;
-      caption.classList.add('visible');
-      chatEl.querySelectorAll('.msg.playing').forEach(e=>e.classList.remove('playing')); if(msgEl)msgEl.classList.add('playing');
-      const head=slot.head; if(!head){dbg('no head');return 1500;} setSpeaking(s,slot,true);
-      try{
-        if(head.audioCtx&&head.audioCtx.state!=='running') await head.audioCtx.resume();
-        const buf=await head.audioCtx.decodeAudioData(await (await fetch(clip.audioUrl)).arrayBuffer());
-        const r={audio:buf}; const text=(clip.text||'').trim();
-        if(text){ const w=text.split(/\s+/).filter(Boolean); const per=(buf.duration*1000)/Math.max(1,w.length);
-          r.words=w; r.wtimes=w.map((_,i)=>Math.round(i*per)); r.wdurations=w.map(()=>Math.round(per*0.9)); }
-        head.speakAudio(r,{lipsyncLang:'en'});
-        clearTimeout(slot._endT); slot._endT=setTimeout(()=>setSpeaking(s,slot,false), buf.duration*1000+400);
-        return buf.duration*1000;
-      }catch(e){ dbg('audio ERR '+e.message); try{const a=new Audio(clip.audioUrl);a.volume=1;await a.play();}catch{} setSpeaking(s,slot,false); return 1500; }
-    }}
-    return 1500;
+    const s = activeKey ? sessions.get(activeKey) : null;
+    if(!s){ dbg('playClip: no active session'); return 1500; }
+    caption.innerHTML=`<span class="spk">${esc(clip.name)} · ${esc(clip.project||clip.origin||'')}</span>${esc(clip.text||'(no text)')}`;
+    caption.classList.add('visible');
+    chatEl.querySelectorAll('.msg.playing').forEach(e=>e.classList.remove('playing')); if(msgEl)msgEl.classList.add('playing');
+    const head=slot.head; if(!head){ dbg('playClip: no head'); return 1500; }
+    setSpeaking(s,slot,true);
+    try{
+      dbg('playClip ctx='+(head.audioCtx?head.audioCtx.state:'none'));
+      if(head.audioCtx && head.audioCtx.state!=='running'){
+        await Promise.race([ head.audioCtx.resume().catch(()=>{}), new Promise(r=>setTimeout(r,1200)) ]);
+        dbg('ctx after resume='+head.audioCtx.state);
+      }
+      const resp=await fetch(clip.audioUrl);
+      const buf=await head.audioCtx.decodeAudioData(await resp.arrayBuffer());
+      dbg('decoded '+buf.duration.toFixed(1)+'s '+buf.sampleRate+'Hz');
+      const r={audio:buf}; const text=(clip.text||'').trim();
+      if(text){ const w=text.split(/\s+/).filter(Boolean); const per=(buf.duration*1000)/Math.max(1,w.length);
+        r.words=w; r.wtimes=w.map((_,i)=>Math.round(i*per)); r.wdurations=w.map(()=>Math.round(per*0.9)); }
+      head.speakAudio(r,{lipsyncLang:'en'});
+      dbg('speakAudio queued '+(r.words?r.words.length:0)+'w');
+      clearTimeout(slot._endT); slot._endT=setTimeout(()=>setSpeaking(s,slot,false), buf.duration*1000+400);
+      return buf.duration*1000;
+    }catch(e){ dbg('audio ERR '+e.message); try{const a=new Audio(clip.audioUrl);a.volume=1;await a.play();}catch{} setSpeaking(s,slot,false); return 1500; }
   }
 
   // ---------- handle speak ----------
   let seq=0;
   async function handleSpeak(msg){
-    if(!msg.audioUrl) return;
+    if(!msg.audioUrl){ dbg('handleSpeak: no audioUrl, skip'); return; }
     const s=getSession(msg);
     const voiceKey=(msg.voice||msg.llm||'default');
+    dbg('handleSpeak v='+voiceKey+' active='+(s.key===activeKey?'Y':'N')+' key='+s.key);
     if(!s.cast[voiceKey]){ const idx=Object.keys(s.cast).length;
       s.cast[voiceKey]={ avatarId:pickAvatar(s,voiceKey,idx), accent:ACCENTS[idx%ACCENTS.length], name:(msg.llm||msg.voice||voiceKey), project:(msg.project||'') }; }
     const meta=s.cast[voiceKey];
-    const clip={ id:++seq, audioUrl:msg.audioUrl, text:msg.text||'', voiceKey, name:meta.name, accent:meta.accent, project:msg.project||'', origin:msg.origin||'remote' };
+    const clip={ id:++seq, audioUrl:msg.audioUrl, text:msg.text||'', voiceKey, name:meta.name, accent:meta.accent, project:msg.project||'', origin:msg.origin||'remote', time:new Date().toLocaleTimeString() };
     s.clips.push(clip); updateTab(s);
     if(s.key===activeKey){
       const slot=await ensureSlot(s,voiceKey);
@@ -365,7 +400,7 @@
     async function tick(){
       if(i>=demoBench.length){ $('replayBtn').style.display='block'; dbg('demo done'); return; }  // play ONCE
       const {slot,c,vk}=demoBench[i];
-      const clip={ id:++seq, audioUrl:c.audioUrl, text:c.text, voiceKey:vk, name:`${c.name} · ${c.role}`, accent:c.accent, project:'BMAD Party', origin:'demo' };
+      const clip={ id:++seq, audioUrl:c.audioUrl, text:c.text, voiceKey:vk, name:`${c.name} · ${c.role}`, accent:c.accent, project:'BMAD Party', origin:'demo', time:new Date().toLocaleTimeString() };
       s.clips.push(clip); renderChat(s);
       const ms=await playClip(clip,slot,null); i++; setTimeout(tick,(ms||3000)+800);
     }
@@ -376,8 +411,9 @@
   function connectSSE(){
     const es=new EventSource('/events');
     es.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data);}catch{return;}
-      if(m.type==='connected'){ connDot.classList.add('on'); }
-      else if(m.type==='speak'){ handleSpeak(m).catch(e=>dbg('speak err '+e.message)); } };
+      if(m.type==='connected'){ connDot.classList.add('on'); dbg('SSE connected'); }
+      else if(m.type==='reload'){ dbg('reload signal — refreshing'); setTimeout(()=>location.reload(), 150); }
+      else if(m.type==='speak'){ dbg('SSE speak v='+(m.voice||'?')+' p='+(m.project||'?')+' url='+(m.audioUrl?'y':'n')); handleSpeak(m).catch(e=>dbg('speak ERR '+e.message)); } };
     es.onerror=()=>{ connDot.classList.remove('on'); es.close(); setTimeout(connectSSE,3000); };
   }
 
@@ -395,6 +431,14 @@
     try{
       applyTheme(0); setupAudioUnlock(); connectSSE();
       if(params.get('demo')==='party'){ $('replayBtn').style.display='none'; runPartyDemo(); }
+      else {
+        // Preload one reliable avatar so the stage is never blank and the first
+        // message has somewhere to speak immediately.
+        const s=getSession({project:'AgentVibes',origin:'local'});
+        s.cast['__default__']={ avatarId:DEFAULT_AVATAR, accent:ACCENTS[0], name:'AgentVibes', project:'AgentVibes' };
+        await ensureSlot(s,'__default__');
+        dbg('default avatar preloaded');
+      }
     }catch(e){ showError('Boot failed: '+e.message); dbg('BOOT '+e.message); }
   })();
   </script>
