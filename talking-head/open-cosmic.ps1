@@ -19,8 +19,9 @@ $base  = "http://localhost:$port"
 
 # Map the friendly view name to a URL
 switch ($View.ToLower()) {
+  "meeting"   { $url = "$base/cosmic.html" }              # AgentVibes HTML Receiver (live)
   "gallery"   { $url = "$base/gallery.html" }
-  "partydemo" { $url = "$base/cosmic.html?mode=party&demo=party" }
+  "partydemo" { $url = "$base/cosmic.html?demo=party" }
   "party"     { $url = "$base/cosmic.html?mode=party" }
   "regular"   { $url = "$base/cosmic.html?mode=regular" }
   "opencast"  { $url = "$base/cosmic.html?mode=opencast" }

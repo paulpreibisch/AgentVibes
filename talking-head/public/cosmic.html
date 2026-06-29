@@ -3,102 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgentVibes · Cosmic Cast</title>
+  <title>AgentVibes HTML Receiver</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #05030f; font-family: -apple-system, 'Segoe UI', sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #05030f; color: #e9e9ff;
+      font-family: -apple-system, 'Segoe UI', sans-serif; }
 
-    /* Galaxy background canvas — fills the window, sits behind everything */
     #galaxy { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; display: block; }
-
-    /* Soft vignette + nebula glow over the galaxy */
-    #nebula {
-      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    #nebula { position: fixed; inset: 0; z-index: 1; pointer-events: none;
       background:
-        radial-gradient(60% 50% at 30% 30%, rgba(80,40,160,0.25), transparent 70%),
-        radial-gradient(50% 50% at 75% 65%, rgba(20,120,160,0.22), transparent 70%),
-        radial-gradient(120% 100% at 50% 120%, rgba(0,0,0,0.65), transparent 60%);
-    }
+        radial-gradient(60% 50% at 30% 30%, rgba(80,40,160,0.22), transparent 70%),
+        radial-gradient(50% 50% at 75% 65%, rgba(20,120,160,0.20), transparent 70%),
+        radial-gradient(120% 100% at 50% 120%, rgba(0,0,0,0.6), transparent 60%); }
 
-    /* Cast layer — holds the avatar slots over the galaxy */
-    #cast {
-      position: fixed; inset: 0; z-index: 10;
-      display: flex; align-items: flex-end; justify-content: center;
-      gap: 0; pointer-events: none;
-    }
+    /* Brand — top right */
+    #brand { position: fixed; top: 12px; right: 16px; z-index: 40; display: flex; align-items: center; gap: 8px;
+      background: rgba(10,8,24,0.7); border: 1px solid rgba(255,255,255,0.14); padding: 7px 14px; border-radius: 999px;
+      font-size: 13px; font-weight: 700; letter-spacing: 0.3px; backdrop-filter: blur(8px); }
+    #brand .logo { background: linear-gradient(90deg,#a78bfa,#22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #brand .dot { width: 8px; height: 8px; border-radius: 50%; background: #f87171; box-shadow: 0 0 8px #f87171; }
+    #brand .dot.on { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
 
-    /* A single avatar slot */
-    .slot {
-      position: relative;
-      width: 420px; height: 92vh;
-      display: flex; align-items: flex-end; justify-content: center;
-      transition: filter 0.5s ease, opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.4,0.64,1);
-      filter: saturate(0.7) brightness(0.75);
-      opacity: 0.78;
-    }
+    /* App layout: sidebar + stage */
+    #app { position: fixed; inset: 0; z-index: 10; display: flex; }
+    #sidebar { width: 300px; flex: 0 0 300px; height: 100vh; display: flex; flex-direction: column;
+      background: linear-gradient(180deg, rgba(10,8,24,0.86), rgba(8,6,18,0.78)); backdrop-filter: blur(10px);
+      border-right: 1px solid rgba(255,255,255,0.08); }
+    #stage { position: relative; flex: 1; height: 100vh; }
+
+    /* Sidebar header */
+    #side-head { padding: 14px 14px 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #9aa3d8; }
+
+    /* Session tabs */
+    #tabs { display: flex; flex-direction: column; gap: 4px; padding: 0 8px 8px; max-height: 28vh; overflow-y: auto; }
+    .tab { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+      border: 1px solid transparent; font-size: 13px; color: #d7dbff; }
+    .tab:hover { background: rgba(255,255,255,0.05); }
+    .tab.active { background: rgba(124,92,255,0.16); border-color: rgba(124,92,255,0.5); }
+    .tab .tname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab .badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #fb7185; color: #fff;
+      font-size: 11px; font-weight: 700; display: none; align-items: center; justify-content: center; }
+    .tab.has-unread .badge { display: inline-flex; }
+    .tab .kind { font-size: 10px; opacity: 0.55; }
+
+    /* Sidebar actions */
+    #actions { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .btn { flex: 1; text-align: center; padding: 8px; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #e9e9ff; }
+    .btn:hover { background: rgba(255,255,255,0.12); }
+    .btn.danger { border-color: rgba(248,113,113,0.5); color: #fca5a5; }
+
+    /* Chat (clips for active session) */
+    #chat-head { padding: 10px 14px 6px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #9aa3d8; }
+    #chat { flex: 1; overflow-y: auto; padding: 0 10px 14px; display: flex; flex-direction: column; gap: 7px; }
+    .msg { background: rgba(16,16,34,0.7); border: 1px solid rgba(255,255,255,0.08); border-left-width: 3px;
+      border-radius: 10px; padding: 8px 10px; font-size: 12px; cursor: pointer; }
+    .msg:hover { background: rgba(40,40,75,0.8); }
+    .msg .who { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+    .msg .proj { font-size: 10px; opacity: 0.55; }
+    .msg.playing { box-shadow: 0 0 0 1px #4ade80 inset; }
+
+    /* Cast layer inside the stage */
+    .cast { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; gap: 0; pointer-events: none; }
+    .cast.hidden { display: none; }
+    .slot { position: relative; width: 420px; height: 94vh; display: flex; align-items: flex-end; justify-content: center;
+      transition: filter .5s, opacity .5s, transform .5s cubic-bezier(0.34,1.4,0.64,1);
+      filter: saturate(0.7) brightness(0.72); opacity: 0.78; }
     .slot.speaking { filter: saturate(1.15) brightness(1.12); opacity: 1; transform: translateY(-10px) scale(1.03); z-index: 5; }
     .slot .canvas-host { position: absolute; inset: 0; }
-
-    /* Accent glow ring behind the speaking avatar */
-    .slot .glow {
-      position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%);
-      width: 320px; height: 320px; border-radius: 50%;
-      background: radial-gradient(circle, var(--accent, #8a5cff) 0%, transparent 65%);
-      opacity: 0; transition: opacity 0.5s ease; filter: blur(14px); z-index: -1;
-    }
+    .slot .glow { position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%); width: 300px; height: 300px;
+      border-radius: 50%; background: radial-gradient(circle, var(--accent,#8a5cff) 0%, transparent 65%); opacity: 0;
+      transition: opacity .5s; filter: blur(14px); z-index: -1; }
     .slot.speaking .glow { opacity: 0.55; }
+    .slot .plate { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); display: flex; flex-direction: column;
+      align-items: center; gap: 1px; background: rgba(8,8,22,0.84); backdrop-filter: blur(8px);
+      border: 1px solid var(--accent,#8a5cff); color: #eef; padding: 5px 14px; border-radius: 14px; white-space: nowrap;
+      box-shadow: 0 0 18px -6px var(--accent,#8a5cff); }
+    .slot .plate .nm { font-size: 13px; font-weight: 700; }
+    .slot .plate .pj { font-size: 10px; opacity: 0.6; }
 
-    /* Nameplate */
-    .slot .plate {
-      position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%);
-      display: none; align-items: center; gap: 8px;
-      background: rgba(8,8,22,0.82); backdrop-filter: blur(8px);
-      border: 1px solid var(--accent, #8a5cff);
-      color: #eef; padding: 6px 14px; border-radius: 999px;
-      font-size: 13px; font-weight: 600; white-space: nowrap;
-      box-shadow: 0 0 22px -4px var(--accent, #8a5cff);
-    }
-    .slot.active .plate { display: flex; }
-    .slot .plate .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #8a5cff); box-shadow: 0 0 8px var(--accent); }
-
-    /* Title / mode chip */
-    #topbar {
-      position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30;
-      display: flex; gap: 10px; align-items: center;
-      color: #cdd3ff; font-size: 13px; letter-spacing: 0.4px;
-    }
-    #topbar .brand { font-weight: 700; background: linear-gradient(90deg,#a78bfa,#22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    #topbar .mode { background: rgba(20,20,45,0.7); border: 1px solid rgba(255,255,255,0.14); padding: 3px 10px; border-radius: 999px; cursor: pointer; }
-    #topbar .mode:hover { background: rgba(40,40,80,0.8); }
-
-    /* Caption */
-    #caption {
-      position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 25;
-      max-width: 80vw; text-align: center; font-size: 18px; line-height: 1.4; color: #fff;
-      background: rgba(8,8,22,0.66); backdrop-filter: blur(8px); padding: 12px 20px;
-      border-radius: 14px; display: none; border: 1px solid rgba(255,255,255,0.12);
-    }
+    /* Caption — bottom of the stage area (never over the sidebar) */
+    #caption { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; max-width: 80%; text-align: center;
+      font-size: 17px; line-height: 1.4; color: #fff; background: rgba(8,8,22,0.62); backdrop-filter: blur(8px);
+      padding: 11px 18px; border-radius: 14px; display: none; border: 1px solid rgba(255,255,255,0.12); z-index: 6; }
     #caption.visible { display: block; }
-    #caption .spk { font-size: 12px; opacity: 0.65; display: block; margin-bottom: 4px; }
+    #caption .spk { font-size: 11px; opacity: 0.65; display: block; margin-bottom: 3px; }
 
-    /* Clip history */
-    #clips { position: fixed; top: 46px; left: 10px; width: 270px; max-height: 60vh; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 6px; z-index: 20; }
-    .clip { background: rgba(14,14,30,0.8); color: #dfe3ff; border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 10px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
-    .clip:hover { background: rgba(40,40,75,0.9); }
-    .clip .meta { font-size: 10px; opacity: 0.6; margin-bottom: 2px; }
-    .clip.playing { border-color: #4ade80; }
+    #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+      gap: 10px; color: rgba(220,225,255,0.5); font-size: 15px; text-align: center; z-index: 4; }
+    #empty .big { font-size: 40px; opacity: 0.5; }
 
-    /* Status + debug */
-    #status { position: fixed; top: 14px; right: 14px; z-index: 30; font-size: 11px; color: rgba(220,225,255,0.5); }
-    #debug { position: fixed; right: 8px; bottom: 8px; width: 320px; max-height: 34vh; overflow-y: auto;
-      background: rgba(0,0,0,0.7); color: #9effa0; font: 10px/1.45 ui-monospace, Consolas, monospace;
-      padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; z-index: 40; display: none; border: 1px solid rgba(255,255,255,0.1); }
-    #debug.visible { display: block; }
-    #enable-audio { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); display: none;
+    #enable-audio { position: fixed; top: 50%; left: calc(50% + 150px); transform: translate(-50%,-50%); display: none;
       background: rgba(20,120,60,0.92); color:#fff; padding: 14px 22px; border-radius: 999px; font-size: 15px;
       font-weight: 600; cursor: pointer; z-index: 50; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    #debug { position: fixed; right: 8px; bottom: 8px; width: 320px; max-height: 32vh; overflow-y: auto;
+      background: rgba(0,0,0,0.7); color: #9effa0; font: 10px/1.45 ui-monospace, Consolas, monospace; padding: 8px 10px;
+      border-radius: 8px; white-space: pre-wrap; z-index: 45; display: none; border: 1px solid rgba(255,255,255,0.1); }
+    #debug.visible { display: block; }
     #error-msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(180,40,40,0.9);
       color:#fff; padding: 16px 24px; border-radius: 10px; font-size: 13px; max-width: 420px; text-align: center; display: none; z-index: 60; }
   </style>
@@ -106,20 +107,31 @@
 <body>
   <canvas id="galaxy"></canvas>
   <div id="nebula"></div>
-  <div id="cast"></div>
 
-  <div id="topbar">
-    <span class="brand">✦ AgentVibes Cosmic Cast</span>
-    <span class="mode" id="modeChip" title="Click to cycle mode">regular</span>
+  <div id="brand"><span class="dot" id="connDot"></span><span class="logo">✦ AgentVibes HTML Receiver</span></div>
+
+  <div id="app">
+    <div id="sidebar">
+      <div id="side-head">Sessions</div>
+      <div id="tabs"></div>
+      <div id="actions">
+        <div class="btn danger" id="clearBtn" title="Clear avatars + chat for the active session">⨯ Clear</div>
+        <div class="btn" id="replayBtn" title="Replay the demo scene" style="display:none">▶ Replay scene</div>
+      </div>
+      <div id="chat-head">Chat</div>
+      <div id="chat"></div>
+    </div>
+    <div id="stage">
+      <div id="empty"><div class="big">🌌</div><div>Waiting for AgentVibes messages…<br>avatars appear when someone speaks.</div></div>
+      <!-- per-session cast containers are injected here -->
+      <div id="caption"></div>
+    </div>
   </div>
-  <div id="clips"></div>
-  <div id="caption"></div>
-  <div id="status">connecting…</div>
+
   <div id="enable-audio">🔊 Click to enable audio</div>
   <div id="debug"></div>
   <div id="error-msg"></div>
 
-  <!-- three import map — resolves bare specifiers used by talkinghead.mjs -->
   <script type="importmap">
   { "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js/+esm",
@@ -132,373 +144,258 @@
   import * as THREE from 'three';
   import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs';
 
-  // =====================================================================
-  // Config
-  // =====================================================================
+  // ---------- config ----------
   const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/';
-  // Distinct heads (verified loadable). body: F/M hints camera framing.
   const AVATARS = [
-    { id: 'brunette',  url: AVATAR_BASE + 'brunette.glb',  body: 'F' },
-    { id: 'brunette-t',url: AVATAR_BASE + 'brunette-t.glb', body: 'F' },
-    { id: 'avaturn',   url: AVATAR_BASE + 'avaturn.glb',   body: 'M' },
-    { id: 'avatarsdk', url: AVATAR_BASE + 'avatarsdk.glb', body: 'M' },
-    { id: 'vroid',     url: AVATAR_BASE + 'vroid.glb',     body: 'F' },
+    { id:'brunette',  url:AVATAR_BASE+'brunette.glb',  body:'F' },
+    { id:'brunette-t',url:AVATAR_BASE+'brunette-t.glb',body:'F' },
+    { id:'avaturn',   url:AVATAR_BASE+'avaturn.glb',   body:'M' },
+    { id:'avatarsdk', url:AVATAR_BASE+'avatarsdk.glb', body:'M' },
+    { id:'vroid',     url:AVATAR_BASE+'vroid.glb',     body:'F' },
   ];
-  const DEFAULT_AVATAR = 'brunette';  // regular mode always uses this
-  // Accent palette cycled across party cast slots
-  const ACCENTS = ['#a78bfa', '#22d3ee', '#fb7185', '#34d399', '#fbbf24', '#60a5fa'];
-
-  const params   = new URLSearchParams(location.search);
-  let   MODE      = params.get('mode') || 'regular';   // regular | party | opencast
+  const DEFAULT_AVATAR = 'brunette';
+  const ACCENTS = ['#a78bfa','#22d3ee','#fb7185','#34d399','#fbbf24','#60a5fa'];
   const MAX_SLOTS = 4;
+  const params = new URLSearchParams(location.search);
+  if (params.get('debug')==='1') document.getElementById('debug').classList.add('visible');
 
-  // =====================================================================
-  // Tiny DOM helpers
-  // =====================================================================
+  // ---------- helpers ----------
   const $ = id => document.getElementById(id);
-  const castEl = $('cast'), caption = $('caption'), clipsBox = $('clips');
-  const statusEl = $('status'), debugBox = $('debug'), modeChip = $('modeChip');
-  function setStatus(s){ statusEl.textContent = s; }
+  const stageEl=$('stage'), caption=$('caption'), chatEl=$('chat'), tabsEl=$('tabs'),
+        emptyEl=$('empty'), connDot=$('connDot'), debugBox=$('debug');
+  const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function dbg(m){ const t=new Date().toLocaleTimeString(); debugBox.textContent=`${t}  ${m}\n`+debugBox.textContent; if(debugBox.textContent.length>4000)debugBox.textContent=debugBox.textContent.slice(0,4000); }
   function showError(m){ const e=$('error-msg'); e.textContent=m; e.style.display='block'; }
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function dbg(m){ const t=new Date().toLocaleTimeString(); debugBox.textContent=`${t}  ${m}\n`+debugBox.textContent; if(debugBox.textContent.length>4000) debugBox.textContent=debugBox.textContent.slice(0,4000); }
-  if (params.get('debug') === '1') debugBox.classList.add('visible');
+  function hashStr(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return h; }
 
-  // =====================================================================
-  // Galaxy background (Three.js particle galaxy + starfield)
-  // =====================================================================
+  // ---------- galaxy ----------
   const galaxy = (() => {
-    const canvas = $('galaxy');
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.4, 6);
-
-    let palette = { inside: new THREE.Color('#ffd9a0'), outside: new THREE.Color('#5b8cff') };
-
-    // --- Spiral galaxy points ---
-    let points = null;
-    function buildGalaxy(seed = 1, paletteIn) {
-      if (paletteIn) palette = paletteIn;
-      if (points) { scene.remove(points); points.geometry.dispose(); points.material.dispose(); }
-      const COUNT = 9000, ARMS = 3, RADIUS = 7, SPIN = 1.1, RAND = 0.45, RANDPOW = 2.6;
-      const pos = new Float32Array(COUNT*3), col = new Float32Array(COUNT*3);
-      let s = seed * 99991;
-      const rnd = () => { s = (s*1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
-      for (let i=0;i<COUNT;i++){
-        const r = Math.pow(rnd(), 1.6) * RADIUS;
-        const arm = (i % ARMS) / ARMS * Math.PI * 2;
-        const spin = r * SPIN;
-        const rx = Math.pow(rnd(), RANDPOW) * (rnd()<0.5?1:-1) * RAND * r;
-        const ry = Math.pow(rnd(), RANDPOW) * (rnd()<0.5?1:-1) * RAND * r * 0.35;
-        const rz = Math.pow(rnd(), RANDPOW) * (rnd()<0.5?1:-1) * RAND * r;
-        const a = arm + spin;
-        pos[i*3]   = Math.cos(a)*r + rx;
-        pos[i*3+1] = ry;
-        pos[i*3+2] = Math.sin(a)*r + rz;
-        const c = palette.inside.clone().lerp(palette.outside, Math.min(1, r/RADIUS));
-        col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-      geo.setAttribute('color', new THREE.BufferAttribute(col,3));
-      const mat = new THREE.PointsMaterial({ size: 0.045, sizeAttenuation: true, depthWrite: false,
-        blending: THREE.AdditiveBlending, vertexColors: true, transparent: true, opacity: 0.95 });
-      points = new THREE.Points(geo, mat);
-      points.rotation.x = 0.5;
-      scene.add(points);
-    }
-
-    // --- Starfield ---
-    const STARS = 1800;
-    const sgeo = new THREE.BufferGeometry();
-    const spos = new Float32Array(STARS*3);
-    for (let i=0;i<STARS;i++){ spos[i*3]=(Math.random()-0.5)*60; spos[i*3+1]=(Math.random()-0.5)*60; spos[i*3+2]=(Math.random()-0.5)*60; }
-    sgeo.setAttribute('position', new THREE.BufferAttribute(spos,3));
-    const stars = new THREE.Points(sgeo, new THREE.PointsMaterial({ size: 0.06, color: 0xffffff, transparent:true, opacity:0.7, depthWrite:false }));
-    scene.add(stars);
-
-    buildGalaxy(1);
-
-    let t = 0;
-    function animate(){
-      requestAnimationFrame(animate);
-      t += 0.0016;
-      if (points) points.rotation.y = t;
-      stars.rotation.y = t * 0.15;
-      camera.position.x = Math.sin(t*0.3) * 1.2;
-      camera.position.y = 1.3 + Math.sin(t*0.21) * 0.4;
-      camera.lookAt(0,0,0);
-      renderer.render(scene, camera);
-    }
-    animate();
-    addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); });
-
-    return { rebuild: buildGalaxy };
+    const canvas=$('galaxy');
+    const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000); camera.position.set(0,1.4,6);
+    let palette={inside:new THREE.Color('#ffd9a0'),outside:new THREE.Color('#5b8cff')};
+    let points=null;
+    function build(seed=1,pal){ if(pal)palette=pal; if(points){scene.remove(points);points.geometry.dispose();points.material.dispose();}
+      const COUNT=9000,ARMS=3,RADIUS=7,SPIN=1.1,RAND=0.45,RP=2.6; const pos=new Float32Array(COUNT*3),col=new Float32Array(COUNT*3);
+      let s=seed*99991; const rnd=()=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;};
+      for(let i=0;i<COUNT;i++){ const r=Math.pow(rnd(),1.6)*RADIUS; const arm=(i%ARMS)/ARMS*Math.PI*2; const spin=r*SPIN;
+        const rx=Math.pow(rnd(),RP)*(rnd()<0.5?1:-1)*RAND*r, ry=Math.pow(rnd(),RP)*(rnd()<0.5?1:-1)*RAND*r*0.35, rz=Math.pow(rnd(),RP)*(rnd()<0.5?1:-1)*RAND*r;
+        const a=arm+spin; pos[i*3]=Math.cos(a)*r+rx; pos[i*3+1]=ry; pos[i*3+2]=Math.sin(a)*r+rz;
+        const c=palette.inside.clone().lerp(palette.outside,Math.min(1,r/RADIUS)); col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; }
+      const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+      points=new THREE.Points(geo,new THREE.PointsMaterial({size:0.045,sizeAttenuation:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true,transparent:true,opacity:0.95}));
+      points.rotation.x=0.5; scene.add(points); }
+    const STARS=1800,sgeo=new THREE.BufferGeometry(),spos=new Float32Array(STARS*3);
+    for(let i=0;i<STARS;i++){spos[i*3]=(Math.random()-0.5)*60;spos[i*3+1]=(Math.random()-0.5)*60;spos[i*3+2]=(Math.random()-0.5)*60;}
+    sgeo.setAttribute('position',new THREE.BufferAttribute(spos,3));
+    const stars=new THREE.Points(sgeo,new THREE.PointsMaterial({size:0.06,color:0xffffff,transparent:true,opacity:0.7,depthWrite:false})); scene.add(stars);
+    build(1); let t=0;
+    (function animate(){ requestAnimationFrame(animate); t+=0.0016; if(points)points.rotation.y=t; stars.rotation.y=t*0.15;
+      camera.position.x=Math.sin(t*0.3)*1.2; camera.position.y=1.3+Math.sin(t*0.21)*0.4; camera.lookAt(0,0,0); renderer.render(scene,camera); })();
+    addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
+    return { rebuild: build };
   })();
+  const THEMES=[{n:'aurora',i:'#b9ffd0',o:'#3a7bff'},{n:'ember',i:'#ffd9a0',o:'#ff4d6d'},{n:'orchid',i:'#f0c2ff',o:'#7c3aed'},
+    {n:'teal',i:'#aef9ff',o:'#0ea5e9'},{n:'sunset',i:'#ffe29a',o:'#ff6a3d'},{n:'mint',i:'#d6ffe9',o:'#10b981'}];
+  function applyTheme(seed){ const th=THEMES[Math.abs(seed)%THEMES.length]; galaxy.rebuild((Math.abs(seed)%7)+1,{inside:new THREE.Color(th.i),outside:new THREE.Color(th.o)}); dbg('theme '+th.n); }
 
-  // OpenCast / party themes — palettes for the galaxy + nebula
-  const THEMES = [
-    { name:'aurora',  inside:'#b9ffd0', outside:'#3a7bff' },
-    { name:'ember',   inside:'#ffd9a0', outside:'#ff4d6d' },
-    { name:'orchid',  inside:'#f0c2ff', outside:'#7c3aed' },
-    { name:'teal',    inside:'#aef9ff', outside:'#0ea5e9' },
-    { name:'sunset',  inside:'#ffe29a', outside:'#ff6a3d' },
-    { name:'mint',    inside:'#d6ffe9', outside:'#10b981' },
-  ];
-  function applyTheme(seed){
-    const th = THEMES[Math.abs(seed) % THEMES.length];
-    galaxy.rebuild((Math.abs(seed)%7)+1, { inside:new THREE.Color(th.inside), outside:new THREE.Color(th.outside) });
-    dbg(`theme: ${th.name}`);
-    return th;
+  // ---------- sessions ----------
+  // A session = one project/cast. Only the ACTIVE session has live avatars.
+  const sessions = new Map();   // key -> { key,label,kind,castEl,slots[],cast{}, clips[], unread, tabEl, built }
+  let activeKey = null;
+  const persistMap = JSON.parse(localStorage.getItem('avAvatarMap')||'{}');  // voice -> avatarId (remembered)
+  const savePersist = () => localStorage.setItem('avAvatarMap', JSON.stringify(persistMap));
+
+  function sessionKey(msg){ return ((msg.project||'').trim()) || ((msg.origin||'').trim()) || 'default'; }
+  function sessionKind(s){ return Object.keys(s.cast).length>1 ? 'cast' : 'solo'; }
+
+  function getSession(msg){
+    const key = sessionKey(msg);
+    if (sessions.has(key)) return sessions.get(key);
+    const castEl=document.createElement('div'); castEl.className='cast hidden'; stageEl.insertBefore(castEl, caption);
+    const s={ key, label:key, kind:'solo', castEl, slots:[], cast:{}, clips:[], unread:0, tabEl:null, built:false };
+    sessions.set(key,s); addTab(s);
+    if(!activeKey) switchTo(key);
+    return s;
   }
 
-  // =====================================================================
-  // Avatar cast — TalkingHead instances per slot
-  // =====================================================================
-  // Persistent voice→avatar mapping so a BMAD agent keeps its face/colour.
-  const castMap = JSON.parse(localStorage.getItem('cosmicCastMap') || '{}');
-  function saveCast(){ localStorage.setItem('cosmicCastMap', JSON.stringify(castMap)); }
-
-  const slots = [];   // { el, host, head, key, voice, accent, ready }
-  let   slotCount = 0;
-
-  function makeSlot(accent){
-    const el = document.createElement('div');
-    el.className = 'slot';
-    el.style.setProperty('--accent', accent);
-    el.innerHTML = `<div class="glow"></div><div class="canvas-host"></div><div class="plate"><span class="dot"></span><span class="name"></span></div>`;
-    castEl.appendChild(el);
-    const slot = { el, host: el.querySelector('.canvas-host'), plate: el.querySelector('.plate'),
-                   nameEl: el.querySelector('.name'), head: null, voice: null, accent, ready: false, key: null };
-    slots.push(slot);
-    return slot;
+  function addTab(s){
+    const el=document.createElement('div'); el.className='tab'; el.dataset.key=s.key;
+    el.innerHTML=`<span class="tname">${esc(s.label)}</span><span class="kind"></span><span class="badge">0</span>`;
+    el.addEventListener('click',()=>switchTo(s.key));
+    tabsEl.appendChild(el); s.tabEl=el; updateTab(s);
+  }
+  function updateTab(s){
+    if(!s.tabEl) return;
+    s.tabEl.querySelector('.kind').textContent = sessionKind(s)==='cast' ? `cast · ${Object.keys(s.cast).length}` : 'solo';
+    s.tabEl.querySelector('.badge').textContent = s.unread;
+    s.tabEl.classList.toggle('has-unread', s.unread>0 && s.key!==activeKey);
+    s.tabEl.classList.toggle('active', s.key===activeKey);
   }
 
-  async function initHead(slot, avatarKey){
-    const av = AVATARS.find(a=>a.id===avatarKey) || AVATARS[0];
-    slot.key = av.id;
-    slot.head = new TalkingHead(slot.host, {
-      ttsEndpoint: 'https://localhost/_unused_tts',  // required but unused (we feed our own audio)
-      cameraView: 'upper', cameraRotateEnable: false,
-      avatarMood: 'neutral', avatarIdleEyeContact: 0.4, avatarIdleHeadMove: 0.5,
-      lightAmbientIntensity: 2.2, lightDirectIntensity: 22,
-      mixerGainSpeech: 3.0,
+  async function switchTo(key){
+    if(activeKey && sessions.has(activeKey)) sessions.get(activeKey).castEl.classList.add('hidden');
+    activeKey=key; const s=sessions.get(key); s.unread=0;
+    s.castEl.classList.remove('hidden');
+    emptyEl.style.display = (Object.keys(s.cast).length||s.clips.length) ? 'none' : 'flex';
+    renderChat(s);
+    sessions.forEach(updateTab);
+    // Lazily build avatars for this session's known cast
+    if(!s.built){ for(const vk of Object.keys(s.cast)) await ensureSlot(s, vk); s.built=true; }
+  }
+
+  function renderChat(s){
+    chatEl.innerHTML='';
+    s.clips.slice(-40).forEach(clip=>{
+      const m=document.createElement('div'); m.className='msg'; m.style.borderLeftColor=clip.accent;
+      m.innerHTML=`<div class="who" style="color:${clip.accent}">${esc(clip.name)}</div>`+
+                  `<div>${esc((clip.text||'(no text)').slice(0,160))}</div>`+
+                  `<div class="proj">${esc(clip.project||clip.origin||'')}</div>`;
+      m.addEventListener('click',()=>{ const slot=s.slots.find(x=>x.voiceKey===clip.voiceKey); if(slot) playClip(clip,slot,m); });
+      chatEl.appendChild(m);
     });
-    try { if (slot.head.audioSpeechGainNode) slot.head.audioSpeechGainNode.gain.value = 3.0; } catch {}
-    try {
-      await slot.head.showAvatar({ url: av.url, body: av.body, avatarMood: 'neutral' });
-      slot.ready = true;
-      dbg(`avatar ready: ${av.id}`);
-    } catch(e){ dbg(`avatar load FAIL ${av.id}: ${e.message}`); }
+    chatEl.scrollTop=chatEl.scrollHeight;
   }
 
-  // Assign (or recall) an avatar+accent for a given voice/agent identity.
-  function resolveSlot(voice, label){
-    const keyName = voice || label || 'default';
-    // Regular mode: always one default avatar.
-    if (MODE === 'regular') {
-      if (!slots.length) { const s = makeSlot(ACCENTS[0]); }
-      const s = slots[0];
-      if (!s.head) initHead(s, DEFAULT_AVATAR);
-      s.voice = keyName; s.nameEl.textContent = label || 'Claude';
-      return s;
+  // ---------- avatar slots (per session) ----------
+  function pickAvatar(s, voiceKey, idx){
+    if(persistMap[voiceKey]) return persistMap[voiceKey];
+    const used=new Set(Object.values(s.cast).map(c=>c.avatarId));
+    const pool=AVATARS.filter(a=>!used.has(a.id));
+    const seed=hashStr(voiceKey)+idx;
+    const av=(pool.length?pool:AVATARS)[Math.abs(seed)%(pool.length||AVATARS.length)].id;
+    persistMap[voiceKey]=av; savePersist(); return av;
+  }
+
+  function relayout(s){ const n=Math.max(1,s.slots.length); const w=Math.min(440,Math.max(220,(stageEl.clientWidth-40)/n)); s.slots.forEach(sl=>sl.el.style.width=w+'px'); }
+
+  async function ensureSlot(s, voiceKey){
+    let slot=s.slots.find(x=>x.voiceKey===voiceKey);
+    if(slot) return slot;
+    if(s.slots.length>=MAX_SLOTS){ slot=s.slots.reduce((a,b)=>(a._last||0)<=(b._last||0)?a:b); slot.voiceKey=voiceKey; }
+    else {
+      const meta=s.cast[voiceKey]; const accent=meta.accent;
+      const el=document.createElement('div'); el.className='slot'; el.style.setProperty('--accent',accent);
+      el.innerHTML=`<div class="glow"></div><div class="canvas-host"></div><div class="plate"><span class="nm"></span><span class="pj"></span></div>`;
+      s.castEl.appendChild(el);
+      slot={ el, host:el.querySelector('.canvas-host'), nm:el.querySelector('.nm'), pj:el.querySelector('.pj'),
+             head:null, voiceKey, accent, ready:false, key:meta.avatarId };
+      s.slots.push(slot); relayout(s);
+      slot.nm.textContent=meta.name; slot.pj.textContent=meta.project||s.label||'';
+      const av=AVATARS.find(a=>a.id===meta.avatarId)||AVATARS[0];
+      slot.head=new TalkingHead(slot.host,{ ttsEndpoint:'https://localhost/_unused_tts', cameraView:'upper',
+        cameraRotateEnable:false, avatarMood:'neutral', avatarIdleEyeContact:0.4, avatarIdleHeadMove:0.5, mixerGainSpeech:3.0 });
+      try{ if(slot.head.audioSpeechGainNode) slot.head.audioSpeechGainNode.gain.value=3.0; }catch{}
+      try{ await slot.head.showAvatar({url:av.url,body:av.body,avatarMood:'neutral'}); slot.ready=true; dbg('avatar '+av.id); }
+      catch(e){ dbg('avatar FAIL '+av.id+': '+e.message); }
     }
-    // Party / OpenCast: remember mapping; allocate up to MAX_SLOTS.
-    let assigned = castMap[keyName];
-    let slot = slots.find(s => s.voice === keyName);
-    if (slot) return slot;
-    if (slots.length < MAX_SLOTS) {
-      const idx = slots.length;
-      const accent = ACCENTS[idx % ACCENTS.length];
-      slot = makeSlot(accent);
-      slot.voice = keyName;
-      slot.el.classList.add('active');
-      slot.nameEl.textContent = label || keyName;
-      // pick avatar: remembered, else next distinct, seeded for OpenCast variety
-      let avId = assigned;
-      if (!avId) {
-        const used = new Set(slots.map(s=>s.key));
-        const pool = AVATARS.filter(a=>!used.has(a.id));
-        const seed = MODE==='opencast' ? (hashStr(keyName)+idx) : idx;
-        avId = (pool.length?pool:AVATARS)[Math.abs(seed)%(pool.length||AVATARS.length)].id;
-        castMap[keyName] = avId; saveCast();
-      }
-      initHead(slot, avId);
-      relayout();
-      return slot;
-    }
-    // All slots full — reuse the least-recently-used slot
-    slot = slots.reduce((a,b)=> (a._last||0)<=(b._last||0)?a:b);
-    slot.voice = keyName; slot.nameEl.textContent = label || keyName;
+    emptyEl.style.display='none';
     return slot;
   }
 
-  function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31 + s.charCodeAt(i))|0; } return h; }
+  function setSpeaking(s, slot, on){ s.slots.forEach(x=>x.el.classList.toggle('speaking', x===slot&&on)); if(on)slot._last=Date.now(); }
 
-  function relayout(){
-    // Even widths; shrink slot width as count grows so 4 fit nicely.
-    const n = Math.max(1, slots.length);
-    const w = Math.min(440, Math.max(220, (innerWidth - 40) / n));
-    slots.forEach(s => { s.el.style.width = w + 'px'; });
-  }
-  addEventListener('resize', relayout);
-
-  function setSpeaking(slot, on){
-    slots.forEach(s => s.el.classList.toggle('speaking', s===slot && on));
-    if (on) slot._last = Date.now();
-  }
-
-  // =====================================================================
-  // Audio playback (decode → speakAudio with word-timed lipsync)
-  // =====================================================================
-  async function playClip(clip, slot, chipEl){
-    caption.innerHTML = `<span class="spk">${escapeHtml(clip.label||clip.voice||'')} · ${escapeHtml(clip.project||clip.origin||'')}</span>${escapeHtml(clip.text||'(no text)')}`;
-    caption.classList.add('visible');
-    document.querySelectorAll('.clip.playing').forEach(e=>e.classList.remove('playing'));
-    if (chipEl) chipEl.classList.add('playing');
-
-    const head = slot.head;
-    if (!head) { dbg('no head for slot'); return; }
-    setSpeaking(slot, true);
-    try {
-      if (head.audioCtx && head.audioCtx.state !== 'running') await head.audioCtx.resume();
-      const arrbuf = await (await fetch(clip.audioUrl)).arrayBuffer();
-      const audioBuf = await head.audioCtx.decodeAudioData(arrbuf);
-      dbg(`decoded ${audioBuf.duration.toFixed(1)}s ${audioBuf.sampleRate}Hz → ${slot.key}`);
-      const r = { audio: audioBuf };
-      const text = (clip.text||'').trim();
-      if (text){
-        const words = text.split(/\s+/).filter(Boolean);
-        const per = (audioBuf.duration*1000)/Math.max(1,words.length);
-        r.words = words; r.wtimes = words.map((_,i)=>Math.round(i*per)); r.wdurations = words.map(()=>Math.round(per*0.9));
-      }
-      head.speakAudio(r, { lipsyncLang:'en' });
-      // Estimate end → drop speaking highlight
-      const ms = audioBuf.duration*1000 + 400;
-      clearTimeout(slot._endT); slot._endT = setTimeout(()=>setSpeaking(slot,false), ms);
-      return audioBuf.duration*1000;
-    } catch(e){
-      dbg(`audio ERROR: ${e.message}`); setStatus('audio error: '+e.message);
-      try { const a=new Audio(clip.audioUrl); a.volume=1; await a.play(); } catch {}
-      setSpeaking(slot, false);
-      return 1500;
-    }
+  // ---------- audio ----------
+  async function playClip(clip, slot, msgEl){
+    if(activeKey){ const s=sessions.get(activeKey); if(s){
+      caption.innerHTML=`<span class="spk">${esc(clip.name)} · ${esc(clip.project||clip.origin||'')}</span>${esc(clip.text||'(no text)')}`;
+      caption.classList.add('visible');
+      chatEl.querySelectorAll('.msg.playing').forEach(e=>e.classList.remove('playing')); if(msgEl)msgEl.classList.add('playing');
+      const head=slot.head; if(!head){dbg('no head');return 1500;} setSpeaking(s,slot,true);
+      try{
+        if(head.audioCtx&&head.audioCtx.state!=='running') await head.audioCtx.resume();
+        const buf=await head.audioCtx.decodeAudioData(await (await fetch(clip.audioUrl)).arrayBuffer());
+        const r={audio:buf}; const text=(clip.text||'').trim();
+        if(text){ const w=text.split(/\s+/).filter(Boolean); const per=(buf.duration*1000)/Math.max(1,w.length);
+          r.words=w; r.wtimes=w.map((_,i)=>Math.round(i*per)); r.wdurations=w.map(()=>Math.round(per*0.9)); }
+        head.speakAudio(r,{lipsyncLang:'en'});
+        clearTimeout(slot._endT); slot._endT=setTimeout(()=>setSpeaking(s,slot,false), buf.duration*1000+400);
+        return buf.duration*1000;
+      }catch(e){ dbg('audio ERR '+e.message); try{const a=new Audio(clip.audioUrl);a.volume=1;await a.play();}catch{} setSpeaking(s,slot,false); return 1500; }
+    }}
+    return 1500;
   }
 
-  let clipSeq = 0;
-  function addClip(clip, slot){
-    const el = document.createElement('div');
-    el.className = 'clip'; el.style.borderLeft = `3px solid ${slot.accent}`;
-    el.innerHTML = `<div class="meta">▶ ${escapeHtml(clip.label||clip.voice||'?')} · ${escapeHtml(clip.project||clip.origin||'')}</div>${escapeHtml((clip.text||'(no text)').slice(0,160))}`;
-    el.addEventListener('click', ()=>playClip(clip, slot, el));
-    clipsBox.prepend(el);
-    while (clipsBox.children.length>25) clipsBox.removeChild(clipsBox.lastChild);
-    return el;
-  }
-
-  // =====================================================================
-  // Handle a speak event
-  // =====================================================================
+  // ---------- handle speak ----------
+  let seq=0;
   async function handleSpeak(msg){
-    if (!msg.audioUrl) return;
-    const label = msg.llm || msg.project || '';
-    const slot = resolveSlot(msg.voice, label);
-    if (!slot.head) await initHead(slot, MODE==='regular'?DEFAULT_AVATAR:(slot.key||DEFAULT_AVATAR));
-    const clip = { id: ++clipSeq, audioUrl: msg.audioUrl, text: msg.text||'', voice: msg.voice||'', label, project: msg.project||'', origin: msg.origin||'remote' };
-    const chip = addClip(clip, slot);
-    await playClip(clip, slot, chip);
+    if(!msg.audioUrl) return;
+    const s=getSession(msg);
+    const voiceKey=(msg.voice||msg.llm||'default');
+    if(!s.cast[voiceKey]){ const idx=Object.keys(s.cast).length;
+      s.cast[voiceKey]={ avatarId:pickAvatar(s,voiceKey,idx), accent:ACCENTS[idx%ACCENTS.length], name:(msg.llm||msg.voice||voiceKey), project:(msg.project||'') }; }
+    const meta=s.cast[voiceKey];
+    const clip={ id:++seq, audioUrl:msg.audioUrl, text:msg.text||'', voiceKey, name:meta.name, accent:meta.accent, project:msg.project||'', origin:msg.origin||'remote' };
+    s.clips.push(clip); updateTab(s);
+    if(s.key===activeKey){
+      const slot=await ensureSlot(s,voiceKey);
+      renderChat(s);
+      await playClip(clip, slot, null);
+    } else { s.unread++; updateTab(s); }
   }
 
-  // =====================================================================
-  // Self-playing party demo — loads bundled clips and performs the cast
-  // (so the party scene animates on open, no live traffic needed).
-  // =====================================================================
+  // ---------- clear ----------
+  $('clearBtn').addEventListener('click',()=>{
+    if(!activeKey) return; const s=sessions.get(activeKey);
+    s.slots.forEach(sl=>{ try{ sl.head&&sl.head.stop&&sl.head.stop(); }catch{}; sl.el.remove(); });
+    s.slots=[]; s.cast={}; s.clips=[]; s.built=false; renderChat(s); caption.classList.remove('visible');
+    emptyEl.style.display='flex'; updateTab(s); dbg('cleared '+s.key);
+  });
+
+  // ---------- self-playing demo (?demo=party), plays ONCE ----------
+  $('replayBtn').addEventListener('click',()=>runPartyDemo());
+  let demoBench=null;
   async function runPartyDemo(){
-    MODE = 'party'; modeChip.textContent = 'party · demo';
     applyTheme(hashStr('partydemo'));
-    let cast;
-    try { cast = await (await fetch('/demo-audio/manifest.json')).json(); }
-    catch(e){ dbg('demo manifest load failed: '+e.message); return; }
-    // Reset slots, build one per cast member with its forced avatar/accent.
-    slots.forEach(s=>s.el.remove()); slots.length = 0;
-    const bench = [];
-    for (const c of cast){
-      const slot = makeSlot(c.accent);
-      slot.voice = c.voiceKey; slot.el.classList.add('active'); slot.nameEl.textContent = `${c.name} · ${c.role}`;
-      castMap[c.voiceKey] = c.avatar; saveCast();
-      await initHead(slot, c.avatar);
-      relayout();
-      bench.push({ slot, c });
-    }
-    setStatus('party demo · performing');
-    let idx = 0;
+    let cast; try{ cast=await(await fetch('/demo-audio/manifest.json')).json(); }catch(e){ dbg('demo manifest fail'); return; }
+    // build a dedicated demo session
+    const fake={ project:'BMAD Party (demo)', origin:'demo' };
+    const s=getSession(fake); switchTo(s.key);
+    // reset it
+    s.slots.forEach(sl=>sl.el.remove()); s.slots=[]; s.cast={}; s.clips=[]; s.built=true;
+    demoBench=[];
+    for(const c of cast){ const vk='agent-'+c.name.toLowerCase();
+      persistMap[vk]=c.avatar; savePersist();
+      s.cast[vk]={ avatarId:c.avatar, accent:c.accent, name:`${c.name} · ${c.role}`, project:'BMAD Party' };
+      const slot=await ensureSlot(s,vk); demoBench.push({slot,c,vk}); }
+    updateTab(s);
+    let i=0;
     async function tick(){
-      const { slot, c } = bench[idx % bench.length];
-      const clip = { id:++clipSeq, audioUrl:c.audioUrl, text:c.text, voice:c.voiceKey,
-                     label:`${c.name} · ${c.role}`, project:'BMAD Party', origin:'demo' };
-      const chip = addClip(clip, slot);
-      const ms = await playClip(clip, slot, chip);
-      idx++;
-      setTimeout(tick, (ms||3000) + 900);
+      if(i>=demoBench.length){ $('replayBtn').style.display='block'; dbg('demo done'); return; }  // play ONCE
+      const {slot,c,vk}=demoBench[i];
+      const clip={ id:++seq, audioUrl:c.audioUrl, text:c.text, voiceKey:vk, name:`${c.name} · ${c.role}`, accent:c.accent, project:'BMAD Party', origin:'demo' };
+      s.clips.push(clip); renderChat(s);
+      const ms=await playClip(clip,slot,null); i++; setTimeout(tick,(ms||3000)+800);
     }
     tick();
   }
 
-  // =====================================================================
-  // SSE
-  // =====================================================================
+  // ---------- SSE ----------
   function connectSSE(){
-    setStatus('connecting…');
-    const es = new EventSource('/events');
-    es.onmessage = (ev) => {
-      let msg; try { msg = JSON.parse(ev.data); } catch { return; }
-      if (msg.type==='connected'){ setStatus(`connected · ${MODE}`); }
-      else if (msg.type==='speak'){ handleSpeak(msg).catch(e=>dbg('speak err: '+e.message)); }
-    };
-    es.onerror = () => { setStatus('reconnecting…'); es.close(); setTimeout(connectSSE, 3000); };
+    const es=new EventSource('/events');
+    es.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data);}catch{return;}
+      if(m.type==='connected'){ connDot.classList.add('on'); }
+      else if(m.type==='speak'){ handleSpeak(m).catch(e=>dbg('speak err '+e.message)); } };
+    es.onerror=()=>{ connDot.classList.remove('on'); es.close(); setTimeout(connectSSE,3000); };
   }
 
-  // =====================================================================
-  // Audio unlock + mode chip
-  // =====================================================================
+  // ---------- audio unlock ----------
   function setupAudioUnlock(){
-    const hint = $('enable-audio');
-    const anyCtxRunning = () => slots.some(s=>s.head&&s.head.audioCtx&&s.head.audioCtx.state==='running');
-    const tryResume = async () => { for(const s of slots){ try{ if(s.head&&s.head.audioCtx&&s.head.audioCtx.state!=='running') await s.head.audioCtx.resume(); }catch{} } if(anyCtxRunning()) hint.style.display='none'; };
-    addEventListener('click', tryResume); addEventListener('keydown', tryResume);
-    hint.addEventListener('click', tryResume); hint.style.display='block';
-    const poll = setInterval(()=>{ if(anyCtxRunning()){ hint.style.display='none'; clearInterval(poll);} }, 800);
-    setTimeout(()=>clearInterval(poll), 20000);
+    const hint=$('enable-audio');
+    const running=()=>{ for(const s of sessions.values()) for(const sl of s.slots) if(sl.head&&sl.head.audioCtx&&sl.head.audioCtx.state==='running') return true; return false; };
+    const resume=async()=>{ for(const s of sessions.values()) for(const sl of s.slots){ try{ if(sl.head&&sl.head.audioCtx&&sl.head.audioCtx.state!=='running') await sl.head.audioCtx.resume(); }catch{} } if(running())hint.style.display='none'; };
+    addEventListener('click',resume); addEventListener('keydown',resume); hint.addEventListener('click',resume); hint.style.display='block';
+    const p=setInterval(()=>{ if(running()){hint.style.display='none';clearInterval(p);} },800); setTimeout(()=>clearInterval(p),20000);
   }
 
-  modeChip.textContent = MODE;
-  modeChip.addEventListener('click', () => {
-    MODE = MODE==='regular' ? 'party' : MODE==='party' ? 'opencast' : 'regular';
-    modeChip.textContent = MODE;
-    if (MODE==='opencast') applyTheme(hashStr('cast'+Date.now()%100000));
-    else applyTheme(0);
-    setStatus(`mode: ${MODE}`);
-  });
-
-  // =====================================================================
-  // Boot
-  // =====================================================================
-  (async () => {
-    try {
-      applyTheme(MODE==='opencast' ? hashStr('boot'+location.search) : 0);
-      // Pre-create the default regular avatar so it's on-screen immediately.
-      const s = makeSlot(ACCENTS[0]); s.el.classList.add('active'); s.nameEl.textContent = 'Claude';
-      await initHead(s, DEFAULT_AVATAR);
-      relayout();
-      setupAudioUnlock();
-      connectSSE();   // always listen for live messages too
-      setStatus(`ready · ${MODE}`);
-      // Self-playing demo on ?demo=party
-      if (params.get('demo') === 'party') runPartyDemo();
-    } catch(e){ showError('Boot failed: '+e.message); dbg('BOOT ERR '+e.message); }
+  // ---------- boot ----------
+  (async()=>{
+    try{
+      applyTheme(0); setupAudioUnlock(); connectSSE();
+      if(params.get('demo')==='party'){ $('replayBtn').style.display='none'; runPartyDemo(); }
+    }catch(e){ showError('Boot failed: '+e.message); dbg('BOOT '+e.message); }
   })();
   </script>
 </body>
