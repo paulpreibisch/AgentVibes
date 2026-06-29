@@ -37,6 +37,17 @@ catch {
   Start-Sleep -Seconds 2
 }
 
+# Idempotent: if a receiver window is already connected, refresh it in place
+# instead of opening a duplicate. (Multiple Claude sessions can call this safely.)
+try {
+  $hb = (Invoke-WebRequest "$base/has-browser" -UseBasicParsing -TimeoutSec 3).Content
+  if ($hb -match '"connected":true') {
+    Write-Host "A receiver window is already open — refreshing it (no duplicate)." -ForegroundColor Yellow
+    try { Invoke-WebRequest "$base/reload" -Method POST -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
+    exit 0
+  }
+} catch {}
+
 New-Item -ItemType Directory -Path $prof -Force | Out-Null
 
 # Always open on the LEFTMOST monitor (Paul's left screen).

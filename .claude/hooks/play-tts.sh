@@ -573,7 +573,7 @@ except Exception: pass
 PY
 }
 _TH_GO=0
-if _th_active && _th_browser; then export AGENTVIBES_NO_PLAY=1; _TH_GO=1; fi
+if _th_active && _th_browser; then _TH_GO=1; fi  # speakers stay on; browser lip-syncs
 
 # Normal single-language mode - route to appropriate provider implementation
 case "$ACTIVE_PROVIDER" in

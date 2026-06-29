@@ -270,6 +270,7 @@
   }
 
   function renderChat(s){
+    dbg('renderChat key='+s.key+' clips='+s.clips.length);
     chatEl.innerHTML='';
     s.clips.slice(-40).forEach(clip=>{
       const m=document.createElement('div'); m.className='msg'; m.style.borderLeftColor=clip.accent;
@@ -365,10 +366,11 @@
     const clip={ id:++seq, audioUrl:msg.audioUrl, text:msg.text||'', voiceKey, name:meta.name, accent:meta.accent, project:msg.project||'', origin:msg.origin||'remote', time:new Date().toLocaleTimeString() };
     s.clips.push(clip); updateTab(s);
     if(s.key===activeKey){
+      dbg('-> active render, clips='+s.clips.length);
       const slot=await ensureSlot(s,voiceKey);
       renderChat(s);
       await playClip(clip, slot, null);
-    } else { s.unread++; updateTab(s); }
+    } else { dbg('-> UNREAD tab '+s.key+' (active='+activeKey+')'); s.unread++; updateTab(s); }
   }
 
   // ---------- clear ----------
