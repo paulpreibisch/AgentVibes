@@ -372,7 +372,7 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
     fireConfigButtons();
     // handleProviderConfigure is async (awaits getHermesConfig / getTransportConfig)
     // so the modal+fieldList appear only after pending microtasks/macrotasks flush.
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 500));
     let covered = false;
     // There are several provider-config modals (one per PROVIDERS row). Drive each
     // fieldList we can find to set engine=kokoro then open the voice picker.
@@ -403,7 +403,7 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
   test('opens ElevenLabs native voice picker + API-key warning (covers _showApiKeyWarning)', async () => {
     await buildTab();
     fireConfigButtons();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 500));
     const fieldLists = _allWidgets.filter(w =>
       w._handlers['key:enter'] && Array.isArray(w.items) &&
       w.items.some(it => typeof it === 'string' && /Voice/.test(it)));
@@ -449,7 +449,7 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
     try {
       await buildTab();
       fireConfigButtons();
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 500));
       const fieldLists = _allWidgets.filter(w =>
         w._handlers['key:enter'] && Array.isArray(w.items) &&
         w.items.some(it => typeof it === 'string' && /Voice/.test(it)));
