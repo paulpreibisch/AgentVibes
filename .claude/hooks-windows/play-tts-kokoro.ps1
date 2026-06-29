@@ -160,6 +160,20 @@ try {
     Write-Host "[OK] Saved to: $AudioFile" -ForegroundColor Green
     Write-Host "[VOICE] Voice used: $VoiceName (Kokoro TTS)" -ForegroundColor Green
 
+    # Kokoro outputs at a lower level than Piper/SAPI, and ffmpeg's amix halves
+    # the voice when background music is mixed in.  Apply a 2.5x (≈8 dB) volume
+    # boost here so the voice is audible in all playback paths.
+    $ffplayCheck = Get-Command ffmpeg -ErrorAction SilentlyContinue
+    if ($ffplayCheck) {
+        $boostedFile = "$AudioDir\tts-boosted-$([System.IO.Path]::GetRandomFileName() -replace '\..*').wav"
+        $boostArgs = "-y -i `"$AudioFile`" -af `"volume=2.5`" `"$boostedFile`""
+        $boostProc = Start-Process -FilePath "ffmpeg" -ArgumentList $boostArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "NUL"
+        if ($boostProc.ExitCode -eq 0 -and (Test-Path $boostedFile) -and (Get-Item $boostedFile).Length -gt 0) {
+            Remove-Item $AudioFile -Force -ErrorAction SilentlyContinue
+            $AudioFile = $boostedFile
+        }
+    }
+
     # Apply per-agent audio effects via audio-processor.ps1, but SKIP when
     # AGENTVIBES_NO_PLAY is set - that means the parent play-tts.ps1 will do its
     # own reverb / background-music post-processing and running effects here too
