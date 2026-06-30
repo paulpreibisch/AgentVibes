@@ -480,7 +480,7 @@
     const es=new EventSource('/events');
     es.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data);}catch{return;}
       if(m.type==='connected'){ connDot.classList.add('on'); dbg('SSE connected'); }
-      else if(m.type==='reload'){ dbg('reload signal — refreshing'); setTimeout(()=>location.reload(), 150); }
+      else if(m.type==='reload'){ dbg('reload signal'); setTimeout(()=>location.replace(location.pathname+'?v='+Date.now()), 150); }
       else if(m.type==='speak'){ dbg('SSE speak v='+(m.voice||'?')+' p='+(m.project||'?')+' url='+(m.audioUrl?'y':'n')); handleSpeak(m).catch(e=>dbg('speak ERR '+e.message)); } };
     es.onerror=()=>{ connDot.classList.remove('on'); es.close(); setTimeout(connectSSE,3000); };
   }

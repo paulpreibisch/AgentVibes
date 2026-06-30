@@ -75,10 +75,12 @@ function serveFile(filePath, res) {
 
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) { res.writeHead(404); res.end('Not found'); return; }
+    // no-store on the HTML/JS so the Chrome app never serves a stale page after an update.
+    const cache = (ext === '.html' || ext === '.js' || ext === '.mjs') ? 'no-store, no-cache, must-revalidate' : 'no-cache';
     res.writeHead(200, {
       'Content-Type': mime,
       'Content-Length': stat.size,
-      'Cache-Control': 'no-cache',
+      'Cache-Control': cache,
     });
     const stream = fs.createReadStream(filePath);
     // Without this, a file deleted mid-read (120s cleanup) or any read error
