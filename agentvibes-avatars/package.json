@@ -14,7 +14,6 @@
     "server.js",
     "avatars.json",
     "public/*.html",
-    "public/demo-audio/",
     "README.md",
     "LICENSE"
   ],
