@@ -177,15 +177,14 @@
   import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs';
 
   // ---------- config ----------
-  // @main, not @1.3: the @1.3 tag only ships brunette.glb — brunette-t/avaturn/
-  // avatarsdk/vroid are 404 there. @main has them all.
-  const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/';
-  // ONLY avatars with the full ARKit+Oculus blendshape set TalkingHead's mood/
-  // blink/viseme system requires. vroid (VRM morphs), avatarsdk and avaturn lack
-  // eyeBlinkLeft/Right etc., which crashes the animate loop every frame — excluded.
+  const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/';
+  // brunette.glb is the ONLY met4citizen demo avatar with the full ARKit+Oculus
+  // blendshape set TalkingHead's mood/blink/viseme system needs. Every other one
+  // (brunette-t, vroid, avatarsdk, avaturn) is missing eyeBlinkLeft/Right and
+  // crashes the animate loop every frame — and at @1.3 they're 404 anyway.
+  // Distinct sessions are differentiated by accent colour + name plate instead.
   const AVATARS = [
     { id:'brunette',  url:AVATAR_BASE+'brunette.glb',  body:'F' },
-    { id:'brunette-t',url:AVATAR_BASE+'brunette-t.glb',body:'F' },
   ];
   const DEFAULT_AVATAR = 'brunette';
   const ACCENTS = ['#a78bfa','#22d3ee','#fb7185','#34d399','#fbbf24','#60a5fa'];
