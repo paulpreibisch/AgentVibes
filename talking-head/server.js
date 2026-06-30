@@ -256,9 +256,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // index.html for /
+    // The receiver IS the home page: localhost:3747 serves cosmic.html.
     if (urlPath === '/' || urlPath === '/index.html') {
-      serveFile(path.join(PUBLIC_DIR, 'index.html'), res);
+      serveFile(path.join(PUBLIC_DIR, 'cosmic.html'), res);
       return;
     }
 
