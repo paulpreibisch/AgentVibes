@@ -1,5 +1,5 @@
 #
-# open-cosmic.ps1 — launch the AgentVibes cosmic avatar stage in a dedicated
+# open-cosmic.ps1 - launch the AgentVibes cosmic avatar stage in a dedicated
 # Chrome app window with autoplay enabled (so audio plays hands-free).
 #
 # Usage:
@@ -37,7 +37,7 @@ catch {
   Start-Sleep -Seconds 2
 }
 
-# Ensure the WARM piper server is running (sub-second avatar synthesis — no per-call model load)
+# Ensure the WARM piper server is running (sub-second avatar synthesis - no per-call model load)
 try { Invoke-WebRequest "http://127.0.0.1:5001/voices" -UseBasicParsing -TimeoutSec 2 | Out-Null }
 catch {
   $py = (Get-Command python -ErrorAction SilentlyContinue).Source
@@ -63,7 +63,7 @@ catch {
 try {
   $hb = (Invoke-WebRequest "$base/has-browser" -UseBasicParsing -TimeoutSec 3).Content
   if ($hb -match '"connected":true') {
-    Write-Host "A receiver window is already open — refreshing it (no duplicate)." -ForegroundColor Yellow
+    Write-Host "A receiver window is already open - refreshing it (no duplicate)." -ForegroundColor Yellow
     try { Invoke-WebRequest "$base/reload" -Method POST -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
     exit 0
   }
