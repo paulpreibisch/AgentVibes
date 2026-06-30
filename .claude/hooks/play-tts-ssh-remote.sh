@@ -338,7 +338,7 @@ SSH_ARGS=()
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
 # Only pass -p for an explicit, non-default port.  Port 22 is ssh's universal
 # default, so forcing "-p 22" is at best a no-op and at worst overrides the
-# real port of an ~/.ssh/config Host alias (e.g. laptop-win -> Port 45217),
+# real port of an ~/.ssh/config Host alias (e.g. my-laptop -> Port 2222),
 # silently delivering the payload to the wrong port.  Empty or "22" means
 # "use ssh / ~/.ssh/config defaults" -- never force it.
 if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then SSH_ARGS+=(-p "$SSH_PORT"); fi
