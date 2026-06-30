@@ -1,0 +1,41 @@
+{
+  "name": "agentvibes-avatars",
+  "version": "0.1.0",
+  "description": "A talking-head avatar window on a galaxy stage that lip-syncs any TTS audio POSTed to it. The met4citizen TalkingHead library and three.js are loaded from CDN at runtime (not bundled).",
+  "bin": {
+    "agentvibes-avatars": "bin/cli.js"
+  },
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "files": [
+    "bin/",
+    "server.js",
+    "avatars.json",
+    "public/*.html",
+    "public/demo-audio/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "avatar",
+    "talking-head",
+    "tts",
+    "text-to-speech",
+    "lip-sync",
+    "three.js",
+    "agentvibes"
+  ],
+  "author": "Paul Preibisch",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulpreibisch/AgentVibes.git",
+    "directory": "agentvibes-avatars"
+  },
+  "homepage": "https://github.com/paulpreibisch/AgentVibes#readme"
+}

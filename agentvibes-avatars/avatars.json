@@ -1,0 +1,35 @@
+{
+  "_comment": "The original models.readyplayer.me URLs no longer resolve (NXDOMAIN), so all entries point to the TalkingHead demo avatar 'brunette.glb' served via jsDelivr — it has ARKit+Oculus visemes baked in for lip sync. Replace any entry's url with your own GLB (e.g. a fresh ReadyPlayerMe export with ?morphTargets=ARKit,Oculus+Visemes) to get distinct avatars per gender.",
+  "avatars": {
+    "female-1": {
+      "url": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/brunette.glb",
+      "body": "F",
+      "label": "Female 1"
+    },
+    "female-2": {
+      "url": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/brunette.glb",
+      "body": "F",
+      "label": "Female 2"
+    },
+    "male-1": {
+      "url": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/brunette.glb",
+      "body": "M",
+      "label": "Male 1"
+    },
+    "male-2": {
+      "url": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/brunette.glb",
+      "body": "M",
+      "label": "Male 2"
+    },
+    "neutral": {
+      "url": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/brunette.glb",
+      "body": "F",
+      "label": "Neutral"
+    }
+  },
+  "genderOrder": {
+    "female": ["female-1", "female-2", "neutral"],
+    "male": ["male-1", "male-2", "neutral"],
+    "neutral": ["neutral", "female-1", "male-1"]
+  }
+}
