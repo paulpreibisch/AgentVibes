@@ -177,7 +177,9 @@
   import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs';
 
   // ---------- config ----------
-  const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/';
+  // @main, not @1.3: the @1.3 tag only ships brunette.glb — brunette-t/avaturn/
+  // avatarsdk/vroid are 404 there. @main has them all.
+  const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/';
   // ONLY avatars with the full ARKit+Oculus blendshape set TalkingHead's mood/
   // blink/viseme system requires. vroid (VRM morphs), avatarsdk and avaturn lack
   // eyeBlinkLeft/Right etc., which crashes the animate loop every frame — excluded.
@@ -355,7 +357,15 @@
         cameraRotateEnable:false, avatarMood:'neutral', avatarIdleEyeContact:0.4, avatarIdleHeadMove:0.5, mixerGainSpeech:3.0 });
       try{ if(slot.head.audioSpeechGainNode) slot.head.audioSpeechGainNode.gain.value=3.0; }catch{}
       try{ await slot.head.showAvatar({url:av.url,body:av.body,avatarMood:'neutral'}); slot.ready=true; dbg('avatar '+av.id); }
-      catch(e){ dbg('avatar FAIL '+av.id+': '+e.message); }
+      catch(e){
+        dbg('avatar FAIL '+av.id+': '+e.message);
+        // Fall back to the default avatar so the slot still speaks (never leave it mute).
+        const fb=AVATARS.find(a=>a.id===DEFAULT_AVATAR)||AVATARS[0];
+        if(fb && fb.id!==av.id){
+          try{ await slot.head.showAvatar({url:fb.url,body:fb.body,avatarMood:'neutral'}); slot.ready=true; slot.key=fb.id; dbg('avatar fallback '+fb.id); }
+          catch(e2){ dbg('avatar fallback FAIL: '+e2.message); }
+        }
+      }
     }
     emptyEl.style.display='none';
     return slot;
