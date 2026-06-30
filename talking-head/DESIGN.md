@@ -9,7 +9,7 @@ Give AgentVibes a visual presence: while you develop, a second monitor shows **t
 ## Data flow (already working)
 
 ```
-Agent (ubuntu-rdp or local)
+Agent (remote server or local)
    │  TTS request
    ▼
 play-remote.ps1 (SSH receiver, session 0)  ──writes──▶ ~/.agentvibes/tts-queue/*.json

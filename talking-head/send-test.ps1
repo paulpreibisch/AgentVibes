@@ -12,7 +12,7 @@ param(
   [string]$Voice   = "af_nova",          # logical voice (drives avatar mapping/colour)
   [string]$Sapi    = "Microsoft David",  # actual SAPI voice used to synthesize
   [string]$Llm     = "claude-code",
-  [string]$Origin  = "ubuntu-rdp",
+  [string]$Origin  = "local",
   [int]$Port = 3747
 )
 Add-Type -AssemblyName System.Speech

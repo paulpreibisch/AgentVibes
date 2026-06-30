@@ -1,5 +1,8 @@
 node_modules/
 *.log
+# TalkingHead runtime artifacts — never commit (Chrome profile = cookies/history; audio = temp TTS)
+talking-head/chrome-profile*/
+talking-head/public/audio/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

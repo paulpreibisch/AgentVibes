@@ -46,6 +46,8 @@ catch {
   $sv = (Get-Content "$env:USERPROFILE\.claude\tts-voice.txt" -ErrorAction SilentlyContinue)
   if (-not $sv) { $sv = "en_US-amy-medium" }
   $sv = ($sv -split '::')[0]
+  # Sanitize before it goes into a file path and a spawned process argument.
+  if ($sv -notmatch '^[A-Za-z0-9_\-\.]+$') { $sv = "en_US-amy-medium" }
   $model = "$vdir\$sv.onnx"
   if (-not (Test-Path $model)) { $model = "$vdir\en_US-amy-medium.onnx" }
   if ((Test-Path $py) -and (Test-Path $model)) {

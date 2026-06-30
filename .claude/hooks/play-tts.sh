@@ -176,7 +176,7 @@ TEXT="${TEXT//\\./.}"        # Remove \. (keep the period)
 # ---------------------------------------------------------------------------
 _th_on()   { [[ -f "$HOME/.claude/config/talking-head-enabled.txt" ]] && \
              [[ "$(tr -d '[:space:]' < "$HOME/.claude/config/talking-head-enabled.txt" 2>/dev/null)" == "true" ]]; }
-_th_conn() { curl -s --max-time 1 "http://127.0.0.1:3747/has-browser" 2>/dev/null | grep -q '"connected":true'; }
+_th_conn() { local _r; _r="$(curl -s --max-time 1 "http://127.0.0.1:3747/has-browser" 2>/dev/null)"; [[ "$_r" == *'"connected":true'* ]]; }
 if _th_on && _th_conn; then
   if bash "$SCRIPT_DIR/forward-to-avatar.sh" "$TEXT" "${VOICE_OVERRIDE:-}" \
        "$(basename "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")" "${LLM_PROVIDER:-claude-code}"; then
@@ -573,7 +573,7 @@ fi
 # speaker playback is suppressed (the browser becomes the audio source).
 _th_active() { [[ -f "$HOME/.claude/config/talking-head-enabled.txt" ]] && \
   [[ "$(tr -d '[:space:]' < "$HOME/.claude/config/talking-head-enabled.txt" 2>/dev/null)" == "true" ]]; }
-_th_browser() { curl -s --max-time 1 http://127.0.0.1:3747/has-browser 2>/dev/null | grep -q '"connected":true'; }
+_th_browser() { local _r; _r="$(curl -s --max-time 1 http://127.0.0.1:3747/has-browser 2>/dev/null)"; [[ "$_r" == *'"connected":true'* ]]; }
 _th_forward() {
   local out="$1" wav proj b64
   wav=$(printf '%s\n' "$out" | grep -oE '([A-Za-z]:[\\/][^"]*|/[^"]*)\.wav' | head -1)

@@ -18,11 +18,11 @@ param(
     [string]$EncodedPayload = ""
 )
 
-# Paths - C:\Users\Paul is replaced at install time by setup-ssh-receiver.ps1
-# with the installing user's home directory (e.g. C:\Users\Paul).
+# Paths - __OWNER_HOME__ is replaced at install time by setup-ssh-receiver.ps1
+# with the installing user's home directory.
 # This is necessary because sshd runs the ForceCommand as the SSH user
 # (e.g. agentvibes-receiver), whose $env:USERPROFILE is a different directory.
-$OwnerHome = "C:\Users\Paul"
+$OwnerHome = "__OWNER_HOME__"
 if (-not (Test-Path "$OwnerHome\.agentvibes")) {
     Write-Output "Error: Receiver not installed properly - run setup-ssh-receiver.ps1"
     exit 1
@@ -51,6 +51,25 @@ function Write-Log {
     $preview = if ($script:Text.Length -gt 200) { $script:Text.Substring(0, 200) } else { $script:Text }
     $logLine = "$timestamp|$Status|$($script:Project)|$($script:Voice)|$preview|$Detail|$senderIp|$LogId"
     Add-Content -Path $LogFile -Value $logLine -ErrorAction SilentlyContinue
+}
+
+# ---------------------------------------------------------------------------
+# Detect the SOURCE server name (for the avatar's origin label).
+# Priority: ~/.agentvibes/source-map.txt ("IP=name") → reverse DNS → IP → "remote".
+# ---------------------------------------------------------------------------
+$script:Source = "remote"
+if ($env:SSH_CLIENT) {
+    $srcIp = ($env:SSH_CLIENT -split ' ')[0]
+    $mapFile = "$AgentVibesDir\source-map.txt"
+    if (Test-Path $mapFile) {
+        $hit = Get-Content $mapFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\s*$([regex]::Escape($srcIp))\s*=" } | Select-Object -First 1
+        if ($hit) { $script:Source = ($hit -split '=', 2)[1].Trim() }
+    }
+    # No source-map entry → use the raw IP. (A reverse-DNS lookup here would be a
+    # timeout-less hang lever for a hostile sender; map IPs→names in source-map.txt.)
+    if ($script:Source -eq "remote") { $script:Source = $srcIp }
+    # Sanitize: the source becomes an origin label rendered in the avatar browser.
+    if ($script:Source -notmatch '^[A-Za-z0-9_\-\.]{1,40}$') { $script:Source = "remote" }
 }
 
 # ---------------------------------------------------------------------------
@@ -165,6 +184,13 @@ if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
     $Llm = "default"
 }
 
+# Validate project name - sender-controlled, and it becomes a tab/badge label
+# in the avatar browser. Constrain the charset (XSS defense-in-depth alongside
+# the browser's HTML-escaping).
+if (-not $script:Project -or $script:Project -notmatch '^[A-Za-z0-9_\-\. ]{1,64}$') {
+    $script:Project = "unknown"
+}
+
 # Validate volume is numeric
 if ($BgVolume -notmatch '^\d+\.?\d*$') {
     $BgVolume = "0.10"
@@ -228,6 +254,7 @@ $ReqJson = @{
     provider = $Provider
     llm      = $Llm
     project  = $script:Project
+    source   = $script:Source
 } | ConvertTo-Json -Compress
 
 try {

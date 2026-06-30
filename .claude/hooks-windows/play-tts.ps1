@@ -518,7 +518,8 @@ if ((Test-Path $thFlag) -and ((Get-Content $thFlag -Raw).Trim() -eq "true") -and
         $thProject = if ($env:AGENTVIBES_PROJECT) { $env:AGENTVIBES_PROJECT }
                      elseif ($env:CLAUDE_PROJECT_DIR) { Split-Path $env:CLAUDE_PROJECT_DIR -Leaf }
                      else { "AgentVibes" }
-        $thBody = @{ audioBase64 = $thB64; text = $Text; voice = $VoiceOverride; project = $thProject; origin = "remote"; llm = $llm } | ConvertTo-Json -Compress
+        $thOrigin = if ($env:AGENTVIBES_SOURCE) { $env:AGENTVIBES_SOURCE } else { "remote" }
+        $thBody = @{ audioBase64 = $thB64; text = $Text; voice = $VoiceOverride; project = $thProject; origin = $thOrigin; llm = $llm } | ConvertTo-Json -Compress
         $thResp = Invoke-RestMethod -Uri "http://127.0.0.1:3747/speak" -Method Post -Body $thBody -ContentType "application/json" -TimeoutSec 3
         if ($thResp.browserConnected) {
             # Browser is playing the audio for lip-sync — skip all local playback.

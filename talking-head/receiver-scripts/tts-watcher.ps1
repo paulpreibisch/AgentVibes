@@ -6,8 +6,11 @@
 # watcher picks them up and calls play-tts.ps1 in the user's desktop session.
 #
 # Single-instance guard: exit immediately if another watcher instance is already running.
+# Catch AbandonedMutexException: if a previous watcher was force-killed, the mutex is
+# abandoned — WaitOne throws but we now own it, so swallow the exception and continue.
 $mutex = New-Object System.Threading.Mutex($false, 'Global\AgentVibesTtsWatcher')
-if (-not $mutex.WaitOne(0)) { $mutex.Dispose(); exit 0 }
+try { if (-not $mutex.WaitOne(0)) { $mutex.Dispose(); exit 0 } }
+catch [System.Threading.AbandonedMutexException] { }
 
 $QueueDir = "$env:USERPROFILE\.agentvibes\tts-queue"
 $LogFile  = "$env:USERPROFILE\.agentvibes\watcher.log"
@@ -39,6 +42,8 @@ try {
                 # TalkingHead forward so the avatar badge/tab shows the real origin.
                 if ($req.project) { $env:AGENTVIBES_PROJECT = $req.project }
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_PROJECT", $null, "Process") }
+                if ($req.source) { $env:AGENTVIBES_SOURCE = $req.source }
+                else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_SOURCE", $null, "Process") }
                 # Use SetEnvironmentVariable to truly unset (assignment to $null leaves empty string)
                 if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",   $null, "Process") }

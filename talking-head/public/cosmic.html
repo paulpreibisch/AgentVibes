@@ -81,6 +81,18 @@
       background-image: radial-gradient(circle at 50% 9px, #e8eefc 0 2px, #aab4c8 2px 3px, #20242e 4px 5.5px, transparent 6px);
       background-size: 100% 46px; background-repeat: repeat-y; }
 
+    /* Big project name + source label at the top of the avatar area */
+    #stage-header { position: absolute; top: 16px; left: 0; right: 0; z-index: 8; text-align: center; pointer-events: none; }
+    #stage-header .proj-big { font-size: 34px; font-weight: 800; letter-spacing: 1px;
+      background: linear-gradient(90deg,#a78bfa,#22d3ee,#fb7185); -webkit-background-clip: text; background-clip: text; color: transparent;
+      text-shadow: 0 2px 24px rgba(0,0,0,0.5); }
+    #stage-header .origin-badge { display: none; margin-top: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1.5px; padding: 4px 14px; border-radius: 999px; background: rgba(14,14,30,0.78);
+      border: 1px solid rgba(255,255,255,0.2); color: #cdd3ff; backdrop-filter: blur(6px); }
+    #stage-header .origin-badge.show { display: inline-block; }
+    #stage-header .origin-badge.local  { border-color:#34d399; color:#9af7c8; }
+    #stage-header .origin-badge.remote { border-color:#fbbf24; color:#ffe3a0; }
+
     /* Cast layer inside the stage */
     .cast { position: absolute; inset: 0; z-index: 3; display: flex; align-items: flex-end; justify-content: center; gap: 0; pointer-events: none; }
     .cast.hidden { display: none; }
@@ -141,6 +153,7 @@
     </div>
     <div id="stage">
       <div id="wall"><div class="rail left"></div><div class="rail right"></div></div>
+      <div id="stage-header"><div class="proj-big" id="projBig">—</div><div class="origin-badge" id="originBadge"></div></div>
       <div id="empty"><div class="big">🌌</div><div>Waiting for AgentVibes messages…<br>avatars appear when someone speaks.</div></div>
       <!-- per-session cast containers are injected here -->
       <div id="caption"></div>
@@ -191,6 +204,28 @@
   function showError(m){ const e=$('error-msg'); e.textContent=m; e.style.display='block'; }
   function hashStr(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return h; }
 
+  // Big project name + source label at the top of the avatar area.
+  const projBig = $('projBig'), originBadge = $('originBadge');
+  function updateHeader(project, origin){
+    projBig.textContent = project || '—';
+    const o = (origin||'').toLowerCase();
+    if (!o){ originBadge.className='origin-badge'; originBadge.textContent=''; return; }
+    let label, cls;
+    if (o==='local'){ label='💻 LOCAL'; cls='local'; }
+    else if (o==='remote'){ label='🖥️ REMOTE'; cls='remote'; }
+    else { label='🖥️ '+origin.toUpperCase(); cls='remote'; }   // e.g. a remote server name
+    originBadge.textContent=label;
+    originBadge.className='origin-badge show '+cls;
+  }
+
+  // Cap retained clips per session so a long-lived window doesn't grow without
+  // bound; free the cached audio bytes of evicted clips.
+  const MAX_CLIPS = 60;
+  function pushClip(s, clip){
+    s.clips.push(clip);
+    while (s.clips.length > MAX_CLIPS){ const old = s.clips.shift(); if (old) old._bytes = null; }
+  }
+
   // ---------- galaxy ----------
   const galaxy = (() => {
     const canvas=$('galaxy');
@@ -238,7 +273,7 @@
     const key = sessionKey(msg);
     if (sessions.has(key)) return sessions.get(key);
     const castEl=document.createElement('div'); castEl.className='cast hidden'; stageEl.insertBefore(castEl, caption);
-    const s={ key, label:key, kind:'solo', castEl, slots:[], cast:{}, clips:[], unread:0, tabEl:null, built:false };
+    const s={ key, label:key, kind:'solo', castEl, slots:[], cast:{}, clips:[], unread:0, tabEl:null, built:false, lastOrigin:'' };
     sessions.set(key,s); addTab(s);
     if(!activeKey) switchTo(key);
     return s;
@@ -263,6 +298,7 @@
     activeKey=key; const s=sessions.get(key); s.unread=0;
     s.castEl.classList.remove('hidden');
     emptyEl.style.display = (Object.keys(s.cast).length||s.clips.length) ? 'none' : 'flex';
+    updateHeader(s.label, s.lastOrigin);
     renderChat(s);
     sessions.forEach(updateTab);
     // Lazily build avatars for this session's known cast
@@ -277,7 +313,7 @@
       m.innerHTML=`<div class="who" style="color:${clip.accent}">${esc(clip.name)}<span class="ts">${esc(clip.time||'')}</span></div>`+
                   `<div>${esc((clip.text||'(no text)').slice(0,160))}</div>`+
                   `<div class="proj">${esc(clip.project||clip.origin||'')}</div>`;
-      m.addEventListener('click',()=>{ const slot=s.slots.find(x=>x.voiceKey===clip.voiceKey); if(slot) playClip(clip,slot,m); });
+      m.addEventListener('click',()=>{ const slot=s.slots.find(x=>x.voiceKey===clip.voiceKey)||s.slots[0]; if(slot) playClip(clip,slot,m); else dbg('replay: no avatar slot'); });
       chatEl.appendChild(m);
     });
     chatEl.scrollTop=chatEl.scrollHeight;
@@ -340,9 +376,13 @@
         await Promise.race([ head.audioCtx.resume().catch(()=>{}), new Promise(r=>setTimeout(r,1200)) ]);
         dbg('ctx after resume='+head.audioCtx.state);
       }
-      const resp=await fetch(clip.audioUrl);
-      const buf=await head.audioCtx.decodeAudioData(await resp.arrayBuffer());
-      dbg('decoded '+buf.duration.toFixed(1)+'s '+buf.sampleRate+'Hz');
+      // Cache the raw audio bytes on the clip so replay works even after the
+      // server deletes the temp file (120s) and across slot reuse.
+      let raw;
+      if (clip._bytes) { raw = clip._bytes; }
+      else { raw = await (await fetch(clip.audioUrl)).arrayBuffer(); clip._bytes = raw; }
+      const buf = await head.audioCtx.decodeAudioData(raw.slice(0));  // decode a copy; keep _bytes intact
+      dbg('decoded '+buf.duration.toFixed(1)+'s '+buf.sampleRate+'Hz'+(clip._bytes?' (cached)':''));
       const r={audio:buf}; const text=(clip.text||'').trim();
       if(text){ const w=text.split(/\s+/).filter(Boolean); const per=(buf.duration*1000)/Math.max(1,w.length);
         r.words=w; r.wtimes=w.map((_,i)=>Math.round(i*per)); r.wdurations=w.map(()=>Math.round(per*0.9)); }
@@ -364,8 +404,9 @@
       s.cast[voiceKey]={ avatarId:pickAvatar(s,voiceKey,idx), accent:ACCENTS[idx%ACCENTS.length], name:(msg.llm||msg.voice||voiceKey), project:(msg.project||'') }; }
     const meta=s.cast[voiceKey];
     const clip={ id:++seq, audioUrl:msg.audioUrl, text:msg.text||'', voiceKey, name:meta.name, accent:meta.accent, project:msg.project||'', origin:msg.origin||'remote', time:new Date().toLocaleTimeString() };
-    s.clips.push(clip); updateTab(s);
+    pushClip(s, clip); s.lastOrigin = msg.origin || s.lastOrigin; updateTab(s);
     if(s.key===activeKey){
+      updateHeader(s.label, s.lastOrigin);
       dbg('-> active render, clips='+s.clips.length);
       const slot=await ensureSlot(s,voiceKey);
       renderChat(s);
@@ -403,7 +444,7 @@
       if(i>=demoBench.length){ $('replayBtn').style.display='block'; dbg('demo done'); return; }  // play ONCE
       const {slot,c,vk}=demoBench[i];
       const clip={ id:++seq, audioUrl:c.audioUrl, text:c.text, voiceKey:vk, name:`${c.name} · ${c.role}`, accent:c.accent, project:'BMAD Party', origin:'demo', time:new Date().toLocaleTimeString() };
-      s.clips.push(clip); renderChat(s);
+      pushClip(s, clip); renderChat(s);
       const ms=await playClip(clip,slot,null); i++; setTimeout(tick,(ms||3000)+800);
     }
     tick();
@@ -430,7 +471,11 @@
 
   // ---------- diagnostics (exposed for CDP testing) ----------
   window.__errors = [];
-  window.addEventListener('error', e => { window.__errors.push(String(e.message||e.error||e)); dbg('JS ERROR '+(e.message||e)); });
+  window.addEventListener('error', e => {
+    const stk = (e.error && e.error.stack) ? e.error.stack.split('\n').slice(0,4).join(' << ') : '';
+    const det = (e.message||'') + ' @ ' + String(e.filename||'?').split('/').pop() + ':' + (e.lineno||'?') + ':' + (e.colno||'?') + (stk ? ' | ' + stk : '');
+    window.__errors.push(det); dbg('JS ERROR '+det);
+  });
   window.addEventListener('unhandledrejection', e => { window.__errors.push('reject: '+String(e.reason)); dbg('REJECT '+String(e.reason)); });
   window.__diag = () => {
     const out = { activeKey, sessions:[...sessions.keys()], errors: window.__errors.slice(-8), slots:[] };
