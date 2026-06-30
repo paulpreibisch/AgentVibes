@@ -416,6 +416,9 @@
     const meta=s.cast[voiceKey];
     const clip={ id:++seq, audioUrl:msg.audioUrl, text:msg.text||'', voiceKey, name:meta.name, accent:meta.accent, project:msg.project||'', origin:msg.origin||'remote', time:new Date().toLocaleTimeString() };
     pushClip(s, clip); s.lastOrigin = msg.origin || s.lastOrigin; updateTab(s);
+    // Follow-latest: auto-activate whichever session just spoke, so remote
+    // messages play live instead of sitting silent in an inactive tab.
+    if(s.key!==activeKey){ await switchTo(s.key); }
     if(s.key===activeKey){
       updateHeader(s.label, s.lastOrigin);
       dbg('-> active render, clips='+s.clips.length);

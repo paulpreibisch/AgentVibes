@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AgentVibes TalkingHead</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: transparent;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    /* Avatar stage — fills the window so TalkingHead's camera centers the head */
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 10;
+    }
+    #stage.visible { /* always-on; class kept for compatibility */ }
+
+    /* 3D canvas fills the stage */
+    #avatar-root {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Info badge above avatar head */
+    #badge {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      background: rgba(10, 10, 20, 0.82);
+      backdrop-filter: blur(6px);
+      color: #e8e8ff;
+      padding: 7px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+      pointer-events: none;
+    }
+    #badge.visible { display: block; }
+
+    /* Status indicator (top-right, small) */
+    #status {
+      position: fixed;
+      top: 12px;
+      right: 14px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      pointer-events: none;
+    }
+
+    /* Click-to-enable audio hint */
+    #enable-audio {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      background: rgba(20, 120, 60, 0.92);
+      color: #fff;
+      padding: 14px 22px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 50;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    /* Live caption — text of the current clip */
+    #caption {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 18px;
+      max-width: 92vw;
+      text-align: center;
+      font-size: 18px;
+      line-height: 1.4;
+      color: #fff;
+      background: rgba(10,10,20,0.72);
+      backdrop-filter: blur(6px);
+      padding: 12px 18px;
+      border-radius: 14px;
+      display: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      z-index: 30;
+    }
+    #caption.visible { display: block; }
+    #caption .spk { font-size: 12px; opacity: 0.6; display: block; margin-bottom: 4px; }
+
+    /* Clip history — clickable chips to replay */
+    #clips {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      width: 300px;
+      max-height: 64vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 20;
+    }
+    .clip {
+      background: rgba(20,20,35,0.82);
+      color: #dfe3ff;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .clip:hover { background: rgba(45,45,75,0.92); }
+    .clip .meta { font-size: 10px; opacity: 0.55; margin-bottom: 3px; }
+    .clip.playing { border-color: #4ade80; background: rgba(30,70,45,0.9); }
+
+    /* Debug panel — bottom-right, shows decode/lip-sync ground truth */
+    #debug {
+      position: fixed;
+      right: 8px;
+      bottom: 8px;
+      width: 340px;
+      max-height: 40vh;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.72);
+      color: #9effa0;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 10px;
+      line-height: 1.45;
+      padding: 8px 10px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      z-index: 40;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Error overlay */
+    #error-msg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(180,40,40,0.85);
+      color: #fff;
+      padding: 16px 24px;
+      border-radius: 10px;
+      font-size: 13px;
+      max-width: 400px;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="avatar-root"></div>
+  <div id="badge"></div>
+</div>
+
+<div id="clips"></div>
+<div id="caption"></div>
+
+<div id="status">connecting…</div>
+<div id="enable-audio">🔊 Click to enable audio</div>
+<div id="debug"></div>
+<div id="error-msg"></div>
+
+<!-- Import map: resolves the bare "three" specifiers that talkinghead.mjs imports.
+     Must precede the module script below or the top-level import throws. -->
+<script type="importmap">
+{ "imports":
+  {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js/+esm",
+    "three/examples/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Imports — TalkingHead.js from CDN (GitHub via jsDelivr)
+// ---------------------------------------------------------------------------
+import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs';
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const stage    = document.getElementById('stage');
+const badge    = document.getElementById('badge');
+const status   = document.getElementById('status');
+const errBox   = document.getElementById('error-msg');
+const root     = document.getElementById('avatar-root');
+const caption  = document.getElementById('caption');
+const clipsBox = document.getElementById('clips');
+let   clipSeq  = 0;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+const debugBox = document.getElementById('debug');
+function dbg(msg) {
+  if (!debugBox) return;
+  const t = new Date().toLocaleTimeString();
+  debugBox.textContent = `${t}  ${msg}\n` + debugBox.textContent;
+  if (debugBox.textContent.length > 4000) debugBox.textContent = debugBox.textContent.slice(0, 4000);
+}
+
+let head        = null;       // TalkingHead instance
+let currentKey  = null;       // e.g. "female-1"
+let avatarCfg   = null;       // avatars.json content
+let isSpeaking  = false;
+let hideTimer   = null;
+// voice → avatar key (persisted in sessionStorage so it survives reconnects)
+const voiceMap  = JSON.parse(sessionStorage.getItem('voiceMap') || '{}');
+
+function showError(msg) {
+  errBox.textContent = msg;
+  errBox.style.display = 'block';
+}
+
+function setStatus(msg) {
+  status.textContent = msg;
+}
+
+// ---------------------------------------------------------------------------
+// Load avatar config
+// ---------------------------------------------------------------------------
+async function loadAvatarCfg() {
+  const r = await fetch('/avatars.json');
+  avatarCfg = await r.json();
+}
+
+// ---------------------------------------------------------------------------
+// Gender detection from voice name
+// ---------------------------------------------------------------------------
+function detectGender(voice) {
+  if (!voice) return 'neutral';
+  // Kokoro pattern: 2nd char of 2-letter prefix = gender (f/m)
+  if (/^[a-z]{2}_[a-z0-9_]+$/.test(voice)) {
+    const g = voice[1];
+    if (g === 'f') return 'female';
+    if (g === 'm') return 'male';
+  }
+  const vl = voice.toLowerCase();
+  if (/\b(amy|anna|bella|emma|ljspeech|chloe|diana|ella|eva|nova|river|heart|star|sky|luna|rose|lily|dawn|sage|ivy|june|fable|shimmer|female|woman|girl|lady)\b/.test(vl)) return 'female';
+  if (/\b(ryan|alex|leo|joe|eric|michael|adam|brian|mark|robert|david|james|john|male|man|guy|onyx|will|echo)\b/.test(vl)) return 'male';
+  return 'neutral';
+}
+
+// Assign and remember an avatar key for a voice
+function avatarKeyForVoice(voice) {
+  if (voiceMap[voice]) return voiceMap[voice];
+  const gender  = detectGender(voice);
+  const order   = avatarCfg.genderOrder[gender] || avatarCfg.genderOrder.neutral;
+  // Pick the first one not already used by another voice
+  const used    = new Set(Object.values(voiceMap));
+  const key     = order.find(k => !used.has(k)) || order[0];
+  voiceMap[voice] = key;
+  sessionStorage.setItem('voiceMap', JSON.stringify(voiceMap));
+  return key;
+}
+
+// ---------------------------------------------------------------------------
+// TalkingHead setup
+// ---------------------------------------------------------------------------
+async function ensureHead() {
+  if (head) return;
+  head = new TalkingHead(root, {
+    // TalkingHead's constructor REQUIRES a truthy ttsEndpoint, but we never use
+    // its built-in Google TTS — we feed our own audio via speakAudio(). This
+    // placeholder satisfies the check and is never actually called.
+    ttsEndpoint: 'https://localhost/_unused_tts',
+    cameraView: 'upper',
+    cameraRotateEnable: false,
+    avatarMood: 'neutral',
+    avatarIdleEyeContact: 0.5,
+    avatarIdleHeadMove: 0.5,
+    // Boost speech loudness — kokoro/piper output was very quiet through the
+    // default Web Audio gain. (null default ≈ 1.0; bump to make it audible.)
+    mixerGainSpeech: 3.0,
+  });
+  // Belt-and-suspenders: also set the live gain node in case opt is ignored.
+  try { if (head.audioSpeechGainNode) head.audioSpeechGainNode.gain.value = 3.0; } catch {}
+}
+
+async function loadAvatarIfNeeded(avatarKey) {
+  if (currentKey === avatarKey) return;
+  const cfg = avatarCfg.avatars[avatarKey];
+  if (!cfg) { console.warn('Unknown avatar key:', avatarKey); return; }
+
+  setStatus(`loading avatar "${cfg.label}"…`);
+  try {
+    await head.showAvatar({ url: cfg.url, body: cfg.body, avatarMood: 'neutral' });
+    currentKey = avatarKey;
+    setStatus('ready');
+  } catch (e) {
+    console.error('Avatar load failed:', e);
+    showError(`Avatar failed to load.\nCheck avatars.json — the RPM avatar IDs may need updating.\n\n${e.message}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Handle a speak event from the server
+// ---------------------------------------------------------------------------
+// Add a clickable clip chip to the history; clicking replays it.
+function addClipChip(clip) {
+  const el = document.createElement('div');
+  el.className = 'clip';
+  el.innerHTML = `<div class="meta">▶ ${escapeHtml(clip.voice || '?')} · ${escapeHtml(clip.project || clip.origin || '')}</div>` +
+                 `${escapeHtml((clip.text || '(no text)').slice(0, 180))}`;
+  el.addEventListener('click', () => playClip(clip, el));
+  clipsBox.prepend(el);
+  while (clipsBox.children.length > 25) clipsBox.removeChild(clipsBox.lastChild);
+  return el;
+}
+
+// Fetch + decode + speak a clip (used for both first play and replay-on-click).
+// Re-fetches the audio URL each time (the server keeps each file ~120s).
+async function playClip(clip, chipEl) {
+  // Caption: show the spoken text
+  caption.innerHTML = `<span class="spk">${escapeHtml(clip.voice || '')} · ${escapeHtml(clip.project || clip.origin || '')}</span>` +
+                      `${escapeHtml(clip.text || '(no text provided)')}`;
+  caption.classList.add('visible');
+
+  document.querySelectorAll('.clip.playing').forEach(e => e.classList.remove('playing'));
+  if (chipEl) chipEl.classList.add('playing');
+
+  isSpeaking = true;
+  try {
+    dbg(`speak: text="${(clip.text||'').slice(0,40)}" (${(clip.text||'').length} chars) voice=${clip.voice}`);
+    if (head.audioCtx && head.audioCtx.state !== 'running') {
+      await head.audioCtx.resume();
+    }
+    dbg(`ctx=${head.audioCtx.state} gain=${head.audioSpeechGainNode ? head.audioSpeechGainNode.gain.value : '?'}`);
+    const arrbuf   = await (await fetch(clip.audioUrl)).arrayBuffer();
+    const audioBuf = await head.audioCtx.decodeAudioData(arrbuf);
+    dbg(`decoded OK: ${audioBuf.duration.toFixed(2)}s ${audioBuf.sampleRate}Hz ${audioBuf.numberOfChannels}ch`);
+
+    const r = { audio: audioBuf };
+    const text = (clip.text || '').trim();
+    if (text) {
+      const words = text.split(/\s+/).filter(Boolean);
+      const per   = (audioBuf.duration * 1000) / Math.max(1, words.length);
+      r.words      = words;
+      r.wtimes     = words.map((_, i) => Math.round(i * per));
+      r.wdurations = words.map(() => Math.round(per * 0.9));
+      dbg(`lipsync: ${words.length} words → speakAudio (lang=en)`);
+    } else {
+      dbg(`lipsync: NO TEXT — mouth will not move`);
+    }
+    setStatus(`speaking · ${r.words ? r.words.length : 0}w · ${audioBuf.duration.toFixed(1)}s · ctx=${head.audioCtx.state}`);
+    head.speakAudio(r, { lipsyncLang: 'en' });
+  } catch (e) {
+    console.error('playClip failed:', e);
+    dbg(`ERROR: ${e.message} — falling back to <audio>`);
+    setStatus('audio error: ' + e.message);
+    caption.innerHTML += `<br><small style="opacity:.6">⚠ ${escapeHtml(e.message)}</small>`;
+    try { const a = new Audio(clip.audioUrl); a.volume = 1; await a.play(); } catch (e2) {}
+  }
+  isSpeaking = false;
+}
+
+async function handleSpeak(msg) {
+  // Abort any pending hide
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+
+  // Show stage
+  stage.classList.add('visible');
+
+  // Update badge
+  const proj   = msg.project || msg.llm || 'AgentVibes';
+  const origin = msg.origin  || 'remote';
+  badge.textContent = `📁 ${proj} • from ${origin}`;
+  badge.classList.add('visible');
+
+  // Ensure TalkingHead + correct avatar
+  await ensureHead();
+  const voice = msg.voice || '';
+  await loadAvatarIfNeeded(avatarKeyForVoice(voice));
+
+  if (!msg.audioUrl) return;
+
+  // Record the clip (text shown + clickable to replay), then play it.
+  const clip = { id: ++clipSeq, audioUrl: msg.audioUrl, text: msg.text || '', voice, project: proj, origin };
+  const chip = addClipChip(clip);
+  await playClip(clip, chip);
+
+  // Keep the talking head on screen at all times; only fade the badge out.
+  hideTimer = setTimeout(() => {
+    badge.classList.remove('visible');
+    hideTimer = null;
+  }, 1500);
+}
+
+// ---------------------------------------------------------------------------
+// SSE connection (auto-reconnects on disconnect)
+// ---------------------------------------------------------------------------
+function connectSSE() {
+  setStatus('connecting…');
+  const es = new EventSource('/events');
+
+  es.onmessage = async (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch { return; }
+
+    if (msg.type === 'connected') {
+      setStatus('connected');
+      console.log('[SSE] Connected, id=', msg.id);
+    } else if (msg.type === 'speak') {
+      handleSpeak(msg).catch(e => console.error('[speak]', e));
+    }
+  };
+
+  es.onerror = () => {
+    setStatus('reconnecting…');
+    es.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Audio unlock — browsers start the Web Audio context suspended until a user
+// gesture. Resume on the first click/key anywhere; show a hint until running.
+// (The dedicated avatar window launches Chrome with
+// --autoplay-policy=no-user-gesture-required so this usually self-clears.)
+// ---------------------------------------------------------------------------
+function setupAudioUnlock() {
+  const hint = document.getElementById('enable-audio');
+  const ctxRunning = () => head && head.audioCtx && head.audioCtx.state === 'running';
+  const tryResume = async () => {
+    try { if (head && head.audioCtx && head.audioCtx.state !== 'running') await head.audioCtx.resume(); } catch {}
+    if (ctxRunning() && hint) hint.style.display = 'none';
+  };
+  window.addEventListener('click', tryResume);
+  window.addEventListener('keydown', tryResume);
+  if (hint) {
+    hint.addEventListener('click', tryResume);
+    hint.style.display = 'block';
+  }
+  // Poll briefly: if autoplay is already allowed, hide the hint automatically.
+  const poll = setInterval(() => { if (ctxRunning() && hint) { hint.style.display = 'none'; clearInterval(poll); } }, 800);
+  setTimeout(() => clearInterval(poll), 15000);
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+(async () => {
+  try {
+    await loadAvatarCfg();
+    // Always-loaded: build the head and load a default avatar up front, and
+    // keep the stage visible so the talking head is always on screen.
+    await ensureHead();
+    const defaultKey = (avatarCfg.genderOrder.neutral && avatarCfg.genderOrder.neutral[0]) || 'neutral';
+    await loadAvatarIfNeeded(defaultKey);
+    stage.classList.add('visible');
+    setupAudioUnlock();
+    connectSSE();
+  } catch (e) {
+    showError('Failed to load configuration: ' + e.message);
+  }
+})();
+</script>
+</body>
+</html>

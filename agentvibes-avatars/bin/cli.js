@@ -26,7 +26,7 @@ const argv = process.argv.slice(2);
 function flag(name, def) { const i = argv.indexOf(name); return (i >= 0 && argv[i + 1]) ? argv[i + 1] : def; }
 
 const PORT = parseInt(process.env.AVATARS_PORT || flag('--port', '3747'), 10);
-const VIEW = flag('--view', 'cosmic.html');
+const VIEW = flag('--view', '');
 const BASE = `http://localhost:${PORT}`;
 
 function get(p) {
