@@ -177,14 +177,13 @@
   import { TalkingHead } from 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs';
 
   // ---------- config ----------
-  const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/';
-  // Smaller, fast-loading avatars first; the big ones (avaturn/avatarsdk ~12-13MB) last.
+  const AVATAR_BASE = 'https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/avatars/';
+  // ONLY avatars with the full ARKit+Oculus blendshape set TalkingHead's mood/
+  // blink/viseme system requires. vroid (VRM morphs), avatarsdk and avaturn lack
+  // eyeBlinkLeft/Right etc., which crashes the animate loop every frame — excluded.
   const AVATARS = [
     { id:'brunette',  url:AVATAR_BASE+'brunette.glb',  body:'F' },
     { id:'brunette-t',url:AVATAR_BASE+'brunette-t.glb',body:'F' },
-    { id:'vroid',     url:AVATAR_BASE+'vroid.glb',     body:'F' },
-    { id:'avatarsdk', url:AVATAR_BASE+'avatarsdk.glb', body:'M' },
-    { id:'avaturn',   url:AVATAR_BASE+'avaturn.glb',   body:'M' },
   ];
   const DEFAULT_AVATAR = 'brunette';
   const ACCENTS = ['#a78bfa','#22d3ee','#fb7185','#34d399','#fbbf24','#60a5fa'];
@@ -321,7 +320,10 @@
 
   // ---------- avatar slots (per session) ----------
   function pickAvatar(s, voiceKey, idx){
-    if(persistMap[voiceKey]) return persistMap[voiceKey];
+    const valid=new Set(AVATARS.map(a=>a.id));
+    // Honour a remembered avatar only if it's still a valid (safe) one — a stale
+    // persisted id (e.g. an old avaturn/vroid) must be reassigned, not reused.
+    if(persistMap[voiceKey] && valid.has(persistMap[voiceKey])) return persistMap[voiceKey];
     const used=new Set(Object.values(s.cast).map(c=>c.avatarId));
     const pool=AVATARS.filter(a=>!used.has(a.id));
     const seed=hashStr(voiceKey)+idx;
