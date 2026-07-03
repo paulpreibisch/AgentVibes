@@ -341,16 +341,21 @@ sprint_5:
     story_8_1:
       id: AVI-S8.1
       title: Install & Packaging Bleeders
-      status: ready-for-dev
+      status: review
       story_points: 5
       acceptance_criteria_count: 6
       file: docs/implementation-artifacts/8-1-install-packaging-bleeders.md
       recommended_model: sonnet
       fable_gate: false
+      completion_date: 2026-07-03
       description: |
         Fix ESM require() crash in installer.js:5381 (bug #1), package
         voice-assignments.json (bug #2), stop settings.json wipe on parse error
         (bug #6), and setup-windows.ps1 config overwrite (bug #9).
+      notes: |
+        Implemented by Opus (YOLO). 4 HIGH bugs fixed + 14 regression tests
+        (10 node:test + 4 PowerShell AST-extracted). npm pack now ships the
+        914-voice catalog (239.8kB); pack-contents guard 8/8. No new regressions.
       dependencies: []
 
     story_8_2:
@@ -470,13 +475,14 @@ sprint_5:
   statistics:
     total_stories: 8
     completed_stories: 0
-    ready_for_dev: 8
+    in_review: 1
+    ready_for_dev: 7
     in_progress: 0
     total_story_points: 54
-    completed_points: 0
-    ready_for_dev_points: 54
+    in_review_points: 5
+    ready_for_dev_points: 49
     completion_percentage: 0.0
-    next_milestone: "Phase 0 (8.1-8.4) — fix 10 ship-blocking bugs this week"
+    next_milestone: "Phase 0: 8.1 in review; next 8.2 (MCP Windows correctness)"
 
   phases:
     phase_0: [AVI-S8.1, AVI-S8.2, AVI-S8.3, AVI-S8.4]   # Sonnet, independent, this week
