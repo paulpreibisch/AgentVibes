@@ -316,6 +316,176 @@ sprint_4:
     completion_percentage: 100.0
     next_milestone: "Epic AVI-E05 COMPLETE — close GitHub issue #194"
 
+# ============================================================
+# SPRINT 5 — Epic AVI-E08: Fable Review Remediation
+# Source: docs/fable-review/ (Fable 5 architecture review, 2026-07-03)
+# ============================================================
+sprint_5:
+  sprint: 5
+  epic_id: AVI-E08
+  epic_name: Fable Review Remediation
+  feature_id: AVI-08-FABLE-REMEDIATION
+  priority: High
+  story_points_total: 54
+  duration: 3-4 weeks
+  focus: Fix production bleeders (Phase 0), then give the audio pipeline one source of truth (Phases 1-4)
+  outcome: Retire the root-cause regression class; single-language precedence + mixing
+  created_date: 2026-07-03
+  model_policy: |
+    Fable = planning + review gates on 8.5/8.6 only (limited credits).
+    Sonnet = Phase 0 + repetitive scaffolding (8.6 build, 8.7).
+    Opus = precedence/architecture (8.5, 8.8). Switch model per phase, not per story.
+
+  development_status:
+
+    story_8_1:
+      id: AVI-S8.1
+      title: Install & Packaging Bleeders
+      status: ready-for-dev
+      story_points: 5
+      acceptance_criteria_count: 6
+      file: docs/implementation-artifacts/8-1-install-packaging-bleeders.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Fix ESM require() crash in installer.js:5381 (bug #1), package
+        voice-assignments.json (bug #2), stop settings.json wipe on parse error
+        (bug #6), and setup-windows.ps1 config overwrite (bug #9).
+      dependencies: []
+
+    story_8_2:
+      id: AVI-S8.2
+      title: MCP Server Windows Correctness
+      status: ready-for-dev
+      story_points: 5
+      acceptance_criteria_count: 6
+      file: docs/implementation-artifacts/8-2-mcp-windows-correctness.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Refactor _run_script to branch on exit code not emoji (bug #3), add
+        stdin=DEVNULL + timeout to stop server hangs (bug #8), implement/stub
+        replay_audio on Windows, remove per-call global-state mutation.
+      dependencies: []
+
+    story_8_3:
+      id: AVI-S8.3
+      title: TUI Safety
+      status: ready-for-dev
+      story_points: 4
+      acceptance_criteria_count: 5
+      file: docs/implementation-artifacts/8-3-tui-safety.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Fix _projectRoot ReferenceError crash in settings-tab (bug #4), guard
+        global-q quit behind isModalOpen (bug #5), make agent-preview config
+        patching transactional incl. reverb restore (bug #7).
+      dependencies: []
+
+    story_8_4:
+      id: AVI-S8.4
+      title: Volume Defaults & Dead-Flag Cleanup
+      status: ready-for-dev
+      story_points: 3
+      acceptance_criteria_count: 4
+      file: docs/implementation-artifacts/8-4-volume-defaults-cleanup.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Replace 70% volume fallbacks with 20% (bug #10), extend regression test
+        to cover the ternary spelling, fix dead _bg_allowed override in
+        audio-processor.sh:580.
+      dependencies: []
+
+    story_8_5:
+      id: AVI-S8.5
+      title: The Utterance Resolver — Single Source of Truth
+      status: ready-for-dev
+      story_points: 13
+      acceptance_criteria_count: 7
+      file: docs/implementation-artifacts/8-5-utterance-resolver.md
+      recommended_model: opus
+      fable_gate: true
+      critical: true
+      description: |
+        One Node module reads all config once, applies one data-driven precedence
+        table, emits a flat plan {voice,engine,transport,effects,music,pretext,
+        speed,volume}. Players stop reading config. Retires the regression class.
+      dependencies:
+        - AVI-S8.1
+        - AVI-S8.2
+        - AVI-S8.3
+        - AVI-S8.4
+
+    story_8_6:
+      id: AVI-S8.6
+      title: Shared Constants Generator + One Mixer Per Platform
+      status: ready-for-dev
+      story_points: 8
+      acceptance_criteria_count: 6
+      file: docs/implementation-artifacts/8-6-shared-constants-mixer.md
+      recommended_model: sonnet
+      fable_gate: true
+      description: |
+        Generate constants (0.20 volume, provider list, Kokoro regex, mute files)
+        into bash + PowerShell from one JSON; unify mixing to one normalize=0
+        filtergraph per platform; delete the three volume-patch scripts.
+      dependencies:
+        - AVI-S8.5
+
+    story_8_7:
+      id: AVI-S8.7
+      title: Provider × Engine × Platform Contract-Test Matrix
+      status: ready-for-dev
+      story_points: 8
+      acceptance_criteria_count: 6
+      file: docs/implementation-artifacts/8-7-contract-test-matrix.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Parametrized conformance suite encoding every regression memory as a
+        permanent test; run pytest + Windows-parity test in CI; resolve the
+        NO_PLAY/NO_PLAYBACK flag mismatch.
+      dependencies:
+        - AVI-S8.5
+        - AVI-S8.6
+
+    story_8_8:
+      id: AVI-S8.8
+      title: Shells → Thin Wrappers + Shared TUI Widget Layer
+      status: ready-for-dev
+      story_points: 8
+      acceptance_criteria_count: 6
+      file: docs/implementation-artifacts/8-8-thin-wrappers-tui-widgets.md
+      recommended_model: opus
+      fable_gate: false
+      description: |
+        Reduce setup-windows.ps1 / install-mcp.js to thin Node-installer wrappers;
+        extract one shared list-modal + voice-picker + preview-controller widget
+        layer; enforce openModal everywhere; kill the 5x duplicated pickers.
+      dependencies:
+        - AVI-S8.6
+
+  statistics:
+    total_stories: 8
+    completed_stories: 0
+    ready_for_dev: 8
+    in_progress: 0
+    total_story_points: 54
+    completed_points: 0
+    ready_for_dev_points: 54
+    completion_percentage: 0.0
+    next_milestone: "Phase 0 (8.1-8.4) — fix 10 ship-blocking bugs this week"
+
+  phases:
+    phase_0: [AVI-S8.1, AVI-S8.2, AVI-S8.3, AVI-S8.4]   # Sonnet, independent, this week
+    phase_1: [AVI-S8.5]                                 # Opus + Fable gate — the core investment
+    phase_2: [AVI-S8.6]                                 # Sonnet build / Opus design + Fable gate
+    phase_3: [AVI-S8.7]                                 # Sonnet
+    phase_4: [AVI-S8.8]                                 # Opus
+  sequencing_rule: "Do phases 1-3 before the MuseTalk/avatar epic (AVI-E07) lands."
+
 notes: |
   ✅ EPIC COMPLETE: Sprint 3 Epic 4 - Custom Background Music System
 
