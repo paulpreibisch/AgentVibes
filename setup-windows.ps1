@@ -73,6 +73,27 @@ function Write-Item([string]$icon, [string]$name, [string]$desc) {
     Write-Host $desc -ForegroundColor DarkGray
 }
 
+# Non-Destructive Configuration Rule (CLAUDE.md): setup must never clobber a
+# user-config value the Node installer deliberately preserves across re-runs.
+# Writes the value ONLY when the file is absent; otherwise keeps the existing
+# choice and reports it. Pass -Force for the rare case where an overwrite is
+# genuinely intended.
+function Set-ConfigValueSafe {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Value,
+        [string]$Label = (Split-Path $Path -Leaf),
+        [switch]$Force
+    )
+    if ((Test-Path $Path) -and -not $Force) {
+        $current = (Get-Content -Path $Path -Raw -ErrorAction SilentlyContinue)
+        if ($null -ne $current) { $current = $current.Trim() }
+        Write-Info "Keeping existing $Label ($current)"
+        return
+    }
+    Set-Content -Path $Path -Value $Value -NoNewline
+}
+
 # ── Read Version ────────────────────────────────────────────
 
 $Version = "unknown"
@@ -672,9 +693,10 @@ if (-not (Test-Path $ConfigDir)) {
 }
 
 $bgEnabledValue = if ($BgMusicEnabled) { "true" } else { "false" }
-Set-Content -Path "$ConfigDir\background-music-enabled.txt" -Value $bgEnabledValue -NoNewline
-Set-Content -Path "$ConfigDir\background-music-default.txt" -Value $BgMusicTrack -NoNewline
-Set-Content -Path "$ConfigDir\background-music-volume.txt" -Value "0.10" -NoNewline
+Set-ConfigValueSafe -Path "$ConfigDir\background-music-enabled.txt" -Value $bgEnabledValue -Label "background music enabled"
+Set-ConfigValueSafe -Path "$ConfigDir\background-music-default.txt" -Value $BgMusicTrack -Label "background music track"
+# Default volume is 20% per project rule (see AVI-S8.4 for the full sweep).
+Set-ConfigValueSafe -Path "$ConfigDir\background-music-volume.txt" -Value "0.20" -Label "background music volume"
 
 # ── Audio Effects (Reverb) ─────────────────────────────
 
@@ -712,7 +734,7 @@ if (-not $HasFfmpeg) {
 }
 
 # Write reverb config
-Set-Content -Path "$ConfigDir\reverb-level.txt" -Value $ReverbLevel -NoNewline
+Set-ConfigValueSafe -Path "$ConfigDir\reverb-level.txt" -Value $ReverbLevel -Label "reverb level"
 
 # ── Verbosity / Transparency ──────────────────────────
 
@@ -741,7 +763,7 @@ Write-Host ""
 Write-Ok "Verbosity: $VerbosityDisplayName"
 
 # Write verbosity config
-Set-Content -Path "$ProjectClaudeDir\tts-verbosity.txt" -Value $VerbosityLevel -NoNewline
+Set-ConfigValueSafe -Path "$ProjectClaudeDir\tts-verbosity.txt" -Value $VerbosityLevel -Label "TTS verbosity"
 
 # ── Test TTS ────────────────────────────────────────────────
 

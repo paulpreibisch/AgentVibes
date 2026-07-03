@@ -73,7 +73,8 @@
     "README.md",
     "RELEASE_NOTES.md",
     "LICENSE",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "voice-assignments.json"
   ],
   "scripts": {
     "install-local": "node src/installer.js install",

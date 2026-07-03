@@ -4176,6 +4176,52 @@ async function copyCodexFiles(targetDir, spinner) {
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
  */
+/**
+ * Safely read a JSON settings file that is about to be modified in place.
+ *
+ * Non-Destructive Configuration Rule: a corrupt settings.json (e.g. one stray
+ * trailing comma) must NEVER be silently overwritten — doing so wipes all of the
+ * user's real settings. This helper distinguishes three cases so callers can
+ * skip-and-warn on corruption instead of clobbering:
+ *   - missing / empty  -> { exists:false, corrupt:false } (safe to create fresh)
+ *   - present + valid   -> { exists:true,  corrupt:false, data }
+ *   - present + invalid -> { exists:true,  corrupt:true }  (caller must NOT write)
+ * @param {string} filePath
+ * @returns {Promise<{exists:boolean, corrupt:boolean, data:object}>}
+ */
+async function readJsonConfigSafe(filePath) {
+  let raw;
+  try {
+    raw = await fs.readFile(filePath, 'utf8');
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return { exists: false, corrupt: false, data: {} };
+    // Unreadable for another reason (permissions, etc.) — treat as present+corrupt
+    // so we never overwrite a file we could not fully read.
+    return { exists: true, corrupt: true, data: {} };
+  }
+  if (raw.trim() === '') return { exists: false, corrupt: false, data: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { exists: true, corrupt: true, data: {} };
+    }
+    return { exists: true, corrupt: false, data: parsed };
+  } catch {
+    return { exists: true, corrupt: true, data: {} };
+  }
+}
+
+/**
+ * Best-effort backup of a config file before mutating it. Writes `<file>.bak`.
+ * A backup failure is non-fatal (callers only mutate files that parsed cleanly).
+ * @param {string} filePath
+ */
+async function backupConfigFile(filePath) {
+  try {
+    await fs.copyFile(filePath, filePath + '.bak');
+  } catch { /* best-effort backup — never block the install on this */ }
+}
+
 async function configureSessionStartHook(targetDir, spinner) {
   spinner = createRobustSpinner(spinner);
   spinner.start('Configuring AgentVibes hook for automatic TTS...');
@@ -4184,13 +4230,15 @@ async function configureSessionStartHook(targetDir, spinner) {
   const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
 
   try {
-    let existingSettings = {};
-    try {
-      const existingContent = await fs.readFile(settingsPath, 'utf8');
-      existingSettings = JSON.parse(existingContent);
-    } catch {
-      // File doesn't exist or is invalid - use template
+    const existing = await readJsonConfigSafe(settingsPath);
+    if (existing.corrupt) {
+      spinner.warn(chalk.yellow(
+        `settings.json at ${settingsPath} is not valid JSON — leaving it untouched to avoid data loss.\n` +
+        `   Fix the file manually and re-run to enable the AgentVibes hook.\n`
+      ));
+      return;
     }
+    const existingSettings = existing.data;
 
     const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
     const templateSettings = JSON.parse(templateContent);
@@ -4216,6 +4264,7 @@ async function configureSessionStartHook(targetDir, spinner) {
         existingSettings.$schema = templateSettings.$schema;
       }
 
+      if (existing.exists) await backupConfigFile(settingsPath);
       await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
       spinner.succeed(chalk.green('SessionStart hook configured!\n'));
     } else {
@@ -4260,14 +4309,17 @@ async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
       ? `powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\bmad-party-speak.ps1"`
       : `bash "$HOME/.claude/hooks/bmad-party-speak.sh"`;
 
-    // Read/create global settings.json
-    let settings = {};
-    try {
-      const content = await fs.readFile(globalSettingsPath, 'utf8');
-      settings = JSON.parse(content);
-    } catch {
-      // File missing or invalid — start fresh
+    // Read/create global settings.json — never overwrite a corrupt file (would
+    // wipe the user's real global settings).
+    const existingGlobal = await readJsonConfigSafe(globalSettingsPath);
+    if (existingGlobal.corrupt) {
+      spinner.warn(chalk.yellow(
+        `Global settings.json at ${globalSettingsPath} is not valid JSON — leaving it untouched.\n` +
+        `   Fix it manually and re-run to enable party mode TTS.\n`
+      ));
+      return;
     }
+    let settings = existingGlobal.data;
 
     if (!settings.hooks) settings.hooks = {};
 
@@ -4286,6 +4338,7 @@ async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
       settings.hooks.PostToolUse.push({
         hooks: [{ type: 'command', command: hookCommand }]
       });
+      if (existingGlobal.exists) await backupConfigFile(globalSettingsPath);
       await fs.writeFile(globalSettingsPath, JSON.stringify(settings, null, 2));
       spinner.succeed(chalk.green('BMAD party mode TTS hook configured!\n'));
     } else {
@@ -5378,7 +5431,9 @@ async function restartWatcherIfInstalled(homeDirOverride) {
     return false;
   }
 
-  const { spawnSync, spawn } = require('child_process');
+  // spawn/spawnSync come from the top-level ESM import (line 48). A require()
+  // here throws "require is not defined" in this "type":"module" package and
+  // aborted `agentvibes update` mid-run for every SSH-receiver user.
 
   // Kill old watcher — use array args to avoid quoting issues
   spawnSync('powershell.exe', [ // NOSONAR
@@ -6810,6 +6865,7 @@ export {
   getProjectManifestPath, getGlobalManifestPath,
   loadManifest, saveManifest, computeFileHash, manifestSafeCopy, removeManifestFiles,
   // Pure helper functions exported for testing
+  readJsonConfigSafe, backupConfigFile,
   isPiperProvider, supportsEmoji, getPersonalityIcon,
   detectEnvironment, createPageHeaderFooter, buildNavigationChoices, handleNavigationAction, getPageTitle,
   getUserShell, showWelcome, getReleaseInfoBoxen, generateActivationInstructions,
