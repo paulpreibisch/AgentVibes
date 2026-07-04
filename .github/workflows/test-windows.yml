@@ -387,6 +387,20 @@ jobs:
       - name: MCP server syntax check
         run: node -c mcp-server/install-deps.js
 
+      # AVI-S8.7: run the Windows<->bash script-parity + MCP correctness suite on
+      # native Windows too — the parity test only means something where the .ps1
+      # players actually run.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run MCP server tests (pytest, Windows)
+        run: python -m pytest mcp-server/ -q
+
       # ─── Summary ──────────────────────────────────────────────────────────
 
       - name: Report test results

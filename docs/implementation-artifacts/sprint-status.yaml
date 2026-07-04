@@ -471,16 +471,24 @@ sprint_5:
     story_8_7:
       id: AVI-S8.7
       title: Provider × Engine × Platform Contract-Test Matrix
-      status: in-progress
+      status: review
       story_points: 8
       acceptance_criteria_count: 6
       file: docs/implementation-artifacts/8-7-contract-test-matrix.md
       recommended_model: sonnet
       fable_gate: false
+      completion_date: 2026-07-03
       description: |
         Parametrized conformance suite encoding every regression memory as a
         permanent test; run pytest + Windows-parity test in CI; resolve the
         NO_PLAY/NO_PLAYBACK flag mismatch.
+      notes: |
+        The SAFETY NET before the Stage-2 player port. 326-case resolver
+        conformance matrix + 15-test real-bash-player characterization harness
+        (hermetic; known bugs skip-documented, flip to pass after port) + CI
+        pytest wiring (test.yml + test-windows.yml). Fixed run-tests.sh no-play
+        flag (AC 7.5) and a race in the inherited harness. Started by Sonnet
+        agent (hit session limit), finished by Opus. All green.
       dependencies:
         - AVI-S8.5
         - AVI-S8.6
@@ -504,14 +512,16 @@ sprint_5:
   statistics:
     total_stories: 8
     completed_stories: 0
-    in_review: 4
-    ready_for_dev: 4
-    in_progress: 0
+    in_review: 5
+    in_progress: 1
+    ready_for_dev: 2
     total_story_points: 54
-    in_review_points: 17
-    ready_for_dev_points: 37
+    in_review_points: 25
+    in_progress_points: 13
+    ready_for_dev_points: 16
     completion_percentage: 0.0
-    next_milestone: "Phase 0 COMPLETE (8.1-8.4 in review, 10 bugs fixed); next Phase 1: 8.5 utterance resolver (Opus + Fable gate)"
+    next_milestone: "8.5 resolver + 8.7 safety-net in review; NEXT: Stage-2 port players onto resolver (bmad-speak.sh fix folded in), then 8.6 constants+mixer"
+    notes_8_5: "8.5 status stays in-progress: resolver core (Stage 1) done + Fable-gated; Stage 2 (port the 4 players) still to do."
 
   phases:
     phase_0: [AVI-S8.1, AVI-S8.2, AVI-S8.3, AVI-S8.4]   # Sonnet, independent, this week
