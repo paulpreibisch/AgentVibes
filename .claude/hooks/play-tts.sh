@@ -145,6 +145,7 @@ unset _POSITIONAL_ARGS
 TEXT="${1:-}"
 VOICE_OVERRIDE="${2:-}"  # Optional: voice name or ID
 AGENT_PROFILE_FILE="${3:-}"  # Optional: path to agent profile file
+_ORIG_EXPLICIT_VOICE="$VOICE_OVERRIDE"  # raw positional voice, before any per-LLM override (fed to the resolver as the explicit voice)
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then
@@ -244,6 +245,37 @@ if [[ -n "$_PRETEXT" ]]; then
   TEXT="${_PRETEXT}, ${TEXT}"
 fi
 
+# ── Utterance Resolver (AVI-S8.5 Stage 2) ────────────────────────────────────
+# Single source of truth for the voice + engine decision. Resolve the plan once
+# and adopt its voice (per-LLM voice wins over an LLM-echoed override — R2) and,
+# below, its local engine (a kokoro-shaped voice forces the kokoro engine on
+# Linux too — R1, curing the detect_voice_provider silence bug). FAIL-SAFE: if
+# node or the resolver bundle isn't reachable (e.g. an installed ~/.claude that
+# predates the bundle-shipping installer change), PLAN_OK stays empty and the
+# legacy logic below runs unchanged — TTS never breaks on a missing bridge.
+PLAN_OK=""
+_RESOLVER_CLI=""
+# AGENTVIBES_RESOLVER_CLI lets the installer (or tests) point at the resolver
+# bundle when it lives outside the hooks tree — e.g. an installed ~/.claude/hooks
+# whose sibling package dir holds bin/resolve-utterance.js.
+for _cand in "${AGENTVIBES_RESOLVER_CLI:-}" "$SCRIPT_DIR/../../bin/resolve-utterance.js" "$SCRIPT_DIR/resolve-utterance.js"; do
+  [[ -n "$_cand" && -f "$_cand" ]] && { _RESOLVER_CLI="$_cand"; break; }
+done
+if [[ -n "$_RESOLVER_CLI" ]] && command -v node &>/dev/null; then
+  _vsource="llm-echo"
+  [[ -n "${AGENTVIBES_EFFECTS_PREVIEW:-}" ]] && _vsource="audition"
+  if _plan_sh=$(node "$_RESOLVER_CLI" --format sh \
+        --text "$TEXT" \
+        --llm "$LLM_PROVIDER" \
+        --voice "$_ORIG_EXPLICIT_VOICE" \
+        --voice-source "$_vsource" \
+        --project-dir "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" 2>/dev/null); then
+    eval "$_plan_sh"          # sets AV_VOICE, AV_ENGINE, AV_TRANSPORT, ... (shell-quoted, safe)
+    PLAN_OK=1
+    [[ -n "${AV_VOICE:-}" ]] && VOICE_OVERRIDE="$AV_VOICE"
+  fi
+fi
+
 # Source provider manager to get active provider
 source "$SCRIPT_DIR/provider-manager.sh"
 
@@ -320,6 +352,17 @@ PYEOF
   fi
 fi
 
+# Adopt the resolver's engine for LOCAL playback (AVI-S8.5 Stage 2): this cures
+# the kokoro/piper voice→engine coupling (R1) and normalizes engine aliases,
+# replacing the detect_voice_provider heuristic below. Transports are left
+# untouched — the plan forwards the voice and the receiver picks its own engine.
+if [[ -n "$PLAN_OK" ]]; then
+  case "$ACTIVE_PROVIDER" in
+    ssh-remote|agentvibes-receiver|termux-ssh) : ;;   # transport — keep it
+    *) [[ -n "${AV_ENGINE:-}" ]] && ACTIVE_PROVIDER="$AV_ENGINE" ;;
+  esac
+fi
+
 # Show GitHub star reminder (once per day)
 bash "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
 
@@ -338,10 +381,10 @@ detect_voice_provider() {
   fi
 }
 
-# Override provider if voice indicates different provider (mixed-provider mode)
-# But never override transport providers (ssh-remote, agentvibes-receiver, termux-ssh)
-# — those are transport layers, not synth engines. The receiver picks its own engine.
-if [[ -n "$VOICE_OVERRIDE" ]]; then
+# Legacy mixed-provider heuristic — ONLY on the fallback path (no resolver plan).
+# When PLAN_OK is set, the resolver already coupled voice→engine correctly above
+# (including kokoro, which this heuristic misses — the R1 silence bug), so skip it.
+if [[ -z "$PLAN_OK" && -n "$VOICE_OVERRIDE" ]]; then
   case "$ACTIVE_PROVIDER" in
     ssh-remote|agentvibes-receiver|termux-ssh)
       # Transport provider — don't override, voice info is forwarded to receiver

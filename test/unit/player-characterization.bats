@@ -46,6 +46,10 @@ setup() {
   SSH_REMOTE="$TEST_CLAUDE_DIR/hooks/play-tts-ssh-remote.sh"
 
   export PATH="$TEST_CLAUDE_DIR/hooks:$PATH"
+  # Point the resolver-plan swap (AVI-S8.5 Stage 2) at the REAL repo bundle so
+  # the isolated hooks copy activates it (the bundle uses only node builtins, so
+  # running it from the repo path resolves its ../src imports correctly).
+  export AGENTVIBES_RESOLVER_CLI="$REPO_ROOT/bin/resolve-utterance.js"
   echo "piper" > "$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude/config"
 }
@@ -84,27 +88,30 @@ write_llm_row() {
   [ "$(decision_provider)" = "piper" ]
 }
 
-@test "characterization: per-LLM ENGINE column overrides the provider file (local, correct)" {
+@test "per-LLM ENGINE column drives the engine, normalized (windows-piper -> piper, F5)" {
   write_llm_row 'llm:claude-code||||||windows-piper'
   export AGENTVIBES_VERBOSE=1
   run "$PLAY_TTS" --project-dir "$CLAUDE_PROJECT_DIR" --llm "claude-code" "hello"
-  # ACTIVE_PROVIDER is literally set to the cfg column value (no alias
-  # canonicalization needed here — the final routing `case` matches both
-  # "piper" and "windows-piper" to the same handler).
-  [ "$(decision_provider)" = "windows-piper" ]
+  # Post-Stage-2: the resolver canonicalizes the alias spelling (F5) so the
+  # engine is the canonical "piper" (routes to the same handler either way).
+  # Before Stage 2 this passed through the raw "windows-piper" string.
+  [ "$(decision_provider)" = "piper" ]
 }
 
-@test "KNOWN DIVERGENCE (map R1 / project_voice_engine_coupling): a Kokoro-shaped explicit voice does NOT force the kokoro engine in bash — it silently stays piper (-> silence)" {
-  skip "R1 known-buggy in play-tts.sh:331-339 (detect_voice_provider only matches piper's _..- shape, not kokoro's plain af_/am_ shape); resolver forces kokoro. Remove this skip once Stage 2 ports play-tts.sh onto resolveUtterance()."
+@test "R1 FIXED (project_voice_engine_coupling): a Kokoro-shaped voice forces the kokoro engine in bash" {
+  # Was the silence bug: detect_voice_provider matched only piper's _..- shape,
+  # so af_river fell through to the piper provider -> silence on Linux. Stage 2
+  # routes the engine through the resolver, which couples af_* -> kokoro.
   write_llm_row 'llm:claude-code||||||piper'
   export AGENTVIBES_VERBOSE=1
   run "$PLAY_TTS" --project-dir "$CLAUDE_PROJECT_DIR" --llm "claude-code" "hello" "af_river"
   [ "$(decision_provider)" = "kokoro" ]
 }
 
-@test "KNOWN DIVERGENCE (map C / memory feedback_per_llm_voice_wins_over_explicit, R2): per-LLM voice does NOT win over an echoed explicit voice in bash today" {
-  skip "Current bash: 'Apply LLM voice only if no explicit VOICE_OVERRIDE was passed' (play-tts.sh:210) -- explicit always wins, which is the documented memory violation the resolver's R2 rule fixes (per-LLM should win when the explicit value is just an LLM echo of get_config). Remove this skip once Stage 2 ports play-tts.sh onto resolveUtterance()."
-  write_llm_row 'llm:claude-code||||af_bella||piper'
+@test "R2 FIXED (feedback_per_llm_voice_wins_over_explicit): per-LLM voice wins over an LLM-echoed explicit voice" {
+  # The hook path treats the positional voice as an LLM echo (voiceSource=llm-echo),
+  # so the per-LLM row voice now wins — restoring per-LLM routing.
+  write_llm_row 'llm:claude-code||||af_bella||'
   export AGENTVIBES_VERBOSE=1
   run "$PLAY_TTS" --project-dir "$CLAUDE_PROJECT_DIR" --llm "claude-code" "hello" "af_sarah"
   [ "$(decision_voice)" = "af_bella" ]
