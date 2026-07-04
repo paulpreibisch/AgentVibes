@@ -435,7 +435,7 @@ sprint_5:
     story_8_5:
       id: AVI-S8.5
       title: The Utterance Resolver — Single Source of Truth
-      status: ready-for-dev
+      status: in-progress
       story_points: 13
       acceptance_criteria_count: 7
       file: docs/implementation-artifacts/8-5-utterance-resolver.md
