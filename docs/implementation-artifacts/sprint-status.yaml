@@ -446,6 +446,20 @@ sprint_5:
         One Node module reads all config once, applies one data-driven precedence
         table, emits a flat plan {voice,engine,transport,effects,music,pretext,
         speed,volume}. Players stop reading config. Retires the regression class.
+      notes: |
+        Stage 1 (resolver core + loader + CLI bridge): DONE, Fable-gated (F1-F12
+        applied). Stage 2 (port players onto the plan):
+          - play-tts.sh (Linux/Mac): DONE — R1 kokoro-silence + R2 per-LLM voice
+            cured, proven via real script; fail-safe fallback to legacy.
+          - play-tts.ps1 (Windows): DONE — same R1/R2/F5 cures, 11 PS tests.
+          - Installer ships the resolver bundle to ~/.claude (co-located w/ hooks
+            so players find it; idempotent via manifestSafeCopy) — fixes reach
+            real installs, not just dev.
+          - bmad-speak.sh: DONE — restored the dropped per-agent profile
+            population (fatal unbound-variable crash fixed); 77 bats green.
+        Remaining Stage 2: SSH-forward mute/language (receiver-authoritative per
+        Paul), AV_OUTPUT sentinel in providers (retire ls -t), then the reserved
+        Fable gate on the finished rewire. MCP inherits the cures via play-tts.sh.
       dependencies:
         - AVI-S8.1
         - AVI-S8.2
