@@ -25,7 +25,8 @@ $EnabledFile = Join-Path $ConfigDir "background-music-enabled.txt"
 $VolumeFile = Join-Path $ConfigDir "background-music-volume.txt"
 $AudioEffectsCfg = Join-Path $ConfigDir "audio-effects.cfg"
 
-$DefaultVolume = "0.34"
+# TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+$DefaultVolume = "0.20"
 
 # Ensure config directory exists
 if (-not (Test-Path $ConfigDir)) {

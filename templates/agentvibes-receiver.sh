@@ -98,8 +98,9 @@ PROVIDER=$(sed -n '8p' <<< "$_PARSE_OUT")
 LLM=$(     sed -n '9p' <<< "$_PARSE_OUT")
 
 # Fall back to defaults
+# TODO(AVI-S8.6): generate the volume constant from the shared JSON source of truth.
 [[ -z "$VOICE"    ]] && VOICE="en_US-lessac-medium"
-[[ -z "$VOLUME"   ]] && VOLUME="0.10"
+[[ -z "$VOLUME"   ]] && VOLUME="0.20"
 [[ -z "$PROVIDER" ]] && PROVIDER="piper"
 
 # Validate text
@@ -114,7 +115,7 @@ fi
 
 # Validate volume is numeric
 if [[ ! "$VOLUME" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-    VOLUME="0.10"
+    VOLUME="0.20"
 fi
 
 # Validate provider

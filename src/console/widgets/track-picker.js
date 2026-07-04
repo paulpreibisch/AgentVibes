@@ -33,9 +33,9 @@ const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
  * @param {Function} [onClose]  - called when modal closes (confirm or cancel)
  */
 export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
-  if (IS_TEST) { onConfirm(currentVol ?? 70); return; }
+  if (IS_TEST) { onConfirm(currentVol ?? 20); return; }
   let vol = (Number.isFinite(currentVol) && currentVol >= 0 && currentVol <= 100)
-    ? currentVol : 70;
+    ? currentVol : 20;
 
   const box = blessed.box({
     parent: screen,
@@ -141,7 +141,7 @@ const BUILT_IN_TRACKS = [
  *
  * @param {object}   screen        - blessed screen
  * @param {string}   currentTrack  - currently selected track filename
- * @param {number}   currentVolume - currently set volume (0-100, default 70)
+ * @param {number}   currentVolume - currently set volume (0-100, default 20)
  * @param {Function} onSelect      - called with (trackFile, volume)
  * @param {Function} [onClose]     - called after modal fully closes
  */

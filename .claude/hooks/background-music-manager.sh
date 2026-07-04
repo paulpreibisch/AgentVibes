@@ -33,7 +33,8 @@ ENABLED_FILE="$CONFIG_DIR/background-music-enabled.txt"
 VOLUME_FILE="$CONFIG_DIR/background-music-volume.txt"
 
 # Defaults
-DEFAULT_VOLUME="0.34"
+# TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+DEFAULT_VOLUME="0.20"
 
 # Ensure config directory exists
 mkdir -p "$CONFIG_DIR"

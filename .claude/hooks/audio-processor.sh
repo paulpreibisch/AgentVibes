@@ -577,7 +577,7 @@ main() {
     fi
 
     local used_background=""
-    if is_background_music_enabled && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
+    if [[ "$_bg_allowed" == "true" ]] && [[ -n "$background_path" ]] && [[ -f "$background_path" ]] && [[ "${bg_volume:-0}" != "0" ]] && [[ "${bg_volume:-0}" != "0.0" ]]; then
         local bg_display_name
         if [[ "$background_path" == "$custom_music_path" ]]; then
             bg_display_name="custom music"

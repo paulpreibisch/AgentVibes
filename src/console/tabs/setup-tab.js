@@ -1144,7 +1144,7 @@ export function createSetupTab(screen, services) {
       pretext:      llmConfig.pretext || '',
       reverbPreset: llmConfig.effects || 'off',
       bgTrack:      llmConfig.bgTrack || '',
-      bgVolume:     llmConfig.bgVolume || '0.15',
+      bgVolume:     llmConfig.bgVolume || '0.20',
       // Hermes SSH fields
       mode:   currentCfg.mode === 'remote' ? 'remote' : 'local',
       sshKey: currentCfg.sshKey || '',
@@ -1330,7 +1330,7 @@ export function createSetupTab(screen, services) {
     const previewBtn = _modalBtn('Preview', 4, _playPreview);
     const resetBtn   = _modalBtn('Reset',   18, () => {
       draft.ttsEngine = ''; draft.voice = ''; draft.pretext = '';
-      draft.reverbPreset = 'off'; draft.bgTrack = ''; draft.bgVolume = '0.15';
+      draft.reverbPreset = 'off'; draft.bgTrack = ''; draft.bgVolume = '0.20';
       _autoSave();
       fieldList.setItems(_fieldItems());
       fieldList.focus();
@@ -2036,7 +2036,7 @@ export function createSetupTab(screen, services) {
       pretext:      config.pretext || defaultPretext[llmKey] || '',
       reverbPreset: config.effects || 'off',
       bgTrack:      config.bgTrack || '',
-      bgVolume:     config.bgVolume || '0.15',
+      bgVolume:     config.bgVolume || '0.20',
       // SSH destination fields
       mode:   sshCfg.mode === 'remote' ? 'remote' : 'local',
       sshKey: sshCfg.sshKey || '',
@@ -2329,7 +2329,7 @@ export function createSetupTab(screen, services) {
       draft.pretext = defaultPretext[llmKey] || '';
       draft.reverbPreset = 'off';
       draft.bgTrack = '';
-      draft.bgVolume = '0.15';
+      draft.bgVolume = '0.20';
       draft.mode     = 'local';
       draft.connType = 'manual';
       draft.sshKey   = '';

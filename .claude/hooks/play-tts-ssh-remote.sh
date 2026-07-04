@@ -149,7 +149,8 @@ fi
 
 SOX_EFFECTS=""
 BG_FILE=""
-BG_VOLUME="0.10"
+# TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+BG_VOLUME="0.20"
 
 # Use CLAUDE_PROJECT_DIR (injected via --project-dir by play-tts.sh) so the
 # agent-name / default row is read from the user's project, not the package.

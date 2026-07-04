@@ -77,10 +77,25 @@ describe('agents-tab volume fallbacks', () => {
 // ---------------------------------------------------------------------------
 
 describe('track-picker openVolumeInput default', () => {
-  test('source file uses ?? 20 for currentVolume fallback', async () => {
+  test('source file uses ?? 20 for currentVol fallback (test-mode branch)', async () => {
     const src = await fs.readFile(path.join(PROJECT_ROOT, 'src/console/widgets/track-picker.js'), 'utf8');
-    assert.ok(src.includes('currentVolume ?? 20'), 'track-picker must use ?? 20 as volume fallback');
-    assert.ok(!src.includes('currentVolume ?? 70'), 'track-picker must not use ?? 70');
+    assert.ok(src.includes('currentVol ?? 20'), 'track-picker must use ?? 20 as volume fallback');
+    assert.ok(!src.includes('currentVol ?? 70') && !src.includes('currentVolume ?? 70'),
+      'track-picker must not use ?? 70 in any spelling');
+  });
+
+  test('source file uses ternary fallback of 20, not 70, for interactive-mode vol', async () => {
+    const src = await fs.readFile(path.join(PROJECT_ROOT, 'src/console/widgets/track-picker.js'), 'utf8');
+    // The interactive-mode branch: `? currentVol : 20` (previously `: 70`)
+    assert.ok(/\?\s*currentVol\s*:\s*20/.test(src),
+      'track-picker ternary fallback must resolve to 20, e.g. "? currentVol : 20"');
+    assert.ok(!/:\s*70\b/.test(src), 'track-picker must not have a ": 70" ternary fallback anywhere');
+  });
+
+  test('no occurrence of the literal 70 fallback in either spelling (?? 70 or : 70)', async () => {
+    const src = await fs.readFile(path.join(PROJECT_ROOT, 'src/console/widgets/track-picker.js'), 'utf8');
+    assert.ok(!/\?\?\s*70\b/.test(src), 'track-picker must not have a "?? 70" fallback anywhere');
+    assert.ok(!/:\s*70\b/.test(src), 'track-picker must not have a ": 70" ternary fallback anywhere');
   });
 });
 

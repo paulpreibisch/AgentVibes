@@ -93,7 +93,8 @@ $script:Text = ""
 $script:Voice = "en_US-lessac-medium"
 $SoxEffects = ""
 $BgFile = ""
-$BgVolume = "0.10"
+# TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+$BgVolume = "0.20"
 $script:Project = "unknown"
 $Pretext = ""
 $Speed = ""
@@ -146,7 +147,7 @@ if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
 
 # Validate volume is numeric
 if ($BgVolume -notmatch '^\d+\.?\d*$') {
-    $BgVolume = "0.10"
+    $BgVolume = "0.20"
 }
 
 # Prepend pretext
