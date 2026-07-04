@@ -208,6 +208,41 @@ ${_tl('bmadDesc')}
   // Capture cwd once at construction (L1 fix)
   const _projectRoot = process.cwd();
 
+  // Story 8.3 fix: Windows agent-preview temp-patches config files (personality.txt,
+  // reverb-level.txt) to apply per-agent settings during a preview. Track every
+  // patched file + its pre-patch content here so ALL of them can be restored —
+  // not just on normal preview completion, but also on abnormal exit (Ctrl+C,
+  // crash, or quitting mid-preview). Non-Destructive Configuration Rule: a
+  // preview must never permanently mutate the user's config.
+  const _patchedConfigFiles = new Map(); // filePath -> original content (string) | null (file did not exist)
+
+  /** Record a file's pre-patch content the first time it's touched (idempotent). */
+  function _trackPatchedConfigFile(filePath, originalContent) {
+    if (!_patchedConfigFiles.has(filePath)) _patchedConfigFiles.set(filePath, originalContent);
+  }
+
+  /** Restore a single tracked file to its pre-patch state (or remove it if it didn't exist before). */
+  function _restorePatchedConfigFile(filePath) {
+    if (!_patchedConfigFiles.has(filePath)) return;
+    const original = _patchedConfigFiles.get(filePath);
+    try {
+      if (original !== null) fs.writeFileSync(filePath, original);
+      else fs.unlinkSync(filePath);
+    } catch { /* best-effort restore */ }
+    _patchedConfigFiles.delete(filePath);
+  }
+
+  /** Restore every currently tracked patched file (used on close and on process exit/SIGINT). */
+  function _restoreAllPatchedConfigFiles() {
+    for (const filePath of [..._patchedConfigFiles.keys()]) _restorePatchedConfigFile(filePath);
+  }
+
+  // Abnormal-exit safety net: if the process dies mid-preview (Ctrl+C, crash,
+  // or the TUI quitting before the preview process's own 'exit' handler runs),
+  // still restore any temp-patched config files.
+  process.on('exit', _restoreAllPatchedConfigFiles);
+  process.on('SIGINT', () => { _restoreAllPatchedConfigFiles(); process.exit(130); });
+
   let _bmadDetected = false;
   let _agents = [];
   let _playingProcess = null;
@@ -1425,10 +1460,14 @@ ${_tl('bmadDesc')}
     }
 
     try {
-      if (profile.personality && profile.personality !== 'none')
+      if (profile.personality && profile.personality !== 'none') {
+        _trackPatchedConfigFile(personalityFile, origPersonality);
         fs.writeFileSync(personalityFile, profile.personality);
-      if (profile.reverbPreset)
+      }
+      if (profile.reverbPreset) {
+        _trackPatchedConfigFile(reverbFile, origReverb);
         fs.writeFileSync(reverbFile, profile.reverbPreset);
+      }
     } catch { /* degrade gracefully */ }
 
     const voiceId = profile.voice || '';
@@ -1440,12 +1479,13 @@ ${_tl('bmadDesc')}
     });
     _playingProcess = proc;
 
+    // Restore BOTH temp-patched files (personality + reverb) — transactional:
+    // whichever files were actually patched above get restored/unlinked here.
+    // Also covered by the module-level process 'exit'/SIGINT handlers if the
+    // process dies before this fires (see _restoreAllPatchedConfigFiles above).
     function _restore() {
-      try {
-        if (origPersonality !== null) fs.writeFileSync(personalityFile, origPersonality);
-        else try { fs.unlinkSync(personalityFile); } catch {}
-        if (origReverb !== null) fs.writeFileSync(reverbFile, origReverb);
-      } catch {}
+      _restorePatchedConfigFile(personalityFile);
+      _restorePatchedConfigFile(reverbFile);
     }
 
     proc.on('exit', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });

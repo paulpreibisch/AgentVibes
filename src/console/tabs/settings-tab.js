@@ -127,6 +127,9 @@ export function createSettingsTab(screen, services) {
 
   const { configService, providerService, navigationService, focusMainTabBar, languageService } = services;
 
+  // Capture cwd once at construction (matches agents-tab.js pattern)
+  const _projectRoot = process.cwd();
+
   // ── Container ────────────────────────────────────────────────────────────
 
   const box = blessed.box({
@@ -646,6 +649,31 @@ export function createSettingsTab(screen, services) {
       _killVP();
 
       const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]; // NOSONAR
+
+      if (_isWin) {
+        // Windows: route through play-tts.ps1 (same pattern as non-Windows bash route)
+        const playTtsScript = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        if (!fs.existsSync(playTtsScript)) return;
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) {
+          vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}...{/cyan-fg}`);
+          _refreshVP();
+        }
+        _previewProc = spawn('powershell', [ // NOSONAR
+          '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTtsScript, phrase, voiceId,
+        ], { stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv });
+        _previewProc.on('exit', () => {
+          if (_previewVoiceId === voiceId) {
+            _previewVoiceId = null;
+            _previewProc = null;
+            if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+          }
+        });
+        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        return;
+      }
+
+      // Non-Windows: use bash play-tts.sh
       const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
@@ -656,7 +684,7 @@ export function createSettingsTab(screen, services) {
       _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore',
         detached: true,
-        env: _spawnEnv,
+        env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;
