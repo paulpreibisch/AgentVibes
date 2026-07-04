@@ -194,17 +194,20 @@ function Replay-Audio {
         $AudioDir = Join-Path $env:CLAUDE_PROJECT_DIR ".claude\audio"
     }
     else {
-        # Walk up from cwd looking for a .claude directory (same fallback as voice-manager.sh)
-        $dir = Get-Location
-        while ($true) {
-            $candidate = Join-Path $dir.Path ".claude"
+        # Walk up from cwd looking for a .claude directory (same fallback as voice-manager.sh).
+        # Use a plain string path throughout: Get-Location returns a PathInfo (.Path),
+        # but Get-Item returns a DirectoryInfo (no .Path) — mixing them made the second
+        # iteration do Join-Path $null and throw a terminating error.
+        $dirPath = (Get-Location).Path
+        while ($dirPath) {
+            $candidate = Join-Path $dirPath ".claude"
             if (Test-Path $candidate) {
                 $AudioDir = Join-Path $candidate "audio"
                 break
             }
-            $parent = Split-Path $dir.Path -Parent
-            if (-not $parent -or $parent -eq $dir.Path) { break }
-            $dir = Get-Item -LiteralPath $parent
+            $parent = Split-Path $dirPath -Parent
+            if (-not $parent -or $parent -eq $dirPath) { break }
+            $dirPath = $parent
         }
         if (-not $AudioDir) {
             $AudioDir = Join-Path $ClaudeDir "audio"

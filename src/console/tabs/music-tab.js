@@ -784,7 +784,9 @@ export function createMusicTab(screen, services) {
       // setGlobal('backgroundMusic', { track }) would replace the whole
       // object and silently drop volume/enabled (Non-Destructive Rule).
       const currentGlobal = configService.getGlobalConfig?.().backgroundMusic ?? {};
-      configService.setGlobal('backgroundMusic', { ...currentGlobal, track: trackId });
+      // Saving a track implies enabling music (mirrors _saveLocally), while
+      // preserving any existing volume/other fields on the global object.
+      configService.setGlobal('backgroundMusic', { ...currentGlobal, track: trackId, enabled: true });
     }
 
     const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {

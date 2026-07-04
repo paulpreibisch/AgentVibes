@@ -400,6 +400,49 @@ def test_personality_restore_calls_script_when_file_existed_before(tmp_path, mon
     assert (tmp_path / "tts-personality.txt").read_text() == "grumpy"
 
 
+def test_personality_restore_reads_original_from_config_dir_not_get_personality(tmp_path, monkeypatch):
+    """Code-review regression: the original value to restore must be read from
+    the SAME file the manager writes to (the config dir), NOT _get_personality()
+    — which reads a different set of dirs (package, then global ~/.claude) and,
+    from inside a host project, returns the wrong value. Restoring that wrong
+    value would overwrite the project's real personality (Non-Destructive Rule).
+
+    Here the project config file says 'cheerful' but _get_personality() returns
+    a divergent 'normal' (simulating the package/global lookup). Restore MUST
+    put back 'cheerful' (the real project value), never 'normal'.
+    """
+    server = AgentVibesServer()
+    server._get_config_dir = lambda: tmp_path
+    (tmp_path / "tts-personality.txt").write_text("cheerful")
+
+    async def divergent_get_personality():
+        return "normal"  # what the OLD code would have (wrongly) restored
+    server._get_personality = divergent_get_personality
+
+    run_script_calls = []
+
+    async def fake_run_script(script_name, args, timeout=DEFAULT_SCRIPT_TIMEOUT):
+        run_script_calls.append((script_name, tuple(args)))
+        # emulate personality-manager writing the value into the config dir
+        if script_name == server.PERSONALITY_MANAGER_SCRIPT and args[:1] == ["set"]:
+            (tmp_path / "tts-personality.txt").write_text(args[1])
+        return ScriptResult(0, "ok", "")
+    server._run_script = fake_run_script
+
+    async def fake_create_subprocess_exec(*_args, **_kwargs):
+        return _FakeProc()
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    asyncio.run(server.text_to_speech("hi", personality="pirate"))
+
+    set_calls = [c for c in run_script_calls if c[0] == server.PERSONALITY_MANAGER_SCRIPT]
+    assert set_calls == [
+        (server.PERSONALITY_MANAGER_SCRIPT, ("set", "pirate")),
+        (server.PERSONALITY_MANAGER_SCRIPT, ("set", "cheerful")),
+    ], "restore must use the config-dir value 'cheerful', not _get_personality()'s 'normal'"
+    assert (tmp_path / "tts-personality.txt").read_text() == "cheerful"
+
+
 # ---------------------------------------------------------------------------
 # #6: background-music default volume description is 20%, not 30%
 # ---------------------------------------------------------------------------

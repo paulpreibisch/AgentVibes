@@ -332,10 +332,19 @@ class AgentVibesServer:
 
         try:
             # Temporarily set personality if specified
+            personality_path = self._get_config_dir() / "tts-personality.txt"
             if personality:
-                original_personality = await self._get_personality()
-                personality_path = self._get_config_dir() / "tts-personality.txt"
+                # Read the ORIGINAL from the SAME file the manager writes to
+                # (the config dir). _get_personality() reads a different set of
+                # dirs (package dir, then global ~/.claude) and, from inside a
+                # host project, returns the wrong value — restoring that would
+                # overwrite the project's real personality. Non-Destructive Rule.
                 personality_file_existed = personality_path.exists()
+                if personality_file_existed:
+                    try:
+                        original_personality = personality_path.read_text(encoding="utf-8").strip()
+                    except OSError:
+                        original_personality = None  # can't read → don't clobber on restore
                 await self._run_script(
                     self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
                 )
@@ -434,21 +443,40 @@ class AgentVibesServer:
             # deleting the file rather than writing "normal" into it — the
             # non-destructive-config rule means a temporary per-call override
             # must not leave a permanent file behind that wasn't there before.
-            if original_personality is not None:
+            if personality:
                 if personality_file_existed:
-                    await self._run_script(
-                        self.PERSONALITY_MANAGER_SCRIPT, ["set", original_personality]
-                    )
+                    if original_personality is not None:
+                        restore = await self._run_script(
+                            self.PERSONALITY_MANAGER_SCRIPT, ["set", original_personality]
+                        )
+                        if not restore.ok:
+                            import sys
+                            print(
+                                f"Warning: failed to restore personality "
+                                f"'{original_personality}': {restore.error_detail}",
+                                file=sys.stderr,
+                            )
                 else:
+                    # No personality file existed before this call — restore by
+                    # deleting (same config dir we captured existence from).
                     try:
-                        (self._get_config_dir() / "tts-personality.txt").unlink()
+                        personality_path.unlink()
                     except OSError:
                         pass
             if original_language is not None:
                 # "english"/"reset" makes language-manager.sh *delete* the
                 # language file rather than write it, so this naturally
                 # restores "no override was ever set" correctly too.
-                await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", original_language])
+                restore_lang = await self._run_script(
+                    self.LANGUAGE_MANAGER_SCRIPT, ["set", original_language]
+                )
+                if not restore_lang.ok:
+                    import sys
+                    print(
+                        f"Warning: failed to restore language "
+                        f"'{original_language}': {restore_lang.error_detail}",
+                        file=sys.stderr,
+                    )
             if needs_override:
                 self._override_lock.release()
 
@@ -608,9 +636,13 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script(
-            self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
-        )
+        # Serialize against text_to_speech's temporary override/restore so a
+        # deliberate set here can't be silently reverted by an in-flight call's
+        # restore step (they mutate the same tts-personality.txt).
+        async with self._override_lock:
+            result = await self._run_script(
+                self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
+            )
         if result.ok:
             # Windows (.ps1) scripts print plain text with no 🎭 marker; add
             # our own so the tool's output stays consistent across platforms.
@@ -663,7 +695,11 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
+        # Serialize against text_to_speech's temporary override/restore (both
+        # mutate the same language config), so a deliberate set here isn't
+        # silently reverted by an in-flight call's restore step.
+        async with self._override_lock:
+            result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
         if result.ok:
             return result.stdout if "✓" in result.stdout else f"✓ {result.stdout}"
         return f"❌ Failed to set language: {result.error_detail}"

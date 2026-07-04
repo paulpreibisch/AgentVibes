@@ -33,6 +33,14 @@ if (-not $fnAst) { throw "Set-ConfigValueSafe not found in setup-windows.ps1" }
 function Write-Info([string]$text) { }
 Invoke-Expression $fnAst.Extent.Text
 
+# Also extract Set-ConfigFromChoice (the interactive-answer writer added by the
+# code-review fix for the "silently discards freshly-typed answers" bug).
+$fnChoiceAst = $ast.FindAll({
+    param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Set-ConfigFromChoice'
+}, $true) | Select-Object -First 1
+if (-not $fnChoiceAst) { throw "Set-ConfigFromChoice not found in setup-windows.ps1" }
+Invoke-Expression $fnChoiceAst.Extent.Text
+
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("avi-8-1-ps-" + [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 try {
@@ -56,11 +64,30 @@ try {
     $f2 = Join-Path $tmp 'tts-verbosity.txt'
     Set-ConfigValueSafe -Path $f2 -Value '' -Label 'verbosity'
     Assert (Test-Path $f2) 'empty-string value writes without error'
+
+    Write-Host "`nCode-review fix — Set-ConfigFromChoice honors explicit answers" -ForegroundColor Cyan
+
+    # 5. Explicit answer (non-empty RawInput) is written even when a file exists.
+    $c1 = Join-Path $tmp 'verbosity-choice.txt'
+    Set-Content -Path $c1 -Value 'high' -NoNewline               # prior value
+    Set-ConfigFromChoice -Path $c1 -Value 'low' -RawInput '3' -Label 'verbosity'
+    Assert ((Get-Content $c1 -Raw) -eq 'low') 'explicit user choice this run overwrites the old value'
+
+    # 6. Blind Enter (empty RawInput) on an EXISTING file preserves it (the bug:
+    #    default value must not silently replace the user's prior choice).
+    Set-Content -Path $c1 -Value 'medium' -NoNewline
+    Set-ConfigFromChoice -Path $c1 -Value 'high' -RawInput '' -Label 'verbosity'
+    Assert ((Get-Content $c1 -Raw) -eq 'medium') 'accepted-default (empty input) preserves existing value'
+
+    # 7. Skipped prompt (empty RawInput) on an ABSENT file writes the default.
+    $c2 = Join-Path $tmp 'reverb-choice.txt'
+    Set-ConfigFromChoice -Path $c2 -Value 'off' -RawInput '' -Label 'reverb'
+    Assert ((Test-Path $c2) -and ((Get-Content $c2 -Raw) -eq 'off')) 'first run with no file writes the default'
 }
 finally {
     Remove-Item -Path $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 if ($script:failures -gt 0) { Write-Host "`n$script:failures failure(s)" -ForegroundColor Red; exit 1 }
-Write-Host "`nAll Set-ConfigValueSafe idempotency checks passed." -ForegroundColor Green
+Write-Host "`nAll setup-windows config-write contract checks passed." -ForegroundColor Green
 exit 0

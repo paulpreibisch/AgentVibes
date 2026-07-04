@@ -176,6 +176,33 @@ function createTestStub() {
 /**
  * Create the Agents tab component.
  */
+// Module-level so the process 'exit'/'SIGINT' handlers are registered EXACTLY
+// once per process, no matter how many times createAgentsTab() is called (the
+// test suite creates many). Registering them per-call leaked listeners
+// (MaxListenersExceededWarning) and left stale SIGINT handlers that each called
+// process.exit(). Each tab adds its patched-files map here; the single handler
+// restores every registered map.
+const _allPatchedConfigMaps = new Set();
+let _patchHandlersRegistered = false;
+function _restoreAllRegisteredPatchedConfigMaps() {
+  for (const map of _allPatchedConfigMaps) {
+    for (const filePath of [...map.keys()]) {
+      const original = map.get(filePath);
+      try {
+        if (original !== null) fs.writeFileSync(filePath, original);
+        else fs.unlinkSync(filePath);
+      } catch { /* best-effort restore */ }
+      map.delete(filePath);
+    }
+  }
+}
+function _ensurePatchExitHandlers() {
+  if (_patchHandlersRegistered) return;
+  _patchHandlersRegistered = true;
+  process.on('exit', _restoreAllRegisteredPatchedConfigMaps);
+  process.on('SIGINT', () => { _restoreAllRegisteredPatchedConfigMaps(); process.exit(130); });
+}
+
 export function createAgentsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
@@ -232,16 +259,12 @@ ${_tl('bmadDesc')}
     _patchedConfigFiles.delete(filePath);
   }
 
-  /** Restore every currently tracked patched file (used on close and on process exit/SIGINT). */
-  function _restoreAllPatchedConfigFiles() {
-    for (const filePath of [..._patchedConfigFiles.keys()]) _restorePatchedConfigFile(filePath);
-  }
-
   // Abnormal-exit safety net: if the process dies mid-preview (Ctrl+C, crash,
   // or the TUI quitting before the preview process's own 'exit' handler runs),
-  // still restore any temp-patched config files.
-  process.on('exit', _restoreAllPatchedConfigFiles);
-  process.on('SIGINT', () => { _restoreAllPatchedConfigFiles(); process.exit(130); });
+  // still restore any temp-patched config files. Registered once per process
+  // via a module-level registry (see top of file) to avoid listener leaks.
+  _allPatchedConfigMaps.add(_patchedConfigFiles);
+  _ensurePatchExitHandlers();
 
   let _bmadDetected = false;
   let _agents = [];
@@ -1482,14 +1505,18 @@ ${_tl('bmadDesc')}
     // Restore BOTH temp-patched files (personality + reverb) — transactional:
     // whichever files were actually patched above get restored/unlinked here.
     // Also covered by the module-level process 'exit'/SIGINT handlers if the
-    // process dies before this fires (see _restoreAllPatchedConfigFiles above).
+    // process dies before this fires (see the module-level exit/SIGINT handler).
     function _restore() {
       _restorePatchedConfigFile(personalityFile);
       _restorePatchedConfigFile(reverbFile);
     }
 
-    proc.on('exit', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });
-    proc.on('error', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });
+    // Gate restore + onComplete behind the generation check too: a superseded
+    // preview's late exit must NOT restore config (it would clobber the newer
+    // preview's in-flight patch and fire onComplete out of order). The current
+    // generation's process — or the module-level exit/SIGINT handler — restores.
+    proc.on('exit', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); _restore(); if (onComplete) onComplete(); } });
+    proc.on('error', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); _restore(); if (onComplete) onComplete(); } });
   }
 
   // -------------------------------------------------------------------------
@@ -1667,8 +1694,14 @@ ${_tl('bmadDesc')}
     function _closeMenu(callback) {
       if (_menuClosed) return;
       _menuClosed = true;
+      navigationService?.closeModal();
       destroyList(menuList, screen, callback);
     }
+
+    // Register as an open modal so the global 'q' quit guard (app.js) blocks
+    // quit while this menu is up — otherwise 'q' falls through and exits the
+    // whole TUI instead of closing the menu.
+    navigationService?.openModal(null, () => _closeMenu(() => { agentList.focus(); screen.render(); }));
 
     menuList.key(['enter'], () => {
       const action = BULK_ACTIONS[menuList.selected];

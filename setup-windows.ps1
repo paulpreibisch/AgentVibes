@@ -94,6 +94,28 @@ function Set-ConfigValueSafe {
     Set-Content -Path $Path -Value $Value -NoNewline
 }
 
+# For values driven by an interactive prompt: honor the user's EXPLICIT answer
+# (non-empty $RawInput) this run, but if they just pressed Enter to accept the
+# default — or the prompt was skipped entirely (e.g. ffmpeg missing) — keep any
+# existing value rather than silently overwriting it with the default. This
+# resolves the bug where the script printed the user's new choice yet wrote the
+# default: honor real input, preserve config on blind-Enter / skipped prompts.
+function Set-ConfigFromChoice {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Value,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$RawInput,
+        [string]$Label = (Split-Path $Path -Leaf)
+    )
+    if ([string]::IsNullOrWhiteSpace($RawInput) -and (Test-Path $Path)) {
+        $current = (Get-Content -Path $Path -Raw -ErrorAction SilentlyContinue)
+        if ($null -ne $current) { $current = $current.Trim() }
+        Write-Info "Keeping existing $Label ($current)"
+        return
+    }
+    Set-Content -Path $Path -Value $Value -NoNewline
+}
+
 # ── Read Version ────────────────────────────────────────────
 
 $Version = "unknown"
@@ -616,6 +638,8 @@ try {
 $BgMusicEnabled = $false
 $BgMusicTrack = "agent_vibes_bachata_v1_loop.mp3"
 $BgMusicDisplayName = "Off"
+$bgChoice = ""       # user's raw answer to the enable prompt ('' = skipped/default)
+$trackChoice = ""    # user's raw answer to the track prompt ('' = skipped/default)
 
 if (-not $HasFfmpeg) {
     Write-Warn "ffmpeg not found - background music requires ffmpeg"
@@ -693,9 +717,12 @@ if (-not (Test-Path $ConfigDir)) {
 }
 
 $bgEnabledValue = if ($BgMusicEnabled) { "true" } else { "false" }
-Set-ConfigValueSafe -Path "$ConfigDir\background-music-enabled.txt" -Value $bgEnabledValue -Label "background music enabled"
-Set-ConfigValueSafe -Path "$ConfigDir\background-music-default.txt" -Value $BgMusicTrack -Label "background music track"
-# Default volume is 20% per project rule (see AVI-S8.4 for the full sweep).
+# Honor the user's explicit answers this run; preserve existing config when the
+# prompt was skipped (no ffmpeg) or accepted by pressing Enter.
+Set-ConfigFromChoice -Path "$ConfigDir\background-music-enabled.txt" -Value $bgEnabledValue -RawInput $bgChoice -Label "background music enabled"
+Set-ConfigFromChoice -Path "$ConfigDir\background-music-default.txt" -Value $BgMusicTrack -RawInput $trackChoice -Label "background music track"
+# Volume is not interactively prompted (hardcoded 20% per project rule; full
+# sweep in AVI-S8.4) — preserve a user's custom volume across re-runs.
 Set-ConfigValueSafe -Path "$ConfigDir\background-music-volume.txt" -Value "0.20" -Label "background music volume"
 
 # ── Audio Effects (Reverb) ─────────────────────────────
@@ -733,8 +760,10 @@ if (-not $HasFfmpeg) {
     Write-Ok "Reverb: $ReverbDisplayName"
 }
 
-# Write reverb config
-Set-ConfigValueSafe -Path "$ConfigDir\reverb-level.txt" -Value $ReverbLevel -Label "reverb level"
+# Write reverb config — honor an explicit choice; preserve existing on skip/Enter.
+# ($reverbChoice is unset when the prompt was skipped for missing ffmpeg.)
+if (-not (Get-Variable -Name reverbChoice -ErrorAction SilentlyContinue)) { $reverbChoice = "" }
+Set-ConfigFromChoice -Path "$ConfigDir\reverb-level.txt" -Value $ReverbLevel -RawInput $reverbChoice -Label "reverb level"
 
 # ── Verbosity / Transparency ──────────────────────────
 
@@ -762,8 +791,9 @@ switch ($verbChoice) {
 Write-Host ""
 Write-Ok "Verbosity: $VerbosityDisplayName"
 
-# Write verbosity config
-Set-ConfigValueSafe -Path "$ProjectClaudeDir\tts-verbosity.txt" -Value $VerbosityLevel -Label "TTS verbosity"
+# Write verbosity config — verbosity is always prompted, so honor the answer;
+# preserve existing only when the user pressed Enter to accept the default.
+Set-ConfigFromChoice -Path "$ProjectClaudeDir\tts-verbosity.txt" -Value $VerbosityLevel -RawInput $verbChoice -Label "TTS verbosity"
 
 # ── Test TTS ────────────────────────────────────────────────
 
