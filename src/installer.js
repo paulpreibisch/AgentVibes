@@ -5410,6 +5410,102 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
 }
 
 /**
+ * Story AVI-S8.5 (Stage 2 packaging) — ship the utterance resolver bundle
+ * (bin/resolve-utterance.js + src/services/{utterance-resolver,utterance-loader}.js)
+ * into a target `.claude` tree so the play-tts hooks can find it.
+ *
+ * Layout: resolve-utterance.js is copied directly into `<claudeDir>/hooks/`
+ * (and `hooks-windows/`, ahead of the PowerShell port). This exactly matches
+ * the `$SCRIPT_DIR/resolve-utterance.js` candidate play-tts.sh already probes
+ * (see .claude/hooks/play-tts.sh ~line 261) — so NO changes to the players'
+ * lookup logic are required. Its `../src/services/...` imports then resolve
+ * to `<claudeDir>/src/services/`, a sibling shared by both hook trees, which
+ * mirrors the real package layout (bin/ + src/services/) one level up.
+ *
+ * This is AgentVibes-owned code — same class as the hook scripts themselves —
+ * so copy/overwrite on update is correct. manifestSafeCopy still refuses to
+ * clobber a user-modified copy (saves a .user.bak) and running this twice is
+ * a no-op on the second pass (Non-Destructive Configuration Rule).
+ *
+ * @param {string} claudeDir - Absolute path to the target `.claude` directory
+ * @param {Object} manifest - Loaded manifest (hash lookups for safe-copy decisions)
+ * @param {Object} manifestUpdates - Mutated in place with new hash entries
+ * @returns {Promise<number>} Count of files actually copied/updated this run
+ */
+async function copyResolverBundleTo(claudeDir, manifest, manifestUpdates) {
+  const pkgRoot = path.join(__dirname, '..');
+  const srcBin = path.join(pkgRoot, 'bin', 'resolve-utterance.js');
+  const srcResolver = path.join(pkgRoot, 'src', 'services', 'utterance-resolver.js');
+  const srcLoader = path.join(pkgRoot, 'src', 'services', 'utterance-loader.js');
+
+  const targets = [
+    { src: srcBin, dest: path.join(claudeDir, 'hooks', 'resolve-utterance.js') },
+    { src: srcBin, dest: path.join(claudeDir, 'hooks-windows', 'resolve-utterance.js') },
+    { src: srcResolver, dest: path.join(claudeDir, 'src', 'services', 'utterance-resolver.js') },
+    { src: srcLoader, dest: path.join(claudeDir, 'src', 'services', 'utterance-loader.js') },
+  ];
+
+  let count = 0;
+  for (const { src, dest } of targets) {
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    try {
+      const result = await manifestSafeCopy(src, dest, manifest);
+      if (result.action !== 'skipped') {
+        if (result.hash) manifestUpdates[dest] = { hash: result.hash, installedAt: new Date().toISOString() };
+        if (result.action !== 'unchanged') count++;
+      }
+    } catch {
+      // src missing (e.g. stripped package) — skip silently, players fall back to legacy
+    }
+  }
+  return count;
+}
+
+/**
+ * Install/update the resolver bundle into a project-local (or explicitly
+ * targeted) `.claude` directory. Mirrors copyHookFiles' manifest handling.
+ * @param {string} targetDir - Target installation directory (parent of .claude/)
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<{count: number}>} Count of files copied/updated
+ */
+async function copyResolverBundle(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
+  spinner.start('Installing utterance resolver bundle...');
+  const claudeDir = path.join(targetDir, '.claude');
+  const manifestPath = getProjectManifestPath(targetDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = {};
+
+  const count = await copyResolverBundleTo(claudeDir, manifest, manifestUpdates);
+
+  if (Object.keys(manifestUpdates).length > 0) {
+    await saveManifest(manifestPath, { ...manifest, ...manifestUpdates }).catch(() => { /* best effort */ });
+  }
+  spinner.succeed(chalk.green('Installed utterance resolver bundle!\n'));
+  return { count };
+}
+
+/**
+ * Keep the resolver bundle up to date in the global ~/.claude/ tree on every
+ * `npx agentvibes update`, regardless of targetDir — mirrors updateGlobalHooks()
+ * since most real installs point their hooks at $HOME, not a project dir.
+ * @param {string} [homeDirOverride] - Override home dir (for testing only)
+ * @returns {Promise<number>} Count of files copied/updated
+ */
+async function updateGlobalResolverBundle(homeDirOverride) {
+  const homeDir = homeDirOverride || os.homedir();
+  const claudeDir = path.join(homeDir, '.claude');
+  const manifestPath = getGlobalManifestPath(homeDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = { ...manifest };
+
+  const count = await copyResolverBundleTo(claudeDir, manifest, manifestUpdates);
+
+  await saveManifest(manifestPath, manifestUpdates).catch(() => { /* best effort */ });
+  return count;
+}
+
+/**
  * Restart the AgentVibes TTS queue watcher on Windows after an update.
  * Only runs if the watcher is already installed (~/.agentvibes/tts-watcher.ps1 exists),
  * meaning the user previously ran setup-ssh-receiver.ps1.  Silently skips for users
@@ -5482,12 +5578,24 @@ async function performUpdateOperations(targetDir, spinner) {
   const hookResult = await copyHookFiles(targetDir, silentSpinner);
   console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
 
+  // Update the utterance resolver bundle alongside the hooks it feeds (AVI-S8.5 Stage 2)
+  const resolverResult = await copyResolverBundle(targetDir, silentSpinner);
+  if (resolverResult.count > 0) {
+    console.log(chalk.green(`✓ Updated ${resolverResult.count} resolver bundle files`));
+  }
+
   // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs)
   const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
   const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
   const globalHooksUpdated = await updateGlobalHooks(srcHooksDir);
   if (globalHooksUpdated > 0) {
     console.log(chalk.green(`✓ Updated ${globalHooksUpdated} critical scripts in ~/.claude/hooks/`));
+  }
+
+  // Keep the global ~/.claude/ resolver bundle current too (mirrors updateGlobalHooks)
+  const globalResolverUpdated = await updateGlobalResolverBundle();
+  if (globalResolverUpdated > 0) {
+    console.log(chalk.green(`✓ Updated ${globalResolverUpdated} resolver bundle files in ~/.claude/`));
   }
 
   // On Windows: restart the TTS queue watcher if it was previously installed via
@@ -5703,6 +5811,7 @@ async function install(options = {}) {
     // Copy all files silently
     await copyCommandFiles(targetDir, silentSpinner);
     await copyHookFiles(targetDir, silentSpinner);
+    await copyResolverBundle(targetDir, silentSpinner);
     await copyPersonalityFiles(targetDir, silentSpinner);
     await copyPluginFiles(targetDir, silentSpinner);
     await copyBmadConfigFiles(targetDir, silentSpinner);
@@ -5715,6 +5824,8 @@ async function install(options = {}) {
     const hooksSubdirInstall = isNativeWindows() ? 'hooks-windows' : 'hooks';
     const srcHooksDirInstall = path.join(__dirname, '..', '.claude', hooksSubdirInstall);
     await updateGlobalHooks(srcHooksDirInstall);
+    // Populate global ~/.claude/ resolver bundle too, same reasoning as above (AVI-S8.5 Stage 2)
+    await updateGlobalResolverBundle();
 
     await configureSessionStartHook(targetDir, silentSpinner);
     await configurePartyModeHook(targetDir, silentSpinner);
@@ -6860,6 +6971,7 @@ export {
   copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
   installPluginManifest, checkAndInstallPiper,
   updateGlobalHooks, updateCommandFiles, updatePersonalityFiles,
+  copyResolverBundle, updateGlobalResolverBundle,
   CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
   // Manifest utilities (used by tests and external tooling)
   getProjectManifestPath, getGlobalManifestPath,
