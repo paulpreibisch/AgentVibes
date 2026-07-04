@@ -6,7 +6,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('list', 'switch', 'get')]
+    [ValidateSet('list', 'switch', 'get', 'replay')]
     [string]$Command = 'list',
 
     [Parameter(Position = 1)]
@@ -155,6 +155,99 @@ function Show-CurrentVoice {
     }
 }
 
+# Play an audio file without blocking the caller (mirrors voice-manager.sh's
+# `afplay "$AUDIO_FILE" &` / `paplay ... &` background playback). Prefers
+# ffplay (handles wav/mp3/aiff); falls back to System.Media.SoundPlayer
+# (.Play(), which is inherently async — wav only).
+function Start-ReplayPlayback {
+    param([string]$FilePath)
+
+    # Stay silent while the automated test suite is running (same convention
+    # as play-tts.ps1's Invoke-AudioPlay).
+    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) { return }
+
+    $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
+    if ($ffplayCmd) {
+        Start-Process -FilePath $ffplayCmd.Source `
+            -ArgumentList @("-autoexit", "-nodisp", "-loglevel", "quiet", $FilePath) `
+            -WindowStyle Hidden | Out-Null
+        return
+    }
+
+    try {
+        $player = New-Object System.Media.SoundPlayer $FilePath
+        $player.Play()
+    }
+    catch {
+        Write-Host "[WARN] Could not start playback: $_" -ForegroundColor Yellow
+    }
+}
+
+# Replay the Nth most recent TTS audio file (mirrors voice-manager.sh's
+# `replay` case: resolve the audio dir, validate N (1-10), pick the file by
+# most-recent-mtime, and play it in the background).
+function Replay-Audio {
+    param([string]$NArg)
+
+    $AudioDir = $null
+    if ($env:CLAUDE_PROJECT_DIR -and (Test-Path (Join-Path $env:CLAUDE_PROJECT_DIR ".claude"))) {
+        $AudioDir = Join-Path $env:CLAUDE_PROJECT_DIR ".claude\audio"
+    }
+    else {
+        # Walk up from cwd looking for a .claude directory (same fallback as voice-manager.sh)
+        $dir = Get-Location
+        while ($true) {
+            $candidate = Join-Path $dir.Path ".claude"
+            if (Test-Path $candidate) {
+                $AudioDir = Join-Path $candidate "audio"
+                break
+            }
+            $parent = Split-Path $dir.Path -Parent
+            if (-not $parent -or $parent -eq $dir.Path) { break }
+            $dir = Get-Item -LiteralPath $parent
+        }
+        if (-not $AudioDir) {
+            $AudioDir = Join-Path $ClaudeDir "audio"
+        }
+    }
+
+    $N = 1
+    if ($NArg) {
+        if ($NArg -notmatch '^\d+$') {
+            Write-Host "[ERROR] Invalid argument. Please use a number (1-10)" -ForegroundColor Red
+            exit 1
+        }
+        $N = [int]$NArg
+    }
+    if ($N -lt 1 -or $N -gt 10) {
+        Write-Host "[ERROR] Number out of range. Please choose 1-10" -ForegroundColor Red
+        exit 1
+    }
+
+    if (-not (Test-Path $AudioDir)) {
+        Write-Host "[ERROR] No audio history found" -ForegroundColor Red
+        Write-Host "Audio files are stored in: $AudioDir"
+        exit 1
+    }
+
+    $files = @(Get-ChildItem -Path $AudioDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^tts-.*\.(wav|mp3|aiff)$' } |
+        Sort-Object LastWriteTime -Descending)
+
+    if ($files.Count -lt $N) {
+        Write-Host "[ERROR] Audio #$N not found in history" -ForegroundColor Red
+        Write-Host "Total audio files available: $($files.Count)"
+        exit 1
+    }
+
+    $target = $files[$N - 1]
+    Write-Host "[REPLAY] Replaying audio #${N}:" -ForegroundColor Cyan
+    Write-Host "   File: $($target.Name)"
+    Write-Host "   Path: $($target.FullName)"
+
+    Start-ReplayPlayback $target.FullName
+}
+
 # Main command routing
 switch ($Command) {
     'list' {
@@ -172,5 +265,9 @@ switch ($Command) {
 
     'get' {
         Show-CurrentVoice
+    }
+
+    'replay' {
+        Replay-Audio $VoiceName
     }
 }

@@ -72,7 +72,7 @@ if ! python3 -c "import mcp" 2>/dev/null; then
     print_section "📦 Installing Python MCP Package"
     echo "Installing 'mcp' package to enable Claude Desktop integration..." >&2
 
-    if python3 -m pip install --user mcp --quiet 2>&1; then
+    if python3 -m pip install --user mcp --quiet >&2; then
         echo "✅ Python MCP package installed successfully!" >&2
     else
         echo "❌ Failed to auto-install MCP package" >&2
@@ -86,9 +86,10 @@ else
     echo "✅ Python MCP package already installed" >&2
 fi
 
-# Check provider (Piper vs ElevenLabs)
+# Check provider — ElevenLabs was removed from the product; Piper (free,
+# offline) is the only provider this wrapper does auto-setup for.
 PROVIDER_FILE="$PACKAGE_ROOT/.claude/tts-provider.txt"
-PROVIDER="elevenlabs"  # Default
+PROVIDER="piper"  # Default
 
 if [ -f "$PROVIDER_FILE" ]; then
     PROVIDER=$(cat "$PROVIDER_FILE" | tr -d '[:space:]')
@@ -104,7 +105,7 @@ if [ "$PROVIDER" = "piper" ]; then
             print_section "📦 Installing pipx"
             echo "pipx is needed to install Piper TTS..." >&2
 
-            if python3 -m pip install --user pipx --quiet 2>&1; then
+            if python3 -m pip install --user pipx --quiet >&2; then
                 # Add pipx to PATH for this session
                 export PATH="$HOME/.local/bin:$PATH"
 
@@ -137,7 +138,7 @@ if [ "$PROVIDER" = "piper" ]; then
             print_section "📦 Installing Piper TTS"
             echo "Installing Piper TTS (free, offline voice synthesis)..." >&2
 
-            if pipx install piper-tts --quiet 2>&1; then
+            if pipx install piper-tts --quiet >&2; then
                 echo "✅ Piper TTS installed successfully!" >&2
 
                 # Add pipx bin to PATH
@@ -180,20 +181,6 @@ if [ "$PROVIDER" = "piper" ]; then
                 echo "✅ Default Piper voice ready" >&2
             fi
         fi
-    fi
-elif [ "$PROVIDER" = "elevenlabs" ]; then
-    # Check for ElevenLabs API key
-    if [ -z "$ELEVENLABS_API_KEY" ]; then
-        echo "⚠️  ElevenLabs selected but ELEVENLABS_API_KEY not set" >&2
-        echo "" >&2
-        echo "📖 Set your API key:" >&2
-        echo "   export ELEVENLABS_API_KEY='your-key-here'" >&2
-        echo "" >&2
-        echo "💡 Or switch to Piper TTS (free):" >&2
-        echo "   echo 'piper' > $PACKAGE_ROOT/.claude/tts-provider.txt" >&2
-        echo "" >&2
-    else
-        echo "✅ ElevenLabs API key configured" >&2
     fi
 fi
 

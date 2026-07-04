@@ -361,16 +361,32 @@ sprint_5:
     story_8_2:
       id: AVI-S8.2
       title: MCP Server Windows Correctness
-      status: ready-for-dev
+      status: review
       story_points: 5
       acceptance_criteria_count: 6
       file: docs/implementation-artifacts/8-2-mcp-windows-correctness.md
       recommended_model: sonnet
       fable_gate: false
+      completion_date: 2026-07-03
       description: |
         Refactor _run_script to branch on exit code not emoji (bug #3), add
         stdin=DEVNULL + timeout to stop server hangs (bug #8), implement/stub
         replay_audio on Windows, remove per-call global-state mutation.
+      notes: |
+        ScriptResult(returncode,stdout,stderr) refactor: every _run_script caller
+        now branches on .ok, not emoji text. stdin=DEVNULL + 30s default timeout
+        (180s for download_extra_voices) on every spawn; auto_yes=False now
+        short-circuits before the script ever runs (no read -p reachable).
+        replay_audio implemented natively in voice-manager-windows.ps1 (async
+        playback, verified end-to-end). Personality/language mutation: added an
+        asyncio.Lock serializing the override critical section (concurrency-safe
+        within this process; cross-process races documented as residual risk) +
+        fixed restore-by-deletion so a temporary override never creates a
+        tts-personality.txt that didn't exist before. bin/mcp-server.sh:
+        elevenlabs->piper default, dead branch removed, pip installs no longer
+        leak onto stdout. 30%->20% tool descriptions. 19 new pytest cases (all
+        green); full mcp-server/ suite 31/31. No new JS regressions (verified
+        against a stashed clean baseline).
       dependencies: []
 
     story_8_3:
@@ -475,14 +491,14 @@ sprint_5:
   statistics:
     total_stories: 8
     completed_stories: 0
-    in_review: 1
-    ready_for_dev: 7
+    in_review: 2
+    ready_for_dev: 6
     in_progress: 0
     total_story_points: 54
-    in_review_points: 5
-    ready_for_dev_points: 49
+    in_review_points: 10
+    ready_for_dev_points: 44
     completion_percentage: 0.0
-    next_milestone: "Phase 0: 8.1 in review; next 8.2 (MCP Windows correctness)"
+    next_milestone: "Phase 0: 8.1 + 8.2 in review; next 8.3 (TUI safety)"
 
   phases:
     phase_0: [AVI-S8.1, AVI-S8.2, AVI-S8.3, AVI-S8.4]   # Sonnet, independent, this week
