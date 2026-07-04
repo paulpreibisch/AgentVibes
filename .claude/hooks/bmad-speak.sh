@@ -104,7 +104,7 @@ read_agent_profile_all() {
 
   # Validate agent_id format (prevent injection)
   if [[ ! "$agent_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "|||||"
+    echo "||||||"
     return
   fi
 
@@ -173,13 +173,24 @@ map_to_agent_id() {
 
 AGENT_ID=$(map_to_agent_id "$AGENT_NAME_OR_ID")
 
-# Get agent's voice and intro text
-AGENT_VOICE=""
-AGENT_INTRO=""
-if [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
-  AGENT_VOICE=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null)
-  AGENT_INTRO=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null)
-fi
+# ---------------------------------------------------------------------------
+# Populate the per-agent profile (voice/pretext/reverb/personality/music) from
+# bmad-voice-map.json. THIS is the population step that a botched merge
+# (610af0f2) dropped, leaving $PROFILE_VOICE et al. below referenced-but-never-
+# -assigned — a fatal "unbound variable" under `set -u`. read_agent_profile_all()
+# already existed (defined above) but was never called; wire it in here.
+# Always initialize (even to "") so downstream references never crash, and a
+# missing/unknown agent just falls through to normal TTS below.
+PROFILE_VOICE=""
+PROFILE_PRETEXT=""
+PROFILE_REVERB=""
+PROFILE_PERSONALITY=""
+PROFILE_MUSIC_TRACK=""
+PROFILE_MUSIC_VOLUME=""
+PROFILE_MUSIC_ENABLED=""
+_PROFILE_ALL="$(read_agent_profile_all "${AGENT_ID:-}")"
+IFS='|' read -r PROFILE_VOICE PROFILE_PRETEXT PROFILE_REVERB PROFILE_PERSONALITY \
+  PROFILE_MUSIC_TRACK PROFILE_MUSIC_VOLUME PROFILE_MUSIC_ENABLED <<< "$_PROFILE_ALL"
 
 # Read global background music volume as fallback (stored as 0.0-1.0, convert to 0-100 integer)
 _BG_VOL_FILE="${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}/.claude/config/background-music-volume.txt"

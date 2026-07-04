@@ -177,26 +177,47 @@ EOF
   assert_output_equals_clean "en_US-ryan-high"
 }
 
-# Test 10: Integration test - bmad-speak.sh uses CSV voice
+# Test 10: Integration test - bmad-speak.sh runs end-to-end without crashing
+#
+# NOTE: this test used to plant its mock BMAD install at
+# `${CLAUDE_PROJECT_DIR}/.bmad/_cfg/agent-voice-map.csv` and mock
+# tts-queue.sh — neither of which bmad-speak.sh actually reads. Its real
+# install-gate checks `_bmad/_config/agent-manifest.csv` under a PROJECT_ROOT
+# derived from bmad-speak.sh's OWN script location (two dirs up), not
+# $CLAUDE_PROJECT_DIR, and its only downstream call is play-tts.sh, not
+# tts-queue.sh. That mismatch meant this test always hit the install-gate
+# `exit 0` at the top of the script and never reached the per-agent profile
+# code below it — so it kept passing even while that code was fatally broken
+# (see test/unit/bmad-speak-profile-map.bats for the real regression
+# coverage of that crash and its fix).
 @test "bmad-speak.sh reads voice from CSV for agent" {
   BMAD_SPEAK="$TEST_CLAUDE_DIR/hooks/bmad-speak.sh"
 
-  # Mock the TTS queue system
-  cat > "$TEST_CLAUDE_DIR/hooks/tts-queue.sh" << 'EOF'
-#!/bin/bash
-# Mock TTS queue - just echo what would be queued
-if [[ "$1" == "add" ]]; then
-  echo "QUEUED: text='$2' voice='$3' agent='$4'"
-fi
+  # bmad-speak.sh resolves PROJECT_ROOT as two dirs up from its own script
+  # location ($TEST_CLAUDE_DIR/hooks -> $TEST_CLAUDE_DIR -> $TEST_HOME).
+  BMAD_PROJECT_ROOT="$TEST_HOME"
+  mkdir -p "$BMAD_PROJECT_ROOT/_bmad/_config"
+  cat > "$BMAD_PROJECT_ROOT/_bmad/_config/agent-manifest.csv" << 'EOF'
+name,displayName,title,icon,module
+pm,John,Product Manager,chart,bmm
 EOF
-  chmod +x "$TEST_CLAUDE_DIR/hooks/tts-queue.sh"
+
+  # Mock play-tts.sh (bmad-speak.sh's actual downstream call) instead of
+  # tts-queue.sh, which bmad-speak.sh never invokes.
+  cat > "$TEST_CLAUDE_DIR/hooks/play-tts.sh" << 'EOF'
+#!/bin/bash
+echo "QUEUED: text='$1' voice='$2'"
+EOF
+  chmod +x "$TEST_CLAUDE_DIR/hooks/play-tts.sh"
 
   # Speak as PM agent
   run "$BMAD_SPEAK" "pm" "Hello from PM"
 
   [ "$status" -eq 0 ]
-  # Should queue TTS with PM's voice from CSV
-  # Note: Output might be suppressed in background mode, so we check the script ran
+  [[ "$output" != *"unbound variable"* ]]
+  # Should have actually reached play-tts.sh (proves the profile-resolution
+  # path executed, not an early install-gate exit).
+  [[ "$output" == *"QUEUED: text='"* ]]
 }
 
 # Helper functions now loaded from ../helpers/bmad-assertions.bash
