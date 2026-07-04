@@ -305,7 +305,9 @@ $PlanVoiceIsOverride = $false
 # (a parameter the resolver can't see). Seed AGENTVIBES_FORCE_PROVIDER from it so
 # the resolver honors the forwarded provider instead of defaulting the plan engine
 # to piper (which dropped a forwarded windows-sapi/soprano voice → wrong/no audio).
-if ($ProviderOverride -and -not $env:AGENTVIBES_FORCE_PROVIDER) {
+if ($ProviderOverride) {
+    # A fresh -ProviderOverride for THIS request must win over any stale/inherited
+    # AGENTVIBES_FORCE_PROVIDER in the environment (a validated allowlist only).
     switch ($ProviderOverride) {
         { $_ -in @('piper','soprano','macos','windows-sapi','sapi','kokoro','elevenlabs','windows-piper') } {
             $env:AGENTVIBES_FORCE_PROVIDER = $ProviderOverride
@@ -328,9 +330,11 @@ if ($_ResolverCli -and $_NodeCmd) {
     $_VoiceSource = if ($env:AGENTVIBES_VOICE_SOURCE) { $env:AGENTVIBES_VOICE_SOURCE }
                     elseif ($env:AGENTVIBES_EFFECTS_PREVIEW) { "audition" }
                     else { "llm-echo" }
-    $_ResolverProjectDir = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { Split-Path -Parent $ClaudeDir }
+    $_ResolverPackageRoot = Split-Path -Parent $ClaudeDir
+    $_ResolverProjectDir = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $_ResolverPackageRoot }
     $_ResolverArgs = @('--format', 'json', '--text', $Text, '--llm', $llm,
-                       '--voice-source', $_VoiceSource, '--project-dir', $_ResolverProjectDir)
+                       '--voice-source', $_VoiceSource, '--project-dir', $_ResolverProjectDir,
+                       '--package-root', $_ResolverPackageRoot)
     # Only pass --voice when there IS an explicit voice; an absent flag tells the
     # resolver "no explicit override" (so per-LLM routing applies cleanly).
     if ($_OrigExplicitVoice) { $_ResolverArgs += @('--voice', $_OrigExplicitVoice) }

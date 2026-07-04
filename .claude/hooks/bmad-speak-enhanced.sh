@@ -144,7 +144,10 @@ if [[ -n "$AGENT_VOICE" ]]; then
     # mode (grabs another agent's audio) and masks synthesis failures. See Story
     # AVI-S8.5 (R6/R7) and memory: feedback_no_most_recent_file_heuristic.
     PIPER_STDOUT=""
-    if ! PIPER_STDOUT=$(AGENTVIBES_NO_PLAYBACK=true "$SCRIPT_DIR/play-tts-piper.sh" "$FULL_TEXT" "$AGENT_VOICE" 2>/dev/null); then
+    # Skip piper's internal (default-row) audio-processor pass: we run our OWN
+    # per-agent audio-processor pass below, so letting piper process first would
+    # double the effects/background-music (double reverb, overlapping tracks).
+    if ! PIPER_STDOUT=$(AGENTVIBES_NO_PLAYBACK=true AGENTVIBES_SKIP_INTERNAL_PROCESSOR=1 "$SCRIPT_DIR/play-tts-piper.sh" "$FULL_TEXT" "$AGENT_VOICE" 2>/dev/null); then
         echo "❌ bmad-speak: piper synthesis failed for agent '$AGENT_FOR_EFFECTS'" >&2
         exit 1
     fi

@@ -384,6 +384,13 @@ class AgentVibesServer:
 
             env = self._build_script_env()
 
+            # Declare voice provenance so the resolver treats an MCP-requested
+            # voice as a genuine explicit pick (user-explicit), never demoting it
+            # to a per-LLM/default row the way it would an LLM echo (F-1). Only
+            # set when the caller actually asked for a specific voice.
+            if voice:
+                env["AGENTVIBES_VOICE_SOURCE"] = "user-explicit"
+
             result = await asyncio.create_subprocess_exec(
                 *args,
                 stdin=asyncio.subprocess.DEVNULL,

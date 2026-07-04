@@ -204,7 +204,35 @@ describe('F-2 — a provider-file voice is carried but flagged non-override (her
   });
 });
 
+describe('F-6 — per-LLM engine row in the package-root tier is found (3-tier search)', () => {
+  test('engine configured only under packageRoot resolves (CLAUDE_PROJECT_DIR != PROJECT_ROOT)', () => {
+    // Simulate MCP-invoked-from-elsewhere: the real project (projectDir) has no
+    // row, but the package root does. The legacy bash was 3-tier; the loader must
+    // match or a per-LLM ENGINE (kokoro/sapi) silently reverts to piper.
+    const projectDir = path.join(root, 'f6', 'realproj');
+    const packageRoot = path.join(root, 'f6', 'pkgroot');
+    const homeDir = path.join(root, 'f6', 'home');
+    for (const d of [projectDir, packageRoot, homeDir]) fs.mkdirSync(path.join(d, '.claude', 'config'), { recursive: true });
+    // row lives ONLY in the package root (7 cols: key|reverb|bgfile|bgvol|voice|pretext|engine)
+    fs.writeFileSync(path.join(packageRoot, '.claude/config/audio-effects.cfg'), 'llm:claude-code|off|||||windows-sapi\n');
+    const p = planFrom({ text: 'hi', llm: 'claude-code', projectDir, packageRoot, homeDir, env: {} });
+    assert.equal(p.engine, 'sapi', 'package-root ENGINE row (windows-sapi→sapi) must be found');
+  });
+});
+
 describe('CLI — bin/resolve-utterance.js emits a valid JSON plan on stdout', () => {
+  test('adversarial-review fix: --text starting with "--" is NOT mis-parsed to boolean true', () => {
+    const { projectDir } = scaffold('cli-dashes', {});
+    const out = execFileSync(process.execPath, [
+      path.join(repoRoot, 'bin', 'resolve-utterance.js'),
+      '--text', '-- shipping now, all good',
+      '--project-dir', projectDir,
+    ], { encoding: 'utf8', env: { ...process.env, AGENTVIBES_NO_PLAYBACK: '1' } });
+    const plan = JSON.parse(out.trim());
+    assert.equal(plan.text, '-- shipping now, all good');   // was mis-parsed to `true`
+    assert.equal(typeof plan.text, 'string');
+  });
+
   test('smoke: prints parseable plan, nothing else on stdout', () => {
     const { projectDir } = scaffold('cli', {
       proj: { '.claude/config/audio-effects.cfg': 'llm:claude-code|off|||af_bella||\n' },

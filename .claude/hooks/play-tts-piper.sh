@@ -474,7 +474,11 @@ fi
 # @returns Updates $TEMP_FILE to processed version, sets $BACKGROUND_MUSIC if used
 # @sideeffects Applies audio effects and background music
 BACKGROUND_MUSIC=""
-if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
+# AGENTVIBES_SKIP_INTERNAL_PROCESSOR=1 lets a caller that will run its OWN
+# audio-processor pass (e.g. bmad-speak-enhanced.sh applying per-agent effects)
+# skip this generic default-row pass — otherwise effects/background-music get
+# applied twice (double reverb / overlapping music).
+if [[ "${AGENTVIBES_SKIP_INTERNAL_PROCESSOR:-}" != "1" && -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   _tmp=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX"); PROCESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$PROCESSED_FILE"
   _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE

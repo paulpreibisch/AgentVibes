@@ -32,15 +32,24 @@ import { gatherInputs } from '../src/services/utterance-loader.js';
 import { resolveUtterance, validatePlan } from '../src/services/utterance-resolver.js';
 
 /** Minimal --flag value parser (no external deps; players pass simple flags). */
+// Flags that take a value. For these we ALWAYS consume the next token as the
+// value — even if it starts with "--" (a message like "-- shipping now" must not
+// be misread as an absent value and turned into boolean true, which would make
+// TTS literally speak "true"). Anything else is treated as a boolean flag.
+const VALUE_FLAGS = new Set([
+  'text', 'voice', 'voiceSource', 'llm', 'personality',
+  'projectDir', 'packageRoot', 'format', 'language',
+]);
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a.startsWith('--')) {
-      const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      const next = argv[i + 1];
-      if (next === undefined || next.startsWith('--')) { out[key] = true; }
-      else { out[key] = next; i++; }
+    if (!a.startsWith('--')) continue;
+    const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    if (VALUE_FLAGS.has(key)) {
+      out[key] = (i + 1 < argv.length) ? argv[++i] : '';
+    } else {
+      out[key] = true;
     }
   }
   return out;
@@ -55,6 +64,7 @@ function main() {
     llm: args.llm,
     personality: args.personality,
     projectDir: args.projectDir,
+    packageRoot: args.packageRoot,
     homeDir: os.homedir(),
     cwd: process.cwd(),
     env: process.env,

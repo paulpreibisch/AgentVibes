@@ -67,6 +67,19 @@ describe('F-2 — voiceIsOverride marks provenance (Fable gate regression)', () 
     assert.equal(p.voice, 'am_michael');
     assert.equal(p.voiceIsOverride, true);
   });
+  test('adversarial-review fix: an LLM echo that just repeats the provider voice is NOT an override', () => {
+    // The common real case: no per-LLM row, LLM parrots back tts-voice.txt. Marking
+    // it an override made the player force VOICE_OVERRIDE and skip piper multi-speaker
+    // resolution → speaker 0. Now it stays non-override so piper resolves model/speaker.
+    const p = plan({ voiceSource: 'llm-echo', explicitVoice: 'en_US-libritts-high::Mike-13', providerVoice: 'en_US-libritts-high::Mike-13', perLlmVoice: undefined });
+    assert.equal(p.voice, 'en_US-libritts-high::Mike-13');
+    assert.equal(p.voiceIsOverride, false);
+  });
+  test('an LLM echo of a DIFFERENT voice than the provider file still counts as override', () => {
+    const p = plan({ voiceSource: 'llm-echo', explicitVoice: 'af_sarah', providerVoice: 'af_bella', perLlmVoice: undefined });
+    assert.equal(p.voice, 'af_sarah');
+    assert.equal(p.voiceIsOverride, true);
+  });
 });
 
 describe('F1 — genuine explicit voices are NOT demoted (only llm-echo is)', () => {

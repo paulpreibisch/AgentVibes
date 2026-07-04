@@ -282,6 +282,13 @@ trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
 # Speak with agent's voice, passing the temp profile path as arg 3 so
 # play-tts-piper.sh → audio-processor.sh can read per-agent music settings
 # without any env vars (safe for concurrent multi-project use).
+#
+# Declare voice provenance so the resolver never demotes a BMAD agent's own voice
+# to the per-LLM/default row (F-1). This must be set independently of whether a
+# TEMP_PROFILE file was created: a voice-only agent (no reverb/personality/music)
+# has an empty TEMP_PROFILE, so the arg-3 heuristic in play-tts.sh alone would
+# miss it. AGENT_VOICE is an agent-profile voice, always.
+export AGENTVIBES_VOICE_SOURCE="agent-profile"
 if [[ -n "$AGENT_VOICE" ]]; then
   bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" "$TEMP_PROFILE"
 else

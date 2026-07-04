@@ -275,17 +275,32 @@ if [[ -n "$_RESOLVER_CLI" ]] && command -v node &>/dev/null; then
   # voice-browser sets 'audition'; otherwise it's an 'llm-echo' (the LLM parroting
   # back get_config, which the per-LLM row rightly overrides — R2).
   _vsource="${AGENTVIBES_VOICE_SOURCE:-llm-echo}"
+  # Whitelist the provenance — an unknown value falls back to llm-echo (safe default).
+  case "$_vsource" in
+    llm-echo|user-explicit|agent-profile|translation-target|audition) ;;
+    *) _vsource="llm-echo" ;;
+  esac
+  # A per-agent profile ($3) also implies agent-profile provenance (belt-and-suspenders
+  # with bmad-speak.sh's explicit AGENTVIBES_VOICE_SOURCE export).
   [[ -n "${AGENT_PROFILE_FILE:-}" && "$_vsource" == "llm-echo" ]] && _vsource="agent-profile"
   [[ -n "${AGENTVIBES_EFFECTS_PREVIEW:-}" ]] && _vsource="audition"
-  if _plan_sh=$(node "$_RESOLVER_CLI" --format sh \
+  # `timeout 5` caps a wedged bridge so the fail-safe promise ("TTS never breaks
+  # on the bridge") also covers a hung node, not just a missing one.
+  _av_timeout="timeout 5"; command -v timeout &>/dev/null || _av_timeout=""
+  if _plan_sh=$($_av_timeout node "$_RESOLVER_CLI" --format sh \
         --text "$TEXT" \
         --llm "$LLM_PROVIDER" \
         --voice "$_ORIG_EXPLICIT_VOICE" \
         --voice-source "$_vsource" \
-        --project-dir "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" 2>/dev/null); then
-    # Guard the eval: a malformed plan must fall back to legacy, never abort
-    # the script mid-run under `set -euo pipefail` (F-7).
-    if eval "$_plan_sh" 2>/dev/null; then   # sets AV_VOICE, AV_ENGINE, ... (shell-quoted, safe)
+        --project-dir "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" \
+        --package-root "$PROJECT_ROOT" 2>/dev/null); then
+    # Guard the eval: a malformed OR EMPTY plan must fall back to legacy, never
+    # abort the script mid-run under `set -euo pipefail`. `eval ""` succeeds with
+    # no AV_* vars set, which would falsely set PLAN_OK — so require non-empty
+    # output AND a field that is ALWAYS present in a valid plan. AV_TRANSPORT is
+    # always 'local' or a transport name (never empty), unlike AV_ENGINE which is
+    # legitimately empty on a remote plan (F-7).
+    if [[ -n "$_plan_sh" ]] && eval "$_plan_sh" 2>/dev/null && [[ -n "${AV_TRANSPORT:-}" ]]; then   # AV_* shell-quoted, safe
       PLAN_OK=1
       # Adopt the voice into VOICE_OVERRIDE ONLY when it's a real override
       # (F-2): a plain provider-file voice is left for play-tts-piper.sh's own

@@ -148,11 +148,22 @@ function gatherInputs(ctx) {
   const projCfg = path.join(projClaude, 'config');
   const homeCfg = path.join(homeClaude, 'config');
 
+  // The FULL 3-tier search the legacy bash player uses: the real user project
+  // (CLAUDE_PROJECT_DIR, = projectDir here) → the package/hooks project root →
+  // home. When the CLI is invoked with CLAUDE_PROJECT_DIR != PROJECT_ROOT (the
+  // MCP-from-elsewhere case), a per-LLM row (esp. its ENGINE column) configured
+  // only under PROJECT_ROOT would otherwise be invisible and the engine would
+  // silently revert to piper (loader 2-tier vs legacy 3-tier gap). packageRoot
+  // is the middle tier; it's skipped when unset or equal to projectDir.
+  const packageRoot = (ctx.packageRoot && ctx.packageRoot !== projectDir) ? ctx.packageRoot : null;
+  const pkgClaude = packageRoot ? path.join(packageRoot, '.claude') : null;
+  const pkgCfg = packageRoot ? path.join(pkgClaude, 'config') : null;
+
   const llmKey = resolveLlmKey({ llm: ctx.llm, env });
 
-  // audio-effects.cfg search order: CLAUDE_PROJECT_DIR project → project root → home
   const cfgPaths = [
     path.join(projCfg, 'audio-effects.cfg'),
+    ...(pkgCfg ? [path.join(pkgCfg, 'audio-effects.cfg')] : []),
     path.join(homeCfg, 'audio-effects.cfg'),
   ];
   const row = parseLlmRow(cfgPaths, llmKey);
@@ -161,13 +172,15 @@ function gatherInputs(ctx) {
   const profile = readAgentProfile(agentName, projectDir, homeDir);
   const profMusic = (profile && profile.backgroundMusic) || {};
 
-  // 3-tier file reader: project .claude → home .claude
+  // 3-tier file readers: project .claude → package-root .claude → home .claude
   const tier = (name, sub = '') => firstFile([
     path.join(projClaude, sub, name),
+    ...(pkgClaude ? [path.join(pkgClaude, sub, name)] : []),
     path.join(homeClaude, sub, name),
   ]);
   const cfgTier = (name) => firstFile([
     path.join(projCfg, name),
+    ...(pkgCfg ? [path.join(pkgCfg, name)] : []),
     path.join(homeCfg, name),
   ]);
 
@@ -178,10 +191,7 @@ function gatherInputs(ctx) {
     // ---- voice ----
     explicitVoice: ctx.voice || undefined,
     perLlmVoice: row.voice,
-    providerVoice: firstFile([
-      path.join(projClaude, 'tts-voice.txt'),
-      path.join(homeClaude, 'tts-voice.txt'),
-    ]),
+    providerVoice: tier('tts-voice.txt'),
     voiceModel: tier('tts-piper-model.txt'),
     speakerId: tier('tts-piper-speaker-id.txt'),
 

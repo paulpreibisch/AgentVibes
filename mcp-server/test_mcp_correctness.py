@@ -244,6 +244,28 @@ def test_text_to_speech_subprocess_spawn_passes_stdin_devnull(monkeypatch):
     assert captured_kwargs.get("stdin") == asyncio.subprocess.DEVNULL
 
 
+def test_text_to_speech_with_voice_declares_user_explicit_provenance(monkeypatch):
+    """Adversarial-review fix (F-1 wiring): when the MCP caller asks for a
+    specific voice, the spawned player must receive AGENTVIBES_VOICE_SOURCE=
+    user-explicit so the resolver treats it as a genuine explicit pick and never
+    demotes it to a per-LLM/default row. Without a voice, it must NOT be set."""
+    server = AgentVibesServer()
+    captured = {}
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        captured["env"] = kwargs.get("env")
+        return _FakeProc()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    asyncio.run(server.text_to_speech("hello", voice="Aria"))
+    assert captured["env"].get("AGENTVIBES_VOICE_SOURCE") == "user-explicit"
+
+    captured.clear()
+    asyncio.run(server.text_to_speech("hello"))  # no voice → provenance not forced
+    assert captured["env"].get("AGENTVIBES_VOICE_SOURCE") is None
+
+
 # ---------------------------------------------------------------------------
 # download_extra_voices(auto_yes=False) must never reach the interactive prompt
 # ---------------------------------------------------------------------------

@@ -189,8 +189,19 @@ function resolveVoiceInfo(inputs) {
   // adopting the provider-file voice as an "explicit override" skips piper's
   // multi-speaker model/speaker-id lookup and plays speaker 0).
   if (hasExplicit) {
-    if (source === 'llm-echo' && firstNonEmpty(perLlmVoice) !== undefined) {
-      return { voice: String(perLlmVoice).trim(), isOverride: true };   // per-LLM wins over echo (R2)
+    if (source === 'llm-echo') {
+      if (firstNonEmpty(perLlmVoice) !== undefined) {
+        return { voice: String(perLlmVoice).trim(), isOverride: true };   // per-LLM wins over echo (R2)
+      }
+      // A bare LLM echo that just repeats the provider's stored voice is NOT a
+      // real override — mark it non-override so the provider script keeps its own
+      // file+model+speaker-id resolution (F-2: forcing it as an explicit override
+      // skips piper's multi-speaker lookup and plays speaker 0).
+      const ev = String(explicitVoice).trim();
+      const pv = firstNonEmpty(providerVoice);
+      if (pv !== undefined && ev === String(pv).trim()) {
+        return { voice: ev, isOverride: false };
+      }
     }
     return { voice: String(explicitVoice).trim(), isOverride: true };   // genuine explicit pick
   }
@@ -446,6 +457,9 @@ function resolveUtterance(inputs = {}) {
 function validatePlan(plan) {
   const errs = [];
   if (!plan || typeof plan !== 'object') return ['plan is not an object'];
+  // text/voice must be strings — a boolean here means the CLI mis-parsed an
+  // argument (e.g. a value that started with "--"); fail loud, never speak it.
+  if (typeof plan.text !== 'string') errs.push('text must be a string');
   if (typeof plan.voice !== 'string') errs.push('voice must be a string');
   const isRemote = REMOTE_TRANSPORTS.has(plan.transport);
   // engine may be null ONLY on a remote plan (the receiver decides from the voice).
