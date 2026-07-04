@@ -630,6 +630,14 @@ fi
 # Display with file count (now showing accurate post-cleanup size)
 echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
 
+# AV_OUTPUT sentinel (Story AVI-S8.5, R6/R7): emit the EXACT absolute path of the
+# wav this invocation produced, on its own machine-parseable stdout line. Consumers
+# (e.g. bmad-speak-enhanced.sh) capture THIS path — never `ls -t | head -1`, which
+# races in party mode and masks synthesis failures (memory:
+# feedback_no_most_recent_file_heuristic). Additive: the human "Saved to:" line
+# above is intact for the MCP server's loose parser.
+printf 'AV_OUTPUT:%s\n' "$TEMP_FILE"
+
 if [[ -n "$BACKGROUND_MUSIC" ]]; then
   # Extract just the filename to save space
   MUSIC_FILENAME=$(basename "$BACKGROUND_MUSIC")

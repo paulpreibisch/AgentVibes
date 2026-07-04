@@ -94,7 +94,10 @@ fi
 
 # Skip the (slow) synthesis + playback entirely in test mode — nothing to play
 # and no need to spin up the kokoro model. Mirrors the sibling Piper provider.
+# Still emit the AV_OUTPUT sentinel so consumers get the exact intended path
+# (Story AVI-S8.5, R6): the path is machine-parseable regardless of playback.
 if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
+  printf 'AV_OUTPUT:%s\n' "$TEMP_WAV"
   trap '' EXIT
   exit 0
 fi
@@ -109,6 +112,12 @@ if [[ ! -f "$TEMP_WAV" || ! -s "$TEMP_WAV" ]]; then
   echo "❌ Kokoro synthesis produced no audio" >&2
   exit 3
 fi
+
+# AV_OUTPUT sentinel (Story AVI-S8.5, R6/R7): emit the EXACT absolute path of the
+# wav this invocation produced, on its own machine-parseable stdout line. Consumers
+# capture THIS path — never a directory listing (memory:
+# feedback_no_most_recent_file_heuristic).
+printf 'AV_OUTPUT:%s\n' "$TEMP_WAV"
 
 # ---------------------------------------------------------------------------
 # Play audio — try players in order (WAV-capable)

@@ -134,29 +134,41 @@ TEMP_FILE="$AUDIO_DIR/tts-enhanced-$(date +%s)-$$.wav"
 # Determine voice and generate audio
 if [[ -n "$AGENT_VOICE" ]]; then
     echo "🎤 Agent: $AGENT_FOR_EFFECTS | Voice: $AGENT_VOICE"
-    # Call piper directly to generate audio without playback
-    "$SCRIPT_DIR/play-tts-piper.sh" "$FULL_TEXT" "$AGENT_VOICE" > /dev/null 2>&1 &
-    PIPER_PID=$!
 
-    # Wait for piper to generate (it outputs the file path)
-    wait $PIPER_PID 2>/dev/null || true
+    # Synthesize WITHOUT playback (this pipeline plays the post-processed file
+    # itself), CAPTURING the provider's stdout so we can read its AV_OUTPUT:
+    # sentinel — the EXACT absolute path piper wrote for THIS invocation.
+    #
+    # We deliberately do NOT scan the audio directory for the newest file (the
+    # banned most-recent-file / directory-listing heuristic): it races in party
+    # mode (grabs another agent's audio) and masks synthesis failures. See Story
+    # AVI-S8.5 (R6/R7) and memory: feedback_no_most_recent_file_heuristic.
+    PIPER_STDOUT=""
+    if ! PIPER_STDOUT=$(AGENTVIBES_NO_PLAYBACK=true "$SCRIPT_DIR/play-tts-piper.sh" "$FULL_TEXT" "$AGENT_VOICE" 2>/dev/null); then
+        echo "❌ bmad-speak: piper synthesis failed for agent '$AGENT_FOR_EFFECTS'" >&2
+        exit 1
+    fi
 
-    # Find the most recent TTS file
-    GENERATED_FILE=$(ls -t "$AUDIO_DIR"/tts-padded-*.wav 2>/dev/null | head -1)
+    # Capture the exact output path from the AV_OUTPUT: sentinel. FAIL LOUD if it
+    # is absent — never fall back to a directory listing.
+    GENERATED_FILE=$(printf '%s\n' "$PIPER_STDOUT" | sed -n 's/^AV_OUTPUT://p' | tail -1)
 
-    if [[ -n "$GENERATED_FILE" ]] && [[ -f "$GENERATED_FILE" ]]; then
-        # Apply audio effects and background mixing
-        if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
-            PROCESSED_FILE="$AUDIO_DIR/tts-enhanced-processed-$(date +%s)-$$.wav"
-            "$SCRIPT_DIR/audio-processor.sh" "$GENERATED_FILE" "$AGENT_FOR_EFFECTS" "$PROCESSED_FILE" 2>/dev/null || {
-                # Fallback to original if processing fails
-                PROCESSED_FILE="$GENERATED_FILE"
-            }
+    if [[ -z "$GENERATED_FILE" ]] || [[ ! -f "$GENERATED_FILE" ]]; then
+        echo "❌ bmad-speak: no AV_OUTPUT sentinel from play-tts-piper.sh — refusing to guess the output file (agent '$AGENT_FOR_EFFECTS')" >&2
+        exit 1
+    fi
 
-            # Play the processed file
-            if [[ -f "$PROCESSED_FILE" ]]; then
-                (mpv "$PROCESSED_FILE" || aplay "$PROCESSED_FILE" || paplay "$PROCESSED_FILE") >/dev/null 2>&1 &
-            fi
+    # Apply audio effects and background mixing
+    if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
+        PROCESSED_FILE="$AUDIO_DIR/tts-enhanced-processed-$(date +%s)-$$.wav"
+        "$SCRIPT_DIR/audio-processor.sh" "$GENERATED_FILE" "$AGENT_FOR_EFFECTS" "$PROCESSED_FILE" 2>/dev/null || {
+            # Fallback to original if processing fails
+            PROCESSED_FILE="$GENERATED_FILE"
+        }
+
+        # Play the processed file
+        if [[ -f "$PROCESSED_FILE" ]]; then
+            (mpv "$PROCESSED_FILE" || aplay "$PROCESSED_FILE" || paplay "$PROCESSED_FILE") >/dev/null 2>&1 &
         fi
     fi
 else
