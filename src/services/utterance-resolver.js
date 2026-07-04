@@ -177,20 +177,33 @@ function fractionVolume(raw) {
  *   - 'audition'           voice-browser preview
  * Otherwise falls back to per-LLM voice, then the provider's stored voice file.
  */
-function resolveVoice(inputs) {
+function resolveVoiceInfo(inputs) {
   const { explicitVoice, perLlmVoice, providerVoice } = inputs;
   const source = inputs.voiceSource || 'llm-echo';
   const hasExplicit = firstNonEmpty(explicitVoice) !== undefined;
 
+  // `isOverride` marks a voice that came from a REAL override source (a genuine
+  // explicit pick or a per-LLM row) vs. merely the provider's stored voice file.
+  // Players adopt an override into their VOICE_OVERRIDE arg; a NON-override voice
+  // is left for the provider script's own file+model+speaker resolution (F-2 —
+  // adopting the provider-file voice as an "explicit override" skips piper's
+  // multi-speaker model/speaker-id lookup and plays speaker 0).
   if (hasExplicit) {
-    // Only an LLM echo is overridden by the per-LLM voice; real explicit wins.
     if (source === 'llm-echo' && firstNonEmpty(perLlmVoice) !== undefined) {
-      return String(perLlmVoice).trim();
+      return { voice: String(perLlmVoice).trim(), isOverride: true };   // per-LLM wins over echo (R2)
     }
-    return String(explicitVoice).trim();
+    return { voice: String(explicitVoice).trim(), isOverride: true };   // genuine explicit pick
   }
-  const v = firstNonEmpty(perLlmVoice, providerVoice);
-  return v === undefined ? '' : String(v).trim();
+  if (firstNonEmpty(perLlmVoice) !== undefined) {
+    return { voice: String(perLlmVoice).trim(), isOverride: true };      // per-LLM row voice
+  }
+  const pv = firstNonEmpty(providerVoice);
+  return { voice: pv === undefined ? '' : String(pv).trim(), isOverride: false }; // provider file fallback
+}
+
+/** Back-compat string accessor (voice only). */
+function resolveVoice(inputs) {
+  return resolveVoiceInfo(inputs).voice;
 }
 
 /**
@@ -380,13 +393,20 @@ function resolveUtterance(inputs = {}) {
   // (play-tts.sh only switches to remote when a host is present).
   if (REMOTE_TRANSPORTS.has(transport) && sshTarget === null) transport = 'local';
 
-  const voice = resolveVoice(inputs);
+  const voiceInfo = resolveVoiceInfo(inputs);
+  const voice = voiceInfo.voice;
   const engine = resolveEngine(inputs, voice, transport);
   const music = resolveMusic(inputs);
 
   const plan = {
     text: inputs.text ?? '',
     voice,
+    // True only when `voice` came from a real override (explicit pick or per-LLM
+    // row), NOT the provider's stored voice file. Players adopt it into their
+    // VOICE_OVERRIDE arg only when true, so a plain provider-file voice keeps the
+    // provider script's own model/speaker-id resolution (F-2). Engine coupling
+    // (R1) still uses `voice` regardless.
+    voiceIsOverride: voiceInfo.isOverride,
     engine,
     transport,
     sshTarget,
@@ -462,6 +482,7 @@ export {
   validatePlan,
   // exported for targeted testing + reuse by the (Stage 2) loader and players
   resolveVoice,
+  resolveVoiceInfo,
   resolveEngine,
   resolveTransport,
   resolveSshTarget,

@@ -258,11 +258,24 @@ _RESOLVER_CLI=""
 # AGENTVIBES_RESOLVER_CLI lets the installer (or tests) point at the resolver
 # bundle when it lives outside the hooks tree — e.g. an installed ~/.claude/hooks
 # whose sibling package dir holds bin/resolve-utterance.js.
-for _cand in "${AGENTVIBES_RESOLVER_CLI:-}" "$SCRIPT_DIR/../../bin/resolve-utterance.js" "$SCRIPT_DIR/resolve-utterance.js"; do
+# Candidate order: explicit env override; the installed dedicated bundle dir
+# (has its own package.json so ESM works on every Node version — F-5); the repo
+# layout (dev); a co-located copy.
+for _cand in "${AGENTVIBES_RESOLVER_CLI:-}" \
+             "$SCRIPT_DIR/../agentvibes-resolver/bin/resolve-utterance.js" \
+             "$SCRIPT_DIR/../../bin/resolve-utterance.js" \
+             "$SCRIPT_DIR/resolve-utterance.js"; do
   [[ -n "$_cand" && -f "$_cand" ]] && { _RESOLVER_CLI="$_cand"; break; }
 done
 if [[ -n "$_RESOLVER_CLI" ]] && command -v node &>/dev/null; then
-  _vsource="llm-echo"
+  # Voice provenance (F-1): a per-agent profile ($3) is an 'agent-profile' voice
+  # (BMAD party mode — each agent its OWN voice, must not be demoted to the
+  # per-LLM/default voice); a caller may declare provenance via
+  # AGENTVIBES_VOICE_SOURCE (e.g. MCP text_to_speech → 'user-explicit'); the
+  # voice-browser sets 'audition'; otherwise it's an 'llm-echo' (the LLM parroting
+  # back get_config, which the per-LLM row rightly overrides — R2).
+  _vsource="${AGENTVIBES_VOICE_SOURCE:-llm-echo}"
+  [[ -n "${AGENT_PROFILE_FILE:-}" && "$_vsource" == "llm-echo" ]] && _vsource="agent-profile"
   [[ -n "${AGENTVIBES_EFFECTS_PREVIEW:-}" ]] && _vsource="audition"
   if _plan_sh=$(node "$_RESOLVER_CLI" --format sh \
         --text "$TEXT" \
@@ -270,9 +283,19 @@ if [[ -n "$_RESOLVER_CLI" ]] && command -v node &>/dev/null; then
         --voice "$_ORIG_EXPLICIT_VOICE" \
         --voice-source "$_vsource" \
         --project-dir "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" 2>/dev/null); then
-    eval "$_plan_sh"          # sets AV_VOICE, AV_ENGINE, AV_TRANSPORT, ... (shell-quoted, safe)
-    PLAN_OK=1
-    [[ -n "${AV_VOICE:-}" ]] && VOICE_OVERRIDE="$AV_VOICE"
+    # Guard the eval: a malformed plan must fall back to legacy, never abort
+    # the script mid-run under `set -euo pipefail` (F-7).
+    if eval "$_plan_sh" 2>/dev/null; then   # sets AV_VOICE, AV_ENGINE, ... (shell-quoted, safe)
+      PLAN_OK=1
+      # Adopt the voice into VOICE_OVERRIDE ONLY when it's a real override
+      # (F-2): a plain provider-file voice is left for play-tts-piper.sh's own
+      # file+model+speaker-id resolution (adopting it as an explicit override
+      # skips the multi-speaker lookup and plays speaker 0). Engine coupling (R1)
+      # still applies below regardless.
+      if [[ "${AV_VOICE_IS_OVERRIDE:-false}" == "true" && -n "${AV_VOICE:-}" ]]; then
+        VOICE_OVERRIDE="$AV_VOICE"
+      fi
+    fi
   fi
 fi
 

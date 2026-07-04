@@ -297,20 +297,37 @@ function Resolve-ProviderScriptForEngine {
 }
 
 $_OrigExplicitVoice = $VoiceOverride   # raw positional voice, before any per-LLM override
-$PlanOk     = $false
-$PlanVoice  = ""
-$PlanEngine = ""
+$PlanOk         = $false
+$PlanVoice      = ""
+$PlanEngine     = ""
+$PlanVoiceIsOverride = $false
+# F-3: the SSH-receiver watcher forwards the sender's engine via -ProviderOverride
+# (a parameter the resolver can't see). Seed AGENTVIBES_FORCE_PROVIDER from it so
+# the resolver honors the forwarded provider instead of defaulting the plan engine
+# to piper (which dropped a forwarded windows-sapi/soprano voice → wrong/no audio).
+if ($ProviderOverride -and -not $env:AGENTVIBES_FORCE_PROVIDER) {
+    switch ($ProviderOverride) {
+        { $_ -in @('piper','soprano','macos','windows-sapi','sapi','kokoro','elevenlabs','windows-piper') } {
+            $env:AGENTVIBES_FORCE_PROVIDER = $ProviderOverride
+        }
+    }
+}
 $_ResolverCli = ""
 foreach ($_cand in @(
         $env:AGENTVIBES_RESOLVER_CLI,
+        (Join-Path $ScriptPath "..\agentvibes-resolver\bin\resolve-utterance.js"),
         (Join-Path $ScriptPath "..\..\bin\resolve-utterance.js"),
         (Join-Path $ScriptPath "resolve-utterance.js"))) {
     if ($_cand -and (Test-Path $_cand)) { $_ResolverCli = $_cand; break }
 }
 $_NodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if ($_ResolverCli -and $_NodeCmd) {
-    # Audition (effects preview) is a genuine explicit voice — never demote it.
-    $_VoiceSource = if ($env:AGENTVIBES_EFFECTS_PREVIEW) { "audition" } else { "llm-echo" }
+    # Voice provenance (F-1): AGENTVIBES_VOICE_SOURCE lets a caller declare it
+    # (MCP/watcher → user-explicit/agent-profile); audition never demotes; else
+    # llm-echo (parroted get_config voice, which the per-LLM row overrides — R2).
+    $_VoiceSource = if ($env:AGENTVIBES_VOICE_SOURCE) { $env:AGENTVIBES_VOICE_SOURCE }
+                    elseif ($env:AGENTVIBES_EFFECTS_PREVIEW) { "audition" }
+                    else { "llm-echo" }
     $_ResolverProjectDir = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { Split-Path -Parent $ClaudeDir }
     $_ResolverArgs = @('--format', 'json', '--text', $Text, '--llm', $llm,
                        '--voice-source', $_VoiceSource, '--project-dir', $_ResolverProjectDir)
@@ -325,6 +342,7 @@ if ($_ResolverCli -and $_NodeCmd) {
                 $PlanOk = $true
                 if ($_Plan.voice)  { $PlanVoice  = [string]$_Plan.voice }
                 if ($_Plan.engine) { $PlanEngine = [string]$_Plan.engine }
+                $PlanVoiceIsOverride = [bool]$_Plan.voiceIsOverride
             }
         }
     } catch {
@@ -396,10 +414,15 @@ $_LlmFound = $false
 # explicit override; genuine explicit/audition voices still win), so take it
 # verbatim. FAIL-SAFE fallback: with no plan, use the legacy explicit-wins order
 # (explicit -VoiceOverride > per-LLM voice).
-if ($PlanOk -and $PlanVoice) {
+# F-2: adopt the plan voice ONLY when it's a real override (explicit pick or
+# per-LLM row) — not the provider's stored voice file. A plain provider-file
+# voice is left empty here so the provider script does its own file+model+speaker
+# resolution (adopting it as an explicit override skips piper's multi-speaker
+# lookup and plays speaker 0). Engine coupling (R1) still applies regardless.
+if ($PlanOk -and $PlanVoiceIsOverride -and $PlanVoice) {
     $VoiceOverride = $PlanVoice
 }
-elseif ($_LlmVoice -and -not $VoiceOverride) {
+elseif (-not $PlanOk -and $_LlmVoice -and -not $VoiceOverride) {
     $VoiceOverride = $_LlmVoice
 }
 

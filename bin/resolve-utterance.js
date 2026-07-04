@@ -96,6 +96,7 @@ function toShell(plan) {
   const lines = [
     `AV_TEXT=${shq(plan.text ?? '')}`,
     `AV_VOICE=${shq(plan.voice ?? '')}`,
+    `AV_VOICE_IS_OVERRIDE=${b(plan.voiceIsOverride)}`,
     `AV_ENGINE=${shq(plan.engine ?? '')}`,
     `AV_TRANSPORT=${shq(plan.transport ?? 'local')}`,
     `AV_VOICE_MODEL=${shq(plan.voiceModel ?? '')}`,

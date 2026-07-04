@@ -173,6 +173,37 @@ describe('pretext + reverb from the per-LLM row', () => {
   });
 });
 
+describe('F-1 — a BMAD agent-profile voice is NOT demoted to the llm:default row (Fable gate)', () => {
+  test('agent-profile voice wins over a configured llm:default voice', () => {
+    // Reproduces the party-mode regression: bmad-speak passes each agent's voice
+    // as an explicit arg with voiceSource=agent-profile; a llm:default row with a
+    // voice must NOT override it (else every agent speaks the default voice).
+    const { projectDir, homeDir } = scaffold('f1', {
+      proj: { '.claude/config/audio-effects.cfg': 'llm:default|off|||af_default||piper\n' },
+    });
+    const demoted = planFrom({ text: 'hi', voice: 'am_michael', homeDir, projectDir, env: {} }); // default llm-echo
+    assert.equal(demoted.voice, 'af_default', 'sanity: an llm-echo IS demoted to the row voice');
+
+    const p = planFrom({ text: 'hi', voice: 'am_michael', voiceSource: 'agent-profile', homeDir, projectDir, env: {} });
+    assert.equal(p.voice, 'am_michael', 'agent-profile voice must survive');
+    assert.equal(p.voiceIsOverride, true);
+  });
+});
+
+describe('F-2 — a provider-file voice is carried but flagged non-override (hermetic)', () => {
+  test('tts-voice.txt multi-speaker voice → voiceIsOverride false', () => {
+    const { projectDir, homeDir } = scaffold('f2', {
+      proj: {
+        '.claude/config/audio-effects.cfg': 'llm:default|off||||\n',   // empty voice column
+        '.claude/tts-voice.txt': 'en_US-libritts-high::Mike-13',
+      },
+    });
+    const p = planFrom({ text: 'hi', homeDir, projectDir, env: {} });
+    assert.equal(p.voice, 'en_US-libritts-high::Mike-13');
+    assert.equal(p.voiceIsOverride, false); // player leaves speaker-id resolution to piper.sh
+  });
+});
+
 describe('CLI — bin/resolve-utterance.js emits a valid JSON plan on stdout', () => {
   test('smoke: prints parseable plan, nothing else on stdout', () => {
     const { projectDir } = scaffold('cli', {

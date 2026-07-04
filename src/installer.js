@@ -5414,13 +5414,19 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
  * (bin/resolve-utterance.js + src/services/{utterance-resolver,utterance-loader}.js)
  * into a target `.claude` tree so the play-tts hooks can find it.
  *
- * Layout: resolve-utterance.js is copied directly into `<claudeDir>/hooks/`
- * (and `hooks-windows/`, ahead of the PowerShell port). This exactly matches
- * the `$SCRIPT_DIR/resolve-utterance.js` candidate play-tts.sh already probes
- * (see .claude/hooks/play-tts.sh ~line 261) — so NO changes to the players'
- * lookup logic are required. Its `../src/services/...` imports then resolve
- * to `<claudeDir>/src/services/`, a sibling shared by both hook trees, which
- * mirrors the real package layout (bin/ + src/services/) one level up.
+ * Layout (F-5): a SELF-CONTAINED bundle dir `<claudeDir>/agentvibes-resolver/`:
+ *     agentvibes-resolver/
+ *       package.json                     -> {"type":"module"}
+ *       bin/resolve-utterance.js
+ *       src/services/utterance-resolver.js
+ *       src/services/utterance-loader.js
+ * The bundle's OWN package.json declares ESM, so `node resolve-utterance.js`
+ * works on EVERY Node version (the CLI uses `import`; without this, Node < 22.7
+ * treats the copied .js as CommonJS and the import throws → players silently fall
+ * back to legacy forever). It lives in a dedicated dir, NOT in `<claudeDir>/hooks/`,
+ * so it can't change the module type of any user-owned `.js` hook. The players
+ * probe `$SCRIPT_DIR/../agentvibes-resolver/bin/resolve-utterance.js`; its
+ * `../src/services/...` imports resolve inside the bundle dir.
  *
  * This is AgentVibes-owned code — same class as the hook scripts themselves —
  * so copy/overwrite on update is correct. manifestSafeCopy still refuses to
@@ -5434,15 +5440,15 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
  */
 async function copyResolverBundleTo(claudeDir, manifest, manifestUpdates) {
   const pkgRoot = path.join(__dirname, '..');
+  const bundleDir = path.join(claudeDir, 'agentvibes-resolver');
   const srcBin = path.join(pkgRoot, 'bin', 'resolve-utterance.js');
   const srcResolver = path.join(pkgRoot, 'src', 'services', 'utterance-resolver.js');
   const srcLoader = path.join(pkgRoot, 'src', 'services', 'utterance-loader.js');
 
   const targets = [
-    { src: srcBin, dest: path.join(claudeDir, 'hooks', 'resolve-utterance.js') },
-    { src: srcBin, dest: path.join(claudeDir, 'hooks-windows', 'resolve-utterance.js') },
-    { src: srcResolver, dest: path.join(claudeDir, 'src', 'services', 'utterance-resolver.js') },
-    { src: srcLoader, dest: path.join(claudeDir, 'src', 'services', 'utterance-loader.js') },
+    { src: srcBin, dest: path.join(bundleDir, 'bin', 'resolve-utterance.js') },
+    { src: srcResolver, dest: path.join(bundleDir, 'src', 'services', 'utterance-resolver.js') },
+    { src: srcLoader, dest: path.join(bundleDir, 'src', 'services', 'utterance-loader.js') },
   ];
 
   let count = 0;
@@ -5457,6 +5463,22 @@ async function copyResolverBundleTo(claudeDir, manifest, manifestUpdates) {
     } catch {
       // src missing (e.g. stripped package) — skip silently, players fall back to legacy
     }
+  }
+
+  // The ESM marker — a fixed one-liner (not copied from a src file). Write it
+  // only if absent or different, so a second run is a no-op.
+  try {
+    const pkgJsonPath = path.join(bundleDir, 'package.json');
+    const desired = JSON.stringify({ type: 'module', private: true, name: 'agentvibes-resolver-bundle' }, null, 2) + '\n';
+    let existing = null;
+    try { existing = await fs.readFile(pkgJsonPath, 'utf8'); } catch { /* absent */ }
+    if (existing !== desired) {
+      await fs.mkdir(bundleDir, { recursive: true });
+      await fs.writeFile(pkgJsonPath, desired);
+      count++;
+    }
+  } catch {
+    // best-effort — if this fails the players fall back to legacy, never break
   }
   return count;
 }

@@ -52,6 +52,23 @@ describe('R2 — per-LLM voice wins ONLY over an LLM-echoed explicit override', 
   });
 });
 
+describe('F-2 — voiceIsOverride marks provenance (Fable gate regression)', () => {
+  test('a genuine explicit/per-LLM voice is an override', () => {
+    assert.equal(plan({ voiceSource: 'user-explicit', explicitVoice: 'af_sarah' }).voiceIsOverride, true);
+    assert.equal(plan({ perLlmVoice: 'af_bella' }).voiceIsOverride, true);
+  });
+  test('a plain provider-file voice is NOT an override (player keeps its own speaker resolution)', () => {
+    const p = plan({ providerVoice: 'en_US-libritts-high::Mike-13' });
+    assert.equal(p.voice, 'en_US-libritts-high::Mike-13');
+    assert.equal(p.voiceIsOverride, false); // player must NOT force this as -VoiceOverride (F-2)
+  });
+  test('an agent-profile voice is an override (must not be demoted — F-1 party mode)', () => {
+    const p = plan({ voiceSource: 'agent-profile', explicitVoice: 'am_michael', perLlmVoice: 'af_default' });
+    assert.equal(p.voice, 'am_michael');
+    assert.equal(p.voiceIsOverride, true);
+  });
+});
+
 describe('F1 — genuine explicit voices are NOT demoted (only llm-echo is)', () => {
   test('user-explicit (MCP text_to_speech voice=) wins over the per-LLM voice', () => {
     const p = plan({ voiceSource: 'user-explicit', explicitVoice: 'af_sarah', perLlmVoice: 'af_bella' });

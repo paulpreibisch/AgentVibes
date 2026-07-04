@@ -50,21 +50,22 @@ after(async () => {
 });
 
 function bundlePaths(claudeDir) {
+  const b = path.join(claudeDir, 'agentvibes-resolver');
   return {
-    hooksCli: path.join(claudeDir, 'hooks', 'resolve-utterance.js'),
-    hooksWindowsCli: path.join(claudeDir, 'hooks-windows', 'resolve-utterance.js'),
-    resolver: path.join(claudeDir, 'src', 'services', 'utterance-resolver.js'),
-    loader: path.join(claudeDir, 'src', 'services', 'utterance-loader.js'),
+    cli: path.join(b, 'bin', 'resolve-utterance.js'),
+    resolver: path.join(b, 'src', 'services', 'utterance-resolver.js'),
+    loader: path.join(b, 'src', 'services', 'utterance-loader.js'),
+    pkgJson: path.join(b, 'package.json'),
   };
 }
 
 describe('copyResolverBundle — project-local install', () => {
-  test('ships all three files with the bin/ + src/services/ layout intact', async () => {
+  test('ships the self-contained agentvibes-resolver/ bundle with an ESM package.json (F-5)', async () => {
     const targetDir = path.join(tmpRoot, 'project-a');
     await fs.mkdir(targetDir, { recursive: true });
 
     const result = await copyResolverBundle(targetDir, stubSpinner());
-    assert.ok(result.count >= 4, 'first run should copy all 4 shipped file targets');
+    assert.ok(result.count >= 4, 'first run should copy the 3 files + write package.json');
 
     const claudeDir = path.join(targetDir, '.claude');
     const p = bundlePaths(claudeDir);
@@ -74,8 +75,16 @@ describe('copyResolverBundle — project-local install', () => {
 
     // Content matches the real repo source (byte-for-byte copy, not a stub).
     const realCli = await fs.readFile(path.join(repoRoot, 'bin', 'resolve-utterance.js'), 'utf8');
-    assert.equal(await fs.readFile(p.hooksCli, 'utf8'), realCli);
-    assert.equal(await fs.readFile(p.hooksWindowsCli, 'utf8'), realCli);
+    assert.equal(await fs.readFile(p.cli, 'utf8'), realCli);
+
+    // The ESM marker is what makes `node resolve-utterance.js` (which uses
+    // `import`) run on Node < 22.7 — without it the players silently fall back.
+    const pkg = JSON.parse(await fs.readFile(p.pkgJson, 'utf8'));
+    assert.equal(pkg.type, 'module', 'bundle package.json must declare type:module');
+
+    // It must NOT drop a package.json into hooks/ (would change module type for
+    // user-owned .js hooks there).
+    assert.equal(fsSync.existsSync(path.join(claudeDir, 'hooks', 'package.json')), false);
   });
 
   test('second run is idempotent — no errors, content unchanged', async () => {
@@ -142,7 +151,7 @@ describe('shipped bundle actually runs (relative imports resolve)', () => {
     await fs.mkdir(targetDir, { recursive: true });
     await copyResolverBundle(targetDir, stubSpinner());
 
-    const shippedCli = path.join(targetDir, '.claude', 'hooks', 'resolve-utterance.js');
+    const shippedCli = bundlePaths(path.join(targetDir, '.claude')).cli;
     const projectDirForPlan = path.join(tmpRoot, 'project-run-plan-target');
     await fs.mkdir(projectDirForPlan, { recursive: true });
 
@@ -158,12 +167,12 @@ describe('shipped bundle actually runs (relative imports resolve)', () => {
     assert.equal(typeof plan.engine, 'string');
   });
 
-  test('node <fakeHome>/.claude/hooks-windows/resolve-utterance.js also runs (shared src/services/)', async () => {
+  test('node <fakeHome>/.claude/agentvibes-resolver/bin/resolve-utterance.js also runs', async () => {
     const fakeHome = path.join(tmpRoot, 'fake-home-run');
     await fs.mkdir(fakeHome, { recursive: true });
     await updateGlobalResolverBundle(fakeHome);
 
-    const shippedCli = path.join(fakeHome, '.claude', 'hooks-windows', 'resolve-utterance.js');
+    const shippedCli = bundlePaths(path.join(fakeHome, '.claude')).cli;
     const stdout = execFileSync(
       process.execPath,
       [shippedCli, '--text', 'hello again', '--project-dir', fakeHome],
