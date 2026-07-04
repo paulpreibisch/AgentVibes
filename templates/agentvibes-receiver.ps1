@@ -100,6 +100,8 @@ $Pretext = ""
 $Speed = ""
 $Provider = "piper"
 $Llm = "default"
+$Mute = "false"
+$Language = ""
 
 if ($decoded.TrimStart().StartsWith('{')) {
     # JSON payload
@@ -115,6 +117,10 @@ if ($decoded.TrimStart().StartsWith('{')) {
         if ($json.speed)    { $Speed = $json.speed }
         if ($json.provider) { $Provider = $json.provider }
         if ($json.llm)      { $Llm = $json.llm }
+        # Forwarded as strings by the sender ("true"/"false"); ConvertFrom-Json
+        # may hand back a real boolean, so stringify defensively.
+        if ($null -ne $json.mute) { $Mute = ([string]$json.mute).ToLower() }
+        if ($json.language) { $Language = $json.language }
     } catch {
         Write-Output "Error: Failed to parse JSON payload"
         exit 1
@@ -155,7 +161,45 @@ if ($Pretext) {
     $script:Text = "$Pretext. $($script:Text)"
 }
 
-Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile"
+# ---------------------------------------------------------------------------
+# RECEIVER-AUTHORITATIVE: mute safety-OR (map §C, R17)
+# ---------------------------------------------------------------------------
+# effective_mute = receiver_local_mute OR forwarded_mute. If EITHER the sender
+# (forwarded $Mute -eq "true") or THIS receiver host is muted, stay silent. A
+# receiver-local mute always vetoes; the forwarded mute is a subordinate DEFAULT
+# that can also veto. We NEVER force-unmute a muted receiver.
+$ReceiverMuteFile = "$ClaudeDir\tts-muted.txt"
+$ReceiverLocalMuted = $false
+if (Test-Path $ReceiverMuteFile) {
+    if ((Get-Content $ReceiverMuteFile -Raw -ErrorAction SilentlyContinue).Trim() -eq "true") {
+        $ReceiverLocalMuted = $true
+    }
+}
+$EffectiveMute = ($Mute -eq "true") -or $ReceiverLocalMuted
+
+# ---------------------------------------------------------------------------
+# RECEIVER-AUTHORITATIVE: language fallback (map §D, R18)
+# ---------------------------------------------------------------------------
+# The receiver's OWN language config wins; otherwise use the forwarded language
+# as the default. Non-destructive: we do NOT overwrite the receiver's own
+# tts-language.txt — the effective value only rides along in the queue JSON.
+$EffectiveLanguage = $Language
+foreach ($lf in @("$ClaudeDir\tts-language.txt", "$ConfigDir\tts-language.txt")) {
+    if (Test-Path $lf) {
+        $rl = (Get-Content $lf -Raw -ErrorAction SilentlyContinue)
+        if ($rl) { $rl = $rl.Trim() }
+        if ($rl) { $EffectiveLanguage = $rl; break }  # receiver's own config wins
+    }
+}
+
+Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile mute=$Mute/$EffectiveMute lang=$EffectiveLanguage"
+
+# RECEIVER-AUTHORITATIVE mute veto: if either side muted, do not queue/play.
+if ($EffectiveMute) {
+    Write-Log "MUTED" "forwarded=$Mute receiverLocal=$ReceiverLocalMuted"
+    Write-Output "Muted (forwarded=$Mute, receiver-local=$ReceiverLocalMuted) - not playing"
+    exit 0
+}
 
 # ---------------------------------------------------------------------------
 # Configure voice for play-tts.ps1
@@ -207,6 +251,7 @@ $ReqJson = @{
     speed    = $Speed
     provider = $Provider
     llm      = $Llm
+    language = $EffectiveLanguage
 } | ConvertTo-Json -Compress
 
 try {

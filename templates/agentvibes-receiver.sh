@@ -78,7 +78,7 @@ _PARSE_OUT=$(python3 - "$DECODED" 2>&1 <<'PYEOF'
 import json, sys
 try:
     d = json.loads(sys.argv[1])
-    for field in ("text","voice","music","volume","effects","pretext","speed","provider","llm"):
+    for field in ("text","voice","music","volume","effects","pretext","speed","provider","llm","mute","language"):
         print(d.get(field, ""))
 except json.JSONDecodeError as e:
     print(f"JSON_PARSE_ERROR: {e}", file=sys.stderr)
@@ -96,6 +96,8 @@ PRETEXT=$( sed -n '6p' <<< "$_PARSE_OUT")
 SPEED=$(   sed -n '7p' <<< "$_PARSE_OUT")
 PROVIDER=$(sed -n '8p' <<< "$_PARSE_OUT")
 LLM=$(     sed -n '9p' <<< "$_PARSE_OUT")
+MUTE=$(    sed -n '10p' <<< "$_PARSE_OUT")
+LANGUAGE=$(sed -n '11p' <<< "$_PARSE_OUT")
 
 # Fall back to defaults
 # TODO(AVI-S8.6): generate the volume constant from the shared JSON source of truth.
@@ -130,6 +132,50 @@ if [[ -n "$PRETEXT" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# RECEIVER-AUTHORITATIVE: mute safety-OR (map §C, R17)
+# ---------------------------------------------------------------------------
+# effective_mute = receiver_local_mute OR forwarded_mute.
+# If EITHER the sender (forwarded MUTE=="true") or THIS receiver host is muted,
+# we stay silent. A receiver-local mute can always veto; the forwarded mute is a
+# subordinate DEFAULT that can also veto — we NEVER force-unmute a muted receiver.
+# The receiver's own 3-level mute (project-unmute > project-mute > global-mute)
+# is additionally enforced downstream by play-tts.sh; here we OR in its global
+# mute file so the OR decision is visible/testable at this layer too.
+receiver_local_muted() {
+    [[ -f "$HOME/.agentvibes-muted" ]] && return 0
+    return 1
+}
+EFFECTIVE_MUTE="false"
+if [[ "$MUTE" == "true" ]] || receiver_local_muted; then
+    EFFECTIVE_MUTE="true"
+fi
+
+# ---------------------------------------------------------------------------
+# RECEIVER-AUTHORITATIVE: language fallback (map §D, R18)
+# ---------------------------------------------------------------------------
+# The receiver's OWN language config wins; otherwise the forwarded language is
+# used as the default. Only forward-as-default is applied here (we never
+# overwrite the receiver's own config). tts-language.txt lives at the .claude/
+# root (language-manager.sh) or the config/ subdir; check both, project-scope is
+# irrelevant on the receiver so we use the receiver host's ~/.claude.
+receiver_local_language() {
+    local f
+    for f in "$HOME/.claude/tts-language.txt" "$HOME/.claude/config/tts-language.txt"; do
+        if [[ -f "$f" ]]; then
+            local v
+            v=$(cat "$f" 2>/dev/null || true)
+            if [[ -n "$v" ]]; then echo "$v"; return 0; fi
+        fi
+    done
+    return 1
+}
+EFFECTIVE_LANGUAGE="$LANGUAGE"
+_RECV_LANG=$(receiver_local_language || true)
+if [[ -n "$_RECV_LANG" ]]; then
+    EFFECTIVE_LANGUAGE="$_RECV_LANG"   # receiver's own language config wins
+fi
+
+# ---------------------------------------------------------------------------
 # Test mode: dump what would be played without calling play-tts
 # ---------------------------------------------------------------------------
 
@@ -137,16 +183,25 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
     python3 -c "
 import json, sys
 print(json.dumps({
-    'text':     sys.argv[1],
-    'voice':    sys.argv[2],
-    'music':    sys.argv[3],
-    'volume':   sys.argv[4],
-    'effects':  sys.argv[5],
-    'pretext':  sys.argv[6],
-    'provider': sys.argv[7],
-    'llm':      sys.argv[8],
+    'text':           sys.argv[1],
+    'voice':          sys.argv[2],
+    'music':          sys.argv[3],
+    'volume':         sys.argv[4],
+    'effects':        sys.argv[5],
+    'pretext':        sys.argv[6],
+    'provider':       sys.argv[7],
+    'llm':            sys.argv[8],
+    'mute':           sys.argv[9],
+    'effective_mute': sys.argv[10],
+    'language':       sys.argv[11],
 }, ensure_ascii=False))
-" "$TEXT" "$VOICE" "$MUSIC" "$VOLUME" "$EFFECTS" "$PRETEXT" "$PROVIDER" "$LLM"
+" "$TEXT" "$VOICE" "$MUSIC" "$VOLUME" "$EFFECTS" "$PRETEXT" "$PROVIDER" "$LLM" "$MUTE" "$EFFECTIVE_MUTE" "$EFFECTIVE_LANGUAGE"
+    exit 0
+fi
+
+# RECEIVER-AUTHORITATIVE mute veto: if either side muted, do not play.
+if [[ "$EFFECTIVE_MUTE" == "true" ]]; then
+    echo "🔇 TTS muted (forwarded=$MUTE, receiver-local honored) — not playing" >&2
     exit 0
 fi
 
@@ -216,6 +271,10 @@ fi
 [[ -n "$VOLUME"  ]] && export AGENTVIBES_OVERRIDE_VOLUME="$VOLUME"
 [[ -n "$EFFECTS" ]] && export AGENTVIBES_OVERRIDE_EFFECTS="$EFFECTS"
 [[ -n "$SPEED"   ]] && export AGENTVIBES_OVERRIDE_SPEED="$SPEED"
+# RECEIVER-AUTHORITATIVE language default: the receiver's own language config (if
+# any) already won above; forward the effective language downstream so play-tts.sh
+# uses it only when the receiver has no local opinion. Subordinate to receiver config.
+[[ -n "$EFFECTIVE_LANGUAGE" ]] && export AGENTVIBES_OVERRIDE_LANGUAGE="$EFFECTIVE_LANGUAGE"
 
 if [[ "${AGENTVIBES_DEBUG:-0}" == "1" ]]; then
     echo "[DEBUG] Voice: $VOICE" >&2
@@ -224,6 +283,8 @@ if [[ "${AGENTVIBES_DEBUG:-0}" == "1" ]]; then
     echo "[DEBUG] Effects: ${EFFECTS:-none}" >&2
     echo "[DEBUG] Pretext: ${PRETEXT:-none}" >&2
     echo "[DEBUG] Provider: $PROVIDER" >&2
+    echo "[DEBUG] Mute: forwarded=$MUTE effective=$EFFECTIVE_MUTE" >&2
+    echo "[DEBUG] Language: forwarded=${LANGUAGE:-none} effective=${EFFECTIVE_LANGUAGE:-none}" >&2
 fi
 
 echo "🎵 Playing via AgentVibes: ${TEXT:0:50}..." >&2
