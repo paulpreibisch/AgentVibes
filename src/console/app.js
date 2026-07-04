@@ -899,8 +899,19 @@ export class AgentVibesConsole {
   // Private: Global keyboard handlers
 
   _registerHandlers() {
-    // Q or Ctrl+C → clean exit (no zombie processes)
-    this.screen.key(['q', 'Q', 'C-c'], () => {
+    // Q or Ctrl+C → clean exit (no zombie processes).
+    // Guarded by isModalOpen(): blessed fires screen-level key handlers
+    // before focused-element handlers, so without this guard 'q' here would
+    // always win over a picker/modal's own Esc/q close binding — e.g. typing
+    // 'q' to jump to a voice named "Quinn" would kill the whole TUI instead
+    // of just being handled by the picker. Ctrl+C always force-quits (it's
+    // the universal "get me out" signal and has no in-modal meaning).
+    this.screen.key(['q', 'Q', 'C-c'], (ch, key) => {
+      const isCtrlC = key?.ctrl && key?.name === 'c';
+      if (!isCtrlC && this.navigationService?.isModalOpen()) {
+        // Let the focused modal/picker's own key handler deal with it.
+        return;
+      }
       this.screen.destroy();
       process.exit(0);
     });

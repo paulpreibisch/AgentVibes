@@ -780,7 +780,11 @@ export function createMusicTab(screen, services) {
     }
 
     function _saveGlobally() {
-      configService.setGlobal('backgroundMusic', { track: trackId });
+      // Merge into the existing global backgroundMusic object — a bare
+      // setGlobal('backgroundMusic', { track }) would replace the whole
+      // object and silently drop volume/enabled (Non-Destructive Rule).
+      const currentGlobal = configService.getGlobalConfig?.().backgroundMusic ?? {};
+      configService.setGlobal('backgroundMusic', { ...currentGlobal, track: trackId });
     }
 
     const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {
