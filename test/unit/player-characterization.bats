@@ -177,8 +177,7 @@ get_payload_field() {
   [ "$(get_payload_field effects)" = "light" ]
 }
 
-@test "KNOWN DIVERGENCE (map C 'mute never forwarded on SSH', R17): the SSH JSON payload has no mute field at all" {
-  skip "play-tts-ssh-remote.sh's build_json_payload() only packs text/voice/effects/music/volume/project/pretext/speed/provider/llm -- no mute key exists, so a sender-side mute can never reach the receiver (the safety-OR the resolver's plan.mute documents). Remove this skip once Stage 2 forwards the resolved plan's mute field."
+@test "R17 FIXED: a sender-side mute is forwarded in the SSH payload (receiver honors it via safety-OR)" {
   echo "mock-host" > "$TEST_HOME/.claude/ssh-remote-host.txt"
   export AGENTVIBES_TEST_MODE=true
   touch "$TEST_HOME/.agentvibes-muted"   # sender is globally muted
@@ -186,8 +185,7 @@ get_payload_field() {
   [ "$(get_payload_field mute)" = "true" ]
 }
 
-@test "KNOWN DIVERGENCE (map D 'language | Forward on SSH', R18): the SSH JSON payload has no language field at all" {
-  skip "build_json_payload() carries no 'language' key, so tts-language.txt / learning-mode target language never reaches the receiver. Remove this skip once Stage 2 forwards the resolved plan's language field."
+@test "R18 FIXED: the target language is forwarded in the SSH payload (receiver's own config still wins)" {
   echo "mock-host" > "$TEST_HOME/.claude/ssh-remote-host.txt"
   export AGENTVIBES_TEST_MODE=true
   mkdir -p "$CLAUDE_PROJECT_DIR/.claude/config"
@@ -200,14 +198,14 @@ get_payload_field() {
 # Section 4 — output-path sentinel (R6) and the banned "most recent file" heuristic
 # ===========================================================================
 
-@test "KNOWN DIVERGENCE (map R6, blocker note): play-tts-piper.sh does not yet emit an AV_OUTPUT: sentinel" {
-  skip "The AV_OUTPUT: sentinel contract (exact path capture, never 'most recent file') is a Stage-2 port-time change per the map's Deferred-to-loader notes. Remove this skip once the provider scripts emit it."
-  run grep -c "^AV_OUTPUT:" "$TEST_CLAUDE_DIR/hooks/play-tts-piper.sh"
+@test "R6 FIXED: play-tts-piper.sh emits an AV_OUTPUT: sentinel (exact output path)" {
+  # The emit is `printf 'AV_OUTPUT:%s\n' ...` so it can't be a source line STARTING
+  # with AV_OUTPUT: — assert the sentinel is emitted anywhere in the script.
+  run grep -c "AV_OUTPUT:" "$TEST_CLAUDE_DIR/hooks/play-tts-piper.sh"
   [ "$output" -gt 0 ]
 }
 
-@test "KNOWN DIVERGENCE (map blockers list): bmad-speak-enhanced.sh still uses the banned 'ls -t' most-recent-file heuristic" {
-  skip "docs/implementation-artifacts/8-5-precedence-map.md 'Blockers & follow-ups': bmad-speak-enhanced.sh:145 uses \`ls -t \"\$AUDIO_DIR\"/tts-padded-*.wav | head -1\` -- exactly the banned heuristic (memory: feedback_no_most_recent_file_heuristic). Remove this skip once it is replaced by the AV_OUTPUT sentinel."
+@test "R6/R7 FIXED: bmad-speak-enhanced.sh no longer uses the banned 'ls -t' most-recent-file heuristic" {
   run grep -c "ls -t" "$TEST_CLAUDE_DIR/hooks/bmad-speak-enhanced.sh"
   [ "$output" -eq 0 ]
 }
