@@ -282,6 +282,76 @@ case "${PROVIDER:-}" in
 esac
 
 # ---------------------------------------------------------------------------
+# Resolve the project-level .claude dir the way the local managers do:
+# CLAUDE_PROJECT_DIR (the real user project, injected via --project-dir by
+# play-tts.sh) wins; otherwise fall back to the package PROJECT_ROOT.
+# ---------------------------------------------------------------------------
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" && -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  _RESOLVE_PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+else
+  _RESOLVE_PROJECT_DIR="$PROJECT_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve MUTE to forward (map §C 'mute never forwarded on SSH', R17).
+# Mirrors play-tts.sh's 3-level file check exactly:
+#   project-unmute (overrides global) > project-mute > global-mute.
+# The receiver is authoritative and applies a SAFETY-OR:
+#   effective_mute = receiver_local_mute OR forwarded_mute
+# so if EITHER side is muted, playback stays silent. We forward this as a
+# STRING ("true"/"false") — the receiver does a plain string compare, and it
+# keeps the JSON boolean out of python's "True"/"False" capitalization.
+# ---------------------------------------------------------------------------
+_GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
+_PROJECT_MUTE_FILE="$_RESOLVE_PROJECT_DIR/.claude/agentvibes-muted"
+_PROJECT_UNMUTE_FILE="$_RESOLVE_PROJECT_DIR/.claude/agentvibes-unmuted"
+MUTE="false"
+if [[ -f "$_PROJECT_UNMUTE_FILE" ]]; then
+  MUTE="false"                       # project explicitly unmuted overrides global
+elif [[ -f "$_PROJECT_MUTE_FILE" ]]; then
+  MUTE="true"
+elif [[ -f "$_GLOBAL_MUTE_FILE" ]]; then
+  MUTE="true"
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve LANGUAGE to forward (map §D 'language | Forward on SSH', R18).
+# Precedence mirrors the local chain (learn-manager.sh / language-manager.sh):
+#   learning-mode target (tts-target-language.txt when tts-learn-mode.txt=="ON")
+#   > tts-language.txt.
+# Forwarded as a DEFAULT only — the receiver stays authoritative and its own
+# language config (if any) wins. language-manager.sh stores tts-language.txt at
+# the .claude/ root; the resolver contract tests use the .claude/config/ subdir,
+# so we accept both. Project scope wins over the global home fallback.
+# ---------------------------------------------------------------------------
+LANGUAGE=""
+for _cdir in "$_RESOLVE_PROJECT_DIR/.claude" "$HOME/.claude"; do
+  # Priority 1: learning-mode target language (only when learn mode is ON).
+  if [[ -z "$LANGUAGE" && -f "$_cdir/tts-learn-mode.txt" ]]; then
+    if [[ "$(cat "$_cdir/tts-learn-mode.txt" 2>/dev/null || true)" == "ON" ]]; then
+      [[ -f "$_cdir/tts-target-language.txt" ]] && \
+        LANGUAGE=$(cat "$_cdir/tts-target-language.txt" 2>/dev/null || true)
+    fi
+  fi
+  # Priority 2: tts-language.txt (root or config/ subdir).
+  if [[ -z "$LANGUAGE" && -f "$_cdir/tts-language.txt" ]]; then
+    LANGUAGE=$(cat "$_cdir/tts-language.txt" 2>/dev/null || true)
+  fi
+  if [[ -z "$LANGUAGE" && -f "$_cdir/config/tts-language.txt" ]]; then
+    LANGUAGE=$(cat "$_cdir/config/tts-language.txt" 2>/dev/null || true)
+  fi
+  [[ -n "$LANGUAGE" ]] && break
+done
+# Trim surrounding whitespace
+LANGUAGE="${LANGUAGE#"${LANGUAGE%%[![:space:]]*}"}"
+LANGUAGE="${LANGUAGE%"${LANGUAGE##*[![:space:]]}"}"
+# SECURITY: only forward a plain language name (letters, spaces, hyphen); jq
+# --arg escapes anyway, but reject odd values rather than propagate them.
+if [[ -n "$LANGUAGE" ]] && [[ ! "$LANGUAGE" =~ ^[a-zA-Z][a-zA-Z\ -]*$ ]]; then
+  LANGUAGE=""
+fi
+
+# ---------------------------------------------------------------------------
 # Build JSON payload
 # ---------------------------------------------------------------------------
 
@@ -299,15 +369,17 @@ build_json_payload() {
       --arg speed "$SPEED" \
       --arg provider "$PROVIDER" \
       --arg llm "$LLM_NAME" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm}'
+      --arg mute "$MUTE" \
+      --arg language "$LANGUAGE" \
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language}'
   else
     # Manual JSON — escape backslashes, quotes, control chars
     local escaped_text
     escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' ' | sed 's/\r//g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME"
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE"
   fi
 }
 
