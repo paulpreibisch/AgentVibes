@@ -1,5 +1,23 @@
 # AgentVibes Release Notes
 
+## 🧪 v5.12.0-alpha.0 — Utterance Resolver Rewrite (ALPHA / testing)
+
+**Published:** 2026-07-04 · dist-tag **`alpha`** (not `latest`). Install with `npm install agentvibes@alpha`.
+
+Alpha of a foundational rewrite: a **single source of truth** for how every utterance is spoken. Historically the voice/engine/transport/volume/music decisions were hand-forked across bash, PowerShell, Python and JavaScript and had drifted — the root cause of a long tail of "audio silently died" bugs. This introduces one Node **utterance resolver** that decides once; the players execute the plan.
+
+- **Fixed: Kokoro voices played silence on Linux/WSL** — a kokoro-shaped voice now forces the kokoro engine on every platform (was only correct on Windows).
+- **Fixed: per-LLM voice routing** — an assistant echoing back its configured voice no longer defeats your per-LLM assignment.
+- **Fixed: BMAD per-agent voices** (party mode) — restored a dropped code path that crashed silently; each agent speaks its own voice again.
+- **Killed the banned "most recent file" heuristic** — providers emit an exact output path (`AV_OUTPUT:`), so party-mode audio never grabs another agent's file.
+- **Unified** the background-music volume default (0.20 everywhere), the no-playback flag, and mute handling; **SSH** now forwards mute + language to the receiver (receiver stays authoritative).
+- Both players (Linux/Mac **and** Windows) run on the resolver; the installer ships the resolver bundle to real machines (works on every Node version). Fail-safe: if the bundle is unreachable, players fall back to the legacy path — TTS never breaks.
+- Reviewed by an adversarial model-gate; 3 real regressions + a deploy bug caught and fixed before this alpha.
+
+**This is an alpha for testing** — please report anything odd. `latest` is unchanged.
+
+---
+
 ## 🐛 v5.11.2 — Kokoro Installer Fix (PEP 668)
 
 **Released:** 2026-06-27
