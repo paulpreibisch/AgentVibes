@@ -471,7 +471,7 @@ sprint_5:
     story_8_7:
       id: AVI-S8.7
       title: Provider × Engine × Platform Contract-Test Matrix
-      status: ready-for-dev
+      status: in-progress
       story_points: 8
       acceptance_criteria_count: 6
       file: docs/implementation-artifacts/8-7-contract-test-matrix.md
