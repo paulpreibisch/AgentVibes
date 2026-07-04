@@ -213,7 +213,7 @@ if ($BgEnabled -or $HasReverb) {
 #   1. Key           - Must start with "llm:" followed by the LLM name
 #   2. REVERB_PRESET - One of: off, light, medium, heavy, cathedral (or blank)
 #   3. BACKGROUND_FILE - Filename relative to .claude/audio/tracks/ (or blank)
-#   4. BACKGROUND_VOLUME - Float 0.0-1.0 (or blank for default 0.25)
+#   4. BACKGROUND_VOLUME - Float 0.0-1.0 (or blank for default 0.20)
 #   5. VOICE         - Provider voice name to use (or blank for global default)
 #   6. PRETEXT       - Text prepended to all TTS utterances (or blank)
 #   7. ENGINE        - Windows engine: windows-sapi, windows-piper, soprano (or blank)
@@ -574,8 +574,9 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                 $BgTrackPath = Join-Path $TracksDir "agent_vibes_bachata_v1_loop.mp3"
             }
 
-            # Get volume (default 0.25) — per-message override takes precedence
-            $BgVolume = "0.25"
+            # Get volume (default 0.20) — per-message override takes precedence
+            # TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+            $BgVolume = "0.20"
             $VolumeFile = "$ConfigDir\background-music-volume.txt"
             if (Test-Path $VolumeFile) {
                 $vol = (Get-Content $VolumeFile -Raw).Trim()

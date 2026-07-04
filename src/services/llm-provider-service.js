@@ -49,7 +49,7 @@ const DEFAULT_LLM_CONFIGS = {
   default: {
     effects: 'light',
     bgTrack: '',
-    bgVolume: '0.15',
+    bgVolume: '0.20',
     voice: 'en_US-lessac-high',
     pretext: '',
     ttsEngine: 'piper',
@@ -57,7 +57,7 @@ const DEFAULT_LLM_CONFIGS = {
   'claude-code': {
     effects: 'light',
     bgTrack: 'agent_vibes_chillwave_v2_loop.mp3',
-    bgVolume: '0.15',
+    bgVolume: '0.20',
     voice: 'en_US-lessac-high',
     pretext: '',
     ttsEngine: 'piper',
@@ -65,7 +65,7 @@ const DEFAULT_LLM_CONFIGS = {
   copilot: {
     effects: 'light',
     bgTrack: 'agent_vibes_bossa_nova_v2_loop.mp3',
-    bgVolume: '0.15',
+    bgVolume: '0.20',
     voice: 'en_US-libritts-high::Anna-11',
     pretext: '',
     ttsEngine: 'piper',
@@ -73,7 +73,7 @@ const DEFAULT_LLM_CONFIGS = {
   codex: {
     effects: 'light',
     bgTrack: 'agent_vibes_chillwave_v2_loop.mp3',
-    bgVolume: '0.15',
+    bgVolume: '0.20',
     // NOTE: lessac-medium appears to silently fail to synthesize on some
     // Windows Piper installs (loads the model, exits with no output).
     // lessac-high works reliably, so use it as the default for codex.
@@ -84,7 +84,7 @@ const DEFAULT_LLM_CONFIGS = {
   hermes: {
     effects: 'light',
     bgTrack: 'agent_vibes_bachata_v1_loop.mp3',
-    bgVolume: '0.15',
+    bgVolume: '0.20',
     voice: 'en_US-libritts-high::Leo-8',
     pretext: '',
     ttsEngine: 'piper',
@@ -943,7 +943,7 @@ export function loadLlmConfigSync(llmKey, targetDir) {
           return {
             effects: (parts[1] || '').trim(),
             bgTrack: (parts[2] || '').trim(),
-            bgVolume: (parts[3] || '0.15').trim(),
+            bgVolume: (parts[3] || '0.20').trim(),
             voice: (parts[4] || '').trim(),
             pretext: (parts[5] || '').trim(),
             ttsEngine: (parts[6] || '').trim(),  // new field — empty if old format
@@ -953,7 +953,7 @@ export function loadLlmConfigSync(llmKey, targetDir) {
       }
     } catch { /* file not found */ }
   }
-  return { effects: '', bgTrack: '', bgVolume: '0.15', voice: '', pretext: '', ttsEngine: '', sourcePath: '' };
+  return { effects: '', bgTrack: '', bgVolume: '0.20', voice: '', pretext: '', ttsEngine: '', sourcePath: '' };
 }
 
 /**
