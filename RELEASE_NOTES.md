@@ -1,20 +1,31 @@
 # AgentVibes Release Notes
 
-## 🧪 v5.12.0-alpha.0 — Utterance Resolver Rewrite (ALPHA / testing)
+## 🧪 v5.12.0-alpha.0 — The "Fable Week" Overhaul (ALPHA / testing)
 
-**Published:** 2026-07-04 · dist-tag **`alpha`** (not `latest`). Install with `npm install agentvibes@alpha`.
+**Published:** 2026-07-04 · dist-tag **`alpha`** (not `latest`). Try it with `npm install agentvibes@alpha`.
 
-Alpha of a foundational rewrite: a **single source of truth** for how every utterance is spoken. Historically the voice/engine/transport/volume/music decisions were hand-forked across bash, PowerShell, Python and JavaScript and had drifted — the root cause of a long tail of "audio silently died" bugs. This introduces one Node **utterance resolver** that decides once; the players execute the plan.
+### The story behind this release
 
-- **Fixed: Kokoro voices played silence on Linux/WSL** — a kokoro-shaped voice now forces the kokoro engine on every platform (was only correct on Windows).
-- **Fixed: per-LLM voice routing** — an assistant echoing back its configured voice no longer defeats your per-LLM assignment.
-- **Fixed: BMAD per-agent voices** (party mode) — restored a dropped code path that crashed silently; each agent speaks its own voice again.
-- **Killed the banned "most recent file" heuristic** — providers emit an exact output path (`AV_OUTPUT:`), so party-mode audio never grabs another agent's file.
-- **Unified** the background-music volume default (0.20 everywhere), the no-playback flag, and mute handling; **SSH** now forwards mute + language to the receiver (receiver stays authoritative).
-- Both players (Linux/Mac **and** Windows) run on the resolver; the installer ships the resolver bundle to real machines (works on every Node version). Fail-safe: if the bundle is unreachable, players fall back to the legacy path — TTS never breaks.
-- Reviewed by an adversarial model-gate; 3 real regressions + a deploy bug caught and fixed before this alpha.
+For one week, Anthropic gave us early access to their brand-new **Fable** model. Instead of keeping that to ourselves, we decided to **spend our tokens on the community** — we pointed Fable at the entire AgentVibes codebase and asked it to find everything that was fragile, duplicated, or quietly broken, and to help us rebuild it properly. This alpha is the result: a real overhaul, paid for with that week of access, so **everyone who uses AgentVibes benefits**.
 
-**This is an alpha for testing** — please report anything odd. `latest` is unchanged.
+### What was wrong (in plain terms)
+
+AgentVibes has to make a lot of decisions every time it speaks — which voice, which engine, play here or send to another machine, background music on or off, how loud, muted or not. Over time, that decision-making logic had been **copied into four different places**, written in four different languages (the Mac/Linux script, the Windows script, the remote-audio script, and the voice-control server). Those copies slowly **drifted apart** — a fix made in one was missed in the others. That's why the same kinds of glitches kept coming back: a voice that played silence on one system but worked on another, volume that ignored your setting, mute that behaved differently everywhere.
+
+### What we did
+
+We built **one "brain"** that makes all those decisions in a single place, and everything else simply does what the brain says. One place to fix, one place to trust — which retires that whole family of recurring bugs. Concretely in this alpha:
+
+- **Kokoro voices that played silence on Linux now work** on every system.
+- **Your per-voice assignments stick** — the assistant repeating back its own settings no longer overrides them.
+- **Team/party voices are back** — a hidden crash that made every agent speak with the same voice is fixed; each agent has its own voice again.
+- **No more grabbing the wrong audio file** — a long-standing shortcut that could play another agent's clip is gone for good.
+- **Consistent volume, mute, and remote playback** across Mac, Linux, and Windows.
+- **Safety first:** if anything about the new brain isn't available on your machine, AgentVibes automatically falls back to the old behaviour — so your voice **never just stops working**.
+
+Before shipping, we had Fable act as a tough reviewer of our own work — it caught **three real bugs and a packaging mistake** we'd have otherwise released, and we fixed them first.
+
+**This is an alpha for testing.** `latest` is unchanged; please try it and tell us what you find. Thank you, Anthropic, for the week with Fable — and thanks to this community for making it worth spending on. 🙏
 
 ---
 
