@@ -513,11 +513,16 @@ speak_text() {
     termux-ssh)
       bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
-    ssh-remote)
+    ssh-remote|agentvibes-receiver)
+      # Both route through the base64-JSON sender that the modern receiver
+      # (templates/agentvibes-receiver.ps1 / .sh, installed as play-remote.*)
+      # understands. The old voiceless-connections sender spoke a 3-positional-arg
+      # protocol for a legacy ~/.agentvibes/play-remote.sh receiver that no current
+      # receiver install produces, so it delivered a non-base64 command the modern
+      # receiver rejects ("Payload must be base64-encoded"). play-tts-ssh-remote.sh
+      # resolves the host from any transport-config mode=remote entry (Priority 2b),
+      # so the agentvibes-receiver section is found without an ssh-remote section.
       bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice" "" "${profile_file:-}"
-      ;;
-    agentvibes-receiver)
-      bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
       ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
@@ -653,11 +658,13 @@ case "$ACTIVE_PROVIDER" in
   termux-ssh)
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
-  ssh-remote)
+  ssh-remote|agentvibes-receiver)
+    # Both route through the base64-JSON sender the modern receiver understands.
+    # The legacy voiceless-connections sender spoke a 3-arg protocol for an old
+    # ~/.agentvibes/play-remote.sh receiver that no current install produces, so it
+    # delivered a non-base64 command the modern receiver rejects with
+    # "Payload must be base64-encoded".
     exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE" "" "${AGENT_PROFILE_FILE:-}"
-    ;;
-  agentvibes-receiver)
-    exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2
