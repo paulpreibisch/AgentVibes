@@ -141,6 +141,8 @@ if ($Kind -eq 'music') {
         Write-Output "Error: music payload has no track"
         exit 1
     }
+} elseif ($Kind -eq 'music-stop') {
+    # Stop request carries neither text nor a track — nothing to validate.
 } elseif (-not $script:Text) {
     Write-Output "Error: No text in payload"
     exit 1
@@ -163,7 +165,7 @@ if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
 
 # Music-only preview: the track must be a bare .mp3 filename (no path parts) —
 # the watcher resolves it against ~/.claude/audio/tracks/ with a containment check.
-if ($Kind -eq 'music' -and $BgFile -notmatch '^[A-Za-z0-9._\-]+\.mp3$') {
+if ($Kind -eq 'music' -and $BgFile -notmatch '^[A-Za-z0-9._][A-Za-z0-9._\-]*\.mp3$') {
     Write-Output "Error: invalid music track name"
     exit 1
 }

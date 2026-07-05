@@ -567,6 +567,10 @@ export function createMusicTab(screen, services) {
 
   let _playingProcess = null;
   let _playingTrackId = null;
+  // Remote playback is fire-and-forget (the local sender exits in ms while the
+  // receiver keeps playing), so the on/off toggle tracks the intended remote
+  // track here rather than relying on a live local process.
+  let _remotePlayingTrackId = null;
 
   function _killPlayingProcess() {
     if (_playingProcess) {
@@ -576,6 +580,51 @@ export function createMusicTab(screen, services) {
   }
 
   const _spawnEnv = buildAudioEnv();
+
+  /**
+   * Spawn the SSH sender to play a music track on the receiver, or stop the
+   * current one. Fire-and-forget (the sender exits after handing the payload to
+   * SSH; the receiver plays/stops asynchronously). Returns true if the send was
+   * launched. On a play error the remote-playing state is cleared so the toggle
+   * doesn't get stuck "on".
+   * @param {{remote:boolean, projectDir:string}} mp
+   * @param {{track?:string, stop?:boolean}} opts
+   */
+  function _sendMusicRemote(mp, { track = null, stop = false } = {}) {
+    const _pkgSender = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..', '.claude', 'hooks', 'play-tts-ssh-remote.sh');
+    const senderPath = fs.existsSync(_pkgSender)
+      ? _pkgSender
+      : path.join(mp.projectDir, '.claude', 'hooks', 'play-tts-ssh-remote.sh');
+    const env = { ..._spawnEnv, CLAUDE_PROJECT_DIR: mp.projectDir };
+    if (stop) env.AGENTVIBES_MUSIC_STOP = '1';
+    else env.AGENTVIBES_MUSIC_ONLY = track;
+    let rproc;
+    try {
+      rproc = spawn('bash', [senderPath, '', ''], { stdio: ['ignore', 'ignore', 'pipe'], detached: true, env }); // NOSONAR
+    } catch {
+      previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
+      screen.render();
+      setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 4000);
+      return false;
+    }
+    let _rerr = '';
+    if (rproc.stderr) rproc.stderr.on('data', d => { _rerr += d.toString(); });
+    rproc.on('exit', (code) => {
+      if (stop || code === 0) return;
+      if (_remotePlayingTrackId === track) _remotePlayingTrackId = null;
+      const msg = _rerr.trim().split('\n').pop() || 'Remote preview failed';
+      previewLine.setContent(`{red-fg}♪ ${msg}{/red-fg}`);
+      screen.render();
+      setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 4000);
+    });
+    rproc.on('error', () => {
+      if (stop) return;
+      if (_remotePlayingTrackId === track) _remotePlayingTrackId = null;
+      previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
+      screen.render();
+    });
+    return true;
+  }
 
   process.on('exit', () => { _killPlayingProcess(); });
 
@@ -593,6 +642,29 @@ export function createMusicTab(screen, services) {
       return;
     }
 
+    // Remote provider: forward to the receiver instead of local playback (which
+    // is silent on a headless box). The receiver auto-stops any prior track when
+    // a new one arrives; pressing Space on the currently-playing track sends an
+    // explicit stop (toggle off).
+    const _mp = _resolveMusicProvider();
+    if (_mp.remote) {
+      if (_remotePlayingTrackId === trackId) {
+        _sendMusicRemote(_mp, { stop: true });
+        _remotePlayingTrackId = null;
+        previewLine.setContent(_listFocused ? _hintText() : '');
+        screen.render();
+        return;
+      }
+      const rlabel = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
+      if (_sendMusicRemote(_mp, { track: trackId })) {
+        _remotePlayingTrackId = trackId;
+        previewLine.setContent(`{${COLORS.playingFg}-fg}♪ Playing on receiver: ${rlabel}  (Space to stop){/${COLORS.playingFg}-fg}`);
+      }
+      screen.render();
+      return;
+    }
+
+    // ── Local playback ──────────────────────────────────────────────────────
     // Toggle: second press on the same track → stop
     if (_playingTrackId === trackId) {
       _killPlayingProcess();
@@ -605,57 +677,6 @@ export function createMusicTab(screen, services) {
     // Kill any previously playing track
     _killPlayingProcess();
     _playingTrackId = null;
-
-    // Remote provider: forward the track to the receiver. Local MP3 playback is
-    // silent on a headless/remote box, so send a music-only payload via the SSH
-    // sender (which self-resolves the receiver host) and let the receiver play it.
-    const _mp = _resolveMusicProvider();
-    if (_mp.remote) {
-      const _pkgSender = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..', '.claude', 'hooks', 'play-tts-ssh-remote.sh');
-      const senderPath = fs.existsSync(_pkgSender)
-        ? _pkgSender
-        : path.join(_mp.projectDir, '.claude', 'hooks', 'play-tts-ssh-remote.sh');
-      let rproc;
-      try {
-        rproc = spawn('bash', [senderPath, '', ''], { // NOSONAR
-          stdio: ['ignore', 'ignore', 'pipe'],
-          detached: true,
-          env: { ..._spawnEnv, AGENTVIBES_MUSIC_ONLY: trackId, CLAUDE_PROJECT_DIR: _mp.projectDir },
-        });
-      } catch {
-        previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
-        screen.render();
-        setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 4000);
-        return;
-      }
-      _playingProcess = rproc;
-      _playingTrackId = trackId;
-      const rlabel = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
-      previewLine.setContent(`{${COLORS.playingFg}-fg}♪ Sending to receiver: ${rlabel}{/${COLORS.playingFg}-fg}`);
-      screen.render();
-      let _rerr = '';
-      if (rproc.stderr) rproc.stderr.on('data', d => { _rerr += d.toString(); });
-      rproc.on('exit', (code) => {
-        if (_playingTrackId !== trackId) return;
-        _playingTrackId = null; _playingProcess = null;
-        if (code !== 0) {
-          const msg = _rerr.trim().split('\n').pop() || 'Remote preview failed';
-          previewLine.setContent(`{red-fg}♪ ${msg}{/red-fg}`);
-          screen.render();
-          setTimeout(() => { if (!_listFocused) refreshDisplay(); else { previewLine.setContent(_hintText()); screen.render(); } }, 4000);
-        } else {
-          previewLine.setContent(_listFocused ? _hintText() : '');
-          screen.render();
-        }
-      });
-      rproc.on('error', () => {
-        if (_playingTrackId !== trackId) return;
-        _playingTrackId = null; _playingProcess = null;
-        previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
-        screen.render();
-      });
-      return;
-    }
 
     const proc = spawnMp3Player(trackPath, _spawnEnv);
     if (!proc) {

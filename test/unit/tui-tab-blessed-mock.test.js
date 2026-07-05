@@ -159,7 +159,7 @@ describe('createPlaceholderTab() — with blessed mock', () => {
   test('TAB_DISPLAY_LABELS contains expected tab names', () => {
     assert.ok(typeof TAB_DISPLAY_LABELS === 'object');
     assert.ok('settings' in TAB_DISPLAY_LABELS);
-    assert.ok('voices' in TAB_DISPLAY_LABELS);
+    assert.ok('music' in TAB_DISPLAY_LABELS);
     assert.ok('help' in TAB_DISPLAY_LABELS);
   });
 

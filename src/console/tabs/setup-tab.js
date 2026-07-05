@@ -2853,6 +2853,7 @@ export function createSetupTab(screen, services) {
     let _kSpinFrame = 0;
     let _kSpinningIdx = -1;
     let _kSpinStartTs = 0;
+    let _kFloorTimer = null;   // pending _stopKSpinnerWithFloor timer (tracked so it can be cancelled)
     // Remote SSH preview is fire-and-forget: play-tts-ssh-remote.sh backgrounds
     // the ssh call and exits within milliseconds, so the row spinner would be
     // torn down before it ever paints a frame while the receiver plays the audio
@@ -2875,6 +2876,9 @@ export function createSetupTab(screen, services) {
     }
 
     function _stopKSpinner() {
+      // Cancel any pending floor timer so a stale one can't fire against a newer
+      // preview's spinner (rapid Space presses) or after the picker closes.
+      if (_kFloorTimer) { clearTimeout(_kFloorTimer); _kFloorTimer = null; }
       if (_kSpinInterval) { clearInterval(_kSpinInterval); _kSpinInterval = null; }
       if (_kSpinningIdx >= 0 && !_kClosed) {
         kPicker.setItem(_kSpinningIdx, _kokoroItem(voices[_kSpinningIdx]));
@@ -2889,8 +2893,10 @@ export function createSetupTab(screen, services) {
     // the _kClosed guard both short-circuit). Used only by the remote path — the
     // local synth path already spins for the whole (multi-second) synthesis.
     function _stopKSpinnerWithFloor(after) {
+      if (_kFloorTimer) { clearTimeout(_kFloorTimer); _kFloorTimer = null; }
       const wait = Math.max(0, _K_MIN_SPIN_MS - (Date.now() - _kSpinStartTs));
-      setTimeout(() => {
+      _kFloorTimer = setTimeout(() => {
+        _kFloorTimer = null;
         _stopKSpinner();
         if (!_kClosed && after) after();
       }, wait);

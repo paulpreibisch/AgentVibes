@@ -32,30 +32,48 @@ try {
             try {
                 $req = Get-Content $procFile -Raw | ConvertFrom-Json
 
-                # Music-only preview: play a standalone background-music track
-                # directly with ffplay (no synthesis, no mixing). Reuses the same
-                # standalone-playback primitive as the remote-prefix sound below.
-                if ($req.kind -eq 'music') {
-                    $trackName = [string]$req.music
-                    if ($trackName -match '^[A-Za-z0-9._\-]+\.mp3$') {
-                        $tracksDir = Join-Path $env:USERPROFILE '.claude\audio\tracks'
-                        $trackPath = Join-Path $tracksDir $trackName
-                        # Path containment: resolve and confirm it stays under tracksDir
-                        $full     = [System.IO.Path]::GetFullPath($trackPath)
-                        $baseFull = [System.IO.Path]::GetFullPath($tracksDir)
-                        if ($full.StartsWith($baseFull, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path $full)) {
-                            $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
-                            if ($ffplay) {
-                                Write-WatcherLog "INFO" "music-preview id=$($req.id) track=$trackName"
-                                & $ffplay.Source -autoexit -nodisp -loglevel quiet $full 2>$null
+                # Music preview: play/stop a standalone background-music track
+                # ASYNCHRONOUSLY (Start-Process) so it never blocks the TTS queue,
+                # tracking the ffplay PID so a new request (or an explicit stop)
+                # replaces the previous track instead of stacking playback.
+                #   kind=music       → stop any current preview, then play the track
+                #   kind=music-stop  → stop any current preview (no new playback)
+                if ($req.kind -eq 'music' -or $req.kind -eq 'music-stop') {
+                    $pidFile = Join-Path $env:USERPROFILE '.agentvibes\music-preview.pid'
+                    # Stop the currently-playing preview, if any. Verify the PID is
+                    # actually ffplay so a recycled PID can't kill an unrelated proc.
+                    if (Test-Path $pidFile) {
+                        $oldPid = (Get-Content $pidFile -Raw -ErrorAction SilentlyContinue).Trim()
+                        if ($oldPid -match '^\d+$') {
+                            $op = Get-Process -Id ([int]$oldPid) -ErrorAction SilentlyContinue
+                            if ($op -and $op.ProcessName -eq 'ffplay') { Stop-Process -Id ([int]$oldPid) -Force -ErrorAction SilentlyContinue }
+                        }
+                        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+                    }
+                    if ($req.kind -eq 'music') {
+                        $trackName = [string]$req.music
+                        if ($trackName -match '^[A-Za-z0-9._][A-Za-z0-9._\-]*\.mp3$') {
+                            $tracksDir = Join-Path $env:USERPROFILE '.claude\audio\tracks'
+                            $full     = [System.IO.Path]::GetFullPath((Join-Path $tracksDir $trackName))
+                            $baseFull = [System.IO.Path]::GetFullPath($tracksDir)
+                            if (-not $baseFull.EndsWith([IO.Path]::DirectorySeparatorChar)) { $baseFull += [IO.Path]::DirectorySeparatorChar }
+                            if ($full.StartsWith($baseFull, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path $full)) {
+                                $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
+                                if ($ffplay) {
+                                    Write-WatcherLog "INFO" "music-preview id=$($req.id) track=$trackName"
+                                    $mp = Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet','-volume','80',$full) -WindowStyle Hidden -PassThru
+                                    if ($mp) { Set-Content -Path $pidFile -Value $mp.Id -NoNewline -ErrorAction SilentlyContinue }
+                                } else {
+                                    Write-WatcherLog "WARN" "ffplay not found - cannot preview music id=$($req.id)"
+                                }
                             } else {
-                                Write-WatcherLog "WARN" "ffplay not found - cannot preview music id=$($req.id)"
+                                Write-WatcherLog "WARN" "music track not found id=$($req.id) track=$trackName"
                             }
                         } else {
-                            Write-WatcherLog "WARN" "music track not found id=$($req.id) track=$trackName"
+                            Write-WatcherLog "WARN" "invalid music track name id=$($req.id)"
                         }
                     } else {
-                        Write-WatcherLog "WARN" "invalid music track name id=$($req.id)"
+                        Write-WatcherLog "INFO" "music-stop id=$($req.id)"
                     }
                     Remove-Item $procFile -Force -ErrorAction SilentlyContinue
                     continue

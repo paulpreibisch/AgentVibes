@@ -41,10 +41,13 @@ LLM_NAME="${LLM_NAME:-default}"
 # kind=music; the receiver resolves the file from its own ~/.claude/audio/tracks/.
 PAYLOAD_KIND="speak"
 MUSIC_ONLY_TRACK=""
-if [[ -n "${AGENTVIBES_MUSIC_ONLY:-}" ]]; then
-  # Only a bare .mp3 filename is allowed (no path separators) — the receiver
-  # resolves it against its own tracks dir, so reject anything path-like.
-  if [[ "$AGENTVIBES_MUSIC_ONLY" =~ ^[A-Za-z0-9._-]+\.mp3$ ]]; then
+if [[ -n "${AGENTVIBES_MUSIC_STOP:-}" ]]; then
+  # Stop whatever music preview is currently playing on the receiver.
+  PAYLOAD_KIND="music-stop"
+elif [[ -n "${AGENTVIBES_MUSIC_ONLY:-}" ]]; then
+  # Only a bare .mp3 filename is allowed (no path separators, no leading dash) —
+  # the receiver resolves it against its own tracks dir, so reject path-like input.
+  if [[ "$AGENTVIBES_MUSIC_ONLY" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*\.mp3$ ]]; then
     PAYLOAD_KIND="music"
     MUSIC_ONLY_TRACK="$AGENTVIBES_MUSIC_ONLY"
   else
@@ -53,9 +56,9 @@ if [[ -n "${AGENTVIBES_MUSIC_ONLY:-}" ]]; then
   fi
 fi
 
-# Validate required input (music-only mode carries a track instead of text)
-if [[ "$PAYLOAD_KIND" == "music" ]]; then
-  TEXT=""   # no speech in a music-only preview
+# Validate required input (music / music-stop modes carry no speech text)
+if [[ "$PAYLOAD_KIND" == "music" || "$PAYLOAD_KIND" == "music-stop" ]]; then
+  TEXT=""   # no speech in a music preview / stop
 elif [[ -z "$TEXT" ]]; then
   echo "Usage: $0 <text> [voice] [agent_name]" >&2
   exit 1

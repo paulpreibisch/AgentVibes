@@ -38,7 +38,6 @@ export function createPlaceholderTab(contentArea, label) {
 /** Map of tabId → display label for all tabs */
 export const TAB_DISPLAY_LABELS = {
   settings:        'Settings',
-  voices:          'Voices',
   music:           'Music',
   agents:          'BMad',
   receiver:        'Receiver',
@@ -66,7 +65,6 @@ export function getTabLabel(id, lang = 'en') {
   const keyMap = {
     setup:           'tabSetup',
     settings:        'tabSettings',
-    voices:          'tabVoices',
     music:           'tabMusic',
     agents:          'tabBmad',
     receiver:        'tabReceiver',

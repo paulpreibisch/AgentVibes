@@ -94,23 +94,6 @@ get_active_provider() {
     fi
   fi
 
-  # Global fallback: get_provider_config_path resolves a path from directory
-  # STRUCTURE (a .claude/ dir may exist without tts-provider.txt — e.g. one just
-  # created to hold audio output), so the resolved project path can be missing
-  # while the user's real provider lives in ~/.claude. Without this, a TUI voice
-  # preview spawned with CLAUDE_PROJECT_DIR pointing at such a dir would silently
-  # default to piper-local and play nothing on a remote/headless receiver box.
-  # Project config still wins (handled above); this only applies when it's absent.
-  local global_file="$HOME/.claude/tts-provider.txt"
-  if [[ "$provider_file" != "$global_file" && -f "$global_file" ]]; then
-    local global_provider
-    global_provider=$(cat "$global_file" | tr -d '[:space:]')
-    if [[ -n "$global_provider" ]]; then
-      echo "$global_provider"
-      return 0
-    fi
-  fi
-
   # Default to piper (free, offline)
   echo "piper"
 }
