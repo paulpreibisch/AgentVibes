@@ -967,15 +967,23 @@ export function createVoicesTab(screen, services) {
     // NOTE: projectRoot is AgentVibes repo root (3 levels up from src/console/tabs/)
     const projectRoot = path.resolve(__dirname, '..', '..', '..');
     let activeProvider = '';
+    // Capture the dir the provider was read from so we can forward it to
+    // play-tts.sh as --project-dir. Without it the script re-resolves the
+    // provider from its OWN cwd/package .claude (which has no tts-provider.txt),
+    // falls back to piper-local, and synthesizes to a silent local device on a
+    // headless/remote box — i.e. the preview appears to do nothing. Passing the
+    // exact dir we matched keeps the JS check and the shell routing in agreement.
+    let activeProjectDir = '';
     try {
-      const providerPaths = [
-        process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
-        path.join(process.cwd(), '.claude', 'tts-provider.txt'),
-        path.join(projectRoot, '.claude', 'tts-provider.txt'),
-        path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+      const providerDirs = [
+        process.env.CLAUDE_PROJECT_DIR,
+        process.cwd(),
+        projectRoot,
+        os.homedir(),
       ].filter(Boolean);
-      for (const p of providerPaths) {
-        if (fs.existsSync(p)) { activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
+      for (const d of providerDirs) {
+        const p = path.join(d, '.claude', 'tts-provider.txt');
+        if (fs.existsSync(p)) { activeProvider = fs.readFileSync(p, 'utf8').trim(); activeProjectDir = d; break; }
       }
     } catch {}
 
@@ -994,12 +1002,14 @@ export function createVoicesTab(screen, services) {
       let proc;
       if (isWindows) {
         const playTts = path.join(hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
-        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId], { // NOSONAR
+        const _pdArgs = activeProjectDir ? ['-ProjectDir', activeProjectDir] : [];
+        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId, ..._pdArgs], { // NOSONAR
           stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
         });
       } else {
         const playTts = path.join(hooksBase, '.claude', 'hooks', 'play-tts.sh');
-        proc = spawn('bash', [playTts, phrase, voiceId], { // NOSONAR
+        const _pdArgs = activeProjectDir ? ['--project-dir', activeProjectDir] : [];
+        proc = spawn('bash', [playTts, phrase, voiceId, ..._pdArgs], { // NOSONAR
           stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _spawnEnv,
           cwd: process.cwd(),
         });
