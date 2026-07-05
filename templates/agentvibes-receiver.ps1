@@ -102,6 +102,9 @@ $Provider = "piper"
 $Llm = "default"
 $Mute = "false"
 $Language = ""
+# kind: "speak" (default — synthesize text) or "music" (play a standalone
+# background-music track, no speech). Set by the Music-tab remote preview.
+$Kind = "speak"
 
 if ($decoded.TrimStart().StartsWith('{')) {
     # JSON payload
@@ -121,6 +124,7 @@ if ($decoded.TrimStart().StartsWith('{')) {
         # may hand back a real boolean, so stringify defensively.
         if ($null -ne $json.mute) { $Mute = ([string]$json.mute).ToLower() }
         if ($json.language) { $Language = $json.language }
+        if ($json.kind)     { $Kind = ([string]$json.kind).ToLower() }
     } catch {
         Write-Output "Error: Failed to parse JSON payload"
         exit 1
@@ -130,8 +134,14 @@ if ($decoded.TrimStart().StartsWith('{')) {
     $script:Text = $decoded
 }
 
-# Validate text
-if (-not $script:Text) {
+# Validate text. Music-only previews carry no speech — they require a track
+# (the "music" field) instead of text.
+if ($Kind -eq 'music') {
+    if (-not $BgFile) {
+        Write-Output "Error: music payload has no track"
+        exit 1
+    }
+} elseif (-not $script:Text) {
     Write-Output "Error: No text in payload"
     exit 1
 }
@@ -149,6 +159,13 @@ if ($Provider -notin @("piper", "soprano", "kokoro", "windows-sapi", "windows-pi
 # Validate LLM name - only safe identifier chars (mirrors play-tts.ps1 check)
 if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
     $Llm = "default"
+}
+
+# Music-only preview: the track must be a bare .mp3 filename (no path parts) —
+# the watcher resolves it against ~/.claude/audio/tracks/ with a containment check.
+if ($Kind -eq 'music' -and $BgFile -notmatch '^[A-Za-z0-9._\-]+\.mp3$') {
+    Write-Output "Error: invalid music track name"
+    exit 1
 }
 
 # Validate volume is numeric
@@ -252,6 +269,7 @@ $ReqJson = @{
     provider = $Provider
     llm      = $Llm
     language = $EffectiveLanguage
+    kind     = $Kind
 } | ConvertTo-Json -Compress
 
 try {

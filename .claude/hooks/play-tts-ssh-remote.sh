@@ -34,8 +34,29 @@ fi
 # Default to "default" so remote always has an LLM key to look up
 LLM_NAME="${LLM_NAME:-default}"
 
-# Validate required input
-if [[ -z "$TEXT" ]]; then
+# Music-only preview mode: AGENTVIBES_MUSIC_ONLY=<track.mp3> tells the receiver to
+# play a standalone background-music track (no speech). Used by the Music tab's
+# remote preview so a track can be auditioned on the receiver. In this mode empty
+# TEXT is allowed and the track name is forwarded as the "music" field with
+# kind=music; the receiver resolves the file from its own ~/.claude/audio/tracks/.
+PAYLOAD_KIND="speak"
+MUSIC_ONLY_TRACK=""
+if [[ -n "${AGENTVIBES_MUSIC_ONLY:-}" ]]; then
+  # Only a bare .mp3 filename is allowed (no path separators) — the receiver
+  # resolves it against its own tracks dir, so reject anything path-like.
+  if [[ "$AGENTVIBES_MUSIC_ONLY" =~ ^[A-Za-z0-9._-]+\.mp3$ ]]; then
+    PAYLOAD_KIND="music"
+    MUSIC_ONLY_TRACK="$AGENTVIBES_MUSIC_ONLY"
+  else
+    echo "Invalid music track name: $AGENTVIBES_MUSIC_ONLY" >&2
+    exit 1
+  fi
+fi
+
+# Validate required input (music-only mode carries a track instead of text)
+if [[ "$PAYLOAD_KIND" == "music" ]]; then
+  TEXT=""   # no speech in a music-only preview
+elif [[ -z "$TEXT" ]]; then
   echo "Usage: $0 <text> [voice] [agent_name]" >&2
   exit 1
 fi
@@ -371,17 +392,24 @@ build_json_payload() {
       --arg llm "$LLM_NAME" \
       --arg mute "$MUTE" \
       --arg language "$LANGUAGE" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language}'
+      --arg kind "$PAYLOAD_KIND" \
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language, kind: $kind}'
   else
     # Manual JSON — escape backslashes, quotes, control chars
     local escaped_text
     escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' ' | sed 's/\r//g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE"
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s","kind":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE" "$PAYLOAD_KIND"
   fi
 }
+
+# Music-only preview: force the track as the "music" field (overriding any
+# per-LLM/agent background-music config) so the receiver plays exactly this track.
+if [[ "$PAYLOAD_KIND" == "music" ]]; then
+  BG_FILE="$MUSIC_ONLY_TRACK"
+fi
 
 JSON_PAYLOAD=$(build_json_payload)
 

@@ -12,15 +12,42 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
 import { t } from '../../i18n/strings.js';
 
+const _MUSIC_TAB_DIR = path.dirname(fileURLToPath(import.meta.url));
+
 // Package-relative tracks dir — used as fallback when cwd has no .claude/audio/tracks/
 const _PKG_TRACKS_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..', '..', '..', '.claude', 'audio', 'tracks'
+  _MUSIC_TAB_DIR, '..', '..', '..', '.claude', 'audio', 'tracks'
 );
+
+// Transport providers route audio to a remote receiver; local MP3 playback is
+// silent on a headless/remote box, so track previews must be forwarded instead.
+const _REMOTE_PROVIDERS = ['ssh-remote', 'agentvibes-receiver'];
+
+/**
+ * Resolve the active provider and the project dir it was read from, using the
+ * same search order as the voice pickers (CLAUDE_PROJECT_DIR → cwd → package →
+ * home). Returns { remote, projectDir } so a remote preview can forward the
+ * track to the receiver and tell the sender which .claude dir to resolve.
+ */
+function _resolveMusicProvider() {
+  const projectRoot = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..');
+  const dirs = [process.env.CLAUDE_PROJECT_DIR, process.cwd(), projectRoot, os.homedir()].filter(Boolean);
+  for (const d of dirs) {
+    const p = path.join(d, '.claude', 'tts-provider.txt');
+    try {
+      if (fs.existsSync(p)) {
+        const provider = fs.readFileSync(p, 'utf8').trim();
+        return { remote: _REMOTE_PROVIDERS.includes(provider), projectDir: d };
+      }
+    } catch { /* next */ }
+  }
+  return { remote: false, projectDir: '' };
+}
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -578,6 +605,57 @@ export function createMusicTab(screen, services) {
     // Kill any previously playing track
     _killPlayingProcess();
     _playingTrackId = null;
+
+    // Remote provider: forward the track to the receiver. Local MP3 playback is
+    // silent on a headless/remote box, so send a music-only payload via the SSH
+    // sender (which self-resolves the receiver host) and let the receiver play it.
+    const _mp = _resolveMusicProvider();
+    if (_mp.remote) {
+      const _pkgSender = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..', '.claude', 'hooks', 'play-tts-ssh-remote.sh');
+      const senderPath = fs.existsSync(_pkgSender)
+        ? _pkgSender
+        : path.join(_mp.projectDir, '.claude', 'hooks', 'play-tts-ssh-remote.sh');
+      let rproc;
+      try {
+        rproc = spawn('bash', [senderPath, '', ''], { // NOSONAR
+          stdio: ['ignore', 'ignore', 'pipe'],
+          detached: true,
+          env: { ..._spawnEnv, AGENTVIBES_MUSIC_ONLY: trackId, CLAUDE_PROJECT_DIR: _mp.projectDir },
+        });
+      } catch {
+        previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
+        screen.render();
+        setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 4000);
+        return;
+      }
+      _playingProcess = rproc;
+      _playingTrackId = trackId;
+      const rlabel = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
+      previewLine.setContent(`{${COLORS.playingFg}-fg}♪ Sending to receiver: ${rlabel}{/${COLORS.playingFg}-fg}`);
+      screen.render();
+      let _rerr = '';
+      if (rproc.stderr) rproc.stderr.on('data', d => { _rerr += d.toString(); });
+      rproc.on('exit', (code) => {
+        if (_playingTrackId !== trackId) return;
+        _playingTrackId = null; _playingProcess = null;
+        if (code !== 0) {
+          const msg = _rerr.trim().split('\n').pop() || 'Remote preview failed';
+          previewLine.setContent(`{red-fg}♪ ${msg}{/red-fg}`);
+          screen.render();
+          setTimeout(() => { if (!_listFocused) refreshDisplay(); else { previewLine.setContent(_hintText()); screen.render(); } }, 4000);
+        } else {
+          previewLine.setContent(_listFocused ? _hintText() : '');
+          screen.render();
+        }
+      });
+      rproc.on('error', () => {
+        if (_playingTrackId !== trackId) return;
+        _playingTrackId = null; _playingProcess = null;
+        previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
+        screen.render();
+      });
+      return;
+    }
 
     const proc = spawnMp3Player(trackPath, _spawnEnv);
     if (!proc) {

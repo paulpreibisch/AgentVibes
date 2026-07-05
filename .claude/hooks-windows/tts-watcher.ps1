@@ -31,6 +31,36 @@ try {
             try { Rename-Item $f.FullName $procFile -ErrorAction Stop } catch { continue }
             try {
                 $req = Get-Content $procFile -Raw | ConvertFrom-Json
+
+                # Music-only preview: play a standalone background-music track
+                # directly with ffplay (no synthesis, no mixing). Reuses the same
+                # standalone-playback primitive as the remote-prefix sound below.
+                if ($req.kind -eq 'music') {
+                    $trackName = [string]$req.music
+                    if ($trackName -match '^[A-Za-z0-9._\-]+\.mp3$') {
+                        $tracksDir = Join-Path $env:USERPROFILE '.claude\audio\tracks'
+                        $trackPath = Join-Path $tracksDir $trackName
+                        # Path containment: resolve and confirm it stays under tracksDir
+                        $full     = [System.IO.Path]::GetFullPath($trackPath)
+                        $baseFull = [System.IO.Path]::GetFullPath($tracksDir)
+                        if ($full.StartsWith($baseFull, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path $full)) {
+                            $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
+                            if ($ffplay) {
+                                Write-WatcherLog "INFO" "music-preview id=$($req.id) track=$trackName"
+                                & $ffplay.Source -autoexit -nodisp -loglevel quiet $full 2>$null
+                            } else {
+                                Write-WatcherLog "WARN" "ffplay not found - cannot preview music id=$($req.id)"
+                            }
+                        } else {
+                            Write-WatcherLog "WARN" "music track not found id=$($req.id) track=$trackName"
+                        }
+                    } else {
+                        Write-WatcherLog "WARN" "invalid music track name id=$($req.id)"
+                    }
+                    Remove-Item $procFile -Force -ErrorAction SilentlyContinue
+                    continue
+                }
+
                 # Validate voice before passing to command line
                 $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
                 $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
