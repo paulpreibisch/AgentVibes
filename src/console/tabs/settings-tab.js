@@ -19,6 +19,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker,
 } from './voices-tab.js';
@@ -129,6 +130,16 @@ export function createSettingsTab(screen, services) {
 
   // Capture cwd once at construction (matches agents-tab.js pattern)
   const _projectRoot = process.cwd();
+
+  // Preview hooks: prefer the CURRENT package copy over the project-local
+  // .claude/hooks (a tarball reinstall refreshes node_modules only, not the
+  // project's .claude), so previews never run a stale sender. CLAUDE_PROJECT_DIR
+  // still points at _projectRoot so the hook reads the project's config/provider.
+  const _pkgClaudeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.claude');
+  function _hookScript(subdir, name) {
+    const pkg = path.join(_pkgClaudeDir, subdir, name);
+    return fs.existsSync(pkg) ? pkg : path.join(_projectRoot, '.claude', subdir, name);
+  }
 
   // ── Container ────────────────────────────────────────────────────────────
 
@@ -652,7 +663,7 @@ export function createSettingsTab(screen, services) {
 
       if (_isWin) {
         // Windows: route through play-tts.ps1 (same pattern as non-Windows bash route)
-        const playTtsScript = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        const playTtsScript = _hookScript('hooks-windows', 'play-tts.ps1');
         if (!fs.existsSync(playTtsScript)) return;
         _previewVoiceId = voiceId;
         if (!_vpClosed) {
@@ -674,7 +685,7 @@ export function createSettingsTab(screen, services) {
       }
 
       // Non-Windows: use bash play-tts.sh
-      const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+      const playTtsScript = _hookScript('hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
       const remoteLlm = detectRemoteLlm();

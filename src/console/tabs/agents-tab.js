@@ -28,6 +28,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
 // Max pretext length to prevent excessively long TTS utterances
@@ -234,6 +235,17 @@ ${_tl('bmadDesc')}
 
   // Capture cwd once at construction (L1 fix)
   const _projectRoot = process.cwd();
+
+  // Preview hooks: prefer the CURRENT package copy over the project-local
+  // .claude/hooks, which a tarball reinstall does NOT refresh (npm updates
+  // node_modules only). A stale project hook routes previews through an outdated
+  // sender (e.g. the old agentvibes-receiver→legacy-sender path). CLAUDE_PROJECT_DIR
+  // still points at _projectRoot so the hook reads the project's config/provider.
+  const _pkgClaudeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.claude');
+  function _hookScript(subdir, name) {
+    const pkg = path.join(_pkgClaudeDir, subdir, name);
+    return fs.existsSync(pkg) ? pkg : path.join(_projectRoot, '.claude', subdir, name);
+  }
 
   // Story 8.3 fix: Windows agent-preview temp-patches config files (personality.txt,
   // reverb-level.txt) to apply per-agent settings during a preview. Track every
@@ -1116,7 +1128,7 @@ ${_tl('bmadDesc')}
 
       if (_isWin) {
         // Windows: route through play-tts.ps1 (same pattern as non-Windows bash route)
-        const playTtsScript = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        const playTtsScript = _hookScript('hooks-windows', 'play-tts.ps1');
         if (!fs.existsSync(playTtsScript)) return;
         _previewVoiceId = voiceId;
         if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
@@ -1131,7 +1143,7 @@ ${_tl('bmadDesc')}
       }
 
       // Non-Windows: use bash play-tts.sh
-      const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+      const playTtsScript = _hookScript('hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
       const remoteLlm = detectRemoteLlm();
