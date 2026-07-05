@@ -2852,11 +2852,20 @@ export function createSetupTab(screen, services) {
     let _kSpinInterval = null;
     let _kSpinFrame = 0;
     let _kSpinningIdx = -1;
+    let _kSpinStartTs = 0;
+    // Remote SSH preview is fire-and-forget: play-tts-ssh-remote.sh backgrounds
+    // the ssh call and exits within milliseconds, so the row spinner would be
+    // torn down before it ever paints a frame while the receiver plays the audio
+    // a beat later — the user hears sound but never sees the spinner. Hold the
+    // spinner on-screen for this minimum window so the remote path still gives a
+    // visible "preview sent" cue (fire-and-forget has no playback signal to await).
+    const _K_MIN_SPIN_MS = 1100;
 
     function _startKSpinner(listIdx) {
       _stopKSpinner();
       _kSpinningIdx = listIdx;
       _kSpinFrame = 0;
+      _kSpinStartTs = Date.now();
       _kSpinInterval = setInterval(() => {
         if (_kClosed) { _stopKSpinner(); return; }
         const spin = `{cyan-fg}${_K_SPIN[_kSpinFrame++ % _K_SPIN.length]}{/cyan-fg}`;
@@ -2872,6 +2881,19 @@ export function createSetupTab(screen, services) {
         screen.render();
       }
       _kSpinningIdx = -1;
+    }
+
+    // Stop the spinner but keep it on-screen for at least _K_MIN_SPIN_MS so a
+    // fire-and-forget remote send stays visible; runs `after` once the floor is
+    // met. No-ops safely if the picker closes in the meantime (_stopKSpinner and
+    // the _kClosed guard both short-circuit). Used only by the remote path — the
+    // local synth path already spins for the whole (multi-second) synthesis.
+    function _stopKSpinnerWithFloor(after) {
+      const wait = Math.max(0, _K_MIN_SPIN_MS - (Date.now() - _kSpinStartTs));
+      setTimeout(() => {
+        _stopKSpinner();
+        if (!_kClosed && after) after();
+      }, wait);
     }
 
     const LEGEND_H = 3;
@@ -3226,8 +3248,7 @@ export function createSetupTab(screen, services) {
         _kPreviewProc = remoteProc;
         remoteProc.on('exit', (code) => {
           _kPreviewProc = null;
-          _stopKSpinner();
-          if (_kClosed) return;
+          _stopKSpinnerWithFloor(() => {
           if (code !== 0 && _isCjkVoice(voiceId)) {
             // CJK voice failed on receiver — needs the language-specific misaki extra there.
             // Still try to download the .pt file locally so the picker shows ✓.
@@ -3272,6 +3293,7 @@ export function createSetupTab(screen, services) {
             screen.render();
             setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
           }
+          });
         });
         remoteProc.on('error', () => {
           _kPreviewProc = null;
