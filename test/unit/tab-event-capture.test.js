@@ -191,10 +191,10 @@ function fireAllHandlers(widgets) {
   fireAllHandlers([..._allWidgets]);
 }
 
-// Pass 2: voices tab
+// Pass 2: music tab
 {
   _allWidgets.length = 0;
-  const app2 = new AgentVibesConsole({ startTab: 'voices' });
+  const app2 = new AgentVibesConsole({ startTab: 'music' });
   await app2.init();
   for (const tab of Object.values(app2.tabs || {})) {
     try { tab.show?.(); } catch {}

@@ -16,12 +16,12 @@ describe('NavigationService - Module Structure', () => {
   test('TAB_ORDER is exported from navigation-service.js', async () => {
     const { TAB_ORDER } = await import('../../src/services/navigation-service.js');
     assert.ok(Array.isArray(TAB_ORDER), 'TAB_ORDER must be an array');
-    assert.ok(TAB_ORDER.length === 8, 'TAB_ORDER must have 8 tabs');
+    assert.ok(TAB_ORDER.length === 7, 'TAB_ORDER must have 7 tabs');
   });
 
   test('TAB_ORDER contains all required tab IDs', async () => {
     const { TAB_ORDER } = await import('../../src/services/navigation-service.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
+    const required = ['settings', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
     for (const id of required) {
       assert.ok(TAB_ORDER.includes(id), `TAB_ORDER must include '${id}'`);
     }
@@ -37,8 +37,8 @@ describe('NavigationService - Initial State', () => {
 
   test('getActiveTab respects constructor initialTab', async () => {
     const { NavigationService } = await import('../../src/services/navigation-service.js');
-    const nav = new NavigationService('voices');
-    assert.strictEqual(nav.getActiveTab(), 'voices');
+    const nav = new NavigationService('music');
+    assert.strictEqual(nav.getActiveTab(), 'music');
   });
 
   test('isModalOpen returns false initially', async () => {
@@ -52,8 +52,8 @@ describe('NavigationService - switchTab', () => {
   test('switchTab changes active tab', async () => {
     const { NavigationService } = await import('../../src/services/navigation-service.js');
     const nav = new NavigationService();
-    nav.switchTab('voices');
-    assert.strictEqual(nav.getActiveTab(), 'voices');
+    nav.switchTab('music');
+    assert.strictEqual(nav.getActiveTab(), 'music');
   });
 
   test('switchTab ignores invalid tab IDs', async () => {
@@ -107,8 +107,8 @@ describe('NavigationService - forceActivate (H1 fix)', () => {
   test('forceActivate updates _activeTab', async () => {
     const { NavigationService } = await import('../../src/services/navigation-service.js');
     const nav = new NavigationService('settings');
-    nav.forceActivate('voices');
-    assert.strictEqual(nav.getActiveTab(), 'voices',
+    nav.forceActivate('music');
+    assert.strictEqual(nav.getActiveTab(), 'music',
       'forceActivate must update _activeTab to the given tab');
   });
 
@@ -138,7 +138,7 @@ describe('NavigationService - cycleTab', () => {
     const { NavigationService } = await import('../../src/services/navigation-service.js');
     const nav = new NavigationService('settings');
     nav.cycleTab();
-    assert.strictEqual(nav.getActiveTab(), 'voices');
+    assert.strictEqual(nav.getActiveTab(), 'music');
   });
 
   test('cycleTab wraps from last tab (help) to first (setup)', async () => {
@@ -154,7 +154,7 @@ describe('NavigationService - cycleTab', () => {
     let fired = null;
     nav.onSwitch(id => { fired = id; });
     nav.cycleTab();
-    assert.strictEqual(fired, 'voices');
+    assert.strictEqual(fired, 'music');
   });
 });
 

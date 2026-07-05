@@ -130,8 +130,8 @@ describe('AgentVibesConsole — constructor', () => {
   });
 
   test('stores startTab option', () => {
-    const app = new AgentVibesConsole({ startTab: 'voices' });
-    assert.strictEqual(app.startTab, 'voices');
+    const app = new AgentVibesConsole({ startTab: 'music' });
+    assert.strictEqual(app.startTab, 'music');
   });
 
   test('_testMode defaults to false', () => {
@@ -196,10 +196,10 @@ describe('AgentVibesConsole.init() — with blessed mock (real code path)', () =
     assert.strictEqual(typeof app.tabs['settings'].show, 'function');
   });
 
-  test('voices tab exists after init()', async () => {
+  test('voices tab is NOT created (removed — voice pickers live in Setup)', async () => {
     const app = new AgentVibesConsole();
     await app.init();
-    assert.ok('voices' in app.tabs, 'voices tab must be created');
+    assert.ok(!('voices' in app.tabs), 'voices tab must NOT be created');
   });
 
   test('agents tab exists after init()', async () => {
@@ -214,8 +214,8 @@ describe('AgentVibesConsole.init() — with blessed mock (real code path)', () =
     assert.ok('setup' in app.tabs, 'setup tab must be created');
   });
 
-  test('starts from voices tab without throwing', async () => {
-    const app = new AgentVibesConsole({ startTab: 'voices' });
+  test('starts from music tab without throwing', async () => {
+    const app = new AgentVibesConsole({ startTab: 'music' });
     await assert.doesNotReject(() => app.init());
   });
 

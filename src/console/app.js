@@ -22,7 +22,6 @@ import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
 import { BRAND_PINK } from './brand-colors.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
-import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
 import { createSetupTab } from './tabs/setup-tab.js';
 import { createHelpTab } from './tabs/help-tab.js';
@@ -728,13 +727,6 @@ export class AgentVibesConsole {
     };
     this.tabs['settings'] = createSettingsTab(this.screen, services);
 
-    // Destroy voices placeholder and mount real voices tab
-    const voicesPlaceholder = this.tabs['voices'];
-    if (voicesPlaceholder && typeof voicesPlaceholder.destroy === 'function') {
-      voicesPlaceholder.destroy();
-    }
-    this.tabs['voices'] = createVoicesTab(this.screen, services);
-
     // Destroy music placeholder and mount real music tab
     const musicPlaceholder = this.tabs['music'];
     if (musicPlaceholder && typeof musicPlaceholder.destroy === 'function') {
@@ -923,7 +915,7 @@ export class AgentVibesConsole {
  *
  * @param {object} opts
  * @param {string} [opts.startTab='settings'] - Which tab to show on launch.
- *   Used by story 6.5 (command routing). Values: 'settings' | 'install' | 'voices' | 'music'
+ *   Used by story 6.5 (command routing). Values: 'settings' | 'setup' | 'music'
  * @param {boolean} [opts._testMode=false] - Internal: skip render in test environments.
  * @returns {Promise<AgentVibesConsole>}
  */

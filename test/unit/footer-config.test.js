@@ -22,10 +22,10 @@ describe('footer-config.js - Module Structure', () => {
   });
 });
 
-describe('footer-config.js - All 8 tabs covered', () => {
-  test('FOOTER_CONFIG has entries for all 8 tab IDs', async () => {
+describe('footer-config.js - All 7 tabs covered', () => {
+  test('FOOTER_CONFIG has entries for all 7 tab IDs', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
+    const required = ['settings', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
     for (const tabId of required) {
       assert.ok(Object.hasOwn(FOOTER_CONFIG, tabId),
         `FOOTER_CONFIG must have an entry for tab '${tabId}'`);
@@ -53,11 +53,6 @@ describe('footer-config.js - Correct colors per tab (AC#2)', () => {
   test('Settings footer color is #2196f3 (blue)', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
     assert.strictEqual(FOOTER_CONFIG.settings.color, '#2196f3');
-  });
-
-  test('Voices footer color is #00bcd4 (cyan)', async () => {
-    const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    assert.strictEqual(FOOTER_CONFIG.voices.color, '#00bcd4');
   });
 
   test('Music footer color is #ff9800 (orange)', async () => {
@@ -94,14 +89,6 @@ describe('footer-config.js - Text content per tab (AC#3)', () => {
       'Settings footer must mention navigation');
   });
 
-  test('Voices footer text includes Sort and Search shortcuts', async () => {
-    const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    assert.ok(FOOTER_CONFIG.voices.text.includes('Sort'),
-      'Voices footer must mention Sort');
-    assert.ok(FOOTER_CONFIG.voices.text.includes('Search') ||
-              FOOTER_CONFIG.voices.text.includes('/'),
-      'Voices footer must mention Search or /');
-  });
 
   test('Music footer text includes Preview, Toggle, and Navigate shortcuts', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');

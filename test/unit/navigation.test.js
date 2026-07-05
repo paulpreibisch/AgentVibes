@@ -41,7 +41,7 @@ describe('navigation.js - setupNavigation', () => {
     setupNavigation(stubScreen, nav);
 
     // Verify all tab shortcuts are registered
-    const expectedKeys = ['s', 'S', 'v', 'V', 'm', 'M', 'b', 'B', 'r', 'R', 'h', 'H', 'i', 'I', 't', 'T', 'escape'];
+    const expectedKeys = ['s', 'S', 'm', 'M', 'b', 'B', 'r', 'R', 'h', 'H', 'i', 'I', 't', 'T', 'escape'];
     for (const key of expectedKeys) {
       assert.ok(registeredKeys.includes(key),
         `Key '${key}' must be registered by setupNavigation`);
@@ -56,18 +56,18 @@ describe('navigation.js - setupNavigation', () => {
     const switched = [];
     nav.onSwitch(id => switched.push(id));
 
-    nav.switchTab('voices');
+    nav.switchTab('agents');
     nav.switchTab('music');
     nav.switchTab('settings');
 
-    assert.deepStrictEqual(switched, ['voices', 'music', 'settings']);
+    assert.deepStrictEqual(switched, ['agents', 'music', 'settings']);
   });
 
   test('Tab key handler blocked when modal is open (tests real setupNavigation guard)', async () => {
     const { setupNavigation } = await import('../../src/console/navigation.js');
     const { NavigationService } = await import('../../src/services/navigation-service.js');
 
-    const nav = new NavigationService('voices');
+    const nav = new NavigationService('music');
     // Capture actual registered key handlers from setupNavigation
     const capturedHandlers = {};
     const stubScreen = {
@@ -79,10 +79,10 @@ describe('navigation.js - setupNavigation', () => {
     };
     setupNavigation(stubScreen, nav);
 
-    // Open modal then fire the 's' handler — should NOT switch away from voices
+    // Open modal then fire the 's' handler — should NOT switch away from music
     nav.openModal(null);
     capturedHandlers['s']?.();
-    assert.strictEqual(nav.getActiveTab(), 'voices',
+    assert.strictEqual(nav.getActiveTab(), 'music',
       'Tab switch must be blocked by real guard in setupNavigation when modal is open');
   });
 
