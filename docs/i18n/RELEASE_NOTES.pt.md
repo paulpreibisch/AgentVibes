@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎉 v5.12.0 — A Reforma da Semana Fable (Estável)
+
+**Lançamento:** 2026-07-05 · agora no `latest` — `npm install agentvibes`
+
+Isto transforma o alfa da "Semana Fable" em um lançamento estável. Durante uma semana de acesso antecipado ao novo modelo **Fable** da Anthropic, nós o direcionamos a toda a base de código do AgentVibes e reconstruímos o núcleo de forma adequada.
+
+### Um núcleo mais forte e compartilhado
+
+Toda vez que o AgentVibes fala, ele toma muitas decisões — qual voz, qual motor, se deve reproduzir aqui ou enviar o áudio para outra máquina, música de fundo, volume, mudo. Essa lógica havia sido copiada em vários scripts separados (Mac/Linux, Windows, remoto e o servidor de voz), e as cópias lentamente **divergiram** — uma correção em uma passava despercebida nas outras, e é por isso que certas falhas continuavam voltando.
+
+Substituímos tudo isso por **um único núcleo compartilhado** que toda parte do AgentVibes agora segue — um só lugar para corrigir, um só lugar para confiar. O que você vai notar:
+
+- **Vozes Kokoro que ficavam mudas no Linux agora funcionam em todos os lugares.**
+- **Suas escolhas de voz permanecem** — as configurações não são mais silenciosamente sobrescritas.
+- **Volume, mudo e reprodução remota se comportam da mesma forma** no Mac, Linux e Windows.
+- **Seguro por padrão** — se o novo núcleo não estiver disponível na sua máquina, o AgentVibes recorre ao comportamento antigo, de modo que nunca simplesmente para de falar.
+
+### As pré-visualizações agora tocam no lugar certo
+
+Pré-visualizar uma voz ou faixa costumava tocar em qualquer máquina em que você estivesse — o que ficava mudo se você tivesse configurado o AgentVibes para enviar seu áudio para outro lugar. Agora:
+
+- **Se você tiver o SSH remoto configurado, as pré-visualizações tocam no seu receptor; caso contrário, tocam localmente, como antes.**
+- Isso abrange **pré-visualizações de voz** (Piper e Kokoro) das telas de Setup, Agente e Configurações, e **pré-visualizações de música/faixa** — pressione Espaço para tocar, Espaço novamente para parar.
+
+### Um menu de vozes mais simples
+
+- **Removemos a aba redundante de Vozes.** Ela só listava vozes do Piper e confundia as pessoas, já que a escolha de uma voz para qualquer provedor já fica em **Setup**.
+
+### Base para o que vem a seguir
+
+- O receptor agora também recebe o **caminho completo da pasta do projeto** de onde uma mensagem veio (um novo campo `projectPath`, ao lado do nome do projeto que ele já recebia) — estabelecendo a base para melhorias futuras.
+
+### Revisado antes de lançar
+
+Executamos três revisões independentes sobre as mudanças — segurança, correção e regressões — e corrigimos cada problema real antes do lançamento.
+
 ## 🎸 v5.8.0 — Soprano Agora Funciona + Seletor de Voz Corrigido para Todos os Motores
 
 **Lançamento:** 2026-05-18

@@ -58,14 +58,19 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Neural voices (v5.11.0)
+## 🆕 A stronger core (v5.12.0)
 
-Your agent team can now sound genuinely human — each agent with its own distinct voice.
+During a week of early access to Anthropic's new **Fable** model, we rebuilt the heart of AgentVibes into **one shared core**. The voice / engine / routing / volume / mute logic that used to be copied across four scripts (and drift apart) now lives in a single place — simpler, more consistent, and steadier.
 
-- **🧠 Kokoro** — local neural TTS that runs on your **CPU, no GPU required**, with **Chinese, Japanese, and Korean** voices built in.
-- **☁️ ElevenLabs** — premium cloud neural voices when you want the absolute best.
+- **🔊 Previews play in the right place** — with SSH remote configured, voice and **music previews** play on your receiver; otherwise they play locally.
+- **🧠 One shared core** — Kokoro-on-Linux silence and per-voice drift fixed at the source, with a safe fallback if needed.
+- **🧹 Removed the redundant Voices tab** — pick a voice for any provider in Setup.
 
-Plus combinable audio effects landed too: stack **reverb**, **echo**, and **chorus** on any voice.
+### v5.11.0 — Neural voices
+
+- **🧠 Kokoro** — local neural TTS on your **CPU, no GPU required** (Chinese, Japanese, Korean built in).
+- **☁️ ElevenLabs** — premium cloud neural voices.
+- Combinable audio effects: stack **reverb**, **echo**, and **chorus** on any voice.
 
 <div align="center">
 
@@ -219,7 +224,7 @@ Running a full BMAD agent team? **Every agent gets its own distinct voice**, aut
 
 ## About
 
-**AgentVibes** · v5.11.2 · Licensed under [Apache-2.0](LICENSE)
+**AgentVibes** · v5.12.0 · Licensed under [Apache-2.0](LICENSE)
 
 Built by **Paul Preibisch** — [@997Fire on X](https://x.com/997Fire) · [agentvibes.org](https://agentvibes.org) · [github.com/paulpreibisch/AgentVibes](https://github.com/paulpreibisch/AgentVibes)
 

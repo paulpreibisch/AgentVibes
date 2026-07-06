@@ -4,13 +4,19 @@
 
 ---
 
-## 🌟 NOVITÀ IN v5.8.0 — Soprano Ora Funziona + Selettore Voci Corretto per Tutti i Motori
+## 🆕 Un nucleo più solido (v5.12.0)
 
-**Soprano TTS funziona davvero ora:** Soprano (il nostro motore TTS neurale) era silenziosamente rotto su Windows dal lancio — nome binario sbagliato, PATH ridotto, percorso wav inviato al flusso di output sbagliato, e nessun auto-avvio per il server WebUI. Tutto corretto. Installa con `pip install soprano-tts`, seleziona Soprano nella scheda di configurazione, e AgentVibes fa il resto.
+Durante una settimana di accesso anticipato al nuovo modello **Fable** di Anthropic, abbiamo ricostruito il cuore di AgentVibes in **un unico nucleo condiviso**. La logica di voce / motore / instradamento / volume / silenziamento che prima era copiata in quattro script (e si allontanava tra loro) ora risiede in un unico posto — più semplice, più coerente e più stabile.
 
-**Il selettore voci ora funziona per Windows SAPI e macOS Say:** In precedenza il selettore mostrava l'intero catalogo voci Piper anche quando SAPI o macOS Say era selezionato, e l'anteprima con barra spaziatrice suonava tramite il motore sbagliato. Il selettore ora mostra esattamente un elemento per ogni motore nativo e mostra un'anteprima tramite il binary corretto.
+- **🔊 Le anteprime si riproducono nel posto giusto** — con SSH remoto configurato, le anteprime vocali e di **musica** si riproducono sul tuo ricevitore; altrimenti si riproducono localmente.
+- **🧠 Un unico nucleo condiviso** — il silenzio di Kokoro su Linux e lo scostamento per singola voce corretti alla radice, con un fallback sicuro se necessario.
+- **🧹 Rimossa la scheda Voci ridondante** — scegli una voce per qualsiasi provider in Setup.
 
-**Il salvataggio automatico non rompe più l'impostazione del motore:** Salvare una configurazione LLM non sovrascrive più silenziosamente il motore scelto tornando a Piper.
+### v5.11.0 — Voci neurali
+
+- **🧠 Kokoro** — TTS neurale locale sulla tua **CPU, nessuna GPU richiesta** (cinese, giapponese, coreano integrati).
+- **☁️ ElevenLabs** — voci neurali cloud premium.
+- Effetti audio combinabili: sovrapponi **reverb**, **echo** e **chorus** su qualsiasi voce.
 
 ## v5.7.7 — Ripristino Voci Modalità Party + Miglioramenti
 

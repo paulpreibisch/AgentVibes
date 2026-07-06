@@ -1,5 +1,43 @@
 # AgentVibes Release Notes
 
+## 🎉 v5.12.0 — The Fable Week Overhaul (Stable)
+
+**Released:** 2026-07-05 · now on `latest` — `npm install agentvibes`
+
+This turns the "Fable Week" alpha into a stable release. During a week of early access to Anthropic's new **Fable** model, we pointed it at the whole AgentVibes codebase and rebuilt the core properly.
+
+### A stronger, shared core
+
+Every time AgentVibes speaks it makes a lot of decisions — which voice, which engine, whether to play here or send the audio to another machine, background music, volume, mute. That logic had been copied into several separate scripts (Mac/Linux, Windows, remote, and the voice server), and the copies slowly **drifted apart** — a fix in one was missed in the others, which is why certain glitches kept coming back.
+
+We replaced all of it with **one shared core** that every part of AgentVibes now follows — one place to fix, one place to trust. What you'll notice:
+
+- **Kokoro voices that were silent on Linux now work everywhere.**
+- **Your voice choices stick** — settings no longer get quietly overridden.
+- **Volume, mute, and remote playback behave the same** across Mac, Linux, and Windows.
+- **Safe by default** — if the new core isn't available on your machine, AgentVibes falls back to the old behaviour, so it never just stops talking.
+
+### Previews now play in the right place
+
+Previewing a voice or track used to play on whatever machine you were sitting at — which was silent if you'd set AgentVibes up to send its audio elsewhere. Now:
+
+- **If you have SSH remote configured, previews play on your receiver; otherwise they play locally, like before.**
+- This covers **voice previews** (Piper and Kokoro) from the Setup, Agent, and Settings screens, and **music/track previews** — press Space to play, Space again to stop.
+
+### A simpler voice menu
+
+- We **removed the redundant Voices tab.** It only ever listed Piper voices and confused people, since choosing a voice for any provider already lives in **Setup**.
+
+### Groundwork for what's next
+
+- The receiver now also receives the **full path of the project folder** a message came from (a new `projectPath` field, alongside the project name it already got) — laying the groundwork for upcoming enhancements.
+
+### Reviewed before shipping
+
+We ran three independent reviews over the changes — security, correctness, and regressions — and fixed every real issue before release.
+
+---
+
 ## 🧪 v5.12.0-alpha.0 — The "Fable Week" Overhaul (ALPHA / testing)
 
 **Published:** 2026-07-04 · dist-tag **`alpha`** (not `latest`). Try it with `npm install agentvibes@alpha`.

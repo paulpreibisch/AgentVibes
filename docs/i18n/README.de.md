@@ -4,13 +4,19 @@
 
 ---
 
-## 🌟 NEU IN v5.8.0 — Soprano Funktioniert Jetzt + Sprachauswahl für Alle Engines Korrigiert
+## 🆕 Ein stärkerer Kern (v5.12.0)
 
-**Soprano TTS funktioniert jetzt wirklich:** Soprano (unsere neuronale TTS-Engine) war seit dem Launch auf Windows stillschweigend kaputt — falscher Binärname, abgeschnittener PATH, wav-Pfad an den falschen Ausgabestream gesendet, und kein Auto-Start für den WebUI-Server. Alles behoben. Installiere mit `pip install soprano-tts`, wähle Soprano im Setup-Tab, und AgentVibes kümmert sich um den Rest.
+Während einer Woche mit frühem Zugang zu Anthropics neuem **Fable**-Modell haben wir das Herz von AgentVibes zu **einem gemeinsamen Kern** neu aufgebaut. Die Logik für Stimme / Engine / Routing / Lautstärke / Stummschaltung, die früher über vier Skripte hinweg kopiert war (und auseinanderdriftete), lebt jetzt an einer einzigen Stelle — einfacher, konsistenter und stabiler.
 
-**Die Sprachauswahl funktioniert jetzt für Windows SAPI und macOS Say:** Bisher zeigte die Auswahl den gesamten Piper-Stimmenkatalog, auch wenn SAPI oder macOS Say ausgewählt war, und die Leerzeichen-Vorschau spielte durch die falsche Engine. Die Auswahl zeigt jetzt genau einen Eintrag für jede native Engine und zeigt eine Vorschau durch das richtige Binary.
+- **🔊 Vorschauen spielen am richtigen Ort** — mit konfiguriertem SSH-Remote spielen Stimm- und **Musikvorschauen** auf deinem Empfänger; andernfalls spielen sie lokal.
+- **🧠 Ein gemeinsamer Kern** — die Stummheit von Kokoro unter Linux und die Pro-Stimme-Drift an der Quelle behoben, mit einem sicheren Fallback bei Bedarf.
+- **🧹 Überflüssigen Voices-Tab entfernt** — wähle eine Stimme für jeden Provider in Setup.
 
-**Die automatische Speicherung bricht deine Engine-Einstellung nicht mehr:** Das Speichern einer LLM-Konfiguration überschreibt deine gewählte Engine nicht mehr stillschweigend zurück zu Piper.
+### v5.11.0 — Neuronale Stimmen
+
+- **🧠 Kokoro** — lokale neuronale TTS auf deiner **CPU, keine GPU erforderlich** (Chinesisch, Japanisch, Koreanisch integriert).
+- **☁️ ElevenLabs** — erstklassige neuronale Cloud-Stimmen.
+- Kombinierbare Audioeffekte: staple **Reverb**, **Echo** und **Chorus** auf jeder Stimme.
 
 ## v5.7.7 — Party-Mode-Stimmen Wiederhergestellt + Verbesserungen
 

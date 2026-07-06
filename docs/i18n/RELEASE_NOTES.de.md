@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎉 v5.12.0 — Die Fable-Week-Überarbeitung (Stabil)
+
+**Veröffentlicht:** 2026-07-05 · jetzt auf `latest` — `npm install agentvibes`
+
+Dies macht aus der „Fable Week"-Alpha ein stabiles Release. Während einer Woche mit frühem Zugang zu Anthropics neuem **Fable**-Modell haben wir es auf die gesamte AgentVibes-Codebasis angesetzt und den Kern von Grund auf richtig neu aufgebaut.
+
+### Ein stärkerer, gemeinsamer Kern
+
+Jedes Mal, wenn AgentVibes spricht, trifft es viele Entscheidungen — welche Stimme, welche Engine, ob hier abgespielt oder das Audio an eine andere Maschine gesendet wird, Hintergrundmusik, Lautstärke, Stummschaltung. Diese Logik war in mehrere separate Skripte kopiert worden (Mac/Linux, Windows, Remote und der Stimmenserver), und die Kopien **drifteten langsam auseinander** — eine Korrektur in einem wurde in den anderen übersehen, weshalb bestimmte Störungen immer wiederkehrten.
+
+Wir haben alles durch **einen gemeinsamen Kern** ersetzt, dem nun jeder Teil von AgentVibes folgt — eine Stelle zum Korrigieren, eine Stelle zum Vertrauen. Was dir auffallen wird:
+
+- **Kokoro-Stimmen, die unter Linux stumm waren, funktionieren jetzt überall.**
+- **Deine Stimmauswahl bleibt bestehen** — Einstellungen werden nicht mehr stillschweigend überschrieben.
+- **Lautstärke, Stummschaltung und Remote-Wiedergabe verhalten sich gleich** unter Mac, Linux und Windows.
+- **Standardmäßig sicher** — wenn der neue Kern auf deiner Maschine nicht verfügbar ist, greift AgentVibes auf das alte Verhalten zurück, sodass es niemals einfach aufhört zu sprechen.
+
+### Vorschauen spielen jetzt am richtigen Ort
+
+Das Vorhören einer Stimme oder eines Tracks wurde früher auf der Maschine abgespielt, an der du gerade saßt — was stumm blieb, wenn du AgentVibes so eingerichtet hattest, dass es sein Audio woanders hinsendet. Jetzt:
+
+- **Wenn du SSH-Remote konfiguriert hast, spielen Vorschauen auf deinem Empfänger; andernfalls spielen sie lokal, wie zuvor.**
+- Das umfasst **Stimmvorschauen** (Piper und Kokoro) aus den Bildschirmen Setup, Agent und Einstellungen sowie **Musik-/Track-Vorschauen** — drücke die Leertaste zum Abspielen, die Leertaste erneut zum Stoppen.
+
+### Ein einfacheres Stimmenmenü
+
+- Wir haben den **überflüssigen Voices-Tab entfernt.** Er listete immer nur Piper-Stimmen auf und verwirrte die Leute, da die Auswahl einer Stimme für jeden Provider bereits in **Setup** liegt.
+
+### Grundlagen für das, was als Nächstes kommt
+
+- Der Empfänger erhält jetzt auch den **vollständigen Pfad des Projektordners**, aus dem eine Nachricht stammt (ein neues `projectPath`-Feld, zusätzlich zum Projektnamen, den er bereits bekam) — als Grundlage für kommende Erweiterungen.
+
+### Vor der Auslieferung geprüft
+
+Wir haben drei unabhängige Reviews über die Änderungen durchgeführt — Sicherheit, Korrektheit und Regressionen — und jedes echte Problem vor dem Release behoben.
+
 ## 🎸 v5.8.0 — Soprano Funktioniert Jetzt + Sprachauswahl für Alle Engines Korrigiert
 
 **Veröffentlicht:** 2026-05-18

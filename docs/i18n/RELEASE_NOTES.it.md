@@ -1,5 +1,41 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎉 v5.12.0 — La Revisione della Settimana Fable (Stabile)
+
+**Rilasciato il:** 2026-07-05 · ora su `latest` — `npm install agentvibes`
+
+Questo trasforma la versione alpha della "Settimana Fable" in un rilascio stabile. Durante una settimana di accesso anticipato al nuovo modello **Fable** di Anthropic, lo abbiamo puntato sull'intera codebase di AgentVibes e abbiamo ricostruito il nucleo come si deve.
+
+### Un nucleo condiviso più solido
+
+Ogni volta che AgentVibes parla prende molte decisioni — quale voce, quale motore, se riprodurre qui o inviare l'audio a un'altra macchina, musica di sottofondo, volume, silenziamento. Quella logica era stata copiata in diversi script separati (Mac/Linux, Windows, remoto e il server vocale), e le copie si sono lentamente **allontanate tra loro** — una correzione in uno veniva dimenticata negli altri, ed è per questo che certi malfunzionamenti continuavano a ripresentarsi.
+
+Abbiamo sostituito tutto questo con **un unico nucleo condiviso** che ogni parte di AgentVibes ora segue — un solo posto da correggere, un solo posto di cui fidarsi. Cosa noterai:
+
+- **Le voci Kokoro che erano silenziose su Linux ora funzionano ovunque.**
+- **Le tue scelte vocali rimangono** — le impostazioni non vengono più silenziosamente sovrascritte.
+- **Volume, silenziamento e riproduzione remota si comportano allo stesso modo** su Mac, Linux e Windows.
+- **Sicuro per impostazione predefinita** — se il nuovo nucleo non è disponibile sulla tua macchina, AgentVibes ricade sul comportamento precedente, così non smette mai semplicemente di parlare.
+
+### Le anteprime ora si riproducono nel posto giusto
+
+L'anteprima di una voce o di una traccia era solita riprodursi su qualunque macchina davanti a cui ti trovavi — il che risultava silenzioso se avevi configurato AgentVibes per inviare l'audio altrove. Ora:
+
+- **Se hai configurato SSH remoto, le anteprime si riproducono sul tuo ricevitore; altrimenti si riproducono localmente, come prima.**
+- Questo copre le **anteprime vocali** (Piper e Kokoro) dalle schermate di Setup, Agent e Settings, e le **anteprime di musica/tracce** — premi Spazio per riprodurre, di nuovo Spazio per fermare.
+
+### Un menu voci più semplice
+
+- Abbiamo **rimosso la scheda Voci ridondante.** Elencava soltanto le voci Piper e confondeva le persone, dato che la scelta di una voce per qualsiasi provider risiede già in **Setup**.
+
+### Le basi per ciò che verrà
+
+- Il ricevitore ora riceve anche il **percorso completo della cartella del progetto** da cui proviene un messaggio (un nuovo campo `projectPath`, insieme al nome del progetto che già riceveva) — gettando le basi per i miglioramenti in arrivo.
+
+### Revisionato prima del rilascio
+
+Abbiamo eseguito tre revisioni indipendenti sulle modifiche — sicurezza, correttezza e regressioni — e corretto ogni problema reale prima del rilascio.
+
 ## 🎸 v5.8.0 — Soprano Ora Funziona + Selettore Voci Corretto per Tutti i Motori
 
 **Rilasciato il:** 2026-05-18

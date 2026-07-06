@@ -4,13 +4,19 @@
 
 ---
 
-## 🌟 NOVO NO v5.8.0 — Soprano Agora Funciona + Seletor de Voz Corrigido para Todos os Motores
+## 🆕 Um núcleo mais forte (v5.12.0)
 
-**Soprano TTS realmente funciona agora:** Soprano (nosso motor de TTS neural) estava silenciosamente quebrado no Windows desde o lançamento — nome de binário errado, PATH reduzido, caminho do wav enviado para o fluxo de saída errado, e sem auto-início para o servidor WebUI. Tudo corrigido. Instale com `pip install soprano-tts`, selecione Soprano na aba de configuração, e AgentVibes cuida do resto.
+Durante uma semana de acesso antecipado ao novo modelo **Fable** da Anthropic, reconstruímos o coração do AgentVibes em **um único núcleo compartilhado**. A lógica de voz / motor / roteamento / volume / mudo que costumava ser copiada em quatro scripts (e divergir) agora fica em um só lugar — mais simples, mais consistente e mais estável.
 
-**O seletor de voz agora funciona para Windows SAPI e macOS Say:** Anteriormente o seletor mostrava todo o catálogo de vozes do Piper mesmo quando SAPI ou macOS Say estava selecionado, e a pré-visualização com a barra de espaço tocava através do motor errado. O seletor agora mostra exatamente um item para cada motor nativo e pré-visualiza através do binário correto.
+- **🔊 As pré-visualizações tocam no lugar certo** — com o SSH remoto configurado, as pré-visualizações de voz e **de música** tocam no seu receptor; caso contrário, tocam localmente.
+- **🧠 Um único núcleo compartilhado** — o silêncio do Kokoro no Linux e a divergência por voz corrigidos na origem, com um fallback seguro se necessário.
+- **🧹 Removemos a aba redundante de Vozes** — escolha uma voz para qualquer provedor em Setup.
 
-**O salvamento automático não quebra mais sua configuração de motor:** Salvar uma configuração de LLM não sobrescreve mais silenciosamente seu motor escolhido de volta para Piper.
+### v5.11.0 — Vozes neurais
+
+- **🧠 Kokoro** — TTS neural local na sua **CPU, sem GPU necessária** (chinês, japonês e coreano integrados).
+- **☁️ ElevenLabs** — vozes neurais premium na nuvem.
+- Efeitos de áudio combináveis: empilhe **reverb**, **echo** e **chorus** em qualquer voz.
 
 ## v5.7.7 — Restauração de Vozes no Modo Party + Melhorias
 
