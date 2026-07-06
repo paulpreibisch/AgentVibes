@@ -96,6 +96,9 @@ $BgFile = ""
 # TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
 $BgVolume = "0.20"
 $script:Project = "unknown"
+# Sender's absolute project path — forwarded to the watcher so the avatar can
+# show/learn the real remote folder (paired with $script:Project).
+$ProjectPath = ""
 $Pretext = ""
 $Speed = ""
 $Provider = "piper"
@@ -116,6 +119,7 @@ if ($decoded.TrimStart().StartsWith('{')) {
         if ($json.music)    { $BgFile = $json.music }
         if ($json.volume)   { $BgVolume = $json.volume }
         if ($json.project)  { $script:Project = $json.project }
+        if ($json.projectPath) { $ProjectPath = $json.projectPath }
         if ($json.pretext)  { $Pretext = $json.pretext }
         if ($json.speed)    { $Speed = $json.speed }
         if ($json.provider) { $Provider = $json.provider }
@@ -272,6 +276,8 @@ $ReqJson = @{
     llm      = $Llm
     language = $EffectiveLanguage
     kind     = $Kind
+    project     = $script:Project
+    projectPath = $ProjectPath
 } | ConvertTo-Json -Compress
 
 try {
