@@ -70,6 +70,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Derive project name from directory
 PROJECT_NAME=$(basename "$PROJECT_ROOT")
+# Absolute path, forwarded so the receiver-side avatar can show/learn the real
+# remote folder (mirrors the local forward-to-avatar.sh's projectPath field).
+PROJECT_PATH="$PROJECT_ROOT"
 
 # ---------------------------------------------------------------------------
 # Get SSH connection details from config
@@ -389,6 +392,7 @@ build_json_payload() {
       --arg music "$BG_FILE" \
       --arg volume "$BG_VOLUME" \
       --arg project "$PROJECT_NAME" \
+      --arg projectPath "$PROJECT_PATH" \
       --arg pretext "$PRETEXT" \
       --arg speed "$SPEED" \
       --arg provider "$PROVIDER" \
@@ -396,15 +400,17 @@ build_json_payload() {
       --arg mute "$MUTE" \
       --arg language "$LANGUAGE" \
       --arg kind "$PAYLOAD_KIND" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language, kind: $kind}'
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, projectPath: $projectPath, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language, kind: $kind}'
   else
     # Manual JSON — escape backslashes, quotes, control chars
     local escaped_text
     escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' ' | sed 's/\r//g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s","kind":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE" "$PAYLOAD_KIND"
+    local escaped_project_path
+    escaped_project_path=$(printf '%s' "$PROJECT_PATH" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","projectPath":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s","kind":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_project_path" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE" "$PAYLOAD_KIND"
   fi
 }
 

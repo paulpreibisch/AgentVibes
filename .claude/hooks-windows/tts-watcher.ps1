@@ -83,6 +83,13 @@ try {
                 $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
                 $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
                 $env:AGENTVIBES_NO_PRETEXT = "1"
+                # Carry the sender's project (folder name/path) through to the
+                # TalkingHead forward so the avatar badge/tab shows the real remote
+                # origin instead of this machine's own profile dir. (Grafted from master WIP.)
+                if ($req.project) { $env:AGENTVIBES_PROJECT = $req.project }
+                else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_PROJECT", $null, "Process") }
+                if ($req.projectPath) { $env:AGENTVIBES_PROJECT_PATH = $req.projectPath }
+                else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_PROJECT_PATH", $null, "Process") }
                 # Use SetEnvironmentVariable to truly unset (assignment to $null leaves empty string)
                 if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",   $null, "Process") }

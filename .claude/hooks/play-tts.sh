@@ -329,7 +329,12 @@ case "$ACTIVE_PROVIDER" in
     # Transport — keep it.  The receiver's audio-effects.cfg picks the engine.
     ;;
   *)
-    if [[ -n "$_LLM_ENGINE" ]]; then
+    if [[ "$VOICE_OVERRIDE" =~ ^(af|am|bf|bm|jf|jm|kf|km|zf|zm|ff|fm|hf|hm|if|im|pf|pm|ef|em|nf|nm)_[a-zA-Z0-9]+$ ]]; then
+      # Kokoro-shaped voice override (e.g. af_heart) must win over the LLM row's
+      # engine column, else it is synthesized as a Piper voice, 404s downloading
+      # a model that doesn't exist, and stays silent. (Grafted from master WIP.)
+      ACTIVE_PROVIDER="kokoro"
+    elif [[ -n "$_LLM_ENGINE" ]]; then
       ACTIVE_PROVIDER="$_LLM_ENGINE"
     fi
     ;;
