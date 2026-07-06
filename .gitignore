@@ -181,3 +181,4 @@ debug-voices.mjs
 
 # Test infrastructure (not part of core package)
 test/installer/
+mockups/
