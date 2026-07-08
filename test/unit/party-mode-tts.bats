@@ -87,15 +87,24 @@ teardown() {
 }
 
 @test "party mode: temp audio files are cleaned up" {
+  # Measure ONLY what this invocation leaks. A global absolute count is wrong:
+  # the box legitimately holds persistent agentvibes files from normal use
+  # (locks, the agentvibes-audio-<user> dir, cached copies), so counting all of
+  # /tmp fails on any machine that has actually run AgentVibes. The real intent
+  # is "one speak call must not leak temp files" — so we assert on the delta.
+  local before_count
+  before_count=$(find /tmp -name "agentvibes-*" -type f 2>/dev/null | wc -l)
+
   # Generate audio
   run "$MOCK_BMAD_SPEAK" "analyst" "Test cleanup"
   [ "$status" -eq 0 ]
 
-  # Check for orphaned temp files
-  local temp_count=$(find /tmp -name "agentvibes-*" -type f 2>/dev/null | wc -l)
+  local after_count delta
+  after_count=$(find /tmp -name "agentvibes-*" -type f 2>/dev/null | wc -l)
+  delta=$(( after_count - before_count ))
 
-  # Should have minimal temp files (process-specific only)
-  [ "$temp_count" -lt 10 ]
+  # This single invocation must not leak a meaningful number of new temp files.
+  [ "$delta" -lt 10 ]
 }
 
 # Error Handling Tests
