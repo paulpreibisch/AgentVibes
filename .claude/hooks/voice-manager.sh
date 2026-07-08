@@ -363,12 +363,34 @@ case "$1" in
         echo "Download extra voices with: /agent-vibes:provider download"
         exit 1
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
+      # Kokoro voice lookup. Kokoro's catalog is a fixed set of ids shaped
+      # `<lang><sex>_name` (e.g. af_heart, am_adam, bf_emma). We validate by the
+      # SAME pattern play-tts-kokoro.sh uses at synth time — that is the bash-side
+      # single source of truth; the model itself rejects a truly-unknown id.
+      # Canonical id catalog: KOKORO_VOICE_IDS in src/services/provider-voice-catalog.js.
+      if [[ "$VOICE_NAME" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+        FOUND="$VOICE_NAME"
+      else
+        echo "❌ Kokoro voice not found: $VOICE_NAME"
+        echo ""
+        echo "Kokoro voice ids look like <lang><sex>_name. Examples:"
+        echo "  - af_heart, af_bella, af_nicole   (American English, female)"
+        echo "  - am_adam, am_michael             (American English, male)"
+        echo "  - bf_emma, bf_lily                (British English, female)"
+        echo "  - bm_george, bm_daniel            (British English, male)"
+        echo "  - jf_alpha (Japanese), zf_xiaoxiao (Mandarin), ef_dora (Spanish)"
+        echo ""
+        echo "List all Kokoro voices with: /agent-vibes:list"
+        exit 1
+      fi
     else
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
       echo "Available providers:"
       echo "  - piper (Free, Offline)"
       echo "  - macos (Built-in, macOS only)"
+      echo "  - kokoro (Neural, local)"
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
       exit 1
@@ -421,6 +443,8 @@ case "$1" in
         echo "Provider: Piper TTS (via AgentVibes Receiver)"
       elif [[ "$ACTIVE_PROVIDER" == "macos" ]]; then
         echo "Provider: macOS Say (Built-in, Free)"
+      elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
+        echo "Provider: Kokoro TTS (Neural, Local)"
       else
         echo "Provider: $ACTIVE_PROVIDER"
       fi

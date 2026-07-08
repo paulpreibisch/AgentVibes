@@ -728,19 +728,24 @@ class AgentVibesServer:
 
     async def set_provider(self, provider: str) -> str:
         """
-        Switch TTS provider between Piper, macOS, and Termux SSH.
+        Switch TTS provider between the supported synthesis engines.
 
         Args:
-            provider: Provider name ("piper", "macos", or "termux-ssh")
+            provider: Provider name. Non-Windows: "piper", "macos", "termux-ssh",
+                "soprano", "kokoro", "elevenlabs". Windows: "windows-piper",
+                "windows-sapi", "soprano", "kokoro", "elevenlabs".
 
         Returns:
             Success or error message
         """
         provider = provider.lower()
+        # kokoro and elevenlabs are cross-platform (runtime + validator on both
+        # Windows and Unix), so they belong in BOTH allowlists. See AVI-S8.1 and
+        # SUPPORTED_PROVIDERS in src/utils/provider-validator.js (single source of truth).
         if self.is_windows:
-            valid_providers = ["windows-piper", "windows-sapi", "soprano"]
+            valid_providers = ["windows-piper", "windows-sapi", "soprano", "kokoro", "elevenlabs"]
         else:
-            valid_providers = ["piper", "macos", "termux-ssh", "soprano"]
+            valid_providers = ["piper", "macos", "termux-ssh", "soprano", "kokoro", "elevenlabs"]
         if provider not in valid_providers:
             return f"❌ Invalid provider: {provider}. Choose from: {', '.join(valid_providers)}"
 
@@ -754,6 +759,8 @@ class AgentVibesServer:
                 "windows-piper": "Windows Piper",
                 "windows-sapi": "Windows SAPI",
                 "soprano": "Soprano",
+                "kokoro": "Kokoro",
+                "elevenlabs": "ElevenLabs",
             }
             provider_name = provider_names.get(provider, provider.title())
             confirmation_text = f"Successfully switched to {provider_name} provider"

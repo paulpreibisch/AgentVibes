@@ -9,6 +9,11 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import os from 'os';
+import {
+  KOKORO_VOICE_IDS,
+  kokoroGender,
+  ELEVENLABS_VOICES,
+} from '../services/provider-voice-catalog.js';
 
 /**
  * Get Piper voices from voice directory
@@ -72,6 +77,42 @@ function getMacOSVoices(currentVoice) {
 }
 
 /**
+ * Kokoro voice ids follow `<lang><sex>_name`. The first char is the language.
+ * Map it to a human-readable language label for the listing.
+ */
+const KOKORO_LANG_LABELS = {
+  a: 'en-US', b: 'en-GB', j: 'ja', z: 'zh', e: 'es',
+  f: 'fr', h: 'hi', i: 'it', p: 'pt-BR', k: 'ko',
+};
+
+/**
+ * Get Kokoro voices from the canonical catalog (KOKORO_VOICE_IDS).
+ * Kokoro's voice set is a fixed catalog, not discovered on disk.
+ */
+function getKokoroVoices(currentVoice) {
+  return KOKORO_VOICE_IDS.map((id) => ({
+    name: id,
+    lang: KOKORO_LANG_LABELS[id[0]] || '',
+    gender: kokoroGender(id),
+    current: id === currentVoice,
+  }));
+}
+
+/**
+ * Get ElevenLabs voices from the canonical catalog (ELEVENLABS_VOICES).
+ * The listing shows the friendly name; matching against currentVoice accepts
+ * either the friendly name or the raw voice_id.
+ */
+function getElevenLabsVoices(currentVoice) {
+  return ELEVENLABS_VOICES.map((v) => ({
+    name: v.name,
+    lang: v.lang || '',
+    gender: v.gender || '',
+    current: v.name === currentVoice || v.id === currentVoice,
+  }));
+}
+
+/**
  * Extract language code from voice name
  */
 function extractLanguage(voiceName) {
@@ -99,6 +140,12 @@ function main() {
   } else if (provider === 'macos') {
     voices = getMacOSVoices(currentVoice);
     providerName = 'macOS TTS';
+  } else if (provider === 'kokoro') {
+    voices = getKokoroVoices(currentVoice);
+    providerName = 'Kokoro TTS';
+  } else if (provider === 'elevenlabs') {
+    voices = getElevenLabsVoices(currentVoice);
+    providerName = 'ElevenLabs';
   }
 
   // Display with boxen

@@ -15,7 +15,9 @@ param(
 
 $ClaudeDir = "$env:USERPROFILE\.claude"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
-$ValidProviders = @('windows-piper', 'windows-sapi', 'soprano')
+# kokoro is cross-platform (play-tts-kokoro.ps1 exists) and canonically supported
+# (SUPPORTED_PROVIDERS in src/utils/provider-validator.js). See AVI-S8.1.
+$ValidProviders = @('windows-piper', 'windows-sapi', 'soprano', 'kokoro')
 
 # Ensure claude directory exists
 if (-not (Test-Path $ClaudeDir)) {
@@ -75,6 +77,30 @@ function Get-AvailableProviders {
         name = "soprano"
         description = "Soprano TTS (Ultra-fast Neural, pip install soprano-tts)"
         installed = $sopranoInstalled
+    }
+
+    # Check if Kokoro is installed. Mirror validateKokoroInstallation() in
+    # src/utils/provider-validator.js, but use importlib.util.find_spec so we do
+    # NOT actually import kokoro — importing the 82M-param neural lib takes
+    # several seconds and would make `provider list` hang (AVI-S8.1). find_spec
+    # only confirms the packages are importable, which is all we need here.
+    $kokoroInstalled = $false
+    $kokoroProbe = "import importlib.util as u,sys; sys.exit(0 if all(u.find_spec(m) for m in ('kokoro','soundfile','numpy')) else 1)"
+    foreach ($py in @('py', 'python', 'python3')) {
+        if (-not (Get-Command $py -ErrorAction SilentlyContinue)) { continue }
+        try {
+            $null = & $py -c $kokoroProbe 2>$null
+            if ($LASTEXITCODE -eq 0) { $kokoroInstalled = $true }
+            break  # first interpreter on PATH is authoritative; don't probe the rest
+        } catch {
+            # interpreter present but failed to run the probe — try next
+        }
+    }
+
+    $available += @{
+        name = "kokoro"
+        description = "Kokoro TTS (Neural, pip install kokoro-onnx soundfile numpy)"
+        installed = $kokoroInstalled
     }
 
     return $available

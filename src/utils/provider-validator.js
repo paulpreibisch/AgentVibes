@@ -9,6 +9,41 @@ import fs from 'node:fs'; // For checking file/directory existence
 import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
 
 /**
+ * Canonical set of TTS synthesis providers AgentVibes knows how to use.
+ * SINGLE SOURCE OF TRUTH: every user-facing dispatcher (MCP set_provider
+ * allowlist, voice switch, voice list, Windows provider manager) must recognise
+ * these providers — platform-scoped where noted below. A provider that lives
+ * here but is missing from a dispatcher is the "silent drop to Piper / Unknown
+ * provider" class of bug (see AVI-S8.1). The dispatcher-parity conformance test
+ * asserts this invariant.
+ *
+ * Platform notes: `macos` is Darwin-only; `windows-sapi`/`windows-piper` are
+ * Windows-only; `kokoro` and `elevenlabs` are cross-platform (both have a
+ * play-tts runtime on Unix AND PowerShell and no platform guard in their
+ * validators), so they must appear in EVERY dispatcher on both platforms.
+ * @type {readonly string[]}
+ */
+export const SUPPORTED_PROVIDERS = Object.freeze([
+  'soprano', 'piper', 'kokoro', 'elevenlabs', 'macos', 'windows-sapi', 'windows-piper',
+]);
+
+/**
+ * Cross-platform synthesis providers that use the SAME provider id on every OS
+ * and therefore must be recognised by every dispatcher regardless of platform.
+ * @type {readonly string[]}
+ */
+export const CROSS_PLATFORM_PROVIDERS = Object.freeze(['kokoro', 'elevenlabs']);
+
+/**
+ * Is `name` a provider AgentVibes canonically supports?
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function isKnownProvider(name) {
+  return SUPPORTED_PROVIDERS.includes(String(name || '').toLowerCase());
+}
+
+/**
  * Helper: Check if command exists in PATH
  * @param {string} command - Command name to check
  * @returns {boolean} True if command exists in PATH
