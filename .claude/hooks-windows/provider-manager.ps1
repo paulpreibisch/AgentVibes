@@ -90,8 +90,10 @@ function Get-AvailableProviders {
         if (-not (Get-Command $py -ErrorAction SilentlyContinue)) { continue }
         try {
             $null = & $py -c $kokoroProbe 2>$null
-            if ($LASTEXITCODE -eq 0) { $kokoroInstalled = $true }
-            break  # first interpreter on PATH is authoritative; don't probe the rest
+            # Only stop once an interpreter actually HAS the packages — mirrors
+            # validateKokoroInstallation(), which tries every interpreter (the
+            # packages may live under python/python3, not the `py` launcher).
+            if ($LASTEXITCODE -eq 0) { $kokoroInstalled = $true; break }
         } catch {
             # interpreter present but failed to run the probe — try next
         }

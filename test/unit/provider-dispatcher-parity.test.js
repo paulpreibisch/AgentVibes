@@ -23,6 +23,7 @@ import path from 'node:path';
 import {
   SUPPORTED_PROVIDERS,
   CROSS_PLATFORM_PROVIDERS,
+  WINDOWS_RUNTIME_PROVIDERS,
   isKnownProvider,
   getProviderDisplayName,
 } from '../../src/utils/provider-validator.js';
@@ -58,9 +59,20 @@ function listVoicesProviders(src) {
   );
 }
 
-/** Provider ids handled by explicit `ACTIVE_PROVIDER == "..."` arms in voice-manager.sh. */
+/**
+ * Provider ids handled by explicit `ACTIVE_PROVIDER == "..."` arms in the
+ * voice-manager.sh `switch` (voice-change) case ONLY.
+ *
+ * We slice the file to the `switch)` case body (up to the next case, `get)`)
+ * before matching, so display/help blocks elsewhere in the file — notably the
+ * `whoami` case, which also tests `ACTIVE_PROVIDER == "kokoro"` for a label —
+ * cannot make a missing dispatch arm falsely pass.
+ */
 function voiceManagerProviders(src) {
-  return (src.match(/ACTIVE_PROVIDER"?\s*==\s*"([^"]+)"/g) || []).map(
+  const start = src.indexOf('switch)');
+  const end = src.indexOf('get)', start);
+  const block = start !== -1 && end !== -1 ? src.slice(start, end) : src;
+  return (block.match(/ACTIVE_PROVIDER"?\s*==\s*"([^"]+)"/g) || []).map(
     (s) => s.replace(/.*"([^"]+)"$/, '$1'),
   );
 }
@@ -74,6 +86,15 @@ describe('canonical provider layer', () => {
   test('cross-platform providers are a subset of SUPPORTED_PROVIDERS', () => {
     for (const p of CROSS_PLATFORM_PROVIDERS) {
       assert.ok(SUPPORTED_PROVIDERS.includes(p), `${p} missing from SUPPORTED_PROVIDERS`);
+    }
+  });
+
+  test('windows-runtime providers are a subset of cross-platform providers', () => {
+    for (const p of WINDOWS_RUNTIME_PROVIDERS) {
+      assert.ok(
+        CROSS_PLATFORM_PROVIDERS.includes(p),
+        `${p} in WINDOWS_RUNTIME_PROVIDERS but not CROSS_PLATFORM_PROVIDERS`,
+      );
     }
   });
 
@@ -93,9 +114,10 @@ describe('canonical provider layer', () => {
 });
 
 // Each dispatcher declares which canonical providers it MUST recognise.
-// kokoro/elevenlabs are cross-platform ⇒ required in the cross-platform dispatchers.
-// The Windows provider manager and the bash voice-lookup are scoped to kokoro
-// for this story (elevenlabs voice enumeration on those paths is AVI-S8.2).
+// The portable (bash/JS) dispatchers must recognise every CROSS_PLATFORM_PROVIDER
+// (kokoro + elevenlabs — both have a Unix runtime). The Windows provider manager
+// is scoped to WINDOWS_RUNTIME_PROVIDERS (kokoro only) because elevenlabs has no
+// play-tts-elevenlabs.ps1 yet (AVI-S8.2).
 const DISPATCHERS = [
   {
     name: 'mcp-server/server.py set_provider allowlists',
@@ -114,14 +136,14 @@ const DISPATCHERS = [
     tokens: () => listVoicesProviders(read('src/cli/list-voices.js')),
   },
   {
-    name: '.claude/hooks-windows/provider-manager.ps1 $ValidProviders',
-    required: ['kokoro'],
-    tokens: () => ps1ValidProviders(read('.claude/hooks-windows/provider-manager.ps1')),
+    name: '.claude/hooks/voice-manager.sh voice-lookup arms',
+    required: CROSS_PLATFORM_PROVIDERS,
+    tokens: () => voiceManagerProviders(read('.claude/hooks/voice-manager.sh')),
   },
   {
-    name: '.claude/hooks/voice-manager.sh voice-lookup arms',
-    required: ['kokoro'],
-    tokens: () => voiceManagerProviders(read('.claude/hooks/voice-manager.sh')),
+    name: '.claude/hooks-windows/provider-manager.ps1 $ValidProviders',
+    required: WINDOWS_RUNTIME_PROVIDERS,
+    tokens: () => ps1ValidProviders(read('.claude/hooks-windows/provider-manager.ps1')),
   },
 ];
 

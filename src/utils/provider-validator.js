@@ -18,9 +18,12 @@ import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
  * asserts this invariant.
  *
  * Platform notes: `macos` is Darwin-only; `windows-sapi`/`windows-piper` are
- * Windows-only; `kokoro` and `elevenlabs` are cross-platform (both have a
- * play-tts runtime on Unix AND PowerShell and no platform guard in their
- * validators), so they must appear in EVERY dispatcher on both platforms.
+ * Windows-only. `kokoro` ships a play-tts runtime on BOTH Unix
+ * (play-tts-kokoro.sh) and PowerShell (play-tts-kokoro.ps1). `elevenlabs` ships
+ * a Unix runtime only (play-tts-elevenlabs.sh) — there is NO
+ * play-tts-elevenlabs.ps1 yet — so it is recognised by the portable (bash/JS)
+ * dispatchers but intentionally excluded from the Windows provider manager
+ * until a PowerShell runtime lands (AVI-S8.2).
  * @type {readonly string[]}
  */
 export const SUPPORTED_PROVIDERS = Object.freeze([
@@ -28,11 +31,22 @@ export const SUPPORTED_PROVIDERS = Object.freeze([
 ]);
 
 /**
- * Cross-platform synthesis providers that use the SAME provider id on every OS
- * and therefore must be recognised by every dispatcher regardless of platform.
+ * Providers that use the SAME id on every OS and have at least a Unix (bash)
+ * runtime. Every PORTABLE dispatcher — the MCP set_provider allowlist,
+ * voice-manager.sh, and list-voices.js — must recognise these regardless of
+ * platform.
  * @type {readonly string[]}
  */
 export const CROSS_PLATFORM_PROVIDERS = Object.freeze(['kokoro', 'elevenlabs']);
+
+/**
+ * Subset of {@link CROSS_PLATFORM_PROVIDERS} that ALSO ships a PowerShell runtime
+ * (play-tts-*.ps1), so the Windows provider manager (provider-manager.ps1) must
+ * recognise them too. `elevenlabs` is excluded until play-tts-elevenlabs.ps1
+ * exists (AVI-S8.2).
+ * @type {readonly string[]}
+ */
+export const WINDOWS_RUNTIME_PROVIDERS = Object.freeze(['kokoro']);
 
 /**
  * Is `name` a provider AgentVibes canonically supports?

@@ -146,6 +146,11 @@ function main() {
   } else if (provider === 'elevenlabs') {
     voices = getElevenLabsVoices(currentVoice);
     providerName = 'ElevenLabs';
+  } else {
+    // Unknown/unhandled provider: label it honestly instead of falsely
+    // rendering an empty list under "Piper TTS".
+    voices = [];
+    providerName = `${provider} (no voice list available)`;
   }
 
   // Display with boxen

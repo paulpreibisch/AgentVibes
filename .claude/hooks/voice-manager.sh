@@ -103,7 +103,7 @@ case "$1" in
 
     ACTIVE_PROVIDER="piper"  # default
     if [ -f "$PROVIDER_FILE" ]; then
-      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+      ACTIVE_PROVIDER=$(tr -d '[:space:]' < "$PROVIDER_FILE")
     fi
 
     CURRENT_VOICE=$(cat "$VOICE_FILE" 2>/dev/null || get_default_voice)
@@ -221,7 +221,7 @@ case "$1" in
 
     ACTIVE_PROVIDER="piper"  # default
     if [[ -n "$PROVIDER_FILE" ]]; then
-      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+      ACTIVE_PROVIDER=$(tr -d '[:space:]' < "$PROVIDER_FILE")
     fi
 
     # Voice lookup strategy depends on active provider
@@ -369,8 +369,10 @@ case "$1" in
       # SAME pattern play-tts-kokoro.sh uses at synth time — that is the bash-side
       # single source of truth; the model itself rejects a truly-unknown id.
       # Canonical id catalog: KOKORO_VOICE_IDS in src/services/provider-voice-catalog.js.
-      if [[ "$VOICE_NAME" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
-        FOUND="$VOICE_NAME"
+      # Case-insensitive to match the piper/macos arms (AF_HEART → af_heart).
+      KOKORO_VOICE_LC="$(to_lower "$VOICE_NAME")"
+      if [[ "$KOKORO_VOICE_LC" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+        FOUND="$KOKORO_VOICE_LC"
       else
         echo "❌ Kokoro voice not found: $VOICE_NAME"
         echo ""
@@ -384,6 +386,29 @@ case "$1" in
         echo "List all Kokoro voices with: /agent-vibes:list"
         exit 1
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
+      # ElevenLabs voice lookup. The catalog (ELEVENLABS_VOICES in
+      # src/services/provider-voice-catalog.js) is the single source of truth —
+      # we resolve the user's input (friendly name OR raw voice_id) to a canonical
+      # voice_id via the shared Node resolver and save THAT, because
+      # play-tts-elevenlabs.sh accepts a raw id directly (avoids any name-map drift).
+      EL_PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+      EL_RESOLVER="$EL_PROJECT_ROOT/src/cli/resolve-voice.js"
+      EL_RESOLVED=""
+      if [[ -f "$EL_RESOLVER" ]] && command -v node >/dev/null 2>&1; then
+        EL_RESOLVED="$(node "$EL_RESOLVER" elevenlabs "$VOICE_NAME" 2>/dev/null)"
+      fi
+      if [[ -n "$EL_RESOLVED" ]]; then
+        FOUND="$EL_RESOLVED"
+      else
+        echo "❌ ElevenLabs voice not found: $VOICE_NAME"
+        echo ""
+        echo "ElevenLabs voices include: Sarah, Roger, Laura, George, Callum, Alice,"
+        echo "Matilda, Will, Jessica, Eric, Brian, Daniel, Lily, Bill (or a raw voice_id)."
+        echo ""
+        echo "List all ElevenLabs voices with: /agent-vibes:list"
+        exit 1
+      fi
     else
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
@@ -391,6 +416,7 @@ case "$1" in
       echo "  - piper (Free, Offline)"
       echo "  - macos (Built-in, macOS only)"
       echo "  - kokoro (Neural, local)"
+      echo "  - elevenlabs (Cloud, API key)"
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
       exit 1
@@ -434,7 +460,7 @@ case "$1" in
     fi
 
     if [ -f "$PROVIDER_FILE" ]; then
-      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+      ACTIVE_PROVIDER=$(tr -d '[:space:]' < "$PROVIDER_FILE")
       if [[ "$ACTIVE_PROVIDER" == "piper" ]]; then
         echo "Provider: Piper TTS (Free, Offline)"
       elif [[ "$ACTIVE_PROVIDER" == "ssh-remote" ]]; then
@@ -445,6 +471,8 @@ case "$1" in
         echo "Provider: macOS Say (Built-in, Free)"
       elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
         echo "Provider: Kokoro TTS (Neural, Local)"
+      elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
+        echo "Provider: ElevenLabs (Cloud, API Key)"
       else
         echo "Provider: $ACTIVE_PROVIDER"
       fi
@@ -490,7 +518,7 @@ case "$1" in
 
     ACTIVE_PROVIDER="piper"  # default
     if [ -f "$PROVIDER_FILE" ]; then
-      ACTIVE_PROVIDER=$(cat "$PROVIDER_FILE")
+      ACTIVE_PROVIDER=$(tr -d '[:space:]' < "$PROVIDER_FILE")
     fi
 
     if [[ "$ACTIVE_PROVIDER" == "piper" || "$ACTIVE_PROVIDER" == "ssh-remote" || "$ACTIVE_PROVIDER" == "agentvibes-receiver" ]]; then
