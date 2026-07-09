@@ -170,12 +170,41 @@ case "$1" in
         fi
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
+      if [[ -f "$FORMATTER" ]] && command -v node &> /dev/null; then
+        node "$FORMATTER" "kokoro" "$CURRENT_VOICE"
+      else
+        echo "🎤 Available Kokoro TTS Voices:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  af_heart af_bella af_nicole af_sarah af_sky   (American, female)"
+        echo "  am_adam am_michael am_onyx am_puck            (American, male)"
+        echo "  bf_emma bf_lily  bm_george bm_daniel          (British)"
+        echo "  jf_alpha (Japanese) zf_xiaoxiao (Mandarin) ef_dora (Spanish)"
+        echo "  (current: $CURRENT_VOICE)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      fi
+    elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
+      if [[ -f "$FORMATTER" ]] && command -v node &> /dev/null; then
+        node "$FORMATTER" "elevenlabs" "$CURRENT_VOICE"
+      else
+        echo "🎤 Available ElevenLabs Voices:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
+          # shellcheck source=/dev/null
+          source "$SCRIPT_DIR/elevenlabs-voices.sh"
+          printf '  %s\n' "${!ELEVENLABS_VOICE_IDS[@]}" | sort
+        fi
+        echo "  (current: $CURRENT_VOICE)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      fi
     else
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
       echo "Available providers:"
       echo "  - piper (Free, Offline)"
       echo "  - macos (Built-in, macOS only)"
+      echo "  - kokoro (Neural, local)"
+      echo "  - elevenlabs (Cloud, API key)"
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
     fi
@@ -387,16 +416,19 @@ case "$1" in
         exit 1
       fi
     elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
-      # ElevenLabs voice lookup. The catalog (ELEVENLABS_VOICES in
-      # src/services/provider-voice-catalog.js) is the single source of truth —
-      # we resolve the user's input (friendly name OR raw voice_id) to a canonical
-      # voice_id via the shared Node resolver and save THAT, because
-      # play-tts-elevenlabs.sh accepts a raw id directly (avoids any name-map drift).
-      EL_PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-      EL_RESOLVER="$EL_PROJECT_ROOT/src/cli/resolve-voice.js"
+      # ElevenLabs voice lookup — resolve a friendly name (case-insensitive) OR a
+      # raw voice_id to the canonical voice_id and save THAT (play-tts-elevenlabs.sh
+      # accepts a raw id directly). Resolution is bash-native via the shared catalog
+      # (elevenlabs-voices.sh) — the SAME source the synth hook uses — so it works
+      # in installed deployments with no Node dependency.
       EL_RESOLVED=""
-      if [[ -f "$EL_RESOLVER" ]] && command -v node >/dev/null 2>&1; then
-        EL_RESOLVED="$(node "$EL_RESOLVER" elevenlabs "$VOICE_NAME" 2>/dev/null)"
+      if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "$SCRIPT_DIR/elevenlabs-voices.sh"
+        EL_RESOLVED="$(elevenlabs_resolve_voice "$VOICE_NAME" 2>/dev/null || true)"
+      elif [[ "$VOICE_NAME" =~ ^[A-Za-z0-9]{20}$ ]]; then
+        # Catalog missing but the input is already a raw voice_id — accept it.
+        EL_RESOLVED="$VOICE_NAME"
       fi
       if [[ -n "$EL_RESOLVED" ]]; then
         FOUND="$EL_RESOLVED"
@@ -538,6 +570,18 @@ case "$1" in
         say -v ? 2>/dev/null | awk '{print $1}' | sort
       else
         echo "(macOS voices only available on macOS)"
+      fi
+    elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
+      # Kokoro's catalog is fixed; list a representative set (ids only).
+      printf '%s\n' af_heart af_bella af_nicole af_sarah af_sky \
+        am_adam am_michael am_onyx am_puck \
+        bf_emma bf_lily bm_george bm_daniel \
+        jf_alpha zf_xiaoxiao ef_dora | sort
+    elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
+      if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "$SCRIPT_DIR/elevenlabs-voices.sh"
+        printf '%s\n' "${!ELEVENLABS_VOICE_IDS[@]}" | sort
       fi
     else
       echo "(Unknown provider: $ACTIVE_PROVIDER)"

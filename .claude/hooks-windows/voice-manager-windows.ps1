@@ -17,6 +17,7 @@ $ClaudeDir = "$env:USERPROFILE\.claude"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
 $VoiceSapiFile = "$ClaudeDir\tts-voice-sapi.txt"
 $VoicePiperFile = "$ClaudeDir\tts-voice-piper.txt"
+$VoiceKokoroFile = "$ClaudeDir\tts-voice-kokoro.txt"
 
 # Get active provider
 $ActiveProvider = "windows-sapi"
@@ -127,6 +128,20 @@ function Switch-Voice {
     }
     elseif ($ActiveProvider -eq "soprano") {
         Write-Host "[INFO] Soprano uses a single fixed voice (Soprano-1.1-80M)" -ForegroundColor Cyan
+        return $true
+    }
+    elseif ($ActiveProvider -eq "kokoro") {
+        # Kokoro's catalog is a large fixed set of ids shaped <lang><sex>_name
+        # (e.g. af_heart, am_adam). Validate by pattern (same as the Unix arm and
+        # play-tts-kokoro.ps1) and write tts-voice-kokoro.txt, which the runtime reads.
+        $kokoroVoice = $NewVoice.ToLower()
+        if ($kokoroVoice -notmatch '^[a-z]{2}_[a-z0-9_]+$') {
+            Write-Host "[ERROR] Kokoro voice not found: $NewVoice" -ForegroundColor Red
+            Write-Host "Kokoro ids look like <lang><sex>_name, e.g. af_heart, am_michael, bf_emma." -ForegroundColor Yellow
+            return $false
+        }
+        Set-Content -Path $VoiceKokoroFile -Value $kokoroVoice
+        Write-Host "[OK] Voice set to: $kokoroVoice" -ForegroundColor Green
         return $true
     }
 

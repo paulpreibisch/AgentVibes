@@ -31,6 +31,7 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 source "$SCRIPT_DIR/audio-cache-utils.sh"
+source "$SCRIPT_DIR/python-resolver.sh"
 source "$SCRIPT_DIR/language-manager.sh"
 
 if [[ -z "$TEXT" ]]; then
@@ -68,7 +69,7 @@ _fetch_key_from_infisical() {
 
   [[ -n "$secret_name" && -n "$project_id" ]] || return 1
   command -v infisical >/dev/null 2>&1 || return 1
-  command -v python3   >/dev/null 2>&1 || return 1
+  [[ -n "$PYTHON_BIN" ]] || return 1
 
   # Obtain an access token: reuse an exported INFISICAL_TOKEN, else exchange the
   # universal-auth client credentials from the bootstrap file (creds via env only).
@@ -77,7 +78,7 @@ _fetch_key_from_infisical() {
     [[ -f "$bootstrap" ]] || return 1
     set -o allexport; source "$bootstrap"; set +o allexport
     [[ -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-}" && -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:-}" ]] || return 1
-    token="$(_AV_DOMAIN="$domain" python3 -c '
+    token="$(_AV_DOMAIN="$domain" "$PYTHON_BIN" -c '
 import os, json, urllib.request
 d = os.environ["_AV_DOMAIN"].rstrip("/")
 req = urllib.request.Request(d + "/v1/auth/universal-auth/login",
@@ -138,75 +139,42 @@ if [[ -z "$API_KEY" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Inline voice name → ID map (covers common built-in ElevenLabs voices)
-declare -A VOICE_IDS
-VOICE_IDS["Rachel"]="21m00Tcm4TlvDq8ikWAM"
-VOICE_IDS["Adam"]="pNInz6obpgDQGcFmaJgB"
-VOICE_IDS["Antoni"]="ErXwobaYiN019PkySvjV"
-VOICE_IDS["Arnold"]="VR6AewLTigWG4xSOukaG"
-VOICE_IDS["Bella"]="EXAVITQu4vr4xnSDxMaL"
-VOICE_IDS["Callum"]="N2lVS1w4EtoT3dr4eOWO"
-VOICE_IDS["Charlie"]="IKne3meq5aSn9XLyUdCD"
-VOICE_IDS["Charlotte"]="XB0fDUnXU5powFXDhCwa"
-VOICE_IDS["Clyde"]="2EiwWnXFnvU5JabPnv8n"
-VOICE_IDS["Daniel"]="onwK4e9ZLuTAKqWW03F9"
-VOICE_IDS["Dave"]="CYw3kZ02Hs0563khs1Fj"
-VOICE_IDS["Dorothy"]="ThT5KcBeYPX3keUQqHPh"
-VOICE_IDS["Domi"]="AZnzlk1XvdvUeBnXmlld"
-VOICE_IDS["Drew"]="29vD33N1CtxCmqQRPOHJ"
-VOICE_IDS["Emily"]="LcfcDJNUP1GQjkzn1xUU"
-VOICE_IDS["Ethan"]="g5CIjZEefAph4nQFvHAz"
-VOICE_IDS["Fin"]="D38z5RcWu1voky8WS1ja"
-VOICE_IDS["Freya"]="jsCqWAovK2LkecY7zXl4"
-VOICE_IDS["Gigi"]="jBpfuIE2acCO8z3wKNLl"
-VOICE_IDS["Giovanni"]="zcAOhNBS3c14rBihAFp1"
-VOICE_IDS["Glinda"]="z9fAnlkpzviPz146aGWa"
-VOICE_IDS["Grace"]="oWAxZDx7w5VEj9dCyTzz"
-VOICE_IDS["Harry"]="SOYHLrjzK2X1ezoPC6cr"
-VOICE_IDS["James"]="ZQe5CZNOzWyzPSCn5a3c"
-VOICE_IDS["Jessie"]="t0jbNlBVZ17f02VDIeMI"
-VOICE_IDS["Josh"]="TxGEqnHWrfWFTfGW9XjX"
-VOICE_IDS["Liam"]="TX3LPaxmHKxFdv7VOQHJ"
-VOICE_IDS["Lily"]="pFZP5JQG7iQjIQuC4Bku"
-VOICE_IDS["Matilda"]="XrExE9yKIg1WjnnlVkGX"
-VOICE_IDS["Michael"]="flq6f7yk4E4fJM5XTYuZ"
-VOICE_IDS["Mimi"]="zrHiDhphv9ZnVXBqCLjz"
-VOICE_IDS["Nicole"]="piTKgcLEGmPE4e6mEKli"
-VOICE_IDS["Patrick"]="ODq5zmih8GrVes37Dizd"
-VOICE_IDS["Paul"]="5Q0t7uMcjvnagumLfvZi"
-VOICE_IDS["Sam"]="yoZ06aMxZJJ28mfd3POQ"
-VOICE_IDS["Sarah"]="EXAVITQu4vr4xnSDxMaL"
-VOICE_IDS["Serena"]="pMsXgVXv3BLzUgSXRplE"
-VOICE_IDS["Thomas"]="GBv7mTt0atIp3Br8iCZE"
-
-DEFAULT_VOICE_ID="${VOICE_IDS[Rachel]}"
+# ElevenLabs voice catalog — single source of truth (shared with voice-manager.sh).
+# Provides ELEVENLABS_VOICE_IDS, ELEVENLABS_DEFAULT_VOICE, elevenlabs_resolve_voice().
+if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/elevenlabs-voices.sh"
+else
+  # Minimal fallback so speech still works if the catalog file is missing.
+  declare -A ELEVENLABS_VOICE_IDS=( [Sarah]="EXAVITQu4vr4xnSDxMaL" )
+  ELEVENLABS_DEFAULT_VOICE="Sarah"
+  elevenlabs_resolve_voice() {
+    local q="${1:-}"; [[ -z "$q" ]] && return 1
+    [[ -n "${ELEVENLABS_VOICE_IDS[$q]:-}" ]] && { printf %s "${ELEVENLABS_VOICE_IDS[$q]}"; return 0; }
+    [[ "$q" =~ ^[A-Za-z0-9]{20}$ ]] && { printf %s "$q"; return 0; }
+    return 1
+  }
+fi
+DEFAULT_VOICE_ID="${ELEVENLABS_VOICE_IDS[$ELEVENLABS_DEFAULT_VOICE]}"
 
 # ---------------------------------------------------------------------------
 # Resolve voice ID from override or config
 VOICE_ID=""
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
-  if [[ -n "${VOICE_IDS[$VOICE_OVERRIDE]:-}" ]]; then
-    VOICE_ID="${VOICE_IDS[$VOICE_OVERRIDE]}"
-  elif [[ "$VOICE_OVERRIDE" =~ ^[a-zA-Z0-9]{10,40}$ ]]; then
-    # Looks like a raw voice ID
-    VOICE_ID="$VOICE_OVERRIDE"
-  else
-    echo "⚠️  Unknown ElevenLabs voice '$VOICE_OVERRIDE', using Rachel" >&2
+  VOICE_ID="$(elevenlabs_resolve_voice "$VOICE_OVERRIDE")" || {
+    echo "[WARN] Unknown ElevenLabs voice '$VOICE_OVERRIDE', using $ELEVENLABS_DEFAULT_VOICE" >&2
     VOICE_ID="$DEFAULT_VOICE_ID"
-  fi
+  }
 else
-  # Check voice manager for configured voice
+  # Config path: read the voice saved by /agent-vibes:switch (a raw voice_id or
+  # a friendly name) and resolve it the same way — this is what hook-driven
+  # speech uses, so a switched voice actually plays (not a silent default).
   VOICE_NAME=""
   if [[ -f "$SCRIPT_DIR/voice-manager.sh" ]]; then
     VOICE_NAME="$("$SCRIPT_DIR/voice-manager.sh" get 2>/dev/null || true)"
   fi
-
-  if [[ -n "$VOICE_NAME" && -n "${VOICE_IDS[$VOICE_NAME]:-}" ]]; then
-    VOICE_ID="${VOICE_IDS[$VOICE_NAME]}"
-  else
-    VOICE_ID="$DEFAULT_VOICE_ID"
-  fi
+  VOICE_ID="$(elevenlabs_resolve_voice "$VOICE_NAME")" || VOICE_ID="$DEFAULT_VOICE_ID"
 fi
 
 # ---------------------------------------------------------------------------
@@ -246,7 +214,12 @@ trap 'rm -f "${TEMP_FILE:-}" "${BODY_FILE:-}" 2>/dev/null || true' EXIT
 # ---------------------------------------------------------------------------
 # Build the JSON request body with python so all escaping is handled correctly
 # (text is passed via env, never interpolated into a shell-quoted payload).
-if ! TTS_TEXT="$TEXT" TTS_MODEL="$MODEL_ID" TTS_LANG="$LANGUAGE_CODE" python3 -c '
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "❌ ElevenLabs needs Python 3, but none was found." >&2
+  echo "   Install Python 3, or set AGENTVIBES_PYTHON=/path/to/python." >&2
+  exit 3
+fi
+if ! TTS_TEXT="$TEXT" TTS_MODEL="$MODEL_ID" TTS_LANG="$LANGUAGE_CODE" "$PYTHON_BIN" -c '
 import os, json
 print(json.dumps({
     "text": os.environ["TTS_TEXT"],
@@ -254,7 +227,7 @@ print(json.dumps({
     "language_code": os.environ["TTS_LANG"],
     "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
 }))' > "$BODY_FILE" 2>/dev/null; then
-  echo "❌ Failed to build ElevenLabs request body (python3 required)" >&2
+  echo "❌ Failed to build ElevenLabs request body ($PYTHON_BIN required)" >&2
   exit 3
 fi
 

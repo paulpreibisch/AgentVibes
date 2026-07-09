@@ -191,7 +191,7 @@ migrate_voice_to_provider() {
   local piper_default="en_US-lessac-medium"
   local macos_default="Samantha"
   local soprano_default="soprano-default"  # Single voice — no selection needed
-  local elevenlabs_default="Rachel"
+  local elevenlabs_default="Sarah"
   local kokoro_default="af_heart"
 
   # Single-voice providers: migration is straightforward
@@ -372,6 +372,7 @@ get_provider_script_path() {
 # @returns Echoes LLM name (e.g. "claude-code") or empty string if no remote routing configured
 # @exitcode 0=always
 detect_routing_llm() {
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/python-resolver.sh"
   # Priority 1: AGENTVIBES_LLM_KEY env var (set during active TTS sessions)
   if [[ -n "${AGENTVIBES_LLM_KEY:-}" ]] && [[ "$AGENTVIBES_LLM_KEY" =~ ^llm:([a-zA-Z0-9][a-zA-Z0-9_-]*)$ ]]; then
     echo "${BASH_REMATCH[1]}"
@@ -380,9 +381,9 @@ detect_routing_llm() {
 
   # Priority 2: First mode=remote entry in transport-config.json
   local _transport_cfg="$HOME/.agentvibes/transport-config.json"
-  if [[ -f "$_transport_cfg" ]] && command -v python3 &>/dev/null; then
+  if [[ -f "$_transport_cfg" ]] && [[ -n "$PYTHON_BIN" ]]; then
     local _remote_llm
-    _remote_llm=$(AGENTVIBES_CFG="$_transport_cfg" python3 - <<'PYEOF'
+    _remote_llm=$(AGENTVIBES_CFG="$_transport_cfg" "$PYTHON_BIN" - <<'PYEOF'
 import json, os, sys
 try:
     d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))

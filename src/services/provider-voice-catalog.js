@@ -36,13 +36,12 @@ export const ELEVENLABS_VOICES = [
   { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',    gender: 'Female', lang: 'en-GB', desc: 'Velvety actress'         },
   { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam',    gender: 'Male',   lang: 'en-US', desc: 'Dominant, firm'          },
   { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill',    gender: 'Male',   lang: 'en-US', desc: 'Wise, mature'            },
-  // ── Added from the ElevenLabs voice library (raw library voice_ids) ───────
-  { id: 'HBDoL4wkcalemIO0nUAu', name: 'Emily',   gender: 'Female', lang: 'en-GB', desc: 'RPG, immersive'    },
-  { id: 'Mtmp3KhFIjYpWYRycDe3', name: 'John',    gender: 'Male',   lang: 'en-US', desc: 'Raspy surfer'      },
-  { id: '8kgj5469z1URcH4MB2G4', name: 'Sakuya',  gender: 'Female', lang: 'en-US', desc: 'Cheerful anime'    },
-  { id: '2ajXGJNYBR0iNHpS4VZb', name: 'Rob',     gender: 'Male',   lang: 'en-GB', desc: 'Tough, gritty'     },
-  { id: 'mMdTuD2nnFiCH88UdXSb', name: 'Jane',    gender: 'Female', lang: 'en-US', desc: 'Cinematic villain' },
 ];
+// NOTE: these 21 are the ElevenLabs DEFAULT-LIBRARY voices, available to every
+// API key. Community/library voices that must be added to an account first are
+// intentionally excluded so a switch can't fail at synth time. This list is
+// mirrored on the shell side by .claude/hooks/elevenlabs-voices.sh; the two are
+// kept in lockstep by test/unit/elevenlabs-catalog-parity.test.js.
 
 /** Kokoro voice ids. Gender is encoded in the id: the 2nd char is f|m. */
 export const KOKORO_VOICE_IDS = [

@@ -60,6 +60,20 @@ function listVoicesProviders(src) {
 }
 
 /**
+ * Provider ids handled by explicit `ACTIVE_PROVIDER == "..."` arms in a NAMED
+ * case block of voice-manager.sh (sliced by the label so arms in other cases
+ * can't leak in). `label` is e.g. 'switch)', 'list)', 'list-simple)'.
+ */
+function voiceManagerCaseProviders(src, label, nextLabel) {
+  const start = src.indexOf(label);
+  const end = src.indexOf(nextLabel, start);
+  const block = start !== -1 && end !== -1 ? src.slice(start, end) : src;
+  return (block.match(/ACTIVE_PROVIDER"?\s*==\s*"([^"]+)"/g) || []).map(
+    (s) => s.replace(/.*"([^"]+)"$/, '$1'),
+  );
+}
+
+/**
  * Provider ids handled by explicit `ACTIVE_PROVIDER == "..."` arms in the
  * voice-manager.sh `switch` (voice-change) case ONLY.
  *
@@ -139,6 +153,16 @@ const DISPATCHERS = [
     name: '.claude/hooks/voice-manager.sh voice-lookup arms',
     required: CROSS_PLATFORM_PROVIDERS,
     tokens: () => voiceManagerProviders(read('.claude/hooks/voice-manager.sh')),
+  },
+  {
+    name: '.claude/hooks/voice-manager.sh list) case',
+    required: CROSS_PLATFORM_PROVIDERS,
+    tokens: () => voiceManagerCaseProviders(read('.claude/hooks/voice-manager.sh'), 'list)', 'preview)'),
+  },
+  {
+    name: '.claude/hooks/voice-manager.sh list-simple) case',
+    required: CROSS_PLATFORM_PROVIDERS,
+    tokens: () => voiceManagerCaseProviders(read('.claude/hooks/voice-manager.sh'), 'list-simple)', 'replay)'),
   },
   {
     name: '.claude/hooks-windows/provider-manager.ps1 $ValidProviders',
