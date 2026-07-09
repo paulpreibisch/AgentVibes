@@ -171,6 +171,7 @@ scripts/regenerate-*.sh
 .agentvibes-unmuted
 .claude/agentvibes-muted
 .claude/agentvibes-unmuted
+.claude/agentvibes-enabled
 .claude/hooks/post-response.sh
 .claude/story-workflow.sh
 bin/ensure-soprano-running.sh

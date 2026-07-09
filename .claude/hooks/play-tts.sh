@@ -113,6 +113,12 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   exit 0
 fi
 
+# Resolve a working Python interpreter once (translator, transport config, and
+# the avatar forward all need it). Sourced AFTER the mute exits so muted calls
+# pay nothing. Windows git-bash frequently has no python3 on PATH — see
+# python-resolver.sh; $PYTHON_BIN is empty when none is usable.
+source "$SCRIPT_DIR/python-resolver.sh"
+
 # Parse named flags (e.g. --llm) before positional arguments.
 # This allows callers to pass: play-tts.sh --llm claude-code "text to speak"
 # Named args are extracted; remaining positional args are shifted into $1/$2/$3.
@@ -241,6 +247,53 @@ if [[ -z "$_PRETEXT" ]]; then
     fi
   done
 fi
+# Dynamic session self-ID: a per-LLM PRETEXT containing the {{session}} token
+# expands to "<LLM> on <Project> in <Terminal>" so multi-session users can tell
+# which tab just spoke. Announced once per session (best-effort — see the key
+# note below); on later utterances the token is dropped so it doesn't prefix
+# every line. Opt-in — only fires when the pretext actually contains the token.
+if [[ "$_PRETEXT" == *"{{session}}"* ]]; then
+  # Session key. There is no true Claude-session id available to a plain Bash
+  # command, so this is best-effort: a terminal-session id if the emulator
+  # exports one (stable for the tab's life), else the parent PID. Worst case the
+  # self-ID repeats or is skipped — cosmetic, and only when a pretext opts in.
+  _SID_RAW="${WT_SESSION:-${TERM_SESSION_ID:-${TMUX:-$PPID}}}"
+  _SID_KEY="$(printf '%s' "${LLM_PROVIDER:-}|$(basename "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")|$_SID_RAW" | tr -c 'A-Za-z0-9' '_')"
+  # Announce-marker dir: an OWNED subdir, per the project's secure-temp rule.
+  # If the dir exists but isn't ours (pre-created symlink attack on a shared
+  # host), skip the marker entirely and just strip the token — never chmod or
+  # write through someone else's path.
+  _ANN_BASE="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u 2>/dev/null || echo 0)}"
+  _ANN_DIR="$_ANN_BASE/agentvibes-session"
+  _ANN_OK=0
+  if mkdir -p "$_ANN_DIR" 2>/dev/null && chmod 700 "$_ANN_DIR" 2>/dev/null; then
+    _ANN_OWNER="$(stat -c '%u' "$_ANN_DIR" 2>/dev/null || stat -f '%u' "$_ANN_DIR" 2>/dev/null || echo '')"
+    [[ -z "$_ANN_OWNER" || "$_ANN_OWNER" == "$(id -u 2>/dev/null || echo 0)" ]] && _ANN_OK=1
+  fi
+  _ANN_FILE="$_ANN_DIR/announced-$_SID_KEY"
+  # First utterance → replacement is the self-ID; later utterances → empty (drop).
+  if [[ "$_ANN_OK" == "1" && -f "$_ANN_FILE" ]]; then
+    _SESSION_ID=""
+  else
+    _SESSION_ID="$(bash "$SCRIPT_DIR/agentvibes-session-id.sh" "${LLM_PROVIDER:-claude-code}" "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" 2>/dev/null || true)"
+    if [[ "$_ANN_OK" == "1" ]]; then
+      touch "$_ANN_FILE" 2>/dev/null || true
+      # Bound growth: drop announce-markers older than a day (find is optional).
+      find "$_ANN_DIR" -maxdepth 1 -name 'announced-*' -mtime +1 -delete 2>/dev/null || true
+    fi
+  fi
+  if [[ -n "$_SESSION_ID" ]]; then
+    _PRETEXT="${_PRETEXT//"{{session}}"/$_SESSION_ID}"
+  else
+    # Empty replacement: also swallow one adjacent ", " so "Hey {{session}}, ready"
+    # becomes "Hey ready", not "Hey , ready"; then drop any bare token.
+    _PRETEXT="${_PRETEXT//"{{session}}, "/}"
+    _PRETEXT="${_PRETEXT//", {{session}}"/}"
+    _PRETEXT="${_PRETEXT//"{{session}}"/}"
+  fi
+  # Final tidy: collapse doubled/edge commas and runs of whitespace.
+  _PRETEXT="$(printf '%s' "$_PRETEXT" | sed -E 's/,[[:space:]]*,/,/g; s/^[[:space:]]*,[[:space:]]*//; s/[[:space:]]*,[[:space:]]*$//; s/[[:space:]]{2,}/ /g; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+fi
 if [[ -n "$_PRETEXT" ]]; then
   TEXT="${_PRETEXT}, ${TEXT}"
 fi
@@ -356,8 +409,8 @@ fi
 _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
 if [[ "$ACTIVE_PROVIDER" != "ssh-remote" && "$ACTIVE_PROVIDER" != "agentvibes-receiver" && "$ACTIVE_PROVIDER" != "termux-ssh" ]] \
    && [[ -n "$LLM_PROVIDER" && "$LLM_PROVIDER" != "default" ]] \
-   && [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-  _LLM_SSH_MODE=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" python3 - <<'PYEOF'
+   && [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+  _LLM_SSH_MODE=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" "$PYTHON_BIN" - <<'PYEOF'
 import json, os, sys
 try:
     d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
@@ -368,7 +421,7 @@ PYEOF
 )
   if [[ "$_LLM_SSH_MODE" == "remote" ]]; then
     # Redirect this LLM's audio through ssh-remote using its own SSH config
-    _llm_remote_data=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" python3 - <<'PYEOF'
+    _llm_remote_data=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" "$PYTHON_BIN" - <<'PYEOF'
 import json, os, sys
 try:
     d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
@@ -568,7 +621,7 @@ handle_learning_mode() {
   # 2. Auto-translate to target language
   local translated
   # SECURITY: Add timeout to prevent hanging (#134)
-  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
+  translated=$(timeout 5 "${PYTHON_BIN:-python3}" "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
 
   # Small pause between languages
   sleep 0.5
@@ -604,7 +657,7 @@ handle_translation_mode() {
   # Translate text
   local translated
   # SECURITY: Add timeout to prevent hanging (#134)
-  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
+  translated=$(timeout 5 "${PYTHON_BIN:-python3}" "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
 
   # Get voice for target language if no override specified
   local voice_to_use="$VOICE_OVERRIDE"

@@ -5668,6 +5668,16 @@ async function performUpdateOperations(targetDir, spinner) {
   spinner.text = 'Checking for old configuration...';
   await detectAndMigrateOldConfig(targetDir, spinner);
 
+  // Upgrade safety for the new opt-in injection gate (session-start-tts.sh):
+  // a project that was already installed and talking pre-gate has no marker, so
+  // the gate would newly silence it. Backfill the enable marker for a PROJECT
+  // update so existing users keep their audio. A GLOBAL (home-dir) update stays
+  // opt-in — and we say so, otherwise the user's voice just stops with no clue.
+  if ((await configureInjectionScope(targetDir)) === 'global') {
+    console.log('');
+    warnGlobalInjectionScope();
+  }
+
   return {
     commandCount,
     hookCount: hookResult.count,
@@ -5719,6 +5729,61 @@ async function updateAgentVibes(targetDir, options) {
     console.error(chalk.red('\n❌ Error:'), error.message);
     process.exit(1);
   }
+}
+
+/**
+ * Configure the session-start injection opt-in marker for this install/update.
+ *
+ * - PROJECT install → drop `.claude/agentvibes-enabled` so session-start-tts.sh
+ *   injects the TTS protocol for THIS project (and only this one), preserving the
+ *   "install in a project and it just works" experience.
+ * - GLOBAL install (target === home dir) → write nothing; injecting into every
+ *   session is exactly the "cacophony of agents" we are preventing.
+ *
+ * Uses `agentvibes-enabled`, NOT `agentvibes-unmuted`, on purpose: the unmuted
+ * marker OVERRIDES a global mute in play-tts.sh, so writing it here would let an
+ * install/update silently defeat a user's `~/.agentvibes-muted` kill-switch.
+ * Non-destructive: never touches an existing mute/unmute/enabled choice.
+ *
+ * @param {string} targetDir - install target
+ * @returns {Promise<'global'|'enabled'|'kept'|'error'>} what happened (for messaging)
+ */
+async function configureInjectionScope(targetDir) {
+  try {
+    // path.relative is case-insensitive on win32 and normalizes separators, so a
+    // lowercase drive letter or trailing slash no longer misdetects a home
+    // install; realpath (best-effort) also collapses a symlinked $HOME.
+    let resolvedTarget = path.resolve(targetDir);
+    let resolvedHome = path.resolve(os.homedir());
+    try { resolvedTarget = fsSync.realpathSync.native(resolvedTarget); } catch { /* dir may not exist yet */ }
+    try { resolvedHome = fsSync.realpathSync.native(resolvedHome); } catch { /* ignore */ }
+    if (path.relative(resolvedHome, resolvedTarget) === '') return 'global';
+
+    const claudeDir = path.join(targetDir, '.claude');
+    // Respect any prior explicit choice — enabled OR either mute/unmute marker.
+    for (const m of ['agentvibes-enabled', 'agentvibes-unmuted', 'agentvibes-muted']) {
+      if (await fs.access(path.join(claudeDir, m)).then(() => true).catch(() => false)) {
+        return 'kept';
+      }
+    }
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.writeFile(path.join(claudeDir, 'agentvibes-enabled'), '', 'utf8');
+    return 'enabled';
+  } catch (err) {
+    // Never fail install/update over the marker, but don't swallow silently —
+    // a read-only FS here would otherwise produce a mysterious "silent" project.
+    console.log(chalk.gray(`   (Could not set TTS injection marker: ${err.code || err.message}. Run /agent-vibes:unmute to enable.)`));
+    return 'error';
+  }
+}
+
+// Print the "global install stays silent" guidance (shared by install + update).
+function warnGlobalInjectionScope() {
+  console.log(chalk.yellow.bold('  ⚠  Global install detected (installed at your home directory)'));
+  console.log(chalk.gray('     TTS stays OFF by default so it will NOT talk in every session at once.'));
+  console.log(chalk.gray('     Enable it in a specific project with:  ') + chalk.cyan('/agent-vibes:unmute'));
+  console.log(chalk.gray('     (or re-run the installer inside a project folder, not your home dir).'));
+  console.log('');
 }
 
 // Installation function
@@ -6242,6 +6307,11 @@ def _strip_markdown(text: str) -> str:
     console.log('');
     console.log(chalk.magenta('  \u2661  Sponsor this Developer  github.com/sponsors/paulpreibisch'));
     console.log('');
+
+    // Opt-in injection marker (prevents the global-install cacophony). See
+    // configureInjectionScope: project installs enable THIS project; a home-dir
+    // install stays silent. Uses agentvibes-enabled so it can't override a global mute.
+    if ((await configureInjectionScope(targetDir)) === 'global') warnGlobalInjectionScope();
 
     if (!(options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1')) {
       // Clean final summary
