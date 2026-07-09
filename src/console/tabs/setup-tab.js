@@ -45,7 +45,7 @@ import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { scanInstalledVoices, getVoiceMeta, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
-import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { buildAudioEnv, getAllWavPlayers } from '../audio-env.js';
 import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import crypto from 'node:crypto';
@@ -4235,20 +4235,51 @@ export function createSetupTab(screen, services) {
           try { fs.unlinkSync(tempWav); } catch {};
           return;
         }
-        const wp = detectWavPlayer(_spawnEnv);
-        if (!wp) return;
-        const pp = spawn(wp.bin, wp.args(tempWav), {
-          stdio: 'ignore',
-          detached: !_isWin,
-          windowsHide: true,
-          env: _spawnEnv,
-        });
-        _previewProc = pp;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
-        pp.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+        // Play the synthesized wav — try each installed player until one succeeds.
+        // A single detectWavPlayer() pick can be present but non-functional (e.g.
+        // sox's `play` exits 1 with "no default audio device configured"), which
+        // would otherwise fail silently since there was no exit-code check here.
+        const _wavPlayers = getAllWavPlayers(_spawnEnv);
+        if (_wavPlayers.length === 0) {
+          _previewProc = null; _previewVoiceId = null;
           try { fs.unlinkSync(tempWav); } catch {}
-        });
+          return;
+        }
+
+        function _tryNextPlayer(remainingPlayers) {
+          if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
+          if (!remainingPlayers.length) {
+            _previewProc = null; _previewVoiceId = null;
+            if (!_vpClosed) {
+              vpPreviewLine.setContent('{red-fg}♪ Audio playback failed (no audio device?){/red-fg}');
+              screen.render();
+              setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
+            }
+            try { fs.unlinkSync(tempWav); } catch {}
+            return;
+          }
+          const [wavP, ...rest] = remainingPlayers;
+          const pp = spawn(wavP.bin, wavP.args(tempWav), {
+            stdio: 'ignore',
+            detached: !_isWin,
+            windowsHide: true,
+            env: _spawnEnv,
+          });
+          _previewProc = pp;
+          if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
+          pp.on('exit', (code) => {
+            if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
+            if (code !== 0) { _tryNextPlayer(rest); return; }
+            _previewVoiceId = null; _previewProc = null;
+            if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+            try { fs.unlinkSync(tempWav); } catch {}
+          });
+          pp.on('error', () => {
+            if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
+            _tryNextPlayer(rest);
+          });
+        }
+        _tryNextPlayer(_wavPlayers);
       });
       piper.on('error', () => {
         _previewProc = null; _previewVoiceId = null;
