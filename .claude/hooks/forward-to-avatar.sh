@@ -30,6 +30,13 @@ PIPER_PORT="${AGENTVIBES_PIPER_PORT:-5001}"
 
 [[ -z "$TEXT" ]] && exit 1
 
+# Resolve a working Python (Windows git-bash often has none on PATH). Without
+# one this lean path can't reach the receiver — return non-zero so the caller
+# falls back to the heavy pipeline.
+_FTA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$_FTA_DIR/python-resolver.sh"
+[[ -n "$PYTHON_BIN" ]] || exit 6
+
 # Resolve voice: explicit arg → session voice file → default.
 if [[ -z "$VOICE" ]]; then
   VOICE="$(cat "$HOME/.claude/tts-voice.txt" 2>/dev/null | tr -d '[:space:]')"
@@ -38,7 +45,7 @@ fi
 
 # ---- Primary: warm piper server (sub-second) ----
 AV_TEXT="$TEXT" AV_VOICE="$VOICE" AV_PROJ="$PROJECT" AV_PROJPATH="$PROJECT_PATH" AV_LLM="$LLM" AV_THPORT="$TH_PORT" AV_PIPER="$PIPER_PORT" \
-python3 - <<'PY'
+"$PYTHON_BIN" - <<'PY'
 import os, json, base64, urllib.request
 text  = os.environ["AV_TEXT"]
 voice = os.environ["AV_VOICE"]
@@ -98,7 +105,7 @@ printf '%s\n' "$TEXT" | piper --model "$MODEL" "${SPEAKER_ARGS[@]}" --output_fil
 # fail silently (E2BIG) for any real-length utterance. Python reads and
 # base64-encodes the file itself instead, with no such size limit.
 AV_WAV="$WAV" AV_TEXT="$TEXT" AV_VOICE="$VOICE" AV_PROJ="$PROJECT" AV_PROJPATH="$PROJECT_PATH" AV_LLM="$LLM" AV_THPORT="$TH_PORT" \
-python3 - <<'PY' 2>/dev/null
+"$PYTHON_BIN" - <<'PY' 2>/dev/null
 import os, sys, json, base64, urllib.request
 with open(os.environ["AV_WAV"], "rb") as f:
     b64 = base64.b64encode(f.read()).decode()

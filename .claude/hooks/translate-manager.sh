@@ -40,6 +40,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
 
 # Use PWD for project dir when called from project context, fall back to script-relative
 if [[ -d "$PWD/.claude" ]]; then
@@ -173,7 +174,7 @@ translate_text() {
 
     # Call translator.py
     local translated
-    translated=$(python3 "$SCRIPT_DIR/translator.py" "$text" "$target" 2>/dev/null) || translated="$text"
+    translated=$("$PYTHON_BIN" "$SCRIPT_DIR/translator.py" "$text" "$target" 2>/dev/null) || translated="$text"
 
     echo "$translated"
 }

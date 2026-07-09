@@ -26,6 +26,7 @@ fi
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # ---------------------------------------------------------------------------
@@ -38,10 +39,10 @@ SSH_KEY=""
 SSH_PORT=""
 
 _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
-if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-  SSH_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('host',''))" 2>/dev/null || echo "")
-  SSH_KEY=$(python3  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
-  SSH_PORT=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+if [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+  SSH_HOST=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+  SSH_KEY=$("$PYTHON_BIN"  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+  SSH_PORT=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('port',''))" 2>/dev/null || echo "")
 fi
 
 if [[ -z "$SSH_HOST" ]]; then

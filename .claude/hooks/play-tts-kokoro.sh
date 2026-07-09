@@ -31,17 +31,27 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 source "$SCRIPT_DIR/audio-cache-utils.sh"
+source "$SCRIPT_DIR/python-resolver.sh"
 
 if [[ -z "$TEXT" ]]; then
   echo "Usage: $0 \"text to speak\" [voice]" >&2
   exit 1
 fi
 
+# Distinguish "no Python at all" from "Python present but kokoro module missing"
+# — the old check conflated them, so a Windows box where python3 simply wasn't on
+# PATH wrongly reported "Kokoro not installed" (see python-resolver.sh).
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "❌ No Python 3 interpreter found." >&2
+  echo "   Kokoro needs Python 3. Install it (Windows: https://python.org, or 'py')," >&2
+  echo "   or set AGENTVIBES_PYTHON=/path/to/python.exe if it's installed elsewhere." >&2
+  exit 2
+fi
 # Check kokoro is installed (use find_spec to avoid slow torch import)
-if ! python3 -c "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>/dev/null; then
-  echo "❌ Kokoro TTS not installed." >&2
+if ! "$PYTHON_BIN" -c "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>/dev/null; then
+  echo "❌ Kokoro TTS module not installed for: $PYTHON_BIN" >&2
   echo "   Install with: ${SCRIPT_DIR}/kokoro-installer.sh" >&2
-  echo "   Or manually:  pip install kokoro-onnx soundfile numpy" >&2
+  echo "   Or manually:  \"$PYTHON_BIN\" -m pip install kokoro soundfile numpy" >&2
   exit 2
 fi
 
@@ -103,7 +113,7 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
 fi
 
 # Run synthesis — output path printed to stdout
-RESULT=$(python3 "$SYNTH_SCRIPT" "$TEXT" "$VOICE" "$TEMP_WAV" "$SPEED" 2>&1) || {
+RESULT=$("$PYTHON_BIN" "$SYNTH_SCRIPT" "$TEXT" "$VOICE" "$TEMP_WAV" "$SPEED" 2>&1) || {
   echo "❌ Kokoro synthesis failed: $RESULT" >&2
   exit 3
 }

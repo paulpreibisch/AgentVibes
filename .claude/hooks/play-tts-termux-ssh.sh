@@ -68,6 +68,7 @@ VOICE_OVERRIDE="$2"  # Not used for termux-ssh, but kept for interface compatibi
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
 
 # @function get_ssh_host
 # @intent Determine SSH host alias for Android device
@@ -119,10 +120,10 @@ SSH_KEY=""
 SSH_PORT=""
 
 _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
-if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-  _CFG_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('host',''))" 2>/dev/null || echo "")
-  SSH_KEY=$(python3    -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
-  SSH_PORT=$(python3   -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+if [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+  _CFG_HOST=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+  SSH_KEY=$("$PYTHON_BIN"    -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+  SSH_PORT=$("$PYTHON_BIN"   -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('termux-ssh',{}); print(p.get('port',''))" 2>/dev/null || echo "")
 fi
 
 if [[ -n "${_CFG_HOST:-}" ]]; then

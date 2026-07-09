@@ -296,6 +296,7 @@ patch_libritts_speaker_names() {
   # Find voice-assignments.json relative to this script (SCRIPT_DIR/../.. = project root)
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  source "$script_dir/python-resolver.sh"
   local project_root
   project_root="$(cd "$script_dir/../.." 2>/dev/null && pwd)"
   local catalog="$project_root/voice-assignments.json"
@@ -315,8 +316,8 @@ patch_libritts_speaker_names() {
   fi
 
   # Check if already patched (first key doesn't start with 'p' + digits)
-  if command -v python3 &>/dev/null; then
-    python3 -c "
+  if [[ -n "$PYTHON_BIN" ]]; then
+    "$PYTHON_BIN" -c "
 import json, sys
 
 json_path = sys.argv[1]
