@@ -32,7 +32,7 @@
 # @dependencies provider-manager.sh for active provider detection, .claude/tts-language.txt for state
 # @entrypoints Called by /agent-vibes:language commands, play-tts-*.sh for voice resolution
 # @patterns Provider abstraction, language-to-voice mapping, backward compatibility with legacy LANGUAGE_VOICES
-# @related play-tts-piper.sh, provider-manager.sh, learn-manager.sh
+# @related play-tts-piper.sh, provider-manager.sh
 
 # Determine target .claude directory based on context
 # Priority:
@@ -215,11 +215,18 @@ get_language_code() {
 }
 
 # Function to check if current voice supports language
+# AVI-S9.6 AC1: this list previously included "Antoni", "Rachel", "Domi",
+# "Charlotte" — none of which exist in the 21-voice ElevenLabs catalog
+# (src/services/provider-catalog.js ELEVENLABS_VOICES), the same class of bug
+# design row 21 flagged in the now-deleted learn-manager.sh. Trimmed to names
+# that ARE in the catalog; test/unit/provider-catalog-conformance.test.js
+# parity-asserts every entry here against the catalog so a future addition of
+# a non-existent name fails the suite instead of shipping silently.
 is_voice_multilingual() {
     local voice="$1"
 
-    # List of multilingual voices
-    local multilingual_voices=("Antoni" "Rachel" "Domi" "Bella" "Charlotte" "Matilda")
+    # List of multilingual voices (must all exist in the ElevenLabs catalog)
+    local multilingual_voices=("Bella" "Matilda")
 
     for mv in "${multilingual_voices[@]}"; do
         if [[ "$voice" == "$mv" ]]; then

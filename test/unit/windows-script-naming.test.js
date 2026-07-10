@@ -117,7 +117,6 @@ test('Naming: HIGH priority scripts (MCP-breaking) must have .ps1 equivalents', 
     'personality-manager',
     'speed-manager',
     'language-manager',
-    'learn-manager',
     'verbosity-manager',
     'clean-audio-cache',
   ];

@@ -19,6 +19,13 @@ $VoiceSapiFile = "$ClaudeDir\tts-voice-sapi.txt"
 $VoicePiperFile = "$ClaudeDir\tts-voice-piper.txt"
 $VoiceKokoroFile = "$ClaudeDir\tts-voice-kokoro.txt"
 
+# Load the generated Provider Catalog (SSOT) for kokoro switch-time validation.
+# FAIL-SAFE: consumers probe `Get-Command Test-CatalogVoice` and fall back to the
+# legacy shape regex when the artifact is missing (installed-tree skew) — mirrors
+# play-tts.sh's PLAN_OK legacy fallback. Switch never breaks on a missing catalog.
+$CatalogPs1 = Join-Path $PSScriptRoot 'provider-catalog.ps1'
+if (Test-Path $CatalogPs1) { . $CatalogPs1 }
+
 # Get active provider
 $ActiveProvider = "windows-sapi"
 if (Test-Path $ProviderFile) {
@@ -131,18 +138,45 @@ function Switch-Voice {
         return $true
     }
     elseif ($ActiveProvider -eq "kokoro") {
-        # Kokoro's catalog is a large fixed set of ids shaped <lang><sex>_name
-        # (e.g. af_heart, am_adam). Validate by pattern (same as the Unix arm and
-        # play-tts-kokoro.ps1) and write tts-voice-kokoro.txt, which the runtime reads.
+        # Kokoro switch-time validation via the generated Provider Catalog (SSOT):
+        # MEMBERSHIP + canonical case-fold, so a typo like af_hart is rejected HERE
+        # and never reaches tts-voice-kokoro.txt to die silently at the model.
+        # Escape hatch AGENTVIBES_ALLOW_UNLISTED_VOICE=1 bypasses MEMBERSHIP (not
+        # shape) so a voice from a newer kokoro model still switches. FAIL-SAFE:
+        # fall back to the legacy shape regex when the catalog artifact is missing.
         $kokoroVoice = $NewVoice.ToLower()
-        if ($kokoroVoice -notmatch '^[a-z]{2}_[a-z0-9_]+$') {
-            Write-Host "[ERROR] Kokoro voice not found: $NewVoice" -ForegroundColor Red
-            Write-Host "Kokoro ids look like <lang><sex>_name, e.g. af_heart, am_michael, bf_emma." -ForegroundColor Yellow
-            return $false
+        $allowUnlisted = ($env:AGENTVIBES_ALLOW_UNLISTED_VOICE -eq '1')
+        if (Get-Command Test-CatalogVoice -ErrorAction SilentlyContinue) {
+            $canon = Test-CatalogVoice -Provider 'kokoro' -Voice $NewVoice
+            if ($canon) {
+                Set-Content -Path $VoiceKokoroFile -Value $canon
+                Write-Host "[OK] Voice set to: $canon" -ForegroundColor Green
+                return $true
+            }
+            elseif ($allowUnlisted -and $kokoroVoice -match '^[a-z]{2}_[a-z0-9_]+$') {
+                Write-Host "[WARN] '$NewVoice' is not in the shipped Kokoro catalog; allowing it (AGENTVIBES_ALLOW_UNLISTED_VOICE=1)." -ForegroundColor Yellow
+                Set-Content -Path $VoiceKokoroFile -Value $kokoroVoice
+                Write-Host "[OK] Voice set to: $kokoroVoice" -ForegroundColor Green
+                return $true
+            }
+            else {
+                Write-Host "[ERROR] Kokoro voice not found: $NewVoice" -ForegroundColor Red
+                Write-Host "That is not a known Kokoro voice. Examples: af_heart, am_michael, bf_emma, bm_george, jf_alpha, zf_xiaoxiao, ef_dora." -ForegroundColor Yellow
+                Write-Host "Set AGENTVIBES_ALLOW_UNLISTED_VOICE=1 to allow a newer-model voice." -ForegroundColor Yellow
+                return $false
+            }
         }
-        Set-Content -Path $VoiceKokoroFile -Value $kokoroVoice
-        Write-Host "[OK] Voice set to: $kokoroVoice" -ForegroundColor Green
-        return $true
+        else {
+            # FAIL-SAFE legacy path (catalog artifact missing): shape-only regex.
+            if ($kokoroVoice -notmatch '^[a-z]{2}_[a-z0-9_]+$') {
+                Write-Host "[ERROR] Kokoro voice not found: $NewVoice" -ForegroundColor Red
+                Write-Host "Kokoro ids look like <lang><sex>_name, e.g. af_heart, am_michael, bf_emma." -ForegroundColor Yellow
+                return $false
+            }
+            Set-Content -Path $VoiceKokoroFile -Value $kokoroVoice
+            Write-Host "[OK] Voice set to: $kokoroVoice" -ForegroundColor Green
+            return $true
+        }
     }
 
     if ($ValidVoices -notcontains $NewVoice) {

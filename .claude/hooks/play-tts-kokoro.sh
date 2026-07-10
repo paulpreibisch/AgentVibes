@@ -57,12 +57,29 @@ fi
 
 # ---------------------------------------------------------------------------
 # Resolve voice
+# Default voice sourced from the generated Provider Catalog (SSOT) when present.
+# FAIL-SAFE: keep the literal fallback for installed-tree skew (mirrors play-tts.sh
+# PLAN_OK) — synth never breaks on a missing catalog.
 DEFAULT_VOICE="af_heart"
+if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+  if type catalog_default_voice >/dev/null 2>&1; then
+    _CATALOG_DEFAULT="$(catalog_default_voice kokoro 2>/dev/null || true)"
+    [[ -n "$_CATALOG_DEFAULT" ]] && DEFAULT_VOICE="$_CATALOG_DEFAULT"
+  fi
+fi
+
+# Synth-time shape check (LENIENT per design §3.3): a voice from a NEWER kokoro
+# model that the shipped catalog doesn't know must still degrade audibly, not
+# brick — so this stays a shape check + loud-warning fallback, NOT membership.
+# One literal, reused at both call sites below.
+KOKORO_SHAPE_RE='^[a-z]{2}_[a-z0-9_]+$'
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
   # Accept kokoro-style voice IDs (2-letter prefix + underscore + name)
   # e.g. af_heart, am_adam, bf_emma, bm_george
-  if [[ "$VOICE_OVERRIDE" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+  if [[ "$VOICE_OVERRIDE" =~ $KOKORO_SHAPE_RE ]]; then
     VOICE="$VOICE_OVERRIDE"
   else
     echo "⚠️  Unrecognized kokoro voice '$VOICE_OVERRIDE', using $DEFAULT_VOICE" >&2
@@ -72,7 +89,7 @@ else
   # Check voice manager
   if [[ -f "$SCRIPT_DIR/voice-manager.sh" ]]; then
     _CONFIGURED="$("$SCRIPT_DIR/voice-manager.sh" get 2>/dev/null || true)"
-    if [[ "$_CONFIGURED" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+    if [[ "$_CONFIGURED" =~ $KOKORO_SHAPE_RE ]]; then
       VOICE="$_CONFIGURED"
     else
       VOICE="$DEFAULT_VOICE"

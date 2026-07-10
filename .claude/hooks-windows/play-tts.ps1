@@ -308,8 +308,30 @@ $PlanVoiceIsOverride = $false
 if ($ProviderOverride) {
     # A fresh -ProviderOverride for THIS request must win over any stale/inherited
     # AGENTVIBES_FORCE_PROVIDER in the environment (a validated allowlist only).
+    #
+    # The allowlist DERIVES from the Provider Catalog (SSOT): the Windows platform
+    # set PLUS the cross-platform forwarding aliases this script normalizes
+    # (piper→windows-piper, sapi→windows-sapi, and macos forwarded verbatim for
+    # SSH-relayed senders). FAIL-SAFE: the literal below is the legacy fallback
+    # used when the generated provider-catalog.ps1 is missing (installed-tree skew).
+    $ProviderOverrideAllowlist = @('piper','soprano','macos','windows-sapi','sapi','kokoro','windows-piper')
+    $__CatalogPs1 = Join-Path $ScriptPath 'provider-catalog.ps1'
+    if (Test-Path $__CatalogPs1) {
+        try {
+            . $__CatalogPs1
+            if (Get-Command Get-CatalogProvidersForPlatform -ErrorAction SilentlyContinue) {
+                $__WinSet = @(Get-CatalogProvidersForPlatform 'windows')
+                if ($__WinSet.Count -gt 0) {
+                    # Windows synth providers + the forwarding aliases play-tts.ps1 normalizes.
+                    $ProviderOverrideAllowlist = @($__WinSet + @('piper','sapi','macos') | Select-Object -Unique)
+                }
+            }
+        } catch {
+            # Keep the legacy fallback allowlist on any catalog load error.
+        }
+    }
     switch ($ProviderOverride) {
-        { $_ -in @('piper','soprano','macos','windows-sapi','sapi','kokoro','elevenlabs','windows-piper') } {
+        { $_ -in $ProviderOverrideAllowlist } {
             $env:AGENTVIBES_FORCE_PROVIDER = $ProviderOverride
         }
     }

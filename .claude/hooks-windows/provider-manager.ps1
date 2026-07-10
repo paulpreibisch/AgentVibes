@@ -15,9 +15,25 @@ param(
 
 $ClaudeDir = "$env:USERPROFILE\.claude"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
-# kokoro is cross-platform (play-tts-kokoro.ps1 exists) and canonically supported
-# (SUPPORTED_PROVIDERS in src/utils/provider-validator.js). See AVI-S8.1.
+# $ValidProviders DERIVES from the generated Provider Catalog (SSOT): the Windows
+# platform set (kokoro is cross-platform — play-tts-kokoro.ps1 exists; elevenlabs
+# is NOT playable on Windows and is therefore absent). Dot-source the generated
+# provider-catalog.ps1 and pull `windows`. FAIL-SAFE: the literal below is the
+# legacy fallback used when the catalog artifact is missing (installed-tree skew)
+# — mirrors AVI-S9.3's probe/fallback pattern. See AVI-S8.1 / AVI-S9.5.
 $ValidProviders = @('windows-piper', 'windows-sapi', 'soprano', 'kokoro')
+$__CatalogPs1 = Join-Path $PSScriptRoot 'provider-catalog.ps1'
+if (Test-Path $__CatalogPs1) {
+    try {
+        . $__CatalogPs1
+        if (Get-Command Get-CatalogProvidersForPlatform -ErrorAction SilentlyContinue) {
+            $__WinSet = @(Get-CatalogProvidersForPlatform 'windows')
+            if ($__WinSet.Count -gt 0) { $ValidProviders = $__WinSet }
+        }
+    } catch {
+        # Keep the legacy fallback literal on any catalog load error.
+    }
+}
 
 # Ensure claude directory exists
 if (-not (Test-Path $ClaudeDir)) {

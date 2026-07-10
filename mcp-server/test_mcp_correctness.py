@@ -122,13 +122,12 @@ def test_set_personality_fails_on_nonzero_exit_despite_matching_marker_text():
     "method_name,call_args,plain_stdout",
     [
         ("set_language", ("spanish",), "Language set to: spanish"),
-        ("set_learn_mode", (True,), "Learn mode enabled"),
         ("set_verbosity", ("high",), "Verbosity set to: high (project-local)"),
         ("replay_audio", (1,), "Replaying audio #1: tts-foo.wav"),
     ],
 )
 def test_windows_style_plain_text_success_is_not_treated_as_failure(method_name, call_args, plain_stdout):
-    """set_language / set_learn_mode / set_verbosity / replay_audio must all
+    """set_language / set_verbosity / replay_audio must all
     report success from returncode==0 alone, even when stdout carries none of
     the emoji markers the old code sniffed for (✓ / ✅ / 🔊)."""
     server = AgentVibesServer()
@@ -480,6 +479,25 @@ def test_tool_descriptions_state_20_percent_default_not_30():
     volume_desc = by_name["set_background_music_volume"].inputSchema["properties"]["volume"]["description"]
     assert "0.20" in volume_desc
     assert "0.30" not in volume_desc
+
+
+def test_valid_providers_derives_from_catalog_and_excludes_elevenlabs_on_windows():
+    """AVI-S9.5: _valid_providers() derives the per-platform allowlist from
+    provider-catalog.json (or the embedded fallback ≡ catalog). ElevenLabs has
+    no Windows runtime (no play-tts-elevenlabs.ps1), so it must be ABSENT from
+    the Windows allowlist and PRESENT on non-Windows — the exact bug class the
+    Provider Catalog closes."""
+    server = AgentVibesServer()
+
+    server.is_windows = True
+    win = server._valid_providers()
+    assert "elevenlabs" not in win, f"elevenlabs must not be a Windows provider: {win}"
+    assert "kokoro" in win and "soprano" in win
+
+    server.is_windows = False
+    non_win = server._valid_providers()
+    assert "elevenlabs" in non_win, f"elevenlabs must be a non-Windows provider: {non_win}"
+    assert "kokoro" in non_win and "soprano" in non_win
 
 
 if __name__ == "__main__":

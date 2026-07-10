@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path'; // For safe path operations and traversal prevention
 import fs from 'node:fs'; // For checking file/directory existence
 import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
+import { listProviders, displayName as catalogDisplayName } from '../services/provider-catalog.js';
 
 /**
  * Canonical set of TTS synthesis providers AgentVibes knows how to use.
@@ -26,27 +27,35 @@ import os from 'node:os'; // For os.homedir() to prevent HOME injection attacks
  * until a PowerShell runtime lands (AVI-S8.2).
  * @type {readonly string[]}
  */
-export const SUPPORTED_PROVIDERS = Object.freeze([
-  'soprano', 'piper', 'kokoro', 'elevenlabs', 'macos', 'windows-sapi', 'windows-piper',
-]);
+export const SUPPORTED_PROVIDERS = Object.freeze(listProviders().map((p) => p.id));
 
 /**
  * Providers that use the SAME id on every OS and have at least a Unix (bash)
  * runtime. Every PORTABLE dispatcher — the MCP set_provider allowlist,
  * voice-manager.sh, and list-voices.js — must recognise these regardless of
- * platform.
+ * platform. DERIVED VIEW over the catalog: the providers with a Unix runtime
+ * whose voices are enumerable without disk (static/name-to-id) — i.e. kokoro and
+ * elevenlabs.
  * @type {readonly string[]}
  */
-export const CROSS_PLATFORM_PROVIDERS = Object.freeze(['kokoro', 'elevenlabs']);
+export const CROSS_PLATFORM_PROVIDERS = Object.freeze(
+  listProviders()
+    .filter((p) => p.runtime.unix !== null && (p.voiceModel === 'static' || p.voiceModel === 'name-to-id'))
+    .map((p) => p.id),
+);
 
 /**
  * Subset of {@link CROSS_PLATFORM_PROVIDERS} that ALSO ships a PowerShell runtime
  * (play-tts-*.ps1), so the Windows provider manager (provider-manager.ps1) must
  * recognise them too. `elevenlabs` is excluded until play-tts-elevenlabs.ps1
- * exists (AVI-S8.2).
+ * exists (AVI-S8.2). DERIVED VIEW over the catalog.
  * @type {readonly string[]}
  */
-export const WINDOWS_RUNTIME_PROVIDERS = Object.freeze(['kokoro']);
+export const WINDOWS_RUNTIME_PROVIDERS = Object.freeze(
+  listProviders()
+    .filter((p) => p.runtime.unix !== null && (p.voiceModel === 'static' || p.voiceModel === 'name-to-id') && p.runtime.windows !== null)
+    .map((p) => p.id),
+);
 
 /**
  * Is `name` a provider AgentVibes canonically supports?
@@ -652,16 +661,8 @@ function getPackageInfo(pkgName) {
  * @returns {string} Display name
  */
 export function getProviderDisplayName(providerName) {
-  const names = {
-    soprano: 'Soprano TTS',
-    piper: 'Piper TTS',
-    kokoro: 'Kokoro TTS',
-    elevenlabs: 'ElevenLabs',
-    macos: 'macOS Say',
-    sapi: 'Windows SAPI',
-    'windows-sapi': 'Windows SAPI',
-    'windows-piper': 'Piper TTS'
-  };
-
-  return names[providerName] || providerName;
+  // DERIVED VIEW: delegate to the Provider Catalog (single source of truth for
+  // display names). The catalog resolves aliases (e.g. 'sapi' → Windows SAPI) and
+  // passes unknown ids through unchanged, preserving this function's contract.
+  return catalogDisplayName(providerName);
 }

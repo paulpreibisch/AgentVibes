@@ -113,16 +113,6 @@ recv_field() {
   [ "$(payload_field language)" = "french" ]
 }
 
-@test "R18: learning-mode target language is forwarded (learn-mode ON)" {
-  echo "ON" > "$CLAUDE_PROJECT_DIR/.claude/tts-learn-mode.txt"
-  echo "german" > "$CLAUDE_PROJECT_DIR/.claude/tts-target-language.txt"
-  # A plain tts-language.txt exists but learning-mode target must win.
-  echo "english" > "$CLAUDE_PROJECT_DIR/.claude/tts-language.txt"
-  run_sender "Hallo"
-  [ "$status" -eq 0 ]
-  [ "$(payload_field language)" = "german" ]
-}
-
 @test "sender: payload remains valid JSON with the two new fields present" {
   echo "italian" > "$CLAUDE_PROJECT_DIR/.claude/config/tts-language.txt"
   touch "$TEST_HOME/.agentvibes-muted"

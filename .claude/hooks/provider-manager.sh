@@ -73,6 +73,23 @@ get_provider_config_path() {
   echo "$provider_file"
 }
 
+# @function _load_provider_catalog
+# @intent Source the generated Provider Catalog (bash-3.2-safe SSOT accessors)
+# @why Single source of truth for per-provider defaults (AVI-S9.4) — mirrors the
+#      identical pattern in voice-manager.sh (AVI-S9.3). FAIL-SAFE: callers probe
+#      `type catalog_* >/dev/null 2>&1` and fall back to legacy hardcoded literals
+#      when the artifact is missing (installed-tree skew). Defaults never break.
+# @returns None (sources catalog_* functions into the current shell when present)
+# @sideeffects None (double-sourcing is guarded inside provider-catalog.sh)
+_load_provider_catalog() {
+  local _script_dir
+  _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$_script_dir/provider-catalog.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$_script_dir/provider-catalog.sh" 2>/dev/null || true
+  fi
+}
+
 # @function get_active_provider
 # @intent Read currently active TTS provider from config file
 # @why Central function for determining which provider to use
@@ -187,12 +204,24 @@ migrate_voice_to_provider() {
     "en_US-danny-low:Alex"
   )
 
-  # Default voices by provider
-  local piper_default="en_US-lessac-medium"
-  local macos_default="Samantha"
-  local soprano_default="soprano-default"  # Single voice — no selection needed
-  local elevenlabs_default="Sarah"
-  local kokoro_default="af_heart"
+  # Default voices by provider — sourced from the generated Provider Catalog SSOT
+  # (AVI-S9.4, catalog_default_voice). FAIL-SAFE: legacy literals if the catalog
+  # artifact is missing (installed-tree skew) — mirrors AVI-S9.3's pattern.
+  _load_provider_catalog
+  local piper_default macos_default soprano_default elevenlabs_default kokoro_default
+  if type catalog_default_voice >/dev/null 2>&1; then
+    piper_default="$(catalog_default_voice piper)"
+    macos_default="$(catalog_default_voice macos)"
+    soprano_default="$(catalog_default_voice soprano)"  # Single voice — no selection needed
+    elevenlabs_default="$(catalog_default_voice elevenlabs)"
+    kokoro_default="$(catalog_default_voice kokoro)"
+  else
+    piper_default="en_US-lessac-medium"
+    macos_default="Samantha"
+    soprano_default="soprano-default"  # Single voice — no selection needed
+    elevenlabs_default="Sarah"
+    kokoro_default="af_heart"
+  fi
 
   # Single-voice providers: migration is straightforward
   case "$target_provider" in
@@ -214,7 +243,15 @@ migrate_voice_to_provider() {
     return 0
   fi
 
-  # If migrating FROM a single-voice provider, return default for target provider
+  # If migrating FROM a single-voice/fixed-shape provider, return default for target.
+  # NOTE ("Rachel" sentinel, AVI-S9.4): "Rachel" was ElevenLabs' hardcoded default
+  # before the 21-voice catalog trim (AVI-S8.1) — it is NOT a name-to-id match in
+  # today's catalog. This is READ-SIDE TOLERANCE ONLY (CLAUDE.md non-destructive
+  # rule): a user config that still says "Rachel" degrades gracefully to the
+  # target provider's default instead of erroring; we never rewrite the user's file.
+  if [[ "$current_voice" == "Rachel" ]]; then
+    echo "⚠️  '$current_voice' is a legacy ElevenLabs default no longer in the voice catalog; migrating to the $target_provider default." >&2
+  fi
   if [[ "$current_voice" == "soprano-default" || "$current_voice" == "Rachel" || "$current_voice" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
     case "$target_provider" in
       piper) echo "$piper_default" ;;

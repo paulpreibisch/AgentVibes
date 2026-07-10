@@ -43,6 +43,27 @@ CONFIG_DIR=".agentvibes/bmad"
 VOICE_CONFIG_FILE="$CONFIG_DIR/bmad-voices.md"
 ENABLED_FLAG="$CONFIG_DIR/bmad-voices-enabled.flag"
 
+# @function _piper_default_voice
+# @intent Return the Provider Catalog's piper default voice (AVI-S9.6 AC2,
+#         design row 22), falling back to the legacy hardcoded literal when the
+#         generated .claude/hooks/provider-catalog.sh artifact is missing
+#         (installed-tree skew — mirrors the fail-safe probe pattern already
+#         used by voice-manager.sh / provider-manager.sh).
+# @returns Echoes the default Piper voice id.
+_piper_default_voice() {
+  local _script_dir
+  _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$_script_dir/provider-catalog.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$_script_dir/provider-catalog.sh" 2>/dev/null || true
+  fi
+  if type catalog_default_voice >/dev/null 2>&1; then
+    catalog_default_voice piper
+  else
+    echo "en_US-lessac-medium"  # legacy fallback if the catalog artifact is missing
+  fi
+}
+
 # AI NOTE: Auto-enable pattern - When BMAD is detected via install-manifest.yaml,
 # automatically enable the voice plugin to provide seamless multi-agent voice support.
 # This avoids requiring manual plugin activation after BMAD installation.
@@ -160,8 +181,9 @@ get_agent_voice() {
         # CSV format: agent_id,voice_name
         local voice=$(grep "^$agent_id," "$bmad_voice_map" | cut -d',' -f2)
 
-        # If voice is empty or generic (same for all), use defaults
-        if [[ -n "$voice" ]] && [[ "$voice" != "en_US-lessac-medium" ]]; then
+        # If voice is empty or generic (same for all), use defaults. "Generic"
+        # means the CSV still carries the catalog's piper default (AVI-S9.6 AC2).
+        if [[ -n "$voice" ]] && [[ "$voice" != "$(_piper_default_voice)" ]]; then
             echo "$voice"
             return
         fi
@@ -172,7 +194,7 @@ get_agent_voice() {
     # These match the BMAD-METHOD defaults for consistency
     case "$agent_id" in
         bmad-master)
-            echo "en_US-lessac-medium"
+            _piper_default_voice
             return
             ;;
         analyst)

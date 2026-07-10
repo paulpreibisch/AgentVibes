@@ -545,6 +545,168 @@ sprint_5:
     phase_4: [AVI-S8.8]                                 # Opus
   sequencing_rule: "Do phases 1-3 before the MuseTalk/avatar epic (AVI-E07) lands."
 
+# ============================================================
+# SPRINT 9 — Epic AVI-E09: Provider Catalog / Voice Registry
+# Source: docs/architecture/provider-catalog-design.md (Fable 5 design, 2026-07-09)
+# SSOT Layer 2 — companion to the Utterance Resolver (AVI-S8.5)
+# ============================================================
+sprint_9:
+  sprint: 9
+  epic_id: AVI-E09
+  epic_name: Provider Catalog / Voice Registry (SSOT Layer 2)
+  feature_id: AVI-09-PROVIDER-CATALOG
+  priority: High
+  story_points_total: 29
+  duration: 2-3 weeks
+  focus: One canonical provider/voice record set + generated bash/ps1/json artifacts; every dispatcher allowlist, voice list, and default becomes derived or parity-asserted
+  outcome: Retire the "provider accepted but unplayable" and hand-mirrored-voice-list regression classes; fixes the two live negative-availability contradictions (server.py:746, play-tts.ps1:312), the soprano fallthrough, and the learn-manager Antoni bug
+  created_date: 2026-07-09
+  design_doc: docs/architecture/provider-catalog-design.md
+  model_policy: |
+    Opus for Phase 0 (the canonical module + conformance matrix — architecture).
+    Sonnet for Phases 1-5 (generator + mechanical consumer migrations).
+    Fable gates Phase 0 and the Phase 4 allowlist derivation.
+    The resolver's 433-test contract must stay green in EVERY phase.
+
+  development_status:
+
+    story_9_1:
+      id: AVI-S9.1
+      title: Provider Catalog Canonical Module + Conformance v1 (Phase 0)
+      status: complete
+      story_points: 8
+      acceptance_criteria_count: 7
+      file: docs/implementation-artifacts/9-1-provider-catalog-canonical-module.md
+      recommended_model: opus
+      fable_gate: true
+      critical: true
+      description: |
+        Create src/services/provider-catalog.js (7 ProviderRecords, pure
+        data/functions); absorb provider-voice-catalog.js (re-export shim);
+        derive provider-validator.js sets + display names. Conformance test
+        groups 2/3/5/6/8 vs existing dispatchers. The NEGATIVE availability
+        assertion fails red on server.py:746 + play-tts.ps1:312 (elevenlabs
+        on Windows, no ps1 runtime) -> delete both tokens, prove green.
+      dependencies: []
+
+    story_9_2:
+      id: AVI-S9.2
+      title: Provider Catalog Generator + Checked-In Artifacts (Phase 1)
+      status: complete
+      story_points: 5
+      acceptance_criteria_count: 8
+      file: docs/implementation-artifacts/9-2-provider-catalog-generator-artifacts.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        scripts/generate-provider-catalog.mjs emits provider-catalog.sh
+        (bash-3.2-safe), provider-catalog.ps1, provider-catalog.json, and
+        regenerates elevenlabs-voices.sh in place (fixes the latent macOS
+        bash-3.2 break: declare -A / ${query,,}). Freshness byte-diff,
+        runtime-truth, and bash-3.2-lint assertions wired into npm test.
+        elevenlabs-catalog-parity.test.js retires. Zero consumer changes.
+      dependencies:
+        - AVI-S9.1
+
+    story_9_3:
+      id: AVI-S9.3
+      title: Kokoro Consumers onto the Catalog (Phase 2)
+      status: complete
+      story_points: 5
+      acceptance_criteria_count: 7
+      file: docs/implementation-artifacts/9-3-provider-catalog-kokoro-consumers.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Switch-time membership validation replaces shape regex in
+        voice-manager.sh:403 + voice-manager-windows.ps1:138 (typo af_hart
+        dies at switch, not at the model); both divergent 16-id kokoro lists
+        become the full 54-voice catalog list; af_heart defaults sourced.
+        Synth stays lenient (design 3.3) + AGENTVIBES_ALLOW_UNLISTED_VOICE
+        escape hatch. Resolver-style legacy fallback in every consumer.
+      dependencies:
+        - AVI-S9.2
+
+    story_9_4:
+      id: AVI-S9.4
+      title: Soprano Arms + Piper Default Constant (Phase 3)
+      status: complete
+      story_points: 3
+      acceptance_criteria_count: 7
+      file: docs/implementation-artifacts/9-4-provider-catalog-soprano-piper-defaults.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Soprano gets real list/switch/list-simple arms in voice-manager.sh
+        (kills the "Unknown provider" fallthrough); "Available providers"
+        help derived from the catalog; en_US-lessac-medium and per-provider
+        defaults (incl. the legacy "Rachel" sentinel in provider-manager.sh)
+        become catalog_default_voice calls.
+      dependencies:
+        - AVI-S9.3
+
+    story_9_5:
+      id: AVI-S9.5
+      title: Platform Allowlists Become Derived (Phase 4)
+      status: complete
+      story_points: 5
+      acceptance_criteria_count: 7
+      file: docs/implementation-artifacts/9-5-provider-catalog-platform-allowlists.md
+      recommended_model: sonnet
+      fable_gate: true
+      description: |
+        server.py reads provider-catalog.json with its lists demoted to
+        embedded fallback (parity asserted BOTH directions); display-name
+        dict derived; provider-manager.ps1 $ValidProviders and the
+        play-tts.ps1:312 allowlist generated; list-voices.js iterates
+        listProviders() branching on voiceModel. play-tts.ps1:519 kokoro
+        shape regex deliberately stays (resolver seam, not inventory).
+        termux-ssh decision recorded.
+      dependencies:
+        - AVI-S9.4
+
+    story_9_6:
+      id: AVI-S9.6
+      title: Long Tail - Defaults, Python Parity, Retire the Old Guard (Phase 5)
+      status: complete
+      story_points: 3
+      acceptance_criteria_count: 8
+      file: docs/implementation-artifacts/9-6-provider-catalog-long-tail.md
+      recommended_model: sonnet
+      fable_gate: false
+      description: |
+        Fix the "Antoni" not-in-catalog voice bug (design cited
+        learn-manager.sh:262, since deleted by the learn-mode removal; the
+        class now lives at language-manager.sh:222 - re-verify at dev
+        time); bmad + receiver defaults from catalog (receiver
+        ALLOWED_VOICES security allowlists deliberately NOT migrated);
+        kokoro python literals parity-asserted as defense-in-depth;
+        installer download targets asserted; retire
+        provider-dispatcher-parity.test.js (fully superseded) and add the
+        dispatcher-drift grep guard.
+      dependencies:
+        - AVI-S9.5
+
+  statistics:
+    total_stories: 6
+    completed_stories: 6
+    in_progress: 0
+    ready_for_dev: 0
+    total_story_points: 29
+    completed_points: 29
+    ready_for_dev_points: 0
+    completion_percentage: 100.0
+    next_milestone: "Epic AVI-E09 complete (Phases 0-5, AVI-S9.1 -> AVI-S9.6). Every design §4 migration row (1-25) is migrated, generated, parity-asserted, or documented as deliberately independent."
+
+  phases:
+    phase_0: [AVI-S9.1]   # Opus + Fable gate - module, conformance v1, the two token deletions
+    phase_1: [AVI-S9.2]   # Sonnet - generator + artifacts, zero behavior change
+    phase_2: [AVI-S9.3]   # Sonnet - kokoro consumers (biggest win)
+    phase_3: [AVI-S9.4]   # Sonnet - soprano arms + defaults
+    phase_4: [AVI-S9.5]   # Sonnet + Fable gate - derived platform allowlists
+    phase_5: [AVI-S9.6]   # Sonnet - long tail + retire old guard
+  sequencing_rule: "Strict chain 9.1 -> 9.6 (each phase depends on the previous). Catalog sits upstream of the resolver: never import between provider-catalog.js and utterance-resolver.js - the seam is welded by conformance assertions only."
+
 notes: |
   ✅ EPIC COMPLETE: Sprint 3 Epic 4 - Custom Background Music System
 

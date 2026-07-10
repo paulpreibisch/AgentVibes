@@ -344,9 +344,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # Resolve LANGUAGE to forward (map §D 'language | Forward on SSH', R18).
-# Precedence mirrors the local chain (learn-manager.sh / language-manager.sh):
-#   learning-mode target (tts-target-language.txt when tts-learn-mode.txt=="ON")
-#   > tts-language.txt.
+# Source: tts-language.txt (set by language-manager.sh).
 # Forwarded as a DEFAULT only — the receiver stays authoritative and its own
 # language config (if any) wins. language-manager.sh stores tts-language.txt at
 # the .claude/ root; the resolver contract tests use the .claude/config/ subdir,
@@ -354,14 +352,7 @@ fi
 # ---------------------------------------------------------------------------
 LANGUAGE=""
 for _cdir in "$_RESOLVE_PROJECT_DIR/.claude" "$HOME/.claude"; do
-  # Priority 1: learning-mode target language (only when learn mode is ON).
-  if [[ -z "$LANGUAGE" && -f "$_cdir/tts-learn-mode.txt" ]]; then
-    if [[ "$(cat "$_cdir/tts-learn-mode.txt" 2>/dev/null || true)" == "ON" ]]; then
-      [[ -f "$_cdir/tts-target-language.txt" ]] && \
-        LANGUAGE=$(cat "$_cdir/tts-target-language.txt" 2>/dev/null || true)
-    fi
-  fi
-  # Priority 2: tts-language.txt (root or config/ subdir).
+  # tts-language.txt (root or config/ subdir).
   if [[ -z "$LANGUAGE" && -f "$_cdir/tts-language.txt" ]]; then
     LANGUAGE=$(cat "$_cdir/tts-language.txt" 2>/dev/null || true)
   fi

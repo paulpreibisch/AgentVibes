@@ -46,6 +46,7 @@ import os
 import platform
 import re as _re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -59,6 +60,53 @@ import mcp.server.stdio
 # manager script (e.g. a `read -p` prompt reached by mistake) from wedging
 # the MCP server forever and eating the stdio JSON-RPC stream.
 DEFAULT_SCRIPT_TIMEOUT = 30.0
+
+
+# ── Provider Catalog (SSOT Layer 2) — platform allowlists + display names ────
+#
+# server.py DERIVES its per-platform provider allowlists and provider display
+# names from the shipped provider-catalog.json (generated from
+# src/services/provider-catalog.js). The literals below are an EMBEDDED FALLBACK
+# used ONLY when that JSON is missing or unreadable (installed-tree skew) —
+# degraded, never dead: the MCP server MUST start without the file.
+#
+# Bidirectional parity (embedded fallback ≡ catalog, per platform, BOTH
+# directions) is asserted by test/unit/provider-catalog-conformance.test.js so
+# the fallback can never silently drift from the catalog (design §8 — a
+# one-directional check is the exact gap that let elevenlabs-on-Windows through
+# the old positive-only test).
+#
+# The non-Windows fallback mirrors the catalog's DARWIN set (the superset that
+# also covers Linux: darwin adds macOS `say`, which a Linux box simply won't
+# have installed — availability is enforced by the dispatchers downstream, not
+# here). Windows uses the catalog WINDOWS set. elevenlabs is deliberately ABSENT
+# from Windows: there is NO play-tts-elevenlabs.ps1 runtime (AVI-S9.1 /
+# provider-catalog.js: elevenlabs.runtime.windows === null).
+_FALLBACK_PROVIDERS_WINDOWS = ["windows-piper", "windows-sapi", "soprano", "kokoro"]
+_FALLBACK_PROVIDERS_NON_WINDOWS = ["piper", "macos", "soprano", "kokoro", "elevenlabs"]
+
+# termux-ssh is a TRANSPORT (relays TTS over SSH to a phone), NOT a synthesis
+# provider: it has no catalog record and no play-tts-termux-ssh runtime. It is
+# accepted on non-Windows as a documented non-catalog transport token, and is
+# EXCLUDED BY NAME from the catalog parity assertion (AC6) so it can neither be
+# silently dropped nor silently drift INTO the catalog.
+_TRANSPORT_TOKENS = ["termux-ssh"]
+
+# Embedded fallback display names — byte-equal to catalog.json `displayNames`
+# (group-8 parity). termux-ssh is NOT here (it has no catalog record); its
+# display name is added separately as a transport token.
+_FALLBACK_DISPLAY_NAMES = {
+    "soprano": "Soprano TTS",
+    "piper": "Piper TTS",
+    "kokoro": "Kokoro TTS",
+    "elevenlabs": "ElevenLabs",
+    "macos": "macOS Say",
+    "windows-sapi": "Windows SAPI",
+    "windows-piper": "Piper TTS",
+}
+_TRANSPORT_DISPLAY_NAMES = {
+    "termux-ssh": "Termux SSH",
+}
 
 
 @dataclass
@@ -126,6 +174,91 @@ class AgentVibesServer:
         # second MCP server process or a slash-command CLI invocation writing
         # the same file at the same time is not covered; see story 8.2 notes).
         self._override_lock = asyncio.Lock()
+
+        # provider-catalog.json is read lazily once and cached (design: no
+        # blocking I/O per call; load at first use, not per set_provider).
+        self._provider_catalog = None
+        self._provider_catalog_loaded = False
+
+    def _load_provider_catalog(self) -> Optional[dict]:
+        """Load the shipped provider-catalog.json ONCE (cached).
+
+        Generated from src/services/provider-catalog.js into
+        .claude/hooks/provider-catalog.json and shipped beside the hooks, it is
+        the SSOT for per-platform provider allowlists and display names. Returns
+        the parsed dict, or None on ANY failure (missing / unreadable /
+        malformed) so the MCP server always starts — callers then fall back to
+        the embedded literals that conformance asserts are equivalent.
+        """
+        if self._provider_catalog_loaded:
+            return self._provider_catalog
+        self._provider_catalog_loaded = True
+        catalog = None
+        try:
+            # catalog.json lives under hooks/ on EVERY platform (program data,
+            # not a per-platform hook script — the generator only writes it there).
+            path = self.claude_dir / "hooks" / "provider-catalog.json"
+            if path.exists() and not path.is_symlink():
+                parsed = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(parsed, dict):
+                    catalog = parsed
+        except (OSError, ValueError):
+            catalog = None
+        if catalog is None:
+            # Degraded, never dead. Warn on stderr ONLY (stdout is the MCP
+            # JSON-RPC stream); one terse line, since a missing file is the
+            # common installed-tree-skew case.
+            print(
+                "agentvibes: provider-catalog.json unavailable; using embedded provider fallback",
+                file=sys.stderr,
+            )
+        self._provider_catalog = catalog
+        return catalog
+
+    def _valid_providers(self) -> list:
+        """Per-platform provider allowlist, DERIVED from provider-catalog.json.
+
+        Windows → catalog `platforms.windows`; non-Windows → catalog
+        `platforms.darwin` (the superset covering both Linux and macOS). Falls
+        back to the embedded literals when the catalog is unavailable. Transport
+        tokens (termux-ssh) are appended on non-Windows only.
+        """
+        catalog = self._load_provider_catalog()
+        base = None
+        if catalog:
+            platforms = catalog.get("platforms")
+            if isinstance(platforms, dict):
+                key = "windows" if self.is_windows else "darwin"
+                derived = platforms.get(key)
+                if isinstance(derived, list) and derived:
+                    base = list(derived)
+        if base is None:
+            base = list(
+                _FALLBACK_PROVIDERS_WINDOWS if self.is_windows else _FALLBACK_PROVIDERS_NON_WINDOWS
+            )
+        if not self.is_windows:
+            for token in _TRANSPORT_TOKENS:
+                if token not in base:
+                    base.append(token)
+        return base
+
+    def _provider_display_names(self) -> dict:
+        """Provider display names, DERIVED from provider-catalog.json.
+
+        Falls back to the embedded dict when the catalog is unavailable. Non-
+        catalog transport tokens (termux-ssh) are always merged in.
+        """
+        catalog = self._load_provider_catalog()
+        names = None
+        if catalog:
+            derived = catalog.get("displayNames")
+            if isinstance(derived, dict) and derived:
+                names = dict(derived)
+        if names is None:
+            names = dict(_FALLBACK_DISPLAY_NAMES)
+        for token, label in _TRANSPORT_DISPLAY_NAMES.items():
+            names.setdefault(token, label)
+        return names
 
     def _find_claude_dir(self) -> Path:
         """Find the .claude directory relative to this script"""
@@ -733,35 +866,26 @@ class AgentVibesServer:
         Args:
             provider: Provider name. Non-Windows: "piper", "macos", "termux-ssh",
                 "soprano", "kokoro", "elevenlabs". Windows: "windows-piper",
-                "windows-sapi", "soprano", "kokoro", "elevenlabs".
+                "windows-sapi", "soprano", "kokoro".
 
         Returns:
             Success or error message
         """
         provider = provider.lower()
-        # kokoro and elevenlabs are cross-platform (runtime + validator on both
-        # Windows and Unix), so they belong in BOTH allowlists. See AVI-S8.1 and
-        # SUPPORTED_PROVIDERS in src/utils/provider-validator.js (single source of truth).
-        if self.is_windows:
-            valid_providers = ["windows-piper", "windows-sapi", "soprano", "kokoro", "elevenlabs"]
-        else:
-            valid_providers = ["piper", "macos", "termux-ssh", "soprano", "kokoro", "elevenlabs"]
+        # Platform allowlist + display names DERIVE from provider-catalog.json
+        # (SSOT), with embedded fallbacks (module constants above). kokoro is
+        # cross-platform; elevenlabs is Unix-only (NO play-tts-elevenlabs.ps1, so
+        # it is absent from the Windows set — switching to it on Windows would be
+        # silently unplayable). See AVI-S9.1 / AVI-S9.5 and provider-catalog.js
+        # (elevenlabs.runtime.windows === null).
+        valid_providers = self._valid_providers()
         if provider not in valid_providers:
             return f"❌ Invalid provider: {provider}. Choose from: {', '.join(valid_providers)}"
 
         result = await self._run_script("provider-manager.sh", ["switch", provider])
         if result.ok:
-            # Automatically speak confirmation in the new provider's voice
-            provider_names = {
-                "macos": "macOS",
-                "termux-ssh": "Termux SSH",
-                "piper": "Piper",
-                "windows-piper": "Windows Piper",
-                "windows-sapi": "Windows SAPI",
-                "soprano": "Soprano",
-                "kokoro": "Kokoro",
-                "elevenlabs": "ElevenLabs",
-            }
+            # Automatically speak confirmation in the new provider's voice.
+            provider_names = self._provider_display_names()
             provider_name = provider_names.get(provider, provider.title())
             confirmation_text = f"Successfully switched to {provider_name} provider"
 
@@ -781,24 +905,6 @@ class AgentVibesServer:
                 return f"{result.stdout}\n⚠️ Provider switched but TTS confirmation failed: {e}"
 
         return f"❌ Failed to switch provider: {result.error_detail}"
-
-    async def set_learn_mode(self, enabled: bool) -> str:
-        """
-        Enable or disable language learning mode.
-
-        When enabled, TTS speaks in both your main language and target language.
-
-        Args:
-            enabled: True to enable, False to disable
-
-        Returns:
-            Success or error message
-        """
-        action = "enable" if enabled else "disable"
-        result = await self._run_script("learn-manager.sh", [action])
-        if result.ok:
-            return result.stdout if "✓" in result.stdout else f"✓ {result.stdout}"
-        return f"❌ Failed to set learn mode: {result.error_detail}"
 
     async def set_speed(self, speed: str, target: bool = False) -> str:
         """
@@ -1599,20 +1705,6 @@ Examples:
             },
         ),
         Tool(
-            name="set_learn_mode",
-            description="Enable or disable language learning mode. When ON, TTS speaks in both your main language and target language for bilingual learning.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "enabled": {
-                        "type": "boolean",
-                        "description": "True to enable learning mode, False to disable"
-                    }
-                },
-                "required": ["enabled"],
-            },
-        ),
-        Tool(
             name="set_speed",
             description="Set speech speed for main or target voice. Works with both Piper and macOS providers. Use this to make voices faster or slower.",
             inputSchema={
@@ -1907,8 +1999,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent] | CallToolR
             result = await agent_vibes.replay_audio(n)
         elif name == "set_provider":
             result = await agent_vibes.set_provider(arguments["provider"])
-        elif name == "set_learn_mode":
-            result = await agent_vibes.set_learn_mode(arguments["enabled"])
         elif name == "set_speed":
             target = arguments.get("target", False)
             result = await agent_vibes.set_speed(arguments["speed"], target)

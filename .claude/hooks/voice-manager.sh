@@ -43,6 +43,18 @@ to_lower() {
   echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+# Source the generated Provider Catalog (bash-3.2-safe SSOT accessors) when present.
+# FAIL-SAFE: consumers probe `type catalog_* >/dev/null 2>&1` and fall back to the
+# legacy regex/hardcoded behavior when the artifact is missing (installed-tree skew)
+# — mirrors play-tts.sh's PLAN_OK legacy fallback. Switch/list never break on a
+# missing catalog. Double-sourcing is guarded inside provider-catalog.sh.
+_load_provider_catalog() {
+  if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+  fi
+}
+
 # Determine target .claude directory based on context
 # Priority:
 # 1. CLAUDE_PROJECT_DIR env var (set by MCP for project-specific settings)
@@ -82,13 +94,26 @@ get_default_voice() {
 
   case "$active_provider" in
     piper)
-      echo "en_US-lessac-medium"  # Piper default
+      # Piper default sourced from the generated Provider Catalog (SSOT, AVI-S9.4).
+      # FAIL-SAFE: legacy literal if the catalog artifact is missing (installed-tree skew).
+      _load_provider_catalog
+      if type catalog_default_voice >/dev/null 2>&1; then
+        catalog_default_voice piper
+      else
+        echo "en_US-lessac-medium"  # Piper default (legacy fallback)
+      fi
       ;;
     macos)
       echo "Samantha"  # macOS default
       ;;
     *)
-      echo "en_US-lessac-medium"  # Default to Piper
+      # Default to Piper — same catalog-sourced value, same fail-safe.
+      _load_provider_catalog
+      if type catalog_default_voice >/dev/null 2>&1; then
+        catalog_default_voice piper
+      else
+        echo "en_US-lessac-medium"  # Default to Piper (legacy fallback)
+      fi
       ;;
   esac
 }
@@ -176,10 +201,17 @@ case "$1" in
       else
         echo "🎤 Available Kokoro TTS Voices:"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "  af_heart af_bella af_nicole af_sarah af_sky   (American, female)"
-        echo "  am_adam am_michael am_onyx am_puck            (American, male)"
-        echo "  bf_emma bf_lily  bm_george bm_daniel          (British)"
-        echo "  jf_alpha (Japanese) zf_xiaoxiao (Mandarin) ef_dora (Spanish)"
+        _load_provider_catalog
+        if type catalog_list_voices >/dev/null 2>&1; then
+          # All ~54 ids from the SSOT, one per line (catalog order = grouped by lang prefix).
+          catalog_list_voices kokoro | sed 's/^/  /'
+        else
+          # FAIL-SAFE legacy path (catalog artifact missing) — degraded, never dead.
+          echo "  af_heart af_bella af_nicole af_sarah af_sky   (American, female)"
+          echo "  am_adam am_michael am_onyx am_puck            (American, male)"
+          echo "  bf_emma bf_lily  bm_george bm_daniel          (British)"
+          echo "  jf_alpha (Japanese) zf_xiaoxiao (Mandarin) ef_dora (Spanish)"
+        fi
         echo "  (current: $CURRENT_VOICE)"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       fi
@@ -192,7 +224,25 @@ case "$1" in
         if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
           # shellcheck source=/dev/null
           source "$SCRIPT_DIR/elevenlabs-voices.sh"
-          printf '  %s\n' "${!ELEVENLABS_VOICE_IDS[@]}" | sort
+          elevenlabs_voice_names | sort | sed 's/^/  /'
+        fi
+        echo "  (current: $CURRENT_VOICE)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      fi
+    elif [[ "$ACTIVE_PROVIDER" == "soprano" ]]; then
+      # Soprano is a single-voice provider (voiceModel: single) — list its one
+      # canonical voice from the generated Provider Catalog (SSOT, AVI-S9.4).
+      if [[ -f "$FORMATTER" ]] && command -v node &> /dev/null; then
+        node "$FORMATTER" "soprano" "$CURRENT_VOICE"
+      else
+        echo "🎤 Available Soprano TTS Voices:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        _load_provider_catalog
+        if type catalog_list_voices >/dev/null 2>&1; then
+          catalog_list_voices soprano | sed 's/^/  /'
+        else
+          # FAIL-SAFE legacy path (catalog artifact missing): single canonical voice.
+          echo "  soprano-default"
         fi
         echo "  (current: $CURRENT_VOICE)"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -201,10 +251,20 @@ case "$1" in
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
       echo "Available providers:"
-      echo "  - piper (Free, Offline)"
-      echo "  - macos (Built-in, macOS only)"
-      echo "  - kokoro (Neural, local)"
-      echo "  - elevenlabs (Cloud, API key)"
+      # Derived from the generated Provider Catalog (SSOT, AVI-S9.4) so a new
+      # provider never silently goes missing from this help text again.
+      _load_provider_catalog
+      if type catalog_providers_for_platform >/dev/null 2>&1; then
+        while IFS= read -r _pid; do
+          echo "  - $_pid ($(catalog_display_name "$_pid"))"
+        done < <(catalog_providers_for_platform unix)
+      else
+        # FAIL-SAFE legacy path (catalog artifact missing).
+        echo "  - piper (Free, Offline)"
+        echo "  - macos (Built-in, macOS only)"
+        echo "  - kokoro (Neural, local)"
+        echo "  - elevenlabs (Cloud, API key)"
+      fi
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
     fi
@@ -393,27 +453,53 @@ case "$1" in
         exit 1
       fi
     elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
-      # Kokoro voice lookup. Kokoro's catalog is a fixed set of ids shaped
-      # `<lang><sex>_name` (e.g. af_heart, am_adam, bf_emma). We validate by the
-      # SAME pattern play-tts-kokoro.sh uses at synth time — that is the bash-side
-      # single source of truth; the model itself rejects a truly-unknown id.
-      # Canonical id catalog: KOKORO_VOICE_IDS in src/services/provider-voice-catalog.js.
-      # Case-insensitive to match the piper/macos arms (AF_HEART → af_heart).
+      # Kokoro switch-time validation via the generated Provider Catalog (SSOT):
+      # MEMBERSHIP + canonical case-fold (AF_HEART → af_heart), so a typo like
+      # `af_hart` is rejected HERE and never reaches tts-voice.txt to die silently
+      # at the model. Escape hatch AGENTVIBES_ALLOW_UNLISTED_VOICE=1 bypasses
+      # MEMBERSHIP (not shape) so a voice from a newer kokoro model still switches.
+      # FAIL-SAFE: if the catalog artifact is missing (installed-tree skew) we fall
+      # back to the legacy shape-only regex — degraded, never dead.
+      _load_provider_catalog
       KOKORO_VOICE_LC="$(to_lower "$VOICE_NAME")"
-      if [[ "$KOKORO_VOICE_LC" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
-        FOUND="$KOKORO_VOICE_LC"
+      if type catalog_validate_voice >/dev/null 2>&1; then
+        _KOKORO_CANON="$(catalog_validate_voice kokoro "$VOICE_NAME" 2>/dev/null || true)"
+        if [[ -n "$_KOKORO_CANON" ]]; then
+          FOUND="$_KOKORO_CANON"
+        elif [[ "${AGENTVIBES_ALLOW_UNLISTED_VOICE:-}" == "1" ]] && [[ "$KOKORO_VOICE_LC" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+          echo "⚠️  '$VOICE_NAME' is not in the shipped Kokoro catalog; allowing it (AGENTVIBES_ALLOW_UNLISTED_VOICE=1)." >&2
+          FOUND="$KOKORO_VOICE_LC"
+        else
+          echo "❌ Kokoro voice not found: $VOICE_NAME"
+          echo ""
+          echo "That is not a known Kokoro voice. Examples:"
+          echo "  - af_heart, af_bella, af_nicole   (American English, female)"
+          echo "  - am_adam, am_michael             (American English, male)"
+          echo "  - bf_emma, bf_lily                (British English, female)"
+          echo "  - bm_george, bm_daniel            (British English, male)"
+          echo "  - jf_alpha (Japanese), zf_xiaoxiao (Mandarin), ef_dora (Spanish)"
+          echo ""
+          echo "Set AGENTVIBES_ALLOW_UNLISTED_VOICE=1 to allow a newer-model voice."
+          echo "List all Kokoro voices with: /agent-vibes:list"
+          exit 1
+        fi
       else
-        echo "❌ Kokoro voice not found: $VOICE_NAME"
-        echo ""
-        echo "Kokoro voice ids look like <lang><sex>_name. Examples:"
-        echo "  - af_heart, af_bella, af_nicole   (American English, female)"
-        echo "  - am_adam, am_michael             (American English, male)"
-        echo "  - bf_emma, bf_lily                (British English, female)"
-        echo "  - bm_george, bm_daniel            (British English, male)"
-        echo "  - jf_alpha (Japanese), zf_xiaoxiao (Mandarin), ef_dora (Spanish)"
-        echo ""
-        echo "List all Kokoro voices with: /agent-vibes:list"
-        exit 1
+        # FAIL-SAFE legacy path (catalog artifact missing): shape-only regex.
+        if [[ "$KOKORO_VOICE_LC" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+          FOUND="$KOKORO_VOICE_LC"
+        else
+          echo "❌ Kokoro voice not found: $VOICE_NAME"
+          echo ""
+          echo "Kokoro voice ids look like <lang><sex>_name. Examples:"
+          echo "  - af_heart, af_bella, af_nicole   (American English, female)"
+          echo "  - am_adam, am_michael             (American English, male)"
+          echo "  - bf_emma, bf_lily                (British English, female)"
+          echo "  - bm_george, bm_daniel            (British English, male)"
+          echo "  - jf_alpha (Japanese), zf_xiaoxiao (Mandarin), ef_dora (Spanish)"
+          echo ""
+          echo "List all Kokoro voices with: /agent-vibes:list"
+          exit 1
+        fi
       fi
     elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
       # ElevenLabs voice lookup — resolve a friendly name (case-insensitive) OR a
@@ -441,14 +527,48 @@ case "$1" in
         echo "List all ElevenLabs voices with: /agent-vibes:list"
         exit 1
       fi
+    elif [[ "$ACTIVE_PROVIDER" == "soprano" ]]; then
+      # Soprano switch-time validation via the generated Provider Catalog (SSOT):
+      # voiceModel `single` — accepts '', 'soprano', 'soprano-default' (case-insensitive)
+      # and canonicalizes to 'soprano-default'; anything else is rejected here so a
+      # typo never reaches tts-voice.txt. FAIL-SAFE: if the catalog artifact is
+      # missing, the same fixed rule is applied hardcoded (soprano has exactly one
+      # voice — this rule never drifts).
+      _load_provider_catalog
+      SOPRANO_CANON=""
+      if type catalog_validate_voice >/dev/null 2>&1; then
+        SOPRANO_CANON="$(catalog_validate_voice soprano "$VOICE_NAME" 2>/dev/null || true)"
+      else
+        case "$(to_lower "$VOICE_NAME")" in
+          ''|soprano|soprano-default) SOPRANO_CANON="soprano-default" ;;
+        esac
+      fi
+      if [[ -n "$SOPRANO_CANON" ]]; then
+        FOUND="$SOPRANO_CANON"
+      else
+        echo "❌ Soprano voice not found: $VOICE_NAME"
+        echo ""
+        echo "Soprano TTS has a single voice: soprano-default"
+        echo "(accepts '', 'soprano', or 'soprano-default')."
+        exit 1
+      fi
     else
       echo "❌ Unknown provider: $ACTIVE_PROVIDER"
       echo ""
       echo "Available providers:"
-      echo "  - piper (Free, Offline)"
-      echo "  - macos (Built-in, macOS only)"
-      echo "  - kokoro (Neural, local)"
-      echo "  - elevenlabs (Cloud, API key)"
+      # Derived from the generated Provider Catalog (SSOT, AVI-S9.4).
+      _load_provider_catalog
+      if type catalog_providers_for_platform >/dev/null 2>&1; then
+        while IFS= read -r _pid; do
+          echo "  - $_pid ($(catalog_display_name "$_pid"))"
+        done < <(catalog_providers_for_platform unix)
+      else
+        # FAIL-SAFE legacy path (catalog artifact missing).
+        echo "  - piper (Free, Offline)"
+        echo "  - macos (Built-in, macOS only)"
+        echo "  - kokoro (Neural, local)"
+        echo "  - elevenlabs (Cloud, API key)"
+      fi
       echo ""
       echo "Switch provider with: /agent-vibes:provider switch piper"
       exit 1
@@ -572,16 +692,32 @@ case "$1" in
         echo "(macOS voices only available on macOS)"
       fi
     elif [[ "$ACTIVE_PROVIDER" == "kokoro" ]]; then
-      # Kokoro's catalog is fixed; list a representative set (ids only).
-      printf '%s\n' af_heart af_bella af_nicole af_sarah af_sky \
-        am_adam am_michael am_onyx am_puck \
-        bf_emma bf_lily bm_george bm_daniel \
-        jf_alpha zf_xiaoxiao ef_dora | sort
+      # Kokoro's catalog is fixed; list ALL ids from the generated Provider Catalog (SSOT).
+      _load_provider_catalog
+      if type catalog_list_voices >/dev/null 2>&1; then
+        catalog_list_voices kokoro | sort
+      else
+        # FAIL-SAFE legacy path (catalog artifact missing): representative subset.
+        printf '%s\n' af_heart af_bella af_nicole af_sarah af_sky \
+          am_adam am_michael am_onyx am_puck \
+          bf_emma bf_lily bm_george bm_daniel \
+          jf_alpha zf_xiaoxiao ef_dora | sort
+      fi
     elif [[ "$ACTIVE_PROVIDER" == "elevenlabs" ]]; then
       if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
         # shellcheck source=/dev/null
         source "$SCRIPT_DIR/elevenlabs-voices.sh"
-        printf '%s\n' "${!ELEVENLABS_VOICE_IDS[@]}" | sort
+        elevenlabs_voice_names | sort
+      fi
+    elif [[ "$ACTIVE_PROVIDER" == "soprano" ]]; then
+      # Soprano's catalog is a single fixed voice; list it from the generated
+      # Provider Catalog (SSOT, AVI-S9.4).
+      _load_provider_catalog
+      if type catalog_list_voices >/dev/null 2>&1; then
+        catalog_list_voices soprano
+      else
+        # FAIL-SAFE legacy path (catalog artifact missing).
+        echo "soprano-default"
       fi
     else
       echo "(Unknown provider: $ACTIVE_PROVIDER)"

@@ -32,7 +32,7 @@
 # @dependencies translator.py, language-manager.sh, .bmad/core/config.yaml (optional)
 # @entrypoints Called by /agent-vibes:translate commands and play-tts.sh
 # @patterns Config cascade - manual override > BMAD config > default (no translation)
-# @related translator.py, play-tts.sh, language-manager.sh, learn-manager.sh
+# @related translator.py, play-tts.sh, language-manager.sh
 
 # Only set strict mode when executed directly, not when sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -42,7 +42,6 @@ HOOKS_LINUX = PROJECT_ROOT / ".claude" / "hooks"
 # The auto-conversion (server.py:902-903) converts .sh -> .ps1
 MCP_HARDCODED_SCRIPTS = [
     "provider-manager",
-    "learn-manager",
     "speed-manager",
     "download-extra-voices",
     "verbosity-manager",
@@ -159,7 +158,6 @@ def test_run_script_error_for_missing():
 MCP_TOOL_SCRIPT_MAP = {
     "set_speed": "speed-manager",
     "get_speed": "speed-manager",
-    "set_learn_mode": "learn-manager",
     "set_verbosity": "verbosity-manager",
     "get_verbosity": "verbosity-manager",
     "mute": "verbosity-manager",

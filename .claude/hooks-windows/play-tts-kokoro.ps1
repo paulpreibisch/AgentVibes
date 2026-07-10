@@ -27,6 +27,20 @@ $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptPath)) ".claude"
 if (Test-Path $ProjectClaudeDir) { $ClaudeDir = $ProjectClaudeDir } else { $ClaudeDir = "$env:USERPROFILE\.claude" }
 
+# --- Default voice from the generated Provider Catalog (SSOT) -----------------
+# FAIL-SAFE: keep the literal fallback for installed-tree skew (mirrors play-tts.sh
+# PLAN_OK). The synth-time shape check below stays LENIENT (design §3.3) so a voice
+# from a newer kokoro model still degrades audibly instead of bricking.
+$KokoroDefault = "af_heart"
+$CatalogPs1 = Join-Path $ScriptPath 'provider-catalog.ps1'
+if (Test-Path $CatalogPs1) {
+    . $CatalogPs1
+    if (Get-Command Get-CatalogDefaultVoice -ErrorAction SilentlyContinue) {
+        $d = Get-CatalogDefaultVoice -Provider 'kokoro'
+        if ($d) { $KokoroDefault = $d }
+    }
+}
+
 $AudioDir  = "$ClaudeDir\audio"
 $ConfigDir = "$ClaudeDir\config"
 if (-not (Test-Path $AudioDir)) { New-Item -ItemType Directory -Path $AudioDir -Force | Out-Null }
@@ -70,13 +84,15 @@ if ($VoiceOverride) {
 }
 # Kokoro voice ids look like af_heart, am_michael, bf_emma. Strip any ::display suffix.
 if ($VoiceName -match '::') { $VoiceName = ($VoiceName -split '::')[0] }
-if (-not $VoiceName) { $VoiceName = "af_heart" }
+if (-not $VoiceName) { $VoiceName = $KokoroDefault }
 
 # Security: validate voice id (lowercase prefix + underscore + name).
-# Rejects path-traversal / injection before it reaches the command line.
+# LENIENT shape check (design §3.3) — rejects path-traversal / injection but lets
+# an unknown-but-shape-valid voice from a newer kokoro model through; falls back
+# to the catalog default only on a shape violation.
 if ($VoiceName -notmatch '^[a-z]{2}_[a-z0-9_]+$') {
-    Write-Host "[WARNING] Invalid Kokoro voice '$VoiceName' - falling back to af_heart" -ForegroundColor Yellow
-    $VoiceName = "af_heart"
+    Write-Host "[WARNING] Invalid Kokoro voice '$VoiceName' - falling back to $KokoroDefault" -ForegroundColor Yellow
+    $VoiceName = $KokoroDefault
 }
 
 # --- Optional speed ----------------------------------------------------------

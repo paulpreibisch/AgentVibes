@@ -7,6 +7,7 @@
 import { formatVoicesList } from '../utils/list-formatter.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 import os from 'os';
 import {
@@ -14,6 +15,10 @@ import {
   kokoroGender,
   ELEVENLABS_VOICES,
 } from '../services/provider-voice-catalog.js';
+import {
+  listVoices as catalogListVoices,
+  getProvider,
+} from '../services/provider-catalog.js';
 
 /**
  * Get Piper voices from voice directory
@@ -113,11 +118,73 @@ function getElevenLabsVoices(currentVoice) {
 }
 
 /**
+ * Get Soprano voices from the canonical catalog. Soprano is voiceModel `single`
+ * (design §3.1): exactly one canonical voice, soprano-default — no picker.
+ */
+function getSopranoVoices(currentVoice) {
+  return catalogListVoices('soprano').map((v) => ({
+    name: v.id,
+    lang: '',
+    gender: v.gender || '',
+    current: v.id === currentVoice || currentVoice === '' || currentVoice === 'soprano',
+  }));
+}
+
+/**
  * Extract language code from voice name
  */
 function extractLanguage(voiceName) {
   const match = voiceName.match(/^([a-z]{2}_[A-Z]{2})/);
   return match ? match[1] : '';
+}
+
+/**
+ * Discovered providers list-voices enumerates HERE, each via its own platform
+ * discovery path (piper: `*.onnx` disk glob; macos: `say -v ?`). Other discovered
+ * providers (windows-piper / windows-sapi) are enumerated by the Windows lister,
+ * not this Unix/darwin CLI, so they fall to the honest "no voice list" label —
+ * preserving pre-AVI-S9.5 output. Adding a record with a static/name-to-id/single
+ * voiceModel adds a list arm for free (no edit here needed).
+ */
+const LISTABLE_DISCOVERED = new Set(['piper', 'macos']);
+
+/**
+ * Resolve a provider token to its voice list + display label by iterating the
+ * Provider Catalog (src/services/provider-catalog.js) and branching ONLY on the
+ * record's `voiceModel` — replacing the former four hardcoded per-provider
+ * equality branches (AVI-S9.5 / design row 19). Unknown tokens keep the honest
+ * "no voice list available" label from AVI-S8.1.
+ *
+ * @param {string} provider
+ * @param {string} currentVoice
+ * @param {string} voiceDir
+ * @returns {{ voices: object[], providerName: string }}
+ */
+function selectVoices(provider, currentVoice, voiceDir) {
+  const record = getProvider(provider);
+  if (!record) {
+    return { voices: [], providerName: `${provider} (no voice list available)` };
+  }
+
+  // Label preserves the pre-existing strings exactly (macOS uses "TTS", not the
+  // catalog display name "macOS Say"); all others equal record.displayName.
+  const providerName = record.id === 'macos' ? 'macOS TTS' : record.displayName;
+
+  switch (record.voiceModel) {
+    case 'static': // kokoro
+      return { voices: getKokoroVoices(currentVoice), providerName };
+    case 'name-to-id': // elevenlabs
+      return { voices: getElevenLabsVoices(currentVoice), providerName };
+    case 'single': // soprano
+      return { voices: getSopranoVoices(currentVoice), providerName };
+    case 'discovered':
+    default:
+      if (record.id === 'piper') return { voices: getPiperVoices(voiceDir, currentVoice), providerName };
+      if (record.id === 'macos') return { voices: getMacOSVoices(currentVoice), providerName };
+      // A discovered provider without a discovery path on this platform: label
+      // it honestly instead of rendering an empty list under a wrong provider.
+      return { voices: [], providerName: `${provider} (no voice list available)` };
+  }
 }
 
 /**
@@ -131,27 +198,7 @@ function main() {
   const currentVoice = args[1] || '';
   const voiceDir = args[2] || '';
 
-  let voices = [];
-  let providerName = 'Piper TTS';
-
-  if (provider === 'piper') {
-    voices = getPiperVoices(voiceDir, currentVoice);
-    providerName = 'Piper TTS';
-  } else if (provider === 'macos') {
-    voices = getMacOSVoices(currentVoice);
-    providerName = 'macOS TTS';
-  } else if (provider === 'kokoro') {
-    voices = getKokoroVoices(currentVoice);
-    providerName = 'Kokoro TTS';
-  } else if (provider === 'elevenlabs') {
-    voices = getElevenLabsVoices(currentVoice);
-    providerName = 'ElevenLabs';
-  } else {
-    // Unknown/unhandled provider: label it honestly instead of falsely
-    // rendering an empty list under "Piper TTS".
-    voices = [];
-    providerName = `${provider} (no voice list available)`;
-  }
+  const { voices, providerName } = selectVoices(provider, currentVoice, voiceDir);
 
   // Display with boxen
   const output = formatVoicesList(voices, {
@@ -163,4 +210,9 @@ function main() {
   console.log(output);
 }
 
-main();
+// Only run when invoked as a CLI (keeps selectVoices importable by tests).
+const _invokedDirectly = process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (_invokedDirectly) main();
+
+export { selectVoices, LISTABLE_DISCOVERED };

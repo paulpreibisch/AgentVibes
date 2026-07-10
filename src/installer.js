@@ -3593,14 +3593,17 @@ async function copyCommandFiles(targetDir, spinner) {
  */
 function shouldIncludeHookFile(file, stat) {
   if (isNativeWindows()) {
-    // Include .ps1 scripts, .py helpers, and hooks.json; exclude dotfiles and prepare-release
+    // Include .ps1 scripts, .py helpers, hooks.json, and the generated
+    // provider-catalog.json; exclude dotfiles and prepare-release
     return stat.isFile() &&
-           (file.endsWith('.ps1') || file.endsWith('.py') || file === 'hooks.json') &&
+           (file.endsWith('.ps1') || file.endsWith('.py') || file === 'hooks.json' ||
+            file === 'provider-catalog.json') &&
            !file.includes('prepare-release') &&
            !file.startsWith('.');
   }
   return stat.isFile() &&
-         (file.endsWith('.sh') || file.endsWith('.py') || file === 'hooks.json') &&
+         (file.endsWith('.sh') || file.endsWith('.py') || file === 'hooks.json' ||
+          file === 'provider-catalog.json') &&
          !file.includes('prepare-release') &&
          !file.startsWith('.');
 }

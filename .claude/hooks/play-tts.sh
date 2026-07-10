@@ -31,13 +31,13 @@
 #
 # ---
 #
-# @fileoverview TTS Provider Router with Translation and Language Learning Support
+# @fileoverview TTS Provider Router with Translation Support
 # @context Routes TTS requests to active provider (Piper or macOS) with optional translation
-# @architecture Provider abstraction layer - single entry point for all TTS, handles translation and learning mode
-# @dependencies provider-manager.sh, play-tts-piper.sh, translator.py, translate-manager.sh, learn-manager.sh
+# @architecture Provider abstraction layer - single entry point for all TTS, handles translation
+# @dependencies provider-manager.sh, play-tts-piper.sh, translator.py, translate-manager.sh
 # @entrypoints Called by hooks, slash commands, personality-manager.sh, and all TTS features
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
-# @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
+# @related provider-manager.sh, play-tts-piper.sh, translate-manager.sh
 #
 # **IMPORTANT: This script should be called inline (NOT in background) in Bash tool**
 # Wait for TTS playback to complete before continuing.
@@ -589,50 +589,8 @@ speak_text() {
   esac
 }
 
-# Note: learn-manager.sh and translate-manager.sh are sourced inside their
-# respective handler functions to avoid triggering their main handlers
-
-# @function handle_learning_mode
-# @intent Speak in both main language and target language for learning
-# @why Issue #51 - Auto-translate and speak twice for immersive language learning
-# @returns 0 if learning mode handled, 1 if not in learning mode
-handle_learning_mode() {
-  # Source learn-manager for learning mode functions
-  source "$SCRIPT_DIR/learn-manager.sh" 2>/dev/null || return 1
-
-  # Check if learning mode is enabled
-  if ! is_learn_mode_enabled 2>/dev/null; then
-    return 1
-  fi
-
-  local target_lang
-  target_lang=$(get_target_language 2>/dev/null || echo "")
-  local target_voice
-  target_voice=$(get_target_voice 2>/dev/null || echo "")
-
-  # Need both target language and voice for learning mode
-  if [[ -z "$target_lang" ]] || [[ -z "$target_voice" ]]; then
-    return 1
-  fi
-
-  # 1. Speak in main language (current voice)
-  speak_text "$TEXT" "$VOICE_OVERRIDE" "$ACTIVE_PROVIDER"
-
-  # 2. Auto-translate to target language
-  local translated
-  # SECURITY: Add timeout to prevent hanging (#134)
-  translated=$(timeout 5 "${PYTHON_BIN:-python3}" "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
-
-  # Small pause between languages
-  sleep 0.5
-
-  # 3. Speak translated text with target voice
-  local target_provider
-  target_provider=$(detect_voice_provider "$target_voice")
-  speak_text "$translated" "$target_voice" "$target_provider"
-
-  return 0
-}
+# Note: translate-manager.sh is sourced inside its handler function to avoid
+# triggering its main handler
 
 # @function handle_translation_mode
 # @intent Translate and speak in target language (non-learning mode)
@@ -678,14 +636,8 @@ handle_translation_mode() {
 }
 
 # Mode priority:
-# 1. Learning mode (speaks twice: main + translated)
-# 2. Translation mode (speaks translated only)
-# 3. Normal mode (speaks as-is)
-
-# Try learning mode first (Issue #51)
-if handle_learning_mode; then
-  exit 0
-fi
+# 1. Translation mode (speaks translated only)
+# 2. Normal mode (speaks as-is)
 
 # Try translation mode (Issue #50)
 if handle_translation_mode; then
