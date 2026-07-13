@@ -67,13 +67,26 @@ fi
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/python-resolver.sh"
+source "$SCRIPT_DIR/session-id.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Derive project name from directory
-PROJECT_NAME=$(basename "$PROJECT_ROOT")
+# Canonical routing session id. The receiver multiplexes forwarded TTS by this
+# id, so it MUST derive from CLAUDE_PROJECT_DIR (the real user project injected
+# via --project-dir), NOT basename(PROJECT_ROOT) — for a global install that
+# basename collapses to the HOME dir name and merges every project into one
+# session. Fallback (CLAUDE_PROJECT_DIR unset) is PROJECT_ROOT, preserving the
+# legacy value for the no-project case.
+SESSION_ID="$(av_session_id "$PROJECT_ROOT")"
+# PROJECT_NAME is kept for receiver back-compat (the receiver reads "project");
+# set it to the SAME corrected session id so both fields agree.
+PROJECT_NAME="$SESSION_ID"
 # Absolute path, forwarded so the receiver-side avatar can show/learn the real
 # remote folder (mirrors the local forward-to-avatar.sh's projectPath field).
-PROJECT_PATH="$PROJECT_ROOT"
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+  PROJECT_PATH="$CLAUDE_PROJECT_DIR"
+else
+  PROJECT_PATH="$PROJECT_ROOT"
+fi
 
 # ---------------------------------------------------------------------------
 # Get SSH connection details from config
@@ -383,6 +396,7 @@ build_json_payload() {
       --arg effects "$SOX_EFFECTS" \
       --arg music "$BG_FILE" \
       --arg volume "$BG_VOLUME" \
+      --arg session "$SESSION_ID" \
       --arg project "$PROJECT_NAME" \
       --arg projectPath "$PROJECT_PATH" \
       --arg pretext "$PRETEXT" \
@@ -392,7 +406,7 @@ build_json_payload() {
       --arg mute "$MUTE" \
       --arg language "$LANGUAGE" \
       --arg kind "$PAYLOAD_KIND" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, projectPath: $projectPath, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language, kind: $kind}'
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, session: $session, project: $project, projectPath: $projectPath, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language, kind: $kind}'
   else
     # Manual JSON — escape backslashes, quotes, control chars
     local escaped_text
@@ -401,8 +415,8 @@ build_json_payload() {
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
     local escaped_project_path
     escaped_project_path=$(printf '%s' "$PROJECT_PATH" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","projectPath":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s","kind":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_project_path" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE" "$PAYLOAD_KIND"
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","session":"%s","project":"%s","projectPath":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s","kind":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$SESSION_ID" "$PROJECT_NAME" "$escaped_project_path" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE" "$PAYLOAD_KIND"
   fi
 }
 

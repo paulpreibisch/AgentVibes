@@ -97,6 +97,12 @@ if [[ "$raw" != *"BMAD agent in a collaborative roundtable"* ]]; then
 fi
 _dbg "fingerprint HIT: display='$display_name' text_len=${#response_text}"
 
+# Party marker (Phase 2): this hook alone knows -- from the roundtable
+# fingerprint -- that we are in party mode. Export the marker so the child
+# bmad-speak.sh can stage the cast on the first party line (stage-on-first-speak)
+# without having to re-derive party context. Additive + harmless outside party.
+export AGENTVIBES_PARTY_MODE=1
+
 if [[ -z "$display_name" ]]; then
     _dbg "skip: empty display_name"
     exit 0
@@ -108,6 +114,11 @@ fi
 
 # --- Resolve project root ---
 project_root="${CLAUDE_PROJECT_DIR:-}"
+
+# Thread the real project dir to the child speak path so its forwarded messages
+# carry the correct routing session id (not the install/HOME basename). Export
+# only when known so the no-project case is unchanged.
+[[ -n "$project_root" ]] && export CLAUDE_PROJECT_DIR="$project_root"
 
 # --- Find bmad-speak.sh (prefer project-local, fall back to global) ---
 bmad_speak=""

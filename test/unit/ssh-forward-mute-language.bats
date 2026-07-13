@@ -113,6 +113,43 @@ recv_field() {
   [ "$(payload_field language)" = "french" ]
 }
 
+# ===========================================================================
+# SENDER — payload now carries a canonical routing `session` id (AVI session-id).
+# The receiver multiplexes many sources by this id; it MUST derive from
+# CLAUDE_PROJECT_DIR, not basename(install root).
+# ===========================================================================
+
+@test "sender: payload contains a 'session' equal to basename(CLAUDE_PROJECT_DIR)" {
+  run_sender "Hello"
+  [ "$status" -eq 0 ]
+  [ "$(payload_field session)" = "$(basename "$CLAUDE_PROJECT_DIR")" ]
+}
+
+@test "sender: session == project (both transports agree on identity)" {
+  run_sender "Hello"
+  [ "$status" -eq 0 ]
+  local s p
+  s="$(payload_field session)"
+  p="$(payload_field project)"
+  [ -n "$s" ]
+  [ "$s" = "$p" ]
+}
+
+@test "regression(administrator): session derives from CLAUDE_PROJECT_DIR, not install/HOME basename" {
+  # Simulate a global install: the sender's PROJECT_ROOT basename (the install
+  # root) must NOT become the identity when a real project dir is known.
+  local install_base
+  install_base="$(basename "$REPO_ROOT")"
+  export CLAUDE_PROJECT_DIR="$BATS_TEST_TMPDIR/real-project"
+  mkdir -p "$CLAUDE_PROJECT_DIR/.claude/config"
+  run_sender "Hello"
+  [ "$status" -eq 0 ]
+  [ "$(payload_field session)" = "real-project" ]
+  [ "$(payload_field session)" != "$install_base" ]
+  [ "$(payload_field project)" = "real-project" ]
+  [ "$(payload_field projectPath)" = "$CLAUDE_PROJECT_DIR" ]
+}
+
 @test "sender: payload remains valid JSON with the two new fields present" {
   echo "italian" > "$CLAUDE_PROJECT_DIR/.claude/config/tts-language.txt"
   touch "$TEST_HOME/.agentvibes-muted"

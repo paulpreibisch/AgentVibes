@@ -35,7 +35,15 @@ PIPER_PORT="${AGENTVIBES_PIPER_PORT:-5001}"
 # falls back to the heavy pipeline.
 _FTA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_FTA_DIR/python-resolver.sh"
+source "$_FTA_DIR/session-id.sh"
 [[ -n "$PYTHON_BIN" ]] || exit 6
+
+# Canonical routing session id — the receiver multiplexes forwarded /speak
+# messages by this stable id. Prefer CLAUDE_PROJECT_DIR (real user project);
+# else the passed project path; else PWD. Keep "project" == "session" so the
+# receiver's existing "project" reader and the new "session" key agree.
+SESSION="$(av_session_id "${PROJECT_PATH:-$PWD}")"
+PROJECT="$SESSION"
 
 # Resolve voice: explicit arg → session voice file → default.
 if [[ -z "$VOICE" ]]; then
@@ -44,7 +52,7 @@ fi
 [[ -z "$VOICE" ]] && VOICE="en_US-amy-medium"
 
 # ---- Primary: warm piper server (sub-second) ----
-AV_TEXT="$TEXT" AV_VOICE="$VOICE" AV_PROJ="$PROJECT" AV_PROJPATH="$PROJECT_PATH" AV_LLM="$LLM" AV_THPORT="$TH_PORT" AV_PIPER="$PIPER_PORT" \
+AV_TEXT="$TEXT" AV_VOICE="$VOICE" AV_PROJ="$PROJECT" AV_SESSION="$SESSION" AV_PROJPATH="$PROJECT_PATH" AV_LLM="$LLM" AV_THPORT="$TH_PORT" AV_PIPER="$PIPER_PORT" \
 "$PYTHON_BIN" - <<'PY'
 import os, json, base64, urllib.request
 text  = os.environ["AV_TEXT"]
@@ -68,6 +76,7 @@ except Exception:
 # Forward to the avatar
 b64 = base64.b64encode(wav).decode()
 body = json.dumps({"audioBase64": b64, "text": text, "voice": voice,
+                   "session": os.environ.get("AV_SESSION", ""),
                    "project": os.environ["AV_PROJ"], "projectPath": os.environ.get("AV_PROJPATH", ""),
                    "origin": "local", "llm": os.environ["AV_LLM"]}).encode()
 try:
@@ -104,13 +113,15 @@ printf '%s\n' "$TEXT" | piper --model "$MODEL" "${SPEAKER_ARGS[@]}" --output_fil
 # blows past after ~2s of speech — passing the content directly made execve
 # fail silently (E2BIG) for any real-length utterance. Python reads and
 # base64-encodes the file itself instead, with no such size limit.
-AV_WAV="$WAV" AV_TEXT="$TEXT" AV_VOICE="$VOICE" AV_PROJ="$PROJECT" AV_PROJPATH="$PROJECT_PATH" AV_LLM="$LLM" AV_THPORT="$TH_PORT" \
+AV_WAV="$WAV" AV_TEXT="$TEXT" AV_VOICE="$VOICE" AV_PROJ="$PROJECT" AV_SESSION="$SESSION" AV_PROJPATH="$PROJECT_PATH" AV_LLM="$LLM" AV_THPORT="$TH_PORT" \
 "$PYTHON_BIN" - <<'PY' 2>/dev/null
 import os, sys, json, base64, urllib.request
 with open(os.environ["AV_WAV"], "rb") as f:
     b64 = base64.b64encode(f.read()).decode()
 body = json.dumps({"audioBase64": b64, "text": os.environ.get("AV_TEXT",""),
-                   "voice": os.environ.get("AV_VOICE",""), "project": os.environ.get("AV_PROJ",""),
+                   "voice": os.environ.get("AV_VOICE",""),
+                   "session": os.environ.get("AV_SESSION",""),
+                   "project": os.environ.get("AV_PROJ",""),
                    "projectPath": os.environ.get("AV_PROJPATH",""),
                    "origin": "local", "llm": os.environ.get("AV_LLM","")}).encode()
 try:
