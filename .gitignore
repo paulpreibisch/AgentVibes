@@ -82,6 +82,7 @@ agentvibes/org/
 
 # MCP Server config (user-specific)
 .mcp.json
+.mcp.json.bak-*
 .mcp-minimal.json
 
 # Local symlinks (user-specific paths)
