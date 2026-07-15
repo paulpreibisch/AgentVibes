@@ -169,7 +169,7 @@ if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
 
 # Music-only preview: the track must be a bare .mp3 filename (no path parts) —
 # the watcher resolves it against ~/.claude/audio/tracks/ with a containment check.
-if ($Kind -eq 'music' -and $BgFile -notmatch '^[A-Za-z0-9._][A-Za-z0-9._\-]*\.mp3$') {
+if ($Kind -eq 'music' -and $BgFile -notmatch '^[A-Za-z0-9._][A-Za-z0-9._ \-]*\.mp3$') {
     Write-Output "Error: invalid music track name"
     exit 1
 }
@@ -222,6 +222,26 @@ if ($EffectiveMute) {
     Write-Log "MUTED" "forwarded=$Mute receiverLocal=$ReceiverLocalMuted"
     Write-Output "Muted (forwarded=$Mute, receiver-local=$ReceiverLocalMuted) - not playing"
     exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Readiness bling — a short cue on the RECEIVER, played BEFORE we generate/play,
+# so a listener knows audio is incoming (kokoro synth + track load have latency).
+# Standardizes the UX across voice AND music: bling first, then the audio. A
+# music-stop carries no audio, so it gets no cue. Best-effort + synchronous (the
+# cue is ~0.7s and must finish before the track so they don't overlap); a missing
+# wav or player failure must NEVER block or fail the actual playback.
+# ---------------------------------------------------------------------------
+if ($Kind -eq 'music') {
+    $blingWav = "$ClaudeDir\audio\ui\bling-success.wav"
+    if (-not (Test-Path $blingWav)) { $blingWav = "$env:USERPROFILE\.agentvibes\bling-success.wav" }
+    if (Test-Path $blingWav) {
+        try {
+            $ffb = Get-Command ffplay -ErrorAction SilentlyContinue
+            if ($ffb) { & $ffb.Source -autoexit -nodisp -loglevel quiet "$blingWav" 2>$null }
+            else { (New-Object System.Media.SoundPlayer "$blingWav").PlaySync() }
+        } catch { Write-Log "WARN" "readiness bling failed: $($_.Exception.Message)" }
+    }
 }
 
 # ---------------------------------------------------------------------------

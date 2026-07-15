@@ -11,43 +11,20 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
+import { resolveMusicProvider, spawnMusicRemote } from '../music-preview.js';
+import { playBlingCue } from '../bling.js';
 import { t } from '../../i18n/strings.js';
 
 const _MUSIC_TAB_DIR = path.dirname(fileURLToPath(import.meta.url));
 
+// AgentVibes package/repo root — used to resolve bundled assets (tracks dir,
+// bling cue) and as the package fallback when resolving the active provider.
+const _PKG_ROOT = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..');
+
 // Package-relative tracks dir — used as fallback when cwd has no .claude/audio/tracks/
-const _PKG_TRACKS_DIR = path.resolve(
-  _MUSIC_TAB_DIR, '..', '..', '..', '.claude', 'audio', 'tracks'
-);
-
-// Transport providers route audio to a remote receiver; local MP3 playback is
-// silent on a headless/remote box, so track previews must be forwarded instead.
-const _REMOTE_PROVIDERS = ['ssh-remote', 'agentvibes-receiver'];
-
-/**
- * Resolve the active provider and the project dir it was read from, using the
- * same search order as the voice pickers (CLAUDE_PROJECT_DIR → cwd → package →
- * home). Returns { remote, projectDir } so a remote preview can forward the
- * track to the receiver and tell the sender which .claude dir to resolve.
- */
-function _resolveMusicProvider() {
-  const projectRoot = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..');
-  const dirs = [process.env.CLAUDE_PROJECT_DIR, process.cwd(), projectRoot, os.homedir()].filter(Boolean);
-  for (const d of dirs) {
-    const p = path.join(d, '.claude', 'tts-provider.txt');
-    try {
-      if (fs.existsSync(p)) {
-        const provider = fs.readFileSync(p, 'utf8').trim();
-        return { remote: _REMOTE_PROVIDERS.includes(provider), projectDir: d };
-      }
-    } catch { /* next */ }
-  }
-  return { remote: false, projectDir: '' };
-}
+const _PKG_TRACKS_DIR = path.join(_PKG_ROOT, '.claude', 'audio', 'tracks');
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -591,16 +568,9 @@ export function createMusicTab(screen, services) {
    * @param {{track?:string, stop?:boolean}} opts
    */
   function _sendMusicRemote(mp, { track = null, stop = false } = {}) {
-    const _pkgSender = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..', '.claude', 'hooks', 'play-tts-ssh-remote.sh');
-    const senderPath = fs.existsSync(_pkgSender)
-      ? _pkgSender
-      : path.join(mp.projectDir, '.claude', 'hooks', 'play-tts-ssh-remote.sh');
-    const env = { ..._spawnEnv, CLAUDE_PROJECT_DIR: mp.projectDir };
-    if (stop) env.AGENTVIBES_MUSIC_STOP = '1';
-    else env.AGENTVIBES_MUSIC_ONLY = track;
     let rproc;
     try {
-      rproc = spawn('bash', [senderPath, '', ''], { stdio: ['ignore', 'ignore', 'pipe'], detached: true, env }); // NOSONAR
+      rproc = spawnMusicRemote({ packageRoot: _PKG_ROOT, projectDir: mp.projectDir, env: _spawnEnv, track, stop });
     } catch {
       previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
       screen.render();
@@ -646,7 +616,7 @@ export function createMusicTab(screen, services) {
     // is silent on a headless box). The receiver auto-stops any prior track when
     // a new one arrives; pressing Space on the currently-playing track sends an
     // explicit stop (toggle off).
-    const _mp = _resolveMusicProvider();
+    const _mp = resolveMusicProvider(_PKG_ROOT);
     if (_mp.remote) {
       if (_remotePlayingTrackId === trackId) {
         _sendMusicRemote(_mp, { stop: true });
@@ -655,6 +625,9 @@ export function createMusicTab(screen, services) {
         screen.render();
         return;
       }
+      // Bling first (fire-and-forget, plays locally) — same readiness cue as the
+      // voice preview — then forward the track to the receiver.
+      playBlingCue(_PKG_ROOT);
       const rlabel = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
       if (_sendMusicRemote(_mp, { track: trackId })) {
         _remotePlayingTrackId = trackId;
@@ -677,6 +650,10 @@ export function createMusicTab(screen, services) {
     // Kill any previously playing track
     _killPlayingProcess();
     _playingTrackId = null;
+
+    // Bling first (fire-and-forget) — same readiness cue as the voice preview —
+    // then start local playback.
+    playBlingCue(_PKG_ROOT);
 
     const proc = spawnMp3Player(trackPath, _spawnEnv);
     if (!proc) {

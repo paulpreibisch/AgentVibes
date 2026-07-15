@@ -46,7 +46,13 @@ import { destroyList } from '../widgets/destroy-list.js';
 import { scanInstalledVoices, getVoiceMeta, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { buildBlingCommand, playBlingCue } from '../bling.js';
 import { spawn, spawnSync } from 'node:child_process';
+
+// Re-exported for backward compatibility — buildBlingCommand moved to
+// ../bling.js so the music-preview surfaces can share it. Existing imports and
+// tests that reference it from this module keep working.
+export { buildBlingCommand };
 import os from 'node:os';
 import crypto from 'node:crypto';
 import net from 'node:net';
@@ -271,33 +277,8 @@ export function buildPyModuleCheckArgs(mods) {
   return ['-c', `import importlib.util as u, sys; sys.exit(0 if ${expr} else 1)`];
 }
 
-/**
- * Build the fire-and-forget "preview ready" cue command for a platform. Pure
- * (no spawning here, so it is unit-testable). Plays the bundled CC0 wav when
- * present, else falls back to a system sound (Windows) / freedesktop cue or
- * terminal bell (POSIX). stdio is ignored by the caller, so the POSIX bell is
- * redirected to /dev/tty rather than the discarded stdout.
- * @param {string} platform - process.platform value
- * @param {string} wavPath - absolute path to the bling wav
- * @param {boolean} haveWav - whether wavPath exists on disk
- * @returns {{command: string, args: string[]}}
- */
-export function buildBlingCommand(platform, wavPath, haveWav) {
-  if (platform === 'win32') {
-    const ps = haveWav
-      ? `Add-Type -AssemblyName System.Windows.Forms; (New-Object System.Media.SoundPlayer('${wavPath.replace(/'/g, "''")}')).PlaySync()`
-      : '[System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 700';
-    return { command: 'powershell', args: ['-NoProfile', '-Command', ps] };
-  }
-  if (haveWav) {
-    // Pass wavPath as a positional arg ($1) so the path is never interpolated
-    // into the shell string (prevents injection / breakage on special chars).
-    const sh = 'paplay "$1" 2>/dev/null || aplay -q "$1" 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
-    return { command: 'bash', args: ['-c', sh, '--', wavPath] };
-  }
-  const sh = 'paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
-  return { command: 'bash', args: ['-c', sh] };
-}
+// buildBlingCommand moved to ../bling.js (imported + re-exported at the top of
+// this file). See that module for the readiness-cue command builder.
 
 // ---------------------------------------------------------------------------
 // Dependency detection helpers
@@ -3175,14 +3156,8 @@ export function createSetupTab(screen, services) {
     // Sound: "Ui sounds - Shimmering success" by Philip_Berger, CC0 (freesound
     // #648212). See .claude/audio/ui/CREDITS.txt. Falls back to a system sound
     // if the bundled asset is ever missing.
-    const _blingWav = path.join(packageDir, '.claude', 'audio', 'ui', 'bling-success.wav');
     function _playReadyCue() {
-      try {
-        const { command, args } = buildBlingCommand(process.platform, _blingWav, fs.existsSync(_blingWav));
-        const cue = spawn(command, args, { stdio: 'ignore', detached: true }); // NOSONAR
-        cue.on('error', () => { /* best-effort cue; a spawn failure must not surface */ });
-        cue.unref();
-      } catch { /* the readiness cue is purely cosmetic — never break the preview */ }
+      playBlingCue(packageDir);
     }
 
     kPicker.key(['space'], () => {
