@@ -25,6 +25,12 @@ const setupSrc = readFileSync(
 const catalogSrc = readFileSync(
   resolve(PROJECT_ROOT, 'src/services/provider-voice-catalog.js'), 'utf8'
 );
+// SSOT Layer 2 (AVI-E09): the raw voice lists now live in provider-catalog.js;
+// provider-voice-catalog.js is a re-export shim. Read both so drift is asserted
+// at the layer that actually holds the definition.
+const providerCatalogSrc = readFileSync(
+  resolve(PROJECT_ROOT, 'src/services/provider-catalog.js'), 'utf8'
+);
 
 // ── Suite 1: NATIVE_ENGINE_VOICES constant ────────────────────────────────────
 
@@ -147,16 +153,19 @@ describe('_buildFields voice getValue shows native engine label', () => {
   });
 
   test('ElevenLabs voices are a static built-in list with raw IDs (in the shared catalog)', () => {
-    // The list now lives in services/provider-voice-catalog.js (single source of
-    // truth); setup-tab imports it so there is no duplicate to drift.
+    // SSOT layering (AVI-E09): the raw list lives in provider-catalog.js;
+    // provider-voice-catalog.js re-exports it; setup-tab imports from the shim.
+    // No layer holds a duplicate, so none can drift.
     assert.ok(setupSrc.includes("from '../../services/provider-voice-catalog.js'"),
       'setup-tab must import the shared voice catalog');
     assert.ok(setupSrc.includes('ELEVENLABS_VOICES'), 'setup-tab must reference ELEVENLABS_VOICES');
     assert.ok(setupSrc.includes('ELEVENLABS_DEFAULT_VOICE_ID'), 'a default voice ID must be defined');
-    assert.ok(catalogSrc.includes('export const ELEVENLABS_VOICES'),
-      'catalog must export ELEVENLABS_VOICES');
-    // Sanity: at least ~20 premade voices listed in the catalog
-    const ids = (catalogSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
+    assert.ok(catalogSrc.includes('ELEVENLABS_VOICES'),
+      'provider-voice-catalog shim must re-export ELEVENLABS_VOICES');
+    assert.ok(providerCatalogSrc.includes('ELEVENLABS_VOICES'),
+      'provider-catalog (SSOT) must define ELEVENLABS_VOICES');
+    // Sanity: at least ~20 premade voices listed in the SSOT catalog
+    const ids = (providerCatalogSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
     assert.ok(ids >= 20, `expected >=20 ElevenLabs voice IDs, found ${ids}`);
   });
 });

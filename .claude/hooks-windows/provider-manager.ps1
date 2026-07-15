@@ -53,6 +53,14 @@ function Get-ActiveProvider {
 function Get-AvailableProviders {
     $available = @()
 
+    # Fast path: skip the live install probes (soprano HTTP + kokoro python
+    # spawns). Those probes are what make `provider list` occasionally stall for
+    # tens of seconds under load; when the caller only needs the provider NAMES
+    # (e.g. the parallel test harness, or an offline listing) set
+    # AGENTVIBES_PROVIDER_LIST_NO_PROBE=1 to report installed=$false without
+    # touching the network or spawning interpreters. Default behavior unchanged.
+    $noProbe = ($env:AGENTVIBES_PROVIDER_LIST_NO_PROBE -eq '1')
+
     # Always available
     $available += @{
         name = "windows-sapi"
@@ -77,15 +85,18 @@ function Get-AvailableProviders {
         $null = Get-Command soprano -ErrorAction Stop
         $sopranoInstalled = $true
     } catch {
-        # Also check if a Soprano server is running (try both API paths)
-        try {
-            $null = Invoke-WebRequest -Uri "http://127.0.0.1:${sopranoPort}/gradio_api/info" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
-            $sopranoInstalled = $true
-        } catch {
+        # Also check if a Soprano server is running (try both API paths) — unless
+        # the fast path is requested, in which case skip the network probes.
+        if (-not $noProbe) {
             try {
-                $null = Invoke-WebRequest -Uri "http://127.0.0.1:${sopranoPort}/info" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+                $null = Invoke-WebRequest -Uri "http://127.0.0.1:${sopranoPort}/gradio_api/info" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
                 $sopranoInstalled = $true
-            } catch {}
+            } catch {
+                try {
+                    $null = Invoke-WebRequest -Uri "http://127.0.0.1:${sopranoPort}/info" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+                    $sopranoInstalled = $true
+                } catch {}
+            }
         }
     }
 
@@ -102,7 +113,7 @@ function Get-AvailableProviders {
     # only confirms the packages are importable, which is all we need here.
     $kokoroInstalled = $false
     $kokoroProbe = "import importlib.util as u,sys; sys.exit(0 if all(u.find_spec(m) for m in ('kokoro','soundfile','numpy')) else 1)"
-    foreach ($py in @('py', 'python', 'python3')) {
+    foreach ($py in ($(if ($noProbe) { @() } else { @('py', 'python', 'python3') }))) {
         if (-not (Get-Command $py -ErrorAction SilentlyContinue)) { continue }
         try {
             $null = & $py -c $kokoroProbe 2>$null

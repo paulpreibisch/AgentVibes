@@ -25,20 +25,32 @@ const serverPy = join(projectRoot, 'mcp-server', 'server.py');
 
 const isWindows = process.platform === 'win32';
 
+// A single provider-manager.ps1 invocation runs in <1s, yet this test was
+// intermittently hanging for the full timeout. Root cause: the spawned
+// PowerShell inherited an OPEN stdin pipe, and its console host occasionally
+// blocks waiting on it — so `list` would never exit. Give the child NO stdin
+// (stdio[0]='ignore' → any stray read hits EOF immediately) to kill the hang.
+// The generous cap + cleared timer is a backstop only; node:test also runs test
+// FILES in parallel, so several PowerShell processes can contend for CPU.
+const PS_TIMEOUT_MS = 45000;
 function runPowerShell(args, options = {}) {
   return new Promise((resolve) => {
     const child = spawn(
       'powershell',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', ...args],
-      { env: { ...process.env, ...options.env }, timeout: 10000 }
+      // AGENTVIBES_PROVIDER_LIST_NO_PROBE: this suite asserts provider NAMES and
+      // liveness, never live install status, so skip the soprano HTTP probe and
+      // kokoro python spawns that make `list`/`switch` intermittently stall.
+      { env: { ...process.env, AGENTVIBES_PROVIDER_LIST_NO_PROBE: '1', ...options.env }, timeout: PS_TIMEOUT_MS,
+        stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
     );
 
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (data) => { stdout += data.toString(); });
     child.stderr.on('data', (data) => { stderr += data.toString(); });
-    child.on('close', (exitCode) => resolve({ stdout, stderr, exitCode }));
-    setTimeout(() => { child.kill(); resolve({ stdout, stderr, exitCode: -1 }); }, 10000);
+    const timer = setTimeout(() => { child.kill(); resolve({ stdout, stderr, exitCode: -1 }); }, PS_TIMEOUT_MS);
+    child.on('close', (exitCode) => { clearTimeout(timer); resolve({ stdout, stderr, exitCode }); });
   });
 }
 
@@ -72,20 +84,20 @@ test('Provider: all provider play-tts scripts exist on Windows', () => {
 test('Provider: MCP server valid_providers should accept "piper" on Windows', () => {
   const serverSource = readFileSync(serverPy, 'utf-8');
 
-  // Find the Windows valid_providers list
-  const windowsMatch = serverSource.match(/if\s+self\.is_windows:\s*\n\s*valid_providers\s*=\s*\[([^\]]+)\]/);
-  assert.ok(windowsMatch, 'Could not find Windows valid_providers in server.py');
+  // AVI-E09: the Windows allowlist is no longer a hardcoded
+  // `if self.is_windows: valid_providers = [...]` block — it is DERIVED from
+  // provider-catalog.json via _valid_providers(), with _FALLBACK_PROVIDERS_WINDOWS
+  // as the embedded fallback. Assert the derived accessor + the fallback literal.
+  assert.ok(/def\s+_valid_providers\s*\(/.test(serverSource),
+    'server.py must derive providers via _valid_providers()');
+
+  const windowsMatch = serverSource.match(/_FALLBACK_PROVIDERS_WINDOWS\s*=\s*\[([^\]]+)\]/);
+  assert.ok(windowsMatch, 'Could not find _FALLBACK_PROVIDERS_WINDOWS in server.py');
 
   const providers = windowsMatch[1];
-
-  // Currently this will show "windows-piper" — when unified, should show "piper"
-  if (providers.includes('windows-piper')) {
-    console.log('  INFO: MCP still uses "windows-piper" — needs unification to "piper"');
-    console.log(`  Current Windows providers: ${providers.trim()}`);
-  }
-
-  // At minimum, verify the provider list exists and isn't empty
-  assert.ok(providers.trim().length > 0, 'Windows valid_providers should not be empty');
+  assert.ok(providers.trim().length > 0, 'Windows fallback providers should not be empty');
+  // A piper-family provider must be accepted on Windows (windows-piper today).
+  assert.ok(/piper/.test(providers), 'Windows providers must include a piper variant');
 });
 
 test('Provider: provider-manager.ps1 accepts both "piper" and "windows-piper"', () => {
