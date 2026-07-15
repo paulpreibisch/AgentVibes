@@ -52,7 +52,7 @@ try {
                     }
                     if ($req.kind -eq 'music') {
                         $trackName = [string]$req.music
-                        if ($trackName -match '^[A-Za-z0-9._][A-Za-z0-9._\-]*\.mp3$') {
+                        if ($trackName -match '^[A-Za-z0-9._][A-Za-z0-9._ \-]*\.mp3$') {
                             $tracksDir = Join-Path $env:USERPROFILE '.claude\audio\tracks'
                             $full     = [System.IO.Path]::GetFullPath((Join-Path $tracksDir $trackName))
                             $baseFull = [System.IO.Path]::GetFullPath($tracksDir)
@@ -61,6 +61,17 @@ try {
                                 $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
                                 if ($ffplay) {
                                     Write-WatcherLog "INFO" "music-preview id=$($req.id) track=$trackName"
+                                    # Readiness bling — a short cue played in THIS (audio-capable) watcher
+                                    # session BEFORE the track so a listener knows music is incoming. Launched
+                                    # async (NOT -Wait — the wav's shimmer tail is long); a fixed 0.3s gap then
+                                    # lets the music follow tightly. Best-effort: a missing wav / player error
+                                    # never blocks the track.
+                                    $blingWav = Join-Path $env:USERPROFILE '.claude\audio\ui\bling-success.wav'
+                                    if (-not (Test-Path $blingWav)) { $blingWav = Join-Path $env:USERPROFILE '.agentvibes\bling-success.wav' }
+                                    if (Test-Path $blingWav) {
+                                        try { Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet',$blingWav) -WindowStyle Hidden | Out-Null } catch { }
+                                        Start-Sleep -Milliseconds 300
+                                    }
                                     $mp = Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet','-volume','80',$full) -WindowStyle Hidden -PassThru
                                     if ($mp) { Set-Content -Path $pidFile -Value $mp.Id -NoNewline -ErrorAction SilentlyContinue }
                                 } else {
@@ -99,15 +110,25 @@ try {
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_EFFECTS", $null, "Process") }
 
                 if (Test-Path $PlayTts) {
-                    # Play remote arrival prefix sound if configured
-                    $prefixSoundFile = "$env:USERPROFILE\.agentvibes\remote-prefix-sound.txt"
-                    if (Test-Path $prefixSoundFile) {
-                        $prefixSound = (Get-Content $prefixSoundFile -Raw).Trim()
-                        if ($prefixSound -and (Test-Path $prefixSound)) {
-                            $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
-                            if ($ffplay) {
-                                & $ffplay.Source -autoexit -nodisp -loglevel quiet $prefixSound 2>$null
+                    # Always play a crisp local "incoming" bling so the user KNOWS audio is
+                    # on the way — even when the voice is forwarded to the TalkingHead avatar
+                    # (which skips local speaker playback). Standard bling-success.wav, async
+                    # with a 0.3s gap (same as the music-preview path); fall back to the
+                    # user-configured remote-prefix-sound.txt if the bling wav is missing.
+                    $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
+                    if ($ffplay) {
+                        $blingWav = Join-Path $env:USERPROFILE '.claude\audio\ui\bling-success.wav'
+                        if (-not (Test-Path $blingWav)) { $blingWav = Join-Path $env:USERPROFILE '.agentvibes\bling-success.wav' }
+                        if (-not (Test-Path $blingWav)) {
+                            $prefixSoundFile = "$env:USERPROFILE\.agentvibes\remote-prefix-sound.txt"
+                            if (Test-Path $prefixSoundFile) {
+                                $ps = (Get-Content $prefixSoundFile -Raw).Trim()
+                                if ($ps -and (Test-Path $ps)) { $blingWav = $ps }
                             }
+                        }
+                        if (Test-Path $blingWav) {
+                            try { Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet',$blingWav) -WindowStyle Hidden | Out-Null } catch { }
+                            Start-Sleep -Milliseconds 300
                         }
                     }
 

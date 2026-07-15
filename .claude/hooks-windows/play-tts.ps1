@@ -116,8 +116,9 @@ switch ($ActiveProvider) {
 # by the SSH-receiver watcher via -ProviderOverride).  This lets the Linux-side
 # audio-effects.cfg row for llm:claude-code specify "piper" and have it honoured
 # on Windows without requiring the Windows tts-provider.txt to be reconfigured.
-# Priority: lower than per-LLM $_LlmEngine (audio-effects.cfg row, set later), higher
-# than the global tts-provider.txt default set above.
+# Priority: an explicit -ProviderOverride is AUTHORITATIVE — it wins over both the
+# per-LLM $_LlmEngine column and the global tts-provider.txt default (see the
+# $ProviderOverride guard in the engine-resolution block below).
 if ($ProviderOverride) {
     switch ($ProviderOverride) {
         { $_ -in "windows-piper", "piper" } {
@@ -543,6 +544,12 @@ else {
         # A Kokoro-format voice forces the Kokoro engine regardless of the per-LLM
         # ENGINE column or the global tts-provider.txt default.
         $ProviderScript = "$HooksDir\play-tts-kokoro.ps1"
+    }
+    elseif ($ProviderOverride) {
+        # An explicit -ProviderOverride (forwarded from the SSH payload's "provider"
+        # field, or a preview) is AUTHORITATIVE and was already applied above. Do NOT
+        # let the per-LLM ENGINE column override it, or a receiver whose llm row
+        # defaults to piper silently swallows a forwarded windows-sapi request.
     }
     elseif ($_LlmEngine) {
         # Accept both canonical Windows names and the cross-platform aliases the TUI

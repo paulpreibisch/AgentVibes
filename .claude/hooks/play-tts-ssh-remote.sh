@@ -47,7 +47,9 @@ if [[ -n "${AGENTVIBES_MUSIC_STOP:-}" ]]; then
 elif [[ -n "${AGENTVIBES_MUSIC_ONLY:-}" ]]; then
   # Only a bare .mp3 filename is allowed (no path separators, no leading dash) —
   # the receiver resolves it against its own tracks dir, so reject path-like input.
-  if [[ "$AGENTVIBES_MUSIC_ONLY" =~ ^[A-Za-z0-9._][A-Za-z0-9._-]*\.mp3$ ]]; then
+  # Spaces ARE allowed (many track names contain them, e.g. "Late Night Hip Hop.mp3");
+  # the name travels as a jq --arg-escaped JSON string, so a space is not injectable.
+  if [[ "$AGENTVIBES_MUSIC_ONLY" =~ ^[A-Za-z0-9._][A-Za-z0-9._\ -]*\.mp3$ ]]; then
     PAYLOAD_KIND="music"
     MUSIC_ONLY_TRACK="$AGENTVIBES_MUSIC_ONLY"
   else
@@ -170,10 +172,11 @@ if [[ -n "$SSH_PORT" ]] && [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]]; then
 fi
 
 # SECURITY: Validate VOICE
-# Allow letters, digits, underscore, hyphen, period, colon (for :: multi-speaker separator), slash.
+# Allow letters, digits, underscore, hyphen, period, colon (for :: multi-speaker separator),
+# slash, and SPACES (Windows SAPI voice names like "Microsoft David Desktop").
 # Voice is passed to the remote via base64-encoded JSON (jq --arg safely escapes it),
-# so shell metacharacters are the only real risk.
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_.:\/-]+$ ]]; then
+# so shell metacharacters are the only real risk — a space is not injectable.
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_.:\/\ -]+$ ]]; then
   echo "Invalid voice format: $VOICE" >&2
   exit 1
 fi
