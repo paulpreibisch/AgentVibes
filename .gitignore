@@ -185,8 +185,3 @@ debug-voices.mjs
 # Test infrastructure (not part of core package)
 test/installer/
 mockups/
-
-# Dev-local avatar / talking-head artifacts (personal notes + infra scripts, not for the package)
-get-talking-head.ps1
-GOOD-MORNING-AVATARS.md
-open-cosmic.ps1

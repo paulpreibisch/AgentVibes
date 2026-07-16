@@ -94,9 +94,9 @@ try {
                 $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
                 $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
                 $env:AGENTVIBES_NO_PRETEXT = "1"
-                # Carry the sender's project (folder name/path) through to the
-                # TalkingHead forward so the avatar badge/tab shows the real remote
-                # origin instead of this machine's own profile dir. (Grafted from master WIP.)
+                # Carry the sender's project (folder name/path) through so a
+                # downstream receiver shows the real remote origin instead of
+                # this machine's own profile dir.
                 if ($req.project) { $env:AGENTVIBES_PROJECT = $req.project }
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_PROJECT", $null, "Process") }
                 if ($req.projectPath) { $env:AGENTVIBES_PROJECT_PATH = $req.projectPath }
@@ -111,8 +111,8 @@ try {
 
                 if (Test-Path $PlayTts) {
                     # Always play a crisp local "incoming" bling so the user KNOWS audio is
-                    # on the way — even when the voice is forwarded to the TalkingHead avatar
-                    # (which skips local speaker playback). Standard bling-success.wav, async
+                    # on the way — even when audio is routed to a downstream receiver
+                    # instead of the local speakers. Standard bling-success.wav, async
                     # with a 0.3s gap (same as the music-preview path); fall back to the
                     # user-configured remote-prefix-sound.txt if the bling wav is missing.
                     $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue

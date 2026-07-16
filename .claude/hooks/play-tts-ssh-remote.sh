@@ -82,8 +82,7 @@ SESSION_ID="$(av_session_id "$PROJECT_ROOT")"
 # PROJECT_NAME is kept for receiver back-compat (the receiver reads "project");
 # set it to the SAME corrected session id so both fields agree.
 PROJECT_NAME="$SESSION_ID"
-# Absolute path, forwarded so the receiver-side avatar can show/learn the real
-# remote folder (mirrors the local forward-to-avatar.sh's projectPath field).
+# Absolute path, forwarded so the receiver can show/learn the real remote folder.
 if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
   PROJECT_PATH="$CLAUDE_PROJECT_DIR"
 else

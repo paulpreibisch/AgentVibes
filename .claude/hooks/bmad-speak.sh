@@ -50,11 +50,10 @@ if [[ ! -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Stage-on-first-speak (Phase 2): the FIRST party line for a session rings the
-# receiver's /stage-roster doorbell so the whole cast is painted up front,
-# instead of avatars trickling in one /speak at a time. Everything here is
-# additive + fail-safe: if python is missing or the doorbell errors, the line
-# still speaks.
+# Stage-on-first-speak: the FIRST party line for a session notifies a compatible
+# receiver of the full party roster up front, rather than letting it learn the
+# cast one line at a time. Everything here is additive + fail-safe: if python is
+# missing or the notification errors, the line still speaks.
 #
 # Party context is detected via either signal:
 #   * AGENTVIBES_PARTY_MODE=1 -- the "party marker" bmad-party-speak.sh exports

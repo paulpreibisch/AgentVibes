@@ -28,9 +28,8 @@ Open-cast vs fixed-cast (the forward-compat contract)
     members, only a freeform ``scene`` theme): POST
       {"session","project","roster":[...anchors if any...],
        "openCast":true,"room":{"id","name","scene"}}
-    so a future receiver can cast avatars / dress a scene from the theme text.
-    (The private prototype SKIPPED open-cast; we broadcast it -- that is the
-    headline forward-compat behavior this doorbell ships.)
+    Open-cast rooms are broadcast rather than skipped, so a receiver that
+    understands the room theme has everything it needs to render it.
 
 ``project`` is sent as a back-compat alias of ``session`` (current receivers key
 on ``project``).
@@ -290,8 +289,8 @@ def main() -> int:
     open_cast = bool(resolved.get("open_cast"))
 
     if open_cast:
-        # KEY DIFFERENCE from the private prototype: broadcast open-cast, don't
-        # skip. A receiver can cast avatars / dress a scene from the theme text.
+        # Broadcast open-cast rooms rather than skipping them: the room theme is
+        # all a receiver needs to render the scene.
         room = {"id": resolved.get("active", ""), "name": resolved.get("name", "")}
         scene = resolved.get("scene")
         if scene:

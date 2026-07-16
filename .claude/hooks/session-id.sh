@@ -10,8 +10,7 @@
 # sessions into one.
 #
 # This helper is the SINGLE source of truth for that routing id so every
-# forward path (forward-to-avatar.sh local /speak, play-tts-ssh-remote.sh SSH)
-# derives it identically:
+# forward path (e.g. play-tts-ssh-remote.sh SSH) derives it identically:
 #
 #   session id = basename(CLAUDE_PROJECT_DIR)   when CLAUDE_PROJECT_DIR is set
 #              = basename(<fallback dir>)        otherwise (passed dir, else PWD)

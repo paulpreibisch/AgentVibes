@@ -12,8 +12,8 @@
 #
 # keyed by the canonical routing session id (av_session_id = basename of
 # CLAUDE_PROJECT_DIR). party-stage-roster.py reads this file and passes the
-# group to resolve_party.py as --party, so an open-cast themed room (e.g. a
-# Star Wars room with a freeform `scene`) gets broadcast instead of the default.
+# group to resolve_party.py as --party, so a chosen non-default room gets
+# broadcast instead of the default.
 #
 # EXTENSION POINT (we do NOT edit the BMAD skill): a party skill can call this
 # from its user-config `activation_steps_append` when the user picks a room --

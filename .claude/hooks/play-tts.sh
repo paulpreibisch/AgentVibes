@@ -113,8 +113,8 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   exit 0
 fi
 
-# Resolve a working Python interpreter once (translator, transport config, and
-# the avatar forward all need it). Sourced AFTER the mute exits so muted calls
+# Resolve a working Python interpreter once (translator and transport config
+# both need it). Sourced AFTER the mute exits so muted calls
 # pay nothing. Windows git-bash frequently has no python3 on PATH — see
 # python-resolver.sh; $PYTHON_BIN is empty when none is usable.
 source "$SCRIPT_DIR/python-resolver.sh"
@@ -385,7 +385,7 @@ case "$ACTIVE_PROVIDER" in
     if [[ "$VOICE_OVERRIDE" =~ ^(af|am|bf|bm|jf|jm|kf|km|zf|zm|ff|fm|hf|hm|if|im|pf|pm|ef|em|nf|nm)_[a-zA-Z0-9]+$ ]]; then
       # Kokoro-shaped voice override (e.g. af_heart) must win over the LLM row's
       # engine column, else it is synthesized as a Piper voice, 404s downloading
-      # a model that doesn't exist, and stays silent. (Grafted from master WIP.)
+      # a model that doesn't exist, and stays silent.
       ACTIVE_PROVIDER="kokoro"
     elif [[ -n "$_LLM_ENGINE" ]]; then
       ACTIVE_PROVIDER="$_LLM_ENGINE"

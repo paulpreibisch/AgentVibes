@@ -141,6 +141,33 @@ async function saveManifest(manifestPath, files) {
 //   • dest hash == manifest hash       → copy  (action: 'updated')
 //   • dest hash != manifest hash       → skip  (action: 'skipped', .user.bak saved)
 //   • no manifest entry yet            → copy  (action: 'updated')
+// Preserve destPath's CURRENT content in a sidecar backup before anything
+// overwrites it. Never clobbers an existing .user.bak — that backup may hold the
+// only surviving copy of an earlier customization; a second backup gets a
+// content-stamped name instead. Returns true only when the current content is
+// safely stored somewhere, so callers can refuse to overwrite when it isn't.
+async function backupUserFile(destPath) {
+  const bak = `${destPath}.user.bak`;
+  try {
+    const currentHash = await computeFileHash(destPath);
+    if (!currentHash) return false;
+
+    const existingHash = await computeFileHash(bak);
+    if (existingHash === currentHash) return true; // already backed up
+
+    if (existingHash) {
+      // A different backup exists — keep it and stamp this one.
+      await fs.copyFile(destPath, `${destPath}.user.bak.${currentHash.slice(0, 8)}`);
+      return true;
+    }
+
+    await fs.copyFile(destPath, bak);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function manifestSafeCopy(srcPath, destPath, manifest) {
   const srcHash = await computeFileHash(srcPath);
   if (!srcHash) return { action: 'skipped', hash: null }; // src missing
@@ -157,15 +184,29 @@ async function manifestSafeCopy(srcPath, destPath, manifest) {
   }
 
   const manifestHash = manifest[destPath]?.hash;
-  if (manifestHash && destHash !== manifestHash) {
-    // User modified the file since we last installed it — preserve it
-    try { await fs.copyFile(destPath, destPath + '.user.bak'); } catch { /* best effort */ }
-    return { action: 'skipped', hash: destHash };
+
+  if (manifestHash) {
+    if (destHash !== manifestHash) {
+      // User modified the file since we last installed it — preserve it
+      await backupUserFile(destPath);
+      return { action: 'skipped', hash: destHash };
+    }
+    // Byte-identical to what we last installed — untouched, ours to update
+    await fs.copyFile(srcPath, destPath);
+    return { action: 'updated', hash: srcHash };
   }
 
-  // Stock file (or no manifest entry yet) — safe to overwrite
+  // No manifest entry, and dest differs from what we ship. This is either a
+  // user's customized file or an older stock copy predating the manifest — the
+  // two are indistinguishable, so we must assume it could be a customization.
+  // Back it up before overwriting, and if the backup can't be secured, refuse
+  // to overwrite at all rather than destroy the only copy.
+  // (CLAUDE.md: never overwrite existing user .claude/ config.)
+  if (!(await backupUserFile(destPath))) {
+    return { action: 'skipped', hash: destHash };
+  }
   await fs.copyFile(srcPath, destPath);
-  return { action: 'updated', hash: srcHash };
+  return { action: 'updated', hash: srcHash, backedUp: true };
 }
 
 // Delete only the files listed in manifest that reside under baseDir.
@@ -7070,7 +7111,7 @@ export {
   CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
   // Manifest utilities (used by tests and external tooling)
   getProjectManifestPath, getGlobalManifestPath,
-  loadManifest, saveManifest, computeFileHash, manifestSafeCopy, removeManifestFiles,
+  loadManifest, saveManifest, computeFileHash, manifestSafeCopy, backupUserFile, removeManifestFiles,
   // Pure helper functions exported for testing
   readJsonConfigSafe, backupConfigFile,
   isPiperProvider, supportsEmoji, getPersonalityIcon,

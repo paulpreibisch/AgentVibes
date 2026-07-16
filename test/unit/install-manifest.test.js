@@ -156,15 +156,58 @@ describe('manifestSafeCopy', () => {
     assert.equal(result.hash, sha256('identical'));
   });
 
-  test('overwrites stock file (no manifest entry) when src differs, action=updated', async () => {
+  test('updates unmanifested file when src differs, action=updated', async () => {
     const src = await writeFile(tmp, 'src/stock.txt', 'v2 content');
     const dest = await writeFile(tmp, 'dest/stock.txt', 'v1 content');
 
-    const result = await manifestSafeCopy(src, dest, {}); // empty manifest = stock
+    const result = await manifestSafeCopy(src, dest, {}); // no manifest entry
 
     assert.equal(result.action, 'updated');
     const written = await fs.readFile(dest, 'utf8');
     assert.equal(written, 'v2 content');
+  });
+
+  // A file with no manifest entry may be a user's customized hook OR an older
+  // stock copy — indistinguishable. Overwriting it without a backup silently
+  // destroyed user customizations (e.g. a hook customized before manifests
+  // existed). We must never lose the bytes.
+  test('REGRESSION: unmanifested user-modified file is backed up before overwrite', async () => {
+    const src = await writeFile(tmp, 'src/hook.sh', 'new stock v2');
+    const dest = await writeFile(tmp, 'dest/hook.sh', 'MY PRECIOUS CUSTOMIZATION');
+
+    const result = await manifestSafeCopy(src, dest, {}); // no manifest entry
+
+    assert.equal(result.action, 'updated', 'update must still be delivered');
+    assert.equal(result.backedUp, true, 'result must report that a backup was taken');
+    assert.equal(await fs.readFile(dest, 'utf8'), 'new stock v2', 'update lands');
+    assert.equal(
+      await fs.readFile(dest + '.user.bak', 'utf8'),
+      'MY PRECIOUS CUSTOMIZATION',
+      'the user\'s content must survive in .user.bak — never silently destroyed'
+    );
+  });
+
+  test('REGRESSION: an existing .user.bak is never clobbered by a second backup', async () => {
+    const src = await writeFile(tmp, 'src/two.sh', 'stock v3');
+    const dest = await writeFile(tmp, 'dest/two.sh', 'customization B');
+    await writeFile(tmp, 'dest/two.sh.user.bak', 'customization A (older, precious)');
+
+    const result = await manifestSafeCopy(src, dest, {});
+
+    assert.equal(result.action, 'updated');
+    assert.equal(
+      await fs.readFile(dest + '.user.bak', 'utf8'),
+      'customization A (older, precious)',
+      'the pre-existing backup must survive untouched'
+    );
+    // customization B must also be recoverable, under a stamped name
+    const dir = await fs.readdir(path.dirname(dest));
+    const stamped = dir.filter(f => f.startsWith('two.sh.user.bak.'));
+    assert.equal(stamped.length, 1, 'the newer customization gets its own stamped backup');
+    assert.equal(
+      await fs.readFile(path.join(path.dirname(dest), stamped[0]), 'utf8'),
+      'customization B'
+    );
   });
 
   test('skips user-modified file when manifest hash differs from dest, action=skipped', async () => {

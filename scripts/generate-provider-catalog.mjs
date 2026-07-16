@@ -483,24 +483,35 @@ function generateProviderCatalogJson() {
  * Registry + main.
  * ------------------------------------------------------------------ */
 
+// `eol` MUST mirror .gitattributes for each path (.claude/hooks-windows/*.ps1 →
+// crlf, everything here else → lf). Git rewrites these endings on checkout, so a
+// generator that always emitted LF produced artifacts that byte-differ from the
+// very files git lays down — the freshness check then fails in every fresh clone
+// (CI included) while passing in an older working tree that predates the rule.
 const ARTIFACTS = [
-  { relPath: '.claude/hooks/provider-catalog.sh', generate: generateProviderCatalogSh },
-  { relPath: '.claude/hooks/elevenlabs-voices.sh', generate: generateElevenlabsVoicesSh },
-  { relPath: '.claude/hooks-windows/provider-catalog.ps1', generate: generateProviderCatalogPs1 },
-  { relPath: '.claude/hooks/provider-catalog.json', generate: generateProviderCatalogJson },
+  { relPath: '.claude/hooks/provider-catalog.sh', generate: generateProviderCatalogSh, eol: '\n' },
+  { relPath: '.claude/hooks/elevenlabs-voices.sh', generate: generateElevenlabsVoicesSh, eol: '\n' },
+  { relPath: '.claude/hooks-windows/provider-catalog.ps1', generate: generateProviderCatalogPs1, eol: '\r\n' },
+  { relPath: '.claude/hooks/provider-catalog.json', generate: generateProviderCatalogJson, eol: '\n' },
 ];
+
+/** Re-end a generated body to `eol`, normalizing first so it is idempotent. */
+function withEol(text, eol) {
+  const lf = text.replace(/\r\n/g, '\n');
+  return eol === '\n' ? lf : lf.replace(/\n/g, eol);
+}
 
 /** Return { relPath → generated content } for all artifacts (no disk I/O). */
 function generateAll() {
   const out = {};
-  for (const a of ARTIFACTS) out[a.relPath] = a.generate();
+  for (const a of ARTIFACTS) out[a.relPath] = withEol(a.generate(), a.eol);
   return out;
 }
 
 function main() {
   for (const a of ARTIFACTS) {
     const dest = path.join(ROOT, a.relPath);
-    writeFileSync(dest, a.generate());
+    writeFileSync(dest, withEol(a.generate(), a.eol));
     process.stdout.write(`  wrote ${a.relPath}\n`);
   }
   process.stdout.write(`provider-catalog: ${ARTIFACTS.length} artifacts generated (version ${CATALOG_VERSION}).\n`);

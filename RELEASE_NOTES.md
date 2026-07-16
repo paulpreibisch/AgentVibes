@@ -26,6 +26,14 @@ Preview a track and it plays wherever your audio is set to go — including on a
 
 Turn on self-introductions and each agent says who it is when it starts — handy when a whole team is talking.
 
+### 🛟 Your own edits are kept safe when you update
+
+Tinkered with one of the AgentVibes files in your `.claude/hooks` folder? From this version on, updating never throws your work away. If we need to update a file you'd changed, we tuck your copy in beside it with `.user.bak` on the end — like `play-tts.sh.user.bak`.
+
+**That file is made by AgentVibes — nothing is broken and nothing else put it there.** It's simply your old version, saved so you can peek at it or copy your changes back into the new one. Delete it whenever you're done with it.
+
+If you customized files in an older version, it's worth a quick look in `.claude/hooks` for anything you'd want to put back.
+
 ### ✨ More voices, smoother ride
 
 - **ElevenLabs** voices fully supported

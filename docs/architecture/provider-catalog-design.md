@@ -1,9 +1,7 @@
 # Provider Catalog / Voice Registry — Architecture Design
 
-**Layer 2 of the SSOT program** (companion to the Utterance Resolver, AVI-S8.5)
-**Repo:** AgentVibes, branch `alpha-kokoro-rock-solid`
-**Author:** Fable 5 (design review), grounded against the working tree.
-**Status:** Design for review — no implementation code.
+**Layer 2 of the single-source-of-truth program** (companion to the Utterance Resolver)
+**Status:** Implemented in v5.13.0.
 
 ---
 
@@ -160,7 +158,7 @@ Mechanics: `scripts/generate-provider-catalog.mjs`, wired into `npm test` (regen
 
 ---
 
-## 7. Phased implementation plan (each phase independently shippable, test-guarded)
+## 7. Implementation history (each phase independently shippable, test-guarded)
 
 **Phase 0 — Canonical module + conformance v1 (pure JS, no consumer changes).**
 Create `provider-catalog.js` absorbing `provider-voice-catalog.js` (re-export shim) and deriving `provider-validator.js`'s three sets + display names. Conformance test groups 2, 3, 5, 6, 8 against *existing* dispatcher files. Group 3 fails on `server.py:746` and `play-tts.ps1:312` → fix both in this phase (delete `elevenlabs` from the Windows allowlists; smallest possible diff). Existing 433 resolver tests + `provider-dispatcher-parity` + `elevenlabs-catalog-parity` all still pass untouched. *Risk: minimal — data + two-token deletions.*

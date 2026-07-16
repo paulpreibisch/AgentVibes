@@ -9,15 +9,11 @@
 #   - normal / SSH path is covered end-to-end in ssh-forward-mute-language.bats
 #   - the party / bmad-speak path threads CLAUDE_PROJECT_DIR through to
 #     play-tts.sh here (regression for the "administrator" install-root bug)
-#   - forward-to-avatar.sh (local /speak, dormant) carries `session` — asserted
-#     at source level, mirroring this repo's static-guard convention for
-#     non-hermetic transports (see the receiver.ps1 asserts).
 
 load '../helpers/test-helper'
 
 REPO_ROOT="${BATS_TEST_DIRNAME}/../.."
 SESSION_ID_SH="$REPO_ROOT/.claude/hooks/session-id.sh"
-FORWARD_SH="$REPO_ROOT/.claude/hooks/forward-to-avatar.sh"
 
 setup() {
   setup_test_env
@@ -125,29 +121,4 @@ EOF
   [ -f "$PARTY_PROJ/pt-args.txt" ]
   run grep -qx -- "--project-dir" "$PARTY_PROJ/pt-args.txt"
   [ "$status" -ne 0 ]
-}
-
-# ===========================================================================
-# LOCAL /speak (forward-to-avatar.sh) — carries `session` and agrees with
-# `project`. Asserted at source level (this path needs a live receiver on two
-# ports to run end-to-end; the SSH transport exercises the runtime payload).
-# ===========================================================================
-
-@test "forward-to-avatar.sh: sources the canonical session-id helper" {
-  run grep -E 'source .*/session-id\.sh' "$FORWARD_SH"
-  [ "$status" -eq 0 ]
-}
-
-@test "forward-to-avatar.sh: derives SESSION via av_session_id and pins project == session" {
-  run grep -E 'SESSION="\$\(av_session_id' "$FORWARD_SH"
-  [ "$status" -eq 0 ]
-  run grep -E '^PROJECT="\$SESSION"' "$FORWARD_SH"
-  [ "$status" -eq 0 ]
-}
-
-@test "forward-to-avatar.sh: both /speak bodies include a session field" {
-  # warm-path + cold-path python bodies each emit "session"
-  run grep -c '"session"' "$FORWARD_SH"
-  [ "$status" -eq 0 ]
-  [ "$output" -ge 2 ]
 }
