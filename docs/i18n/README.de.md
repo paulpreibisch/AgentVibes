@@ -4,7 +4,16 @@
 
 ---
 
-## 🆕 Ein stärkerer Kern (v5.12.0)
+## 🆕 Deine Stimmen überall (v5.13.0)
+
+Wähle die in **Windows** oder **Mac** eingebauten Stimmen und höre sie, wo immer du zuhörst — selbst wenn deine Agenten auf einem anderen Computer laufen. Dazu ein freundlicher Ankündigungston, sodass du immer weißt, dass Klang unterwegs ist.
+
+- **🖥️ Die eigenen Stimmen deines Computers, von überall** — wähle Windows- oder Mac-Stimmen und höre sie auf deiner Maschine; jede Stimme wird angezeigt, nicht verfügbare klar markiert.
+- **🗂️ Alle Stimmen in einer Liste** — Piper, Kokoro, ElevenLabs, Windows, Mac und Soprano an einem Ort, sodass das, was du siehst, auch das ist, was du nutzen kannst.
+- **🔔 Ankündigungston** — ein kurzer Ton spielt kurz vor einer Stimm- oder Musikvorschau, sodass du weißt, dass Audio unterwegs ist.
+- **🆔 Agenten, die sich selbst vorstellen** — optionale Selbstvorstellungen, sodass du weißt, wer in einem Team spricht.
+
+### v5.12.0 — Ein stärkerer Kern
 
 Während einer Woche mit frühem Zugang zu Anthropics neuem **Fable**-Modell haben wir das Herz von AgentVibes zu **einem gemeinsamen Kern** neu aufgebaut. Die Logik für Stimme / Engine / Routing / Lautstärke / Stummschaltung, die früher über vier Skripte hinweg kopiert war (und auseinanderdriftete), lebt jetzt an einer einzigen Stelle — einfacher, konsistenter und stabiler.
 

@@ -4,7 +4,16 @@
 
 ---
 
-## 🆕 Un cœur plus solide (v5.12.0)
+## 🆕 Vos voix partout (v5.13.0)
+
+Choisissez les voix intégrées de **Windows** ou de **Mac** et entendez-les là où vous écoutez — même quand vos agents tournent sur une autre machine. Et un signal sonore amical vous prévient toujours que le son arrive.
+
+- **🖥️ Les voix intégrées de votre ordinateur, depuis n'importe où** — choisissez des voix Windows ou Mac et entendez-les sur votre machine ; chaque voix est affichée, celles indisponibles étant clairement marquées.
+- **🗂️ Toutes les voix dans une seule liste** — Piper, Kokoro, ElevenLabs, Windows, Mac et Soprano au même endroit, de sorte que ce que vous voyez est ce que vous pouvez utiliser.
+- **🔔 Signal sonore d'avertissement** — un court son se joue juste avant un aperçu de voix ou de musique, pour que vous sachiez que l'audio arrive.
+- **🆔 Des agents qui se présentent** — auto-présentations optionnelles pour savoir qui parle au sein d'une équipe.
+
+### v5.12.0 — Un cœur plus solide
 
 Pendant une semaine d'accès anticipé au nouveau modèle **Fable** d'Anthropic, nous avons reconstruit le cœur d'AgentVibes en **un seul cœur commun**. La logique de voix / moteur / routage / volume / coupure du son, autrefois copiée dans quatre scripts (et qui divergeait), tient désormais en un seul endroit — plus simple, plus cohérent et plus stable.
 

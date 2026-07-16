@@ -1,5 +1,34 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎉 v5.13.0 — Le Tue Voci Ovunque, Con un Preavviso
+
+**Rilasciato il:** 2026-07-15 · su `latest` — `npm install agentvibes`
+
+Novità:
+
+### 🖥️ Usa le voci integrate del tuo computer, da qualunque posto
+Esegui i tuoi agenti su una macchina e ascolti su un'altra? Ora puoi scegliere le voci integrate in **Windows** (David, Zira, Mark) o **Mac**, e ascoltarle proprio lì dove sei seduto. AgentVibes ti mostra ogni voce e contrassegna chiaramente quelle che il tuo dispositivo di ascolto può riprodurre.
+
+### 🗂️ Tutte le tue voci in un unico elenco ordinato
+Piper, Kokoro, ElevenLabs, Windows, Mac, Soprano — ogni voce proviene ora da un unico elenco, così ciò che vedi è sempre ciò che puoi usare.
+
+### 🔔 Un tono di "preavviso" prima che parta il suono
+Poco prima che inizi una battuta vocale o un'anteprima musicale, sentirai un breve tono — così sai sempre che l'audio sta per arrivare, anche se ci vuole un momento.
+
+### 🎵 Le anteprime musicali seguono il tuo audio
+Fai l'anteprima di una traccia e viene riprodotta ovunque sia configurato il tuo audio — anche su un altro computer.
+
+### 🆔 Agenti che si presentano
+Attiva le auto-presentazioni e ogni agente dice chi è quando parte — comodo quando parla un intero team.
+
+### ✨ Più voci, esperienza più fluida
+- Voci **ElevenLabs** pienamente supportate
+- Più voci **Kokoro**, funzionanti alla grande su Windows
+- Configurazione più veloce e affidabile su Windows
+- **3.261 test automatizzati superati** — stabile e affidabile
+
+---
+
 ## 🎉 v5.12.0 — La Revisione della Settimana Fable (Stabile)
 
 **Rilasciato il:** 2026-07-05 · ora su `latest` — `npm install agentvibes`

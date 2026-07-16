@@ -4,7 +4,16 @@
 
 ---
 
-## 🆕 Un núcleo más sólido (v5.12.0)
+## 🆕 Tus voces en todas partes (v5.13.0)
+
+Elige las voces integradas en **Windows** o **Mac** y escúchalas dondequiera que estés escuchando — incluso cuando tus agentes se ejecutan en otro ordenador. Además, un amable tono de aviso para que siempre sepas que el audio está en camino.
+
+- **🖥️ Las voces propias de tu ordenador, desde cualquier lugar** — elige voces de Windows o Mac y escúchalas en tu máquina; se muestran todas las voces, con las no disponibles claramente marcadas.
+- **🗂️ Todas las voces en una lista** — Piper, Kokoro, ElevenLabs, Windows, Mac y Soprano en un solo lugar, así que lo que ves es lo que puedes usar.
+- **🔔 Tono de aviso** — un breve sonido se reproduce justo antes de una vista previa de voz o de música, para que sepas que el audio está en camino.
+- **🆔 Agentes que se presentan a sí mismos** — auto-presentaciones opcionales para que sepas quién está hablando en un equipo.
+
+### v5.12.0 — Un núcleo más sólido
 
 Durante una semana de acceso anticipado al nuevo modelo **Fable** de Anthropic, reconstruimos el corazón de AgentVibes en **un único núcleo compartido**. La lógica de voz / motor / enrutamiento / volumen / silencio que solía estar copiada en cuatro scripts (y divergía entre sí) ahora vive en un solo lugar — más simple, más consistente y más estable.
 

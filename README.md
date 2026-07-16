@@ -58,9 +58,18 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 A stronger core (v5.12.0)
+## 🆕 Your voices everywhere (v5.13.0)
 
-During a week of early access to Anthropic's new **Fable** model, we rebuilt the heart of AgentVibes into **one shared core**. The voice / engine / routing / volume / mute logic that used to be copied across four scripts (and drift apart) now lives in a single place — simpler, more consistent, and steadier.
+Pick the voices built into **Windows** or **Mac** and hear them wherever you're listening — even when your agents run on another computer. Plus a friendly heads-up chime so you always know sound is coming.
+
+- **🖥️ Your computer's own voices, from anywhere** — choose Windows or Mac voices and hear them on your machine; every voice is shown, with unavailable ones clearly marked.
+- **🗂️ All voices in one list** — Piper, Kokoro, ElevenLabs, Windows, Mac, and Soprano in one place, so what you see is what you can use.
+- **🔔 Heads-up chime** — a short sound plays just before a voice or music preview, so you know audio is on the way.
+- **🆔 Agents that introduce themselves** — optional self-introductions so you know who's talking in a team.
+
+### v5.12.0 — A stronger core
+
+During a week of early access to Anthropic's new **Fable** model, we rebuilt the heart of AgentVibes into **one shared core**. The voice / engine / routing / volume / mute logic now lives in a single place — simpler, more consistent, and steadier.
 
 - **🔊 Previews play in the right place** — with SSH remote configured, voice and **music previews** play on your receiver; otherwise they play locally.
 - **🧠 One shared core** — Kokoro-on-Linux silence and per-voice drift fixed at the source, with a safe fallback if needed.
@@ -224,7 +233,7 @@ Running a full BMAD agent team? **Every agent gets its own distinct voice**, aut
 
 ## About
 
-**AgentVibes** · v5.12.0 · Licensed under [Apache-2.0](LICENSE)
+**AgentVibes** · v5.13.0 · Licensed under [Apache-2.0](LICENSE)
 
 Built by **Paul Preibisch** — [@997Fire on X](https://x.com/997Fire) · [agentvibes.org](https://agentvibes.org) · [github.com/paulpreibisch/AgentVibes](https://github.com/paulpreibisch/AgentVibes)
 

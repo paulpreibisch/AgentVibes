@@ -1,5 +1,40 @@
 # AgentVibes Release Notes
 
+## 🎉 v5.13.0 — Your Voices Everywhere, With a Heads-Up
+
+**Released:** 2026-07-15 · on `latest` — `npm install agentvibes`
+
+What's new:
+
+### 🖥️ Use your computer's own voices, from anywhere
+
+Run your agents on one machine and listen on another? You can now pick the voices built into **Windows** (David, Zira, Mark) or **Mac**, and hear them right where you're sitting. AgentVibes shows you every voice and clearly marks the ones your listening device can play.
+
+### 🗂️ All your voices in one tidy list
+
+Piper, Kokoro, ElevenLabs, Windows, Mac, Soprano — every voice now comes from a single list, so what you see is always what you can use.
+
+### 🔔 A "heads-up" chime before sound plays
+
+Just before a voice line or music preview starts, you'll hear a short chime — so you always know audio is on the way, even if it takes a moment.
+
+### 🎵 Music previews follow your sound
+
+Preview a track and it plays wherever your audio is set to go — including on another computer.
+
+### 🆔 Agents that introduce themselves
+
+Turn on self-introductions and each agent says who it is when it starts — handy when a whole team is talking.
+
+### ✨ More voices, smoother ride
+
+- **ElevenLabs** voices fully supported
+- More **Kokoro** voices, working great on Windows
+- Faster, more reliable setup on Windows
+- **3,261 automated tests passing** — steady and dependable
+
+---
+
 ## 🎉 v5.12.0 — The Fable Week Overhaul (Stable)
 
 **Released:** 2026-07-05 · now on `latest` — `npm install agentvibes`
