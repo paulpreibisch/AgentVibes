@@ -21,6 +21,13 @@ Höre einen Track vor, und er spielt dort, wo dein Audio hin eingestellt ist —
 ### 🆔 Agenten, die sich selbst vorstellen
 Aktiviere Selbstvorstellungen, und jeder Agent sagt beim Start, wer er ist — praktisch, wenn ein ganzes Team spricht.
 
+### 🛟 Deine eigenen Änderungen sind beim Update sicher
+Hast du an einer der AgentVibes-Dateien in deinem `.claude/hooks`-Ordner herumgebastelt? Ab dieser Version geht bei einem Update nie mehr etwas von deiner Arbeit verloren. Wenn wir eine Datei aktualisieren müssen, die du verändert hast, legen wir deine Kopie einfach daneben, mit `.user.bak` am Ende — zum Beispiel `play-tts.sh.user.bak`.
+
+**Diese Datei wird von AgentVibes erstellt — es ist nichts kaputt, und niemand sonst hat sie dort hingelegt.** Es ist einfach deine alte Version, aufgehoben, damit du reinschauen oder deine Änderungen in die neue Datei übertragen kannst. Lösch sie einfach, wenn du sie nicht mehr brauchst.
+
+Falls du in einer älteren Version Dateien angepasst hast, lohnt sich ein kurzer Blick in `.claude/hooks` — vielleicht gibt es dort etwas, das du zurückholen möchtest.
+
 ### ✨ Mehr Stimmen, geschmeidigere Fahrt
 - **ElevenLabs**-Stimmen vollständig unterstützt
 - Mehr **Kokoro**-Stimmen, die unter Windows großartig funktionieren

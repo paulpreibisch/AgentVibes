@@ -21,6 +21,13 @@ Pré-visualize uma faixa e ela toca onde quer que o seu áudio esteja configurad
 ### 🆔 Agentes que se apresentam
 Ative as autoapresentações e cada agente diz quem é ao iniciar — útil quando uma equipe inteira está falando.
 
+### 🛟 Suas próprias edições ficam seguras quando você atualiza
+Mexeu em algum dos arquivos do AgentVibes na sua pasta `.claude/hooks`? A partir desta versão, atualizar nunca mais vai jogar fora o seu trabalho. Se precisarmos atualizar um arquivo que você alterou, guardamos a sua cópia bem ao lado, com `.user.bak` no final — algo como `play-tts.sh.user.bak`.
+
+**Esse arquivo é criado pelo AgentVibes — nada está quebrado e mais ninguém o colocou ali.** É simplesmente a sua versão antiga, guardada para você dar uma olhada ou copiar suas mudanças para a nova. Apague quando não precisar mais dele.
+
+Se você personalizou arquivos em uma versão mais antiga, vale a pena dar uma olhada rápida em `.claude/hooks` para ver se há algo que você queira recuperar.
+
 ### ✨ Mais vozes, uma experiência mais suave
 - Vozes do **ElevenLabs** totalmente suportadas
 - Mais vozes do **Kokoro**, funcionando muito bem no Windows

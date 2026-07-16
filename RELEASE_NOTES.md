@@ -39,7 +39,7 @@ If you customized files in an older version, it's worth a quick look in `.claude
 - **ElevenLabs** voices fully supported
 - More **Kokoro** voices, working great on Windows
 - Faster, more reliable setup on Windows
-- **3,261 automated tests passing** — steady and dependable
+- **3,263 automated tests passing** — steady and dependable
 
 ---
 

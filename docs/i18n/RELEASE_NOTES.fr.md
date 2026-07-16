@@ -21,6 +21,13 @@ Prévisualisez une piste et elle se joue là où votre audio est configuré pour
 ### 🆔 Des agents qui se présentent
 Activez les auto-présentations et chaque agent annonce qui il est au démarrage — bien pratique quand toute une équipe parle.
 
+### 🛟 Vos propres modifications sont protégées lors d'une mise à jour
+Vous avez modifié l'un des fichiers d'AgentVibes dans votre dossier `.claude/hooks` ? À partir de cette version, une mise à jour ne jette plus jamais votre travail à la poubelle. Si nous devons mettre à jour un fichier que vous aviez modifié, nous plaçons votre copie juste à côté avec `.user.bak` à la fin — par exemple `play-tts.sh.user.bak`.
+
+**Ce fichier est créé par AgentVibes — rien n'est cassé et personne d'autre ne l'a déposé là.** C'est simplement votre ancienne version, conservée pour que vous puissiez y jeter un œil ou recopier vos modifications dans le nouveau fichier. Supprimez-le dès que vous n'en avez plus besoin.
+
+Si vous aviez personnalisé des fichiers dans une version plus ancienne, cela vaut la peine de jeter un coup d'œil rapide dans `.claude/hooks` pour repérer ce que vous voudriez restaurer.
+
 ### ✨ Plus de voix, une expérience plus fluide
 - Voix **ElevenLabs** entièrement prises en charge
 - Davantage de voix **Kokoro**, fonctionnant parfaitement sur Windows
