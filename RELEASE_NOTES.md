@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — Your Voices Everywhere, With a Heads-Up
 
-**Released:** 2026-07-15 · on `latest` — `npm install agentvibes`
+**Released:** 2026-07-16 · on `latest` — `npm install agentvibes`
 
 What's new:
 

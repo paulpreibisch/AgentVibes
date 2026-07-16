@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — 你的语音，随处可用，还有提前提醒
 
-**发布日期：** 2026-07-15 · 现已进入 `latest` — `npm install agentvibes`
+**发布日期：** 2026-07-16 · 现已进入 `latest` — `npm install agentvibes`
 
 新增内容：
 

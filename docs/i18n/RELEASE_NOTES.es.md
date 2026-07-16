@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — Tus Voces en Todas Partes, Con un Aviso Previo
 
-**Lanzamiento:** 2026-07-15 · en `latest` — `npm install agentvibes`
+**Lanzamiento:** 2026-07-16 · en `latest` — `npm install agentvibes`
 
 Novedades:
 

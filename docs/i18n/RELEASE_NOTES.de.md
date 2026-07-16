@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — Deine Stimmen überall, mit Vorankündigung
 
-**Veröffentlicht:** 2026-07-15 · auf `latest` — `npm install agentvibes`
+**Veröffentlicht:** 2026-07-16 · auf `latest` — `npm install agentvibes`
 
 Was ist neu:
 

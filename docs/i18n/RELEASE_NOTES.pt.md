@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — Suas Vozes em Todo Lugar, Com um Aviso
 
-**Lançamento:** 2026-07-15 · no `latest` — `npm install agentvibes`
+**Lançamento:** 2026-07-16 · no `latest` — `npm install agentvibes`
 
 Novidades:
 

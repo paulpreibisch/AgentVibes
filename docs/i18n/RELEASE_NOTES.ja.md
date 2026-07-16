@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — あなたの音声をどこでも、お知らせ付きで
 
-**リリース日:** 2026-07-15 · `latest` で公開中 — `npm install agentvibes`
+**リリース日:** 2026-07-16 · `latest` で公開中 — `npm install agentvibes`
 
 新機能:
 

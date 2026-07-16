@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — Le Tue Voci Ovunque, Con un Preavviso
 
-**Rilasciato il:** 2026-07-15 · su `latest` — `npm install agentvibes`
+**Rilasciato il:** 2026-07-16 · su `latest` — `npm install agentvibes`
 
 Novità:
 

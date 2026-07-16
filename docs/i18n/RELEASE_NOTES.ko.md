@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — 당신의 음성을 어디서나, 미리 알려주면서
 
-**출시일:** 2026-07-15 · 이제 `latest` 채널 — `npm install agentvibes`
+**출시일:** 2026-07-16 · 이제 `latest` 채널 — `npm install agentvibes`
 
 새로운 기능:
 

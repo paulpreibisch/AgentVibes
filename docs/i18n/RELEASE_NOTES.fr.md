@@ -2,7 +2,7 @@
 
 ## 🎉 v5.13.0 — Vos Voix Partout, avec un Signal Sonore
 
-**Publié le :** 2026-07-15 · sur `latest` — `npm install agentvibes`
+**Publié le :** 2026-07-16 · sur `latest` — `npm install agentvibes`
 
 Quoi de neuf :
 
