@@ -1,5 +1,27 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.13.2 — Instalaciones más limpias, configuración más sencilla
+
+**Lanzamiento:** 2026-07-17 · en `latest` — `npm install agentvibes@latest`
+
+### 🎛️ Empiezas con la configuración por defecto, lista para hacerla tuya
+
+Las instalaciones nuevas ahora empiezan limpias, con los valores por defecto integrados para voz, música de fondo y personalidad — así que es tu configuración desde la primera vez que la ejecutas.
+
+### 🐧 La instalación en Mac y Linux funciona correctamente
+
+Algunos de los scripts que preparan todo estaban guardados en un formato de Windows que Mac y Linux no pueden leer, así que se detenían antes de hacer nada. Ahora están en el formato correcto. Instalar Piper y descargar voces vuelve a funcionar en una máquina Mac o Linux recién configurada.
+
+### 🔊 Tu elección de voz se mantiene
+
+El archivo de configuración que recuerda qué voz va con qué motor podía leerse un poco mal, así que tu elección de motor se ignoraba en silencio. Arreglado — lo que eliges es lo que obtienes.
+
+### 📦 Una descarga más pequeña y ordenada
+
+El paquete ya no incluye archivos que nunca necesitó. Todo lo que la aplicación te dice que ejecutes ahora está realmente incluido.
+
+---
+
 ## 🔧 v5.13.1 — Actualizaciones de Windows que de verdad actualizan
 
 **Lanzamiento:** 2026-07-16 · en `latest` — `npm install agentvibes@latest`

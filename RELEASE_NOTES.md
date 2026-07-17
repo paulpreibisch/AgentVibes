@@ -1,5 +1,27 @@
 # AgentVibes Release Notes
 
+## 🔧 v5.13.2 — Cleaner installs, smoother setup
+
+**Released:** 2026-07-17 · on `latest` — `npm install agentvibes@latest`
+
+### 🎛️ You start with the default settings, ready to make your own
+
+Fresh installs now begin clean, with the built-in defaults for voice, background music, and personality — so it's your setup from the very first run.
+
+### 🐧 Mac and Linux setup works properly
+
+A few of the scripts that set things up were saved in a Windows format that Mac and Linux can't read, so they'd stop before doing anything. They're in the right format now. Installing Piper and downloading voices work on a fresh Mac or Linux machine again.
+
+### 🔊 Your voice choice sticks
+
+The settings file that remembers which voice goes with which engine could be read slightly wrong, so your engine choice quietly got ignored. Fixed — what you pick is what you get.
+
+### 📦 A smaller, tidier download
+
+The package no longer carries files it never needed. Everything the app tells you to run is now actually included.
+
+---
+
 ## 🔧 v5.13.1 — Windows updates that actually update
 
 **Released:** 2026-07-16 · on `latest` — `npm install agentvibes@latest`
