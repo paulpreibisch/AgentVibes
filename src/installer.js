@@ -3192,16 +3192,40 @@ function execScript(scriptPath, options = {}) {
   const scriptFile = parts[0];
   const args = parts.slice(1);
 
-  // Validate that the script file doesn't contain shell metacharacters
-  if (scriptFile.match(/[;&|`$(){}[\]<>'"\\]/)) {
+  // Validate that the script file doesn't contain shell metacharacters.
+  // NOTE: `\` and `:` are deliberately NOT in this class — the script is run via
+  // execFileSync(..., { shell: false }) at the bottom of this function, so the
+  // path never reaches a shell and backslashes are not a metacharacter. Rejecting
+  // `\` made EVERY Windows path ("C:\Users\...") throw before the directory check
+  // was even reached. The real control is the allow-list below.
+  if (scriptFile.match(/[;&|`$(){}[\]<>'"]/)) {
     throw new Error('Invalid characters in script path');
   }
 
-  // Validate path is within expected directory (defense in depth)
+  // Validate the path is under a directory we're willing to execute from.
+  //
+  // This used to allow ONLY the *package's own* .claude/hooks. But every install
+  // caller passes a path under the TARGET project (targetDir/.claude/hooks/...),
+  // and under npx/global installs the package dir is never the target dir — so
+  // the check threw for every real user. The throw was swallowed by each caller's
+  // catch and surfaced as "Piper installation failed or was cancelled" / "Voice
+  // download failed", blaming the script for something we never ran. It only
+  // worked in a linked dev checkout, where package === target. Callers now pass
+  // the base they legitimately execute from.
+  const pkgRoot = path.resolve(__dirname, '..');
+  const allowedDirs = [
+    path.join(pkgRoot, '.claude', 'hooks'),
+    path.join(pkgRoot, 'bin'),
+    ...(options.allowedDirs || []).map((d) => path.resolve(d)),
+  ];
   const resolvedPath = path.resolve(scriptFile);
-  const allowedDir = path.resolve(__dirname, '..', '.claude', 'hooks');
-  if (!resolvedPath.startsWith(allowedDir + path.sep) && resolvedPath !== allowedDir) {
-    throw new Error('Script path outside allowed directory');
+  const permitted = allowedDirs.some(
+    (dir) => resolvedPath === dir || resolvedPath.startsWith(dir + path.sep)
+  );
+  if (!permitted) {
+    throw new Error(
+      `Script path outside allowed directories: ${resolvedPath}\n  allowed: ${allowedDirs.join(', ')}`
+    );
   }
 
   // Security: Validate shell and shellConfig don't contain dangerous characters
@@ -3233,8 +3257,10 @@ function execScript(scriptPath, options = {}) {
   // Note: This means shell aliases/functions won't be available, but that's safer
   // S8701: scriptFile is validated to live under .claude/hooks (above), args are
   // passed as an array and shell:false disables shell interpretation. Risk handled.
+  // allowedDirs is ours, not execFileSync's — strip it before handing options on.
+  const { allowedDirs: _ignored, ...execOptions } = options;
   return execFileSync(scriptFile, args, { // NOSONAR
-    ...options,
+    ...execOptions,
     shell: false  // Don't use shell to avoid injection risks
   });
 }
@@ -4480,7 +4506,8 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
   try {
     execScript(`${piperDownloadPath} --libritts --yes`, {
       stdio: 'inherit',
-      env: process.env
+      env: process.env,
+      allowedDirs: [path.dirname(piperDownloadPath)]
     });
     console.log(chalk.green('\n✅ LibriTTS voices downloaded! Browse with /agent-vibes:list\n'));
   } catch {
@@ -4531,7 +4558,8 @@ async function checkAndInstallPiper(targetDir, options) {
         if (fsSync.existsSync(piperDownloadPath)) {
           execScript(`${piperDownloadPath} --yes`, {
             stdio: options.silent ? 'pipe' : 'inherit',
-            env: process.env
+            env: process.env,
+            allowedDirs: [path.dirname(piperDownloadPath)]
           });
           console.log(chalk.green('\n✅ Voice models downloaded successfully!\n'));
         } else {
@@ -4576,7 +4604,8 @@ async function checkAndInstallPiper(targetDir, options) {
         try {
           execScript(`${piperInstallerPath} --non-interactive`, {
             stdio: options.silent ? 'pipe' : 'inherit',
-            env: process.env
+            env: process.env,
+            allowedDirs: [path.dirname(piperInstallerPath)]
           });
           console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
         } catch (error) {
@@ -6785,8 +6814,11 @@ program
   .command('agentvibes-mcp-server')
   .description('Start AgentVibes MCP server')
   .action(async () => {
-    // Run the bash wrapper script
-    const mcpServerScript = path.join(__dirname, '..', 'bin', 'mcp-server');
+    // Run the bash wrapper script. NOTE: 'bin/mcp-server' (no extension) has
+    // never existed — bin/ ships mcp-server.sh and mcp-server.js. Combined with
+    // the catch below exiting silently, this subcommand failed with no output at
+    // all for every user who tried it.
+    const mcpServerScript = path.join(__dirname, '..', 'bin', 'mcp-server.sh');
 
     try {
       execScript(mcpServerScript, {
@@ -6794,6 +6826,9 @@ program
         env: process.env
       });
     } catch (error) {
+      // Never exit silently — say why.
+      console.error(chalk.red(`\n❌ Could not start the MCP server: ${error.message}`));
+      console.error(chalk.gray(`   Script: ${mcpServerScript}`));
       process.exit(error.status || 1);
     }
   });
@@ -7116,6 +7151,7 @@ export {
   // Manifest utilities (used by tests and external tooling)
   getProjectManifestPath, getGlobalManifestPath,
   loadManifest, saveManifest, computeFileHash, manifestSafeCopy, backupUserFile, removeManifestFiles,
+  execScript,
   // Pure helper functions exported for testing
   readJsonConfigSafe, backupConfigFile,
   isPiperProvider, supportsEmoji, getPersonalityIcon,
