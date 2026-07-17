@@ -1,7 +1,16 @@
-# Shell scripts must stay LF — CRLF breaks bash on Linux/macOS
+# Shell scripts must stay LF — CRLF breaks bash on Linux/macOS.
+# These are BY EXTENSION on purpose: path-scoped rules (.claude/hooks/*.sh) left
+# templates/*.sh and every *.py uncovered, so on a Windows dev machine
+# core.autocrlf gave them CRLF working copies — and `npm publish` packs the
+# WORKING TREE. v5.12.0/5.13.0/5.13.1 all shipped templates/agentvibes-receiver.sh
+# with a `#!/usr/bin/env bash\r` shebang, which dies on Linux/macOS with
+# "env: 'bash\r': No such file or directory".
+*.sh text eol=lf
+*.py text eol=lf
 bin/* text eol=lf
-.claude/hooks/*.sh text eol=lf
-.claude/hooks-windows/*.ps1 text eol=crlf
+# PowerShell is Windows-only and wants CRLF. By extension so templates/*.ps1 and
+# the root setup-*.ps1 are covered too, not just .claude/hooks-windows/.
+*.ps1 text eol=crlf
 
 # Standard text files
 *.js text eol=lf
