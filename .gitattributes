@@ -1,24 +1,26 @@
-# Shell scripts must stay LF — CRLF breaks bash on Linux/macOS.
-# These are BY EXTENSION on purpose: path-scoped rules (.claude/hooks/*.sh) left
-# templates/*.sh and every *.py uncovered, so on a Windows dev machine
-# core.autocrlf gave them CRLF working copies — and `npm publish` packs the
-# WORKING TREE. v5.12.0/5.13.0/5.13.1 all shipped templates/agentvibes-receiver.sh
-# with a `#!/usr/bin/env bash\r` shebang, which dies on Linux/macOS with
-# "env: 'bash\r': No such file or directory".
-*.sh text eol=lf
-*.py text eol=lf
-bin/* text eol=lf
+# DEFAULT: LF for every text file. `text=auto` lets git detect binary itself, so
+# this is safe for unlisted binaries too.
+#
+# Why a catch-all instead of per-extension rules: this file used to list only
+# specific paths (.claude/hooks/*.sh, *.js, *.json...). Everything uncovered —
+# templates/*.sh, *.py, *.cfg, *.txt, LICENSE, *.toml — got CRLF working copies
+# from core.autocrlf on a Windows dev machine, and `npm publish` packs the
+# WORKING TREE. Consequences that actually shipped in v5.12.0/5.13.0/5.13.1:
+#   * templates/agentvibes-receiver.sh with a `#!/usr/bin/env bash\r` shebang —
+#     fatal on Linux/macOS ("env: 'bash\r': No such file or directory").
+#   * .claude/config/audio-effects.cfg.sample with CRLF — copyConfigFiles installs
+#     it as the user's real config, and the hooks parse it with `IFS='|' read`, so
+#     the last field became "piper\r" and never matched "piper" (the
+#     voice/engine-coupling class of bug that silently kills audio).
+# Any NEW file type is now correct by default rather than by remembering to add it.
+* text=auto eol=lf
+
 # PowerShell is Windows-only and wants CRLF. By extension so templates/*.ps1 and
-# the root setup-*.ps1 are covered too, not just .claude/hooks-windows/.
+# the root setup-*.ps1 are covered, not just .claude/hooks-windows/.
+# NOTE: scripts/generate-provider-catalog.mjs mirrors this for the artifacts it
+# emits — keep the two in sync or the freshness byte-diff fails in fresh clones.
 *.ps1 text eol=crlf
 
-# Standard text files
-*.js text eol=lf
-*.json text eol=lf
-*.md text eol=lf
-*.yaml text eol=lf
-*.yml text eol=lf
-*.bats text eol=lf
 
 # Binary files — no line ending conversion
 *.wav binary
