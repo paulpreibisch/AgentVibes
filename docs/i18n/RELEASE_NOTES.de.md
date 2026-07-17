@@ -12,6 +12,10 @@ Jetzt aktualisieren sie sich wirklich. Führe `npx agentvibes update` aus, und d
 
 Wenn du macOS oder Linux nutzt, ändert sich nichts — Updates haben für dich schon immer funktioniert.
 
+### 🔒 Ein kleiner Sicherheits-Feinschliff hinter den Kulissen
+
+Wir haben einen der Bausteine aktualisiert, den AgentVibes zum Lesen von Konfigurationsdateien nutzt. Eine speziell präparierte Konfigurationsdatei hätte ihn zum Stillstand bringen können. Gestohlen oder ausgespäht werden konnte dabei nie etwas — aber jetzt kann er sich auch nicht mehr festfahren. Du musst nichts tun; es ist einfach schon drin.
+
 ---
 
 ## 🎉 v5.13.0 — Deine Stimmen überall, mit Vorankündigung

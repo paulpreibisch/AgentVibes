@@ -12,6 +12,10 @@ Now they update for real. Run `npx agentvibes update` and you'll pick up every f
 
 If you're on macOS or Linux, nothing changes — updates were already working for you.
 
+### 🔒 A security tune-up under the hood
+
+We updated one of the building blocks AgentVibes uses to read settings files. A specially-crafted settings file could have made it grind to a halt. Nothing could ever have been stolen or snooped on — but now it can't get stuck either. Nothing for you to do; it's just in.
+
 ---
 
 ## 🎉 v5.13.0 — Your Voices Everywhere, With a Heads-Up

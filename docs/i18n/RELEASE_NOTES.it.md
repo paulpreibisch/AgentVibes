@@ -12,6 +12,10 @@ Ora si aggiornano per davvero. Esegui `npx agentvibes update` e riceverai tutte 
 
 Se usi macOS o Linux, non cambia nulla — per te gli aggiornamenti funzionavano già.
 
+### 🔒 Una messa a punto della sicurezza dietro le quinte
+
+Abbiamo aggiornato uno dei componenti che AgentVibes usa per leggere i file di configurazione. Un file di configurazione costruito ad arte avrebbe potuto bloccarlo completamente. Non è mai stato possibile rubare o spiare nulla — ma ora non può nemmeno più bloccarsi. Non devi fare nulla; è già attivo.
+
 ---
 
 ## 🎉 v5.13.0 — Le Tue Voci Ovunque, Con un Preavviso
