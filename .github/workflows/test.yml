@@ -47,7 +47,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python test deps
-        run: python -m pip install --upgrade pip pytest
+        # mcp-server/requirements.txt is REQUIRED, not optional: test_mcp_correctness.py
+        # does `from server import ...`, and server.py imports mcp (which pulls idna).
+        # Installing only pytest made every run fail at collection with
+        # "ModuleNotFoundError: No module named 'idna'".
+        run: python -m pip install --upgrade pip pytest -r mcp-server/requirements.txt
 
       - name: Setup test fixtures
         run: cp .claude/config/audio-effects.cfg.sample .claude/config/audio-effects.cfg
