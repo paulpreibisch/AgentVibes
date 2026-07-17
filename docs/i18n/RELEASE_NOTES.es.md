@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.13.1 — Actualizaciones de Windows que de verdad actualizan
+
+**Lanzamiento:** 2026-07-16 · en `latest` — `npm install agentvibes@latest`
+
+### 🪟 Tus scripts de Windows ahora sí se actualizan de verdad
+
+En Windows, los pequeños scripts que hacen que tus agentes hablen viven en tu carpeta `.claude/hooks`. Actualizar decía que los refrescaba — pero en Windows, en silencio, no lo hacía, así que podían quedarse con la versión que instalaste por primera vez durante meses.
+
+Ahora sí se actualizan de verdad. Ejecuta `npx agentvibes update` y recibirás cada arreglo que te estabas perdiendo. Todo lo que hayas personalizado tú mismo sigue a salvo justo al lado, como un archivo `.user.bak`, igual que antes.
+
+Si usas macOS o Linux, no cambia nada — las actualizaciones ya funcionaban bien para ti.
+
+---
+
 ## 🎉 v5.13.0 — Tus Voces en Todas Partes, Con un Aviso Previo
 
 **Lanzamiento:** 2026-07-16 · en `latest` — `npm install agentvibes`

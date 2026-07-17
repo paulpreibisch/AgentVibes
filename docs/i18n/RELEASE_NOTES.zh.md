@@ -1,5 +1,19 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🔧 v5.13.1 — Windows 更新，这次真的会更新
+
+**发布日期：** 2026-07-16 · 现已进入 `latest` — `npm install agentvibes@latest`
+
+### 🪟 你的 Windows 脚本现在真的会更新了
+
+在 Windows 上，让你的代理开口说话的那些小脚本，存放在你的 `.claude/hooks` 文件夹里。更新时提示说已经刷新了它们 — 但在 Windows 上其实悄悄没有更新，于是它们可能会停留在你最初安装的版本上，一放就是好几个月。
+
+现在它们会真正更新了。运行 `npx agentvibes update`，你就能获得之前一直错过的所有修复。你自己改过的内容依然会安全保留在旁边，命名为 `.user.bak` 文件，和以前一样。
+
+如果你用的是 macOS 或 Linux，什么都不会变 — 更新在那里本来就一直正常工作。
+
+---
+
 ## 🎉 v5.13.0 — 你的语音，随处可用，还有提前提醒
 
 **发布日期：** 2026-07-16 · 现已进入 `latest` — `npm install agentvibes`

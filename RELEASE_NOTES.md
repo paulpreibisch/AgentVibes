@@ -1,5 +1,19 @@
 # AgentVibes Release Notes
 
+## 🔧 v5.13.1 — Windows updates that actually update
+
+**Released:** 2026-07-16 · on `latest` — `npm install agentvibes@latest`
+
+### 🪟 Your Windows scripts now really do update
+
+On Windows, the little scripts that make your agents talk live in your `.claude/hooks` folder. Updating said it refreshed them — but on Windows it quietly didn't, so they could sit on the version you first installed for months.
+
+Now they update for real. Run `npx agentvibes update` and you'll pick up every fix you've been missing. Anything you'd customized yourself is still kept safe beside it as a `.user.bak` file, exactly as before.
+
+If you're on macOS or Linux, nothing changes — updates were already working for you.
+
+---
+
 ## 🎉 v5.13.0 — Your Voices Everywhere, With a Heads-Up
 
 **Released:** 2026-07-16 · on `latest` — `npm install agentvibes`
