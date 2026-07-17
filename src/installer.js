@@ -5650,10 +5650,14 @@ async function performUpdateOperations(targetDir, spinner) {
     console.log(chalk.green(`✓ Updated ${resolverResult.count} resolver bundle files`));
   }
 
-  // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs)
-  const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
-  const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
-  const globalHooksUpdated = await updateGlobalHooks(srcHooksDir);
+  // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs).
+  // ALWAYS pass the unix hooks dir: updateGlobalHooks copies CRITICAL_HOOKS (all .sh)
+  // from here and derives hooks-windows itself for CRITICAL_HOOKS_WINDOWS. Passing
+  // hooks-windows on Windows made every .sh lookup miss and hit the "src missing"
+  // catch, so ~/.claude/hooks/*.sh — which git-bash hooks actually execute on
+  // Windows — silently never updated (installs stayed frozen at their first version).
+  const srcGlobalHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
+  const globalHooksUpdated = await updateGlobalHooks(srcGlobalHooksDir);
   if (globalHooksUpdated > 0) {
     console.log(chalk.green(`✓ Updated ${globalHooksUpdated} critical scripts in ~/.claude/hooks/`));
   }
@@ -5951,10 +5955,10 @@ async function install(options = {}) {
     await copyCodexFiles(targetDir, silentSpinner);
 
     // Populate global ~/.claude/hooks[/-windows]/ so $HOME hook paths resolve
-    // on first install (not just on update).
-    const hooksSubdirInstall = isNativeWindows() ? 'hooks-windows' : 'hooks';
-    const srcHooksDirInstall = path.join(__dirname, '..', '.claude', hooksSubdirInstall);
-    await updateGlobalHooks(srcHooksDirInstall);
+    // on first install (not just on update). Always the unix hooks dir — see the
+    // note in the update path; updateGlobalHooks derives hooks-windows itself.
+    const srcGlobalHooksDirInstall = path.join(__dirname, '..', '.claude', 'hooks');
+    await updateGlobalHooks(srcGlobalHooksDirInstall);
     // Populate global ~/.claude/ resolver bundle too, same reasoning as above (AVI-S8.5 Stage 2)
     await updateGlobalResolverBundle();
 

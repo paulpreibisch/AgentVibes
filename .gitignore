@@ -173,6 +173,10 @@ scripts/regenerate-*.sh
 .claude/agentvibes-muted
 .claude/agentvibes-unmuted
 .claude/agentvibes-enabled
+# Generated at install time by copyResolverBundle() from bin/ + src/services/ —
+# a derived artifact, not source. Appears whenever the installer runs against
+# this repo as its own targetDir.
+.claude/agentvibes-resolver/
 .claude/hooks/post-response.sh
 .claude/story-workflow.sh
 bin/ensure-soprano-running.sh

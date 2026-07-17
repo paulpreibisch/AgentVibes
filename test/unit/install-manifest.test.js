@@ -406,6 +406,71 @@ describe('updateGlobalHooks — manifest tracking and user preservation', () => 
     assert.ok(Object.keys(manifest).length > 0, 'Global manifest must be written');
   });
 
+  // The .sh CRITICAL_HOOKS are what git-bash executes on Windows too. Callers
+  // used to pass `.claude/hooks-windows` when isNativeWindows(), so every .sh
+  // lookup missed and was swallowed by the "src missing" catch — Windows global
+  // hooks silently never updated. Assert the .sh hooks actually land.
+  test('REGRESSION: every CRITICAL_HOOK (.sh) is installed into ~/.claude/hooks', async () => {
+    const home = await makeTmpDir();
+    try {
+      const srcHooksDir = path.join(PROJECT_ROOT, '.claude', 'hooks');
+      await updateGlobalHooks(srcHooksDir, home);
+
+      const destDir = path.join(home, '.claude', 'hooks');
+      const missing = [];
+      for (const hook of CRITICAL_HOOKS) {
+        // Only assert hooks that actually exist in the source tree.
+        const srcExists = await fs.access(path.join(srcHooksDir, hook)).then(() => true, () => false);
+        if (!srcExists) continue;
+        const landed = await fs.access(path.join(destDir, hook)).then(() => true, () => false);
+        if (!landed) missing.push(hook);
+      }
+      assert.deepEqual(missing, [], `CRITICAL_HOOKS not installed globally: ${missing.join(', ')}`);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('REGRESSION: a hooks-windows srcDir must not silently skip every .sh hook', async () => {
+    const home = await makeTmpDir();
+    try {
+      // Simulate the old bug's argument. updateGlobalHooks must not be the thing
+      // that makes this "work" — the CALLER must pass the unix dir. This test
+      // documents that passing the wrong dir installs nothing, which is exactly
+      // why the caller assertion below matters.
+      const wrongDir = path.join(PROJECT_ROOT, '.claude', 'hooks-windows');
+      await updateGlobalHooks(wrongDir, home);
+      const shLanded = await fs
+        .access(path.join(home, '.claude', 'hooks', 'play-tts.sh'))
+        .then(() => true, () => false);
+      assert.equal(shLanded, false, 'sanity: hooks-windows has no .sh — nothing lands');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('REGRESSION: installer passes the unix hooks dir to updateGlobalHooks', async () => {
+    // Guards the real defect at the call sites: they used
+    // `isNativeWindows() ? 'hooks-windows' : 'hooks'`, so on Windows every .sh
+    // CRITICAL_HOOK lookup missed and ~/.claude/hooks/*.sh never synced.
+    // NOTE: copyHookFiles() legitimately picks a platform subdir for the PROJECT
+    // dir — that is a different function and must not be caught here, which is
+    // why the global-hooks vars carry distinct names.
+    const src = await fs.readFile(path.join(PROJECT_ROOT, 'src', 'installer.js'), 'utf8');
+
+    const callArgs = [...src.matchAll(/await updateGlobalHooks\((\w+)[,)]/g)].map((m) => m[1]);
+    assert.ok(callArgs.length >= 2, `expected >=2 updateGlobalHooks call sites, found ${callArgs.length}`);
+
+    for (const varName of callArgs) {
+      const decl = new RegExp(`const ${varName}\\s*=\\s*path\\.join\\([^)]*?'hooks'\\s*\\)`);
+      assert.ok(
+        decl.test(src),
+        `${varName} passed to updateGlobalHooks must be declared as path.join(..., 'hooks') — ` +
+        'a platform-conditional subdir silently skips every .sh hook on Windows'
+      );
+    }
+  });
+
   test('preserves user-modified global hook on second update', async () => {
     const globalHooksDir = path.join(fakeHome, '.claude', 'hooks');
     const hookFile = CRITICAL_HOOKS.find(h => h.endsWith('.sh'));
