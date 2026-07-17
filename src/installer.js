@@ -4198,32 +4198,40 @@ async function copyCodexFiles(targetDir, spinner) {
   const srcCodexDir = path.join(__dirname, '..', '.codex');
   const destCodexDir = path.join(targetDir, '.codex');
 
+  const codexManifestPath = getProjectManifestPath(targetDir);
+  const codexManifest = await loadManifest(codexManifestPath);
+  const codexManifestUpdates = { ...codexManifest };
+
   let copiedFiles = [];
   try {
     await fs.mkdir(destCodexDir, { recursive: true });
     await fs.mkdir(path.join(destCodexDir, 'hooks'), { recursive: true });
 
-    // Copy AGENTS.md
-    const agentsSrc = path.join(srcCodexDir, 'AGENTS.md');
-    try {
-      const content = await fs.readFile(agentsSrc, 'utf8');
-      await fs.writeFile(path.join(destCodexDir, 'AGENTS.md'), content);
-      copiedFiles.push('.codex/AGENTS.md');
-    } catch { /* source not found */ }
+    // Non-Destructive Configuration Rule: a user-edited AGENTS.md or Codex hook
+    // must survive re-install/update. manifestSafeCopy skips (and .user.bak's) a
+    // file the user changed instead of rewriting it from the template every run.
+    const codexTargets = [
+      { src: path.join(srcCodexDir, 'AGENTS.md'), dest: path.join(destCodexDir, 'AGENTS.md'), label: '.codex/AGENTS.md', exec: false },
+      { src: path.join(srcCodexDir, 'hooks', 'init-agentvibes.sh'), dest: path.join(destCodexDir, 'hooks', 'init-agentvibes.sh'), label: '.codex/hooks/init-agentvibes.sh', exec: true },
+      { src: path.join(srcCodexDir, 'hooks', 'init-agentvibes.ps1'), dest: path.join(destCodexDir, 'hooks', 'init-agentvibes.ps1'), label: '.codex/hooks/init-agentvibes.ps1', exec: false },
+    ];
 
-    // Copy hook scripts
-    for (const hookFile of ['init-agentvibes.sh', 'init-agentvibes.ps1']) {
-      const hookSrc = path.join(srcCodexDir, 'hooks', hookFile);
+    for (const { src, dest, label, exec } of codexTargets) {
       try {
-        const content = await fs.readFile(hookSrc, 'utf8');
-        const destPath = path.join(destCodexDir, 'hooks', hookFile);
-        await fs.writeFile(destPath, content);
-        if (hookFile.endsWith('.sh')) {
-          try { await fs.chmod(destPath, 0o750); } catch { /* Windows */ }
+        const result = await manifestSafeCopy(src, dest, codexManifest);
+        // src missing → nothing copied and nothing at dest; only such a skip has no hash.
+        if (result.action === 'skipped' && !result.hash) continue;
+        if (exec && result.action !== 'unchanged') {
+          try { await fs.chmod(dest, 0o750); } catch { /* Windows */ }
         }
-        copiedFiles.push(`.codex/hooks/${hookFile}`);
+        if (result.hash && result.action !== 'skipped') {
+          codexManifestUpdates[dest] = { hash: result.hash, installedAt: new Date().toISOString() };
+        }
+        copiedFiles.push(label);
       } catch { /* source not found */ }
     }
+
+    await saveManifest(codexManifestPath, codexManifestUpdates).catch(() => { /* best effort */ });
 
     if (copiedFiles.length > 0) {
       spinner.succeed(chalk.green(`Installed ${copiedFiles.length} Codex file${copiedFiles.length === 1 ? '' : 's'}!\n`));
@@ -4367,11 +4375,23 @@ async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
     const srcScript = path.join(__dirname, '..', '.claude', hooksSubdir, scriptName);
     const destScript = path.join(globalHooksDir, scriptName);
 
-    // Copy script to global hooks dir (create dir if needed)
+    // Copy script to global hooks dir (create dir if needed). Non-Destructive
+    // Configuration Rule: a user-modified bmad-party-speak script must survive an
+    // update, so go through manifestSafeCopy (which .user.bak's and skips a file
+    // the user changed) instead of an unconditional overwrite. The sibling
+    // updateGlobalHooks path for this same file is already manifest-guarded.
     await fs.mkdir(globalHooksDir, { recursive: true });
-    await fs.copyFile(srcScript, destScript);
-    if (!isNativeWindows()) {
-      await fs.chmod(destScript, 0o750);
+    const scriptManifestPath = getGlobalManifestPath(homeDir);
+    const scriptManifest = await loadManifest(scriptManifestPath);
+    const scriptCopy = await manifestSafeCopy(srcScript, destScript, scriptManifest);
+    if (scriptCopy.action !== 'skipped') {
+      if (!isNativeWindows() && scriptCopy.action !== 'unchanged') {
+        await fs.chmod(destScript, 0o750);
+      }
+      if (scriptCopy.hash) {
+        scriptManifest[destScript] = { hash: scriptCopy.hash, installedAt: new Date().toISOString() };
+        await saveManifest(scriptManifestPath, scriptManifest).catch(() => { /* best effort */ });
+      }
     }
 
     // Build the PostToolUse hook command

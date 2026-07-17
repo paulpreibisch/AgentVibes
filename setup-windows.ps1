@@ -322,41 +322,51 @@ if (-not (Test-Path $HooksDir)) {
     New-Item -ItemType Directory -Path $HooksDir -Force | Out-Null
 }
 
-# Script info: filename, description
-$HookScriptInfo = @(
-    @{ Name = "play-tts.ps1"; Desc = "Main TTS router - dispatches to active provider" },
-    @{ Name = "play-tts-soprano.ps1"; Desc = "Soprano neural voice provider (fastest)" },
-    @{ Name = "play-tts-windows-piper.ps1"; Desc = "Piper offline neural voice provider" },
-    @{ Name = "play-tts-windows-sapi.ps1"; Desc = "Windows built-in SAPI voice provider" },
-    @{ Name = "provider-manager.ps1"; Desc = "Switch between TTS providers" },
-    @{ Name = "voice-manager-windows.ps1"; Desc = "Browse and select voice models" },
-    @{ Name = "audio-cache-utils.ps1"; Desc = "Manage TTS audio file cache" },
-    @{ Name = "session-start-tts.ps1"; Desc = "Auto-activates TTS when Claude starts" }
-)
+# Friendly descriptions for the well-known scripts; any other *.ps1 in the
+# source dir still gets installed (with a generic label) rather than dropped.
+$HookDescriptions = @{
+    "play-tts.ps1"               = "Main TTS router - dispatches to active provider"
+    "play-tts-soprano.ps1"       = "Soprano neural voice provider (fastest)"
+    "play-tts-windows-piper.ps1" = "Piper offline neural voice provider"
+    "play-tts-windows-sapi.ps1"  = "Windows built-in SAPI voice provider"
+    "provider-manager.ps1"       = "Switch between TTS providers"
+    "voice-manager-windows.ps1"  = "Browse and select voice models"
+    "audio-cache-utils.ps1"      = "Manage TTS audio file cache"
+    "session-start-tts.ps1"      = "Auto-activates TTS when Claude starts"
+}
 
+# One timestamp per run so this run's backups group together and never collide.
+$BackupStamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
+
+# Copy EVERY hook script, not a hand-maintained whitelist — a partial list
+# produced mixed-generation installs (new router + stale providers/watcher).
 $CopiedCount = 0
-foreach ($info in $HookScriptInfo) {
-    $script = $info.Name
-    $SourceFile = Join-Path $SourceHooksDir $script
+foreach ($SourceFile in (Get-ChildItem -Path $SourceHooksDir -Filter *.ps1 -File)) {
+    $script = $SourceFile.Name
     $DestFile = Join-Path $HooksDir $script
+    $desc = if ($HookDescriptions.ContainsKey($script)) { $HookDescriptions[$script] } else { "AgentVibes hook script" }
 
-    if (Test-Path $SourceFile) {
-        # Skip if source and destination are the same file (running from project root)
-        $resolvedSrc = (Resolve-Path $SourceFile).Path
-        $resolvedDst = if (Test-Path $DestFile) { (Resolve-Path $DestFile).Path } else { "" }
-        if ($resolvedSrc -eq $resolvedDst) {
-            Write-Item "[OK]" $script $info.Desc
-        } else {
-            Copy-Item -Path $SourceFile -Destination $DestFile -Force
-            Write-Item "[OK]" $script $info.Desc
-        }
+    # Skip if source and destination are the same file (running from project root)
+    $resolvedSrc = $SourceFile.FullName
+    $resolvedDst = if (Test-Path $DestFile) { (Resolve-Path $DestFile).Path } else { "" }
+    if ($resolvedSrc -eq $resolvedDst) {
+        Write-Item "[OK]" $script $desc
         $CopiedCount++
+        continue
     }
-    else {
-        Write-Host "    [!!] " -ForegroundColor Yellow -NoNewline
-        Write-Host "$($script.PadRight(30))" -ForegroundColor White -NoNewline
-        Write-Host "not found" -ForegroundColor Yellow
+
+    # Non-Destructive rule: back up an existing, differing file before overwrite
+    # so a user-modified hook is always recoverable (timestamped, every run).
+    if (Test-Path $DestFile) {
+        $srcHash = (Get-FileHash -Path $resolvedSrc -Algorithm SHA256).Hash
+        $dstHash = (Get-FileHash -Path $DestFile -Algorithm SHA256).Hash
+        if ($srcHash -ne $dstHash) {
+            Copy-Item -Path $DestFile -Destination "$DestFile.user.bak.$BackupStamp" -ErrorAction SilentlyContinue
+        }
     }
+    Copy-Item -Path $SourceFile.FullName -Destination $DestFile -Force
+    Write-Item "[OK]" $script $desc
+    $CopiedCount++
 }
 
 if ($CopiedCount -eq 0) {
