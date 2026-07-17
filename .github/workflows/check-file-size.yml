@@ -52,12 +52,21 @@ jobs:
         # Install dependencies to ensure package.json is valid
         npm ci --ignore-scripts
 
-        # Dry-run npm pack to see what would be packaged
-        npm pack --dry-run > /tmp/pack-output.txt 2>&1 || true
+        # Dry-run npm pack to see what would be packaged.
+        # No `|| true`: a broken `npm pack` must fail this gate, not slip through
+        # with an empty grep and a tautological "✅ acceptable".
+        npm pack --dry-run > /tmp/pack-output.txt 2>&1
 
-        # Extract package size
-        PACKAGE_SIZE=$(grep "package size:" /tmp/pack-output.txt | awk '{print $3}')
-        PACKAGE_UNIT=$(grep "package size:" /tmp/pack-output.txt | awk '{print $4}')
+        # The line is: "npm notice package size: 10.4 MB"
+        # $3/$4 were "package"/"size:" — so PACKAGE_UNIT was NEVER "MB" and the
+        # 50MB check below could never run. Take the last two fields instead.
+        if ! grep -q "package size:" /tmp/pack-output.txt; then
+          echo "❌ ERROR: could not find 'package size:' in npm pack output"
+          cat /tmp/pack-output.txt
+          exit 1
+        fi
+        PACKAGE_SIZE=$(grep "package size:" /tmp/pack-output.txt | awk '{print $(NF-1)}')
+        PACKAGE_UNIT=$(grep "package size:" /tmp/pack-output.txt | awk '{print $NF}')
 
         echo "Package size: $PACKAGE_SIZE $PACKAGE_UNIT"
 

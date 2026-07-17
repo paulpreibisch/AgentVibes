@@ -113,7 +113,11 @@ jobs:
           fi
 
           # BATS exited non-zero — check for real failures vs plan-mismatch from skips
-          FAIL_COUNT=$(echo "$BATS_OUTPUT" | grep -c '^not ok' || echo 0)
+          # `grep -c` prints 0 AND exits 1 when there are no matches, so
+          # `|| echo 0` appended a SECOND "0" — FAIL_COUNT became "0\n0" and the
+          # -gt test below died with "integer expression expected". Use `|| true`
+          # so grep's own "0" is the only value.
+          FAIL_COUNT=$(echo "$BATS_OUTPUT" | grep -c '^not ok' || true)
           if [ "$FAIL_COUNT" -gt 0 ]; then
             echo "❌ $FAIL_COUNT BATS test(s) failed"
             exit 1

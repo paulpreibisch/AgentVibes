@@ -13,8 +13,8 @@
  * Used by `npm run test:coverage` so every consumer (run-tests.sh, the CI
  * workflows, SonarCloud) inherits the same gating on every platform.
  */
-import { spawn } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 const TEST_DIR = 'test/unit';
@@ -98,10 +98,50 @@ child.on('close', (code) => {
     process.exit(code || 1);
   }
 
+  // A file-level entry is only an ARTIFACT if the file genuinely passes on its
+  // own. This used to be asserted by comment ("all subtests passed") and by
+  // nothing else: any failure whose NAME merely looked like a *.test.js path was
+  // waved through. A file that failed to LOAD (bad import after a rename, syntax
+  // error) reports exactly that shape — so hundreds of assertions could stop
+  // running and every consumer of this gate (npm test, CI, SonarCloud, and the
+  // release skill, whose ONLY test step is this) stayed green. Proven, not
+  // theorised: a deliberately-broken import produced "✅ Suite passed … no real
+  // failures" and exit 0.
+  //
+  // So: re-run each flagged file serially, without --test-force-exit (which is
+  // the only thing the tolerance exists to excuse). If it passes alone, it was a
+  // race. If it fails alone, it is real and the build must fail.
   if (fileFails.length > 0) {
-    console.warn(`\n⚠️  ${fileFails.length} file-level force-exit artifact(s) tolerated ` +
-      '(all subtests passed):');
-    fileFails.forEach((n) => console.warn(`   • ${n}`));
+    console.warn(`\n⚠️  ${fileFails.length} file-level failure(s) reported — re-running each ` +
+      'serially to tell a force-exit race from a genuinely broken file:');
+
+    const stillFailing = [];
+    for (const name of fileFails) {
+      const rel = name.trim().replace(/\\/g, '/');
+      if (!existsSync(rel)) {
+        // Can't verify it → refuse to tolerate it.
+        console.error(`   • ${name} — cannot locate file to re-verify; treating as REAL`);
+        stillFailing.push(name);
+        continue;
+      }
+      const res = spawnSync(
+        process.execPath,
+        ['--experimental-test-module-mocks', '--test', rel],
+        { encoding: 'utf8', timeout: 300_000 }
+      );
+      if (res.status === 0) {
+        console.warn(`   • ${name} — passes alone ✔ (force-exit race, tolerated)`);
+      } else {
+        console.error(`   • ${name} — FAILS alone ✖ (real failure, not an artifact)`);
+        stillFailing.push(name);
+      }
+    }
+
+    if (stillFailing.length > 0) {
+      console.error(`\n❌ ${stillFailing.length} test file(s) fail on their own:`);
+      stillFailing.forEach((n) => console.error(`   • ${n}`));
+      process.exit(1);
+    }
   }
   if (code !== 0) {
     console.warn(`\n⚠️  node --test exited ${code} but no real failures — known ` +
