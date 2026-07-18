@@ -1477,19 +1477,19 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            # Shield the communicate() task from wait_for's cancellation. On the
-            # Unix event loop, cancelling communicate() awaits the still-running
-            # child, so a plain `wait_for(proc.communicate())` does NOT honor the
-            # timeout (it blocks for the child's full runtime). Instead let the
-            # timeout fire, kill the child ourselves, then drain the shielded task
-            # (which now returns promptly). Works on both Unix and Windows loops.
+            # Enforce the timeout WITHOUT asyncio.wait_for(proc.communicate()):
+            # on the Unix loop, wait_for cancels communicate(), whose cancellation
+            # handler awaits the still-running child, so the call blocks for the
+            # child's full runtime and the timeout is never honored. asyncio.wait()
+            # with a timeout does NOT cancel the task — it simply returns once the
+            # deadline passes — so we can then kill the child ourselves and reap
+            # the now-unblocked task. Works on both Unix and Windows loops.
             comm_task = asyncio.ensure_future(proc.communicate())
-            try:
-                stdout, stderr = await asyncio.wait_for(asyncio.shield(comm_task), timeout=timeout)
-            except asyncio.TimeoutError:
+            done, _pending = await asyncio.wait({comm_task}, timeout=timeout)
+            if comm_task not in done:
                 proc.kill()
                 try:
-                    await comm_task  # completes quickly once the child is dead
+                    await comm_task  # child is dead → communicate() returns promptly
                 except Exception:
                     pass
                 return ScriptResult(
@@ -1497,6 +1497,7 @@ class AgentVibesServer:
                     f"Script '{script_name}' timed out after {timeout:.0f}s "
                     "(it may have reached an interactive prompt)"
                 )
+            stdout, stderr = comm_task.result()
             return ScriptResult(
                 proc.returncode if proc.returncode is not None else -1,
                 stdout.decode(errors="replace").strip(),
