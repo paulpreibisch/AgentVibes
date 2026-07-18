@@ -109,7 +109,7 @@ test('getVoiceMeta: SAPI voice name -> Windows SAPI provider + friendly name', (
   const m = getVoiceMeta('Microsoft David Desktop');
   assert.equal(m.provider, 'Windows SAPI');
   assert.notEqual(m.provider, 'Piper');
-  assert.equal(m.displayName, 'David (Desktop)');
+  assert.equal(m.displayName, 'David');
   assert.equal(m.gender, 'Male');
 });
 

@@ -33,12 +33,16 @@ export { ELEVENLABS_VOICES, KOKORO_VOICE_IDS, kokoroGender };
  * Verified against a real Windows 11 install (System.Speech GetInstalledVoices).
  * The receiver remains authoritative — this is UI convenience, not inventory SSOT.
  */
+// Only the classic SAPI5 "Desktop" voices are listed. The modern OneCore voices
+// ("Microsoft David/Mark/Zira" WITHOUT "Desktop") are NOT selectable via
+// System.Speech in a spawned process — the receiver's player is spawned, so
+// SelectVoice throws "No matching voice is installed" and silently falls back to
+// the default (David, male). That made e.g. "Microsoft Zira" play as a MALE voice.
+// David Desktop + Zira Desktop are present on every Windows 10/11 and select
+// reliably in any process/bitness, so they are the safe curated set.
 const WINDOWS_SAPI_VOICES = [
-  { id: 'Microsoft David Desktop', name: 'David (Desktop)', gender: 'Male',   lang: 'en-US' },
-  { id: 'Microsoft Zira Desktop',  name: 'Zira (Desktop)',  gender: 'Female', lang: 'en-US' },
-  { id: 'Microsoft David',         name: 'David',           gender: 'Male',   lang: 'en-US' },
-  { id: 'Microsoft Mark',          name: 'Mark',            gender: 'Male',   lang: 'en-US' },
-  { id: 'Microsoft Zira',          name: 'Zira',            gender: 'Female', lang: 'en-US' },
+  { id: 'Microsoft David Desktop', name: 'David', gender: 'Male',   lang: 'en-US' },
+  { id: 'Microsoft Zira Desktop',  name: 'Zira',  gender: 'Female', lang: 'en-US' },
 ];
 
 const MACOS_VOICES = [
