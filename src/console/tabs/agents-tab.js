@@ -21,6 +21,7 @@ import {
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
 import { voicesForProvider } from '../../services/provider-voice-catalog.js';
+import { receiverProviderId } from '../../services/tts-engine-service.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { t } from '../../i18n/strings.js';
@@ -1150,9 +1151,18 @@ ${_tl('bmadDesc')}
       const args = [playTtsScript, phrase, voiceId];
       if (remoteLlm) args.push('--llm', remoteLlm);
 
+      // audition = keep the EXACT previewed voice (F1, don't demote); force the
+      // receiver engine to the previewed voice's engine so SAPI/macOS render right.
+      const _pvEngine = configService?.getConfig?.()?.ttsEngine
+        || providerService?.getActiveProvider?.() || 'piper';
       _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore', detached: true,
-        env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
+        env: {
+          ..._spawnEnv,
+          CLAUDE_PROJECT_DIR: _projectRoot,
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(_pvEngine),
+        },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;

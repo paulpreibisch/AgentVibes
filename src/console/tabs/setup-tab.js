@@ -20,7 +20,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
 import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
-import { ELEVENLABS_VOICES, KOKORO_VOICE_IDS } from '../../services/provider-voice-catalog.js';
+import { ELEVENLABS_VOICES, KOKORO_VOICE_IDS, voicesForProvider } from '../../services/provider-voice-catalog.js';
 import {
   PROVIDERS,
   checkClaudeInstalled, checkCopilotInstalled, checkCodexInstalled,
@@ -36,7 +36,7 @@ import {
   loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
 } from '../../services/llm-provider-service.js';
 import {
-  getAvailableEngines, getAllEngines, checkEngineInstalled,
+  getAvailableEngines, getAllEngines, checkEngineInstalled, receiverProviderId,
 } from '../../services/tts-engine-service.js';
 import { openReverbPicker, formatEffectLabel } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
@@ -174,6 +174,20 @@ const NATIVE_ENGINE_VOICES = {
   // the id here is the default voice assigned when the engine is first selected.
   elevenlabs:  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'ElevenLabs'           },
 };
+
+// SAPI and macOS Say are NATIVE but MULTI-voice (many built-in system voices),
+// unlike soprano (a genuine single-voice engine). They get the full voice picker
+// and a real default voice, not the engine-id placeholder.
+const MULTI_VOICE_NATIVE = new Set(['sapi', 'macos-say']);
+
+/** Default voice to assign when an engine is first selected in a per-LLM draft. */
+function defaultVoiceForEngine(engine) {
+  if (MULTI_VOICE_NATIVE.has(engine)) {
+    const list = voicesForProvider(engine, { scanInstalledVoices, getVoiceMeta });
+    return list[0]?.id || NATIVE_ENGINE_VOICES[engine]?.id || '';
+  }
+  return NATIVE_ENGINE_VOICES[engine]?.id || '';
+}
 
 // Static built-in ElevenLabs premade voices — universal to every ElevenLabs
 // account. The stored config value is the raw ElevenLabs voice_id; the TTS hook
@@ -1288,6 +1302,10 @@ export function createSetupTab(screen, services) {
         stdio: 'ignore', windowsHide: true,
         env: {
           ...process.env, CLAUDE_PROJECT_DIR: targetDir,
+          // audition = keep the draft's EXACT voice (F1); force the receiver engine
+          // to the draft's engine so SAPI/macOS voices render in their own engine.
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine || 'piper'),
           ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
         },
       });
@@ -2225,6 +2243,10 @@ export function createSetupTab(screen, services) {
           windowsHide: true,
           env: {
             ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}`,
+            // audition = keep the draft's EXACT voice (F1); force the receiver
+            // engine to the draft's engine so SAPI/macOS render in their own engine.
+            AGENTVIBES_VOICE_SOURCE: 'audition',
+            AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine || 'piper'),
             ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
           },
         });
@@ -2579,7 +2601,7 @@ export function createSetupTab(screen, services) {
         draft.voice = (elevenLabsVoiceName(draft.voice) || looksLikeElId)
           ? draft.voice : ELEVENLABS_DEFAULT_VOICE_ID;
       } else {
-        draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
+        draft.voice = defaultVoiceForEngine(selectedEngine);
       }
       _closePicker();
     });
@@ -3847,9 +3869,13 @@ export function createSetupTab(screen, services) {
       destroyList(vpModal, screen, onDone);
     }
 
-    // AVI-S5.1/5.2: Single-item overlay for non-Piper engines.
-    // scanInstalledVoices() is NOT called; Space previews via the correct engine binary.
-    const nativeVoice = NATIVE_ENGINE_VOICES[draft.ttsEngine];
+    // AVI-S5.1/5.2: Single-item overlay for TRUE single-voice engines (soprano).
+    // SAPI / macOS Say are native but MULTI-voice — they fall through to the full
+    // voice picker below (populated from their built-in catalog) so a specific
+    // voice (e.g. Zira) can be chosen and previewed, not just the engine name.
+    const nativeVoice = MULTI_VOICE_NATIVE.has(draft.ttsEngine)
+      ? null
+      : NATIVE_ENGINE_VOICES[draft.ttsEngine];
     if (nativeVoice) {
       draft.voice = nativeVoice.id;
       let _nvClosed = false;
@@ -4114,7 +4140,10 @@ export function createSetupTab(screen, services) {
       if (_vpClosed) return;
       const savedIdx = vpList.selected ?? 0;
       const savedScroll = vpList.childBase ?? 0;
-      _allVoices = scanInstalledVoices();
+      // SAPI / macOS Say list their built-in catalog voices; Piper scans disk.
+      _allVoices = MULTI_VOICE_NATIVE.has(draft.ttsEngine)
+        ? voicesForProvider(draft.ttsEngine, { scanInstalledVoices, getVoiceMeta }).map(v => v.id)
+        : scanInstalledVoices();
       // Sort by display name so the first-letter quick jump is intuitive
       _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
         getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
@@ -4156,6 +4185,10 @@ export function createSetupTab(screen, services) {
           : targetDir;
         const _rEnv = {
           ..._spawnEnv, CLAUDE_PROJECT_DIR: targetDir,
+          // audition = keep the EXACT previewed voice (F1); force the receiver
+          // engine so SAPI/macOS voices render in their own engine, not the default.
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine || 'piper'),
           ...(llmKey ? { AGENTVIBES_LLM_KEY: `llm:${llmKey}` } : {}),
         };
         let rProc;

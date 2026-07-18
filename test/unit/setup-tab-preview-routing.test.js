@@ -32,7 +32,10 @@ const setupSrc = readFileSync(
 
 // Extract the native-engine guard block for targeted assertions
 function getNativeGuardBlock(src) {
-  const start = src.indexOf('const nativeVoice = NATIVE_ENGINE_VOICES[draft.ttsEngine]');
+  // Soprano (a true single-voice engine) still uses the single-item overlay;
+  // SAPI/macOS were promoted to the multi-voice picker, so the guard now begins
+  // with the MULTI_VOICE_NATIVE check that yields null for those engines.
+  const start = src.indexOf('const nativeVoice = MULTI_VOICE_NATIVE.has(draft.ttsEngine)');
   assert.ok(start >= 0, 'native guard block must exist');
   // Grab a generous slice covering the entire block (key bindings follow _previewNativeVoice)
   return src.slice(start, start + 10000);
