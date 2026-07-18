@@ -875,10 +875,22 @@ export function createSettingsTab(screen, services) {
       const args = [playTtsScript, phrase, voiceId];
       if (remoteLlm) args.push('--llm', remoteLlm);
 
+      // Mark this as an AUDITION so the resolver keeps the EXACT voice we're
+      // previewing (F1) instead of demoting it to the per-LLM/provider voice —
+      // essential for engines whose ids aren't self-identifying (SAPI/macOS).
+      // Also force the receiver engine to the previewed voice's engine for this
+      // one send, so a SAPI/macOS voice actually renders in its own engine.
+      const _pvEngine = configService?.getConfig?.()?.ttsEngine
+        || providerService?.getActiveProvider?.() || 'piper';
       _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore',
         detached: true,
-        env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
+        env: {
+          ..._spawnEnv,
+          CLAUDE_PROJECT_DIR: _projectRoot,
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(_pvEngine),
+        },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;

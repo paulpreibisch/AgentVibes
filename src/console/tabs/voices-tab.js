@@ -17,6 +17,7 @@ import { buildAudioEnv, detectWavPlayer, getAllWavPlayers } from '../audio-env.j
 import { SURNAME_POOL, uniquifyVoiceName } from '../../utils/voice-names.js';
 import { voicesForProvider, ELEVENLABS_VOICES, KOKORO_VOICE_IDS, WINDOWS_SAPI_VOICES, MACOS_VOICES, kokoroGender } from '../../services/provider-voice-catalog.js';
 import { getProvider as _catalogGetProvider } from '../../services/provider-catalog.js';
+import { receiverProviderId } from '../../services/tts-engine-service.js';
 
 /**
  * Resolve display name / gender / provider label for a NON-Piper catalog voice
@@ -1069,7 +1070,16 @@ export function createVoicesTab(screen, services) {
       // Guard: if that resolves to a transport (not a real engine), fall back to
       // piper so we never tell the receiver to "synthesize with ssh-remote".
       if (_remoteProviders.includes(_previewEngine)) _previewEngine = 'piper';
-      const _previewEnv = { ..._spawnEnv, AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: _previewEngine };
+      // AGENTVIBES_VOICE_SOURCE=audition: the resolver must keep the EXACT voice
+      // we're previewing (F1), not demote it to the per-LLM/provider voice —
+      // required for engines whose ids aren't self-identifying (SAPI/macOS).
+      // receiverProviderId maps the engine id to the receiver's provider id the
+      // sender validates (sapi -> windows-sapi, macos-say -> macos).
+      const _previewEnv = {
+        ..._spawnEnv,
+        AGENTVIBES_VOICE_SOURCE: 'audition',
+        AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(_previewEngine),
+      };
       // Hooks live in the AgentVibes package (projectRoot), not the user's project dir.
       // Fall back to CLAUDE_PROJECT_DIR / cwd only if the hook isn't at projectRoot
       // (e.g. when running from a published npm package with a different layout).
