@@ -1393,7 +1393,7 @@ export function createVoicesTab(screen, services) {
       try { fs.unlinkSync(path.join(globalClaudeDir, 'tts-piper-speaker-id.txt')); } catch { /* ok */ }
     }
     // Also write global tts-voice.txt for shell scripts
-    try { fs.writeFileSync(path.join(globalClaudeDir, 'tts-voice.txt'), ms.isMultiSpeaker ? voiceId : voiceId, 'utf8'); } catch { /* ok */ }
+    try { fs.writeFileSync(path.join(globalClaudeDir, 'tts-voice.txt'), voiceId, 'utf8'); } catch { /* ok */ }
   }
 
   function _openSelectVoiceModal(voiceId) {

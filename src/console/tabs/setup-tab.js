@@ -824,7 +824,6 @@ export function createSetupTab(screen, services) {
   const providerStatusTexts = [];
 
   // Transport provider row widgets (Configure-only, no Install/Remove)
-  const transportRows = [];
 
   // Info box for provider details
   const infoBox = blessed.box({
@@ -1909,14 +1908,9 @@ export function createSetupTab(screen, services) {
     }
 
     function _autoSave(silent) {
-      saveTransportConfig(provider.id, draft).then(() => {
-        // Refresh status text below provider name
-        const row = transportRows.find(r => r.id === provider.id);
-        if (row && draft.host) {
-          row.statusText.setContent(`{#9e9e9e-fg}→ ${draft.host}:${draft.port}{/#9e9e9e-fg}`);
-          screen.render();
-        }
-      }).catch(() => {});
+      // (Removed a dead status-text refresh keyed off `transportRows`, which was
+      // always empty — Sonar S2583. The config still saves below.)
+      saveTransportConfig(provider.id, draft).catch(() => {});
       if (!silent) _showSavedToast(`${provider.name} Config`, `~/.agentvibes/transport-config.json`);
     }
 
