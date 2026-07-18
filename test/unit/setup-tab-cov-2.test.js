@@ -238,8 +238,10 @@ const ENGINES = [
 await mock.module('../../src/services/tts-engine-service.js', {
   namedExports: {
     getAvailableEngines: () => ENGINES,
+    getAllEngines: () => ENGINES.map(e => ({ ...e, supported: true })),
     getEngineStatuses:   () => ENGINES,
     checkEngineInstalled: () => true,
+    receiverProviderId: (id) => ({ sapi: 'windows-sapi', 'macos-say': 'macos' }[id] || id),
   },
 });
 

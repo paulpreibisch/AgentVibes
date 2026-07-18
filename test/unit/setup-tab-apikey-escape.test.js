@@ -128,8 +128,10 @@ await mock.module('node:child_process', { namedExports: cpMock });
 await mock.module('../../src/services/tts-engine-service.js', {
   namedExports: {
     getAvailableEngines: () => _engines,
+    getAllEngines: () => _engines.map(e => ({ ...e, supported: true })),
     getEngineStatuses: () => _engines.map(e => ({ ...e, installed: false })),
     checkEngineInstalled: () => false,
+    receiverProviderId: (id) => ({ sapi: 'windows-sapi', 'macos-say': 'macos' }[id] || id),
   },
 });
 
