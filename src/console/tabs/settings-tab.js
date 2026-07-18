@@ -855,7 +855,8 @@ export function createSettingsTab(screen, services) {
           _refreshVP();
         }
         _previewProc = spawn('powershell', _psArgs, // NOSONAR
-          { stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv });
+          { stdio: 'ignore', detached: false, windowsHide: true,
+            env: { ..._spawnEnv, AGENTVIBES_VOICE_SOURCE: 'audition' } });
         _previewProc.on('exit', () => {
           if (_previewVoiceId === voiceId) {
             _previewVoiceId = null;
@@ -880,8 +881,12 @@ export function createSettingsTab(screen, services) {
       // essential for engines whose ids aren't self-identifying (SAPI/macOS).
       // Also force the receiver engine to the previewed voice's engine for this
       // one send, so a SAPI/macOS voice actually renders in its own engine.
-      const _pvEngine = configService?.getConfig?.()?.ttsEngine
+      let _pvEngine = configService?.getConfig?.()?.ttsEngine
         || providerService?.getActiveProvider?.() || 'piper';
+      // Guard: a transport (ssh-remote/agentvibes-receiver) is not an engine —
+      // fall back to piper so we never send the receiver a transport id as its
+      // engine (Fable review; mirrors voices-tab).
+      if (_pvEngine === 'ssh-remote' || _pvEngine === 'agentvibes-receiver') _pvEngine = 'piper';
       _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore',
         detached: true,

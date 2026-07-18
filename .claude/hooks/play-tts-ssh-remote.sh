@@ -15,6 +15,7 @@
 set -euo pipefail
 
 TEXT="${1:-}"
+_VOICE_ARG="${2:-}"                 # raw voice as passed (empty on normal hook TTS)
 VOICE="${2:-en_US-lessac-medium}"
 AGENT_NAME="${3:-default}"
 AGENT_PROFILE_FILE="${4:-}"
@@ -314,16 +315,23 @@ if [[ -n "${AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE:-}" ]]; then
   PROVIDER="$AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE"
 fi
 # Voice->engine coupling (mirrors the guard in play-tts.ps1): a Kokoro-format
-# voice id (^[a-z]{2}_[a-z0-9_]+$, e.g. af_bella) or a Piper voice (locale+hyphen
-# like en_US-lessac-medium, or an ::Speaker suffix) can ONLY be synthesised by
-# that engine — so the voice itself decides the receiver engine, overriding a
-# stale/mislabeled provider default (e.g. an old console that always sends
-# windows-sapi). This makes a remote PREVIEW render in the previewed voice's own
-# engine no matter which build enqueued it. Names that don't encode an engine
-# (SAPI/macOS voice names) fall through to the configured provider below.
-if [[ -z "$PROVIDER" ]]; then
+# voice id (strict lang/gender prefix, e.g. af_bella) or a Piper voice (locale+
+# hyphen like en_US-lessac-medium, or an ::Speaker suffix) can ONLY be
+# synthesised by that engine — so the voice itself decides the receiver engine,
+# overriding a stale/mislabeled provider default (e.g. an old console that always
+# sends windows-sapi). Names that don't encode an engine (SAPI/macOS names) fall
+# through to the configured provider below.
+#
+# GATED on an EXPLICIT voice arg ($2): normal hook TTS passes no voice, and VOICE
+# then defaults to a piper id — coupling on that default would wrongly force
+# `piper` on EVERY normal utterance and shadow receiver-provider.txt (a kokoro/
+# SAPI receiver would silently regress to piper). Only a caller that passed a
+# real voice (every voice-picker preview does) gets voice->engine coupling.
+if [[ -z "$PROVIDER" && -n "$_VOICE_ARG" ]]; then
   _v_nospk="${VOICE%%::*}"   # strip any ::Speaker-ID suffix before matching
-  if [[ "$_v_nospk" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+  # Kokoro ids use a fixed lang/gender prefix set (mirrors play-tts.sh) — a loose
+  # `^[a-z]{2}_...` would misclassify a custom piper model like `my_voice`.
+  if [[ "$_v_nospk" =~ ^(af|am|bf|bm|jf|jm|kf|km|zf|zm|ff|fm|hf|hm|if|im|pf|pm|ef|em|nf|nm)_[a-z0-9_]+$ ]]; then
     PROVIDER="kokoro"
   elif [[ "$VOICE" == *"::"* ]] || [[ "$_v_nospk" =~ ^[a-z]{2}_[A-Za-z]{2}-. ]]; then
     PROVIDER="piper"

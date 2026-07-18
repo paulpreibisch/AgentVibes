@@ -1302,10 +1302,12 @@ export function createSetupTab(screen, services) {
         stdio: 'ignore', windowsHide: true,
         env: {
           ...process.env, CLAUDE_PROJECT_DIR: targetDir,
-          // audition = keep the draft's EXACT voice (F1); force the receiver engine
-          // to the draft's engine so SAPI/macOS voices render in their own engine.
+          // audition = keep the draft's EXACT voice (F1). Force the receiver engine
+          // ONLY when this row has an explicit engine — an empty engine means
+          // "use the global/voice-derived engine", and forcing piper here would
+          // shadow a kokoro/SAPI row voice on the receiver (Fable review).
           AGENTVIBES_VOICE_SOURCE: 'audition',
-          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine || 'piper'),
+          ...(draft.ttsEngine ? { AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine) } : {}),
           ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
         },
       });
@@ -2243,10 +2245,12 @@ export function createSetupTab(screen, services) {
           windowsHide: true,
           env: {
             ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}`,
-            // audition = keep the draft's EXACT voice (F1); force the receiver
-            // engine to the draft's engine so SAPI/macOS render in their own engine.
+            // audition = keep the draft's EXACT voice (F1). Force the receiver
+            // engine ONLY when this row has an explicit engine (empty = use the
+            // global/voice-derived engine; forcing piper would shadow a kokoro/
+            // SAPI row voice on the receiver — Fable review).
             AGENTVIBES_VOICE_SOURCE: 'audition',
-            AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine || 'piper'),
+            ...(draft.ttsEngine ? { AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine) } : {}),
             ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
           },
         });
@@ -2600,6 +2604,10 @@ export function createSetupTab(screen, services) {
         const looksLikeElId = /^[A-Za-z0-9]{10,40}$/.test(draft.voice || '');
         draft.voice = (elevenLabsVoiceName(draft.voice) || looksLikeElId)
           ? draft.voice : ELEVENLABS_DEFAULT_VOICE_ID;
+      } else if (MULTI_VOICE_NATIVE.has(selectedEngine)
+        && voicesForProvider(selectedEngine, { scanInstalledVoices, getVoiceMeta }).some(v => v.id === draft.voice)) {
+        // Re-selecting the SAME multi-voice native engine must NOT discard an
+        // already-valid chosen voice (e.g. Zira -> David) — keep it (Fable review).
       } else {
         draft.voice = defaultVoiceForEngine(selectedEngine);
       }
@@ -4216,6 +4224,41 @@ export function createSetupTab(screen, services) {
           }
         });
         rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        return;
+      }
+
+      // Local preview of the native MULTI-voice engines (Windows SAPI, macOS Say):
+      // the piper synth below cannot render these. Restores the local preview the
+      // single-item overlay used to provide before SAPI/macOS became multi-voice
+      // (Fable review — otherwise a local SAPI preview mis-ran piper and showed a
+      // bogus "is Piper installed?" error).
+      if (MULTI_VOICE_NATIVE.has(draft.ttsEngine)) {
+        let nProc = null;
+        if (_isWin && draft.ttsEngine === 'sapi') {
+          let _sapiScript = '';
+          for (const n of ['play-tts-sapi.ps1', 'play-tts-windows-sapi.ps1']) {
+            for (const base of [packageDir, targetDir]) {
+              const _p = path.join(base, '.claude', 'hooks-windows', n);
+              if (fs.existsSync(_p)) { _sapiScript = _p; break; }
+            }
+            if (_sapiScript) break;
+          }
+          if (_sapiScript) {
+            nProc = _spawnAudio('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _sapiScript, '-Text', phrase, '-VoiceOverride', voiceId], { stdio: 'ignore', windowsHide: true }); // NOSONAR
+          }
+        } else if (process.platform === 'darwin' && draft.ttsEngine === 'macos-say') {
+          nProc = _spawnAudio('say', ['-v', voiceId, phrase], { stdio: 'ignore' }); // NOSONAR
+        }
+        if (!nProc) {
+          // Engine can't run on THIS OS and this LLM isn't remote — nothing to play.
+          if (!_vpClosed) { vpPreviewLine.setContent('{yellow-fg}♪ Runs on the receiver — set this LLM to remote to preview{/yellow-fg}'); _refreshVP(); }
+          return;
+        }
+        _previewProc = nProc;
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}...{/cyan-fg}`); _refreshVP(); }
+        nProc.on('exit', () => { if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } } });
+        nProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
         return;
       }
 
