@@ -21,7 +21,7 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker,
+  scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, PIPER_VOICES_DIR, parseMultiSpeaker,
 } from './voices-tab.js';
 import { voicesForProvider } from '../../services/provider-voice-catalog.js';
 import { LanguageService } from '../../services/language-service.js';
@@ -817,7 +817,8 @@ export function createSettingsTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]; // NOSONAR
+      // Announce the voice + its engine, consistent with every other picker.
+      const phrase = previewPhrase(voiceId);
 
       if (_isWin) {
         // Which engine is being previewed? (Default TTS Engine selector.)

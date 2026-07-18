@@ -36,7 +36,7 @@ import {
   loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
 } from '../../services/llm-provider-service.js';
 import {
-  getAvailableEngines, getEngineStatuses, checkEngineInstalled,
+  getAvailableEngines, getAllEngines, checkEngineInstalled,
 } from '../../services/tts-engine-service.js';
 import { openReverbPicker, formatEffectLabel } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
@@ -2478,8 +2478,24 @@ export function createSetupTab(screen, services) {
     }
     navigationService?.openModal(null, _closePicker);
 
-    const engines = getEngineStatuses();
+    // Show ALL engines (like the Settings → Default TTS Engine picker), not just
+    // the platform-native ones — otherwise Windows SAPI / macOS Say vanish on a
+    // Linux/other host even though a remote receiver could synthesize them. When
+    // this LLM (or the global default) is in remote mode the receiver renders the
+    // audio, so off-platform engines are valid, selectable choices tagged
+    // "(Receiver)"; locally they stay greyed "(Not supported)".
+    const _isRemote = draft.mode === 'remote'
+      || (configService?.getConfig?.()?.audio_destination ?? 'local') === 'remote';
+    const engines = getAllEngines().map(e => ({
+      ...e,
+      installed: e.supported ? checkEngineInstalled(e.id) : false,
+    }));
     const items = engines.map(e => {
+      if (!e.supported) {
+        return _isRemote
+          ? `{cyan-fg}  ${e.name.padEnd(20)} (Receiver){/cyan-fg}  ${e.desc}`
+          : `{#607d8b-fg}  ${e.name.padEnd(20)} (Not supported){/#607d8b-fg}`;
+      }
       const status = e.installed ? '{green-fg}[OK]{/green-fg}' : '{yellow-fg}[Not Found]{/yellow-fg}';
       return `  ${e.name.padEnd(20)} ${status}  ${e.desc}`;
     });
@@ -2533,18 +2549,22 @@ export function createSetupTab(screen, services) {
       const engine = idx > 0 ? engines[idx - 1] : null;
       if (idx > 0 && !engine) { _closePicker(); return; }
       const selectedEngine = engine ? engine.id : '';
-      // Guard: block selection of non-installed optional engines
+      // Guard selection. In remote mode the receiver synthesizes, so any engine
+      // (incl. off-platform SAPI/macOS) is allowed. Locally, block engines that
+      // can't run here: off-platform ones, and optional engines not installed.
       if (selectedEngine) {
         const engineStatus = engines.find(e => e.id === selectedEngine);
-        if (engineStatus && !engineStatus.installed && !engineStatus.native) {
-          box.setLabel(` {red-fg} ${engineStatus.name} is not installed — go to Setup > TTS Engines to install {/red-fg} `);
+        const _flash = (msg) => {
+          box.setLabel(` {red-fg} ${msg} {/red-fg} `);
           screen.render();
-          setTimeout(() => {
-            if (!box.destroyed) {
-              box.setLabel(ENGINE_TITLE);
-              screen.render();
-            }
-          }, 3000);
+          setTimeout(() => { if (!box.destroyed) { box.setLabel(ENGINE_TITLE); screen.render(); } }, 3000);
+        };
+        if (engineStatus && !_isRemote && !engineStatus.supported) {
+          _flash(`${engineStatus.name} runs on the receiver — switch this LLM to a remote receiver to use it`);
+          return;
+        }
+        if (engineStatus && !_isRemote && engineStatus.supported && !engineStatus.installed && !engineStatus.native) {
+          _flash(`${engineStatus.name} is not installed — go to Setup > TTS Engines to install`);
           return;
         }
       }
