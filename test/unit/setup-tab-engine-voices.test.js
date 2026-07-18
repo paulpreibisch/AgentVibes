@@ -111,23 +111,30 @@ describe('_openVoicePickerForLlm native-engine guard', () => {
 // ── Suite 3: Engine picker auto-sets draft.voice on engine change ─────────────
 
 describe('_openTtsEnginePicker auto-sets draft.voice on engine change', () => {
-  test('enter handler assigns draft.voice from NATIVE_ENGINE_VOICES or empty', () => {
+  test('enter handler assigns draft.voice via defaultVoiceForEngine', () => {
     const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
     assert.ok(fnIdx >= 0, '_openTtsEnginePicker must exist');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
-    // New pattern: NATIVE_ENGINE_VOICES[selectedEngine]?.id || ''
+    // Window sized to reach the Enter handler's draft.voice assignment, which now
+    // sits deeper in the function after the getAllEngines/remote-aware rewrite.
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 8000);
+    // SAPI/macOS became MULTI-voice: the default voice per engine is now resolved
+    // by defaultVoiceForEngine() (first catalog voice for multi-voice native
+    // engines, NATIVE_ENGINE_VOICES id for single-voice, '' for piper/empty).
     assert.ok(
-      fnBody.includes('NATIVE_ENGINE_VOICES[selectedEngine]'),
-      "Engine picker enter handler must set draft.voice from NATIVE_ENGINE_VOICES for native engines"
+      fnBody.includes('defaultVoiceForEngine(selectedEngine)'),
+      "Engine picker enter handler must set draft.voice via defaultVoiceForEngine(selectedEngine)"
     );
   });
 
-  test('enter handler falls back to empty string for non-native engines', () => {
-    const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
+  test('defaultVoiceForEngine falls back to the engine id / empty for non-multi-voice', () => {
+    const fnIdx = setupSrc.indexOf('function defaultVoiceForEngine');
+    assert.ok(fnIdx >= 0, 'defaultVoiceForEngine must exist');
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 600);
+    // Multi-voice native engines take the first catalog voice; everything else
+    // falls back to NATIVE_ENGINE_VOICES[engine]?.id || '' (piper/empty -> '').
     assert.ok(
-      fnBody.includes("?.id || ''"),
-      "Engine picker must fall back to empty string when engine is not a native engine"
+      fnBody.includes('MULTI_VOICE_NATIVE') && fnBody.includes("NATIVE_ENGINE_VOICES[engine]?.id || ''"),
+      "defaultVoiceForEngine must branch on MULTI_VOICE_NATIVE and fall back to the engine id / empty string"
     );
   });
 });
