@@ -305,10 +305,32 @@ fi
 
 # Read the TTS provider the RECEIVER should use to generate audio.
 # This is separate from the sender's own provider (which is "ssh-remote").
-# Check receiver-provider.txt first, then fall back to "piper".
+# Priority: one-off caller override (a voice-picker PREVIEW forces the previewed
+# voice's own engine for THIS send only) → project receiver-provider.txt →
+# home receiver-provider.txt → "piper". The override intentionally does NOT
+# write any config: a preview must preview, never change the persisted setting.
 PROVIDER=""
+if [[ -n "${AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE:-}" ]]; then
+  PROVIDER="$AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE"
+fi
+# Voice->engine coupling (mirrors the guard in play-tts.ps1): a Kokoro-format
+# voice id (^[a-z]{2}_[a-z0-9_]+$, e.g. af_bella) or a Piper voice (locale+hyphen
+# like en_US-lessac-medium, or an ::Speaker suffix) can ONLY be synthesised by
+# that engine — so the voice itself decides the receiver engine, overriding a
+# stale/mislabeled provider default (e.g. an old console that always sends
+# windows-sapi). This makes a remote PREVIEW render in the previewed voice's own
+# engine no matter which build enqueued it. Names that don't encode an engine
+# (SAPI/macOS voice names) fall through to the configured provider below.
+if [[ -z "$PROVIDER" ]]; then
+  _v_nospk="${VOICE%%::*}"   # strip any ::Speaker-ID suffix before matching
+  if [[ "$_v_nospk" =~ ^[a-z]{2}_[a-z0-9_]+$ ]]; then
+    PROVIDER="kokoro"
+  elif [[ "$VOICE" == *"::"* ]] || [[ "$_v_nospk" =~ ^[a-z]{2}_[A-Za-z]{2}-. ]]; then
+    PROVIDER="piper"
+  fi
+fi
 RECEIVER_PROVIDER_FILE="$PROJECT_ROOT/.agentvibes/config/receiver-provider.txt"
-if [[ -f "$RECEIVER_PROVIDER_FILE" ]]; then
+if [[ -z "$PROVIDER" && -f "$RECEIVER_PROVIDER_FILE" ]]; then
   PROVIDER=$(cat "$RECEIVER_PROVIDER_FILE" 2>/dev/null || true)
 fi
 # Also check home-level config

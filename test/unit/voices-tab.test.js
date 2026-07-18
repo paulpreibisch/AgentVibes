@@ -181,3 +181,36 @@ describe('formatVoiceName', () => {
     assert.ok(result.toLowerCase().includes('alan'));
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe('previewPhrase — every engine announces name + engine', () => {
+  let previewPhrase;
+  before(async () => {
+    const mod = await import('../../src/console/tabs/voices-tab.js');
+    previewPhrase = mod.previewPhrase;
+  });
+
+  test('exported as named function', () => {
+    assert.strictEqual(typeof previewPhrase, 'function');
+  });
+
+  test('Piper voice names the Piper engine', () => {
+    const p = previewPhrase('en_US-lessac-medium');
+    assert.match(p, /from Piper\.$/);
+    assert.match(p, /Lessac/i);
+  });
+
+  test('Kokoro voice names the Kokoro engine and drops the lang/gender prefix', () => {
+    const p = previewPhrase('af_bella');
+    assert.match(p, /from Kokoro\.$/);
+    assert.match(p, /Bella/);
+    assert.ok(!/Af Bella/i.test(p), 'must not speak the "Af" lang/gender prefix');
+  });
+
+  test('phrase always follows the "Hi, I\'m NAME from ENGINE." shape', () => {
+    for (const v of ['en_US-lessac-medium', 'af_bella', 'am_michael']) {
+      assert.match(previewPhrase(v), /^Hi, I'm .+ from .+\.$/);
+    }
+  });
+});

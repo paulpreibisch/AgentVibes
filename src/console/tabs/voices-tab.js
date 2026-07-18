@@ -724,6 +724,27 @@ export function getVoiceMeta(voiceId) {
   return result;
 }
 
+/**
+ * Build the spoken preview phrase for a voice — announces BOTH the voice's name
+ * and the engine it renders on, consistently across every voice picker in the
+ * app (Piper / Kokoro / Windows SAPI / macOS / ElevenLabs). Centralised so a
+ * preview reads the same everywhere: "Hi, I'm Bella from Piper."
+ * @param {string} voiceId
+ * @returns {string}
+ */
+export function previewPhrase(voiceId) {
+  const meta = getVoiceMeta(voiceId);
+  // Strip a parenthetical model note ("Piper (libritts)" -> "Piper") for a clean
+  // spoken line; fall back to a neutral label if the provider can't be resolved.
+  const engine = String(meta.provider || '').replace(/\s*\(.*\)\s*$/, '').trim() || 'AgentVibes';
+  // Kokoro ids (af_bella, am_michael) carry a 2-letter lang/gender prefix that the
+  // display name keeps ("Af Bella") — awkward aloud, so speak just the name part.
+  let name = meta.displayName;
+  const kok = voiceId.match(/^[a-z]{2}_([a-z0-9_]+)$/);
+  if (kok) name = kok[1].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `Hi, I'm ${name} from ${engine}.`;
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -1037,7 +1058,18 @@ export function createVoicesTab(screen, services) {
     if (!_isPiperLocal) {
       const _remote = _remoteProviders.includes(activeProvider);
       const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const phrase = previewPhrase(voiceId);
+      // A PREVIEW must render in the previewed voice's OWN engine — never the
+      // receiver's persisted default (receiver-provider.txt). Compute the engine
+      // these voices belong to (the Default TTS Engine, same rule the list uses)
+      // and forward it as a ONE-OFF override the remote sender honours for this
+      // invocation only. This changes no settings; it just makes preview preview.
+      let _previewEngine = configService?.getConfig?.()?.ttsEngine
+        || providerService?.getActiveProvider?.() || 'piper';
+      // Guard: if that resolves to a transport (not a real engine), fall back to
+      // piper so we never tell the receiver to "synthesize with ssh-remote".
+      if (_remoteProviders.includes(_previewEngine)) _previewEngine = 'piper';
+      const _previewEnv = { ..._spawnEnv, AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: _previewEngine };
       // Hooks live in the AgentVibes package (projectRoot), not the user's project dir.
       // Fall back to CLAUDE_PROJECT_DIR / cwd only if the hook isn't at projectRoot
       // (e.g. when running from a published npm package with a different layout).
@@ -1052,13 +1084,13 @@ export function createVoicesTab(screen, services) {
         const playTts = path.join(hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
         const _pdArgs = activeProjectDir ? ['-ProjectDir', activeProjectDir] : [];
         proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId, ..._pdArgs], { // NOSONAR
-          stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
+          stdio: 'ignore', detached: false, windowsHide: true, env: _previewEnv,
         });
       } else {
         const playTts = path.join(hooksBase, '.claude', 'hooks', 'play-tts.sh');
         const _pdArgs = activeProjectDir ? ['--project-dir', activeProjectDir] : [];
         proc = spawn('bash', [playTts, phrase, voiceId, ..._pdArgs], { // NOSONAR
-          stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _spawnEnv,
+          stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _previewEnv,
           cwd: process.cwd(),
         });
       }
@@ -1103,7 +1135,7 @@ export function createVoicesTab(screen, services) {
     }
 
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
-    const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+    const phrase = previewPhrase(voiceId);
 
     // Synthesize: spawn piper; on Windows use the exe path directly
     const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;

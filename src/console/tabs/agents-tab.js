@@ -16,7 +16,7 @@ import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatReverbState, formatTrackName, formatVoiceName } from '../widgets/format-utils.js';
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
-  parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, genderIconTag,
+  parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag,
   getFavorites, getThumbsDown, toggleThumbsUp, toggleThumbsDown,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
@@ -1123,7 +1123,7 @@ ${_tl('bmadDesc')}
       _killVP();
       if (_previewMinTimer) { clearTimeout(_previewMinTimer); _previewMinTimer = null; }
 
-      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const phrase = previewPhrase(voiceId);
       const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
 
       if (_isWin) {

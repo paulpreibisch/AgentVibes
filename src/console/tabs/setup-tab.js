@@ -43,7 +43,7 @@ import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { renderHelpBar, selectorTitle } from '../widgets/help-bar.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
 import { buildBlingCommand, playBlingCue } from '../bling.js';
@@ -3196,7 +3196,7 @@ export function createSetupTab(screen, services) {
           ? '안녕하세요, 코코로 한국어 음성 미리보기입니다.'
           : _pfx2 === 'jf' || _pfx2 === 'jm'
             ? 'こんにちは、これはKokoroの日本語音声プレビューです。'
-            : `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
+            : previewPhrase(voiceId);
 
       // Bling now — a real preview is committed (past the install-prompt and
       // toggle-off early returns). Fires for both local and remote paths.
@@ -3726,7 +3726,7 @@ export function createSetupTab(screen, services) {
       const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
       let proc;
       try {
-        proc = _spawnAudio(resolveBash(), [elScript, `Hi, I am ${v.name}.`, v.id], { // NOSONAR — local hook on user's PATH
+        proc = _spawnAudio(resolveBash(), [elScript, `Hi, I'm ${v.name} from ElevenLabs.`, v.id], { // NOSONAR — local hook on user's PATH
           stdio: 'ignore',
           env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
         });
@@ -3890,7 +3890,10 @@ export function createSetupTab(screen, services) {
           screen.render();
           return;
         }
-        const phrase = `Hi, I am the ${nativeVoice.label} voice.`;
+        const _engineLabel = nativeVoice.id === 'macos' ? 'macOS'
+          : (nativeVoice.id && nativeVoice.id.includes('sapi')) ? 'Windows SAPI'
+            : (nativeVoice.id || 'your system');
+        const phrase = `Hi, I'm ${nativeVoice.label} from ${_engineLabel}.`;
         const engine = nativeVoice.id;
 
         function _spawnAndTrack(cmd, args, opts) {
@@ -4106,7 +4109,7 @@ export function createSetupTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
-      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const phrase = previewPhrase(voiceId);
 
       // Route through remote provider if active
       // Search order: targetDir → cwd → package root → home
