@@ -964,7 +964,10 @@ export function saveLlmConfigSync(llmKey, config, targetDir) {
   const cfgKey = `llm:${llmKey}`;
   // Sanitize user-editable fields: strip pipe chars (config delimiter) and newlines
   // (newlines could inject extra rows into the pipe-delimited config file)
-  const sanitize = (v) => (v || '').replace(/[\|\n\r\x00]/g, '');
+  // Strip the pipe delimiter and any control character (newlines/NUL could inject
+  // extra rows). Done via a char filter rather than control chars in a regex
+  // literal (Sonar S6324 flags regex control chars).
+  const sanitize = (v) => Array.from(String(v || '')).filter(ch => ch !== '|' && ch.charCodeAt(0) >= 0x20).join('');
   const cfgLine = `${cfgKey}|${sanitize(config.effects)}|${sanitize(config.bgTrack)}|${sanitize(config.bgVolume)}|${sanitize(config.voice)}|${sanitize(config.pretext)}|${sanitize(config.ttsEngine)}`;
   const resolvedTargetDir = targetDir || process.env.INIT_CWD || process.cwd();
   // When targetDir is explicitly passed, always write to the project dir — never follow

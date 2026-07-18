@@ -137,11 +137,25 @@ const _origPersonalityContent = 'sarcastic';
 before(() => {
   _tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-avi83-test-'));
   const hooksWinDir = path.join(_tempDir, '.claude', 'hooks-windows');
+  const hooksDir = path.join(_tempDir, '.claude', 'hooks');
   const configDir = path.join(_tempDir, '.claude', 'config');
   fs.mkdirSync(hooksWinDir, { recursive: true });
+  fs.mkdirSync(hooksDir, { recursive: true });
   fs.mkdirSync(configDir, { recursive: true });
-  // Dummy play-tts.ps1 — existence is all _sampleWithFullEffectsWindows checks for.
+  // Dummy play-tts hooks — existence is all the preview path checks for (spawn
+  // is mocked). Provide BOTH so the preview target exists on every OS: Windows
+  // takes the .ps1 branch, Unix the .sh branch.
   fs.writeFileSync(path.join(hooksWinDir, 'play-tts.ps1'), '# test stub, never executed (spawn is mocked)\n');
+  fs.writeFileSync(path.join(hooksDir, 'play-tts.sh'), '# test stub, never executed (spawn is mocked)\n');
+
+  // Provide a deterministic BMAD agent in the isolated project root so
+  // scanBmadAgents() always finds a preview target. Without this the test
+  // depended on the CI runner's ambient home dir having agents — true on the
+  // Unix runners, FALSE on Windows → the whole suite silently went vacuous
+  // (precondition failed) on Windows CI.
+  const bmadAgentsDir = path.join(_tempDir, '_bmad', 'bmm', 'agents');
+  fs.mkdirSync(bmadAgentsDir, { recursive: true });
+  fs.writeFileSync(path.join(bmadAgentsDir, 'sarah.md'), '# Sarah\n\nTest agent fixture.\n');
 
   _personalityFile = path.join(configDir, 'personality.txt');
   _reverbFile = path.join(configDir, 'reverb-level.txt');

@@ -532,7 +532,7 @@ export function scanInstalledVoices() {
       } catch { /* fall through to add as single voice */ }
       result.push(voiceId);
     }
-    return result.sort();
+    return result.sort((a, b) => a.localeCompare(b));
   } catch {
     return [];
   }

@@ -2874,7 +2874,7 @@ async function collectConfiguration(options = {}) {
     // Navigation with page titles
     const navChoices = [];
     if (currentPage < totalPages - 1) {
-      const nextPageTitle = getPageTitle(currentPage + 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      const nextPageTitle = getPageTitle(currentPage + 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/u, ''); // Remove emoji
       navChoices.push({ name: chalk.green('Next →') + chalk.gray(` (${nextPageTitle})`), value: 'next' });
     } else {
       navChoices.push({ name: chalk.cyan('✓ Continue to Installation'), value: 'continue' });
@@ -2884,7 +2884,7 @@ async function collectConfiguration(options = {}) {
     if (currentPage === 0) {
       navChoices.push({ name: chalk.magentaBright('← Back to Welcome'), value: 'back' });
     } else {
-      const prevPageTitle = getPageTitle(currentPage - 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      const prevPageTitle = getPageTitle(currentPage - 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/u, ''); // Remove emoji
       navChoices.push({ name: chalk.magentaBright('← Previous') + chalk.gray(` (${prevPageTitle})`), value: 'prev' });
     }
 

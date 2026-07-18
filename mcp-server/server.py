@@ -1477,11 +1477,21 @@ class AgentVibesServer:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
+            # Shield the communicate() task from wait_for's cancellation. On the
+            # Unix event loop, cancelling communicate() awaits the still-running
+            # child, so a plain `wait_for(proc.communicate())` does NOT honor the
+            # timeout (it blocks for the child's full runtime). Instead let the
+            # timeout fire, kill the child ourselves, then drain the shielded task
+            # (which now returns promptly). Works on both Unix and Windows loops.
+            comm_task = asyncio.ensure_future(proc.communicate())
             try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                stdout, stderr = await asyncio.wait_for(asyncio.shield(comm_task), timeout=timeout)
             except asyncio.TimeoutError:
                 proc.kill()
-                await proc.wait()
+                try:
+                    await comm_task  # completes quickly once the child is dead
+                except Exception:
+                    pass
                 return ScriptResult(
                     -1, "",
                     f"Script '{script_name}' timed out after {timeout:.0f}s "
