@@ -45,6 +45,7 @@ import json
 import os
 import platform
 import re as _re
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -1470,28 +1471,42 @@ class AgentVibesServer:
 
         proc = None
         try:
+            # Run the child in its OWN process group/session (Unix) so a timeout
+            # can kill the WHOLE tree. A plain proc.kill() only kills the direct
+            # child (e.g. bash); a `sleep`/piper grandchild survives, keeps the
+            # stdout pipe OPEN, and communicate() then blocks until it exits — so
+            # the timeout is never honored (CI: 1s timeout let a 5s script run 5s).
+            _popen_kwargs = {}
+            if os.name != "nt":
+                _popen_kwargs["start_new_session"] = True
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                **_popen_kwargs,
             )
-            # Enforce the timeout WITHOUT asyncio.wait_for(proc.communicate()):
-            # on the Unix loop, wait_for cancels communicate(), whose cancellation
-            # handler awaits the still-running child, so the call blocks for the
-            # child's full runtime and the timeout is never honored. asyncio.wait()
-            # with a timeout does NOT cancel the task — it simply returns once the
-            # deadline passes — so we can then kill the child ourselves and reap
-            # the now-unblocked task. Works on both Unix and Windows loops.
+            # asyncio.wait() with a timeout returns at the deadline WITHOUT
+            # cancelling the task (unlike wait_for, whose cancellation of
+            # communicate() awaits the child). So we get control back on time,
+            # then kill the whole group and drain.
             comm_task = asyncio.ensure_future(proc.communicate())
             done, _pending = await asyncio.wait({comm_task}, timeout=timeout)
             if comm_task not in done:
-                proc.kill()
                 try:
-                    await comm_task  # child is dead → communicate() returns promptly
-                except Exception:
+                    if os.name != "nt":
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # whole group
+                    else:
+                        proc.kill()
+                except (ProcessLookupError, PermissionError, OSError):
                     pass
+                # Bounded drain: the group is dead, so pipes close and this returns
+                # immediately; the timeout guards against any lingering handle.
+                try:
+                    await asyncio.wait_for(comm_task, timeout=2.0)
+                except Exception:
+                    comm_task.cancel()
                 return ScriptResult(
                     -1, "",
                     f"Script '{script_name}' timed out after {timeout:.0f}s "
