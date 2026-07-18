@@ -34,6 +34,12 @@ const c8Args = [
   'c8', '--reporter=lcov', '--reporter=text',
   'node',
   '--experimental-test-module-mocks',
+  // Run each test FILE in its own process. Without this, mock.module() mocks and
+  // shared filesystem/global state leak across files in one shared process, so
+  // tests that pass alone fail when the whole suite runs together (the suite had
+  // never actually run in CI before — earlier red steps masked it). Node writes
+  // per-child V8 coverage (NODE_V8_COVERAGE is inherited), so c8 still aggregates.
+  '--test-isolation=process',
   '--test-concurrency=2',
   '--test-force-exit',
   '--test',
