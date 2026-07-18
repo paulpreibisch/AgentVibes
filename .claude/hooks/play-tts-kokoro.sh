@@ -47,8 +47,13 @@ if [[ -z "$PYTHON_BIN" ]]; then
   echo "   or set AGENTVIBES_PYTHON=/path/to/python.exe if it's installed elsewhere." >&2
   exit 2
 fi
-# Check kokoro is installed (use find_spec to avoid slow torch import)
-if ! "$PYTHON_BIN" -c "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>/dev/null; then
+# Check kokoro is installed (use find_spec to avoid slow torch import).
+# Skipped in AGENTVIBES_TEST_MODE: the hermetic sentinel tests emit a fake
+# AV_OUTPUT below without real synthesis, so kokoro need not be installed on the
+# runner (mirrors the TEST_MODE guards in play-tts-piper.sh; CI has Piper but not
+# the heavy Kokoro deps).
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && \
+   ! "$PYTHON_BIN" -c "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>/dev/null; then
   echo "❌ Kokoro TTS module not installed for: $PYTHON_BIN" >&2
   echo "   Install with: ${SCRIPT_DIR}/kokoro-installer.sh" >&2
   echo "   Or manually:  \"$PYTHON_BIN\" -m pip install kokoro soundfile numpy" >&2
