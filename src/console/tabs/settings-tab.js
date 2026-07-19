@@ -210,9 +210,12 @@ export function createSettingsTab(screen, services) {
         if (dst === 'remote') {
           const alias = configService?.getConfig?.()?.audio_ssh_alias ?? '';
           const mode = configService?.getConfig?.()?.audio_stream_mode ?? 'text';
-          return `Remote (${alias || 'no alias'}) — ${mode === 'pulse' ? 'PulseAudio' : 'Text Only'}`;
+          // Remote value in RED — audio leaves this machine (a deliberate,
+          // "here be dragons" destination). Rendered raw (see _refreshValues).
+          return `{red-fg}Remote (${alias || 'no alias'}) — ${mode === 'pulse' ? 'PulseAudio' : 'Text Only'}{/red-fg}`;
         }
-        return 'Local';
+        // Local value in GREEN — audio plays here, the safe default.
+        return '{green-fg}Local{/green-fg}';
       },
       desc: 'Play audio locally or stream to a remote host via SSH',
     },
@@ -360,6 +363,10 @@ export function createSettingsTab(screen, services) {
       const val = w.setting.getValue();
       if (w.setting.isAction) {
         w.valueWidget.setContent('');
+      } else if (w.setting.key === 'audioDst') {
+        // audioDst supplies its own colour (green=Local / red=Remote); don't
+        // wrap it in the default yellow.
+        w.valueWidget.setContent(val);
       } else {
         w.valueWidget.setContent(`{yellow-fg}${val}{/yellow-fg}`);
       }
