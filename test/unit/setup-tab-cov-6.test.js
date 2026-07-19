@@ -228,6 +228,28 @@ function fireKeyOnAll(key) {
   }
 }
 
+// Drive the provider → LLM-config → voice-field drill-down until `opened()`
+// returns true (the target picker has appeared) or we exhaust `maxPasses`.
+// Firing enter blindly across widgets can leave a modal open (the isModalOpen
+// guard then blocks the next open), and modal/picker creation settles across
+// async ticks — both make a fixed pass count race on slow CI runners (the picker
+// intermittently never opened on Windows). Resetting with 'escape' each pass and
+// re-driving until the picker is present removes that timing dependence.
+async function driveUntilOpen(opened, maxPasses = 24) {
+  for (let pass = 0; pass < maxPasses && !opened(); pass++) {
+    fireKeyOnAll('escape');          // close any modal left open by the last pass
+    fireAllEnter();
+    await new Promise(r => setTimeout(r, 40));
+    for (const w of [..._allWidgets]) {
+      if (w._tag !== 'list') continue;
+      for (let idx = 0; idx < 8 && !opened(); idx++) {
+        w.selected = idx;
+        try { w._handlers['key:enter']?.(); } catch {}
+      }
+    }
+  }
+}
+
 // Drive every captured child process to completion (exit code) and error path.
 function drainSpawnedProcs() {
   // exit handlers first (success path: code 0)
@@ -324,18 +346,9 @@ describe('setup-tab-cov-6', () => {
       try { tab.show?.(); } catch {}
       try { tab.onFocus?.(); } catch {}
 
-      // Walk the provider list, open config, drill into voice field.
-      for (let pass = 0; pass < 4; pass++) {
-        fireAllEnter();
-        await new Promise(r => setTimeout(r, 30));
-        for (const w of [..._allWidgets]) {
-          if (w._tag !== 'list') continue;
-          for (let idx = 0; idx < 8; idx++) {
-            w.selected = idx;
-            try { w._handlers['key:enter']?.(); } catch {}
-          }
-        }
-      }
+      // Walk the provider list, open config, drill into voice field — until the
+      // Kokoro picker (a widget with a Download-All 'd' handler) actually opens.
+      await driveUntilOpen(() => _allWidgets.some(w => w._handlers['key:d']));
 
       // Exercise kokoro picker key handlers + spawned proc events.
       fireKeyOnAll('d');
@@ -392,17 +405,9 @@ describe('setup-tab-cov-6', () => {
       try { tab.show?.(); } catch {}
       try { tab.onFocus?.(); } catch {}
 
-      for (let pass = 0; pass < 4; pass++) {
-        fireAllEnter();
-        await new Promise(r => setTimeout(r, 30));
-        for (const w of [..._allWidgets]) {
-          if (w._tag !== 'list') continue;
-          for (let idx = 0; idx < 8; idx++) {
-            w.selected = idx;
-            try { w._handlers['key:enter']?.(); } catch {}
-          }
-        }
-      }
+      // Drill into the voice field until the native (elevenlabs) picker — a list
+      // with a Space-preview handler — actually opens.
+      await driveUntilOpen(() => _allWidgets.some(w => w._tag === 'list' && w._handlers['key:space']));
 
       // Native picker: space => _previewNativeVoice (elevenlabs spawn branch),
       // then drive exit/error; enter to select; escape to close.
