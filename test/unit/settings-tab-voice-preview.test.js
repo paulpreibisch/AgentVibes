@@ -74,6 +74,22 @@ const blessedStub = {
 
 await mock.module('blessed', { defaultExport: blessedStub });
 
+// The voice-preview list is populated by voicesForProvider(), which for Piper
+// scans the machine's INSTALLED .onnx voices from disk. On a CI runner no Piper
+// voices are installed, so the list would be empty and pressing Space would have
+// nothing to preview (the handler is `if (sel) _previewVoice(sel)`), making the
+// "a process is spawned" assertion environment-dependent. Mock ONLY
+// voicesForProvider (spreading the real module so its other exports —
+// ELEVENLABS_VOICES etc. that voices-tab.js imports — survive) so the list always
+// has a known voice, testing the preview path, not what's installed on the runner.
+const { default: _catalogDefault, ..._realCatalogNamed } = await import('../../src/services/provider-voice-catalog.js');
+await mock.module('../../src/services/provider-voice-catalog.js', {
+  namedExports: {
+    ..._realCatalogNamed,
+    voicesForProvider: () => [{ id: 'en_US-amy-medium', gender: 'Female' }],
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Mock node:child_process — never actually spawn a real TTS/powershell
 // process during this test.
