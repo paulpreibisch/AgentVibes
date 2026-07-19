@@ -215,6 +215,21 @@ Running a full BMAD agent team? **Every agent gets its own distinct voice**, aut
 
 ---
 
+## 🔬 Reserved for future enhancements
+
+You may notice a few dormant hooks in `.claude/hooks/` (`forward-to-avatar.sh`) and small
+gated blocks inside `play-tts.sh` / `play-tts.ps1` referencing a "TalkingHead avatar" and a
+`config/talking-head-enabled.txt` flag. These are **not an active feature** — there's no
+avatar UI shipped in this package. They're scaffolding for an in-development, browser-based
+avatar receiver that isn't merged yet, checked in early so that project has a stable
+client-side delivery contract to build against.
+
+Everything about this is inert by default: the enable-flag file doesn't exist until you
+create it yourself, and every code path is short-circuited behind that check before it does
+anything (no new network calls, no behavior change) for every current install.
+
+---
+
 ## 📚 Documentation
 
 | Guide | |
