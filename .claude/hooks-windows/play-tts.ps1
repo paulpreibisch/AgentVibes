@@ -509,6 +509,23 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
     }
 }
 
+# Fail loudly when mixing was requested but ffmpeg is unavailable. Without this,
+# background music and reverb are dropped silently and the voice plays "fine" —
+# indistinguishable from a config problem. A long-running tts-watcher.ps1 that
+# started before ffmpeg was installed keeps a stale PATH snapshot and hits this,
+# so the message names the restart explicitly. Mirrors the bash-side warning in
+# audio-processor.sh ("ffmpeg not installed, skipping background mix").
+if (-not $HasFfmpeg -and ($BgEnabled -or $HasReverb)) {
+    $_dropped = @()
+    if ($BgEnabled) { $_dropped += "background music" }
+    if ($HasReverb) { $_dropped += "reverb ($ReverbLevel)" }
+    Write-Host ("[WARNING] play-tts.ps1: ffmpeg not found on PATH — dropping " +
+        ($_dropped -join " and ") + "; voice will play unmixed.") -ForegroundColor Yellow
+    Write-Host ("[WARNING] Install ffmpeg (e.g. 'scoop install ffmpeg'). If it IS " +
+        "installed, a background tts-watcher started before it will have a stale " +
+        "PATH — restart the watcher.") -ForegroundColor Yellow
+}
+
 # --- Apply LLM-specific engine override --------------------------------------
 # Allowed local Windows engines: windows-sapi, windows-piper, soprano.
 # Transport providers (ssh-remote etc.) are not listed because they forward

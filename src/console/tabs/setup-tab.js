@@ -1242,8 +1242,14 @@ export function createSetupTab(screen, services) {
       style: { bg: COLORS.contentBg },
     });
 
+    // _bgRestoreFn is modal-scoped so _killPreview can restore bg music synchronously,
+    // eliminating the race condition when Preview is clicked twice rapidly.
     let _previewModalProc = null;
+    let _bgRestoreFn = null;
     function _killPreview() {
+      // Restore bg music immediately (synchronously) before killing the process —
+      // otherwise a second Preview reads bgWas=true before the first's exit fires.
+      if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
       if (_previewModalProc) { try { _previewModalProc.kill(); } catch {} _previewModalProc = null; }
     }
 
@@ -1279,6 +1285,24 @@ export function createSetupTab(screen, services) {
       const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       const sampleText = 'This is how your Hermes audio settings sound right now.';
+
+      // Temporarily enable background music for preview if a track is configured.
+      // Preview must play everything combined — voice, effects AND music. Write to
+      // targetDir (project): audio-processor.sh checks CLAUDE_PROJECT_DIR first
+      // (set to targetDir in the subprocess env below).
+      if (!!draft.bgTrack) {
+        const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
+        let bgWas = false;
+        try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
+        if (!bgWas) {
+          try {
+            fs.mkdirSync(path.dirname(bgEnabledFile), { recursive: true });
+            fs.writeFileSync(bgEnabledFile, 'true', 'utf8');
+          } catch {}
+          _bgRestoreFn = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
+        }
+      }
+
       let cmd, args;
       if (draft.ttsEngine === 'elevenlabs') {
         // ElevenLabs has no Windows provider; route through the bash orchestrator
@@ -1313,6 +1337,7 @@ export function createSetupTab(screen, services) {
       _previewModalProc = proc;
       proc.on('exit', (code) => {
         _previewModalProc = null;
+        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
         if (!_closed) {
           if (code !== 0 && code !== null) {
             const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
@@ -1324,7 +1349,11 @@ export function createSetupTab(screen, services) {
           }
         }
       });
-      proc.on('error', () => { _previewModalProc = null; if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); } });
+      proc.on('error', () => {
+        _previewModalProc = null;
+        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+        if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
+      });
     }
 
     const previewBtn = _modalBtn('Preview', 4, _playPreview);
