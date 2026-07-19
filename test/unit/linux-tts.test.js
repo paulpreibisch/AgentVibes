@@ -77,26 +77,55 @@ test('Session Start (Linux) - static check: uses CLAUDE_PROJECT_DIR for per-proj
   );
 });
 
-test('Session Start (Linux) - injects --llm claude-code flag', { skip: SKIP_ON_WINDOWS }, async () => {
-  const result = await runBash(
-    [join(hooksDir, 'session-start-tts.sh')],
-    { env: { CLAUDE_PROJECT_DIR: projectRoot, HOME: process.env.HOME } }
-  );
+// The SessionStart hook only injects the TTS protocol for projects that OPTED IN
+// (Issue: global-install cacophony). A clean checkout has no opt-in marker, so
+// these tests create an isolated project dir with an `agentvibes-enabled` marker
+// and an isolated HOME (so a real ~/.agentvibes-muted kill-switch can't leak in).
+// play-tts.sh is still resolved from the hook's own BASH_SOURCE location, so the
+// injected absolute path remains the real hooksDir regardless of the project dir.
+function makeEnabledProjectDir() {
+  const dir = mkdtempSync(join(tmpdir(), 'agentvibes-session-start-'));
+  const claudeDir = join(dir, '.claude');
+  mkdirSync(claudeDir, { recursive: true });
+  writeFileSync(join(claudeDir, 'agentvibes-enabled'), '');
+  return dir;
+}
 
-  const output = result.stdout + result.stderr;
-  assert.ok(
-    output.includes('--llm claude-code'),
-    `session-start-tts.sh must inject --llm claude-code so per-LLM voice/music is used. Output: ${output.slice(0, 400)}`
-  );
+test('Session Start (Linux) - injects --llm claude-code flag', { skip: SKIP_ON_WINDOWS }, async () => {
+  const projectDir = makeEnabledProjectDir();
+  const fakeHome = mkdtempSync(join(tmpdir(), 'agentvibes-session-start-home-'));
+  try {
+    const result = await runBash(
+      [join(hooksDir, 'session-start-tts.sh')],
+      { env: { CLAUDE_PROJECT_DIR: projectDir, HOME: fakeHome } }
+    );
+
+    const output = result.stdout + result.stderr;
+    assert.ok(
+      output.includes('--llm claude-code'),
+      `session-start-tts.sh must inject --llm claude-code so per-LLM voice/music is used. Output: ${output.slice(0, 400)}`
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(fakeHome, { recursive: true, force: true });
+  }
 });
 
 test('Session Start (Linux) - injects absolute play-tts.sh path not relative', { skip: SKIP_ON_WINDOWS }, async () => {
-  const result = await runBash(
-    [join(hooksDir, 'session-start-tts.sh')],
-    { env: { CLAUDE_PROJECT_DIR: projectRoot, HOME: process.env.HOME } }
-  );
+  const projectDir = makeEnabledProjectDir();
+  const fakeHome = mkdtempSync(join(tmpdir(), 'agentvibes-session-start-home-'));
+  let output;
+  try {
+    const result = await runBash(
+      [join(hooksDir, 'session-start-tts.sh')],
+      { env: { CLAUDE_PROJECT_DIR: projectDir, HOME: fakeHome } }
+    );
+    output = result.stdout + result.stderr;
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(fakeHome, { recursive: true, force: true });
+  }
 
-  const output = result.stdout + result.stderr;
   assert.ok(
     !output.includes('".claude/hooks/play-tts.sh"'),
     'session-start-tts.sh must not inject relative play-tts.sh path'
@@ -277,6 +306,8 @@ test('E2E (Linux) - project voice used even when CLAUDE_PROJECT_DIR not in Bash 
   );
   // Force piper locally so the test never attempts an SSH transport
   writeFileSync(join(tempDir, '.claude', 'tts-provider.txt'), 'piper');
+  // Opt this project into SessionStart protocol injection (Issue: global cacophony)
+  writeFileSync(join(tempDir, '.claude', 'agentvibes-enabled'), '');
 
   // Step 1: Run session-start-tts.sh WITH CLAUDE_PROJECT_DIR to capture injected protocol
   const sessionResult = await runBash(

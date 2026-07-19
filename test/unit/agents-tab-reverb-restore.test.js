@@ -244,6 +244,15 @@ function triggerPreview(agentList) {
   return _lastSpawnedProc;
 }
 
+// The config-file patch/restore is the WINDOWS agent-preview mechanism only:
+// play-tts.ps1 reads personality.txt / reverb-level.txt, so the preview temp-
+// patches then restores them. The non-Windows (bash) preview passes per-agent
+// config via env instead and never touches those files, so these assertions are
+// Windows-only. (The precondition below is cross-platform and stays ungated.)
+const WIN_ONLY = process.platform === 'win32'
+  ? {}
+  : { skip: 'agent-preview config file patch/restore is Windows-only (bash preview passes config via env)' };
+
 describe('AVI-8.3 bug 3 — agent-preview config patch/restore (agents-tab.js)', () => {
   // Reset to a known pristine state before EVERY test, regardless of whether
   // the previous test intentionally left files patched (e.g. to test restore
@@ -261,7 +270,7 @@ describe('AVI-8.3 bug 3 — agent-preview config patch/restore (agents-tab.js)',
     assert.ok(proc, 'space key must spawn a preview process for a real agent — otherwise this whole test is vacuous');
   });
 
-  test('during preview: both personality.txt and reverb-level.txt are patched', () => {
+  test('during preview: both personality.txt and reverb-level.txt are patched', WIN_ONLY, () => {
     const agentList = setupTab();
     triggerPreview(agentList);
     assert.strictEqual(fs.readFileSync(_personalityFile, 'utf8'), 'sarcastic');
@@ -269,7 +278,7 @@ describe('AVI-8.3 bug 3 — agent-preview config patch/restore (agents-tab.js)',
     assert.strictEqual(fs.readFileSync(_reverbFile, 'utf8'), 'light');
   });
 
-  test('normal completion: proc exit handler restores personality.txt and REMOVES reverb-level.txt', () => {
+  test('normal completion: proc exit handler restores personality.txt and REMOVES reverb-level.txt', WIN_ONLY, () => {
     const agentList = setupTab();
     const proc = triggerPreview(agentList);
     proc._emit('exit');
@@ -280,7 +289,7 @@ describe('AVI-8.3 bug 3 — agent-preview config patch/restore (agents-tab.js)',
       'reverb-level.txt must be REMOVED (it did not exist before the preview) — this is the core bug-3 fix');
   });
 
-  test('idempotency: a second preview cycle leaves byte-identical state', () => {
+  test('idempotency: a second preview cycle leaves byte-identical state', WIN_ONLY, () => {
     const agentList = setupTab();
     const proc1 = triggerPreview(agentList);
     proc1._emit('exit');
@@ -297,7 +306,7 @@ describe('AVI-8.3 bug 3 — agent-preview config patch/restore (agents-tab.js)',
     assert.ok(reverbGoneFirst && reverbGoneSecond, 'reverb-level.txt absent after every preview cycle');
   });
 
-  test('abnormal exit: if the child process never fires its own "exit" event, the process-level exit handler still restores config', () => {
+  test('abnormal exit: if the child process never fires its own "exit" event, the process-level exit handler still restores config', WIN_ONLY, () => {
     const agentList = setupTab();
     triggerPreview(agentList);
     // Do NOT emit 'exit' on the fake child — simulates a crash / quitting the
