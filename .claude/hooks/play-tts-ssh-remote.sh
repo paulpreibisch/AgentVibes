@@ -422,7 +422,12 @@ fi
 # SECURITY: Use jq if available for safe JSON construction, else manual escaping
 build_json_payload() {
   if command -v jq &>/dev/null; then
-    jq -n \
+    # On Windows git-bash, native jq.exe triggers MSYS2 path-conversion of any
+    # POSIX-looking --arg value (projectPath "/c/proj" becomes "C:/proj", music
+    # file paths likewise), silently corrupting the JSON string the receiver
+    # reads. Excluding all args from conversion passes every --arg literally.
+    # Both vars are no-ops on Linux/macOS.
+    MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 jq -n \
       --arg text "$TEXT" \
       --arg voice "$VOICE" \
       --arg effects "$SOX_EFFECTS" \
