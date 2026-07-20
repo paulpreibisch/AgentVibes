@@ -33,6 +33,42 @@ if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) 
     $ProjectClaudeDir = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptDir)) ".claude"
 }
 
+# ---------------------------------------------------------------------------
+# OPT-IN INJECTION GATE (Issue: global-install cacophony).
+#
+# Mirror of the gate in .claude/hooks/session-start-tts.sh — see the long
+# rationale there. Previously this hook injected the ~250-token TTS protocol
+# into EVERY Windows session where AgentVibes was found on disk, so a global
+# install made every open session start speaking at once, and idle sessions
+# still paid the token cost. Injection is now OPT-IN on Windows too.
+#
+# Precedence (identical to bash, so injection and audio agree):
+#   1. project agentvibes-unmuted  -> inject   (explicit per-project ON)
+#   2. project agentvibes-muted    -> silent
+#   3. global ~/.agentvibes-muted  -> silent   (the global kill-switch)
+#   4. project agentvibes-enabled, OR global opt-in
+#      (~/.claude/agentvibes-enabled or ~/.claude/agentvibes-unmuted) -> inject
+#   5. otherwise                   -> silent   (opt-in default; zero tokens)
+#
+# $HOME is honoured ahead of $env:USERPROFILE so the markers resolve the same
+# way under git-bash (where bash writes them) as under native PowerShell.
+$HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+if (Test-Path (Join-Path $ProjectClaudeDir "agentvibes-unmuted")) {
+    # explicit per-project enable — wins over a global mute, as in play-tts.sh
+} elseif (Test-Path (Join-Path $ProjectClaudeDir "agentvibes-muted")) {
+    exit 0
+} elseif (Test-Path (Join-Path $HomeDir ".agentvibes-muted")) {
+    exit 0   # global kill-switch, no per-project override
+} elseif ((Test-Path (Join-Path $ProjectClaudeDir "agentvibes-enabled")) -or
+          (Test-Path (Join-Path $HomeDir ".claude\agentvibes-enabled"))  -or
+          (Test-Path (Join-Path $HomeDir ".claude\agentvibes-unmuted"))) {
+    # opted in (project install marker, or a deliberate global opt-in)
+} else {
+    # Not enabled for this project -> inject nothing (zero tokens).
+    # Enable for this project with:  /agent-vibes:unmute
+    exit 0
+}
+
 # Build the -ProjectDir flag to inject into TTS commands (empty string = omit flag).
 # Sanitize: strip any embedded quotes that would break PowerShell argument quoting.
 $ProjectDirFlag = ""
