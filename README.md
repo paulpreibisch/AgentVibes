@@ -58,7 +58,17 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Your voices everywhere (v5.13.0)
+## 🆕 Installs that work, previews you can trust (v5.14.0)
+
+A catch-up release, including everything from 5.13.2 which never reached npm.
+
+- **📥 Mac & Linux setup actually works** — installing Piper and downloading voices never ran on a fresh install, and reported a failure for a step it never started. Broken for 51 releases; fixed and properly tested.
+- **🔧 Your customised files stay yours** — updating no longer overwrites hook scripts you've edited; your version is saved beside it first, e.g. `play-tts.ps1.user.bak.20260719-143052`.
+- **🎵 Preview plays the whole mix** — the Preview button plays your voice, reverb/effects **and** background music together; music no longer goes missing, and if ffmpeg is unavailable you get a clear message instead of silence.
+- **🎙️ The right voice, named** — previews use the previewed voice's own engine and say which one; Windows and Mac voices work over remote previews.
+- **🟢 Local or remote, at a glance** — audio destination shows green for **Local**, red for **Remote**.
+
+### v5.13.0 — Your voices everywhere
 
 Pick the voices built into **Windows** or **Mac** and hear them wherever you're listening — even when your agents run on another computer. Plus a friendly heads-up chime so you always know sound is coming.
 

@@ -4,7 +4,17 @@
 
 ---
 
-## 🆕 Deine Stimmen überall (v5.13.0)
+## 🆕 Installationen, die klappen, Vorschauen, auf die Verlass ist (v5.14.0)
+
+Ein Nachhol-Release, das auch alles aus 5.13.2 enthält, das nie zu npm gelangt ist.
+
+- **📥 Die Einrichtung unter Mac & Linux funktioniert wirklich** — bei einer frischen Installation wurden Piper und der Download der Stimmen nie ausgeführt, und es wurde ein Fehler für einen Schritt gemeldet, der nie gestartet war. 51 Releases lang kaputt; behoben und ordentlich getestet.
+- **🔧 Deine angepassten Dateien bleiben deine** — ein Update überschreibt keine von dir bearbeiteten Hook-Skripte mehr; deine Fassung wird vorher daneben gesichert, z. B. als `play-tts.ps1.user.bak.20260719-143052`.
+- **🎵 Die Vorschau spielt die komplette Mischung** — die Vorschau-Schaltfläche spielt Stimme, Hall/Effekte **und** Hintergrundmusik zusammen; die Musik verschwindet nicht mehr, und wenn ffmpeg nicht verfügbar ist, bekommst du eine klare Meldung statt Stille.
+- **🎙️ Die richtige Stimme, beim Namen genannt** — Vorschauen nutzen die eigene Engine der jeweiligen Stimme und sagen dir, welche es ist; Windows- und Mac-Stimmen funktionieren auch über Remote-Vorschauen.
+- **🟢 Lokal oder remote, auf einen Blick** — das Audioziel wird grün für **Local** und rot für **Remote** angezeigt.
+
+### v5.13.0 — Deine Stimmen überall
 
 Wähle die in **Windows** oder **Mac** eingebauten Stimmen und höre sie, wo immer du zuhörst — selbst wenn deine Agenten auf einem anderen Computer laufen. Dazu ein freundlicher Ankündigungston, sodass du immer weißt, dass Klang unterwegs ist.
 

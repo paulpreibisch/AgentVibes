@@ -1,5 +1,61 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎧 v5.14.0 — Instalações que funcionam, pré-visualizações em que você pode confiar
+
+**Lançamento:** 2026-07-19 · no `latest` — `npm install agentvibes@latest`
+
+Um grande lançamento para colocar tudo em dia. Se você está vindo da 5.13.1, esta versão traz também tudo o que havia na 5.13.2 — aquela versão chegou a ser marcada, mas nunca foi publicada no npm.
+
+### 📥 A instalação no Mac e no Linux agora funciona de verdade
+
+Esta é a correção mais importante. Em uma instalação nova no Mac ou no Linux, instalar o Piper e baixar as vozes **simplesmente nunca era executado**. Você via "Installing Piper TTS…" seguido de "installation failed or was cancelled" — culpando uma etapa que sequer havia começado.
+
+Ficou quebrado por 51 lançamentos. Só funcionava na única configuração em que desenvolvemos, e é exatamente por isso que passou tanto tempo despercebido. Corrigido, e agora testado do jeito que você realmente instalaria.
+
+Alguns problemas de instalação relacionados foram junto: certos scripts estavam salvos em um formato do Windows que o Mac e o Linux não conseguem ler, então paravam antes de fazer qualquer coisa. Agora estão no formato certo.
+
+### 🔧 Seus arquivos personalizados continuam sendo seus
+
+Se você tinha editado algum dos scripts de hook que o AgentVibes instala, a atualização podia sobrescrever o seu trabalho. No Windows era pior ainda — o atualizador conhecia apenas 8 dos 25 scripts, então a maioria era tratada de forma errada.
+
+Agora todos os scripts estão cobertos, e tudo o que você alterou é copiado para um backup com data e hora antes de ser tocado. Se você tivesse editado o `play-tts.ps1`, encontraria a sua versão salva ao lado dele como:
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+O carimbo de data e hora corresponde ao momento daquela atualização, então cada atualização que você fizer guarda o seu próprio backup — você sempre pode voltar atrás, e não apenas para a primeira versão.
+
+### 🎵 O botão de pré-visualização toca a mistura completa
+
+O botão de pré-visualização nas telas de configuração deveria tocar tudo combinado — a **voz** escolhida, qualquer **reverb ou efeito de áudio** e a sua **música de fundo** — para que você ouça exatamente como seu agente vai soar. Duas coisas atrapalhavam isso.
+
+Ao configurar um agente Hermes, a pré-visualização tocava a voz e os efeitos, mas deixava a música totalmente de fora. E no Windows, se o **ffmpeg** (a ferramenta que mistura a música com a fala) não estivesse acessível, a música era descartada em silêncio — a voz tocava perfeitamente, então nada parecia errado.
+
+Ambos corrigidos. E quando o ffmpeg realmente está faltando, você agora recebe uma mensagem clara avisando, em vez de um silêncio que você teria que adivinhar.
+
+### 🎙️ Pré-visualizações na voz certa, com o nome certo
+
+Pré-visualizar uma voz agora usa o motor da própria voz, em vez do que estava definido globalmente, e informa qual motor você está ouvindo. As vozes do sistema do Windows e do Mac também funcionam em pré-visualizações remotas. A lista de vozes do Windows agora mostra apenas as vozes que podem realmente ser selecionadas — chega de escolher uma que nunca fala.
+
+### 🟢 Local ou remoto, num relance
+
+As configurações agora colorem o destino do seu áudio: **Local** em verde, **Remote** em vermelho. Prático para quando você fica se perguntando por que a sala está silenciosa — normalmente a resposta é que o som está indo para outra máquina.
+
+### 🪟 Windows enviando áudio para outro lugar
+
+Enviar áudio de uma máquina Windows para outro computador podia embaralhar os caminhos dos arquivos pelo caminho, o que descartava silenciosamente a sua música de fundo. Corrigido.
+
+### 📦 Um download mais limpo
+
+O pacote não carrega mais arquivos de que nunca precisou, incluindo algumas configurações locais esquecidas que não deveriam ter sido publicadas. Tudo o que o aplicativo manda você executar agora está de fato incluído.
+
+### 🧰 Nos bastidores
+
+A suíte de testes agora passa sem erros no Windows, no Mac e no Linux a partir de um checkout limpo — ela vinha falhando de maneiras que escondiam bugs reais, como o da instalação acima. Novos testes travam as correções desta versão para que elas não voltem sorrateiramente. Também corrigimos um caso em que um processo em segundo plano podia travar em vez de encerrar.
+
+---
+
 ## 🔧 v5.13.2 — Instalações mais limpas, configuração mais tranquila
 
 **Lançamento:** 2026-07-17 · no `latest` — `npm install agentvibes@latest`

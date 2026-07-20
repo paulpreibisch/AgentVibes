@@ -1,5 +1,61 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎧 v5.14.0 — Des installations qui marchent, des aperçus fiables
+
+**Publié le :** 2026-07-19 · sur `latest` — `npm install agentvibes@latest`
+
+Une grosse version de rattrapage. Si vous venez de la 5.13.1, celle-ci contient aussi tout ce que la 5.13.2 apportait — cette version avait été taguée mais n'est jamais arrivée sur npm.
+
+### 📥 L'installation sur Mac et Linux fonctionne enfin
+
+C'est LE gros morceau. Sur une installation Mac ou Linux toute neuve, l'installation de Piper et le téléchargement des voix **ne se lançaient tout simplement jamais**. Vous voyiez « Installing Piper TTS… » puis « installation failed or was cancelled » — un échec annoncé pour une étape qui n'avait même pas commencé.
+
+C'était cassé depuis 51 versions. Ça n'a jamais fonctionné que sur la seule configuration sur laquelle nous développons, ce qui explique précisément pourquoi personne ne l'avait remarqué aussi longtemps. C'est corrigé, et désormais testé de la façon dont vous installez réellement le produit.
+
+Quelques problèmes d'installation connexes sont partis avec : certains scripts étaient enregistrés dans un format Windows que Mac et Linux ne savent pas lire, et s'arrêtaient donc avant de faire quoi que ce soit. Ils sont maintenant dans le bon format.
+
+### 🔧 Vos fichiers personnalisés restent les vôtres
+
+Si vous aviez modifié l'un des scripts de hook installés par AgentVibes, une mise à jour pouvait écraser votre travail. Sur Windows, c'était pire encore : le programme de mise à jour ne connaissait que 8 des 25 scripts, la plupart étaient donc mal traités.
+
+Désormais, tous les scripts sont pris en compte, et tout ce que vous avez modifié est copié dans une sauvegarde horodatée avant d'être touché. Si vous aviez modifié `play-tts.ps1`, vous retrouveriez votre version enregistrée juste à côté sous la forme :
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+L'horodatage correspond à la date et à l'heure de cette mise à jour : chaque mise à jour conserve donc sa propre sauvegarde — vous pouvez toujours revenir en arrière, et pas seulement jusqu'à la première.
+
+### 🎵 Le bouton Aperçu joue l'ensemble du mixage
+
+Le bouton Aperçu des écrans de configuration est censé tout jouer ensemble — la **voix** que vous avez choisie, la **réverbération et les effets audio**, et votre **musique de fond** — pour que vous entendiez exactement ce à quoi votre agent va ressembler. Deux choses cassaient ça.
+
+Lors de la configuration d'un agent Hermes, l'Aperçu jouait la voix et les effets mais laissait complètement tomber la musique. Et sous Windows, si **ffmpeg** (l'outil qui mélange la musique à la parole) n'était pas accessible, la musique disparaissait en silence — la voix se jouait parfaitement, donc rien ne semblait anormal.
+
+Les deux sont corrigés. Et quand ffmpeg manque vraiment, vous recevez maintenant un message clair qui le dit, au lieu d'un silence à déchiffrer.
+
+### 🎙️ Des aperçus dans la bonne voix, avec le bon nom
+
+L'aperçu d'une voix utilise désormais le moteur propre à cette voix plutôt que celui défini globalement, et vous indique quel moteur vous êtes en train d'entendre. Les voix système de Windows et de Mac fonctionnent aussi via les aperçus distants. La liste des voix Windows n'affiche plus que les voix réellement sélectionnables — fini d'en choisir une qui ne parle jamais.
+
+### 🟢 Local ou distant, en un coup d'œil
+
+Les réglages colorent maintenant votre destination audio : **Local** en vert, **Remote** en rouge. Bien pratique quand vous vous demandez pourquoi la pièce est silencieuse — la réponse, en général, c'est que le son part sur une autre machine.
+
+### 🪟 Windows envoyant l'audio ailleurs
+
+Envoyer l'audio d'une machine Windows vers un autre ordinateur pouvait déformer les chemins de fichiers en route, ce qui faisait disparaître votre musique de fond sans rien dire. Corrigé.
+
+### 📦 Un téléchargement plus propre
+
+Le paquet n'embarque plus de fichiers dont il n'a jamais eu besoin, y compris des réglages locaux résiduels qui n'auraient jamais dû être publiés. Tout ce que l'application vous demande de lancer est désormais réellement inclus.
+
+### 🧰 Sous le capot
+
+La suite de tests passe maintenant sans accroc sur Windows, Mac et Linux à partir d'un dépôt tout neuf — elle échouait auparavant d'une manière qui masquait de vrais bugs, comme celui de l'installation ci-dessus. De nouveaux tests verrouillent les corrections apportées ici pour qu'elles ne puissent pas revenir en douce. Nous avons aussi corrigé un cas où un processus en arrière-plan pouvait rester bloqué au lieu de s'arrêter.
+
+---
+
 ## 🔧 v5.13.2 — Des installations plus propres, une mise en route plus fluide
 
 **Publié le :** 2026-07-17 · sur `latest` — `npm install agentvibes@latest`

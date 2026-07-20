@@ -1,5 +1,61 @@
 # AgentVibes Release Notes
 
+## 🎧 v5.14.0 — Installs that work, previews you can trust
+
+**Released:** 2026-07-19 · on `latest` — `npm install agentvibes@latest`
+
+A big catch-up release. If you're coming from 5.13.1, this includes everything from 5.13.2 as well — that version was tagged but never made it to npm.
+
+### 📥 Setting up on Mac or Linux actually works now
+
+This is the big one. On a fresh Mac or Linux install, installing Piper and downloading voices **never ran at all**. You'd see "Installing Piper TTS…" followed by "installation failed or was cancelled" — blaming a step that was never even started.
+
+It had been broken for 51 releases. It only ever worked on the one setup we develop on, which is exactly why it went unnoticed for so long. Fixed, and now tested the way you'd actually install it.
+
+A few related setup problems went with it: some scripts were saved in a Windows format that Mac and Linux can't read, so they stopped before doing anything. Those are in the right format now.
+
+### 🔧 Your customised files stay yours
+
+If you'd edited any of the hook scripts AgentVibes installs, updating could overwrite your work. On Windows it was worse — the updater only knew about 8 of 25 scripts, so most were being handled wrongly.
+
+Now every script is covered, and anything you've changed is copied to a timestamped backup before it's touched. If you'd edited `play-tts.ps1`, you'd find your version saved beside it as:
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+The timestamp is the date and time of that update, so every update you run keeps its own backup — you can always go back, not just to the first one.
+
+### 🎵 The Preview button plays the whole mix
+
+The Preview button in the setup screens is supposed to play everything combined — your chosen **voice**, any **reverb or audio effects**, and your **background music** — so you hear exactly what your agent will sound like. Two things broke that.
+
+Setting up a Hermes agent, Preview played the voice and effects but left the music out entirely. And on Windows, if **ffmpeg** (the tool that blends music with speech) wasn't reachable, the music was silently dropped — the voice played perfectly, so nothing looked wrong.
+
+Both fixed. And when ffmpeg really is missing, you now get a clear message saying so instead of silence you have to guess at.
+
+### 🎙️ Previews in the right voice, with the right name
+
+Previewing a voice now uses that voice's own engine instead of whatever was set globally, and tells you which engine you're hearing. Windows and Mac system voices work through remote previews too. The Windows voice list now shows only voices that can actually be selected — no more choosing one that never speaks.
+
+### 🟢 Local or remote, at a glance
+
+Settings now colours your audio destination: **Local** in green, **Remote** in red. Handy when you're wondering why the room is quiet — usually the answer is that sound is going to another machine.
+
+### 🪟 Windows sending audio elsewhere
+
+Sending audio from a Windows machine to another computer could mangle file paths along the way, which quietly dropped your background music. Fixed.
+
+### 📦 A cleaner download
+
+The package no longer carries files it never needed, including some leftover local settings that shouldn't have shipped. Everything the app tells you to run is now actually included.
+
+### 🧰 Under the hood
+
+The test suite now passes cleanly on Windows, Mac and Linux from a fresh checkout — it had been failing in ways that hid real bugs like the install one above. New tests lock in the fixes here so they can't quietly come back. Also fixed a case where a background process could hang instead of shutting down.
+
+---
+
 ## 🔧 v5.13.2 — Cleaner installs, smoother setup
 
 **Released:** 2026-07-17 · on `latest` — `npm install agentvibes@latest`

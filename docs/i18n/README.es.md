@@ -4,7 +4,17 @@
 
 ---
 
-## 🆕 Tus voces en todas partes (v5.13.0)
+## 🆕 Instalaciones que funcionan, vistas previas fiables (v5.14.0)
+
+Una versión de puesta al día, que incluye también todo lo de la 5.13.2, que nunca llegó a npm.
+
+- **📥 La instalación en Mac y Linux por fin funciona** — la instalación de Piper y la descarga de voces nunca llegaban a ejecutarse en una instalación nueva, y encima informaban de un fallo en un paso que jamás habían empezado. Llevaba 51 versiones roto; ya está corregido y debidamente probado.
+- **🔧 Tus archivos personalizados siguen siendo tuyos** — al actualizar ya no se sobrescriben los scripts de hooks que hayas editado; tu versión se guarda antes a su lado, por ejemplo `play-tts.ps1.user.bak.20260719-143052`.
+- **🎵 La vista previa reproduce la mezcla completa** — el botón de vista previa reproduce tu voz, el reverb y los efectos **y** la música de fondo, todo junto; la música ya no desaparece, y si ffmpeg no está disponible recibes un mensaje claro en lugar de silencio.
+- **🎙️ La voz correcta, con su nombre** — las vistas previas usan el motor propio de la voz que estás escuchando y te dicen cuál es; las voces de Windows y Mac funcionan en las vistas previas remotas.
+- **🟢 Local o remoto, de un vistazo** — el destino del audio se muestra en verde para **Local** y en rojo para **Remote**.
+
+### v5.13.0 — Tus voces en todas partes
 
 Elige las voces integradas en **Windows** o **Mac** y escúchalas dondequiera que estés escuchando — incluso cuando tus agentes se ejecutan en otro ordenador. Además, un amable tono de aviso para que siempre sepas que el audio está en camino.
 

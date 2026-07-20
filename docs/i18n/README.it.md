@@ -4,7 +4,17 @@
 
 ---
 
-## 🆕 Le tue voci ovunque (v5.13.0)
+## 🆕 Installazioni che funzionano, anteprime di cui fidarti (v5.14.0)
+
+Una release di recupero, che include anche tutto ciò che conteneva la 5.13.2, mai arrivata su npm.
+
+- **📥 La configurazione su Mac e Linux funziona davvero** — l'installazione di Piper e il download delle voci non venivano proprio eseguiti su un'installazione nuova, e veniva segnalato un errore per un passaggio mai iniziato. Rotto da 51 release; ora risolto e testato come si deve.
+- **🔧 I tuoi file personalizzati restano tuoi** — l'aggiornamento non sovrascrive più gli script hook che hai modificato; la tua versione viene prima salvata accanto, ad esempio `play-tts.ps1.user.bak.20260719-143052`.
+- **🎵 L'Anteprima riproduce l'intero mix** — il pulsante Anteprima riproduce insieme la tua voce, il riverbero/gli effetti **e** la musica di sottofondo; la musica non sparisce più e, se ffmpeg non è disponibile, ricevi un messaggio chiaro invece del silenzio.
+- **🎙️ La voce giusta, con il suo nome** — le anteprime usano il motore proprio della voce in ascolto e ti dicono quale sia; le voci Windows e Mac funzionano anche nelle anteprime remote.
+- **🟢 Locale o remoto, a colpo d'occhio** — la destinazione audio è verde per **Local** e rossa per **Remote**.
+
+### v5.13.0 — Le tue voci ovunque
 
 Scegli le voci integrate in **Windows** o **Mac** e ascoltale ovunque tu stia ascoltando — anche quando i tuoi agenti vengono eseguiti su un altro computer. In più, un cordiale tono di preavviso così sai sempre che il suono sta per arrivare.
 

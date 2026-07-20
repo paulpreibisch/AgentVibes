@@ -1,5 +1,61 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎧 v5.14.0 — Installationen, die klappen, Vorschauen, auf die Verlass ist
+
+**Veröffentlicht:** 2026-07-19 · auf `latest` — `npm install agentvibes@latest`
+
+Ein großes Nachhol-Release. Wenn du von 5.13.1 kommst, ist alles aus 5.13.2 ebenfalls enthalten — diese Version bekam zwar einen Tag, schaffte es aber nie zu npm.
+
+### 📥 Die Einrichtung unter Mac und Linux funktioniert jetzt wirklich
+
+Das ist die große Sache. Bei einer frischen Installation unter Mac oder Linux wurden Piper und der Download der Stimmen **überhaupt nie ausgeführt**. Du sahst „Installing Piper TTS…" und direkt danach „installation failed or was cancelled" — die Schuld bekam ein Schritt, der nie gestartet war.
+
+Das war 51 Releases lang kaputt. Funktioniert hat es immer nur auf genau der einen Umgebung, auf der wir entwickeln — und genau deshalb ist es so lange niemandem aufgefallen. Behoben, und jetzt so getestet, wie du es tatsächlich installieren würdest.
+
+Ein paar verwandte Einrichtungsprobleme sind gleich mitgegangen: Einige Skripte waren in einem Windows-Format gespeichert, das Mac und Linux nicht lesen können, sodass sie stoppten, bevor sie irgendetwas taten. Die sind jetzt im richtigen Format.
+
+### 🔧 Deine angepassten Dateien bleiben deine
+
+Wenn du eines der Hook-Skripte bearbeitet hattest, die AgentVibes installiert, konnte ein Update deine Arbeit überschreiben. Unter Windows war es noch schlimmer — der Updater kannte nur 8 von 25 Skripten, der Rest wurde also falsch behandelt.
+
+Jetzt ist jedes Skript abgedeckt, und alles, was du geändert hast, wird vor dem Anfassen in ein Backup mit Zeitstempel kopiert. Hattest du `play-tts.ps1` bearbeitet, findest du deine Fassung direkt daneben als:
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+Der Zeitstempel ist Datum und Uhrzeit genau dieses Updates — jedes Update, das du ausführst, behält also sein eigenes Backup. Du kannst immer zurück, nicht nur zur allerersten Version.
+
+### 🎵 Die Vorschau-Schaltfläche spielt die komplette Mischung
+
+Die Vorschau-Schaltfläche in den Einrichtungsbildschirmen soll alles zusammen abspielen — deine gewählte **Stimme**, jeden **Hall und alle Audioeffekte** sowie deine **Hintergrundmusik** — damit du genau hörst, wie dein Agent klingen wird. Zwei Dinge haben das kaputt gemacht.
+
+Beim Einrichten eines Hermes-Agenten spielte die Vorschau Stimme und Effekte, ließ die Musik aber komplett weg. Und wenn unter Windows **ffmpeg** (das Werkzeug, das Musik und Sprache zusammenmischt) nicht erreichbar war, fiel die Musik stillschweigend weg — die Stimme kam einwandfrei, es sah also nach nichts aus.
+
+Beides behoben. Und wenn ffmpeg wirklich fehlt, bekommst du jetzt eine klare Meldung, statt Stille, die du dir selbst zusammenreimen musst.
+
+### 🎙️ Vorschauen in der richtigen Stimme, mit dem richtigen Namen
+
+Die Vorschau einer Stimme nutzt jetzt deren eigene Engine statt der global eingestellten — und sagt dir, welche Engine du gerade hörst. Windows- und Mac-Systemstimmen funktionieren auch über Remote-Vorschauen. Die Windows-Stimmliste zeigt jetzt nur noch Stimmen, die sich wirklich auswählen lassen — kein Griff mehr ins Leere.
+
+### 🟢 Lokal oder remote, auf einen Blick
+
+Die Einstellungen färben jetzt dein Audioziel: **Local** in Grün, **Remote** in Rot. Praktisch, wenn du dich fragst, warum es im Raum still ist — meistens lautet die Antwort, dass der Ton auf einem anderen Rechner landet.
+
+### 🪟 Windows schickt Audio woandershin
+
+Wenn ein Windows-Rechner Audio an einen anderen Computer schickte, konnten unterwegs Dateipfade verstümmelt werden, wodurch deine Hintergrundmusik still verschwand. Behoben.
+
+### 📦 Ein aufgeräumterer Download
+
+Das Paket schleppt keine Dateien mehr mit, die es nie gebraucht hat — darunter übrig gebliebene lokale Einstellungen, die nie hätten mitgeliefert werden dürfen. Alles, was die App dir zum Ausführen sagt, ist jetzt auch wirklich enthalten.
+
+### 🧰 Unter der Haube
+
+Die Testsuite läuft jetzt unter Windows, Mac und Linux aus einem frischen Checkout sauber durch — vorher schlug sie auf eine Weise fehl, die echte Fehler wie den Installationsfehler oben verdeckte. Neue Tests halten die Korrekturen aus diesem Release fest, damit sie nicht klammheimlich zurückkehren. Außerdem behoben: ein Fall, in dem ein Hintergrundprozess hängen bleiben konnte, statt sich zu beenden.
+
+---
+
 ## 🔧 v5.13.2 — Saubere Installationen, einfachere Einrichtung
 
 **Veröffentlicht:** 2026-07-17 · auf `latest` — `npm install agentvibes@latest`

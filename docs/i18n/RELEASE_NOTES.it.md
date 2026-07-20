@@ -1,5 +1,61 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## 🎧 v5.14.0 — Installazioni che funzionano, anteprime di cui fidarti
+
+**Rilasciato il:** 2026-07-19 · su `latest` — `npm install agentvibes@latest`
+
+Una release di recupero in grande stile. Se arrivi dalla 5.13.1, qui trovi anche tutto ciò che conteneva la 5.13.2 — quella versione era stata etichettata ma non è mai arrivata su npm.
+
+### 📥 Su Mac e Linux la configurazione ora funziona davvero
+
+Questa è la correzione più importante. Su un'installazione nuova su Mac o Linux, l'installazione di Piper e il download delle voci **non venivano proprio eseguiti**. Comparivano i messaggi "Installing Piper TTS…" e subito dopo "installation failed or was cancelled" — dando la colpa a un passaggio che non era nemmeno iniziato.
+
+Era rotto da 51 release. Aveva sempre funzionato soltanto sull'unica configurazione su cui sviluppiamo, ed è esattamente per questo che è passato inosservato così a lungo. Ora è risolto e testato nel modo in cui lo installeresti davvero.
+
+Insieme a questo sono spariti anche alcuni problemi di configurazione collegati: alcuni script erano salvati in un formato Windows che Mac e Linux non riescono a leggere, quindi si fermavano prima di fare qualsiasi cosa. Ora sono nel formato giusto.
+
+### 🔧 I tuoi file personalizzati restano tuoi
+
+Se avevi modificato uno degli script hook installati da AgentVibes, l'aggiornamento rischiava di sovrascrivere il tuo lavoro. Su Windows andava anche peggio: l'updater conosceva solo 8 script su 25, quindi la maggior parte veniva gestita in modo sbagliato.
+
+Ora sono coperti tutti gli script, e qualsiasi cosa tu abbia modificato viene copiata in un backup con data e ora prima di essere toccata. Se avevi modificato `play-tts.ps1`, ritroveresti la tua versione salvata accanto con questo nome:
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+L'indicazione temporale è la data e l'ora di quell'aggiornamento, quindi ogni aggiornamento che esegui conserva il proprio backup — puoi sempre tornare indietro, non solo al primo.
+
+### 🎵 Il pulsante Anteprima riproduce l'intero mix
+
+Il pulsante Anteprima nelle schermate di configurazione dovrebbe riprodurre tutto insieme — la **voce** che hai scelto, l'eventuale **riverbero o gli effetti audio** e la tua **musica di sottofondo** — così senti esattamente come suonerà il tuo agente. Due cose lo impedivano.
+
+Configurando un agente Hermes, l'Anteprima riproduceva voce ed effetti ma lasciava fuori del tutto la musica. E su Windows, se **ffmpeg** (lo strumento che mescola la musica con il parlato) non era raggiungibile, la musica veniva scartata in silenzio — la voce si sentiva perfettamente, quindi sembrava tutto a posto.
+
+Entrambi risolti. E quando ffmpeg manca davvero, ora ricevi un messaggio chiaro che te lo dice, invece di un silenzio da interpretare a intuito.
+
+### 🎙️ Anteprime con la voce giusta e il nome giusto
+
+L'anteprima di una voce ora usa il motore proprio di quella voce invece di quello impostato globalmente, e ti dice quale motore stai ascoltando. Le voci di sistema di Windows e Mac funzionano anche tramite le anteprime remote. L'elenco delle voci Windows ora mostra solo le voci realmente selezionabili — niente più scelte che poi non parlano.
+
+### 🟢 Locale o remoto, a colpo d'occhio
+
+Le impostazioni ora colorano la destinazione audio: **Local** in verde, **Remote** in rosso. Comodo quando ti chiedi perché la stanza è silenziosa — di solito la risposta è che il suono sta andando su un'altra macchina.
+
+### 🪟 Windows che invia l'audio altrove
+
+Inviare audio da una macchina Windows a un altro computer poteva alterare i percorsi dei file lungo il tragitto, facendo sparire silenziosamente la musica di sottofondo. Risolto.
+
+### 📦 Un download più pulito
+
+Il pacchetto non porta più con sé file di cui non ha mai avuto bisogno, comprese alcune impostazioni locali residue che non avrebbero dovuto essere distribuite. Tutto ciò che l'app ti dice di eseguire è ora davvero incluso.
+
+### 🧰 Sotto il cofano
+
+La suite di test ora passa senza intoppi su Windows, Mac e Linux partendo da un checkout pulito — prima falliva in modi che nascondevano bug reali, come quello dell'installazione qui sopra. Nuovi test blindano le correzioni di questa release così non possono tornare di nascosto. Risolto anche un caso in cui un processo in background poteva bloccarsi invece di chiudersi.
+
+---
+
 ## 🔧 v5.13.2 — Installazioni più pulite, configurazione più semplice
 
 **Rilasciato il:** 2026-07-17 · su `latest` — `npm install agentvibes@latest`
