@@ -73,12 +73,42 @@ $HooksDir = "$ClaudeDir\hooks-windows"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
 $MuteFile = "$ClaudeDir\tts-muted.txt"
 
-# Check if TTS is muted
+# Check if TTS is muted (receiver master switch — /agent-vibes:receiver off).
+# Kept as an absolute pre-check so existing behaviour does not regress.
 if (Test-Path $MuteFile) {
     $muteStatus = Get-Content $MuteFile -Raw
     if ($muteStatus.Trim() -eq "true") {
         exit 0
     }
+}
+
+# ---------------------------------------------------------------------------
+# MUTE PRECEDENCE (parity with .claude/hooks/play-tts.sh:89-114).
+#
+# Until now this player read ONLY tts-muted.txt above, which /agent-vibes:mute
+# never writes — so `/agent-vibes:mute` did not silence Windows audio at all,
+# and the global `~/.agentvibes-muted` kill-switch was ignored on Windows.
+# Same three levels as bash, in the same order:
+#   1. project agentvibes-unmuted -> speak (overrides a global mute)
+#   2. project agentvibes-muted   -> silent
+#   3. global ~/.agentvibes-muted -> silent
+#
+# The project markers live under the REAL project root (CLAUDE_PROJECT_DIR when
+# set), not $ClaudeDir, which falls back to the user profile for global installs.
+# $HOME is preferred over $env:USERPROFILE so markers written by bash under
+# git-bash resolve to the same file here.
+$HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+$MuteScopeDir = if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) {
+    "$env:CLAUDE_PROJECT_DIR\.claude"
+} else {
+    $ClaudeDir
+}
+if (Test-Path (Join-Path $MuteScopeDir "agentvibes-unmuted")) {
+    # explicit per-project enable — wins over the global kill-switch
+} elseif (Test-Path (Join-Path $MuteScopeDir "agentvibes-muted")) {
+    exit 0
+} elseif (Test-Path (Join-Path $HomeDir ".agentvibes-muted")) {
+    exit 0
 }
 
 # Determine active provider
@@ -451,6 +481,70 @@ if ($PlanOk -and $PlanVoiceIsOverride -and $PlanVoice) {
 }
 elseif (-not $PlanOk -and $_LlmVoice -and -not $VoiceOverride) {
     $VoiceOverride = $_LlmVoice
+}
+
+# --- Dynamic session self-ID ({{session}} token) ------------------------------
+# Parity with play-tts.sh:250-296. A per-LLM PRETEXT containing {{session}}
+# expands to "<LLM> on <Project> in <Terminal>" so multi-session users can tell
+# which window just spoke. Announced ONCE per session; on later utterances the
+# token is dropped rather than prefixing every line. Opt-in — this whole block
+# is inert unless the configured pretext actually contains the token.
+if ($_LlmPretext -like "*{{session}}*") {
+    # Session key. There is no true Claude-session id available to a hook, so
+    # this is best-effort: a terminal-session id when the emulator exports one
+    # (stable for that tab's life), else this process's parent PID. Worst case
+    # the self-ID repeats or is skipped — cosmetic, and only when opted in.
+    $_SidRaw = if ($env:WT_SESSION) { $env:WT_SESSION }
+               elseif ($env:TERM_SESSION_ID) { $env:TERM_SESSION_ID }
+               elseif ($env:TMUX) { $env:TMUX }
+               else {
+                   try { (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId } catch { $PID }
+               }
+    $_SidProj = ""
+    $_SidProjDirRaw = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $ClaudeDir }
+    try { $_SidProj = Split-Path -Leaf ($_SidProjDirRaw.TrimEnd('\', '/')) } catch { }
+    $_SidKey = (("$llm|$_SidProj|$_SidRaw") -replace '[^A-Za-z0-9]', '_')
+
+    # Announce-marker dir under the per-user temp path (already user-scoped on
+    # Windows: %LOCALAPPDATA%\Temp), so no cross-user marker collisions.
+    $_AnnDir  = Join-Path ([System.IO.Path]::GetTempPath()) "agentvibes-session"
+    $_AnnOk   = $false
+    try { $null = New-Item -ItemType Directory -Path $_AnnDir -Force -ErrorAction Stop; $_AnnOk = $true } catch { }
+    $_AnnFile = Join-Path $_AnnDir "announced-$_SidKey"
+
+    # First utterance -> replacement is the self-ID; later utterances -> empty.
+    $_SessionId = ""
+    if ($_AnnOk -and (Test-Path $_AnnFile)) {
+        $_SessionId = ""
+    } else {
+        $_SidScript = Join-Path $HooksDir "agentvibes-session-id.ps1"
+        if (Test-Path $_SidScript) {
+            $_SidProjDir = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $ClaudeDir }
+            try { $_SessionId = & $_SidScript -LlmKey $llm -ProjectDir $_SidProjDir } catch { $_SessionId = "" }
+        }
+        if ($_AnnOk) {
+            try {
+                if (-not (Test-Path $_AnnFile)) { $null = New-Item -ItemType File -Path $_AnnFile -ErrorAction Stop }
+                # Bound growth: drop announce-markers older than a day.
+                Get-ChildItem -Path $_AnnDir -Filter 'announced-*' -ErrorAction SilentlyContinue |
+                    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-1) } |
+                    Remove-Item -Force -ErrorAction SilentlyContinue
+            } catch { }
+        }
+    }
+
+    if ($_SessionId) {
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape('{{session}}'), $_SessionId
+    } else {
+        # Empty replacement: also swallow one adjacent ", " so "Hey {{session}}, ready"
+        # becomes "Hey ready", not "Hey , ready"; then drop any bare token.
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape('{{session}}, '), ''
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape(', {{session}}'), ''
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape('{{session}}'), ''
+    }
+    # Final tidy: collapse doubled/edge commas and runs of whitespace.
+    $_LlmPretext = $_LlmPretext -replace ',\s*,', ',' -replace '^\s*,\s*', '' -replace '\s*,\s*$', '' -replace '\s{2,}', ' '
+    $_LlmPretext = $_LlmPretext.Trim()
 }
 
 # --- Apply LLM-specific pretext ----------------------------------------------

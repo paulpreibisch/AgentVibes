@@ -5442,8 +5442,13 @@ async function updateCommandFiles(targetDir, spinner) {
  * These hooks contain bug fixes (e.g. markdown stripping) that must propagate
  * on every `npx agentvibes update` regardless of target directory.
  */
-const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'play-tts-piper.sh', 'audio-processor.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
-const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1', 'tts-watcher.ps1'];
+// agentvibes-session-id.{sh,ps1} are listed because play-tts.{sh,ps1} SHELL OUT to
+// them to expand a {{session}} pretext. They were absent here, so on a global
+// install the global-update path never shipped them and the self-ID silently
+// degraded to an empty string forever — the callers fail soft by design, so the
+// omission produced no error, just a feature that never worked.
+const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'play-tts-piper.sh', 'audio-processor.sh', 'session-start-tts.sh', 'bmad-party-speak.sh', 'agentvibes-session-id.sh'];
+const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1', 'tts-watcher.ps1', 'agentvibes-session-id.ps1'];
 
 /**
  * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.
