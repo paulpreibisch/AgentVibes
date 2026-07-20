@@ -4,15 +4,15 @@
 
 ---
 
-## 🆕 Installazioni che funzionano, anteprime di cui fidarti (v5.14.0)
+## 🆕 Installazione affidabile e anteprime audio complete (v5.14.0)
 
-Una release di recupero, che include anche tutto ciò che conteneva la 5.13.2, mai arrivata su npm.
+Include tutte le modifiche della 5.13.2, che non è stata pubblicata su npm.
 
-- **📥 La configurazione su Mac e Linux funziona davvero** — l'installazione di Piper e il download delle voci non venivano proprio eseguiti su un'installazione nuova, e veniva segnalato un errore per un passaggio mai iniziato. Rotto da 51 release; ora risolto e testato come si deve.
-- **🔧 I tuoi file personalizzati restano tuoi** — l'aggiornamento non sovrascrive più gli script hook che hai modificato; la tua versione viene prima salvata accanto, ad esempio `play-tts.ps1.user.bak.20260719-143052`.
-- **🎵 L'Anteprima riproduce l'intero mix** — il pulsante Anteprima riproduce insieme la tua voce, il riverbero/gli effetti **e** la musica di sottofondo; la musica non sparisce più e, se ffmpeg non è disponibile, ricevi un messaggio chiaro invece del silenzio.
-- **🎙️ La voce giusta, con il suo nome** — le anteprime usano il motore proprio della voce in ascolto e ti dicono quale sia; le voci Windows e Mac funzionano anche nelle anteprime remote.
-- **🟢 Locale o remoto, a colpo d'occhio** — la destinazione audio è verde per **Local** e rossa per **Remote**.
+- **La configurazione si completa su macOS e Linux** — l'installazione di Piper e il download delle voci vengono ora eseguiti correttamente su una macchina nuova, risolvendo un problema di lunga data alla prima installazione.
+- **L'Anteprima riproduce il mix completo** — voce, riverbero/effetti e musica di sottofondo insieme, così le anteprime riflettono come suonerà davvero il tuo agente.
+- **Gli aggiornamenti preservano le tue personalizzazioni** — gli script hook modificati vengono salvati in un backup con marca temporale prima che qualsiasi file venga sostituito.
+- **Destinazione audio più chiara** — le impostazioni mostrano **Local** in verde e **Remote** in rosso.
+- **Motore di anteprima corretto** — le anteprime usano il motore proprio della voce selezionata e lo indicano; le voci Windows e macOS funzionano nelle anteprime remote.
 
 ### v5.13.0 — Le tue voci ovunque
 

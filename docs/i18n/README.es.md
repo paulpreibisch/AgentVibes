@@ -4,15 +4,15 @@
 
 ---
 
-## 🆕 Instalaciones que funcionan, vistas previas fiables (v5.14.0)
+## 🆕 Instalación fiable y vistas previas de audio completas (v5.14.0)
 
-Una versión de puesta al día, que incluye también todo lo de la 5.13.2, que nunca llegó a npm.
+Incluye todos los cambios de la 5.13.2, que no llegó a publicarse en npm.
 
-- **📥 La instalación en Mac y Linux por fin funciona** — la instalación de Piper y la descarga de voces nunca llegaban a ejecutarse en una instalación nueva, y encima informaban de un fallo en un paso que jamás habían empezado. Llevaba 51 versiones roto; ya está corregido y debidamente probado.
-- **🔧 Tus archivos personalizados siguen siendo tuyos** — al actualizar ya no se sobrescriben los scripts de hooks que hayas editado; tu versión se guarda antes a su lado, por ejemplo `play-tts.ps1.user.bak.20260719-143052`.
-- **🎵 La vista previa reproduce la mezcla completa** — el botón de vista previa reproduce tu voz, el reverb y los efectos **y** la música de fondo, todo junto; la música ya no desaparece, y si ffmpeg no está disponible recibes un mensaje claro en lugar de silencio.
-- **🎙️ La voz correcta, con su nombre** — las vistas previas usan el motor propio de la voz que estás escuchando y te dicen cuál es; las voces de Windows y Mac funcionan en las vistas previas remotas.
-- **🟢 Local o remoto, de un vistazo** — el destino del audio se muestra en verde para **Local** y en rojo para **Remote**.
+- **La instalación se completa en macOS y Linux** — la instalación de Piper y la descarga de voces se ejecutan ahora correctamente en un equipo nuevo, resolviendo un problema de larga duración en la primera instalación.
+- **La vista previa reproduce tu mezcla completa** — voz, reverb/efectos y música de fondo a la vez, para que las vistas previas reflejen cómo sonará realmente tu agente.
+- **Las actualizaciones conservan tus personalizaciones** — los scripts de hooks que hayas editado se guardan en una copia de seguridad con marca de tiempo antes de reemplazar ningún archivo.
+- **Destino del audio más claro** — los ajustes muestran **Local** en verde y **Remote** en rojo.
+- **Motor de vista previa correcto** — las vistas previas usan el motor propio de la voz seleccionada y lo identifican; las voces de Windows y macOS funcionan en las vistas previas remotas.
 
 ### v5.13.0 — Tus voces en todas partes
 

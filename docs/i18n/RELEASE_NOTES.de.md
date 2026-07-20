@@ -1,58 +1,48 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
-## 🎧 v5.14.0 — Installationen, die klappen, Vorschauen, auf die Verlass ist
+## v5.14.0 — Zuverlässige Einrichtung und vollständige Audio-Vorschauen
 
-**Veröffentlicht:** 2026-07-19 · auf `latest` — `npm install agentvibes@latest`
+**Veröffentlicht:** 2026-07-19 · `npm install agentvibes@latest`
 
-Ein großes Nachhol-Release. Wenn du von 5.13.1 kommst, ist alles aus 5.13.2 ebenfalls enthalten — diese Version bekam zwar einen Tag, schaffte es aber nie zu npm.
+Dieses Release konzentriert sich auf zwei Dinge: AgentVibes auf jeder Plattform korrekt zu installieren und die Vorschau-Schaltfläche zu einer verlässlichen Wiedergabe dessen zu machen, wie dein Agent tatsächlich klingen wird. Ebenfalls enthalten ist alles aus 5.13.2, das zwar getaggt, aber nie auf npm veröffentlicht wurde.
 
-### 📥 Die Einrichtung unter Mac und Linux funktioniert jetzt wirklich
+### Die Einrichtung wird unter macOS und Linux vollständig abgeschlossen
 
-Das ist die große Sache. Bei einer frischen Installation unter Mac oder Linux wurden Piper und der Download der Stimmen **überhaupt nie ausgeführt**. Du sahst „Installing Piper TTS…" und direkt danach „installation failed or was cancelled" — die Schuld bekam ein Schritt, der nie gestartet war.
+Die Installation von Piper und der Download der Stimmen laufen auf einem frischen macOS- oder Linux-System jetzt korrekt durch. Bisher konnten diese Schritte einen Fehler melden, ohne überhaupt ausgeführt worden zu sein — neue Nutzer standen damit ohne funktionierende Sprach-Engine da und ohne klaren Weg nach vorn. Dieses Problem bestand seit Langem und betraf speziell Erstinstallationen. Falls du die Einrichtung damals aufgegeben hast, lohnt sich ein neuer Versuch.
 
-Das war 51 Releases lang kaputt. Funktioniert hat es immer nur auf genau der einen Umgebung, auf der wir entwickeln — und genau deshalb ist es so lange niemandem aufgefallen. Behoben, und jetzt so getestet, wie du es tatsächlich installieren würdest.
+Passend dazu: Mehrere Einrichtungsskripte liegen jetzt im korrekten Zeilenendenformat vor und lassen sich damit unter macOS und Linux einwandfrei ausführen.
 
-Ein paar verwandte Einrichtungsprobleme sind gleich mitgegangen: Einige Skripte waren in einem Windows-Format gespeichert, das Mac und Linux nicht lesen können, sodass sie stoppten, bevor sie irgendetwas taten. Die sind jetzt im richtigen Format.
+### Die Vorschau spielt deine vollständige Audio-Mischung
 
-### 🔧 Deine angepassten Dateien bleiben deine
+Die Vorschau-Schaltfläche spielt jetzt genau das, wonach dein Agent klingen wird: deine gewählte **Stimme**, sämtliche **Hall- und Audioeffekte** sowie deine **Hintergrundmusik**, zusammengemischt.
 
-Wenn du eines der Hook-Skripte bearbeitet hattest, die AgentVibes installiert, konnte ein Update deine Arbeit überschreiben. Unter Windows war es noch schlimmer — der Updater kannte nur 8 von 25 Skripten, der Rest wurde also falsch behandelt.
+In zwei Fällen wurde bisher eine unvollständige Mischung abgespielt: Vorschauen für Hermes-Agenten ließen die Hintergrundmusik ganz weg, und unter Windows fiel die Musikspur weg, sobald ffmpeg — die Komponente, die Musik und Sprache zusammenmischt — nicht verfügbar war. Beides ist behoben. Fehlt ffmpeg, erhältst du jetzt eine klare Meldung, die genau das benennt, statt stillschweigend reduziertem Audio.
 
-Jetzt ist jedes Skript abgedeckt, und alles, was du geändert hast, wird vor dem Anfassen in ein Backup mit Zeitstempel kopiert. Hattest du `play-tts.ps1` bearbeitet, findest du deine Fassung direkt daneben als:
+### Deine Anpassungen überstehen Updates
+
+Wenn du eines der von AgentVibes installierten Hook-Skripte bearbeitet hast, bleibt deine Arbeit beim Update erhalten. Deine Fassung wird vor dem Ersetzen einer Datei in ein Backup mit Zeitstempel kopiert:
 
 ```
 play-tts.ps1.user.bak.20260719-143052
 ```
 
-Der Zeitstempel ist Datum und Uhrzeit genau dieses Updates — jedes Update, das du ausführst, behält also sein eigenes Backup. Du kannst immer zurück, nicht nur zur allerersten Version.
+Jedes Update legt sein eigenes Backup an, sodass auch frühere Fassungen wiederherstellbar bleiben. Unter Windows wurde die Update-Abdeckung von 8 auf alle 25 Skripte erweitert.
 
-### 🎵 Die Vorschau-Schaltfläche spielt die komplette Mischung
+### Das Audioziel ist auf einen Blick erkennbar
 
-Die Vorschau-Schaltfläche in den Einrichtungsbildschirmen soll alles zusammen abspielen — deine gewählte **Stimme**, jeden **Hall und alle Audioeffekte** sowie deine **Hintergrundmusik** — damit du genau hörst, wie dein Agent klingen wird. Zwei Dinge haben das kaputt gemacht.
+Die Einstellungen kennzeichnen jetzt farblich, wo dein Audio abgespielt wird: **Local** in Grün, **Remote** in Rot. So ist sofort ersichtlich, wenn der Ton auf einen anderen Rechner geleitet wird.
 
-Beim Einrichten eines Hermes-Agenten spielte die Vorschau Stimme und Effekte, ließ die Musik aber komplett weg. Und wenn unter Windows **ffmpeg** (das Werkzeug, das Musik und Sprache zusammenmischt) nicht erreichbar war, fiel die Musik stillschweigend weg — die Stimme kam einwandfrei, es sah also nach nichts aus.
+### Sprachvorschauen nutzen die richtige Engine
 
-Beides behoben. Und wenn ffmpeg wirklich fehlt, bekommst du jetzt eine klare Meldung, statt Stille, die du dir selbst zusammenreimen musst.
+Die Vorschau einer Stimme nutzt jetzt deren eigene Engine statt der globalen Einstellung und benennt, welche Engine du gerade hörst. Windows- und macOS-Systemstimmen funktionieren korrekt über Remote-Vorschauen, und die Windows-Stimmliste zeigt jetzt nur noch Stimmen, die sich tatsächlich auswählen lassen.
 
-### 🎙️ Vorschauen in der richtigen Stimme, mit dem richtigen Namen
+### Windows-Remote-Audio
 
-Die Vorschau einer Stimme nutzt jetzt deren eigene Engine statt der global eingestellten — und sagt dir, welche Engine du gerade hörst. Windows- und Mac-Systemstimmen funktionieren auch über Remote-Vorschauen. Die Windows-Stimmliste zeigt jetzt nur noch Stimmen, die sich wirklich auswählen lassen — kein Griff mehr ins Leere.
+Wenn ein Windows-Rechner Audio an einen anderen Computer sendet, werden Dateipfade unterwegs nicht mehr verändert — bisher verhinderte das, dass die Hintergrundmusik beim Empfänger ankam.
 
-### 🟢 Lokal oder remote, auf einen Blick
+### Paket und Qualität
 
-Die Einstellungen färben jetzt dein Audioziel: **Local** in Grün, **Remote** in Rot. Praktisch, wenn du dich fragst, warum es im Raum still ist — meistens lautet die Antwort, dass der Ton auf einem anderen Rechner landet.
-
-### 🪟 Windows schickt Audio woandershin
-
-Wenn ein Windows-Rechner Audio an einen anderen Computer schickte, konnten unterwegs Dateipfade verstümmelt werden, wodurch deine Hintergrundmusik still verschwand. Behoben.
-
-### 📦 Ein aufgeräumterer Download
-
-Das Paket schleppt keine Dateien mehr mit, die es nie gebraucht hat — darunter übrig gebliebene lokale Einstellungen, die nie hätten mitgeliefert werden dürfen. Alles, was die App dir zum Ausführen sagt, ist jetzt auch wirklich enthalten.
-
-### 🧰 Unter der Haube
-
-Die Testsuite läuft jetzt unter Windows, Mac und Linux aus einem frischen Checkout sauber durch — vorher schlug sie auf eine Weise fehl, die echte Fehler wie den Installationsfehler oben verdeckte. Neue Tests halten die Korrekturen aus diesem Release fest, damit sie nicht klammheimlich zurückkehren. Außerdem behoben: ein Fall, in dem ein Hintergrundprozess hängen bleiben konnte, statt sich zu beenden.
+Das veröffentlichte Paket enthält keine überflüssigen Dateien mehr, und alles, worauf die Anwendung verweist, ist jetzt auch tatsächlich enthalten. Die vollständige Testsuite läuft unter Windows, macOS und Linux aus einem frischen Checkout durch, ergänzt um neue Regressionstests für das oben beschriebene Vorschau-Verhalten.
 
 ---
 

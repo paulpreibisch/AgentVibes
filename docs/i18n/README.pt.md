@@ -4,15 +4,15 @@
 
 ---
 
-## 🆕 Instalações que funcionam, pré-visualizações em que você pode confiar (v5.14.0)
+## 🆕 Configuração confiável e pré-visualizações de áudio completas (v5.14.0)
 
-Um lançamento para colocar tudo em dia, incluindo tudo o que havia na 5.13.2, que nunca chegou ao npm.
+Inclui todas as mudanças da 5.13.2, que não foi publicada no npm.
 
-- **📥 A configuração no Mac e no Linux funciona de verdade** — instalar o Piper e baixar vozes nunca chegava a ser executado em uma instalação nova, e o programa relatava falha em uma etapa que nem havia começado. Quebrado por 51 lançamentos; corrigido e devidamente testado.
-- **🔧 Seus arquivos personalizados continuam sendo seus** — a atualização não sobrescreve mais os scripts de hook que você editou; sua versão é salva ao lado antes, por exemplo `play-tts.ps1.user.bak.20260719-143052`.
-- **🎵 A pré-visualização toca a mistura completa** — o botão de pré-visualização toca sua voz, o reverb/efeitos **e** a música de fundo juntos; a música não some mais e, se o ffmpeg não estiver disponível, você recebe uma mensagem clara em vez de silêncio.
-- **🎙️ A voz certa, com nome** — as pré-visualizações usam o motor da própria voz pré-visualizada e dizem qual é; as vozes do Windows e do Mac funcionam em pré-visualizações remotas.
-- **🟢 Local ou remoto, num relance** — o destino do áudio aparece em verde para **Local** e em vermelho para **Remote**.
+- **A configuração é concluída no macOS e no Linux** — instalar o Piper e baixar as vozes agora funciona corretamente em uma máquina nova, resolvendo um problema antigo da primeira instalação.
+- **A pré-visualização toca a sua mistura completa** — voz, reverb/efeitos e música de fundo juntos, para que as pré-visualizações reflitam como o seu agente vai realmente soar.
+- **As atualizações preservam suas personalizações** — os scripts de hook editados recebem um backup com data e hora antes de qualquer arquivo ser substituído.
+- **Destino do áudio mais claro** — as configurações mostram **Local** em verde e **Remote** em vermelho.
+- **Motor de pré-visualização correto** — as pré-visualizações usam o motor da própria voz selecionada e o identificam; as vozes do Windows e do macOS funcionam em pré-visualizações remotas.
 
 ### v5.13.0 — Suas vozes em todo lugar
 

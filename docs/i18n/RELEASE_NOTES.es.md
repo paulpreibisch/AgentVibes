@@ -1,58 +1,48 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
-## 🎧 v5.14.0 — Instalaciones que funcionan, vistas previas fiables
+## v5.14.0 — Instalación fiable y vistas previas de audio completas
 
-**Lanzamiento:** 2026-07-19 · en `latest` — `npm install agentvibes@latest`
+**Lanzamiento:** 2026-07-19 · `npm install agentvibes@latest`
 
-Una gran versión de puesta al día. Si vienes de la 5.13.1, aquí encontrarás también todo lo de la 5.13.2 — esa versión se etiquetó, pero nunca llegó a npm.
+Esta versión se centra en dos objetivos: conseguir que AgentVibes se instale correctamente en todas las plataformas y que el botón de vista previa refleje con exactitud cómo sonará tu agente. Incluye además todo lo de la 5.13.2, que se etiquetó pero nunca llegó a publicarse en npm.
 
-### 📥 Instalar en Mac o Linux por fin funciona
+### La instalación ya se completa correctamente en macOS y Linux
 
-Esta es la importante. En una instalación nueva de Mac o Linux, la instalación de Piper y la descarga de voces **nunca llegaban a ejecutarse**. Veías «Installing Piper TTS…» seguido de «installation failed or was cancelled» — culpando a un paso que ni siquiera había empezado.
+La instalación de Piper y la descarga de voces se ejecutan ahora correctamente en un equipo macOS o Linux recién configurado. Antes, estos pasos podían informar de un fallo sin haberse llegado a ejecutar, lo que dejaba a los nuevos usuarios sin un motor de voz operativo y sin una vía clara para continuar. Era un problema de larga duración que afectaba específicamente a las primeras instalaciones: si en su momento desististe de la configuración, merece la pena volver a intentarlo.
 
-Llevaba 51 versiones roto. Solo funcionaba en el único equipo sobre el que desarrollamos, y por eso pasó desapercibido tanto tiempo. Ya está corregido, y ahora se prueba tal y como lo instalarías tú de verdad.
+Relacionado: varios scripts de configuración se almacenan ahora con el formato de fin de línea correcto, de modo que se ejecutan sin problemas en macOS y Linux.
 
-Con ello se fueron un par de problemas relacionados: algunos scripts estaban guardados en un formato de Windows que Mac y Linux no saben leer, así que se detenían antes de hacer nada. Ahora están en el formato correcto.
+### La vista previa reproduce tu mezcla de audio completa
 
-### 🔧 Tus archivos personalizados siguen siendo tuyos
+El botón de vista previa reproduce ahora exactamente cómo sonará tu agente: la **voz** seleccionada, el **reverb y los efectos de audio** que tengas activos y tu **música de fondo**, todo mezclado.
 
-Si habías editado alguno de los scripts de hooks que instala AgentVibes, al actualizar podías perder tu trabajo. En Windows era peor todavía: el actualizador solo conocía 8 de 25 scripts, así que la mayoría se trataba de forma incorrecta.
+Antes había dos casos en los que la mezcla sonaba incompleta. Las vistas previas de los agentes Hermes omitían por completo la música de fondo y, en Windows, la pista musical se descartaba siempre que ffmpeg —el componente que mezcla la música con la voz— no estaba disponible. Ambos casos están resueltos y, si falta ffmpeg, ahora recibes un mensaje claro que lo identifica en lugar de un audio incompleto sin explicación.
 
-Ahora están cubiertos todos los scripts, y cualquier cosa que hayas cambiado se copia a una copia de seguridad con fecha y hora antes de tocarla. Si habías editado `play-tts.ps1`, encontrarías tu versión guardada a su lado como:
+### Tus personalizaciones sobreviven a las actualizaciones
+
+Si has editado alguno de los scripts de hooks que instala AgentVibes, al actualizar se conserva tu trabajo. Tu versión se copia a una copia de seguridad con marca de tiempo antes de reemplazar ningún archivo:
 
 ```
 play-tts.ps1.user.bak.20260719-143052
 ```
 
-La marca de tiempo es la fecha y la hora de esa actualización, así que cada actualización que ejecutes conserva su propia copia de seguridad — siempre puedes volver atrás, y no solo a la primera.
+Cada actualización crea su propia copia de seguridad, por lo que las versiones anteriores siguen siendo recuperables. En Windows, la cobertura de la actualización pasa de 8 scripts a los 25 completos.
 
-### 🎵 El botón de vista previa reproduce la mezcla completa
+### El destino del audio se ve de un vistazo
 
-El botón de vista previa de las pantallas de configuración debería reproducirlo todo junto — la **voz** que has elegido, el **reverb** o los **efectos de audio**, y tu **música de fondo** — para que oigas exactamente cómo va a sonar tu agente. Dos cosas lo impedían.
+Los ajustes ahora señalan con colores dónde se reproduce tu audio: **Local** en verde y **Remote** en rojo. Así resulta evidente al instante cuando el audio se está enviando a otro equipo.
 
-Al configurar un agente Hermes, la vista previa reproducía la voz y los efectos, pero dejaba fuera la música por completo. Y en Windows, si **ffmpeg** (la herramienta que mezcla la música con la voz) no estaba accesible, la música desaparecía en silencio — la voz sonaba perfectamente, así que nada parecía ir mal.
+### Las vistas previas de voz usan el motor correcto
 
-Ambos corregidos. Y cuando ffmpeg realmente falta, ahora recibes un mensaje claro que te lo dice, en lugar de un silencio que tienes que adivinar.
+La vista previa de una voz utiliza ahora el motor propio de esa voz en lugar del ajuste global, e indica qué motor estás escuchando. Las voces del sistema de Windows y macOS funcionan correctamente en las vistas previas remotas, y la lista de voces de Windows muestra únicamente las voces que se pueden seleccionar realmente.
 
-### 🎙️ Vistas previas con la voz correcta y con su nombre
+### Audio remoto en Windows
 
-Al escuchar la vista previa de una voz ahora se usa el motor propio de esa voz en lugar del que estuviera configurado globalmente, y se te indica qué motor estás oyendo. Las voces del sistema de Windows y de Mac también funcionan en las vistas previas remotas. La lista de voces de Windows ahora muestra solo las voces que realmente se pueden seleccionar — se acabó elegir una que nunca habla.
+El envío de audio desde un equipo Windows a otro ordenador ya no altera las rutas de archivo por el camino, algo que antes impedía que la música de fondo llegara al receptor.
 
-### 🟢 Local o remoto, de un vistazo
+### Paquete y calidad
 
-La configuración ahora colorea el destino del audio: **Local** en verde, **Remote** en rojo. Muy útil cuando te preguntas por qué hay tanto silencio en la habitación — normalmente la respuesta es que el sonido se está yendo a otro equipo.
-
-### 🪟 Windows enviando audio a otro equipo
-
-Enviar audio desde una máquina Windows a otro ordenador podía estropear las rutas de los archivos por el camino, lo que hacía desaparecer tu música de fondo sin avisar. Corregido.
-
-### 📦 Una descarga más limpia
-
-El paquete ya no arrastra archivos que nunca necesitó, incluidos unos ajustes locales sobrantes que no deberían haberse publicado. Todo lo que la aplicación te dice que ejecutes viene ahora realmente incluido.
-
-### 🧰 Bajo el capó
-
-La batería de pruebas ahora pasa sin problemas en Windows, Mac y Linux partiendo de una copia limpia del repositorio — antes fallaba de formas que ocultaban errores reales, como el de la instalación de más arriba. Nuevas pruebas fijan las correcciones de esta versión para que no puedan volver por la puerta de atrás. También se ha corregido un caso en el que un proceso en segundo plano podía quedarse colgado en lugar de cerrarse.
+El paquete publicado ya no incluye archivos innecesarios, y todo aquello a lo que hace referencia la aplicación está ahora presente. La batería de pruebas completa pasa en Windows, macOS y Linux partiendo de una copia limpia del repositorio, con nuevas pruebas de regresión que cubren el comportamiento de las vistas previas descrito arriba.
 
 ---
 

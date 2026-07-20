@@ -1,58 +1,48 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
-## 🎧 v5.14.0 — Des installations qui marchent, des aperçus fiables
+## v5.14.0 — Installation fiable et aperçus audio complets
 
-**Publié le :** 2026-07-19 · sur `latest` — `npm install agentvibes@latest`
+**Publié le :** 2026-07-19 · `npm install agentvibes@latest`
 
-Une grosse version de rattrapage. Si vous venez de la 5.13.1, celle-ci contient aussi tout ce que la 5.13.2 apportait — cette version avait été taguée mais n'est jamais arrivée sur npm.
+Cette version se concentre sur deux points : réussir l'installation d'AgentVibes sur toutes les plateformes, et faire du bouton Aperçu une restitution fidèle de ce à quoi votre agent va réellement ressembler. Elle inclut également tout le contenu de la 5.13.2, qui avait été taguée mais jamais publiée sur npm.
 
-### 📥 L'installation sur Mac et Linux fonctionne enfin
+### La configuration aboutit désormais sur macOS et Linux
 
-C'est LE gros morceau. Sur une installation Mac ou Linux toute neuve, l'installation de Piper et le téléchargement des voix **ne se lançaient tout simplement jamais**. Vous voyiez « Installing Piper TTS… » puis « installation failed or was cancelled » — un échec annoncé pour une étape qui n'avait même pas commencé.
+L'installation de Piper et le téléchargement des voix se déroulent maintenant correctement sur une machine macOS ou Linux neuve. Auparavant, ces étapes pouvaient signaler un échec sans avoir été exécutées, laissant les nouveaux utilisateurs sans moteur de voix fonctionnel et sans piste claire pour avancer. Il s'agissait d'un problème de longue date touchant spécifiquement les premières installations — si vous aviez renoncé à la configuration par le passé, cela vaut la peine de réessayer.
 
-C'était cassé depuis 51 versions. Ça n'a jamais fonctionné que sur la seule configuration sur laquelle nous développons, ce qui explique précisément pourquoi personne ne l'avait remarqué aussi longtemps. C'est corrigé, et désormais testé de la façon dont vous installez réellement le produit.
+Dans le même esprit : plusieurs scripts de configuration sont désormais enregistrés dans le bon format de fin de ligne, ce qui leur permet de s'exécuter correctement sur macOS et Linux.
 
-Quelques problèmes d'installation connexes sont partis avec : certains scripts étaient enregistrés dans un format Windows que Mac et Linux ne savent pas lire, et s'arrêtaient donc avant de faire quoi que ce soit. Ils sont maintenant dans le bon format.
+### L'Aperçu joue votre mixage audio complet
 
-### 🔧 Vos fichiers personnalisés restent les vôtres
+Le bouton Aperçu joue maintenant exactement ce à quoi votre agent va ressembler : la **voix** que vous avez sélectionnée, la **réverbération et les effets audio** éventuels, et votre **musique de fond**, le tout mixé ensemble.
 
-Si vous aviez modifié l'un des scripts de hook installés par AgentVibes, une mise à jour pouvait écraser votre travail. Sur Windows, c'était pire encore : le programme de mise à jour ne connaissait que 8 des 25 scripts, la plupart étaient donc mal traités.
+Deux cas produisaient auparavant un mixage incomplet. Les aperçus des agents Hermes omettaient entièrement la musique de fond, et sous Windows la piste musicale était abandonnée dès que ffmpeg — le composant qui mixe la musique avec la parole — n'était pas disponible. Les deux sont résolus, et si ffmpeg est absent vous recevez désormais un message clair l'identifiant, plutôt qu'un audio silencieusement appauvri.
 
-Désormais, tous les scripts sont pris en compte, et tout ce que vous avez modifié est copié dans une sauvegarde horodatée avant d'être touché. Si vous aviez modifié `play-tts.ps1`, vous retrouveriez votre version enregistrée juste à côté sous la forme :
+### Vos personnalisations survivent aux mises à jour
+
+Si vous avez modifié l'un des scripts de hook installés par AgentVibes, la mise à jour préserve désormais votre travail. Votre version est copiée dans une sauvegarde horodatée avant tout remplacement de fichier :
 
 ```
 play-tts.ps1.user.bak.20260719-143052
 ```
 
-L'horodatage correspond à la date et à l'heure de cette mise à jour : chaque mise à jour conserve donc sa propre sauvegarde — vous pouvez toujours revenir en arrière, et pas seulement jusqu'à la première.
+Chaque mise à jour crée sa propre sauvegarde, si bien que les versions antérieures restent récupérables. Sous Windows, la couverture des mises à jour passe de 8 scripts à la totalité des 25.
 
-### 🎵 Le bouton Aperçu joue l'ensemble du mixage
+### La destination audio est plus lisible d'un coup d'œil
 
-Le bouton Aperçu des écrans de configuration est censé tout jouer ensemble — la **voix** que vous avez choisie, la **réverbération et les effets audio**, et votre **musique de fond** — pour que vous entendiez exactement ce à quoi votre agent va ressembler. Deux choses cassaient ça.
+Les réglages indiquent maintenant par un code couleur l'endroit où votre audio est joué : **Local** en vert, **Remote** en rouge. On voit ainsi immédiatement quand l'audio est routé vers une autre machine.
 
-Lors de la configuration d'un agent Hermes, l'Aperçu jouait la voix et les effets mais laissait complètement tomber la musique. Et sous Windows, si **ffmpeg** (l'outil qui mélange la musique à la parole) n'était pas accessible, la musique disparaissait en silence — la voix se jouait parfaitement, donc rien ne semblait anormal.
+### Les aperçus de voix utilisent le bon moteur
 
-Les deux sont corrigés. Et quand ffmpeg manque vraiment, vous recevez maintenant un message clair qui le dit, au lieu d'un silence à déchiffrer.
+L'aperçu d'une voix utilise désormais le moteur propre à cette voix plutôt que le réglage global, et indique quel moteur vous êtes en train d'entendre. Les voix système de Windows et de macOS fonctionnent correctement via les aperçus distants, et la liste des voix Windows n'affiche plus que les voix réellement sélectionnables.
 
-### 🎙️ Des aperçus dans la bonne voix, avec le bon nom
+### Audio distant sous Windows
 
-L'aperçu d'une voix utilise désormais le moteur propre à cette voix plutôt que celui défini globalement, et vous indique quel moteur vous êtes en train d'entendre. Les voix système de Windows et de Mac fonctionnent aussi via les aperçus distants. La liste des voix Windows n'affiche plus que les voix réellement sélectionnables — fini d'en choisir une qui ne parle jamais.
+L'envoi d'audio depuis une machine Windows vers un autre ordinateur ne modifie plus les chemins de fichiers en transit, ce qui empêchait jusqu'ici la musique de fond d'atteindre le récepteur.
 
-### 🟢 Local ou distant, en un coup d'œil
+### Paquet et qualité
 
-Les réglages colorent maintenant votre destination audio : **Local** en vert, **Remote** en rouge. Bien pratique quand vous vous demandez pourquoi la pièce est silencieuse — la réponse, en général, c'est que le son part sur une autre machine.
-
-### 🪟 Windows envoyant l'audio ailleurs
-
-Envoyer l'audio d'une machine Windows vers un autre ordinateur pouvait déformer les chemins de fichiers en route, ce qui faisait disparaître votre musique de fond sans rien dire. Corrigé.
-
-### 📦 Un téléchargement plus propre
-
-Le paquet n'embarque plus de fichiers dont il n'a jamais eu besoin, y compris des réglages locaux résiduels qui n'auraient jamais dû être publiés. Tout ce que l'application vous demande de lancer est désormais réellement inclus.
-
-### 🧰 Sous le capot
-
-La suite de tests passe maintenant sans accroc sur Windows, Mac et Linux à partir d'un dépôt tout neuf — elle échouait auparavant d'une manière qui masquait de vrais bugs, comme celui de l'installation ci-dessus. De nouveaux tests verrouillent les corrections apportées ici pour qu'elles ne puissent pas revenir en douce. Nous avons aussi corrigé un cas où un processus en arrière-plan pouvait rester bloqué au lieu de s'arrêter.
+Le paquet publié n'embarque plus de fichiers inutiles, et tout ce que l'application référence est désormais présent. La suite de tests complète passe sur Windows, macOS et Linux à partir d'un dépôt propre, avec de nouveaux tests de non-régression couvrant les comportements d'aperçu décrits ci-dessus.
 
 ---
 

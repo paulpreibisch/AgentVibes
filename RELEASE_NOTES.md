@@ -1,58 +1,48 @@
 # AgentVibes Release Notes
 
-## 🎧 v5.14.0 — Installs that work, previews you can trust
+## v5.14.0 — Reliable setup and complete audio previews
 
-**Released:** 2026-07-19 · on `latest` — `npm install agentvibes@latest`
+**Released:** 2026-07-19 · `npm install agentvibes@latest`
 
-A big catch-up release. If you're coming from 5.13.1, this includes everything from 5.13.2 as well — that version was tagged but never made it to npm.
+This release focuses on two things: getting AgentVibes installed correctly on every platform, and making the Preview button an accurate representation of how your agent will actually sound. It also includes everything from 5.13.2, which was tagged but never published to npm.
 
-### 📥 Setting up on Mac or Linux actually works now
+### Setup now completes properly on macOS and Linux
 
-This is the big one. On a fresh Mac or Linux install, installing Piper and downloading voices **never ran at all**. You'd see "Installing Piper TTS…" followed by "installation failed or was cancelled" — blaming a step that was never even started.
+Installing Piper and downloading voices now runs correctly on a fresh macOS or Linux machine. Previously these steps could report a failure without having run, which left new users without a working voice engine and no clear way forward. This was a long-standing issue affecting first-time installs specifically — if you gave up on setup previously, it is worth another try.
 
-It had been broken for 51 releases. It only ever worked on the one setup we develop on, which is exactly why it went unnoticed for so long. Fixed, and now tested the way you'd actually install it.
+Related: several setup scripts are now stored in the correct line-ending format, so they execute properly on macOS and Linux.
 
-A few related setup problems went with it: some scripts were saved in a Windows format that Mac and Linux can't read, so they stopped before doing anything. Those are in the right format now.
+### Preview plays your complete audio mix
 
-### 🔧 Your customised files stay yours
+The Preview button now plays exactly what your agent will sound like: your selected **voice**, any **reverb or audio effects**, and your **background music**, mixed together.
 
-If you'd edited any of the hook scripts AgentVibes installs, updating could overwrite your work. On Windows it was worse — the updater only knew about 8 of 25 scripts, so most were being handled wrongly.
+Two cases previously played an incomplete mix. Hermes agent previews omitted background music entirely, and on Windows the music track was dropped whenever ffmpeg — the component that mixes music with speech — was unavailable. Both are resolved, and if ffmpeg is missing you now receive a clear message identifying it rather than silently reduced audio.
 
-Now every script is covered, and anything you've changed is copied to a timestamped backup before it's touched. If you'd edited `play-tts.ps1`, you'd find your version saved beside it as:
+### Your customisations survive updates
+
+If you have edited any of the hook scripts AgentVibes installs, updating now preserves your work. Your version is copied to a timestamped backup before any file is replaced:
 
 ```
 play-tts.ps1.user.bak.20260719-143052
 ```
 
-The timestamp is the date and time of that update, so every update you run keeps its own backup — you can always go back, not just to the first one.
+Each update creates its own backup, so earlier versions remain recoverable. On Windows, update coverage extended from 8 scripts to all 25.
 
-### 🎵 The Preview button plays the whole mix
+### Audio destination is clearer at a glance
 
-The Preview button in the setup screens is supposed to play everything combined — your chosen **voice**, any **reverb or audio effects**, and your **background music** — so you hear exactly what your agent will sound like. Two things broke that.
+Settings now colour-codes where your audio plays: **Local** in green, **Remote** in red. This makes it immediately obvious when audio is being routed to another machine.
 
-Setting up a Hermes agent, Preview played the voice and effects but left the music out entirely. And on Windows, if **ffmpeg** (the tool that blends music with speech) wasn't reachable, the music was silently dropped — the voice played perfectly, so nothing looked wrong.
+### Voice previews use the correct engine
 
-Both fixed. And when ffmpeg really is missing, you now get a clear message saying so instead of silence you have to guess at.
+Previewing a voice now uses that voice's own engine rather than the global setting, and identifies which engine you are hearing. Windows and macOS system voices work correctly through remote previews, and the Windows voice list now shows only voices that can actually be selected.
 
-### 🎙️ Previews in the right voice, with the right name
+### Windows remote audio
 
-Previewing a voice now uses that voice's own engine instead of whatever was set globally, and tells you which engine you're hearing. Windows and Mac system voices work through remote previews too. The Windows voice list now shows only voices that can actually be selected — no more choosing one that never speaks.
+Sending audio from a Windows machine to another computer no longer alters file paths in transit, which previously prevented background music from reaching the receiver.
 
-### 🟢 Local or remote, at a glance
+### Package and quality
 
-Settings now colours your audio destination: **Local** in green, **Remote** in red. Handy when you're wondering why the room is quiet — usually the answer is that sound is going to another machine.
-
-### 🪟 Windows sending audio elsewhere
-
-Sending audio from a Windows machine to another computer could mangle file paths along the way, which quietly dropped your background music. Fixed.
-
-### 📦 A cleaner download
-
-The package no longer carries files it never needed, including some leftover local settings that shouldn't have shipped. Everything the app tells you to run is now actually included.
-
-### 🧰 Under the hood
-
-The test suite now passes cleanly on Windows, Mac and Linux from a fresh checkout — it had been failing in ways that hid real bugs like the install one above. New tests lock in the fixes here so they can't quietly come back. Also fixed a case where a background process could hang instead of shutting down.
+The published package no longer includes unnecessary files, and everything the application references is now present. The full test suite passes on Windows, macOS and Linux from a clean checkout, with new regression tests covering the preview behaviour described above.
 
 ---
 

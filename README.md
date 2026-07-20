@@ -58,15 +58,15 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Installs that work, previews you can trust (v5.14.0)
+## 🆕 Reliable setup and complete audio previews (v5.14.0)
 
-A catch-up release, including everything from 5.13.2 which never reached npm.
+Includes all changes from 5.13.2, which was not published to npm.
 
-- **📥 Mac & Linux setup actually works** — installing Piper and downloading voices never ran on a fresh install, and reported a failure for a step it never started. Broken for 51 releases; fixed and properly tested.
-- **🔧 Your customised files stay yours** — updating no longer overwrites hook scripts you've edited; your version is saved beside it first, e.g. `play-tts.ps1.user.bak.20260719-143052`.
-- **🎵 Preview plays the whole mix** — the Preview button plays your voice, reverb/effects **and** background music together; music no longer goes missing, and if ffmpeg is unavailable you get a clear message instead of silence.
-- **🎙️ The right voice, named** — previews use the previewed voice's own engine and say which one; Windows and Mac voices work over remote previews.
-- **🟢 Local or remote, at a glance** — audio destination shows green for **Local**, red for **Remote**.
+- **Setup completes on macOS and Linux** — installing Piper and downloading voices now runs correctly on a fresh machine, resolving a long-standing first-install issue.
+- **Preview plays your complete mix** — voice, reverb/effects and background music together, so previews reflect how your agent will actually sound.
+- **Updates preserve your customisations** — edited hook scripts are backed up with a timestamp before any file is replaced.
+- **Clearer audio destination** — Settings shows **Local** in green and **Remote** in red.
+- **Correct preview engine** — previews use the selected voice's own engine and identify it; Windows and macOS voices work over remote previews.
 
 ### v5.13.0 — Your voices everywhere
 

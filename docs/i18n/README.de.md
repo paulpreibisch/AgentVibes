@@ -4,15 +4,15 @@
 
 ---
 
-## 🆕 Installationen, die klappen, Vorschauen, auf die Verlass ist (v5.14.0)
+## 🆕 Zuverlässige Einrichtung und vollständige Audio-Vorschauen (v5.14.0)
 
-Ein Nachhol-Release, das auch alles aus 5.13.2 enthält, das nie zu npm gelangt ist.
+Enthält alle Änderungen aus 5.13.2, das nicht auf npm veröffentlicht wurde.
 
-- **📥 Die Einrichtung unter Mac & Linux funktioniert wirklich** — bei einer frischen Installation wurden Piper und der Download der Stimmen nie ausgeführt, und es wurde ein Fehler für einen Schritt gemeldet, der nie gestartet war. 51 Releases lang kaputt; behoben und ordentlich getestet.
-- **🔧 Deine angepassten Dateien bleiben deine** — ein Update überschreibt keine von dir bearbeiteten Hook-Skripte mehr; deine Fassung wird vorher daneben gesichert, z. B. als `play-tts.ps1.user.bak.20260719-143052`.
-- **🎵 Die Vorschau spielt die komplette Mischung** — die Vorschau-Schaltfläche spielt Stimme, Hall/Effekte **und** Hintergrundmusik zusammen; die Musik verschwindet nicht mehr, und wenn ffmpeg nicht verfügbar ist, bekommst du eine klare Meldung statt Stille.
-- **🎙️ Die richtige Stimme, beim Namen genannt** — Vorschauen nutzen die eigene Engine der jeweiligen Stimme und sagen dir, welche es ist; Windows- und Mac-Stimmen funktionieren auch über Remote-Vorschauen.
-- **🟢 Lokal oder remote, auf einen Blick** — das Audioziel wird grün für **Local** und rot für **Remote** angezeigt.
+- **Die Einrichtung wird unter macOS und Linux abgeschlossen** — die Installation von Piper und der Download der Stimmen laufen auf einem frischen System jetzt korrekt durch und beheben ein seit Langem bestehendes Problem bei Erstinstallationen.
+- **Die Vorschau spielt deine vollständige Mischung** — Stimme, Hall/Effekte und Hintergrundmusik zusammen, sodass Vorschauen widerspiegeln, wie dein Agent tatsächlich klingen wird.
+- **Updates bewahren deine Anpassungen** — bearbeitete Hook-Skripte werden vor dem Ersetzen einer Datei mit Zeitstempel gesichert.
+- **Klareres Audioziel** — die Einstellungen zeigen **Local** in Grün und **Remote** in Rot.
+- **Richtige Vorschau-Engine** — Vorschauen nutzen die eigene Engine der gewählten Stimme und benennen sie; Windows- und macOS-Stimmen funktionieren über Remote-Vorschauen.
 
 ### v5.13.0 — Deine Stimmen überall
 

@@ -4,15 +4,15 @@
 
 ---
 
-## 🆕 Des installations qui marchent, des aperçus fiables (v5.14.0)
+## 🆕 Installation fiable et aperçus audio complets (v5.14.0)
 
-Une version de rattrapage, qui inclut également tout ce que la 5.13.2 apportait et qui n'était jamais arrivé sur npm.
+Inclut toutes les modifications de la 5.13.2, qui n'avait pas été publiée sur npm.
 
-- **📥 L'installation sur Mac et Linux fonctionne enfin** — l'installation de Piper et le téléchargement des voix ne se lançaient jamais sur une installation neuve, et annonçaient l'échec d'une étape qui n'avait jamais commencé. Cassé depuis 51 versions ; corrigé et correctement testé.
-- **🔧 Vos fichiers personnalisés restent les vôtres** — une mise à jour n'écrase plus les scripts de hook que vous avez modifiés ; votre version est d'abord sauvegardée juste à côté, par exemple `play-tts.ps1.user.bak.20260719-143052`.
-- **🎵 L'Aperçu joue l'ensemble du mixage** — le bouton Aperçu joue votre voix, la réverbération et les effets **et** la musique de fond ensemble ; la musique ne disparaît plus, et si ffmpeg est indisponible vous recevez un message clair au lieu du silence.
-- **🎙️ La bonne voix, nommée** — les aperçus utilisent le moteur propre à la voix écoutée et vous disent lequel c'est ; les voix Windows et Mac fonctionnent via les aperçus distants.
-- **🟢 Local ou distant, en un coup d'œil** — la destination audio s'affiche en vert pour **Local**, en rouge pour **Remote**.
+- **La configuration aboutit sur macOS et Linux** — l'installation de Piper et le téléchargement des voix se déroulent maintenant correctement sur une machine neuve, résolvant un problème de longue date sur la première installation.
+- **L'Aperçu joue votre mixage complet** — voix, réverbération/effets et musique de fond ensemble, pour que les aperçus reflètent ce à quoi votre agent va réellement ressembler.
+- **Les mises à jour préservent vos personnalisations** — les scripts de hook que vous avez modifiés sont sauvegardés avec un horodatage avant tout remplacement de fichier.
+- **Destination audio plus lisible** — les réglages affichent **Local** en vert et **Remote** en rouge.
+- **Le bon moteur d'aperçu** — les aperçus utilisent le moteur propre à la voix sélectionnée et l'indiquent ; les voix Windows et macOS fonctionnent via les aperçus distants.
 
 ### v5.13.0 — Vos voix partout
 
