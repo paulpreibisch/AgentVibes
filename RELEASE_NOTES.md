@@ -1,5 +1,76 @@
 # AgentVibes Release Notes
 
+## v5.15.0 — Multi-session control on Windows
+
+**Released:** 2026-07-20 · `npm install agentvibes@latest`
+
+If you run several agent sessions at once, this release gives Windows the same
+control macOS and Linux gained in 5.13.0: sessions stay quiet unless you turn
+them on, and each one can tell you which window is speaking.
+
+### Sessions no longer all speak at once
+
+Running AgentVibes across several projects previously meant every open session
+announced itself, with no straightforward way to keep just one talking. On
+macOS and Linux this was addressed in 5.13.0. **On Windows it was not** — the
+Windows session hook enabled speech in every session regardless of your
+settings.
+
+Windows now follows the same rule: a session speaks only in a project you have
+explicitly enabled. Projects you have not enabled contribute **nothing at all**
+— not silent audio, but no added instructions and no token cost.
+
+### Mute now works on Windows
+
+`/agent-vibes:mute` had no effect on Windows audio. It silenced macOS and Linux
+only, because the Windows player read a different setting than the one the
+command wrote.
+
+Both the project mute and the global switch are now honoured on Windows:
+
+- `/agent-vibes:mute` — quiet this project
+- `/agent-vibes:unmute` — turn this project back on, even while everything else
+  is globally muted
+
+This makes "off everywhere, on in the one project I am working in" a single
+pair of commands on every platform.
+
+### Sessions can identify themselves on Windows
+
+Include `{{session}}` in your pretext and a session introduces itself once:
+
+```
+Claude on my-app in Windows Terminal
+```
+
+It names the project and detects the terminal — Windows Terminal, VS Code,
+Ghostty, iTerm, Terminal, WezTerm, tmux and others. Announced once per session
+rather than before every line. This previously worked only on macOS and Linux.
+
+### A related fix for every platform
+
+The script that produces that introduction was missing from the update process,
+so on a global install it was never delivered and the feature silently did
+nothing. It is now included on macOS, Linux and Windows alike.
+
+### Upgrading
+
+Your existing choices are preserved — if you have already muted, unmuted, or
+enabled a project, updating leaves that setting alone.
+
+**One change worth noting for Windows users on a global install:** because
+sessions are now off unless enabled, a global Windows install will be quiet
+after updating. Turn on the projects you want with `/agent-vibes:unmute`.
+Project installs are enabled automatically and are unaffected.
+
+### Quality
+
+New regression tests assert that the session gate, the mute rules, and the
+self-identification behave identically on both runtimes, so the platforms
+cannot drift apart again without the build failing.
+
+---
+
 ## v5.14.0 — Reliable setup and complete audio previews
 
 **Released:** 2026-07-19 · `npm install agentvibes@latest`

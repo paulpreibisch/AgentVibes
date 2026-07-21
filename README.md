@@ -58,7 +58,15 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Reliable setup and complete audio previews (v5.14.0)
+## 🆕 Multi-session control on Windows (v5.15.0)
+
+- **Sessions stay quiet unless you enable them** — a session speaks only in a project you've turned on; others add no instructions and no token cost.
+- **`/agent-vibes:mute` now works on Windows** — it previously had no effect there. Both project and global mute are honoured on every platform.
+- **Sessions can introduce themselves on Windows** — `{{session}}` announces "Claude on my-app in Windows Terminal", once per session.
+- **Self-introductions now reach global installs** — the script behind them was never delivered by the updater on any platform.
+- **Note for global Windows installs:** sessions are off by default after this update — enable with `/agent-vibes:unmute`.
+
+### v5.14.0 — Reliable setup and complete audio previews
 
 Includes all changes from 5.13.2, which was not published to npm.
 
