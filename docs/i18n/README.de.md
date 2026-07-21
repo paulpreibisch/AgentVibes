@@ -4,7 +4,15 @@
 
 ---
 
-## 🆕 Zuverlässige Einrichtung und vollständige Audio-Vorschauen (v5.14.0)
+## 🆕 Steuerung mehrerer Sitzungen unter Windows (v5.15.0)
+
+- **Sitzungen bleiben stumm, sofern du sie nicht aktivierst** — eine Sitzung spricht nur in einem Projekt, das du eingeschaltet hast; andere fügen keine Anweisungen und keine Token-Kosten hinzu.
+- **`/agent-vibes:mute` funktioniert jetzt unter Windows** — bisher hatte es dort keine Wirkung. Sowohl die projektbezogene als auch die globale Stummschaltung werden auf jeder Plattform beachtet.
+- **Sitzungen können sich unter Windows selbst vorstellen** — `{{session}}` kündigt „Claude on my-app in Windows Terminal" an, einmal pro Sitzung.
+- **Selbstvorstellungen erreichen jetzt auch globale Installationen** — das dahinterstehende Skript wurde vom Updater auf keiner Plattform jemals ausgeliefert.
+- **Hinweis für globale Windows-Installationen:** Sitzungen sind nach diesem Update standardmäßig aus — aktiviere sie mit `/agent-vibes:unmute`.
+
+### v5.14.0 — Zuverlässige Einrichtung und vollständige Audio-Vorschauen
 
 Enthält alle Änderungen aus 5.13.2, das nicht auf npm veröffentlicht wurde.
 

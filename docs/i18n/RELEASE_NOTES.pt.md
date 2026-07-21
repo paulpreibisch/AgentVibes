@@ -1,5 +1,54 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.0 — Controle de múltiplas sessões no Windows
+
+**Lançamento:** 2026-07-20 · `npm install agentvibes@latest`
+
+Se você executa várias sessões de agente ao mesmo tempo, esta versão dá ao Windows o mesmo controle que o macOS e o Linux ganharam na 5.13.0: as sessões permanecem em silêncio a menos que você as ative, e cada uma pode informar qual janela está falando.
+
+### As sessões não falam mais todas ao mesmo tempo
+
+Executar o AgentVibes em vários projetos antes significava que toda sessão aberta se anunciava, sem uma forma simples de manter apenas uma falando. No macOS e no Linux isso foi resolvido na 5.13.0. **No Windows não foi** — o hook de sessão do Windows ativava a fala em todas as sessões, independentemente das suas configurações.
+
+O Windows agora segue a mesma regra: uma sessão fala apenas em um projeto que você tenha ativado explicitamente. Projetos que você não ativou não contribuem com **absolutamente nada** — não com áudio silencioso, mas sem instruções adicionais e sem custo de tokens.
+
+### O mudo agora funciona no Windows
+
+O `/agent-vibes:mute` não tinha efeito no áudio do Windows. Ele silenciava apenas o macOS e o Linux, porque o reprodutor do Windows lia uma configuração diferente daquela que o comando gravava.
+
+Tanto o mudo do projeto quanto o interruptor global agora são respeitados no Windows:
+
+- `/agent-vibes:mute` — silencia este projeto
+- `/agent-vibes:unmute` — reativa este projeto, mesmo enquanto todo o resto está mudo globalmente
+
+Isso torna "desligado em todo lugar, ligado no único projeto em que estou trabalhando" um único par de comandos em todas as plataformas.
+
+### As sessões podem se identificar no Windows
+
+Inclua `{{session}}` no seu pretexto e uma sessão se apresenta uma vez:
+
+```
+Claude on my-app in Windows Terminal
+```
+
+Ela nomeia o projeto e detecta o terminal — Windows Terminal, VS Code, Ghostty, iTerm, Terminal, WezTerm, tmux e outros. Anunciada uma vez por sessão em vez de antes de cada linha. Isso antes funcionava apenas no macOS e no Linux.
+
+### Uma correção relacionada para todas as plataformas
+
+O script que produz essa apresentação estava faltando no processo de atualização, então em uma instalação global ele nunca era entregue e o recurso silenciosamente não fazia nada. Agora ele está incluído no macOS, no Linux e no Windows igualmente.
+
+### Atualização
+
+Suas escolhas existentes são preservadas — se você já silenciou, reativou ou ativou um projeto, a atualização deixa essa configuração intacta.
+
+**Uma mudança que vale notar para usuários do Windows em uma instalação global:** como as sessões agora ficam desativadas a menos que sejam ativadas, uma instalação global no Windows ficará em silêncio após a atualização. Ative os projetos que você quiser com `/agent-vibes:unmute`. Instalações por projeto são ativadas automaticamente e não são afetadas.
+
+### Qualidade
+
+Novos testes de regressão garantem que a barreira de sessão, as regras de mudo e a autoidentificação se comportem de forma idêntica em ambos os runtimes, para que as plataformas não possam divergir de novo sem que a compilação falhe.
+
+---
+
 ## v5.14.0 — Configuração confiável e pré-visualizações de áudio completas
 
 **Lançamento:** 2026-07-19 · `npm install agentvibes@latest`

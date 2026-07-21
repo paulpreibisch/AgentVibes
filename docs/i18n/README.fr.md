@@ -4,7 +4,15 @@
 
 ---
 
-## 🆕 Installation fiable et aperçus audio complets (v5.14.0)
+## 🆕 Contrôle multi-session sous Windows (v5.15.0)
+
+- **Les sessions restent silencieuses tant que vous ne les activez pas** — une session ne parle que dans un projet que vous avez activé ; les autres n'ajoutent aucune instruction et aucun coût en tokens.
+- **`/agent-vibes:mute` fonctionne désormais sous Windows** — il n'avait auparavant aucun effet là-bas. La mise en sourdine par projet et globale est respectée sur toutes les plateformes.
+- **Les sessions peuvent se présenter sous Windows** — `{{session}}` annonce « Claude on my-app in Windows Terminal », une fois par session.
+- **Les auto-présentations atteignent désormais les installations globales** — le script qui les produit n'était jamais livré par le programme de mise à jour, sur aucune plateforme.
+- **Note pour les installations Windows globales :** les sessions sont désactivées par défaut après cette mise à jour — activez-les avec `/agent-vibes:unmute`.
+
+### v5.14.0 — Installation fiable et aperçus audio complets
 
 Inclut toutes les modifications de la 5.13.2, qui n'avait pas été publiée sur npm.
 

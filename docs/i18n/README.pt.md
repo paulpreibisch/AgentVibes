@@ -4,7 +4,15 @@
 
 ---
 
-## 🆕 Configuração confiável e pré-visualizações de áudio completas (v5.14.0)
+## 🆕 Controle de múltiplas sessões no Windows (v5.15.0)
+
+- **As sessões permanecem em silêncio a menos que você as ative** — uma sessão fala apenas em um projeto que você tenha ativado; as demais não adicionam instruções nem custo de tokens.
+- **`/agent-vibes:mute` agora funciona no Windows** — antes não tinha efeito ali. Tanto o mudo do projeto quanto o global são respeitados em todas as plataformas.
+- **As sessões podem se apresentar no Windows** — `{{session}}` anuncia "Claude on my-app in Windows Terminal", uma vez por sessão.
+- **As autoapresentações agora chegam às instalações globais** — o script por trás delas nunca era entregue pelo atualizador em nenhuma plataforma.
+- **Nota para instalações globais no Windows:** as sessões ficam desativadas por padrão após esta atualização — ative com `/agent-vibes:unmute`.
+
+### v5.14.0 — Configuração confiável e pré-visualizações de áudio completas
 
 Inclui todas as mudanças da 5.13.2, que não foi publicada no npm.
 

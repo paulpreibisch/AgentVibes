@@ -1,5 +1,85 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.0 — Steuerung mehrerer Sitzungen unter Windows
+
+**Veröffentlicht:** 2026-07-20 · `npm install agentvibes@latest`
+
+Wenn du mehrere Agenten-Sitzungen gleichzeitig betreibst, bringt dieses Release
+Windows dieselbe Kontrolle, die macOS und Linux mit 5.13.0 erhalten haben:
+Sitzungen bleiben stumm, sofern du sie nicht aktivierst, und jede kann dir
+mitteilen, welches Fenster gerade spricht.
+
+### Sitzungen sprechen nicht mehr alle gleichzeitig
+
+Wer AgentVibes über mehrere Projekte hinweg einsetzte, hatte bisher das Problem,
+dass sich jede geöffnete Sitzung selbst ankündigte — ohne einen einfachen Weg,
+nur eine einzige sprechen zu lassen. Unter macOS und Linux wurde dies mit 5.13.0
+behoben. **Unter Windows nicht** — der Windows-Sitzungs-Hook aktivierte die
+Sprachausgabe in jeder Sitzung, unabhängig von deinen Einstellungen.
+
+Windows folgt jetzt derselben Regel: Eine Sitzung spricht nur in einem Projekt,
+das du ausdrücklich aktiviert hast. Nicht aktivierte Projekte tragen **überhaupt
+nichts** bei — keine stumme Audioausgabe, sondern keine zusätzlichen Anweisungen
+und keine Token-Kosten.
+
+### Stummschaltung funktioniert jetzt unter Windows
+
+`/agent-vibes:mute` hatte unter Windows keine Wirkung auf die Audioausgabe. Es
+verstummte nur macOS und Linux, weil der Windows-Player eine andere Einstellung
+las als jene, die der Befehl schrieb.
+
+Sowohl die projektbezogene Stummschaltung als auch der globale Schalter werden
+unter Windows nun beachtet:
+
+- `/agent-vibes:mute` — dieses Projekt verstummen lassen
+- `/agent-vibes:unmute` — dieses Projekt wieder aktivieren, selbst wenn alles
+  andere global stummgeschaltet ist
+
+Damit lässt sich „überall aus, nur in dem einen Projekt an, an dem ich gerade
+arbeite" auf jeder Plattform mit einem einzigen Befehlspaar umsetzen.
+
+### Sitzungen können sich unter Windows selbst zu erkennen geben
+
+Füge `{{session}}` in deinen Pretext ein, und eine Sitzung stellt sich einmalig
+vor:
+
+```
+Claude on my-app in Windows Terminal
+```
+
+Sie benennt das Projekt und erkennt das Terminal — Windows Terminal, VS Code,
+Ghostty, iTerm, Terminal, WezTerm, tmux und andere. Angekündigt wird einmal pro
+Sitzung statt vor jeder Zeile. Bisher funktionierte dies nur unter macOS und
+Linux.
+
+### Eine zugehörige Korrektur für jede Plattform
+
+Das Skript, das diese Vorstellung erzeugt, fehlte im Update-Prozess, sodass es
+bei einer globalen Installation nie ausgeliefert wurde und die Funktion still
+und leise nichts tat. Es ist nun unter macOS, Linux und Windows gleichermaßen
+enthalten.
+
+### Update
+
+Deine bisherigen Einstellungen bleiben erhalten — hast du ein Projekt bereits
+stummgeschaltet, aktiviert oder freigeschaltet, lässt das Update diese
+Einstellung unangetastet.
+
+**Ein Punkt, den Windows-Nutzer mit globaler Installation beachten sollten:** Da
+Sitzungen jetzt standardmäßig aus sind, sofern nicht aktiviert, bleibt eine
+globale Windows-Installation nach dem Update stumm. Aktiviere die gewünschten
+Projekte mit `/agent-vibes:unmute`. Projektinstallationen werden automatisch
+aktiviert und sind nicht betroffen.
+
+### Qualität
+
+Neue Regressionstests stellen sicher, dass das Sitzungs-Gate, die
+Stummschaltungsregeln und die Selbstidentifikation sich auf beiden Laufzeiten
+identisch verhalten, sodass die Plattformen nicht erneut auseinanderdriften
+können, ohne dass der Build fehlschlägt.
+
+---
+
 ## v5.14.0 — Zuverlässige Einrichtung und vollständige Audio-Vorschauen
 
 **Veröffentlicht:** 2026-07-19 · `npm install agentvibes@latest`

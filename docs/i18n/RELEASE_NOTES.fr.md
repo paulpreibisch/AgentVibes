@@ -1,5 +1,54 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.0 — Contrôle multi-session sous Windows
+
+**Publié le :** 2026-07-20 · `npm install agentvibes@latest`
+
+Si vous exécutez plusieurs sessions d'agent en même temps, cette version apporte à Windows le même contrôle que macOS et Linux avaient obtenu dans la 5.13.0 : les sessions restent silencieuses tant que vous ne les activez pas, et chacune peut vous indiquer quelle fenêtre est en train de parler.
+
+### Les sessions ne parlent plus toutes en même temps
+
+Utiliser AgentVibes sur plusieurs projets signifiait auparavant que chaque session ouverte s'annonçait, sans moyen simple de n'en garder qu'une seule active. Sur macOS et Linux, cela avait été corrigé dans la 5.13.0. **Sous Windows, ce n'était pas le cas** — le hook de session Windows activait la parole dans chaque session, quels que soient vos réglages.
+
+Windows suit désormais la même règle : une session ne parle que dans un projet que vous avez explicitement activé. Les projets que vous n'avez pas activés n'apportent **absolument rien** — pas un son silencieux, mais aucune instruction supplémentaire et aucun coût en tokens.
+
+### La mise en sourdine fonctionne désormais sous Windows
+
+`/agent-vibes:mute` n'avait aucun effet sur l'audio Windows. Il ne mettait en sourdine que macOS et Linux, car le lecteur Windows lisait un réglage différent de celui écrit par la commande.
+
+La mise en sourdine du projet et l'interrupteur global sont désormais tous deux respectés sous Windows :
+
+- `/agent-vibes:mute` — rendre ce projet silencieux
+- `/agent-vibes:unmute` — réactiver ce projet, même lorsque tout le reste est mis en sourdine globalement
+
+Cela fait de « désactivé partout, activé dans le seul projet sur lequel je travaille » une simple paire de commandes sur toutes les plateformes.
+
+### Les sessions peuvent s'identifier sous Windows
+
+Incluez `{{session}}` dans votre pretext et une session se présente une seule fois :
+
+```
+Claude on my-app in Windows Terminal
+```
+
+Elle nomme le projet et détecte le terminal — Windows Terminal, VS Code, Ghostty, iTerm, Terminal, WezTerm, tmux et d'autres. Annoncée une fois par session plutôt qu'avant chaque ligne. Cela ne fonctionnait auparavant que sur macOS et Linux.
+
+### Une correction connexe pour toutes les plateformes
+
+Le script qui produit cette présentation était absent du processus de mise à jour, si bien que sur une installation globale il n'était jamais livré et la fonctionnalité ne faisait silencieusement rien. Il est désormais inclus aussi bien sur macOS que sur Linux et Windows.
+
+### Mise à niveau
+
+Vos choix existants sont préservés — si vous avez déjà mis en sourdine, réactivé ou activé un projet, la mise à jour laisse ce réglage intact.
+
+**Un changement à noter pour les utilisateurs Windows en installation globale :** puisque les sessions sont désormais désactivées tant qu'elles ne sont pas activées, une installation Windows globale sera silencieuse après la mise à jour. Activez les projets que vous souhaitez avec `/agent-vibes:unmute`. Les installations par projet sont activées automatiquement et ne sont pas affectées.
+
+### Qualité
+
+De nouveaux tests de non-régression vérifient que le filtre de session, les règles de mise en sourdine et l'auto-identification se comportent de manière identique sur les deux runtimes, afin que les plateformes ne puissent plus diverger sans faire échouer la compilation.
+
+---
+
 ## v5.14.0 — Installation fiable et aperçus audio complets
 
 **Publié le :** 2026-07-19 · `npm install agentvibes@latest`
