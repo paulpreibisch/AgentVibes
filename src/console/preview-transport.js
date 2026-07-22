@@ -54,22 +54,6 @@ export function previewRowContent(frameChar, remote, stopHint = 'Space to stop')
 }
 
 /**
- * Preview indicator APPENDED after a row's existing label (keepLabel mode).
- * Used where replacing the label would be jarring — e.g. the Music tab, whose
- * rows carry emoji: keeping the name in place avoids a perceived "jump", and
- * only the trailing spinner char changes per frame so blessed never re-diffs the
- * (wide) emoji cell.
- * @param {string} baseRow - the row's normal content (with its label/emoji)
- * @param {string} frameChar
- * @param {boolean} remote
- * @param {string} [stopHint]
- * @returns {string}
- */
-export function previewRowAppend(baseRow, frameChar, remote, stopHint = 'Space to stop') {
-  return `${baseRow}   {cyan-fg}${frameChar}{/cyan-fg} ${transportBadge(remote)}{cyan-fg}  (${stopHint}){/cyan-fg}`;
-}
-
-/**
  * Attach an animated preview indicator to the SELECTED row of a blessed list.
  * Generalizes the Kokoro picker's row spinner so every picker behaves identically.
  *
@@ -88,16 +72,7 @@ export function createRowSpinner(list, screen, renderItem, opts = {}) {
   const now = opts.now ?? (() => Date.now());
   const intervalMs = opts.intervalMs ?? 80;
   const minVisibleMs = opts.minVisibleMs ?? 1100;
-  // fullRedraw: force a complete repaint (realloc) instead of a diff render.
-  // Needed for lists containing double-width emoji (the Music tab): blessed's
-  // diff render desyncs the terminal cursor around wide chars during rapid
-  // in-place updates, corrupting rows — even though the internal buffer is
-  // correct. A realloc rewrites the terminal from that correct buffer.
-  const fullRedraw = opts.fullRedraw ?? false;
-  // keepLabel: append the indicator after the row's existing label instead of
-  // replacing it (avoids a perceived "jump" on emoji rows — see previewRowAppend).
-  const keepLabel = opts.keepLabel ?? false;
-  // isStatic: write the indicator ONCE (no animation). Needed for lists with
+  // isStatic: write the indicator ONCE (no animation). Used for lists with
   // double-width emoji (the Music tab): repeated in-place mutation of emoji rows
   // desyncs blessed's terminal output. One write + full-width space padding is
   // the least-fragile option there. A frozen "♪" stands in for the spinner.
@@ -110,17 +85,18 @@ export function createRowSpinner(list, screen, renderItem, opts = {}) {
   let remote = false;
   let startTs = 0;
 
-  // full=true forces a complete repaint (realloc) — used ONCE on start and stop
-  // to fix the wide-char cursor desync from the emoji-row→spinner transition (and
-  // stale decorations). Per-frame renders are plain diffs: the spinner row has no
-  // wide chars, so animating it is clean AND doesn't shimmer the whole screen.
-  function _render(full) {
-    if (full && fullRedraw && typeof screen.realloc === 'function') { try { screen.realloc(); } catch { /* ignore */ } }
-    screen.render();
+  // Guard: blessed's List.setItem dereferences this.items[i] unchecked, so a
+  // stale idx (e.g. the list was rebuilt shorter by a filter while a preview was
+  // active) would throw an uncaught TypeError and kill the whole TUI. Only touch
+  // a row that still exists. list.items is an array on a real list; the test stub
+  // uses a plain object, so treat "not an array" as always-in-range.
+  function _inRange(i) {
+    if (i < 0) return false;
+    return Array.isArray(list.items) ? i < list.items.length : true;
   }
 
-  function _paint(full) {
-    if (idx < 0) return;
+  function _paint() {
+    if (!_inRange(idx)) return;
     // Pad to the widest reliable measure so the row fully overwrites the previous
     // (longer) content. list.width may still be a percentage string pre-layout, so
     // fall back to the screen width; over-padding is clipped by the non-wrapping list.
@@ -128,19 +104,16 @@ export function createRowSpinner(list, screen, renderItem, opts = {}) {
     const sw = (screen && typeof screen.width === 'number' && screen.width > 0) ? screen.width : 0;
     const w = Math.max(lw, sw, 80);
     const spin = isStatic ? '♪' : SPIN_FRAMES[frame++ % SPIN_FRAMES.length];
-    const content = keepLabel
-      ? previewRowAppend(renderItem(idx), spin, remote)
-      : previewRowContent(spin, remote);
-    list.setItem(idx, padTaggedTo(content, w));
-    _render(full);
+    list.setItem(idx, padTaggedTo(previewRowContent(spin, remote), w));
+    screen.render();
   }
 
   function stop() {
     if (floor) { clearTimeout(floor); floor = null; }
     if (timer) { clearInterval(timer); timer = null; }
-    if (idx >= 0 && !isClosed()) {
+    if (_inRange(idx) && !isClosed()) {
       list.setItem(idx, renderItem(idx));
-      _render(true);   // one full repaint to clear the wide-char desync on restore
+      screen.render();
     }
     idx = -1;
   }
@@ -152,9 +125,9 @@ export function createRowSpinner(list, screen, renderItem, opts = {}) {
       frame = 0;
       remote = !!isRemote;
       startTs = now();
-      _paint(fullRedraw);   // one repaint (realloc only if fullRedraw) fixes the transition
+      _paint();
       if (isStatic) return; // static indicator: written once, no animation loop
-      timer = setInterval(() => { if (isClosed()) { stop(); return; } _paint(false); }, intervalMs);
+      timer = setInterval(() => { if (isClosed()) { stop(); return; } _paint(); }, intervalMs);
       // A UI spinner must never keep the process alive (blessed's stdin does that
       // in the real TUI); unref so a leaked spinner can't hang node --test on exit.
       if (timer.unref) timer.unref();

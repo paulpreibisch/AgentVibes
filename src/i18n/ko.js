@@ -198,6 +198,6 @@ export default {
   helpSearchLabel: "검색:",
   readmeScrollMore: "↓ 아래로 스크롤하여 더 보기 ↓",
   readmeNotFound: "*(현재 디렉토리에서 README.md를 찾을 수 없습니다)*",
-  bmadFooterNobmad: "[Tab] 탭 전환  [Q] 나가기",
+  bmadFooterNobmad: "[Enter] 다시 확인  [Tab] 탭 전환  [Q] 나가기",
   bmadFooterBmad: "[↑↓/jk] 탐색  [Space] 미리보기  [Enter] 설정  [A] 자동배정  [B] 일괄  [Del] 초기화  [Q] 나가기",
 };

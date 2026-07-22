@@ -765,8 +765,26 @@ export function createMusicTab(screen, services) {
     });
   }
 
+  // Stop any in-flight preview (local player, remote receiver, and the row
+  // spinner). Used before a list rebuild so a stale spinner index can't crash
+  // blessed's setItem, and so a preview can't be left "playing" invisibly.
+  function _stopAnyPreview() {
+    if (_remotePlayingTrackId) {
+      const mp = resolveMusicProvider(_PKG_ROOT);
+      if (mp.remote) _sendMusicRemote(mp, { stop: true });
+      _remotePlayingTrackId = null;
+    }
+    _killPlayingProcess();
+    _playingTrackId = null;
+    _trackSpin.stop();
+  }
+
   function refreshDisplay() {
     _refreshing = true;
+    // A rebuild (setItems) invalidates the spinner's row index and wipes its
+    // indicator — stop any active preview first (guarded, so a normal refresh with
+    // no preview is a no-op). Prevents a stale-index crash and a stuck preview.
+    if (_trackSpin.isActive()) _stopAnyPreview();
     const savedIdx = trackList.selected ?? 0;
 
     _allTracks = _buildAllTracks();

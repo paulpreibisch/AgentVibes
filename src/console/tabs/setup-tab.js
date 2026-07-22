@@ -4261,7 +4261,7 @@ export function createSetupTab(screen, services) {
             _vpSpin.stopWithFloor();
           }
         });
-        rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); });
         return;
       }
 

@@ -143,6 +143,19 @@ describe('scanBmadAgents — v6.6+ skills layout (regression)', () => {
     assert.strictEqual(mary.title, 'Business Analyst');
   });
 
+  test('derives persona name from a bare "# Name" heading / the description', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-bmad-'));
+    mock.method(os, 'homedir', () => root);
+    const d = path.join(root, '.claude', 'skills', 'bmad-agent-analyst');
+    fs.mkdirSync(d, { recursive: true });
+    // No dashed "Name — Title" heading; a bare "# Mary" + a description that names
+    // the persona ("talk to Mary"). Either source should yield "Mary", not "Analyst".
+    fs.writeFileSync(path.join(d, 'SKILL.md'),
+      '---\nname: bmad-agent-analyst\ndescription: Strategic analyst. Use when the user asks to talk to Mary or requests the analyst.\n---\n\n# Mary\n\n## Overview\n');
+    const mary = scanBmadAgents(root).find(a => a.id === 'analyst');
+    assert.strictEqual(mary.displayName, 'Mary');
+  });
+
   test('falls back to title-cased id when SKILL.md has no "Name — Title" heading', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-bmad-'));
     mock.method(os, 'homedir', () => root);

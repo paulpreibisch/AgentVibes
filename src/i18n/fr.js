@@ -198,6 +198,6 @@ export default {
   helpSearchLabel: "Recherche:",
   readmeScrollMore: "↓ Défiler pour plus de contenu ↓",
   readmeNotFound: "*(Aucun README.md trouvé dans le répertoire actuel)*",
-  bmadFooterNobmad: "[Tab] Changer d'onglet  [Q] Quitter",
+  bmadFooterNobmad: "[Enter] Revérifier  [Tab] Changer d'onglet  [Q] Quitter",
   bmadFooterBmad: "[↑↓/jk] Naviguer  [Space] Aperçu  [Enter] Configurer  [A] Auto-assigner  [B] Lot  [Del] Réinitialiser  [Q] Quitter",
 };

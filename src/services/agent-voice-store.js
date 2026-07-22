@@ -228,18 +228,31 @@ function _findBmadAgentSkills(root) {
  * heading ("# Mary — Business Analyst") for the persona name + title. Falls back
  * to a title-cased id when the heading is missing/unreadable.
  */
+// Generic section words that a bare "# Word" heading might be (not a persona).
+const _GENERIC_HEADING = /^(overview|about|usage|conventions|activation|role|purpose|description|instructions)$/i;
+
 function _agentFromSkill(id, skillDir) {
   let displayName = _titleCaseId(id);
   let title = '';
   try {
     const md = fs.readFileSync(path.resolve(skillDir, 'SKILL.md'), 'utf8');
-    // Persona heading format: "# Mary — Business Analyst" (name <dash> title).
-    // Require the spaced dash so a generic section heading like "# Overview" is
-    // skipped and we fall back to the title-cased id instead of mislabeling.
-    const m = md.match(/^#\s+([^\n]+?)\s+[—–-]\s+([^\n]+?)\s*$/m); // em / en / hyphen
-    if (m) {
-      displayName = m[1].trim() || displayName;
-      title = m[2].trim();
+    // 1) Preferred: "# Mary — Business Analyst" (name <dash> title).
+    const dash = md.match(/^#\s+([^\n]+?)\s+[—–-]\s+([^\n]+?)\s*$/m); // em / en / hyphen
+    if (dash) {
+      displayName = dash[1].trim() || displayName;
+      title = dash[2].trim();
+    } else {
+      // 2) Frontmatter description often names the persona: "...talk to Mary...".
+      const desc = md.match(/^description:\s*(.+)$/mi);
+      const talk = desc && desc[1].match(/talk to ([A-Z][\w'’-]+)/);
+      if (talk) {
+        displayName = talk[1];
+      } else {
+        // 3) A bare "# Mary" heading — but skip generic section headings so a
+        // skill without a persona heading (e.g. "# Overview") falls back to the id.
+        const h1 = md.match(/^#\s+([A-Z][\w'’-]*)\s*$/m);
+        if (h1 && !_GENERIC_HEADING.test(h1[1])) displayName = h1[1];
+      }
     }
   } catch { /* use derived displayName */ }
   return { id, displayName, title, icon: '', module: 'bmm' };

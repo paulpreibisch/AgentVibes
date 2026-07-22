@@ -8,25 +8,26 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  transportBadge, previewRowContent, createRowSpinner, SPIN_FRAMES, padTaggedTo, previewRowAppend,
+  transportBadge, previewRowContent, createRowSpinner, SPIN_FRAMES, padTaggedTo,
 } from '../../src/console/preview-transport.js';
 
-describe('previewRowAppend (keepLabel)', () => {
-  test('keeps the base row and appends the badge', () => {
-    const c = previewRowAppend('🌌 Celestial Velvet', '⠹', true);
-    assert.ok(c.startsWith('🌌 Celestial Velvet'), 'label preserved in place');
-    assert.ok(c.includes('(remotely via SSH)'));
-    assert.ok(c.includes('(Space to stop)'));
+describe('createRowSpinner — out-of-range guard (no TUI crash on a shrunk list)', () => {
+  // blessed's List.setItem dereferences items[i] unchecked; a stale spinner index
+  // after a filter rebuild used to throw an uncaught TypeError and kill the TUI.
+  function strictList(items) {
+    return { items, setItem(i, s) { if (i >= this.items.length) throw new RangeError(`oob ${i}`); this.items[i] = s; } };
+  }
+  test('stop() does not touch a row that no longer exists', () => {
+    const list = strictList(['a', 'b', 'c', 'd', 'e']);
+    const sp = createRowSpinner(list, { render() {} }, (i) => `ROW${i}`, { now: () => 0 });
+    sp.start(4, false);          // spinner on the last row
+    list.items = ['a', 'b'];     // list shrank (filter applied)
+    assert.doesNotThrow(() => sp.stop(), 'stop must skip a now-missing row');
   });
-
-  test('createRowSpinner keepLabel appends to renderItem output', () => {
-    const list = { items: {}, setItem(i, s) { this.items[i] = s; }, width: 120 };
-    const sp = createRowSpinner(list, { render() {} }, (i) => `🎺 Track${i}`, { keepLabel: true, now: () => 0 });
-    sp.start(4, false);
-    assert.ok(list.items[4].startsWith('🎺 Track4'), 'label kept');
-    assert.ok(list.items[4].includes('(locally)'));
-    sp.stop();
-    assert.equal(list.items[4], '🎺 Track4', 'restored to plain row');
+  test('start() on an out-of-range index is a no-op, not a throw', () => {
+    const list = strictList(['a', 'b']);
+    const sp = createRowSpinner(list, { render() {} }, (i) => `ROW${i}`, { now: () => 0 });
+    assert.doesNotThrow(() => sp.start(9, false));
   });
 });
 

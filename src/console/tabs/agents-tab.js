@@ -21,6 +21,7 @@ import {
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
 import { createRowSpinner } from '../preview-transport.js';
+import { resolveMusicProvider } from '../music-preview.js';
 import { voicesForProvider } from '../../services/provider-voice-catalog.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
@@ -335,7 +336,11 @@ ${_tl('bmadDesc')}
 
   // Manual re-check: after installing BMAD from a separate terminal, Enter
   // re-scans without leaving the tab. (Switching tabs also re-scans via onFocus.)
-  onboardingBox.key(['enter'], () => { refreshDisplay(); });
+  // If BMAD now shows up, move focus to the roster (else keys go to the hidden box).
+  onboardingBox.key(['enter'], () => {
+    refreshDisplay();
+    if (_bmadDetected) { agentList.focus(); screen.render(); }
+  });
 
   // -------------------------------------------------------------------------
   // BMAD state — section header
@@ -1135,13 +1140,18 @@ ${_tl('bmadDesc')}
 
       const phrase = previewPhrase(voiceId);
       const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      // Badge must match where play-tts actually routes: remote if the provider
+      // file is ssh-remote/agentvibes-receiver OR a transport-config entry is
+      // mode=remote. resolveMusicProvider is the shared transport resolver (both
+      // signals) — don't re-derive routing here (CLAUDE.md invariant #1).
+      const _isRemote = resolveMusicProvider(path.dirname(_pkgClaudeDir)).remote;
 
       if (_isWin) {
         // Windows: route through play-tts.ps1 (same pattern as non-Windows bash route)
         const playTtsScript = _hookScript('hooks-windows', 'play-tts.ps1');
         if (!fs.existsSync(playTtsScript)) return;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { _vpSpin.start(vpList.selected, false); }
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, _isRemote); }
         _previewProc = spawn('powershell', [ // NOSONAR
           '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTtsScript, phrase, voiceId,
         ], { stdio: 'ignore', detached: false, windowsHide: true,
@@ -1176,7 +1186,7 @@ ${_tl('bmadDesc')}
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;
-      if (!_vpClosed) { _vpSpin.start(vpList.selected, !!remoteLlm); }
+      if (!_vpClosed) { _vpSpin.start(vpList.selected, _isRemote); }
 
       const _clearAfterMinDisplay = () => {
         if (_previewVoiceId === voiceId) {

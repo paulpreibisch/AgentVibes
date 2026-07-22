@@ -198,6 +198,6 @@ export default {
   helpSearchLabel: "खोजें:",
   readmeScrollMore: "↓ अधिक सामग्री के लिए स्क्रॉल करें ↓",
   readmeNotFound: "*(वर्तमान निर्देशिका में README.md नहीं मिला)*",
-  bmadFooterNobmad: "[Tab] टैब बदलें  [Q] बाहर",
+  bmadFooterNobmad: "[Enter] फिर से जाँचें  [Tab] टैब बदलें  [Q] बाहर",
   bmadFooterBmad: "[↑↓/jk] नेविगेट  [Space] प्रीव्यू  [Enter] कॉन्फ़िगर  [A] ऑटो-असाइन  [B] बल्क  [Del] रीसेट  [Q] बाहर",
 };
