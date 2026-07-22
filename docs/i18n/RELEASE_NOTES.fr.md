@@ -1,5 +1,22 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.1 — Sachez où votre aperçu se joue
+
+**Publié le :** 2026-07-21 · `npm install agentvibes@latest`
+
+Voici le problème que nous rencontrions sans cesse : lorsque vous appuyez sur Espace pour prévisualiser une voix ou un morceau de musique, il n'y avait aucun moyen de savoir s'il allait se jouer *sur votre propre machine* ou être envoyé *à votre récepteur distant*. Sur une machine sans écran, cela signifiait appuyer sur aperçu et n'entendre… rien — sans comprendre pourquoi.
+
+Alors nous l'avons corrigé. Chaque aperçu vous indique désormais exactement où va le son — **(locally)** (en local) ou **(remotely via SSH)** (à distance via SSH) — directement sur la ligne que vous êtes en train d'écouter. Fini les devinettes.
+
+Et tant que nous y étions, nous avons **uniformisé l'aperçu dans toute l'application**. Les sélecteurs de voix (Kokoro, Piper, ElevenLabs et les voix BMAD par agent) ainsi que la page Musique affichent tous désormais le même indicateur `Previewing (locally / remotely via SSH)`, pour que cela ait l'air et se comporte de manière identique partout. Une petite chose qui s'avère réellement utile.
+
+Une conséquence pratique : si un projet achemine sa synthèse vocale (TTS) vers un récepteur distant, **les aperçus de musique le suivent désormais aussi** — auparavant, ils se jouaient discrètement sur la machine locale, ce qui revient au silence sur un serveur sans écran.
+
+### Également dans cette version
+
+- **L'onglet Agents affiche vos véritables agents BMAD** (Mary, Winston, Amelia, John, Paige, Sally…) au lieu des assistants internes d'une compétence — et il se revérifie lorsque vous revenez sur l'onglet, de sorte qu'une installation BMAD toute fraîche apparaît sans redémarrage.
+- **La réinitialisation ne vous propulse plus vers l'onglet Récepteur.** Elle était associée à `X`, la même touche qui, globalement, saute vers le Récepteur ; c'est désormais `Del`.
+
 ## v5.15.0 — Contrôle multi-session sous Windows
 
 **Publié le :** 2026-07-20 · `npm install agentvibes@latest`

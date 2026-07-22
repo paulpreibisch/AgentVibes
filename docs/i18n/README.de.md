@@ -4,7 +4,13 @@
 
 ---
 
-## 🆕 Steuerung mehrerer Sitzungen unter Windows (v5.15.0)
+## 🆕 Wisse, wo deine Vorschau abgespielt wird (v5.15.1)
+
+- **Jede Vorschau zeigt, wo sie abgespielt wird** — Stimm- und Musikvorschauen zeigen jetzt **(locally)** oder **(remotely via SSH)** direkt in der Zeile an, die du gerade anhörst, sodass du nie rätseln musst (oder auf einem Rechner ohne Bildschirm nur Stille hörst).
+- **Vorschau in der gesamten App vereinheitlicht** — die Stimmenauswahl (Kokoro, Piper, ElevenLabs, BMAD pro Agent) und die Musikseite zeigen alle denselben Hinweis; Musikvorschauen folgen jetzt auch dem Remote-Empfänger eines Projekts.
+- **Aufgeräumterer Agents-Tab** — er listet deine echten BMAD-Agenten auf (nicht die internen Helfer eines Skills) und prüft sich beim Fokussieren erneut; **Reset** wurde von `X` (das zum Receiver-Tab sprang) auf **`Del`** verschoben.
+
+### v5.15.0 — Steuerung mehrerer Sitzungen unter Windows
 
 - **Sitzungen bleiben stumm, sofern du sie nicht aktivierst** — eine Sitzung spricht nur in einem Projekt, das du eingeschaltet hast; andere fügen keine Anweisungen und keine Token-Kosten hinzu.
 - **`/agent-vibes:mute` funktioniert jetzt unter Windows** — bisher hatte es dort keine Wirkung. Sowohl die projektbezogene als auch die globale Stummschaltung werden auf jeder Plattform beachtet.

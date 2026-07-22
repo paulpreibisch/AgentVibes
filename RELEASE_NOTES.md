@@ -1,5 +1,37 @@
 # AgentVibes Release Notes
 
+## v5.15.1 — Know where your preview plays
+
+**Released:** 2026-07-21 · `npm install agentvibes@latest`
+
+Here's the thing we kept running into: when you press Space to preview a voice
+or a music track, there was no way to tell whether it was about to play *on your
+own machine* or get sent *to your remote receiver*. On a headless box that meant
+pressing preview and hearing… nothing — with no idea why.
+
+So we fixed it. Every preview now tells you exactly where the sound is going —
+**(locally)** or **(remotely via SSH)** — right on the row you're auditioning.
+No more guessing.
+
+And while we were in there, we **standardized preview across the whole app**.
+The voice pickers (Kokoro, Piper, ElevenLabs, and per-agent BMAD voices) and the
+Music page now all show the same `Previewing (locally / remotely via SSH)`
+indicator, so it looks and behaves identically everywhere. It's a small thing
+that turns out to be genuinely useful.
+
+One practical upshot: if a project routes its TTS to a remote receiver, **music
+previews now follow it too** — before, they quietly played on the local machine,
+which is silence on a headless server.
+
+### Also in this release
+
+- **The Agents tab shows your real BMAD agents** (Mary, Winston, Amelia, John,
+  Paige, Sally…) instead of a skill's internal helpers — and it re-checks itself
+  when you switch back to the tab, so a fresh BMAD install shows up without a
+  restart.
+- **Reset no longer yanks you to the Receiver tab.** It was mapped to `X`, the
+  same key that globally jumps to Receiver; it's now `Del`.
+
 ## v5.15.0 — Multi-session control on Windows
 
 **Released:** 2026-07-20 · `npm install agentvibes@latest`

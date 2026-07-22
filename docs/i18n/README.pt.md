@@ -4,7 +4,13 @@
 
 ---
 
-## 🆕 Controle de múltiplas sessões no Windows (v5.15.0)
+## 🆕 Saiba onde a sua pré-visualização toca (v5.15.1)
+
+- **Cada pré-visualização mostra onde toca** — as pré-visualizações de voz e de música agora exibem **(localmente)** ou **(remotamente via SSH)** bem na linha que você está testando, então você nunca fica adivinhando (nem ouvindo silêncio em uma máquina sem monitor).
+- **Pré-visualização padronizada em todo o aplicativo** — os seletores de voz (Kokoro, Piper, ElevenLabs, BMAD por agente) e a página de Música mostram todos o mesmo indicador; as pré-visualizações de música agora acompanham também o receptor remoto de um projeto.
+- **Aba Agents mais limpa** — ela lista os seus agentes BMAD reais (não os auxiliares internos de uma skill) e se reverifica ao receber o foco; o **Reset** saiu de `X` (que saltava para a aba Receiver) para **`Del`**.
+
+### v5.15.0 — Controle de múltiplas sessões no Windows
 
 - **As sessões permanecem em silêncio a menos que você as ative** — uma sessão fala apenas em um projeto que você tenha ativado; as demais não adicionam instruções nem custo de tokens.
 - **`/agent-vibes:mute` agora funciona no Windows** — antes não tinha efeito ali. Tanto o mudo do projeto quanto o global são respeitados em todas as plataformas.

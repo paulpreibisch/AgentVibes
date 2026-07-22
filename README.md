@@ -58,7 +58,13 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Multi-session control on Windows (v5.15.0)
+## 🆕 Know where your preview plays (v5.15.1)
+
+- **Every preview shows where it plays** — voice and music previews now display **(locally)** or **(remotely via SSH)** right on the row you're auditioning, so you're never guessing (or hearing silence on a headless box).
+- **Preview standardized across the app** — the voice pickers (Kokoro, Piper, ElevenLabs, per-agent BMAD) and the Music page all show the same indicator; music previews now follow a project's remote receiver too.
+- **Cleaner Agents tab** — it lists your real BMAD agents (not a skill's internal helpers) and re-checks itself on focus; **Reset** moved off `X` (which jumped to the Receiver tab) to **`Del`**.
+
+### v5.15.0 — Multi-session control on Windows
 
 - **Sessions stay quiet unless you enable them** — a session speaks only in a project you've turned on; others add no instructions and no token cost.
 - **`/agent-vibes:mute` now works on Windows** — it previously had no effect there. Both project and global mute are honoured on every platform.

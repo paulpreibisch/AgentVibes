@@ -1,5 +1,39 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.1 — Wisse, wo deine Vorschau abgespielt wird
+
+**Veröffentlicht:** 2026-07-21 · `npm install agentvibes@latest`
+
+Das Problem, auf das wir immer wieder stießen: Wenn du die Leertaste drückst, um
+eine Stimme oder einen Musiktitel in der Vorschau zu hören, gab es keine
+Möglichkeit zu erkennen, ob das Ganze gleich *auf deinem eigenen Rechner* abläuft
+oder *an deinen Remote-Empfänger* gesendet wird. Auf einem Rechner ohne Bildschirm
+bedeutete das: Vorschau drücken und… nichts hören — ohne zu wissen, warum.
+
+Das haben wir behoben. Jede Vorschau sagt dir jetzt genau, wohin der Ton geht —
+**(locally)** oder **(remotely via SSH)** — direkt in der Zeile, die du gerade
+anhörst. Kein Rätselraten mehr.
+
+Und wo wir schon dabei waren, haben wir **die Vorschau in der gesamten App
+vereinheitlicht**. Die Stimmenauswahl (Kokoro, Piper, ElevenLabs und die
+BMAD-Stimmen pro Agent) und die Musikseite zeigen jetzt alle denselben Hinweis
+`Previewing (locally / remotely via SSH)`, sodass es überall gleich aussieht und
+sich gleich verhält. Eine Kleinigkeit, die sich als wirklich nützlich erweist.
+
+Ein praktischer Nebeneffekt: Wenn ein Projekt seine TTS an einen Remote-Empfänger
+leitet, **folgen jetzt auch die Musikvorschauen** — vorher spielten sie
+stillschweigend auf dem lokalen Rechner, was auf einem Server ohne Bildschirm
+Stille bedeutet.
+
+### Ebenfalls in diesem Release
+
+- **Der Agents-Tab zeigt deine echten BMAD-Agenten** (Mary, Winston, Amelia,
+  John, Paige, Sally…) statt der internen Helfer eines Skills — und er prüft sich
+  selbst erneut, wenn du zum Tab zurückwechselst, sodass eine frische
+  BMAD-Installation ohne Neustart erscheint.
+- **Reset reißt dich nicht mehr zum Receiver-Tab.** Es war auf `X` gelegt,
+  dieselbe Taste, die global zum Receiver springt; jetzt ist es `Del`.
+
 ## v5.15.0 — Steuerung mehrerer Sitzungen unter Windows
 
 **Veröffentlicht:** 2026-07-20 · `npm install agentvibes@latest`

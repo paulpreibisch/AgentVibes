@@ -4,7 +4,13 @@
 
 ---
 
-## 🆕 Control multisesión en Windows (v5.15.0)
+## 🆕 Sabe dónde se reproduce tu vista previa (v5.15.1)
+
+- **Cada vista previa muestra dónde se reproduce** — las vistas previas de voz y de música ahora muestran **(locally)** (localmente) o **(remotely via SSH)** (de forma remota vía SSH) justo en la fila que estás escuchando, para que nunca adivines (ni oigas silencio en un equipo sin pantalla).
+- **Vista previa estandarizada en toda la aplicación** — los selectores de voz (Kokoro, Piper, ElevenLabs, BMAD por agente) y la página de Música muestran todos el mismo indicador; las vistas previas de música ahora también siguen el receptor remoto de un proyecto.
+- **Pestaña de Agentes más limpia** — muestra tus agentes BMAD reales (no los ayudantes internos de una skill) y se vuelve a comprobar al enfocarla; **Reset** dejó de estar en `X` (que saltaba a la pestaña Receiver) y pasó a **`Del`**.
+
+### v5.15.0 — Control multisesión en Windows
 
 - **Las sesiones permanecen en silencio salvo que las actives** — una sesión solo habla en un proyecto que hayas activado; las demás no añaden instrucciones ni coste de tokens.
 - **`/agent-vibes:mute` ya funciona en Windows** — antes no tenía ningún efecto allí. Tanto el silenciado del proyecto como el global se respetan en todas las plataformas.

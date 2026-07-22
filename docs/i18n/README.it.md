@@ -4,7 +4,13 @@
 
 ---
 
-## 🆕 Controllo multi-sessione su Windows (v5.15.0)
+## 🆕 Sai dove viene riprodotta la tua anteprima (v5.15.1)
+
+- **Ogni anteprima mostra dove viene riprodotta** — le anteprime di voce e musica ora mostrano **(locally)** o **(remotely via SSH)** proprio sulla riga che stai ascoltando, così non devi mai indovinare (né sentire il silenzio su una macchina headless).
+- **Anteprima standardizzata in tutta l'app** — i selettori di voce (Kokoro, Piper, ElevenLabs, BMAD per singolo agente) e la pagina Musica mostrano tutti lo stesso indicatore; ora anche le anteprime musicali seguono il ricevitore remoto di un progetto.
+- **Scheda Agents più pulita** — elenca i tuoi veri agenti BMAD (non gli helper interni di una skill) e si ricontrolla quando riprende il focus; **Reset** è stato spostato da `X` (che saltava alla scheda Receiver) a **`Del`**.
+
+### v5.15.0 — Controllo multi-sessione su Windows
 
 - **Le sessioni restano silenziose finché non le abiliti** — una sessione parla solo in un progetto che hai attivato; le altre non aggiungono istruzioni né costi in token.
 - **`/agent-vibes:mute` ora funziona su Windows** — in precedenza qui non aveva alcun effetto. Sia il muto del progetto sia quello globale sono rispettati su ogni piattaforma.

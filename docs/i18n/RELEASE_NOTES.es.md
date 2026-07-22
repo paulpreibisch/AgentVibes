@@ -1,5 +1,22 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.1 — Sabe dónde se reproduce tu vista previa
+
+**Lanzamiento:** 2026-07-21 · `npm install agentvibes@latest`
+
+Este es el problema con el que seguíamos topándonos: cuando pulsabas Espacio para escuchar una vista previa de una voz o de una pista de música, no había forma de saber si iba a reproducirse *en tu propia máquina* o a enviarse *a tu receptor remoto*. En un equipo sin pantalla eso significaba pulsar la vista previa y no oír… nada — sin idea de por qué.
+
+Así que lo arreglamos. Cada vista previa ahora te dice exactamente adónde va el sonido — **(locally)** (localmente) o **(remotely via SSH)** (de forma remota vía SSH) — justo en la fila que estás escuchando. Se acabó adivinar.
+
+Y ya que estábamos, **estandarizamos la vista previa en toda la aplicación**. Los selectores de voz (Kokoro, Piper, ElevenLabs y las voces BMAD por agente) y la página de Música ahora muestran todos el mismo indicador `Previewing (locally / remotely via SSH)`, así que se ve y se comporta de forma idéntica en todas partes. Es una cosa pequeña que resulta ser realmente útil.
+
+Una consecuencia práctica: si un proyecto enruta su TTS a un receptor remoto, **las vistas previas de música ahora también lo siguen** — antes se reproducían silenciosamente en la máquina local, lo que es silencio en un servidor sin pantalla.
+
+### También en esta versión
+
+- **La pestaña de Agentes muestra tus agentes BMAD reales** (Mary, Winston, Amelia, John, Paige, Sally…) en lugar de los ayudantes internos de una skill — y se vuelve a comprobar cuando regresas a la pestaña, de modo que una instalación reciente de BMAD aparece sin reiniciar.
+- **Reset ya no te arrastra a la pestaña Receiver.** Estaba asignado a `X`, la misma tecla que salta globalmente a Receiver; ahora es `Del`.
+
 ## v5.15.0 — Control multisesión en Windows
 
 **Lanzamiento:** 2026-07-20 · `npm install agentvibes@latest`

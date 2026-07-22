@@ -4,7 +4,13 @@
 
 ---
 
-## 🆕 Contrôle multi-session sous Windows (v5.15.0)
+## 🆕 Sachez où votre aperçu se joue (v5.15.1)
+
+- **Chaque aperçu indique où il se joue** — les aperçus de voix et de musique affichent désormais **(locally)** (en local) ou **(remotely via SSH)** (à distance via SSH) directement sur la ligne que vous écoutez, pour ne plus jamais deviner (ni n'entendre que le silence sur une machine sans écran).
+- **Aperçu uniformisé dans toute l'application** — les sélecteurs de voix (Kokoro, Piper, ElevenLabs, BMAD par agent) et la page Musique affichent tous le même indicateur ; les aperçus de musique suivent désormais aussi le récepteur distant d'un projet.
+- **Onglet Agents plus propre** — il liste vos véritables agents BMAD (et non les assistants internes d'une compétence) et se revérifie lorsqu'il reçoit le focus ; **la réinitialisation** est passée de `X` (qui sautait vers l'onglet Récepteur) à **`Del`**.
+
+### v5.15.0 — Contrôle multi-session sous Windows
 
 - **Les sessions restent silencieuses tant que vous ne les activez pas** — une session ne parle que dans un projet que vous avez activé ; les autres n'ajoutent aucune instruction et aucun coût en tokens.
 - **`/agent-vibes:mute` fonctionne désormais sous Windows** — il n'avait auparavant aucun effet là-bas. La mise en sourdine par projet et globale est respectée sur toutes les plateformes.
