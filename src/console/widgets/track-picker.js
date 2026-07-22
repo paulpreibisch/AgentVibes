@@ -14,7 +14,7 @@ import { BRAND_PINK } from '../brand-colors.js';
 import { renderHelpBar, selectorTitle } from './help-bar.js';
 import { formatTrackName } from './format-utils.js';
 import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
-import { resolveMusicProvider, spawnMusicRemote } from '../music-preview.js';
+import { resolveMusicProvider, spawnMusicRemote, createRowSpinner } from '../music-preview.js';
 import { playBlingCue } from '../bling.js';
 
 // AgentVibes package/repo root — resolves bundled assets (bling cue) and is the
@@ -231,11 +231,19 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     },
   });
 
-  // Transient preview/error status shows in the title area; idle restores the title.
+  // Transient error status shows in the title area; idle restores the title.
   function _setStatus(text) {
     box.setLabel(text || TITLE);
     screen.render();
   }
+
+  // Row spinner: paints "⠹ Previewing (locally|remotely via SSH)  (Space to stop)"
+  // ON the selected track row — shared with every other picker. _setStatus stays
+  // for error messages only.
+  let _closed = false;
+  const _rowSpin = createRowSpinner(list, screen, (i) => (
+    tracks[i] && tracks[i].file === currentTrack ? `● ${tracks[i].label}` : `  ${tracks[i] ? tracks[i].label : ''}`
+  ), { isClosed: () => _closed });
 
   if (currentIdx >= 0) list.select(currentIdx);
   list.focus();
@@ -263,6 +271,7 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
       if (mp.remote) _sendRemote(mp, { stop: true });
       _remotePreviewTrackId = null;
     }
+    _rowSpin.stop();
   }
 
   /**
@@ -310,16 +319,16 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
       if (_remotePreviewTrackId === trackFile) {
         _sendRemote(_mp, { stop: true });
         _remotePreviewTrackId = null;
-        _setStatus();
+        _rowSpin.stop();
         return;
       }
       // Bling first (fire-and-forget, plays locally like the voice preview),
-      // then forward the track to the receiver.
+      // then forward the track to the receiver. The receiver keeps playing until
+      // an explicit stop, so the row spinner persists (no floor).
       playBlingCue(_PKG_ROOT);
       if (_sendRemote(_mp, { track: trackFile })) {
         _remotePreviewTrackId = trackFile;
-        const rlabel = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
-        _setStatus(` {bright-cyan-fg}♪ ${rlabel}  (Space to stop){/bright-cyan-fg} `);
+        _rowSpin.start(list.selected, true);
       }
       return;
     }
@@ -357,25 +366,25 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
 
     _previewProc = proc;
     _previewTrackId = trackFile;
-
-    const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
-    _setStatus(` {bright-cyan-fg}♪ ${label}  (Space to stop){/bright-cyan-fg} `);
+    _rowSpin.start(list.selected, false);
 
     proc.on('exit', () => {
       if (_previewTrackId === trackFile) {
         _previewTrackId = null;
         _previewProc = null;
-        _setStatus();
+        _rowSpin.stop();
       }
     });
 
     proc.on('error', () => {
       _previewTrackId = null;
       _previewProc = null;
+      _rowSpin.stop();
     });
   }
 
   function _close(callback) {
+    _closed = true;
     _killPreview();
     if (callback) {
       callback();

@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 // Controllable mock state
 // ---------------------------------------------------------------------------
 let _provider = 'ssh-remote';     // contents returned for tts-provider.txt
+let _remoteLlm = null;            // value returned by mocked detectRemoteLlm()
 let _events = [];                 // ordered timeline of spawns / mp3 playback
 
 const TRACK = 'agent_vibes_bossa_nova_v2_loop.mp3';
@@ -109,14 +110,14 @@ await mock.module('../../src/console/audio-env.js', {
     detectMp3Player: () => null,
     detectWavPlayer: () => null,
     getAllWavPlayers: () => [],
-    detectRemoteLlm: () => null,
+    detectRemoteLlm: () => _remoteLlm,
   },
 });
 
 // ---------------------------------------------------------------------------
 // Imports AFTER mocks
 // ---------------------------------------------------------------------------
-const { resolveMusicProvider, spawnMusicRemote, REMOTE_PROVIDERS } =
+const { resolveMusicProvider, spawnMusicRemote, REMOTE_PROVIDERS, transportBadge } =
   await import('../../src/console/music-preview.js');
 const { playBlingCue, buildBlingCommand } = await import('../../src/console/bling.js');
 const { openTrackPicker } = await import('../../src/console/widgets/track-picker.js');
@@ -129,7 +130,7 @@ function makeScreen() { const s = makeWidget('screen'); s.rows = 40; s.render = 
 function findList(from = 0) { return _allWidgets.slice(from).find(w => w._tag === 'list' && w._handlers['key:space']); }
 const forwardCall = () => _events.find(e => e.kind === 'spawn' && e.env && e.env.AGENTVIBES_MUSIC_ONLY);
 
-beforeEach(() => { _events = []; _allWidgets.length = 0; _provider = 'ssh-remote'; });
+beforeEach(() => { _events = []; _allWidgets.length = 0; _provider = 'ssh-remote'; _remoteLlm = null; });
 
 // ===========================================================================
 describe('music-preview shared helpers', () => {
@@ -147,6 +148,20 @@ describe('music-preview shared helpers', () => {
   test('resolveMusicProvider treats a local provider as non-remote', () => {
     _provider = 'piper';
     assert.equal(resolveMusicProvider('/pkg/root').remote, false);
+  });
+
+  test('resolveMusicProvider forwards when a remote TTS transport is configured, even with a local provider', () => {
+    // Regression: project tts-provider.txt=piper (local) but transport-config.json
+    // routes TTS to a remote receiver → music preview must forward too, or it
+    // plays to an inaudible local sink on the headless box.
+    _provider = 'piper';
+    _remoteLlm = 'claude-code';
+    assert.equal(resolveMusicProvider('/pkg/root').remote, true);
+  });
+
+  test('transportBadge is color-coded: green (locally), red (remotely via SSH)', () => {
+    assert.equal(transportBadge(false), '{green-fg}(locally){/green-fg}');
+    assert.equal(transportBadge(true), '{red-fg}(remotely via SSH){/red-fg}');
   });
 
   test('spawnMusicRemote builds the play invocation (bash sender + AGENTVIBES_MUSIC_ONLY + CLAUDE_PROJECT_DIR)', () => {

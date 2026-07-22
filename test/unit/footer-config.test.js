@@ -109,6 +109,16 @@ describe('footer-config.js - Text content per tab (AC#3)', () => {
     assert.ok(FOOTER_CONFIG.agents.text.includes('Reset'), 'Agents footer must mention Reset');
   });
 
+  test('Agents footer Reset does not reuse a global tab-shortcut key (X=receiver, R=readme)', async () => {
+    // Regression: Reset was bound to X, but X is the global Receiver-tab shortcut
+    // (navigation.js), so pressing it reset the agent AND jumped tabs. R collides
+    // with Readme. Reset must advertise a non-tab key (Del).
+    const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
+    assert.ok(!/\[X\]\s*Reset/i.test(FOOTER_CONFIG.agents.text), 'Reset must not use [X] (Receiver tab key)');
+    assert.ok(!/\[R\]\s*Reset/i.test(FOOTER_CONFIG.agents.text), 'Reset must not use [R] (Readme tab key)');
+    assert.ok(/Del/i.test(FOOTER_CONFIG.agents.text), 'Reset should advertise Del');
+  });
+
   test('Readme footer text includes Scroll and Page shortcuts', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
     assert.ok(FOOTER_CONFIG.readme.text.includes('Scroll'), 'Readme footer must mention Scroll');

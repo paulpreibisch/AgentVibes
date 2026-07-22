@@ -46,6 +46,7 @@ import { destroyList } from '../widgets/destroy-list.js';
 import { scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, detectWavPlayer } from '../audio-env.js';
+import { previewRowContent, createRowSpinner, padTaggedTo } from '../preview-transport.js';
 import { buildBlingCommand, playBlingCue } from '../bling.js';
 import { spawn, spawnSync } from 'node:child_process';
 
@@ -2907,6 +2908,7 @@ export function createSetupTab(screen, services) {
     let _kSpinFrame = 0;
     let _kSpinningIdx = -1;
     let _kSpinStartTs = 0;
+    let _kSpinRemote = false;  // whether the active preview is forwarded to the receiver
     let _kFloorTimer = null;   // pending _stopKSpinnerWithFloor timer (tracked so it can be cancelled)
     // Remote SSH preview is fire-and-forget: play-tts-ssh-remote.sh backgrounds
     // the ssh call and exits within milliseconds, so the row spinner would be
@@ -2916,17 +2918,20 @@ export function createSetupTab(screen, services) {
     // visible "preview sent" cue (fire-and-forget has no playback signal to await).
     const _K_MIN_SPIN_MS = 1100;
 
-    function _startKSpinner(listIdx) {
+    function _startKSpinner(listIdx, remote = false) {
       _stopKSpinner();
       _kSpinningIdx = listIdx;
       _kSpinFrame = 0;
       _kSpinStartTs = Date.now();
+      _kSpinRemote = remote;
       _kSpinInterval = setInterval(() => {
         if (_kClosed) { _stopKSpinner(); return; }
-        const spin = `{cyan-fg}${_K_SPIN[_kSpinFrame++ % _K_SPIN.length]}{/cyan-fg}`;
-        kPicker.setItem(listIdx, `${_kokoroItem(voices[listIdx])} ${spin}`);
+        // Row indicator: "⠹ Previewing (locally|remotely via SSH)  (Space to stop)".
+        // The row IS the selected voice, so the name is intentionally omitted.
+        kPicker.setItem(listIdx, padTaggedTo(previewRowContent(_K_SPIN[_kSpinFrame++ % _K_SPIN.length], _kSpinRemote), kPicker.width || 78));
         screen.render();
       }, 80);
+      if (_kSpinInterval.unref) _kSpinInterval.unref(); // never keep the process alive
     }
 
     function _stopKSpinner() {
@@ -3277,7 +3282,7 @@ export function createSetupTab(screen, services) {
 
       // ── Remote preview: route through SSH pipeline so receiver plays it ──
       if (_validSshHost) {
-        _startKSpinner(kPicker.selected);
+        _startKSpinner(kPicker.selected, true);
         const hookDir = path.join(packageDir, '.claude', 'hooks');
         const remoteEnv = { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_SSH_HOST: _sshHost };
         if (_validSshKey)  remoteEnv.AGENTVIBES_SSH_KEY  = _sshKey;
@@ -3392,6 +3397,7 @@ export function createSetupTab(screen, services) {
           }
           screen.render();
         }, 120);
+        if (_kAnimInterval.unref) _kAnimInterval.unref(); // never keep the process alive
       }
 
       function _stopDlAnim() {
@@ -3788,10 +3794,15 @@ export function createSetupTab(screen, services) {
     function _setHint(text) { elBox.setLabel(text || _defaultHint); screen.render(); }
     _setHint(_defaultHint);
 
+    // Row spinner: "⠹ Previewing (locally)  (Space to stop)" on the selected row.
+    // ElevenLabs preview always plays locally today, so the badge is honestly
+    // local; _setHint stays for error messages only.
+    const _elSpin = createRowSpinner(elPicker, screen, (i) => _items[i], { isClosed: () => _elClosed });
+
     function _previewEl() {
       if (_elPreviewProc) {  // toggle off
         _killElPreview();
-        _setHint(_defaultHint);
+        _elSpin.stop();
         return;
       }
       const v = ELEVENLABS_VOICES[elPicker.selected];
@@ -3808,18 +3819,17 @@ export function createSetupTab(screen, services) {
         return;
       }
       _elPreviewProc = proc;
-      _setHint(` {cyan-fg}♪ ${v.name}... (Space=stop){/cyan-fg} `);
+      _elSpin.start(elPicker.selected, false);
       proc.on('exit', (code) => {
         _elPreviewProc = null;
         if (_elClosed) return;
+        _elSpin.stop();
         if (code && code !== 0) {
           _setHint(' {red-fg}Preview failed — check API key / plan{/red-fg} ');
           setTimeout(() => { if (!_elClosed) _setHint(_defaultHint); }, 3000);
-        } else {
-          _setHint(_defaultHint);
         }
       });
-      proc.on('error', () => { _elPreviewProc = null; if (!_elClosed) _setHint(' {red-fg}Preview failed{/red-fg} '); });
+      proc.on('error', () => { _elPreviewProc = null; _elSpin.stop(); if (!_elClosed) _setHint(' {red-fg}Preview failed{/red-fg} '); });
     }
 
     elPicker.key(['enter'], () => {
@@ -4137,6 +4147,11 @@ export function createSetupTab(screen, services) {
       content: ' ', style: { fg: 'cyan', bg: COLORS.contentBg },
     });
 
+    // Row spinner: paints "⠹ Previewing (locally|remotely via SSH)  (Space to stop)"
+    // ON the selected row (shared with every other picker). renderItem restores the
+    // row's normal content on stop. vpPreviewLine is kept for error messages only.
+    const _vpSpin = createRowSpinner(vpList, screen, (i) => _buildVoiceItems([_allVoices[i]])[0], { isClosed: () => _vpClosed });
+
     // Movement hints at the bottom (primary actions live in the top help bar, so
     // they are not duplicated here). Standardized [key] = label formatting.
     blessed.text({
@@ -4186,7 +4201,7 @@ export function createSetupTab(screen, services) {
     }
 
     function _previewVoice(voiceId) {
-      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
+      if (_previewVoiceId === voiceId) { _killVP(); _vpSpin.stop(); return; }
       _killVP();
 
       const phrase = previewPhrase(voiceId);
@@ -4238,12 +4253,12 @@ export function createSetupTab(screen, services) {
         }
         _previewProc = rProc;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { _refreshVP(); vpPreviewLine.setContent('{bright-magenta-fg}♪ Synthesizing on remote...{/bright-magenta-fg}'); screen.render(); }
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, true); }
         rProc.on('exit', () => {
           if (_previewVoiceId === voiceId) {
             _previewVoiceId = null; _previewProc = null;
-            // Keep message + ♪ visible for 5s while remote device synthesises and plays
-            setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }, 5000);
+            // Fire-and-forget SSH exits in ms; keep the row cue up briefly, then restore.
+            _vpSpin.stopWithFloor();
           }
         });
         rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
@@ -4279,9 +4294,9 @@ export function createSetupTab(screen, services) {
         }
         _previewProc = nProc;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}...{/cyan-fg}`); _refreshVP(); }
-        nProc.on('exit', () => { if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } } });
-        nProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, false); }
+        nProc.on('exit', () => { if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; _vpSpin.stop(); } });
+        nProc.on('error', () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); });
         return;
       }
 
@@ -4316,14 +4331,14 @@ export function createSetupTab(screen, services) {
       _previewVoiceId = voiceId;
 
       if (!_vpClosed) {
-        vpPreviewLine.setContent(`{cyan-fg}♪ Synthesizing: ${voiceId}...{/cyan-fg}`);
-        _refreshVP();
+        _vpSpin.start(vpList.selected, false);
       }
 
       piper.on('exit', (code) => {
         if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
         if (code !== 0) {
           _previewProc = null; _previewVoiceId = null;
+          _vpSpin.stop();
           if (!_vpClosed) {
             vpPreviewLine.setContent('{red-fg}♪ Preview failed — is Piper installed?{/red-fg}');
             screen.render();
@@ -4341,14 +4356,15 @@ export function createSetupTab(screen, services) {
           env: _spawnEnv,
         });
         _previewProc = pp;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
+        // Row spinner already running from the synth phase — keep it through playback.
         pp.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; _vpSpin.stop(); }
           try { fs.unlinkSync(tempWav); } catch {}
         });
       });
       piper.on('error', () => {
         _previewProc = null; _previewVoiceId = null;
+        _vpSpin.stop();
         if (!_vpClosed) {
           vpPreviewLine.setContent('{red-fg}♪ Cannot find Piper — install it first{/red-fg}');
           screen.render();

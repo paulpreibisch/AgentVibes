@@ -199,5 +199,5 @@ export default {
   readmeScrollMore: "↓ スクロールして続きを見る ↓",
   readmeNotFound: "*(現在のディレクトリにREADME.mdが見つかりません)*",
   bmadFooterNobmad: "[Tab] タブ切替  [Q] 終了",
-  bmadFooterBmad: "[↑↓/jk] 移動  [Space] プレビュー  [Enter] 設定  [A] 自動割当  [B] 一括  [X] リセット  [Q] 終了",
+  bmadFooterBmad: "[↑↓/jk] 移動  [Space] プレビュー  [Enter] 設定  [A] 自動割当  [B] 一括  [Del] リセット  [Q] 終了",
 };

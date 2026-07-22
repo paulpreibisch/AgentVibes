@@ -20,6 +20,7 @@ import {
   getFavorites, getThumbsDown, toggleThumbsUp, toggleThumbsDown,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
+import { createRowSpinner } from '../preview-transport.js';
 import { voicesForProvider } from '../../services/provider-voice-catalog.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
@@ -139,7 +140,7 @@ const COLORS = {
   linkFg:     'bright-cyan',
 };
 
-const _FOOTER_BMAD_EN   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
+const _FOOTER_BMAD_EN   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [Del] Reset  [Q] Quit';
 const _FOOTER_NOBMAD_EN = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
@@ -332,6 +333,10 @@ ${_tl('bmadDesc')}
     if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
   });
 
+  // Manual re-check: after installing BMAD from a separate terminal, Enter
+  // re-scans without leaving the tab. (Switching tabs also re-scans via onFocus.)
+  onboardingBox.key(['enter'], () => { refreshDisplay(); });
+
   // -------------------------------------------------------------------------
   // BMAD state — section header
 
@@ -421,7 +426,7 @@ ${_tl('bmadDesc')}
     left: 4,
     hidden: true,
     tags: true,
-    content: '{#546e7a-fg}[Space] Preview  [Enter] Configure  [X] Reset  [A] Auto-assign  [B] Bulk Edit{/#546e7a-fg}',
+    content: '{#546e7a-fg}[Space] Preview  [Enter] Configure  [Del] Reset  [A] Auto-assign  [B] Bulk Edit{/#546e7a-fg}',
     style: { bg: COLORS.contentBg },
   });
 
@@ -468,7 +473,7 @@ ${_tl('bmadDesc')}
     return btn;
   }
 
-  const resetBtn = _createBtn('[X] Reset', () => {
+  const resetBtn = _createBtn('[Del] Reset', () => {
     const agent = _agents[agentList.selected ?? 0];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
@@ -1073,6 +1078,11 @@ ${_tl('bmadDesc')}
       content: '', style: { fg: 'bright-cyan', bg: COLORS.contentBg },
     });
 
+    // Row spinner: "⠹ Previewing (locally|remotely via SSH)  (Space to stop)" ON
+    // the selected row — shared with every other picker. renderItem restores the
+    // row on stop. vpPreviewLine is retained for parity but no longer shows preview.
+    const _vpSpin = createRowSpinner(vpList, screen, (i) => _buildVoiceItems([_allVoices[i]])[0], { isClosed: () => _vpClosed });
+
     blessed.text({
       parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
       content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump{/white-fg}',
@@ -1119,7 +1129,7 @@ ${_tl('bmadDesc')}
     }
 
     function _previewVoice(voiceId) {
-      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
+      if (_previewVoiceId === voiceId) { _killVP(); _vpSpin.stop(); return; }
       _killVP();
       if (_previewMinTimer) { clearTimeout(_previewMinTimer); _previewMinTimer = null; }
 
@@ -1131,15 +1141,15 @@ ${_tl('bmadDesc')}
         const playTtsScript = _hookScript('hooks-windows', 'play-tts.ps1');
         if (!fs.existsSync(playTtsScript)) return;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, false); }
         _previewProc = spawn('powershell', [ // NOSONAR
           '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTtsScript, phrase, voiceId,
         ], { stdio: 'ignore', detached: false, windowsHide: true,
           env: { ..._spawnEnv, AGENTVIBES_VOICE_SOURCE: 'audition' } });
         _previewProc.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; _vpSpin.stop(); }
         });
-        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); });
         return;
       }
 
@@ -1166,12 +1176,12 @@ ${_tl('bmadDesc')}
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;
-      if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
+      if (!_vpClosed) { _vpSpin.start(vpList.selected, !!remoteLlm); }
 
       const _clearAfterMinDisplay = () => {
         if (_previewVoiceId === voiceId) {
           _previewVoiceId = null; _previewProc = null;
-          if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+          _vpSpin.stop();
         }
         _previewMinTimer = null;
       };
@@ -1878,7 +1888,12 @@ ${_tl('bmadDesc')}
   // -------------------------------------------------------------------------
   // Key bindings
 
-  agentList.key(['x', 'X'], () => {
+  // Reset uses Delete/Backspace — NOT a letter. 'x'/'X' is the GLOBAL shortcut
+  // for the Receiver tab (navigation.js KEY_TO_TAB), and screen-level keys fire
+  // even while this list is focused, so binding Reset to X reset the agent AND
+  // jumped to the Receiver tab. Delete has no global binding and doesn't clash
+  // with type-to-jump.
+  agentList.key(['delete', 'backspace'], () => {
     const agent = _agents[agentList.selected ?? 0];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
@@ -2038,6 +2053,11 @@ ${_tl('bmadDesc')}
     },
 
     onFocus() {
+      // Re-detect on focus so BMAD installed in another tab/terminal (or just
+      // now, via the onboarding install command) appears without restarting the
+      // TUI. Tab switching invokes onFocus, so returning to this tab IS the
+      // rescan — onboarding ⇄ agent list flips automatically.
+      refreshDisplay();
       if (_bmadDetected) {
         agentList.focus();
       } else {

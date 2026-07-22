@@ -15,10 +15,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { detectRemoteLlm } from './audio-env.js';
 
 // Transport providers route audio to a remote receiver; local MP3 playback is
 // silent on a headless/remote box, so track previews must be forwarded instead.
 export const REMOTE_PROVIDERS = ['ssh-remote', 'agentvibes-receiver'];
+
+// Preview transport badge + row spinner live in the neutral preview-transport
+// module (shared with the voice pickers). Re-exported here for the music
+// surfaces that already import from music-preview.js.
+export { transportBadge, createRowSpinner, previewRowContent, SPIN_FRAMES } from './preview-transport.js';
 
 /**
  * Resolve the active provider and the project dir it was read from, using the
@@ -30,16 +36,26 @@ export const REMOTE_PROVIDERS = ['ssh-remote', 'agentvibes-receiver'];
  */
 export function resolveMusicProvider(packageRoot) {
   const dirs = [process.env.CLAUDE_PROJECT_DIR, process.cwd(), packageRoot, os.homedir()].filter(Boolean);
+
+  // A configured remote TTS transport (transport-config.json mode=remote) routes
+  // audio to a receiver, so a LOCAL music preview would be silent on this box —
+  // forward it too, matching the voice preview. This is a SEPARATE signal from
+  // the provider file: a project can carry tts-provider.txt=piper (local) while
+  // the global transport routes TTS to a remote receiver, and the two surfaces
+  // must agree or the picker plays to an inaudible local sink.
+  const transportRemote = !!detectRemoteLlm();
+
   for (const d of dirs) {
     const p = path.join(d, '.claude', 'tts-provider.txt');
     try {
       if (fs.existsSync(p)) {
         const provider = fs.readFileSync(p, 'utf8').trim();
-        return { remote: REMOTE_PROVIDERS.includes(provider), projectDir: d };
+        return { remote: REMOTE_PROVIDERS.includes(provider) || transportRemote, projectDir: d };
       }
     } catch { /* next */ }
   }
-  return { remote: false, projectDir: '' };
+  // No provider file found anywhere — still forward if a remote transport is set.
+  return { remote: transportRemote, projectDir: process.env.CLAUDE_PROJECT_DIR || process.cwd() };
 }
 
 /**

@@ -199,5 +199,5 @@ export default {
   readmeScrollMore: "↓ 向下滚动查看更多 ↓",
   readmeNotFound: "*(当前目录中未找到README.md)*",
   bmadFooterNobmad: "[Tab] 切换标签  [Q] 退出",
-  bmadFooterBmad: "[↑↓/jk] 导航  [Space] 预览  [Enter] 配置  [A] 自动分配  [B] 批量  [X] 重置  [Q] 退出",
+  bmadFooterBmad: "[↑↓/jk] 导航  [Space] 预览  [Enter] 配置  [A] 自动分配  [B] 批量  [Del] 重置  [Q] 退出",
 };

@@ -192,9 +192,63 @@ function _parseCSVLine(line) {
 // ---------------------------------------------------------------------------
 // BMAD agent scanner (story 11.5) — fallback when manifest is unavailable
 
+/** Title-case a hyphenated id: "tech-writer" → "Tech Writer". */
+function _titleCaseId(id) {
+  return id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+/**
+ * Find v6.6+ persona-agent skills: top-level skill directories named
+ * `bmad-agent-<role>` under <root>/.claude/skills (e.g. bmad-agent-analyst →
+ * "analyst"). Deliberately IGNORES a skill's private `agents/` subfolder (e.g.
+ * bmad-prfaq/agents/) — those hold a skill's internal helper sub-agents, not
+ * BMAD persona agents. Matching them produced a bogus "2 agents" roster in the
+ * Agents tab when no real BMAD roster was installed.
+ *
+ * @param {string} root
+ * @returns {{ id: string, dir: string }[]}
+ */
+function _findBmadAgentSkills(root) {
+  const skillsDir = path.resolve(root, '.claude', 'skills');
+  const out = [];
+  if (!fs.existsSync(skillsDir)) return out;
+  try {
+    for (const skill of fs.readdirSync(skillsDir)) {
+      if (!skill.startsWith('bmad-agent-')) continue;
+      const id = skill.slice('bmad-agent-'.length);
+      if (!_isValidAgentId(id)) continue;
+      out.push({ id, dir: path.resolve(skillsDir, skill) });
+    }
+  } catch { /* skip */ }
+  return out;
+}
+
+/**
+ * Build an agent record from a `bmad-agent-*` skill dir, reading the SKILL.md
+ * heading ("# Mary — Business Analyst") for the persona name + title. Falls back
+ * to a title-cased id when the heading is missing/unreadable.
+ */
+function _agentFromSkill(id, skillDir) {
+  let displayName = _titleCaseId(id);
+  let title = '';
+  try {
+    const md = fs.readFileSync(path.resolve(skillDir, 'SKILL.md'), 'utf8');
+    // Persona heading format: "# Mary — Business Analyst" (name <dash> title).
+    // Require the spaced dash so a generic section heading like "# Overview" is
+    // skipped and we fall back to the title-cased id instead of mislabeling.
+    const m = md.match(/^#\s+([^\n]+?)\s+[—–-]\s+([^\n]+?)\s*$/m); // em / en / hyphen
+    if (m) {
+      displayName = m[1].trim() || displayName;
+      title = m[2].trim();
+    }
+  } catch { /* use derived displayName */ }
+  return { id, displayName, title, icon: '', module: 'bmm' };
+}
+
 /**
  * Scan for BMAD agents in the project root.
- * Prefers manifest-based discovery; falls back to directory scan.
+ * Prefers manifest-based discovery; falls back to legacy dir scan, then to the
+ * v6.6+ skills-only layout (`bmad-agent-*` skills).
  *
  * @param {string} projectRoot
  * @returns {{ id: string, displayName: string, title: string, icon: string, module: string }[]}
@@ -207,50 +261,42 @@ export function scanBmadAgents(projectRoot) {
   // Fallback: directory scan — check project-local then home dir
   const safeRoot = path.resolve(projectRoot ?? process.cwd());
   const homeDir2 = os.homedir();
+  const roots = safeRoot !== homeDir2 ? [safeRoot, homeDir2] : [safeRoot];
 
-  // v6.6+: agents under .claude/skills/*/agents/ — collect all such dirs
-  const skillsAgentDirs = [];
-  for (const root of (safeRoot !== homeDir2 ? [safeRoot, homeDir2] : [safeRoot])) {
-    const skillsDir = path.resolve(root, '.claude', 'skills');
-    if (fs.existsSync(skillsDir)) {
-      try {
-        for (const skill of fs.readdirSync(skillsDir)) {
-          const agentsDir = path.resolve(skillsDir, skill, 'agents');
-          if (fs.existsSync(agentsDir)) skillsAgentDirs.push(agentsDir);
-        }
-      } catch { /* skip */ }
-    }
+  // Legacy layouts: <root>/_bmad/bmm/agents and <root>/.bmad/agents hold one
+  // .md per agent.
+  const candidateDirs = [];
+  for (const root of roots) {
+    candidateDirs.push(path.resolve(root, '_bmad', 'bmm', 'agents'));
+    candidateDirs.push(path.resolve(root, '.bmad', 'agents'));
   }
-
-  const candidateDirs = [
-    path.resolve(safeRoot, '_bmad', 'bmm', 'agents'),
-    path.resolve(safeRoot, '.bmad', 'agents'),
-    ...(safeRoot !== homeDir2 ? [
-      path.resolve(homeDir2, '_bmad', 'bmm', 'agents'),
-      path.resolve(homeDir2, '.bmad', 'agents'),
-    ] : []),
-    ...skillsAgentDirs,
-  ];
-
   for (const dir of candidateDirs) {
     if (!fs.existsSync(dir)) continue;
     try {
-      const files = fs.readdirSync(dir);
-      return files
+      const agents = fs.readdirSync(dir)
         .filter(f => f.endsWith('.md') && !f.includes('.backup') && !f.includes('.bak'))
         .map(f => {
           const id = f.replace(/\.md$/, '');
-          const displayName = id
-            .split('-')
-            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(' ');
-          return { id, displayName, title: '', icon: '', module: 'bmm' };
-        })
-        .sort((a, b) => a.id.localeCompare(b.id));
+          return { id, displayName: _titleCaseId(id), title: '', icon: '', module: 'bmm' };
+        });
+      if (agents.length > 0) return agents.sort((a, b) => a.id.localeCompare(b.id));
     } catch {
       // Directory not readable — skip
     }
   }
+
+  // v6.6+ skills-only install: persona agents are `bmad-agent-<role>` skills.
+  const seen = new Set();
+  const skillAgents = [];
+  for (const root of roots) {
+    for (const { id, dir } of _findBmadAgentSkills(root)) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      skillAgents.push(_agentFromSkill(id, dir));
+    }
+  }
+  if (skillAgents.length > 0) return skillAgents.sort((a, b) => a.id.localeCompare(b.id));
+
   return [];
 }
 
@@ -277,14 +323,10 @@ export function isBmadDetected(projectRoot) {
     ];
     if (dirs.some(d => fs.existsSync(d))) return true;
 
-    // v6.6+: agents live under .claude/skills/*/agents/
-    const skillsDir = path.resolve(root, '.claude', 'skills');
-    if (fs.existsSync(skillsDir)) {
-      try {
-        const skills = fs.readdirSync(skillsDir);
-        if (skills.some(s => fs.existsSync(path.resolve(skillsDir, s, 'agents')))) return true;
-      } catch { /* skip */ }
-    }
+    // v6.6+ skills-only install: persona agents are `bmad-agent-<role>` skills.
+    // (NOT `<skill>/agents/` subfolders — those are a skill's private helper
+    // sub-agents and must not count as a BMAD install.)
+    if (_findBmadAgentSkills(root).length > 0) return true;
   }
 
   return false;

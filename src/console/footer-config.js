@@ -33,7 +33,7 @@ export const FOOTER_CONFIG = {
   },
   agents: {
     color: '#9c27b0',
-    text: ` ${key('↑↓')} Navigate  ${key('Enter')} Edit Agent  ${key('Space')} Sample  ${key('R')} Reset`,
+    text: ` ${key('↑↓')} Navigate  ${key('Enter')} Edit Agent  ${key('Space')} Sample  ${key('Del')} Reset`,
   },
   receiver: {
     color: '#00897b',

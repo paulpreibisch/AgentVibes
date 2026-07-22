@@ -199,5 +199,5 @@ export default {
   readmeScrollMore: "↓ Role para mais conteúdo ↓",
   readmeNotFound: "*(Nenhum README.md encontrado no diretório atual)*",
   bmadFooterNobmad: "[Tab] Mudar Aba  [Q] Sair",
-  bmadFooterBmad: "[↑↓/jk] Navegar  [Space] Visualizar  [Enter] Configurar  [A] Auto-atribuir  [B] Lote  [X] Redefinir  [Q] Sair",
+  bmadFooterBmad: "[↑↓/jk] Navegar  [Space] Visualizar  [Enter] Configurar  [A] Auto-atribuir  [B] Lote  [Del] Redefinir  [Q] Sair",
 };

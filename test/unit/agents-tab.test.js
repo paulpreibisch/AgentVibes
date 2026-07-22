@@ -5,7 +5,7 @@
 
 process.env.AGENTVIBES_TEST_MODE = 'true';
 
-import { test, describe, before } from 'node:test';
+import { test, describe, before, mock, afterEach } from 'node:test';
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
@@ -87,6 +87,82 @@ describe('scanBmadAgents', () => {
       assert.ok(result[0].id, 'agent has id');
       assert.ok(result[0].displayName, 'agent has displayName');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: v6.6+ skills-only BMAD layout. Persona agents are top-level
+// `bmad-agent-<role>` skill dirs; a skill's private `agents/` subfolder (e.g.
+// bmad-prfaq/agents/) must NOT be mistaken for the BMAD roster — that produced
+// a bogus "2 agents" list (artifact-analyzer, web-researcher).
+
+describe('scanBmadAgents — v6.6+ skills layout (regression)', () => {
+  let scanBmadAgents, isBmadDetected;
+  before(async () => {
+    const mod = await import('../../src/services/agent-voice-store.js');
+    scanBmadAgents = mod.scanBmadAgents;
+    isBmadDetected = mod.isBmadDetected;
+  });
+
+  afterEach(() => mock.restoreAll());
+
+  // Build an isolated project AND pin os.homedir() to it, so the scan only sees
+  // this fixture (both functions also scan the real home dir otherwise).
+  function makeProject({ personaSkills = [], helperSkill = false }) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-bmad-'));
+    mock.method(os, 'homedir', () => root);
+    const skills = path.join(root, '.claude', 'skills');
+    for (const role of personaSkills) {
+      const d = path.join(skills, `bmad-agent-${role}`);
+      fs.mkdirSync(d, { recursive: true });
+      const name = { analyst: 'Mary', architect: 'Winston', dev: 'Amelia' }[role] ?? role;
+      const title = { analyst: 'Business Analyst', architect: 'Architect', dev: 'Developer' }[role] ?? '';
+      fs.writeFileSync(path.join(d, 'SKILL.md'), `---\nname: bmad-agent-${role}\n---\n\n# ${name} — ${title}\n`);
+    }
+    if (helperSkill) {
+      const d = path.join(skills, 'bmad-prfaq', 'agents');
+      fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(path.join(d, 'artifact-analyzer.md'), '# helper\n');
+      fs.writeFileSync(path.join(d, 'web-researcher.md'), '# helper\n');
+    }
+    return root;
+  }
+
+  test('finds bmad-agent-* persona skills, ignores skill-internal agents/', () => {
+    const root = makeProject({ personaSkills: ['analyst', 'architect', 'dev'], helperSkill: true });
+    const ids = scanBmadAgents(root).map(a => a.id).sort();
+    assert.deepStrictEqual(ids, ['analyst', 'architect', 'dev']);
+    assert.ok(!ids.includes('artifact-analyzer'), 'skill helper must not be listed');
+    assert.ok(!ids.includes('web-researcher'), 'skill helper must not be listed');
+  });
+
+  test('reads persona name + title from SKILL.md heading', () => {
+    const root = makeProject({ personaSkills: ['analyst'] });
+    const mary = scanBmadAgents(root).find(a => a.id === 'analyst');
+    assert.strictEqual(mary.displayName, 'Mary');
+    assert.strictEqual(mary.title, 'Business Analyst');
+  });
+
+  test('falls back to title-cased id when SKILL.md has no "Name — Title" heading', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentvibes-bmad-'));
+    mock.method(os, 'homedir', () => root);
+    const d = path.join(root, '.claude', 'skills', 'bmad-agent-builder');
+    fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, 'SKILL.md'), '---\nname: bmad-agent-builder\n---\n\n# Overview\n\nBuilds skills.\n');
+    const builder = scanBmadAgents(root).find(a => a.id === 'builder');
+    assert.strictEqual(builder.displayName, 'Builder');
+    assert.strictEqual(builder.title, '');
+  });
+
+  test('a skill-internal agents/ folder alone is NOT a BMAD install', () => {
+    const root = makeProject({ helperSkill: true });
+    assert.deepStrictEqual(scanBmadAgents(root), []);
+    assert.strictEqual(isBmadDetected(root), false);
+  });
+
+  test('bmad-agent-* skills DO count as a BMAD install', () => {
+    const root = makeProject({ personaSkills: ['pm'] });
+    assert.strictEqual(isBmadDetected(root), true);
   });
 });
 
