@@ -272,7 +272,7 @@ anything (no new network calls, no behavior change) for every current install.
 
 ## About
 
-**AgentVibes** · v5.15.0 · Licensed under [Apache-2.0](LICENSE)
+**AgentVibes** · v5.15.1 · Licensed under [Apache-2.0](LICENSE)
 
 Built by **Paul Preibisch** — [@997Fire on X](https://x.com/997Fire) · [agentvibes.org](https://agentvibes.org) · [github.com/paulpreibisch/AgentVibes](https://github.com/paulpreibisch/AgentVibes)
 
