@@ -1,5 +1,24 @@
 # AgentVibes Release Notes
 
+## v5.15.2 — Fixes for the preview indicators
+
+**Released:** 2026-07-22 · `npm install agentvibes@latest`
+
+Follow-up fixes for the 5.15.1 preview work, from an adversarial code review:
+
+- **Fixed a crash** — filtering or favoriting a track *while a preview was
+  playing* could rebuild the list out from under the indicator and take the whole
+  TUI down. It can't anymore.
+- **The badge tells the truth** — the per-agent voice picker now shows
+  **(remotely via SSH)** vs **(locally)** based on your actual routing (provider
+  file or remote receiver), not a partial guess.
+- **Your BMAD agents show their real names** — the Agents tab reads the persona
+  name (Mary, Winston, Amelia…) even on installs whose skill files don't use the
+  `Name — Title` heading format.
+- **Smaller polish** — a remote voice-preview error no longer leaves a stuck
+  spinner, the onboarding "re-check" hint is translated in all languages, and the
+  onboarding screen keeps keyboard focus after a re-check.
+
 ## v5.15.1 — Know where your preview plays
 
 **Released:** 2026-07-21 · `npm install agentvibes@latest`

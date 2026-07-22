@@ -58,7 +58,13 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Know where your preview plays (v5.15.1)
+## 🆕 Fixes for the preview indicators (v5.15.2)
+
+- **Fixed a TUI crash** — filtering/favoriting a track while a preview was playing could rebuild the list under the indicator and crash; it can't now.
+- **Honest per-agent badge** — the voice picker shows **(remotely via SSH)** vs **(locally)** from your real routing, not a partial guess.
+- **BMAD agents show their real names** (Mary, Winston…) even when a skill file lacks the `Name — Title` heading; plus small preview/onboarding polish.
+
+### v5.15.1 — Know where your preview plays
 
 - **Every preview shows where it plays** — voice and music previews now display **(locally)** or **(remotely via SSH)** right on the row you're auditioning, so you're never guessing (or hearing silence on a headless box).
 - **Preview standardized across the app** — the voice pickers (Kokoro, Piper, ElevenLabs, per-agent BMAD) and the Music page all show the same indicator; music previews now follow a project's remote receiver too.
