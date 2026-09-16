@@ -265,6 +265,7 @@ anything (no new network calls, no behavior change) for every current install.
 | Guide | |
 |-------|--|
 | [Quick Start](docs/quick-start.md) | Get voiced in minutes |
+| [GrokBot TTS Setup](docs/grokbot-tts-setup.md) | AgentVibes + Kokoro on Windows for Cursor GrokBot |
 | [MCP Setup](docs/mcp-setup.md) | Natural-language control |
 | [Commands](docs/commands.md) | Every slash command |
 | [Providers](docs/providers.md) | Engine setup & samples |
