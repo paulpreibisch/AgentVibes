@@ -23,6 +23,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { stripAnsi, failedTestNames, runWithRunnerCrashRetry } from './lib/test-output.mjs';
 
 const TEST_DIR = 'test/unit';
 const files = readdirSync(TEST_DIR)
@@ -41,7 +42,6 @@ try { rmSync(COV_DIR, { recursive: true, force: true }); } catch { /* fresh anyw
 mkdirSync(COV_DIR, { recursive: true });
 
 const CONCURRENCY = Number(process.env.AGENTVIBES_TEST_CONCURRENCY) || 2;
-const stripAnsi = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 /** Run ONE test file in its own process. Resolves { file, code, out }. */
 function runFile(file) {
@@ -63,13 +63,19 @@ function runFile(file) {
   });
 }
 
+// Node 20/22's test runner on Windows sometimes fails to read a file's results
+// back from its own child ("Unable to deserialize cloned data"), even though
+// the tests ran. Node 24 does not. A run whose only failure is that runner
+// crash gets one rerun; a run with any failed test is kept as it is.
+const runFileWithRetry = (file) => runWithRunnerCrashRetry(file, runFile);
+
 /** Fixed-size concurrency pool over the file list. */
 async function runAll() {
   const queue = [...files];
   const results = [];
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
-      results.push(await runFile(f));
+      results.push(await runFileWithRetry(f));
     }
   }));
   return results;
@@ -101,10 +107,7 @@ for (const { file, code, out } of results) {
   totalPassLines += passLines;
 
   // Genuine per-test failures (descriptive names), from either reporter.
-  const names = [
-    ...[...clean.matchAll(/^\s*not ok \d+ - (.+?)\s*$/gm)].map((m) => m[1]),
-    ...[...clean.matchAll(/^\s*✖ (.+?)(?: \([\d.]+ms\))?\s*$/gm)].map((m) => m[1]),
-  ].filter((n) => n && n !== 'failing tests:' && !/\.test\.js$/.test(n.trim()));
+  const names = failedTestNames(clean, file);
   if (names.length) realFails.push(...names.map((n) => `${n}  [${file}]`));
 
   // A child that exited non-zero with ZERO passing lines never ran its tests

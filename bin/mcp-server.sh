@@ -68,17 +68,18 @@ PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_inf
 echo "🐍 Python $PYTHON_VERSION detected" >&2
 
 # Auto-install Python mcp package
-if ! python3 -c "import mcp" 2>/dev/null; then
+# mcp 2.x removed the decorator API server.py uses, so an installed 2.x counts as missing.
+if ! python3 -c "import mcp, importlib.metadata as m; assert int(m.version('mcp').split('.')[0]) < 2" 2>/dev/null; then
     print_section "📦 Installing Python MCP Package"
     echo "Installing 'mcp' package to enable Claude Desktop integration..." >&2
 
-    if python3 -m pip install --user mcp --quiet >&2; then
+    if python3 -m pip install --user "mcp>=1.27,<2" --quiet >&2; then
         echo "✅ Python MCP package installed successfully!" >&2
     else
         echo "❌ Failed to auto-install MCP package" >&2
         echo "" >&2
         echo "💡 Try manually:" >&2
-        echo "   python3 -m pip install --user mcp" >&2
+        echo "   python3 -m pip install --user \"mcp>=1.27,<2\"" >&2
         echo "" >&2
         exit 1
     fi
