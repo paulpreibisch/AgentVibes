@@ -63,13 +63,26 @@ function runFile(file) {
   });
 }
 
+// Node 20/22's test runner on Windows sometimes fails to read a file's results
+// back from its own child ("Unable to deserialize cloned data"), even though
+// the tests ran. Node 24 does not. That runner error, and only that one, gets
+// one rerun.
+const RUNNER_DESERIALIZE_BUG = 'Unable to deserialize cloned data';
+
+async function runFileWithRetry(file) {
+  const first = await runFile(file);
+  if (first.code === 0 || !first.out.includes(RUNNER_DESERIALIZE_BUG)) return first;
+  console.warn(`\n⚠️  ${file}: Node test runner failed to deserialize results; rerunning once.`);
+  return runFile(file);
+}
+
 /** Fixed-size concurrency pool over the file list. */
 async function runAll() {
   const queue = [...files];
   const results = [];
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
-      results.push(await runFile(f));
+      results.push(await runFileWithRetry(f));
     }
   }));
   return results;
