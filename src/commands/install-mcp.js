@@ -304,9 +304,9 @@ async function installMCPPackage(pythonCmd, useWSL = false) {
   try {
     // Security: Use execFileSync with array args to prevent command injection
     if (useWSL) {
-      execFileSync('wsl', [pythonCmd, '-m', 'pip', 'install', '--break-system-packages', MCP_REQUIREMENT], { stdio: 'pipe' });
+      execFileSync('wsl', [pythonCmd, '-m', 'pip', 'install', '--break-system-packages', MCP_REQUIREMENT], { stdio: 'pipe' }); // NOSONAR - pythonCmd comes from a fixed allowlist; args are an array, no shell
     } else {
-      execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', MCP_REQUIREMENT], { stdio: 'pipe' });
+      execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', MCP_REQUIREMENT], { stdio: 'pipe' }); // NOSONAR - pythonCmd comes from a fixed allowlist; args are an array, no shell
     }
     spinner.succeed('Python MCP package installed successfully!');
     return true;
