@@ -1,0 +1,4 @@
+pr-watch (SKILL.md and pr-digest) is adapted from the Rakazo project
+(https://github.com/elie222/rakazo, .agents/skills/pr-watch at 8d3fedb6),
+licensed under the Apache License 2.0. Changes: removed a Rakazo-specific
+screenshot-comment filter from pr-digest.
