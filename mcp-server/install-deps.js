@@ -49,7 +49,8 @@ function checkMcpInstalled(pythonCmd) {
 
   try {
     // Security: Use execFileSync with array args to prevent command injection
-    execFileSync(pythonCmd, ['-c', 'import mcp'], { stdio: 'pipe' });
+    // mcp 2.x removed the decorator API the server uses, so it counts as missing.
+    execFileSync(pythonCmd, ['-c', 'import importlib.metadata as m; assert int(m.version("mcp").split(".")[0]) < 2'], { stdio: 'pipe' });
     return true;
   } catch (error) {
     return false;
@@ -73,7 +74,7 @@ function installMcp(pythonCmd) {
     // null — which silently disabled the externally-managed branch below and
     // showed macOS users a scary "failed" instead of the venv guidance written
     // for them. Piped stderr is re-emitted below so nothing is swallowed.
-    execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], {
+    execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp>=1.27,<2'], {
       stdio: ['ignore', 'inherit', 'pipe'],
     });
     console.log('✅ Python mcp package installed successfully!\n');
@@ -94,8 +95,8 @@ function installMcp(pythonCmd) {
     if (errorOutput.trim()) console.error(errorOutput.trim());
     console.error('❌ Failed to install mcp package');
     console.error('⚠️  Manual installation required:');
-    console.error('   Please install manually: pip install --user mcp');
-    console.error('   Run: pip install mcp\n');
+    console.error('   Please install manually: pip install --user "mcp>=1.27,<2"');
+    console.error('   Run: pip install "mcp>=1.27,<2"\n');
     return false;
   }
 }
@@ -172,10 +173,10 @@ function main() {
     console.log('   See mcp-server/README.md for Claude Desktop configuration\n');
   } else if (result === 'skipped') {
     console.log('✅ AgentVibes MCP Server is ready for virtual environment setup');
-    console.log('   Create a venv and install: python3 -m venv venv && source venv/bin/activate && pip install mcp\n');
+    console.log('   Create a venv and install: python3 -m venv venv && source venv/bin/activate && pip install "mcp>=1.27,<2"\n');
   } else {
     console.log('⚠️  Manual installation required:');
-    console.log('   Run: pip install mcp\n');
+    console.log('   Run: pip install "mcp>=1.27,<2"\n');
   }
 }
 
