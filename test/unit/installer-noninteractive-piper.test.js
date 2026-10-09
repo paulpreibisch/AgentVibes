@@ -75,15 +75,23 @@ describe('installPiperNonInteractive', () => {
     assert.deepEqual(args, ['--non-interactive']);
   });
 
-  test('puts ~/.local/bin on PATH so the fresh install is found', () => {
+  test('puts ~/.local/bin first on PATH so the fresh install is found', () => {
     quiet();
     const localBin = path.join(os.homedir(), '.local', 'bin');
     process.env.PATH = ['/usr/bin', '/bin'].join(path.delimiter);
     installPiperNonInteractive();
-    assert.ok(process.env.PATH.split(path.delimiter).includes(localBin));
+    assert.equal(process.env.PATH.split(path.delimiter)[0], localBin);
     const before = process.env.PATH;
     installPiperNonInteractive();
     assert.equal(process.env.PATH, before, 'adds ~/.local/bin only once');
+  });
+
+  test('moves ~/.local/bin ahead of a directory with a broken piper', () => {
+    quiet();
+    const localBin = path.join(os.homedir(), '.local', 'bin');
+    process.env.PATH = ['/opt/broken-piper/bin', localBin, '/usr/bin'].join(path.delimiter);
+    installPiperNonInteractive();
+    assert.deepEqual(process.env.PATH.split(path.delimiter), [localBin, '/opt/broken-piper/bin', '/usr/bin']);
   });
 
   test('reports failure when the installer fails', () => {
@@ -138,7 +146,8 @@ describe('ensureNonInteractivePiper', () => {
     installerSucceeds = false;
     const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
     assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'macos');
-    assert.deepEqual(config, { provider: 'macos', defaultVoice: 'Samantha' });
+    // replaceSavedVoice: a saved Piper voice would force the engine back to Piper.
+    assert.deepEqual(config, { provider: 'macos', defaultVoice: 'Samantha', replaceSavedVoice: true });
   });
 
   test('gives up elsewhere when Piper cannot be installed', posixOnly, () => {
@@ -147,5 +156,14 @@ describe('ensureNonInteractivePiper', () => {
     const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
     assert.equal(ensureNonInteractivePiper(config, 'linux'), null);
     assert.equal(config.provider, 'piper');
+  });
+
+  test('native Windows never runs the POSIX installer', { skip: process.platform !== 'win32' && 'native Windows only' }, () => {
+    quiet();
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    ensureNonInteractivePiper(config, 'win32');
+    piperOnPath = true;
+    assert.equal(ensureNonInteractivePiper(config, 'win32'), 'piper');
+    assert.equal(installerCalls.length, 0, 'piper.exe is installed by checkAndInstallPiperWindows instead');
   });
 });

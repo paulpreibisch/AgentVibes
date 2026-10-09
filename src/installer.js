@@ -4549,11 +4549,11 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
 function installPiperNonInteractive() {
   const piperInstallerPath = path.join(__dirname, '..', '.claude', 'hooks', 'piper-installer.sh');
   console.log(`[AV] Piper not found; installing it`);
-  // The installer puts piper in ~/.local/bin, which a non-login shell often lacks.
+  // The installer puts piper in ~/.local/bin, which a non-login shell often
+  // lacks. Put it first, so a broken piper elsewhere on PATH cannot shadow it.
   const localBin = path.join(os.homedir(), '.local', 'bin');
-  if (!(process.env.PATH || '').split(path.delimiter).includes(localBin)) {
-    process.env.PATH = `${localBin}${path.delimiter}${process.env.PATH || ''}`;
-  }
+  const rest = (process.env.PATH || '').split(path.delimiter).filter((p) => p && p !== localBin);
+  process.env.PATH = [localBin, ...rest].join(path.delimiter);
   try {
     execScript(piperInstallerPath, {
       args: ['--non-interactive'],
@@ -4590,14 +4590,18 @@ function isPiperWorking() {
  * @returns {string|null} provider to use, or null when the install cannot continue
  */
 function ensureNonInteractivePiper(userConfig, platform = process.platform) {
-  if (!isPiperProvider(userConfig.provider) || isPiperWorking() || installPiperNonInteractive()) {
-    return userConfig.provider;
-  }
+  if (!isPiperProvider(userConfig.provider)) return userConfig.provider;
+  // Native Windows installs piper.exe with checkAndInstallPiperWindows() and finds
+  // it on disk, not on PATH, so it keeps that path; the bash installer is POSIX-only.
+  if (isNativeWindows()) return isPiperInstalled() ? userConfig.provider : null;
+  if (isPiperWorking() || installPiperNonInteractive()) return userConfig.provider;
   if (platform !== 'darwin') return null;
   // macOS Say needs no setup, so the install still speaks without Piper.
   console.log(`[AV] Piper could not be installed; using macOS Say instead`);
   userConfig.provider = 'macos';
   userConfig.defaultVoice = 'Samantha';
+  // A saved Piper voice would force the engine back to Piper; replace it.
+  userConfig.replaceSavedVoice = true;
   return 'macos';
 }
 
@@ -6015,18 +6019,25 @@ async function install(options = {}) {
   const targetDir = options.directory || currentDir;
 
   // Non-interactive mode: structured logging and piper validation before install
-  if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+  const strictNonInteractive = options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1';
+  if (strictNonInteractive) {
     console.log(`[AV] Non-interactive mode detected`);
     console.log(`[AV] Provider: ${selectedProvider} | Platform: ${process.platform}`);
-
-    selectedProvider = ensureNonInteractivePiper(userConfig);
-    if (!selectedProvider) {
+  }
+  // --yes installs cannot answer prompts either, so they get the same Piper
+  // check and macOS fallback; only strict non-interactive mode stops on failure.
+  if (isNonInteractive) {
+    const provider = ensureNonInteractivePiper(userConfig);
+    if (provider) {
+      selectedProvider = provider;
+    } else if (strictNonInteractive) {
       process.stderr.write(`[AV ERROR] Piper TTS could not be installed.\n`);
       process.stderr.write(`[AV] Install it manually with: pipx install piper-tts\n`);
       process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
       process.exit(1);
     }
-
+  }
+  if (strictNonInteractive) {
     console.log(`[AV] Installing to: ${targetDir}/.claude/`);
   }
 
@@ -6203,7 +6214,11 @@ Troubleshooting:
       }
     }
     // Only write voice on first install — preserve user's current voice selection on reinstall
-    try { await fs.access(voiceConfigPath); } catch { await fs.writeFile(voiceConfigPath, defaultVoice); }
+    if (userConfig.replaceSavedVoice) {
+      await fs.writeFile(voiceConfigPath, defaultVoice);
+    } else {
+      try { await fs.access(voiceConfigPath); } catch { await fs.writeFile(voiceConfigPath, defaultVoice); }
+    }
 
     // Sync voice + provider to global .agentvibes/config.json so TUI finds them
     // regardless of which directory it's launched from

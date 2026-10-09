@@ -22,10 +22,14 @@ import { spawn, spawnSync } from 'node:child_process';
  * @returns {Object} Environment object safe to pass to child_process.spawn
  */
 export function buildAudioEnv() {
+  // ~/.local/bin goes first: that is where the installer puts a working piper,
+  // and a broken one elsewhere on PATH must not shadow it.
+  const sep = process.platform === 'win32' ? ';' : ':';
+  const localBin = path.join(os.homedir(), '.local', 'bin');
+  const inherited = (process.env.PATH || '').split(sep).filter((p) => p && p !== localBin);
   const env = {
     ...process.env,
-    PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin'), '/usr/local/bin']
-      .filter(Boolean).join(process.platform === 'win32' ? ';' : ':'),
+    PATH: [localBin, ...inherited, '/usr/local/bin'].join(sep),
   };
 
   if (process.env.PULSE_SERVER) {
