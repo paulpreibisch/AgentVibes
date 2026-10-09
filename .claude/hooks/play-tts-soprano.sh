@@ -217,6 +217,19 @@ fi
 # @why Support multiple audio players and prevent overlapping audio
 LOCK_FILE="/tmp/agentvibes-audio.lock"
 
+# Auto-remove stale lock files (older than 30 seconds) to prevent permanent blocking
+# This handles cases where the background cleanup process was killed mid-playback
+if [ -f "$LOCK_FILE" ]; then
+  if [[ "$(uname)" == "Darwin" ]]; then
+    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+  else
+    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
+  fi
+  if [[ $(( $(date +%s) - _lock_mtime )) -gt 30 ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+fi
+
 for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
     break
