@@ -327,6 +327,21 @@ function fireConfigButtons(providerId) {
 // Drive the chain
 // ---------------------------------------------------------------------------
 
+// handleProviderConfigure is async, so the config modals appear a little after
+// fireConfigButtons(). The fixed 500ms sleep alone raced slow Windows runners, so
+// keep it as a floor and then wait for the modals to exist.
+async function waitForVoiceFieldLists(timeoutMs = 5000) {
+  await new Promise(r => setTimeout(r, 500));
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ready = _allWidgets.some(w =>
+      w._handlers['key:enter'] && Array.isArray(w.items) &&
+      w.items.some(it => typeof it === 'string' && /Voice/.test(it)));
+    if (ready) return;
+    await new Promise(r => setTimeout(r, 25));
+  }
+}
+
 async function buildTab() {
   _allWidgets.length = 0;
   _allWidgets.push(_screen);
@@ -374,7 +389,7 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
     fireConfigButtons();
     // handleProviderConfigure is async (awaits getHermesConfig / getTransportConfig)
     // so the modal+fieldList appear only after pending microtasks/macrotasks flush.
-    await new Promise(r => setTimeout(r, 500));
+    await waitForVoiceFieldLists();
     let covered = false;
     // There are several provider-config modals (one per PROVIDERS row). Drive each
     // fieldList we can find to set engine=kokoro then open the voice picker.
@@ -405,7 +420,7 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
   test('opens ElevenLabs native voice picker + API-key warning (covers _showApiKeyWarning)', async () => {
     await buildTab();
     fireConfigButtons();
-    await new Promise(r => setTimeout(r, 500));
+    await waitForVoiceFieldLists();
     const fieldLists = _allWidgets.filter(w =>
       w._handlers['key:enter'] && Array.isArray(w.items) &&
       w.items.some(it => typeof it === 'string' && /Voice/.test(it)));
@@ -451,7 +466,7 @@ describe('setup-tab kokoro picker + api-key warning coverage', () => {
     try {
       await buildTab();
       fireConfigButtons();
-      await new Promise(r => setTimeout(r, 500));
+      await waitForVoiceFieldLists();
       const fieldLists = _allWidgets.filter(w =>
         w._handlers['key:enter'] && Array.isArray(w.items) &&
         w.items.some(it => typeof it === 'string' && /Voice/.test(it)));

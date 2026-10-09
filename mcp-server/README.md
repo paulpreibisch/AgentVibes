@@ -58,13 +58,13 @@ pip install -r requirements.txt
 **IMPORTANT for Windows users:** Make sure you install the `mcp` package globally on your Windows Python:
 
 ```powershell
-pip install mcp
+pip install "mcp>=1.27,<2"
 ```
 
 If you have multiple Python versions, use:
 
 ```powershell
-python -m pip install mcp
+python -m pip install "mcp>=1.27,<2"
 ```
 
 Verify installation:

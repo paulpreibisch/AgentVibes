@@ -18,13 +18,13 @@ If you hear audio, you're good to go! If not, see the main AgentVibes README.
 
 ```bash
 cd mcp-server
-pip install mcp
+pip install "mcp>=1.27,<2"
 ```
 
 Or using pipx (recommended for CLI tools):
 
 ```bash
-pipx install mcp
+pipx install "mcp>=1.27,<2"
 ```
 
 ## Step 3: Test the Server (Optional)
@@ -98,9 +98,9 @@ You should hear audio!
 ### "No module named 'mcp'"
 
 ```bash
-pip install mcp
+pip install "mcp>=1.27,<2"
 # or
-pip3 install mcp
+pip3 install "mcp>=1.27,<2"
 ```
 
 ### "Server not showing in Claude Desktop"
