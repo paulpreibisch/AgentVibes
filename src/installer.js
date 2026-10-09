@@ -1287,8 +1287,9 @@ async function collectConfiguration(options = {}) {
       config.provider = 'piper';
       config.defaultVoice = 'en_US-ryan-high';
     } else {
-      config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
-      config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
+      // macOS gets Piper too; install() falls back to macOS Say if Piper cannot be installed.
+      config.provider = 'piper';
+      config.defaultVoice = 'en_US-ryan-high';
     }
     const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
@@ -4537,6 +4538,31 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
 }
 
 /**
+ * Install Piper with the packaged installer, before the hooks are copied into
+ * the project. Non-interactive installs use it because they cannot prompt.
+ * @returns {boolean} true when a working piper is on PATH afterwards
+ */
+function installPiperNonInteractive() {
+  const piperInstallerPath = path.join(__dirname, '..', '.claude', 'hooks', 'piper-installer.sh');
+  console.log(`[AV] Piper not found; installing it`);
+  // The installer puts piper in ~/.local/bin, which a non-login shell often lacks.
+  const localBin = path.join(os.homedir(), '.local', 'bin');
+  if (!(process.env.PATH || '').split(path.delimiter).includes(localBin)) {
+    process.env.PATH = `${localBin}${path.delimiter}${process.env.PATH || ''}`;
+  }
+  try {
+    execScript(`${piperInstallerPath} --non-interactive`, {
+      stdio: 'inherit',
+      env: process.env,
+      allowedDirs: [path.dirname(piperInstallerPath)]
+    });
+  } catch {
+    return false;
+  }
+  return isPiperInstalled();
+}
+
+/**
  * Check if Piper is installed and optionally install it
  * @param {string} targetDir - Target installation directory
  * @param {Object} options - Installation options
@@ -5943,7 +5969,7 @@ async function install(options = {}) {
     });
   }
 
-  const selectedProvider = userConfig.provider;
+  let selectedProvider = userConfig.provider;
   const piperVoicesPath = userConfig.piperPath;
   const targetDir = options.directory || currentDir;
 
@@ -5952,12 +5978,19 @@ async function install(options = {}) {
     console.log(`[AV] Non-interactive mode detected`);
     console.log(`[AV] Provider: ${selectedProvider} | Platform: ${process.platform}`);
 
-    if (isPiperProvider(selectedProvider) && !isPiperInstalled()) {
-      process.stderr.write(`[AV ERROR] Piper binaries not found.\n`);
-      process.stderr.write(`[AV] To install Piper manually, run:\n`);
-      process.stderr.write(`[AV]   npx agentvibes --install-piper\n`);
-      process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
-      process.exit(1);
+    if (isPiperProvider(selectedProvider) && !isPiperInstalled() && !installPiperNonInteractive()) {
+      if (process.platform === 'darwin') {
+        // macOS Say needs no setup, so the install still speaks without Piper.
+        console.log(`[AV] Piper could not be installed; using macOS Say instead`);
+        selectedProvider = 'macos';
+        userConfig.provider = 'macos';
+        userConfig.defaultVoice = 'Samantha';
+      } else {
+        process.stderr.write(`[AV ERROR] Piper TTS could not be installed.\n`);
+        process.stderr.write(`[AV] Install it manually with: pipx install piper-tts\n`);
+        process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
+        process.exit(1);
+      }
     }
 
     console.log(`[AV] Installing to: ${targetDir}/.claude/`);

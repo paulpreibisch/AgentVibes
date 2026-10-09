@@ -128,85 +128,25 @@ jobs:
           node $GITHUB_WORKSPACE/src/installer.js --help || true
 
       - name: Test Piper TTS installation on macOS
+        # Runs the shipped installer the way a fresh Mac sees it: an empty home,
+        # the system python3 and no pipx or Homebrew on PATH. Then speaks with it.
         run: |
-          echo "=== Testing Piper TTS Installation on macOS ==="
+          export HOME="$RUNNER_TEMP/fresh-home"
+          mkdir -p "$HOME"
+          export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 
-          # Create test virtual environment
-          python3 -m venv /tmp/test-piper-env
-          source /tmp/test-piper-env/bin/activate
+          bash .claude/hooks/piper-installer.sh --non-interactive
 
-          # Attempt installation with user's suggested method
-          echo "📥 Attempting: pip install piper-tts --no-deps piper-phonemize-cross onnxruntime numpy"
-          if pip install piper-tts --no-deps piper-phonemize-cross onnxruntime numpy; then
-            echo "✅ Piper TTS installed successfully using --no-deps method!"
+          PIPER="$HOME/.local/bin/piper"
+          VOICE="$HOME/.claude/piper-voices/en_US-ryan-high.onnx"
+          test -x "$PIPER"
+          test -f "$VOICE"
+          echo "Hello from AgentVibes on macOS" | "$PIPER" --model "$VOICE" --output_file "$RUNNER_TEMP/piper-test.wav"
+          test -s "$RUNNER_TEMP/piper-test.wav"
+          echo "✅ Piper installed and synthesized $(wc -c < "$RUNNER_TEMP/piper-test.wav") bytes of audio"
 
-            # Verify piper command is available
-            if command -v piper &> /dev/null; then
-              echo "✅ piper command found in PATH"
-              PIPER_PATH=$(which piper)
-              echo "   Location: $PIPER_PATH"
-
-              # Try to get version
-              piper --version 2>&1 || echo "   (version check may not be supported)"
-
-              # Test if piper can run (basic execution test)
-              echo "Testing basic piper execution..."
-              if piper --help &> /dev/null; then
-                echo "✅ Piper executes successfully on macOS!"
-              else
-                echo "⚠️  Piper installed but execution failed"
-              fi
-            else
-              echo "⚠️  Piper installed but command not found in PATH"
-              echo "Checking installation location..."
-              python3 -c "import sys; print(sys.path)"
-            fi
-
-            # Check installed packages
-            echo ""
-            echo "Installed packages:"
-            pip list | grep -E "(piper|onnxruntime|phonemize)" || true
-          else
-            echo "❌ Piper TTS installation failed on macOS"
-            echo ""
-            echo "Trying alternative: pipx install piper-tts"
-            if pip install pipx; then
-              pipx install piper-tts 2>&1 | tee /tmp/pipx-piper-install.log || true
-
-              if grep -q "ResolutionImpossible\|Cannot install" /tmp/pipx-piper-install.log; then
-                echo "❌ Confirmed: Standard pipx installation fails with dependency conflicts"
-                echo "✅ User's workaround (--no-deps) is required for macOS"
-              fi
-            fi
-          fi
-
-          deactivate
-
-          echo ""
-          echo "=== Piper Binary Availability Check ==="
-          # Check if Piper binary exists or can be downloaded for macOS
-          ARCH=$(uname -m)
-          echo "Architecture: $ARCH"
-
-          if [ "$ARCH" = "arm64" ]; then
-            echo "Running on Apple Silicon (M1/M2/M3)"
-            PIPER_ARCH="arm64"
-          else
-            echo "Running on Intel"
-            PIPER_ARCH="x64"
-          fi
-
-          # Test Piper download URL
-          PIPER_VERSION="1.2.0"
-          PIPER_URL="https://github.com/rhasspy/piper/releases/download/v${PIPER_VERSION}/piper_macos_${PIPER_ARCH}.tar.gz"
-          echo "Piper binary URL: $PIPER_URL"
-
-          # Check if URL is valid
-          if curl --head --silent --fail "$PIPER_URL" > /dev/null; then
-            echo "✅ Piper binary available for download"
-          else
-            echo "⚠️  Piper binary might not be available for this architecture"
-          fi
+          # A second run must see the working install and leave it alone.
+          bash .claude/hooks/piper-installer.sh --non-interactive | grep -q "already installed"
 
       - name: Test ElevenLabs API integration (mock)
         env:
