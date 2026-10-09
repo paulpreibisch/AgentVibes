@@ -249,7 +249,7 @@ MCP package isn't installed:
 
 2. Run:
    ```powershell
-   pip install mcp
+   pip install "mcp>=1.27,<2"
    ```
 
 3. Restart Claude Desktop
