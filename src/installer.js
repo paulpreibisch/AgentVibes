@@ -3180,8 +3180,11 @@ function getUserShell() {
 
 /**
  * Execute a shell script using the user's default shell with environment loaded
- * @param {string} scriptPath - Path to the script with optional arguments (e.g., "script.sh enable")
- * @param {object} options - execSync options
+ * @param {string} scriptPath - Path to the script. Without options.args, a string
+ *   of path plus arguments split on whitespace (e.g., "script.sh enable").
+ * @param {object} options - execSync options, plus allowedDirs and args
+ * @param {string[]} [options.args] - arguments, keeping scriptPath whole; use it
+ *   whenever the path can contain spaces ("/Users/Jane Doe/...")
  * @returns {Buffer} - Output from the script
  */
 function execScript(scriptPath, options = {}) {
@@ -3189,7 +3192,7 @@ function execScript(scriptPath, options = {}) {
 
   // Security: Properly escape the scriptPath to prevent command injection
   // Split scriptPath into command and arguments
-  const parts = scriptPath.split(/\s+/);
+  const parts = options.args ? [scriptPath, ...options.args] : scriptPath.split(/\s+/);
   const scriptFile = parts[0];
   const args = parts.slice(1);
 
@@ -3259,7 +3262,7 @@ function execScript(scriptPath, options = {}) {
   // S8701: scriptFile is validated to live under .claude/hooks (above), args are
   // passed as an array and shell:false disables shell interpretation. Risk handled.
   // allowedDirs is ours, not execFileSync's — strip it before handing options on.
-  const { allowedDirs: _ignored, ...execOptions } = options;
+  const { allowedDirs: _ignored, args: _args, ...execOptions } = options;
   return execFileSync(scriptFile, args, { // NOSONAR
     ...execOptions,
     shell: false  // Don't use shell to avoid injection risks
@@ -4525,7 +4528,8 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
   }
 
   try {
-    execScript(`${piperDownloadPath} --libritts --yes`, {
+    execScript(piperDownloadPath, {
+      args: ['--libritts', '--yes'],
       stdio: 'inherit',
       env: process.env,
       allowedDirs: [path.dirname(piperDownloadPath)]
@@ -4540,7 +4544,7 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
 /**
  * Install Piper with the packaged installer, before the hooks are copied into
  * the project. Non-interactive installs use it because they cannot prompt.
- * @returns {boolean} true when a working piper is on PATH afterwards
+ * @returns {boolean} true when a piper that starts is on PATH afterwards
  */
 function installPiperNonInteractive() {
   const piperInstallerPath = path.join(__dirname, '..', '.claude', 'hooks', 'piper-installer.sh');
@@ -4551,7 +4555,8 @@ function installPiperNonInteractive() {
     process.env.PATH = `${localBin}${path.delimiter}${process.env.PATH || ''}`;
   }
   try {
-    execScript(`${piperInstallerPath} --non-interactive`, {
+    execScript(piperInstallerPath, {
+      args: ['--non-interactive'],
       stdio: 'inherit',
       env: process.env,
       allowedDirs: [path.dirname(piperInstallerPath)]
@@ -4559,7 +4564,22 @@ function installPiperNonInteractive() {
   } catch {
     return false;
   }
-  return isPiperInstalled();
+  return isPiperWorking();
+}
+
+/**
+ * True when a piper on PATH actually starts. `which piper` alone accepts the old
+ * macOS release binaries, which are found but cannot load their libraries.
+ * @returns {boolean}
+ */
+function isPiperWorking() {
+  if (!isPiperInstalled()) return false;
+  try {
+    execSync('piper --help', { stdio: 'ignore', timeout: 15000 }); // NOSONAR - fixed command, no user input
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -4570,7 +4590,7 @@ function installPiperNonInteractive() {
  * @returns {string|null} provider to use, or null when the install cannot continue
  */
 function ensureNonInteractivePiper(userConfig, platform = process.platform) {
-  if (!isPiperProvider(userConfig.provider) || isPiperInstalled() || installPiperNonInteractive()) {
+  if (!isPiperProvider(userConfig.provider) || isPiperWorking() || installPiperNonInteractive()) {
     return userConfig.provider;
   }
   if (platform !== 'darwin') return null;
@@ -4621,7 +4641,8 @@ async function checkAndInstallPiper(targetDir, options) {
 
       try {
         if (fsSync.existsSync(piperDownloadPath)) {
-          execScript(`${piperDownloadPath} --yes`, {
+          execScript(piperDownloadPath, {
+            args: ['--yes'],
             stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env,
             allowedDirs: [path.dirname(piperDownloadPath)]
@@ -4667,7 +4688,8 @@ async function checkAndInstallPiper(targetDir, options) {
         const piperInstallerPath = path.join(targetDir, '.claude', 'hooks', 'piper-installer.sh');
 
         try {
-          execScript(`${piperInstallerPath} --non-interactive`, {
+          execScript(piperInstallerPath, {
+            args: ['--non-interactive'],
             stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env,
             allowedDirs: [path.dirname(piperInstallerPath)]
@@ -6892,6 +6914,7 @@ program
 
     try {
       execScript(mcpServerScript, {
+        args: [],
         stdio: 'inherit',
         env: process.env
       });
@@ -7175,7 +7198,8 @@ program
     const testScript = path.join(__dirname, '..', 'bin', 'test-bmad-pr');
 
     try {
-      execScript(`${testScript} ${prNumber}`, {
+      execScript(testScript, {
+        args: [String(prNumber)],
         stdio: 'inherit',
         env: process.env
       });

@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 let piperOnPath = false;
+let piperBroken = false;
 let installerSucceeds = true;
 let installerCalls = [];
 
@@ -19,12 +20,14 @@ await mock.module('node:child_process', {
   namedExports: {
     execSync: (cmd) => {
       if (/\b(which|where)\b.*piper/.test(String(cmd)) && !piperOnPath) throw new Error('not found');
+      if (/^piper --help/.test(String(cmd)) && (!piperOnPath || piperBroken)) throw new Error('dyld: Library not loaded');
       return Buffer.from('');
     },
     execFileSync: (file, args) => {
       installerCalls.push([file, args]);
       if (!installerSucceeds) throw new Error('installer failed');
       piperOnPath = true;
+      piperBroken = false;
       return Buffer.from('');
     },
     spawn: () => ({ unref() {}, on() {}, kill() {}, killed: false, stdout: { on() {} }, stderr: { on() {} } }),
@@ -45,6 +48,7 @@ beforeEach(() => {
   for (const k of ['PATH', 'SHELL']) savedEnv[k] = process.env[k];
   process.env.SHELL = '/bin/bash';
   piperOnPath = false;
+  piperBroken = false;
   installerSucceeds = true;
   installerCalls = [];
 });
@@ -97,6 +101,24 @@ describe('ensureNonInteractivePiper', () => {
     const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
     assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'piper');
     assert.equal(installerCalls.length, 0);
+  });
+
+  test('replaces a piper that is on PATH but cannot start', posixOnly, () => {
+    quiet();
+    piperOnPath = true;
+    piperBroken = true;
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'piper');
+    assert.equal(installerCalls.length, 1, 'the installer ran to replace it');
+  });
+
+  test('falls back to Say when a broken piper cannot be replaced on macOS', posixOnly, () => {
+    quiet();
+    piperOnPath = true;
+    piperBroken = true;
+    installerSucceeds = false;
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'macos');
   });
 
   test('installs a missing Piper and keeps it', posixOnly, () => {
