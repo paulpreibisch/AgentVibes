@@ -16,6 +16,9 @@ import ora from 'ora';
 import boxen from 'boxen';
 import { checkDependencies, displayMissingDependencies } from '../utils/dependency-checker.js';
 
+// mcp 2.x removed the decorator API the server uses.
+const MCP_REQUIREMENT = 'mcp>=1.27,<2';
+
 // ─── Platform helpers ──────────────────────────────────────────────────────────
 
 function commandExists(cmd) {
@@ -147,7 +150,8 @@ function checkPython() {
 function checkMCPPackage(pythonCmd) {
   try {
     // Security: Use execFileSync with array args to prevent command injection
-    execFileSync(pythonCmd, ['-c', 'import mcp'], { stdio: 'pipe' });
+    // mcp 2.x removed the decorator API the server uses, so it counts as missing.
+    execFileSync(pythonCmd, ['-c', 'import importlib.metadata as m; assert int(m.version("mcp").split(".")[0]) < 2'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -300,9 +304,9 @@ async function installMCPPackage(pythonCmd, useWSL = false) {
   try {
     // Security: Use execFileSync with array args to prevent command injection
     if (useWSL) {
-      execFileSync('wsl', [pythonCmd, '-m', 'pip', 'install', '--break-system-packages', 'mcp'], { stdio: 'pipe' });
+      execFileSync('wsl', [pythonCmd, '-m', 'pip', 'install', '--break-system-packages', MCP_REQUIREMENT], { stdio: 'pipe' });
     } else {
-      execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], { stdio: 'pipe' });
+      execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', MCP_REQUIREMENT], { stdio: 'pipe' });
     }
     spinner.succeed('Python MCP package installed successfully!');
     return true;
