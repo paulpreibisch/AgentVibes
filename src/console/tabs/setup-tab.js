@@ -45,7 +45,7 @@ import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
-import { buildAudioEnv, getAllWavPlayers } from '../audio-env.js';
+import { buildAudioEnv, getAllWavPlayers, playWavWithFallback } from '../audio-env.js';
 import { previewRowContent, createRowSpinner, padTaggedTo } from '../preview-transport.js';
 import { buildBlingCommand, playBlingCue } from '../bling.js';
 import { spawn, spawnSync } from 'node:child_process';
@@ -3892,6 +3892,17 @@ export function createSetupTab(screen, services) {
       } catch {}
     }
 
+    function _finishPreviewPlayback(tempWav, result) {
+      try { fs.unlinkSync(tempWav); } catch {}
+      if (result === 'cancelled') return;
+      _previewProc = null; _previewVoiceId = null; _vpSpin.stop();
+      if (result === 'failed' && !_vpClosed) {
+        vpPreviewLine.setContent('{red-fg}♪ Audio playback failed (no audio device?){/red-fg}');
+        screen.render();
+        setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
+      }
+    }
+
     function _killVP() {
       if (_previewProc) {
         try {
@@ -4347,53 +4358,14 @@ export function createSetupTab(screen, services) {
           try { fs.unlinkSync(tempWav); } catch {};
           return;
         }
-        // Play the synthesized wav — try each installed player until one succeeds.
-        // A single detectWavPlayer() pick can be present but non-functional (e.g.
-        // sox's `play` exits 1 with "no default audio device configured"), which
-        // would otherwise fail silently since there was no exit-code check here.
-        const _wavPlayers = getAllWavPlayers(_spawnEnv);
-        if (_wavPlayers.length === 0) {
-          _previewProc = null; _previewVoiceId = null; _vpSpin.stop();
-          try { fs.unlinkSync(tempWav); } catch {}
-          return;
-        }
-
-        function _tryNextPlayer(remainingPlayers) {
-          if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-          if (!remainingPlayers.length) {
-            _previewProc = null; _previewVoiceId = null; _vpSpin.stop();
-            if (!_vpClosed) {
-              vpPreviewLine.setContent('{red-fg}♪ Audio playback failed (no audio device?){/red-fg}');
-              screen.render();
-              setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
-            }
-            try { fs.unlinkSync(tempWav); } catch {}
-            return;
-          }
-          const [wavP, ...rest] = remainingPlayers;
-          const pp = spawn(wavP.bin, wavP.args(tempWav), {
-            stdio: 'ignore',
-            detached: !_isWin,
-            windowsHide: true,
-            env: _spawnEnv,
-          });
-          _previewProc = pp;
-          // Row spinner already running from the synth phase — keep it through playback.
-          // Node can emit both 'error' and 'exit' for one failed spawn; settle once.
-          let settled = false;
-          const settle = (failed) => {
-            if (settled) return;
-            settled = true;
-            // A newer preview (or a stop) owns the row now; this player is stale.
-            if (_previewVoiceId !== voiceId || _previewProc !== pp) { try { fs.unlinkSync(tempWav); } catch {} return; }
-            if (failed) { _tryNextPlayer(rest); return; }
-            _previewVoiceId = null; _previewProc = null; _vpSpin.stop();
-            try { fs.unlinkSync(tempWav); } catch {}
-          };
-          pp.on('exit', (code) => settle(code !== 0));
-          pp.on('error', () => settle(true));
-        }
-        _tryNextPlayer(_wavPlayers);
+        // Row spinner already running from the synth phase — keep it through playback.
+        playWavWithFallback(getAllWavPlayers(_spawnEnv), tempWav, {
+          env: _spawnEnv,
+          onSpawn: (proc) => { _previewProc = proc; },
+          // A newer preview (or a stop) owns the row once these change.
+          isCurrent: (proc) => _previewVoiceId === voiceId && _previewProc === proc,
+          onDone: (result) => _finishPreviewPlayback(tempWav, result),
+        });
       });
       piper.on('error', () => {
         _previewProc = null; _previewVoiceId = null;

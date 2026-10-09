@@ -269,3 +269,44 @@ export function getAllWavPlayers(env) {
   if (process.platform === 'win32') installed.push(WIN_WAV_PLAYER);
   return installed;
 }
+
+/**
+ * Play a WAV with each player in turn until one exits cleanly. A player can be
+ * installed yet unable to play (sox's `play` exits 1 with "no default audio
+ * device configured"), so one pick is not enough.
+ *
+ * @param {Player[]} players - candidates in preference order
+ * @param {string} wavPath - file to play
+ * @param {Object} opts
+ * @param {Object} opts.env - environment for the player processes
+ * @param {(proc: import('node:child_process').ChildProcess) => void} [opts.onSpawn] - each spawned player
+ * @param {(proc: import('node:child_process').ChildProcess) => boolean} opts.isCurrent -
+ *   false once the caller has moved on (stopped, or started another preview)
+ * @param {(result: 'played'|'failed'|'cancelled') => void} opts.onDone - called exactly once
+ * @param {Function} [opts.spawnFn] - spawn, injectable for tests
+ */
+export function playWavWithFallback(players, wavPath, { env, onSpawn, isCurrent, onDone, spawnFn = spawn }) {
+  const tryFrom = (index) => {
+    if (index >= players.length) { onDone('failed'); return; }
+    const player = players[index];
+    const proc = spawnFn(player.bin, player.args(wavPath), {
+      stdio: 'ignore',
+      detached: process.platform !== 'win32',
+      windowsHide: true,
+      env,
+    });
+    onSpawn?.(proc);
+    // Node can emit both 'error' and 'exit' for one failed spawn; settle once.
+    let settled = false;
+    const settle = (failed) => {
+      if (settled) return;
+      settled = true;
+      if (!isCurrent(proc)) onDone('cancelled');
+      else if (failed) tryFrom(index + 1);
+      else onDone('played');
+    };
+    proc.on('exit', (code) => settle(code !== 0));
+    proc.on('error', () => settle(true));
+  };
+  tryFrom(0);
+}
