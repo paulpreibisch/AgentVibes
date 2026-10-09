@@ -266,7 +266,7 @@ jobs:
               source /tmp/test-mcp-env/bin/activate
 
               echo "Installing MCP package..."
-              if pip install mcp>=0.9.0 2>&1; then
+              if pip install "mcp>=1.27,<2" 2>&1; then
                 echo "✅ MCP package installation completed"
 
                 # Verify import

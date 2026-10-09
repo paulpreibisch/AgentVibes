@@ -50,12 +50,17 @@ async function findPythonCommand() {
   return null;
 }
 
+// Function to check if a Python snippet runs cleanly
+function checkPythonCode(pythonCmd, code) {
+  return new Promise((resolve) => {
+    const proc = spawn(pythonCmd, ['-c', code], { stdio: 'ignore' });
+    proc.on('close', (exitCode) => resolve(exitCode === 0));
+  });
+}
+
 // Function to check if Python module is installed
 function checkPythonModule(pythonCmd, moduleName) {
-  return new Promise((resolve) => {
-    const proc = spawn(pythonCmd, ['-c', `import ${moduleName}`], { stdio: 'ignore' });
-    proc.on('close', (code) => resolve(code === 0));
-  });
+  return checkPythonCode(pythonCmd, `import ${moduleName}`);
 }
 
 // Main setup and launch function
@@ -70,12 +75,13 @@ async function main() {
   }
 
   // Check if MCP Python package is installed
-  const hasMCP = await checkPythonModule(pythonCmd, 'mcp');
+  // mcp 2.x removed the decorator API server.py uses, so an installed 2.x counts as missing.
+  const hasMCP = await checkPythonModule(pythonCmd, 'mcp') && await checkPythonCode(pythonCmd,
+    'import importlib.metadata as m; assert int(m.version("mcp").split(".")[0]) < 2');
   if (!hasMCP) {
     // Try to install MCP package directly
     try {
-      const installCmd = `${pythonCmd} -m pip install --user mcp`;
-      const installProc = spawn(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], {
+      const installProc = spawn(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp>=1.27,<2'], {
         stdio: 'pipe',
         shell: false
       });
@@ -85,13 +91,13 @@ async function main() {
           if (code === 0) {
             resolve();
           } else {
-            console.error('ERROR: Failed to install Python mcp package. Run: pip install mcp');
+            console.error('ERROR: Failed to install Python mcp package. Run: pip install "mcp>=1.27,<2"');
             reject(new Error('Dependency installation failed'));
           }
         });
       });
     } catch (err) {
-      console.error('ERROR: Failed to install Python mcp package. Run: pip install mcp');
+      console.error('ERROR: Failed to install Python mcp package. Run: pip install "mcp>=1.27,<2"');
       process.exit(1);
     }
   }
