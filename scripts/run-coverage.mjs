@@ -23,7 +23,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { stripAnsi, failedTestNames, isRunnerDeserializeCrash } from './lib/test-output.mjs';
+import { stripAnsi, failedTestNames, runWithRunnerCrashRetry } from './lib/test-output.mjs';
 
 const TEST_DIR = 'test/unit';
 const files = readdirSync(TEST_DIR)
@@ -67,12 +67,7 @@ function runFile(file) {
 // back from its own child ("Unable to deserialize cloned data"), even though
 // the tests ran. Node 24 does not. A run whose only failure is that runner
 // crash gets one rerun; a run with any failed test is kept as it is.
-async function runFileWithRetry(file) {
-  const first = await runFile(file);
-  if (!isRunnerDeserializeCrash(first)) return first;
-  console.warn(`\n⚠️  ${file}: Node test runner failed to deserialize results; rerunning once.`);
-  return runFile(file);
-}
+const runFileWithRetry = (file) => runWithRunnerCrashRetry(file, runFile);
 
 /** Fixed-size concurrency pool over the file list. */
 async function runAll() {
@@ -112,7 +107,7 @@ for (const { file, code, out } of results) {
   totalPassLines += passLines;
 
   // Genuine per-test failures (descriptive names), from either reporter.
-  const names = failedTestNames(clean);
+  const names = failedTestNames(clean, file);
   if (names.length) realFails.push(...names.map((n) => `${n}  [${file}]`));
 
   // A child that exited non-zero with ZERO passing lines never ran its tests
