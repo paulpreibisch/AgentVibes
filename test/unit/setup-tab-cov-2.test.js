@@ -203,7 +203,7 @@ function fakeFs() {
       if (s.endsWith('kokoro-favorites.json')) return JSON.stringify(['af_heart', 'bm_fable']);
       if (s.endsWith('transport-config.json')) {
         return JSON.stringify({
-          'claude-code': { mode: 'remote', host: 'laptop-win', sshKey: '/home/u/.ssh/id_test', port: 45217 },
+          'claude-code': { mode: 'remote', host: 'my-laptop', sshKey: '/home/u/.ssh/id_test', port: 2222 },
           'other':       { mode: 'remote', host: 'box2', sshKey: '/home/u/.ssh/id_test', port: 22 },
         });
       }
@@ -238,8 +238,10 @@ const ENGINES = [
 await mock.module('../../src/services/tts-engine-service.js', {
   namedExports: {
     getAvailableEngines: () => ENGINES,
+    getAllEngines: () => ENGINES.map(e => ({ ...e, supported: true })),
     getEngineStatuses:   () => ENGINES,
     checkEngineInstalled: () => true,
+    receiverProviderId: (id) => ({ sapi: 'windows-sapi', 'macos-say': 'macos' }[id] || id),
   },
 });
 

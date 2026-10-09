@@ -22,7 +22,6 @@ import { FOOTER_CONFIG, DEFAULT_FOOTER_COLOR } from './footer-config.js';
 import { createModalOverlay } from './modals/modal-overlay.js';
 import { BRAND_PINK } from './brand-colors.js';
 import { createSettingsTab } from './tabs/settings-tab.js';
-import { createVoicesTab } from './tabs/voices-tab.js';
 import { createMusicTab } from './tabs/music-tab.js';
 import { createSetupTab } from './tabs/setup-tab.js';
 import { createHelpTab } from './tabs/help-tab.js';
@@ -728,13 +727,6 @@ export class AgentVibesConsole {
     };
     this.tabs['settings'] = createSettingsTab(this.screen, services);
 
-    // Destroy voices placeholder and mount real voices tab
-    const voicesPlaceholder = this.tabs['voices'];
-    if (voicesPlaceholder && typeof voicesPlaceholder.destroy === 'function') {
-      voicesPlaceholder.destroy();
-    }
-    this.tabs['voices'] = createVoicesTab(this.screen, services);
-
     // Destroy music placeholder and mount real music tab
     const musicPlaceholder = this.tabs['music'];
     if (musicPlaceholder && typeof musicPlaceholder.destroy === 'function') {
@@ -899,8 +891,19 @@ export class AgentVibesConsole {
   // Private: Global keyboard handlers
 
   _registerHandlers() {
-    // Q or Ctrl+C → clean exit (no zombie processes)
-    this.screen.key(['q', 'Q', 'C-c'], () => {
+    // Q or Ctrl+C → clean exit (no zombie processes).
+    // Guarded by isModalOpen(): blessed fires screen-level key handlers
+    // before focused-element handlers, so without this guard 'q' here would
+    // always win over a picker/modal's own Esc/q close binding — e.g. typing
+    // 'q' to jump to a voice named "Quinn" would kill the whole TUI instead
+    // of just being handled by the picker. Ctrl+C always force-quits (it's
+    // the universal "get me out" signal and has no in-modal meaning).
+    this.screen.key(['q', 'Q', 'C-c'], (ch, key) => {
+      const isCtrlC = key?.ctrl && key?.name === 'c';
+      if (!isCtrlC && this.navigationService?.isModalOpen()) {
+        // Let the focused modal/picker's own key handler deal with it.
+        return;
+      }
       this.screen.destroy();
       process.exit(0);
     });
@@ -912,7 +915,7 @@ export class AgentVibesConsole {
  *
  * @param {object} opts
  * @param {string} [opts.startTab='settings'] - Which tab to show on launch.
- *   Used by story 6.5 (command routing). Values: 'settings' | 'install' | 'voices' | 'music'
+ *   Used by story 6.5 (command routing). Values: 'settings' | 'setup' | 'music'
  * @param {boolean} [opts._testMode=false] - Internal: skip render in test environments.
  * @returns {Promise<AgentVibesConsole>}
  */

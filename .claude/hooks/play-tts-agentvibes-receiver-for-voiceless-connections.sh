@@ -14,7 +14,7 @@
 set -euo pipefail
 
 TEXT="${1:-}"
-VOICE="${2:-en_US-lessac-medium}"
+VOICE="${2:-}"
 AGENT_NAME="${3:-default}"
 
 # Validate required input
@@ -26,7 +26,26 @@ fi
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Default voice: prefer the Provider Catalog's piper default (AVI-S9.6 AC3,
+# design row 23), falling back to the legacy literal if the generated catalog
+# artifact is missing (installed-tree skew). NOTE: any voice-format allowlist
+# added to this receiver in the future must stay independent of the catalog —
+# a security allowlist is deliberately narrower than the full inventory (see
+# provider-catalog.js module header).
+if [[ -z "$VOICE" ]]; then
+  if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+  fi
+  if type catalog_default_voice >/dev/null 2>&1; then
+    VOICE="$(catalog_default_voice piper)"
+  else
+    VOICE="en_US-lessac-medium"  # legacy fallback
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # Get SSH connection details from config
@@ -38,10 +57,10 @@ SSH_KEY=""
 SSH_PORT=""
 
 _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
-if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-  SSH_HOST=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('host',''))" 2>/dev/null || echo "")
-  SSH_KEY=$(python3  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
-  SSH_PORT=$(python3 -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+if [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+  SSH_HOST=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+  SSH_KEY=$("$PYTHON_BIN"  -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+  SSH_PORT=$("$PYTHON_BIN" -c "import json; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('agentvibes-receiver',{}); print(p.get('port',''))" 2>/dev/null || echo "")
 fi
 
 if [[ -z "$SSH_HOST" ]]; then
@@ -99,7 +118,7 @@ echo "📱 Sending to $SSH_HOST for local playback..." >&2
 SSH_ARGS=()
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
 # Never force "-p 22" (ssh default) -- it would override an ~/.ssh/config
-# Host alias port (e.g. laptop-win -> 45217). Empty/22 => defer to ssh config.
+# Host alias port (e.g. my-laptop -> 2222). Empty/22 => defer to ssh config.
 if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then SSH_ARGS+=(-p "$SSH_PORT"); fi
 
 # Try receiver scripts in order — single SSH call, no separate probe

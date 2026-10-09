@@ -198,12 +198,24 @@ setup_agentvibes_scripts() {
     return 1
   fi
 
-  # Copy hooks to test .claude directory
-  cp -r "$REPO_ROOT/.claude/hooks" "$TEST_CLAUDE_DIR/"
-  cp -r "$REPO_ROOT/.claude/personalities" "$TEST_PERSONALITIES_DIR/"
-
-  # Make scripts executable
-  chmod +x "$TEST_CLAUDE_DIR/hooks/"*.sh
+  # Copy hooks + personalities and mark scripts executable. Git Bash on Windows
+  # can transiently fail to fork/exec (status 127) under heavy parallel bats
+  # load, which flakes setup(). These operations are idempotent, so retry a few
+  # times before giving up. Fail loudly if every attempt fails.
+  local _try _setup_ok=0
+  for _try in 1 2 3; do
+    if cp -r "$REPO_ROOT/.claude/hooks" "$TEST_CLAUDE_DIR/" 2>/dev/null \
+       && cp -r "$REPO_ROOT/.claude/personalities" "$TEST_PERSONALITIES_DIR/" 2>/dev/null \
+       && chmod +x "$TEST_CLAUDE_DIR/hooks/"*.sh 2>/dev/null; then
+      _setup_ok=1
+      break
+    fi
+    sleep 0.3
+  done
+  if [[ "$_setup_ok" -ne 1 ]]; then
+    echo "Error: setup_agentvibes_scripts failed to copy hooks after retries (transient fork/exec failure?)"
+    return 1
+  fi
 
   # Ensure all config subdirectories exist
   mkdir -p "$TEST_CLAUDE_DIR/config"

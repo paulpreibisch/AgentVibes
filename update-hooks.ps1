@@ -31,36 +31,39 @@ if (-not (Test-Path $DestDir)) {
     New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
 }
 
-$Scripts = @(
-    "play-tts.ps1",
-    "play-tts-windows-piper.ps1",
-    "play-tts-windows-sapi.ps1",
-    "play-tts-soprano.ps1",
-    "provider-manager.ps1",
-    "voice-manager-windows.ps1",
-    "audio-cache-utils.ps1",
-    "session-start-tts.ps1"
-)
+# Copy EVERY hook script in the source dir, not a hand-maintained whitelist.
+# A stale whitelist produced mixed-generation installs (new router + stale
+# providers, e.g. play-tts-kokoro.ps1 / audio-processor.ps1 / tts-watcher.ps1
+# were never updated). Globbing keeps every provider/manager/watcher in lockstep.
+$SourceScripts = Get-ChildItem -Path $SourceDir -Filter *.ps1 -File
+
+# One timestamp per run so this run's backups group together and never collide
+# with a previous run's — every update stays recoverable, not just the first.
+$BackupStamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
 
 $Updated = 0
-foreach ($script in $Scripts) {
-    $src = Join-Path $SourceDir $script
-    $dst = Join-Path $DestDir  $script
-    if (Test-Path $src) {
-        # Back up any existing file before overwriting so user edits are recoverable
-        if (Test-Path $dst) {
-            $bak = $dst + '.user.bak'
-            if (-not (Test-Path $bak)) {
-                Copy-Item -Path $dst -Destination $bak -ErrorAction SilentlyContinue
-            }
+$Current = 0
+foreach ($item in $SourceScripts) {
+    $script = $item.Name
+    $src = $item.FullName
+    $dst = Join-Path $DestDir $script
+
+    if (Test-Path $dst) {
+        # Non-Destructive rule: never lose a user edit. Only back up + overwrite
+        # when the installed file actually differs from what we ship; a matching
+        # file needs neither a copy nor a backup.
+        $srcHash = (Get-FileHash -Path $src -Algorithm SHA256).Hash
+        $dstHash = (Get-FileHash -Path $dst -Algorithm SHA256).Hash
+        if ($srcHash -eq $dstHash) {
+            $Current++
+            continue
         }
-        Copy-Item -Path $src -Destination $dst -Force
-        Write-Host "  Updated: $script" -ForegroundColor Green
-        $Updated++
-    } else {
-        Write-Host "  Skipped (not found): $script" -ForegroundColor DarkGray
+        Copy-Item -Path $dst -Destination "$dst.user.bak.$BackupStamp" -ErrorAction SilentlyContinue
     }
+    Copy-Item -Path $src -Destination $dst -Force
+    Write-Host "  Updated: $script" -ForegroundColor Green
+    $Updated++
 }
 
-Write-Host "`nDone. $Updated hook script(s) updated in: $DestDir" -ForegroundColor Cyan
+Write-Host "`nDone. $Updated hook script(s) updated, $Current already current in: $DestDir" -ForegroundColor Cyan
 Write-Host "Trigger a voice preview in AgentVibes to test." -ForegroundColor Gray

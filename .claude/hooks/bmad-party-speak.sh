@@ -18,6 +18,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
+# Party speech is best-effort and this hook runs under `set -e`; with no Python
+# the `"$PYTHON_BIN" …` calls below would be `: command not found` (127) and abort
+# the hook, surfacing an error on every Agent call. Degrade silently instead.
+[[ -n "$PYTHON_BIN" ]] || exit 0
 LOCK_FILE="/tmp/agentvibes-party-queue.lock"
 DEBUG_LOG="/tmp/agentvibes-party-debug.log"
 
@@ -33,7 +38,7 @@ _dbg "fired (stdin ${#raw} bytes)"
 
 # --- Parse all needed fields in one python3 call (fixes M5: 3x subprocess, echo safety) ---
 # Outputs: TOOL_NAME|DISPLAY_NAME|RESPONSE_TEXT (newlines in response encoded as \n literals)
-parsed="$(printf '%s' "$raw" | python3 - <<'PYEOF'
+parsed="$(printf '%s' "$raw" | "$PYTHON_BIN" - <<'PYEOF'
 import sys, json, re
 
 try:
@@ -92,6 +97,12 @@ if [[ "$raw" != *"BMAD agent in a collaborative roundtable"* ]]; then
 fi
 _dbg "fingerprint HIT: display='$display_name' text_len=${#response_text}"
 
+# Party marker (Phase 2): this hook alone knows -- from the roundtable
+# fingerprint -- that we are in party mode. Export the marker so the child
+# bmad-speak.sh can stage the cast on the first party line (stage-on-first-speak)
+# without having to re-derive party context. Additive + harmless outside party.
+export AGENTVIBES_PARTY_MODE=1
+
 if [[ -z "$display_name" ]]; then
     _dbg "skip: empty display_name"
     exit 0
@@ -103,6 +114,11 @@ fi
 
 # --- Resolve project root ---
 project_root="${CLAUDE_PROJECT_DIR:-}"
+
+# Thread the real project dir to the child speak path so its forwarded messages
+# carry the correct routing session id (not the install/HOME basename). Export
+# only when known so the no-project case is unchanged.
+[[ -n "$project_root" ]] && export CLAUDE_PROJECT_DIR="$project_root"
 
 # --- Find bmad-speak.sh (prefer project-local, fall back to global) ---
 bmad_speak=""
@@ -117,7 +133,7 @@ fi
 agent_id="$display_name"  # fallback
 if [[ -n "$project_root" && -f "$project_root/_bmad/_config/agent-manifest.csv" ]]; then
     manifest="$project_root/_bmad/_config/agent-manifest.csv"
-    matched="$(python3 - "$manifest" "$display_name" <<'PYEOF'
+    matched="$("$PYTHON_BIN" - "$manifest" "$display_name" <<'PYEOF'
 import sys, csv
 manifest_path, target = sys.argv[1], sys.argv[2].lower()
 try:
@@ -147,7 +163,7 @@ fi
 case "$verbosity" in
     low)
         # First sentence — fall back to full text if no punctuation (fixes m1)
-        first="$(printf '%s' "$response_text" | python3 -c "
+        first="$(printf '%s' "$response_text" | "$PYTHON_BIN" -c "
 import sys, re
 t = sys.stdin.read()
 m = re.match(r'^.*?[.!?]', t)
@@ -157,7 +173,7 @@ print(m.group(0) if m else t)
         ;;
     medium)
         # First 2 sentences — fall back to full text if no punctuation (fixes m1)
-        two="$(printf '%s' "$response_text" | python3 -c "
+        two="$(printf '%s' "$response_text" | "$PYTHON_BIN" -c "
 import sys, re
 t = sys.stdin.read()
 parts = re.findall(r'.*?[.!?]', t)

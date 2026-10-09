@@ -8,11 +8,19 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { destroyList } from './destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
 import { renderHelpBar, selectorTitle } from './help-bar.js';
 import { formatTrackName } from './format-utils.js';
 import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
+import { resolveMusicProvider, spawnMusicRemote, createRowSpinner } from '../music-preview.js';
+import { playBlingCue } from '../bling.js';
+
+// AgentVibes package/repo root — resolves bundled assets (bling cue) and is the
+// package fallback when resolving the active provider for remote forwarding.
+const _WIDGET_DIR = path.dirname(fileURLToPath(import.meta.url));
+const _PKG_ROOT = path.resolve(_WIDGET_DIR, '..', '..', '..');
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 let blessed;
@@ -33,9 +41,9 @@ const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
  * @param {Function} [onClose]  - called when modal closes (confirm or cancel)
  */
 export function openVolumeInput(screen, currentVol, onConfirm, onClose) {
-  if (IS_TEST) { onConfirm(currentVol ?? 70); return; }
+  if (IS_TEST) { onConfirm(currentVol ?? 20); return; }
   let vol = (Number.isFinite(currentVol) && currentVol >= 0 && currentVol <= 100)
-    ? currentVol : 70;
+    ? currentVol : 20;
 
   const box = blessed.box({
     parent: screen,
@@ -141,7 +149,7 @@ const BUILT_IN_TRACKS = [
  *
  * @param {object}   screen        - blessed screen
  * @param {string}   currentTrack  - currently selected track filename
- * @param {number}   currentVolume - currently set volume (0-100, default 70)
+ * @param {number}   currentVolume - currently set volume (0-100, default 20)
  * @param {Function} onSelect      - called with (trackFile, volume)
  * @param {Function} [onClose]     - called after modal fully closes
  */
@@ -223,11 +231,19 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
     },
   });
 
-  // Transient preview/error status shows in the title area; idle restores the title.
+  // Transient error status shows in the title area; idle restores the title.
   function _setStatus(text) {
     box.setLabel(text || TITLE);
     screen.render();
   }
+
+  // Row spinner: paints "⠹ Previewing (locally|remotely via SSH)  (Space to stop)"
+  // ON the selected track row — shared with every other picker. _setStatus stays
+  // for error messages only.
+  let _closed = false;
+  const _rowSpin = createRowSpinner(list, screen, (i) => (
+    tracks[i] && tracks[i].file === currentTrack ? `● ${tracks[i].label}` : `  ${tracks[i] ? tracks[i].label : ''}`
+  ), { isClosed: () => _closed });
 
   if (currentIdx >= 0) list.select(currentIdx);
   list.focus();
@@ -237,6 +253,10 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
   const _spawnEnv = buildAudioEnv();
   let _previewProc = null;
   let _previewTrackId = null;
+  // Remote playback is fire-and-forget (the local sender exits in ms while the
+  // receiver keeps playing), so the toggle tracks the intended remote track
+  // here rather than relying on a live local process.
+  let _remotePreviewTrackId = null;
 
   function _killPreview() {
     if (_previewProc) {
@@ -244,9 +264,76 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
       _previewProc = null;
     }
     _previewTrackId = null;
+    // Stop any remote preview so closing/selecting doesn't leave music playing
+    // on the receiver (the local equivalent of killing the player process).
+    if (_remotePreviewTrackId) {
+      const mp = resolveMusicProvider(_PKG_ROOT);
+      if (mp.remote) _sendRemote(mp, { stop: true });
+      _remotePreviewTrackId = null;
+    }
+    _rowSpin.stop();
+  }
+
+  /**
+   * Forward a music track to the receiver (or stop it), mirroring the Music
+   * tab's remote-preview behavior. Fire-and-forget; UI errors surface in the
+   * title status area. Returns true if the send was launched.
+   * @param {{remote:boolean, projectDir:string}} mp
+   * @param {{track?:string, stop?:boolean}} opts
+   */
+  function _sendRemote(mp, { track = null, stop = false } = {}) {
+    let proc;
+    try {
+      proc = spawnMusicRemote({ packageRoot: _PKG_ROOT, projectDir: mp.projectDir, env: _spawnEnv, track, stop });
+    } catch {
+      if (!stop) {
+        _setStatus(' {red-fg}Remote preview failed{/red-fg} ');
+        setTimeout(() => { _setStatus(); }, 4000);
+      }
+      return false;
+    }
+    let _rerr = '';
+    if (proc.stderr) proc.stderr.on('data', d => { _rerr += d.toString(); });
+    proc.on('exit', (code) => {
+      if (stop || code === 0) return;
+      if (_remotePreviewTrackId === track) _remotePreviewTrackId = null;
+      const msg = _rerr.trim().split('\n').pop() || 'Remote preview failed';
+      _setStatus(` {red-fg}♪ ${msg}{/red-fg} `);
+      setTimeout(() => { _setStatus(); }, 4000);
+    });
+    proc.on('error', () => {
+      if (stop) return;
+      if (_remotePreviewTrackId === track) _remotePreviewTrackId = null;
+      _setStatus(' {red-fg}Remote preview failed{/red-fg} ');
+      setTimeout(() => { _setStatus(); }, 4000);
+    });
+    return true;
   }
 
   function _previewTrack(trackFile) {
+    // Transport provider: forward to the receiver instead of local playback
+    // (which is silent on a headless box) — parity with the Music tab.
+    const _mp = resolveMusicProvider(_PKG_ROOT);
+    if (_mp.remote) {
+      // Toggle off if same track → explicit music-stop signal
+      if (_remotePreviewTrackId === trackFile) {
+        _sendRemote(_mp, { stop: true });
+        _remotePreviewTrackId = null;
+        _rowSpin.stop();
+        return;
+      }
+      // Bling first (fire-and-forget, plays locally like the voice preview),
+      // then forward the track to the receiver. The receiver keeps playing until
+      // an explicit stop, so the row spinner persists (no floor).
+      playBlingCue(_PKG_ROOT);
+      if (_sendRemote(_mp, { track: trackFile })) {
+        _remotePreviewTrackId = trackFile;
+        _rowSpin.start(list.selected, true);
+      }
+      return;
+    }
+
+    // ── Local playback ──────────────────────────────────────────────────────
     // Toggle off if same track
     if (_previewTrackId === trackFile) {
       _killPreview();
@@ -266,6 +353,10 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
       return;
     }
 
+    // Bling first (fire-and-forget) — same readiness cue as the voice preview —
+    // then start local playback.
+    playBlingCue(_PKG_ROOT);
+
     const proc = spawnMp3Player(trackPath, _spawnEnv);
     if (!proc) {
       _setStatus(' {red-fg}No MP3 player found{/red-fg} ');
@@ -275,25 +366,25 @@ export function openTrackPicker(screen, currentTrack, currentVolume, onSelect, o
 
     _previewProc = proc;
     _previewTrackId = trackFile;
-
-    const label = tracks.find(t => t.file === trackFile)?.label ?? trackFile;
-    _setStatus(` {bright-cyan-fg}♪ ${label}  (Space to stop){/bright-cyan-fg} `);
+    _rowSpin.start(list.selected, false);
 
     proc.on('exit', () => {
       if (_previewTrackId === trackFile) {
         _previewTrackId = null;
         _previewProc = null;
-        _setStatus();
+        _rowSpin.stop();
       }
     });
 
     proc.on('error', () => {
       _previewTrackId = null;
       _previewProc = null;
+      _rowSpin.stop();
     });
   }
 
   function _close(callback) {
+    _closed = true;
     _killPreview();
     if (callback) {
       callback();

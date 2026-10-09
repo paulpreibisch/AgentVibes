@@ -22,11 +22,30 @@
 set -euo pipefail
 
 ENCODED_TEXT="${1:-}"
-VOICE="${2:-en_US-lessac-medium}"
+
+# Default voice: prefer the Provider Catalog's piper default (AVI-S9.6 AC3,
+# design row 23), falling back to the legacy literal if the generated catalog
+# artifact is missing (installed-tree skew).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+fi
+if type catalog_default_voice >/dev/null 2>&1; then
+  _CATALOG_PIPER_DEFAULT="$(catalog_default_voice piper)"
+else
+  _CATALOG_PIPER_DEFAULT="en_US-lessac-medium"  # legacy fallback
+fi
+VOICE="${2:-$_CATALOG_PIPER_DEFAULT}"
 ENCODED_AGENT="${3:-}"
 ENCODED_INTRO="${4:-}"
 
-# SECURITY: Whitelist of allowed voice names
+# SECURITY: Whitelist of allowed voice names.
+# DO NOT UNIFY with the Provider Catalog — this is a SECURITY control, not an
+# inventory list. It is deliberately narrower than (and independent of) the
+# catalog's piper voice set; syncing it to the catalog would silently widen
+# what an untrusted remote SSH sender can request (design §8, provider-catalog.js
+# module header).
 ALLOWED_VOICES="en_US-amy-medium|en_US-lessac-medium|es_ES-mls_9972-low|es_ES-davefx-medium|en_US-joe-medium"
 
 # Validate inputs

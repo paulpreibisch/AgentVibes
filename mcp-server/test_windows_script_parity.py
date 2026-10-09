@@ -42,7 +42,6 @@ HOOKS_LINUX = PROJECT_ROOT / ".claude" / "hooks"
 # The auto-conversion (server.py:902-903) converts .sh -> .ps1
 MCP_HARDCODED_SCRIPTS = [
     "provider-manager",
-    "learn-manager",
     "speed-manager",
     "download-extra-voices",
     "verbosity-manager",
@@ -130,10 +129,14 @@ def test_run_script_error_for_missing():
         server = AgentVibesServer()
 
         async def check_missing():
-            # Try calling a script we know doesn't exist
+            # Try calling a script we know doesn't exist.
+            # _run_script returns a ScriptResult(returncode, stdout, stderr) —
+            # never a plain string — so callers (and this test) must branch
+            # on .ok/.stderr, not string-containment on the result itself.
             result = await server._run_script("definitely-does-not-exist.ps1", [])
-            assert "Script not found" in result, (
-                f"Expected 'Script not found' for missing script, got: {result}"
+            assert not result.ok, f"Expected failure for missing script, got: {result}"
+            assert "Script not found" in result.stderr, (
+                f"Expected 'Script not found' in stderr for missing script, got: {result}"
             )
             print("  PASS: _run_script returns 'Script not found' for missing scripts")
 
@@ -155,7 +158,6 @@ def test_run_script_error_for_missing():
 MCP_TOOL_SCRIPT_MAP = {
     "set_speed": "speed-manager",
     "get_speed": "speed-manager",
-    "set_learn_mode": "learn-manager",
     "set_verbosity": "verbosity-manager",
     "get_verbosity": "verbosity-manager",
     "mute": "verbosity-manager",
@@ -165,6 +167,7 @@ MCP_TOOL_SCRIPT_MAP = {
     "list_personalities": "personality-manager",
     "set_language": "language-manager",
     "clean_audio_cache": "clean-audio-cache",
+    "replay_audio": "voice-manager-windows",
 }
 
 

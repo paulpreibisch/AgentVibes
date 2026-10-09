@@ -31,7 +31,6 @@ setup() {
 
   TRANSLATOR="$TEST_CLAUDE_DIR/hooks/translator.py"
   TRANSLATE_MANAGER="$TEST_CLAUDE_DIR/hooks/translate-manager.sh"
-  LEARN_MANAGER="$TEST_CLAUDE_DIR/hooks/learn-manager.sh"
 
   # Set up paths
   export PATH="$TEST_CLAUDE_DIR/hooks:$PATH"
@@ -205,48 +204,3 @@ EOF
   [[ "$output" == "french" ]]
 }
 
-# ============================================
-# Learning mode auto-translation tests (Issue #51)
-# ============================================
-
-@test "learn-manager.sh enables learning mode" {
-  run "$LEARN_MANAGER" enable
-
-  [ "$status" -eq 0 ]
-  local clean_output=$(strip_colors "$output")
-  [[ "$clean_output" == *"ENABLED"* ]]
-}
-
-@test "learn-manager.sh disables learning mode" {
-  "$LEARN_MANAGER" enable
-  run "$LEARN_MANAGER" disable
-
-  [ "$status" -eq 0 ]
-  local clean_output=$(strip_colors "$output")
-  [[ "$clean_output" == *"DISABLED"* ]]
-}
-
-@test "learn-manager.sh is-enabled returns correct status" {
-  "$LEARN_MANAGER" disable
-  run "$LEARN_MANAGER" is-enabled
-
-  [ "$status" -eq 1 ]
-  local clean_output=$(strip_colors "$output")
-  [[ "$clean_output" == *"OFF"* ]]
-
-  "$LEARN_MANAGER" enable
-  run "$LEARN_MANAGER" is-enabled
-
-  [ "$status" -eq 0 ]
-  clean_output=$(strip_colors "$output")
-  [[ "$clean_output" == *"ON"* ]]
-}
-
-@test "learn-manager.sh set-target-language sets language and voice" {
-  run "$LEARN_MANAGER" set-target-language spanish
-
-  [ "$status" -eq 0 ]
-  local clean_output=$(strip_colors "$output")
-  [[ "$clean_output" == *"Target language set to"* ]]
-  [[ "$clean_output" == *"Target voice automatically set"* ]]
-}

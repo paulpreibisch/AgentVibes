@@ -50,6 +50,56 @@ if [[ ! -f "$PROJECT_ROOT/_bmad/_config/agent-manifest.csv" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Stage-on-first-speak: the FIRST party line for a session notifies a compatible
+# receiver of the full party roster up front, rather than letting it learn the
+# cast one line at a time. Everything here is additive + fail-safe: if python is
+# missing or the notification errors, the line still speaks.
+#
+# Party context is detected via either signal:
+#   * AGENTVIBES_PARTY_MODE=1 -- the "party marker" bmad-party-speak.sh exports
+#     before it invokes this script (it alone knows the roundtable fingerprint).
+#   * the routing session id ends in "-bmad-party-mode" (the suffix the party
+#     stages under), for any flow that runs under that session directly.
+#
+# Idempotency: a per-session flag ~/.agentvibes/staged-<sessionid>.flag makes the
+# doorbell fire ONCE per party, not once per line.
+#
+# Clearing the flag: there is no per-line clear (that would re-fire every line).
+# `party-set-room.sh --clear` removes it (manual reset / room change), and a
+# party-end / clear hook should remove it too. TODO: wire an automatic clear to
+# a party-teardown hook if/when BMAD exposes one -- until then the flag persists
+# for the life of the session, which is the correct once-per-party behavior.
+if [[ "${AGENTVIBES_STAGE_ROSTER_DISABLED:-}" != "1" ]]; then
+  _sr_session=""
+  if [[ -f "$SCRIPT_DIR/session-id.sh" ]]; then
+    # shellcheck source=./session-id.sh
+    source "$SCRIPT_DIR/session-id.sh"
+    _sr_session="$(av_session_id "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")"
+  fi
+  if [[ "${AGENTVIBES_PARTY_MODE:-}" == "1" || "$_sr_session" == *-bmad-party-mode ]]; then
+    _sr_flag="$HOME/.agentvibes/staged-${_sr_session:-unknown}.flag"
+    if [[ -n "$_sr_session" && ! -f "$_sr_flag" ]]; then
+      # Claim the flag FIRST (atomic-ish) so parallel party lines don't each fire.
+      mkdir -p "$HOME/.agentvibes" 2>/dev/null || true
+      if ( set -o noclobber; : > "$_sr_flag" ) 2>/dev/null; then
+        _sr_python=""
+        if [[ -f "$SCRIPT_DIR/python-resolver.sh" ]]; then
+          # shellcheck source=./python-resolver.sh
+          source "$SCRIPT_DIR/python-resolver.sh"
+          _sr_python="${PYTHON_BIN:-}"
+        fi
+        if [[ -n "$_sr_python" && -f "$SCRIPT_DIR/party-stage-roster.py" ]]; then
+          # Fire-and-forget in the background; NEVER block or fail the line.
+          ( "$_sr_python" "$SCRIPT_DIR/party-stage-roster.py" \
+              --project-root "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" \
+              --session-suffix bmad-party-mode >/dev/null 2>&1 || true ) &
+        fi
+      fi
+    fi
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Per-agent profile reader — reads from project .agentvibes/bmad-voice-map.json (falls back to global)
 # Uses node for reliable JSON parsing (jq may not be installed)
 # Returns empty string if field not found or file missing
@@ -104,7 +154,7 @@ read_agent_profile_all() {
 
   # Validate agent_id format (prevent injection)
   if [[ ! "$agent_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "|||||"
+    echo "||||||"
     return
   fi
 
@@ -173,13 +223,24 @@ map_to_agent_id() {
 
 AGENT_ID=$(map_to_agent_id "$AGENT_NAME_OR_ID")
 
-# Get agent's voice and intro text
-AGENT_VOICE=""
-AGENT_INTRO=""
-if [[ -n "$AGENT_ID" ]] && [[ -f "$SCRIPT_DIR/bmad-voice-manager.sh" ]]; then
-  AGENT_VOICE=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-voice "$AGENT_ID" 2>/dev/null)
-  AGENT_INTRO=$(cd "$PROJECT_ROOT" && "$SCRIPT_DIR/bmad-voice-manager.sh" get-intro "$AGENT_ID" 2>/dev/null)
-fi
+# ---------------------------------------------------------------------------
+# Populate the per-agent profile (voice/pretext/reverb/personality/music) from
+# bmad-voice-map.json. THIS is the population step that a botched merge
+# (610af0f2) dropped, leaving $PROFILE_VOICE et al. below referenced-but-never-
+# -assigned — a fatal "unbound variable" under `set -u`. read_agent_profile_all()
+# already existed (defined above) but was never called; wire it in here.
+# Always initialize (even to "") so downstream references never crash, and a
+# missing/unknown agent just falls through to normal TTS below.
+PROFILE_VOICE=""
+PROFILE_PRETEXT=""
+PROFILE_REVERB=""
+PROFILE_PERSONALITY=""
+PROFILE_MUSIC_TRACK=""
+PROFILE_MUSIC_VOLUME=""
+PROFILE_MUSIC_ENABLED=""
+_PROFILE_ALL="$(read_agent_profile_all "${AGENT_ID:-}")"
+IFS='|' read -r PROFILE_VOICE PROFILE_PRETEXT PROFILE_REVERB PROFILE_PERSONALITY \
+  PROFILE_MUSIC_TRACK PROFILE_MUSIC_VOLUME PROFILE_MUSIC_ENABLED <<< "$_PROFILE_ALL"
 
 # Read global background music volume as fallback (stored as 0.0-1.0, convert to 0-100 integer)
 _BG_VOL_FILE="${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}/.claude/config/background-music-volume.txt"
@@ -271,10 +332,25 @@ trap 'rmdir "$SPEECH_LOCK" 2>/dev/null' EXIT
 # Speak with agent's voice, passing the temp profile path as arg 3 so
 # play-tts-piper.sh → audio-processor.sh can read per-agent music settings
 # without any env vars (safe for concurrent multi-project use).
+#
+# Declare voice provenance so the resolver never demotes a BMAD agent's own voice
+# to the per-LLM/default row (F-1). This must be set independently of whether a
+# TEMP_PROFILE file was created: a voice-only agent (no reverb/personality/music)
+# has an empty TEMP_PROFILE, so the arg-3 heuristic in play-tts.sh alone would
+# miss it. AGENT_VOICE is an agent-profile voice, always.
+export AGENTVIBES_VOICE_SOURCE="agent-profile"
+# Thread the real project dir through to play-tts.sh so any downstream forward
+# (SSH-remote / avatar) derives the correct routing session id from the user's
+# project — NOT the install/HOME basename. Only add the flag when the var is
+# non-empty so the no-project case is unchanged. Mirrors session-start-tts.sh.
+_PT_PROJECT_FLAG=()
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+  _PT_PROJECT_FLAG=(--project-dir "$CLAUDE_PROJECT_DIR")
+fi
 if [[ -n "$AGENT_VOICE" ]]; then
-  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" "$TEMP_PROFILE"
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "$AGENT_VOICE" "$TEMP_PROFILE" "${_PT_PROJECT_FLAG[@]+"${_PT_PROJECT_FLAG[@]}"}"
 else
-  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "" "$TEMP_PROFILE"
+  bash "$SCRIPT_DIR/play-tts.sh" "$FULL_TEXT" "" "$TEMP_PROFILE" "${_PT_PROJECT_FLAG[@]+"${_PT_PROJECT_FLAG[@]}"}"
 fi
 
 # Release lock

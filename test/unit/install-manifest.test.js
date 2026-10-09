@@ -156,15 +156,58 @@ describe('manifestSafeCopy', () => {
     assert.equal(result.hash, sha256('identical'));
   });
 
-  test('overwrites stock file (no manifest entry) when src differs, action=updated', async () => {
+  test('updates unmanifested file when src differs, action=updated', async () => {
     const src = await writeFile(tmp, 'src/stock.txt', 'v2 content');
     const dest = await writeFile(tmp, 'dest/stock.txt', 'v1 content');
 
-    const result = await manifestSafeCopy(src, dest, {}); // empty manifest = stock
+    const result = await manifestSafeCopy(src, dest, {}); // no manifest entry
 
     assert.equal(result.action, 'updated');
     const written = await fs.readFile(dest, 'utf8');
     assert.equal(written, 'v2 content');
+  });
+
+  // A file with no manifest entry may be a user's customized hook OR an older
+  // stock copy — indistinguishable. Overwriting it without a backup silently
+  // destroyed user customizations (e.g. a hook customized before manifests
+  // existed). We must never lose the bytes.
+  test('REGRESSION: unmanifested user-modified file is backed up before overwrite', async () => {
+    const src = await writeFile(tmp, 'src/hook.sh', 'new stock v2');
+    const dest = await writeFile(tmp, 'dest/hook.sh', 'MY PRECIOUS CUSTOMIZATION');
+
+    const result = await manifestSafeCopy(src, dest, {}); // no manifest entry
+
+    assert.equal(result.action, 'updated', 'update must still be delivered');
+    assert.equal(result.backedUp, true, 'result must report that a backup was taken');
+    assert.equal(await fs.readFile(dest, 'utf8'), 'new stock v2', 'update lands');
+    assert.equal(
+      await fs.readFile(dest + '.user.bak', 'utf8'),
+      'MY PRECIOUS CUSTOMIZATION',
+      'the user\'s content must survive in .user.bak — never silently destroyed'
+    );
+  });
+
+  test('REGRESSION: an existing .user.bak is never clobbered by a second backup', async () => {
+    const src = await writeFile(tmp, 'src/two.sh', 'stock v3');
+    const dest = await writeFile(tmp, 'dest/two.sh', 'customization B');
+    await writeFile(tmp, 'dest/two.sh.user.bak', 'customization A (older, precious)');
+
+    const result = await manifestSafeCopy(src, dest, {});
+
+    assert.equal(result.action, 'updated');
+    assert.equal(
+      await fs.readFile(dest + '.user.bak', 'utf8'),
+      'customization A (older, precious)',
+      'the pre-existing backup must survive untouched'
+    );
+    // customization B must also be recoverable, under a stamped name
+    const dir = await fs.readdir(path.dirname(dest));
+    const stamped = dir.filter(f => f.startsWith('two.sh.user.bak.'));
+    assert.equal(stamped.length, 1, 'the newer customization gets its own stamped backup');
+    assert.equal(
+      await fs.readFile(path.join(path.dirname(dest), stamped[0]), 'utf8'),
+      'customization B'
+    );
   });
 
   test('skips user-modified file when manifest hash differs from dest, action=skipped', async () => {
@@ -361,6 +404,71 @@ describe('updateGlobalHooks — manifest tracking and user preservation', () => 
 
     const manifest = await loadManifest(getGlobalManifestPath(fakeHome));
     assert.ok(Object.keys(manifest).length > 0, 'Global manifest must be written');
+  });
+
+  // The .sh CRITICAL_HOOKS are what git-bash executes on Windows too. Callers
+  // used to pass `.claude/hooks-windows` when isNativeWindows(), so every .sh
+  // lookup missed and was swallowed by the "src missing" catch — Windows global
+  // hooks silently never updated. Assert the .sh hooks actually land.
+  test('REGRESSION: every CRITICAL_HOOK (.sh) is installed into ~/.claude/hooks', async () => {
+    const home = await makeTmpDir();
+    try {
+      const srcHooksDir = path.join(PROJECT_ROOT, '.claude', 'hooks');
+      await updateGlobalHooks(srcHooksDir, home);
+
+      const destDir = path.join(home, '.claude', 'hooks');
+      const missing = [];
+      for (const hook of CRITICAL_HOOKS) {
+        // Only assert hooks that actually exist in the source tree.
+        const srcExists = await fs.access(path.join(srcHooksDir, hook)).then(() => true, () => false);
+        if (!srcExists) continue;
+        const landed = await fs.access(path.join(destDir, hook)).then(() => true, () => false);
+        if (!landed) missing.push(hook);
+      }
+      assert.deepEqual(missing, [], `CRITICAL_HOOKS not installed globally: ${missing.join(', ')}`);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('REGRESSION: a hooks-windows srcDir must not silently skip every .sh hook', async () => {
+    const home = await makeTmpDir();
+    try {
+      // Simulate the old bug's argument. updateGlobalHooks must not be the thing
+      // that makes this "work" — the CALLER must pass the unix dir. This test
+      // documents that passing the wrong dir installs nothing, which is exactly
+      // why the caller assertion below matters.
+      const wrongDir = path.join(PROJECT_ROOT, '.claude', 'hooks-windows');
+      await updateGlobalHooks(wrongDir, home);
+      const shLanded = await fs
+        .access(path.join(home, '.claude', 'hooks', 'play-tts.sh'))
+        .then(() => true, () => false);
+      assert.equal(shLanded, false, 'sanity: hooks-windows has no .sh — nothing lands');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('REGRESSION: installer passes the unix hooks dir to updateGlobalHooks', async () => {
+    // Guards the real defect at the call sites: they used
+    // `isNativeWindows() ? 'hooks-windows' : 'hooks'`, so on Windows every .sh
+    // CRITICAL_HOOK lookup missed and ~/.claude/hooks/*.sh never synced.
+    // NOTE: copyHookFiles() legitimately picks a platform subdir for the PROJECT
+    // dir — that is a different function and must not be caught here, which is
+    // why the global-hooks vars carry distinct names.
+    const src = await fs.readFile(path.join(PROJECT_ROOT, 'src', 'installer.js'), 'utf8');
+
+    const callArgs = [...src.matchAll(/await updateGlobalHooks\((\w+)[,)]/g)].map((m) => m[1]);
+    assert.ok(callArgs.length >= 2, `expected >=2 updateGlobalHooks call sites, found ${callArgs.length}`);
+
+    for (const varName of callArgs) {
+      const decl = new RegExp(`const ${varName}\\s*=\\s*path\\.join\\([^)]*?'hooks'\\s*\\)`);
+      assert.ok(
+        decl.test(src),
+        `${varName} passed to updateGlobalHooks must be declared as path.join(..., 'hooks') — ` +
+        'a platform-conditional subdir silently skips every .sh hook on Windows'
+      );
+    }
   });
 
   test('preserves user-modified global hook on second update', async () => {

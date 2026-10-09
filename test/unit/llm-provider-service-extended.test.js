@@ -736,7 +736,7 @@ describe('loadLlmConfigSync — backward-compatible old 6-field format', () => {
     const cfg = loadLlmConfigSync('nonexistent', targetDir);
     assert.equal(cfg.effects, '');
     assert.equal(cfg.bgTrack, '');
-    assert.equal(cfg.bgVolume, '0.15');
+    assert.equal(cfg.bgVolume, '0.20');
     assert.equal(cfg.voice, '');
     assert.equal(cfg.pretext, '');
     assert.equal(cfg.ttsEngine, '');
@@ -766,7 +766,7 @@ describe('loadLlmConfigSync — backward-compatible old 6-field format', () => {
     assert.equal(cfg.ttsEngine, 'piper');
   });
 
-  test('bgVolume defaults to 0.15 when field is empty', () => {
+  test('bgVolume defaults to 0.20 when field is empty', () => {
     targetDir = makeProjectDir();
     // field index 3 (bgVolume) must be an empty string (falsy) for the || default to apply.
     // Whitespace like '  ' is truthy and trims to '', so use a truly empty field instead.
@@ -775,7 +775,7 @@ describe('loadLlmConfigSync — backward-compatible old 6-field format', () => {
       'llm:hermes|light|||voice|pretext|piper\n'
     );
     const cfg = loadLlmConfigSync('hermes', targetDir);
-    assert.equal(cfg.bgVolume, '0.15', 'empty bgVolume must default to 0.15');
+    assert.equal(cfg.bgVolume, '0.20', 'empty bgVolume must default to 0.20 (never 0.15/0.70 — see AVI-S8.4)');
   });
 
   test('returns sourcePath pointing to the file that was read', () => {

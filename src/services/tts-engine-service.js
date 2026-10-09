@@ -53,6 +53,22 @@ export function getAvailableEngines() {
   return TTS_ENGINES.filter(e => !e.platform || e.platform === process.platform);
 }
 
+/** Is this engine runnable on the current OS? (Native engines are platform-bound.) */
+export function isEngineSupported(engineId) {
+  const e = TTS_ENGINES.find(x => x.id === engineId);
+  return !!e && (!e.platform || e.platform === process.platform);
+}
+
+/**
+ * Every engine, each tagged with `supported` for the current platform. Unlike
+ * getAvailableEngines() (which hides off-platform engines), this lists them all
+ * so the picker can show e.g. Windows SAPI greyed "(Not supported)" on Linux
+ * instead of appearing to be missing.
+ */
+export function getAllEngines() {
+  return TTS_ENGINES.map(e => ({ ...e, supported: !e.platform || e.platform === process.platform }));
+}
+
 export function checkEngineInstalled(engineId) {
   const engine = TTS_ENGINES.find(e => e.id === engineId);
   if (!engine) return false;
@@ -108,6 +124,19 @@ export function checkEngineInstalled(engineId) {
     }
   }
   return false;
+}
+
+/**
+ * Map a picker engine id to the provider name the SSH-remote sender + receiver
+ * understand. play-tts-ssh-remote.sh validates
+ * piper|soprano|macos|windows-sapi|kokoro|elevenlabs, but the picker/config use
+ * 'sapi' and 'macos-say'. This is the single translation point.
+ * @param {string} engineId
+ * @returns {string} receiver/sender provider name
+ */
+const RECEIVER_PROVIDER_MAP = { sapi: 'windows-sapi', 'macos-say': 'macos' };
+export function receiverProviderId(engineId) {
+  return RECEIVER_PROVIDER_MAP[engineId] || engineId;
 }
 
 export function getEngineStatuses() {

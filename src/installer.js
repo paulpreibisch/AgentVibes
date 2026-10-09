@@ -141,6 +141,33 @@ async function saveManifest(manifestPath, files) {
 //   • dest hash == manifest hash       → copy  (action: 'updated')
 //   • dest hash != manifest hash       → skip  (action: 'skipped', .user.bak saved)
 //   • no manifest entry yet            → copy  (action: 'updated')
+// Preserve destPath's CURRENT content in a sidecar backup before anything
+// overwrites it. Never clobbers an existing .user.bak — that backup may hold the
+// only surviving copy of an earlier customization; a second backup gets a
+// content-stamped name instead. Returns true only when the current content is
+// safely stored somewhere, so callers can refuse to overwrite when it isn't.
+async function backupUserFile(destPath) {
+  const bak = `${destPath}.user.bak`;
+  try {
+    const currentHash = await computeFileHash(destPath);
+    if (!currentHash) return false;
+
+    const existingHash = await computeFileHash(bak);
+    if (existingHash === currentHash) return true; // already backed up
+
+    if (existingHash) {
+      // A different backup exists — keep it and stamp this one.
+      await fs.copyFile(destPath, `${destPath}.user.bak.${currentHash.slice(0, 8)}`);
+      return true;
+    }
+
+    await fs.copyFile(destPath, bak);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function manifestSafeCopy(srcPath, destPath, manifest) {
   const srcHash = await computeFileHash(srcPath);
   if (!srcHash) return { action: 'skipped', hash: null }; // src missing
@@ -157,15 +184,29 @@ async function manifestSafeCopy(srcPath, destPath, manifest) {
   }
 
   const manifestHash = manifest[destPath]?.hash;
-  if (manifestHash && destHash !== manifestHash) {
-    // User modified the file since we last installed it — preserve it
-    try { await fs.copyFile(destPath, destPath + '.user.bak'); } catch { /* best effort */ }
-    return { action: 'skipped', hash: destHash };
+
+  if (manifestHash) {
+    if (destHash !== manifestHash) {
+      // User modified the file since we last installed it — preserve it
+      await backupUserFile(destPath);
+      return { action: 'skipped', hash: destHash };
+    }
+    // Byte-identical to what we last installed — untouched, ours to update
+    await fs.copyFile(srcPath, destPath);
+    return { action: 'updated', hash: srcHash };
   }
 
-  // Stock file (or no manifest entry yet) — safe to overwrite
+  // No manifest entry, and dest differs from what we ship. This is either a
+  // user's customized file or an older stock copy predating the manifest — the
+  // two are indistinguishable, so we must assume it could be a customization.
+  // Back it up before overwriting, and if the backup can't be secured, refuse
+  // to overwrite at all rather than destroy the only copy.
+  // (CLAUDE.md: never overwrite existing user .claude/ config.)
+  if (!(await backupUserFile(destPath))) {
+    return { action: 'skipped', hash: destHash };
+  }
   await fs.copyFile(srcPath, destPath);
-  return { action: 'updated', hash: srcHash };
+  return { action: 'updated', hash: srcHash, backedUp: true };
 }
 
 // Delete only the files listed in manifest that reside under baseDir.
@@ -2833,7 +2874,7 @@ async function collectConfiguration(options = {}) {
     // Navigation with page titles
     const navChoices = [];
     if (currentPage < totalPages - 1) {
-      const nextPageTitle = getPageTitle(currentPage + 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      const nextPageTitle = getPageTitle(currentPage + 1).replace(/(?:🔧|🎙️|🎤|😎|💧|🔊)\s*/u, ''); // Remove emoji (alternation: 🎙️ is a combined char)
       navChoices.push({ name: chalk.green('Next →') + chalk.gray(` (${nextPageTitle})`), value: 'next' });
     } else {
       navChoices.push({ name: chalk.cyan('✓ Continue to Installation'), value: 'continue' });
@@ -2843,7 +2884,7 @@ async function collectConfiguration(options = {}) {
     if (currentPage === 0) {
       navChoices.push({ name: chalk.magentaBright('← Back to Welcome'), value: 'back' });
     } else {
-      const prevPageTitle = getPageTitle(currentPage - 1).replace(/[🔧🎙️🎤😎💧🔊]\s*/, ''); // Remove emoji
+      const prevPageTitle = getPageTitle(currentPage - 1).replace(/(?:🔧|🎙️|🎤|😎|💧|🔊)\s*/u, ''); // Remove emoji (alternation: 🎙️ is a combined char)
       navChoices.push({ name: chalk.magentaBright('← Previous') + chalk.gray(` (${prevPageTitle})`), value: 'prev' });
     }
 
@@ -3151,16 +3192,40 @@ function execScript(scriptPath, options = {}) {
   const scriptFile = parts[0];
   const args = parts.slice(1);
 
-  // Validate that the script file doesn't contain shell metacharacters
-  if (scriptFile.match(/[;&|`$(){}[\]<>'"\\]/)) {
+  // Validate that the script file doesn't contain shell metacharacters.
+  // NOTE: `\` and `:` are deliberately NOT in this class — the script is run via
+  // execFileSync(..., { shell: false }) at the bottom of this function, so the
+  // path never reaches a shell and backslashes are not a metacharacter. Rejecting
+  // `\` made EVERY Windows path ("C:\Users\...") throw before the directory check
+  // was even reached. The real control is the allow-list below.
+  if (scriptFile.match(/[;&|`$(){}[\]<>'"]/)) {
     throw new Error('Invalid characters in script path');
   }
 
-  // Validate path is within expected directory (defense in depth)
+  // Validate the path is under a directory we're willing to execute from.
+  //
+  // This used to allow ONLY the *package's own* .claude/hooks. But every install
+  // caller passes a path under the TARGET project (targetDir/.claude/hooks/...),
+  // and under npx/global installs the package dir is never the target dir — so
+  // the check threw for every real user. The throw was swallowed by each caller's
+  // catch and surfaced as "Piper installation failed or was cancelled" / "Voice
+  // download failed", blaming the script for something we never ran. It only
+  // worked in a linked dev checkout, where package === target. Callers now pass
+  // the base they legitimately execute from.
+  const pkgRoot = path.resolve(__dirname, '..');
+  const allowedDirs = [
+    path.join(pkgRoot, '.claude', 'hooks'),
+    path.join(pkgRoot, 'bin'),
+    ...(options.allowedDirs || []).map((d) => path.resolve(d)),
+  ];
   const resolvedPath = path.resolve(scriptFile);
-  const allowedDir = path.resolve(__dirname, '..', '.claude', 'hooks');
-  if (!resolvedPath.startsWith(allowedDir + path.sep) && resolvedPath !== allowedDir) {
-    throw new Error('Script path outside allowed directory');
+  const permitted = allowedDirs.some(
+    (dir) => resolvedPath === dir || resolvedPath.startsWith(dir + path.sep)
+  );
+  if (!permitted) {
+    throw new Error(
+      `Script path outside allowed directories: ${resolvedPath}\n  allowed: ${allowedDirs.join(', ')}`
+    );
   }
 
   // Security: Validate shell and shellConfig don't contain dangerous characters
@@ -3192,8 +3257,10 @@ function execScript(scriptPath, options = {}) {
   // Note: This means shell aliases/functions won't be available, but that's safer
   // S8701: scriptFile is validated to live under .claude/hooks (above), args are
   // passed as an array and shell:false disables shell interpretation. Risk handled.
+  // allowedDirs is ours, not execFileSync's — strip it before handing options on.
+  const { allowedDirs: _ignored, ...execOptions } = options;
   return execFileSync(scriptFile, args, { // NOSONAR
-    ...options,
+    ...execOptions,
     shell: false  // Don't use shell to avoid injection risks
   });
 }
@@ -3593,14 +3660,17 @@ async function copyCommandFiles(targetDir, spinner) {
  */
 function shouldIncludeHookFile(file, stat) {
   if (isNativeWindows()) {
-    // Include .ps1 scripts, .py helpers, and hooks.json; exclude dotfiles and prepare-release
+    // Include .ps1 scripts, .py helpers, hooks.json, and the generated
+    // provider-catalog.json; exclude dotfiles and prepare-release
     return stat.isFile() &&
-           (file.endsWith('.ps1') || file.endsWith('.py') || file === 'hooks.json') &&
+           (file.endsWith('.ps1') || file.endsWith('.py') || file === 'hooks.json' ||
+            file === 'provider-catalog.json') &&
            !file.includes('prepare-release') &&
            !file.startsWith('.');
   }
   return stat.isFile() &&
-         (file.endsWith('.sh') || file.endsWith('.py') || file === 'hooks.json') &&
+         (file.endsWith('.sh') || file.endsWith('.py') || file === 'hooks.json' ||
+          file === 'provider-catalog.json') &&
          !file.includes('prepare-release') &&
          !file.startsWith('.');
 }
@@ -4128,32 +4198,40 @@ async function copyCodexFiles(targetDir, spinner) {
   const srcCodexDir = path.join(__dirname, '..', '.codex');
   const destCodexDir = path.join(targetDir, '.codex');
 
+  const codexManifestPath = getProjectManifestPath(targetDir);
+  const codexManifest = await loadManifest(codexManifestPath);
+  const codexManifestUpdates = { ...codexManifest };
+
   let copiedFiles = [];
   try {
     await fs.mkdir(destCodexDir, { recursive: true });
     await fs.mkdir(path.join(destCodexDir, 'hooks'), { recursive: true });
 
-    // Copy AGENTS.md
-    const agentsSrc = path.join(srcCodexDir, 'AGENTS.md');
-    try {
-      const content = await fs.readFile(agentsSrc, 'utf8');
-      await fs.writeFile(path.join(destCodexDir, 'AGENTS.md'), content);
-      copiedFiles.push('.codex/AGENTS.md');
-    } catch { /* source not found */ }
+    // Non-Destructive Configuration Rule: a user-edited AGENTS.md or Codex hook
+    // must survive re-install/update. manifestSafeCopy skips (and .user.bak's) a
+    // file the user changed instead of rewriting it from the template every run.
+    const codexTargets = [
+      { src: path.join(srcCodexDir, 'AGENTS.md'), dest: path.join(destCodexDir, 'AGENTS.md'), label: '.codex/AGENTS.md', exec: false },
+      { src: path.join(srcCodexDir, 'hooks', 'init-agentvibes.sh'), dest: path.join(destCodexDir, 'hooks', 'init-agentvibes.sh'), label: '.codex/hooks/init-agentvibes.sh', exec: true },
+      { src: path.join(srcCodexDir, 'hooks', 'init-agentvibes.ps1'), dest: path.join(destCodexDir, 'hooks', 'init-agentvibes.ps1'), label: '.codex/hooks/init-agentvibes.ps1', exec: false },
+    ];
 
-    // Copy hook scripts
-    for (const hookFile of ['init-agentvibes.sh', 'init-agentvibes.ps1']) {
-      const hookSrc = path.join(srcCodexDir, 'hooks', hookFile);
+    for (const { src, dest, label, exec } of codexTargets) {
       try {
-        const content = await fs.readFile(hookSrc, 'utf8');
-        const destPath = path.join(destCodexDir, 'hooks', hookFile);
-        await fs.writeFile(destPath, content);
-        if (hookFile.endsWith('.sh')) {
-          try { await fs.chmod(destPath, 0o750); } catch { /* Windows */ }
+        const result = await manifestSafeCopy(src, dest, codexManifest);
+        // src missing → nothing copied and nothing at dest; only such a skip has no hash.
+        if (result.action === 'skipped' && !result.hash) continue;
+        if (exec && result.action !== 'unchanged') {
+          try { await fs.chmod(dest, 0o750); } catch { /* Windows */ }
         }
-        copiedFiles.push(`.codex/hooks/${hookFile}`);
+        if (result.hash && result.action !== 'skipped') {
+          codexManifestUpdates[dest] = { hash: result.hash, installedAt: new Date().toISOString() };
+        }
+        copiedFiles.push(label);
       } catch { /* source not found */ }
     }
+
+    await saveManifest(codexManifestPath, codexManifestUpdates).catch(() => { /* best effort */ });
 
     if (copiedFiles.length > 0) {
       spinner.succeed(chalk.green(`Installed ${copiedFiles.length} Codex file${copiedFiles.length === 1 ? '' : 's'}!\n`));
@@ -4176,6 +4254,52 @@ async function copyCodexFiles(targetDir, spinner) {
  * @param {string} targetDir - Target installation directory
  * @param {Object} spinner - Ora spinner instance
  */
+/**
+ * Safely read a JSON settings file that is about to be modified in place.
+ *
+ * Non-Destructive Configuration Rule: a corrupt settings.json (e.g. one stray
+ * trailing comma) must NEVER be silently overwritten — doing so wipes all of the
+ * user's real settings. This helper distinguishes three cases so callers can
+ * skip-and-warn on corruption instead of clobbering:
+ *   - missing / empty  -> { exists:false, corrupt:false } (safe to create fresh)
+ *   - present + valid   -> { exists:true,  corrupt:false, data }
+ *   - present + invalid -> { exists:true,  corrupt:true }  (caller must NOT write)
+ * @param {string} filePath
+ * @returns {Promise<{exists:boolean, corrupt:boolean, data:object}>}
+ */
+async function readJsonConfigSafe(filePath) {
+  let raw;
+  try {
+    raw = await fs.readFile(filePath, 'utf8');
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return { exists: false, corrupt: false, data: {} };
+    // Unreadable for another reason (permissions, etc.) — treat as present+corrupt
+    // so we never overwrite a file we could not fully read.
+    return { exists: true, corrupt: true, data: {} };
+  }
+  if (raw.trim() === '') return { exists: false, corrupt: false, data: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { exists: true, corrupt: true, data: {} };
+    }
+    return { exists: true, corrupt: false, data: parsed };
+  } catch {
+    return { exists: true, corrupt: true, data: {} };
+  }
+}
+
+/**
+ * Best-effort backup of a config file before mutating it. Writes `<file>.bak`.
+ * A backup failure is non-fatal (callers only mutate files that parsed cleanly).
+ * @param {string} filePath
+ */
+async function backupConfigFile(filePath) {
+  try {
+    await fs.copyFile(filePath, filePath + '.bak');
+  } catch { /* best-effort backup — never block the install on this */ }
+}
+
 async function configureSessionStartHook(targetDir, spinner) {
   spinner = createRobustSpinner(spinner);
   spinner.start('Configuring AgentVibes hook for automatic TTS...');
@@ -4184,13 +4308,15 @@ async function configureSessionStartHook(targetDir, spinner) {
   const templateSettingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
 
   try {
-    let existingSettings = {};
-    try {
-      const existingContent = await fs.readFile(settingsPath, 'utf8');
-      existingSettings = JSON.parse(existingContent);
-    } catch {
-      // File doesn't exist or is invalid - use template
+    const existing = await readJsonConfigSafe(settingsPath);
+    if (existing.corrupt) {
+      spinner.warn(chalk.yellow(
+        `settings.json at ${settingsPath} is not valid JSON — leaving it untouched to avoid data loss.\n` +
+        `   Fix the file manually and re-run to enable the AgentVibes hook.\n`
+      ));
+      return;
     }
+    const existingSettings = existing.data;
 
     const templateContent = await fs.readFile(templateSettingsPath, 'utf8');
     const templateSettings = JSON.parse(templateContent);
@@ -4216,6 +4342,7 @@ async function configureSessionStartHook(targetDir, spinner) {
         existingSettings.$schema = templateSettings.$schema;
       }
 
+      if (existing.exists) await backupConfigFile(settingsPath);
       await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2));
       spinner.succeed(chalk.green('SessionStart hook configured!\n'));
     } else {
@@ -4248,11 +4375,23 @@ async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
     const srcScript = path.join(__dirname, '..', '.claude', hooksSubdir, scriptName);
     const destScript = path.join(globalHooksDir, scriptName);
 
-    // Copy script to global hooks dir (create dir if needed)
+    // Copy script to global hooks dir (create dir if needed). Non-Destructive
+    // Configuration Rule: a user-modified bmad-party-speak script must survive an
+    // update, so go through manifestSafeCopy (which .user.bak's and skips a file
+    // the user changed) instead of an unconditional overwrite. The sibling
+    // updateGlobalHooks path for this same file is already manifest-guarded.
     await fs.mkdir(globalHooksDir, { recursive: true });
-    await fs.copyFile(srcScript, destScript);
-    if (!isNativeWindows()) {
-      await fs.chmod(destScript, 0o750);
+    const scriptManifestPath = getGlobalManifestPath(homeDir);
+    const scriptManifest = await loadManifest(scriptManifestPath);
+    const scriptCopy = await manifestSafeCopy(srcScript, destScript, scriptManifest);
+    if (scriptCopy.action !== 'skipped') {
+      if (!isNativeWindows() && scriptCopy.action !== 'unchanged') {
+        await fs.chmod(destScript, 0o750);
+      }
+      if (scriptCopy.hash) {
+        scriptManifest[destScript] = { hash: scriptCopy.hash, installedAt: new Date().toISOString() };
+        await saveManifest(scriptManifestPath, scriptManifest).catch(() => { /* best effort */ });
+      }
     }
 
     // Build the PostToolUse hook command
@@ -4260,14 +4399,17 @@ async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
       ? `powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\\.claude\\hooks-windows\\bmad-party-speak.ps1"`
       : `bash "$HOME/.claude/hooks/bmad-party-speak.sh"`;
 
-    // Read/create global settings.json
-    let settings = {};
-    try {
-      const content = await fs.readFile(globalSettingsPath, 'utf8');
-      settings = JSON.parse(content);
-    } catch {
-      // File missing or invalid — start fresh
+    // Read/create global settings.json — never overwrite a corrupt file (would
+    // wipe the user's real global settings).
+    const existingGlobal = await readJsonConfigSafe(globalSettingsPath);
+    if (existingGlobal.corrupt) {
+      spinner.warn(chalk.yellow(
+        `Global settings.json at ${globalSettingsPath} is not valid JSON — leaving it untouched.\n` +
+        `   Fix it manually and re-run to enable party mode TTS.\n`
+      ));
+      return;
     }
+    let settings = existingGlobal.data;
 
     if (!settings.hooks) settings.hooks = {};
 
@@ -4286,6 +4428,7 @@ async function configurePartyModeHook(targetDir, spinner, homeDirOverride) {
       settings.hooks.PostToolUse.push({
         hooks: [{ type: 'command', command: hookCommand }]
       });
+      if (existingGlobal.exists) await backupConfigFile(globalSettingsPath);
       await fs.writeFile(globalSettingsPath, JSON.stringify(settings, null, 2));
       spinner.succeed(chalk.green('BMAD party mode TTS hook configured!\n'));
     } else {
@@ -4383,7 +4526,8 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
   try {
     execScript(`${piperDownloadPath} --libritts --yes`, {
       stdio: 'inherit',
-      env: process.env
+      env: process.env,
+      allowedDirs: [path.dirname(piperDownloadPath)]
     });
     console.log(chalk.green('\n✅ LibriTTS voices downloaded! Browse with /agent-vibes:list\n'));
   } catch {
@@ -4434,7 +4578,8 @@ async function checkAndInstallPiper(targetDir, options) {
         if (fsSync.existsSync(piperDownloadPath)) {
           execScript(`${piperDownloadPath} --yes`, {
             stdio: options.silent ? 'pipe' : 'inherit',
-            env: process.env
+            env: process.env,
+            allowedDirs: [path.dirname(piperDownloadPath)]
           });
           console.log(chalk.green('\n✅ Voice models downloaded successfully!\n'));
         } else {
@@ -4479,7 +4624,8 @@ async function checkAndInstallPiper(targetDir, options) {
         try {
           execScript(`${piperInstallerPath} --non-interactive`, {
             stdio: options.silent ? 'pipe' : 'inherit',
-            env: process.env
+            env: process.env,
+            allowedDirs: [path.dirname(piperInstallerPath)]
           });
           console.log(chalk.green('\n✅ Piper TTS installed successfully!\n'));
         } catch (error) {
@@ -5296,8 +5442,13 @@ async function updateCommandFiles(targetDir, spinner) {
  * These hooks contain bug fixes (e.g. markdown stripping) that must propagate
  * on every `npx agentvibes update` regardless of target directory.
  */
-const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'play-tts-piper.sh', 'audio-processor.sh', 'session-start-tts.sh', 'bmad-party-speak.sh'];
-const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1', 'tts-watcher.ps1'];
+// agentvibes-session-id.{sh,ps1} are listed because play-tts.{sh,ps1} SHELL OUT to
+// them to expand a {{session}} pretext. They were absent here, so on a global
+// install the global-update path never shipped them and the self-ID silently
+// degraded to an empty string forever — the callers fail soft by design, so the
+// omission produced no error, just a feature that never worked.
+const CRITICAL_HOOKS = ['stop-tts.sh', 'stop.sh', 'play-tts.sh', 'play-tts-piper.sh', 'audio-processor.sh', 'session-start-tts.sh', 'bmad-party-speak.sh', 'agentvibes-session-id.sh'];
+const CRITICAL_HOOKS_WINDOWS = ['play-tts.ps1', 'play-tts-piper.ps1', 'audio-processor.ps1', 'session-start-tts.ps1', 'bmad-speak.ps1', 'bmad-party-speak.ps1', 'tts-watcher.ps1', 'agentvibes-session-id.ps1'];
 
 /**
  * Update critical hooks in the global ~/.claude/hooks/ directory if it exists.
@@ -5357,6 +5508,124 @@ async function updateGlobalHooks(srcHooksDir, homeDirOverride) {
 }
 
 /**
+ * Story AVI-S8.5 (Stage 2 packaging) — ship the utterance resolver bundle
+ * (bin/resolve-utterance.js + src/services/{utterance-resolver,utterance-loader}.js)
+ * into a target `.claude` tree so the play-tts hooks can find it.
+ *
+ * Layout (F-5): a SELF-CONTAINED bundle dir `<claudeDir>/agentvibes-resolver/`:
+ *     agentvibes-resolver/
+ *       package.json                     -> {"type":"module"}
+ *       bin/resolve-utterance.js
+ *       src/services/utterance-resolver.js
+ *       src/services/utterance-loader.js
+ * The bundle's OWN package.json declares ESM, so `node resolve-utterance.js`
+ * works on EVERY Node version (the CLI uses `import`; without this, Node < 22.7
+ * treats the copied .js as CommonJS and the import throws → players silently fall
+ * back to legacy forever). It lives in a dedicated dir, NOT in `<claudeDir>/hooks/`,
+ * so it can't change the module type of any user-owned `.js` hook. The players
+ * probe `$SCRIPT_DIR/../agentvibes-resolver/bin/resolve-utterance.js`; its
+ * `../src/services/...` imports resolve inside the bundle dir.
+ *
+ * This is AgentVibes-owned code — same class as the hook scripts themselves —
+ * so copy/overwrite on update is correct. manifestSafeCopy still refuses to
+ * clobber a user-modified copy (saves a .user.bak) and running this twice is
+ * a no-op on the second pass (Non-Destructive Configuration Rule).
+ *
+ * @param {string} claudeDir - Absolute path to the target `.claude` directory
+ * @param {Object} manifest - Loaded manifest (hash lookups for safe-copy decisions)
+ * @param {Object} manifestUpdates - Mutated in place with new hash entries
+ * @returns {Promise<number>} Count of files actually copied/updated this run
+ */
+async function copyResolverBundleTo(claudeDir, manifest, manifestUpdates) {
+  const pkgRoot = path.join(__dirname, '..');
+  const bundleDir = path.join(claudeDir, 'agentvibes-resolver');
+  const srcBin = path.join(pkgRoot, 'bin', 'resolve-utterance.js');
+  const srcResolver = path.join(pkgRoot, 'src', 'services', 'utterance-resolver.js');
+  const srcLoader = path.join(pkgRoot, 'src', 'services', 'utterance-loader.js');
+
+  const targets = [
+    { src: srcBin, dest: path.join(bundleDir, 'bin', 'resolve-utterance.js') },
+    { src: srcResolver, dest: path.join(bundleDir, 'src', 'services', 'utterance-resolver.js') },
+    { src: srcLoader, dest: path.join(bundleDir, 'src', 'services', 'utterance-loader.js') },
+  ];
+
+  let count = 0;
+  for (const { src, dest } of targets) {
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    try {
+      const result = await manifestSafeCopy(src, dest, manifest);
+      if (result.action !== 'skipped') {
+        if (result.hash) manifestUpdates[dest] = { hash: result.hash, installedAt: new Date().toISOString() };
+        if (result.action !== 'unchanged') count++;
+      }
+    } catch {
+      // src missing (e.g. stripped package) — skip silently, players fall back to legacy
+    }
+  }
+
+  // The ESM marker — a fixed one-liner (not copied from a src file). Write it
+  // only if absent or different, so a second run is a no-op.
+  try {
+    const pkgJsonPath = path.join(bundleDir, 'package.json');
+    const desired = JSON.stringify({ type: 'module', private: true, name: 'agentvibes-resolver-bundle' }, null, 2) + '\n';
+    let existing = null;
+    try { existing = await fs.readFile(pkgJsonPath, 'utf8'); } catch { /* absent */ }
+    if (existing !== desired) {
+      await fs.mkdir(bundleDir, { recursive: true });
+      await fs.writeFile(pkgJsonPath, desired);
+      count++;
+    }
+  } catch {
+    // best-effort — if this fails the players fall back to legacy, never break
+  }
+  return count;
+}
+
+/**
+ * Install/update the resolver bundle into a project-local (or explicitly
+ * targeted) `.claude` directory. Mirrors copyHookFiles' manifest handling.
+ * @param {string} targetDir - Target installation directory (parent of .claude/)
+ * @param {Object} spinner - Ora spinner instance
+ * @returns {Promise<{count: number}>} Count of files copied/updated
+ */
+async function copyResolverBundle(targetDir, spinner) {
+  spinner = createRobustSpinner(spinner);
+  spinner.start('Installing utterance resolver bundle...');
+  const claudeDir = path.join(targetDir, '.claude');
+  const manifestPath = getProjectManifestPath(targetDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = {};
+
+  const count = await copyResolverBundleTo(claudeDir, manifest, manifestUpdates);
+
+  if (Object.keys(manifestUpdates).length > 0) {
+    await saveManifest(manifestPath, { ...manifest, ...manifestUpdates }).catch(() => { /* best effort */ });
+  }
+  spinner.succeed(chalk.green('Installed utterance resolver bundle!\n'));
+  return { count };
+}
+
+/**
+ * Keep the resolver bundle up to date in the global ~/.claude/ tree on every
+ * `npx agentvibes update`, regardless of targetDir — mirrors updateGlobalHooks()
+ * since most real installs point their hooks at $HOME, not a project dir.
+ * @param {string} [homeDirOverride] - Override home dir (for testing only)
+ * @returns {Promise<number>} Count of files copied/updated
+ */
+async function updateGlobalResolverBundle(homeDirOverride) {
+  const homeDir = homeDirOverride || os.homedir();
+  const claudeDir = path.join(homeDir, '.claude');
+  const manifestPath = getGlobalManifestPath(homeDir);
+  const manifest = await loadManifest(manifestPath);
+  const manifestUpdates = { ...manifest };
+
+  const count = await copyResolverBundleTo(claudeDir, manifest, manifestUpdates);
+
+  await saveManifest(manifestPath, manifestUpdates).catch(() => { /* best effort */ });
+  return count;
+}
+
+/**
  * Restart the AgentVibes TTS queue watcher on Windows after an update.
  * Only runs if the watcher is already installed (~/.agentvibes/tts-watcher.ps1 exists),
  * meaning the user previously ran setup-ssh-receiver.ps1.  Silently skips for users
@@ -5378,7 +5647,9 @@ async function restartWatcherIfInstalled(homeDirOverride) {
     return false;
   }
 
-  const { spawnSync, spawn } = require('child_process');
+  // spawn/spawnSync come from the top-level ESM import (line 48). A require()
+  // here throws "require is not defined" in this "type":"module" package and
+  // aborted `agentvibes update` mid-run for every SSH-receiver user.
 
   // Kill old watcher — use array args to avoid quoting issues
   spawnSync('powershell.exe', [ // NOSONAR
@@ -5427,12 +5698,28 @@ async function performUpdateOperations(targetDir, spinner) {
   const hookResult = await copyHookFiles(targetDir, silentSpinner);
   console.log(chalk.green(`✓ Updated ${hookResult.count} TTS scripts`));
 
-  // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs)
-  const hooksSubdir = isNativeWindows() ? 'hooks-windows' : 'hooks';
-  const srcHooksDir = path.join(__dirname, '..', '.claude', hooksSubdir);
-  const globalHooksUpdated = await updateGlobalHooks(srcHooksDir);
+  // Update the utterance resolver bundle alongside the hooks it feeds (AVI-S8.5 Stage 2)
+  const resolverResult = await copyResolverBundle(targetDir, silentSpinner);
+  if (resolverResult.count > 0) {
+    console.log(chalk.green(`✓ Updated ${resolverResult.count} resolver bundle files`));
+  }
+
+  // Also update critical hooks in global ~/.claude/hooks/ if present (fixes stale installs).
+  // ALWAYS pass the unix hooks dir: updateGlobalHooks copies CRITICAL_HOOKS (all .sh)
+  // from here and derives hooks-windows itself for CRITICAL_HOOKS_WINDOWS. Passing
+  // hooks-windows on Windows made every .sh lookup miss and hit the "src missing"
+  // catch, so ~/.claude/hooks/*.sh — which git-bash hooks actually execute on
+  // Windows — silently never updated (installs stayed frozen at their first version).
+  const srcGlobalHooksDir = path.join(__dirname, '..', '.claude', 'hooks');
+  const globalHooksUpdated = await updateGlobalHooks(srcGlobalHooksDir);
   if (globalHooksUpdated > 0) {
     console.log(chalk.green(`✓ Updated ${globalHooksUpdated} critical scripts in ~/.claude/hooks/`));
+  }
+
+  // Keep the global ~/.claude/ resolver bundle current too (mirrors updateGlobalHooks)
+  const globalResolverUpdated = await updateGlobalResolverBundle();
+  if (globalResolverUpdated > 0) {
+    console.log(chalk.green(`✓ Updated ${globalResolverUpdated} resolver bundle files in ~/.claude/`));
   }
 
   // On Windows: restart the TTS queue watcher if it was previously installed via
@@ -5482,6 +5769,16 @@ async function performUpdateOperations(targetDir, spinner) {
   // Detect and migrate old configuration
   spinner.text = 'Checking for old configuration...';
   await detectAndMigrateOldConfig(targetDir, spinner);
+
+  // Upgrade safety for the new opt-in injection gate (session-start-tts.sh):
+  // a project that was already installed and talking pre-gate has no marker, so
+  // the gate would newly silence it. Backfill the enable marker for a PROJECT
+  // update so existing users keep their audio. A GLOBAL (home-dir) update stays
+  // opt-in — and we say so, otherwise the user's voice just stops with no clue.
+  if ((await configureInjectionScope(targetDir)) === 'global') {
+    console.log('');
+    warnGlobalInjectionScope();
+  }
 
   return {
     commandCount,
@@ -5534,6 +5831,61 @@ async function updateAgentVibes(targetDir, options) {
     console.error(chalk.red('\n❌ Error:'), error.message);
     process.exit(1);
   }
+}
+
+/**
+ * Configure the session-start injection opt-in marker for this install/update.
+ *
+ * - PROJECT install → drop `.claude/agentvibes-enabled` so session-start-tts.sh
+ *   injects the TTS protocol for THIS project (and only this one), preserving the
+ *   "install in a project and it just works" experience.
+ * - GLOBAL install (target === home dir) → write nothing; injecting into every
+ *   session is exactly the "cacophony of agents" we are preventing.
+ *
+ * Uses `agentvibes-enabled`, NOT `agentvibes-unmuted`, on purpose: the unmuted
+ * marker OVERRIDES a global mute in play-tts.sh, so writing it here would let an
+ * install/update silently defeat a user's `~/.agentvibes-muted` kill-switch.
+ * Non-destructive: never touches an existing mute/unmute/enabled choice.
+ *
+ * @param {string} targetDir - install target
+ * @returns {Promise<'global'|'enabled'|'kept'|'error'>} what happened (for messaging)
+ */
+async function configureInjectionScope(targetDir) {
+  try {
+    // path.relative is case-insensitive on win32 and normalizes separators, so a
+    // lowercase drive letter or trailing slash no longer misdetects a home
+    // install; realpath (best-effort) also collapses a symlinked $HOME.
+    let resolvedTarget = path.resolve(targetDir);
+    let resolvedHome = path.resolve(os.homedir());
+    try { resolvedTarget = fsSync.realpathSync.native(resolvedTarget); } catch { /* dir may not exist yet */ }
+    try { resolvedHome = fsSync.realpathSync.native(resolvedHome); } catch { /* ignore */ }
+    if (path.relative(resolvedHome, resolvedTarget) === '') return 'global';
+
+    const claudeDir = path.join(targetDir, '.claude');
+    // Respect any prior explicit choice — enabled OR either mute/unmute marker.
+    for (const m of ['agentvibes-enabled', 'agentvibes-unmuted', 'agentvibes-muted']) {
+      if (await fs.access(path.join(claudeDir, m)).then(() => true).catch(() => false)) {
+        return 'kept';
+      }
+    }
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.writeFile(path.join(claudeDir, 'agentvibes-enabled'), '', 'utf8');
+    return 'enabled';
+  } catch (err) {
+    // Never fail install/update over the marker, but don't swallow silently —
+    // a read-only FS here would otherwise produce a mysterious "silent" project.
+    console.log(chalk.gray(`   (Could not set TTS injection marker: ${err.code || err.message}. Run /agent-vibes:unmute to enable.)`));
+    return 'error';
+  }
+}
+
+// Print the "global install stays silent" guidance (shared by install + update).
+function warnGlobalInjectionScope() {
+  console.log(chalk.yellow.bold('  ⚠  Global install detected (installed at your home directory)'));
+  console.log(chalk.gray('     TTS stays OFF by default so it will NOT talk in every session at once.'));
+  console.log(chalk.gray('     Enable it in a specific project with:  ') + chalk.cyan('/agent-vibes:unmute'));
+  console.log(chalk.gray('     (or re-run the installer inside a project folder, not your home dir).'));
+  console.log('');
 }
 
 // Installation function
@@ -5648,6 +6000,7 @@ async function install(options = {}) {
     // Copy all files silently
     await copyCommandFiles(targetDir, silentSpinner);
     await copyHookFiles(targetDir, silentSpinner);
+    await copyResolverBundle(targetDir, silentSpinner);
     await copyPersonalityFiles(targetDir, silentSpinner);
     await copyPluginFiles(targetDir, silentSpinner);
     await copyBmadConfigFiles(targetDir, silentSpinner);
@@ -5656,10 +6009,12 @@ async function install(options = {}) {
     await copyCodexFiles(targetDir, silentSpinner);
 
     // Populate global ~/.claude/hooks[/-windows]/ so $HOME hook paths resolve
-    // on first install (not just on update).
-    const hooksSubdirInstall = isNativeWindows() ? 'hooks-windows' : 'hooks';
-    const srcHooksDirInstall = path.join(__dirname, '..', '.claude', hooksSubdirInstall);
-    await updateGlobalHooks(srcHooksDirInstall);
+    // on first install (not just on update). Always the unix hooks dir — see the
+    // note in the update path; updateGlobalHooks derives hooks-windows itself.
+    const srcGlobalHooksDirInstall = path.join(__dirname, '..', '.claude', 'hooks');
+    await updateGlobalHooks(srcGlobalHooksDirInstall);
+    // Populate global ~/.claude/ resolver bundle too, same reasoning as above (AVI-S8.5 Stage 2)
+    await updateGlobalResolverBundle();
 
     await configureSessionStartHook(targetDir, silentSpinner);
     await configurePartyModeHook(targetDir, silentSpinner);
@@ -6054,6 +6409,11 @@ def _strip_markdown(text: str) -> str:
     console.log('');
     console.log(chalk.magenta('  \u2661  Sponsor this Developer  github.com/sponsors/paulpreibisch'));
     console.log('');
+
+    // Opt-in injection marker (prevents the global-install cacophony). See
+    // configureInjectionScope: project installs enable THIS project; a home-dir
+    // install stays silent. Uses agentvibes-enabled so it can't override a global mute.
+    if ((await configureInjectionScope(targetDir)) === 'global') warnGlobalInjectionScope();
 
     if (!(options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1')) {
       // Clean final summary
@@ -6479,8 +6839,11 @@ program
   .command('agentvibes-mcp-server')
   .description('Start AgentVibes MCP server')
   .action(async () => {
-    // Run the bash wrapper script
-    const mcpServerScript = path.join(__dirname, '..', 'bin', 'mcp-server');
+    // Run the bash wrapper script. NOTE: 'bin/mcp-server' (no extension) has
+    // never existed — bin/ ships mcp-server.sh and mcp-server.js. Combined with
+    // the catch below exiting silently, this subcommand failed with no output at
+    // all for every user who tried it.
+    const mcpServerScript = path.join(__dirname, '..', 'bin', 'mcp-server.sh');
 
     try {
       execScript(mcpServerScript, {
@@ -6488,6 +6851,9 @@ program
         env: process.env
       });
     } catch (error) {
+      // Never exit silently — say why.
+      console.error(chalk.red(`\n❌ Could not start the MCP server: ${error.message}`));
+      console.error(chalk.gray(`   Script: ${mcpServerScript}`));
       process.exit(error.status || 1);
     }
   });
@@ -6805,11 +7171,14 @@ export {
   copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
   installPluginManifest, checkAndInstallPiper,
   updateGlobalHooks, updateCommandFiles, updatePersonalityFiles,
+  copyResolverBundle, updateGlobalResolverBundle,
   CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
   // Manifest utilities (used by tests and external tooling)
   getProjectManifestPath, getGlobalManifestPath,
-  loadManifest, saveManifest, computeFileHash, manifestSafeCopy, removeManifestFiles,
+  loadManifest, saveManifest, computeFileHash, manifestSafeCopy, backupUserFile, removeManifestFiles,
+  execScript,
   // Pure helper functions exported for testing
+  readJsonConfigSafe, backupConfigFile,
   isPiperProvider, supportsEmoji, getPersonalityIcon,
   detectEnvironment, createPageHeaderFooter, buildNavigationChoices, handleNavigationAction, getPageTitle,
   getUserShell, showWelcome, getReleaseInfoBoxen, generateActivationInstructions,

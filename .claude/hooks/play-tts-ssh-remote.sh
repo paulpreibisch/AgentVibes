@@ -15,6 +15,7 @@
 set -euo pipefail
 
 TEXT="${1:-}"
+_VOICE_ARG="${2:-}"                 # raw voice as passed (empty on normal hook TTS)
 VOICE="${2:-en_US-lessac-medium}"
 AGENT_NAME="${3:-default}"
 AGENT_PROFILE_FILE="${4:-}"
@@ -34,18 +35,60 @@ fi
 # Default to "default" so remote always has an LLM key to look up
 LLM_NAME="${LLM_NAME:-default}"
 
-# Validate required input
-if [[ -z "$TEXT" ]]; then
+# Music-only preview mode: AGENTVIBES_MUSIC_ONLY=<track.mp3> tells the receiver to
+# play a standalone background-music track (no speech). Used by the Music tab's
+# remote preview so a track can be auditioned on the receiver. In this mode empty
+# TEXT is allowed and the track name is forwarded as the "music" field with
+# kind=music; the receiver resolves the file from its own ~/.claude/audio/tracks/.
+PAYLOAD_KIND="speak"
+MUSIC_ONLY_TRACK=""
+if [[ -n "${AGENTVIBES_MUSIC_STOP:-}" ]]; then
+  # Stop whatever music preview is currently playing on the receiver.
+  PAYLOAD_KIND="music-stop"
+elif [[ -n "${AGENTVIBES_MUSIC_ONLY:-}" ]]; then
+  # Only a bare .mp3 filename is allowed (no path separators, no leading dash) —
+  # the receiver resolves it against its own tracks dir, so reject path-like input.
+  # Spaces ARE allowed (many track names contain them, e.g. "Late Night Hip Hop.mp3");
+  # the name travels as a jq --arg-escaped JSON string, so a space is not injectable.
+  if [[ "$AGENTVIBES_MUSIC_ONLY" =~ ^[A-Za-z0-9._][A-Za-z0-9._\ -]*\.mp3$ ]]; then
+    PAYLOAD_KIND="music"
+    MUSIC_ONLY_TRACK="$AGENTVIBES_MUSIC_ONLY"
+  else
+    echo "Invalid music track name: $AGENTVIBES_MUSIC_ONLY" >&2
+    exit 1
+  fi
+fi
+
+# Validate required input (music / music-stop modes carry no speech text)
+if [[ "$PAYLOAD_KIND" == "music" || "$PAYLOAD_KIND" == "music-stop" ]]; then
+  TEXT=""   # no speech in a music preview / stop
+elif [[ -z "$TEXT" ]]; then
   echo "Usage: $0 <text> [voice] [agent_name]" >&2
   exit 1
 fi
 
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
+source "$SCRIPT_DIR/session-id.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Derive project name from directory
-PROJECT_NAME=$(basename "$PROJECT_ROOT")
+# Canonical routing session id. The receiver multiplexes forwarded TTS by this
+# id, so it MUST derive from CLAUDE_PROJECT_DIR (the real user project injected
+# via --project-dir), NOT basename(PROJECT_ROOT) — for a global install that
+# basename collapses to the HOME dir name and merges every project into one
+# session. Fallback (CLAUDE_PROJECT_DIR unset) is PROJECT_ROOT, preserving the
+# legacy value for the no-project case.
+SESSION_ID="$(av_session_id "$PROJECT_ROOT")"
+# PROJECT_NAME is kept for receiver back-compat (the receiver reads "project");
+# set it to the SAME corrected session id so both fields agree.
+PROJECT_NAME="$SESSION_ID"
+# Absolute path, forwarded so the receiver can show/learn the real remote folder.
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+  PROJECT_PATH="$CLAUDE_PROJECT_DIR"
+else
+  PROJECT_PATH="$PROJECT_ROOT"
+fi
 
 # ---------------------------------------------------------------------------
 # Get SSH connection details from config
@@ -66,10 +109,10 @@ fi
 # Priority 2: ~/.agentvibes/transport-config.json (ssh-remote section)
 if [[ -z "$SSH_HOST" ]]; then
   _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
-  if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-    SSH_HOST=$(python3 -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('host',''))" 2>/dev/null || echo "")
-    SSH_KEY=$(python3  -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
-    SSH_PORT=$(python3 -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('port',''))" 2>/dev/null || echo "")
+  if [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+    SSH_HOST=$("$PYTHON_BIN" -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('host',''))" 2>/dev/null || echo "")
+    SSH_KEY=$("$PYTHON_BIN"  -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('sshKey',''))" 2>/dev/null || echo "")
+    SSH_PORT=$("$PYTHON_BIN" -c "import json,sys; d=json.load(open('$_TRANSPORT_CFG')); p=d.get('ssh-remote',{}); print(p.get('port',''))" 2>/dev/null || echo "")
   fi
 fi
 
@@ -77,8 +120,8 @@ fi
 # (config keyed by LLM name rather than 'ssh-remote', e.g. 'claude-code')
 if [[ -z "$SSH_HOST" ]]; then
   _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
-  if [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-    _remote_data=$(python3 -c "
+  if [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+    _remote_data=$("$PYTHON_BIN" -c "
 import json, sys
 try:
     d = json.load(open('$_TRANSPORT_CFG'))
@@ -129,10 +172,11 @@ if [[ -n "$SSH_PORT" ]] && [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]]; then
 fi
 
 # SECURITY: Validate VOICE
-# Allow letters, digits, underscore, hyphen, period, colon (for :: multi-speaker separator), slash.
+# Allow letters, digits, underscore, hyphen, period, colon (for :: multi-speaker separator),
+# slash, and SPACES (Windows SAPI voice names like "Microsoft David Desktop").
 # Voice is passed to the remote via base64-encoded JSON (jq --arg safely escapes it),
-# so shell metacharacters are the only real risk.
-if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_.:\/-]+$ ]]; then
+# so shell metacharacters are the only real risk — a space is not injectable.
+if [[ ! "$VOICE" =~ ^[a-zA-Z0-9_.:\/\ -]+$ ]]; then
   echo "Invalid voice format: $VOICE" >&2
   exit 1
 fi
@@ -149,7 +193,8 @@ fi
 
 SOX_EFFECTS=""
 BG_FILE=""
-BG_VOLUME="0.10"
+# TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+BG_VOLUME="0.20"
 
 # Use CLAUDE_PROJECT_DIR (injected via --project-dir by play-tts.sh) so the
 # agent-name / default row is read from the user's project, not the package.
@@ -261,10 +306,39 @@ fi
 
 # Read the TTS provider the RECEIVER should use to generate audio.
 # This is separate from the sender's own provider (which is "ssh-remote").
-# Check receiver-provider.txt first, then fall back to "piper".
+# Priority: one-off caller override (a voice-picker PREVIEW forces the previewed
+# voice's own engine for THIS send only) → project receiver-provider.txt →
+# home receiver-provider.txt → "piper". The override intentionally does NOT
+# write any config: a preview must preview, never change the persisted setting.
 PROVIDER=""
+if [[ -n "${AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE:-}" ]]; then
+  PROVIDER="$AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE"
+fi
+# Voice->engine coupling (mirrors the guard in play-tts.ps1): a Kokoro-format
+# voice id (strict lang/gender prefix, e.g. af_bella) or a Piper voice (locale+
+# hyphen like en_US-lessac-medium, or an ::Speaker suffix) can ONLY be
+# synthesised by that engine — so the voice itself decides the receiver engine,
+# overriding a stale/mislabeled provider default (e.g. an old console that always
+# sends windows-sapi). Names that don't encode an engine (SAPI/macOS names) fall
+# through to the configured provider below.
+#
+# GATED on an EXPLICIT voice arg ($2): normal hook TTS passes no voice, and VOICE
+# then defaults to a piper id — coupling on that default would wrongly force
+# `piper` on EVERY normal utterance and shadow receiver-provider.txt (a kokoro/
+# SAPI receiver would silently regress to piper). Only a caller that passed a
+# real voice (every voice-picker preview does) gets voice->engine coupling.
+if [[ -z "$PROVIDER" && -n "$_VOICE_ARG" ]]; then
+  _v_nospk="${VOICE%%::*}"   # strip any ::Speaker-ID suffix before matching
+  # Kokoro ids use a fixed lang/gender prefix set (mirrors play-tts.sh) — a loose
+  # `^[a-z]{2}_...` would misclassify a custom piper model like `my_voice`.
+  if [[ "$_v_nospk" =~ ^(af|am|bf|bm|jf|jm|kf|km|zf|zm|ff|fm|hf|hm|if|im|pf|pm|ef|em|nf|nm)_[a-z0-9_]+$ ]]; then
+    PROVIDER="kokoro"
+  elif [[ "$VOICE" == *"::"* ]] || [[ "$_v_nospk" =~ ^[a-z]{2}_[A-Za-z]{2}-. ]]; then
+    PROVIDER="piper"
+  fi
+fi
 RECEIVER_PROVIDER_FILE="$PROJECT_ROOT/.agentvibes/config/receiver-provider.txt"
-if [[ -f "$RECEIVER_PROVIDER_FILE" ]]; then
+if [[ -z "$PROVIDER" && -f "$RECEIVER_PROVIDER_FILE" ]]; then
   PROVIDER=$(cat "$RECEIVER_PROVIDER_FILE" 2>/dev/null || true)
 fi
 # Also check home-level config
@@ -281,34 +355,113 @@ case "${PROVIDER:-}" in
 esac
 
 # ---------------------------------------------------------------------------
+# Resolve the project-level .claude dir the way the local managers do:
+# CLAUDE_PROJECT_DIR (the real user project, injected via --project-dir by
+# play-tts.sh) wins; otherwise fall back to the package PROJECT_ROOT.
+# ---------------------------------------------------------------------------
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" && -d "$CLAUDE_PROJECT_DIR/.claude" ]]; then
+  _RESOLVE_PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+else
+  _RESOLVE_PROJECT_DIR="$PROJECT_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve MUTE to forward (map §C 'mute never forwarded on SSH', R17).
+# Mirrors play-tts.sh's 3-level file check exactly:
+#   project-unmute (overrides global) > project-mute > global-mute.
+# The receiver is authoritative and applies a SAFETY-OR:
+#   effective_mute = receiver_local_mute OR forwarded_mute
+# so if EITHER side is muted, playback stays silent. We forward this as a
+# STRING ("true"/"false") — the receiver does a plain string compare, and it
+# keeps the JSON boolean out of python's "True"/"False" capitalization.
+# ---------------------------------------------------------------------------
+_GLOBAL_MUTE_FILE="$HOME/.agentvibes-muted"
+_PROJECT_MUTE_FILE="$_RESOLVE_PROJECT_DIR/.claude/agentvibes-muted"
+_PROJECT_UNMUTE_FILE="$_RESOLVE_PROJECT_DIR/.claude/agentvibes-unmuted"
+MUTE="false"
+if [[ -f "$_PROJECT_UNMUTE_FILE" ]]; then
+  MUTE="false"                       # project explicitly unmuted overrides global
+elif [[ -f "$_PROJECT_MUTE_FILE" ]]; then
+  MUTE="true"
+elif [[ -f "$_GLOBAL_MUTE_FILE" ]]; then
+  MUTE="true"
+fi
+
+# ---------------------------------------------------------------------------
+# Resolve LANGUAGE to forward (map §D 'language | Forward on SSH', R18).
+# Source: tts-language.txt (set by language-manager.sh).
+# Forwarded as a DEFAULT only — the receiver stays authoritative and its own
+# language config (if any) wins. language-manager.sh stores tts-language.txt at
+# the .claude/ root; the resolver contract tests use the .claude/config/ subdir,
+# so we accept both. Project scope wins over the global home fallback.
+# ---------------------------------------------------------------------------
+LANGUAGE=""
+for _cdir in "$_RESOLVE_PROJECT_DIR/.claude" "$HOME/.claude"; do
+  # tts-language.txt (root or config/ subdir).
+  if [[ -z "$LANGUAGE" && -f "$_cdir/tts-language.txt" ]]; then
+    LANGUAGE=$(cat "$_cdir/tts-language.txt" 2>/dev/null || true)
+  fi
+  if [[ -z "$LANGUAGE" && -f "$_cdir/config/tts-language.txt" ]]; then
+    LANGUAGE=$(cat "$_cdir/config/tts-language.txt" 2>/dev/null || true)
+  fi
+  [[ -n "$LANGUAGE" ]] && break
+done
+# Trim surrounding whitespace
+LANGUAGE="${LANGUAGE#"${LANGUAGE%%[![:space:]]*}"}"
+LANGUAGE="${LANGUAGE%"${LANGUAGE##*[![:space:]]}"}"
+# SECURITY: only forward a plain language name (letters, spaces, hyphen); jq
+# --arg escapes anyway, but reject odd values rather than propagate them.
+if [[ -n "$LANGUAGE" ]] && [[ ! "$LANGUAGE" =~ ^[a-zA-Z][a-zA-Z\ -]*$ ]]; then
+  LANGUAGE=""
+fi
+
+# ---------------------------------------------------------------------------
 # Build JSON payload
 # ---------------------------------------------------------------------------
 
 # SECURITY: Use jq if available for safe JSON construction, else manual escaping
 build_json_payload() {
   if command -v jq &>/dev/null; then
-    jq -n \
+    # On Windows git-bash, native jq.exe triggers MSYS2 path-conversion of any
+    # POSIX-looking --arg value (projectPath "/c/proj" becomes "C:/proj", music
+    # file paths likewise), silently corrupting the JSON string the receiver
+    # reads. Excluding all args from conversion passes every --arg literally.
+    # Both vars are no-ops on Linux/macOS.
+    MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 jq -n \
       --arg text "$TEXT" \
       --arg voice "$VOICE" \
       --arg effects "$SOX_EFFECTS" \
       --arg music "$BG_FILE" \
       --arg volume "$BG_VOLUME" \
+      --arg session "$SESSION_ID" \
       --arg project "$PROJECT_NAME" \
+      --arg projectPath "$PROJECT_PATH" \
       --arg pretext "$PRETEXT" \
       --arg speed "$SPEED" \
       --arg provider "$PROVIDER" \
       --arg llm "$LLM_NAME" \
-      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, project: $project, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm}'
+      --arg mute "$MUTE" \
+      --arg language "$LANGUAGE" \
+      --arg kind "$PAYLOAD_KIND" \
+      '{text: $text, voice: $voice, effects: $effects, music: $music, volume: $volume, session: $session, project: $project, projectPath: $projectPath, pretext: $pretext, speed: $speed, provider: $provider, llm: $llm, mute: $mute, language: $language, kind: $kind}'
   else
     # Manual JSON — escape backslashes, quotes, control chars
     local escaped_text
     escaped_text=$(printf '%s' "$TEXT" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | tr '\n' ' ' | sed 's/\r//g')
     local escaped_pretext
     escaped_pretext=$(printf '%s' "$PRETEXT" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","project":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s"}' \
-      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$PROJECT_NAME" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME"
+    local escaped_project_path
+    escaped_project_path=$(printf '%s' "$PROJECT_PATH" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    printf '{"text":"%s","voice":"%s","effects":"%s","music":"%s","volume":"%s","session":"%s","project":"%s","projectPath":"%s","pretext":"%s","speed":"%s","provider":"%s","llm":"%s","mute":"%s","language":"%s","kind":"%s"}' \
+      "$escaped_text" "$VOICE" "$SOX_EFFECTS" "$BG_FILE" "$BG_VOLUME" "$SESSION_ID" "$PROJECT_NAME" "$escaped_project_path" "$escaped_pretext" "$SPEED" "$PROVIDER" "$LLM_NAME" "$MUTE" "$LANGUAGE" "$PAYLOAD_KIND"
   fi
 }
+
+# Music-only preview: force the track as the "music" field (overriding any
+# per-LLM/agent background-music config) so the receiver plays exactly this track.
+if [[ "$PAYLOAD_KIND" == "music" ]]; then
+  BG_FILE="$MUSIC_ONLY_TRACK"
+fi
 
 JSON_PAYLOAD=$(build_json_payload)
 
@@ -338,7 +491,7 @@ SSH_ARGS=()
 [[ -n "$SSH_KEY"  && -f "$SSH_KEY"  ]] && SSH_ARGS+=(-i "$SSH_KEY")
 # Only pass -p for an explicit, non-default port.  Port 22 is ssh's universal
 # default, so forcing "-p 22" is at best a no-op and at worst overrides the
-# real port of an ~/.ssh/config Host alias (e.g. laptop-win -> Port 45217),
+# real port of an ~/.ssh/config Host alias (e.g. my-laptop -> Port 2222),
 # silently delivering the payload to the wrong port.  Empty or "22" means
 # "use ssh / ~/.ssh/config defaults" -- never force it.
 if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then SSH_ARGS+=(-p "$SSH_PORT"); fi

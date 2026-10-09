@@ -160,7 +160,7 @@ describe('modal-overlay.js - Tab blocking while open (AC#10)', () => {
 
     modal.open();
     // Simulate the navigation.js guard: if (!nav.isModalOpen()) switchTab(...)
-    // switchTab('voices') should be blocked
+    // switchTab('music') should be blocked
     const before = nav.getActiveTab();
     // Direct call — NavigationService.switchTab does NOT have the modal guard
     // The guard is in navigation.js key handlers. For unit testing, we verify

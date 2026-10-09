@@ -27,8 +27,8 @@ describe('AgentVibesConsole - Module Structure', () => {
 
   test('AgentVibesConsole constructor stores startTab option', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
-    const instance = new AgentVibesConsole({ startTab: 'voices' });
-    assert.strictEqual(instance.startTab, 'voices',
+    const instance = new AgentVibesConsole({ startTab: 'music' });
+    assert.strictEqual(instance.startTab, 'music',
       'startTab from opts must be stored on instance');
   });
 
@@ -93,7 +93,7 @@ describe('AgentVibesConsole - Context Footer (Story 6.3)', () => {
       'contextFooterBox must be set after init (story 6.3 depends on this)');
   });
 
-  test('_updateContextFooter sets bg color matching FOOTER_CONFIG for voices tab', async () => {
+  test('_updateContextFooter sets bg color matching FOOTER_CONFIG for music tab', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
@@ -102,11 +102,11 @@ describe('AgentVibesConsole - Context Footer (Story 6.3)', () => {
       style: { bg: '' },
       setContent: (t) => { capturedText = t; },
     };
-    instance._updateContextFooter('voices');
-    assert.strictEqual(instance.contextFooterBox.style.bg, '#00bcd4',
-      '_updateContextFooter must set #00bcd4 for voices tab (AC#2)');
+    instance._updateContextFooter('music');
+    assert.strictEqual(instance.contextFooterBox.style.bg, '#ff9800',
+      '_updateContextFooter must set #ff9800 for music tab (AC#2)');
     assert.ok(typeof capturedText === 'string' && capturedText.length > 0,
-      '_updateContextFooter must set non-empty text for voices tab (AC#3)');
+      '_updateContextFooter must set non-empty text for music tab (AC#3)');
   });
 
   test('_updateContextFooter uses DEFAULT_FOOTER_COLOR for unknown tabId', async () => {
@@ -138,18 +138,18 @@ describe('AgentVibesConsole - Navigation (Story 6.2)', () => {
 
   test('navigationService.getActiveTab() equals startTab after init', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
-    const instance = new AgentVibesConsole({ startTab: 'voices', _testMode: true });
+    const instance = new AgentVibesConsole({ startTab: 'music', _testMode: true });
     await instance.init();
-    assert.strictEqual(instance.navigationService.getActiveTab(), 'voices',
+    assert.strictEqual(instance.navigationService.getActiveTab(), 'music',
       'navigationService active tab must match startTab option');
   });
 
-  test('_renderTabBarContent includes all 8 tab shortcut labels', async () => {
+  test('_renderTabBarContent includes all 7 tab shortcut labels', async () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
     const content = instance._renderTabBarContent('settings');
-    const expectedShortcuts = ['[S]', '[V]', '[M]', '[B]', '[X]', '[R]', '[H]', '[I]'];
+    const expectedShortcuts = ['[S]', '[M]', '[B]', '[X]', '[R]', '[H]', '[I]'];
     for (const shortcut of expectedShortcuts) {
       assert.ok(content.includes(shortcut),
         `Tab bar content must include shortcut '${shortcut}' (AC#1)`);
@@ -160,8 +160,8 @@ describe('AgentVibesConsole - Navigation (Story 6.2)', () => {
     const { AgentVibesConsole } = await import('../../src/console/app.js');
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
-    const content = instance._renderTabBarContent('voices');
-    assert.ok(content.includes('{bold}') && content.includes('Voices'),
+    const content = instance._renderTabBarContent('music');
+    assert.ok(content.includes('{bold}') && content.includes('Music'),
       'Active tab must have {bold} tag (AC#2 active tab highlight)');
   });
 
@@ -235,9 +235,10 @@ describe('AgentVibesConsole - Settings Tab Wiring (Story 7.1)', () => {
     const instance = new AgentVibesConsole({ _testMode: true });
     await instance.init();
     instance.contextFooterBox = { style: { bg: '' }, setContent: () => {} };
-    // 'voices' is a placeholder tab — should fall through to FOOTER_CONFIG
-    instance._updateContextFooter('voices');
-    assert.strictEqual(instance.contextFooterBox.style.bg, '#00bcd4',
+    // Simulate a placeholder tab (no getFooterColor getter) — must fall through to FOOTER_CONFIG
+    instance.tabs.music = {};
+    instance._updateContextFooter('music');
+    assert.strictEqual(instance.contextFooterBox.style.bg, '#ff9800',
       'placeholder tab must use FOOTER_CONFIG color, not tab component getter');
   });
 

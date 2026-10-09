@@ -307,8 +307,9 @@ test('agents-tab: _openVoicePickerForAgent._previewVoice calls _refreshVP after 
   const previewBody = fnBody.slice(previewFnStart, j + 1);
 
   assert.ok(
-    previewBody.includes('_refreshVP()'),
-    '_previewVoice must call _refreshVP() so the ♪ dot updates in the voice list'
+    previewBody.includes('_vpSpin.start') || previewBody.includes('_refreshVP()'),
+    '_previewVoice must update the selected row when a preview starts — via the ' +
+    'row spinner (_vpSpin.start) or _refreshVP() for the legacy ♪ dot'
   );
 });
 

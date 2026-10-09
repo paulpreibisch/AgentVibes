@@ -93,12 +93,21 @@ $script:Text = ""
 $script:Voice = "en_US-lessac-medium"
 $SoxEffects = ""
 $BgFile = ""
-$BgVolume = "0.10"
+# TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+$BgVolume = "0.20"
 $script:Project = "unknown"
+# Sender's absolute project path — forwarded to the watcher so the avatar can
+# show/learn the real remote folder (paired with $script:Project).
+$ProjectPath = ""
 $Pretext = ""
 $Speed = ""
 $Provider = "piper"
 $Llm = "default"
+$Mute = "false"
+$Language = ""
+# kind: "speak" (default — synthesize text) or "music" (play a standalone
+# background-music track, no speech). Set by the Music-tab remote preview.
+$Kind = "speak"
 
 if ($decoded.TrimStart().StartsWith('{')) {
     # JSON payload
@@ -110,10 +119,16 @@ if ($decoded.TrimStart().StartsWith('{')) {
         if ($json.music)    { $BgFile = $json.music }
         if ($json.volume)   { $BgVolume = $json.volume }
         if ($json.project)  { $script:Project = $json.project }
+        if ($json.projectPath) { $ProjectPath = $json.projectPath }
         if ($json.pretext)  { $Pretext = $json.pretext }
         if ($json.speed)    { $Speed = $json.speed }
         if ($json.provider) { $Provider = $json.provider }
         if ($json.llm)      { $Llm = $json.llm }
+        # Forwarded as strings by the sender ("true"/"false"); ConvertFrom-Json
+        # may hand back a real boolean, so stringify defensively.
+        if ($null -ne $json.mute) { $Mute = ([string]$json.mute).ToLower() }
+        if ($json.language) { $Language = $json.language }
+        if ($json.kind)     { $Kind = ([string]$json.kind).ToLower() }
     } catch {
         Write-Output "Error: Failed to parse JSON payload"
         exit 1
@@ -123,8 +138,16 @@ if ($decoded.TrimStart().StartsWith('{')) {
     $script:Text = $decoded
 }
 
-# Validate text
-if (-not $script:Text) {
+# Validate text. Music-only previews carry no speech — they require a track
+# (the "music" field) instead of text.
+if ($Kind -eq 'music') {
+    if (-not $BgFile) {
+        Write-Output "Error: music payload has no track"
+        exit 1
+    }
+} elseif ($Kind -eq 'music-stop') {
+    # Stop request carries neither text nor a track — nothing to validate.
+} elseif (-not $script:Text) {
     Write-Output "Error: No text in payload"
     exit 1
 }
@@ -144,9 +167,16 @@ if ($Llm -and $Llm -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_-]*$') {
     $Llm = "default"
 }
 
+# Music-only preview: the track must be a bare .mp3 filename (no path parts) —
+# the watcher resolves it against ~/.claude/audio/tracks/ with a containment check.
+if ($Kind -eq 'music' -and $BgFile -notmatch '^[A-Za-z0-9._][A-Za-z0-9._ \-]*\.mp3$') {
+    Write-Output "Error: invalid music track name"
+    exit 1
+}
+
 # Validate volume is numeric
 if ($BgVolume -notmatch '^\d+\.?\d*$') {
-    $BgVolume = "0.10"
+    $BgVolume = "0.20"
 }
 
 # Prepend pretext
@@ -154,7 +184,65 @@ if ($Pretext) {
     $script:Text = "$Pretext. $($script:Text)"
 }
 
-Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile"
+# ---------------------------------------------------------------------------
+# RECEIVER-AUTHORITATIVE: mute safety-OR (map §C, R17)
+# ---------------------------------------------------------------------------
+# effective_mute = receiver_local_mute OR forwarded_mute. If EITHER the sender
+# (forwarded $Mute -eq "true") or THIS receiver host is muted, stay silent. A
+# receiver-local mute always vetoes; the forwarded mute is a subordinate DEFAULT
+# that can also veto. We NEVER force-unmute a muted receiver.
+$ReceiverMuteFile = "$ClaudeDir\tts-muted.txt"
+$ReceiverLocalMuted = $false
+if (Test-Path $ReceiverMuteFile) {
+    if ((Get-Content $ReceiverMuteFile -Raw -ErrorAction SilentlyContinue).Trim() -eq "true") {
+        $ReceiverLocalMuted = $true
+    }
+}
+$EffectiveMute = ($Mute -eq "true") -or $ReceiverLocalMuted
+
+# ---------------------------------------------------------------------------
+# RECEIVER-AUTHORITATIVE: language fallback (map §D, R18)
+# ---------------------------------------------------------------------------
+# The receiver's OWN language config wins; otherwise use the forwarded language
+# as the default. Non-destructive: we do NOT overwrite the receiver's own
+# tts-language.txt — the effective value only rides along in the queue JSON.
+$EffectiveLanguage = $Language
+foreach ($lf in @("$ClaudeDir\tts-language.txt", "$ConfigDir\tts-language.txt")) {
+    if (Test-Path $lf) {
+        $rl = (Get-Content $lf -Raw -ErrorAction SilentlyContinue)
+        if ($rl) { $rl = $rl.Trim() }
+        if ($rl) { $EffectiveLanguage = $rl; break }  # receiver's own config wins
+    }
+}
+
+Write-Log "RECEIVED" "provider=$Provider effects=$SoxEffects music=$BgFile mute=$Mute/$EffectiveMute lang=$EffectiveLanguage"
+
+# RECEIVER-AUTHORITATIVE mute veto: if either side muted, do not queue/play.
+if ($EffectiveMute) {
+    Write-Log "MUTED" "forwarded=$Mute receiverLocal=$ReceiverLocalMuted"
+    Write-Output "Muted (forwarded=$Mute, receiver-local=$ReceiverLocalMuted) - not playing"
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Readiness bling — a short cue on the RECEIVER, played BEFORE we generate/play,
+# so a listener knows audio is incoming (kokoro synth + track load have latency).
+# Standardizes the UX across voice AND music: bling first, then the audio. A
+# music-stop carries no audio, so it gets no cue. Best-effort + synchronous (the
+# cue is ~0.7s and must finish before the track so they don't overlap); a missing
+# wav or player failure must NEVER block or fail the actual playback.
+# ---------------------------------------------------------------------------
+if ($Kind -eq 'music') {
+    $blingWav = "$ClaudeDir\audio\ui\bling-success.wav"
+    if (-not (Test-Path $blingWav)) { $blingWav = "$env:USERPROFILE\.agentvibes\bling-success.wav" }
+    if (Test-Path $blingWav) {
+        try {
+            $ffb = Get-Command ffplay -ErrorAction SilentlyContinue
+            if ($ffb) { & $ffb.Source -autoexit -nodisp -loglevel quiet "$blingWav" 2>$null }
+            else { (New-Object System.Media.SoundPlayer "$blingWav").PlaySync() }
+        } catch { Write-Log "WARN" "readiness bling failed: $($_.Exception.Message)" }
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Configure voice for play-tts.ps1
@@ -206,6 +294,10 @@ $ReqJson = @{
     speed    = $Speed
     provider = $Provider
     llm      = $Llm
+    language = $EffectiveLanguage
+    kind     = $Kind
+    project     = $script:Project
+    projectPath = $ProjectPath
 } | ConvertTo-Json -Compress
 
 try {

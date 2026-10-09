@@ -40,6 +40,25 @@ set -e  # Exit on error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$(dirname "$SCRIPT_DIR")"
 
+# @function _piper_default_voice
+# @intent Return the Provider Catalog's piper default voice (AVI-S9.6 AC2,
+#         design row 22), falling back to the legacy hardcoded literal when the
+#         generated .claude/hooks/provider-catalog.sh artifact is missing
+#         (installed-tree skew — mirrors the fail-safe probe pattern already
+#         used by voice-manager.sh / provider-manager.sh).
+# @returns Echoes the default Piper voice id.
+_piper_default_voice() {
+  if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+  fi
+  if type catalog_default_voice >/dev/null 2>&1; then
+    catalog_default_voice piper
+  else
+    echo "en_US-lessac-medium"  # legacy fallback if the catalog artifact is missing
+  fi
+}
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -193,7 +212,7 @@ map_voice_to_provider() {
   # Map legacy voice names to Piper equivalents
   case "$voice" in
     "Jessica Anne Bogart"|"Aria")
-      echo "en_US-lessac-medium"
+      _piper_default_voice
       ;;
     "Matthew Schmitz"|"Archer"|"Michael")
       echo "en_US-danny-low"

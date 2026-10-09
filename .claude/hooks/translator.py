@@ -32,7 +32,7 @@
 # @dependencies deep-translator, langdetect (pip install deep-translator langdetect)
 # @entrypoints CLI: python3 translator.py <text> <target_lang>, Library: from translator import translate
 # @patterns Command pattern - supports translate, detect, and batch operations
-# @related play-tts.sh, learn-manager.sh, language-manager.sh
+# @related play-tts.sh, language-manager.sh
 #
 
 """

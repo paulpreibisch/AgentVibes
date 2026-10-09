@@ -94,7 +94,6 @@ Legend:
 | # | Feature | Script | Linux/macOS | Windows | WSL | Slash Cmd | MCP Tool | Test |
 |---|---------|--------|:-----------:|:-------:|:---:|-----------|----------|:----:|
 | 44 | Language set | `language-manager` | Y | - | Y | `/set-language` | `set_language` | - |
-| 45 | Learn mode toggle | `learn-manager` | Y | - | Y | `/learn` | `set_learn_mode` | - |
 | 46 | Translation | `translate-manager` | Y | - | Y | `/translate` | - | Y |
 | 47 | Replay target audio | `replay-target-audio` | Y | - | Y | `/replay-target` | - | - |
 | 48 | Set target language | - | Y | Y | Y | `/target` | - | - |
@@ -178,7 +177,6 @@ Scripts that exist on Linux/macOS but are **missing** on Windows (excluding N/A 
 | 2 | `voice-manager` | Voice ops via MCP may fail | **HIGH** | `voice-manager-windows.ps1` exists but naming mismatch |
 | 3 | `speed-manager` | Cannot set/get speed | **HIGH** | MCP `set_speed` + `get_speed` broken |
 | 4 | `language-manager` | Cannot set language | **HIGH** | MCP `set_language` broken |
-| 5 | `learn-manager` | Cannot toggle learn mode | **HIGH** | MCP `set_learn_mode` broken |
 | 6 | `verbosity-manager` | Cannot mute/unmute/set verbosity | **HIGH** | MCP `mute`/`unmute`/`set_verbosity` broken |
 | 7 | `clean-audio-cache` | Cannot clean cache via MCP | **MEDIUM** | MCP `clean_audio_cache` broken |
 | 8 | `sentiment-manager` | Cannot set sentiment | **MEDIUM** | Slash cmd only |
@@ -290,8 +288,6 @@ Scripts that exist on Linux/macOS but are **missing** on Windows (excluding N/A 
 | 7 | Piper voice manager | `piper-voice-manager` | No test | LOW |
 | 8 | Download extra voices | `download-extra-voices` | No test | MEDIUM |
 | 9 | Language manager | `language-manager` | No test | MEDIUM |
-| 10 | Learn manager | `learn-manager` | No test | MEDIUM |
-| 11 | Replay target audio | `replay-target-audio` | No test | LOW |
 | 12 | Sentiment manager | `sentiment-manager` | No test | LOW |
 | 13 | Audio processor (sox) | `audio-processor` | No test | LOW |
 | 14 | Clean audio cache | `clean-audio-cache` | No test | LOW |

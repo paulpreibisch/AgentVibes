@@ -30,11 +30,14 @@ else
   #  - the marker file silences the shell hooks (play-tts.sh / play-tts.ps1);
   #  - AGENTVIBES_SUPPRESS_AUDIO silences the TUI's direct-spawn voice previews
   #    (SAPI/piper/say/kokoro) that coverage tests fire via the Space key;
-  #  - AGENTVIBES_NO_PLAY is the providers' own "synthesize but don't play" flag,
-  #    honored by every play-tts-*.ps1/.sh, so any provider script a test invokes
-  #    directly still produces its [VOICE]/path output without real playback.
+  #  - the "synthesize but don't play" flag is spelled TWO ways across the fork:
+  #    the PowerShell providers read AGENTVIBES_NO_PLAY, the bash providers read
+  #    AGENTVIBES_NO_PLAYBACK (zero overlap — AVI-S8.7 finding). Export BOTH so
+  #    provider scripts a test invokes directly are actually silenced on both
+  #    platforms. Stage 2 (resolver port) retires the split via plan.noPlayback.
   export AGENTVIBES_SUPPRESS_AUDIO=true
   export AGENTVIBES_NO_PLAY=1
+  export AGENTVIBES_NO_PLAYBACK=1
 fi
 
 npm run test:syntax

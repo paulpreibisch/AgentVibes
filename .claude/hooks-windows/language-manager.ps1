@@ -146,7 +146,13 @@ switch ($Command) {
             Write-Output "Usage: language-manager.ps1 check-voice <voice-name>"
             exit 1
         }
-        $multilingual = @("Antoni", "Rachel", "Domi", "Bella", "Charlotte", "Matilda")
+        # AVI-S9.6 AC1: trimmed to names that exist in the 21-voice ElevenLabs
+        # catalog (src/services/provider-catalog.js ELEVENLABS_VOICES) — the
+        # list previously included "Antoni"/"Rachel"/"Domi"/"Charlotte", none of
+        # which exist there (the same class of bug design row 21 found in the
+        # now-deleted learn-manager.sh). Parity-asserted against the catalog by
+        # test/unit/provider-catalog-conformance.test.js.
+        $multilingual = @("Bella", "Matilda")
         if ($Arg1 -in $multilingual) { Write-Output "yes" } else { Write-Output "no" }
     }
 

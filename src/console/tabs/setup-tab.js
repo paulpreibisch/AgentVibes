@@ -20,7 +20,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import { promises as _fsP } from 'node:fs';
 import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
-import { ELEVENLABS_VOICES, KOKORO_VOICE_IDS } from '../../services/provider-voice-catalog.js';
+import { ELEVENLABS_VOICES, KOKORO_VOICE_IDS, voicesForProvider } from '../../services/provider-voice-catalog.js';
 import {
   PROVIDERS,
   checkClaudeInstalled, checkCopilotInstalled, checkCodexInstalled,
@@ -36,17 +36,24 @@ import {
   loadLlmConfigSync, saveLlmConfigSync, resolveCfgPath,
 } from '../../services/llm-provider-service.js';
 import {
-  getAvailableEngines, getEngineStatuses, checkEngineInstalled,
+  getAvailableEngines, getAllEngines, checkEngineInstalled, receiverProviderId,
 } from '../../services/tts-engine-service.js';
 import { openReverbPicker, formatEffectLabel } from '../widgets/reverb-picker.js';
 import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { renderHelpBar, selectorTitle } from '../widgets/help-bar.js';
 import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
-import { scanInstalledVoices, getVoiceMeta, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
+import { scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
 import { buildAudioEnv, getAllWavPlayers } from '../audio-env.js';
+import { previewRowContent, createRowSpinner, padTaggedTo } from '../preview-transport.js';
+import { buildBlingCommand, playBlingCue } from '../bling.js';
 import { spawn, spawnSync } from 'node:child_process';
+
+// Re-exported for backward compatibility — buildBlingCommand moved to
+// ../bling.js so the music-preview surfaces can share it. Existing imports and
+// tests that reference it from this module keep working.
+export { buildBlingCommand };
 import os from 'node:os';
 import crypto from 'node:crypto';
 import net from 'node:net';
@@ -169,6 +176,20 @@ const NATIVE_ENGINE_VOICES = {
   elevenlabs:  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'ElevenLabs'           },
 };
 
+// SAPI and macOS Say are NATIVE but MULTI-voice (many built-in system voices),
+// unlike soprano (a genuine single-voice engine). They get the full voice picker
+// and a real default voice, not the engine-id placeholder.
+const MULTI_VOICE_NATIVE = new Set(['sapi', 'macos-say']);
+
+/** Default voice to assign when an engine is first selected in a per-LLM draft. */
+function defaultVoiceForEngine(engine) {
+  if (MULTI_VOICE_NATIVE.has(engine)) {
+    const list = voicesForProvider(engine, { scanInstalledVoices, getVoiceMeta });
+    return list[0]?.id || NATIVE_ENGINE_VOICES[engine]?.id || '';
+  }
+  return NATIVE_ENGINE_VOICES[engine]?.id || '';
+}
+
 // Static built-in ElevenLabs premade voices — universal to every ElevenLabs
 // account. The stored config value is the raw ElevenLabs voice_id; the TTS hook
 // accepts raw IDs directly (its ^[a-zA-Z0-9]{10,40}$ path), so there is no
@@ -271,33 +292,8 @@ export function buildPyModuleCheckArgs(mods) {
   return ['-c', `import importlib.util as u, sys; sys.exit(0 if ${expr} else 1)`];
 }
 
-/**
- * Build the fire-and-forget "preview ready" cue command for a platform. Pure
- * (no spawning here, so it is unit-testable). Plays the bundled CC0 wav when
- * present, else falls back to a system sound (Windows) / freedesktop cue or
- * terminal bell (POSIX). stdio is ignored by the caller, so the POSIX bell is
- * redirected to /dev/tty rather than the discarded stdout.
- * @param {string} platform - process.platform value
- * @param {string} wavPath - absolute path to the bling wav
- * @param {boolean} haveWav - whether wavPath exists on disk
- * @returns {{command: string, args: string[]}}
- */
-export function buildBlingCommand(platform, wavPath, haveWav) {
-  if (platform === 'win32') {
-    const ps = haveWav
-      ? `Add-Type -AssemblyName System.Windows.Forms; (New-Object System.Media.SoundPlayer('${wavPath.replace(/'/g, "''")}')).PlaySync()`
-      : '[System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 700';
-    return { command: 'powershell', args: ['-NoProfile', '-Command', ps] };
-  }
-  if (haveWav) {
-    // Pass wavPath as a positional arg ($1) so the path is never interpolated
-    // into the shell string (prevents injection / breakage on special chars).
-    const sh = 'paplay "$1" 2>/dev/null || aplay -q "$1" 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
-    return { command: 'bash', args: ['-c', sh, '--', wavPath] };
-  }
-  const sh = 'paplay /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null || printf "\\a" > /dev/tty 2>/dev/null';
-  return { command: 'bash', args: ['-c', sh] };
-}
+// buildBlingCommand moved to ../bling.js (imported + re-exported at the top of
+// this file). See that module for the readiness-cue command builder.
 
 // ---------------------------------------------------------------------------
 // Dependency detection helpers
@@ -829,7 +825,6 @@ export function createSetupTab(screen, services) {
   const providerStatusTexts = [];
 
   // Transport provider row widgets (Configure-only, no Install/Remove)
-  const transportRows = [];
 
   // Info box for provider details
   const infoBox = blessed.box({
@@ -1144,7 +1139,7 @@ export function createSetupTab(screen, services) {
       pretext:      llmConfig.pretext || '',
       reverbPreset: llmConfig.effects || 'off',
       bgTrack:      llmConfig.bgTrack || '',
-      bgVolume:     llmConfig.bgVolume || '0.15',
+      bgVolume:     llmConfig.bgVolume || '0.20',
       // Hermes SSH fields
       mode:   currentCfg.mode === 'remote' ? 'remote' : 'local',
       sshKey: currentCfg.sshKey || '',
@@ -1248,8 +1243,14 @@ export function createSetupTab(screen, services) {
       style: { bg: COLORS.contentBg },
     });
 
+    // _bgRestoreFn is modal-scoped so _killPreview can restore bg music synchronously,
+    // eliminating the race condition when Preview is clicked twice rapidly.
     let _previewModalProc = null;
+    let _bgRestoreFn = null;
     function _killPreview() {
+      // Restore bg music immediately (synchronously) before killing the process —
+      // otherwise a second Preview reads bgWas=true before the first's exit fires.
+      if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
       if (_previewModalProc) { try { _previewModalProc.kill(); } catch {} _previewModalProc = null; }
     }
 
@@ -1285,6 +1286,24 @@ export function createSetupTab(screen, services) {
       const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
       const isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
       const sampleText = 'This is how your Hermes audio settings sound right now.';
+
+      // Temporarily enable background music for preview if a track is configured.
+      // Preview must play everything combined — voice, effects AND music. Write to
+      // targetDir (project): audio-processor.sh checks CLAUDE_PROJECT_DIR first
+      // (set to targetDir in the subprocess env below).
+      if (!!draft.bgTrack) {
+        const bgEnabledFile = path.join(targetDir, '.claude', 'config', 'background-music-enabled.txt');
+        let bgWas = false;
+        try { bgWas = fs.readFileSync(bgEnabledFile, 'utf8').trim() === 'true'; } catch {}
+        if (!bgWas) {
+          try {
+            fs.mkdirSync(path.dirname(bgEnabledFile), { recursive: true });
+            fs.writeFileSync(bgEnabledFile, 'true', 'utf8');
+          } catch {}
+          _bgRestoreFn = () => { try { fs.writeFileSync(bgEnabledFile, 'false', 'utf8'); } catch {} };
+        }
+      }
+
       let cmd, args;
       if (draft.ttsEngine === 'elevenlabs') {
         // ElevenLabs has no Windows provider; route through the bash orchestrator
@@ -1307,12 +1326,19 @@ export function createSetupTab(screen, services) {
         stdio: 'ignore', windowsHide: true,
         env: {
           ...process.env, CLAUDE_PROJECT_DIR: targetDir,
+          // audition = keep the draft's EXACT voice (F1). Force the receiver engine
+          // ONLY when this row has an explicit engine — an empty engine means
+          // "use the global/voice-derived engine", and forcing piper here would
+          // shadow a kokoro/SAPI row voice on the receiver (Fable review).
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          ...(draft.ttsEngine ? { AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine) } : {}),
           ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
         },
       });
       _previewModalProc = proc;
       proc.on('exit', (code) => {
         _previewModalProc = null;
+        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
         if (!_closed) {
           if (code !== 0 && code !== null) {
             const engineLabel = NATIVE_ENGINE_VOICES[draft.ttsEngine]?.label || draft.ttsEngine || 'engine';
@@ -1324,13 +1350,17 @@ export function createSetupTab(screen, services) {
           }
         }
       });
-      proc.on('error', () => { _previewModalProc = null; if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); } });
+      proc.on('error', () => {
+        _previewModalProc = null;
+        if (_bgRestoreFn) { _bgRestoreFn(); _bgRestoreFn = null; }
+        if (!_closed) { previewLine.setContent('{red-fg}Preview failed{/red-fg}'); screen.render(); }
+      });
     }
 
     const previewBtn = _modalBtn('Preview', 4, _playPreview);
     const resetBtn   = _modalBtn('Reset',   18, () => {
       draft.ttsEngine = ''; draft.voice = ''; draft.pretext = '';
-      draft.reverbPreset = 'off'; draft.bgTrack = ''; draft.bgVolume = '0.15';
+      draft.reverbPreset = 'off'; draft.bgTrack = ''; draft.bgVolume = '0.20';
       _autoSave();
       fieldList.setItems(_fieldItems());
       fieldList.focus();
@@ -1908,14 +1938,9 @@ export function createSetupTab(screen, services) {
     }
 
     function _autoSave(silent) {
-      saveTransportConfig(provider.id, draft).then(() => {
-        // Refresh status text below provider name
-        const row = transportRows.find(r => r.id === provider.id);
-        if (row && draft.host) {
-          row.statusText.setContent(`{#9e9e9e-fg}→ ${draft.host}:${draft.port}{/#9e9e9e-fg}`);
-          screen.render();
-        }
-      }).catch(() => {});
+      // (Removed a dead status-text refresh keyed off `transportRows`, which was
+      // always empty — Sonar S2583. The config still saves below.)
+      saveTransportConfig(provider.id, draft).catch(() => {});
       if (!silent) _showSavedToast(`${provider.name} Config`, `~/.agentvibes/transport-config.json`);
     }
 
@@ -2036,7 +2061,7 @@ export function createSetupTab(screen, services) {
       pretext:      config.pretext || defaultPretext[llmKey] || '',
       reverbPreset: config.effects || 'off',
       bgTrack:      config.bgTrack || '',
-      bgVolume:     config.bgVolume || '0.15',
+      bgVolume:     config.bgVolume || '0.20',
       // SSH destination fields
       mode:   sshCfg.mode === 'remote' ? 'remote' : 'local',
       sshKey: sshCfg.sshKey || '',
@@ -2244,6 +2269,12 @@ export function createSetupTab(screen, services) {
           windowsHide: true,
           env: {
             ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_LLM_KEY: `llm:${llmKey}`,
+            // audition = keep the draft's EXACT voice (F1). Force the receiver
+            // engine ONLY when this row has an explicit engine (empty = use the
+            // global/voice-derived engine; forcing piper would shadow a kokoro/
+            // SAPI row voice on the receiver — Fable review).
+            AGENTVIBES_VOICE_SOURCE: 'audition',
+            ...(draft.ttsEngine ? { AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine) } : {}),
             ...(draft.ttsEngine === 'elevenlabs' ? { AGENTVIBES_FORCE_PROVIDER: 'elevenlabs' } : {}),
           },
         });
@@ -2329,7 +2360,7 @@ export function createSetupTab(screen, services) {
       draft.pretext = defaultPretext[llmKey] || '';
       draft.reverbPreset = 'off';
       draft.bgTrack = '';
-      draft.bgVolume = '0.15';
+      draft.bgVolume = '0.20';
       draft.mode     = 'local';
       draft.connType = 'manual';
       draft.sshKey   = '';
@@ -2497,8 +2528,24 @@ export function createSetupTab(screen, services) {
     }
     navigationService?.openModal(null, _closePicker);
 
-    const engines = getEngineStatuses();
+    // Show ALL engines (like the Settings → Default TTS Engine picker), not just
+    // the platform-native ones — otherwise Windows SAPI / macOS Say vanish on a
+    // Linux/other host even though a remote receiver could synthesize them. When
+    // this LLM (or the global default) is in remote mode the receiver renders the
+    // audio, so off-platform engines are valid, selectable choices tagged
+    // "(Receiver)"; locally they stay greyed "(Not supported)".
+    const _isRemote = draft.mode === 'remote'
+      || (configService?.getConfig?.()?.audio_destination ?? 'local') === 'remote';
+    const engines = getAllEngines().map(e => ({
+      ...e,
+      installed: e.supported ? checkEngineInstalled(e.id) : false,
+    }));
     const items = engines.map(e => {
+      if (!e.supported) {
+        return _isRemote
+          ? `{cyan-fg}  ${e.name.padEnd(20)} (Receiver){/cyan-fg}  ${e.desc}`
+          : `{#607d8b-fg}  ${e.name.padEnd(20)} (Not supported){/#607d8b-fg}`;
+      }
       const status = e.installed ? '{green-fg}[OK]{/green-fg}' : '{yellow-fg}[Not Found]{/yellow-fg}';
       return `  ${e.name.padEnd(20)} ${status}  ${e.desc}`;
     });
@@ -2552,18 +2599,22 @@ export function createSetupTab(screen, services) {
       const engine = idx > 0 ? engines[idx - 1] : null;
       if (idx > 0 && !engine) { _closePicker(); return; }
       const selectedEngine = engine ? engine.id : '';
-      // Guard: block selection of non-installed optional engines
+      // Guard selection. In remote mode the receiver synthesizes, so any engine
+      // (incl. off-platform SAPI/macOS) is allowed. Locally, block engines that
+      // can't run here: off-platform ones, and optional engines not installed.
       if (selectedEngine) {
         const engineStatus = engines.find(e => e.id === selectedEngine);
-        if (engineStatus && !engineStatus.installed && !engineStatus.native) {
-          box.setLabel(` {red-fg} ${engineStatus.name} is not installed — go to Setup > TTS Engines to install {/red-fg} `);
+        const _flash = (msg) => {
+          box.setLabel(` {red-fg} ${msg} {/red-fg} `);
           screen.render();
-          setTimeout(() => {
-            if (!box.destroyed) {
-              box.setLabel(ENGINE_TITLE);
-              screen.render();
-            }
-          }, 3000);
+          setTimeout(() => { if (!box.destroyed) { box.setLabel(ENGINE_TITLE); screen.render(); } }, 3000);
+        };
+        if (engineStatus && !_isRemote && !engineStatus.supported) {
+          _flash(`${engineStatus.name} runs on the receiver — switch this LLM to a remote receiver to use it`);
+          return;
+        }
+        if (engineStatus && !_isRemote && engineStatus.supported && !engineStatus.installed && !engineStatus.native) {
+          _flash(`${engineStatus.name} is not installed — go to Setup > TTS Engines to install`);
           return;
         }
       }
@@ -2577,8 +2628,12 @@ export function createSetupTab(screen, services) {
         const looksLikeElId = /^[A-Za-z0-9]{10,40}$/.test(draft.voice || '');
         draft.voice = (elevenLabsVoiceName(draft.voice) || looksLikeElId)
           ? draft.voice : ELEVENLABS_DEFAULT_VOICE_ID;
+      } else if (MULTI_VOICE_NATIVE.has(selectedEngine)
+        && voicesForProvider(selectedEngine, { scanInstalledVoices, getVoiceMeta }).some(v => v.id === draft.voice)) {
+        // Re-selecting the SAME multi-voice native engine must NOT discard an
+        // already-valid chosen voice (e.g. Zira -> David) — keep it (Fable review).
       } else {
-        draft.voice = NATIVE_ENGINE_VOICES[selectedEngine]?.id || '';
+        draft.voice = defaultVoiceForEngine(selectedEngine);
       }
       _closePicker();
     });
@@ -2852,26 +2907,58 @@ export function createSetupTab(screen, services) {
     let _kSpinInterval = null;
     let _kSpinFrame = 0;
     let _kSpinningIdx = -1;
+    let _kSpinStartTs = 0;
+    let _kSpinRemote = false;  // whether the active preview is forwarded to the receiver
+    let _kFloorTimer = null;   // pending _stopKSpinnerWithFloor timer (tracked so it can be cancelled)
+    // Remote SSH preview is fire-and-forget: play-tts-ssh-remote.sh backgrounds
+    // the ssh call and exits within milliseconds, so the row spinner would be
+    // torn down before it ever paints a frame while the receiver plays the audio
+    // a beat later — the user hears sound but never sees the spinner. Hold the
+    // spinner on-screen for this minimum window so the remote path still gives a
+    // visible "preview sent" cue (fire-and-forget has no playback signal to await).
+    const _K_MIN_SPIN_MS = 1100;
 
-    function _startKSpinner(listIdx) {
+    function _startKSpinner(listIdx, remote = false) {
       _stopKSpinner();
       _kSpinningIdx = listIdx;
       _kSpinFrame = 0;
+      _kSpinStartTs = Date.now();
+      _kSpinRemote = remote;
       _kSpinInterval = setInterval(() => {
         if (_kClosed) { _stopKSpinner(); return; }
-        const spin = `{cyan-fg}${_K_SPIN[_kSpinFrame++ % _K_SPIN.length]}{/cyan-fg}`;
-        kPicker.setItem(listIdx, `${_kokoroItem(voices[listIdx])} ${spin}`);
+        // Row indicator: "⠹ Previewing (locally|remotely via SSH)  (Space to stop)".
+        // The row IS the selected voice, so the name is intentionally omitted.
+        kPicker.setItem(listIdx, padTaggedTo(previewRowContent(_K_SPIN[_kSpinFrame++ % _K_SPIN.length], _kSpinRemote), kPicker.width || 78));
         screen.render();
       }, 80);
+      if (_kSpinInterval.unref) _kSpinInterval.unref(); // never keep the process alive
     }
 
     function _stopKSpinner() {
+      // Cancel any pending floor timer so a stale one can't fire against a newer
+      // preview's spinner (rapid Space presses) or after the picker closes.
+      if (_kFloorTimer) { clearTimeout(_kFloorTimer); _kFloorTimer = null; }
       if (_kSpinInterval) { clearInterval(_kSpinInterval); _kSpinInterval = null; }
       if (_kSpinningIdx >= 0 && !_kClosed) {
         kPicker.setItem(_kSpinningIdx, _kokoroItem(voices[_kSpinningIdx]));
         screen.render();
       }
       _kSpinningIdx = -1;
+    }
+
+    // Stop the spinner but keep it on-screen for at least _K_MIN_SPIN_MS so a
+    // fire-and-forget remote send stays visible; runs `after` once the floor is
+    // met. No-ops safely if the picker closes in the meantime (_stopKSpinner and
+    // the _kClosed guard both short-circuit). Used only by the remote path — the
+    // local synth path already spins for the whole (multi-second) synthesis.
+    function _stopKSpinnerWithFloor(after) {
+      if (_kFloorTimer) { clearTimeout(_kFloorTimer); _kFloorTimer = null; }
+      const wait = Math.max(0, _K_MIN_SPIN_MS - (Date.now() - _kSpinStartTs));
+      _kFloorTimer = setTimeout(() => {
+        _kFloorTimer = null;
+        _stopKSpinner();
+        if (!_kClosed && after) after();
+      }, wait);
     }
 
     const LEGEND_H = 3;
@@ -3147,14 +3234,8 @@ export function createSetupTab(screen, services) {
     // Sound: "Ui sounds - Shimmering success" by Philip_Berger, CC0 (freesound
     // #648212). See .claude/audio/ui/CREDITS.txt. Falls back to a system sound
     // if the bundled asset is ever missing.
-    const _blingWav = path.join(packageDir, '.claude', 'audio', 'ui', 'bling-success.wav');
     function _playReadyCue() {
-      try {
-        const { command, args } = buildBlingCommand(process.platform, _blingWav, fs.existsSync(_blingWav));
-        const cue = spawn(command, args, { stdio: 'ignore', detached: true }); // NOSONAR
-        cue.on('error', () => { /* best-effort cue; a spawn failure must not surface */ });
-        cue.unref();
-      } catch { /* the readiness cue is purely cosmetic — never break the preview */ }
+      playBlingCue(packageDir);
     }
 
     kPicker.key(['space'], () => {
@@ -3193,7 +3274,7 @@ export function createSetupTab(screen, services) {
           ? '안녕하세요, 코코로 한국어 음성 미리보기입니다.'
           : _pfx2 === 'jf' || _pfx2 === 'jm'
             ? 'こんにちは、これはKokoroの日本語音声プレビューです。'
-            : `Hi, I am the ${voiceId.slice(3)} Kokoro voice.`;
+            : previewPhrase(voiceId);
 
       // Bling now — a real preview is committed (past the install-prompt and
       // toggle-off early returns). Fires for both local and remote paths.
@@ -3201,7 +3282,7 @@ export function createSetupTab(screen, services) {
 
       // ── Remote preview: route through SSH pipeline so receiver plays it ──
       if (_validSshHost) {
-        _startKSpinner(kPicker.selected);
+        _startKSpinner(kPicker.selected, true);
         const hookDir = path.join(packageDir, '.claude', 'hooks');
         const remoteEnv = { ...process.env, CLAUDE_PROJECT_DIR: targetDir, AGENTVIBES_SSH_HOST: _sshHost };
         if (_validSshKey)  remoteEnv.AGENTVIBES_SSH_KEY  = _sshKey;
@@ -3226,8 +3307,7 @@ export function createSetupTab(screen, services) {
         _kPreviewProc = remoteProc;
         remoteProc.on('exit', (code) => {
           _kPreviewProc = null;
-          _stopKSpinner();
-          if (_kClosed) return;
+          _stopKSpinnerWithFloor(() => {
           if (code !== 0 && _isCjkVoice(voiceId)) {
             // CJK voice failed on receiver — needs the language-specific misaki extra there.
             // Still try to download the .pt file locally so the picker shows ✓.
@@ -3272,6 +3352,7 @@ export function createSetupTab(screen, services) {
             screen.render();
             setTimeout(() => { if (!_kClosed) { kBox.setLabel(IDLE_LABEL); screen.render(); } }, 3000);
           }
+          });
         });
         remoteProc.on('error', () => {
           _kPreviewProc = null;
@@ -3316,6 +3397,7 @@ export function createSetupTab(screen, services) {
           }
           screen.render();
         }, 120);
+        if (_kAnimInterval.unref) _kAnimInterval.unref(); // never keep the process alive
       }
 
       function _stopDlAnim() {
@@ -3712,10 +3794,15 @@ export function createSetupTab(screen, services) {
     function _setHint(text) { elBox.setLabel(text || _defaultHint); screen.render(); }
     _setHint(_defaultHint);
 
+    // Row spinner: "⠹ Previewing (locally)  (Space to stop)" on the selected row.
+    // ElevenLabs preview always plays locally today, so the badge is honestly
+    // local; _setHint stays for error messages only.
+    const _elSpin = createRowSpinner(elPicker, screen, (i) => _items[i], { isClosed: () => _elClosed });
+
     function _previewEl() {
       if (_elPreviewProc) {  // toggle off
         _killElPreview();
-        _setHint(_defaultHint);
+        _elSpin.stop();
         return;
       }
       const v = ELEVENLABS_VOICES[elPicker.selected];
@@ -3723,7 +3810,7 @@ export function createSetupTab(screen, services) {
       const elScript = path.join(packageDir, '.claude', 'hooks', 'play-tts-elevenlabs.sh');
       let proc;
       try {
-        proc = _spawnAudio(resolveBash(), [elScript, `Hi, I am ${v.name}.`, v.id], { // NOSONAR — local hook on user's PATH
+        proc = _spawnAudio(resolveBash(), [elScript, `Hi, I'm ${v.name} from ElevenLabs.`, v.id], { // NOSONAR — local hook on user's PATH
           stdio: 'ignore',
           env: { ...process.env, CLAUDE_PROJECT_DIR: targetDir },
         });
@@ -3732,18 +3819,17 @@ export function createSetupTab(screen, services) {
         return;
       }
       _elPreviewProc = proc;
-      _setHint(` {cyan-fg}♪ ${v.name}... (Space=stop){/cyan-fg} `);
+      _elSpin.start(elPicker.selected, false);
       proc.on('exit', (code) => {
         _elPreviewProc = null;
         if (_elClosed) return;
+        _elSpin.stop();
         if (code && code !== 0) {
           _setHint(' {red-fg}Preview failed — check API key / plan{/red-fg} ');
           setTimeout(() => { if (!_elClosed) _setHint(_defaultHint); }, 3000);
-        } else {
-          _setHint(_defaultHint);
         }
       });
-      proc.on('error', () => { _elPreviewProc = null; if (!_elClosed) _setHint(' {red-fg}Preview failed{/red-fg} '); });
+      proc.on('error', () => { _elPreviewProc = null; _elSpin.stop(); if (!_elClosed) _setHint(' {red-fg}Preview failed{/red-fg} '); });
     }
 
     elPicker.key(['enter'], () => {
@@ -3824,9 +3910,13 @@ export function createSetupTab(screen, services) {
       destroyList(vpModal, screen, onDone);
     }
 
-    // AVI-S5.1/5.2: Single-item overlay for non-Piper engines.
-    // scanInstalledVoices() is NOT called; Space previews via the correct engine binary.
-    const nativeVoice = NATIVE_ENGINE_VOICES[draft.ttsEngine];
+    // AVI-S5.1/5.2: Single-item overlay for TRUE single-voice engines (soprano).
+    // SAPI / macOS Say are native but MULTI-voice — they fall through to the full
+    // voice picker below (populated from their built-in catalog) so a specific
+    // voice (e.g. Zira) can be chosen and previewed, not just the engine name.
+    const nativeVoice = MULTI_VOICE_NATIVE.has(draft.ttsEngine)
+      ? null
+      : NATIVE_ENGINE_VOICES[draft.ttsEngine];
     if (nativeVoice) {
       draft.voice = nativeVoice.id;
       let _nvClosed = false;
@@ -3887,7 +3977,10 @@ export function createSetupTab(screen, services) {
           screen.render();
           return;
         }
-        const phrase = `Hi, I am the ${nativeVoice.label} voice.`;
+        const _engineLabel = nativeVoice.id === 'macos' ? 'macOS'
+          : (nativeVoice.id && nativeVoice.id.includes('sapi')) ? 'Windows SAPI'
+            : (nativeVoice.id || 'your system');
+        const phrase = `Hi, I'm ${nativeVoice.label} from ${_engineLabel}.`;
         const engine = nativeVoice.id;
 
         function _spawnAndTrack(cmd, args, opts) {
@@ -4054,6 +4147,11 @@ export function createSetupTab(screen, services) {
       content: ' ', style: { fg: 'cyan', bg: COLORS.contentBg },
     });
 
+    // Row spinner: paints "⠹ Previewing (locally|remotely via SSH)  (Space to stop)"
+    // ON the selected row (shared with every other picker). renderItem restores the
+    // row's normal content on stop. vpPreviewLine is kept for error messages only.
+    const _vpSpin = createRowSpinner(vpList, screen, (i) => _buildVoiceItems([_allVoices[i]])[0], { isClosed: () => _vpClosed });
+
     // Movement hints at the bottom (primary actions live in the top help bar, so
     // they are not duplicated here). Standardized [key] = label formatting.
     blessed.text({
@@ -4088,7 +4186,10 @@ export function createSetupTab(screen, services) {
       if (_vpClosed) return;
       const savedIdx = vpList.selected ?? 0;
       const savedScroll = vpList.childBase ?? 0;
-      _allVoices = scanInstalledVoices();
+      // SAPI / macOS Say list their built-in catalog voices; Piper scans disk.
+      _allVoices = MULTI_VOICE_NATIVE.has(draft.ttsEngine)
+        ? voicesForProvider(draft.ttsEngine, { scanInstalledVoices, getVoiceMeta }).map(v => v.id)
+        : scanInstalledVoices();
       // Sort by display name so the first-letter quick jump is intuitive
       _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
         getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
@@ -4100,10 +4201,10 @@ export function createSetupTab(screen, services) {
     }
 
     function _previewVoice(voiceId) {
-      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
+      if (_previewVoiceId === voiceId) { _killVP(); _vpSpin.stop(); return; }
       _killVP();
 
-      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const phrase = previewPhrase(voiceId);
 
       // Route through remote provider if active
       // Search order: targetDir → cwd → package root → home
@@ -4130,6 +4231,10 @@ export function createSetupTab(screen, services) {
           : targetDir;
         const _rEnv = {
           ..._spawnEnv, CLAUDE_PROJECT_DIR: targetDir,
+          // audition = keep the EXACT previewed voice (F1); force the receiver
+          // engine so SAPI/macOS voices render in their own engine, not the default.
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(draft.ttsEngine || 'piper'),
           ...(llmKey ? { AGENTVIBES_LLM_KEY: `llm:${llmKey}` } : {}),
         };
         let rProc;
@@ -4148,15 +4253,50 @@ export function createSetupTab(screen, services) {
         }
         _previewProc = rProc;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { _refreshVP(); vpPreviewLine.setContent('{bright-magenta-fg}♪ Synthesizing on remote...{/bright-magenta-fg}'); screen.render(); }
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, true); }
         rProc.on('exit', () => {
           if (_previewVoiceId === voiceId) {
             _previewVoiceId = null; _previewProc = null;
-            // Keep message + ♪ visible for 5s while remote device synthesises and plays
-            setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }, 5000);
+            // Fire-and-forget SSH exits in ms; keep the row cue up briefly, then restore.
+            _vpSpin.stopWithFloor();
           }
         });
-        rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        rProc.on('error', () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); });
+        return;
+      }
+
+      // Local preview of the native MULTI-voice engines (Windows SAPI, macOS Say):
+      // the piper synth below cannot render these. Restores the local preview the
+      // single-item overlay used to provide before SAPI/macOS became multi-voice
+      // (Fable review — otherwise a local SAPI preview mis-ran piper and showed a
+      // bogus "is Piper installed?" error).
+      if (MULTI_VOICE_NATIVE.has(draft.ttsEngine)) {
+        let nProc = null;
+        if (_isWin && draft.ttsEngine === 'sapi') {
+          let _sapiScript = '';
+          for (const n of ['play-tts-sapi.ps1', 'play-tts-windows-sapi.ps1']) {
+            for (const base of [packageDir, targetDir]) {
+              const _p = path.join(base, '.claude', 'hooks-windows', n);
+              if (fs.existsSync(_p)) { _sapiScript = _p; break; }
+            }
+            if (_sapiScript) break;
+          }
+          if (_sapiScript) {
+            nProc = _spawnAudio('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', _sapiScript, '-Text', phrase, '-VoiceOverride', voiceId], { stdio: 'ignore', windowsHide: true }); // NOSONAR
+          }
+        } else if (process.platform === 'darwin' && draft.ttsEngine === 'macos-say') {
+          nProc = _spawnAudio('say', ['-v', voiceId, phrase], { stdio: 'ignore' }); // NOSONAR
+        }
+        if (!nProc) {
+          // Engine can't run on THIS OS and this LLM isn't remote — nothing to play.
+          if (!_vpClosed) { vpPreviewLine.setContent('{yellow-fg}♪ Runs on the receiver — set this LLM to remote to preview{/yellow-fg}'); _refreshVP(); }
+          return;
+        }
+        _previewProc = nProc;
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, false); }
+        nProc.on('exit', () => { if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; _vpSpin.stop(); } });
+        nProc.on('error', () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); });
         return;
       }
 
@@ -4191,14 +4331,14 @@ export function createSetupTab(screen, services) {
       _previewVoiceId = voiceId;
 
       if (!_vpClosed) {
-        vpPreviewLine.setContent(`{cyan-fg}♪ Synthesizing: ${voiceId}...{/cyan-fg}`);
-        _refreshVP();
+        _vpSpin.start(vpList.selected, false);
       }
 
       piper.on('exit', (code) => {
         if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
         if (code !== 0) {
           _previewProc = null; _previewVoiceId = null;
+          _vpSpin.stop();
           if (!_vpClosed) {
             vpPreviewLine.setContent('{red-fg}♪ Preview failed — is Piper installed?{/red-fg}');
             screen.render();
@@ -4213,7 +4353,7 @@ export function createSetupTab(screen, services) {
         // would otherwise fail silently since there was no exit-code check here.
         const _wavPlayers = getAllWavPlayers(_spawnEnv);
         if (_wavPlayers.length === 0) {
-          _previewProc = null; _previewVoiceId = null;
+          _previewProc = null; _previewVoiceId = null; _vpSpin.stop();
           try { fs.unlinkSync(tempWav); } catch {}
           return;
         }
@@ -4221,7 +4361,7 @@ export function createSetupTab(screen, services) {
         function _tryNextPlayer(remainingPlayers) {
           if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
           if (!remainingPlayers.length) {
-            _previewProc = null; _previewVoiceId = null;
+            _previewProc = null; _previewVoiceId = null; _vpSpin.stop();
             if (!_vpClosed) {
               vpPreviewLine.setContent('{red-fg}♪ Audio playback failed (no audio device?){/red-fg}');
               screen.render();
@@ -4238,23 +4378,26 @@ export function createSetupTab(screen, services) {
             env: _spawnEnv,
           });
           _previewProc = pp;
-          if (!_vpClosed) { vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}{/cyan-fg}`); screen.render(); }
-          pp.on('exit', (code) => {
-            if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-            if (code !== 0) { _tryNextPlayer(rest); return; }
-            _previewVoiceId = null; _previewProc = null;
-            if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+          // Row spinner already running from the synth phase — keep it through playback.
+          // Node can emit both 'error' and 'exit' for one failed spawn; settle once.
+          let settled = false;
+          const settle = (failed) => {
+            if (settled) return;
+            settled = true;
+            // A newer preview (or a stop) owns the row now; this player is stale.
+            if (_previewVoiceId !== voiceId || _previewProc !== pp) { try { fs.unlinkSync(tempWav); } catch {} return; }
+            if (failed) { _tryNextPlayer(rest); return; }
+            _previewVoiceId = null; _previewProc = null; _vpSpin.stop();
             try { fs.unlinkSync(tempWav); } catch {}
-          });
-          pp.on('error', () => {
-            if (_previewVoiceId !== voiceId) { try { fs.unlinkSync(tempWav); } catch {} return; }
-            _tryNextPlayer(rest);
-          });
+          };
+          pp.on('exit', (code) => settle(code !== 0));
+          pp.on('error', () => settle(true));
         }
         _tryNextPlayer(_wavPlayers);
       });
       piper.on('error', () => {
         _previewProc = null; _previewVoiceId = null;
+        _vpSpin.stop();
         if (!_vpClosed) {
           vpPreviewLine.setContent('{red-fg}♪ Cannot find Piper — install it first{/red-fg}');
           screen.render();

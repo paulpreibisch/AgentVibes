@@ -1,179 +1,87 @@
-# AgentVibes Development Guidelines
+# AgentVibes — Development Guidelines
 
-**Version:** 3.0
-**Updated:** 2026-02-15
-**Status:** Active (Using BMAD Methodology)
+**Updated:** 2026-07-06 (v5.12.x era)
 
-## Overview
+## What this is
 
-AgentVibes is a Text-to-Speech system for AI assistants with personality support.
+AgentVibes (`agentvibes` on npm) gives AI coding agents a spoken voice: Claude Code hooks + MCP server + interactive TUI, with Piper/Kokoro/ElevenLabs providers, background music, per-agent BMAD voices, a remote SSH receiver, and avatar rendering. Node ESM core with **parallel bash and PowerShell runtimes** and a Python MCP server.
 
-### Project Uses BMAD Methodology
+## Repo map
 
-This project follows **BMAD (BMM - Business Model Methodology)** for all story development:
-- Use `/sprint-planning` to initialize sprint tracking
-- Use `/dev-story` for each story implementation (NOT manual commits)
-- `/dev-story` handles: implementation → testing → code review → auto-fixes → status updates
-- All stories tracked in `docs/implementation-artifacts/sprint-status.yaml`
-- Status updates: `ready-for-dev` → `in-progress` → `complete`
+| Path | What it is |
+|------|-----------|
+| `src/installer.js` + `src/installer/` | npx installer (manifest-based, non-destructive) |
+| `src/console/` | blessed TUI (tabs, modals, widgets) |
+| `src/services/` | config-service, provider services, **utterance-resolver.js** (single source of truth for playback plans) |
+| `.claude/hooks/` + `.claude/hooks-windows/` | **Shipped product code** — bash/PS1 runtime (`play-tts.sh`, `audio-processor.sh`, `bmad-speak.sh`, …) installed into user projects |
+| `mcp-server/` | Python MCP server (`server.py`, pytest suite) |
+| `templates/` | Remote receiver scripts (`agentvibes-receiver.sh`/`.ps1`) |
+| `bin/` | CLI entry points (`agentvibes.js`, `resolve-utterance.js`, `mcp-server.js`) |
+| `test/unit/` | node:test `.test.js` + bats `.bats` suites |
+| `docs/implementation-artifacts/` | BMAD story files + `sprint-status.yaml` |
+| `docs/architecture/` | Provider/system architecture docs |
 
-**Required Reading:** See `BMAD-STORY-DEVELOPMENT.md` for complete workflow.
+**Everything under the repo's `.claude/` (hooks, personalities, commands, config) is the npm package payload.** Editing a hook here is a product change: it must pass tests, keep bash/PowerShell parity, and reach real installs via the installer (`manifestSafeCopy`) — not just the dev checkout. The remote receiver additionally needs an in-place redeploy to `~/.agentvibes/` + watcher restart.
 
-## Critical Rules
+## Architecture invariants (hard-won — do not regress)
 
-### ✅ MANDATORY: Use BMAD Workflow
-1. **Initialize sprint:** Run `/sprint-planning` once per sprint
-2. **Develop each story:** Run `/dev-story` (NOT manual coding)
-3. **Never skip workflow steps** - Workflow enforces quality gates
-4. **Update sprint-status.yaml** automatically via `/dev-story`
-5. **Code review included** - Built into `/dev-story` workflow
+1. **The utterance resolver is the single source of truth.** `src/services/utterance-resolver.js` reads all config once and emits a flat plan (voice, engine, transport, effects, music, speed, volume). Players consume the plan; they must NOT re-read config files directly. New playback behavior goes in the resolver + precedence table, not in a player script.
+2. **Volume defaults are 20% (`0.20`), never 70%.** Regression-tested; covered in bash, PS, and JS.
+3. **Never select TTS output by "most recent file."** Providers emit an `AV_OUTPUT:` sentinel on stdout; capture the exact filename and fail loudly on synthesis failure. The `ls -t` heuristic is retired.
+4. **Kokoro voices force the kokoro engine** (an `af_*`/`am_*` voice with a piper ENGINE column = silence). The resolver encodes this; keep it.
+5. **Bash/PowerShell parity.** Any change to `play-tts.sh` needs the mirror change in `play-tts.ps1` (and vice versa), plus the contract-test matrix (`AVI-S8.7`) kept green. Note the historical env-flag split: bash reads `AGENTVIBES_NO_PLAYBACK`, PS reads `AGENTVIBES_NO_PLAY` — set both.
+6. **Receiver settings are keyed by project** (TTS `--project-dir` basename namespaces scene/avatar/voice). Don't wipe `glb-scenes.json` — it holds calibration.
+7. **SSH senders must never force `-p 22`** — it overrides `~/.ssh/config` alias ports and silently drops TTS.
 
-### ✅ Non-Destructive Configuration Rule (MANDATORY)
-All code that reads, writes, or modifies user configuration MUST be non-destructive:
-1. **Never delete or overwrite** existing user `.claude/` or `~/.claude/` config files (settings, voices, personalities, audio-effects.cfg) unless the user explicitly requested it
-2. **Copy new files; never remove existing ones** — installer adds missing files only
-3. **Write hooks only when absent** — `configureSessionStartHook` and similar functions check for existing hooks before writing
-4. **Preserve custom entries** — e.g. `audio-effects.cfg` user rows must survive an `agentvibes update`
-5. **Creating directories is fine** — `mkdir -p` / `{ recursive: true }` is always safe
-6. Any function that could overwrite user data must have a test asserting idempotency
+## Non-Destructive Configuration Rule (MANDATORY)
 
-### ✅ Git Workflow (ONLY Outside BMAD)
-For changes outside story development:
-1. Describe changes before acting
-2. Get explicit user approval before commits/pushes
-3. Test locally before pushing
-4. Exception: Changes made by `/dev-story` auto-commit
+All code touching user `.claude/` or `~/.claude/` config must be non-destructive. This is enforced by real machinery — use it:
 
-## Security Requirements (SonarCloud Compliance)
+- `manifestSafeCopy()` in `src/installer.js` copies via an install manifest and refuses to clobber user-modified files. New installed files go through it.
+- `configureSessionStartHook()` and friends write hooks **only when absent**.
+- Never delete/overwrite user settings, voices, personalities, or `audio-effects.cfg`; custom entries must survive `agentvibes update`. A settings.json parse error must not wipe the file.
+- Any function that could overwrite user data needs an idempotency test (see `test/unit/installer-config-safety.test.js`, `install-manifest.test.js`).
 
-### Core Security Rules (NO EXCEPTIONS)
-1. **No hardcoded credentials** - Never commit API keys, passwords, tokens
-2. **Validate all external input** - User input, files, environment variables
-3. **Secure temp directories** - Use `$XDG_RUNTIME_DIR` or user-specific `/tmp`
-4. **Verify file ownership** - Check before processing external files (uid check)
-5. **Prevent path traversal** - Validate paths stay within expected directories (use `path.resolve()`)
-6. **Never log sensitive data** - Mask credentials in logs
+## Development workflow
 
-### Bash/Shell Security
-```bash
-set -euo pipefail  # REQUIRED: Always use strict mode
+Hybrid, in practice:
 
-# Secure temp with proper permissions
-TEMP_DIR="${XDG_RUNTIME_DIR:-/tmp}/agentvibes-$RANDOM"
-mkdir -p "$TEMP_DIR"; chmod 700 "$TEMP_DIR"
+- **BMAD for planning and tracking.** Epics/stories live in `docs/implementation-artifacts/` with `sprint-status.yaml` actively maintained. Use `/sprint-planning`, `/create-story`, `/dev-story` for story-shaped work; update `sprint-status.yaml` when a story changes state.
+- **Implementation happens on feature branches and git worktrees** (many active: `feat/*`, `fix/*`, worktrees like `AgentVibes-musetalk`, `AgentVibes-outfit-swap`), merged to `master`. Direct fixes, agent-driven implementation, and adversarial code-review passes are all normal — `/dev-story` is a tool, not a gate on every commit.
+- **Adversarial code review before merging significant work** (see the `fix(review): …` commits); HIGH/MEDIUM findings get fixed, not deferred.
+- Get explicit user approval before commits/pushes for non-story work. Paul doesn't code — do the work end-to-end via scripts; give estimates in AI time.
 
-# Verify file ownership before processing
-[[ $(stat -c '%u' "$file" 2>/dev/null || stat -f '%u' "$file" 2>/dev/null) == $(id -u) ]] || exit 1
+## Testing
 
-trap 'rm -f "$TEMP_FILE"' EXIT  # Clean up: use single quotes for deferred expansion
+- `npm test` → `scripts/run-tests.sh`: syntax check → bats suite → `node --test` with c8 coverage. **Required before committing.**
+- The runner suppresses TTS audio globally (marker file `~/.agentvibes-tests-running` + `AGENTVIBES_SUPPRESS_AUDIO` + both no-play flags). Opt in to audio with `AGENTVIBES_TEST_AUDIO=true`.
+- Python: `pytest` in `mcp-server/` (`test_server.py`, `test_mcp_correctness.py`, `test_windows_script_parity.py`).
+- CI: `test.yml`, `test-windows.yml`, `test-macos*.yml`, `sonarcloud.yml`, `codeql.yml`, `publish.yml`.
+- New regressions become permanent tests (contract-test matrix pattern) — a bug fixed without a test will come back.
 
-# Validate input
-[[ "$VALUE" =~ ^[0-9]+$ ]] || exit 1  # Only allow numbers
+## Releases — use the `/release` skill
 
-echo "$VARIABLE"  # GOOD: Quoted
-echo $VARIABLE    # BAD: Vulnerable to word splitting
-```
+`/release` runs the managed workflow with human checkpoints: pre-flight (coverage must pass, secret scan), version-bump recommendation, drafted RELEASE_NOTES.md + README "NEW IN" section + 8-language translations (`docs/i18n/`), then `npm version` → push → `gh release create` → optional `npm publish`, each gated on explicit approval.
 
-### JavaScript/Node.js Security
-```javascript
-// Path safety: ALWAYS use path.resolve()
-const safePath = path.resolve(userInput);
-function isPathSafe(target, base) {
-  const r = path.resolve(target), b = path.resolve(base);
-  return r === b || r.startsWith(b + path.sep);
-}
+- **`package.json` is the single source of truth for version.** The README badge is auto-updated by `scripts/sync-readme-version.js` via the npm `version` hook — never hand-edit it.
+- **`npm publish` packs the working tree, not the git tag.** Run the pack-contents test (`test/unit/npm-pack-contents.test.js`) and never publish from a dirty tree.
+- Alpha flow is normal: ship `x.y.z-alpha.N` while iterating, then promote to stable.
 
-// Never log credentials - ALWAYS mask
-console.log('Key: ' + apiKey.substring(0, 3) + '...');  // Good
-console.log(`Key: ${apiKey}`);                           // BAD
+## Security (project-specific, enforced by tests)
 
-// Resource cleanup with try-finally
-let proc;
-try {
-  proc = spawn(...);
-} finally {
-  if (proc && !proc.killed) proc.kill();
-}
-```
+- **User-supplied file paths** (custom music, config) go through the validator chain: `path.resolve()`, containment check, magic-number format validation, UID ownership check (see `audio-format-validator`, `file-ownership-verifier` and the 180-case traversal suite).
+- **Hooks/shell scripts use `set -euo pipefail`**, quoted expansions, and `trap` cleanup of temp files.
+- **Never display or log secrets** — no API keys/tokens in chat, logs, commits, or example data (real SSH ports/aliases were once scrubbed from tests; don't reintroduce them). Mask credentials (`key.substring(0,3) + '...'`).
+- Clean up spawned processes (`try/finally` kill in JS, `finally: process.kill()` in Python) — the TUI spawns preview processes constantly.
+- SonarCloud runs on CI after push; it can't run locally.
 
-### Python Security
-```python
-# Resource cleanup
-process = None
-try:
-    process = subprocess.Popen(...)
-finally:
-    if process and process.poll() is None:
-        process.kill()
-
-# Graceful error handling
-try:
-    content = path.read_text()
-except (PermissionError, UnicodeDecodeError, OSError) as e:
-    print(f"Warning: {e}", file=sys.stderr)
-    return default_value
-```
-
-## Code Quality Standards
-
-- ✅ **Error handling:** No silent failures - always handle errors explicitly
-- ✅ **Defensive programming:** Check preconditions and validate inputs
-- ✅ **Resource cleanup:** Always clean up files, processes, connections
-- ✅ **Race conditions:** Use file locking for shared resources
-- ✅ **Comments:** Security-critical code only (explain WHY, not WHAT)
-- ✅ **Single responsibility:** Keep functions focused and testable
-
-## Testing Requirements
-
-- Run `npm test` before committing (REQUIRED)
-- Write tests for: input validation, path handling, edge cases
-- Code review via `/dev-story` includes test validation
-- Target: 80%+ code coverage for new features
-
-## Definition of Done (Checked by /dev-story)
-
-- [ ] All tests pass (`npm test`)
-- [ ] No Sonar security hotspots
-- [ ] Code follows project patterns (project-context.md)
-- [ ] Credentials masked in logs
-- [ ] Paths validated (no traversal)
-- [ ] File operations safe (ownership checked)
-- [ ] Shell scripts use strict mode
-- [ ] Resources properly cleaned up
-- [ ] Acceptance criteria satisfied
-
-## Story Development Workflow (REQUIRED)
-
-### For Each Sprint:
-1. Run `/sprint-planning` to initialize sprint-status.yaml
-2. For each story, run `/dev-story` (handles everything)
-3. Check progress anytime with `/sprint-status`
-
-### What /dev-story Does:
-- Finds next ready-for-dev story
-- Loads story file with acceptance criteria
-- Implements tasks with code + tests
-- **Runs adversarial code review** (finds 3-10 issues)
-- **Auto-fixes HIGH and MEDIUM severity issues**
-- Validates against project-context.md
-- Updates sprint-status.yaml automatically
-- Marks story complete when all ACs satisfied
-
-**Never bypass the workflow** - it enforces all quality gates.
-
-## Important Files
+## Key references
 
 | File | Purpose |
 |------|---------|
-| `CLAUDE.md` | Development standards (this file) |
-| `BMAD-STORY-DEVELOPMENT.md` | How to use BMAD methodology |
-| `project-context.md` | Project-specific patterns (if exists) |
-| `docs/epics.md` | All epics and stories |
-| `docs/implementation-artifacts/sprint-status.yaml` | Sprint progress tracking |
-| `_bmad/core/tasks/workflow.xml` | BMAD execution engine (read-only) |
-
-## References
-
-- **BMAD Methodology:** See `/sprint-planning`, `/dev-story`, `/sprint-status` workflows
-- **Security Standards:** [SonarCloud Rules](https://rules.sonarsource.com/javascript/type/Security_Hotspot), [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- **Bash Best Practices:** [Shellharden](https://github.com/anordal/shellharden/blob/master/how_to_do_things_safely_in_bash.md)
+| `docs/implementation-artifacts/sprint-status.yaml` | Live sprint/story state |
+| `docs/architecture/provider-system.md` | Provider architecture |
+| `BMAD-STORY-DEVELOPMENT.md` | BMAD story workflow reference |
+| `AGENTS.md` | TTS protocol for AI agents using AgentVibes |
+| `.claude/skills/release/SKILL.md` | Release workflow |
+| `docs/feature-platform-matrix.md` | What works on which platform |

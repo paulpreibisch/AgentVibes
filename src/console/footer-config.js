@@ -19,10 +19,6 @@ export const FOOTER_CONFIG = {
     color: '#2196f3',
     text: ` ${key('↑↓')} Navigate  ${key('←→')} Same Row  ${key('Enter')} Activate  ${key('Space')} Preview  ${key('Esc')} Cancel`,
   },
-  voices: {
-    color: '#00bcd4',
-    text: ` ${key('1-6')} Sort  ${key('/')} Search  ${key('P')} Provider  ${key('F')} Favorites  ${key('Space')} Preview  ${key('*')} Fav  ${key('I')} Install`,
-  },
   music: {
     color: '#ff9800',
     text: ` ${key('Space')} Preview  ${key('Enter')} Select  ${key('M')} Toggle  ${key('*')} Fav  ${key('F')} Filter  ${key('↑↓')} Navigate`,
@@ -37,7 +33,7 @@ export const FOOTER_CONFIG = {
   },
   agents: {
     color: '#9c27b0',
-    text: ` ${key('↑↓')} Navigate  ${key('Enter')} Edit Agent  ${key('Space')} Sample  ${key('R')} Reset`,
+    text: ` ${key('↑↓')} Navigate  ${key('Enter')} Edit Agent  ${key('Space')} Sample  ${key('Del')} Reset`,
   },
   receiver: {
     color: '#00897b',

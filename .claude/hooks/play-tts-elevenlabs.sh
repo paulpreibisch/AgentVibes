@@ -16,7 +16,8 @@
 # @related play-tts.sh, provider-manager.sh, language-manager.sh
 #
 # Voice can be a name (e.g. "Rachel") or a raw ElevenLabs voice ID.
-# Set ELEVENLABS_API_KEY in your shell profile or via Infisical.
+# Set ELEVENLABS_API_KEY in your shell profile, or store it in
+# ~/.agentvibes/elevenlabs-key.txt (chmod 600).
 # Default voice: Rachel (English, warm female)
 #
 
@@ -31,6 +32,7 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 source "$SCRIPT_DIR/audio-cache-utils.sh"
+source "$SCRIPT_DIR/python-resolver.sh"
 source "$SCRIPT_DIR/language-manager.sh"
 
 if [[ -z "$TEXT" ]]; then
@@ -44,58 +46,7 @@ if [[ ${#TEXT} -gt 2000 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Optional: fetch the key from Infisical on demand, so no key is stored on disk.
-# Opt-in via ~/.agentvibes/infisical.env, which sets (env vars take precedence):
-#   INFISICAL_SECRET_NAME   name of the secret in Infisical (e.g. ELEVEN_LABS)
-#   INFISICAL_PROJECT_ID    project/workspace id
-#   INFISICAL_ENV           environment slug         (default: prod)
-#   INFISICAL_DOMAIN        API base URL             (default: http://127.0.0.1:8200/api)
-#   INFISICAL_BOOTSTRAP     universal-auth creds file (default: ~/.palace-bootstrap)
-# Requires the infisical CLI + python3. Fails soft: prints nothing and returns
-# non-zero when unconfigured or unreachable, so the normal error path still runs.
-# The fetched value is never printed.
-_fetch_key_from_infisical() {
-  local cfg="${HOME}/.agentvibes/infisical.env"
-  if [[ -f "$cfg" ]]; then
-    set -o allexport; source "$cfg"; set +o allexport
-  fi
-
-  local secret_name="${INFISICAL_SECRET_NAME:-}"
-  local project_id="${INFISICAL_PROJECT_ID:-}"
-  local env_name="${INFISICAL_ENV:-prod}"
-  local domain="${INFISICAL_DOMAIN:-http://127.0.0.1:8200/api}"
-  local bootstrap="${INFISICAL_BOOTSTRAP:-${HOME}/.palace-bootstrap}"
-
-  [[ -n "$secret_name" && -n "$project_id" ]] || return 1
-  command -v infisical >/dev/null 2>&1 || return 1
-  command -v python3   >/dev/null 2>&1 || return 1
-
-  # Obtain an access token: reuse an exported INFISICAL_TOKEN, else exchange the
-  # universal-auth client credentials from the bootstrap file (creds via env only).
-  local token="${INFISICAL_TOKEN:-}"
-  if [[ -z "$token" ]]; then
-    [[ -f "$bootstrap" ]] || return 1
-    set -o allexport; source "$bootstrap"; set +o allexport
-    [[ -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-}" && -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:-}" ]] || return 1
-    token="$(_AV_DOMAIN="$domain" python3 -c '
-import os, json, urllib.request
-d = os.environ["_AV_DOMAIN"].rstrip("/")
-req = urllib.request.Request(d + "/v1/auth/universal-auth/login",
-    data=json.dumps({"clientId": os.environ["INFISICAL_UNIVERSAL_AUTH_CLIENT_ID"],
-                     "clientSecret": os.environ["INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET"]}).encode(),
-    headers={"Content-Type": "application/json"})
-print(json.loads(urllib.request.urlopen(req, timeout=10).read())["accessToken"])
-' 2>/dev/null || true)"
-  fi
-  [[ -n "$token" ]] || return 1
-
-  INFISICAL_TOKEN="$token" infisical secrets get "$secret_name" \
-    --projectId "$project_id" --env "$env_name" --domain "$domain" \
-    --plain 2>/dev/null | head -1
-}
-
-# ---------------------------------------------------------------------------
-# API key — env var (only if it looks valid), then key file, then Infisical.
+# API key — env var (only if it looks valid), then key file.
 # A malformed/truncated ELEVENLABS_API_KEY (e.g. a half-pasted key) is ignored so
 # it can't silently shadow a good key file — a common foot-gun that yields
 # confusing "API key fail" errors despite a valid key on disk.
@@ -122,91 +73,55 @@ if [[ -z "$API_KEY" ]]; then
     API_KEY="$(tr -d '[:space:]' < "$_key_file")"
   fi
 fi
-if [[ -z "$API_KEY" ]]; then
-  API_KEY="$(_fetch_key_from_infisical || true)"
-  API_KEY="$(printf '%s' "$API_KEY" | tr -d '[:space:]')"
-fi
 
 if [[ -z "$API_KEY" ]]; then
   echo "❌ ElevenLabs API key not set." >&2
-  echo "   Set it one of three ways:" >&2
+  echo "   Set it one of two ways:" >&2
   echo "   1. export ELEVENLABS_API_KEY=your_key  (add to ~/.bashrc or ~/.zshrc)" >&2
   echo "   2. echo 'your_key' > ~/.agentvibes/elevenlabs-key.txt && chmod 600 ~/.agentvibes/elevenlabs-key.txt" >&2
-  echo "   3. Configure Infisical in ~/.agentvibes/infisical.env (INFISICAL_SECRET_NAME + INFISICAL_PROJECT_ID)" >&2
   echo "   Get a free key at: https://elevenlabs.io" >&2
   exit 2
 fi
 
 # ---------------------------------------------------------------------------
-# Inline voice name → ID map (covers common built-in ElevenLabs voices)
-declare -A VOICE_IDS
-VOICE_IDS["Rachel"]="21m00Tcm4TlvDq8ikWAM"
-VOICE_IDS["Adam"]="pNInz6obpgDQGcFmaJgB"
-VOICE_IDS["Antoni"]="ErXwobaYiN019PkySvjV"
-VOICE_IDS["Arnold"]="VR6AewLTigWG4xSOukaG"
-VOICE_IDS["Bella"]="EXAVITQu4vr4xnSDxMaL"
-VOICE_IDS["Callum"]="N2lVS1w4EtoT3dr4eOWO"
-VOICE_IDS["Charlie"]="IKne3meq5aSn9XLyUdCD"
-VOICE_IDS["Charlotte"]="XB0fDUnXU5powFXDhCwa"
-VOICE_IDS["Clyde"]="2EiwWnXFnvU5JabPnv8n"
-VOICE_IDS["Daniel"]="onwK4e9ZLuTAKqWW03F9"
-VOICE_IDS["Dave"]="CYw3kZ02Hs0563khs1Fj"
-VOICE_IDS["Dorothy"]="ThT5KcBeYPX3keUQqHPh"
-VOICE_IDS["Domi"]="AZnzlk1XvdvUeBnXmlld"
-VOICE_IDS["Drew"]="29vD33N1CtxCmqQRPOHJ"
-VOICE_IDS["Emily"]="LcfcDJNUP1GQjkzn1xUU"
-VOICE_IDS["Ethan"]="g5CIjZEefAph4nQFvHAz"
-VOICE_IDS["Fin"]="D38z5RcWu1voky8WS1ja"
-VOICE_IDS["Freya"]="jsCqWAovK2LkecY7zXl4"
-VOICE_IDS["Gigi"]="jBpfuIE2acCO8z3wKNLl"
-VOICE_IDS["Giovanni"]="zcAOhNBS3c14rBihAFp1"
-VOICE_IDS["Glinda"]="z9fAnlkpzviPz146aGWa"
-VOICE_IDS["Grace"]="oWAxZDx7w5VEj9dCyTzz"
-VOICE_IDS["Harry"]="SOYHLrjzK2X1ezoPC6cr"
-VOICE_IDS["James"]="ZQe5CZNOzWyzPSCn5a3c"
-VOICE_IDS["Jessie"]="t0jbNlBVZ17f02VDIeMI"
-VOICE_IDS["Josh"]="TxGEqnHWrfWFTfGW9XjX"
-VOICE_IDS["Liam"]="TX3LPaxmHKxFdv7VOQHJ"
-VOICE_IDS["Lily"]="pFZP5JQG7iQjIQuC4Bku"
-VOICE_IDS["Matilda"]="XrExE9yKIg1WjnnlVkGX"
-VOICE_IDS["Michael"]="flq6f7yk4E4fJM5XTYuZ"
-VOICE_IDS["Mimi"]="zrHiDhphv9ZnVXBqCLjz"
-VOICE_IDS["Nicole"]="piTKgcLEGmPE4e6mEKli"
-VOICE_IDS["Patrick"]="ODq5zmih8GrVes37Dizd"
-VOICE_IDS["Paul"]="5Q0t7uMcjvnagumLfvZi"
-VOICE_IDS["Sam"]="yoZ06aMxZJJ28mfd3POQ"
-VOICE_IDS["Sarah"]="EXAVITQu4vr4xnSDxMaL"
-VOICE_IDS["Serena"]="pMsXgVXv3BLzUgSXRplE"
-VOICE_IDS["Thomas"]="GBv7mTt0atIp3Br8iCZE"
-
-DEFAULT_VOICE_ID="${VOICE_IDS[Rachel]}"
+# ElevenLabs voice catalog — single source of truth (shared with voice-manager.sh).
+# Provides ELEVENLABS_DEFAULT_VOICE, elevenlabs_resolve_voice(), elevenlabs_voice_names().
+if [[ -f "$SCRIPT_DIR/elevenlabs-voices.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/elevenlabs-voices.sh"
+else
+  # Minimal fallback so speech still works if the catalog file is missing.
+  # bash-3.2-safe: no associative array, case-statement resolver.
+  ELEVENLABS_DEFAULT_VOICE="Sarah"
+  elevenlabs_resolve_voice() {
+    local q="${1:-}"; [[ -z "$q" ]] && return 1
+    case "$(printf '%s' "$q" | tr '[:upper:]' '[:lower:]')" in
+      sarah) printf %s "EXAVITQu4vr4xnSDxMaL"; return 0 ;;
+    esac
+    [[ "$q" =~ ^[A-Za-z0-9]{20}$ ]] && { printf %s "$q"; return 0; }
+    return 1
+  }
+fi
+DEFAULT_VOICE_ID="$(elevenlabs_resolve_voice "$ELEVENLABS_DEFAULT_VOICE")"
 
 # ---------------------------------------------------------------------------
 # Resolve voice ID from override or config
 VOICE_ID=""
 
 if [[ -n "$VOICE_OVERRIDE" ]]; then
-  if [[ -n "${VOICE_IDS[$VOICE_OVERRIDE]:-}" ]]; then
-    VOICE_ID="${VOICE_IDS[$VOICE_OVERRIDE]}"
-  elif [[ "$VOICE_OVERRIDE" =~ ^[a-zA-Z0-9]{10,40}$ ]]; then
-    # Looks like a raw voice ID
-    VOICE_ID="$VOICE_OVERRIDE"
-  else
-    echo "⚠️  Unknown ElevenLabs voice '$VOICE_OVERRIDE', using Rachel" >&2
+  VOICE_ID="$(elevenlabs_resolve_voice "$VOICE_OVERRIDE")" || {
+    echo "[WARN] Unknown ElevenLabs voice '$VOICE_OVERRIDE', using $ELEVENLABS_DEFAULT_VOICE" >&2
     VOICE_ID="$DEFAULT_VOICE_ID"
-  fi
+  }
 else
-  # Check voice manager for configured voice
+  # Config path: read the voice saved by /agent-vibes:switch (a raw voice_id or
+  # a friendly name) and resolve it the same way — this is what hook-driven
+  # speech uses, so a switched voice actually plays (not a silent default).
   VOICE_NAME=""
   if [[ -f "$SCRIPT_DIR/voice-manager.sh" ]]; then
     VOICE_NAME="$("$SCRIPT_DIR/voice-manager.sh" get 2>/dev/null || true)"
   fi
-
-  if [[ -n "$VOICE_NAME" && -n "${VOICE_IDS[$VOICE_NAME]:-}" ]]; then
-    VOICE_ID="${VOICE_IDS[$VOICE_NAME]}"
-  else
-    VOICE_ID="$DEFAULT_VOICE_ID"
-  fi
+  VOICE_ID="$(elevenlabs_resolve_voice "$VOICE_NAME")" || VOICE_ID="$DEFAULT_VOICE_ID"
 fi
 
 # ---------------------------------------------------------------------------
@@ -246,7 +161,12 @@ trap 'rm -f "${TEMP_FILE:-}" "${BODY_FILE:-}" 2>/dev/null || true' EXIT
 # ---------------------------------------------------------------------------
 # Build the JSON request body with python so all escaping is handled correctly
 # (text is passed via env, never interpolated into a shell-quoted payload).
-if ! TTS_TEXT="$TEXT" TTS_MODEL="$MODEL_ID" TTS_LANG="$LANGUAGE_CODE" python3 -c '
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "❌ ElevenLabs needs Python 3, but none was found." >&2
+  echo "   Install Python 3, or set AGENTVIBES_PYTHON=/path/to/python." >&2
+  exit 3
+fi
+if ! TTS_TEXT="$TEXT" TTS_MODEL="$MODEL_ID" TTS_LANG="$LANGUAGE_CODE" "$PYTHON_BIN" -c '
 import os, json
 print(json.dumps({
     "text": os.environ["TTS_TEXT"],
@@ -254,7 +174,7 @@ print(json.dumps({
     "language_code": os.environ["TTS_LANG"],
     "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
 }))' > "$BODY_FILE" 2>/dev/null; then
-  echo "❌ Failed to build ElevenLabs request body (python3 required)" >&2
+  echo "❌ Failed to build ElevenLabs request body ($PYTHON_BIN required)" >&2
   exit 3
 fi
 

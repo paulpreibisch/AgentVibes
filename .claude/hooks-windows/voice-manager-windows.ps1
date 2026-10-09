@@ -6,7 +6,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('list', 'switch', 'get')]
+    [ValidateSet('list', 'switch', 'get', 'replay')]
     [string]$Command = 'list',
 
     [Parameter(Position = 1)]
@@ -17,6 +17,14 @@ $ClaudeDir = "$env:USERPROFILE\.claude"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
 $VoiceSapiFile = "$ClaudeDir\tts-voice-sapi.txt"
 $VoicePiperFile = "$ClaudeDir\tts-voice-piper.txt"
+$VoiceKokoroFile = "$ClaudeDir\tts-voice-kokoro.txt"
+
+# Load the generated Provider Catalog (SSOT) for kokoro switch-time validation.
+# FAIL-SAFE: consumers probe `Get-Command Test-CatalogVoice` and fall back to the
+# legacy shape regex when the artifact is missing (installed-tree skew) — mirrors
+# play-tts.sh's PLAN_OK legacy fallback. Switch never breaks on a missing catalog.
+$CatalogPs1 = Join-Path $PSScriptRoot 'provider-catalog.ps1'
+if (Test-Path $CatalogPs1) { . $CatalogPs1 }
 
 # Get active provider
 $ActiveProvider = "windows-sapi"
@@ -129,6 +137,47 @@ function Switch-Voice {
         Write-Host "[INFO] Soprano uses a single fixed voice (Soprano-1.1-80M)" -ForegroundColor Cyan
         return $true
     }
+    elseif ($ActiveProvider -eq "kokoro") {
+        # Kokoro switch-time validation via the generated Provider Catalog (SSOT):
+        # MEMBERSHIP + canonical case-fold, so a typo like af_hart is rejected HERE
+        # and never reaches tts-voice-kokoro.txt to die silently at the model.
+        # Escape hatch AGENTVIBES_ALLOW_UNLISTED_VOICE=1 bypasses MEMBERSHIP (not
+        # shape) so a voice from a newer kokoro model still switches. FAIL-SAFE:
+        # fall back to the legacy shape regex when the catalog artifact is missing.
+        $kokoroVoice = $NewVoice.ToLower()
+        $allowUnlisted = ($env:AGENTVIBES_ALLOW_UNLISTED_VOICE -eq '1')
+        if (Get-Command Test-CatalogVoice -ErrorAction SilentlyContinue) {
+            $canon = Test-CatalogVoice -Provider 'kokoro' -Voice $NewVoice
+            if ($canon) {
+                Set-Content -Path $VoiceKokoroFile -Value $canon
+                Write-Host "[OK] Voice set to: $canon" -ForegroundColor Green
+                return $true
+            }
+            elseif ($allowUnlisted -and $kokoroVoice -match '^[a-z]{2}_[a-z0-9_]+$') {
+                Write-Host "[WARN] '$NewVoice' is not in the shipped Kokoro catalog; allowing it (AGENTVIBES_ALLOW_UNLISTED_VOICE=1)." -ForegroundColor Yellow
+                Set-Content -Path $VoiceKokoroFile -Value $kokoroVoice
+                Write-Host "[OK] Voice set to: $kokoroVoice" -ForegroundColor Green
+                return $true
+            }
+            else {
+                Write-Host "[ERROR] Kokoro voice not found: $NewVoice" -ForegroundColor Red
+                Write-Host "That is not a known Kokoro voice. Examples: af_heart, am_michael, bf_emma, bm_george, jf_alpha, zf_xiaoxiao, ef_dora." -ForegroundColor Yellow
+                Write-Host "Set AGENTVIBES_ALLOW_UNLISTED_VOICE=1 to allow a newer-model voice." -ForegroundColor Yellow
+                return $false
+            }
+        }
+        else {
+            # FAIL-SAFE legacy path (catalog artifact missing): shape-only regex.
+            if ($kokoroVoice -notmatch '^[a-z]{2}_[a-z0-9_]+$') {
+                Write-Host "[ERROR] Kokoro voice not found: $NewVoice" -ForegroundColor Red
+                Write-Host "Kokoro ids look like <lang><sex>_name, e.g. af_heart, am_michael, bf_emma." -ForegroundColor Yellow
+                return $false
+            }
+            Set-Content -Path $VoiceKokoroFile -Value $kokoroVoice
+            Write-Host "[OK] Voice set to: $kokoroVoice" -ForegroundColor Green
+            return $true
+        }
+    }
 
     if ($ValidVoices -notcontains $NewVoice) {
         Write-Host "[ERROR] Voice not found: $NewVoice" -ForegroundColor Red
@@ -155,6 +204,102 @@ function Show-CurrentVoice {
     }
 }
 
+# Play an audio file without blocking the caller (mirrors voice-manager.sh's
+# `afplay "$AUDIO_FILE" &` / `paplay ... &` background playback). Prefers
+# ffplay (handles wav/mp3/aiff); falls back to System.Media.SoundPlayer
+# (.Play(), which is inherently async — wav only).
+function Start-ReplayPlayback {
+    param([string]$FilePath)
+
+    # Stay silent while the automated test suite is running (same convention
+    # as play-tts.ps1's Invoke-AudioPlay).
+    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) { return }
+
+    $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
+    if ($ffplayCmd) {
+        Start-Process -FilePath $ffplayCmd.Source `
+            -ArgumentList @("-autoexit", "-nodisp", "-loglevel", "quiet", $FilePath) `
+            -WindowStyle Hidden | Out-Null
+        return
+    }
+
+    try {
+        $player = New-Object System.Media.SoundPlayer $FilePath
+        $player.Play()
+    }
+    catch {
+        Write-Host "[WARN] Could not start playback: $_" -ForegroundColor Yellow
+    }
+}
+
+# Replay the Nth most recent TTS audio file (mirrors voice-manager.sh's
+# `replay` case: resolve the audio dir, validate N (1-10), pick the file by
+# most-recent-mtime, and play it in the background).
+function Replay-Audio {
+    param([string]$NArg)
+
+    $AudioDir = $null
+    if ($env:CLAUDE_PROJECT_DIR -and (Test-Path (Join-Path $env:CLAUDE_PROJECT_DIR ".claude"))) {
+        $AudioDir = Join-Path $env:CLAUDE_PROJECT_DIR ".claude\audio"
+    }
+    else {
+        # Walk up from cwd looking for a .claude directory (same fallback as voice-manager.sh).
+        # Use a plain string path throughout: Get-Location returns a PathInfo (.Path),
+        # but Get-Item returns a DirectoryInfo (no .Path) — mixing them made the second
+        # iteration do Join-Path $null and throw a terminating error.
+        $dirPath = (Get-Location).Path
+        while ($dirPath) {
+            $candidate = Join-Path $dirPath ".claude"
+            if (Test-Path $candidate) {
+                $AudioDir = Join-Path $candidate "audio"
+                break
+            }
+            $parent = Split-Path $dirPath -Parent
+            if (-not $parent -or $parent -eq $dirPath) { break }
+            $dirPath = $parent
+        }
+        if (-not $AudioDir) {
+            $AudioDir = Join-Path $ClaudeDir "audio"
+        }
+    }
+
+    $N = 1
+    if ($NArg) {
+        if ($NArg -notmatch '^\d+$') {
+            Write-Host "[ERROR] Invalid argument. Please use a number (1-10)" -ForegroundColor Red
+            exit 1
+        }
+        $N = [int]$NArg
+    }
+    if ($N -lt 1 -or $N -gt 10) {
+        Write-Host "[ERROR] Number out of range. Please choose 1-10" -ForegroundColor Red
+        exit 1
+    }
+
+    if (-not (Test-Path $AudioDir)) {
+        Write-Host "[ERROR] No audio history found" -ForegroundColor Red
+        Write-Host "Audio files are stored in: $AudioDir"
+        exit 1
+    }
+
+    $files = @(Get-ChildItem -Path $AudioDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^tts-.*\.(wav|mp3|aiff)$' } |
+        Sort-Object LastWriteTime -Descending)
+
+    if ($files.Count -lt $N) {
+        Write-Host "[ERROR] Audio #$N not found in history" -ForegroundColor Red
+        Write-Host "Total audio files available: $($files.Count)"
+        exit 1
+    }
+
+    $target = $files[$N - 1]
+    Write-Host "[REPLAY] Replaying audio #${N}:" -ForegroundColor Cyan
+    Write-Host "   File: $($target.Name)"
+    Write-Host "   Path: $($target.FullName)"
+
+    Start-ReplayPlayback $target.FullName
+}
+
 # Main command routing
 switch ($Command) {
     'list' {
@@ -172,5 +317,9 @@ switch ($Command) {
 
     'get' {
         Show-CurrentVoice
+    }
+
+    'replay' {
+        Replay-Audio $VoiceName
     }
 }

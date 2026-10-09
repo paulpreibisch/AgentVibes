@@ -54,6 +54,7 @@ VOICE_OVERRIDE="$2"  # Ignored — Soprano has a single voice, kept for provider
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 source "$SCRIPT_DIR/audio-cache-utils.sh"
+source "$SCRIPT_DIR/python-resolver.sh"
 
 SOPRANO_PORT="${SOPRANO_PORT:-7860}"
 SOPRANO_DEVICE="${SOPRANO_DEVICE:-auto}"
@@ -135,7 +136,7 @@ SYNTH_MODE=""
 if check_webui_server; then
   # Gradio WebUI mode — use Python helper for SSE protocol
   SYNTH_MODE="webui"
-  python3 "$SCRIPT_DIR/soprano-gradio-synth.py" "$TEXT" "$TEMP_FILE" "$SOPRANO_PORT" 2>/dev/null
+  "$PYTHON_BIN" "$SCRIPT_DIR/soprano-gradio-synth.py" "$TEXT" "$TEMP_FILE" "$SOPRANO_PORT" 2>/dev/null
 elif check_api_server; then
   # OpenAI-compatible API mode — direct curl
   SYNTH_MODE="api"
@@ -151,7 +152,7 @@ fi
 
 if [[ ! -f "$TEMP_FILE" ]] || [[ ! -s "$TEMP_FILE" ]]; then
   echo "❌ Failed to synthesize speech with Soprano ($SYNTH_MODE mode)"
-  [[ "$SYNTH_MODE" == "webui" ]] && echo "   Try: python3 $SCRIPT_DIR/soprano-gradio-synth.py \"test\" /tmp/test.wav $SOPRANO_PORT"
+  [[ "$SYNTH_MODE" == "webui" ]] && echo "   Try: $PYTHON_BIN $SCRIPT_DIR/soprano-gradio-synth.py \"test\" /tmp/test.wav $SOPRANO_PORT"
   exit 4
 fi
 

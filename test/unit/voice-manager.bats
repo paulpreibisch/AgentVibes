@@ -141,3 +141,88 @@ teardown() {
   expected_path=$(cd "$CLAUDE_PROJECT_DIR/.claude/audio" && pwd -P)/tts-999999.mp3
   assert_output_contains "Path: $expected_path"
 }
+
+# --- Kokoro catalog-backed switch validation (AVI-S9.3, Phase 2) --------------
+# These prove the switch-time MEMBERSHIP validation (catalog_validate_voice),
+# canonical case-fold, the AGENTVIBES_ALLOW_UNLISTED_VOICE escape hatch, and the
+# resolver-style FAIL-SAFE fallback when provider-catalog.sh is missing.
+
+# Route voice-manager to the kokoro provider (provider file lives in the same
+# .claude dir voice-manager resolves for reads/writes: CLAUDE_PROJECT_DIR/.claude).
+_use_kokoro_provider() {
+  echo "kokoro" > "$CLAUDE_PROJECT_DIR/.claude/tts-provider.txt"
+}
+
+@test "voice-manager kokoro switch accepts a catalog voice" {
+  _use_kokoro_provider
+  run "$VOICE_MANAGER" switch "am_michael" --silent
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Voice switched to: am_michael"
+  run "$VOICE_MANAGER" get
+  assert_output_contains "am_michael"
+}
+
+@test "voice-manager kokoro switch case-folds AM_MICHAEL to am_michael" {
+  _use_kokoro_provider
+  run "$VOICE_MANAGER" switch "AM_MICHAEL" --silent
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Voice switched to: am_michael"
+}
+
+@test "voice-manager kokoro switch rejects a typo (af_hart) without saving it" {
+  _use_kokoro_provider
+  echo "am_michael" > "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"  # sentinel
+
+  run "$VOICE_MANAGER" switch "af_hart" --silent
+  [ "$status" -eq 1 ]
+  assert_output_contains "Kokoro voice not found"
+
+  # The typo must NOT have been written over the sentinel.
+  run cat "$CLAUDE_PROJECT_DIR/.claude/tts-voice.txt"
+  assert_output_contains "am_michael"
+}
+
+@test "voice-manager kokoro escape hatch allows an unlisted shape-valid voice" {
+  _use_kokoro_provider
+  export AGENTVIBES_ALLOW_UNLISTED_VOICE=1
+  run "$VOICE_MANAGER" switch "xz_newvoice" --silent
+
+  [ "$status" -eq 0 ]
+  assert_output_contains "Voice switched to: xz_newvoice"
+}
+
+@test "voice-manager kokoro escape hatch still rejects a shape-invalid voice" {
+  _use_kokoro_provider
+  export AGENTVIBES_ALLOW_UNLISTED_VOICE=1
+  run "$VOICE_MANAGER" switch "BadVoice!" --silent
+
+  [ "$status" -eq 1 ]
+}
+
+@test "voice-manager kokoro switch fails safe to legacy regex when catalog is missing" {
+  _use_kokoro_provider
+  # Hide the generated catalog artifact to simulate installed-tree skew.
+  mv "$TEST_CLAUDE_DIR/hooks/provider-catalog.sh" "$TEST_CLAUDE_DIR/hooks/provider-catalog.sh.hidden"
+
+  # A shape-valid voice still switches via the legacy fallback path.
+  run "$VOICE_MANAGER" switch "am_puck" --silent
+  [ "$status" -eq 0 ]
+  assert_output_contains "Voice switched to: am_puck"
+
+  # A shape-invalid voice is still rejected on the legacy path.
+  run "$VOICE_MANAGER" switch "nope!" --silent
+  [ "$status" -eq 1 ]
+}
+
+@test "voice-manager kokoro list-simple emits the full catalog set" {
+  _use_kokoro_provider
+  run "$VOICE_MANAGER" list-simple
+
+  [ "$status" -eq 0 ]
+  # A representative id from a NON-English language block only present in the full
+  # ~54-id catalog list (not the legacy 16-id subset) proves catalog-driven output.
+  assert_output_contains "km_hyunsu"
+  assert_output_contains "af_heart"
+}

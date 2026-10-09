@@ -1,0 +1,352 @@
+{
+  "_generated": "DO NOT EDIT — generated from src/services/provider-catalog.js",
+  "_contentHash": "sha256:5e717024f1250a8f54d07291256e532606dba7b4a15ab9589305d1af6bba7f35",
+  "version": "5e717024f1250a8f",
+  "providers": [
+    {
+      "id": "soprano",
+      "engineId": "soprano",
+      "aliases": [],
+      "displayName": "Soprano TTS",
+      "voiceModel": "single",
+      "defaultVoice": "soprano-default",
+      "requires": "pip",
+      "runtime": {
+        "unix": "play-tts-soprano.sh",
+        "windows": "play-tts-soprano.ps1",
+        "darwinOnly": false
+      },
+      "voices": [
+        "soprano-default"
+      ]
+    },
+    {
+      "id": "piper",
+      "engineId": "piper",
+      "aliases": [],
+      "displayName": "Piper TTS",
+      "voiceModel": "discovered",
+      "defaultVoice": "en_US-lessac-medium",
+      "requires": "pip",
+      "runtime": {
+        "unix": "play-tts-piper.sh",
+        "windows": null,
+        "darwinOnly": false
+      },
+      "voices": null
+    },
+    {
+      "id": "kokoro",
+      "engineId": "kokoro",
+      "aliases": [],
+      "displayName": "Kokoro TTS",
+      "voiceModel": "static",
+      "defaultVoice": "af_heart",
+      "requires": "pip",
+      "runtime": {
+        "unix": "play-tts-kokoro.sh",
+        "windows": "play-tts-kokoro.ps1",
+        "darwinOnly": false
+      },
+      "voices": [
+        "af_heart",
+        "af_alloy",
+        "af_aoede",
+        "af_bella",
+        "af_jessica",
+        "af_kore",
+        "af_nicole",
+        "af_nova",
+        "af_river",
+        "af_sarah",
+        "af_sky",
+        "am_adam",
+        "am_echo",
+        "am_eric",
+        "am_fenrir",
+        "am_liam",
+        "am_michael",
+        "am_onyx",
+        "am_puck",
+        "bf_alice",
+        "bf_emma",
+        "bf_isabella",
+        "bf_lily",
+        "bm_daniel",
+        "bm_fable",
+        "bm_george",
+        "bm_lewis",
+        "jf_alpha",
+        "jf_gongitsune",
+        "jf_nezumi",
+        "jf_tebukuro",
+        "jm_kumo",
+        "zf_xiaobei",
+        "zf_xiaoni",
+        "zf_xiaoxiao",
+        "zf_xiaoyi",
+        "zm_yunxi",
+        "zm_yunxia",
+        "zm_yunyang",
+        "ef_dora",
+        "em_alex",
+        "em_santa",
+        "ff_siwis",
+        "hf_alpha",
+        "hm_omega",
+        "if_sara",
+        "im_nicola",
+        "pf_dora",
+        "pm_alex",
+        "pm_santa",
+        "kf_alpha",
+        "km_hyunsu"
+      ]
+    },
+    {
+      "id": "elevenlabs",
+      "engineId": "elevenlabs",
+      "aliases": [],
+      "displayName": "ElevenLabs",
+      "voiceModel": "name-to-id",
+      "defaultVoice": "Sarah",
+      "requires": "api-key",
+      "runtime": {
+        "unix": "play-tts-elevenlabs.sh",
+        "windows": null,
+        "darwinOnly": false
+      },
+      "voices": [
+        {
+          "id": "EXAVITQu4vr4xnSDxMaL",
+          "name": "Sarah",
+          "gender": "Female",
+          "lang": "en-US",
+          "desc": "Mature, reassuring"
+        },
+        {
+          "id": "CwhRBWXzGAHq8TQ4Fs17",
+          "name": "Roger",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Laid-back, casual"
+        },
+        {
+          "id": "FGY2WhTYpPnrIDTdsKH5",
+          "name": "Laura",
+          "gender": "Female",
+          "lang": "en-US",
+          "desc": "Enthusiast, quirky"
+        },
+        {
+          "id": "IKne3meq5aSn9XLyUdCD",
+          "name": "Charlie",
+          "gender": "Male",
+          "lang": "en-AU",
+          "desc": "Deep, confident"
+        },
+        {
+          "id": "JBFqnCBsd6RMkjVDRZzb",
+          "name": "George",
+          "gender": "Male",
+          "lang": "en-GB",
+          "desc": "Warm storyteller"
+        },
+        {
+          "id": "N2lVS1w4EtoT3dr4eOWO",
+          "name": "Callum",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Husky trickster"
+        },
+        {
+          "id": "SAz9YHcvj6GT2YYXdXww",
+          "name": "River",
+          "gender": "",
+          "lang": "en-US",
+          "desc": "Relaxed, neutral"
+        },
+        {
+          "id": "SOYHLrjzK2X1ezoPC6cr",
+          "name": "Harry",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Fierce warrior"
+        },
+        {
+          "id": "TX3LPaxmHKxFdv7VOQHJ",
+          "name": "Liam",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Energetic creator"
+        },
+        {
+          "id": "Xb7hH8MSUJpSbSDYk0k2",
+          "name": "Alice",
+          "gender": "Female",
+          "lang": "en-GB",
+          "desc": "Clear educator"
+        },
+        {
+          "id": "XrExE9yKIg1WjnnlVkGX",
+          "name": "Matilda",
+          "gender": "Female",
+          "lang": "en-US",
+          "desc": "Knowledgable, pro"
+        },
+        {
+          "id": "bIHbv24MWmeRgasZH58o",
+          "name": "Will",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Relaxed optimist"
+        },
+        {
+          "id": "cgSgspJ2msm6clMCkdW9",
+          "name": "Jessica",
+          "gender": "Female",
+          "lang": "en-US",
+          "desc": "Playful, bright"
+        },
+        {
+          "id": "cjVigY5qzO86Huf0OWal",
+          "name": "Eric",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Smooth, trustworthy"
+        },
+        {
+          "id": "hpp4J3VqNfWAUOO0d1Us",
+          "name": "Bella",
+          "gender": "Female",
+          "lang": "en-US",
+          "desc": "Professional, warm"
+        },
+        {
+          "id": "iP95p4xoKVk53GoZ742B",
+          "name": "Chris",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Charming, down-to-earth"
+        },
+        {
+          "id": "nPczCjzI2devNBz1zQrb",
+          "name": "Brian",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Deep, comforting"
+        },
+        {
+          "id": "onwK4e9ZLuTAKqWW03F9",
+          "name": "Daniel",
+          "gender": "Male",
+          "lang": "en-GB",
+          "desc": "Steady broadcaster"
+        },
+        {
+          "id": "pFZP5JQG7iQjIQuC4Bku",
+          "name": "Lily",
+          "gender": "Female",
+          "lang": "en-GB",
+          "desc": "Velvety actress"
+        },
+        {
+          "id": "pNInz6obpgDQGcFmaJgB",
+          "name": "Adam",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Dominant, firm"
+        },
+        {
+          "id": "pqHfZKP75CvOlQylNhV4",
+          "name": "Bill",
+          "gender": "Male",
+          "lang": "en-US",
+          "desc": "Wise, mature"
+        }
+      ]
+    },
+    {
+      "id": "macos",
+      "engineId": "macos",
+      "aliases": [
+        "macos-say",
+        "say"
+      ],
+      "displayName": "macOS Say",
+      "voiceModel": "discovered",
+      "defaultVoice": "Samantha",
+      "requires": "builtin",
+      "runtime": {
+        "unix": "play-tts-macos.sh",
+        "windows": null,
+        "darwinOnly": true
+      },
+      "voices": null
+    },
+    {
+      "id": "windows-sapi",
+      "engineId": "sapi",
+      "aliases": [
+        "sapi"
+      ],
+      "displayName": "Windows SAPI",
+      "voiceModel": "discovered",
+      "defaultVoice": "",
+      "requires": "builtin",
+      "runtime": {
+        "unix": null,
+        "windows": "play-tts-sapi.ps1",
+        "darwinOnly": false
+      },
+      "voices": null
+    },
+    {
+      "id": "windows-piper",
+      "engineId": "piper",
+      "aliases": [
+        "piper"
+      ],
+      "displayName": "Piper TTS",
+      "voiceModel": "discovered",
+      "defaultVoice": "en_US-lessac-medium",
+      "requires": "exe",
+      "runtime": {
+        "unix": null,
+        "windows": "play-tts-windows-piper.ps1",
+        "darwinOnly": false
+      },
+      "voices": null
+    }
+  ],
+  "platforms": {
+    "unix": [
+      "soprano",
+      "piper",
+      "kokoro",
+      "elevenlabs"
+    ],
+    "darwin": [
+      "soprano",
+      "piper",
+      "kokoro",
+      "elevenlabs",
+      "macos"
+    ],
+    "windows": [
+      "soprano",
+      "kokoro",
+      "windows-sapi",
+      "windows-piper"
+    ]
+  },
+  "displayNames": {
+    "soprano": "Soprano TTS",
+    "piper": "Piper TTS",
+    "kokoro": "Kokoro TTS",
+    "elevenlabs": "ElevenLabs",
+    "macos": "macOS Say",
+    "windows-sapi": "Windows SAPI",
+    "windows-piper": "Piper TTS"
+  }
+}

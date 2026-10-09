@@ -1,5 +1,229 @@
 > 🌐 [English version](../../RELEASE_NOTES.md)
 
+## v5.15.1 — Sachez où votre aperçu se joue
+
+**Publié le :** 2026-07-21 · `npm install agentvibes@latest`
+
+Voici le problème que nous rencontrions sans cesse : lorsque vous appuyez sur Espace pour prévisualiser une voix ou un morceau de musique, il n'y avait aucun moyen de savoir s'il allait se jouer *sur votre propre machine* ou être envoyé *à votre récepteur distant*. Sur une machine sans écran, cela signifiait appuyer sur aperçu et n'entendre… rien — sans comprendre pourquoi.
+
+Alors nous l'avons corrigé. Chaque aperçu vous indique désormais exactement où va le son — **(locally)** (en local) ou **(remotely via SSH)** (à distance via SSH) — directement sur la ligne que vous êtes en train d'écouter. Fini les devinettes.
+
+Et tant que nous y étions, nous avons **uniformisé l'aperçu dans toute l'application**. Les sélecteurs de voix (Kokoro, Piper, ElevenLabs et les voix BMAD par agent) ainsi que la page Musique affichent tous désormais le même indicateur `Previewing (locally / remotely via SSH)`, pour que cela ait l'air et se comporte de manière identique partout. Une petite chose qui s'avère réellement utile.
+
+Une conséquence pratique : si un projet achemine sa synthèse vocale (TTS) vers un récepteur distant, **les aperçus de musique le suivent désormais aussi** — auparavant, ils se jouaient discrètement sur la machine locale, ce qui revient au silence sur un serveur sans écran.
+
+### Également dans cette version
+
+- **L'onglet Agents affiche vos véritables agents BMAD** (Mary, Winston, Amelia, John, Paige, Sally…) au lieu des assistants internes d'une compétence — et il se revérifie lorsque vous revenez sur l'onglet, de sorte qu'une installation BMAD toute fraîche apparaît sans redémarrage.
+- **La réinitialisation ne vous propulse plus vers l'onglet Récepteur.** Elle était associée à `X`, la même touche qui, globalement, saute vers le Récepteur ; c'est désormais `Del`.
+
+## v5.15.0 — Contrôle multi-session sous Windows
+
+**Publié le :** 2026-07-20 · `npm install agentvibes@latest`
+
+Si vous exécutez plusieurs sessions d'agent en même temps, cette version apporte à Windows le même contrôle que macOS et Linux avaient obtenu dans la 5.13.0 : les sessions restent silencieuses tant que vous ne les activez pas, et chacune peut vous indiquer quelle fenêtre est en train de parler.
+
+### Les sessions ne parlent plus toutes en même temps
+
+Utiliser AgentVibes sur plusieurs projets signifiait auparavant que chaque session ouverte s'annonçait, sans moyen simple de n'en garder qu'une seule active. Sur macOS et Linux, cela avait été corrigé dans la 5.13.0. **Sous Windows, ce n'était pas le cas** — le hook de session Windows activait la parole dans chaque session, quels que soient vos réglages.
+
+Windows suit désormais la même règle : une session ne parle que dans un projet que vous avez explicitement activé. Les projets que vous n'avez pas activés n'apportent **absolument rien** — pas un son silencieux, mais aucune instruction supplémentaire et aucun coût en tokens.
+
+### La mise en sourdine fonctionne désormais sous Windows
+
+`/agent-vibes:mute` n'avait aucun effet sur l'audio Windows. Il ne mettait en sourdine que macOS et Linux, car le lecteur Windows lisait un réglage différent de celui écrit par la commande.
+
+La mise en sourdine du projet et l'interrupteur global sont désormais tous deux respectés sous Windows :
+
+- `/agent-vibes:mute` — rendre ce projet silencieux
+- `/agent-vibes:unmute` — réactiver ce projet, même lorsque tout le reste est mis en sourdine globalement
+
+Cela fait de « désactivé partout, activé dans le seul projet sur lequel je travaille » une simple paire de commandes sur toutes les plateformes.
+
+### Les sessions peuvent s'identifier sous Windows
+
+Incluez `{{session}}` dans votre pretext et une session se présente une seule fois :
+
+```
+Claude on my-app in Windows Terminal
+```
+
+Elle nomme le projet et détecte le terminal — Windows Terminal, VS Code, Ghostty, iTerm, Terminal, WezTerm, tmux et d'autres. Annoncée une fois par session plutôt qu'avant chaque ligne. Cela ne fonctionnait auparavant que sur macOS et Linux.
+
+### Une correction connexe pour toutes les plateformes
+
+Le script qui produit cette présentation était absent du processus de mise à jour, si bien que sur une installation globale il n'était jamais livré et la fonctionnalité ne faisait silencieusement rien. Il est désormais inclus aussi bien sur macOS que sur Linux et Windows.
+
+### Mise à niveau
+
+Vos choix existants sont préservés — si vous avez déjà mis en sourdine, réactivé ou activé un projet, la mise à jour laisse ce réglage intact.
+
+**Un changement à noter pour les utilisateurs Windows en installation globale :** puisque les sessions sont désormais désactivées tant qu'elles ne sont pas activées, une installation Windows globale sera silencieuse après la mise à jour. Activez les projets que vous souhaitez avec `/agent-vibes:unmute`. Les installations par projet sont activées automatiquement et ne sont pas affectées.
+
+### Qualité
+
+De nouveaux tests de non-régression vérifient que le filtre de session, les règles de mise en sourdine et l'auto-identification se comportent de manière identique sur les deux runtimes, afin que les plateformes ne puissent plus diverger sans faire échouer la compilation.
+
+---
+
+## v5.14.0 — Installation fiable et aperçus audio complets
+
+**Publié le :** 2026-07-19 · `npm install agentvibes@latest`
+
+Cette version se concentre sur deux points : réussir l'installation d'AgentVibes sur toutes les plateformes, et faire du bouton Aperçu une restitution fidèle de ce à quoi votre agent va réellement ressembler. Elle inclut également tout le contenu de la 5.13.2, qui avait été taguée mais jamais publiée sur npm.
+
+### La configuration aboutit désormais sur macOS et Linux
+
+L'installation de Piper et le téléchargement des voix se déroulent maintenant correctement sur une machine macOS ou Linux neuve. Auparavant, ces étapes pouvaient signaler un échec sans avoir été exécutées, laissant les nouveaux utilisateurs sans moteur de voix fonctionnel et sans piste claire pour avancer. Il s'agissait d'un problème de longue date touchant spécifiquement les premières installations — si vous aviez renoncé à la configuration par le passé, cela vaut la peine de réessayer.
+
+Dans le même esprit : plusieurs scripts de configuration sont désormais enregistrés dans le bon format de fin de ligne, ce qui leur permet de s'exécuter correctement sur macOS et Linux.
+
+### L'Aperçu joue votre mixage audio complet
+
+Le bouton Aperçu joue maintenant exactement ce à quoi votre agent va ressembler : la **voix** que vous avez sélectionnée, la **réverbération et les effets audio** éventuels, et votre **musique de fond**, le tout mixé ensemble.
+
+Deux cas produisaient auparavant un mixage incomplet. Les aperçus des agents Hermes omettaient entièrement la musique de fond, et sous Windows la piste musicale était abandonnée dès que ffmpeg — le composant qui mixe la musique avec la parole — n'était pas disponible. Les deux sont résolus, et si ffmpeg est absent vous recevez désormais un message clair l'identifiant, plutôt qu'un audio silencieusement appauvri.
+
+### Vos personnalisations survivent aux mises à jour
+
+Si vous avez modifié l'un des scripts de hook installés par AgentVibes, la mise à jour préserve désormais votre travail. Votre version est copiée dans une sauvegarde horodatée avant tout remplacement de fichier :
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+Chaque mise à jour crée sa propre sauvegarde, si bien que les versions antérieures restent récupérables. Sous Windows, la couverture des mises à jour passe de 8 scripts à la totalité des 25.
+
+### La destination audio est plus lisible d'un coup d'œil
+
+Les réglages indiquent maintenant par un code couleur l'endroit où votre audio est joué : **Local** en vert, **Remote** en rouge. On voit ainsi immédiatement quand l'audio est routé vers une autre machine.
+
+### Les aperçus de voix utilisent le bon moteur
+
+L'aperçu d'une voix utilise désormais le moteur propre à cette voix plutôt que le réglage global, et indique quel moteur vous êtes en train d'entendre. Les voix système de Windows et de macOS fonctionnent correctement via les aperçus distants, et la liste des voix Windows n'affiche plus que les voix réellement sélectionnables.
+
+### Audio distant sous Windows
+
+L'envoi d'audio depuis une machine Windows vers un autre ordinateur ne modifie plus les chemins de fichiers en transit, ce qui empêchait jusqu'ici la musique de fond d'atteindre le récepteur.
+
+### Paquet et qualité
+
+Le paquet publié n'embarque plus de fichiers inutiles, et tout ce que l'application référence est désormais présent. La suite de tests complète passe sur Windows, macOS et Linux à partir d'un dépôt propre, avec de nouveaux tests de non-régression couvrant les comportements d'aperçu décrits ci-dessus.
+
+---
+
+## 🔧 v5.13.2 — Des installations plus propres, une mise en route plus fluide
+
+**Publié le :** 2026-07-17 · sur `latest` — `npm install agentvibes@latest`
+
+### 🎛️ Vous démarrez avec les réglages par défaut, prêts à faire les vôtres
+
+Les nouvelles installations démarrent désormais propres, avec les réglages par défaut intégrés pour la voix, la musique de fond et la personnalité — c'est donc votre configuration dès la toute première utilisation.
+
+### 🐧 L'installation sur Mac et Linux fonctionne correctement
+
+Certains des scripts qui configurent tout étaient enregistrés dans un format Windows que Mac et Linux ne peuvent pas lire, si bien qu'ils s'arrêtaient avant de faire quoi que ce soit. Ils sont maintenant dans le bon format. Installer Piper et télécharger des voix fonctionne à nouveau sur une machine Mac ou Linux toute neuve.
+
+### 🔊 Votre choix de voix reste en place
+
+Le fichier de réglages qui se souvient de quelle voix va avec quel moteur pouvait être mal lu, si bien que votre choix de moteur était silencieusement ignoré. Corrigé — ce que vous choisissez, c'est ce que vous obtenez.
+
+### 📦 Un téléchargement plus léger et plus ordonné
+
+Le paquet ne transporte plus de fichiers dont il n'a jamais eu besoin. Tout ce que l'application vous dit d'exécuter est maintenant vraiment inclus.
+
+---
+
+## 🔧 v5.13.1 — Les mises à jour Windows qui mettent vraiment à jour
+
+**Publié le :** 2026-07-16 · sur `latest` — `npm install agentvibes@latest`
+
+### 🪟 Vos scripts Windows se mettent maintenant vraiment à jour
+
+Sous Windows, les petits scripts qui font parler vos agents vivent dans votre dossier `.claude/hooks`. La mise à jour disait qu'elle les rafraîchissait — mais sous Windows, elle ne le faisait pas vraiment, en silence, si bien qu'ils pouvaient rester bloqués sur la version installée au tout début pendant des mois.
+
+Maintenant, ils se mettent à jour pour de vrai. Lancez `npx agentvibes update` et vous récupérerez chaque correctif que vous aviez manqué. Tout ce que vous aviez personnalisé vous-même reste protégé juste à côté, dans un fichier `.user.bak`, exactement comme avant.
+
+Si vous êtes sur macOS ou Linux, rien ne change — les mises à jour fonctionnaient déjà très bien pour vous.
+
+### 🔒 Un petit réglage de sécurité, en coulisses
+
+Nous avons mis à jour l'un des composants qu'AgentVibes utilise pour lire les fichiers de configuration. Un fichier de configuration spécialement conçu aurait pu le faire se bloquer complètement. Rien n'a jamais pu être volé ou espionné — mais maintenant, il ne peut plus rester coincé non plus. Rien à faire de votre côté ; c'est déjà en place.
+
+---
+
+## 🎉 v5.13.0 — Vos Voix Partout, avec un Signal Sonore
+
+**Publié le :** 2026-07-16 · sur `latest` — `npm install agentvibes`
+
+Quoi de neuf :
+
+### 🖥️ Utilisez les voix intégrées de votre ordinateur, depuis n'importe où
+Vos agents tournent sur une machine et vous écoutez sur une autre ? Vous pouvez désormais choisir les voix intégrées de **Windows** (David, Zira, Mark) ou de **Mac**, et les entendre là où vous êtes assis. AgentVibes vous montre chaque voix et marque clairement celles que votre appareil d'écoute peut jouer.
+
+### 🗂️ Toutes vos voix dans une seule liste bien rangée
+Piper, Kokoro, ElevenLabs, Windows, Mac, Soprano — chaque voix provient désormais d'une seule liste, de sorte que ce que vous voyez est toujours ce que vous pouvez utiliser.
+
+### 🔔 Un signal sonore avant que le son ne se joue
+Juste avant qu'une réplique vocale ou un aperçu de musique ne démarre, vous entendrez un court carillon — vous savez ainsi que l'audio arrive, même s'il faut patienter un instant.
+
+### 🎵 Les aperçus de musique suivent votre son
+Prévisualisez une piste et elle se joue là où votre audio est configuré pour aller — y compris sur une autre machine.
+
+### 🆔 Des agents qui se présentent
+Activez les auto-présentations et chaque agent annonce qui il est au démarrage — bien pratique quand toute une équipe parle.
+
+### 🛟 Vos propres modifications sont protégées lors d'une mise à jour
+Vous avez modifié l'un des fichiers d'AgentVibes dans votre dossier `.claude/hooks` ? À partir de cette version, une mise à jour ne jette plus jamais votre travail à la poubelle. Si nous devons mettre à jour un fichier que vous aviez modifié, nous plaçons votre copie juste à côté avec `.user.bak` à la fin — par exemple `play-tts.sh.user.bak`.
+
+**Ce fichier est créé par AgentVibes — rien n'est cassé et personne d'autre ne l'a déposé là.** C'est simplement votre ancienne version, conservée pour que vous puissiez y jeter un œil ou recopier vos modifications dans le nouveau fichier. Supprimez-le dès que vous n'en avez plus besoin.
+
+Si vous aviez personnalisé des fichiers dans une version plus ancienne, cela vaut la peine de jeter un coup d'œil rapide dans `.claude/hooks` pour repérer ce que vous voudriez restaurer.
+
+### ✨ Plus de voix, une expérience plus fluide
+- Voix **ElevenLabs** entièrement prises en charge
+- Davantage de voix **Kokoro**, fonctionnant parfaitement sur Windows
+- Une installation plus rapide et plus fiable sur Windows
+- **3 261 tests automatisés réussis** — stable et fiable
+
+---
+
+## 🎉 v5.12.0 — La Refonte de la Semaine Fable (Stable)
+
+**Publié le :** 2026-07-05 · désormais sur `latest` — `npm install agentvibes`
+
+Cette version transforme l'alpha de la « Semaine Fable » en une version stable. Pendant une semaine d'accès anticipé au nouveau modèle **Fable** d'Anthropic, nous l'avons pointé sur l'ensemble du code d'AgentVibes et avons reconstruit le cœur du système comme il se doit.
+
+### Un cœur commun, plus solide
+
+Chaque fois qu'AgentVibes parle, il prend beaucoup de décisions — quelle voix, quel moteur, faut-il jouer ici ou envoyer l'audio vers une autre machine, la musique de fond, le volume, la coupure du son. Cette logique avait été copiée dans plusieurs scripts distincts (Mac/Linux, Windows, distant, et le serveur de voix), et les copies ont lentement **divergé** — un correctif appliqué dans l'un était oublié dans les autres, ce qui explique pourquoi certains défauts revenaient sans cesse.
+
+Nous avons tout remplacé par **un seul cœur commun** que chaque partie d'AgentVibes suit désormais — un seul endroit à corriger, un seul endroit auquel se fier. Ce que vous remarquerez :
+
+- **Les voix Kokoro qui restaient muettes sur Linux fonctionnent maintenant partout.**
+- **Vos choix de voix sont conservés** — les paramètres ne sont plus discrètement écrasés.
+- **Le volume, la coupure du son et la lecture à distance se comportent de la même façon** sur Mac, Linux et Windows.
+- **Sûr par défaut** — si le nouveau cœur n'est pas disponible sur votre machine, AgentVibes revient à l'ancien comportement, de sorte qu'il ne cesse jamais simplement de parler.
+
+### Les aperçus se jouent désormais au bon endroit
+
+Prévisualiser une voix ou une piste se jouait auparavant sur la machine devant laquelle vous étiez assis — ce qui restait muet si vous aviez configuré AgentVibes pour envoyer son audio ailleurs. Désormais :
+
+- **Si vous avez configuré le mode distant SSH, les aperçus se jouent sur votre récepteur ; sinon ils se jouent localement, comme avant.**
+- Cela couvre les **aperçus de voix** (Piper et Kokoro) depuis les écrans Setup, Agent et Settings, ainsi que les **aperçus de musique/piste** — appuyez sur Espace pour lancer, à nouveau sur Espace pour arrêter.
+
+### Un menu de voix plus simple
+
+- Nous avons **supprimé l'onglet Voices redondant.** Il ne listait jamais que les voix Piper et semait la confusion, puisque le choix d'une voix pour n'importe quel fournisseur se trouve déjà dans **Setup**.
+
+### Les fondations de la suite
+
+- Le récepteur reçoit désormais aussi le **chemin complet du dossier de projet** d'où provient un message (un nouveau champ `projectPath`, en plus du nom de projet qu'il recevait déjà) — posant les fondations des améliorations à venir.
+
+### Revu avant la livraison
+
+Nous avons mené trois revues indépendantes sur les changements — sécurité, exactitude et régressions — et corrigé chaque problème réel avant la publication.
+
 ## 🎸 v5.8.0 — Soprano Fonctionne Maintenant + Sélecteur de Voix Corrigé pour Tous les Moteurs
 
 **Publié le :** 2026-05-18

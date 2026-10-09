@@ -29,6 +29,13 @@ if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) 
 
 $PersonalityFile = Join-Path $ConfigClaudeDir "tts-personality.txt"
 
+# Load the generated Provider Catalog (SSOT) for the Piper default voice.
+# FAIL-SAFE: consumers probe `Get-Command Get-CatalogDefaultVoice` and fall back
+# to the legacy literal when the artifact is missing (installed-tree skew) —
+# mirrors voice-manager-windows.ps1 / play-tts-kokoro.ps1 (AVI-S9.3/9.4).
+$CatalogPs1 = Join-Path $ScriptDir 'provider-catalog.ps1'
+if (Test-Path $CatalogPs1) { . $CatalogPs1 }
+
 function Get-PersonalityData {
     param([string]$Personality, [string]$Field)
     $file = Join-Path $PersonalitiesDir "$Personality.md"
@@ -116,7 +123,15 @@ switch ($Command) {
 
         # Get assigned voice
         $assignedVoice = Get-PersonalityData $personality "piper_voice"
-        if (-not $assignedVoice) { $assignedVoice = "en_US-lessac-medium" }
+        if (-not $assignedVoice) {
+            # Fallback to default Piper voice — sourced from the generated Provider
+            # Catalog SSOT (AVI-S9.4). FAIL-SAFE: legacy literal if artifact missing.
+            $assignedVoice = $null
+            if (Get-Command Get-CatalogDefaultVoice -ErrorAction SilentlyContinue) {
+                $assignedVoice = Get-CatalogDefaultVoice -Provider 'piper'
+            }
+            if (-not $assignedVoice) { $assignedVoice = "en_US-lessac-medium" }
+        }
 
         if ($assignedVoice) {
             Write-Output "Switching to assigned voice: $assignedVoice"

@@ -31,10 +31,76 @@ try {
             try { Rename-Item $f.FullName $procFile -ErrorAction Stop } catch { continue }
             try {
                 $req = Get-Content $procFile -Raw | ConvertFrom-Json
+
+                # Music preview: play/stop a standalone background-music track
+                # ASYNCHRONOUSLY (Start-Process) so it never blocks the TTS queue,
+                # tracking the ffplay PID so a new request (or an explicit stop)
+                # replaces the previous track instead of stacking playback.
+                #   kind=music       → stop any current preview, then play the track
+                #   kind=music-stop  → stop any current preview (no new playback)
+                if ($req.kind -eq 'music' -or $req.kind -eq 'music-stop') {
+                    $pidFile = Join-Path $env:USERPROFILE '.agentvibes\music-preview.pid'
+                    # Stop the currently-playing preview, if any. Verify the PID is
+                    # actually ffplay so a recycled PID can't kill an unrelated proc.
+                    if (Test-Path $pidFile) {
+                        $oldPid = (Get-Content $pidFile -Raw -ErrorAction SilentlyContinue).Trim()
+                        if ($oldPid -match '^\d+$') {
+                            $op = Get-Process -Id ([int]$oldPid) -ErrorAction SilentlyContinue
+                            if ($op -and $op.ProcessName -eq 'ffplay') { Stop-Process -Id ([int]$oldPid) -Force -ErrorAction SilentlyContinue }
+                        }
+                        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+                    }
+                    if ($req.kind -eq 'music') {
+                        $trackName = [string]$req.music
+                        if ($trackName -match '^[A-Za-z0-9._][A-Za-z0-9._ \-]*\.mp3$') {
+                            $tracksDir = Join-Path $env:USERPROFILE '.claude\audio\tracks'
+                            $full     = [System.IO.Path]::GetFullPath((Join-Path $tracksDir $trackName))
+                            $baseFull = [System.IO.Path]::GetFullPath($tracksDir)
+                            if (-not $baseFull.EndsWith([IO.Path]::DirectorySeparatorChar)) { $baseFull += [IO.Path]::DirectorySeparatorChar }
+                            if ($full.StartsWith($baseFull, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path $full)) {
+                                $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
+                                if ($ffplay) {
+                                    Write-WatcherLog "INFO" "music-preview id=$($req.id) track=$trackName"
+                                    # Readiness bling — a short cue played in THIS (audio-capable) watcher
+                                    # session BEFORE the track so a listener knows music is incoming. Launched
+                                    # async (NOT -Wait — the wav's shimmer tail is long); a fixed 0.3s gap then
+                                    # lets the music follow tightly. Best-effort: a missing wav / player error
+                                    # never blocks the track.
+                                    $blingWav = Join-Path $env:USERPROFILE '.claude\audio\ui\bling-success.wav'
+                                    if (-not (Test-Path $blingWav)) { $blingWav = Join-Path $env:USERPROFILE '.agentvibes\bling-success.wav' }
+                                    if (Test-Path $blingWav) {
+                                        try { Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet',$blingWav) -WindowStyle Hidden | Out-Null } catch { }
+                                        Start-Sleep -Milliseconds 300
+                                    }
+                                    $mp = Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet','-volume','80',$full) -WindowStyle Hidden -PassThru
+                                    if ($mp) { Set-Content -Path $pidFile -Value $mp.Id -NoNewline -ErrorAction SilentlyContinue }
+                                } else {
+                                    Write-WatcherLog "WARN" "ffplay not found - cannot preview music id=$($req.id)"
+                                }
+                            } else {
+                                Write-WatcherLog "WARN" "music track not found id=$($req.id) track=$trackName"
+                            }
+                        } else {
+                            Write-WatcherLog "WARN" "invalid music track name id=$($req.id)"
+                        }
+                    } else {
+                        Write-WatcherLog "INFO" "music-stop id=$($req.id)"
+                    }
+                    Remove-Item $procFile -Force -ErrorAction SilentlyContinue
+                    continue
+                }
+
                 # Validate voice before passing to command line
                 $safeVoice = if ($req.voice -and $req.voice -match '^[a-zA-Z0-9_\-\. :]+$') { $req.voice } else { "" }
                 $env:CLAUDE_PROJECT_DIR = $env:USERPROFILE
                 $env:AGENTVIBES_NO_PRETEXT = "1"
+                # Carry the sender's project (folder name/path) through so a
+                # downstream receiver shows the real remote origin instead of
+                # this machine's own profile dir.
+                if ($req.project) { $env:AGENTVIBES_PROJECT = $req.project }
+                else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_PROJECT", $null, "Process") }
+                if ($req.projectPath) { $env:AGENTVIBES_PROJECT_PATH = $req.projectPath }
+                else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_PROJECT_PATH", $null, "Process") }
                 # Use SetEnvironmentVariable to truly unset (assignment to $null leaves empty string)
                 if ($req.music)   { $env:AGENTVIBES_OVERRIDE_MUSIC   = $req.music }
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_MUSIC",   $null, "Process") }
@@ -44,15 +110,25 @@ try {
                 else { [System.Environment]::SetEnvironmentVariable("AGENTVIBES_OVERRIDE_EFFECTS", $null, "Process") }
 
                 if (Test-Path $PlayTts) {
-                    # Play remote arrival prefix sound if configured
-                    $prefixSoundFile = "$env:USERPROFILE\.agentvibes\remote-prefix-sound.txt"
-                    if (Test-Path $prefixSoundFile) {
-                        $prefixSound = (Get-Content $prefixSoundFile -Raw).Trim()
-                        if ($prefixSound -and (Test-Path $prefixSound)) {
-                            $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
-                            if ($ffplay) {
-                                & $ffplay.Source -autoexit -nodisp -loglevel quiet $prefixSound 2>$null
+                    # Always play a crisp local "incoming" bling so the user KNOWS audio is
+                    # on the way — even when audio is routed to a downstream receiver
+                    # instead of the local speakers. Standard bling-success.wav, async
+                    # with a 0.3s gap (same as the music-preview path); fall back to the
+                    # user-configured remote-prefix-sound.txt if the bling wav is missing.
+                    $ffplay = Get-Command ffplay -ErrorAction SilentlyContinue
+                    if ($ffplay) {
+                        $blingWav = Join-Path $env:USERPROFILE '.claude\audio\ui\bling-success.wav'
+                        if (-not (Test-Path $blingWav)) { $blingWav = Join-Path $env:USERPROFILE '.agentvibes\bling-success.wav' }
+                        if (-not (Test-Path $blingWav)) {
+                            $prefixSoundFile = "$env:USERPROFILE\.agentvibes\remote-prefix-sound.txt"
+                            if (Test-Path $prefixSoundFile) {
+                                $ps = (Get-Content $prefixSoundFile -Raw).Trim()
+                                if ($ps -and (Test-Path $ps)) { $blingWav = $ps }
                             }
+                        }
+                        if (Test-Path $blingWav) {
+                            try { Start-Process -FilePath $ffplay.Source -ArgumentList @('-autoexit','-nodisp','-loglevel','quiet',$blingWav) -WindowStyle Hidden | Out-Null } catch { }
+                            Start-Sleep -Milliseconds 300
                         }
                     }
 

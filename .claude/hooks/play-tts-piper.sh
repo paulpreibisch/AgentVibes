@@ -474,7 +474,11 @@ fi
 # @returns Updates $TEMP_FILE to processed version, sets $BACKGROUND_MUSIC if used
 # @sideeffects Applies audio effects and background music
 BACKGROUND_MUSIC=""
-if [[ -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
+# AGENTVIBES_SKIP_INTERNAL_PROCESSOR=1 lets a caller that will run its OWN
+# audio-processor pass (e.g. bmad-speak-enhanced.sh applying per-agent effects)
+# skip this generic default-row pass — otherwise effects/background-music get
+# applied twice (double reverb / overlapping music).
+if [[ "${AGENTVIBES_SKIP_INTERNAL_PROCESSOR:-}" != "1" && -f "$SCRIPT_DIR/audio-processor.sh" ]]; then
   _tmp=$(mktemp "$AUDIO_DIR/tts-processed-XXXXXX"); PROCESSED_FILE="${_tmp}.wav"; mv "$_tmp" "$PROCESSED_FILE"
   _CLEANUP_FILES+=("$PROCESSED_FILE")
   # audio-processor.sh returns: FILE_PATH|BACKGROUND_FILE
@@ -629,6 +633,14 @@ fi
 
 # Display with file count (now showing accurate post-cleanup size)
 echo -e "${WHITE}💾 Saved to:${NC} ${CYAN}$TEMP_FILE${NC} ${YELLOW}$FILE_COUNT${NC} ${WHITE}🗄️${NC} ${CACHE_COLOR}$SIZE_HUMAN${NC} ${WHITE}🧹${NC}${GOLD}[${AUTO_CLEAN_THRESHOLD}mb]${NC}"
+
+# AV_OUTPUT sentinel (Story AVI-S8.5, R6/R7): emit the EXACT absolute path of the
+# wav this invocation produced, on its own machine-parseable stdout line. Consumers
+# (e.g. bmad-speak-enhanced.sh) capture THIS path — never `ls -t | head -1`, which
+# races in party mode and masks synthesis failures (memory:
+# feedback_no_most_recent_file_heuristic). Additive: the human "Saved to:" line
+# above is intact for the MCP server's loose parser.
+printf 'AV_OUTPUT:%s\n' "$TEMP_FILE"
 
 if [[ -n "$BACKGROUND_MUSIC" ]]; then
   # Extract just the filename to save space

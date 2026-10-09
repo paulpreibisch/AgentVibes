@@ -45,13 +45,94 @@ import json
 import os
 import platform
 import re as _re
+import signal
 import subprocess
+import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from mcp.server import Server
-from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
+from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource, CallToolResult
 import mcp.server.stdio
+
+
+# Default per-script timeout for _run_script(). Keeps a hung/interactive
+# manager script (e.g. a `read -p` prompt reached by mistake) from wedging
+# the MCP server forever and eating the stdio JSON-RPC stream.
+DEFAULT_SCRIPT_TIMEOUT = 30.0
+
+
+# ── Provider Catalog (SSOT Layer 2) — platform allowlists + display names ────
+#
+# server.py DERIVES its per-platform provider allowlists and provider display
+# names from the shipped provider-catalog.json (generated from
+# src/services/provider-catalog.js). The literals below are an EMBEDDED FALLBACK
+# used ONLY when that JSON is missing or unreadable (installed-tree skew) —
+# degraded, never dead: the MCP server MUST start without the file.
+#
+# Bidirectional parity (embedded fallback ≡ catalog, per platform, BOTH
+# directions) is asserted by test/unit/provider-catalog-conformance.test.js so
+# the fallback can never silently drift from the catalog (design §8 — a
+# one-directional check is the exact gap that let elevenlabs-on-Windows through
+# the old positive-only test).
+#
+# The non-Windows fallback mirrors the catalog's DARWIN set (the superset that
+# also covers Linux: darwin adds macOS `say`, which a Linux box simply won't
+# have installed — availability is enforced by the dispatchers downstream, not
+# here). Windows uses the catalog WINDOWS set. elevenlabs is deliberately ABSENT
+# from Windows: there is NO play-tts-elevenlabs.ps1 runtime (AVI-S9.1 /
+# provider-catalog.js: elevenlabs.runtime.windows === null).
+_FALLBACK_PROVIDERS_WINDOWS = ["windows-piper", "windows-sapi", "soprano", "kokoro"]
+_FALLBACK_PROVIDERS_NON_WINDOWS = ["piper", "macos", "soprano", "kokoro", "elevenlabs"]
+
+# termux-ssh is a TRANSPORT (relays TTS over SSH to a phone), NOT a synthesis
+# provider: it has no catalog record and no play-tts-termux-ssh runtime. It is
+# accepted on non-Windows as a documented non-catalog transport token, and is
+# EXCLUDED BY NAME from the catalog parity assertion (AC6) so it can neither be
+# silently dropped nor silently drift INTO the catalog.
+_TRANSPORT_TOKENS = ["termux-ssh"]
+
+# Embedded fallback display names — byte-equal to catalog.json `displayNames`
+# (group-8 parity). termux-ssh is NOT here (it has no catalog record); its
+# display name is added separately as a transport token.
+_FALLBACK_DISPLAY_NAMES = {
+    "soprano": "Soprano TTS",
+    "piper": "Piper TTS",
+    "kokoro": "Kokoro TTS",
+    "elevenlabs": "ElevenLabs",
+    "macos": "macOS Say",
+    "windows-sapi": "Windows SAPI",
+    "windows-piper": "Piper TTS",
+}
+_TRANSPORT_DISPLAY_NAMES = {
+    "termux-ssh": "Termux SSH",
+}
+
+
+@dataclass
+class ScriptResult:
+    """Structured result of running a hook script.
+
+    Callers MUST branch on `ok`/`returncode`, never on emoji/text sniffing —
+    Windows manager scripts print plain text (no ✅/✓/🎭), so any
+    `"<emoji>" in stdout` check silently reports failure on Windows even when
+    the script succeeded.
+    """
+    returncode: int
+    stdout: str
+    stderr: str
+
+    @property
+    def ok(self) -> bool:
+        return self.returncode == 0
+
+    @property
+    def error_detail(self) -> str:
+        """Best-effort human-readable error text for failure messages."""
+        return self.stderr or self.stdout or f"exit code {self.returncode}"
+
+
 class AgentVibesServer:
     """MCP Server for AgentVibes TTS functionality"""
 
@@ -86,6 +167,99 @@ class AgentVibesServer:
         self.hooks_dir = self.claude_dir / ("hooks-windows" if self.is_windows else "hooks")
         # Store AgentVibes root directory for environment variable
         self.agentvibes_root = self.claude_dir.parent
+
+        # Serializes the "mutate global personality/language -> speak -> restore"
+        # critical section in text_to_speech() so concurrent MCP tool calls
+        # cannot interleave and corrupt persistent state (residual risk: this
+        # only protects against concurrent calls *within this process* — a
+        # second MCP server process or a slash-command CLI invocation writing
+        # the same file at the same time is not covered; see story 8.2 notes).
+        self._override_lock = asyncio.Lock()
+
+        # provider-catalog.json is read lazily once and cached (design: no
+        # blocking I/O per call; load at first use, not per set_provider).
+        self._provider_catalog = None
+        self._provider_catalog_loaded = False
+
+    def _load_provider_catalog(self) -> Optional[dict]:
+        """Load the shipped provider-catalog.json ONCE (cached).
+
+        Generated from src/services/provider-catalog.js into
+        .claude/hooks/provider-catalog.json and shipped beside the hooks, it is
+        the SSOT for per-platform provider allowlists and display names. Returns
+        the parsed dict, or None on ANY failure (missing / unreadable /
+        malformed) so the MCP server always starts — callers then fall back to
+        the embedded literals that conformance asserts are equivalent.
+        """
+        if self._provider_catalog_loaded:
+            return self._provider_catalog
+        self._provider_catalog_loaded = True
+        catalog = None
+        try:
+            # catalog.json lives under hooks/ on EVERY platform (program data,
+            # not a per-platform hook script — the generator only writes it there).
+            path = self.claude_dir / "hooks" / "provider-catalog.json"
+            if path.exists() and not path.is_symlink():
+                parsed = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(parsed, dict):
+                    catalog = parsed
+        except (OSError, ValueError):
+            catalog = None
+        if catalog is None:
+            # Degraded, never dead. Warn on stderr ONLY (stdout is the MCP
+            # JSON-RPC stream); one terse line, since a missing file is the
+            # common installed-tree-skew case.
+            print(
+                "agentvibes: provider-catalog.json unavailable; using embedded provider fallback",
+                file=sys.stderr,
+            )
+        self._provider_catalog = catalog
+        return catalog
+
+    def _valid_providers(self) -> list:
+        """Per-platform provider allowlist, DERIVED from provider-catalog.json.
+
+        Windows → catalog `platforms.windows`; non-Windows → catalog
+        `platforms.darwin` (the superset covering both Linux and macOS). Falls
+        back to the embedded literals when the catalog is unavailable. Transport
+        tokens (termux-ssh) are appended on non-Windows only.
+        """
+        catalog = self._load_provider_catalog()
+        base = None
+        if catalog:
+            platforms = catalog.get("platforms")
+            if isinstance(platforms, dict):
+                key = "windows" if self.is_windows else "darwin"
+                derived = platforms.get(key)
+                if isinstance(derived, list) and derived:
+                    base = list(derived)
+        if base is None:
+            base = list(
+                _FALLBACK_PROVIDERS_WINDOWS if self.is_windows else _FALLBACK_PROVIDERS_NON_WINDOWS
+            )
+        if not self.is_windows:
+            for token in _TRANSPORT_TOKENS:
+                if token not in base:
+                    base.append(token)
+        return base
+
+    def _provider_display_names(self) -> dict:
+        """Provider display names, DERIVED from provider-catalog.json.
+
+        Falls back to the embedded dict when the catalog is unavailable. Non-
+        catalog transport tokens (termux-ssh) are always merged in.
+        """
+        catalog = self._load_provider_catalog()
+        names = None
+        if catalog:
+            derived = catalog.get("displayNames")
+            if isinstance(derived, dict) and derived:
+                names = dict(derived)
+        if names is None:
+            names = dict(_FALLBACK_DISPLAY_NAMES)
+        for token, label in _TRANSPORT_DISPLAY_NAMES.items():
+            names.setdefault(token, label)
+        return names
 
     def _find_claude_dir(self) -> Path:
         """Find the .claude directory relative to this script"""
@@ -278,14 +452,33 @@ class AgentVibesServer:
         Returns:
             Success message with audio file path
         """
-        # Store original settings to restore later
+        # Store original settings to restore later. Mutating the personality/
+        # language files is inherently racy across processes; the lock below
+        # only protects against concurrent tool calls within *this* server
+        # instance (see the residual-risk note on self._override_lock).
         original_personality = None
+        personality_file_existed = True
         original_language = None
+        needs_override = bool(personality or language)
+
+        if needs_override:
+            await self._override_lock.acquire()
 
         try:
             # Temporarily set personality if specified
+            personality_path = self._get_config_dir() / "tts-personality.txt"
             if personality:
-                original_personality = await self._get_personality()
+                # Read the ORIGINAL from the SAME file the manager writes to
+                # (the config dir). _get_personality() reads a different set of
+                # dirs (package dir, then global ~/.claude) and, from inside a
+                # host project, returns the wrong value — restoring that would
+                # overwrite the project's real personality. Non-Destructive Rule.
+                personality_file_existed = personality_path.exists()
+                if personality_file_existed:
+                    try:
+                        original_personality = personality_path.read_text(encoding="utf-8").strip()
+                    except OSError:
+                        original_personality = None  # can't read → don't clobber on restore
                 await self._run_script(
                     self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
                 )
@@ -325,8 +518,16 @@ class AgentVibesServer:
 
             env = self._build_script_env()
 
+            # Declare voice provenance so the resolver treats an MCP-requested
+            # voice as a genuine explicit pick (user-explicit), never demoting it
+            # to a per-LLM/default row the way it would an LLM echo (F-1). Only
+            # set when the caller actually asked for a specific voice.
+            if voice:
+                env["AGENTVIBES_VOICE_SOURCE"] = "user-explicit"
+
             result = await asyncio.create_subprocess_exec(
                 *args,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
@@ -377,15 +578,48 @@ class AgentVibesServer:
                     await result.wait()
 
         finally:
-            # Restore original settings
-            if original_personality:
-                await self._run_script(
-                    self.PERSONALITY_MANAGER_SCRIPT, ["set", original_personality]
-                )
-            if original_language:
-                await self._run_script(
+            # Restore original personality. personality-manager.sh has no
+            # delete-on-default behavior (unlike language-manager.sh), so if
+            # no personality file existed before this call, restore by
+            # deleting the file rather than writing "normal" into it — the
+            # non-destructive-config rule means a temporary per-call override
+            # must not leave a permanent file behind that wasn't there before.
+            if personality:
+                if personality_file_existed:
+                    if original_personality is not None:
+                        restore = await self._run_script(
+                            self.PERSONALITY_MANAGER_SCRIPT, ["set", original_personality]
+                        )
+                        if not restore.ok:
+                            import sys
+                            print(
+                                f"Warning: failed to restore personality "
+                                f"'{original_personality}': {restore.error_detail}",
+                                file=sys.stderr,
+                            )
+                else:
+                    # No personality file existed before this call — restore by
+                    # deleting (same config dir we captured existence from).
+                    try:
+                        personality_path.unlink()
+                    except OSError:
+                        pass
+            if original_language is not None:
+                # "english"/"reset" makes language-manager.sh *delete* the
+                # language file rather than write it, so this naturally
+                # restores "no override was ever set" correctly too.
+                restore_lang = await self._run_script(
                     self.LANGUAGE_MANAGER_SCRIPT, ["set", original_language]
                 )
+                if not restore_lang.ok:
+                    import sys
+                    print(
+                        f"Warning: failed to restore language "
+                        f"'{original_language}': {restore_lang.error_detail}",
+                        file=sys.stderr,
+                    )
+            if needs_override:
+                self._override_lock.release()
 
     async def list_voices(self) -> str:
         """
@@ -400,8 +634,8 @@ class AgentVibesServer:
 
         # voice-manager.sh list-simple is now provider-aware
         result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["list-simple"])
-        if result:
-            voices = result.strip().split("\n")
+        if result.ok and result.stdout:
+            voices = result.stdout.strip().split("\n")
             voices = [v for v in voices if v]  # Filter empty strings
 
             if not voices:
@@ -460,7 +694,7 @@ class AgentVibesServer:
                 output += f"\n💡 Switch to {alternative_provider}? Use: set_provider(provider=\"{alternative_provider.lower()}\")\n"
 
             return output
-        return "❌ Failed to list voices"
+        return f"❌ Failed to list voices: {result.error_detail}"
 
     async def set_voice(self, voice_name: str) -> str:
         """
@@ -512,11 +746,14 @@ class AgentVibesServer:
         result = await self._run_script(
             self.VOICE_MANAGER_SCRIPT, ["switch", resolved_name, "--silent"]
         )
-        if result and "✅" in result:
+        if result.ok:
             if original_name.lower() != resolved_name.lower():
                 return f"✅ Voice switched to: {original_name} ({resolved_name})"
             return f"✅ Voice switched to: {voice_name}"
-        return f"❌ Failed to switch voice — could not resolve '{voice_name}'. Try 'list_voices' to see available names."
+        return (
+            f"❌ Failed to switch voice — could not resolve '{voice_name}'. "
+            f"Try 'list_voices' to see available names. ({result.error_detail})"
+        )
 
     async def list_personalities(self) -> str:
         """
@@ -526,7 +763,9 @@ class AgentVibesServer:
             Formatted list of personalities with descriptions
         """
         result = await self._run_script(self.PERSONALITY_MANAGER_SCRIPT, ["list"])
-        return result if result else "❌ Failed to list personalities"
+        if result.ok:
+            return result.stdout
+        return f"❌ Failed to list personalities: {result.error_detail}"
 
     async def set_personality(self, personality: str) -> str:
         """
@@ -538,12 +777,18 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script(
-            self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
-        )
-        if result and "🎭" in result:
-            return result
-        return f"❌ Failed to set personality: {result}"
+        # Serialize against text_to_speech's temporary override/restore so a
+        # deliberate set here can't be silently reverted by an in-flight call's
+        # restore step (they mutate the same tts-personality.txt).
+        async with self._override_lock:
+            result = await self._run_script(
+                self.PERSONALITY_MANAGER_SCRIPT, ["set", personality]
+            )
+        if result.ok:
+            # Windows (.ps1) scripts print plain text with no 🎭 marker; add
+            # our own so the tool's output stays consistent across platforms.
+            return result.stdout if "🎭" in result.stdout else f"🎭 {result.stdout}"
+        return f"❌ Failed to set personality: {result.error_detail}"
 
     async def get_config(self) -> str:
         """
@@ -591,10 +836,14 @@ class AgentVibesServer:
         Returns:
             Success or error message
         """
-        result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
-        if result and "✓" in result:
-            return result
-        return f"❌ Failed to set language: {result}"
+        # Serialize against text_to_speech's temporary override/restore (both
+        # mutate the same language config), so a deliberate set here isn't
+        # silently reverted by an in-flight call's restore step.
+        async with self._override_lock:
+            result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["set", language])
+        if result.ok:
+            return result.stdout if "✓" in result.stdout else f"✓ {result.stdout}"
+        return f"❌ Failed to set language: {result.error_detail}"
 
     async def replay_audio(self, n: int = 1) -> str:
         """
@@ -607,39 +856,37 @@ class AgentVibesServer:
             Success or error message
         """
         result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["replay", str(n)])
-        if result and "🔊" in result:
-            return result
-        return f"❌ Failed to replay audio: {result}"
+        if result.ok:
+            return result.stdout if "🔊" in result.stdout else f"🔊 {result.stdout}"
+        return f"❌ Failed to replay audio: {result.error_detail}"
 
     async def set_provider(self, provider: str) -> str:
         """
-        Switch TTS provider between Piper, macOS, and Termux SSH.
+        Switch TTS provider between the supported synthesis engines.
 
         Args:
-            provider: Provider name ("piper", "macos", or "termux-ssh")
+            provider: Provider name. Non-Windows: "piper", "macos", "termux-ssh",
+                "soprano", "kokoro", "elevenlabs". Windows: "windows-piper",
+                "windows-sapi", "soprano", "kokoro".
 
         Returns:
             Success or error message
         """
         provider = provider.lower()
-        if self.is_windows:
-            valid_providers = ["windows-piper", "windows-sapi", "soprano"]
-        else:
-            valid_providers = ["piper", "macos", "termux-ssh", "soprano"]
+        # Platform allowlist + display names DERIVE from provider-catalog.json
+        # (SSOT), with embedded fallbacks (module constants above). kokoro is
+        # cross-platform; elevenlabs is Unix-only (NO play-tts-elevenlabs.ps1, so
+        # it is absent from the Windows set — switching to it on Windows would be
+        # silently unplayable). See AVI-S9.1 / AVI-S9.5 and provider-catalog.js
+        # (elevenlabs.runtime.windows === null).
+        valid_providers = self._valid_providers()
         if provider not in valid_providers:
             return f"❌ Invalid provider: {provider}. Choose from: {', '.join(valid_providers)}"
 
         result = await self._run_script("provider-manager.sh", ["switch", provider])
-        if result and ("✓" in result or "[OK]" in result):
-            # Automatically speak confirmation in the new provider's voice
-            provider_names = {
-                "macos": "macOS",
-                "termux-ssh": "Termux SSH",
-                "piper": "Piper",
-                "windows-piper": "Windows Piper",
-                "windows-sapi": "Windows SAPI",
-                "soprano": "Soprano",
-            }
+        if result.ok:
+            # Automatically speak confirmation in the new provider's voice.
+            provider_names = self._provider_display_names()
             provider_name = provider_names.get(provider, provider.title())
             confirmation_text = f"Successfully switched to {provider_name} provider"
 
@@ -650,33 +897,15 @@ class AgentVibesServer:
                     timeout=5.0
                 )
                 # Return the provider switch result plus TTS confirmation
-                return f"{result}\n🔊 Spoken confirmation: {confirmation_text}"
+                return f"{result.stdout}\n🔊 Spoken confirmation: {confirmation_text}"
             except asyncio.TimeoutError:
                 # Timeout - provider may need setup (e.g., Piper not installed)
-                return f"{result}\n⚠️ Provider switched (TTS confirmation timed out - provider may need setup)"
+                return f"{result.stdout}\n⚠️ Provider switched (TTS confirmation timed out - provider may need setup)"
             except Exception as e:
                 # If TTS fails, still return success for the provider switch
-                return f"{result}\n⚠️ Provider switched but TTS confirmation failed: {e}"
+                return f"{result.stdout}\n⚠️ Provider switched but TTS confirmation failed: {e}"
 
-        return f"❌ Failed to switch provider: {result}"
-
-    async def set_learn_mode(self, enabled: bool) -> str:
-        """
-        Enable or disable language learning mode.
-
-        When enabled, TTS speaks in both your main language and target language.
-
-        Args:
-            enabled: True to enable, False to disable
-
-        Returns:
-            Success or error message
-        """
-        action = "enable" if enabled else "disable"
-        result = await self._run_script("learn-manager.sh", [action])
-        if result and "✓" in result:
-            return result
-        return f"❌ Failed to set learn mode: {result}"
+        return f"❌ Failed to switch provider: {result.error_detail}"
 
     async def set_speed(self, speed: str, target: bool = False) -> str:
         """
@@ -697,7 +926,7 @@ class AgentVibesServer:
 
         args = ["target", speed] if target else [speed]
         result = await self._run_script("speed-manager.sh", args)
-        if result and "✓" in result:
+        if result.ok:
             # Simple test messages to demonstrate the new speed
             test_messages = [
                 "Testing speed change",
@@ -713,12 +942,12 @@ class AgentVibesServer:
             try:
                 # Speak the test message to demonstrate the new speed
                 await self.text_to_speech(test_message)
-                return f"{result}\n🔊 Testing new speed: \"{test_message}\""
+                return f"{result.stdout}\n🔊 Testing new speed: \"{test_message}\""
             except Exception as e:
                 # If TTS fails, still return success for the speed change
-                return f"{result}\n⚠️ Speed changed but demo failed: {e}"
+                return f"{result.stdout}\n⚠️ Speed changed but demo failed: {e}"
 
-        return f"❌ Failed to set speed: {result}"
+        return f"❌ Failed to set speed: {result.error_detail}"
 
     async def get_speed(self) -> str:
         """
@@ -728,7 +957,7 @@ class AgentVibesServer:
             Current speed settings for main and target voices
         """
         result = await self._run_script("speed-manager.sh", ["get"])
-        return result if result else "❌ Failed to get speed settings"
+        return result.stdout if result.ok else f"❌ Failed to get speed settings: {result.error_detail}"
 
     async def download_extra_voices(self, auto_yes: bool = False) -> str:
         """
@@ -742,11 +971,23 @@ class AgentVibesServer:
         Returns:
             Success message with download summary
         """
-        args = ["--yes"] if auto_yes else []
-        result = await self._run_script("download-extra-voices.sh", args)
-        if result and ("✅" in result or "Successfully downloaded" in result or "already downloaded" in result):
-            return result
-        return f"❌ Failed to download extra voices: {result}"
+        if not auto_yes:
+            # download-extra-voices.sh hits `read -p "...? [Y/n]: "` when no
+            # --yes flag is given. Since stdin is always DEVNULL (see
+            # _run_script), that read would return EOF/empty rather than
+            # hang — but reaching it at all is still the wrong behavior for
+            # an MCP tool: an LLM caller can't answer an interactive prompt.
+            # Fail fast with a clear, actionable error instead of ever
+            # spawning the script.
+            return (
+                "⚠️ Confirmation required: call download_extra_voices(auto_yes=True) "
+                "to download the extra voices. This tool cannot answer an interactive "
+                "Y/n prompt, so it refuses to start the download without explicit consent."
+            )
+        result = await self._run_script("download-extra-voices.sh", ["--yes"], timeout=180.0)
+        if result.ok:
+            return result.stdout
+        return f"❌ Failed to download extra voices: {result.error_detail}"
 
     async def get_verbosity(self) -> str:
         """
@@ -756,8 +997,8 @@ class AgentVibesServer:
             Current verbosity level with description
         """
         result = await self._run_script("verbosity-manager.sh", ["get"])
-        if result:
-            level = result.strip()
+        if result.ok:
+            level = result.stdout.strip()
             descriptions = {
                 "low": "LOW - Acknowledgments + Completions only (minimal)",
                 "medium": "MEDIUM - + Major decisions and findings (balanced)",
@@ -765,7 +1006,7 @@ class AgentVibesServer:
             }
             desc = descriptions.get(level, level)
             return f"🎙️ Current Verbosity: {desc}\n\n💡 Change with: set_verbosity(level=\"low|medium|high\")"
-        return "❌ Failed to get verbosity level"
+        return f"❌ Failed to get verbosity level: {result.error_detail}"
 
     async def set_verbosity(self, level: str) -> str:
         """
@@ -778,9 +1019,10 @@ class AgentVibesServer:
             Success or error message
         """
         result = await self._run_script("verbosity-manager.sh", ["set", level])
-        if result and "✅" in result:
-            return f"{result}\n\n⚠️  Restart Claude Code for changes to take effect"
-        return f"❌ Failed to set verbosity: {result}"
+        if result.ok:
+            body = result.stdout if "✅" in result.stdout else f"✅ {result.stdout}"
+            return f"{body}\n\n⚠️  Restart Claude Code for changes to take effect"
+        return f"❌ Failed to set verbosity: {result.error_detail}"
 
     def _get_mute_files(self) -> list:
         """Get all mute file paths for current platform"""
@@ -866,7 +1108,7 @@ class AgentVibesServer:
             Formatted list of all pre-packaged background music files
         """
         result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["list"])
-        return result if result else "❌ Failed to list background music"
+        return result.stdout if result.ok else f"❌ Failed to list background music: {result.error_detail}"
 
     async def set_background_music(self, track_name: str, agent_name: Optional[str] = None) -> str:
         """
@@ -883,12 +1125,12 @@ class AgentVibesServer:
 
         # Get list of available tracks for fuzzy matching
         list_result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["list"])
-        if not list_result or "❌" in list_result:
-            return "❌ Failed to list background music tracks"
+        if not list_result.ok:
+            return f"❌ Failed to list background music tracks: {list_result.error_detail}"
 
         # Parse track names
         tracks = []
-        for line in list_result.split("\n"):
+        for line in list_result.stdout.split("\n"):
             match = re.match(r'\s*\d+\.\s+(.+)', line.strip())
             if match:
                 tracks.append(match.group(1).strip())
@@ -926,11 +1168,11 @@ class AgentVibesServer:
             # Set as default
             result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["set-default", matched_track])
 
-        if result and ("✅" in result or "[OK]" in result):
+        if result.ok:
             if matched_track.lower() != track_name.lower():
-                return f"{result}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
-            return result
-        return f"❌ Failed to set background music: {result}"
+                return f"{result.stdout}\n\n🔍 Matched '{track_name}' to '{matched_track}'"
+            return result.stdout
+        return f"❌ Failed to set background music: {result.error_detail}"
 
     async def enable_background_music(self, enabled: bool) -> str:
         """
@@ -958,7 +1200,9 @@ class AgentVibesServer:
             cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
         except Exception:
             pass  # best-effort sync
-        return result if result else f"❌ Failed to {'enable' if enabled else 'disable'} background music"
+        if result.ok:
+            return result.stdout
+        return f"❌ Failed to {'enable' if enabled else 'disable'} background music: {result.error_detail}"
 
     async def set_background_music_volume(self, volume: float) -> str:
         """
@@ -971,7 +1215,7 @@ class AgentVibesServer:
             Success or error message
         """
         result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["volume", str(volume)])
-        return result if result else "❌ Failed to set background music volume"
+        return result.stdout if result.ok else f"❌ Failed to set background music volume: {result.error_detail}"
 
     async def get_background_music_status(self) -> str:
         """
@@ -981,7 +1225,7 @@ class AgentVibesServer:
             Status information
         """
         result = await self._run_script(self.BACKGROUND_MUSIC_MANAGER_SCRIPT, ["status"])
-        return result if result else "❌ Failed to get background music status"
+        return result.stdout if result.ok else f"❌ Failed to get background music status: {result.error_detail}"
 
     async def set_reverb(self, level: str, agent: str = "default", apply_all: bool = False) -> str:
         """
@@ -999,7 +1243,9 @@ class AgentVibesServer:
         if apply_all:
             args.append("--all")
         result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, args)
-        return result if result else f"✅ Set reverb to {level}"
+        if result.ok:
+            return result.stdout if result.stdout else f"✅ Set reverb to {level}"
+        return f"❌ Failed to set reverb: {result.error_detail}"
 
     async def get_reverb(self, agent: str = "default") -> str:
         """
@@ -1012,9 +1258,9 @@ class AgentVibesServer:
             Current reverb level
         """
         result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["get-reverb", agent])
-        if result:
-            return f"Current reverb level for {agent}: {result.strip()}"
-        return f"❌ Failed to get reverb for {agent}"
+        if result.ok:
+            return f"Current reverb level for {agent}: {result.stdout.strip()}"
+        return f"❌ Failed to get reverb for {agent}: {result.error_detail}"
 
     async def list_audio_effects(self) -> str:
         """
@@ -1024,7 +1270,7 @@ class AgentVibesServer:
             Effects configuration
         """
         result = await self._run_script(self.EFFECTS_MANAGER_SCRIPT, ["list"])
-        return result if result else "❌ Failed to list audio effects"
+        return result.stdout if result.ok else f"❌ Failed to list audio effects: {result.error_detail}"
 
     async def clean_audio_cache(self) -> str:
         """
@@ -1038,7 +1284,7 @@ class AgentVibesServer:
             Cleanup results with file count and space freed
         """
         result = await self._run_script("clean-audio-cache.sh", [])
-        return result if result else "❌ Failed to clean audio cache"
+        return result.stdout if result.ok else f"❌ Failed to clean audio cache: {result.error_detail}"
 
     # ── Hermes config helpers ────────────────────────────────────────────────
 
@@ -1189,14 +1435,28 @@ class AgentVibesServer:
 
         return env
 
-    async def _run_script(self, script_name: str, args: list[str]) -> str:
-        """Run a script and return output (bash on Unix, PowerShell on Windows)"""
+    async def _run_script(
+        self,
+        script_name: str,
+        args: list[str],
+        timeout: float = DEFAULT_SCRIPT_TIMEOUT,
+    ) -> ScriptResult:
+        """Run a script and return its (returncode, stdout, stderr) as a ScriptResult.
+
+        Callers MUST branch on `.ok`/`.returncode` — never on text/emoji
+        content — because Windows manager scripts (.ps1) print plain text
+        where the Unix (.sh) scripts print an emoji marker.
+
+        `stdin` is always DEVNULL and a timeout is always enforced so a
+        script that reaches an interactive prompt (e.g. `read -p`) cannot
+        inherit the MCP stdio JSON-RPC stream or hang the server forever.
+        """
         # Auto-resolve .sh → .ps1 on Windows (class constants handle special cases)
         if self.is_windows and script_name.endswith('.sh'):
             script_name = script_name[:-3] + '.ps1'
         script_path = self.hooks_dir / script_name
         if not script_path.exists():
-            return f"Script not found: {script_path}"
+            return ScriptResult(127, "", f"Script not found: {script_path}")
 
         # Build command — PowerShell on Windows, bash on Unix
         if self.is_windows:
@@ -1209,34 +1469,67 @@ class AgentVibesServer:
 
         env = self._build_script_env()
 
+        proc = None
         try:
-            result = await asyncio.create_subprocess_exec(
+            # Run the child in its OWN process group/session (Unix) so a timeout
+            # can kill the WHOLE tree. A plain proc.kill() only kills the direct
+            # child (e.g. bash); a `sleep`/piper grandchild survives, keeps the
+            # stdout pipe OPEN, and communicate() then blocks until it exits — so
+            # the timeout is never honored (CI: 1s timeout let a 5s script run 5s).
+            _popen_kwargs = {}
+            if os.name != "nt":
+                _popen_kwargs["start_new_session"] = True
+            proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                **_popen_kwargs,
             )
-            try:
-                stdout, stderr = await result.communicate()
-                if result.returncode == 0:
-                    return stdout.decode().strip()
-                else:
-                    error_msg = stderr.decode().strip()
-                    if not error_msg:  # If stderr is empty, include stdout for debugging
-                        error_msg = f"Return code {result.returncode}. Stdout: {stdout.decode().strip()}"
-                    return error_msg
-            finally:
-                # Ensure process cleanup
-                if result.returncode is None:
-                    result.kill()
-                    await result.wait()
+            # asyncio.wait() with a timeout returns at the deadline WITHOUT
+            # cancelling the task (unlike wait_for, whose cancellation of
+            # communicate() awaits the child). So we get control back on time,
+            # then kill the whole group and drain.
+            comm_task = asyncio.ensure_future(proc.communicate())
+            done, _pending = await asyncio.wait({comm_task}, timeout=timeout)
+            if comm_task not in done:
+                try:
+                    if os.name != "nt":
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # whole group
+                    else:
+                        proc.kill()
+                except (ProcessLookupError, PermissionError, OSError):
+                    pass
+                # Bounded drain: the group is dead, so pipes close and this returns
+                # immediately; the timeout guards against any lingering handle.
+                try:
+                    await asyncio.wait_for(comm_task, timeout=2.0)
+                except Exception:
+                    comm_task.cancel()
+                return ScriptResult(
+                    -1, "",
+                    f"Script '{script_name}' timed out after {timeout:.0f}s "
+                    "(it may have reached an interactive prompt)"
+                )
+            stdout, stderr = comm_task.result()
+            return ScriptResult(
+                proc.returncode if proc.returncode is not None else -1,
+                stdout.decode(errors="replace").strip(),
+                stderr.decode(errors="replace").strip(),
+            )
         except Exception as e:
-            return f"Error running script: {e}"
+            return ScriptResult(-2, "", f"Error running script: {e}")
+        finally:
+            # Ensure process cleanup
+            if proc is not None and proc.returncode is None:
+                proc.kill()
+                await proc.wait()
 
     async def _get_current_voice(self) -> str:
         """Get the currently active voice"""
         result = await self._run_script(self.VOICE_MANAGER_SCRIPT, ["get"])
-        return result.strip() if result else "Unknown"
+        return result.stdout.strip() if result.ok and result.stdout else "Unknown"
 
     async def _get_personality(self) -> str:
         """Get the current personality setting"""
@@ -1257,7 +1550,7 @@ class AgentVibesServer:
     async def _get_language(self) -> str:
         """Get the current language setting"""
         result = await self._run_script(self.LANGUAGE_MANAGER_SCRIPT, ["code"])
-        return result.strip() if result else "english"
+        return result.stdout.strip() if result.ok and result.stdout else "english"
 
     async def _get_provider(self) -> str:
         """Get the active TTS provider"""
@@ -1438,20 +1731,6 @@ Examples:
             },
         ),
         Tool(
-            name="set_learn_mode",
-            description="Enable or disable language learning mode. When ON, TTS speaks in both your main language and target language for bilingual learning.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "enabled": {
-                        "type": "boolean",
-                        "description": "True to enable learning mode, False to disable"
-                    }
-                },
-                "required": ["enabled"],
-            },
-        ),
-        Tool(
             name="set_speed",
             description="Set speech speed for main or target voice. Works with both Piper and macOS providers. Use this to make voices faster or slower.",
             inputSchema={
@@ -1477,13 +1756,24 @@ Examples:
         ),
         Tool(
             name="download_extra_voices",
-            description="Download extra high-quality custom Piper voices from HuggingFace. Includes: Kristin (US female), Jenny (UK female with Irish accent), and Tracy/16Speakers (multi-speaker). Perfect for adding variety to your TTS voices.",
+            description=(
+                "Download extra high-quality custom Piper voices from HuggingFace. "
+                "Includes: Kristin (US female), Jenny (UK female with Irish accent), "
+                "and Tracy/16Speakers (multi-speaker). Perfect for adding variety to "
+                "your TTS voices. This tool never proceeds without explicit consent: "
+                "call it with auto_yes=True to actually start the download, or it "
+                "returns a 'confirmation required' message and does nothing."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "auto_yes": {
                         "type": "boolean",
-                        "description": "Skip confirmation prompt and download automatically (default: False)",
+                        "description": (
+                            "Must be True to download. False (the default) returns a "
+                            "confirmation-required message without downloading anything — "
+                            "this tool cannot answer an interactive Y/n prompt."
+                        ),
                         "default": False
                     }
                 },
@@ -1574,7 +1864,7 @@ Fuzzy matching examples:
         ),
         Tool(
             name="enable_background_music",
-            description="Enable or disable background music globally. When enabled, TTS audio will be mixed with background music at configured volume (default 30%).",
+            description="Enable or disable background music globally. When enabled, TTS audio will be mixed with background music at configured volume (default 20%).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1594,7 +1884,7 @@ Fuzzy matching examples:
                 "properties": {
                     "volume": {
                         "type": "number",
-                        "description": "Volume level (0.0 = silent, 0.30 = default, 1.0 = full volume)",
+                        "description": "Volume level (0.0 = silent, 0.20 = default, 1.0 = full volume)",
                         "minimum": 0.0,
                         "maximum": 1.0,
                     }
@@ -1701,8 +1991,15 @@ Examples:
 
 
 @app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Handle tool calls"""
+async def call_tool(name: str, arguments: dict) -> list[TextContent] | CallToolResult:
+    """Handle tool calls.
+
+    Every AgentVibesServer method below returns a string that starts with
+    "❌" on failure (a marker produced by our own code from the script's
+    *exit code*, not sniffed from the child script's stdout — see H1/#1 in
+    story 8.2). We use that marker here, once, to set MCP's `isError` so
+    clients can distinguish failure without parsing text.
+    """
     try:
         if name == "text_to_speech":
             result = await agent_vibes.text_to_speech(
@@ -1728,8 +2025,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await agent_vibes.replay_audio(n)
         elif name == "set_provider":
             result = await agent_vibes.set_provider(arguments["provider"])
-        elif name == "set_learn_mode":
-            result = await agent_vibes.set_learn_mode(arguments["enabled"])
         elif name == "set_speed":
             target = arguments.get("target", False)
             result = await agent_vibes.set_speed(arguments["speed"], target)
@@ -1785,12 +2080,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 voice=arguments.get("voice"),
             )
         else:
-            result = f"Unknown tool: {name}"
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Unknown tool: {name}")],
+                isError=True,
+            )
 
-        return [TextContent(type="text", text=result)]
+        content = [TextContent(type="text", text=result)]
+        if isinstance(result, str) and result.startswith("❌"):
+            return CallToolResult(content=content, isError=True)
+        return content
 
     except Exception as e:
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"Error: {str(e)}")],
+            isError=True,
+        )
 
 
 async def main():

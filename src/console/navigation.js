@@ -9,7 +9,6 @@
 /** Map of key → tab ID for global tab shortcut keys */
 const KEY_TO_TAB = {
   's': 'settings', 'S': 'settings',
-  'v': 'voices',   'V': 'voices',
   'm': 'music',    'M': 'music',
   'b': 'agents',   'B': 'agents',
   'x': 'receiver', 'X': 'receiver',

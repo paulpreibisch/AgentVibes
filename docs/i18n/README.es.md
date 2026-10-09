@@ -4,13 +4,52 @@
 
 ---
 
-## 🌟 NUEVO EN v5.8.0 — Soprano Ahora Funciona + Selector de Voz Corregido para Todos los Motores
+## 🆕 Sabe dónde se reproduce tu vista previa (v5.15.1)
 
-**Soprano TTS funciona ahora de verdad:** Soprano (nuestro motor de TTS neuronal) estaba silenciosamente roto en Windows desde el lanzamiento — nombre binario incorrecto, PATH recortado, ruta del wav enviada al flujo de salida incorrecto, y sin auto-inicio para el servidor WebUI. Todo corregido. Instala con `pip install soprano-tts`, selecciona Soprano en la pestaña de configuración, y AgentVibes se encarga del resto.
+- **Cada vista previa muestra dónde se reproduce** — las vistas previas de voz y de música ahora muestran **(locally)** (localmente) o **(remotely via SSH)** (de forma remota vía SSH) justo en la fila que estás escuchando, para que nunca adivines (ni oigas silencio en un equipo sin pantalla).
+- **Vista previa estandarizada en toda la aplicación** — los selectores de voz (Kokoro, Piper, ElevenLabs, BMAD por agente) y la página de Música muestran todos el mismo indicador; las vistas previas de música ahora también siguen el receptor remoto de un proyecto.
+- **Pestaña de Agentes más limpia** — muestra tus agentes BMAD reales (no los ayudantes internos de una skill) y se vuelve a comprobar al enfocarla; **Reset** dejó de estar en `X` (que saltaba a la pestaña Receiver) y pasó a **`Del`**.
 
-**El selector de voz ahora funciona para Windows SAPI y macOS Say:** Anteriormente el selector mostraba todo el catálogo de voces de Piper incluso cuando SAPI o macOS Say estaba seleccionado, y la vista previa con barra espaciadora reproducía a través del motor incorrecto. El selector ahora muestra exactamente un elemento para cada motor nativo y previsualiza a través del binario correcto.
+### v5.15.0 — Control multisesión en Windows
 
-**El guardado automático ya no rompe tu configuración de motor:** Guardar una configuración de LLM ya no sobrescribe silenciosamente tu motor elegido de vuelta a Piper.
+- **Las sesiones permanecen en silencio salvo que las actives** — una sesión solo habla en un proyecto que hayas activado; las demás no añaden instrucciones ni coste de tokens.
+- **`/agent-vibes:mute` ya funciona en Windows** — antes no tenía ningún efecto allí. Tanto el silenciado del proyecto como el global se respetan en todas las plataformas.
+- **Las sesiones pueden presentarse en Windows** — `{{session}}` anuncia "Claude on my-app in Windows Terminal", una vez por sesión.
+- **Las autopresentaciones ya llegan a las instalaciones globales** — el script que las genera nunca lo entregaba el actualizador en ninguna plataforma.
+- **Nota para las instalaciones globales de Windows:** tras esta actualización, las sesiones están desactivadas por defecto — actívalas con `/agent-vibes:unmute`.
+
+### v5.14.0 — Instalación fiable y vistas previas de audio completas
+
+Incluye todos los cambios de la 5.13.2, que no llegó a publicarse en npm.
+
+- **La instalación se completa en macOS y Linux** — la instalación de Piper y la descarga de voces se ejecutan ahora correctamente en un equipo nuevo, resolviendo un problema de larga duración en la primera instalación.
+- **La vista previa reproduce tu mezcla completa** — voz, reverb/efectos y música de fondo a la vez, para que las vistas previas reflejen cómo sonará realmente tu agente.
+- **Las actualizaciones conservan tus personalizaciones** — los scripts de hooks que hayas editado se guardan en una copia de seguridad con marca de tiempo antes de reemplazar ningún archivo.
+- **Destino del audio más claro** — los ajustes muestran **Local** en verde y **Remote** en rojo.
+- **Motor de vista previa correcto** — las vistas previas usan el motor propio de la voz seleccionada y lo identifican; las voces de Windows y macOS funcionan en las vistas previas remotas.
+
+### v5.13.0 — Tus voces en todas partes
+
+Elige las voces integradas en **Windows** o **Mac** y escúchalas dondequiera que estés escuchando — incluso cuando tus agentes se ejecutan en otro ordenador. Además, un amable tono de aviso para que siempre sepas que el audio está en camino.
+
+- **🖥️ Las voces propias de tu ordenador, desde cualquier lugar** — elige voces de Windows o Mac y escúchalas en tu máquina; se muestran todas las voces, con las no disponibles claramente marcadas.
+- **🗂️ Todas las voces en una lista** — Piper, Kokoro, ElevenLabs, Windows, Mac y Soprano en un solo lugar, así que lo que ves es lo que puedes usar.
+- **🔔 Tono de aviso** — un breve sonido se reproduce justo antes de una vista previa de voz o de música, para que sepas que el audio está en camino.
+- **🆔 Agentes que se presentan a sí mismos** — auto-presentaciones opcionales para que sepas quién está hablando en un equipo.
+
+### v5.12.0 — Un núcleo más sólido
+
+Durante una semana de acceso anticipado al nuevo modelo **Fable** de Anthropic, reconstruimos el corazón de AgentVibes en **un único núcleo compartido**. La lógica de voz / motor / enrutamiento / volumen / silencio que solía estar copiada en cuatro scripts (y divergía entre sí) ahora vive en un solo lugar — más simple, más consistente y más estable.
+
+- **🔊 Las vistas previas se reproducen en el lugar correcto** — con SSH remoto configurado, las vistas previas de voz y de **música** se reproducen en tu receptor; de lo contrario se reproducen localmente.
+- **🧠 Un único núcleo compartido** — el silencio de Kokoro en Linux y la divergencia por voz corregidos en el origen, con un respaldo seguro si es necesario.
+- **🧹 Eliminada la pestaña Voces redundante** — elige una voz para cualquier proveedor en Setup.
+
+### v5.11.0 — Voces neuronales
+
+- **🧠 Kokoro** — TTS neuronal local en tu **CPU, sin GPU requerida** (chino, japonés y coreano integrados).
+- **☁️ ElevenLabs** — voces neuronales premium en la nube.
+- Efectos de audio combinables: apila **reverb**, **echo** y **chorus** en cualquier voz.
 
 ## v5.7.7 — Restauración de Voces en Modo Party + Mejoras
 

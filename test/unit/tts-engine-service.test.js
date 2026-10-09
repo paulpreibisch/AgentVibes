@@ -17,6 +17,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
   getAvailableEngines,
+  getAllEngines,
+  isEngineSupported,
+  receiverProviderId,
   checkEngineInstalled,
   getEngineStatuses,
 } from '../../src/services/tts-engine-service.js';
@@ -98,6 +101,82 @@ describe('getAvailableEngines', () => {
     if (process.platform === 'darwin') {
       const engines = getAvailableEngines();
       assert.ok(engines.some(e => e.id === 'macos-say'), 'macos-say must appear on darwin');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAllEngines() + isEngineSupported() — show-all-with-supported-flag
+// ---------------------------------------------------------------------------
+
+describe('getAllEngines', () => {
+  test('includes every engine regardless of platform (sapi + macos-say always present)', () => {
+    const ids = getAllEngines().map(e => e.id);
+    assert.ok(ids.includes('sapi'), 'sapi must be listed on every platform');
+    assert.ok(ids.includes('macos-say'), 'macos-say must be listed on every platform');
+    assert.ok(ids.includes('piper') && ids.includes('kokoro') && ids.includes('elevenlabs'));
+  });
+
+  test('is a superset of getAvailableEngines()', () => {
+    const all = getAllEngines().map(e => e.id);
+    for (const e of getAvailableEngines()) assert.ok(all.includes(e.id));
+    assert.ok(getAllEngines().length >= getAvailableEngines().length);
+  });
+
+  test('every entry carries a supported boolean matching the platform', () => {
+    for (const e of getAllEngines()) {
+      assert.strictEqual(typeof e.supported, 'boolean');
+      assert.strictEqual(e.supported, isEngineSupported(e.id));
+    }
+  });
+
+  test('sapi.supported is true only on win32', () => {
+    const sapi = getAllEngines().find(e => e.id === 'sapi');
+    assert.strictEqual(sapi.supported, process.platform === 'win32');
+  });
+
+  test('macos-say.supported is true only on darwin', () => {
+    const m = getAllEngines().find(e => e.id === 'macos-say');
+    assert.strictEqual(m.supported, process.platform === 'darwin');
+  });
+
+  test('piper is supported on every platform', () => {
+    assert.strictEqual(isEngineSupported('piper'), true);
+  });
+
+  test('isEngineSupported is false for unknown ids', () => {
+    assert.strictEqual(isEngineSupported('__nope__'), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// receiverProviderId() — picker id -> sender/receiver provider name
+// ---------------------------------------------------------------------------
+
+describe('receiverProviderId', () => {
+  // These are exactly the names play-tts-ssh-remote.sh accepts for the payload
+  // `provider` field (case: piper|soprano|macos|windows-sapi|kokoro|elevenlabs).
+  const SENDER_ALLOWED = new Set(['piper', 'soprano', 'macos', 'windows-sapi', 'kokoro', 'elevenlabs']);
+
+  test('maps sapi -> windows-sapi', () => {
+    assert.strictEqual(receiverProviderId('sapi'), 'windows-sapi');
+  });
+
+  test('maps macos-say -> macos', () => {
+    assert.strictEqual(receiverProviderId('macos-say'), 'macos');
+  });
+
+  test('passes through engines that already match sender names', () => {
+    for (const id of ['piper', 'kokoro', 'elevenlabs', 'soprano']) {
+      assert.strictEqual(receiverProviderId(id), id);
+    }
+  });
+
+  test('every getAllEngines id maps to a sender-accepted provider name', () => {
+    for (const e of getAllEngines()) {
+      const mapped = receiverProviderId(e.id);
+      assert.ok(SENDER_ALLOWED.has(mapped),
+        `engine "${e.id}" -> "${mapped}" is not accepted by play-tts-ssh-remote.sh`);
     }
   });
 });

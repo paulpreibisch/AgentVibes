@@ -15,6 +15,41 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { buildAudioEnv, detectWavPlayer, getAllWavPlayers } from '../audio-env.js';
 import { SURNAME_POOL, uniquifyVoiceName } from '../../utils/voice-names.js';
+import { voicesForProvider, ELEVENLABS_VOICES, KOKORO_VOICE_IDS, WINDOWS_SAPI_VOICES, MACOS_VOICES, kokoroGender } from '../../services/provider-voice-catalog.js';
+import { getProvider as _catalogGetProvider } from '../../services/provider-catalog.js';
+import { receiverProviderId } from '../../services/tts-engine-service.js';
+
+/**
+ * Resolve display name / gender / provider label for a NON-Piper catalog voice
+ * (Kokoro or ElevenLabs) from the Provider Catalog SSOT. Returns null for Piper
+ * ids so getVoiceMeta falls through to its Piper resolution. This keeps the
+ * picker's labels/gender correct once non-Piper voices are listed — otherwise
+ * a raw ElevenLabs id (EXAVITQu4vr4xnSDxMaL) would render as its own name,
+ * gender '—', provider 'Piper'.
+ */
+function catalogVoiceMeta(voiceId) {
+  const el = ELEVENLABS_VOICES.find(v => v.id === voiceId);
+  if (el) return { displayName: el.name || voiceId, gender: el.gender || '—', provider: 'ElevenLabs' };
+  if (KOKORO_VOICE_IDS.includes(voiceId)) {
+    // Kokoro ids look like af_heart / am_michael; title-case for display.
+    const pretty = voiceId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return { displayName: pretty, gender: kokoroGender(voiceId) || '—', provider: 'Kokoro' };
+  }
+  // OS-native voices (Windows SAPI "Microsoft David Desktop", macOS "Samantha").
+  const sapi = WINDOWS_SAPI_VOICES.find(v => v.id === voiceId);
+  if (sapi) return { displayName: sapi.name, gender: sapi.gender || '—', provider: 'Windows SAPI' };
+  const mac = MACOS_VOICES.find(v => v.id === voiceId);
+  if (mac) return { displayName: mac.name, gender: mac.gender || '—', provider: 'macOS Say' };
+  // Single-voice / native providers whose voice id IS the provider id or alias
+  // (soprano, windows-sapi/sapi, macos-say/say). Without this they fall through to
+  // the Piper resolution below and get mislabeled "Piper" (the soprano bug).
+  const prov = _catalogGetProvider(voiceId);
+  if (prov && prov.engineId !== 'piper') {
+    const label = prov.displayName.replace(/\s+TTS$/, '');
+    return { displayName: label, gender: '—', provider: label };
+  }
+  return null;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -497,7 +532,7 @@ export function scanInstalledVoices() {
       } catch { /* fall through to add as single voice */ }
       result.push(voiceId);
     }
-    return result.sort();
+    return result.sort((a, b) => a.localeCompare(b));
   } catch {
     return [];
   }
@@ -603,6 +638,12 @@ export function getVoiceMeta(voiceId) {
   // Lazy-load the catalog so callers from any tab get uniquified names
   loadCatalog();
 
+  // Non-Piper catalog voices (Kokoro / ElevenLabs) resolve from the Provider
+  // Catalog SSOT — real name, real gender, correct provider label — before the
+  // Piper-only paths below (which would mislabel them).
+  const nonPiper = catalogVoiceMeta(voiceId);
+  if (nonPiper) { _metaCache.set(voiceId, nonPiper); return nonPiper; }
+
   const ms = parseMultiSpeaker(voiceId);
   if (ms.isMultiSpeaker) {
     if (!ms.speakerName) {
@@ -682,6 +723,27 @@ export function getVoiceMeta(voiceId) {
   };
   _metaCache.set(voiceId, result);
   return result;
+}
+
+/**
+ * Build the spoken preview phrase for a voice — announces BOTH the voice's name
+ * and the engine it renders on, consistently across every voice picker in the
+ * app (Piper / Kokoro / Windows SAPI / macOS / ElevenLabs). Centralised so a
+ * preview reads the same everywhere: "Hi, I'm Bella from Piper."
+ * @param {string} voiceId
+ * @returns {string}
+ */
+export function previewPhrase(voiceId) {
+  const meta = getVoiceMeta(voiceId);
+  // Strip a parenthetical model note ("Piper (libritts)" -> "Piper") for a clean
+  // spoken line; fall back to a neutral label if the provider can't be resolved.
+  const engine = String(meta.provider || '').replace(/\s*\(.*\)\s*$/, '').trim() || 'AgentVibes';
+  // Kokoro ids (af_bella, am_michael) carry a 2-letter lang/gender prefix that the
+  // display name keeps ("Af Bella") — awkward aloud, so speak just the name part.
+  let name = meta.displayName;
+  const kok = voiceId.match(/^[a-z]{2}_([a-z0-9_]+)$/);
+  if (kok) name = kok[1].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `Hi, I'm ${name} from ${engine}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -967,21 +1029,57 @@ export function createVoicesTab(screen, services) {
     // NOTE: projectRoot is AgentVibes repo root (3 levels up from src/console/tabs/)
     const projectRoot = path.resolve(__dirname, '..', '..', '..');
     let activeProvider = '';
+    // Capture the dir the provider was read from so we can forward it to
+    // play-tts.sh as --project-dir. Without it the script re-resolves the
+    // provider from its OWN cwd/package .claude (which has no tts-provider.txt),
+    // falls back to piper-local, and synthesizes to a silent local device on a
+    // headless/remote box — i.e. the preview appears to do nothing. Passing the
+    // exact dir we matched keeps the JS check and the shell routing in agreement.
+    let activeProjectDir = '';
     try {
-      const providerPaths = [
-        process.env.CLAUDE_PROJECT_DIR && path.join(process.env.CLAUDE_PROJECT_DIR, '.claude', 'tts-provider.txt'),
-        path.join(process.cwd(), '.claude', 'tts-provider.txt'),
-        path.join(projectRoot, '.claude', 'tts-provider.txt'),
-        path.join(os.homedir(), '.claude', 'tts-provider.txt'),
+      const providerDirs = [
+        process.env.CLAUDE_PROJECT_DIR,
+        process.cwd(),
+        projectRoot,
+        os.homedir(),
       ].filter(Boolean);
-      for (const p of providerPaths) {
-        if (fs.existsSync(p)) { activeProvider = fs.readFileSync(p, 'utf8').trim(); break; }
+      for (const d of providerDirs) {
+        const p = path.join(d, '.claude', 'tts-provider.txt');
+        if (fs.existsSync(p)) { activeProvider = fs.readFileSync(p, 'utf8').trim(); activeProjectDir = d; break; }
       }
     } catch {}
 
-    if (_remoteProviders.includes(activeProvider)) {
+    // Route through the engine-aware play-tts for ANY non-Piper provider — remote
+    // transports (ssh-remote / agentvibes-receiver) AND local non-Piper engines
+    // (kokoro / elevenlabs / soprano / macos). Only Piper (and unset = default)
+    // uses the fast local piper path below; play-tts.sh/.ps1 dispatches to the
+    // correct engine so Kokoro/ElevenLabs previews actually synthesize instead of
+    // erroring against a nonexistent <id>.onnx piper model.
+    const _isPiperLocal = (activeProvider === '' || activeProvider === 'piper' || activeProvider === 'windows-piper');
+    if (!_isPiperLocal) {
+      const _remote = _remoteProviders.includes(activeProvider);
       const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
-      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const phrase = previewPhrase(voiceId);
+      // A PREVIEW must render in the previewed voice's OWN engine — never the
+      // receiver's persisted default (receiver-provider.txt). Compute the engine
+      // these voices belong to (the Default TTS Engine, same rule the list uses)
+      // and forward it as a ONE-OFF override the remote sender honours for this
+      // invocation only. This changes no settings; it just makes preview preview.
+      let _previewEngine = configService?.getConfig?.()?.ttsEngine
+        || providerService?.getActiveProvider?.() || 'piper';
+      // Guard: if that resolves to a transport (not a real engine), fall back to
+      // piper so we never tell the receiver to "synthesize with ssh-remote".
+      if (_remoteProviders.includes(_previewEngine)) _previewEngine = 'piper';
+      // AGENTVIBES_VOICE_SOURCE=audition: the resolver must keep the EXACT voice
+      // we're previewing (F1), not demote it to the per-LLM/provider voice —
+      // required for engines whose ids aren't self-identifying (SAPI/macOS).
+      // receiverProviderId maps the engine id to the receiver's provider id the
+      // sender validates (sapi -> windows-sapi, macos-say -> macos).
+      const _previewEnv = {
+        ..._spawnEnv,
+        AGENTVIBES_VOICE_SOURCE: 'audition',
+        AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(_previewEngine),
+      };
       // Hooks live in the AgentVibes package (projectRoot), not the user's project dir.
       // Fall back to CLAUDE_PROJECT_DIR / cwd only if the hook isn't at projectRoot
       // (e.g. when running from a published npm package with a different layout).
@@ -994,20 +1092,22 @@ export function createVoicesTab(screen, services) {
       let proc;
       if (isWindows) {
         const playTts = path.join(hooksBase, '.claude', 'hooks-windows', 'play-tts.ps1');
-        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId], { // NOSONAR
-          stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv,
+        const _pdArgs = activeProjectDir ? ['-ProjectDir', activeProjectDir] : [];
+        proc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTts, phrase, voiceId, ..._pdArgs], { // NOSONAR
+          stdio: 'ignore', detached: false, windowsHide: true, env: _previewEnv,
         });
       } else {
         const playTts = path.join(hooksBase, '.claude', 'hooks', 'play-tts.sh');
-        proc = spawn('bash', [playTts, phrase, voiceId], { // NOSONAR
-          stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _spawnEnv,
+        const _pdArgs = activeProjectDir ? ['--project-dir', activeProjectDir] : [];
+        proc = spawn('bash', [playTts, phrase, voiceId, ..._pdArgs], { // NOSONAR
+          stdio: ['ignore', 'ignore', 'pipe'], detached: true, env: _previewEnv,
           cwd: process.cwd(),
         });
       }
       _playingProcess = proc;
       _playingVoiceId = voiceId;
       refreshDisplay();
-      previewLine.setContent('{bright-magenta-fg}♪ Synthesizing on remote...{/bright-magenta-fg}');
+      previewLine.setContent(`{bright-magenta-fg}♪ Synthesizing${_remote ? ' on remote' : ''}...{/bright-magenta-fg}`);
       screen.render();
       let _stderrBuf = '';
       if (proc.stderr) {
@@ -1045,7 +1145,7 @@ export function createVoicesTab(screen, services) {
     }
 
     const tempWav = path.join(os.tmpdir(), `agentvibes-preview-${Date.now()}.wav`);
-    const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+    const phrase = previewPhrase(voiceId);
 
     // Synthesize: spawn piper; on Windows use the exe path directly
     const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
@@ -1293,7 +1393,7 @@ export function createVoicesTab(screen, services) {
       try { fs.unlinkSync(path.join(globalClaudeDir, 'tts-piper-speaker-id.txt')); } catch { /* ok */ }
     }
     // Also write global tts-voice.txt for shell scripts
-    try { fs.writeFileSync(path.join(globalClaudeDir, 'tts-voice.txt'), ms.isMultiSpeaker ? voiceId : voiceId, 'utf8'); } catch { /* ok */ }
+    try { fs.writeFileSync(path.join(globalClaudeDir, 'tts-voice.txt'), voiceId, 'utf8'); } catch { /* ok */ }
   }
 
   function _openSelectVoiceModal(voiceId) {
@@ -1678,10 +1778,16 @@ export function createVoicesTab(screen, services) {
       // genderIconTag has invisible color tags — pad with literal spaces (1 visible char + 3 spaces = 4)
       const gIcon = genderIconTag(gender);
       if (!installed) {
-        // Greyed-out row for uninstalled catalog voices — close grey wrap around the icon so its colors show
-        return `{bright-black-fg} ${star}  ${name}{/bright-black-fg}${gIcon}   {bright-black-fg}${provider}{/bright-black-fg}`;
+        // Greyed-out row for uninstalled catalog voices. Use a mid blue-grey (not
+        // bright-black) so the row stays legible when selected — bright-black on the
+        // green selection bg is unreadable. Close the grey wrap around the icon so
+        // its own colors show.
+        return `{#90a4ae-fg} ${star}  ${name}{/#90a4ae-fg}${gIcon}   {#90a4ae-fg}${provider}{/#90a4ae-fg}`;
       }
-      return `{${COLORS.labelFg}-fg} ${star}${dot} ${name}{/${COLORS.labelFg}-fg}${gIcon}   {${COLORS.labelFg}-fg}${provider}${isPrev ? ` ${_tl('voicePlaying')}` : ''}{/${COLORS.labelFg}-fg}`;
+      // No fg wrap on the name/provider: unselected rows inherit the list's item.fg
+      // (labelFg); the selected row inherits selected.fg (#ffffff bold) so the
+      // highlight is white-on-green and readable, instead of pale text on green.
+      return ` ${star}${dot} ${name}${gIcon}   ${provider}${isPrev ? ` ${_tl('voicePlaying')}` : ''}`;
     });
   }
 
@@ -1732,15 +1838,30 @@ export function createVoicesTab(screen, services) {
       _metaCache.clear();
     }
 
-    // Installed voices (from local disk)
-    const installed = scanInstalledVoices();
-    _installedSet = new Set(installed);
+    // Provider-aware voice list. Piper (disk-discovered) keeps the installer
+    // behavior — installed voices plus uninstalled catalog voices to download.
+    // For Kokoro/ElevenLabs/soprano the voices come from the Provider Catalog
+    // (via voicesForProvider) and are all available (nothing to "install"), so
+    // mark them installed to suppress the download UI.
+    // Prefer the explicitly-chosen Default TTS Engine (config.ttsEngine) over the
+    // provider (which may be a transport like agentvibes-receiver, not an engine).
+    const _vtProvider = configService?.getConfig?.()?.ttsEngine
+      || providerService?.getActiveProvider?.() || 'piper';
+    const _vtIsDisk = (_vtProvider === 'piper' || _vtProvider === 'windows-piper');
+    if (_vtIsDisk) {
+      // Installed voices (from local disk)
+      const installed = scanInstalledVoices();
+      _installedSet = new Set(installed);
 
-    // Merge: installed voices first, then uninstalled catalog voices
-    const catalogOnly = _catalogEntries
-      .filter(c => !_installedSet.has(c.voiceId))
-      .map(c => c.voiceId);
-    _allVoices = [...installed, ...catalogOnly];
+      // Merge: installed voices first, then uninstalled catalog voices
+      const catalogOnly = _catalogEntries
+        .filter(c => !_installedSet.has(c.voiceId))
+        .map(c => c.voiceId);
+      _allVoices = [...installed, ...catalogOnly];
+    } else {
+      _allVoices = voicesForProvider(_vtProvider, { scanInstalledVoices, getVoiceMeta }).map(v => v.id);
+      _installedSet = new Set(_allVoices);
+    }
 
     const active = providerService.getActiveVoiceId();
     const favorites = getFavorites(configService);

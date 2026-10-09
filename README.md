@@ -58,14 +58,58 @@ New here? The [**Quick Start guide**](docs/quick-start.md) walks you through you
 
 ---
 
-## 🆕 Neural voices (v5.11.0)
+## 🆕 Fixes for the preview indicators (v5.15.2)
 
-Your agent team can now sound genuinely human — each agent with its own distinct voice.
+- **Fixed a TUI crash** — filtering/favoriting a track while a preview was playing could rebuild the list under the indicator and crash; it can't now.
+- **Honest per-agent badge** — the voice picker shows **(remotely via SSH)** vs **(locally)** from your real routing, not a partial guess.
+- **BMAD agents show their real names** (Mary, Winston…) even when a skill file lacks the `Name — Title` heading; plus small preview/onboarding polish.
 
-- **🧠 Kokoro** — local neural TTS that runs on your **CPU, no GPU required**, with **Chinese, Japanese, and Korean** voices built in.
-- **☁️ ElevenLabs** — premium cloud neural voices when you want the absolute best.
+### v5.15.1 — Know where your preview plays
 
-Plus combinable audio effects landed too: stack **reverb**, **echo**, and **chorus** on any voice.
+- **Every preview shows where it plays** — voice and music previews now display **(locally)** or **(remotely via SSH)** right on the row you're auditioning, so you're never guessing (or hearing silence on a headless box).
+- **Preview standardized across the app** — the voice pickers (Kokoro, Piper, ElevenLabs, per-agent BMAD) and the Music page all show the same indicator; music previews now follow a project's remote receiver too.
+- **Cleaner Agents tab** — it lists your real BMAD agents (not a skill's internal helpers) and re-checks itself on focus; **Reset** moved off `X` (which jumped to the Receiver tab) to **`Del`**.
+
+### v5.15.0 — Multi-session control on Windows
+
+- **Sessions stay quiet unless you enable them** — a session speaks only in a project you've turned on; others add no instructions and no token cost.
+- **`/agent-vibes:mute` now works on Windows** — it previously had no effect there. Both project and global mute are honoured on every platform.
+- **Sessions can introduce themselves on Windows** — `{{session}}` announces "Claude on my-app in Windows Terminal", once per session.
+- **Self-introductions now reach global installs** — the script behind them was never delivered by the updater on any platform.
+- **Note for global Windows installs:** sessions are off by default after this update — enable with `/agent-vibes:unmute`.
+
+### v5.14.0 — Reliable setup and complete audio previews
+
+Includes all changes from 5.13.2, which was not published to npm.
+
+- **Setup completes on macOS and Linux** — installing Piper and downloading voices now runs correctly on a fresh machine, resolving a long-standing first-install issue.
+- **Preview plays your complete mix** — voice, reverb/effects and background music together, so previews reflect how your agent will actually sound.
+- **Updates preserve your customisations** — edited hook scripts are backed up with a timestamp before any file is replaced.
+- **Clearer audio destination** — Settings shows **Local** in green and **Remote** in red.
+- **Correct preview engine** — previews use the selected voice's own engine and identify it; Windows and macOS voices work over remote previews.
+
+### v5.13.0 — Your voices everywhere
+
+Pick the voices built into **Windows** or **Mac** and hear them wherever you're listening — even when your agents run on another computer. Plus a friendly heads-up chime so you always know sound is coming.
+
+- **🖥️ Your computer's own voices, from anywhere** — choose Windows or Mac voices and hear them on your machine; every voice is shown, with unavailable ones clearly marked.
+- **🗂️ All voices in one list** — Piper, Kokoro, ElevenLabs, Windows, Mac, and Soprano in one place, so what you see is what you can use.
+- **🔔 Heads-up chime** — a short sound plays just before a voice or music preview, so you know audio is on the way.
+- **🆔 Agents that introduce themselves** — optional self-introductions so you know who's talking in a team.
+
+### v5.12.0 — A stronger core
+
+During a week of early access to Anthropic's new **Fable** model, we rebuilt the heart of AgentVibes into **one shared core**. The voice / engine / routing / volume / mute logic now lives in a single place — simpler, more consistent, and steadier.
+
+- **🔊 Previews play in the right place** — with SSH remote configured, voice and **music previews** play on your receiver; otherwise they play locally.
+- **🧠 One shared core** — Kokoro-on-Linux silence and per-voice drift fixed at the source, with a safe fallback if needed.
+- **🧹 Removed the redundant Voices tab** — pick a voice for any provider in Setup.
+
+### v5.11.0 — Neural voices
+
+- **🧠 Kokoro** — local neural TTS on your **CPU, no GPU required** (Chinese, Japanese, Korean built in).
+- **☁️ ElevenLabs** — premium cloud neural voices.
+- Combinable audio effects: stack **reverb**, **echo**, and **chorus** on any voice.
 
 <div align="center">
 
@@ -201,11 +245,27 @@ Running a full BMAD agent team? **Every agent gets its own distinct voice**, aut
 
 ---
 
+## 🔬 Reserved for future enhancements
+
+You may notice a few dormant hooks in `.claude/hooks/` (`forward-to-avatar.sh`) and small
+gated blocks inside `play-tts.sh` / `play-tts.ps1` referencing a "TalkingHead avatar" and a
+`config/talking-head-enabled.txt` flag. These are **not an active feature** — there's no
+avatar UI shipped in this package. They're scaffolding for an in-development, browser-based
+avatar receiver that isn't merged yet, checked in early so that project has a stable
+client-side delivery contract to build against.
+
+Everything about this is inert by default: the enable-flag file doesn't exist until you
+create it yourself, and every code path is short-circuited behind that check before it does
+anything (no new network calls, no behavior change) for every current install.
+
+---
+
 ## 📚 Documentation
 
 | Guide | |
 |-------|--|
 | [Quick Start](docs/quick-start.md) | Get voiced in minutes |
+| [GrokBot TTS Setup](docs/grokbot-tts-setup.md) | AgentVibes + Kokoro on Windows for Cursor GrokBot |
 | [MCP Setup](docs/mcp-setup.md) | Natural-language control |
 | [Commands](docs/commands.md) | Every slash command |
 | [Providers](docs/providers.md) | Engine setup & samples |
@@ -219,7 +279,7 @@ Running a full BMAD agent team? **Every agent gets its own distinct voice**, aut
 
 ## About
 
-**AgentVibes** · v5.11.2 · Licensed under [Apache-2.0](LICENSE)
+**AgentVibes** · v5.15.2 · Licensed under [Apache-2.0](LICENSE)
 
 Built by **Paul Preibisch** — [@997Fire on X](https://x.com/997Fire) · [agentvibes.org](https://agentvibes.org) · [github.com/paulpreibisch/AgentVibes](https://github.com/paulpreibisch/AgentVibes)
 

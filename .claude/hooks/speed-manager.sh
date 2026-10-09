@@ -37,7 +37,7 @@
 # @dependencies .claude/config/tts-speech-rate.txt, .claude/config/tts-target-speech-rate.txt
 # @entrypoints Called by /agent-vibes:set-speed slash command
 # @patterns Provider-agnostic speed config, legacy file migration, random tongue twisters for testing
-# @related play-tts.sh, play-tts-piper.sh, play-tts-macos.sh, learn-manager.sh
+# @related play-tts.sh, play-tts-piper.sh, play-tts-macos.sh
 #
 
 # Get script directory

@@ -16,10 +16,12 @@ import { openTrackPicker, openVolumeInput } from '../widgets/track-picker.js';
 import { formatReverbState, formatTrackName, formatVoiceName } from '../widgets/format-utils.js';
 import {
   PIPER_VOICES_DIR, SAMPLE_PHRASES,
-  parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, genderIconTag,
+  parseMultiSpeaker, scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag,
   getFavorites, getThumbsDown, toggleThumbsUp, toggleThumbsDown,
 } from './voices-tab.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
+import { createRowSpinner } from '../preview-transport.js';
+import { resolveMusicProvider } from '../music-preview.js';
 import { voicesForProvider } from '../../services/provider-voice-catalog.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { BRAND_PINK } from '../brand-colors.js';
@@ -28,6 +30,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
 // Max pretext length to prevent excessively long TTS utterances
@@ -138,7 +141,7 @@ const COLORS = {
   linkFg:     'bright-cyan',
 };
 
-const _FOOTER_BMAD_EN   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [X] Reset  [Q] Quit';
+const _FOOTER_BMAD_EN   = '[↑↓/jk] Navigate  [Space] Preview  [Enter] Configure  [A] Auto-assign  [B] Bulk  [Del] Reset  [Q] Quit';
 const _FOOTER_NOBMAD_EN = '[Tab] Switch Tab  [Q] Quit';
 
 const _modalTitle = (text) => ` {${BRAND_PINK}-fg}${text}{/${BRAND_PINK}-fg} `;
@@ -176,6 +179,33 @@ function createTestStub() {
 /**
  * Create the Agents tab component.
  */
+// Module-level so the process 'exit'/'SIGINT' handlers are registered EXACTLY
+// once per process, no matter how many times createAgentsTab() is called (the
+// test suite creates many). Registering them per-call leaked listeners
+// (MaxListenersExceededWarning) and left stale SIGINT handlers that each called
+// process.exit(). Each tab adds its patched-files map here; the single handler
+// restores every registered map.
+const _allPatchedConfigMaps = new Set();
+let _patchHandlersRegistered = false;
+function _restoreAllRegisteredPatchedConfigMaps() {
+  for (const map of _allPatchedConfigMaps) {
+    for (const filePath of [...map.keys()]) {
+      const original = map.get(filePath);
+      try {
+        if (original !== null) fs.writeFileSync(filePath, original);
+        else fs.unlinkSync(filePath);
+      } catch { /* best-effort restore */ }
+      map.delete(filePath);
+    }
+  }
+}
+function _ensurePatchExitHandlers() {
+  if (_patchHandlersRegistered) return;
+  _patchHandlersRegistered = true;
+  process.on('exit', _restoreAllRegisteredPatchedConfigMaps);
+  process.on('SIGINT', () => { _restoreAllRegisteredPatchedConfigMaps(); process.exit(130); });
+}
+
 export function createAgentsTab(screen, services) {
   if (IS_TEST) return createTestStub();
 
@@ -207,6 +237,48 @@ ${_tl('bmadDesc')}
 
   // Capture cwd once at construction (L1 fix)
   const _projectRoot = process.cwd();
+
+  // Preview hooks: prefer the CURRENT package copy over the project-local
+  // .claude/hooks, which a tarball reinstall does NOT refresh (npm updates
+  // node_modules only). A stale project hook routes previews through an outdated
+  // sender (e.g. the old agentvibes-receiver→legacy-sender path). CLAUDE_PROJECT_DIR
+  // still points at _projectRoot so the hook reads the project's config/provider.
+  const _pkgClaudeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.claude');
+  function _hookScript(subdir, name) {
+    const pkg = path.join(_pkgClaudeDir, subdir, name);
+    return fs.existsSync(pkg) ? pkg : path.join(_projectRoot, '.claude', subdir, name);
+  }
+
+  // Story 8.3 fix: Windows agent-preview temp-patches config files (personality.txt,
+  // reverb-level.txt) to apply per-agent settings during a preview. Track every
+  // patched file + its pre-patch content here so ALL of them can be restored —
+  // not just on normal preview completion, but also on abnormal exit (Ctrl+C,
+  // crash, or quitting mid-preview). Non-Destructive Configuration Rule: a
+  // preview must never permanently mutate the user's config.
+  const _patchedConfigFiles = new Map(); // filePath -> original content (string) | null (file did not exist)
+
+  /** Record a file's pre-patch content the first time it's touched (idempotent). */
+  function _trackPatchedConfigFile(filePath, originalContent) {
+    if (!_patchedConfigFiles.has(filePath)) _patchedConfigFiles.set(filePath, originalContent);
+  }
+
+  /** Restore a single tracked file to its pre-patch state (or remove it if it didn't exist before). */
+  function _restorePatchedConfigFile(filePath) {
+    if (!_patchedConfigFiles.has(filePath)) return;
+    const original = _patchedConfigFiles.get(filePath);
+    try {
+      if (original !== null) fs.writeFileSync(filePath, original);
+      else fs.unlinkSync(filePath);
+    } catch { /* best-effort restore */ }
+    _patchedConfigFiles.delete(filePath);
+  }
+
+  // Abnormal-exit safety net: if the process dies mid-preview (Ctrl+C, crash,
+  // or the TUI quitting before the preview process's own 'exit' handler runs),
+  // still restore any temp-patched config files. Registered once per process
+  // via a module-level registry (see top of file) to avoid listener leaks.
+  _allPatchedConfigMaps.add(_patchedConfigFiles);
+  _ensurePatchExitHandlers();
 
   let _bmadDetected = false;
   let _agents = [];
@@ -260,6 +332,14 @@ ${_tl('bmadDesc')}
 
   onboardingBox.key(['escape'], () => {
     if (typeof focusMainTabBar === 'function') { focusMainTabBar(); screen.render(); }
+  });
+
+  // Manual re-check: after installing BMAD from a separate terminal, Enter
+  // re-scans without leaving the tab. (Switching tabs also re-scans via onFocus.)
+  // If BMAD now shows up, move focus to the roster (else keys go to the hidden box).
+  onboardingBox.key(['enter'], () => {
+    refreshDisplay();
+    if (_bmadDetected) { agentList.focus(); screen.render(); }
   });
 
   // -------------------------------------------------------------------------
@@ -351,7 +431,7 @@ ${_tl('bmadDesc')}
     left: 4,
     hidden: true,
     tags: true,
-    content: '{#546e7a-fg}[Space] Preview  [Enter] Configure  [X] Reset  [A] Auto-assign  [B] Bulk Edit{/#546e7a-fg}',
+    content: '{#546e7a-fg}[Space] Preview  [Enter] Configure  [Del] Reset  [A] Auto-assign  [B] Bulk Edit{/#546e7a-fg}',
     style: { bg: COLORS.contentBg },
   });
 
@@ -398,7 +478,7 @@ ${_tl('bmadDesc')}
     return btn;
   }
 
-  const resetBtn = _createBtn('[X] Reset', () => {
+  const resetBtn = _createBtn('[Del] Reset', () => {
     const agent = _agents[agentList.selected ?? 0];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
@@ -1003,6 +1083,11 @@ ${_tl('bmadDesc')}
       content: '', style: { fg: 'bright-cyan', bg: COLORS.contentBg },
     });
 
+    // Row spinner: "⠹ Previewing (locally|remotely via SSH)  (Space to stop)" ON
+    // the selected row — shared with every other picker. renderItem restores the
+    // row on stop. vpPreviewLine is retained for parity but no longer shows preview.
+    const _vpSpin = createRowSpinner(vpList, screen, (i) => _buildVoiceItems([_allVoices[i]])[0], { isClosed: () => _vpClosed });
+
     blessed.text({
       parent: vpModal, bottom: 3, left: 2, right: 2, height: 1, tags: true,
       content: '{white-fg}[↑↓] Nav  [PgUp/PgDn] Page  [a-z] Jump{/white-fg}',
@@ -1049,49 +1134,64 @@ ${_tl('bmadDesc')}
     }
 
     function _previewVoice(voiceId) {
-      if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
+      if (_previewVoiceId === voiceId) { _killVP(); _vpSpin.stop(); return; }
       _killVP();
       if (_previewMinTimer) { clearTimeout(_previewMinTimer); _previewMinTimer = null; }
 
-      const phrase = `Hi, my name is ${getVoiceMeta(voiceId).displayName}.`;
+      const phrase = previewPhrase(voiceId);
       const _isWin = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
+      // Badge must match where play-tts actually routes: remote if the provider
+      // file is ssh-remote/agentvibes-receiver OR a transport-config entry is
+      // mode=remote. resolveMusicProvider is the shared transport resolver (both
+      // signals) — don't re-derive routing here (CLAUDE.md invariant #1).
+      const _isRemote = resolveMusicProvider(path.dirname(_pkgClaudeDir)).remote;
 
       if (_isWin) {
         // Windows: route through play-tts.ps1 (same pattern as non-Windows bash route)
-        const playTtsScript = path.join(_projectRoot, '.claude', 'hooks-windows', 'play-tts.ps1');
+        const playTtsScript = _hookScript('hooks-windows', 'play-tts.ps1');
         if (!fs.existsSync(playTtsScript)) return;
         _previewVoiceId = voiceId;
-        if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
+        if (!_vpClosed) { _vpSpin.start(vpList.selected, _isRemote); }
         _previewProc = spawn('powershell', [ // NOSONAR
           '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', playTtsScript, phrase, voiceId,
-        ], { stdio: 'ignore', detached: false, windowsHide: true, env: _spawnEnv });
+        ], { stdio: 'ignore', detached: false, windowsHide: true,
+          env: { ..._spawnEnv, AGENTVIBES_VOICE_SOURCE: 'audition' } });
         _previewProc.on('exit', () => {
-          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); } }
+          if (_previewVoiceId === voiceId) { _previewVoiceId = null; _previewProc = null; _vpSpin.stop(); }
         });
-        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); });
         return;
       }
 
       // Non-Windows: use bash play-tts.sh
-      const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+      const playTtsScript = _hookScript('hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
       const remoteLlm = detectRemoteLlm();
       const args = [playTtsScript, phrase, voiceId];
       if (remoteLlm) args.push('--llm', remoteLlm);
 
+      // audition = keep the EXACT previewed voice (F1, don't demote). The Agents
+      // tab lists Piper disk voices ONLY, so the previewed voice is always a Piper
+      // id — let the sender's voice->engine coupling derive the engine rather than
+      // forcing it from the global ttsEngine (which may be kokoro/SAPI and would
+      // mismatch the piper voice → wrong voice/silence — Fable review).
       _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore', detached: true,
-        env: { ..._spawnEnv, CLAUDE_PROJECT_DIR: _projectRoot },
+        env: {
+          ..._spawnEnv,
+          CLAUDE_PROJECT_DIR: _projectRoot,
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+        },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;
-      if (!_vpClosed) { vpPreviewLine.setContent(`{bright-cyan-fg}♪ Playing: ${voiceId}...{/bright-cyan-fg}`); _refreshVP(); }
+      if (!_vpClosed) { _vpSpin.start(vpList.selected, _isRemote); }
 
       const _clearAfterMinDisplay = () => {
         if (_previewVoiceId === voiceId) {
           _previewVoiceId = null; _previewProc = null;
-          if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+          _vpSpin.stop();
         }
         _previewMinTimer = null;
       };
@@ -1425,10 +1525,14 @@ ${_tl('bmadDesc')}
     }
 
     try {
-      if (profile.personality && profile.personality !== 'none')
+      if (profile.personality && profile.personality !== 'none') {
+        _trackPatchedConfigFile(personalityFile, origPersonality);
         fs.writeFileSync(personalityFile, profile.personality);
-      if (profile.reverbPreset)
+      }
+      if (profile.reverbPreset) {
+        _trackPatchedConfigFile(reverbFile, origReverb);
         fs.writeFileSync(reverbFile, profile.reverbPreset);
+      }
     } catch { /* degrade gracefully */ }
 
     const voiceId = profile.voice || '';
@@ -1440,16 +1544,21 @@ ${_tl('bmadDesc')}
     });
     _playingProcess = proc;
 
+    // Restore BOTH temp-patched files (personality + reverb) — transactional:
+    // whichever files were actually patched above get restored/unlinked here.
+    // Also covered by the module-level process 'exit'/SIGINT handlers if the
+    // process dies before this fires (see the module-level exit/SIGINT handler).
     function _restore() {
-      try {
-        if (origPersonality !== null) fs.writeFileSync(personalityFile, origPersonality);
-        else try { fs.unlinkSync(personalityFile); } catch {}
-        if (origReverb !== null) fs.writeFileSync(reverbFile, origReverb);
-      } catch {}
+      _restorePatchedConfigFile(personalityFile);
+      _restorePatchedConfigFile(reverbFile);
     }
 
-    proc.on('exit', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });
-    proc.on('error', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); } _restore(); if (onComplete) onComplete(); });
+    // Gate restore + onComplete behind the generation check too: a superseded
+    // preview's late exit must NOT restore config (it would clobber the newer
+    // preview's in-flight patch and fire onComplete out of order). The current
+    // generation's process — or the module-level exit/SIGINT handler — restores.
+    proc.on('exit', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); _restore(); if (onComplete) onComplete(); } });
+    proc.on('error', () => { if (gen === _playGeneration) { _playingProcess = null; _stopSpinner(); _restore(); if (onComplete) onComplete(); } });
   }
 
   // -------------------------------------------------------------------------
@@ -1627,8 +1736,14 @@ ${_tl('bmadDesc')}
     function _closeMenu(callback) {
       if (_menuClosed) return;
       _menuClosed = true;
+      navigationService?.closeModal();
       destroyList(menuList, screen, callback);
     }
+
+    // Register as an open modal so the global 'q' quit guard (app.js) blocks
+    // quit while this menu is up — otherwise 'q' falls through and exits the
+    // whole TUI instead of closing the menu.
+    navigationService?.openModal(null, () => _closeMenu(() => { agentList.focus(); screen.render(); }));
 
     menuList.key(['enter'], () => {
       const action = BULK_ACTIONS[menuList.selected];
@@ -1783,7 +1898,12 @@ ${_tl('bmadDesc')}
   // -------------------------------------------------------------------------
   // Key bindings
 
-  agentList.key(['x', 'X'], () => {
+  // Reset uses Delete/Backspace — NOT a letter. 'x'/'X' is the GLOBAL shortcut
+  // for the Receiver tab (navigation.js KEY_TO_TAB), and screen-level keys fire
+  // even while this list is focused, so binding Reset to X reset the agent AND
+  // jumped to the Receiver tab. Delete has no global binding and doesn't clash
+  // with type-to-jump.
+  agentList.key(['delete', 'backspace'], () => {
     const agent = _agents[agentList.selected ?? 0];
     if (agent) {
       voiceStore.resetAgentProfile(agent.id);
@@ -1943,6 +2063,11 @@ ${_tl('bmadDesc')}
     },
 
     onFocus() {
+      // Re-detect on focus so BMAD installed in another tab/terminal (or just
+      // now, via the onboarding install command) appears without restarting the
+      // TUI. Tab switching invokes onFocus, so returning to this tab IS the
+      // rescan — onboarding ⇄ agent list flips automatically.
+      refreshDisplay();
       if (_bmadDetected) {
         agentList.focus();
       } else {

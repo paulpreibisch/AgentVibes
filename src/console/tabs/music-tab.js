@@ -11,16 +11,20 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { buildAudioEnv, spawnMp3Player } from '../audio-env.js';
+import { resolveMusicProvider, spawnMusicRemote, createRowSpinner } from '../music-preview.js';
+import { playBlingCue } from '../bling.js';
 import { t } from '../../i18n/strings.js';
 
+const _MUSIC_TAB_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+// AgentVibes package/repo root — used to resolve bundled assets (tracks dir,
+// bling cue) and as the package fallback when resolving the active provider.
+const _PKG_ROOT = path.resolve(_MUSIC_TAB_DIR, '..', '..', '..');
+
 // Package-relative tracks dir — used as fallback when cwd has no .claude/audio/tracks/
-const _PKG_TRACKS_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..', '..', '..', '.claude', 'audio', 'tracks'
-);
+const _PKG_TRACKS_DIR = path.join(_PKG_ROOT, '.claude', 'audio', 'tracks');
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 
@@ -368,6 +372,20 @@ export function createMusicTab(screen, services) {
     },
   });
 
+  // Row spinner: paints "⠹ Previewing (locally|remotely via SSH)  (Space to stop)"
+  // ON the selected track row — shared with every other picker. renderItem
+  // restores the row's normal content when the preview stops.
+  const _trackSpin = createRowSpinner(trackList, screen, (i) => {
+    const t = _getVisibleTracks()[i];
+    if (!t) return '';
+    const { track: activeTrackId } = _getMusic(configService);
+    return _buildListItems([t], activeTrackId, getMusicFavorites(configService))[0];
+    // static: track rows carry double-width emoji; animating/reallocating them
+    // desyncs blessed's terminal output (jumps/corruption). Write the indicator
+    // ONCE (padded to full width to clear the old row), no animation, no realloc —
+    // the least-fragile option for emoji rows.
+  }, { isClosed: () => box.hidden, static: true });
+
   // -------------------------------------------------------------------------
   // Status panel
 
@@ -518,7 +536,23 @@ export function createMusicTab(screen, services) {
     return _stripHint(_stripBlink(raw));
   }
 
+  // Strip hint text + blink cursor from EVERY row and forget the hint anchor.
+  // Called when a preview starts so the internal buffer is clean before the
+  // spinner's full-repaint (otherwise a stale hint/blink would be faithfully
+  // re-rendered by the realloc).
+  function _clearRowDecorations() {
+    const items = trackList.items || [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i]) items[i].setContent(_stripDecorations(items[i].content));
+    }
+    _hintIdx = -1; _hintBase = '';
+  }
+
   function _updateHint(idx) {
+    // While a preview spinner is animating a row, it owns row rendering — the
+    // inline hint must not rewrite rows (it would fight the 80ms spinner and
+    // leave ghost characters on the previewing row when the cursor moves).
+    if (_trackSpin.isActive()) return;
     const items = trackList.items;
     // Restore previously hinted row — pad with spaces to overwrite ghost hint text
     const _pad = ' '.repeat(60);
@@ -540,6 +574,10 @@ export function createMusicTab(screen, services) {
 
   let _playingProcess = null;
   let _playingTrackId = null;
+  // Remote playback is fire-and-forget (the local sender exits in ms while the
+  // receiver keeps playing), so the on/off toggle tracks the intended remote
+  // track here rather than relying on a live local process.
+  let _remotePlayingTrackId = null;
 
   function _killPlayingProcess() {
     if (_playingProcess) {
@@ -549,6 +587,44 @@ export function createMusicTab(screen, services) {
   }
 
   const _spawnEnv = buildAudioEnv();
+
+  /**
+   * Spawn the SSH sender to play a music track on the receiver, or stop the
+   * current one. Fire-and-forget (the sender exits after handing the payload to
+   * SSH; the receiver plays/stops asynchronously). Returns true if the send was
+   * launched. On a play error the remote-playing state is cleared so the toggle
+   * doesn't get stuck "on".
+   * @param {{remote:boolean, projectDir:string}} mp
+   * @param {{track?:string, stop?:boolean}} opts
+   */
+  function _sendMusicRemote(mp, { track = null, stop = false } = {}) {
+    let rproc;
+    try {
+      rproc = spawnMusicRemote({ packageRoot: _PKG_ROOT, projectDir: mp.projectDir, env: _spawnEnv, track, stop });
+    } catch {
+      previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
+      screen.render();
+      setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 4000);
+      return false;
+    }
+    let _rerr = '';
+    if (rproc.stderr) rproc.stderr.on('data', d => { _rerr += d.toString(); });
+    rproc.on('exit', (code) => {
+      if (stop || code === 0) return;
+      if (_remotePlayingTrackId === track) _remotePlayingTrackId = null;
+      const msg = _rerr.trim().split('\n').pop() || 'Remote preview failed';
+      previewLine.setContent(`{red-fg}♪ ${msg}{/red-fg}`);
+      screen.render();
+      setTimeout(() => { previewLine.setContent(_listFocused ? _hintText() : ''); screen.render(); }, 4000);
+    });
+    rproc.on('error', () => {
+      if (stop) return;
+      if (_remotePlayingTrackId === track) _remotePlayingTrackId = null;
+      previewLine.setContent('{red-fg}Remote music preview failed{/red-fg}');
+      screen.render();
+    });
+    return true;
+  }
 
   process.on('exit', () => { _killPlayingProcess(); });
 
@@ -566,10 +642,41 @@ export function createMusicTab(screen, services) {
       return;
     }
 
+    // Remote provider: forward to the receiver instead of local playback (which
+    // is silent on a headless box). The receiver auto-stops any prior track when
+    // a new one arrives; pressing Space on the currently-playing track sends an
+    // explicit stop (toggle off).
+    const _mp = resolveMusicProvider(_PKG_ROOT);
+    if (_mp.remote) {
+      if (_remotePlayingTrackId === trackId) {
+        _sendMusicRemote(_mp, { stop: true });
+        _remotePlayingTrackId = null;
+        _trackSpin.stop();
+        if (_listFocused) _updateHint(trackList.selected);
+        previewLine.setContent(_listFocused ? _hintText() : '');
+        screen.render();
+        return;
+      }
+      // Bling first (fire-and-forget, plays locally) — same readiness cue as the
+      // voice preview — then forward the track to the receiver. The receiver keeps
+      // playing until an explicit stop, so the row spinner persists (no floor).
+      playBlingCue(_PKG_ROOT);
+      if (_sendMusicRemote(_mp, { track: trackId })) {
+        _remotePlayingTrackId = trackId;
+        _clearRowDecorations();   // spinner owns the rows; wipe stale hint/blink first
+        _trackSpin.start(trackList.selected, true);
+      }
+      screen.render();
+      return;
+    }
+
+    // ── Local playback ──────────────────────────────────────────────────────
     // Toggle: second press on the same track → stop
     if (_playingTrackId === trackId) {
       _killPlayingProcess();
       _playingTrackId = null;
+      _trackSpin.stop();
+      if (_listFocused) _updateHint(trackList.selected);
       previewLine.setContent(_listFocused ? _hintText() : '');
       screen.render();
       return;
@@ -578,6 +685,10 @@ export function createMusicTab(screen, services) {
     // Kill any previously playing track
     _killPlayingProcess();
     _playingTrackId = null;
+
+    // Bling first (fire-and-forget) — same readiness cue as the voice preview —
+    // then start local playback.
+    playBlingCue(_PKG_ROOT);
 
     const proc = spawnMp3Player(trackPath, _spawnEnv);
     if (!proc) {
@@ -592,17 +703,15 @@ export function createMusicTab(screen, services) {
 
     _playingProcess = proc;
     _playingTrackId = trackId;
-
-    const label = _allTracks.find(t => t.id === trackId)?.label ?? formatTrackLabel(trackId);
-    previewLine.setContent(`{${COLORS.playingFg}-fg}♪ Previewing: ${label}  (Space again to stop){/${COLORS.playingFg}-fg}`);
+    _clearRowDecorations();   // spinner owns the rows; wipe stale hint/blink first
+    _trackSpin.start(trackList.selected, false);
     screen.render();
 
     proc.on('exit', () => {
       if (_playingTrackId === trackId) {
         _playingTrackId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? _hintText() : '');
-        refreshDisplay(); // clears (playing) label
+        _trackSpin.stop();
       }
     });
 
@@ -611,7 +720,7 @@ export function createMusicTab(screen, services) {
         _killPlayingProcess();
         _playingTrackId = null;
         _playingProcess = null;
-        previewLine.setContent(_listFocused ? _hintText() : '');
+        _trackSpin.stop();
       }
     });
   }
@@ -656,8 +765,26 @@ export function createMusicTab(screen, services) {
     });
   }
 
+  // Stop any in-flight preview (local player, remote receiver, and the row
+  // spinner). Used before a list rebuild so a stale spinner index can't crash
+  // blessed's setItem, and so a preview can't be left "playing" invisibly.
+  function _stopAnyPreview() {
+    if (_remotePlayingTrackId) {
+      const mp = resolveMusicProvider(_PKG_ROOT);
+      if (mp.remote) _sendMusicRemote(mp, { stop: true });
+      _remotePlayingTrackId = null;
+    }
+    _killPlayingProcess();
+    _playingTrackId = null;
+    _trackSpin.stop();
+  }
+
   function refreshDisplay() {
     _refreshing = true;
+    // A rebuild (setItems) invalidates the spinner's row index and wipes its
+    // indicator — stop any active preview first (guarded, so a normal refresh with
+    // no preview is a no-op). Prevents a stale-index crash and a stuck preview.
+    if (_trackSpin.isActive()) _stopAnyPreview();
     const savedIdx = trackList.selected ?? 0;
 
     _allTracks = _buildAllTracks();
@@ -743,6 +870,7 @@ export function createMusicTab(screen, services) {
     function _close() {
       _killPlayingProcess();
       _playingTrackId = null;
+      _trackSpin.stop();
       previewLine.setContent(_listFocused ? _hintText() : '');
       modal.destroy();
       trackList.focus();
@@ -780,7 +908,13 @@ export function createMusicTab(screen, services) {
     }
 
     function _saveGlobally() {
-      configService.setGlobal('backgroundMusic', { track: trackId });
+      // Merge into the existing global backgroundMusic object — a bare
+      // setGlobal('backgroundMusic', { track }) would replace the whole
+      // object and silently drop volume/enabled (Non-Destructive Rule).
+      const currentGlobal = configService.getGlobalConfig?.().backgroundMusic ?? {};
+      // Saving a track implies enabling music (mirrors _saveLocally), while
+      // preserving any existing volume/other fields on the global object.
+      configService.setGlobal('backgroundMusic', { ...currentGlobal, track: trackId, enabled: true });
     }
 
     const okLocalBtn = _makeBtn('Save Locally', COLORS.btnDefault, 2, 5, () => {
@@ -860,8 +994,9 @@ export function createMusicTab(screen, services) {
   trackList.key(['space'], () => {
     const trackId = _getSelectedTrackId();
     if (trackId) {
+      // No refreshDisplay() here — it rebuilds every row via setItems and would
+      // clobber the preview spinner's row (the spinner now shows preview state).
       _playTrack(trackId);
-      refreshDisplay();
     }
   });
 
@@ -931,6 +1066,10 @@ export function createMusicTab(screen, services) {
   let _tlBlink = { interval: null, on: false, sel: -1 };
   process.on('exit', () => { if (_tlBlink.interval) clearInterval(_tlBlink.interval); });
   function _tlTick() {
+    // While a preview is animating a row, the preview spinner (80ms) owns the
+    // display — don't fight it with the 500ms blink cursor (that interleaving
+    // left ghost characters on the previewing row).
+    if (_trackSpin.isActive()) return;
     _tlBlink.on = !_tlBlink.on;
     const items = trackList.items;
     const cur = trackList.selected ?? 0;
@@ -1052,6 +1191,7 @@ export function createMusicTab(screen, services) {
       // Stop any preview when leaving the tab
       _killPlayingProcess();
       _playingTrackId = null;
+      _trackSpin.stop();
       previewLine.setContent('');
       box.hide();
       screen.render();
@@ -1066,6 +1206,7 @@ export function createMusicTab(screen, services) {
       // Stop preview when focus leaves Music tab
       _killPlayingProcess();
       _playingTrackId = null;
+      _trackSpin.stop();
     },
 
     getFooterText() {

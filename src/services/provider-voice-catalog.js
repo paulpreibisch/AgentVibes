@@ -1,87 +1,59 @@
 /**
- * Provider voice catalogs — single source of truth for the static voice lists
- * of the cloud/neural providers, plus a helper that returns the voice pool for
- * whichever provider is currently active.
+ * Provider voice catalogs — BACK-COMPAT SHIM.
  *
- * Piper voices are NOT listed here (they are discovered on disk via
- * scanInstalledVoices); this module covers the providers whose voices are a
- * fixed catalog: ElevenLabs and Kokoro. Single-voice providers (e.g. soprano)
- * resolve to a single synthetic entry.
+ * The canonical source of provider voice data is now
+ * `src/services/provider-catalog.js` (the Provider Catalog, SSOT Layer 2). This
+ * module re-exports the static voice lists (`ELEVENLABS_VOICES`,
+ * `KOKORO_VOICE_IDS`) and the gender helper from the catalog, and keeps the
+ * `voicesForProvider()` convenience used by BMAD gender-aware auto-assignment.
+ *
+ * Kept as a shim so existing importers (and test/unit/provider-voice-catalog.test.js)
+ * continue to work unmodified.
  *
  * @module services/provider-voice-catalog
  */
 
 import { isSingleVoiceProvider } from './agent-voice-store.js';
+import {
+  ELEVENLABS_VOICES,
+  KOKORO_VOICE_IDS,
+  kokoroGender,
+} from './provider-catalog.js';
 
-/** ElevenLabs library voices (voice_id + display metadata). */
-export const ELEVENLABS_VOICES = [
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',   gender: 'Female', lang: 'en-US', desc: 'Mature, reassuring'      },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger',   gender: 'Male',   lang: 'en-US', desc: 'Laid-back, casual'       },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura',   gender: 'Female', lang: 'en-US', desc: 'Enthusiast, quirky'      },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'Male',   lang: 'en-AU', desc: 'Deep, confident'         },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',  gender: 'Male',   lang: 'en-GB', desc: 'Warm storyteller'        },
-  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum',  gender: 'Male',   lang: 'en-US', desc: 'Husky trickster'         },
-  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River',   gender: '',       lang: 'en-US', desc: 'Relaxed, neutral'        },
-  { id: 'SOYHLrjzK2X1ezoPC6cr', name: 'Harry',   gender: 'Male',   lang: 'en-US', desc: 'Fierce warrior'          },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam',    gender: 'Male',   lang: 'en-US', desc: 'Energetic creator'       },
-  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',   gender: 'Female', lang: 'en-GB', desc: 'Clear educator'          },
-  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'Female', lang: 'en-US', desc: 'Knowledgable, pro'       },
-  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will',    gender: 'Male',   lang: 'en-US', desc: 'Relaxed optimist'        },
-  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'Female', lang: 'en-US', desc: 'Playful, bright'         },
-  { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric',    gender: 'Male',   lang: 'en-US', desc: 'Smooth, trustworthy'     },
-  { id: 'hpp4J3VqNfWAUOO0d1Us', name: 'Bella',   gender: 'Female', lang: 'en-US', desc: 'Professional, warm'      },
-  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris',   gender: 'Male',   lang: 'en-US', desc: 'Charming, down-to-earth' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian',   gender: 'Male',   lang: 'en-US', desc: 'Deep, comforting'        },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',  gender: 'Male',   lang: 'en-GB', desc: 'Steady broadcaster'      },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',    gender: 'Female', lang: 'en-GB', desc: 'Velvety actress'         },
-  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam',    gender: 'Male',   lang: 'en-US', desc: 'Dominant, firm'          },
-  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill',    gender: 'Male',   lang: 'en-US', desc: 'Wise, mature'            },
-  // ── Added from the ElevenLabs voice library (raw library voice_ids) ───────
-  { id: 'HBDoL4wkcalemIO0nUAu', name: 'Emily',   gender: 'Female', lang: 'en-GB', desc: 'RPG, immersive'    },
-  { id: 'Mtmp3KhFIjYpWYRycDe3', name: 'John',    gender: 'Male',   lang: 'en-US', desc: 'Raspy surfer'      },
-  { id: '8kgj5469z1URcH4MB2G4', name: 'Sakuya',  gender: 'Female', lang: 'en-US', desc: 'Cheerful anime'    },
-  { id: '2ajXGJNYBR0iNHpS4VZb', name: 'Rob',     gender: 'Male',   lang: 'en-GB', desc: 'Tough, gritty'     },
-  { id: 'mMdTuD2nnFiCH88UdXSb', name: 'Jane',    gender: 'Female', lang: 'en-US', desc: 'Cinematic villain' },
-];
-
-/** Kokoro voice ids. Gender is encoded in the id: the 2nd char is f|m. */
-export const KOKORO_VOICE_IDS = [
-  // American English
-  'af_heart','af_alloy','af_aoede','af_bella','af_jessica','af_kore','af_nicole','af_nova','af_river','af_sarah','af_sky',
-  'am_adam','am_echo','am_eric','am_fenrir','am_liam','am_michael','am_onyx','am_puck',
-  // British English
-  'bf_alice','bf_emma','bf_isabella','bf_lily',
-  'bm_daniel','bm_fable','bm_george','bm_lewis',
-  // Japanese
-  'jf_alpha','jf_gongitsune','jf_nezumi','jf_tebukuro','jm_kumo',
-  // Mandarin Chinese
-  'zf_xiaobei','zf_xiaoni','zf_xiaoxiao','zf_xiaoyi','zm_yunxi','zm_yunxia','zm_yunyang',
-  // Spanish
-  'ef_dora','em_alex','em_santa',
-  // French
-  'ff_siwis',
-  // Hindi
-  'hf_alpha','hm_omega',
-  // Italian
-  'if_sara','im_nicola',
-  // Brazilian Portuguese
-  'pf_dora','pm_alex','pm_santa',
-  // Korean
-  'kf_alpha','km_hyunsu',
-];
+export { ELEVENLABS_VOICES, KOKORO_VOICE_IDS, kokoroGender };
 
 /**
- * Infer a Kokoro voice's gender from its id. Kokoro ids follow `<lang><sex>_name`
- * where the 2nd character is `f` (female) or `m` (male).
- * @param {string} id
- * @returns {'Female'|'Male'|''}
+ * Curated built-in voices for the OS-native "discovered" providers (Windows SAPI,
+ * macOS `say`). Their real voices live on the target device — for a remote
+ * receiver we cannot enumerate them from here — so these standard voices (shipped
+ * by default on Windows 10/11 and macOS) give the picker an honest, selectable
+ * list. The `id` is the exact name the player passes to SelectVoice / `say -v`;
+ * if the receiver lacks one it falls back to the system default (benign).
+ *
+ * Verified against a real Windows 11 install (System.Speech GetInstalledVoices).
+ * The receiver remains authoritative — this is UI convenience, not inventory SSOT.
  */
-export function kokoroGender(id) {
-  const c = typeof id === 'string' && id.length > 1 ? id[1].toLowerCase() : '';
-  if (c === 'f') return 'Female';
-  if (c === 'm') return 'Male';
-  return '';
-}
+// Only the classic SAPI5 "Desktop" voices are listed. The modern OneCore voices
+// ("Microsoft David/Mark/Zira" WITHOUT "Desktop") are NOT selectable via
+// System.Speech in a spawned process — the receiver's player is spawned, so
+// SelectVoice throws "No matching voice is installed" and silently falls back to
+// the default (David, male). That made e.g. "Microsoft Zira" play as a MALE voice.
+// David Desktop + Zira Desktop are present on every Windows 10/11 and select
+// reliably in any process/bitness, so they are the safe curated set.
+const WINDOWS_SAPI_VOICES = [
+  { id: 'Microsoft David Desktop', name: 'David', gender: 'Male',   lang: 'en-US' },
+  { id: 'Microsoft Zira Desktop',  name: 'Zira',  gender: 'Female', lang: 'en-US' },
+];
+
+const MACOS_VOICES = [
+  { id: 'Samantha', name: 'Samantha', gender: 'Female', lang: 'en-US' },
+  { id: 'Alex',     name: 'Alex',     gender: 'Male',   lang: 'en-US' },
+  { id: 'Daniel',   name: 'Daniel',   gender: 'Male',   lang: 'en-GB' },
+  { id: 'Karen',    name: 'Karen',    gender: 'Female', lang: 'en-AU' },
+  { id: 'Moira',    name: 'Moira',    gender: 'Female', lang: 'en-IE' },
+];
+
+export { WINDOWS_SAPI_VOICES, MACOS_VOICES };
 
 /**
  * Return the voice pool for the currently-active provider as `{ id, gender }`
@@ -108,6 +80,17 @@ export function voicesForProvider(provider, { scanInstalledVoices, getVoiceMeta 
     return ELEVENLABS_VOICES.map(v => ({ id: v.id, gender: v.gender || '' }));
   }
 
+  // OS-native discovered providers: their voices live on the target device (the
+  // receiver in remote mode), so they can't be scanned here. Return the curated
+  // built-in list instead of falling through to the Piper disk scan (which would
+  // mislabel them as Piper voices).
+  if (p === 'sapi' || p === 'windows-sapi') {
+    return WINDOWS_SAPI_VOICES.map(v => ({ id: v.id, gender: v.gender || '' }));
+  }
+  if (p === 'macos' || p === 'macos-say' || p === 'say') {
+    return MACOS_VOICES.map(v => ({ id: v.id, gender: v.gender || '' }));
+  }
+
   // Single-voice providers (e.g. soprano): one synthetic entry named after the
   // provider — every agent ends up sharing it, which is correct for these.
   if (isSingleVoiceProvider(p)) {
@@ -123,4 +106,4 @@ export function voicesForProvider(provider, { scanInstalledVoices, getVoiceMeta 
   return [];
 }
 
-export default { ELEVENLABS_VOICES, KOKORO_VOICE_IDS, kokoroGender, voicesForProvider };
+export default { ELEVENLABS_VOICES, KOKORO_VOICE_IDS, WINDOWS_SAPI_VOICES, MACOS_VOICES, kokoroGender, voicesForProvider };

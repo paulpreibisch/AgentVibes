@@ -1,5 +1,323 @@
 # AgentVibes Release Notes
 
+## v5.15.2 — Fixes for the preview indicators
+
+**Released:** 2026-07-22 · `npm install agentvibes@latest`
+
+Follow-up fixes for the 5.15.1 preview work, from an adversarial code review:
+
+- **Fixed a crash** — filtering or favoriting a track *while a preview was
+  playing* could rebuild the list out from under the indicator and take the whole
+  TUI down. It can't anymore.
+- **The badge tells the truth** — the per-agent voice picker now shows
+  **(remotely via SSH)** vs **(locally)** based on your actual routing (provider
+  file or remote receiver), not a partial guess.
+- **Your BMAD agents show their real names** — the Agents tab reads the persona
+  name (Mary, Winston, Amelia…) even on installs whose skill files don't use the
+  `Name — Title` heading format.
+- **Smaller polish** — a remote voice-preview error no longer leaves a stuck
+  spinner, the onboarding "re-check" hint is translated in all languages, and the
+  onboarding screen keeps keyboard focus after a re-check.
+
+## v5.15.1 — Know where your preview plays
+
+**Released:** 2026-07-21 · `npm install agentvibes@latest`
+
+Here's the thing we kept running into: when you press Space to preview a voice
+or a music track, there was no way to tell whether it was about to play *on your
+own machine* or get sent *to your remote receiver*. On a headless box that meant
+pressing preview and hearing… nothing — with no idea why.
+
+So we fixed it. Every preview now tells you exactly where the sound is going —
+**(locally)** or **(remotely via SSH)** — right on the row you're auditioning.
+No more guessing.
+
+And while we were in there, we **standardized preview across the whole app**.
+The voice pickers (Kokoro, Piper, ElevenLabs, and per-agent BMAD voices) and the
+Music page now all show the same `Previewing (locally / remotely via SSH)`
+indicator, so it looks and behaves identically everywhere. It's a small thing
+that turns out to be genuinely useful.
+
+One practical upshot: if a project routes its TTS to a remote receiver, **music
+previews now follow it too** — before, they quietly played on the local machine,
+which is silence on a headless server.
+
+### Also in this release
+
+- **The Agents tab shows your real BMAD agents** (Mary, Winston, Amelia, John,
+  Paige, Sally…) instead of a skill's internal helpers — and it re-checks itself
+  when you switch back to the tab, so a fresh BMAD install shows up without a
+  restart.
+- **Reset no longer yanks you to the Receiver tab.** It was mapped to `X`, the
+  same key that globally jumps to Receiver; it's now `Del`.
+
+## v5.15.0 — Multi-session control on Windows
+
+**Released:** 2026-07-20 · `npm install agentvibes@latest`
+
+If you run several agent sessions at once, this release gives Windows the same
+control macOS and Linux gained in 5.13.0: sessions stay quiet unless you turn
+them on, and each one can tell you which window is speaking.
+
+### Sessions no longer all speak at once
+
+Running AgentVibes across several projects previously meant every open session
+announced itself, with no straightforward way to keep just one talking. On
+macOS and Linux this was addressed in 5.13.0. **On Windows it was not** — the
+Windows session hook enabled speech in every session regardless of your
+settings.
+
+Windows now follows the same rule: a session speaks only in a project you have
+explicitly enabled. Projects you have not enabled contribute **nothing at all**
+— not silent audio, but no added instructions and no token cost.
+
+### Mute now works on Windows
+
+`/agent-vibes:mute` had no effect on Windows audio. It silenced macOS and Linux
+only, because the Windows player read a different setting than the one the
+command wrote.
+
+Both the project mute and the global switch are now honoured on Windows:
+
+- `/agent-vibes:mute` — quiet this project
+- `/agent-vibes:unmute` — turn this project back on, even while everything else
+  is globally muted
+
+This makes "off everywhere, on in the one project I am working in" a single
+pair of commands on every platform.
+
+### Sessions can identify themselves on Windows
+
+Include `{{session}}` in your pretext and a session introduces itself once:
+
+```
+Claude on my-app in Windows Terminal
+```
+
+It names the project and detects the terminal — Windows Terminal, VS Code,
+Ghostty, iTerm, Terminal, WezTerm, tmux and others. Announced once per session
+rather than before every line. This previously worked only on macOS and Linux.
+
+### A related fix for every platform
+
+The script that produces that introduction was missing from the update process,
+so on a global install it was never delivered and the feature silently did
+nothing. It is now included on macOS, Linux and Windows alike.
+
+### Upgrading
+
+Your existing choices are preserved — if you have already muted, unmuted, or
+enabled a project, updating leaves that setting alone.
+
+**One change worth noting for Windows users on a global install:** because
+sessions are now off unless enabled, a global Windows install will be quiet
+after updating. Turn on the projects you want with `/agent-vibes:unmute`.
+Project installs are enabled automatically and are unaffected.
+
+### Quality
+
+New regression tests assert that the session gate, the mute rules, and the
+self-identification behave identically on both runtimes, so the platforms
+cannot drift apart again without the build failing.
+
+---
+
+## v5.14.0 — Reliable setup and complete audio previews
+
+**Released:** 2026-07-19 · `npm install agentvibes@latest`
+
+This release focuses on two things: getting AgentVibes installed correctly on every platform, and making the Preview button an accurate representation of how your agent will actually sound. It also includes everything from 5.13.2, which was tagged but never published to npm.
+
+### Setup now completes properly on macOS and Linux
+
+Installing Piper and downloading voices now runs correctly on a fresh macOS or Linux machine. Previously these steps could report a failure without having run, which left new users without a working voice engine and no clear way forward. This was a long-standing issue affecting first-time installs specifically — if you gave up on setup previously, it is worth another try.
+
+Related: several setup scripts are now stored in the correct line-ending format, so they execute properly on macOS and Linux.
+
+### Preview plays your complete audio mix
+
+The Preview button now plays exactly what your agent will sound like: your selected **voice**, any **reverb or audio effects**, and your **background music**, mixed together.
+
+Two cases previously played an incomplete mix. Hermes agent previews omitted background music entirely, and on Windows the music track was dropped whenever ffmpeg — the component that mixes music with speech — was unavailable. Both are resolved, and if ffmpeg is missing you now receive a clear message identifying it rather than silently reduced audio.
+
+### Your customisations survive updates
+
+If you have edited any of the hook scripts AgentVibes installs, updating now preserves your work. Your version is copied to a timestamped backup before any file is replaced:
+
+```
+play-tts.ps1.user.bak.20260719-143052
+```
+
+Each update creates its own backup, so earlier versions remain recoverable. On Windows, update coverage extended from 8 scripts to all 25.
+
+### Audio destination is clearer at a glance
+
+Settings now colour-codes where your audio plays: **Local** in green, **Remote** in red. This makes it immediately obvious when audio is being routed to another machine.
+
+### Voice previews use the correct engine
+
+Previewing a voice now uses that voice's own engine rather than the global setting, and identifies which engine you are hearing. Windows and macOS system voices work correctly through remote previews, and the Windows voice list now shows only voices that can actually be selected.
+
+### Windows remote audio
+
+Sending audio from a Windows machine to another computer no longer alters file paths in transit, which previously prevented background music from reaching the receiver.
+
+### Package and quality
+
+The published package no longer includes unnecessary files, and everything the application references is now present. The full test suite passes on Windows, macOS and Linux from a clean checkout, with new regression tests covering the preview behaviour described above.
+
+---
+
+## 🔧 v5.13.2 — Cleaner installs, smoother setup
+
+**Released:** 2026-07-17 · on `latest` — `npm install agentvibes@latest`
+
+### 🎛️ You start with the default settings, ready to make your own
+
+Fresh installs now begin clean, with the built-in defaults for voice, background music, and personality — so it's your setup from the very first run.
+
+### 🐧 Mac and Linux setup works properly
+
+A few of the scripts that set things up were saved in a Windows format that Mac and Linux can't read, so they'd stop before doing anything. They're in the right format now. Installing Piper and downloading voices work on a fresh Mac or Linux machine again.
+
+### 🔊 Your voice choice sticks
+
+The settings file that remembers which voice goes with which engine could be read slightly wrong, so your engine choice quietly got ignored. Fixed — what you pick is what you get.
+
+### 📦 A smaller, tidier download
+
+The package no longer carries files it never needed. Everything the app tells you to run is now actually included.
+
+---
+
+## 🔧 v5.13.1 — Windows updates that actually update
+
+**Released:** 2026-07-16 · on `latest` — `npm install agentvibes@latest`
+
+### 🪟 Your Windows scripts now really do update
+
+On Windows, the little scripts that make your agents talk live in your `.claude/hooks` folder. Updating said it refreshed them — but on Windows it quietly didn't, so they could sit on the version you first installed for months.
+
+Now they update for real. Run `npx agentvibes update` and you'll pick up every fix you've been missing. Anything you'd customized yourself is still kept safe beside it as a `.user.bak` file, exactly as before.
+
+If you're on macOS or Linux, nothing changes — updates were already working for you.
+
+### 🔒 A security tune-up under the hood
+
+We updated one of the building blocks AgentVibes uses to read settings files. A specially-crafted settings file could have made it grind to a halt. Nothing could ever have been stolen or snooped on — but now it can't get stuck either. Nothing for you to do; it's just in.
+
+---
+
+## 🎉 v5.13.0 — Your Voices Everywhere, With a Heads-Up
+
+**Released:** 2026-07-16 · on `latest` — `npm install agentvibes`
+
+What's new:
+
+### 🖥️ Use your computer's own voices, from anywhere
+
+Run your agents on one machine and listen on another? You can now pick the voices built into **Windows** (David, Zira, Mark) or **Mac**, and hear them right where you're sitting. AgentVibes shows you every voice and clearly marks the ones your listening device can play.
+
+### 🗂️ All your voices in one tidy list
+
+Piper, Kokoro, ElevenLabs, Windows, Mac, Soprano — every voice now comes from a single list, so what you see is always what you can use.
+
+### 🔔 A "heads-up" chime before sound plays
+
+Just before a voice line or music preview starts, you'll hear a short chime — so you always know audio is on the way, even if it takes a moment.
+
+### 🎵 Music previews follow your sound
+
+Preview a track and it plays wherever your audio is set to go — including on another computer.
+
+### 🆔 Agents that introduce themselves
+
+Turn on self-introductions and each agent says who it is when it starts — handy when a whole team is talking.
+
+### 🛟 Your own edits are kept safe when you update
+
+Tinkered with one of the AgentVibes files in your `.claude/hooks` folder? From this version on, updating never throws your work away. If we need to update a file you'd changed, we tuck your copy in beside it with `.user.bak` on the end — like `play-tts.sh.user.bak`.
+
+**That file is made by AgentVibes — nothing is broken and nothing else put it there.** It's simply your old version, saved so you can peek at it or copy your changes back into the new one. Delete it whenever you're done with it.
+
+If you customized files in an older version, it's worth a quick look in `.claude/hooks` for anything you'd want to put back.
+
+### ✨ More voices, smoother ride
+
+- **ElevenLabs** voices fully supported
+- More **Kokoro** voices, working great on Windows
+- Faster, more reliable setup on Windows
+- **3,263 automated tests passing** — steady and dependable
+
+---
+
+## 🎉 v5.12.0 — The Fable Week Overhaul (Stable)
+
+**Released:** 2026-07-05 · now on `latest` — `npm install agentvibes`
+
+This turns the "Fable Week" alpha into a stable release. During a week of early access to Anthropic's new **Fable** model, we pointed it at the whole AgentVibes codebase and rebuilt the core properly.
+
+### A stronger, shared core
+
+Every time AgentVibes speaks it makes a lot of decisions — which voice, which engine, whether to play here or send the audio to another machine, background music, volume, mute. That logic had been copied into several separate scripts (Mac/Linux, Windows, remote, and the voice server), and the copies slowly **drifted apart** — a fix in one was missed in the others, which is why certain glitches kept coming back.
+
+We replaced all of it with **one shared core** that every part of AgentVibes now follows — one place to fix, one place to trust. What you'll notice:
+
+- **Kokoro voices that were silent on Linux now work everywhere.**
+- **Your voice choices stick** — settings no longer get quietly overridden.
+- **Volume, mute, and remote playback behave the same** across Mac, Linux, and Windows.
+- **Safe by default** — if the new core isn't available on your machine, AgentVibes falls back to the old behaviour, so it never just stops talking.
+
+### Previews now play in the right place
+
+Previewing a voice or track used to play on whatever machine you were sitting at — which was silent if you'd set AgentVibes up to send its audio elsewhere. Now:
+
+- **If you have SSH remote configured, previews play on your receiver; otherwise they play locally, like before.**
+- This covers **voice previews** (Piper and Kokoro) from the Setup, Agent, and Settings screens, and **music/track previews** — press Space to play, Space again to stop.
+
+### A simpler voice menu
+
+- We **removed the redundant Voices tab.** It only ever listed Piper voices and confused people, since choosing a voice for any provider already lives in **Setup**.
+
+### Groundwork for what's next
+
+- The receiver now also receives the **full path of the project folder** a message came from (a new `projectPath` field, alongside the project name it already got) — laying the groundwork for upcoming enhancements.
+
+### Reviewed before shipping
+
+We ran three independent reviews over the changes — security, correctness, and regressions — and fixed every real issue before release.
+
+---
+
+## 🧪 v5.12.0-alpha.0 — The "Fable Week" Overhaul (ALPHA / testing)
+
+**Published:** 2026-07-04 · dist-tag **`alpha`** (not `latest`). Try it with `npm install agentvibes@alpha`.
+
+### The story behind this release
+
+For one week, Anthropic gave us early access to their brand-new **Fable** model. Instead of keeping that to ourselves, we decided to **spend our tokens on the community** — we pointed Fable at the entire AgentVibes codebase and asked it to find everything that was fragile, duplicated, or quietly broken, and to help us rebuild it properly. This alpha is the result: a real overhaul, paid for with that week of access, so **everyone who uses AgentVibes benefits**.
+
+### What was wrong (in plain terms)
+
+AgentVibes has to make a lot of decisions every time it speaks — which voice, which engine, play here or send to another machine, background music on or off, how loud, muted or not. Over time, that decision-making logic had been **copied into four different places**, written in four different languages (the Mac/Linux script, the Windows script, the remote-audio script, and the voice-control server). Those copies slowly **drifted apart** — a fix made in one was missed in the others. That's why the same kinds of glitches kept coming back: a voice that played silence on one system but worked on another, volume that ignored your setting, mute that behaved differently everywhere.
+
+### What we did
+
+We built **one "brain"** that makes all those decisions in a single place, and everything else simply does what the brain says. One place to fix, one place to trust — which retires that whole family of recurring bugs. Concretely in this alpha:
+
+- **Kokoro voices that played silence on Linux now work** on every system.
+- **Your per-voice assignments stick** — the assistant repeating back its own settings no longer overrides them.
+- **Team/party voices are back** — a hidden crash that made every agent speak with the same voice is fixed; each agent has its own voice again.
+- **No more grabbing the wrong audio file** — a long-standing shortcut that could play another agent's clip is gone for good.
+- **Consistent volume, mute, and remote playback** across Mac, Linux, and Windows.
+- **Safety first:** if anything about the new brain isn't available on your machine, AgentVibes automatically falls back to the old behaviour — so your voice **never just stops working**.
+
+Before shipping, we had Fable act as a tough reviewer of our own work — it caught **three real bugs and a packaging mistake** we'd have otherwise released, and we fixed them first.
+
+**This is an alpha for testing.** `latest` is unchanged; please try it and tell us what you find. Thank you, Anthropic, for the week with Fable — and thanks to this community for making it worth spending on. 🙏
+
+---
+
 ## 🐛 v5.11.2 — Kokoro Installer Fix (PEP 668)
 
 **Released:** 2026-06-27

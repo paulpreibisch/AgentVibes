@@ -62,6 +62,17 @@ fi
 
 PERSONALITY_FILE="$CLAUDE_DIR/tts-personality.txt"
 
+# Source the generated Provider Catalog (bash-3.2-safe SSOT accessors) when present.
+# FAIL-SAFE: consumers probe `type catalog_* >/dev/null 2>&1` and fall back to the
+# legacy hardcoded literal when the artifact is missing (installed-tree skew) —
+# mirrors voice-manager.sh's identical pattern (AVI-S9.3/9.4).
+_load_provider_catalog() {
+  if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+  fi
+}
+
 # Function to get personality data from markdown file
 get_personality_data() {
   local personality="$1"
@@ -200,8 +211,14 @@ case "$1" in
       # Try to get Piper-specific voice first
       ASSIGNED_VOICE=$(get_personality_data "$PERSONALITY" "piper_voice")
       if [[ -z "$ASSIGNED_VOICE" ]]; then
-        # Fallback to default Piper voice
-        ASSIGNED_VOICE="en_US-lessac-medium"
+        # Fallback to default Piper voice — sourced from the generated Provider
+        # Catalog SSOT (AVI-S9.4). FAIL-SAFE: legacy literal if artifact missing.
+        _load_provider_catalog
+        if type catalog_default_voice >/dev/null 2>&1; then
+          ASSIGNED_VOICE="$(catalog_default_voice piper)"
+        else
+          ASSIGNED_VOICE="en_US-lessac-medium"
+        fi
       fi
     else
       # Use Piper voice (reads from piper_voice: field)

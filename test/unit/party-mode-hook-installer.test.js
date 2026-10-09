@@ -223,4 +223,35 @@ describe('configurePartyModeHook', () => {
       await fs.rm(tmpHome6, { recursive: true, force: true });
     }
   });
+
+  // Non-Destructive Configuration Rule (CLAUDE.md #6): the script copy must not
+  // clobber a user-modified bmad-party-speak script on a later update.
+  test('does not overwrite a user-modified party script; saves a .user.bak', async () => {
+    const tmpHome7 = await fs.mkdtemp(path.join(os.tmpdir(), 'av-party-nondestruct-test-'));
+    try {
+      const hooksSubdir = process.platform === 'win32' ? 'hooks-windows' : 'hooks';
+      const scriptName = process.platform === 'win32' ? 'bmad-party-speak.ps1' : 'bmad-party-speak.sh';
+      const destScript = path.join(tmpHome7, '.claude', hooksSubdir, scriptName);
+
+      // First run installs the stock script and records it in the manifest.
+      await configurePartyModeHook(PROJECT_ROOT, silentSpinner, tmpHome7);
+
+      // Simulate a user hand-editing the installed script.
+      const userMarker = '# USER EDIT — do not clobber';
+      await fs.writeFile(destScript, userMarker);
+
+      // Second run must recognize the divergence and preserve the edit.
+      await configurePartyModeHook(PROJECT_ROOT, silentSpinner, tmpHome7);
+
+      const afterUpdate = await fs.readFile(destScript, 'utf8');
+      assert.strictEqual(afterUpdate, userMarker,
+        'A user-modified party script must survive a re-run untouched');
+
+      const backup = await fs.readFile(`${destScript}.user.bak`, 'utf8');
+      assert.strictEqual(backup, userMarker,
+        'The user edit must be preserved in a .user.bak sidecar');
+    } finally {
+      await fs.rm(tmpHome7, { recursive: true, force: true });
+    }
+  });
 });

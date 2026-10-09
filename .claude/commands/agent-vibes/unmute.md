@@ -37,9 +37,13 @@ fi
 
 **Advanced Options:**
 
-To unmute globally (removes global mute AND project mute):
+To unmute globally — this deliberately opts EVERY session into the TTS protocol
+(removes global mute AND drops a global opt-in marker the session-start hook
+checks). Use with care: with a global install this makes all open sessions speak.
 ```bash
 rm -f "$HOME/.agentvibes-muted"
 rm -f "$(pwd)/.claude/agentvibes-muted" 2>/dev/null || true
-echo "🔊 **AgentVibes TTS unmuted globally.** Voice output restored for all projects."
+mkdir -p "$HOME/.claude"
+touch "$HOME/.claude/agentvibes-unmuted"   # global opt-in for the injection gate
+echo "🔊 **AgentVibes TTS unmuted globally.** Every session will now announce. Run /agent-vibes:mute to stop."
 ```

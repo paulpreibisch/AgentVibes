@@ -73,6 +73,49 @@ function Write-Item([string]$icon, [string]$name, [string]$desc) {
     Write-Host $desc -ForegroundColor DarkGray
 }
 
+# Non-Destructive Configuration Rule (CLAUDE.md): setup must never clobber a
+# user-config value the Node installer deliberately preserves across re-runs.
+# Writes the value ONLY when the file is absent; otherwise keeps the existing
+# choice and reports it. Pass -Force for the rare case where an overwrite is
+# genuinely intended.
+function Set-ConfigValueSafe {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Value,
+        [string]$Label = (Split-Path $Path -Leaf),
+        [switch]$Force
+    )
+    if ((Test-Path $Path) -and -not $Force) {
+        $current = (Get-Content -Path $Path -Raw -ErrorAction SilentlyContinue)
+        if ($null -ne $current) { $current = $current.Trim() }
+        Write-Info "Keeping existing $Label ($current)"
+        return
+    }
+    Set-Content -Path $Path -Value $Value -NoNewline
+}
+
+# For values driven by an interactive prompt: honor the user's EXPLICIT answer
+# (non-empty $RawInput) this run, but if they just pressed Enter to accept the
+# default — or the prompt was skipped entirely (e.g. ffmpeg missing) — keep any
+# existing value rather than silently overwriting it with the default. This
+# resolves the bug where the script printed the user's new choice yet wrote the
+# default: honor real input, preserve config on blind-Enter / skipped prompts.
+function Set-ConfigFromChoice {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Value,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$RawInput,
+        [string]$Label = (Split-Path $Path -Leaf)
+    )
+    if ([string]::IsNullOrWhiteSpace($RawInput) -and (Test-Path $Path)) {
+        $current = (Get-Content -Path $Path -Raw -ErrorAction SilentlyContinue)
+        if ($null -ne $current) { $current = $current.Trim() }
+        Write-Info "Keeping existing $Label ($current)"
+        return
+    }
+    Set-Content -Path $Path -Value $Value -NoNewline
+}
+
 # ── Read Version ────────────────────────────────────────────
 
 $Version = "unknown"
@@ -279,41 +322,51 @@ if (-not (Test-Path $HooksDir)) {
     New-Item -ItemType Directory -Path $HooksDir -Force | Out-Null
 }
 
-# Script info: filename, description
-$HookScriptInfo = @(
-    @{ Name = "play-tts.ps1"; Desc = "Main TTS router - dispatches to active provider" },
-    @{ Name = "play-tts-soprano.ps1"; Desc = "Soprano neural voice provider (fastest)" },
-    @{ Name = "play-tts-windows-piper.ps1"; Desc = "Piper offline neural voice provider" },
-    @{ Name = "play-tts-windows-sapi.ps1"; Desc = "Windows built-in SAPI voice provider" },
-    @{ Name = "provider-manager.ps1"; Desc = "Switch between TTS providers" },
-    @{ Name = "voice-manager-windows.ps1"; Desc = "Browse and select voice models" },
-    @{ Name = "audio-cache-utils.ps1"; Desc = "Manage TTS audio file cache" },
-    @{ Name = "session-start-tts.ps1"; Desc = "Auto-activates TTS when Claude starts" }
-)
+# Friendly descriptions for the well-known scripts; any other *.ps1 in the
+# source dir still gets installed (with a generic label) rather than dropped.
+$HookDescriptions = @{
+    "play-tts.ps1"               = "Main TTS router - dispatches to active provider"
+    "play-tts-soprano.ps1"       = "Soprano neural voice provider (fastest)"
+    "play-tts-windows-piper.ps1" = "Piper offline neural voice provider"
+    "play-tts-windows-sapi.ps1"  = "Windows built-in SAPI voice provider"
+    "provider-manager.ps1"       = "Switch between TTS providers"
+    "voice-manager-windows.ps1"  = "Browse and select voice models"
+    "audio-cache-utils.ps1"      = "Manage TTS audio file cache"
+    "session-start-tts.ps1"      = "Auto-activates TTS when Claude starts"
+}
 
+# One timestamp per run so this run's backups group together and never collide.
+$BackupStamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
+
+# Copy EVERY hook script, not a hand-maintained whitelist — a partial list
+# produced mixed-generation installs (new router + stale providers/watcher).
 $CopiedCount = 0
-foreach ($info in $HookScriptInfo) {
-    $script = $info.Name
-    $SourceFile = Join-Path $SourceHooksDir $script
+foreach ($SourceFile in (Get-ChildItem -Path $SourceHooksDir -Filter *.ps1 -File)) {
+    $script = $SourceFile.Name
     $DestFile = Join-Path $HooksDir $script
+    $desc = if ($HookDescriptions.ContainsKey($script)) { $HookDescriptions[$script] } else { "AgentVibes hook script" }
 
-    if (Test-Path $SourceFile) {
-        # Skip if source and destination are the same file (running from project root)
-        $resolvedSrc = (Resolve-Path $SourceFile).Path
-        $resolvedDst = if (Test-Path $DestFile) { (Resolve-Path $DestFile).Path } else { "" }
-        if ($resolvedSrc -eq $resolvedDst) {
-            Write-Item "[OK]" $script $info.Desc
-        } else {
-            Copy-Item -Path $SourceFile -Destination $DestFile -Force
-            Write-Item "[OK]" $script $info.Desc
-        }
+    # Skip if source and destination are the same file (running from project root)
+    $resolvedSrc = $SourceFile.FullName
+    $resolvedDst = if (Test-Path $DestFile) { (Resolve-Path $DestFile).Path } else { "" }
+    if ($resolvedSrc -eq $resolvedDst) {
+        Write-Item "[OK]" $script $desc
         $CopiedCount++
+        continue
     }
-    else {
-        Write-Host "    [!!] " -ForegroundColor Yellow -NoNewline
-        Write-Host "$($script.PadRight(30))" -ForegroundColor White -NoNewline
-        Write-Host "not found" -ForegroundColor Yellow
+
+    # Non-Destructive rule: back up an existing, differing file before overwrite
+    # so a user-modified hook is always recoverable (timestamped, every run).
+    if (Test-Path $DestFile) {
+        $srcHash = (Get-FileHash -Path $resolvedSrc -Algorithm SHA256).Hash
+        $dstHash = (Get-FileHash -Path $DestFile -Algorithm SHA256).Hash
+        if ($srcHash -ne $dstHash) {
+            Copy-Item -Path $DestFile -Destination "$DestFile.user.bak.$BackupStamp" -ErrorAction SilentlyContinue
+        }
     }
+    Copy-Item -Path $SourceFile.FullName -Destination $DestFile -Force
+    Write-Item "[OK]" $script $desc
+    $CopiedCount++
 }
 
 if ($CopiedCount -eq 0) {
@@ -595,6 +648,8 @@ try {
 $BgMusicEnabled = $false
 $BgMusicTrack = "agent_vibes_bachata_v1_loop.mp3"
 $BgMusicDisplayName = "Off"
+$bgChoice = ""       # user's raw answer to the enable prompt ('' = skipped/default)
+$trackChoice = ""    # user's raw answer to the track prompt ('' = skipped/default)
 
 if (-not $HasFfmpeg) {
     Write-Warn "ffmpeg not found - background music requires ffmpeg"
@@ -672,9 +727,13 @@ if (-not (Test-Path $ConfigDir)) {
 }
 
 $bgEnabledValue = if ($BgMusicEnabled) { "true" } else { "false" }
-Set-Content -Path "$ConfigDir\background-music-enabled.txt" -Value $bgEnabledValue -NoNewline
-Set-Content -Path "$ConfigDir\background-music-default.txt" -Value $BgMusicTrack -NoNewline
-Set-Content -Path "$ConfigDir\background-music-volume.txt" -Value "0.10" -NoNewline
+# Honor the user's explicit answers this run; preserve existing config when the
+# prompt was skipped (no ffmpeg) or accepted by pressing Enter.
+Set-ConfigFromChoice -Path "$ConfigDir\background-music-enabled.txt" -Value $bgEnabledValue -RawInput $bgChoice -Label "background music enabled"
+Set-ConfigFromChoice -Path "$ConfigDir\background-music-default.txt" -Value $BgMusicTrack -RawInput $trackChoice -Label "background music track"
+# Volume is not interactively prompted (hardcoded 20% per project rule; full
+# sweep in AVI-S8.4) — preserve a user's custom volume across re-runs.
+Set-ConfigValueSafe -Path "$ConfigDir\background-music-volume.txt" -Value "0.20" -Label "background music volume"
 
 # ── Audio Effects (Reverb) ─────────────────────────────
 
@@ -711,8 +770,10 @@ if (-not $HasFfmpeg) {
     Write-Ok "Reverb: $ReverbDisplayName"
 }
 
-# Write reverb config
-Set-Content -Path "$ConfigDir\reverb-level.txt" -Value $ReverbLevel -NoNewline
+# Write reverb config — honor an explicit choice; preserve existing on skip/Enter.
+# ($reverbChoice is unset when the prompt was skipped for missing ffmpeg.)
+if (-not (Get-Variable -Name reverbChoice -ErrorAction SilentlyContinue)) { $reverbChoice = "" }
+Set-ConfigFromChoice -Path "$ConfigDir\reverb-level.txt" -Value $ReverbLevel -RawInput $reverbChoice -Label "reverb level"
 
 # ── Verbosity / Transparency ──────────────────────────
 
@@ -740,8 +801,9 @@ switch ($verbChoice) {
 Write-Host ""
 Write-Ok "Verbosity: $VerbosityDisplayName"
 
-# Write verbosity config
-Set-Content -Path "$ProjectClaudeDir\tts-verbosity.txt" -Value $VerbosityLevel -NoNewline
+# Write verbosity config — verbosity is always prompted, so honor the answer;
+# preserve existing only when the user pressed Enter to accept the default.
+Set-ConfigFromChoice -Path "$ProjectClaudeDir\tts-verbosity.txt" -Value $VerbosityLevel -RawInput $verbChoice -Label "TTS verbosity"
 
 # ── Test TTS ────────────────────────────────────────────────
 

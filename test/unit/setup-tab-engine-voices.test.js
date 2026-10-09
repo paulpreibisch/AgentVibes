@@ -25,6 +25,12 @@ const setupSrc = readFileSync(
 const catalogSrc = readFileSync(
   resolve(PROJECT_ROOT, 'src/services/provider-voice-catalog.js'), 'utf8'
 );
+// SSOT Layer 2 (AVI-E09): the raw voice lists now live in provider-catalog.js;
+// provider-voice-catalog.js is a re-export shim. Read both so drift is asserted
+// at the layer that actually holds the definition.
+const providerCatalogSrc = readFileSync(
+  resolve(PROJECT_ROOT, 'src/services/provider-catalog.js'), 'utf8'
+);
 
 // ── Suite 1: NATIVE_ENGINE_VOICES constant ────────────────────────────────────
 
@@ -105,23 +111,30 @@ describe('_openVoicePickerForLlm native-engine guard', () => {
 // ── Suite 3: Engine picker auto-sets draft.voice on engine change ─────────────
 
 describe('_openTtsEnginePicker auto-sets draft.voice on engine change', () => {
-  test('enter handler assigns draft.voice from NATIVE_ENGINE_VOICES or empty', () => {
+  test('enter handler assigns draft.voice via defaultVoiceForEngine', () => {
     const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
     assert.ok(fnIdx >= 0, '_openTtsEnginePicker must exist');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
-    // New pattern: NATIVE_ENGINE_VOICES[selectedEngine]?.id || ''
+    // Window sized to reach the Enter handler's draft.voice assignment, which now
+    // sits deeper in the function after the getAllEngines/remote-aware rewrite.
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 8000);
+    // SAPI/macOS became MULTI-voice: the default voice per engine is now resolved
+    // by defaultVoiceForEngine() (first catalog voice for multi-voice native
+    // engines, NATIVE_ENGINE_VOICES id for single-voice, '' for piper/empty).
     assert.ok(
-      fnBody.includes('NATIVE_ENGINE_VOICES[selectedEngine]'),
-      "Engine picker enter handler must set draft.voice from NATIVE_ENGINE_VOICES for native engines"
+      fnBody.includes('defaultVoiceForEngine(selectedEngine)'),
+      "Engine picker enter handler must set draft.voice via defaultVoiceForEngine(selectedEngine)"
     );
   });
 
-  test('enter handler falls back to empty string for non-native engines', () => {
-    const fnIdx = setupSrc.indexOf('function _openTtsEnginePicker');
-    const fnBody = setupSrc.slice(fnIdx, fnIdx + 4000);
+  test('defaultVoiceForEngine falls back to the engine id / empty for non-multi-voice', () => {
+    const fnIdx = setupSrc.indexOf('function defaultVoiceForEngine');
+    assert.ok(fnIdx >= 0, 'defaultVoiceForEngine must exist');
+    const fnBody = setupSrc.slice(fnIdx, fnIdx + 600);
+    // Multi-voice native engines take the first catalog voice; everything else
+    // falls back to NATIVE_ENGINE_VOICES[engine]?.id || '' (piper/empty -> '').
     assert.ok(
-      fnBody.includes("?.id || ''"),
-      "Engine picker must fall back to empty string when engine is not a native engine"
+      fnBody.includes('MULTI_VOICE_NATIVE') && fnBody.includes("NATIVE_ENGINE_VOICES[engine]?.id || ''"),
+      "defaultVoiceForEngine must branch on MULTI_VOICE_NATIVE and fall back to the engine id / empty string"
     );
   });
 });
@@ -147,16 +160,19 @@ describe('_buildFields voice getValue shows native engine label', () => {
   });
 
   test('ElevenLabs voices are a static built-in list with raw IDs (in the shared catalog)', () => {
-    // The list now lives in services/provider-voice-catalog.js (single source of
-    // truth); setup-tab imports it so there is no duplicate to drift.
+    // SSOT layering (AVI-E09): the raw list lives in provider-catalog.js;
+    // provider-voice-catalog.js re-exports it; setup-tab imports from the shim.
+    // No layer holds a duplicate, so none can drift.
     assert.ok(setupSrc.includes("from '../../services/provider-voice-catalog.js'"),
       'setup-tab must import the shared voice catalog');
     assert.ok(setupSrc.includes('ELEVENLABS_VOICES'), 'setup-tab must reference ELEVENLABS_VOICES');
     assert.ok(setupSrc.includes('ELEVENLABS_DEFAULT_VOICE_ID'), 'a default voice ID must be defined');
-    assert.ok(catalogSrc.includes('export const ELEVENLABS_VOICES'),
-      'catalog must export ELEVENLABS_VOICES');
-    // Sanity: at least ~20 premade voices listed in the catalog
-    const ids = (catalogSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
+    assert.ok(catalogSrc.includes('ELEVENLABS_VOICES'),
+      'provider-voice-catalog shim must re-export ELEVENLABS_VOICES');
+    assert.ok(providerCatalogSrc.includes('ELEVENLABS_VOICES'),
+      'provider-catalog (SSOT) must define ELEVENLABS_VOICES');
+    // Sanity: at least ~20 premade voices listed in the SSOT catalog
+    const ids = (providerCatalogSrc.match(/id: '[A-Za-z0-9]{20}'/g) || []).length;
     assert.ok(ids >= 20, `expected >=20 ElevenLabs voice IDs, found ${ids}`);
   });
 });

@@ -31,13 +31,13 @@
 #
 # ---
 #
-# @fileoverview TTS Provider Router with Translation and Language Learning Support
+# @fileoverview TTS Provider Router with Translation Support
 # @context Routes TTS requests to active provider (Piper or macOS) with optional translation
-# @architecture Provider abstraction layer - single entry point for all TTS, handles translation and learning mode
-# @dependencies provider-manager.sh, play-tts-piper.sh, translator.py, translate-manager.sh, learn-manager.sh
+# @architecture Provider abstraction layer - single entry point for all TTS, handles translation
+# @dependencies provider-manager.sh, play-tts-piper.sh, translator.py, translate-manager.sh
 # @entrypoints Called by hooks, slash commands, personality-manager.sh, and all TTS features
 # @patterns Provider pattern - delegates to provider-specific implementations, auto-detects provider from voice name
-# @related provider-manager.sh, play-tts-piper.sh, learn-manager.sh, translate-manager.sh
+# @related provider-manager.sh, play-tts-piper.sh, translate-manager.sh
 #
 # **IMPORTANT: This script should be called inline (NOT in background) in Bash tool**
 # Wait for TTS playback to complete before continuing.
@@ -113,6 +113,12 @@ elif [[ -f "$GLOBAL_MUTE_FILE" ]]; then
   exit 0
 fi
 
+# Resolve a working Python interpreter once (translator and transport config
+# both need it). Sourced AFTER the mute exits so muted calls
+# pay nothing. Windows git-bash frequently has no python3 on PATH — see
+# python-resolver.sh; $PYTHON_BIN is empty when none is usable.
+source "$SCRIPT_DIR/python-resolver.sh"
+
 # Parse named flags (e.g. --llm) before positional arguments.
 # This allows callers to pass: play-tts.sh --llm claude-code "text to speak"
 # Named args are extracted; remaining positional args are shifted into $1/$2/$3.
@@ -145,6 +151,7 @@ unset _POSITIONAL_ARGS
 TEXT="${1:-}"
 VOICE_OVERRIDE="${2:-}"  # Optional: voice name or ID
 AGENT_PROFILE_FILE="${3:-}"  # Optional: path to agent profile file
+_ORIG_EXPLICIT_VOICE="$VOICE_OVERRIDE"  # raw positional voice, before any per-LLM override (fed to the resolver as the explicit voice)
 
 # Security: Validate inputs
 if [[ -z "$TEXT" ]]; then
@@ -240,8 +247,124 @@ if [[ -z "$_PRETEXT" ]]; then
     fi
   done
 fi
+# Dynamic session self-ID: a per-LLM PRETEXT containing the {{session}} token
+# expands to "<LLM> on <Project> in <Terminal>" so multi-session users can tell
+# which tab just spoke. Announced once per session (best-effort — see the key
+# note below); on later utterances the token is dropped so it doesn't prefix
+# every line. Opt-in — only fires when the pretext actually contains the token.
+if [[ "$_PRETEXT" == *"{{session}}"* ]]; then
+  # Session key. There is no true Claude-session id available to a plain Bash
+  # command, so this is best-effort: a terminal-session id if the emulator
+  # exports one (stable for the tab's life), else the parent PID. Worst case the
+  # self-ID repeats or is skipped — cosmetic, and only when a pretext opts in.
+  _SID_RAW="${WT_SESSION:-${TERM_SESSION_ID:-${TMUX:-$PPID}}}"
+  _SID_KEY="$(printf '%s' "${LLM_PROVIDER:-}|$(basename "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}")|$_SID_RAW" | tr -c 'A-Za-z0-9' '_')"
+  # Announce-marker dir: an OWNED subdir, per the project's secure-temp rule.
+  # If the dir exists but isn't ours (pre-created symlink attack on a shared
+  # host), skip the marker entirely and just strip the token — never chmod or
+  # write through someone else's path.
+  _ANN_BASE="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u 2>/dev/null || echo 0)}"
+  _ANN_DIR="$_ANN_BASE/agentvibes-session"
+  _ANN_OK=0
+  if mkdir -p "$_ANN_DIR" 2>/dev/null && chmod 700 "$_ANN_DIR" 2>/dev/null; then
+    _ANN_OWNER="$(stat -c '%u' "$_ANN_DIR" 2>/dev/null || stat -f '%u' "$_ANN_DIR" 2>/dev/null || echo '')"
+    [[ -z "$_ANN_OWNER" || "$_ANN_OWNER" == "$(id -u 2>/dev/null || echo 0)" ]] && _ANN_OK=1
+  fi
+  _ANN_FILE="$_ANN_DIR/announced-$_SID_KEY"
+  # First utterance → replacement is the self-ID; later utterances → empty (drop).
+  if [[ "$_ANN_OK" == "1" && -f "$_ANN_FILE" ]]; then
+    _SESSION_ID=""
+  else
+    _SESSION_ID="$(bash "$SCRIPT_DIR/agentvibes-session-id.sh" "${LLM_PROVIDER:-claude-code}" "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" 2>/dev/null || true)"
+    if [[ "$_ANN_OK" == "1" ]]; then
+      touch "$_ANN_FILE" 2>/dev/null || true
+      # Bound growth: drop announce-markers older than a day (find is optional).
+      find "$_ANN_DIR" -maxdepth 1 -name 'announced-*' -mtime +1 -delete 2>/dev/null || true
+    fi
+  fi
+  if [[ -n "$_SESSION_ID" ]]; then
+    _PRETEXT="${_PRETEXT//"{{session}}"/$_SESSION_ID}"
+  else
+    # Empty replacement: also swallow one adjacent ", " so "Hey {{session}}, ready"
+    # becomes "Hey ready", not "Hey , ready"; then drop any bare token.
+    _PRETEXT="${_PRETEXT//"{{session}}, "/}"
+    _PRETEXT="${_PRETEXT//", {{session}}"/}"
+    _PRETEXT="${_PRETEXT//"{{session}}"/}"
+  fi
+  # Final tidy: collapse doubled/edge commas and runs of whitespace.
+  _PRETEXT="$(printf '%s' "$_PRETEXT" | sed -E 's/,[[:space:]]*,/,/g; s/^[[:space:]]*,[[:space:]]*//; s/[[:space:]]*,[[:space:]]*$//; s/[[:space:]]{2,}/ /g; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+fi
 if [[ -n "$_PRETEXT" ]]; then
   TEXT="${_PRETEXT}, ${TEXT}"
+fi
+
+# ── Utterance Resolver (AVI-S8.5 Stage 2) ────────────────────────────────────
+# Single source of truth for the voice + engine decision. Resolve the plan once
+# and adopt its voice (per-LLM voice wins over an LLM-echoed override — R2) and,
+# below, its local engine (a kokoro-shaped voice forces the kokoro engine on
+# Linux too — R1, curing the detect_voice_provider silence bug). FAIL-SAFE: if
+# node or the resolver bundle isn't reachable (e.g. an installed ~/.claude that
+# predates the bundle-shipping installer change), PLAN_OK stays empty and the
+# legacy logic below runs unchanged — TTS never breaks on a missing bridge.
+PLAN_OK=""
+_RESOLVER_CLI=""
+# AGENTVIBES_RESOLVER_CLI lets the installer (or tests) point at the resolver
+# bundle when it lives outside the hooks tree — e.g. an installed ~/.claude/hooks
+# whose sibling package dir holds bin/resolve-utterance.js.
+# Candidate order: explicit env override; the installed dedicated bundle dir
+# (has its own package.json so ESM works on every Node version — F-5); the repo
+# layout (dev); a co-located copy.
+for _cand in "${AGENTVIBES_RESOLVER_CLI:-}" \
+             "$SCRIPT_DIR/../agentvibes-resolver/bin/resolve-utterance.js" \
+             "$SCRIPT_DIR/../../bin/resolve-utterance.js" \
+             "$SCRIPT_DIR/resolve-utterance.js"; do
+  [[ -n "$_cand" && -f "$_cand" ]] && { _RESOLVER_CLI="$_cand"; break; }
+done
+if [[ -n "$_RESOLVER_CLI" ]] && command -v node &>/dev/null; then
+  # Voice provenance (F-1): a per-agent profile ($3) is an 'agent-profile' voice
+  # (BMAD party mode — each agent its OWN voice, must not be demoted to the
+  # per-LLM/default voice); a caller may declare provenance via
+  # AGENTVIBES_VOICE_SOURCE (e.g. MCP text_to_speech → 'user-explicit'); the
+  # voice-browser sets 'audition'; otherwise it's an 'llm-echo' (the LLM parroting
+  # back get_config, which the per-LLM row rightly overrides — R2).
+  _vsource="${AGENTVIBES_VOICE_SOURCE:-llm-echo}"
+  # Whitelist the provenance — an unknown value falls back to llm-echo (safe default).
+  case "$_vsource" in
+    llm-echo|user-explicit|agent-profile|translation-target|audition) ;;
+    *) _vsource="llm-echo" ;;
+  esac
+  # A per-agent profile ($3) also implies agent-profile provenance (belt-and-suspenders
+  # with bmad-speak.sh's explicit AGENTVIBES_VOICE_SOURCE export).
+  [[ -n "${AGENT_PROFILE_FILE:-}" && "$_vsource" == "llm-echo" ]] && _vsource="agent-profile"
+  [[ -n "${AGENTVIBES_EFFECTS_PREVIEW:-}" ]] && _vsource="audition"
+  # `timeout 5` caps a wedged bridge so the fail-safe promise ("TTS never breaks
+  # on the bridge") also covers a hung node, not just a missing one.
+  _av_timeout="timeout 5"; command -v timeout &>/dev/null || _av_timeout=""
+  if _plan_sh=$($_av_timeout node "$_RESOLVER_CLI" --format sh \
+        --text "$TEXT" \
+        --llm "$LLM_PROVIDER" \
+        --voice "$_ORIG_EXPLICIT_VOICE" \
+        --voice-source "$_vsource" \
+        --project-dir "${CLAUDE_PROJECT_DIR:-$PROJECT_ROOT}" \
+        --package-root "$PROJECT_ROOT" 2>/dev/null); then
+    # Guard the eval: a malformed OR EMPTY plan must fall back to legacy, never
+    # abort the script mid-run under `set -euo pipefail`. `eval ""` succeeds with
+    # no AV_* vars set, which would falsely set PLAN_OK — so require non-empty
+    # output AND a field that is ALWAYS present in a valid plan. AV_TRANSPORT is
+    # always 'local' or a transport name (never empty), unlike AV_ENGINE which is
+    # legitimately empty on a remote plan (F-7).
+    if [[ -n "$_plan_sh" ]] && eval "$_plan_sh" 2>/dev/null && [[ -n "${AV_TRANSPORT:-}" ]]; then   # AV_* shell-quoted, safe
+      PLAN_OK=1
+      # Adopt the voice into VOICE_OVERRIDE ONLY when it's a real override
+      # (F-2): a plain provider-file voice is left for play-tts-piper.sh's own
+      # file+model+speaker-id resolution (adopting it as an explicit override
+      # skips the multi-speaker lookup and plays speaker 0). Engine coupling (R1)
+      # still applies below regardless.
+      if [[ "${AV_VOICE_IS_OVERRIDE:-false}" == "true" && -n "${AV_VOICE:-}" ]]; then
+        VOICE_OVERRIDE="$AV_VOICE"
+      fi
+    fi
+  fi
 fi
 
 # Source provider manager to get active provider
@@ -259,7 +382,12 @@ case "$ACTIVE_PROVIDER" in
     # Transport — keep it.  The receiver's audio-effects.cfg picks the engine.
     ;;
   *)
-    if [[ -n "$_LLM_ENGINE" ]]; then
+    if [[ "$VOICE_OVERRIDE" =~ ^(af|am|bf|bm|jf|jm|kf|km|zf|zm|ff|fm|hf|hm|if|im|pf|pm|ef|em|nf|nm)_[a-zA-Z0-9]+$ ]]; then
+      # Kokoro-shaped voice override (e.g. af_heart) must win over the LLM row's
+      # engine column, else it is synthesized as a Piper voice, 404s downloading
+      # a model that doesn't exist, and stays silent.
+      ACTIVE_PROVIDER="kokoro"
+    elif [[ -n "$_LLM_ENGINE" ]]; then
       ACTIVE_PROVIDER="$_LLM_ENGINE"
     fi
     ;;
@@ -281,8 +409,8 @@ fi
 _TRANSPORT_CFG="$HOME/.agentvibes/transport-config.json"
 if [[ "$ACTIVE_PROVIDER" != "ssh-remote" && "$ACTIVE_PROVIDER" != "agentvibes-receiver" && "$ACTIVE_PROVIDER" != "termux-ssh" ]] \
    && [[ -n "$LLM_PROVIDER" && "$LLM_PROVIDER" != "default" ]] \
-   && [[ -f "$_TRANSPORT_CFG" ]] && command -v python3 &>/dev/null; then
-  _LLM_SSH_MODE=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" python3 - <<'PYEOF'
+   && [[ -f "$_TRANSPORT_CFG" ]] && [[ -n "$PYTHON_BIN" ]]; then
+  _LLM_SSH_MODE=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" "$PYTHON_BIN" - <<'PYEOF'
 import json, os, sys
 try:
     d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
@@ -293,7 +421,7 @@ PYEOF
 )
   if [[ "$_LLM_SSH_MODE" == "remote" ]]; then
     # Redirect this LLM's audio through ssh-remote using its own SSH config
-    _llm_remote_data=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" python3 - <<'PYEOF'
+    _llm_remote_data=$(AGENTVIBES_CFG="$_TRANSPORT_CFG" AGENTVIBES_KEY="$LLM_PROVIDER" "$PYTHON_BIN" - <<'PYEOF'
 import json, os, sys
 try:
     d = json.load(open(os.environ['AGENTVIBES_CFG'], encoding='utf-8'))
@@ -320,6 +448,17 @@ PYEOF
   fi
 fi
 
+# Adopt the resolver's engine for LOCAL playback (AVI-S8.5 Stage 2): this cures
+# the kokoro/piper voice→engine coupling (R1) and normalizes engine aliases,
+# replacing the detect_voice_provider heuristic below. Transports are left
+# untouched — the plan forwards the voice and the receiver picks its own engine.
+if [[ -n "$PLAN_OK" ]]; then
+  case "$ACTIVE_PROVIDER" in
+    ssh-remote|agentvibes-receiver|termux-ssh) : ;;   # transport — keep it
+    *) [[ -n "${AV_ENGINE:-}" ]] && ACTIVE_PROVIDER="$AV_ENGINE" ;;
+  esac
+fi
+
 # Show GitHub star reminder (once per day)
 bash "$SCRIPT_DIR/github-star-reminder.sh" 2>/dev/null || true
 
@@ -338,10 +477,10 @@ detect_voice_provider() {
   fi
 }
 
-# Override provider if voice indicates different provider (mixed-provider mode)
-# But never override transport providers (ssh-remote, agentvibes-receiver, termux-ssh)
-# — those are transport layers, not synth engines. The receiver picks its own engine.
-if [[ -n "$VOICE_OVERRIDE" ]]; then
+# Legacy mixed-provider heuristic — ONLY on the fallback path (no resolver plan).
+# When PLAN_OK is set, the resolver already coupled voice→engine correctly above
+# (including kokoro, which this heuristic misses — the R1 silence bug), so skip it.
+if [[ -z "$PLAN_OK" && -n "$VOICE_OVERRIDE" ]]; then
   case "$ACTIVE_PROVIDER" in
     ssh-remote|agentvibes-receiver|termux-ssh)
       # Transport provider — don't override, voice info is forwarded to receiver
@@ -432,11 +571,16 @@ speak_text() {
     termux-ssh)
       bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$text" "$voice"
       ;;
-    ssh-remote)
+    ssh-remote|agentvibes-receiver)
+      # Both route through the base64-JSON sender that the modern receiver
+      # (templates/agentvibes-receiver.ps1 / .sh, installed as play-remote.*)
+      # understands. The old voiceless-connections sender spoke a 3-positional-arg
+      # protocol for a legacy ~/.agentvibes/play-remote.sh receiver that no current
+      # receiver install produces, so it delivered a non-base64 command the modern
+      # receiver rejects ("Payload must be base64-encoded"). play-tts-ssh-remote.sh
+      # resolves the host from any transport-config mode=remote entry (Priority 2b),
+      # so the agentvibes-receiver section is found without an ssh-remote section.
       bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$text" "$voice" "" "${profile_file:-}"
-      ;;
-    agentvibes-receiver)
-      bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$text" "$voice"
       ;;
     *)
       echo "❌ Unknown provider: $provider" >&2
@@ -445,50 +589,8 @@ speak_text() {
   esac
 }
 
-# Note: learn-manager.sh and translate-manager.sh are sourced inside their
-# respective handler functions to avoid triggering their main handlers
-
-# @function handle_learning_mode
-# @intent Speak in both main language and target language for learning
-# @why Issue #51 - Auto-translate and speak twice for immersive language learning
-# @returns 0 if learning mode handled, 1 if not in learning mode
-handle_learning_mode() {
-  # Source learn-manager for learning mode functions
-  source "$SCRIPT_DIR/learn-manager.sh" 2>/dev/null || return 1
-
-  # Check if learning mode is enabled
-  if ! is_learn_mode_enabled 2>/dev/null; then
-    return 1
-  fi
-
-  local target_lang
-  target_lang=$(get_target_language 2>/dev/null || echo "")
-  local target_voice
-  target_voice=$(get_target_voice 2>/dev/null || echo "")
-
-  # Need both target language and voice for learning mode
-  if [[ -z "$target_lang" ]] || [[ -z "$target_voice" ]]; then
-    return 1
-  fi
-
-  # 1. Speak in main language (current voice)
-  speak_text "$TEXT" "$VOICE_OVERRIDE" "$ACTIVE_PROVIDER"
-
-  # 2. Auto-translate to target language
-  local translated
-  # SECURITY: Add timeout to prevent hanging (#134)
-  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$target_lang" 2>/dev/null) || translated="$TEXT"
-
-  # Small pause between languages
-  sleep 0.5
-
-  # 3. Speak translated text with target voice
-  local target_provider
-  target_provider=$(detect_voice_provider "$target_voice")
-  speak_text "$translated" "$target_voice" "$target_provider"
-
-  return 0
-}
+# Note: translate-manager.sh is sourced inside its handler function to avoid
+# triggering its main handler
 
 # @function handle_translation_mode
 # @intent Translate and speak in target language (non-learning mode)
@@ -513,7 +615,7 @@ handle_translation_mode() {
   # Translate text
   local translated
   # SECURITY: Add timeout to prevent hanging (#134)
-  translated=$(timeout 5 python3 "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
+  translated=$(timeout 5 "${PYTHON_BIN:-python3}" "$SCRIPT_DIR/translator.py" "$TEXT" "$translate_to" 2>/dev/null) || translated="$TEXT"
 
   # Get voice for target language if no override specified
   local voice_to_use="$VOICE_OVERRIDE"
@@ -534,14 +636,8 @@ handle_translation_mode() {
 }
 
 # Mode priority:
-# 1. Learning mode (speaks twice: main + translated)
-# 2. Translation mode (speaks translated only)
-# 3. Normal mode (speaks as-is)
-
-# Try learning mode first (Issue #51)
-if handle_learning_mode; then
-  exit 0
-fi
+# 1. Translation mode (speaks translated only)
+# 2. Normal mode (speaks as-is)
 
 # Try translation mode (Issue #50)
 if handle_translation_mode; then
@@ -572,11 +668,13 @@ case "$ACTIVE_PROVIDER" in
   termux-ssh)
     exec bash "$SCRIPT_DIR/play-tts-termux-ssh.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
-  ssh-remote)
+  ssh-remote|agentvibes-receiver)
+    # Both route through the base64-JSON sender the modern receiver understands.
+    # The legacy voiceless-connections sender spoke a 3-arg protocol for an old
+    # ~/.agentvibes/play-remote.sh receiver that no current install produces, so it
+    # delivered a non-base64 command the modern receiver rejects with
+    # "Payload must be base64-encoded".
     exec bash "$SCRIPT_DIR/play-tts-ssh-remote.sh" "$TEXT" "$VOICE_OVERRIDE" "" "${AGENT_PROFILE_FILE:-}"
-    ;;
-  agentvibes-receiver)
-    exec bash "$SCRIPT_DIR/play-tts-agentvibes-receiver-for-voiceless-connections.sh" "$TEXT" "$VOICE_OVERRIDE"
     ;;
   *)
     echo "❌ Unknown provider: $ACTIVE_PROVIDER" >&2

@@ -45,8 +45,12 @@ jobs:
         run: cp .claude/config/audio-effects.cfg.sample .claude/config/audio-effects.cfg
 
       - name: Generate coverage report
+        # No continue-on-error: if coverage generation fails, lcov.info is absent
+        # or stale and everything downstream reports fiction. run:test:coverage
+        # already tolerates the known --test-force-exit race itself (and now
+        # re-verifies file-level failures serially), so a non-zero exit here is a
+        # REAL failure worth surfacing.
         run: npm run test:coverage
-        continue-on-error: true
         env:
           ELEVENLABS_API_KEY: test_mock_key
           # Note: AGENTVIBES_TEST_MODE is NOT set here — test:coverage uses
@@ -63,6 +67,10 @@ jobs:
           else
             echo "❌ coverage/lcov.info NOT FOUND"
             ls -la coverage/ || echo "coverage/ directory does not exist"
+            # Must fail: without lcov, the Sonar scan below silently reports 0%
+            # coverage as though it were measured. This step printed ❌ and
+            # exited 0, so a missing report looked identical to a good one.
+            exit 1
           fi
 
       - name: SonarCloud Scan

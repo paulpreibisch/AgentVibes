@@ -22,10 +22,10 @@ describe('footer-config.js - Module Structure', () => {
   });
 });
 
-describe('footer-config.js - All 8 tabs covered', () => {
-  test('FOOTER_CONFIG has entries for all 8 tab IDs', async () => {
+describe('footer-config.js - All 7 tabs covered', () => {
+  test('FOOTER_CONFIG has entries for all 7 tab IDs', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    const required = ['settings', 'voices', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
+    const required = ['settings', 'music', 'agents', 'receiver', 'readme', 'help', 'setup'];
     for (const tabId of required) {
       assert.ok(Object.hasOwn(FOOTER_CONFIG, tabId),
         `FOOTER_CONFIG must have an entry for tab '${tabId}'`);
@@ -53,11 +53,6 @@ describe('footer-config.js - Correct colors per tab (AC#2)', () => {
   test('Settings footer color is #2196f3 (blue)', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
     assert.strictEqual(FOOTER_CONFIG.settings.color, '#2196f3');
-  });
-
-  test('Voices footer color is #00bcd4 (cyan)', async () => {
-    const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    assert.strictEqual(FOOTER_CONFIG.voices.color, '#00bcd4');
   });
 
   test('Music footer color is #ff9800 (orange)', async () => {
@@ -94,14 +89,6 @@ describe('footer-config.js - Text content per tab (AC#3)', () => {
       'Settings footer must mention navigation');
   });
 
-  test('Voices footer text includes Sort and Search shortcuts', async () => {
-    const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
-    assert.ok(FOOTER_CONFIG.voices.text.includes('Sort'),
-      'Voices footer must mention Sort');
-    assert.ok(FOOTER_CONFIG.voices.text.includes('Search') ||
-              FOOTER_CONFIG.voices.text.includes('/'),
-      'Voices footer must mention Search or /');
-  });
 
   test('Music footer text includes Preview, Toggle, and Navigate shortcuts', async () => {
     const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
@@ -120,6 +107,16 @@ describe('footer-config.js - Text content per tab (AC#3)', () => {
     assert.ok(FOOTER_CONFIG.agents.text.includes('Edit') || FOOTER_CONFIG.agents.text.includes('Assign'),
       'Agents footer must mention Edit or Assign');
     assert.ok(FOOTER_CONFIG.agents.text.includes('Reset'), 'Agents footer must mention Reset');
+  });
+
+  test('Agents footer Reset does not reuse a global tab-shortcut key (X=receiver, R=readme)', async () => {
+    // Regression: Reset was bound to X, but X is the global Receiver-tab shortcut
+    // (navigation.js), so pressing it reset the agent AND jumped tabs. R collides
+    // with Readme. Reset must advertise a non-tab key (Del).
+    const { FOOTER_CONFIG } = await import('../../src/console/footer-config.js');
+    assert.ok(!/\[X\]\s*Reset/i.test(FOOTER_CONFIG.agents.text), 'Reset must not use [X] (Receiver tab key)');
+    assert.ok(!/\[R\]\s*Reset/i.test(FOOTER_CONFIG.agents.text), 'Reset must not use [R] (Readme tab key)');
+    assert.ok(/Del/i.test(FOOTER_CONFIG.agents.text), 'Reset should advertise Del');
   });
 
   test('Readme footer text includes Scroll and Page shortcuts', async () => {

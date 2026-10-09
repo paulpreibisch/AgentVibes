@@ -716,24 +716,56 @@ test('Piper Provider - voice-manager works via PowerShell', { skip: process.plat
 // Suite: Session-start TTS Protocol Injection
 // ============================================================
 
-test('Session Start - injects -llm claude-code flag', { skip: process.platform !== 'win32' }, async () => {
-  const result = await runPowerShell(
-    ['-File', join(hooksDir, 'session-start-tts.ps1')],
-    { env: { CLAUDE_PROJECT_DIR: projectRoot } }
-  );
+// Injection is OPT-IN (see the gate in session-start-tts.ps1): the hook stays
+// silent unless the project has an `agentvibes-enabled` / `agentvibes-unmuted`
+// marker, so a global install no longer makes every session speak at once.
+// These tests therefore point CLAUDE_PROJECT_DIR at a temp project that HAS
+// opted in — that is the only state in which injection is expected to happen.
+// (The gate's own precedence is covered by session-injection-gate-parity.test.js.)
+//
+// HOME/USERPROFILE are also redirected into the temp tree so the developer's real
+// ~/.claude markers (e.g. a global ~/.agentvibes-muted, which the gate honours
+// BEFORE the project-enabled marker) cannot make these pass or fail for the wrong
+// reason — the test is identical on a dev box and on a clean CI runner.
+function makeSessionEnv(optIn) {
+  const home = mkdtempSync(join(tmpdir(), 'av-session-'));
+  const claude = join(home, '.claude');
+  mkdirSync(claude, { recursive: true });
+  if (optIn) writeFileSync(join(claude, 'agentvibes-enabled'), '', 'utf8');
+  // CLAUDE_PROJECT_DIR === HOME so the project's .claude and ~/.claude are the
+  // same dir; no stray ~/.agentvibes-muted exists under this temp HOME.
+  return { home, env: { CLAUDE_PROJECT_DIR: home, HOME: home, USERPROFILE: home } };
+}
 
-  const output = result.stdout + result.stderr;
-  assert.ok(
-    output.includes('-llm claude-code'),
-    'session-start-tts.ps1 must inject -llm claude-code so per-LLM voice/music is used'
-  );
+test('Session Start - injects -llm claude-code flag', { skip: process.platform !== 'win32' }, async () => {
+  const { home, env } = makeSessionEnv(true);
+  try {
+    const result = await runPowerShell(
+      ['-File', join(hooksDir, 'session-start-tts.ps1')],
+      { env }
+    );
+
+    const output = result.stdout + result.stderr;
+    assert.ok(
+      output.includes('-llm claude-code'),
+      'session-start-tts.ps1 must inject -llm claude-code so per-LLM voice/music is used'
+    );
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('Session Start - injects absolute play-tts.ps1 path not relative', { skip: process.platform !== 'win32' }, async () => {
-  const result = await runPowerShell(
-    ['-File', join(hooksDir, 'session-start-tts.ps1')],
-    { env: { CLAUDE_PROJECT_DIR: projectRoot } }
-  );
+  const { home, env } = makeSessionEnv(true);
+  let result;
+  try {
+    result = await runPowerShell(
+      ['-File', join(hooksDir, 'session-start-tts.ps1')],
+      { env }
+    );
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 
   const output = result.stdout + result.stderr;
   // Must NOT contain the relative path that breaks when CWD != project dir
@@ -746,6 +778,28 @@ test('Session Start - injects absolute play-tts.ps1 path not relative', { skip: 
     /[A-Za-z]:\\.*play-tts\.ps1/.test(output),
     'session-start-tts.ps1 must inject an absolute path to play-tts.ps1'
   );
+});
+
+test('Session Start - stays SILENT for a project that has not opted in', { skip: process.platform !== 'win32' }, async () => {
+  // The opt-in gate is the Windows half of the "cacophony of agents" fix: a
+  // project with no agentvibes-enabled/-unmuted marker must inject NOTHING, so a
+  // global install no longer makes every open session speak at once. This is the
+  // behaviour a gate-revert would break, so assert it directly (not just the
+  // enabled path above).
+  const { home, env } = makeSessionEnv(false);   // .claude exists, but no opt-in marker
+  try {
+    const result = await runPowerShell(
+      ['-File', join(hooksDir, 'session-start-tts.ps1')],
+      { env }
+    );
+    const output = (result.stdout + result.stderr).trim();
+    assert.equal(
+      output, '',
+      'session-start-tts.ps1 must inject zero tokens for a project that has not opted in'
+    );
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('Session Start - static check: uses $PlayTtsPath variable not hardcoded relative path', () => {

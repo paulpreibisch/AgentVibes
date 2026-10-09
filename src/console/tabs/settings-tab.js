@@ -19,9 +19,11 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
-  scanInstalledVoices, getVoiceMeta, genderIconTag, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker,
+  scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, PIPER_VOICES_DIR, parseMultiSpeaker,
 } from './voices-tab.js';
+import { voicesForProvider } from '../../services/provider-voice-catalog.js';
 import { LanguageService } from '../../services/language-service.js';
 import { SUPPORTED_LANGUAGES, t } from '../../i18n/strings.js';
 import { buildAudioEnv, detectWavPlayer, detectRemoteLlm } from '../audio-env.js';
@@ -32,7 +34,7 @@ import { PERSONALITY_EMOJIS } from '../constants/personalities.js';
 import { formatTrackName as _sharedFormatTrackName, formatReverbState as _sharedFormatReverbState } from '../widgets/format-utils.js';
 import { showNotice as _showNoticeWidget } from '../widgets/notice.js';
 import {
-  getAvailableEngines, checkEngineInstalled,
+  getAvailableEngines, getAllEngines, checkEngineInstalled, receiverProviderId,
 } from '../../services/tts-engine-service.js';
 
 const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
@@ -127,6 +129,19 @@ export function createSettingsTab(screen, services) {
 
   const { configService, providerService, navigationService, focusMainTabBar, languageService } = services;
 
+  // Capture cwd once at construction (matches agents-tab.js pattern)
+  const _projectRoot = process.cwd();
+
+  // Preview hooks: prefer the CURRENT package copy over the project-local
+  // .claude/hooks (a tarball reinstall refreshes node_modules only, not the
+  // project's .claude), so previews never run a stale sender. CLAUDE_PROJECT_DIR
+  // still points at _projectRoot so the hook reads the project's config/provider.
+  const _pkgClaudeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.claude');
+  function _hookScript(subdir, name) {
+    const pkg = path.join(_pkgClaudeDir, subdir, name);
+    return fs.existsSync(pkg) ? pkg : path.join(_projectRoot, '.claude', subdir, name);
+  }
+
   // ── Container ────────────────────────────────────────────────────────────
 
   const box = blessed.box({
@@ -165,7 +180,7 @@ export function createSettingsTab(screen, services) {
           const installed = engines.find(e => checkEngineInstalled(e.id));
           return installed ? installed.name : '(none)';
         }
-        const match = getAvailableEngines().find(e => e.id === engine);
+        const match = getAllEngines().find(e => e.id === engine);
         return match ? match.name : engine;
       },
       desc: 'Global default — individual providers can override in Setup → Configure',
@@ -195,9 +210,12 @@ export function createSettingsTab(screen, services) {
         if (dst === 'remote') {
           const alias = configService?.getConfig?.()?.audio_ssh_alias ?? '';
           const mode = configService?.getConfig?.()?.audio_stream_mode ?? 'text';
-          return `Remote (${alias || 'no alias'}) — ${mode === 'pulse' ? 'PulseAudio' : 'Text Only'}`;
+          // Remote value in RED — audio leaves this machine (a deliberate,
+          // "here be dragons" destination). Rendered raw (see _refreshValues).
+          return `{red-fg}Remote (${alias || 'no alias'}) — ${mode === 'pulse' ? 'PulseAudio' : 'Text Only'}{/red-fg}`;
         }
-        return 'Local';
+        // Local value in GREEN — audio plays here, the safe default.
+        return '{green-fg}Local{/green-fg}';
       },
       desc: 'Play audio locally or stream to a remote host via SSH',
     },
@@ -345,6 +363,10 @@ export function createSettingsTab(screen, services) {
       const val = w.setting.getValue();
       if (w.setting.isAction) {
         w.valueWidget.setContent('');
+      } else if (w.setting.key === 'audioDst') {
+        // audioDst supplies its own colour (green=Local / red=Remote); don't
+        // wrap it in the default yellow.
+        w.valueWidget.setContent(val);
       } else {
         w.valueWidget.setContent(`{yellow-fg}${val}{/yellow-fg}`);
       }
@@ -471,15 +493,128 @@ export function createSettingsTab(screen, services) {
 
   // ── TTS Engine editor ────────────────────────────────────────────────────
 
+  // Build actionable "how to enable" text for an engine that shows [N/A] in the
+  // picker, so the user is never left stranded not knowing what to do.
+  function _engineGuidance(engine) {
+    if (!engine) return '';
+    if (engine.requiresApiKey) {
+      const keyHint = engine.id === 'elevenlabs'
+        ? '\n  or save it to ~/.agentvibes/elevenlabs-key.txt'
+        : '';
+      return `${engine.name} needs an API key.\n\n`
+        + `Set ${engine.apiKeyEnvVar} in your shell profile${keyHint}.\n\n`
+        + `Get a free key at elevenlabs.io, then reopen this menu.`;
+    }
+    if (engine.installCmd && !/^echo /.test(engine.installCmd)) {
+      return `${engine.name} isn't installed yet.\n\nInstall it with:\n  ${engine.installCmd}\n\nThen reopen this menu.`;
+    }
+    return `${engine.name} isn't available on this system.`;
+  }
+
+  function _showEngineGuidance(engine) {
+    const text = _engineGuidance(engine);
+    if (!text) return;
+    navigationService?.openModal();
+    const lines = text.split('\n');
+    const width = Math.min(76, Math.max(44, ...lines.map(l => l.length + 4)));
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width,
+      height: lines.length + 4,
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      mouse: true,
+      label: ` {bold}{yellow-fg} How to enable ${engine.name} {/yellow-fg}{/bold} `,
+      content: text,
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'yellow' } },
+    });
+    modal.setFront();
+    const close = () => {
+      navigationService?.closeModal();
+      destroyList(modal, screen);
+      box.focus();
+      screen.render();
+    };
+    modal.key(['enter', 'escape', 'q', 'space'], close);
+    modal.focus();
+    screen.render();
+  }
+
+  // Announce the chosen engine to the remote by writing receiver-provider.txt —
+  // the exact file play-tts-ssh-remote.sh reads to fill the payload's `provider`
+  // field. The receiver then honors it (or overrides with its own local config).
+  // Written to ~/.agentvibes/config/ (the sender's guaranteed fallback path).
+  function _writeReceiverProvider(engineId) {
+    const provider = receiverProviderId(engineId);
+    try {
+      const dir = path.join(os.homedir(), '.agentvibes', 'config');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'receiver-provider.txt'), provider + '\n', 'utf8');
+    } catch (e) {
+      process.stderr.write(`[AgentVibes] could not write receiver-provider.txt: ${e.message}\n`);
+    }
+  }
+
+  // Confirm selecting an engine that can't run on THIS machine but may run on the
+  // remote receiver (remote mode only). onConfirm() runs on Yes.
+  function _confirmReceiverEngine(engine, onConfirm) {
+    navigationService?.openModal();
+    const lines = [
+      `${engine.name} can't run on this machine's OS.`,
+      '',
+      'In remote mode the receiver synthesizes the audio, so this',
+      'only works if your remote receiver supports it.',
+      '',
+      `Are you sure your receiver supports ${engine.name}?`,
+      '',
+      '  [Y] Yes, send it to the receiver     [N] Cancel',
+    ];
+    const modal = blessed.box({
+      parent: screen,
+      top: 'center',
+      left: 'center',
+      width: Math.min(70, Math.max(50, ...lines.map(l => l.length + 4))),
+      height: lines.length + 4,
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      mouse: true,
+      label: ' {bold}{yellow-fg} Confirm remote engine {/yellow-fg}{/bold} ',
+      content: lines.join('\n'),
+      style: { fg: COLORS.labelFg, bg: COLORS.contentBg, border: { fg: 'yellow' } },
+    });
+    modal.setFront();
+    // Restore focus to whatever was focused before (the engine list) so cancel
+    // returns the user there to pick again; on confirm, onConfirm() takes over.
+    const prevFocus = screen.focused;
+    const close = (confirmed) => {
+      navigationService?.closeModal();
+      destroyList(modal, screen);
+      if (prevFocus && !prevFocus.detached) prevFocus.focus(); else box.focus();
+      screen.render();
+      if (confirmed) onConfirm();
+    };
+    modal.key(['y', 'Y', 'enter'], () => close(true));
+    modal.key(['n', 'N', 'escape', 'q'], () => close(false));
+    modal.focus();
+    screen.render();
+  }
+
   function _editTtsEngine() {
     navigationService?.openModal();
 
-    const engines = getAvailableEngines();
+    // Show ALL engines (not just the platform-available ones) so off-platform
+    // engines like Windows SAPI appear greyed "(Not supported)" instead of looking
+    // missing. `supported` marks whether the engine can run on this OS.
+    const engines = getAllEngines();
     const modal = blessed.list({
       parent: screen,
       top: 'center',
       left: 'center',
-      width: 50,
+      width: 54,
       height: engines.length + 4,
       border: { type: 'line' },
       tags: true,
@@ -497,17 +632,51 @@ export function createSettingsTab(screen, services) {
     });
     modal.setFront();
 
+    // In remote mode the receiver synthesizes, so off-platform engines (e.g.
+    // Windows SAPI on a Linux server) ARE valid choices — the selection is sent
+    // to the receiver. Locally they cannot run, so they stay greyed & blocked.
+    const _isRemote = (configService?.getConfig?.()?.audio_destination ?? 'local') === 'remote';
+
     const items = engines.map(e => {
+      if (!e.supported) {
+        if (_isRemote) {
+          // Selectable, but tag it so it's clear it runs on the receiver, not here.
+          return `{cyan-fg}  ${e.name}  (Receiver){/cyan-fg}`;
+        }
+        // Greyed, non-selectable: not runnable on this OS and no remote to send to.
+        return `{#607d8b-fg}  ${e.name}  (Not supported){/#607d8b-fg}`;
+      }
       const installed = checkEngineInstalled(e.id);
       const status = installed ? '{green-fg}[OK]{/green-fg}' : '{yellow-fg}[N/A]{/yellow-fg}';
       return `  ${e.name}  ${status}`;
     });
     modal.setItems(items);
 
+    // Commit a selection: persist the local default AND announce it to the remote.
+    const _applyEngine = (sel, showGuidance) => {
+      configService.set('ttsEngine', sel.id);
+      _writeReceiverProvider(sel.id);
+      _closeModal();
+      if (showGuidance) _showEngineGuidance(sel);
+    };
+
     modal.key(['enter'], () => {
       const sel = engines[modal.selected];
-      if (sel) configService.set('ttsEngine', sel.id);
-      _closeModal();
+      if (!sel) { _closeModal(); return; }
+      if (!sel.supported) {
+        if (!_isRemote) {
+          // No remote receiver to run it on — explain and keep the menu open.
+          _showNoticeWidget(screen, `${sel.name} is not supported on this system`);
+          return;
+        }
+        // Remote mode: confirm the receiver can run it, then send the selection.
+        _confirmReceiverEngine(sel, () => _applyEngine(sel, false));
+        return;
+      }
+      // Supported locally: [N/A] means "installable here" — offer guidance, but not
+      // in remote mode (local install is irrelevant when the receiver synthesizes).
+      const notInstalled = !checkEngineInstalled(sel.id);
+      _applyEngine(sel, notInstalled && !_isRemote);
     });
     modal.key(['escape', 'q'], _closeModal);
 
@@ -630,7 +799,17 @@ export function createSettingsTab(screen, services) {
       if (_vpClosed) return;
       const savedIdx = vpList.selected ?? 0;
       const savedScroll = vpList.childBase ?? 0;
-      _allVoices = scanInstalledVoices();
+      // Provider-aware: list the ACTIVE engine's voices, derived from the Provider
+      // Catalog (via the voicesForProvider shim) — Kokoro/ElevenLabs from the catalog,
+      // Piper from the on-disk scan, soprano its single entry. Map {id,gender} → id
+      // so the rest of this picker (which treats _allVoices as string ids) is unchanged.
+      // The active ENGINE drives which voices to list. The "Default TTS Engine"
+      // selector writes config.ttsEngine (kokoro/elevenlabs/piper/…); prefer it,
+      // then the provider, then piper. (getActiveProvider = config.provider, which
+      // can be a transport like agentvibes-receiver and isn't the engine.)
+      const _activeProvider = configService?.getConfig?.()?.ttsEngine
+        || providerService?.getActiveProvider?.() || 'piper';
+      _allVoices = voicesForProvider(_activeProvider, { scanInstalledVoices, getVoiceMeta }).map(v => v.id);
       // Sort by display name so the first-letter quick jump is intuitive
       _allVoices.sort((a, b) => getVoiceMeta(a).displayName.localeCompare(
         getVoiceMeta(b).displayName, undefined, { sensitivity: 'base' }));
@@ -645,18 +824,85 @@ export function createSettingsTab(screen, services) {
       if (_previewVoiceId === voiceId) { _killVP(); vpPreviewLine.setContent(''); _refreshVP(); return; }
       _killVP();
 
-      const phrase = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]; // NOSONAR
-      const playTtsScript = path.join(_projectRoot, '.claude', 'hooks', 'play-tts.sh');
+      // Announce the voice + its engine, consistent with every other picker.
+      const phrase = previewPhrase(voiceId);
+
+      if (_isWin) {
+        // Which engine is being previewed? (Default TTS Engine selector.)
+        const _engine = configService?.getConfig?.()?.ttsEngine
+          || providerService?.getActiveProvider?.() || 'piper';
+        const _prov = receiverProviderId(_engine); // windows-sapi / piper / kokoro / …
+
+        // Windows SAPI voice names ("Microsoft David Desktop") don't auto-route, and
+        // play-tts.ps1's per-LLM engine resolution overrides -ProviderOverride back to
+        // Piper — so preview SAPI by calling its provider script DIRECTLY. Deterministic
+        // and it plays the voice (effects are skipped, which is fine for a preview).
+        // Piper/Kokoro keep the existing play-tts.ps1 path (they auto-route correctly).
+        const _directNames = _prov === 'windows-sapi'
+          ? ['play-tts-sapi.ps1', 'play-tts-windows-sapi.ps1']
+          : null;
+        let _script = null;
+        const _psArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File'];
+        if (_directNames) {
+          for (const n of _directNames) {
+            const p = _hookScript('hooks-windows', n);
+            if (fs.existsSync(p)) { _script = p; break; }
+          }
+          if (_script) _psArgs.push(_script, '-Text', phrase, '-VoiceOverride', voiceId);
+        }
+        if (!_script) {
+          _script = _hookScript('hooks-windows', 'play-tts.ps1');
+          if (!fs.existsSync(_script)) return;
+          _psArgs.push(_script, phrase, voiceId);
+        }
+
+        _previewVoiceId = voiceId;
+        if (!_vpClosed) {
+          vpPreviewLine.setContent(`{cyan-fg}♪ Playing: ${voiceId}...{/cyan-fg}`);
+          _refreshVP();
+        }
+        _previewProc = spawn('powershell', _psArgs, // NOSONAR
+          { stdio: 'ignore', detached: false, windowsHide: true,
+            env: { ..._spawnEnv, AGENTVIBES_VOICE_SOURCE: 'audition' } });
+        _previewProc.on('exit', () => {
+          if (_previewVoiceId === voiceId) {
+            _previewVoiceId = null;
+            _previewProc = null;
+            if (!_vpClosed) { vpPreviewLine.setContent(''); _refreshVP(); }
+          }
+        });
+        _previewProc.on('error', () => { _previewProc = null; _previewVoiceId = null; });
+        return;
+      }
+
+      // Non-Windows: use bash play-tts.sh
+      const playTtsScript = _hookScript('hooks', 'play-tts.sh');
       if (!fs.existsSync(playTtsScript)) return;
 
       const remoteLlm = detectRemoteLlm();
       const args = [playTtsScript, phrase, voiceId];
       if (remoteLlm) args.push('--llm', remoteLlm);
 
+      // Mark this as an AUDITION so the resolver keeps the EXACT voice we're
+      // previewing (F1) instead of demoting it to the per-LLM/provider voice —
+      // essential for engines whose ids aren't self-identifying (SAPI/macOS).
+      // Also force the receiver engine to the previewed voice's engine for this
+      // one send, so a SAPI/macOS voice actually renders in its own engine.
+      let _pvEngine = configService?.getConfig?.()?.ttsEngine
+        || providerService?.getActiveProvider?.() || 'piper';
+      // Guard: a transport (ssh-remote/agentvibes-receiver) is not an engine —
+      // fall back to piper so we never send the receiver a transport id as its
+      // engine (Fable review; mirrors voices-tab).
+      if (_pvEngine === 'ssh-remote' || _pvEngine === 'agentvibes-receiver') _pvEngine = 'piper';
       _previewProc = spawn('bash', args, { // NOSONAR
         stdio: 'ignore',
         detached: true,
-        env: _spawnEnv,
+        env: {
+          ..._spawnEnv,
+          CLAUDE_PROJECT_DIR: _projectRoot,
+          AGENTVIBES_VOICE_SOURCE: 'audition',
+          AGENTVIBES_RECEIVER_PROVIDER_OVERRIDE: receiverProviderId(_pvEngine),
+        },
         cwd: _projectRoot,
       });
       _previewVoiceId = voiceId;

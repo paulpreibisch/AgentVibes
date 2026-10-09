@@ -56,6 +56,50 @@ describe('npm pack content validation (pre-publish guard)', () => {
     assert.ok(packResult, 'npm pack returned no result');
   });
 
+  // The `files` array OVERRIDES .npmignore, so listing a whole directory ships
+  // every gitignored local file inside it. v5.12.0/5.13.0/5.13.1 all published
+  // the maintainer's live .claude/config/* (which copyConfigFiles then seeded
+  // into every user's project INSTEAD of the .sample defaults) and
+  // .agentvibes/install-manifest.json containing absolute C:\Users\<name> paths.
+  // Rule: a packed file must be tracked by git. Untracked == local state.
+  test('REGRESSION: pack ships no untracked local state (no personal config/paths)', () => {
+    if (packError) assert.fail('npm pack failed in before(): ' + packError.message);
+
+    const tracked = new Set(
+      execSync('git ls-files', { cwd: PROJECT_ROOT, encoding: 'utf8', timeout: 30_000 })
+        .split('\n').map((s) => s.trim()).filter(Boolean)
+    );
+
+    // Deliberately shipped despite being gitignored — each is listed EXPLICITLY
+    // (not via a directory glob) in package.json "files". Keep this list tiny and
+    // justified; anything not here that is untracked is machine state, not product.
+    const INTENTIONAL_UNTRACKED = new Set([
+      '.mcp.json',                    // MCP server wiring shipped for users
+      '.claude/github-star-reminder.txt',
+      '.claude/piper-voices-dir.txt',
+    ]);
+
+    const leaked = (packResult.files || [])
+      .map((f) => f.path)
+      .filter((p) => !tracked.has(p) && !INTENTIONAL_UNTRACKED.has(p));
+
+    assert.deepEqual(
+      leaked, [],
+      'These packed files are NOT tracked by git — they are local machine state and must not ship:\n  ' +
+      leaked.join('\n  ')
+    );
+  });
+
+  test('REGRESSION: files the TUI tells users to run are actually shipped', () => {
+    if (packError) assert.fail('npm pack failed in before(): ' + packError.message);
+    const packed = new Set((packResult.files || []).map((f) => f.path));
+    // receiver-tab.js tells the user to run these by path; they were absent from
+    // the tarball, so npm-installed users hit file-not-found.
+    for (const required of ['setup-ssh-receiver.ps1', 'templates/agentvibes-receiver.ps1']) {
+      assert.ok(packed.has(required), `${required} is referenced at runtime but not in package.json "files"`);
+    }
+  });
+
   test('package.json version is set', () => {
     if (packError) assert.fail('npm pack failed in before(): ' + packError.message);
     assert.ok(packResult.version, 'pack result has no version');

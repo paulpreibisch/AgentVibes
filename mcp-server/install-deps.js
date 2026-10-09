@@ -67,8 +67,15 @@ function installMcp(pythonCmd) {
 
   try {
     console.log('\n📦 Installing Python mcp package...');
-    // Security: Use execFileSync with array args to prevent command injection
-    execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], { stdio: 'inherit' });
+    // Security: Use execFileSync with array args to prevent command injection.
+    // stderr is PIPED, not inherited: pip reports PEP 668 on stderr, and with
+    // 'inherit' the child writes straight to the terminal so error.stderr is
+    // null — which silently disabled the externally-managed branch below and
+    // showed macOS users a scary "failed" instead of the venv guidance written
+    // for them. Piped stderr is re-emitted below so nothing is swallowed.
+    execFileSync(pythonCmd, ['-m', 'pip', 'install', '--user', 'mcp'], {
+      stdio: ['ignore', 'inherit', 'pipe'],
+    });
     console.log('✅ Python mcp package installed successfully!\n');
     return true;
   } catch (error) {
@@ -82,6 +89,9 @@ function installMcp(pythonCmd) {
       return 'skipped'; // Special return value
     }
 
+    // Surface pip's own stderr — it is piped above, so print it or the user
+    // sees a bare "failed" with no reason.
+    if (errorOutput.trim()) console.error(errorOutput.trim());
     console.error('❌ Failed to install mcp package');
     console.error('⚠️  Manual installation required:');
     console.error('   Please install manually: pip install --user mcp');

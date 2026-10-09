@@ -73,12 +73,42 @@ $HooksDir = "$ClaudeDir\hooks-windows"
 $ProviderFile = "$ClaudeDir\tts-provider.txt"
 $MuteFile = "$ClaudeDir\tts-muted.txt"
 
-# Check if TTS is muted
+# Check if TTS is muted (receiver master switch — /agent-vibes:receiver off).
+# Kept as an absolute pre-check so existing behaviour does not regress.
 if (Test-Path $MuteFile) {
     $muteStatus = Get-Content $MuteFile -Raw
     if ($muteStatus.Trim() -eq "true") {
         exit 0
     }
+}
+
+# ---------------------------------------------------------------------------
+# MUTE PRECEDENCE (parity with .claude/hooks/play-tts.sh:89-114).
+#
+# Until now this player read ONLY tts-muted.txt above, which /agent-vibes:mute
+# never writes — so `/agent-vibes:mute` did not silence Windows audio at all,
+# and the global `~/.agentvibes-muted` kill-switch was ignored on Windows.
+# Same three levels as bash, in the same order:
+#   1. project agentvibes-unmuted -> speak (overrides a global mute)
+#   2. project agentvibes-muted   -> silent
+#   3. global ~/.agentvibes-muted -> silent
+#
+# The project markers live under the REAL project root (CLAUDE_PROJECT_DIR when
+# set), not $ClaudeDir, which falls back to the user profile for global installs.
+# $HOME is preferred over $env:USERPROFILE so markers written by bash under
+# git-bash resolve to the same file here.
+$HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+$MuteScopeDir = if ($env:CLAUDE_PROJECT_DIR -and (Test-Path "$env:CLAUDE_PROJECT_DIR\.claude")) {
+    "$env:CLAUDE_PROJECT_DIR\.claude"
+} else {
+    $ClaudeDir
+}
+if (Test-Path (Join-Path $MuteScopeDir "agentvibes-unmuted")) {
+    # explicit per-project enable — wins over the global kill-switch
+} elseif (Test-Path (Join-Path $MuteScopeDir "agentvibes-muted")) {
+    exit 0
+} elseif (Test-Path (Join-Path $HomeDir ".agentvibes-muted")) {
+    exit 0
 }
 
 # Determine active provider
@@ -116,8 +146,9 @@ switch ($ActiveProvider) {
 # by the SSH-receiver watcher via -ProviderOverride).  This lets the Linux-side
 # audio-effects.cfg row for llm:claude-code specify "piper" and have it honoured
 # on Windows without requiring the Windows tts-provider.txt to be reconfigured.
-# Priority: lower than per-LLM $_LlmEngine (audio-effects.cfg row, set later), higher
-# than the global tts-provider.txt default set above.
+# Priority: an explicit -ProviderOverride is AUTHORITATIVE — it wins over both the
+# per-LLM $_LlmEngine column and the global tts-provider.txt default (see the
+# $ProviderOverride guard in the engine-resolution block below).
 if ($ProviderOverride) {
     switch ($ProviderOverride) {
         { $_ -in "windows-piper", "piper" } {
@@ -213,7 +244,7 @@ if ($BgEnabled -or $HasReverb) {
 #   1. Key           - Must start with "llm:" followed by the LLM name
 #   2. REVERB_PRESET - One of: off, light, medium, heavy, cathedral (or blank)
 #   3. BACKGROUND_FILE - Filename relative to .claude/audio/tracks/ (or blank)
-#   4. BACKGROUND_VOLUME - Float 0.0-1.0 (or blank for default 0.25)
+#   4. BACKGROUND_VOLUME - Float 0.0-1.0 (or blank for default 0.20)
 #   5. VOICE         - Provider voice name to use (or blank for global default)
 #   6. PRETEXT       - Text prepended to all TTS utterances (or blank)
 #   7. ENGINE        - Windows engine: windows-sapi, windows-piper, soprano (or blank)
@@ -262,6 +293,121 @@ if (-not $llm) {
 # This mirrors the `export AGENTVIBES_LLM_KEY="llm:${LLM_PROVIDER}"` line in
 # the POSIX play-tts.sh so the cross-platform contract is symmetric.
 $env:AGENTVIBES_LLM_KEY = "llm:$llm"
+
+# ── Utterance Resolver (AVI-S8.5 Stage 2) ────────────────────────────────────
+# Single source of truth for the voice + engine decision, mirroring the bash
+# play-tts.sh port. Resolve the plan ONCE and adopt its voice (per-LLM voice
+# wins over an LLM-echoed explicit override — R2) and, below, its local engine
+# (a kokoro-shaped voice forces the kokoro engine and engine aliases normalize —
+# R1/F5). FAIL-SAFE: if node or the resolver bundle isn't reachable (e.g. an
+# installed ~/.claude that predates the bundle-shipping installer), $PlanOk
+# stays $false and the legacy logic below runs unchanged — Windows TTS never
+# breaks on a missing bridge. AGENTVIBES_RESOLVER_CLI lets the installer (or
+# tests) point at the resolver bundle when it lives outside the hooks tree.
+
+# Map a resolver engine name to its Windows provider script. Returns $null for
+# engines with no local Windows script (e.g. elevenlabs/macos) so the caller
+# keeps the current provider rather than breaking playback.
+function Resolve-ProviderScriptForEngine {
+    param([string]$Engine, [string]$HooksRoot)
+    switch ($Engine) {
+        { $_ -in "windows-sapi", "sapi" } {
+            $s = "$HooksRoot\play-tts-sapi.ps1"
+            if (-not (Test-Path $s)) { $s = "$HooksRoot\play-tts-windows-sapi.ps1" }
+            return $s
+        }
+        { $_ -in "windows-piper", "piper" } {
+            $s = "$HooksRoot\play-tts-piper.ps1"
+            if (-not (Test-Path $s)) { $s = "$HooksRoot\play-tts-windows-piper.ps1" }
+            return $s
+        }
+        "soprano" { return "$HooksRoot\play-tts-soprano.ps1" }
+        "kokoro"  { return "$HooksRoot\play-tts-kokoro.ps1" }
+        default   { return $null }
+    }
+}
+
+$_OrigExplicitVoice = $VoiceOverride   # raw positional voice, before any per-LLM override
+$PlanOk         = $false
+$PlanVoice      = ""
+$PlanEngine     = ""
+$PlanVoiceIsOverride = $false
+# F-3: the SSH-receiver watcher forwards the sender's engine via -ProviderOverride
+# (a parameter the resolver can't see). Seed AGENTVIBES_FORCE_PROVIDER from it so
+# the resolver honors the forwarded provider instead of defaulting the plan engine
+# to piper (which dropped a forwarded windows-sapi/soprano voice → wrong/no audio).
+if ($ProviderOverride) {
+    # A fresh -ProviderOverride for THIS request must win over any stale/inherited
+    # AGENTVIBES_FORCE_PROVIDER in the environment (a validated allowlist only).
+    #
+    # The allowlist DERIVES from the Provider Catalog (SSOT): the Windows platform
+    # set PLUS the cross-platform forwarding aliases this script normalizes
+    # (piper→windows-piper, sapi→windows-sapi, and macos forwarded verbatim for
+    # SSH-relayed senders). FAIL-SAFE: the literal below is the legacy fallback
+    # used when the generated provider-catalog.ps1 is missing (installed-tree skew).
+    $ProviderOverrideAllowlist = @('piper','soprano','macos','windows-sapi','sapi','kokoro','windows-piper')
+    $__CatalogPs1 = Join-Path $ScriptPath 'provider-catalog.ps1'
+    if (Test-Path $__CatalogPs1) {
+        try {
+            . $__CatalogPs1
+            if (Get-Command Get-CatalogProvidersForPlatform -ErrorAction SilentlyContinue) {
+                $__WinSet = @(Get-CatalogProvidersForPlatform 'windows')
+                if ($__WinSet.Count -gt 0) {
+                    # Windows synth providers + the forwarding aliases play-tts.ps1 normalizes.
+                    $ProviderOverrideAllowlist = @($__WinSet + @('piper','sapi','macos') | Select-Object -Unique)
+                }
+            }
+        } catch {
+            # Keep the legacy fallback allowlist on any catalog load error.
+        }
+    }
+    switch ($ProviderOverride) {
+        { $_ -in $ProviderOverrideAllowlist } {
+            $env:AGENTVIBES_FORCE_PROVIDER = $ProviderOverride
+        }
+    }
+}
+$_ResolverCli = ""
+foreach ($_cand in @(
+        $env:AGENTVIBES_RESOLVER_CLI,
+        (Join-Path $ScriptPath "..\agentvibes-resolver\bin\resolve-utterance.js"),
+        (Join-Path $ScriptPath "..\..\bin\resolve-utterance.js"),
+        (Join-Path $ScriptPath "resolve-utterance.js"))) {
+    if ($_cand -and (Test-Path $_cand)) { $_ResolverCli = $_cand; break }
+}
+$_NodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if ($_ResolverCli -and $_NodeCmd) {
+    # Voice provenance (F-1): AGENTVIBES_VOICE_SOURCE lets a caller declare it
+    # (MCP/watcher → user-explicit/agent-profile); audition never demotes; else
+    # llm-echo (parroted get_config voice, which the per-LLM row overrides — R2).
+    $_VoiceSource = if ($env:AGENTVIBES_VOICE_SOURCE) { $env:AGENTVIBES_VOICE_SOURCE }
+                    elseif ($env:AGENTVIBES_EFFECTS_PREVIEW) { "audition" }
+                    else { "llm-echo" }
+    $_ResolverPackageRoot = Split-Path -Parent $ClaudeDir
+    $_ResolverProjectDir = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $_ResolverPackageRoot }
+    $_ResolverArgs = @('--format', 'json', '--text', $Text, '--llm', $llm,
+                       '--voice-source', $_VoiceSource, '--project-dir', $_ResolverProjectDir,
+                       '--package-root', $_ResolverPackageRoot)
+    # Only pass --voice when there IS an explicit voice; an absent flag tells the
+    # resolver "no explicit override" (so per-LLM routing applies cleanly).
+    if ($_OrigExplicitVoice) { $_ResolverArgs += @('--voice', $_OrigExplicitVoice) }
+    try {
+        $_PlanJson = & $_NodeCmd.Source $_ResolverCli @_ResolverArgs 2>$null
+        if ($LASTEXITCODE -eq 0 -and $_PlanJson) {
+            $_Plan = ($_PlanJson | Out-String).Trim() | ConvertFrom-Json
+            if ($_Plan) {
+                $PlanOk = $true
+                if ($_Plan.voice)  { $PlanVoice  = [string]$_Plan.voice }
+                if ($_Plan.engine) { $PlanEngine = [string]$_Plan.engine }
+                $PlanVoiceIsOverride = [bool]$_Plan.voiceIsOverride
+            }
+        }
+    } catch {
+        # Any bridge failure (bad JSON, nonzero exit, missing bundle) fails safe
+        # to the legacy logic below.
+        $PlanOk = $false
+    }
+}
 
 # --- Lookup per-LLM config in audio-effects.cfg ------------------------------
 # Scan project config first, then user-profile config.  Stop at first match.
@@ -320,9 +466,85 @@ $_LlmFound = $false
 # 3. BMAD agent voice from bmad-voice-map.json (resolved in provider scripts)
 # 4. Global active voice from tts-provider.txt / active-voice.txt
 
-# Apply LLM-specific voice only when no explicit -VoiceOverride was passed
-if ($_LlmVoice -and -not $VoiceOverride) {
+# Adopt the resolver's voice when a plan resolved (AVI-S8.5 Stage 2). The plan
+# already applied the R2 precedence (per-LLM voice wins over an LLM-echoed
+# explicit override; genuine explicit/audition voices still win), so take it
+# verbatim. FAIL-SAFE fallback: with no plan, use the legacy explicit-wins order
+# (explicit -VoiceOverride > per-LLM voice).
+# F-2: adopt the plan voice ONLY when it's a real override (explicit pick or
+# per-LLM row) — not the provider's stored voice file. A plain provider-file
+# voice is left empty here so the provider script does its own file+model+speaker
+# resolution (adopting it as an explicit override skips piper's multi-speaker
+# lookup and plays speaker 0). Engine coupling (R1) still applies regardless.
+if ($PlanOk -and $PlanVoiceIsOverride -and $PlanVoice) {
+    $VoiceOverride = $PlanVoice
+}
+elseif (-not $PlanOk -and $_LlmVoice -and -not $VoiceOverride) {
     $VoiceOverride = $_LlmVoice
+}
+
+# --- Dynamic session self-ID ({{session}} token) ------------------------------
+# Parity with play-tts.sh:250-296. A per-LLM PRETEXT containing {{session}}
+# expands to "<LLM> on <Project> in <Terminal>" so multi-session users can tell
+# which window just spoke. Announced ONCE per session; on later utterances the
+# token is dropped rather than prefixing every line. Opt-in — this whole block
+# is inert unless the configured pretext actually contains the token.
+if ($_LlmPretext -like "*{{session}}*") {
+    # Session key. There is no true Claude-session id available to a hook, so
+    # this is best-effort: a terminal-session id when the emulator exports one
+    # (stable for that tab's life), else this process's parent PID. Worst case
+    # the self-ID repeats or is skipped — cosmetic, and only when opted in.
+    $_SidRaw = if ($env:WT_SESSION) { $env:WT_SESSION }
+               elseif ($env:TERM_SESSION_ID) { $env:TERM_SESSION_ID }
+               elseif ($env:TMUX) { $env:TMUX }
+               else {
+                   try { (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId } catch { $PID }
+               }
+    $_SidProj = ""
+    $_SidProjDirRaw = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $ClaudeDir }
+    try { $_SidProj = Split-Path -Leaf ($_SidProjDirRaw.TrimEnd('\', '/')) } catch { }
+    $_SidKey = (("$llm|$_SidProj|$_SidRaw") -replace '[^A-Za-z0-9]', '_')
+
+    # Announce-marker dir under the per-user temp path (already user-scoped on
+    # Windows: %LOCALAPPDATA%\Temp), so no cross-user marker collisions.
+    $_AnnDir  = Join-Path ([System.IO.Path]::GetTempPath()) "agentvibes-session"
+    $_AnnOk   = $false
+    try { $null = New-Item -ItemType Directory -Path $_AnnDir -Force -ErrorAction Stop; $_AnnOk = $true } catch { }
+    $_AnnFile = Join-Path $_AnnDir "announced-$_SidKey"
+
+    # First utterance -> replacement is the self-ID; later utterances -> empty.
+    $_SessionId = ""
+    if ($_AnnOk -and (Test-Path $_AnnFile)) {
+        $_SessionId = ""
+    } else {
+        $_SidScript = Join-Path $HooksDir "agentvibes-session-id.ps1"
+        if (Test-Path $_SidScript) {
+            $_SidProjDir = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { $ClaudeDir }
+            try { $_SessionId = & $_SidScript -LlmKey $llm -ProjectDir $_SidProjDir } catch { $_SessionId = "" }
+        }
+        if ($_AnnOk) {
+            try {
+                if (-not (Test-Path $_AnnFile)) { $null = New-Item -ItemType File -Path $_AnnFile -ErrorAction Stop }
+                # Bound growth: drop announce-markers older than a day.
+                Get-ChildItem -Path $_AnnDir -Filter 'announced-*' -ErrorAction SilentlyContinue |
+                    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-1) } |
+                    Remove-Item -Force -ErrorAction SilentlyContinue
+            } catch { }
+        }
+    }
+
+    if ($_SessionId) {
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape('{{session}}'), $_SessionId
+    } else {
+        # Empty replacement: also swallow one adjacent ", " so "Hey {{session}}, ready"
+        # becomes "Hey ready", not "Hey , ready"; then drop any bare token.
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape('{{session}}, '), ''
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape(', {{session}}'), ''
+        $_LlmPretext = $_LlmPretext -replace [regex]::Escape('{{session}}'), ''
+    }
+    # Final tidy: collapse doubled/edge commas and runs of whitespace.
+    $_LlmPretext = $_LlmPretext -replace ',\s*,', ',' -replace '^\s*,\s*', '' -replace '\s*,\s*$', '' -replace '\s{2,}', ' '
+    $_LlmPretext = $_LlmPretext.Trim()
 }
 
 # --- Apply LLM-specific pretext ----------------------------------------------
@@ -381,6 +603,23 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
     }
 }
 
+# Fail loudly when mixing was requested but ffmpeg is unavailable. Without this,
+# background music and reverb are dropped silently and the voice plays "fine" —
+# indistinguishable from a config problem. A long-running tts-watcher.ps1 that
+# started before ffmpeg was installed keeps a stale PATH snapshot and hits this,
+# so the message names the restart explicitly. Mirrors the bash-side warning in
+# audio-processor.sh ("ffmpeg not installed, skipping background mix").
+if (-not $HasFfmpeg -and ($BgEnabled -or $HasReverb)) {
+    $_dropped = @()
+    if ($BgEnabled) { $_dropped += "background music" }
+    if ($HasReverb) { $_dropped += "reverb ($ReverbLevel)" }
+    Write-Host ("[WARNING] play-tts.ps1: ffmpeg not found on PATH — dropping " +
+        ($_dropped -join " and ") + "; voice will play unmixed.") -ForegroundColor Yellow
+    Write-Host ("[WARNING] Install ffmpeg (e.g. 'scoop install ffmpeg'). If it IS " +
+        "installed, a background tts-watcher started before it will have a stale " +
+        "PATH — restart the watcher.") -ForegroundColor Yellow
+}
+
 # --- Apply LLM-specific engine override --------------------------------------
 # Allowed local Windows engines: windows-sapi, windows-piper, soprano.
 # Transport providers (ssh-remote etc.) are not listed because they forward
@@ -398,31 +637,51 @@ if ($OverrideEffects -ne "" -and $OverrideEffects -in @("off", "light", "medium"
 # piper/sapi for that LLM's normal text responses that use Piper voices — must
 # NOT redirect it to an incompatible engine, or synthesis fails silently
 # (Piper can't find the Kokoro voice model → no audio, exit 0).
-$_VoiceIsKokoro = $VoiceOverride -match '^[a-z]{2}_[a-z0-9_]+$'
-if ($_VoiceIsKokoro) {
-    # A Kokoro-format voice forces the Kokoro engine regardless of the per-LLM
-    # ENGINE column or the global tts-provider.txt default.
-    $ProviderScript = "$HooksDir\play-tts-kokoro.ps1"
+if ($PlanOk -and $PlanEngine) {
+    # Resolver plan is authoritative for the LOCAL engine (AVI-S8.5 Stage 2):
+    # this cures the kokoro/piper voice->engine coupling (R1) and normalizes
+    # engine aliases like windows-sapi->sapi (F5), replacing the legacy heuristic
+    # below. An engine with no local Windows script (elevenlabs/macos) leaves the
+    # current provider in place.
+    $_PlanScript = Resolve-ProviderScriptForEngine -Engine $PlanEngine -HooksRoot $HooksDir
+    if ($_PlanScript) { $ProviderScript = $_PlanScript }
 }
-elseif ($_LlmEngine) {
-    # Accept both canonical Windows names and the cross-platform aliases the TUI
-    # writes (e.g. "piper" saved on a Linux/WSL install that is later read on
-    # Windows, or "sapi" as a short form).  Unknown values keep the global default.
-    # Mirror the global-provider switch: prefer the PS-5.1-compatible script name,
-    # fall back to the alternate name if the first doesn't exist on disk.
-    switch ($_LlmEngine) {
-        { $_ -in "windows-sapi", "sapi" } {
-            $ProviderScript = "$HooksDir\play-tts-sapi.ps1"
-            if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1" }
-        }
-        { $_ -in "windows-piper", "piper" } {
-            $ProviderScript = "$HooksDir\play-tts-piper.ps1"
-            if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
-        }
-        "soprano" { $ProviderScript = "$HooksDir\play-tts-soprano.ps1" }
-        "kokoro" { $ProviderScript = "$HooksDir\play-tts-kokoro.ps1" }
-        default {
-            Write-Host "[INFO] play-tts.ps1: Unrecognised engine '$_LlmEngine' — keeping default provider" -ForegroundColor DarkGray
+else {
+    # Legacy voice->engine heuristic — ONLY on the fallback path (no resolver
+    # plan). When a plan resolved, the resolver already coupled voice->engine
+    # correctly above, so this is skipped.
+    $_VoiceIsKokoro = $VoiceOverride -match '^[a-z]{2}_[a-z0-9_]+$'
+    if ($_VoiceIsKokoro) {
+        # A Kokoro-format voice forces the Kokoro engine regardless of the per-LLM
+        # ENGINE column or the global tts-provider.txt default.
+        $ProviderScript = "$HooksDir\play-tts-kokoro.ps1"
+    }
+    elseif ($ProviderOverride) {
+        # An explicit -ProviderOverride (forwarded from the SSH payload's "provider"
+        # field, or a preview) is AUTHORITATIVE and was already applied above. Do NOT
+        # let the per-LLM ENGINE column override it, or a receiver whose llm row
+        # defaults to piper silently swallows a forwarded windows-sapi request.
+    }
+    elseif ($_LlmEngine) {
+        # Accept both canonical Windows names and the cross-platform aliases the TUI
+        # writes (e.g. "piper" saved on a Linux/WSL install that is later read on
+        # Windows, or "sapi" as a short form).  Unknown values keep the global default.
+        # Mirror the global-provider switch: prefer the PS-5.1-compatible script name,
+        # fall back to the alternate name if the first doesn't exist on disk.
+        switch ($_LlmEngine) {
+            { $_ -in "windows-sapi", "sapi" } {
+                $ProviderScript = "$HooksDir\play-tts-sapi.ps1"
+                if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-sapi.ps1" }
+            }
+            { $_ -in "windows-piper", "piper" } {
+                $ProviderScript = "$HooksDir\play-tts-piper.ps1"
+                if (-not (Test-Path $ProviderScript)) { $ProviderScript = "$HooksDir\play-tts-windows-piper.ps1" }
+            }
+            "soprano" { $ProviderScript = "$HooksDir\play-tts-soprano.ps1" }
+            "kokoro" { $ProviderScript = "$HooksDir\play-tts-kokoro.ps1" }
+            default {
+                Write-Host "[INFO] play-tts.ps1: Unrecognised engine '$_LlmEngine' — keeping default provider" -ForegroundColor DarkGray
+            }
         }
     }
 }
@@ -437,7 +696,20 @@ elseif ($_LlmEngine) {
 
 # --- Diagnostic output -------------------------------------------------------
 # Set AGENTVIBES_VERBOSE=1 in the shell environment to print routing state.
+# The bare `provider=`/`voice=`/`plan=` lines mirror play-tts.sh's verbose
+# DECISION echo so the resolved engine/voice can be characterization-tested
+# without producing real audio (see test/windows/play-tts-resolver.Tests.ps1).
 if ($env:AGENTVIBES_VERBOSE -eq "1") {
+    $_ProviderName = switch -Wildcard ($ProviderScript) {
+        "*play-tts-kokoro.ps1"  { "kokoro" }
+        "*soprano*"             { "soprano" }
+        "*piper*"               { "piper" }
+        "*sapi*"                { "sapi" }
+        default                 { Split-Path -Leaf $ProviderScript }
+    }
+    Write-Output "provider=$_ProviderName"
+    Write-Output "voice=$VoiceOverride"
+    Write-Output ("plan=" + $(if ($PlanOk) { "ok" } else { "fallback" }))
     Write-Host "[DEBUG] play-tts.ps1 LLM routing: llm=$llm | voice=$VoiceOverride | engine=$_LlmEngine | pretext=$_LlmPretext" -ForegroundColor DarkCyan
     Write-Host "[DEBUG] play-tts.ps1 LLM routing: reverb=$ReverbLevel | HasFfmpeg=$HasFfmpeg | BgEnabled=$BgEnabled | script=$ProviderScript" -ForegroundColor DarkCyan
 }
@@ -574,8 +846,9 @@ if (($BgEnabled -or $HasReverb) -and $HasFfmpeg) {
                 $BgTrackPath = Join-Path $TracksDir "agent_vibes_bachata_v1_loop.mp3"
             }
 
-            # Get volume (default 0.25) — per-message override takes precedence
-            $BgVolume = "0.25"
+            # Get volume (default 0.20) — per-message override takes precedence
+            # TODO(AVI-S8.6): generate this constant from the shared JSON source of truth.
+            $BgVolume = "0.20"
             $VolumeFile = "$ConfigDir\background-music-volume.txt"
             if (Test-Path $VolumeFile) {
                 $vol = (Get-Content $VolumeFile -Raw).Trim()

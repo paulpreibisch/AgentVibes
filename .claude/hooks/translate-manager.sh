@@ -32,7 +32,7 @@
 # @dependencies translator.py, language-manager.sh, .bmad/core/config.yaml (optional)
 # @entrypoints Called by /agent-vibes:translate commands and play-tts.sh
 # @patterns Config cascade - manual override > BMAD config > default (no translation)
-# @related translator.py, play-tts.sh, language-manager.sh, learn-manager.sh
+# @related translator.py, play-tts.sh, language-manager.sh
 
 # Only set strict mode when executed directly, not when sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
@@ -40,6 +40,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python-resolver.sh"
 
 # Use PWD for project dir when called from project context, fall back to script-relative
 if [[ -d "$PWD/.claude" ]]; then
@@ -173,7 +174,7 @@ translate_text() {
 
     # Call translator.py
     local translated
-    translated=$(python3 "$SCRIPT_DIR/translator.py" "$text" "$target" 2>/dev/null) || translated="$text"
+    translated=$("$PYTHON_BIN" "$SCRIPT_DIR/translator.py" "$text" "$target" 2>/dev/null) || translated="$text"
 
     echo "$translated"
 }

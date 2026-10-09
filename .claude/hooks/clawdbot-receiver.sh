@@ -24,7 +24,25 @@
 set -euo pipefail
 
 ENCODED_TEXT="${1:-}"
-VOICE="${2:-en_US-lessac-medium}"
+
+# Default voice: prefer the Provider Catalog's piper default (AVI-S9.6 AC3,
+# design row 23), falling back to the legacy literal if the generated catalog
+# artifact is missing (installed-tree skew). NOTE: this receiver has no voice
+# allowlist of its own — see clawdbot-receiver-SECURE.sh for the hardened
+# variant, whose ALLOWED_VOICES security allowlist is intentionally NOT
+# migrated to (or synced with) the catalog (a security allowlist must stay
+# independently narrow — see provider-catalog.js module header).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/provider-catalog.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/provider-catalog.sh" 2>/dev/null || true
+fi
+if type catalog_default_voice >/dev/null 2>&1; then
+  _CATALOG_PIPER_DEFAULT="$(catalog_default_voice piper)"
+else
+  _CATALOG_PIPER_DEFAULT="en_US-lessac-medium"  # legacy fallback
+fi
+VOICE="${2:-$_CATALOG_PIPER_DEFAULT}"
 ENCODED_AGENT="${3:-}"
 ENCODED_INTRO="${4:-}"
 

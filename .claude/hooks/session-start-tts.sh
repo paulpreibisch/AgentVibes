@@ -38,6 +38,45 @@ else
   _PROJECT_CLAUDE_DIR="$(dirname "$SCRIPT_DIR")"
 fi
 
+# ---------------------------------------------------------------------------
+# OPT-IN INJECTION GATE (Issue: global-install cacophony).
+#
+# Previously this hook injected the ~250-token TTS protocol into EVERY session
+# where AgentVibes was found on disk. A GLOBAL install therefore made every open
+# Claude session start speaking at once ("a cacophony of agents"). It also spent
+# tokens on idle sessions that never wanted audio. Injection is now OPT-IN.
+#
+# Two distinct markers, kept SEPARATE on purpose:
+#   * agentvibes-unmuted / agentvibes-muted — the user's runtime mute choice,
+#     also read by play-tts.sh, where a project `unmuted` OVERRIDES a global mute.
+#   * agentvibes-enabled — "this project opted into injection" (written by a
+#     project install). It does NOT override a global mute; it only turns the
+#     protocol injection on. This separation is why a project install can no
+#     longer silently defeat a user's `~/.agentvibes-muted` global kill-switch.
+#
+# Precedence (mirrors play-tts.sh so injection and audio agree):
+#   1. project agentvibes-unmuted  → inject   (explicit per-project ON)
+#   2. project agentvibes-muted    → silent
+#   3. global ~/.agentvibes-muted  → silent   (the global kill-switch)
+#   4. project agentvibes-enabled, OR global opt-in
+#      (~/.claude/agentvibes-enabled or ~/.claude/agentvibes-unmuted) → inject
+#   5. otherwise                   → silent   (opt-in default; zero tokens)
+if [[ -f "$_PROJECT_CLAUDE_DIR/agentvibes-unmuted" ]]; then
+  :   # explicit per-project enable — wins over a global mute, as in play-tts.sh
+elif [[ -f "$_PROJECT_CLAUDE_DIR/agentvibes-muted" ]]; then
+  exit 0
+elif [[ -f "$HOME/.agentvibes-muted" ]]; then
+  exit 0   # global kill-switch, no per-project override
+elif [[ -f "$_PROJECT_CLAUDE_DIR/agentvibes-enabled" \
+     || -f "$HOME/.claude/agentvibes-enabled" \
+     || -f "$HOME/.claude/agentvibes-unmuted" ]]; then
+  :   # opted in (project install marker, or a deliberate global opt-in)
+else
+  # Not enabled for this project → inject nothing (zero tokens).
+  # Enable for this project with:  /agent-vibes:unmute
+  exit 0
+fi
+
 # Build --project-dir flag to embed in TTS commands.
 # Sanitize: strip any embedded quotes that would break shell quoting.
 PROJECT_DIR_FLAG=""
