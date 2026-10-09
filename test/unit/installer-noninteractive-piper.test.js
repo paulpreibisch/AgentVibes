@@ -1,0 +1,125 @@
+/**
+ * Non-interactive installs (agents, CI) must end with a provider that speaks:
+ * a missing Piper is installed with the packaged installer, and on macOS a
+ * failed Piper install falls back to Say instead of aborting.
+ *
+ * node:child_process is mocked, so no installer runs and `which piper` is
+ * answered by the test.
+ */
+import { describe, test, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
+
+let piperOnPath = false;
+let installerSucceeds = true;
+let installerCalls = [];
+
+await mock.module('node:child_process', {
+  namedExports: {
+    execSync: (cmd) => {
+      if (/\b(which|where)\b.*piper/.test(String(cmd)) && !piperOnPath) throw new Error('not found');
+      return Buffer.from('');
+    },
+    execFileSync: (file, args) => {
+      installerCalls.push([file, args]);
+      if (!installerSucceeds) throw new Error('installer failed');
+      piperOnPath = true;
+      return Buffer.from('');
+    },
+    spawn: () => ({ unref() {}, on() {}, kill() {}, killed: false, stdout: { on() {} }, stderr: { on() {} } }),
+    spawnSync: () => ({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }),
+    exec: (_cmd, _opts, cb) => { if (typeof cb === 'function') cb(null, '', ''); },
+  },
+});
+
+const { installPiperNonInteractive, ensureNonInteractivePiper } = await import('../../src/installer.js');
+
+const savedEnv = {};
+const quiet = () => mock.method(console, 'log', () => {});
+// Native Windows installs Piper another way (checkAndInstallPiperWindows) and
+// checks for it on disk, so these paths are POSIX-only.
+const posixOnly = { skip: process.platform === 'win32' && 'non-interactive Piper install is POSIX-only' };
+
+beforeEach(() => {
+  for (const k of ['PATH', 'SHELL']) savedEnv[k] = process.env[k];
+  process.env.SHELL = '/bin/bash';
+  piperOnPath = false;
+  installerSucceeds = true;
+  installerCalls = [];
+});
+
+afterEach(() => {
+  for (const [k, v] of Object.entries(savedEnv)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  mock.restoreAll();
+});
+
+describe('installPiperNonInteractive', () => {
+  test('runs the packaged piper-installer.sh non-interactively', posixOnly, () => {
+    quiet();
+    assert.equal(installPiperNonInteractive(), true);
+    assert.equal(installerCalls.length, 1);
+    const [file, args] = installerCalls[0];
+    assert.match(file.replace(/\\/g, '/'), /\.claude\/hooks\/piper-installer\.sh$/);
+    assert.deepEqual(args, ['--non-interactive']);
+  });
+
+  test('puts ~/.local/bin on PATH so the fresh install is found', () => {
+    quiet();
+    const localBin = path.join(os.homedir(), '.local', 'bin');
+    process.env.PATH = ['/usr/bin', '/bin'].join(path.delimiter);
+    installPiperNonInteractive();
+    assert.ok(process.env.PATH.split(path.delimiter).includes(localBin));
+    const before = process.env.PATH;
+    installPiperNonInteractive();
+    assert.equal(process.env.PATH, before, 'adds ~/.local/bin only once');
+  });
+
+  test('reports failure when the installer fails', () => {
+    quiet();
+    installerSucceeds = false;
+    assert.equal(installPiperNonInteractive(), false);
+  });
+});
+
+describe('ensureNonInteractivePiper', () => {
+  test('keeps a provider that is not Piper without installing anything', () => {
+    const config = { provider: 'macos', defaultVoice: 'Samantha' };
+    assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'macos');
+    assert.equal(installerCalls.length, 0);
+  });
+
+  test('keeps Piper when it is already installed', () => {
+    piperOnPath = true;
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'piper');
+    assert.equal(installerCalls.length, 0);
+  });
+
+  test('installs a missing Piper and keeps it', posixOnly, () => {
+    quiet();
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'piper');
+    assert.equal(installerCalls.length, 1);
+    assert.equal(config.defaultVoice, 'en_US-ryan-high');
+  });
+
+  test('falls back to macOS Say when Piper cannot be installed on macOS', posixOnly, () => {
+    quiet();
+    installerSucceeds = false;
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    assert.equal(ensureNonInteractivePiper(config, 'darwin'), 'macos');
+    assert.deepEqual(config, { provider: 'macos', defaultVoice: 'Samantha' });
+  });
+
+  test('gives up elsewhere when Piper cannot be installed', posixOnly, () => {
+    quiet();
+    installerSucceeds = false;
+    const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
+    assert.equal(ensureNonInteractivePiper(config, 'linux'), null);
+    assert.equal(config.provider, 'piper');
+  });
+});

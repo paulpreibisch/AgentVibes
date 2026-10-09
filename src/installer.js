@@ -4563,6 +4563,25 @@ function installPiperNonInteractive() {
 }
 
 /**
+ * Make sure a non-interactive install has a provider that can speak. A missing
+ * Piper is installed; on macOS, Say is the fallback when that fails.
+ * @param {Object} userConfig - collected configuration; updated on fallback
+ * @param {string} [platform] - process.platform, injectable for tests
+ * @returns {string|null} provider to use, or null when the install cannot continue
+ */
+function ensureNonInteractivePiper(userConfig, platform = process.platform) {
+  if (!isPiperProvider(userConfig.provider) || isPiperInstalled() || installPiperNonInteractive()) {
+    return userConfig.provider;
+  }
+  if (platform !== 'darwin') return null;
+  // macOS Say needs no setup, so the install still speaks without Piper.
+  console.log(`[AV] Piper could not be installed; using macOS Say instead`);
+  userConfig.provider = 'macos';
+  userConfig.defaultVoice = 'Samantha';
+  return 'macos';
+}
+
+/**
  * Check if Piper is installed and optionally install it
  * @param {string} targetDir - Target installation directory
  * @param {Object} options - Installation options
@@ -5978,19 +5997,12 @@ async function install(options = {}) {
     console.log(`[AV] Non-interactive mode detected`);
     console.log(`[AV] Provider: ${selectedProvider} | Platform: ${process.platform}`);
 
-    if (isPiperProvider(selectedProvider) && !isPiperInstalled() && !installPiperNonInteractive()) {
-      if (process.platform === 'darwin') {
-        // macOS Say needs no setup, so the install still speaks without Piper.
-        console.log(`[AV] Piper could not be installed; using macOS Say instead`);
-        selectedProvider = 'macos';
-        userConfig.provider = 'macos';
-        userConfig.defaultVoice = 'Samantha';
-      } else {
-        process.stderr.write(`[AV ERROR] Piper TTS could not be installed.\n`);
-        process.stderr.write(`[AV] Install it manually with: pipx install piper-tts\n`);
-        process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
-        process.exit(1);
-      }
+    selectedProvider = ensureNonInteractivePiper(userConfig);
+    if (!selectedProvider) {
+      process.stderr.write(`[AV ERROR] Piper TTS could not be installed.\n`);
+      process.stderr.write(`[AV] Install it manually with: pipx install piper-tts\n`);
+      process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
+      process.exit(1);
     }
 
     console.log(`[AV] Installing to: ${targetDir}/.claude/`);
@@ -7202,7 +7214,7 @@ export {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
   copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
-  installPluginManifest, checkAndInstallPiper,
+  installPluginManifest, checkAndInstallPiper, installPiperNonInteractive, ensureNonInteractivePiper,
   updateGlobalHooks, updateCommandFiles, updatePersonalityFiles,
   copyResolverBundle, updateGlobalResolverBundle,
   CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,
