@@ -118,7 +118,9 @@ $AudioFile = "$AudioDir\tts-$([System.IO.Path]::GetRandomFileName() -replace '\.
 # ~2-3s (just synthesis) instead of ~31s (fresh model load + CUDA init per call).
 # Fast path: POST to the daemon. Fallback: auto-start the daemon for next time,
 # and synthesize this one message directly so nothing is dropped while it warms.
-$KokoroPort = 7855
+# AGENTVIBES_KOKORO_PORT overrides the port; AGENTVIBES_KOKORO_DAEMON=false opts out (mirrors play-tts-kokoro.sh).
+$KokoroPort = if ($env:AGENTVIBES_KOKORO_PORT -match '^\d+$') { [int]$env:AGENTVIBES_KOKORO_PORT } else { 7855 }
+$KokoroDaemonEnabled = $env:AGENTVIBES_KOKORO_DAEMON -ne 'false'
 $KokoroServerPy = Join-Path $ScriptPath "kokoro-server.py"
 
 function Test-KokoroServer {
@@ -144,7 +146,7 @@ function Start-KokoroServer {
 # --- Synthesize --------------------------------------------------------------
 try {
     $usedServer = $false
-    if (Test-KokoroServer) {
+    if ($KokoroDaemonEnabled -and (Test-KokoroServer)) {
         Write-Host "[SYNTH] Synthesizing with Kokoro daemon (voice=$VoiceName speed=$Speed)..." -ForegroundColor Cyan
         try {
             $payload = @{ text = $Text; voice = $VoiceName; speed = [double]$Speed; output = $AudioFile } | ConvertTo-Json -Compress
@@ -163,7 +165,7 @@ try {
     if (-not $usedServer) {
         # Daemon not up (or failed): start it for subsequent messages, then
         # synthesize this one directly so the current message is never dropped.
-        Start-KokoroServer
+        if ($KokoroDaemonEnabled) { Start-KokoroServer }
         Write-Host "[SYNTH] Synthesizing with Kokoro direct (voice=$VoiceName speed=$Speed)..." -ForegroundColor Cyan
         $synthOut = & $PythonExe $KokoroPy $Text $VoiceName $AudioFile $Speed 2>&1
         if (-not (Test-Path $AudioFile) -or (Get-Item $AudioFile).Length -eq 0) {

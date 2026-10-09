@@ -213,7 +213,14 @@ function Start-ReplayPlayback {
 
     # Stay silent while the automated test suite is running (same convention
     # as play-tts.ps1's Invoke-AudioPlay).
-    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) { return }
+    # (scoped to the repo under test; see tests-running-guard.ps1)
+    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) {
+        $avGuard = Join-Path $PSScriptRoot "tests-running-guard.ps1"
+        if (-not (Test-Path $avGuard)) { return }
+        . $avGuard
+        $avProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        if (Test-AvTestsRunningMute @((Get-Location).Path, $env:CLAUDE_PROJECT_DIR, $avProjectRoot)) { return }
+    }
 
     $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
     if ($ffplayCmd) {
