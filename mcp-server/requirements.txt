@@ -1,2 +1,2 @@
 # AgentVibes MCP Server Requirements
-mcp>=0.9.0
+mcp>=1.27,<2  # 2.x removed Server.list_tools(); server.py uses the 1.x API
