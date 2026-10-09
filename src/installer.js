@@ -4546,14 +4546,21 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
  * the project. Non-interactive installs use it because they cannot prompt.
  * @returns {boolean} true when a piper that starts is on PATH afterwards
  */
-function installPiperNonInteractive() {
-  const piperInstallerPath = path.join(__dirname, '..', '.claude', 'hooks', 'piper-installer.sh');
-  console.log(`[AV] Piper not found; installing it`);
-  // The installer puts piper in ~/.local/bin, which a non-login shell often
-  // lacks. Put it first, so a broken piper elsewhere on PATH cannot shadow it.
+/**
+ * Put ~/.local/bin first on this process's PATH. The installer puts piper there,
+ * and play-tts-piper.sh and buildAudioEnv() search it first, so checking piper
+ * with any other order could validate a different binary than playback runs.
+ */
+function preferLocalBin() {
   const localBin = path.join(os.homedir(), '.local', 'bin');
   const rest = (process.env.PATH || '').split(path.delimiter).filter((p) => p && p !== localBin);
   process.env.PATH = [localBin, ...rest].join(path.delimiter);
+}
+
+function installPiperNonInteractive() {
+  const piperInstallerPath = path.join(__dirname, '..', '.claude', 'hooks', 'piper-installer.sh');
+  console.log(`[AV] Piper not found; installing it`);
+  preferLocalBin();
   try {
     execScript(piperInstallerPath, {
       args: ['--non-interactive'],
@@ -4591,9 +4598,10 @@ function isPiperWorking() {
  */
 function ensureNonInteractivePiper(userConfig, platform = process.platform) {
   if (!isPiperProvider(userConfig.provider)) return userConfig.provider;
-  // Native Windows installs piper.exe with checkAndInstallPiperWindows() and finds
-  // it on disk, not on PATH, so it keeps that path; the bash installer is POSIX-only.
-  if (isNativeWindows()) return isPiperInstalled() ? userConfig.provider : null;
+  // Native Windows installs piper.exe later, with checkAndInstallPiperWindows(),
+  // and finds it on disk rather than on PATH; the bash installer is POSIX-only.
+  if (isNativeWindows()) return userConfig.provider;
+  preferLocalBin();
   if (isPiperWorking() || installPiperNonInteractive()) return userConfig.provider;
   if (platform !== 'darwin') return null;
   // macOS Say needs no setup, so the install still speaks without Piper.
@@ -4603,6 +4611,18 @@ function ensureNonInteractivePiper(userConfig, platform = process.platform) {
   // A saved Piper voice would force the engine back to Piper; replace it.
   userConfig.replaceSavedVoice = true;
   return 'macos';
+}
+
+/**
+ * True for a saved voice that only Piper or Kokoro can speak (en_US-ryan-high,
+ * af_heart), which must not survive a fallback to macOS Say. Say voice names
+ * (Samantha, Alex, "Good News") are kept.
+ * @param {string} voice
+ * @returns {boolean}
+ */
+function isNonSayVoice(voice) {
+  const v = String(voice || '').trim();
+  return /^[a-z]{2,3}_[A-Z]{2}-/.test(v) || /^[a-z]{2}_[a-z0-9]+$/.test(v);
 }
 
 /**
@@ -6213,11 +6233,12 @@ Troubleshooting:
         default:               defaultVoice = 'Samantha'; break;
       }
     }
-    // Only write voice on first install — preserve user's current voice selection on reinstall
-    if (userConfig.replaceSavedVoice) {
+    // Only write voice on first install — preserve user's current voice selection on
+    // reinstall, except a Piper/Kokoro voice left behind by a fallback to macOS Say.
+    let savedVoice = null;
+    try { savedVoice = await fs.readFile(voiceConfigPath, 'utf8'); } catch { /* first install */ }
+    if (savedVoice === null || (userConfig.replaceSavedVoice && isNonSayVoice(savedVoice))) {
       await fs.writeFile(voiceConfigPath, defaultVoice);
-    } else {
-      try { await fs.access(voiceConfigPath); } catch { await fs.writeFile(voiceConfigPath, defaultVoice); }
     }
 
     // Sync voice + provider to global .agentvibes/config.json so TUI finds them
@@ -7253,7 +7274,7 @@ export {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
   copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
-  installPluginManifest, checkAndInstallPiper, installPiperNonInteractive, ensureNonInteractivePiper,
+  installPluginManifest, checkAndInstallPiper, installPiperNonInteractive, ensureNonInteractivePiper, isNonSayVoice,
   updateGlobalHooks, updateCommandFiles, updatePersonalityFiles,
   copyResolverBundle, updateGlobalResolverBundle,
   CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,

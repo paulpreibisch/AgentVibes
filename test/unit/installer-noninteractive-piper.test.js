@@ -40,7 +40,7 @@ await mock.module('node:child_process', {
 // child_process mock on Node 20. Nothing here prompts.
 await mock.module('inquirer', { defaultExport: { prompt: async () => ({}) } });
 
-const { installPiperNonInteractive, ensureNonInteractivePiper } = await import('../../src/installer.js');
+const { installPiperNonInteractive, ensureNonInteractivePiper, isNonSayVoice } = await import('../../src/installer.js');
 
 const savedEnv = {};
 const quiet = () => mock.method(console, 'log', () => {});
@@ -158,12 +158,32 @@ describe('ensureNonInteractivePiper', () => {
     assert.equal(config.provider, 'piper');
   });
 
-  test('native Windows never runs the POSIX installer', { skip: process.platform !== 'win32' && 'native Windows only' }, () => {
+  test('checks piper with ~/.local/bin first, the order playback uses', posixOnly, () => {
+    piperOnPath = true;
+    const localBin = path.join(os.homedir(), '.local', 'bin');
+    process.env.PATH = ['/opt/other/bin', localBin].join(path.delimiter);
+    ensureNonInteractivePiper({ provider: 'piper', defaultVoice: 'en_US-ryan-high' }, 'darwin');
+    assert.equal(process.env.PATH.split(path.delimiter)[0], localBin);
+  });
+
+  test('native Windows keeps Piper for its own installer step and never runs the POSIX one', { skip: process.platform !== 'win32' && 'native Windows only' }, () => {
     quiet();
     const config = { provider: 'piper', defaultVoice: 'en_US-ryan-high' };
-    ensureNonInteractivePiper(config, 'win32');
-    piperOnPath = true;
-    assert.equal(ensureNonInteractivePiper(config, 'win32'), 'piper');
-    assert.equal(installerCalls.length, 0, 'piper.exe is installed by checkAndInstallPiperWindows instead');
+    assert.equal(ensureNonInteractivePiper(config, 'win32'), 'piper', 'a fresh setup is installed later by checkAndInstallPiperWindows');
+    assert.equal(installerCalls.length, 0);
+  });
+});
+
+describe('isNonSayVoice', () => {
+  test('flags Piper and Kokoro voices, which Say cannot speak', () => {
+    for (const v of ['en_US-ryan-high', 'en_GB-alba-medium', 'fil_PH-x-low', 'af_heart', 'am_michael', 'en_US-ryan-high\n']) {
+      assert.equal(isNonSayVoice(v), true, v);
+    }
+  });
+
+  test('keeps Say voices and empty input', () => {
+    for (const v of ['Samantha', 'Alex', 'Good News', 'Daniel (Enhanced)', '', null, undefined]) {
+      assert.equal(isNonSayVoice(v), false, String(v));
+    }
   });
 });
