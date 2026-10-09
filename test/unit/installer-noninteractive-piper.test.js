@@ -36,6 +36,10 @@ await mock.module('node:child_process', {
   },
 });
 
+// The real inquirer pulls @inquirer/prompts, which fails to load against the
+// child_process mock on Node 20. Nothing here prompts.
+await mock.module('inquirer', { defaultExport: { prompt: async () => ({}) } });
+
 const { installPiperNonInteractive, ensureNonInteractivePiper } = await import('../../src/installer.js');
 
 const savedEnv = {};
