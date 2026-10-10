@@ -215,19 +215,35 @@ fi
 # @function play_audio
 # @intent Play generated audio using available player with sequential playback
 # @why Support multiple audio players and prevent overlapping audio
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+# The same lock as play-tts-piper.sh and play-tts-macos.sh, so providers take
+# turns instead of talking over each other.
+_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
+mkdir -p "$_LOCK_DIR"
+chmod 700 "$_LOCK_DIR"
+LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
 
-# Auto-remove stale lock files (older than 30 seconds) to prevent permanent blocking
-# This handles cases where the background cleanup process was killed mid-playback
-if [ -f "$LOCK_FILE" ]; then
+# A lock whose holder has exited is stale: its cleanup was killed mid-playback,
+# and left alone it would silence Soprano for good. The lock holds the PID of
+# the process that releases it, which lives as long as playback, so a long clip
+# keeps its lock. A lock with no PID (written by another provider) falls back to
+# a 30-second age limit.
+soprano_lock_is_stale() {
+  local holder mtime
+  holder=$(cat "$LOCK_FILE" 2>/dev/null || true)
+  if [[ "$holder" =~ ^[0-9]+$ ]]; then
+    ! kill -0 "$holder" 2>/dev/null
+    return
+  fi
   if [[ "$(uname)" == "Darwin" ]]; then
-    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
+    mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
   else
-    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
+    mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
   fi
-  if [[ $(( $(date +%s) - _lock_mtime )) -gt 30 ]]; then
-    rm -f "$LOCK_FILE"
-  fi
+  [[ $(( $(date +%s) - mtime )) -gt 30 ]]
+}
+
+if [ -f "$LOCK_FILE" ] && soprano_lock_is_stale; then
+  rm -f "$LOCK_FILE"
 fi
 
 for i in {1..4}; do
@@ -242,7 +258,7 @@ if [ -f "$LOCK_FILE" ]; then
   exit 0
 fi
 
-touch "$LOCK_FILE"
+echo "$$" > "$LOCK_FILE"
 
 AUDIO_DIR_PLAY="${TEMP_FILE%/*}"
 WRITE_LOCK_FILE="$AUDIO_DIR_PLAY/$(basename "$TEMP_FILE" .wav).lock"
@@ -265,7 +281,13 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
   fi
 fi
 
-(sleep $DURATION; rm -f "$LOCK_FILE" "$WRITE_LOCK_FILE") &
+# The releaser takes over the lock, and removes it only if it still holds it,
+# so a lock taken over by a later call is never deleted from under it. In sh -c,
+# $$ is the releaser's own PID, which is $! here. Its output is detached, or a
+# caller reading this script's output would wait out the whole clip.
+sh -c 'sleep "$1"; [ "$(cat "$2" 2>/dev/null)" = "$$" ] && rm -f "$2"; rm -f "$3"' \
+  _ "$DURATION" "$LOCK_FILE" "$WRITE_LOCK_FILE" </dev/null >/dev/null 2>&1 &
+echo "$!" > "$LOCK_FILE"
 disown
 
 # @function display_cache_stats
