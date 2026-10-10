@@ -505,25 +505,11 @@ fi
 # @why Support multiple audio players and prevent overlapping audio in learning mode
 # @param Uses global: $TEMP_FILE, $CURRENT_LANGUAGE
 # @sideeffects Plays audio with lock mechanism for sequential playback
-_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
-mkdir -p "$_LOCK_DIR"
-chmod 700 "$_LOCK_DIR"
-LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
-
-# Auto-remove stale lock files (older than 30 seconds) to prevent permanent blocking
-# This handles cases where the background cleanup process was killed mid-playback
-if [ -f "$LOCK_FILE" ]; then
-  _lock_age=0
-  if [[ "$(uname)" == "Darwin" ]]; then
-    _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
-  else
-    _lock_mtime=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo 0)
-  fi
-  _now=$(date +%s)
-  _lock_age=$((_now - _lock_mtime))
-  if [[ $_lock_age -gt 30 ]]; then
-    rm -f "$LOCK_FILE"
-  fi
+# One lock shared with the other providers (audio-cache-utils.sh), so they
+# take turns instead of talking over each other.
+LOCK_FILE=$(audio_lock_file)
+if [ -f "$LOCK_FILE" ] && audio_lock_is_stale "$LOCK_FILE"; then
+  rm -f "$LOCK_FILE"
 fi
 
 # Wait for previous audio to finish (max 15 seconds to prevent overlapping playback)
@@ -546,8 +532,8 @@ if [[ "$CURRENT_LANGUAGE" != "english" ]]; then
   echo "$TEMP_FILE" > "$TARGET_AUDIO_FILE"
 fi
 
-# Create lock and play audio
-touch "$LOCK_FILE"
+# Create lock and play audio. This script holds it until playback ends.
+audio_lock_write "$LOCK_FILE" "$$"
 
 # Create write lock file in audio directory to signal file is in-use (prevents race condition in cleanup)
 AUDIO_DIR="${TEMP_FILE%/*}"
@@ -719,4 +705,5 @@ fi
 if [[ -n "$PLAYER_PID" ]]; then
   wait "$PLAYER_PID" 2>/dev/null || true
 fi
-rm -f "$LOCK_FILE" "$WRITE_LOCK_FILE"
+audio_lock_release "$LOCK_FILE" "$$"
+rm -f "$WRITE_LOCK_FILE"

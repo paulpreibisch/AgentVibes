@@ -215,7 +215,12 @@ fi
 # @function play_audio
 # @intent Play generated audio using available player with sequential playback
 # @why Support multiple audio players and prevent overlapping audio
-LOCK_FILE="/tmp/agentvibes-audio.lock"
+# One lock shared with the other providers (audio-cache-utils.sh), so they
+# take turns instead of talking over each other.
+LOCK_FILE=$(audio_lock_file)
+if [ -f "$LOCK_FILE" ] && audio_lock_is_stale "$LOCK_FILE"; then
+  rm -f "$LOCK_FILE"
+fi
 
 for i in {1..4}; do
   if [ ! -f "$LOCK_FILE" ]; then
@@ -229,7 +234,7 @@ if [ -f "$LOCK_FILE" ]; then
   exit 0
 fi
 
-touch "$LOCK_FILE"
+audio_lock_write "$LOCK_FILE" "$$"
 
 AUDIO_DIR_PLAY="${TEMP_FILE%/*}"
 WRITE_LOCK_FILE="$AUDIO_DIR_PLAY/$(basename "$TEMP_FILE" .wav).lock"
@@ -252,8 +257,7 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
   fi
 fi
 
-(sleep $DURATION; rm -f "$LOCK_FILE" "$WRITE_LOCK_FILE") &
-disown
+audio_lock_release_after "$DURATION" "$LOCK_FILE" "$WRITE_LOCK_FILE"
 
 # @function display_cache_stats
 # @intent Show audio cache statistics with color-coded output
