@@ -6440,7 +6440,6 @@ def _strip_markdown(text: str) -> str:
 
 // CLI setup
 program
-  .version(VERSION)
   .description('AgentVibes - Now your AI Agents can finally talk back! TTS Voice for Claude Code');
 
 program

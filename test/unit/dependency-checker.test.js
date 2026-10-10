@@ -11,10 +11,13 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import {
   getInstallCommands,
   displayMissingDependencies,
   checkDependencies,
+  isSupportedNodeVersion,
+  SUPPORTED_NODE,
 } from '../../src/utils/dependency-checker.js';
 
 // ---------------------------------------------------------------------------
@@ -284,7 +287,7 @@ describe('displayMissingDependencies - return value', () => {
       core: { node: { installed: true, version: '14.0', isCompatible: false } },
       optional: {},
       missing: { node: true },
-      warnings: ['Node.js 14.0 - requires ≥16.0']
+      warnings: ['Node.js 14.0 - requires 20.17+, 22.13+ or 23.5+']
     };
     const ret = displayMissingDependencies(results);
     assert.strictEqual(ret, true);
@@ -354,16 +357,15 @@ describe('checkDependencies - Node.js version check', () => {
     assert.strictEqual(results.core.node.installed, true);
   });
 
-  test('core.node.isCompatible is true for current Node (≥16)', () => {
-    // The test runner itself requires a modern Node, so this should always pass.
-    const major = parseInt(process.version.replace(/^v/, '').split('.')[0], 10);
+  test('core.node.isCompatible matches the engines range for current Node', () => {
+    const [major, minor] = process.version.replace(/^v/, '').split('.').map(Number);
     let results;
     try {
       results = checkDependencies();
     } catch {
       return;
     }
-    const expected = major >= 16;
+    const expected = isSupportedNodeVersion(major, minor);
     assert.strictEqual(results.core.node.isCompatible, expected);
   });
 
@@ -438,5 +440,28 @@ describe('getInstallCommands - package map completeness', () => {
   test('undefined values in missing object are ignored', () => {
     const result = getInstallCommands({ sox: undefined }, 'linux');
     assert.deepStrictEqual(result, []);
+  });
+});
+
+describe('isSupportedNodeVersion', () => {
+  test('accepts the releases package.json engines allows', () => {
+    for (const [major, minor] of [[20, 17], [20, 19], [22, 13], [22, 20], [23, 5], [24, 0], [26, 1]]) {
+      assert.strictEqual(isSupportedNodeVersion(major, minor), true, `${major}.${minor}`);
+    }
+  });
+
+  test('rejects releases inquirer 14 does not run on', () => {
+    for (const [major, minor] of [[16, 20], [18, 20], [20, 16], [21, 7], [22, 12], [23, 4]]) {
+      assert.strictEqual(isSupportedNodeVersion(major, minor), false, `${major}.${minor}`);
+    }
+  });
+});
+
+describe('SUPPORTED_NODE', () => {
+  test('names every minimum in package.json engines, so upgrade advice matches', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+    const minimums = [...pkg.engines.node.matchAll(/(\d+)\.(\d+)\.0/g)].map((m) => `${m[1]}.${m[2]}+`);
+    assert.ok(minimums.length >= 3);
+    for (const v of minimums) assert.ok(SUPPORTED_NODE.includes(v), `${v} in "${SUPPORTED_NODE}"`);
   });
 });
