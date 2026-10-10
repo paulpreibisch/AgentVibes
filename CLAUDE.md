@@ -50,6 +50,7 @@ Hybrid, in practice:
 - **Implementation happens on feature branches and git worktrees** (many active: `feat/*`, `fix/*`, worktrees like `AgentVibes-musetalk`, `AgentVibes-outfit-swap`), merged to `master`. Direct fixes, agent-driven implementation, and adversarial code-review passes are all normal — `/dev-story` is a tool, not a gate on every commit.
 - **Adversarial code review before merging significant work** (see the `fix(review): …` commits); HIGH/MEDIUM findings get fixed, not deferred.
 - Get explicit user approval before commits/pushes for non-story work. Paul doesn't code — do the work end-to-end via scripts; give estimates in AI time.
+- **Stay with a pull request until it is clean.** After opening one, follow `.agents/skills/pr-watch/SKILL.md`: run `pr-digest --watch` as one backgrounded call (never poll in the foreground), fix failing checks, answer every review-bot comment (fix it, or reply with the evidence that it is wrong), push, and repeat. Passing checks alone do not mean review is done. Never merge or resolve review threads without Paul's approval.
 
 ## Testing
 

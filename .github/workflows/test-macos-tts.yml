@@ -41,6 +41,14 @@ on:
       - '.claude/tts-provider.txt'
       - '.github/workflows/test-macos-tts.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
 jobs:
   smoke-test-macos-say:
     name: Smoke Test - macOS say command
@@ -48,7 +56,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Verify macOS environment
         run: |
@@ -200,7 +208,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload test audio artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: macos-tts-test-output

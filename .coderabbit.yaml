@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: chill
+  # Vendored BMAD skills and audio/demo assets are not reviewed; the code is.
+  path_filters:
+    - "!.agents/skills/bmad-*/**"
+    - "!demo-audio/**"
+    - "!**/*.mp3"
+    - "!**/*.wav"
+    - "!package-lock.json"
+  auto_review:
+    enabled: true
+    drafts: false
