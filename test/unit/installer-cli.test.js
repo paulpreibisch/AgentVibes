@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -89,4 +90,21 @@ test('Exported functions are available for import', async () => {
     'function',
     'detectAndNotifyTermux should be exported as a function'
   );
+});
+
+// commander 14 throws when a flag is registered twice; a duplicate .version()
+// once made every command crash before it ran.
+test('CLI entry point - --version and -v print the package version', async () => {
+  const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8'));
+  for (const flag of ['--version', '-v']) {
+    const result = await runInstaller([flag]);
+    assert.strictEqual(result.exitCode, 0, `${flag}: ${result.stderr}`);
+    assert.ok(result.stdout.includes(version), `${flag} prints ${version}`);
+  }
+});
+
+test('CLI entry point - install --help lists install options', async () => {
+  const result = await runInstaller(['install', '--help']);
+  assert.strictEqual(result.exitCode, 0, result.stderr);
+  assert.match(result.stdout, /--yes/);
 });

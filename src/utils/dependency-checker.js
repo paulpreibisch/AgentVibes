@@ -73,6 +73,20 @@ function checkPythonVersion() {
 }
 
 /**
+ * True for the Node releases package.json engines allows (>=23.5, ^22.13,
+ * ^20.17), which are the ones inquirer 14 and commander 14 run on.
+ * @param {number} major
+ * @param {number} minor
+ * @returns {boolean}
+ */
+export function isSupportedNodeVersion(major, minor) {
+  if (major === 20) return minor >= 17;
+  if (major === 22) return minor >= 13;
+  if (major === 23) return minor >= 5;
+  return major > 23;
+}
+
+/**
  * Check Node.js version
  */
 function checkNodeVersion() {
@@ -82,7 +96,7 @@ function checkNodeVersion() {
     if (match) {
       const major = parseInt(match[1]);
       const versionStr = `${major}.${match[2]}`;
-      const isCompatible = major >= 16;
+      const isCompatible = isSupportedNodeVersion(major, parseInt(match[2]));
       return { installed: true, version: versionStr, isCompatible };
     }
     return { installed: true, version: 'unknown', isCompatible: false };

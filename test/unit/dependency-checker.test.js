@@ -15,6 +15,7 @@ import {
   getInstallCommands,
   displayMissingDependencies,
   checkDependencies,
+  isSupportedNodeVersion,
 } from '../../src/utils/dependency-checker.js';
 
 // ---------------------------------------------------------------------------
@@ -354,16 +355,15 @@ describe('checkDependencies - Node.js version check', () => {
     assert.strictEqual(results.core.node.installed, true);
   });
 
-  test('core.node.isCompatible is true for current Node (≥16)', () => {
-    // The test runner itself requires a modern Node, so this should always pass.
-    const major = parseInt(process.version.replace(/^v/, '').split('.')[0], 10);
+  test('core.node.isCompatible matches the engines range for current Node', () => {
+    const [major, minor] = process.version.replace(/^v/, '').split('.').map(Number);
     let results;
     try {
       results = checkDependencies();
     } catch {
       return;
     }
-    const expected = major >= 16;
+    const expected = isSupportedNodeVersion(major, minor);
     assert.strictEqual(results.core.node.isCompatible, expected);
   });
 
@@ -438,5 +438,19 @@ describe('getInstallCommands - package map completeness', () => {
   test('undefined values in missing object are ignored', () => {
     const result = getInstallCommands({ sox: undefined }, 'linux');
     assert.deepStrictEqual(result, []);
+  });
+});
+
+describe('isSupportedNodeVersion', () => {
+  test('accepts the releases package.json engines allows', () => {
+    for (const [major, minor] of [[20, 17], [20, 19], [22, 13], [22, 20], [23, 5], [24, 0], [26, 1]]) {
+      assert.strictEqual(isSupportedNodeVersion(major, minor), true, `${major}.${minor}`);
+    }
+  });
+
+  test('rejects releases inquirer 14 does not run on', () => {
+    for (const [major, minor] of [[16, 20], [18, 20], [20, 16], [21, 7], [22, 12], [23, 4]]) {
+      assert.strictEqual(isSupportedNodeVersion(major, minor), false, `${major}.${minor}`);
+    }
   });
 });
