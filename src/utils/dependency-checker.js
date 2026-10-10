@@ -72,6 +72,9 @@ function checkPythonVersion() {
   return { installed: false, command: null, version: null, isCompatible: false };
 }
 
+/** The Node releases package.json engines allows, as users read it. */
+export const SUPPORTED_NODE = '20.17+, 22.13+ or 23.5+';
+
 /**
  * True for the Node releases package.json engines allows (>=23.5, ^22.13,
  * ^20.17), which are the ones inquirer 14 and commander 14 run on.
@@ -278,7 +281,7 @@ export function checkDependencies(options = {}) {
   results.core.node = nodeCheck;
   if (!nodeCheck.isCompatible) {
     results.missing.node = true;
-    results.warnings.push(`Node.js ${nodeCheck.version || 'not found'} - requires ≥16.0`);
+    results.warnings.push(`Node.js ${nodeCheck.version || 'not found'} - requires ${SUPPORTED_NODE}`);
   }
 
   const pythonCheck = checkPythonVersion();
@@ -362,7 +365,7 @@ export function checkDependencies(options = {}) {
 function buildCoreMissingList(missing, results) {
   const list = [];
   const coreMap = {
-    node: { label: 'Node.js ≥16.0', key: 'node' },
+    node: { label: `Node.js ${SUPPORTED_NODE}`, key: 'node' },
     python: { label: 'Python ≥3.10', key: 'python' },
     bash: { label: 'Bash ≥5.0', key: 'bash' }
   };
