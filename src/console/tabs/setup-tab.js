@@ -45,7 +45,7 @@ import { formatTrackName } from '../widgets/format-utils.js';
 import { destroyList } from '../widgets/destroy-list.js';
 import { scanInstalledVoices, getVoiceMeta, previewPhrase, genderIconTag, formatVoiceRow, voiceRowHeader, PIPER_VOICES_DIR, SAMPLE_PHRASES, parseMultiSpeaker, getFavorites, getThumbsDown, toggleFavorite, toggleThumbsUp, toggleThumbsDown } from './voices-tab.js';
 import { attachBtnBlink } from './agents-tab.js';
-import { buildAudioEnv, getAllWavPlayers, playWavWithFallback } from '../audio-env.js';
+import { buildAudioEnv, playPreviewWav } from '../audio-env.js';
 import { previewRowContent, createRowSpinner, padTaggedTo } from '../preview-transport.js';
 import { buildBlingCommand, playBlingCue } from '../bling.js';
 import { spawn, spawnSync } from 'node:child_process';
@@ -3892,17 +3892,6 @@ export function createSetupTab(screen, services) {
       } catch {}
     }
 
-    function _finishPreviewPlayback(tempWav, result) {
-      try { fs.unlinkSync(tempWav); } catch {}
-      if (result === 'cancelled') return;
-      _previewProc = null; _previewVoiceId = null; _vpSpin.stop();
-      if (result === 'failed' && !_vpClosed) {
-        vpPreviewLine.setContent('{red-fg}♪ Audio playback failed (no audio device?){/red-fg}');
-        screen.render();
-        setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
-      }
-    }
-
     function _killVP() {
       if (_previewProc) {
         try {
@@ -4359,12 +4348,18 @@ export function createSetupTab(screen, services) {
           return;
         }
         // Row spinner already running from the synth phase — keep it through playback.
-        playWavWithFallback(getAllWavPlayers(_spawnEnv), tempWav, {
+        playPreviewWav(tempWav, {
           env: _spawnEnv,
           onSpawn: (proc) => { _previewProc = proc; },
           // A newer preview (or a stop) owns the row once these change.
           isCurrent: (proc) => _previewVoiceId === voiceId && _previewProc === proc,
-          onDone: (result) => _finishPreviewPlayback(tempWav, result),
+          release: () => { _previewProc = null; _previewVoiceId = null; _vpSpin.stop(); },
+          onFailed: () => {
+            if (_vpClosed) return;
+            vpPreviewLine.setContent('{red-fg}♪ Audio playback failed (no audio device?){/red-fg}');
+            screen.render();
+            setTimeout(() => { if (!_vpClosed) { vpPreviewLine.setContent(''); screen.render(); } }, 4000);
+          },
         });
       });
       piper.on('error', () => {

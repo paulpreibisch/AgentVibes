@@ -310,3 +310,24 @@ export function playWavWithFallback(players, wavPath, { env, onSpawn, isCurrent,
   };
   tryFrom(0);
 }
+
+/**
+ * Play a synthesized voice preview, then tidy up: the temp wav is always
+ * removed, and unless a newer preview took over, the row is released and a
+ * failed playback is reported.
+ * @param {string} wavPath
+ * @param {{ env: object, onSpawn?: (proc: object) => void, isCurrent: (proc: object) => boolean,
+ *           release: () => void, onFailed: () => void,
+ *           players?: Array<{bin: string, args: (f: string) => string[]}>, spawnFn?: Function }} opts
+ */
+export function playPreviewWav(wavPath, { env, onSpawn, isCurrent, release, onFailed, players = getAllWavPlayers(env), spawnFn }) {
+  playWavWithFallback(players, wavPath, {
+    env, onSpawn, isCurrent, spawnFn,
+    onDone: (result) => {
+      try { fs.unlinkSync(wavPath); } catch {}
+      if (result === 'cancelled') return;
+      release();
+      if (result === 'failed') onFailed();
+    },
+  });
+}

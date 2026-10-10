@@ -1,11 +1,15 @@
 /**
  * playWavWithFallback: try each WAV player until one exits cleanly, settle
- * each player once, and stop when the caller has moved on.
+ * each player once, and stop when the caller has moved on. playPreviewWav:
+ * tidy up a voice preview after it.
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { playWavWithFallback } from '../../src/console/audio-env.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { playWavWithFallback, playPreviewWav } from '../../src/console/audio-env.js';
 
 const player = (bin) => ({ bin, args: (f) => [f] });
 
@@ -89,5 +93,52 @@ describe('playWavWithFallback', () => {
     procs[0].emit('exit', null);
     assert.equal(procs.length, 1);
     assert.deepEqual(results, ['cancelled']);
+  });
+});
+
+describe('playPreviewWav', () => {
+  /** Play a real temp file and record what the row was told. */
+  function preview({ isCurrent = () => true } = {}) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'av-preview-'));
+    const wav = path.join(dir, 'vp.wav');
+    fs.writeFileSync(wav, 'RIFF');
+    const { procs, spawnFn } = fakeSpawn();
+    const calls = [];
+    playPreviewWav(wav, {
+      env: {},
+      players: [player('a'), player('b')],
+      spawnFn,
+      isCurrent,
+      release: () => calls.push('release'),
+      onFailed: () => calls.push('failed'),
+    });
+    return { wav, procs, calls, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  }
+
+  test('releases the row and removes the wav after playing', () => {
+    const { wav, procs, calls, cleanup } = preview();
+    procs[0].emit('exit', 0);
+    assert.deepEqual(calls, ['release']);
+    assert.equal(fs.existsSync(wav), false);
+    cleanup();
+  });
+
+  test('reports a failure when no player can play it', () => {
+    const { wav, procs, calls, cleanup } = preview();
+    procs[0].emit('exit', 1);
+    procs[1].emit('exit', 1);
+    assert.deepEqual(calls, ['release', 'failed']);
+    assert.equal(fs.existsSync(wav), false);
+    cleanup();
+  });
+
+  test('leaves the row to a newer preview, but still removes the wav', () => {
+    let current = true;
+    const { wav, procs, calls, cleanup } = preview({ isCurrent: () => current });
+    current = false;
+    procs[0].emit('exit', null);
+    assert.deepEqual(calls, []);
+    assert.equal(fs.existsSync(wav), false);
+    cleanup();
   });
 });
