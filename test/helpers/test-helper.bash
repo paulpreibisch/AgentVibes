@@ -19,6 +19,12 @@ setup_test_env() {
   # Override HOME for isolated testing
   export HOME="$TEST_HOME"
 
+  # The players keep their audio lock in XDG_RUNTIME_DIR, else a /tmp dir
+  # shared by every run as this user. A lock left there by anything else made
+  # a provider wait 15s and skip without output.
+  export XDG_RUNTIME_DIR="${BATS_TEST_TMPDIR}/run"
+  mkdir -p "$XDG_RUNTIME_DIR"
+
   # Set test environment variables
   export ELEVENLABS_API_KEY="test_api_key_mock"
   export CLAUDE_PROJECT_DIR="${BATS_TEST_TMPDIR}/project"
