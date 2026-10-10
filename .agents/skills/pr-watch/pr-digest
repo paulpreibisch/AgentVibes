@@ -332,10 +332,16 @@ main() {
   [ -n "$pr" ] || pr=$(gh pr view --json number --jq .number 2>/dev/null) || die "no PR for this branch"
 
   if [ "$watch" -eq 1 ]; then
-    local started=$SECONDS head runs statuses empty=0 left
+    local started=$SECONDS waited_from=$SECONDS head watched="" runs statuses empty=0 left
     while :; do
       head=$(gh pr view "$pr" --repo "$repo" --json headRefOid --jq .headRefOid) \
         || die "could not read PR head"
+      # A push mid-watch starts the wait over: bots review the new head from
+      # the moment it lands. DEADLINE still counts from the first call.
+      if [ "$head" != "$watched" ]; then
+        [ -n "$watched" ] && echo "head moved to ${head:0:8}; waiting again" >&2
+        watched=$head waited_from=$SECONDS empty=0
+      fi
       runs=$(check_runs "$repo" "$head") || die "could not read check runs"
       statuses=$(commit_statuses "$repo" "$head") || die "could not read commit statuses"
       if [ "$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")" = "0" ] &&
@@ -346,7 +352,7 @@ main() {
         if [ "$(jq 'length' <<<"$runs")" != "0" ] ||
            [ "$(jq 'length' <<<"$statuses")" != "0" ] ||
            [ "$empty" -ge "$EMPTY_POLLS" ]; then
-          if [ $((SECONDS - started)) -ge "$MIN_WAIT" ]; then break; fi
+          if [ $((SECONDS - waited_from)) -ge "$MIN_WAIT" ]; then break; fi
         else
           empty=$((empty + 1))
         fi

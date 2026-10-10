@@ -148,7 +148,8 @@ Finish only when one observation of a single SHA proves all of:
 1. `VERDICT green` — local, upstream, and PR head agree; no failing check or
    status.
 2. Every review bot has produced a signal on that SHA: a `review … (this head)`
-   line, a check run, or a comment on it. If none has ever
+   line or a check run on it. Comments do not count; the digest reads them
+   for the whole PR, so an old one says nothing about this SHA. If none has ever
    appeared, require two consecutive observations separated by a full wait
    before concluding none is configured.
 3. Every root comment is answered — inline review threads and conversation
