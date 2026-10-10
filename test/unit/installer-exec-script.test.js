@@ -112,6 +112,27 @@ describe('execScript() path allow-list', () => {
     }
   });
 
+  test('REGRESSION: options.args keeps a script path with spaces whole', { skip: isWindows && 'needs a POSIX shell to run the script' }, async () => {
+    // Splitting "path args" on whitespace cut "/Users/Jane Doe/..." in two, so
+    // the shortened path failed the allow-list and nothing ran.
+    const base = await fs.mkdtemp(path.join(os.tmpdir(), 'av target with spaces-'));
+    try {
+      const hooks = path.join(base, '.claude', 'hooks');
+      await fs.mkdir(hooks, { recursive: true });
+      const script = path.join(hooks, 'echo-args.sh');
+      await fs.writeFile(script, '#!/usr/bin/env bash\necho "args:$*"\n');
+      await fs.chmod(script, 0o755);
+      const out = execScript(script, {
+        args: ['--non-interactive', 'two words'],
+        stdio: 'pipe',
+        allowedDirs: [hooks],
+      });
+      assert.equal(out.toString().trim(), 'args:--non-interactive two words');
+    } finally {
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  });
+
   test('the CLI subcommand points at a bin script that exists', async () => {
     // 'bin/mcp-server' (no extension) never existed; bin/ has mcp-server.sh/.js.
     const src = await fs.readFile(path.join(PROJECT_ROOT, 'src', 'installer.js'), 'utf8');

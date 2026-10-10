@@ -1287,8 +1287,9 @@ async function collectConfiguration(options = {}) {
       config.provider = 'piper';
       config.defaultVoice = 'en_US-ryan-high';
     } else {
-      config.provider = process.platform === 'darwin' ? 'macos' : 'piper';
-      config.defaultVoice = process.platform === 'darwin' ? 'Samantha' : 'en_US-ryan-high';
+      // macOS gets Piper too; install() falls back to macOS Say if Piper cannot be installed.
+      config.provider = 'piper';
+      config.defaultVoice = 'en_US-ryan-high';
     }
     const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
     config.piperPath = path.join(homeDir, '.claude', 'piper-voices');
@@ -3179,8 +3180,11 @@ function getUserShell() {
 
 /**
  * Execute a shell script using the user's default shell with environment loaded
- * @param {string} scriptPath - Path to the script with optional arguments (e.g., "script.sh enable")
- * @param {object} options - execSync options
+ * @param {string} scriptPath - Path to the script. Without options.args, a string
+ *   of path plus arguments split on whitespace (e.g., "script.sh enable").
+ * @param {object} options - execSync options, plus allowedDirs and args
+ * @param {string[]} [options.args] - arguments, keeping scriptPath whole; use it
+ *   whenever the path can contain spaces ("/Users/Jane Doe/...")
  * @returns {Buffer} - Output from the script
  */
 function execScript(scriptPath, options = {}) {
@@ -3188,7 +3192,7 @@ function execScript(scriptPath, options = {}) {
 
   // Security: Properly escape the scriptPath to prevent command injection
   // Split scriptPath into command and arguments
-  const parts = scriptPath.split(/\s+/);
+  const parts = options.args ? [scriptPath, ...options.args] : scriptPath.split(/\s+/);
   const scriptFile = parts[0];
   const args = parts.slice(1);
 
@@ -3258,7 +3262,7 @@ function execScript(scriptPath, options = {}) {
   // S8701: scriptFile is validated to live under .claude/hooks (above), args are
   // passed as an array and shell:false disables shell interpretation. Risk handled.
   // allowedDirs is ours, not execFileSync's — strip it before handing options on.
-  const { allowedDirs: _ignored, ...execOptions } = options;
+  const { allowedDirs: _ignored, args: _args, ...execOptions } = options;
   return execFileSync(scriptFile, args, { // NOSONAR
     ...execOptions,
     shell: false  // Don't use shell to avoid injection risks
@@ -4524,7 +4528,8 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
   }
 
   try {
-    execScript(`${piperDownloadPath} --libritts --yes`, {
+    execScript(piperDownloadPath, {
+      args: ['--libritts', '--yes'],
       stdio: 'inherit',
       env: process.env,
       allowedDirs: [path.dirname(piperDownloadPath)]
@@ -4534,6 +4539,90 @@ async function offerLibriTTSDownload(piperDownloadPath, options) {
     console.log(chalk.yellow('\n⚠️  LibriTTS download failed.'));
     console.log(chalk.gray('   Run later: ~/.claude/hooks/piper-download-voices.sh --libritts\n'));
   }
+}
+
+/**
+ * Install Piper with the packaged installer, before the hooks are copied into
+ * the project. Non-interactive installs use it because they cannot prompt.
+ * @returns {boolean} true when a piper that starts is on PATH afterwards
+ */
+/**
+ * Put ~/.local/bin first on this process's PATH. The installer puts piper there,
+ * and play-tts-piper.sh and buildAudioEnv() search it first, so checking piper
+ * with any other order could validate a different binary than playback runs.
+ */
+function preferLocalBin() {
+  const localBin = path.join(os.homedir(), '.local', 'bin');
+  const rest = (process.env.PATH || '').split(path.delimiter).filter((p) => p && p !== localBin);
+  process.env.PATH = [localBin, ...rest].join(path.delimiter);
+}
+
+function installPiperNonInteractive() {
+  const piperInstallerPath = path.join(__dirname, '..', '.claude', 'hooks', 'piper-installer.sh');
+  console.log(`[AV] Piper not found; installing it`);
+  preferLocalBin();
+  try {
+    execScript(piperInstallerPath, {
+      args: ['--non-interactive'],
+      stdio: 'inherit',
+      env: process.env,
+      allowedDirs: [path.dirname(piperInstallerPath)]
+    });
+  } catch {
+    return false;
+  }
+  return isPiperWorking();
+}
+
+/**
+ * True when a piper on PATH actually starts. `which piper` alone accepts the old
+ * macOS release binaries, which are found but cannot load their libraries.
+ * @returns {boolean}
+ */
+function isPiperWorking() {
+  if (!isPiperInstalled()) return false;
+  try {
+    execSync('piper --help', { stdio: 'ignore', timeout: 15000 }); // NOSONAR - fixed command, no user input
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Make sure a non-interactive install has a provider that can speak. A missing
+ * Piper is installed; on macOS, Say is the fallback when that fails.
+ * @param {Object} userConfig - collected configuration; updated on fallback
+ * @param {string} [platform] - process.platform, injectable for tests
+ * @returns {string|null} provider to use, or null when the install cannot continue
+ */
+function ensureNonInteractivePiper(userConfig, platform = process.platform) {
+  if (!isPiperProvider(userConfig.provider)) return userConfig.provider;
+  // Native Windows installs piper.exe later, with checkAndInstallPiperWindows(),
+  // and finds it on disk rather than on PATH; the bash installer is POSIX-only.
+  if (isNativeWindows()) return userConfig.provider;
+  preferLocalBin();
+  if (isPiperWorking() || installPiperNonInteractive()) return userConfig.provider;
+  if (platform !== 'darwin') return null;
+  // macOS Say needs no setup, so the install still speaks without Piper.
+  console.log(`[AV] Piper could not be installed; using macOS Say instead`);
+  userConfig.provider = 'macos';
+  userConfig.defaultVoice = 'Samantha';
+  // A saved Piper voice would force the engine back to Piper; replace it.
+  userConfig.replaceSavedVoice = true;
+  return 'macos';
+}
+
+/**
+ * True for a saved voice that only Piper or Kokoro can speak (en_US-ryan-high,
+ * af_heart), which must not survive a fallback to macOS Say. Say voice names
+ * (Samantha, Alex, "Good News") are kept.
+ * @param {string} voice
+ * @returns {boolean}
+ */
+function isNonSayVoice(voice) {
+  const v = String(voice || '').trim();
+  return /^[a-z]{2,3}_[A-Z]{2}-/.test(v) || /^[a-z]{2}_[a-z0-9]+$/.test(v);
 }
 
 /**
@@ -4576,7 +4665,8 @@ async function checkAndInstallPiper(targetDir, options) {
 
       try {
         if (fsSync.existsSync(piperDownloadPath)) {
-          execScript(`${piperDownloadPath} --yes`, {
+          execScript(piperDownloadPath, {
+            args: ['--yes'],
             stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env,
             allowedDirs: [path.dirname(piperDownloadPath)]
@@ -4622,7 +4712,8 @@ async function checkAndInstallPiper(targetDir, options) {
         const piperInstallerPath = path.join(targetDir, '.claude', 'hooks', 'piper-installer.sh');
 
         try {
-          execScript(`${piperInstallerPath} --non-interactive`, {
+          execScript(piperInstallerPath, {
+            args: ['--non-interactive'],
             stdio: options.silent ? 'pipe' : 'inherit',
             env: process.env,
             allowedDirs: [path.dirname(piperInstallerPath)]
@@ -5943,23 +6034,30 @@ async function install(options = {}) {
     });
   }
 
-  const selectedProvider = userConfig.provider;
+  let selectedProvider = userConfig.provider;
   const piperVoicesPath = userConfig.piperPath;
   const targetDir = options.directory || currentDir;
 
   // Non-interactive mode: structured logging and piper validation before install
-  if (options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1') {
+  const strictNonInteractive = options.nonInteractive || process.env.AGENT_VIBES_NON_INTERACTIVE === '1';
+  if (strictNonInteractive) {
     console.log(`[AV] Non-interactive mode detected`);
     console.log(`[AV] Provider: ${selectedProvider} | Platform: ${process.platform}`);
-
-    if (isPiperProvider(selectedProvider) && !isPiperInstalled()) {
-      process.stderr.write(`[AV ERROR] Piper binaries not found.\n`);
-      process.stderr.write(`[AV] To install Piper manually, run:\n`);
-      process.stderr.write(`[AV]   npx agentvibes --install-piper\n`);
+  }
+  // --yes installs cannot answer prompts either, so they get the same Piper
+  // check and macOS fallback; only strict non-interactive mode stops on failure.
+  if (isNonInteractive) {
+    const provider = ensureNonInteractivePiper(userConfig);
+    if (provider) {
+      selectedProvider = provider;
+    } else if (strictNonInteractive) {
+      process.stderr.write(`[AV ERROR] Piper TTS could not be installed.\n`);
+      process.stderr.write(`[AV] Install it manually with: pipx install piper-tts\n`);
       process.stderr.write(`[AV] Or visit: https://github.com/paulpreibisch/AgentVibes#-installation\n`);
       process.exit(1);
     }
-
+  }
+  if (strictNonInteractive) {
     console.log(`[AV] Installing to: ${targetDir}/.claude/`);
   }
 
@@ -6135,8 +6233,13 @@ Troubleshooting:
         default:               defaultVoice = 'Samantha'; break;
       }
     }
-    // Only write voice on first install — preserve user's current voice selection on reinstall
-    try { await fs.access(voiceConfigPath); } catch { await fs.writeFile(voiceConfigPath, defaultVoice); }
+    // Only write voice on first install — preserve user's current voice selection on
+    // reinstall, except a Piper/Kokoro voice left behind by a fallback to macOS Say.
+    let savedVoice = null;
+    try { savedVoice = await fs.readFile(voiceConfigPath, 'utf8'); } catch { /* first install */ }
+    if (savedVoice === null || (userConfig.replaceSavedVoice && isNonSayVoice(savedVoice))) {
+      await fs.writeFile(voiceConfigPath, defaultVoice);
+    }
 
     // Sync voice + provider to global .agentvibes/config.json so TUI finds them
     // regardless of which directory it's launched from
@@ -6847,6 +6950,7 @@ program
 
     try {
       execScript(mcpServerScript, {
+        args: [],
         stdio: 'inherit',
         env: process.env
       });
@@ -7130,7 +7234,8 @@ program
     const testScript = path.join(__dirname, '..', 'bin', 'test-bmad-pr');
 
     try {
-      execScript(`${testScript} ${prNumber}`, {
+      execScript(testScript, {
+        args: [String(prNumber)],
         stdio: 'inherit',
         env: process.env
       });
@@ -7169,7 +7274,7 @@ export {
   copyCommandFiles, copyHookFiles, copyPersonalityFiles,
   copyPluginFiles, copyBmadConfigFiles, copyBackgroundMusicFiles,
   copyConfigFiles, copyCodexFiles, configureSessionStartHook, configurePartyModeHook, ensureGitRepo,
-  installPluginManifest, checkAndInstallPiper,
+  installPluginManifest, checkAndInstallPiper, installPiperNonInteractive, ensureNonInteractivePiper, isNonSayVoice,
   updateGlobalHooks, updateCommandFiles, updatePersonalityFiles,
   copyResolverBundle, updateGlobalResolverBundle,
   CRITICAL_HOOKS, CRITICAL_HOOKS_WINDOWS,

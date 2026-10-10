@@ -90,136 +90,95 @@ else
   exit 1
 fi
 
-# Check if Piper is already installed
-if command -v piper &> /dev/null; then
-  # Piper doesn't have a --version flag, just check if it exists
-  echo "✅ Piper TTS is already installed!"
-  echo "   Location: $(which piper)"
+INSTALL_DIR="$HOME/.local/bin"
+mkdir -p "$INSTALL_DIR"
+# pipx and the private venv both put piper in ~/.local/bin; play-tts-piper.sh
+# adds it to PATH too, so non-login shells find it.
+export PATH="$INSTALL_DIR:$PATH"
+
+# A piper that is on PATH but cannot start is not an install. The old macOS
+# release binaries fail this way (their dylibs do not load), and treating them
+# as installed left Macs silent.
+piper_works() {
+  "$1" --help >/dev/null 2>&1
+}
+
+if EXISTING_PIPER=$(command -v piper 2>/dev/null); then
+  if piper_works "$EXISTING_PIPER"; then
+    echo "✅ Piper TTS is already installed!"
+    echo "   Location: $EXISTING_PIPER"
+    echo ""
+    echo "   Download voices with: .claude/hooks/piper-download-voices.sh"
+    exit 0
+  fi
+  echo "⚠️  Found piper at $EXISTING_PIPER, but it does not run. Replacing it."
+  if [[ "$EXISTING_PIPER" == "$INSTALL_DIR/piper" ]]; then
+    mv -f "$EXISTING_PIPER" "$EXISTING_PIPER.broken"
+  fi
   echo ""
-  echo "   Download voices with: .claude/hooks/piper-download-voices.sh"
-  exit 0
 fi
 
 echo "📦 Installing Piper TTS..."
 echo ""
 
-# macOS: Use precompiled binaries
-if [[ "$IS_MACOS" == true ]]; then
-  echo "🍎 Installing Piper TTS from precompiled binaries for macOS..."
+# pipx is used when it is present. Linux installs it from the package manager;
+# macOS skips that, since a Homebrew pipx pulls in a whole Python build.
+ensure_pipx() {
+  command -v pipx &> /dev/null && return 0
+  [[ "$IS_MACOS" == true ]] && return 1
+
+  echo "⚠️  pipx not found. Installing pipx first..."
   echo ""
-
-  # Determine architecture
-  if [[ "$ARCH" == "arm64" ]]; then
-    echo "Detected Apple Silicon (M1/M2/M3)"
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_aarch64.tar.gz"
-  elif [[ "$ARCH" == "x86_64" ]]; then
-    echo "Detected Intel Mac"
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_macos_x64.tar.gz"
+  if command -v apt-get &> /dev/null; then
+    # Debian/Ubuntu — DEBIAN_FRONTEND prevents tzdata interactive prompt
+    DEBIAN_FRONTEND=noninteractive sudo -E apt-get update -qq || return 1
+    DEBIAN_FRONTEND=noninteractive sudo -E apt-get install -y pipx || return 1
+  elif command -v brew &> /dev/null; then
+    brew install pipx || return 1
+  elif command -v dnf &> /dev/null; then
+    sudo dnf install -y pipx || return 1
+  elif command -v pacman &> /dev/null; then
+    sudo pacman -S --noconfirm python-pipx || return 1
   else
-    echo "❌ Unsupported macOS architecture: $ARCH"
-    exit 1
+    return 1
   fi
+  pipx ensurepath 2>/dev/null || true
+}
 
-  # Create installation directory
-  INSTALL_DIR="$HOME/.local/bin"
-  mkdir -p "$INSTALL_DIR"
-
-  # Download and extract
-  echo "📥 Downloading Piper from: $PIPER_URL"
-  TEMP_DIR=$(mktemp -d)
-  cd "$TEMP_DIR"
-
-  if curl -L "$PIPER_URL" | tar -xz; then
-    echo "✅ Downloaded and extracted successfully"
-
-    # Copy binaries to ~/.local/bin
-    if [[ -d "piper" ]]; then
-      cp -r piper/* "$INSTALL_DIR/"
-      chmod +x "$INSTALL_DIR/piper"
-      chmod +x "$INSTALL_DIR/piper_phonemize"
-
-      echo "✅ Installed Piper to: $INSTALL_DIR/piper"
-
-      # Add to PATH if not already there
-      if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        echo ""
-        echo "⚠️  Add $INSTALL_DIR to your PATH:"
-        echo ""
-        if [[ "$SHELL" == *"zsh"* ]]; then
-          echo "   echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
-          echo "   source ~/.zshrc"
-        else
-          echo "   echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bash_profile"
-          echo "   source ~/.bash_profile"
-        fi
-      fi
-    else
-      echo "❌ Failed to extract Piper binaries"
-      cd -
-      rm -rf "$TEMP_DIR"
-      exit 1
-    fi
-  else
-    echo "❌ Failed to download Piper"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-  fi
-
-  cd -
-  rm -rf "$TEMP_DIR"
-
-# Linux/WSL: Use pipx
-else
-  # Check if pipx is installed
-  if ! command -v pipx &> /dev/null; then
-    echo "⚠️  pipx not found. Installing pipx first..."
-    echo ""
-
-    # Try to install pipx
-    if command -v apt-get &> /dev/null; then
-      # Debian/Ubuntu — DEBIAN_FRONTEND prevents tzdata interactive prompt
-      DEBIAN_FRONTEND=noninteractive sudo -E apt-get update -qq
-      DEBIAN_FRONTEND=noninteractive sudo -E apt-get install -y pipx
-    elif command -v brew &> /dev/null; then
-      # Linux with Homebrew
-      brew install pipx
-    elif command -v dnf &> /dev/null; then
-      # Fedora
-      sudo dnf install -y pipx
-    elif command -v pacman &> /dev/null; then
-      # Arch Linux
-      sudo pacman -S python-pipx
-    else
-      echo "❌ Unable to install pipx automatically."
-      echo ""
-      echo "   Please install pipx manually:"
-      echo "   https://pipx.pypa.io/stable/installation/"
-      exit 1
-    fi
-
-    # Ensure pipx is in PATH (updates shell rc file) and update current session
-    pipx ensurepath 2>/dev/null || true
-    export PATH="$HOME/.local/bin:$PATH"
-    echo ""
-  fi
-
-  # Make sure ~/.local/bin is in PATH for this session (pipx installs there)
-  export PATH="$HOME/.local/bin:$PATH"
-  INSTALL_DIR="$HOME/.local/bin"
-
-  # Install Piper TTS
+install_with_pipx() {
+  ensure_pipx || return 1
   echo "📥 Installing Piper TTS via pipx..."
-  pipx install piper-tts
+  # Pin the bin dir: a user PIPX_BIN_DIR would put piper where the check below
+  # does not look.
+  PIPX_BIN_DIR="$INSTALL_DIR" pipx install --force piper-tts || return 1
+}
 
-  if ! command -v piper &> /dev/null && [[ ! -x "$HOME/.local/bin/piper" ]]; then
-    echo ""
-    echo "❌ Installation completed but piper command not found in PATH"
-    echo ""
-    echo "   Try running: pipx ensurepath"
-    echo "   Then restart your terminal"
-    exit 1
+# Needs nothing but python3 (3.9+), which every Mac with the command line
+# tools has. piper-tts ships prebuilt wheels for Apple Silicon and Intel.
+install_with_venv() {
+  local venv="$HOME/.local/share/agentvibes/piper-venv"
+  command -v python3 &> /dev/null || return 1
+  echo "📥 Installing Piper TTS into $venv..."
+  python3 -m venv "$venv" || return 1
+  "$venv/bin/python" -m pip install --quiet --upgrade pip || return 1
+  "$venv/bin/python" -m pip install --quiet piper-tts || return 1
+  ln -sf "$venv/bin/piper" "$INSTALL_DIR/piper" || return 1
+}
+
+if ! install_with_pipx || ! piper_works "$INSTALL_DIR/piper"; then
+  install_with_venv || true
+fi
+
+if ! piper_works "$INSTALL_DIR/piper"; then
+  echo ""
+  echo "❌ Piper TTS could not be installed."
+  echo ""
+  if [[ "$IS_MACOS" == true ]]; then
+    echo "   Install the command line tools (xcode-select --install), then run this again."
+  else
+    echo "   Install pipx (https://pipx.pypa.io/stable/installation/) or python3-venv, then run this again."
   fi
+  exit 1
 fi
 
 echo ""
