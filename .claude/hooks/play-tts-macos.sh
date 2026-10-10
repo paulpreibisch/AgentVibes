@@ -238,18 +238,11 @@ fi
 # @function play_audio
 # @intent Play generated audio - via PulseAudio tunnel for SSH, afplay for local
 # SECURITY: Use user-isolated lock directory (#129)
-_LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
-mkdir -p "$_LOCK_DIR"
-chmod 700 "$_LOCK_DIR"
-LOCK_FILE="$_LOCK_DIR/agentvibes-audio.lock"
-
-# Auto-remove stale lock files (older than 30 seconds)
-if [ -f "$LOCK_FILE" ]; then
-  _lock_mtime=$(stat -f %m "$LOCK_FILE" 2>/dev/null || echo 0)
-  _lock_age=$(( $(date +%s) - _lock_mtime ))
-  if [[ $_lock_age -gt 30 ]]; then
-    rm -f "$LOCK_FILE"
-  fi
+# One lock shared with the other providers (audio-cache-utils.sh), so they
+# take turns instead of talking over each other.
+LOCK_FILE=$(audio_lock_file)
+if [ -f "$LOCK_FILE" ] && audio_lock_is_stale "$LOCK_FILE"; then
+  rm -f "$LOCK_FILE"
 fi
 
 # Wait for previous audio to finish (max 30 seconds)
@@ -261,7 +254,7 @@ for i in {1..60}; do
 done
 
 # Create lock and play audio
-touch "$LOCK_FILE"
+audio_lock_write "$LOCK_FILE" "$$"
 
 # Get audio duration for proper lock timing
 if command -v ffprobe &> /dev/null; then
@@ -297,8 +290,7 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && [[ "${AGENTVIBES_NO_PLAYB
 fi
 
 # Wait for audio to finish, then release lock
-(sleep $DURATION; rm -f "$LOCK_FILE") &
-disown
+audio_lock_release_after "$DURATION" "$LOCK_FILE"
 
 # Get audio cache stats
 AUDIO_DIR_PATH=$(get_audio_dir)

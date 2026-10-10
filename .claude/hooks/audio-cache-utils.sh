@@ -244,3 +244,64 @@ clean_all_tts_files() {
   echo "  • Space freed: ${YELLOW}$human_freed${NC}"
   echo "  • Before: $human_before | After: $human_after"
 }
+
+# ---------------------------------------------------------------------------
+# Shared audio lock: play-tts-piper.sh, play-tts-macos.sh and
+# play-tts-soprano.sh take turns through one lock file holding the PID of the
+# process that will release it.
+# ---------------------------------------------------------------------------
+
+# Print the lock file's path. Its directory must be a real directory owned by
+# this user: one someone else pre-created in /tmp could hold a symlink that a
+# lock write would follow. If it is not ours, use a private directory, which
+# gives up taking turns but never writes through another user's path.
+audio_lock_file() {
+  local dir="${XDG_RUNTIME_DIR:-/tmp/agentvibes-$(id -u)}"
+  if ! { mkdir -p "$dir" 2>/dev/null && [ ! -L "$dir" ] && [ -O "$dir" ] && chmod 700 "$dir" 2>/dev/null; }; then
+    echo "⚠️  $dir is not a private directory; not sharing the audio lock" >&2
+    dir=$(mktemp -d)
+  fi
+  printf '%s/agentvibes-audio.lock\n' "$dir"
+}
+
+# True when the lock can be cleared. A lock naming a PID belongs to that
+# process for as long as it runs, however long the clip. A lock with no PID
+# falls back to a 30-second age limit.
+audio_lock_is_stale() {
+  local lock=$1 holder mtime
+  holder=$(cat "$lock" 2>/dev/null || true)
+  if [[ "$holder" =~ ^[0-9]+$ ]]; then
+    ! kill -0 "$holder" 2>/dev/null
+    return
+  fi
+  mtime=$(stat -c %Y "$lock" 2>/dev/null || stat -f %m "$lock" 2>/dev/null || echo 0)
+  [[ $(( $(date +%s) - mtime )) -gt 30 ]]
+}
+
+# Write a PID into the lock. The rename replaces whatever is at the path,
+# a symlink included, rather than writing through it.
+audio_lock_write() {
+  local lock=$1 pid=$2 tmp
+  tmp=$(mktemp "${lock%/*}/.agentvibes-lock.XXXXXX") || return 1
+  printf '%s\n' "$pid" > "$tmp" && mv -f "$tmp" "$lock"
+}
+
+# Remove the lock only if PID still holds it, so a lock a later call has
+# taken over is never deleted from under it.
+audio_lock_release() {
+  [ "$(cat "$1" 2>/dev/null)" = "$2" ] && rm -f "$1"
+  return 0
+}
+
+# Release the lock after SECONDS from a detached process, which becomes the
+# holder. Further paths are removed with it. Its output is detached, or a
+# caller reading this script's output would wait out the clip. In sh -c, $$ is
+# the releaser's own PID, which is $! here.
+audio_lock_release_after() {
+  local secs=$1 lock=$2
+  shift 2
+  sh -c 'sleep "$1"; [ "$(cat "$2" 2>/dev/null)" = "$$" ] && rm -f "$2"; shift 2; rm -f "$@"' \
+    _ "$secs" "$lock" "$@" </dev/null >/dev/null 2>&1 &
+  audio_lock_write "$lock" "$!"
+  disown 2>/dev/null || true
+}
