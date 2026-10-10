@@ -148,7 +148,9 @@ ensure_pipx() {
 install_with_pipx() {
   ensure_pipx || return 1
   echo "📥 Installing Piper TTS via pipx..."
-  pipx install --force piper-tts || return 1
+  # Pin the bin dir: a user PIPX_BIN_DIR would put piper where the check below
+  # does not look.
+  PIPX_BIN_DIR="$INSTALL_DIR" pipx install --force piper-tts || return 1
 }
 
 # Needs nothing but python3 (3.9+), which every Mac with the command line
@@ -163,7 +165,7 @@ install_with_venv() {
   ln -sf "$venv/bin/piper" "$INSTALL_DIR/piper" || return 1
 }
 
-if ! install_with_pipx; then
+if ! install_with_pipx || ! piper_works "$INSTALL_DIR/piper"; then
   install_with_venv || true
 fi
 

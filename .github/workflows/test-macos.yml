@@ -146,7 +146,7 @@ jobs:
           echo "✅ Piper installed and synthesized $(wc -c < "$RUNNER_TEMP/piper-test.wav") bytes of audio"
 
           # A second run must see the working install and leave it alone.
-          bash .claude/hooks/piper-installer.sh --non-interactive | grep -q "already installed"
+          bash .claude/hooks/piper-installer.sh --non-interactive | grep "already installed" > /dev/null
 
       - name: Test ElevenLabs API integration (mock)
         env:
