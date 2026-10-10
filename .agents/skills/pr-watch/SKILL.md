@@ -31,8 +31,10 @@ PRD="$(git rev-parse --show-toplevel)/.agents/skills/pr-watch/pr-digest"
 ## The cycle
 
 1. Run `"$PRD" --watch` with **`run_in_background: true`**. It blocks until
-   every check run and commit status on the exact head SHA is terminal, then
-   prints the digest. You are re-invoked when it exits.
+   every check run and commit status on the exact head SHA is terminal, and
+   at least `PR_DIGEST_MIN_WAIT` seconds (default 180) have passed, then prints
+   the digest. The minimum is the full wait the completion gate asks for: bots
+   often review after CI has finished. You are re-invoked when it exits.
 
    Never wait in the foreground. `sleep` is blocked and an `until` loop is
    killed at the execution tool's timeout, costing an error round-trip plus a
@@ -64,8 +66,10 @@ The logs flag returns the assertion and code frame. Raw CI
 logs prefix every line with job name, step name, and a timestamp, and a
 Playwright job can exceed two megabytes; the flag strips all of that.
 
-Before calling a failure unrelated, prove it: restore the base branch's version
-of the touched paths, rerun that one spec, and report the result. Do not sync
+Before calling a failure unrelated, prove it: in a temporary worktree
+(`git worktree add`), never the one holding your fixes, restore the base
+branch's version of the touched paths, rerun that one spec, report the result,
+and remove the worktree. Do not sync
 the base or start comparison runs merely to make an unrelated failure pass, and
 do not mutate external checks without authorization.
 
@@ -103,9 +107,11 @@ Review summaries block only while that reviewer has an active change request;
 a later approval or dismissal clears it. A general comment does not override
 a change request.
 
-The digest prints each finding in full once, then lists it as a one-liner while
-it stays open, so nothing is hidden and re-observing is cheap. `--all` reprints
-everything. Fetch a raw body only when the excerpt genuinely isn't enough.
+The digest prints an excerpt of each finding once, then lists it as a one-liner
+while it stays open, so re-observing is cheap. Excerpts stop at
+`PR_DIGEST_BODY_CHARS` (default 600) and end in `[shortened; …]` when cut; run
+with `PR_DIGEST_BODY_CHARS=0` to print them whole. `--all` reprints findings
+already shown. Never act on a shortened finding without reading all of it.
 
 ### Resolving threads
 
@@ -141,7 +147,8 @@ Finish only when one observation of a single SHA proves all of:
 
 1. `VERDICT green` — local, upstream, and PR head agree; no failing check or
    status.
-2. Every review bot has produced a signal on that SHA. If none has ever
+2. Every review bot has produced a signal on that SHA: a `review … (this head)`
+   line, a check run, or a comment on it. If none has ever
    appeared, require two consecutive observations separated by a full wait
    before concluding none is configured.
 3. Every root comment is answered — inline review threads and conversation
@@ -164,3 +171,6 @@ clean or stopped at a limit. If you stopped at a limit, say what was pending.
 
 Exit codes: `0` green · `10` failures · `11` open comments · `12` pending ·
 `20` out of sync · `1` error. Needs `gh`, `jq`, and `perl`.
+
+Settings: `PR_DIGEST_MIN_WAIT` (180), `PR_DIGEST_POLL` (30),
+`PR_DIGEST_DEADLINE` (7200), `PR_DIGEST_BODY_CHARS` (600, 0 for no limit).

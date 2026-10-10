@@ -9,10 +9,14 @@
 #
 # Exit: 0 green · 10 check failures · 11 open comments · 12 still pending
 #       20 local/remote out of sync · 1 error
-set -uo pipefail
+set -euo pipefail
 
 POLL=${PR_DIGEST_POLL:-30}
 DEADLINE=${PR_DIGEST_DEADLINE:-7200}
+# --watch never returns sooner than this. Review bots post minutes after a
+# push, often after CI has finished, and a reply leaves CI complete, so a watch
+# that returned as soon as checks were done would never see their feedback.
+MIN_WAIT=${PR_DIGEST_MIN_WAIT:-180}
 BODY_CHARS=${PR_DIGEST_BODY_CHARS:-600}
 SEEN_DIR=${PR_DIGEST_SEEN_DIR:-$HOME/.cache/pr-digest}
 # How many empty polls to allow before accepting that a PR has no check runs.
@@ -52,14 +56,14 @@ logs() {
     grep -E "$keep" |
     perl -pe 's/\e\[[0-9;]*m//g' |
     awk '!/^##\[error\]/ || !seen[$0]++' |
-    tail -n "${PR_DIGEST_LOG_LINES:-80}")
+    tail -n "${PR_DIGEST_LOG_LINES:-80}") || true
   if [ -n "$out" ]; then
     echo "$out"
     return 0
   fi
   out=$(gh run view --job "$job" --log-failed 2>/dev/null |
     perl -pe 's/^[^\t]*\t[^\t]*\t\S+\s//' |
-    grep -vE '^\s*$|^\[WebServer\]' | tail -n 40)
+    grep -vE '^\s*$|^\[WebServer\]' | tail -n 40) || true
   if [ -n "$out" ]; then
     echo "$out"
     return 0
@@ -88,7 +92,7 @@ digest() {
   branch=$(jq -r .headRefName <<<"$meta")
   local decision; decision=$(jq -r '.reviewDecision // ""' <<<"$meta")
 
-  echo "PR $pr · $branch · $state · $mergeable${decision:+ · $decision}"
+  echo "PR $pr · $branch · head ${head:0:8} · $state · $mergeable${decision:+ · $decision}"
   [ "$state" = "OPEN" ] || { echo "VERDICT $state"; return 0; }
 
   # Sync only matters when this checkout is on the PR's branch; inspecting
@@ -135,7 +139,7 @@ digest() {
             else " · step \"\($bad.name)\" \($bad.conclusion)"
                  + (if ([$s[] | select(.number > $bad.number and .conclusion == "skipped")] | length) > 0
                     then " (later steps skipped)" else "" end)
-            end' 2>/dev/null)
+            end' 2>/dev/null) || step_info=""
       fi
       echo "FAIL $name [$conclusion]$step_info"
       echo "     job=$job $url"
@@ -156,7 +160,10 @@ digest() {
       | explode
       | map(select(. >= 32 and (. < 127 or . > 159)))
       | implode
-      | sub("^ +"; "") | sub(" +$"; "") | .[0:$n];'
+      | sub("^ +"; "") | sub(" +$"; "")
+      | if $n > 0 and length > $n
+        then .[0:$n] + " … [shortened; PR_DIGEST_BODY_CHARS=0 prints it whole]"
+        else . end;'
 
   # Deploy tables, rate-limit notices, screenshot galleries, and sticky bot
   # summaries are status chrome — not findings that need a reply. Actionable
@@ -169,6 +176,8 @@ digest() {
           startswith("<!-- This is an auto-generated comment: summarize by coderabbit.ai -->")
           or startswith("<!-- This is an auto-generated comment: rate limited by coderabbit.ai -->")))
         or (.user.login == "greptile-apps[bot]" and (.body | startswith("<h3>Greptile Summary</h3>")))
+        # Its pass or fail also arrives as the SonarCloud check run.
+        or (.user.login == "sonarqubecloud[bot]" and (.body | contains("Quality Gate")))
       );'
 
   # Compare complete URL tokens, never substrings or bare comment IDs.
@@ -224,6 +233,14 @@ digest() {
   local reviews review_open
   reviews=$(api --paginate "repos/$repo/pulls/$pr/reviews?per_page=100" | jq -s 'add // []') \
     || die "could not read reviews"
+
+  # Each reviewer's latest review and the commit it was on, so the completion
+  # gate (every reviewer has reported on this head) needs no other API call.
+  jq -r --arg me "$viewer" --arg head "$head" '
+    [.[] | select(.user.login != $me)] | group_by(.user.login)
+    | map(sort_by(.submitted_at, .id) | last) | .[]
+    | "review \(.user.login) \(.state) @\(.commit_id[0:8])"
+      + (if .commit_id == $head then " (this head)" else " (older commit)" end)' <<<"$reviews"
   review_open=$(jq --arg me "$viewer" --argjson n "$BODY_CHARS" "
     $clean_def
     group_by(.user.login)
@@ -324,13 +341,15 @@ main() {
       if [ "$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")" = "0" ] &&
          [ "$(jq '[.[] | select(.state == "pending")] | length' <<<"$statuses")" = "0" ]; then
         # Nothing outstanding. Wait a few polls before believing a PR that has
-        # reported nothing at all, in case checks are still registering.
+        # reported nothing at all, in case checks are still registering, and
+        # always wait MIN_WAIT so late bot reviews are seen.
         if [ "$(jq 'length' <<<"$runs")" != "0" ] ||
            [ "$(jq 'length' <<<"$statuses")" != "0" ] ||
            [ "$empty" -ge "$EMPTY_POLLS" ]; then
-          break
+          if [ $((SECONDS - started)) -ge "$MIN_WAIT" ]; then break; fi
+        else
+          empty=$((empty + 1))
         fi
-        empty=$((empty + 1))
       fi
       left=$((DEADLINE - (SECONDS - started)))
       [ "$left" -le 0 ] && break
