@@ -727,7 +727,15 @@ function Invoke-AudioPlay {
     # tests invoke this script and assert on its [VOICE]/routing output (printed
     # earlier) — they never check playback — so skipping only the audio output keeps
     # them green while preventing real speech on the developer's machine.
-    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) { return }
+    # Scoped: only callers inside the repo under test are muted (tests-running-guard.ps1);
+    # an empty marker, or a missing guard helper, still mutes everything.
+    if (Test-Path (Join-Path $env:USERPROFILE ".agentvibes-tests-running")) {
+        $avGuard = Join-Path $PSScriptRoot "tests-running-guard.ps1"
+        if (-not (Test-Path $avGuard)) { return }
+        . $avGuard
+        $avProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        if (Test-AvTestsRunningMute @((Get-Location).Path, $ProjectDir, $env:CLAUDE_PROJECT_DIR, $avProjectRoot)) { return }
+    }
     $ffplayCmd = Get-Command ffplay -ErrorAction SilentlyContinue
     $fp = if ($ffplayCmd) { $ffplayCmd.Source } else { $null }
     if (-not $fp) {

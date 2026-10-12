@@ -60,8 +60,19 @@ fi
 # CLAUDE_PROJECT_DIR takes priority so TUI preview writes to the project dir and
 # audio-processor.sh (running from the package hooks dir) still finds the flag.
 is_background_music_enabled() {
-    # Suppress music entirely when a test run is in progress
-    [[ -f "${HOME}/.agentvibes-tests-running" ]] && return 1
+    # Suppress music entirely when a test run covers this caller (scoped marker;
+    # an empty marker or a missing guard helper still suppresses everywhere).
+    if [[ -f "${HOME}/.agentvibes-tests-running" ]]; then
+        local _guard
+        _guard="$(dirname "${BASH_SOURCE[0]}")/tests-running-guard.sh"
+        if [[ -f "$_guard" ]]; then
+            # shellcheck source=/dev/null
+            source "$_guard"
+            av_tests_running_mute "$PWD" "${PROJECT_ROOT:-}" "${CLAUDE_PROJECT_DIR:-}" && return 1
+        else
+            return 1
+        fi
+    fi
 
     local enabled="" _f
     # 1. Project dir (set by TUI preview via CLAUDE_PROJECT_DIR env var)

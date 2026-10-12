@@ -47,12 +47,31 @@ if [[ -z "$PYTHON_BIN" ]]; then
   echo "   or set AGENTVIBES_PYTHON=/path/to/python.exe if it's installed elsewhere." >&2
   exit 2
 fi
+
+# --- Persistent daemon (mirrors play-tts-kokoro.ps1) -------------------------
+# A resident kokoro-server keeps the model loaded (on the GPU when CUDA is
+# available), so a request is ~0.6 s of synthesis instead of ~20 s of fresh model
+# load per call. Fast path: POST to the daemon. Fallback: synthesize this message
+# directly (never dropped) and start the daemon for the next one.
+# AGENTVIBES_KOKORO_PORT overrides the port; AGENTVIBES_KOKORO_DAEMON=false opts out.
+KOKORO_PORT="${AGENTVIBES_KOKORO_PORT:-7855}"
+[[ "$KOKORO_PORT" =~ ^[0-9]+$ ]] || KOKORO_PORT=7855
+KOKORO_DAEMON_ENABLED=true
+[[ "${AGENTVIBES_KOKORO_DAEMON:-true}" == "false" ]] && KOKORO_DAEMON_ENABLED=false
+KOKORO_SERVER_UP=false
+if [[ "$KOKORO_DAEMON_ENABLED" == "true" && "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] \
+   && command -v curl >/dev/null 2>&1 \
+   && curl -s --max-time 2 "http://127.0.0.1:${KOKORO_PORT}/health" 2>/dev/null | grep -q '"ok": *true'; then
+  KOKORO_SERVER_UP=true
+fi
+
 # Check kokoro is installed (use find_spec to avoid slow torch import).
 # Skipped in AGENTVIBES_TEST_MODE: the hermetic sentinel tests emit a fake
 # AV_OUTPUT below without real synthesis, so kokoro need not be installed on the
 # runner (mirrors the TEST_MODE guards in play-tts-piper.sh; CI has Piper but not
-# the heavy Kokoro deps).
-if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" ]] && \
+# the heavy Kokoro deps). Also skipped while the daemon answers: it may run under
+# a different interpreter than $PYTHON_BIN, and it is the one doing synthesis.
+if [[ "${AGENTVIBES_TEST_MODE:-false}" != "true" && "$KOKORO_SERVER_UP" != "true" ]] && \
    ! "$PYTHON_BIN" -c "import importlib.util; exit(0 if importlib.util.find_spec('kokoro') else 1)" 2>/dev/null; then
   echo "❌ Kokoro TTS module not installed for: $PYTHON_BIN" >&2
   echo "   Install with: ${SCRIPT_DIR}/kokoro-installer.sh" >&2
@@ -134,11 +153,37 @@ if [[ "${AGENTVIBES_TEST_MODE:-false}" == "true" ]]; then
   exit 0
 fi
 
-# Run synthesis — output path printed to stdout
-RESULT=$("$PYTHON_BIN" "$SYNTH_SCRIPT" "$TEXT" "$VOICE" "$TEMP_WAV" "$SPEED" 2>&1) || {
-  echo "❌ Kokoro synthesis failed: $RESULT" >&2
-  exit 3
-}
+USED_SERVER=false
+if [[ "$KOKORO_SERVER_UP" == "true" ]]; then
+  # The daemon is a native process: on Windows (Git Bash) it needs C:/... not /c/...
+  _wav_native="$TEMP_WAV"
+  command -v cygpath >/dev/null 2>&1 && _wav_native="$(cygpath -m "$TEMP_WAV")"
+  _payload="$("$PYTHON_BIN" -c 'import json,sys; print(json.dumps({"text":sys.argv[1],"voice":sys.argv[2],"speed":float(sys.argv[3]),"output":sys.argv[4]}))' \
+    "$TEXT" "$VOICE" "$SPEED" "$_wav_native" 2>/dev/null)" || _payload=""
+  if [[ -n "$_payload" ]] \
+     && curl -s --max-time 120 -H "Content-Type: application/json" --data-binary "$_payload" \
+          "http://127.0.0.1:${KOKORO_PORT}/synth" 2>/dev/null | grep -q '"ok": *true' \
+     && [[ -s "$TEMP_WAV" ]]; then
+    USED_SERVER=true
+  else
+    echo "⚠️  Kokoro daemon request failed; falling back to direct synthesis" >&2
+  fi
+fi
+
+if [[ "$USED_SERVER" != "true" ]]; then
+  # Start the daemon for subsequent messages (only when it is down — a daemon that
+  # answered /health but failed this request is left alone). Detached, output
+  # discarded; kokoro-server.py binds 127.0.0.1 only.
+  if [[ "$KOKORO_DAEMON_ENABLED" == "true" && "$KOKORO_SERVER_UP" != "true" && -f "$SCRIPT_DIR/kokoro-server.py" ]]; then
+    nohup "$PYTHON_BIN" "$SCRIPT_DIR/kokoro-server.py" "$KOKORO_PORT" >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+  fi
+  # Run synthesis — output path printed to stdout
+  RESULT=$("$PYTHON_BIN" "$SYNTH_SCRIPT" "$TEXT" "$VOICE" "$TEMP_WAV" "$SPEED" 2>&1) || {
+    echo "❌ Kokoro synthesis failed: $RESULT" >&2
+    exit 3
+  }
+fi
 
 if [[ ! -f "$TEMP_WAV" || ! -s "$TEMP_WAV" ]]; then
   echo "❌ Kokoro synthesis produced no audio" >&2

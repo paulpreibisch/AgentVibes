@@ -80,10 +80,28 @@ export PROJECT_ROOT  # Export for child scripts
 # Suppress audio when tests are running in a separate shell.
 # AGENTVIBES_TEST_MODE only propagates to child processes of the test runner;
 # external callers (e.g. Claude Code hooks) don't inherit it.
-# scripts/run-tests.sh writes this marker file so all play-tts.sh invocations —
+# scripts/run-tests.sh writes this marker file so play-tts.sh invocations —
 # regardless of which process spawns them — stay silent during test runs.
+# The marker is scoped: it lists the repo root(s) under test, and only callers
+# inside one are muted (an empty marker still mutes everything). Context = the
+# caller's cwd, this script's project root, and the --project-dir / env project.
 if [[ -f "${HOME}/.agentvibes-tests-running" ]]; then
-  exit 0
+  _av_ctx_project="${CLAUDE_PROJECT_DIR:-}"
+  _av_prev=""
+  for _av_a in "$@"; do
+    [[ "$_av_prev" == "--project-dir" ]] && _av_ctx_project="$_av_a"
+    _av_prev="$_av_a"
+  done
+  if [[ -f "$SCRIPT_DIR/tests-running-guard.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/tests-running-guard.sh"
+    if av_tests_running_mute "$PWD" "$PROJECT_ROOT" "$_av_ctx_project"; then
+      exit 0
+    fi
+  else
+    exit 0  # installed-tree skew: no guard helper -> legacy global mute
+  fi
+  unset _av_ctx_project _av_prev _av_a
 fi
 
 # Check if muted (persists across sessions)

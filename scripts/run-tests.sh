@@ -2,9 +2,9 @@
 # Test runner that suppresses AgentVibes TTS audio for the duration of the test suite.
 #
 # Default behaviour (no env vars):
-#   Creates $HOME/.agentvibes-tests-running so that play-tts.sh exits early even when
-#   called from a separate shell process (e.g. a Claude Code hook running concurrently).
-#   The marker file is removed on EXIT, so it is always cleaned up even when tests fail.
+#   Adds this repo's root to $HOME/.agentvibes-tests-running so that play-tts.sh exits
+#   early for callers inside this checkout, even from a separate shell process. Other
+#   projects keep speaking. The line is removed on EXIT, even when tests fail.
 #
 # Opt-in to audio during tests:
 #   AGENTVIBES_TEST_AUDIO=true npm test
@@ -23,9 +23,22 @@ if [[ "${AGENTVIBES_TEST_AUDIO:-false}" == "true" ]]; then
   echo "   Background track: $AGENTVIBES_TEST_TRACK"
 else
   MARKER="$HOME/.agentvibes-tests-running"
-  # shellcheck disable=SC2064
-  trap "rm -f '$MARKER'" EXIT
-  touch "$MARKER"
+  # Scoped mute: record THIS repo root, so only speech from inside it is silenced
+  # (tests-running-guard.sh). Concurrent runs each add and remove their own line;
+  # the file is deleted when the last run exits.
+  TEST_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+  _av_marker_cleanup() {
+    [[ -f "$MARKER" ]] || return 0
+    local rest
+    rest="$(grep -vxF -- "$TEST_ROOT" "$MARKER" 2>/dev/null || true)"
+    if [[ -n "${rest//[[:space:]]/}" ]]; then
+      printf '%s\n' "$rest" > "$MARKER"
+    else
+      rm -f "$MARKER"
+    fi
+  }
+  trap _av_marker_cleanup EXIT
+  printf '%s\n' "$TEST_ROOT" >> "$MARKER"
   # Belt-and-suspenders silencing during tests:
   #  - the marker file silences the shell hooks (play-tts.sh / play-tts.ps1);
   #  - AGENTVIBES_SUPPRESS_AUDIO silences the TUI's direct-spawn voice previews

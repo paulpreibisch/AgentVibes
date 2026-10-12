@@ -74,7 +74,28 @@ const IS_TEST = process.env.AGENTVIBES_TEST_MODE === 'true';
 // process is replaced with a silent no-op.
 function _suppressAudio() {
   if (process.env.AGENTVIBES_SUPPRESS_AUDIO === 'true') return true;
-  try { return fs.existsSync(path.join(os.homedir(), '.agentvibes-tests-running')); } catch { return false; }
+  try {
+    return testsRunningMute([process.cwd(), process.env.CLAUDE_PROJECT_DIR]);
+  } catch { return false; }
+}
+
+// Scoped "tests running" mute — JS twin of .claude/hooks/tests-running-guard.sh.
+// The marker lists the repo root(s) under test; only callers inside one are muted.
+// An empty marker (older runner) still mutes everything.
+function _normTestsPath(p) {
+  let s = String(p).replace(/\\/g, '/');
+  while (s.length > 1 && s.endsWith('/')) s = s.slice(0, -1);
+  const m = /^([A-Za-z]):(\/.*)?$/.exec(s);
+  if (m) s = `/${m[1]}${m[2] || ''}`;
+  return s.toLowerCase();
+}
+
+export function testsRunningMute(contextDirs, markerPath = path.join(os.homedir(), '.agentvibes-tests-running')) {
+  if (!fs.existsSync(markerPath)) return false;
+  const roots = fs.readFileSync(markerPath, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (roots.length === 0) return true;
+  const ctx = (contextDirs || []).filter(Boolean).map(_normTestsPath);
+  return roots.map(_normTestsPath).some((r) => ctx.some((c) => c === r || c.startsWith(`${r}/`)));
 }
 
 // A child_process-like stub that emits a clean exit on the next tick, so the
