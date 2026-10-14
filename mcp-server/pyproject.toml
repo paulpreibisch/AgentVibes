@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "mcp>=1.27,<2",
+    "mcp>=1.27,<3",
 ]
 
 [project.optional-dependencies]
