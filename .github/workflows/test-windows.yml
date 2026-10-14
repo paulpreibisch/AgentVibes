@@ -395,7 +395,7 @@ jobs:
       # native Windows too — the parity test only means something where the .ps1
       # players actually run.
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
